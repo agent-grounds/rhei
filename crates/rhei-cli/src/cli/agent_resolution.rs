@@ -140,26 +140,7 @@ fn resolve_legacy_agent_with_model(
 ) -> MietteResult<Option<ResolvedAgent>> {
     // §FS-rhei-agents.1.4: Agent/model resolution precedence.
     let model = select_legacy_model(state_def, settings, opts, model_override);
-
-    let model_profile = match model.as_deref() {
-        Some(id) => Some(settings.models.get(id).ok_or_else(|| {
-            let known = settings.models.keys().cloned().collect::<Vec<_>>();
-            // The file the project resolves, not the write path: a project on
-            // the deprecated home sent to the new one shadows its own settings.
-            // §FS-rhei-agents.1.1
-            miette!(
-                help = format!(
-                    "{}Add a `models.{id}` entry to {} or \
-                     ~/.config/rhei/settings.json, or drop the model selection.",
-                    did_you_mean(id, &known).map(|hint| format!("{hint} ")).unwrap_or_default(),
-                    settings.project_settings_file.relative_path()
-                ),
-                "model '{}' is not defined in settings.models",
-                id
-            )
-        })?),
-        None => None,
-    };
+    let model_profile = resolve_model_profile(settings, model.as_deref())?;
 
     let agent = select_legacy_agent(state_def, settings, opts, model_profile);
 
@@ -200,18 +181,7 @@ fn resolve_legacy_agent_with_model(
     }
 
     let binding = model_profile.and_then(|p| p.agents.get(agent.id()));
-
-    let timeout_secs = state_def
-        .and_then(|d| d.agent_timeout.as_deref())
-        .and_then(rhei_validator::parse_duration_secs)
-        .or_else(|| {
-            binding.and_then(|b| b.timeout.as_deref()).and_then(rhei_validator::parse_duration_secs)
-        })
-        .or_else(|| profile.timeout.as_deref().and_then(rhei_validator::parse_duration_secs))
-        .or_else(|| settings.agent_timeout.as_deref().and_then(rhei_validator::parse_duration_secs))
-        .or_else(|| {
-            settings.defaults.agent_timeout.as_deref().and_then(rhei_validator::parse_duration_secs)
-        });
+    let timeout_secs = resolve_legacy_agent_timeout(state_def, settings, &profile, binding);
 
     let model_provider = model_profile.and_then(|p| p.provider.clone());
     let model_name = model_profile.and_then(|p| p.model.clone()).or_else(|| model.clone());
@@ -311,11 +281,11 @@ fn resolve_agent_invocations_for_task(
                     model,
                 )?]);
             }
-            return Ok(resolve_legacy_agent_with_model(
+            return Ok(resolve_legacy_agent_with_task_model(
                 Some(state_def),
                 settings,
                 opts,
-                Some(model.to_string()),
+                model,
             )?
             .into_iter()
             .collect());

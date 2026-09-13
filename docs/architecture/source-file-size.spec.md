@@ -114,7 +114,7 @@ under `crates/rhei-cli/src/cli/`:
   `system_transition_execution` contain state-machine inspection, plan
   metadata, artifact contracts, and transition application.
 - `run_options`, `settings_types`, `settings_load_validate`,
-  `tooling_resolution`, `agent_resolution`,
+  `tooling_resolution`, `agent_resolution`, `agent_model_resolution`,
   `agent_command`, `agent_spawn`, and `programs` contain run configuration,
   settings merge/validation, tooling resolution, agent command construction,
   agent spawning, and program-state execution.

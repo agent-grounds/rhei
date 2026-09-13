@@ -1,9 +1,10 @@
 // §AR-source-file-size.3: directory workspaces — how one is loaded, validated,
 // and written back. Projects, diagnostics, `panta`, and `rhei init` are
 // siblings; shared fixtures live in `common.rs`.
-/// A path broken across lines cannot be copied, clicked, or grepped, and the
-/// CLI prints one in nearly every diagnostic. miette's defaults offered a
-/// break at every `/` and `-`; the handler installed in `main` removes them.
+/// A path broken across lines cannot be copied, clicked, or grepped. The
+/// slash-and-hyphen-heavy fixture keeps the selected spelling longer than the
+/// renderer's wrap width; the assertion must accept the shorter of its relative
+/// and absolute spellings, intact on one physical line. §FS-rhei-validate.4.2
 #[test]
 fn diagnostics_never_break_a_file_path_across_lines() {
     let root = unique_temp_dir("diag-long-path");
@@ -22,6 +23,20 @@ fn diagnostics_never_break_a_file_path_across_lines() {
     assert!(!output.status.success(), "the malformed plan must fail validation");
 
     let stderr = String::from_utf8_lossy(&output.stderr);
+    let invocation_dir = std::env::current_dir().expect("read test invocation directory");
+    let rendered_path = stderr
+        .lines()
+        .skip_while(|line| line.trim() != "│ in")
+        .nth(1)
+        .map(str::trim)
+        .and_then(|line| line.strip_prefix("│ "))
+        .expect("parse diagnostic should name its file after `in`");
+    eprintln!("invocation directory: {}", invocation_dir.display());
+    eprintln!("fixture root: {}", root.display());
+    eprintln!("absolute path ({} chars): {}", plan_path.as_os_str().len(), plan_path.display());
+    eprintln!("selected diagnostic path ({} chars): {rendered_path}", rendered_path.len());
+    eprintln!("validation exit: {:?}", output.status.code());
+    eprintln!("parse error present: {}", stderr.contains("PARSE ERROR"));
     let wanted = plan_path.display().to_string();
     assert!(
         stderr.lines().any(|line| line.contains(&wanted)),

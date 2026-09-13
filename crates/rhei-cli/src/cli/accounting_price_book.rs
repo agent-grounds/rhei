@@ -8,16 +8,18 @@ const PRICE_BOOK_ID: &str = "builtin-2026-05-20";
 const PRICE_UNIT_TOKENS: u64 = 1_000_000;
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(deny_unknown_fields)]
 struct PriceBook {
     schema: String,
     price_book_id: String,
     currency: String,
     entries: Vec<PriceBookEntry>,
+    /// Caller metadata retained through every durable copy but ignored by
+    /// price-book semantics. §FS-rhei-cost-accounting.5.1
+    #[serde(default, flatten, skip_serializing_if = "BTreeMap::is_empty")]
+    extensions: BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(deny_unknown_fields)]
 struct PriceBookEntry {
     provider: String,
     model: String,
@@ -27,6 +29,10 @@ struct PriceBookEntry {
     input_cached_read_micro: u64,
     input_cache_write_micro: u64,
     output_total_micro: u64,
+    /// Caller metadata retained through every durable copy but ignored by
+    /// matching and pricing. §FS-rhei-cost-accounting.5.1
+    #[serde(default, flatten, skip_serializing_if = "BTreeMap::is_empty")]
+    extensions: BTreeMap<String, serde_json::Value>,
 }
 
 fn builtin_price_entries() -> Vec<PriceBookEntry> {
@@ -39,6 +45,7 @@ fn builtin_price_entries() -> Vec<PriceBookEntry> {
         input_cached_read_micro: 300_000,
         input_cache_write_micro: 3_750_000,
         output_total_micro: 15_000_000,
+        extensions: BTreeMap::new(),
     }]
 }
 
@@ -48,6 +55,7 @@ fn builtin_price_book() -> PriceBook {
         price_book_id: PRICE_BOOK_ID.to_string(),
         currency: "USD".to_string(),
         entries: builtin_price_entries(),
+        extensions: BTreeMap::new(),
     }
 }
 

@@ -21,7 +21,9 @@ fn roots_price_book(input_total_micro: u64) -> PriceBook {
             input_cached_read_micro: input_total_micro / 10,
             input_cache_write_micro: input_total_micro * 5 / 4,
             output_total_micro: input_total_micro * 5,
+            extensions: BTreeMap::new(),
         }],
+        extensions: BTreeMap::new(),
     }
 }
 

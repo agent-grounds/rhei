@@ -12,7 +12,9 @@ fn custom_luna_price_book() -> PriceBook {
             input_cached_read_micro: 250_000,
             input_cache_write_micro: 4_000_000,
             output_total_micro: 10_000_000,
+            extensions: BTreeMap::new(),
         }],
+        extensions: BTreeMap::new(),
     }
 }
 

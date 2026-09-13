@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- **Price books now accept and preserve the extension metadata their published
+  v1 schema permits.** Additional document and entry properties retain their
+  JSON values in every participating run-owned copy without affecting price
+  selection, validation, coverage, or calculated amounts. (PR #257)
+
 - **The bundled authoring skills now resolve a built-in `rhei` project default
   the way the CLI does.** Their no-CLI guidance no longer lets a member-only
   `states.yaml` replace built-in `pending`/`completed` for an inheriting or

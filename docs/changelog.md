@@ -4,6 +4,14 @@
 
 ### Fixed
 
+- **The bundled authoring skills now resolve a built-in `rhei` project default
+  the way the CLI does.** Their no-CLI guidance no longer lets a member-only
+  `states.yaml` replace built-in `pending`/`completed` for an inheriting or
+  restating member. It retains project-root and standalone lookup for `rhei`,
+  and the unique member-root fallback for custom project defaults. Existing
+  copied skill installations can pick up the correction by rerunning
+  `rhei install-skills`. (PR #255)
+
 - **A member rhei can opt back into the built-in state machine when its project
   uses a custom default.** An explicit `**States:** rhei` now falls back to the
   built-in machine when the complete candidate-file lookup finds no matching

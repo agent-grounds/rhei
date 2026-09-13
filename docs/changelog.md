@@ -4,6 +4,13 @@
 
 ### Fixed
 
+- **A member rhei can opt back into the built-in state machine when its project
+  uses a custom default.** An explicit `**States:** rhei` now falls back to the
+  built-in machine when the complete candidate-file lookup finds no matching
+  definition, while a matching definition still wins and a missing custom
+  machine remains an error. Undeclared siblings continue to inherit the project
+  default. (PR #248)
+
 - **A failed `rhei next` claim now leaves its task unchanged and retryable.**
   Auto-advancing a task previously wrote the target state and counted-visit
   metadata before it wrote the assignee or transition ledger, so a later I/O

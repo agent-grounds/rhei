@@ -50,12 +50,13 @@ fn price_book_json() -> serde_json::Value {
 }
 
 fn write_price_book(dir: &Path) -> PathBuf {
-    let path = dir.join("luna-prices.json");
-    fs::write(
-        &path,
-        serde_json::to_string_pretty(&price_book_json()).expect("serialize price book"),
-    )
-    .expect("write price book");
+    write_price_book_value(dir, "luna-prices.json", &price_book_json())
+}
+
+fn write_price_book_value(dir: &Path, name: &str, price_book: &serde_json::Value) -> PathBuf {
+    let path = dir.join(name);
+    fs::write(&path, serde_json::to_string_pretty(price_book).expect("serialize price book"))
+        .expect("write price book");
     path
 }
 
@@ -152,13 +153,13 @@ fn assert_selected_pricing(root: &Path) {
     assert_eq!(invocation["pricing"]["priced_amount_micro"], 9_625_000);
 }
 
-fn assert_selected_book_copy(root: &Path) {
+fn assert_selected_book_copy(root: &Path, expected: &serde_json::Value) {
     let copied: serde_json::Value = serde_json::from_str(
         &fs::read_to_string(root.join("runtime/accounting/prices.json"))
             .unwrap_or_else(|err| panic!("read copied book under {}: {err}", root.display())),
     )
     .expect("parse copied price book");
-    assert_eq!(copied, price_book_json());
+    assert_eq!(&copied, expected);
 }
 
 /// A selected exact match prices measured dimensions with integer arithmetic,
@@ -178,7 +179,7 @@ fn sequential_run_prices_luna_with_the_selected_book() {
 
     assert_success(&result);
     assert_selected_pricing(&dir);
-    assert_selected_book_copy(&dir);
+    assert_selected_book_copy(&dir, &price_book_json());
     let summary: serde_json::Value = serde_json::from_str(
         &fs::read_to_string(dir.join("runtime/accounting/summary.json"))
             .expect("read accounting summary"),
@@ -188,6 +189,28 @@ fn sequential_run_prices_luna_with_the_selected_book() {
     assert_eq!(summary["summary"]["priced_cost_micro"], 9_625_000);
     assert_eq!(summary["summary"]["pricing_status"], "priced");
     assert_eq!(summary["summary"]["coverage"], "complete");
+}
+
+/// A document-only scalar extension is accepted and copied without changing
+/// the price produced by the same metadata-free rates.
+// §FS-rhei-cost-accounting.5.1
+#[test]
+fn sequential_run_preserves_document_metadata_without_changing_pricing() {
+    let dir = unique_temp_dir("custom-prices-document-metadata");
+    let plan = write_fixture_file(&dir, "plan.rhei.md", ONE_TASK_PLAN);
+    let machine = write_fixture_file(&dir, "states.yaml", PRICED_MACHINE);
+    let mut expected = price_book_json();
+    expected["source"] = serde_json::json!("vendor-rate-card");
+    let prices = write_price_book_value(&dir, "document-metadata.json", &expected);
+    write_measured_codex_settings(&dir, None);
+    let prices_arg = prices.to_string_lossy().into_owned();
+
+    let result =
+        run_cli("run", &plan, &machine, &["--no-tui", "--no-callbacks", "--prices", &prices_arg]);
+
+    assert_success(&result);
+    assert_selected_book_copy(&dir, &expected);
+    assert_selected_pricing(&dir);
 }
 
 /// The same in-memory selection reaches parallel workers, and a project run
@@ -211,7 +234,12 @@ fn parallel_project_run_uses_one_selected_book_in_every_root() {
     fs::write(project.join("index.panta.md"), "# Panta: Priced Project\n")
         .expect("write project manifest");
     let machine = write_fixture_file(&dir, "states.yaml", PRICED_MACHINE);
-    let prices = write_price_book(&dir);
+    let mut expected = price_book_json();
+    expected["entries"][0]["constraints"] = serde_json::json!({
+        "service_tier": "standard",
+        "context_tokens": 200_000
+    });
+    let prices = write_price_book_value(&dir, "entry-metadata.json", &expected);
     write_measured_codex_settings(&project, None);
     let prices_arg = prices.to_string_lossy().into_owned();
 
@@ -223,10 +251,10 @@ fn parallel_project_run_uses_one_selected_book_in_every_root() {
     );
 
     assert_success(&result);
-    assert_selected_book_copy(&project);
+    assert_selected_book_copy(&project, &expected);
     for member in ["alpha", "beta"] {
         let root = project.join(member);
-        assert_selected_book_copy(&root);
+        assert_selected_book_copy(&root, &expected);
         assert_selected_pricing(&root);
     }
 }
@@ -274,7 +302,10 @@ fn successive_run_rejects_mixed_currency_before_any_root_changes() {
     fs::write(project.join("index.panta.md"), "# Panta: Priced Project\n")
         .expect("write project manifest");
     let machine = write_fixture_file(&dir, "states.yaml", PRICED_MACHINE);
-    let prices = write_price_book(&dir);
+    let mut expected = price_book_json();
+    expected["entries"][0]["note"] =
+        serde_json::json!("Rate confirmed against the vendor price page");
+    let prices = write_price_book_value(&dir, "reported-note.json", &expected);
     write_measured_codex_settings(&project, None);
     let prices_arg = prices.to_string_lossy().into_owned();
 
@@ -285,8 +316,8 @@ fn successive_run_rejects_mixed_currency_before_any_root_changes() {
         &["--no-tui", "--no-callbacks", "--rhei", "beta", "--prices", &prices_arg],
     );
     assert_success(&first);
-    assert_selected_book_copy(&project);
-    assert_selected_book_copy(&project.join("beta"));
+    assert_selected_book_copy(&project, &expected);
+    assert_selected_book_copy(&project.join("beta"), &expected);
     assert_selected_pricing(&project.join("beta"));
     assert!(!project.join("alpha/runtime/accounting").exists());
 

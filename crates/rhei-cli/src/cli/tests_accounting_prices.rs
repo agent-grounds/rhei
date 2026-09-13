@@ -16,6 +16,107 @@ fn custom_luna_price_book() -> PriceBook {
     }
 }
 
+fn custom_luna_price_book_json() -> serde_json::Value {
+    serde_json::to_value(custom_luna_price_book()).expect("serialize fixture price book")
+}
+
+fn fixture_pricing(price_book: &PriceBook) -> AccountingPricing {
+    let tokens = tokens_from_usage(ExtractedUsage {
+        input_total: Some(1_250_000),
+        input_cached_read: Some(500_000),
+        input_cache_write: Some(250_000),
+        output_total: Some(750_000),
+        ..ExtractedUsage::default()
+    });
+    price_tokens(price_book, Some("openai"), Some("gpt-5.6-luna"), &tokens)
+}
+
+fn write_price_book_json(path: &Path, price_book: &serde_json::Value) {
+    std::fs::write(
+        path,
+        serde_json::to_string_pretty(price_book).expect("serialize JSON fixture"),
+    )
+    .expect("write JSON fixture");
+}
+
+#[test]
+fn accounting_prices_document_extensions_round_trip_as_json_and_do_not_affect_pricing() {
+    // §FS-rhei-cost-accounting.5.1: document metadata keeps its JSON values
+    // through the validated writer and durable reload, outside pricing.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let source = dir.path().join("document-metadata.json");
+    let mut extended = custom_luna_price_book_json();
+    let metadata = serde_json::json!({
+        "source_text": "vendor rate card",
+        "tags": ["verified", 2026],
+        "provenance": {"publisher": "OpenAI", "tier": "standard"},
+        "enabled": true,
+        "revision": 7,
+        "expires": null
+    });
+    extended.as_object_mut().expect("book object").extend(
+        metadata.as_object().expect("metadata object").clone(),
+    );
+    write_price_book_json(&source, &extended);
+
+    let loaded = load_price_book(&source).expect("document metadata must be accepted");
+    let copied_root = dir.path().join("runtime/accounting");
+    write_price_book(&copied_root, &loaded).expect("write selected price book");
+    let copied_path = copied_root.join("prices.json");
+    let copied: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(&copied_path).expect("read selected price book"),
+    )
+    .expect("parse selected price book");
+    for (key, expected) in metadata.as_object().expect("metadata object") {
+        assert_eq!(&copied[key], expected, "document metadata {key}");
+    }
+    let reloaded = load_price_book(&copied_path).expect("reload durable price book");
+    assert_eq!(
+        serde_json::to_value(fixture_pricing(&reloaded)).expect("serialize reloaded pricing"),
+        serde_json::to_value(fixture_pricing(&custom_luna_price_book()))
+            .expect("serialize baseline pricing")
+    );
+}
+
+#[test]
+fn accounting_prices_entry_extensions_round_trip_as_json_and_do_not_affect_pricing() {
+    // §FS-rhei-cost-accounting.5.1: entry metadata, including the reported
+    // `note` member, is preserved but cannot affect matching or cost.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let source = dir.path().join("entry-metadata.json");
+    let mut extended = custom_luna_price_book_json();
+    let metadata = serde_json::json!({
+        "note": "Rate confirmed against the vendor price page",
+        "tiers": ["standard", "batch"],
+        "constraints": {"context_tokens": 200000, "region": null},
+        "discounted": false,
+        "minimum_context": 1024,
+        "superseded_by": null
+    });
+    extended["entries"][0].as_object_mut().expect("entry object").extend(
+        metadata.as_object().expect("metadata object").clone(),
+    );
+    write_price_book_json(&source, &extended);
+
+    let loaded = load_price_book(&source).expect("entry metadata must be accepted");
+    let copied_root = dir.path().join("runtime/accounting");
+    write_price_book(&copied_root, &loaded).expect("write selected price book");
+    let copied_path = copied_root.join("prices.json");
+    let copied: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(&copied_path).expect("read selected price book"),
+    )
+    .expect("parse selected price book");
+    for (key, expected) in metadata.as_object().expect("metadata object") {
+        assert_eq!(&copied["entries"][0][key], expected, "entry metadata {key}");
+    }
+    let reloaded = load_price_book(&copied_path).expect("reload durable price book");
+    assert_eq!(
+        serde_json::to_value(fixture_pricing(&reloaded)).expect("serialize reloaded pricing"),
+        serde_json::to_value(fixture_pricing(&custom_luna_price_book()))
+            .expect("serialize baseline pricing")
+    );
+}
+
 #[test]
 fn custom_price_book_prices_luna_usage_and_complete_rollup() {
     // §FS-rhei-cost-accounting.5.1: the selected book's exact match, id,
@@ -117,6 +218,48 @@ fn custom_price_book_rejects_wrong_schema_with_its_path() {
 
     assert!(error.contains(path.to_string_lossy().as_ref()), "got: {error}");
     assert!(error.contains("unsupported schema"), "got: {error}");
+}
+
+#[test]
+fn accounting_prices_known_fields_remain_authoritative() {
+    // §FS-rhei-cost-accounting.5.1: accepting metadata does not relax the
+    // required shape, known string values, integer rates, unit, or uniqueness.
+    let baseline = custom_luna_price_book_json();
+    let mut cases: Vec<(&str, serde_json::Value, &str)> = Vec::new();
+
+    let mut missing = baseline.clone();
+    missing.as_object_mut().expect("book object").remove("entries");
+    cases.push(("missing-required", missing, "missing field `entries`"));
+
+    for (label, pointer, expected) in [
+        ("empty-id", "/price_book_id", "price_book_id must not be empty"),
+        ("empty-currency", "/currency", "currency must not be empty"),
+        ("empty-provider", "/entries/0/provider", "provider and model must not be empty"),
+        ("empty-model", "/entries/0/model", "provider and model must not be empty"),
+        ("empty-time", "/entries/0/effective_at", "effective_at must not be empty"),
+        ("wrong-unit", "/entries/0/unit", "unsupported unit"),
+    ] {
+        let mut value = baseline.clone();
+        *value.pointer_mut(pointer).expect("known fixture pointer") = serde_json::json!("");
+        cases.push((label, value, expected));
+    }
+
+    let mut non_integer = baseline.clone();
+    non_integer["entries"][0]["input_total_micro"] = serde_json::json!("2000000");
+    cases.push(("non-integer-rate", non_integer, "invalid type"));
+
+    let mut duplicate = baseline;
+    let duplicate_entry = duplicate["entries"][0].clone();
+    duplicate["entries"].as_array_mut().expect("entries array").push(duplicate_entry);
+    cases.push(("duplicate-match", duplicate, "duplicate provider/model entry"));
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    for (label, value, expected) in cases {
+        let path = dir.path().join(format!("{label}.json"));
+        write_price_book_json(&path, &value);
+        let error = load_price_book(&path).expect_err(label).to_string();
+        assert!(error.contains(expected), "{label}: expected {expected:?} in {error:?}");
+    }
 }
 
 #[test]

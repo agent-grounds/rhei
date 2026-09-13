@@ -264,23 +264,37 @@ fn dynamic_completion_filters_instantiate_templates_by_prefix() {
 }
 
 #[test]
-fn dynamic_completion_uses_nearest_project_template_root() {
+fn template_ancestor_discovery_completion_crosses_project_markers() {
     let home = unique_temp_dir("completions-template-nearest-home");
     let outer = unique_temp_dir("completions-template-nearest-outer");
-    fs::create_dir_all(outer.join(".git")).expect("create outer marker");
+    write_project_template(&outer, "ancestor-review", "Ancestor review template");
     let dir = outer.join("project");
     fs::create_dir_all(&dir).expect("create nested project");
-    write_project_template(&dir, "alpha-review", "Alpha review template");
+    fs::create_dir_all(dir.join(".git")).expect("create nested Git marker");
+    write_fixture_file(&dir, "index.panta.md", "# Panta: Marker fixture\n");
+    write_project_template(&dir, "member-plan", "Member plan template");
 
-    let result = run_dynamic_completion(&dir, &home, "fish", &["--", "rhei", "instantiate", ""]);
+    let member =
+        run_dynamic_completion(&dir, &home, "fish", &["--", "rhei", "instantiate", "member"]);
+    let ancestor =
+        run_dynamic_completion(&dir, &home, "fish", &["--", "rhei", "instantiate", "ancestor"]);
 
     assert!(
-        result.status.success(),
-        "template completion should succeed\nstdout:\n{}\nstderr:\n{}",
-        result.stdout,
-        result.stderr
+        member.status.success() && ancestor.status.success(),
+        "template completion should succeed\nmember stderr:\n{}\nancestor stderr:\n{}",
+        member.stderr,
+        ancestor.stderr
     );
-    assert!(result.stdout.contains("alpha-review\tAlpha review template"));
+    assert!(
+        member.stdout.contains("member-plan\tMember plan template"),
+        "the nearer completion must remain visible; stdout was:\n{}",
+        member.stdout
+    );
+    assert!(
+        ancestor.stdout.contains("ancestor-review\tAncestor review template"),
+        "Git and Panta markers must not stop ancestor template completion; stdout was:\n{}",
+        ancestor.stdout
+    );
 }
 
 #[test]

@@ -111,37 +111,37 @@ fn agent_grounds_shadows_the_deprecated_home_and_lists_the_template_once() {
 }
 
 /// §FS-rhei-templates.1.2: the walk checks both names at each level before
-/// ascending, so the enclosing directory wins whichever name it uses. Two full
-/// walks — one per name — would resolve the parent here and break
-/// nearest-directory-wins.
+/// ascending, so a nearer deprecated copy beats a farther current copy of the
+/// same name. Two full walks — one per home name — would reverse this order.
 #[test]
-fn the_ancestor_walk_prefers_the_nearest_home_whichever_name_it_has() {
+fn template_ancestor_discovery_nearer_deprecated_shadows_farther_current() {
     let dir = unique_temp_dir("grounds-templates-walk");
-    write_template(&dir.join(GROUNDS_TEMPLATES), "parent-template", "Held by the parent");
+    write_template(&dir.join(GROUNDS_TEMPLATES), "shared", "Farther current copy");
     let child = dir.join("child");
     std::fs::create_dir_all(&child).expect("create child directory");
-    write_template(&child.join(DEPRECATED_TEMPLATES), "child-template", "Held by the child");
+    write_template(&child.join(DEPRECATED_TEMPLATES), "shared", "Nearer legacy copy");
 
     let result = run_in(&["templates", "--source", "project"], &child, &dir.join("home"));
     assert_success(&result);
     assert!(
-        result.stdout.contains("child-template"),
-        "the nearest home wins even under the deprecated name; stdout was:\n{}",
+        result.stdout.contains("Nearer legacy copy"),
+        "the nearest copy wins even under the deprecated name; stdout was:\n{}",
         result.stdout
     );
     assert!(
-        !result.stdout.contains("parent-template"),
-        "a distant ancestor must not beat the enclosing directory; stdout was:\n{}",
+        !result.stdout.contains("Farther current copy"),
+        "a farther current copy must stay shadowed; stdout was:\n{}",
         result.stdout
     );
+    assert_eq!(result.stdout.matches("shared  1.0.0").count(), 1, "stdout was:\n{}", result.stdout);
     assert_deprecation_warning(&result, &child, DEPRECATED_TEMPLATES, GROUNDS_TEMPLATES);
 }
 
-/// §FS-rhei-templates.1.2: the same rule from the other side — a nearer
-/// `.agent-grounds` home beats a farther `.agents` one, and nothing is read
-/// from the ancestor's deprecated home to warn about.
+/// §FS-rhei-templates.1.2: distinct names aggregate across ancestor levels and
+/// both home names. Reading the farther deprecated copy warns even though a
+/// nearer current templates directory exists.
 #[test]
-fn the_ancestor_walk_stops_at_the_nearest_agent_grounds_home() {
+fn template_ancestor_discovery_aggregates_distinct_names_from_both_homes() {
     let dir = unique_temp_dir("grounds-templates-walk-new");
     write_template(&dir.join(DEPRECATED_TEMPLATES), "parent-template", "Held by the parent");
     let child = dir.join("child");
@@ -156,11 +156,11 @@ fn the_ancestor_walk_stops_at_the_nearest_agent_grounds_home() {
         result.stdout
     );
     assert!(
-        !result.stdout.contains("parent-template"),
-        "the walk must stop at the nearest level, not carry on to the old name; stdout was:\n{}",
+        result.stdout.contains("parent-template"),
+        "the walk must continue and aggregate the ancestor's distinct name; stdout was:\n{}",
         result.stdout
     );
-    assert_silent_about_the_deprecated_home(&result);
+    assert_deprecation_warning(&result, &dir, DEPRECATED_TEMPLATES, GROUNDS_TEMPLATES);
 }
 
 /// §FS-rhei-templates.1: the tool states its own search path, so the new home
@@ -252,7 +252,7 @@ fn user_template_under_the_deprecated_home_is_found_and_warned() {
     );
 }
 
-/// §FS-rhei-templates.1.2: the level the walk settles on contributes both
+/// §FS-rhei-templates.1.2: a level holding either directory contributes both
 /// names, whether or not both are directories. The `Searched:` listing is where
 /// an author about to write their first project template reads where it goes,
 /// and a level found by its `.agents` directory alone must not advertise the

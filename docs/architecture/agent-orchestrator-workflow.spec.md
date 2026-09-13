@@ -273,6 +273,17 @@ its open handle, which closes on ordinary release or process exit. Keeping the
 pathname stable prevents cleanup from installing a second lock identity while
 a prior handle is still held.
 
+The central transition ledger uses the same stable-identity rule across
+replacement of both its data file and its containing runtime directory. Its
+sidecar is `<execution-root>/runtime.state-transitions.log.lock`, outside the
+replaceable `runtime/` tree. A writer locks that sidecar before it creates
+`runtime/` or opens `runtime/state-transitions.log`, then opens the current data
+pathname after acquisition. Reset takes the same sidecar before reading,
+pruning, replacing, or removing the ledger and retains it while a full reset
+removes the runtime tree. The sidecar remains after reset, so a waiter that
+started before cleanup cannot append through an unlinked ledger or acquire a
+replacement synchronization identity. [§FS-rhei-reset.3](../functional-spec/rhei-reset.spec.md#3-safety)
+
 Writers use one order: metadata sidecar, then a distinct task-file sidecar,
 then the transition ledger. They release in reverse order. A single-file plan
 uses its one sidecar for both metadata and task content. Creation treats its
@@ -282,6 +293,13 @@ recovery releases the ledger and plan sidecars before it invokes a separate
 ordinary transition. The destination-file handle used for mandatory-lock
 platform compatibility may be released to permit an atomic rename, but the
 sidecar remains held through commitment or restoration.
+
+Reset applies that order across the whole selected scope: it sorts and
+deduplicates metadata paths, then distinct task paths, then ledger roots. It
+holds every acquired sidecar while it re-reads authoritative plan and ledger
+paths, restores plan state and ownership, and completes scoped pruning or full
+runtime removal. This makes an ordinary writer run wholly before or wholly
+after the reset persistence boundary. [§FS-rhei-reset.3](../functional-spec/rhei-reset.spec.md#3-safety)
 
 ### 3.4. Durable State and Git Boundary
 

@@ -151,6 +151,8 @@ include!("cli/snapshot_runtime_preload.rs");
 include!("cli/task_metadata_lines.rs");
 include!("cli/next_command.rs");
 include!("cli/reset_authored_states.rs");
+include!("cli/reset_locks.rs");
+include!("cli/reset_runtime_cleanup.rs");
 include!("cli/complete_reset_commands.rs");
 include!("cli/complete_reset_rewrites.rs");
 include!("cli/file_locks.rs");
@@ -179,6 +181,7 @@ mod tests {
     include!("cli/tests_file_locks.rs");
     include!("cli/tests_claim_transaction.rs");
     include!("cli/tests_claim_writer_exclusion.rs");
+    include!("cli/tests_reset_writer_exclusion.rs");
     include!("cli/tests_claim_revalidation.rs");
     include!("cli/tests_headless_console_log.rs");
     include!("cli/tests_agent_resolution.rs");

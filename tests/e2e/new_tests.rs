@@ -272,11 +272,12 @@ fn workspace_tickets_get_their_own_task_file_and_subtasks_join_it() {
     assert!(contents.starts_with("### Task 1: Dunning emails\n"));
     // A task file owns a subtree. §FS-rhei-new.3.1
     assert!(contents.contains("#### Task 1.1: Retry schedule\n"));
-    assert_eq!(
-        fs::read_dir(dir.join("billing/tasks")).expect("tasks dir").count(),
-        1,
-        "a subtask must not become a second file"
-    );
+    let authored_task_files = fs::read_dir(dir.join("billing/tasks"))
+        .expect("tasks dir")
+        .map(|entry| entry.expect("task directory entry"))
+        .filter(|entry| entry.path().extension().is_some_and(|extension| extension == "md"))
+        .count();
+    assert_eq!(authored_task_files, 1, "a subtask must not become a second authored file");
 }
 
 /// §FS-rhei-panta.2: the basin is created on demand and has no authored index.

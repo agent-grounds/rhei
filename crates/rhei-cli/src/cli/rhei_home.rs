@@ -107,10 +107,15 @@ fn ancestor_template_roots_from_levels<'a>(
     user_home: Option<&Path>,
 ) -> Vec<RheiHomePath> {
     let user_roots = user_home.map(|home| rhei_home_paths(home, "templates"));
+    let user_root_reals: Option<[PathBuf; 2]> =
+        user_roots.as_ref().map(|roots| [real_path(roots[0].path()), real_path(roots[1].path())]);
+    // `cwd`'s ancestors resolve symlinks (`getcwd`'s physical path) while
+    // `$HOME` is read literally, so a symlinked temp root (macOS's
+    // `/var` -> `/private/var`) breaks a lexical identity check. §FS-rhei-templates.1.2
     let is_user_root = |candidate: &RheiHomePath| {
-        user_roots
+        user_root_reals
             .as_ref()
-            .is_some_and(|roots| roots.iter().any(|root| root.path() == candidate.path()))
+            .is_some_and(|reals| reals.iter().any(|root| *root == real_path(candidate.path())))
     };
     let roots = levels
         .into_iter()
@@ -126,6 +131,13 @@ fn ancestor_template_roots_from_levels<'a>(
     } else {
         roots
     }
+}
+
+/// `path`, symlink-resolved when that succeeds. Comparing this form is what
+/// lets the exact-user-root check survive a symlinked temp root; callers keep
+/// using the original, unresolved path everywhere else. §FS-rhei-templates.1.2
+fn real_path(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 /// Whether this process still owes a warning about `read`, taking the debt when
@@ -251,5 +263,30 @@ mod template_root_order_tests {
             Some(home.as_path()),
         );
         assert!(excluded.is_empty(), "fallback must not reinsert either exact user root");
+    }
+
+    /// A symlinked ancestor level must still match the exact user root reached
+    /// through its real path — the mismatch a lexical comparison would miss on
+    /// a platform whose temp root is itself a symlink (macOS's `/var`). §FS-rhei-templates.1.2
+    #[test]
+    #[cfg(unix)]
+    fn template_ancestor_fallback_excludes_a_user_root_reached_through_a_symlinked_level() {
+        let temp = tempfile::tempdir().expect("create symlink fixture");
+        let real_home = temp.path().join("real-home");
+        for root in rhei_home_paths(&real_home, "templates") {
+            std::fs::create_dir_all(root.path()).expect("create user template root");
+        }
+        let linked_home = temp.path().join("linked-home");
+        std::os::unix::fs::symlink(&real_home, &linked_home).expect("create home symlink");
+
+        let excluded = ancestor_template_roots_from_levels(
+            [linked_home.as_path()],
+            &real_home,
+            Some(real_home.as_path()),
+        );
+        assert!(
+            excluded.is_empty(),
+            "the level reached through a symlink must still resolve to the exact user root: {excluded:?}"
+        );
     }
 }

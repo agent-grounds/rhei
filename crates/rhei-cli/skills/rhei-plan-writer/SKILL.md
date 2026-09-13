@@ -74,11 +74,14 @@ lookup location shown above; without one, use that same built-in machine and its
 `pending`/`completed` states. In particular, a member that inherits or restates
 a Panta project default named `rhei` cannot replace it with a member-root file.
 
-For a non-`rhei` declaration, a member's own declaration that differs from the
-project default checks its execution root first. Otherwise check the Panta
-project root; if it is absent or names a different machine, use a matching file
-from the rhei roots only when exactly one exists. Multiple matches are an error,
-as is an unreadable candidate. No other automatic location is searched
+For a non-`rhei` declaration outside a Panta project, use a matching sibling
+`states.yaml` for a single-file plan or a matching `states.yaml` at a Directory
+Workspace root. In a Panta project, a member's own declaration that differs
+from the project default checks its execution root first. Otherwise check the
+Panta project root; if it is absent or names a different machine, use a matching
+file from the rhei roots only when exactly one exists. A missing match, multiple
+matches, or an unreadable candidate is an error. No other automatic location is
+searched
 ([§FS-rhei-plan-language.1.3](../../../../docs/functional-spec/rhei-plan-language.spec.md#13-state-machine-resolution)).
 
 Each node's initial state comes from the machine's `profiles.<name>.initial` via `node_policy` — **not** from a state-level `initial: true` flag. In the built-in `rhei` machine the initial state is `pending`, so every task in a new plan under that machine starts in `pending`.

@@ -561,3 +561,14 @@ until = "A follow-up defines child declarations for the tutorial and data-model 
 reason = """
 The plan-language declaration has no approved split map for separating its tutorial, grammar, and data-model sections while preserving their live section IDs and inbound citations; this issue must extend the owning FS-rhei-plan-language.1.3 point in place.
 """
+
+[[exceptions]]
+path = "crates/rhei-cli/src/cli/templates_discovery.rs"
+match = "exact"
+rules = ["source"]
+kind = "deferred"
+max_accepted = { value = 800, unit = "lines" }
+until = "template discovery is decomposed into cohesive root-order, listing, and named-resolution modules"
+reason = """
+No stable module boundary separates root ordering from discovery consumers; extracting this call site alone would create a one-function fragment.
+"""

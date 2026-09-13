@@ -84,24 +84,22 @@ fn resolve_rhei_home_file(base: &Path, leaf: &str) -> Option<RheiHomePath> {
     rhei_home_paths(base, leaf).into_iter().find(|candidate| candidate.path.is_file())
 }
 
-/// The nearest level at or above `start` holding either name. Both names are
-/// checked at each level *before* ascending: two full walks, one per name,
-/// would let a distant ancestor's `.agent-grounds` directory beat the enclosing
-/// repository's `.agents` one and break nearest-directory-wins.
-///
-/// The level is what is returned, not the directories it holds: a caller that
-/// searches it also has to be able to *name* both of its names, and a level
-/// found by its `.agents` directory alone would otherwise be reported as the
-/// only place a template can go. §FS-rhei-templates.1.2
-fn nearest_rhei_home_level(start: &Path, leaf: &str) -> Option<PathBuf> {
-    let mut dir = Some(start);
-    while let Some(current) = dir {
-        if !existing_rhei_home_dirs(current, leaf).is_empty() {
-            return Some(current.to_path_buf());
-        }
-        dir = current.parent();
+/// Every ancestor level holding either template-home name, nearest first. Each
+/// contributing level includes both names in current-then-deprecated order. A
+/// walk with no such level uses `fallback` for empty-search diagnostics.
+/// Filesystem, Git, and Panta boundaries do not stop the ancestor walk.
+/// §FS-rhei-templates.1.2
+fn ancestor_template_roots(start: &Path, fallback: &Path) -> Vec<RheiHomePath> {
+    let roots = start
+        .ancestors()
+        .filter(|level| !existing_rhei_home_dirs(level, "templates").is_empty())
+        .flat_map(|level| rhei_home_paths(level, "templates"))
+        .collect::<Vec<_>>();
+    if roots.is_empty() {
+        rhei_home_paths(fallback, "templates").into_iter().collect()
+    } else {
+        roots
     }
-    None
 }
 
 /// Whether this process still owes a warning about `read`, taking the debt when

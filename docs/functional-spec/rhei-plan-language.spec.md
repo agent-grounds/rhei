@@ -222,8 +222,9 @@ State-machine resolution is normative for all commands:
    project `states.yaml` files are ignored in this case.
 4. When `**States:** rhei` is declared and no override is supplied, a matching
    auto-discovered `states.yaml` named `rhei` may be used from the same lookup
-   location that would serve a non-`rhei` declaration; otherwise the plan falls
-   back to the built-in `rhei` state machine.
+   location that would serve a non-`rhei` declaration; otherwise — including for
+   a member whose Panta default names a different machine — the plan falls back
+   to the built-in `rhei` state machine.
 5. When a non-`rhei` `**States:** <name>` is declared and no override is
    supplied, the CLI resolves the file from a sibling `states.yaml` for a
    single-file plan, from `<workspace>/states.yaml` for a Directory Workspace,

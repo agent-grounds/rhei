@@ -255,12 +255,18 @@ impl ResolvedMachineSet {
     /// wrong one for at least one of the rheis it claims.
     // §FS-rhei-states-cmd.3: one rendered block per genuinely distinct machine.
     fn machine_groups(&self) -> Vec<MachineGroup<'_>> {
+        let default_fingerprint = self.default.machine.fingerprint();
         let mut out = vec![(
-            self.default.machine.fingerprint(),
+            default_fingerprint.clone(),
             MachineGroup { resolved: &self.default, rheis: Vec::new() },
         )];
         for (rhei_id, resolved) in &self.per_rhei {
             let fingerprint = resolved.machine.fingerprint();
+            // A same-source resolution is already represented by the project
+            // default; keep that whole-project block unqualified. §FS-rhei-states-cmd.3
+            if fingerprint == default_fingerprint && resolved.path == self.default.path {
+                continue;
+            }
             match out.iter_mut().find(|(seen, _)| *seen == fingerprint) {
                 Some((_, group)) => group.rheis.push(rhei_id.as_str()),
                 None => out.push((

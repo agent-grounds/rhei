@@ -23,50 +23,79 @@ fn reset_runtime_preview(loaded: &LoadedPlan, input: &Path, scope: &RheiScope) -
     dirs
 }
 
+/// The one authoritative reset decision used for preview, mutation, cleanup,
+/// and summary while the complete writer stack remains held.
+// §FS-rhei-reset.1.2 §FS-rhei-reset.4
+struct ResetDecision {
+    scope: RheiScope,
+    task_count: usize,
+    descendant_count: usize,
+    authored: AuthoredStates,
+    runtime_targets: Vec<PathBuf>,
+}
+
+fn collect_reset_decision(
+    loaded: &LoadedPlan,
+    input: &Path,
+    scope: &RheiScope,
+    machines: &rhei_validator::MachineSet,
+) -> ResetDecision {
+    fn count_nodes(task: &rhei_core::ast::Task) -> usize {
+        1 + task.children.iter().map(count_nodes).sum::<usize>()
+    }
+
+    let in_scope: Vec<&rhei_core::ast::Task> = loaded
+        .rhei
+        .tasks
+        .iter()
+        .filter(|task| task_in_rhei_scope(scope, &task.id.to_string()))
+        .collect();
+    let task_count = in_scope.len();
+    let total_nodes: usize = in_scope.iter().map(|task| count_nodes(task)).sum();
+
+    ResetDecision {
+        scope: scope.clone(),
+        task_count,
+        descendant_count: total_nodes.saturating_sub(task_count),
+        authored: collect_authored_states(loaded, input, scope, machines),
+        runtime_targets: reset_runtime_preview(loaded, input, scope),
+    }
+}
+
 /// Describe what a reset is about to destroy, and which tasks it would move.
 /// The preview and the summary print the same move list, so what the dry run
 /// promises and what the reset reports are the same text. §FS-rhei-reset.4
-fn report_reset_preview(
-    task_count: usize,
-    descendant_count: usize,
-    authored: &AuthoredStates,
-    runtime_dirs: &[PathBuf],
-) {
-    if descendant_count == 0 {
-        println!("Would reset {task_count} task(s) to their authored states.");
+fn report_reset_preview(decision: &ResetDecision) {
+    if decision.descendant_count == 0 {
+        println!("Would reset {} task(s) to their authored states.", decision.task_count);
     } else {
         println!(
-            "Would reset {task_count} task(s) and {descendant_count} subtask(s) to their \
-             authored states."
+            "Would reset {} task(s) and {} subtask(s) to their authored states.",
+            decision.task_count, decision.descendant_count
         );
     }
-    report_state_moves(authored, "Would move");
-    if runtime_dirs.is_empty() {
+    report_state_moves(&decision.authored, "Would move");
+    if decision.runtime_targets.is_empty() {
         println!("Would remove per-ticket runtime artifacts (results, ledgers).");
     } else {
         println!("Would delete, with every result and ledger inside:");
-        for dir in runtime_dirs {
+        for dir in &decision.runtime_targets {
             println!("  {}", dir.display());
         }
     }
 }
 
 /// §FS-rhei-reset.4
-fn report_reset_summary(
-    task_count: usize,
-    descendant_count: usize,
-    authored: &AuthoredStates,
-    removed_runtime: bool,
-) {
-    if descendant_count == 0 {
-        println!("Reset {task_count} task(s) to their authored states.");
+fn report_reset_summary(decision: &ResetDecision, removed_runtime: bool) {
+    if decision.descendant_count == 0 {
+        println!("Reset {} task(s) to their authored states.", decision.task_count);
     } else {
         println!(
-            "Reset {task_count} task(s) (and {descendant_count} descendant task(s)) to their \
-             authored states."
+            "Reset {} task(s) (and {} descendant task(s)) to their authored states.",
+            decision.task_count, decision.descendant_count
         );
     }
-    report_state_moves(authored, "Moved");
+    report_state_moves(&decision.authored, "Moved");
     if removed_runtime {
         println!("Removed runtime output.");
     } else {

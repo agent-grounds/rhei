@@ -297,9 +297,16 @@ sidecar remains held through commitment or restoration.
 Reset applies that order across the whole selected scope: it sorts and
 deduplicates metadata paths, then distinct task paths, then ledger roots. It
 holds every acquired sidecar while it re-reads authoritative plan and ledger
-paths, restores plan state and ownership, and completes scoped pruning or full
-runtime removal. This makes an ordinary writer run wholly before or wholly
-after the reset persistence boundary. [§FS-rhei-reset.3](../functional-spec/rhei-reset.spec.md#3-safety)
+paths, collects and prints the destructive preview, waits for confirmation,
+restores plan state and ownership, and completes scoped pruning or full runtime
+removal. The preview, cleanup, and success summary use that one locked decision
+snapshot. Cancellation and refusal release the stack without reset mutation;
+errors and success release it through the same ownership lifetime. This makes
+an ordinary writer run wholly before the preview or after the reset persistence
+boundary, never between consent and destruction.
+[§FS-rhei-reset.1.2](../functional-spec/rhei-reset.spec.md#12-confirmation)
+[§FS-rhei-reset.3](../functional-spec/rhei-reset.spec.md#3-safety)
+[§FS-rhei-reset.4](../functional-spec/rhei-reset.spec.md#4-output)
 
 ### 3.4. Durable State and Git Boundary
 

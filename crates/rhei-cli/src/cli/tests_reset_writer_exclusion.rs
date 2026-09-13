@@ -29,41 +29,96 @@ fn reset_exclusion_plan(title: &str, state: &str, assigned: bool) -> String {
     )
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct ResetDecisionView {
+    scope: RheiScope,
+    task_count: usize,
+    descendant_count: usize,
+    moves: Vec<(String, String, String)>,
+    runtime_targets: Vec<PathBuf>,
+}
+
+fn reset_decision_view(decision: &ResetDecision) -> ResetDecisionView {
+    ResetDecisionView {
+        scope: decision.scope.clone(),
+        task_count: decision.task_count,
+        descendant_count: decision.descendant_count,
+        moves: decision
+            .authored
+            .moves
+            .iter()
+            .map(|mv| (mv.task_id.clone(), mv.from.clone(), mv.to.clone()))
+            .collect(),
+        runtime_targets: decision.runtime_targets.clone(),
+    }
+}
+
 /// Full reset retains every stable sidecar through runtime deletion. A ledger
 /// waiter and a real transition that both started before cleanup can only run
 /// afterwards, reopen the current pathname, and preserve both acknowledged
-/// appends. §FS-rhei-reset.3 §AR-agent-orchestrator-workflow.3.3.1
+/// appends. §FS-rhei-reset.1.2 §FS-rhei-reset.3 §FS-rhei-reset.4
+/// §AR-agent-orchestrator-workflow.3.3.1
 #[test]
 fn full_reset_excludes_waiters_through_runtime_deletion_and_recreation() {
     let dir = tempfile::tempdir().expect("tempdir");
     let plan = dir.path().join("plan.rhei.md");
     let machine = dir.path().join("states.yaml");
     let runtime = dir.path().join("runtime");
-    fs::write(&plan, reset_exclusion_plan("Full Reset", "pending", true)).expect("plan");
+    fs::write(&plan, reset_exclusion_plan("Full Reset", "draft", true)).expect("plan");
     fs::write(&machine, RESET_EXCLUSION_MACHINE).expect("machine");
-    fs::create_dir_all(&runtime).expect("runtime");
-    fs::write(runtime.join("state-transitions.log"), "plan.1 draft@pending\n")
-        .expect("ledger");
 
-    let (locked_tx, locked_rx) = mpsc::channel();
+    let (before_locks_tx, before_locks_rx) = mpsc::channel();
+    let (acquire_tx, acquire_rx) = mpsc::channel();
+    let (preview_tx, preview_rx) = mpsc::channel();
     let (clean_tx, clean_rx) = mpsc::channel();
     let (continue_tx, continue_rx) = mpsc::channel();
     let (unlock_tx, unlock_rx) = mpsc::channel();
     let reset_plan = plan.clone();
     let reset_machine = machine.clone();
     let resetter = std::thread::spawn(move || {
-        set_reset_after_locks_hook(move || {
-            locked_tx.send(()).expect("reset locked");
+        set_reset_confirmation(true, || panic!("--yes reset must not prompt"));
+        set_reset_before_locks_hook(move || {
+            before_locks_tx.send(()).expect("reset reached lock acquisition");
+            acquire_rx.recv_timeout(Duration::from_secs(2)).expect("acquire reset locks");
+        });
+        set_reset_after_preview_hook(move |decision| {
+            preview_tx.send(reset_decision_view(decision)).expect("reset preview");
             continue_rx.recv_timeout(Duration::from_secs(2)).expect("continue reset");
         });
-        set_reset_before_unlock_hook(move || {
-            clean_tx.send(()).expect("reset cleaned");
+        set_reset_before_unlock_hook(move |decision| {
+            clean_tx.send(reset_decision_view(decision)).expect("reset cleaned");
             unlock_rx.recv_timeout(Duration::from_secs(2)).expect("release reset");
         });
         reset_command(&reset_plan, Some(&reset_machine), &[], false, true)
             .map_err(|error| error.to_string())
     });
-    locked_rx.recv_timeout(Duration::from_secs(2)).expect("reset lock boundary");
+
+    // A writer that commits before acquisition belongs to the authoritative
+    // preview rather than the stale plan reset first loaded.
+    before_locks_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("reset before lock acquisition");
+    transition_command(
+        &plan,
+        &[],
+        Some(&machine),
+        "1",
+        "draft",
+        "pending",
+        None,
+        None,
+        true,
+    )
+    .expect("transition before reset locks");
+    assert!(fs::read_to_string(&plan).expect("transitioned plan").contains("**State:** pending"));
+    acquire_tx.send(()).expect("allow reset acquisition");
+    let preview = preview_rx.recv_timeout(Duration::from_secs(2)).expect("reset preview");
+    assert_eq!(preview.scope, None);
+    assert_eq!((preview.task_count, preview.descendant_count), (1, 0));
+    assert_eq!(preview.moves.len(), 1, "the pre-lock transition must be previewed");
+    assert_eq!(preview.moves[0].1, "pending");
+    assert_eq!(preview.moves[0].2, "draft");
+    assert_eq!(preview.runtime_targets, vec![runtime.clone()]);
 
     let (plan_lock_tx, plan_lock_rx) = mpsc::channel();
     let (transition_done_tx, transition_done_rx) = mpsc::channel();
@@ -112,7 +167,8 @@ fn full_reset_excludes_waiters_through_runtime_deletion_and_recreation() {
     );
 
     continue_tx.send(()).expect("continue reset cleanup");
-    clean_rx.recv_timeout(Duration::from_secs(2)).expect("reset cleanup boundary");
+    let summary = clean_rx.recv_timeout(Duration::from_secs(2)).expect("reset cleanup boundary");
+    assert_eq!(summary, preview, "preview and summary must use one locked decision");
     assert!(!runtime.exists(), "full reset must remove runtime while retaining its locks");
     assert!(
         dir.path().join("runtime.state-transitions.log.lock").is_file(),
@@ -153,7 +209,7 @@ fn full_reset_excludes_waiters_through_runtime_deletion_and_recreation() {
 /// Narrowed reset prunes under the same ledger identity. A transition on an
 /// untargeted sibling may hold its own plan lock while waiting, but it cannot
 /// append until pruning commits and cannot be lost to stale replacement.
-/// §FS-rhei-reset.3 §FS-rhei-panta.6.4
+/// §FS-rhei-reset.1.2 §FS-rhei-reset.3 §FS-rhei-reset.4 §FS-rhei-panta.6.4
 #[test]
 fn narrowed_reset_serializes_pruning_with_an_untargeted_transition() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -176,25 +232,34 @@ fn narrowed_reset_serializes_pruning_with_an_untargeted_transition() {
         "auth.1 draft@pending\nbilling.1 draft@pending\n",
     )
     .expect("ledger");
+    fs::create_dir_all(project.join("runtime/results")).expect("results");
+    fs::write(project.join("runtime/results/auth.1.md"), "remove me\n").expect("auth result");
+    fs::write(project.join("runtime/results/billing.1.md"), "keep me\n")
+        .expect("billing result");
 
-    let (locked_tx, locked_rx) = mpsc::channel();
+    let (preview_tx, preview_rx) = mpsc::channel();
     let (pruned_tx, pruned_rx) = mpsc::channel();
     let (continue_tx, continue_rx) = mpsc::channel();
     let (unlock_tx, unlock_rx) = mpsc::channel();
     let reset_project = project.to_path_buf();
     let resetter = std::thread::spawn(move || {
-        set_reset_after_locks_hook(move || {
-            locked_tx.send(()).expect("reset locked");
+        set_reset_after_preview_hook(move |decision| {
+            preview_tx.send(reset_decision_view(decision)).expect("reset preview");
             continue_rx.recv_timeout(Duration::from_secs(2)).expect("continue reset");
         });
-        set_reset_before_unlock_hook(move || {
-            pruned_tx.send(()).expect("reset pruned");
+        set_reset_before_unlock_hook(move |decision| {
+            pruned_tx.send(reset_decision_view(decision)).expect("reset pruned");
             unlock_rx.recv_timeout(Duration::from_secs(2)).expect("release reset");
         });
         reset_command(&reset_project, None, &["auth".to_string()], false, true)
             .map_err(|error| error.to_string())
     });
-    locked_rx.recv_timeout(Duration::from_secs(2)).expect("reset lock boundary");
+    let preview = preview_rx.recv_timeout(Duration::from_secs(2)).expect("reset preview");
+    assert_eq!(preview.scope, Some(BTreeSet::from(["auth".to_string()])));
+    assert_eq!((preview.task_count, preview.descendant_count), (1, 0));
+    assert_eq!(preview.moves.len(), 1);
+    assert_eq!(preview.moves[0].0, "auth.1");
+    assert!(preview.runtime_targets.is_empty(), "narrowed cleanup is ticket-scoped");
 
     let (ledger_lock_tx, ledger_lock_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
@@ -223,7 +288,8 @@ fn narrowed_reset_serializes_pruning_with_an_untargeted_transition() {
     );
 
     continue_tx.send(()).expect("continue narrowed reset");
-    pruned_rx.recv_timeout(Duration::from_secs(2)).expect("prune boundary");
+    let summary = pruned_rx.recv_timeout(Duration::from_secs(2)).expect("prune boundary");
+    assert_eq!(summary, preview, "narrowed preview and summary must share one decision");
     assert!(
         matches!(done_rx.recv_timeout(Duration::from_millis(50)), Err(RecvTimeoutError::Timeout)),
         "the transition must remain outside the pruning boundary"
@@ -233,6 +299,8 @@ fn narrowed_reset_serializes_pruning_with_an_untargeted_transition() {
         "billing.1 draft@pending\n",
         "narrowed reset must remove only targeted history"
     );
+    assert!(!project.join("runtime/results/auth.1.md").exists());
+    assert!(project.join("runtime/results/billing.1.md").is_file());
 
     unlock_tx.send(()).expect("release narrowed reset");
     resetter.join().expect("reset thread").expect("narrowed reset succeeds");
@@ -252,5 +320,161 @@ fn narrowed_reset_serializes_pruning_with_an_untargeted_transition() {
     assert_eq!(
         fs::read_to_string(project.join("runtime/state-transitions.log")).expect("final ledger"),
         "billing.1 draft@pending\nbilling.1 pending@review\n"
+    );
+}
+
+/// Declining the prompt performs no reset mutation and releases the complete
+/// stack to a writer that began after the preview. §FS-rhei-reset.1.2
+#[test]
+fn declined_confirmation_releases_waiting_writer_without_reset_mutation() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let plan = dir.path().join("plan.rhei.md");
+    let machine = dir.path().join("states.yaml");
+    let runtime = dir.path().join("runtime");
+    fs::write(&plan, reset_exclusion_plan("Declined Reset", "pending", true)).expect("plan");
+    fs::write(&machine, RESET_EXCLUSION_MACHINE).expect("machine");
+    fs::create_dir_all(runtime.join("results")).expect("runtime");
+    fs::write(runtime.join("state-transitions.log"), "plan.1 draft@pending\n")
+        .expect("ledger");
+    fs::write(runtime.join("results/plan.1.md"), "keep me\n").expect("result");
+
+    let (preview_tx, preview_rx) = mpsc::channel();
+    let (confirm_tx, confirm_rx) = mpsc::channel();
+    let (decline_tx, decline_rx) = mpsc::channel();
+    let reset_plan = plan.clone();
+    let reset_machine = machine.clone();
+    let resetter = std::thread::spawn(move || {
+        set_reset_after_preview_hook(move |decision| {
+            preview_tx.send(reset_decision_view(decision)).expect("reset preview");
+        });
+        set_reset_confirmation(true, move || {
+            confirm_tx.send(()).expect("confirmation reached");
+            decline_rx.recv_timeout(Duration::from_secs(2)).expect("decline reset");
+            false
+        });
+        reset_command(&reset_plan, Some(&reset_machine), &[], false, false)
+            .map_err(|error| error.to_string())
+    });
+
+    let preview = preview_rx.recv_timeout(Duration::from_secs(2)).expect("reset preview");
+    assert_eq!(preview.moves.len(), 1);
+    confirm_rx.recv_timeout(Duration::from_secs(2)).expect("confirmation boundary");
+
+    let (plan_lock_tx, plan_lock_rx) = mpsc::channel();
+    let transition_plan = plan.clone();
+    let transition_machine = machine.clone();
+    let transition = std::thread::spawn(move || {
+        set_plan_lock_observer(plan_lock_tx);
+        transition_command(
+            &transition_plan,
+            &[],
+            Some(&transition_machine),
+            "1",
+            "pending",
+            "review",
+            None,
+            None,
+            true,
+        )
+        .map_err(|error| error.to_string())
+    });
+    assert_eq!(
+        plan_lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition contention"),
+        PlanLockEvent::Contended
+    );
+
+    decline_tx.send(()).expect("decline confirmation");
+    resetter.join().expect("reset thread").expect("declined reset succeeds");
+    transition.join().expect("transition thread").expect("waiting transition succeeds");
+    assert_eq!(
+        plan_lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition acquisition"),
+        PlanLockEvent::Acquired
+    );
+
+    let final_plan = fs::read_to_string(&plan).expect("final plan");
+    assert!(final_plan.contains("**State:** review"));
+    assert!(final_plan.contains("**Assignee:** manual"), "decline must not clear ownership");
+    assert!(final_plan.contains("pending: 1"), "decline must not clear prior visits");
+    assert!(final_plan.contains("review: 1"), "waiting transition records its visit");
+    assert!(runtime.join("results/plan.1.md").is_file(), "decline must retain runtime output");
+    assert_eq!(
+        fs::read_to_string(runtime.join("state-transitions.log")).expect("final ledger"),
+        "plan.1 draft@pending\nplan.1 pending@review\n"
+    );
+}
+
+/// Non-interactive refusal follows the same no-mutation release path after
+/// printing the authoritative preview. §FS-rhei-reset.1.2
+#[test]
+fn noninteractive_refusal_releases_waiting_writer_without_reset_mutation() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let plan = dir.path().join("plan.rhei.md");
+    let machine = dir.path().join("states.yaml");
+    let runtime = dir.path().join("runtime");
+    fs::write(&plan, reset_exclusion_plan("Refused Reset", "pending", true)).expect("plan");
+    fs::write(&machine, RESET_EXCLUSION_MACHINE).expect("machine");
+    fs::create_dir_all(runtime.join("results")).expect("runtime");
+    fs::write(runtime.join("state-transitions.log"), "plan.1 draft@pending\n")
+        .expect("ledger");
+    fs::write(runtime.join("results/plan.1.md"), "keep me\n").expect("result");
+
+    let (preview_tx, preview_rx) = mpsc::channel();
+    let (refuse_tx, refuse_rx) = mpsc::channel();
+    let reset_plan = plan.clone();
+    let reset_machine = machine.clone();
+    let resetter = std::thread::spawn(move || {
+        set_reset_after_preview_hook(move |decision| {
+            preview_tx.send(reset_decision_view(decision)).expect("reset preview");
+            refuse_rx.recv_timeout(Duration::from_secs(2)).expect("refuse reset");
+        });
+        set_reset_confirmation(false, || panic!("non-interactive reset must not prompt"));
+        reset_command(&reset_plan, Some(&reset_machine), &[], false, false)
+            .map_err(|error| error.to_string())
+    });
+
+    let preview = preview_rx.recv_timeout(Duration::from_secs(2)).expect("reset preview");
+    assert_eq!(preview.moves.len(), 1);
+
+    let (plan_lock_tx, plan_lock_rx) = mpsc::channel();
+    let transition_plan = plan.clone();
+    let transition_machine = machine.clone();
+    let transition = std::thread::spawn(move || {
+        set_plan_lock_observer(plan_lock_tx);
+        transition_command(
+            &transition_plan,
+            &[],
+            Some(&transition_machine),
+            "1",
+            "pending",
+            "review",
+            None,
+            None,
+            true,
+        )
+        .map_err(|error| error.to_string())
+    });
+    assert_eq!(
+        plan_lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition contention"),
+        PlanLockEvent::Contended
+    );
+
+    refuse_tx.send(()).expect("continue to refusal");
+    let error = resetter.join().expect("reset thread").expect_err("reset must refuse");
+    assert!(error.contains("stdin is not a terminal"), "unexpected refusal: {error}");
+    transition.join().expect("transition thread").expect("waiting transition succeeds");
+    assert_eq!(
+        plan_lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition acquisition"),
+        PlanLockEvent::Acquired
+    );
+
+    let final_plan = fs::read_to_string(&plan).expect("final plan");
+    assert!(final_plan.contains("**State:** review"));
+    assert!(final_plan.contains("**Assignee:** manual"), "refusal must not clear ownership");
+    assert!(final_plan.contains("pending: 1"), "refusal must not clear prior visits");
+    assert!(final_plan.contains("review: 1"), "waiting transition records its visit");
+    assert!(runtime.join("results/plan.1.md").is_file(), "refusal must retain runtime output");
+    assert_eq!(
+        fs::read_to_string(runtime.join("state-transitions.log")).expect("final ledger"),
+        "plan.1 draft@pending\nplan.1 pending@review\n"
     );
 }

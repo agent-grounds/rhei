@@ -23,6 +23,8 @@ enum ClaimFaultPoint {
 thread_local! {
     static CLAIM_FAULTS: std::cell::RefCell<Vec<(ClaimFaultPoint, String)>> =
         const { std::cell::RefCell::new(Vec::new()) };
+    static CLAIM_BEFORE_LOCK_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 /// Install one-shot, thread-local persistence failures for focused unit tests.
@@ -44,6 +46,25 @@ fn take_claim_fault(point: ClaimFaultPoint) -> Option<String> {
         let index = installed.iter().position(|(candidate, _)| *candidate == point)?;
         Some(installed.remove(index).1)
     })
+}
+
+/// Install a one-shot mutation immediately after `next` selects a task and
+/// before its claim path acquires the plan lock. Unit tests use this to make a
+/// stale selection deterministic; no command flag or authored setting can
+/// reach the seam. §FS-rhei-next.3.1
+#[cfg(test)]
+fn set_claim_before_lock_hook(hook: impl FnOnce() + 'static) {
+    CLAIM_BEFORE_LOCK_HOOK.with(|installed| {
+        *installed.borrow_mut() = Some(Box::new(hook));
+    });
+}
+
+#[cfg(test)]
+fn run_claim_before_lock_hook() {
+    let hook = CLAIM_BEFORE_LOCK_HOOK.with(|installed| installed.borrow_mut().take());
+    if let Some(hook) = hook {
+        hook();
+    }
 }
 
 /// Original bytes and serialized bookkeeping retained until a claim commits.

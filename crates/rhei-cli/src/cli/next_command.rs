@@ -311,6 +311,11 @@ fn next_command(
         && initial_state_has_non_terminal_forward_transition(selected_task, &loaded.rhei, machine)?;
 
     let route = loaded.task_route(&task_id_str, input);
+    let claim_eligibility = ClaimEligibilityContext {
+        input,
+        machines: &machines,
+        workspace_root: &workspace_root,
+    };
 
     let final_state = if auto_transition_initial && !peek {
         // Advance from a setup-only initial state (for example planning -> pending).
@@ -347,6 +352,7 @@ fn next_command(
             &current_state,
             &to_state,
             no_callbacks,
+            &claim_eligibility,
         )?
     } else {
         current_state.clone()
@@ -391,28 +397,15 @@ fn next_command(
     if !peek && !auto_transition_initial && task.assignee.is_none() {
         let assignee = agent_id_str.as_deref().unwrap_or("manual");
         claimed_as = Some(assignee.to_string());
-        let final_state_def = machine
-            .states
-            .get(&final_state)
-            .ok_or_else(|| miette!(
-                help = internal_error_help(),
-                "state '{}' missing from loaded machine", final_state
-            ))?;
-        // The re-read under the lock parses the task file under the kinds its
-        // own rhei declared, as the scan did. §FS-rhei-next.3.1
-        let claim_structure = claim_node_kinds(&route)?;
         write_task_assignee(
             &route.task_file,
             &route.local_id,
             &task_id_str,
             &final_state,
             machine,
-            TaskAssigneeClaimContext {
-                workspace_root: &task_workspace_root,
-                metadata: loaded.rhei.metadata.as_ref(),
-                structure: claim_structure.as_ref(),
-                state_def: final_state_def,
-                settings: &settings,
+            LockedTaskAssigneeClaimContext {
+                metadata_file: &route.metadata_file,
+                eligibility: &claim_eligibility,
             },
             assignee,
         )?;

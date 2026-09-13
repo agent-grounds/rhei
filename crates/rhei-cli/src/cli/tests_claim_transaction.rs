@@ -176,20 +176,44 @@ fn claim_transaction_partial_ledger_failure_preserves_another_writer() {
         .unwrap();
 
     let root = fixture.dir.path().to_path_buf();
-    let barrier = Arc::new(std::sync::Barrier::new(2));
-    let writer_barrier = barrier.clone();
+    let (lock_tx, lock_rx) = mpsc::channel();
+    let (done_tx, done_rx) = mpsc::channel();
     let writer = std::thread::spawn(move || {
-        writer_barrier.wait();
-        append_state_transition_log_entry(&root, "plan.2", "review", "completed")
+        set_ledger_lock_observer(lock_tx);
+        let result = append_state_transition_log_entry(&root, "plan.2", "review", "completed")
+            .map_err(|error| error.to_string());
+        done_tx.send(result).expect("report writer result");
     });
-    barrier.wait();
+    assert_eq!(
+        lock_rx.recv_timeout(Duration::from_secs(2)).expect("writer lock attempt"),
+        LedgerLockEvent::Contended,
+        "the competing writer must encounter the claim's held ledger lock"
+    );
+    assert!(
+        matches!(done_rx.recv_timeout(Duration::from_millis(50)), Err(RecvTimeoutError::Timeout)),
+        "the competing writer completed while the claim still owned the ledger lock"
+    );
+
     set_claim_faults(vec![(ClaimFaultPoint::LedgerAppend, "short write")]);
     let error = transaction.commit("draft", "pending").expect_err("partial append");
     transaction.rollback(error);
+    assert_eq!(
+        fs::read_to_string(&ledger).unwrap(),
+        "plan.9 pending@completed\n",
+        "rollback must restore the prior bytes before releasing the competing writer"
+    );
     drop(transaction);
     drop(task_lock);
     drop(metadata_lock);
-    writer.join().expect("writer thread").expect("writer append");
+    assert_eq!(
+        lock_rx.recv_timeout(Duration::from_secs(2)).expect("writer lock acquisition"),
+        LedgerLockEvent::Acquired
+    );
+    done_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("writer completion")
+        .expect("writer append");
+    writer.join().expect("writer thread");
 
     assert_eq!(
         fs::read_to_string(&fixture.metadata).unwrap(),

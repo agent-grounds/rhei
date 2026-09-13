@@ -279,6 +279,7 @@ fn transition_command(
             supervisor,
             ..TransitionOrigin::default()
         },
+        None,
     )?;
 
     println!("Task {} transitioned: '{}' → '{}'", task_id_str, from, effective_to);
@@ -346,6 +347,7 @@ fn execute_transition(
             result_message: result_msg.map(str::to_string),
             ..TransitionOrigin::default()
         },
+        None,
     )
 }
 
@@ -363,6 +365,7 @@ fn execute_claim_transition(
     from: &str,
     to: &str,
     no_callbacks: bool,
+    claim: &ClaimEligibilityContext<'_>,
 ) -> MietteResult<String> {
     execute_transition_with_origin(
         files,
@@ -373,5 +376,6 @@ fn execute_claim_transition(
         to,
         no_callbacks,
         TransitionOrigin { claim: true, ..TransitionOrigin::default() },
+        Some(claim),
     )
 }

@@ -95,14 +95,25 @@ fn ancestor_template_roots(
     fallback: &Path,
     user_home: Option<&Path>,
 ) -> Vec<RheiHomePath> {
+    ancestor_template_roots_from_levels(start.ancestors(), fallback, user_home)
+}
+
+/// The production ancestor-root selection over caller-supplied levels. Keeping
+/// the filesystem walk at the caller gives fallback coverage deterministic
+/// inputs without reproducing the selection algorithm. §FS-rhei-templates.1.2
+fn ancestor_template_roots_from_levels<'a>(
+    levels: impl IntoIterator<Item = &'a Path>,
+    fallback: &Path,
+    user_home: Option<&Path>,
+) -> Vec<RheiHomePath> {
     let user_roots = user_home.map(|home| rhei_home_paths(home, "templates"));
     let is_user_root = |candidate: &RheiHomePath| {
         user_roots
             .as_ref()
             .is_some_and(|roots| roots.iter().any(|root| root.path() == candidate.path()))
     };
-    let roots = start
-        .ancestors()
+    let roots = levels
+        .into_iter()
         .filter(|level| !existing_rhei_home_dirs(level, "templates").is_empty())
         .flat_map(|level| rhei_home_paths(level, "templates"))
         .filter(|candidate| !is_user_root(candidate))
@@ -211,5 +222,34 @@ mod template_root_order_tests {
         let final_pair = rhei_home_paths(filesystem_root, "templates");
         assert_eq!(roots[roots.len() - 2].path(), final_pair[0].path());
         assert_eq!(roots[roots.len() - 1].path(), final_pair[1].path());
+    }
+
+    #[test]
+    fn template_ancestor_fallback_excludes_user_roots_and_orders_the_project_pair() {
+        let temp = tempfile::tempdir().expect("create fallback fixture");
+        let home = temp.path().join("home");
+        let fallback = temp.path().join("project");
+        for root in rhei_home_paths(&home, "templates") {
+            std::fs::create_dir_all(root.path()).expect("create user template root");
+        }
+
+        let roots = ancestor_template_roots_from_levels(
+            [home.as_path()],
+            &fallback,
+            Some(home.as_path()),
+        );
+        let expected = rhei_home_paths(&fallback, "templates");
+        assert_eq!(roots.len(), 2);
+        assert_eq!(roots[0].path(), expected[0].path());
+        assert_eq!(roots[1].path(), expected[1].path());
+        assert!(roots[0].deprecated_path().is_none());
+        assert_eq!(roots[1].deprecated_path(), Some(expected[1].path()));
+
+        let excluded = ancestor_template_roots_from_levels(
+            std::iter::empty(),
+            &home,
+            Some(home.as_path()),
+        );
+        assert!(excluded.is_empty(), "fallback must not reinsert either exact user root");
     }
 }

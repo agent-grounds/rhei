@@ -308,9 +308,9 @@ fn nested_user_home_stays_out_of_project_tier_without_ending_the_walk() {
     );
     let user_deprecated = write_template(
         &home.join(DEPRECATED_TEMPLATES),
-        "user-deprecated",
-        "USER DEPRECATED",
-        "USER DEPRECATED RENDERED",
+        "user-legacy",
+        "USER LEGACY",
+        "USER LEGACY RENDERED",
     );
     let user_preferred = write_template(
         &home.join(TEMPLATES),
@@ -334,7 +334,7 @@ fn nested_user_home_stays_out_of_project_tier_without_ending_the_walk() {
         project_names.iter().all(|entry| {
             !matches!(
                 entry["name"].as_str(),
-                Some("user-current" | "user-deprecated" | "user-preferred")
+                Some("user-current" | "user-legacy" | "user-preferred")
             )
         }),
         "user-only templates must not enter the project tier:\n{}",
@@ -362,7 +362,7 @@ fn nested_user_home_stays_out_of_project_tier_without_ending_the_walk() {
     let user_json = json(&user);
     for (name, description, path) in [
         ("user-current", "USER CURRENT", &user_current),
-        ("user-deprecated", "USER DEPRECATED", &user_deprecated),
+        ("user-legacy", "USER LEGACY", &user_deprecated),
         ("user-preferred", "USER CURRENT WINS", &user_preferred),
     ] {
         let entry = named_entry(&user_json, name);
@@ -393,7 +393,7 @@ fn nested_user_home_stays_out_of_project_tier_without_ending_the_walk() {
     for (name, source, path) in [
         (TARGET, "project", &project_target),
         ("user-current", "user", &user_current),
-        ("user-deprecated", "user", &user_deprecated),
+        ("user-legacy", "user", &user_deprecated),
         ("user-preferred", "user", &user_preferred),
     ] {
         let entry = named_entry(&all_json, name);
@@ -417,12 +417,12 @@ fn nested_user_home_stays_out_of_project_tier_without_ending_the_walk() {
     );
 
     let deprecated_detail =
-        run_in(&["templates", "user-deprecated", "--source", "user", "--json"], &member, &home);
+        run_in(&["templates", "user-legacy", "--source", "user", "--json"], &member, &home);
     let deprecated_json = json(&deprecated_detail);
     let deprecated_tail = path_tail(&root, &user_deprecated);
     assert!(
         deprecated_json["source"] == "user"
-            && deprecated_json["description"] == "USER DEPRECATED"
+            && deprecated_json["description"] == "USER LEGACY"
             && json_path_ends_with(&deprecated_json, &deprecated_tail),
         "named detail should identify the deprecated user copy at '{deprecated_tail}':\n{}",
         deprecated_detail.stdout
@@ -445,11 +445,12 @@ fn nested_user_home_stays_out_of_project_tier_without_ending_the_walk() {
     );
 }
 
-/// If HOME is the only ancestor with template directories, excluding its user
-/// roots leaves the project tier empty. The diagnostic fallback must not add
-/// those same roots back with a project label. §FS-rhei-templates.1.2
+/// Exact HOME roots stay out of project listings even when genuine template
+/// directories elsewhere on the filesystem ancestor walk contribute entries.
+/// Controlled production-unit coverage pins the empty diagnostic fallback.
+/// §FS-rhei-templates.1.2
 #[test]
-fn nested_user_home_is_not_reinserted_by_project_diagnostic_fallback() {
+fn nested_user_home_roots_stay_out_of_project_listing_with_ambient_ancestors() {
     let root = unique_temp_dir("template-ancestors-user-fallback");
     let home = root.join("home");
     let member = home.join("workspace/member");
@@ -469,21 +470,31 @@ fn nested_user_home_is_not_reinserted_by_project_diagnostic_fallback() {
 
     let project = run_in(&["templates", "--source", "project", "--json"], &member, &home);
     let project_json = json(&project);
-    assert_eq!(
-        project_json,
-        serde_json::json!([]),
-        "user roots must not return through the empty-project fallback:\n{}",
+    let project_entries = project_json.as_array().expect("project listing should be an array");
+    let home_current_tail = path_tail(&root, &home.join(TEMPLATES));
+    let home_deprecated_tail = path_tail(&root, &home.join(DEPRECATED_TEMPLATES));
+    let home_current_marker = format!("/{home_current_tail}/");
+    let home_deprecated_marker = format!("/{home_deprecated_tail}/");
+    assert!(
+        project_entries.iter().all(|entry| {
+            let path = entry["path"].as_str().unwrap_or_default().replace('\\', "/");
+            !matches!(
+                entry["name"].as_str(),
+                Some("user-current-only" | "user-deprecated-only")
+            ) && entry["source"] == "project"
+                && !path.contains(&home_current_marker)
+                && !path.contains(&home_deprecated_marker)
+        }),
+        "neither exact user root may enter the project tier, even when genuine ambient ancestors contribute templates:\n{}",
         project.stdout
     );
 
-    let diagnostic = run_in(&["templates", "--source", "project"], &member, &home);
-    assert_success(&diagnostic);
-    let home_current_tail = path_tail(&root, &home.join(TEMPLATES));
-    let home_deprecated_tail = path_tail(&root, &home.join(DEPRECATED_TEMPLATES));
-    let normalized = diagnostic.stdout.replace('\\', "/");
+    let text_listing = run_in(&["templates", "--source", "project"], &member, &home);
+    assert_success(&text_listing);
+    let normalized = text_listing.stdout.replace('\\', "/");
     assert!(
         !normalized.contains(&home_current_tail) && !normalized.contains(&home_deprecated_tail),
-        "project diagnostics must not relabel either user root:\n{}",
-        diagnostic.stdout
+        "project text listings must not relabel either user root:\n{}",
+        text_listing.stdout
     );
 }

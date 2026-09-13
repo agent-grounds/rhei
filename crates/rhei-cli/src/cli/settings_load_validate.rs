@@ -254,9 +254,69 @@ fn known_modes_hint(settings: &RheiSettings, id: &str, profile: &CustomAgentProf
     format!("known modes: {}; declare another under {location}", modes.join(", "))
 }
 
+/// Validate legacy executions with runtime's precedence; selector-owned modes
+/// remain under the existing selector checks. §FS-rhei-agents.1.4.1
+fn validate_effective_static_agent_modes(
+    machine: &rhei_validator::StateMachine,
+    settings: &RheiSettings,
+    errors: &mut Vec<String>,
+) {
+    let opts = default_run_options();
+    let mut refused = BTreeSet::new();
+
+    for (state_name, state) in &machine.states {
+        let uses_selector = state.target.is_some() || !state.all_targets.is_empty();
+        if state.terminal || state.gating || state.program.is_some() || uses_selector {
+            continue;
+        }
+
+        let model_overrides: Vec<Option<String>> = if state.all_models.is_empty() {
+            vec![None]
+        } else {
+            state.all_models.iter().cloned().map(Some).collect()
+        };
+
+        for model_override in model_overrides {
+            let model = select_legacy_model(Some(state), settings, &opts, model_override);
+            let model_profile = model.as_deref().and_then(|id| settings.models.get(id));
+            let Some(agent) = select_legacy_agent(Some(state), settings, &opts, model_profile)
+            else {
+                continue;
+            };
+            let Some(profile) = settings.agents.get(agent.id()) else {
+                continue;
+            };
+            let Some(mode) = select_legacy_agent_mode(Some(state), settings, &opts, profile) else {
+                continue;
+            };
+            if profile.modes.is_empty() || profile.modes.contains_key(&mode) {
+                continue;
+            }
+            if refused.insert((agent.id().to_string(), mode.clone())) {
+                errors.push(format!(
+                    "agent '{}' has no mode '{}' in state '{}' ({})",
+                    agent.id(),
+                    mode,
+                    state_name,
+                    known_modes_hint(settings, agent.id(), profile)
+                ));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
 fn validate_machine_settings_references(
     machine: &rhei_validator::StateMachine,
     settings: &RheiSettings,
+) -> Vec<String> {
+    validate_machine_settings_references_inner(machine, settings, true)
+}
+
+fn validate_machine_settings_references_inner(
+    machine: &rhei_validator::StateMachine,
+    settings: &RheiSettings,
+    validate_static_modes: bool,
 ) -> Vec<String> {
     let mut errors = Vec::new();
 
@@ -329,6 +389,10 @@ fn validate_machine_settings_references(
         &mut errors,
     );
 
+    if validate_static_modes {
+        validate_effective_static_agent_modes(machine, settings, &mut errors);
+    }
+
     for (state_name, state) in &machine.states {
         validate_mcp_entries_known(
             &format!("state '{state_name}' mcp_servers"),
@@ -344,7 +408,7 @@ fn validate_machine_settings_references(
         );
 
         if let Some(agent) = state.agent.as_ref() {
-            let Some(profile) = settings.agents.get(agent.id()) else {
+            if !settings.agents.contains_key(agent.id()) {
                 errors.push(format!(
                     "state '{}' references unknown agent '{}' ({})",
                     state_name,
@@ -352,17 +416,6 @@ fn validate_machine_settings_references(
                     known_agents_hint(settings)
                 ));
                 continue;
-            };
-            if let Some(mode) = state.agent_mode.as_deref() {
-                if !profile.modes.is_empty() && !profile.modes.contains_key(mode) {
-                    errors.push(format!(
-                        "state '{}' references unknown mode '{}' for agent '{}' ({})",
-                        state_name,
-                        mode,
-                        agent.id(),
-                        known_modes_hint(settings, agent.id(), profile)
-                    ));
-                }
             }
         }
 
@@ -478,6 +531,46 @@ fn validate_machine_settings_references(
         }
     }
 
+    errors
+}
+
+fn machine_has_unshadowed_task_selection(
+    rhei: &rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    machine: &rhei_validator::StateMachine,
+) -> bool {
+    fn visit(
+        tasks: &[rhei_core::ast::Task],
+        machines: &rhei_validator::MachineSet,
+        fingerprint: &str,
+    ) -> bool {
+        tasks.iter().any(|task| {
+            (machines.for_task(&task.id).fingerprint() == fingerprint && task.target.is_none())
+                || visit(&task.children, machines, fingerprint)
+        })
+    }
+
+    visit(&rhei.tasks, machines, &machine.fingerprint())
+}
+
+/// Validate merged-settings references in the execution contexts the plan can
+/// actually use. A task `**Target:**` owns its full identity and cannot make a
+/// shadowed settings mode applicable. §FS-rhei-validate.4 §FS-rhei-agents.1.4.1
+fn validate_plan_settings_references(
+    rhei: &rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    settings: &RheiSettings,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    for machine in machines.distinct() {
+        let validate_static_modes = machine_has_unshadowed_task_selection(rhei, machines, machine);
+        errors.extend(validate_machine_settings_references_inner(
+            machine,
+            settings,
+            validate_static_modes,
+        ));
+    }
+    errors.extend(validate_task_execution_override_settings_references(rhei, settings));
     errors
 }
 

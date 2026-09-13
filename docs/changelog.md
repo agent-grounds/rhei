@@ -26,6 +26,17 @@
   **Breaking:** scripts that supplied a different real task and relied on the
   transition succeeding must pass the actual owner or omit the flag. (PR #246)
 
+- **Validation rejects an undeclared effective settings-default agent mode
+  before execution.** `rhei validate` previously checked modes written on a
+  state or target selector but accepted the same invalid selection from merged
+  `defaults.agent_mode` or the legacy top-level `agent_mode`, leaving runtime
+  resolution to fail later. Validation now applies the runtime precedence to
+  static selections and names the effective agent, mode, declaration key, and
+  settings locations. **Upgrading:** configurations that relied on this false
+  successful validation now fail until the selected mode is corrected or
+  declared; shadowed defaults and agents without declared modes are unchanged.
+  (PR #247)
+
 - **`rhei cost` and `rhei summary` read the accounting of the rhei they were
   pointed at.** Both resolved their accounting root one level above where a run
   laid into a Panta work root writes its records, so every spelling of a member

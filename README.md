@@ -57,7 +57,7 @@ Rhei is the only agent runtime that combines all of:
   [`docs/functional-spec/rhei-supervision.spec.md`](docs/functional-spec/rhei-supervision.spec.md).
 - **Full validator.** `rhei validate` checks syntax, state validity, dependency
   integrity, hierarchy/id alignment, link integrity, terminal-tree coherence,
-  and artifact contracts.
+  artifact contracts, and execution references resolved from merged settings.
 - **Templates: automate your complex daily routines in minutes.** Capture a
   recurring workflow — code review loops, release checklists, onboarding,
   audits — once as a parameterized template (plan skeleton + state machine +

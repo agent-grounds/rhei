@@ -300,12 +300,9 @@ fn run_command(
 
     // Initial validation pass.
     let mut report = rhei_validator::validate_with_machine_set(&loaded.rhei, &machines.set);
-    for machine in machines.set.distinct() {
-        report.errors.extend(validate_machine_settings_references(machine, &settings));
-    }
     report
         .errors
-        .extend(validate_task_execution_override_settings_references(&loaded.rhei, &settings));
+        .extend(validate_plan_settings_references(&loaded.rhei, &machines.set, &settings));
     report.errors.extend(validate_snapshot_plan_context(&loaded, &resolved));
     if report.has_errors() {
         return Err(validation_report(

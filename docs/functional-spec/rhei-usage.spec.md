@@ -260,6 +260,15 @@ rhei next plan.rhei.md
 rhei complete plan.rhei.md --task 3 --result "Schema migration applied successfully"
 ```
 
+An auto-advancing claim commits only when the new state, resolved assignee, and
+transition entry are all durable ([§FS-rhei-next.3.1](rhei-next.spec.md#31-behavior)). An ordinary
+failure before that boundary restores the original task and can be retried
+after its cause is removed, without `rhei reset`. A diagnostic that says
+restoration itself failed instead names the affected paths and does not promise
+retryability. Failures after commitment, including prompt-rendering failures,
+leave the durable claim in place, and callback effects outside Rhei's files are
+not undone.
+
 For finer-grained control, workers can use `rhei transition` directly with a compare-and-swap:
 
 ```bash

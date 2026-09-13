@@ -164,23 +164,21 @@ fn template_ancestor_discovery_aggregates_distinct_names_from_both_homes() {
 }
 
 /// §FS-rhei-templates.1: the tool states its own search path, so the new home
-/// appears in the `Searched:` listing when nothing is found.
+/// appears in the `Searched:` listing when nothing is found. The isolated user
+/// tier makes emptiness independent of project ancestors above the fixture.
 #[test]
 fn the_searched_listing_names_the_agent_grounds_root() {
     let dir = unique_temp_dir("grounds-templates-searched");
+    let home = dir.join("home");
 
-    let result = run_project(&["templates", "--source", "project"], &dir);
+    let result = run_in(&["templates", "--source", "user"], &dir, &home);
     assert_success(&result);
     assert!(
         result.stdout.contains("No templates found."),
-        "the fixture has no templates; stdout was:\n{}",
+        "the isolated user tier has no templates; stdout was:\n{}",
         result.stdout
     );
-    assert!(
-        result.stdout.replace('\\', "/").contains(GROUNDS_TEMPLATES),
-        "the new home must be named as a search root; stdout was:\n{}",
-        result.stdout
-    );
+    assert_names_path(&result.stdout, &dir, &format!("home/{GROUNDS_TEMPLATES}"));
 }
 
 /// §FS-rhei-templates.1.3: once per distinct deprecated path per process, not
@@ -252,29 +250,29 @@ fn user_template_under_the_deprecated_home_is_found_and_warned() {
     );
 }
 
-/// §FS-rhei-templates.1.2: a level holding either directory contributes both
-/// names, whether or not both are directories. The `Searched:` listing is where
-/// an author about to write their first project template reads where it goes,
-/// and a level found by its `.agents` directory alone must not advertise the
-/// deprecated home as the only place.
+/// §FS-rhei-templates.1.2: a tier contributes both names, whether or not both
+/// are directories. The isolated user tier exercises the same searched-path
+/// display without assuming a temporary directory ends the project walk.
 #[test]
 fn the_searched_listing_names_both_homes_of_the_level_it_resolved() {
     let dir = unique_temp_dir("grounds-templates-searched");
-    std::fs::create_dir_all(dir.join(DEPRECATED_TEMPLATES)).expect("create the deprecated home");
+    let home = dir.join("home");
+    std::fs::create_dir_all(home.join(DEPRECATED_TEMPLATES))
+        .expect("create the deprecated user home");
 
-    let result = run_project(&["templates", "--source", "project"], &dir);
+    let result = run_in(&["templates", "--source", "user"], &dir, &home);
     assert_success(&result);
     assert!(
         result.stdout.contains("No templates found."),
-        "the fixture holds no templates; stdout was:\n{}",
+        "the isolated user tier holds no templates; stdout was:\n{}",
         result.stdout
     );
-    for home in [GROUNDS_TEMPLATES, DEPRECATED_TEMPLATES] {
-        assert_names_path(&result.stdout, &dir, home);
+    for template_home in [GROUNDS_TEMPLATES, DEPRECATED_TEMPLATES] {
+        assert_names_path(&result.stdout, &dir, &format!("home/{template_home}"));
     }
     assert!(
         result.stdout.contains("(does not exist)"),
-        "the absent name is marked, as the no-home branch already marks it; stdout was:\n{}",
+        "the absent current home must be marked; stdout was:\n{}",
         result.stdout
     );
     // Nothing was read from the deprecated home, so nothing is warned about.

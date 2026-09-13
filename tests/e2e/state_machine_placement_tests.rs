@@ -132,6 +132,69 @@ fn a_project_default_and_a_rheis_own_machine_are_both_found() {
     }
 }
 
+/// A member may opt into the built-in machine even when its Panta project has
+/// a differently named default. The two vocabularies are deliberately
+/// disjoint: `audit` proves omitted declarations still inherit `alpha`, while
+/// `billing` proves an explicit `rhei` declaration reaches the built-in
+/// machine without a matching file. §FS-rhei-plan-language.1.3
+#[test]
+fn a_member_declaring_rhei_under_a_custom_default_falls_back_to_builtin() {
+    let dir = unique_temp_dir("placement-member-builtin-fallback");
+    let project = two_machine_project(&dir);
+    let billing = project.join("billing");
+    write_fixture_file(&billing, "index.rhei.md", "# Rhei: Billing\n**States:** rhei\n");
+    std::fs::remove_file(billing.join("states.yaml")).expect("remove the member machine");
+    write_fixture_file(
+        &billing.join("tasks"),
+        "01.md",
+        "### Task 1: Built-in work\n**State:** pending\n",
+    );
+    let project_arg = project.display().to_string();
+
+    assert_validates(&rhei_in(&dir, &dir.join(".home"), &["validate", &project_arg]));
+}
+
+/// The built-in fallback is last: a member-local definition named `rhei`
+/// remains authoritative when it exists. Its `drafting` state is absent from
+/// both the built-in machine and the project's `alpha` default.
+/// §FS-rhei-plan-language.1.3
+#[test]
+fn a_member_declaring_rhei_prefers_its_matching_file_to_the_builtin() {
+    let dir = unique_temp_dir("placement-member-rhei-file");
+    let project = two_machine_project(&dir);
+    let billing = project.join("billing");
+    write_fixture_file(&billing, "index.rhei.md", "# Rhei: Billing\n**States:** rhei\n");
+    write_fixture_file(&billing, "states.yaml", &machine("rhei", "drafting", "filed"));
+
+    let project_arg = project.display().to_string();
+    assert_validates(&rhei_in(&dir, &dir.join(".home"), &["validate", &project_arg]));
+}
+
+/// The fallback belongs only to the built-in name. An unknown member machine
+/// without a matching definition remains a resolution error.
+/// §FS-rhei-plan-language.1.3
+#[test]
+fn a_member_declaring_an_unknown_machine_without_a_file_is_rejected() {
+    let dir = unique_temp_dir("placement-member-unknown");
+    let project = two_machine_project(&dir);
+    let billing = project.join("billing");
+    write_fixture_file(
+        &billing,
+        "index.rhei.md",
+        "# Rhei: Billing\n**States:** missing-member-machine\n",
+    );
+    std::fs::remove_file(billing.join("states.yaml")).expect("remove the member machine");
+    let project_arg = project.display().to_string();
+
+    let result = rhei_in(&dir, &dir.join(".home"), &["validate", &project_arg]);
+    assert_failure(&result, "missing-member-machine");
+    let said = flattened_output(&result);
+    assert!(
+        said.contains("no states file declaring it was found"),
+        "an unknown member machine should keep the missing-definition diagnostic; got:\n{said}"
+    );
+}
+
 /// A rhei whose `**States:**` restates the project default's name runs the
 /// default's file, and its own root gets no precedence: `billing` declares
 /// `alpha` beside a file of that name with other states, and its ticket

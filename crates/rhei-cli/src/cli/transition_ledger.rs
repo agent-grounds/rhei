@@ -222,7 +222,10 @@ impl LockedTransitionLedger {
             file.flush().map_err(|err| {
                 file_io_report(&self.path, "failed to flush partial transition entry", err)
             })?;
-            return Err(miette!("ledger append injection after partial write: {message}"));
+            return Err(miette!(
+                help = transition_log_help(),
+                "ledger append injection after partial write: {message}"
+            ));
         }
         writeln!(file, "{} {}@{}", task_id, from, to).map_err(|err| {
             miette!(

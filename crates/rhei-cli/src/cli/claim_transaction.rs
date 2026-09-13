@@ -113,7 +113,10 @@ impl<'a> ClaimTransaction<'a> {
     ) -> MietteResult<Self> {
         #[cfg(test)]
         if let Some(message) = take_claim_fault(ClaimFaultPoint::LedgerPreflight) {
-            return Err(miette!("ledger preflight injection: {message}"));
+            return Err(miette!(
+                help = transition_log_help(),
+                "ledger preflight injection: {message}"
+            ));
         }
         let ledger = LockedTransitionLedger::open(files.artifact_root)?;
         Ok(Self { files, metadata_handle, task_handle, metadata_raw, task_raw, ledger })
@@ -126,7 +129,10 @@ impl<'a> ClaimTransaction<'a> {
     ) -> MietteResult<()> {
         #[cfg(test)]
         if let Some(message) = take_claim_fault(ClaimFaultPoint::StateMetadataWrite) {
-            return Err(miette!("metadata persistence injection: {message}"));
+            return Err(miette!(
+                help = runtime_dir_help(),
+                "metadata persistence injection: {message}"
+            ));
         }
         write_file_atomic_locked(
             self.files.metadata_file,
@@ -136,7 +142,10 @@ impl<'a> ClaimTransaction<'a> {
         if let Some(task_raw_updated) = task_raw_updated {
             #[cfg(test)]
             if let Some(message) = take_claim_fault(ClaimFaultPoint::StateTaskWrite) {
-                return Err(miette!("task persistence injection: {message}"));
+                return Err(miette!(
+                    help = runtime_dir_help(),
+                    "task persistence injection: {message}"
+                ));
             }
             write_file_atomic_locked(self.files.task_file, task_raw_updated, self.task_handle)?;
         }
@@ -153,7 +162,10 @@ impl<'a> ClaimTransaction<'a> {
     ) -> MietteResult<()> {
         #[cfg(test)]
         if let Some(message) = take_claim_fault(ClaimFaultPoint::AssigneeWrite) {
-            return Err(miette!("assignee persistence injection: {message}"));
+            return Err(miette!(
+                help = "check that the task file is writable",
+                "assignee persistence injection: {message}"
+            ));
         }
         if let Some(task_raw_updated) = task_raw_updated {
             let claimed = insert_task_assignee(task_raw_updated, local_id, assignee)?;
@@ -179,7 +191,7 @@ impl<'a> ClaimTransaction<'a> {
         #[cfg(test)]
         let metadata_restore_fault =
             take_claim_fault(ClaimFaultPoint::RestoreMetadata).map(|message| {
-                miette!("metadata restoration injection: {message}")
+                miette!(help = runtime_dir_help(), "metadata restoration injection: {message}")
             });
         #[cfg(not(test))]
         let metadata_restore_fault: Option<Report> = None;
@@ -199,7 +211,9 @@ impl<'a> ClaimTransaction<'a> {
         if self.files.task_file != self.files.metadata_file {
             #[cfg(test)]
             let task_restore_fault = take_claim_fault(ClaimFaultPoint::RestoreTask)
-                .map(|message| miette!("task restoration injection: {message}"));
+                .map(|message| {
+                    miette!(help = runtime_dir_help(), "task restoration injection: {message}")
+                });
             #[cfg(not(test))]
             let task_restore_fault: Option<Report> = None;
             let task_restore = task_restore_fault.map_or_else(
@@ -218,7 +232,9 @@ impl<'a> ClaimTransaction<'a> {
         }
         #[cfg(test)]
         let ledger_restore_fault = take_claim_fault(ClaimFaultPoint::RestoreLedger)
-            .map(|message| miette!("ledger restoration injection: {message}"));
+            .map(|message| {
+                miette!(help = transition_log_help(), "ledger restoration injection: {message}")
+            });
         #[cfg(not(test))]
         let ledger_restore_fault: Option<Report> = None;
         let ledger_restore = ledger_restore_fault.map_or_else(|| self.ledger.restore(), Err);
@@ -375,6 +391,7 @@ fn finish_failed_claim_enter(
         Ok(recovery) => recovery,
         Err(policy_error) => {
             return miette!(
+                help = state_machine_help(),
                 "{}; reading the configured on-enter recovery also failed: {policy_error}",
                 rollback.error
             );
@@ -401,6 +418,7 @@ fn finish_failed_claim_enter(
         no_callbacks,
     ) {
         Ok(recovered_to) => miette!(
+            help = callback_command_help(),
             "{}; configured on-enter recovery transitioned Task {} from '{}' to '{}'",
             rollback.error,
             files.artifact_id,
@@ -408,6 +426,7 @@ fn finish_failed_claim_enter(
             recovered_to
         ),
         Err(recovery_error) => miette!(
+            help = callback_command_help(),
             "{}; configured on-enter recovery to '{}' also failed: {recovery_error}",
             rollback.error,
             recovery

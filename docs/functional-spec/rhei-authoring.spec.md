@@ -185,6 +185,15 @@ rhei validate plans/content-refresh.rhei.md
 
 See the [States Specification](rhei-states.spec.md) for the states file format.
 
+Inside a Panta project, an explicit declaration also selects where the
+definition is resolved. For example, if `index.panta.md` declares `alpha` and
+the project-root `states.yaml` defines `surveying → signed-off`, a `billing`
+member that declares `**States:** alpha` beside its own matching `states.yaml`
+uses that member-local definition — for example `drafting → filed`. Remove the
+member's `**States:**` line to inherit the already-resolved project definition
+instead. The same-name declaration inherits the default's *name*, not its
+definition file ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)).
+
 ## 6. Common Pitfalls
 
 - **Missing `**State:**`** — every task header must be followed by a

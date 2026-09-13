@@ -277,10 +277,14 @@ governs every rhei that does not declare its own `**States:**`, plus the
 synthetic `basin` rhei and the Panta root's node policy. A rhei that declares
 its own machine runs under it ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)): a machine is a *process*,
 and one project holds several processes the moment it holds two instantiated
-templates. Restating the default is legal and means the same thing as omitting
-the line. Each ticket validates, transitions, and completes under its owning
-rhei's machine; the only place two machines meet is a cross-rhei prior, judged
-under the target's machine (§6.1).
+templates. Restating a custom default is legal and inherits the same effective
+machine *name*, but its explicit declaration still gives a matching
+member-local `states.yaml` precedence. Restating the built-in `rhei` default
+is the exception: that precedence does not apply, and the restatement is
+equivalent to omission in every respect. Omitting the line instead inherits the
+already-resolved project machine wholesale. Each ticket validates, transitions,
+and completes under its owning rhei's machine; the only place two machines meet
+is a cross-rhei prior, judged under the target's machine (§6.1).
 
 ### 6.1. Readiness and `rhei next`
 

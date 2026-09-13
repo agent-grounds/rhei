@@ -183,28 +183,43 @@ rhei's machine. The resolved source of each machine is surfaced in diagnostics
 — CLI override path, rhei declaration, `index.panta.md` declaration, or
 built-in `rhei` fallback.
 
-A machine's *definition file* resolves per declaration. For a rhei's own
-declaration that differs from the project default, the rhei's execution root
-`states.yaml` resolves it first when its `name:` matches — the shape every
-instantiated template ships. Otherwise, and
-for a custom manifest default, the project root's `states.yaml` resolves first;
-when that is absent or names a different machine, a `states.yaml` in a
-discovered rhei's root whose declared `name:` matches may resolve it — but only
-a **unique** match. The explicitly declared built-in project default
-`**States:** rhei` is the exception: only a matching project-root file replaces
-the built-in machine. A member that inherits or restates that explicit default
-cannot make a member-root file the project default. When the effective
-declaration is omitted after inheritance, automatic project-root and member-root
-files are ignored and built-in `rhei` is used. When several candidate roots
-hold files declaring a custom default's
-name, resolution is ambiguous and errors, naming the candidates and the fixes
-(move the definitive file to the project root, or pass
-`--state-machine`): a stale copy silently driving tickets would be far worse
-than asking once. A candidate that fails to load is likewise an error, not a
-silent non-match — it would otherwise surface as a misleading "no states file
-found". Name-match resolution is file resolution, not shadowing, and it is
-what lets a project initialized over existing plans by `rhei init` keep each
-machine file where its rhei always kept it ([§FS-rhei-init.2](../functional-spec/rhei-init.spec.md#2-behavior)).
+A machine's *definition file* resolves per declaration. Declaration presence,
+not whether its value differs from the default name, decides whether a member
+root gets first refusal — for a *custom* default. For any rhei-local
+declaration of a custom name, the rhei's execution root `states.yaml` resolves
+it first when its `name:` matches — the shape every instantiated template
+ships — including when that name equals the resolved project default. An
+absent local file, or a valid one naming another machine, falls back to the
+already-resolved project default for that same-name declaration. An invalid
+local candidate is an error rather than a fallback. A rhei that omits
+`**States:**` instead inherits the resolved project machine wholesale; its
+root is not consulted on the inherited declaration's behalf. Restating the
+project's effective built-in `rhei` default is not a custom same-name
+declaration: it is equivalent to omission in every respect, including
+definition-file precedence, so a rhei's own root is never consulted for it
+either, exactly as the paragraph below requires for other roots.
+
+For a different rhei-local name, and while resolving the manifest's own
+default declaration, resolution otherwise proceeds as before: the project
+root's `states.yaml` resolves first; when that is absent or names a different
+machine, a `states.yaml` in a discovered rhei's root whose declared `name:`
+matches may resolve it — but only a **unique** match. The explicitly declared
+built-in project default `**States:** rhei` is the exception: only a matching
+project-root file replaces the built-in machine as the manifest's default. A
+member that inherits or restates that explicit default cannot make any
+member-root file — including its own — the project default. When the
+manifest's declaration is omitted entirely, automatic project-root and
+member-root files are ignored and built-in `rhei` is used. When several
+candidate roots hold files declaring a
+custom default's name, resolution is ambiguous and errors, naming the
+candidates and the fixes (move the definitive file to the project root, or
+pass `--state-machine`): a stale copy silently driving tickets would be far
+worse than asking once. A candidate that fails to load is likewise an error,
+not a silent non-match — it would otherwise surface as a misleading "no states
+file found". Name-match resolution is file resolution, not shadowing, and it
+is what lets a project initialized over existing plans by `rhei init` keep
+each machine file where its rhei always kept it
+([§FS-rhei-init.2](../functional-spec/rhei-init.spec.md#2-behavior)).
 
 `--state-machine <path>` stays a whole-scope override: it replaces resolution
 for every rhei in scope, and errors when any in-scope rhei declares a machine

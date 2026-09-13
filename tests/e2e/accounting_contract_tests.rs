@@ -321,6 +321,21 @@ fn schema_command_lists_and_prints_every_published_contract() {
     assert_stderr_contains(&unknown, "rhei schema --list");
 }
 
+/// The published price-book contract exposes additive extension points at the
+/// same two object levels consumed by `rhei run --prices`.
+// §FS-rhei-cost-accounting.8.1
+#[test]
+fn accounting_prices_schema_opens_document_and_entry_objects() {
+    let dir = unique_temp_dir("accounting-prices-schema-extensions");
+    let result = schema_output(&dir.join("home"), "rhei.accounting.prices.v1");
+    assert_success(&result);
+    let schema: serde_json::Value =
+        serde_json::from_str(&result.stdout).expect("published price-book schema JSON");
+
+    assert_eq!(schema["additionalProperties"], true);
+    assert_eq!(schema["$defs"]["entry"]["additionalProperties"], true);
+}
+
 /// One actual run produces all six artifact/output shapes accepted by their
 /// published schemas, including exact CLI session identity and duration.
 // §FS-rhei-cost-accounting.3.1 §FS-rhei-cost-accounting.3.4 §FS-rhei-cost-accounting.5

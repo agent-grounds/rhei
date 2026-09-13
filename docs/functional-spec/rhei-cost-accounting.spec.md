@@ -362,11 +362,16 @@ only accepts structured capture events that identify the accounting schema.
   "schema": "rhei.accounting.prices.v1",
   "price_book_id": "builtin-2026-05-20",
   "currency": "USD",
+  "provenance": {
+    "publisher": "Anthropic",
+    "retrieved_at": "2026-05-20T00:00:00Z"
+  },
   "entries": [
     {
       "provider": "anthropic",
       "model": "claude-sonnet-4-6",
       "effective_at": "2026-05-20T00:00:00Z",
+      "note": "Standard service tier, up to 200k context",
       "unit": "1m_tokens",
       "input_total_micro": 3000000,
       "input_cached_read_micro": 300000,
@@ -388,6 +393,14 @@ provider/model entries are rejected because pricing uses one exact match.
 Missing, unreadable, malformed, wrong-schema, and unsupported books fail the
 run with a diagnostic that names the supplied path. Selection never fetches a
 book over the network.
+
+The document object and each entry object accept arbitrary additional JSON
+properties as metadata. Rhei preserves every additional property's JSON value
+in each run-owned `runtime/accounting/prices.json` copy, including the run root
+and every participating rhei execution root. Metadata does not participate in
+known-field validation, provider/model matching, coverage, or cost calculation;
+it cannot supply, replace, or override a required known field. Rhei preserves
+JSON values, not the source file's whitespace or object-key order.
 
 The selected in-memory book is shared by sequential and parallel agent
 execution. Before any agent starts, Rhei atomically copies a caller-owned book

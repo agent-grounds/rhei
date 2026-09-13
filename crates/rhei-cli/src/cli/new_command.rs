@@ -236,8 +236,7 @@ fn perform_new_write(
     let before = create_plan_ids(target);
 
     let previous = locks.read(&write.path);
-    let created_dirs: Vec<PathBuf> =
-        write.dirs.iter().filter(|dir| !dir.exists()).cloned().collect();
+    let created_dirs = invocation_created_directories(&write.dirs)?;
     for dir in &write.dirs {
         fs::create_dir_all(dir).map_err(|err| file_io_report(dir, "failed to create", err))?;
     }
@@ -245,6 +244,21 @@ fn perform_new_write(
 
     let failure = new_write_failure(target, write, &inherited, before.as_ref());
     Ok(AppliedWrite { previous, created_dirs, inherited, failure })
+}
+
+/// Record only directories absent before this invocation, so cleanup never
+/// claims an adopted root or anything authored inside it.
+/// §FS-rhei-new.5.1 §FS-rhei-new.5.2 §FS-rhei-new.5.4
+fn invocation_created_directories(dirs: &[PathBuf]) -> MietteResult<Vec<PathBuf>> {
+    let mut created = Vec::new();
+    for dir in dirs {
+        match fs::symlink_metadata(dir) {
+            Ok(_) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => created.push(dir.clone()),
+            Err(err) => return Err(file_io_report(dir, "failed to inspect destination", err)),
+        }
+    }
+    Ok(created)
 }
 
 /// Write the create and keep it, or undo it and say why. `--dry-run` undoes it

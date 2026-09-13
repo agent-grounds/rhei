@@ -21,6 +21,18 @@
   one ledger entry commit together; prompt-rendering failures after that point
   leave the durable claim intact. (PR #245)
 
+- **`rhei new --dir` can adopt an authored state-machine workspace.** A
+  same-id directory containing only `states.yaml` and optional
+  `prompt_templates/` was called an existing rhei and refused, making the
+  documented machine-first authoring order impossible without reversing it and
+  using `--keep-on-error`. The explicit Directory Workspace form now adopts
+  that bundle (or an empty directory), resolves the machine through ordinary
+  post-write loading, and preserves every authored byte through success,
+  rollback, and dry run. The default form remains a single-file create and now
+  reports the same-id directory as a layout conflict; actual rheis remain
+  collisions, while unrelated content is named as an occupied destination.
+  (PR #249)
+
 - **The worker skill's capture instruction now says when it can be followed.**
   `rhei-plan-worker` is handed one plan and forbidden from looking for a project
   around it, so it routinely works a lone `.rhei.md`. *Capturing Work You Did

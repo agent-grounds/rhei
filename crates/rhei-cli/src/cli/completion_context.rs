@@ -178,6 +178,16 @@ struct ResolvedMachineSet {
     per_rhei: BTreeMap<String, ResolvedStateMachine>,
 }
 
+/// One state-machine source used by a validation pass, with the rheis that it
+/// governs. Source identity is the resolved path, not machine contents.
+// §FS-rhei-validate.6
+#[derive(Clone)]
+struct ValidationMachineSource {
+    path: Option<PathBuf>,
+    project_default: bool,
+    rheis: Vec<String>,
+}
+
 impl ResolvedMachineSet {
     fn single(default: ResolvedStateMachine) -> Self {
         Self { default, per_rhei: BTreeMap::new() }
@@ -204,6 +214,38 @@ impl ResolvedMachineSet {
                 .map(|(id, resolved)| (id.clone(), resolved.machine.clone()))
                 .collect(),
         }
+    }
+
+    /// Summarize the exact resolved sources supplied to semantic validation.
+    /// The default is first; the `BTreeMap` makes remaining groups and their
+    /// owners deterministic by rhei id. §FS-rhei-validate.6
+    fn validation_sources(&self, rhei_ids: &[String]) -> Vec<ValidationMachineSource> {
+        let mut default_rheis = rhei_ids
+            .iter()
+            .filter(|rhei_id| !self.per_rhei.contains_key(*rhei_id))
+            .cloned()
+            .collect::<Vec<_>>();
+        default_rheis.sort();
+
+        let mut sources = vec![ValidationMachineSource {
+            path: self.default.path.clone(),
+            project_default: true,
+            rheis: default_rheis,
+        }];
+        for (rhei_id, resolved) in &self.per_rhei {
+            if let Some(source) =
+                sources.iter_mut().find(|source| source.path == resolved.path)
+            {
+                source.rheis.push(rhei_id.clone());
+            } else {
+                sources.push(ValidationMachineSource {
+                    path: resolved.path.clone(),
+                    project_default: false,
+                    rheis: vec![rhei_id.clone()],
+                });
+            }
+        }
+        sources
     }
 
     /// One group per distinct machine, default first, each carrying the rhei

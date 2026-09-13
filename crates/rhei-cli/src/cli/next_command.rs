@@ -46,7 +46,7 @@ fn next_command(
     if report.has_errors() {
         return Err(validation_report(
             input,
-            resolved.default.path.as_deref(),
+            &resolved.validation_sources(&loaded.rhei_ids), // §FS-rhei-validate.6
             &report.errors,
             &report.help,
         ));

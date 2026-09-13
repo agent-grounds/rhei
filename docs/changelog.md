@@ -12,6 +12,12 @@
   copied skill installations can pick up the correction by rerunning
   `rhei install-skills`. (PR #255)
 
+- **Validation failures name every state-machine source they actually used.**
+  A heterogeneous Panta project no longer attributes every invalid state to
+  only the project default: the diagnostic lists each resolved source and the
+  rheis it governs, while single-source failures keep their existing wording.
+  (PR #256)
+
 - **A member rhei can opt back into the built-in state machine when its project
   uses a custom default.** An explicit `**States:** rhei` now falls back to the
   built-in machine when the complete candidate-file lookup finds no matching

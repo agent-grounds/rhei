@@ -214,6 +214,7 @@ mod tests {
     include!("cli/tests_run_registry.rs");
     include!("cli/tests_attach_support.rs");
     include!("cli/tests_new_verify.rs");
+    include!("cli/tests_new_rhei.rs");
     include!("cli/tests_prompt_memory.rs");
     include!("cli/tests_prompt_memory_supervisors.rs");
     include!("cli/tests_prompt_memory_history.rs");

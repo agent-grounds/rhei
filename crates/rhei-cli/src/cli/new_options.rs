@@ -52,7 +52,9 @@ struct NewOptions {
         add = ArgValueCompleter::new(complete_any_path)
     )]
     description_file: Option<PathBuf>,
-    /// Create a Directory Workspace rhei instead of a single file
+    /// Create a Directory Workspace rhei instead of a single file; an empty
+    /// same-id directory or one containing an authored `states.yaml` and
+    /// optional `prompt_templates/` is adopted
     #[arg(long, help_heading = "Creating a rhei")]
     dir: bool,
     /// Bind the new rhei to a state machine by name. The machine has to

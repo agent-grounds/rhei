@@ -158,6 +158,7 @@ impl LockedTransitionLedger {
             .create(true)
             .read(true)
             .write(true)
+            .truncate(false)
             .open(&ledger_lock_path)
             .map_err(|err| miette!(
                 help = transition_log_help(),
@@ -167,14 +168,12 @@ impl LockedTransitionLedger {
 
         let (file, created_by_open) = match fs::OpenOptions::new()
             .create_new(true)
-            .write(true)
             .append(true)
             .open(&transitions_file)
         {
             Ok(file) => (file, true),
             Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
                 let file = fs::OpenOptions::new()
-                    .write(true)
                     .append(true)
                     .open(&transitions_file)
                     .map_err(|err| miette!(

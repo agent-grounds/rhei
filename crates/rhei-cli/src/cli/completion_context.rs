@@ -249,10 +249,9 @@ impl ResolvedMachineSet {
         sources
     }
 
-    /// One group per distinct machine, default first, each carrying the rhei
-    /// ids that run it. This is what a reader is shown: a `Source:` line names
-    /// one file, so a group that spans two different files would name the
-    /// wrong one for at least one of the rheis it claims.
+    /// One group per distinct complete machine, regardless of source path.
+    /// The project default comes first and stays unqualified; additional
+    /// groups carry the rhei ids that run them.
     // §FS-rhei-states-cmd.3: one rendered block per genuinely distinct machine.
     fn machine_groups(&self) -> Vec<MachineGroup<'_>> {
         let default_fingerprint = self.default.machine.fingerprint();
@@ -262,9 +261,9 @@ impl ResolvedMachineSet {
         )];
         for (rhei_id, resolved) in &self.per_rhei {
             let fingerprint = resolved.machine.fingerprint();
-            // A same-source resolution is already represented by the project
-            // default; keep that whole-project block unqualified. §FS-rhei-states-cmd.3
-            if fingerprint == default_fingerprint && resolved.path == self.default.path {
+            // Identical content is already represented by the project default,
+            // even from another file; keep it unqualified. §FS-rhei-states-cmd.3
+            if fingerprint == default_fingerprint {
                 continue;
             }
             match out.iter_mut().find(|(seen, _)| *seen == fingerprint) {

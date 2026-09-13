@@ -551,3 +551,13 @@ until = "A citable user-facing feature overview under docs/ owns the detailed fe
 reason = """
 No narrower document owns the multi-feature product overview yet, so README still carries both first-page orientation and the detailed feature list that successive behavioral fixes keep updating; extracting it is a dedicated information-architecture change, not part of any one fix.
 """
+[[exceptions]]
+path = "docs/functional-spec/rhei-plan-language.spec.md"
+match = "exact"
+rules = ["citable-spec"]
+kind = "deferred"
+max_accepted = { value = 1100, unit = "lines" }
+until = "Separate grammar and semantic declarations exist and live citations to FS-rhei-plan-language sections have been repointed to them."
+reason = """
+The canonical plan-language declaration currently owns both the formal Markdown grammar and its semantic constraints. Neither subject has a narrower declaration to receive a whole section, and creating those declarations plus repointing the live citations is a repository-wide specification restructure that does not belong in this localized fallback clarification.
+"""

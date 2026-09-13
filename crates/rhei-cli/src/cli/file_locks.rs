@@ -30,6 +30,7 @@ impl LockedPlanFile {
             .create(true)
             .read(true)
             .write(true)
+            .truncate(false)
             .open(&lock_path)
             .map_err(|err| file_io_report(&lock_path, "failed to open plan lock file", err))?;
         lock_plan_writer(&writer_lock, &lock_path)?;

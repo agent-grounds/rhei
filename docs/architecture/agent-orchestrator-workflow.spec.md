@@ -263,7 +263,7 @@ file name and the suffix `.lock`: `tasks/01-work.md` is guarded by
 never this identity, so a writer that waited across one or more replacements
 opens and reads the current destination only after it acquires the sidecar.
 [§FS-rhei-next.3.1](../functional-spec/rhei-next.spec.md#31-behavior)
-[§FS-rhei-transition-cmd.3](../functional-spec/rhei-transition-cmd.spec.md#3-execution)
+[§FS-rhei-transition-cmd.3](../functional-spec/rhei-transition-cmd.spec.md#3-behavior)
 
 Rhei creates a sidecar when the destination is first locked and leaves the
 empty file in place permanently. It never renames, truncates, or removes one,

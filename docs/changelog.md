@@ -16,6 +16,14 @@
   renderer's wrap width, without depending on checkout or temporary-directory
   layout. (PR #259)
 
+- **Template discovery now continues through every filesystem ancestor per
+  template name.** A nearer empty templates directory or one containing only
+  other names no longer hides an ancestor project template and exposes a user
+  or built-in fallback; listings and completion aggregate the nearest copy of
+  each name. This can make ancestor names newly visible and causes matching
+  ancestor copies to shadow fallback copies. Pass an explicit template path to
+  select one exact directory. (PR #258)
+
 - **The bundled authoring skills now resolve a built-in `rhei` project default
   the way the CLI does.** Their no-CLI guidance no longer lets a member-only
   `states.yaml` replace built-in `pending`/`completed` for an inheriting or

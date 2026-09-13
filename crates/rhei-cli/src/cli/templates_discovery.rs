@@ -115,25 +115,15 @@
         Ok(roots)
     }
 
-    /// The project tier's roots: the nearest level at or above the working
-    /// directory holding either home name, even when an unrelated parent has
-    /// VCS markers. §FS-rhei-templates.1.2
+    /// Every template-home ancestor, nearest first and without marker cutoffs;
+    /// the project root supplies empty-search diagnostic paths. §FS-rhei-templates.1.2
     fn project_template_roots() -> MietteResult<Vec<RheiHomePath>> {
         let cwd = std::env::current_dir()
             .map_err(|e| miette!(
                 help = cwd_help(),
                 "failed to determine working directory: {e}"
             ))?;
-        let level = match nearest_rhei_home_level(&cwd, "templates") {
-            Some(level) => level,
-            // No ancestor holds either name: the project root supplies the
-            // base. §FS-rhei-templates.1.2
-            None => find_project_root()?,
-        };
-        // Both of the level's names, even when only one is a directory: the
-        // absent one is where a first template belongs, and the "searched"
-        // listing is where an author reads that. §FS-rhei-templates.1.2
-        Ok(rhei_home_paths(&level, "templates").into_iter().collect())
+        Ok(ancestor_template_roots(&cwd, &find_project_root()?))
     }
 
     /// A template resolved to a directory the instantiation pipeline can read.

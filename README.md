@@ -240,9 +240,11 @@ rhei completions powershell --install
 rhei completions elvish --install
 ```
 
-Installed completions are dynamic, so `rhei instantiate <TAB>` offers template
-names from `.agent-grounds/rhei/templates/`, `~/.agent-grounds/rhei/templates/`, and the
-built-in library shipped with the binary.
+Installed completions are dynamic, so `rhei instantiate <TAB>` offers the
+nearest copy of each template name found in `.agent-grounds/rhei/templates/`
+or deprecated `.agents/rhei/templates/` at every ancestor, followed by user
+templates and the built-in library shipped with the binary
+([§FS-rhei-templates.1.2](docs/functional-spec/rhei-templates.spec.md#12-the-ancestor-walk-checks-both-names-at-each-level)).
 
 See [Tab Completions](docs/functional-spec/tab-completions.md) for shell-specific setup notes,
 default install paths, and system-wide installation.

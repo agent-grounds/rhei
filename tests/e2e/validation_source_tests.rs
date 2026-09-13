@@ -96,7 +96,8 @@ fn validate_failure_lists_every_resolved_machine_source() {
     let said = assert_billing_state_error(&result);
     let default =
         format!("{} (project default; rhei: audit)", quoted(&project.join("states.yaml")));
-    let billing = format!("{} (rhei: billing)", quoted(&project.join("billing/states.yaml")));
+    let billing =
+        format!("{} (rhei: billing)", quoted(&project.join("billing").join("states.yaml")));
     assert!(
         said.contains("I validated this plan using these state-machine sources:")
             && said.contains(&default)
@@ -137,8 +138,8 @@ fn validation_sources_are_ordered_and_default_owners_are_grouped() {
     let said = assert_billing_state_error(&result);
     let entries = [
         format!("{} (project default; rhei: audit, zeta)", quoted(&project.join("states.yaml"))),
-        format!("{} (rhei: billing)", quoted(&project.join("billing/states.yaml"))),
-        format!("{} (rhei: ledger)", quoted(&project.join("ledger/states.yaml"))),
+        format!("{} (rhei: billing)", quoted(&project.join("billing").join("states.yaml"))),
+        format!("{} (rhei: ledger)", quoted(&project.join("ledger").join("states.yaml"))),
     ];
     let positions = entries
         .iter()
@@ -163,8 +164,10 @@ fn identical_machine_files_remain_separate_sources() {
     let result = run_in(&dir, &["validate", &project.display().to_string()]);
     let said = assert_billing_state_error(&result);
     let built_in = "the built-in default state machine (project default)";
-    let billing = format!("{} (rhei: billing)", quoted(&project.join("billing/states.yaml")));
-    let treasury = format!("{} (rhei: treasury)", quoted(&project.join("treasury/states.yaml")));
+    let billing =
+        format!("{} (rhei: billing)", quoted(&project.join("billing").join("states.yaml")));
+    let treasury =
+        format!("{} (rhei: treasury)", quoted(&project.join("treasury").join("states.yaml")));
     assert!(
         said.contains(built_in) && said.contains(&billing) && said.contains(&treasury),
         "content-identical files are still separate sources; got:\n{said}"
@@ -204,7 +207,7 @@ fn next_validation_failure_lists_every_resolved_machine_source() {
     let said = assert_billing_state_error(&result);
     assert!(
         said.contains(&quoted(&project.join("states.yaml")))
-            && said.contains(&quoted(&project.join("billing/states.yaml"))),
+            && said.contains(&quoted(&project.join("billing").join("states.yaml"))),
         "a persistent-source caller must receive the shared source summary; got:\n{said}"
     );
 }
@@ -250,11 +253,13 @@ fn instantiate_failure_keeps_its_single_source_presentation() {
     let result = run_in(&dir, &["instantiate", "invalid-source", "--output", "rendered"]);
     assert_eq!(result.status.code(), Some(1), "stderr:\n{}", result.stderr);
     let said = flattened_output(&result);
+    let rendered_states = format!(
+        "I validated this plan using {}, but found a problem.",
+        quoted(&Path::new("rendered").join("states.yaml"))
+    );
     assert!(
         said.contains("Task rendered.1 has invalid state 'surveying'. Allowed: [drafting, filed]")
-            && said.contains(
-                "I validated this plan using 'rendered/states.yaml', but found a problem."
-            ),
+            && said.contains(&rendered_states),
         "instantiate must retain its existing generated-source sentence; got:\n{said}"
     );
     assert!(!dir.join("rendered").exists(), "failed generated output should be removed");

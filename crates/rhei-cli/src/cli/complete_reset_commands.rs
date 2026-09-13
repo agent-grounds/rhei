@@ -271,9 +271,10 @@ fn reset_command(
     report_panta_scope_narrowed(&loaded, "reset", &scope);
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
     let machines = resolved.validator_set();
-    // Read the ledgers now: step 4 deletes them, and they are the only record
-    // of what state each task started in. §FS-rhei-reset.2.2
-    let authored = collect_authored_states(&loaded, input, &scope, &machines);
+    // This unlocked read is only the confirmation preview. After confirmation,
+    // reset repeats it under the complete plan-and-ledger lock stack before it
+    // changes anything. §FS-rhei-reset.2.2 §FS-rhei-reset.3
+    let preview_authored = collect_authored_states(&loaded, input, &scope, &machines);
 
     fn count_nodes(task: &rhei_core::ast::Task) -> usize {
         1 + task.children.iter().map(count_nodes).sum::<usize>()
@@ -295,7 +296,7 @@ fn reset_command(
     // The preview precedes every destructive reset, not just the one that
     // stops to ask: printing it only on the interactive path left exactly the
     // unattended runs — scripts, CI, agents — silent. §FS-rhei-reset.1.2
-    report_reset_preview(task_count, descendant_count, &authored, &runtime_targets);
+    report_reset_preview(task_count, descendant_count, &preview_authored, &runtime_targets);
     if dry_run {
         println!("\nDry run — nothing was changed.");
         return Ok(());
@@ -318,16 +319,41 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
         }
     }
 
+    // Reset participates in the same metadata, distinct-task, then ledger
+    // order as every ordinary writer and holds the whole stack through plan
+    // restoration and runtime cleanup. §AR-agent-orchestrator-workflow.3.3.1
+    let mut reset_locks = ResetWriterLocks::acquire(&loaded, input, &scope)?;
+    let loaded = load_plan(input)?;
+    let scope = resolve_rhei_scope(&loaded, rhei_scope)?;
+    reset_locks.verify_coverage(&loaded, input, &scope)?;
+    let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
+    let machines = resolved.validator_set();
+    let authored = collect_authored_states(&loaded, input, &scope, &machines);
+
+    let in_scope: Vec<&rhei_core::ast::Task> = loaded
+        .rhei
+        .tasks
+        .iter()
+        .filter(|task| task_in_rhei_scope(&scope, &task.id.to_string()))
+        .collect();
+    let task_count = in_scope.len();
+    let total_nodes: usize = in_scope.iter().map(|task| count_nodes(task)).sum();
+    let descendant_count = total_nodes.saturating_sub(task_count);
+
+    #[cfg(test)]
+    run_reset_after_locks_hook();
+
     // Each plan file's tasks return to the states *that file* authored them
     // in; a file whose tasks never moved still has its runtime lines
     // (assignee, result links) stripped. §FS-rhei-reset.2.2
     let no_moves: BTreeMap<String, String> = BTreeMap::new();
     for (file, _sample_task_id) in reset_target_files(&loaded, input, &scope) {
         let file_authored = authored.by_file.get(&file).unwrap_or(&no_moves);
-        reset_plan_file_states(&file, file_authored)?;
+        reset_plan_file_states(&file, file_authored, reset_locks.plan(&file)?)?;
     }
     if workspace::is_workspace(input) {
-        clear_runtime_metadata_in_file(&input.join("index.rhei.md"), true)?;
+        let index = input.join("index.rhei.md");
+        clear_runtime_metadata_in_file(&index, true, reset_locks.plan(&index)?)?;
     }
 
     // §FS-rhei-panta.6.4: a narrowed reset removes per-ticket artifacts, never
@@ -344,10 +370,17 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
             .collect();
         for root in scoped_roots {
             if workspace::is_workspace(root) && root.as_path() != input {
-                clear_runtime_metadata_in_file(&root.join("index.rhei.md"), true)?;
+                let index = root.join("index.rhei.md");
+                clear_runtime_metadata_in_file(&index, true, reset_locks.plan(&index)?)?;
             }
         }
-        let removed = remove_scoped_runtime_artifacts(&loaded, input, &scope, &machines)?;
+        let removed = remove_scoped_runtime_artifacts(
+            &loaded,
+            input,
+            &scope,
+            &machines,
+            &mut reset_locks,
+        )?;
         report_reset_summary(task_count, descendant_count, &authored, removed);
         // A narrowed reset can only speak for ticket-owned artifacts; run-scoped
         // rollups belong to the run, not the ticket. Say so rather than leaving
@@ -356,6 +389,8 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
             "Kept run-scoped output not owned by any ticket (run report, dashboard, \
              accounting rollups). Reset without `--rhei` to clear it."
         );
+        #[cfg(test)]
+        run_reset_before_unlock_hook();
         return Ok(());
     }
 
@@ -365,7 +400,8 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
         roots.insert(input.to_path_buf());
         for root in roots {
             if workspace::is_workspace(&root) {
-                clear_runtime_metadata_in_file(&root.join("index.rhei.md"), true)?;
+                let index = root.join("index.rhei.md");
+                clear_runtime_metadata_in_file(&index, true, reset_locks.plan(&index)?)?;
             }
             runtime_dirs.push(root.join("runtime"));
         }
@@ -386,56 +422,9 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
     }
 
     report_reset_summary(task_count, descendant_count, &authored, removed_runtime);
+    #[cfg(test)]
+    run_reset_before_unlock_hook();
     Ok(())
-}
-
-/// Runtime directories a full reset would delete, in report order. A narrowed
-/// reset removes per-ticket artifacts rather than whole trees, so it lists
-/// none and the preview says so in words. §FS-rhei-panta.6.4
-fn reset_runtime_preview(loaded: &LoadedPlan, input: &Path, scope: &RheiScope) -> Vec<PathBuf> {
-    if scope.is_some() {
-        return Vec::new();
-    }
-    let mut dirs: Vec<PathBuf> = Vec::new();
-    if loaded.is_panta_project() {
-        let mut roots: BTreeSet<PathBuf> = loaded.task_roots.values().cloned().collect();
-        roots.insert(input.to_path_buf());
-        dirs.extend(roots.into_iter().map(|root| root.join("runtime")));
-    } else if workspace::is_workspace(input) {
-        dirs.push(input.join("runtime"));
-    } else if let Some(parent) = input.parent() {
-        dirs.push(parent.join("runtime"));
-    }
-    dirs.retain(|dir| dir.exists());
-    dirs
-}
-
-/// Describe what a reset is about to destroy, and which tasks it would move.
-/// The preview and the summary print the same move list, so what the dry run
-/// promises and what the reset reports are the same text. §FS-rhei-reset.4
-fn report_reset_preview(
-    task_count: usize,
-    descendant_count: usize,
-    authored: &AuthoredStates,
-    runtime_dirs: &[PathBuf],
-) {
-    if descendant_count == 0 {
-        println!("Would reset {task_count} task(s) to their authored states.");
-    } else {
-        println!(
-            "Would reset {task_count} task(s) and {descendant_count} subtask(s) to their \
-             authored states."
-        );
-    }
-    report_state_moves(authored, "Would move");
-    if runtime_dirs.is_empty() {
-        println!("Would remove per-ticket runtime artifacts (results, ledgers).");
-    } else {
-        println!("Would delete, with every result and ledger inside:");
-        for dir in runtime_dirs {
-            println!("  {}", dir.display());
-        }
-    }
 }
 
 /// True when there is a human on stdin to answer a prompt.
@@ -458,250 +447,6 @@ help = internal_error_help(),
 help = "re-run with -y to confirm without a prompt.",
 "failed to read confirmation: {err}"))?;
     Ok(matches!(answer.trim(), "y" | "Y" | "yes" | "Yes"))
-}
-
-/// §FS-rhei-reset.4
-fn report_reset_summary(
-    task_count: usize,
-    descendant_count: usize,
-    authored: &AuthoredStates,
-    removed_runtime: bool,
-) {
-    if descendant_count == 0 {
-        println!("Reset {task_count} task(s) to their authored states.");
-    } else {
-        println!(
-            "Reset {task_count} task(s) (and {descendant_count} descendant task(s)) to their \
-             authored states."
-        );
-    }
-    report_state_moves(authored, "Moved");
-    if removed_runtime {
-        println!("Removed runtime output.");
-    } else {
-        println!("No runtime output was present.");
-    }
-}
-
-/// One runtime path a narrowed reset removes for a ticket: either a fully
-/// resolved path, or a literal prefix within a directory when the artifact
-/// template still carries run-time placeholders (`{state}`, `{visit_count}`,
-/// `{model}`, …) that a reset cannot resolve.
-enum ScopedTarget {
-    Exact(PathBuf),
-    Prefixed { dir: PathBuf, prefix: String },
-}
-
-/// Remove everything keyed by an in-scope ticket id — results, logs, declared
-/// artifacts, snapshots, worktree refs, accounting, ledger lines — and nothing
-/// else: sibling rheis share one execution root. §FS-rhei-reset.2.1
-fn remove_scoped_runtime_artifacts(
-    loaded: &LoadedPlan,
-    input: &Path,
-    scope: &RheiScope,
-    machines: &rhei_validator::MachineSet,
-) -> MietteResult<bool> {
-    let mut removed = false;
-    let mut task_ids: Vec<String> = Vec::new();
-    fn collect(task: &rhei_core::ast::Task, out: &mut Vec<String>) {
-        out.push(task.id.to_string());
-        for child in &task.children {
-            collect(child, out);
-        }
-    }
-    for task in &loaded.rhei.tasks {
-        collect(task, &mut task_ids);
-    }
-
-    // Ledger lines are pruned per execution root, once, after the per-ticket
-    // sweep: sibling rheis share one `state-transitions.log`.
-    let mut ledger_roots: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
-
-    // Pre-qualification runtime records are keyed by the rhei-local id; a
-    // local-id sweep at a root is only unambiguous when every rhei rooted
-    // there is in scope — shared roots collide on local ids. §FS-rhei-panta.6.4
-    let mut root_owners: BTreeMap<&PathBuf, BTreeSet<&str>> = BTreeMap::new();
-    for (task_id, root) in &loaded.task_roots {
-        let owner = task_id.split_once('.').map(|(head, _)| head).unwrap_or(task_id);
-        root_owners.entry(root).or_default().insert(owner);
-    }
-    let legacy_sweep_ok = |root: &PathBuf| {
-        root_owners
-            .get(root)
-            .is_some_and(|owners| owners.iter().all(|owner| task_in_rhei_scope(scope, owner)))
-    };
-
-    // Run-orchestrated logs and captures land under the project execution
-    // root even for tickets whose own rhei root is a subdirectory, so a
-    // narrowed reset must sweep both roots. §FS-rhei-reset.2.1
-    let project_root = execution_workspace_root(input);
-    for task_id in task_ids.iter().filter(|id| task_in_rhei_scope(scope, id)) {
-        let root = loaded.task_root(task_id, input);
-        let ledger_ids = ledger_roots.entry(root.clone()).or_default();
-        ledger_ids.insert(task_id.clone());
-        let local_id = rhei_local_id_str(task_id);
-        if local_id != task_id && legacy_sweep_ok(&root) {
-            ledger_ids.insert(local_id.to_string());
-        }
-        let mut base_roots = vec![root.clone()];
-        if root != project_root {
-            base_roots.push(project_root.clone());
-        }
-        for base in base_roots {
-            let runtime = base.join("runtime");
-            if !runtime.exists() {
-                continue;
-            }
-            // Artifact-name patterns come from the owning ticket's machine.
-            // §DA-per-rhei-state-machines
-            let machine = machines.for_task_str(task_id);
-            for target in scoped_runtime_targets(&runtime, task_id, machine) {
-                removed |= remove_scoped_target(&target)?;
-            }
-            if local_id != task_id && legacy_sweep_ok(&base) {
-                for target in scoped_runtime_targets(&runtime, local_id, machine) {
-                    removed |= remove_scoped_target(&target)?;
-                }
-            }
-        }
-    }
-
-    for (root, ids) in ledger_roots {
-        removed |= prune_transition_ledger(&root, &ids)?;
-    }
-    Ok(removed)
-}
-
-/// Every runtime path keyed by `task_id` under one execution root's `runtime/`.
-fn scoped_runtime_targets(
-    runtime: &Path,
-    task_id: &str,
-    machine: &rhei_validator::StateMachine,
-) -> Vec<ScopedTarget> {
-    let accounting_id = safe_accounting_file_segment(task_id);
-    let mut targets = vec![
-        // §FS-rhei-complete.4: the completion result file.
-        ScopedTarget::Exact(runtime.join("results").join(format!("{task_id}.md"))),
-        // §FS-rhei-agents.9 / §FS-rhei-programs.5: `task-<id>-<state>[-…].log`.
-        ScopedTarget::Prefixed { dir: runtime.join("logs"), prefix: format!("task-{task_id}-") },
-        // The record of every spawn those logs came from. §FS-rhei-agents.8.4
-        ScopedTarget::Prefixed { dir: runtime.join("spawns"), prefix: format!("task-{task_id}-") },
-        // §FS-rhei-snapshots.4: `<id>-<state>-<slug>-<nonce>/` session dirs.
-        ScopedTarget::Prefixed {
-            dir: runtime.join("snapshot-sessions"),
-            prefix: format!("{task_id}-"),
-        },
-        ScopedTarget::Exact(runtime.join("worktree-refs").join(format!("{task_id}.yaml"))),
-        // §FS-rhei-cost-accounting.2: per-ticket captures and task index.
-        ScopedTarget::Prefixed {
-            dir: runtime.join("accounting").join("captures"),
-            prefix: format!("{accounting_id}-"),
-        },
-        ScopedTarget::Exact(
-            runtime.join("accounting").join("tasks").join(format!("{accounting_id}.json")),
-        ),
-    ];
-
-    // §FS-rhei-states.6: artifact contracts are the machine's own declaration
-    // of what a ticket writes, so a reset that leaves them behind would let a
-    // stale output satisfy a required input on the next run.
-    let root = runtime.parent().unwrap_or(runtime);
-    let mut seen: BTreeSet<String> = BTreeSet::new();
-    for state in machine.states.values() {
-        for artifact in state.inputs.iter().chain(state.outputs.iter()) {
-            if !artifact.path.contains("{task_id}") || !seen.insert(artifact.path.clone()) {
-                continue;
-            }
-            let resolved = artifact.path.replace("{task_id}", task_id);
-            match resolved.split_once('{') {
-                // A template with placeholders a reset cannot resolve becomes a
-                // literal prefix; the text between `{task_id}` and the next
-                // placeholder keeps `auth.1` from matching `auth.10`.
-                Some((literal, _)) => {
-                    let literal = root.join(literal);
-                    let Some(dir) = literal.parent().map(Path::to_path_buf) else { continue };
-                    let Some(prefix) =
-                        literal.file_name().and_then(|name| name.to_str()).map(str::to_string)
-                    else {
-                        continue;
-                    };
-                    if !prefix.is_empty() {
-                        targets.push(ScopedTarget::Prefixed { dir, prefix });
-                    }
-                }
-                None => targets.push(ScopedTarget::Exact(root.join(resolved))),
-            }
-        }
-    }
-    targets
-}
-
-fn remove_scoped_target(target: &ScopedTarget) -> MietteResult<bool> {
-    match target {
-        ScopedTarget::Exact(path) => remove_runtime_path(path),
-        ScopedTarget::Prefixed { dir, prefix } => {
-            if !dir.is_dir() {
-                return Ok(false);
-            }
-            let mut removed = false;
-            for entry in fs::read_dir(dir)
-                .map_err(|err| file_io_report(dir, "failed to read runtime directory", err))?
-                .flatten()
-            {
-                let name = entry.file_name();
-                let Some(name) = name.to_str() else { continue };
-                if name.starts_with(prefix.as_str()) {
-                    removed |= remove_runtime_path(&entry.path())?;
-                }
-            }
-            Ok(removed)
-        }
-    }
-}
-
-fn remove_runtime_path(path: &Path) -> MietteResult<bool> {
-    if path.is_dir() {
-        fs::remove_dir_all(path)
-            .map_err(|err| file_io_report(path, "failed to remove runtime directory", err))?;
-        return Ok(true);
-    }
-    if path.exists() {
-        fs::remove_file(path)
-            .map_err(|err| file_io_report(path, "failed to remove runtime artifact", err))?;
-        return Ok(true);
-    }
-    Ok(false)
-}
-
-/// Drop the in-scope tickets' lines from one execution root's transition
-/// ledger, so a reset ticket's recorded history matches its plan state.
-/// Lines read `<task-id> <from>@<to>`. §FS-rhei-panta.6.4
-fn prune_transition_ledger(root: &Path, task_ids: &BTreeSet<String>) -> MietteResult<bool> {
-    let ledger = root.join("runtime").join("state-transitions.log");
-    if !ledger.is_file() {
-        return Ok(false);
-    }
-    let raw = fs::read_to_string(&ledger)
-        .map_err(|err| file_io_report(&ledger, "failed to read state transition log", err))?;
-    let kept: Vec<&str> = raw
-        .lines()
-        .filter(|line| {
-            let id = line.split_whitespace().next().unwrap_or_default();
-            !task_ids.contains(id)
-        })
-        .collect();
-    if kept.len() == raw.lines().count() {
-        return Ok(false);
-    }
-    if kept.is_empty() {
-        fs::remove_file(&ledger)
-            .map_err(|err| file_io_report(&ledger, "failed to remove state transition log", err))?;
-        return Ok(true);
-    }
-    let mut content = kept.join("\n");
-    content.push('\n');
-    write_file_atomic(&ledger, &content)?;
-    Ok(true)
 }
 
 fn initial_state_for_node(

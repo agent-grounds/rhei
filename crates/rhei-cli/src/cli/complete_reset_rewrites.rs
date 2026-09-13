@@ -35,8 +35,8 @@ fn reset_target_files(
 fn reset_plan_file_states(
     path: &Path,
     authored: &BTreeMap<String, String>,
+    locked: &LockedPlanFile,
 ) -> MietteResult<()> {
-    let locked = LockedPlanFile::open(path)?;
     let raw = locked.read_to_string("failed to read plan file")?;
     let new_raw = rewrite_states_to_authored(&raw, authored)?;
     let new_raw = strip_result_links(&new_raw);
@@ -62,17 +62,18 @@ fn reset_plan_file_states(
         help = temp_write_help(),
         "failed to write temp file: {err}"
     ))?;
-    persist_locked(tmp, path, Some(&locked)).map_err(|err| miette!(
+    persist_locked(tmp, path, Some(locked)).map_err(|err| miette!(
         help = temp_write_help(),
         "failed to persist temp file: {err}"
     ))?;
-
-    locked.release();
     Ok(())
 }
 
-fn clear_runtime_metadata_in_file(path: &Path, workspace_index: bool) -> MietteResult<()> {
-    let locked = LockedPlanFile::open(path)?;
+fn clear_runtime_metadata_in_file(
+    path: &Path,
+    workspace_index: bool,
+    locked: &LockedPlanFile,
+) -> MietteResult<()> {
     let raw = locked.read_to_string("failed to read plan file")?;
     let metadata = if workspace_index {
         rhei_core::parser::parse_workspace_index(&raw)
@@ -108,12 +109,10 @@ fn clear_runtime_metadata_in_file(path: &Path, workspace_index: bool) -> MietteR
         help = temp_write_help(),
         "failed to write temp file: {err}"
     ))?;
-    persist_locked(tmp, path, Some(&locked)).map_err(|err| miette!(
+    persist_locked(tmp, path, Some(locked)).map_err(|err| miette!(
         help = temp_write_help(),
         "failed to persist temp file: {err}"
     ))?;
-
-    locked.release();
     Ok(())
 }
 

@@ -268,39 +268,43 @@ fn reset_command(
     let input = input_buf.as_path();
     let loaded = load_plan(input)?;
     let scope = resolve_rhei_scope(&loaded, rhei_scope)?;
-    report_panta_scope_narrowed(&loaded, "reset", &scope);
-    let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
-    let machines = resolved.validator_set();
-    // This unlocked read is only the confirmation preview. After confirmation,
-    // reset repeats it under the complete plan-and-ledger lock stack before it
-    // changes anything. §FS-rhei-reset.2.2 §FS-rhei-reset.3
-    let preview_authored = collect_authored_states(&loaded, input, &scope, &machines);
 
-    fn count_nodes(task: &rhei_core::ast::Task) -> usize {
-        1 + task.children.iter().map(count_nodes).sum::<usize>()
-    }
-    let in_scope: Vec<&rhei_core::ast::Task> = loaded
-        .rhei
-        .tasks
-        .iter()
-        .filter(|task| task_in_rhei_scope(&scope, &task.id.to_string()))
-        .collect();
-    let task_count = in_scope.len();
-    let total_nodes: usize = in_scope.iter().map(|task| count_nodes(task)).sum();
-    let descendant_count = total_nodes.saturating_sub(task_count);
-
-    // Reset destroys result artifacts and ledgers that live under a `panta/`
-    // directory `rhei init` gitignores by default — there is usually no VCS
-    // copy to recover from. Show the damage before doing it.
-    let runtime_targets = reset_runtime_preview(&loaded, input, &scope);
-    // The preview precedes every destructive reset, not just the one that
-    // stops to ask: printing it only on the interactive path left exactly the
-    // unattended runs — scripts, CI, agents — silent. §FS-rhei-reset.1.2
-    report_reset_preview(task_count, descendant_count, &preview_authored, &runtime_targets);
+    // A dry run is read-only and reports the snapshot it just loaded. A
+    // destructive reset instead takes the complete writer stack below before
+    // it decides what its preview promises. §FS-rhei-reset.1.2
     if dry_run {
+        report_panta_scope_narrowed(&loaded, "reset", &scope);
+        let resolved =
+            resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
+        let machines = resolved.validator_set();
+        let decision = collect_reset_decision(&loaded, input, &scope, &machines);
+        report_reset_preview(&decision);
         println!("\nDry run — nothing was changed.");
         return Ok(());
     }
+
+    #[cfg(test)]
+    run_reset_before_locks_hook();
+
+    // Reset participates in the same metadata, distinct-task, then ledger
+    // order as every ordinary writer. Its authoritative decision is made only
+    // after the whole stack is held. §AR-agent-orchestrator-workflow.3.3.1
+    let mut reset_locks = ResetWriterLocks::acquire(&loaded, input, &scope)?;
+    let loaded = load_plan(input)?;
+    let scope = resolve_rhei_scope(&loaded, rhei_scope)?;
+    reset_locks.verify_coverage(&loaded, input, &scope)?;
+    let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
+    let machines = resolved.validator_set();
+    let decision = collect_reset_decision(&loaded, input, &scope, &machines);
+
+    report_panta_scope_narrowed(&loaded, "reset", &decision.scope);
+    // This preview, the mutation below, and the success summary all use the
+    // same decision while every writer lock stays held. §FS-rhei-reset.1.2
+    // §FS-rhei-reset.4
+    report_reset_preview(&decision);
+    #[cfg(test)]
+    run_reset_after_preview_hook(&decision);
+
     if !assume_yes {
         // §FS-rhei-reset.1.2: with no terminal there is no one to answer, and
         // the destroyed material is typically gitignored with no VCS copy. Ask
@@ -319,36 +323,12 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
         }
     }
 
-    // Reset participates in the same metadata, distinct-task, then ledger
-    // order as every ordinary writer and holds the whole stack through plan
-    // restoration and runtime cleanup. §AR-agent-orchestrator-workflow.3.3.1
-    let mut reset_locks = ResetWriterLocks::acquire(&loaded, input, &scope)?;
-    let loaded = load_plan(input)?;
-    let scope = resolve_rhei_scope(&loaded, rhei_scope)?;
-    reset_locks.verify_coverage(&loaded, input, &scope)?;
-    let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
-    let machines = resolved.validator_set();
-    let authored = collect_authored_states(&loaded, input, &scope, &machines);
-
-    let in_scope: Vec<&rhei_core::ast::Task> = loaded
-        .rhei
-        .tasks
-        .iter()
-        .filter(|task| task_in_rhei_scope(&scope, &task.id.to_string()))
-        .collect();
-    let task_count = in_scope.len();
-    let total_nodes: usize = in_scope.iter().map(|task| count_nodes(task)).sum();
-    let descendant_count = total_nodes.saturating_sub(task_count);
-
-    #[cfg(test)]
-    run_reset_after_locks_hook();
-
     // Each plan file's tasks return to the states *that file* authored them
     // in; a file whose tasks never moved still has its runtime lines
     // (assignee, result links) stripped. §FS-rhei-reset.2.2
     let no_moves: BTreeMap<String, String> = BTreeMap::new();
-    for (file, _sample_task_id) in reset_target_files(&loaded, input, &scope) {
-        let file_authored = authored.by_file.get(&file).unwrap_or(&no_moves);
+    for (file, _sample_task_id) in reset_target_files(&loaded, input, &decision.scope) {
+        let file_authored = decision.authored.by_file.get(&file).unwrap_or(&no_moves);
         reset_plan_file_states(&file, file_authored, reset_locks.plan(&file)?)?;
     }
     if workspace::is_workspace(input) {
@@ -358,14 +338,14 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
 
     // §FS-rhei-panta.6.4: a narrowed reset removes per-ticket artifacts, never
     // whole `runtime/` trees — sibling rheis share one execution root.
-    if scope.is_some() {
+    if decision.scope.is_some() {
         // §FS-rhei-panta.6.4: runtime ticket metadata (visit counts, poll
         // timers) in an in-scope workspace rhei's index is ticket-owned
         // state; leaving it would be a silent partial reset.
         let scoped_roots: BTreeSet<&PathBuf> = loaded
             .task_roots
             .iter()
-            .filter(|(task_id, _)| task_in_rhei_scope(&scope, task_id))
+            .filter(|(task_id, _)| task_in_rhei_scope(&decision.scope, task_id))
             .map(|(_, root)| root)
             .collect();
         for root in scoped_roots {
@@ -377,11 +357,11 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
         let removed = remove_scoped_runtime_artifacts(
             &loaded,
             input,
-            &scope,
+            &decision.scope,
             &machines,
             &mut reset_locks,
         )?;
-        report_reset_summary(task_count, descendant_count, &authored, removed);
+        report_reset_summary(&decision, removed);
         // A narrowed reset can only speak for ticket-owned artifacts; run-scoped
         // rollups belong to the run, not the ticket. Say so rather than leaving
         // the operator to discover the difference. §FS-rhei-panta.6.4
@@ -390,11 +370,10 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
              accounting rollups). Reset without `--rhei` to clear it."
         );
         #[cfg(test)]
-        run_reset_before_unlock_hook();
+        run_reset_before_unlock_hook(&decision);
         return Ok(());
     }
 
-    let mut runtime_dirs: Vec<PathBuf> = Vec::new();
     if loaded.is_panta_project() {
         let mut roots: BTreeSet<PathBuf> = loaded.task_roots.values().cloned().collect();
         roots.insert(input.to_path_buf());
@@ -403,38 +382,46 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
                 let index = root.join("index.rhei.md");
                 clear_runtime_metadata_in_file(&index, true, reset_locks.plan(&index)?)?;
             }
-            runtime_dirs.push(root.join("runtime"));
         }
-    } else if workspace::is_workspace(input) {
-        runtime_dirs.push(input.join("runtime"));
-    } else if let Some(parent) = input.parent() {
-        runtime_dirs.push(parent.join("runtime"));
     }
 
     let mut removed_runtime = false;
-    for runtime_dir in runtime_dirs {
+    // Delete exactly the runtime directories named in the confirmed preview.
+    // A cooperating writer cannot create another one until these locks leave.
+    // §FS-rhei-reset.1.2 §FS-rhei-reset.4
+    for runtime_dir in &decision.runtime_targets {
         if runtime_dir.exists() {
-            fs::remove_dir_all(&runtime_dir).map_err(|err| {
-                file_io_report(&runtime_dir, "failed to remove runtime directory", err)
+            fs::remove_dir_all(runtime_dir).map_err(|err| {
+                file_io_report(runtime_dir, "failed to remove runtime directory", err)
             })?;
             removed_runtime = true;
         }
     }
 
-    report_reset_summary(task_count, descendant_count, &authored, removed_runtime);
+    report_reset_summary(&decision, removed_runtime);
     #[cfg(test)]
-    run_reset_before_unlock_hook();
+    run_reset_before_unlock_hook(&decision);
     Ok(())
 }
 
 /// True when there is a human on stdin to answer a prompt.
 fn stdin_is_interactive() -> bool {
+    #[cfg(test)]
+    if let Some(interactive) = reset_stdin_interactive_override() {
+        return interactive;
+    }
+
     use std::io::IsTerminal;
     std::io::stdin().is_terminal()
 }
 
 /// Ask a yes/no question, defaulting to no.
 fn confirm(question: &str) -> MietteResult<bool> {
+    #[cfg(test)]
+    if let Some(answer) = run_reset_confirm_hook() {
+        return Ok(answer);
+    }
+
     use std::io::Write;
     print!("{question} [y/N] ");
     std::io::stdout().flush().map_err(|err| miette!(

@@ -201,39 +201,78 @@ fn reset_ledger_roots(
 }
 
 #[cfg(test)]
+type ResetDecisionHook = Box<dyn FnOnce(&ResetDecision)>;
+
+#[cfg(test)]
 thread_local! {
-    static RESET_AFTER_LOCKS_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
+    static RESET_BEFORE_LOCKS_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
         const { std::cell::RefCell::new(None) };
-    static RESET_BEFORE_UNLOCK_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
+    static RESET_AFTER_PREVIEW_HOOK: std::cell::RefCell<Option<ResetDecisionHook>> =
+        const { std::cell::RefCell::new(None) };
+    static RESET_BEFORE_UNLOCK_HOOK: std::cell::RefCell<Option<ResetDecisionHook>> =
+        const { std::cell::RefCell::new(None) };
+    static RESET_STDIN_INTERACTIVE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+    static RESET_CONFIRM_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce() -> bool>>> =
         const { std::cell::RefCell::new(None) };
 }
 
-/// Pause after reset has revalidated its inputs under the complete lock stack.
-/// Focused tests use this to start real writers across cleanup. §FS-rhei-reset.3
 #[cfg(test)]
-fn set_reset_after_locks_hook(hook: impl FnOnce() + 'static) {
-    RESET_AFTER_LOCKS_HOOK.with(|installed| *installed.borrow_mut() = Some(Box::new(hook)));
+fn set_reset_before_locks_hook(hook: impl FnOnce() + 'static) {
+    RESET_BEFORE_LOCKS_HOOK.with(|installed| *installed.borrow_mut() = Some(Box::new(hook)));
 }
 
 #[cfg(test)]
-fn run_reset_after_locks_hook() {
-    let hook = RESET_AFTER_LOCKS_HOOK.with(|installed| installed.borrow_mut().take());
+fn run_reset_before_locks_hook() {
+    let hook = RESET_BEFORE_LOCKS_HOOK.with(|installed| installed.borrow_mut().take());
     if let Some(hook) = hook {
         hook();
     }
 }
 
-/// Pause after cleanup but before the lock stack leaves scope. Tests use this
-/// to inspect the reset boundary without racing a released writer.
+/// Pause after the authoritative preview while the complete stack is held.
+/// Focused tests start real writers in the consent window. §FS-rhei-reset.1.2
 #[cfg(test)]
-fn set_reset_before_unlock_hook(hook: impl FnOnce() + 'static) {
+fn set_reset_after_preview_hook(hook: impl FnOnce(&ResetDecision) + 'static) {
+    RESET_AFTER_PREVIEW_HOOK.with(|installed| *installed.borrow_mut() = Some(Box::new(hook)));
+}
+
+#[cfg(test)]
+fn run_reset_after_preview_hook(decision: &ResetDecision) {
+    let hook = RESET_AFTER_PREVIEW_HOOK.with(|installed| installed.borrow_mut().take());
+    if let Some(hook) = hook {
+        hook(decision);
+    }
+}
+
+/// Pause after summary and cleanup but before the lock stack leaves scope.
+/// The decision argument exposes the exact data the summary reported.
+#[cfg(test)]
+fn set_reset_before_unlock_hook(hook: impl FnOnce(&ResetDecision) + 'static) {
     RESET_BEFORE_UNLOCK_HOOK.with(|installed| *installed.borrow_mut() = Some(Box::new(hook)));
 }
 
 #[cfg(test)]
-fn run_reset_before_unlock_hook() {
+fn run_reset_before_unlock_hook(decision: &ResetDecision) {
     let hook = RESET_BEFORE_UNLOCK_HOOK.with(|installed| installed.borrow_mut().take());
     if let Some(hook) = hook {
-        hook();
+        hook(decision);
     }
+}
+
+#[cfg(test)]
+fn set_reset_confirmation(interactive: bool, hook: impl FnOnce() -> bool + 'static) {
+    RESET_STDIN_INTERACTIVE.with(|value| value.set(Some(interactive)));
+    RESET_CONFIRM_HOOK.with(|installed| *installed.borrow_mut() = Some(Box::new(hook)));
+}
+
+#[cfg(test)]
+fn reset_stdin_interactive_override() -> Option<bool> {
+    RESET_STDIN_INTERACTIVE.with(std::cell::Cell::get)
+}
+
+#[cfg(test)]
+fn run_reset_confirm_hook() -> Option<bool> {
+    RESET_CONFIRM_HOOK
+        .with(|installed| installed.borrow_mut().take())
+        .map(|hook| hook())
 }

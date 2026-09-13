@@ -185,14 +185,15 @@ fn without_task_assignee(raw: &str, local_id: &str) -> (String, bool, bool) {
     (output, target_found, removed)
 }
 
-/// Drop the target task's `**Assignee:**` line, leaving every other line alone.
+/// Drop the target task's `**Assignee:**` line under the shared writer lock,
+/// leaving every other line alone. §AR-agent-orchestrator-workflow.3.3.1
 fn remove_task_assignee(
     task_file: &Path,
     local_id: &str,
     qualified_id: &str,
 ) -> MietteResult<()> {
-    let raw = fs::read_to_string(task_file)
-        .map_err(|err| file_io_report(task_file, "failed to read plan file", err))?;
+    let locked = LockedPlanFile::open(task_file)?;
+    let raw = locked.read_to_string("failed to read plan file")?;
 
     let (output, target_found, removed) = without_task_assignee(&raw, local_id);
 
@@ -213,5 +214,5 @@ help = task_moved_help(),
         ));
     }
 
-    write_file_atomic(task_file, &output)
+    write_file_atomic_locked(task_file, &output, Some(&locked))
 }

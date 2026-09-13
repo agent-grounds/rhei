@@ -1,8 +1,7 @@
-// The two platform facts every rewriting command now shares: what a refused
-// lock means, and which of two candidate readings of a locked plan is the
-// authoritative one.
+// The platform facts every rewriting command shares: what a refused lock
+// means, which plan reading is authoritative, and the stable sidecar identity.
 
-// §FS-rhei-run-headless.3 §FS-rhei-new.4
+// §FS-rhei-run-headless.3 §FS-rhei-new.4 §AR-agent-orchestrator-workflow.3.3.1
 
 mod file_lock_tests {
     use super::super::*;
@@ -54,25 +53,46 @@ mod file_lock_tests {
         locked.release();
     }
 
-    // A rename over a locked file is refused on Windows, so the state this
-    // builds — somebody else's file at our locked path — cannot arise there.
-    #[cfg(unix)]
     #[test]
-    fn a_locked_plan_is_read_by_path_and_not_through_the_handle() {
+    fn a_waiter_reads_the_current_path_after_replacement() {
         let dir = tempfile::tempdir().expect("tmpdir");
         let path = plan_file(&dir, "before\n");
         let locked = LockedPlanFile::open(&path).expect("lock the plan");
+        let waiting_path = path.clone();
+        let (lock_tx, lock_rx) = mpsc::channel();
+        let (done_tx, done_rx) = mpsc::channel();
+        let waiter = std::thread::spawn(move || {
+            set_plan_lock_observer(lock_tx);
+            let result = LockedPlanFile::open(&waiting_path).and_then(|waiting| {
+                let raw = waiting.read_to_string("failed to read waiting plan")?;
+                waiting.release();
+                Ok(raw)
+            });
+            done_tx.send(result.map_err(|error| error.to_string())).expect("waiter result");
+        });
+        assert_eq!(
+            lock_rx.recv_timeout(Duration::from_secs(2)).expect("waiter lock attempt"),
+            PlanLockEvent::Contended
+        );
 
-        // What a writer that got there first leaves behind: a *different* file
-        // at the same path. The handle still names the one it replaced, so a
-        // read through the handle would answer with content nobody can write
-        // to any more.
-        let replacement = dir.path().join("replacement");
-        fs::write(&replacement, "after\n").expect("write replacement");
-        fs::rename(&replacement, &path).expect("replace the plan");
-
-        assert_eq!(locked.read_to_string("failed to read plan file").expect("read"), "after\n");
+        let mut replacement = tempfile::NamedTempFile::new_in(dir.path()).expect("temp file");
+        replacement.write_all(b"after\n").expect("write replacement");
+        persist_locked(replacement, &path, Some(&locked)).expect("replace the plan");
+        assert!(
+            matches!(done_rx.recv_timeout(Duration::from_millis(50)), Err(RecvTimeoutError::Timeout)),
+            "the waiter completed before the replacing writer released its stable sidecar"
+        );
         locked.release();
+
+        assert_eq!(
+            lock_rx.recv_timeout(Duration::from_secs(2)).expect("waiter lock acquisition"),
+            PlanLockEvent::Acquired
+        );
+        assert_eq!(
+            done_rx.recv_timeout(Duration::from_secs(2)).expect("waiter completion").unwrap(),
+            "after\n"
+        );
+        waiter.join().expect("waiter thread");
     }
 
     #[test]
@@ -134,11 +154,16 @@ mod file_lock_tests {
         locked.release();
 
         assert_eq!(fs::read_to_string(&path).expect("read back"), "after\n");
-        let leftovers: Vec<String> = fs::read_dir(dir.path())
+        let mut leftovers: Vec<String> = fs::read_dir(dir.path())
             .expect("read dir")
             .map(|entry| entry.expect("entry").file_name().to_string_lossy().into_owned())
             .filter(|name| name != "plan.rhei.md")
             .collect();
-        assert!(leftovers.is_empty(), "the rewrite left {leftovers:?} behind");
+        leftovers.sort();
+        assert_eq!(
+            leftovers,
+            vec!["plan.rhei.md.lock"],
+            "only the persistent writer sidecar remains"
+        );
     }
 }

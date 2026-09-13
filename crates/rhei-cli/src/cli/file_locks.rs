@@ -1,33 +1,39 @@
-// The plan-file lock every rewriting command takes, and the one classification
-// every `fs2` try-lock in this crate depends on.
+// The stable writer lock every plan-rewriting command takes, and the one
+// classification every `fs2` try-lock in this crate depends on.
 //
 // Its own part because both are platform facts rather than command behavior,
 // and the commands that got them wrong — `rhei complete`, `rhei transition`,
 // `rhei reset`, a dashboard gate choice, the run-lock liveness probe, the
 // headless launch lock, snapshot-continue — had each gone their own way.
 
-// §AR-source-file-size.3
+// §AR-source-file-size.3 §AR-agent-orchestrator-workflow.3.3.1
 
-/// A plan file held under an exclusive lock for the length of one rewrite.
+/// A plan pathname held under one stable exclusive writer lock.
 ///
-/// It owns the handle rather than borrowing it, because releasing the lock and
-/// closing the handle are the same act on Windows: the lock there is a
-/// mandatory byte range, and the filesystem refuses to hand the path to a new
-/// file while the old one is open and locked. A rewrite that renames a temp
-/// file over its own locked plan has to let go first.
+/// `writer_lock` is a persistent sibling sidecar that atomic plan replacement
+/// never touches. `file` retains the destination handle required by mandatory
+/// locking platforms; a rename may release that handle, but never the sidecar.
 struct LockedPlanFile {
-    /// `None` once released. A refused replace releases it early and the caller
-    /// releases it again on its way out, so taking it has to be idempotent.
-    ///
-    /// Shared rather than owned, because the same handle is what
-    /// [`HELD_PLAN_LOCKS`] hands to a reader that has no lock object of its own.
+    writer_lock: Mutex<Option<fs::File>>,
     file: PlanLockHandle,
     path: PathBuf,
 }
 
 impl LockedPlanFile {
-    /// Open `path` and take its exclusive lock, blocking until it is free.
+    /// Take the stable sidecar before opening the destination it protects.
+    ///
+    /// A waiter therefore opens the current destination only after the prior
+    /// writer's last replacement and cannot retain a stale plan inode.
     fn open(path: &Path) -> MietteResult<Self> {
+        let lock_path = plan_lock_path(path)?;
+        let writer_lock = fs::OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(&lock_path)
+            .map_err(|err| file_io_report(&lock_path, "failed to open plan lock file", err))?;
+        lock_plan_writer(&writer_lock, &lock_path)?;
+
         let file = fs::File::open(path)
             .map_err(|err| file_io_report(path, "failed to open plan file", err))?;
         file.lock_exclusive()
@@ -38,7 +44,11 @@ impl LockedPlanFile {
         // this process tells it where to ask. §FS-rhei-new.4
         rhei_core::source::set_reader(plan_source_reader);
         held_plan_locks().lock().expect("held plan locks").push((path.to_path_buf(), file.clone()));
-        Ok(Self { file, path: path.to_path_buf() })
+        Ok(Self {
+            writer_lock: Mutex::new(Some(writer_lock)),
+            file,
+            path: path.to_path_buf(),
+        })
     }
 
     /// Read the locked file, by path first.
@@ -53,22 +63,9 @@ impl LockedPlanFile {
     /// process has locked is refused outright — the writer locks the plan and
     /// then cannot read it.
     ///
-    /// The refusal does not *prove* the handle is still the file at `path`, and
-    /// the comment here used to say it did. It is true only while no other
-    /// process is inside the release-then-rename window [`persist_locked`]
-    /// opens: in that window a rewriter has let go of the file it is about to
-    /// replace, so this process can take a lock on a file that is orphaned a
-    /// moment later, and a third process locking the *replacement* is enough to
-    /// refuse our read by path and send us to a handle naming the old content.
-    /// Nothing in this function can tell those two refusals apart without a
-    /// file-identity check, and rhei does not take a dependency for one. #95's
-    /// sidecar lock — held on a file the rename never touches — removes the
-    /// window, and with it this hole.
-    ///
-    /// What is closed here: once *this* process has released its own lock the
-    /// handle is never consulted again ([`read_through_handle`] answers `None`
-    /// and the caller reports the original refusal), so the window this
-    /// process opens cannot be read through by this process.
+    /// No cooperating writer can replace `path` while this object holds its
+    /// sidecar. The handle fallback is therefore authoritative precisely when
+    /// this process's own mandatory destination lock refused the path read.
     ///
     /// `action` names the read the way `file_io_report` wants it, so a caller's
     /// diagnostic reads the same as it did when this was `fs::read_to_string`.
@@ -85,9 +82,8 @@ impl LockedPlanFile {
             .map_err(|err| file_io_report(&self.path, action, err))
     }
 
-    /// Release the lock and close the handle. Idempotent, and a no-op once a
-    /// refused replace has already done it.
-    fn release(&self) {
+    /// Release only the replaceable destination handle, retaining the sidecar.
+    fn release_destination(&self) {
         if let Some(file) = self.file.lock().expect("plan lock handle").take() {
             let _ = fs2::FileExt::unlock(&file);
         }
@@ -95,6 +91,14 @@ impl LockedPlanFile {
             .lock()
             .expect("held plan locks")
             .retain(|(_, handle)| !Arc::ptr_eq(handle, &self.file));
+    }
+
+    /// Release the destination and then the stable writer sidecar. Idempotent.
+    fn release(&self) {
+        self.release_destination();
+        if let Some(file) = self.writer_lock.lock().expect("plan writer lock").take() {
+            let _ = fs2::FileExt::unlock(&file);
+        }
     }
 }
 
@@ -120,6 +124,76 @@ fn held_plan_locks() -> &'static Mutex<Vec<(PathBuf, PlanLockHandle)>> {
 
 /// The open, locked file, shared between the lock object and the registry.
 type PlanLockHandle = Arc<Mutex<Option<fs::File>>>;
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PlanLockEvent {
+    Contended,
+    Acquired,
+}
+
+#[cfg(test)]
+thread_local! {
+    static PLAN_LOCK_OBSERVER: std::cell::RefCell<Option<mpsc::Sender<PlanLockEvent>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+fn set_plan_lock_observer(observer: mpsc::Sender<PlanLockEvent>) {
+    PLAN_LOCK_OBSERVER.with(|installed| *installed.borrow_mut() = Some(observer));
+}
+
+#[cfg(test)]
+fn notify_plan_lock_observer(event: PlanLockEvent) {
+    PLAN_LOCK_OBSERVER.with(|installed| {
+        let observer = installed.borrow().clone();
+        if let Some(observer) = observer {
+            let _ = observer.send(event);
+        }
+        if event == PlanLockEvent::Acquired {
+            installed.borrow_mut().take();
+        }
+    });
+}
+
+/// The sibling lock identity for one replaceable plan pathname.
+///
+/// Canonicalizing only the parent makes relative and absolute spellings agree
+/// without resolving a final symlink that an atomic rewrite would replace.
+// §AR-agent-orchestrator-workflow.3.3.1
+fn plan_lock_path(path: &Path) -> MietteResult<PathBuf> {
+    let parent = path.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let parent = rhei_core::platform::canonical_path(parent)
+        .map_err(|err| file_io_report(parent, "failed to resolve plan lock directory", err))?;
+    let name = path.file_name().ok_or_else(|| {
+        miette!("failed to derive plan lock file for {}", path.display())
+    })?;
+    let mut lock_name = name.to_os_string();
+    lock_name.push(".lock");
+    Ok(parent.join(lock_name))
+}
+
+fn lock_plan_writer(file: &fs::File, path: &Path) -> MietteResult<()> {
+    #[cfg(test)]
+    if PLAN_LOCK_OBSERVER.with(|installed| installed.borrow().is_some()) {
+        match file.try_lock_exclusive() {
+            Ok(()) => {
+                notify_plan_lock_observer(PlanLockEvent::Acquired);
+                return Ok(());
+            }
+            Err(err) if lock_is_contended(&err) => {
+                notify_plan_lock_observer(PlanLockEvent::Contended);
+            }
+            Err(err) => return Err(file_io_report(path, "failed to acquire plan lock", err)),
+        }
+    }
+
+    file.lock_exclusive()
+        .map_err(|err| file_io_report(path, "failed to acquire plan lock", err))?;
+    #[cfg(test)]
+    notify_plan_lock_observer(PlanLockEvent::Acquired);
+    Ok(())
+}
 
 /// Read the whole file behind a lock handle, from the start.
 ///
@@ -160,8 +234,8 @@ fn read_through_held_lock(path: &Path) -> Option<std::io::Result<String>> {
 /// writer that took the lock before us has left a different file at `path`, and
 /// only reading by path sees it. The fallback covers the case that reading by
 /// path cannot: the file is one *we* locked, and Windows will not open it twice.
-/// Its limit is that function's too — a lock we have released is deregistered
-/// and never read through, and the window that remains is #95's.
+/// A destination handle released for replacement is deregistered and never
+/// read through; its stable writer sidecar still excludes other writers.
 ///
 /// The `io::Error` is passed through rather than wrapped, because the loader
 /// this is installed into branches on its kind.
@@ -186,26 +260,10 @@ fn read_plan_source(path: &Path, action: &str) -> MietteResult<String> {
 
 /// Rename a temp file over `path`, which `locked` may be holding.
 ///
-/// A refused replace releases the lock and tries once more — exactly once; a
-/// second refusal is returned to the caller. Unix never reaches the retry, an
-/// advisory lock refusing no rename, so everything below is about Windows.
-///
-/// **This opens a window, and the window is real.** Between the `release()` and
-/// the rename that follows it, the plan is held by nobody and this process has
-/// no handle on it: a command that was blocked on the lock acquires it there,
-/// reads the file as it stood *before* our rename, and may persist its own
-/// rewrite after ours — losing ours entirely. Nothing here narrows that; the
-/// retry only makes the write possible at all, where the alternative is a
-/// rewrite that cannot land on Windows even uncontended.
-///
-/// Nor does the caller's own `release()` afterwards close it: by then the lock
-/// object names a file no path points at any more, so releasing it is letting
-/// go of an orphan, and whatever the caller does between the rename and that
-/// release — an `on_enter` callback, a rollback write — it does unlocked.
-///
-/// The fix is a lock that does not live on the file being replaced: a sidecar
-/// the rename never touches, held across the whole rewrite. That is #95, and it
-/// is a change to every locking command rather than to this function.
+/// A mandatory destination lock may refuse the first replace. Release only
+/// that replaceable handle and retry once; [`LockedPlanFile::writer_lock`]
+/// continues excluding every cooperating writer across the retry.
+// §AR-agent-orchestrator-workflow.3.3.1
 fn persist_locked(
     tmp: tempfile::NamedTempFile,
     path: &Path,
@@ -218,7 +276,7 @@ fn persist_locked(
     let Some(locked) = locked else {
         return Err(refused);
     };
-    locked.release();
+    locked.release_destination();
     refused.file.persist(path).map(|_| ())
 }
 

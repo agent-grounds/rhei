@@ -25,6 +25,8 @@ thread_local! {
         const { std::cell::RefCell::new(Vec::new()) };
     static CLAIM_BEFORE_LOCK_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
         const { std::cell::RefCell::new(None) };
+    static CLAIM_AFTER_STATE_WRITE_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 /// Install one-shot, thread-local persistence failures for focused unit tests.
@@ -62,6 +64,24 @@ fn set_claim_before_lock_hook(hook: impl FnOnce() + 'static) {
 #[cfg(test)]
 fn run_claim_before_lock_hook() {
     let hook = CLAIM_BEFORE_LOCK_HOOK.with(|installed| installed.borrow_mut().take());
+    if let Some(hook) = hook {
+        hook();
+    }
+}
+
+/// Pause after the provisional state replacement while the complete writer
+/// lock stack remains held. Focused tests use this to start an ordinary writer
+/// in the former inode-lock gap. §AR-agent-orchestrator-workflow.3.3.1
+#[cfg(test)]
+fn set_claim_after_state_write_hook(hook: impl FnOnce() + 'static) {
+    CLAIM_AFTER_STATE_WRITE_HOOK.with(|installed| {
+        *installed.borrow_mut() = Some(Box::new(hook));
+    });
+}
+
+#[cfg(test)]
+fn run_claim_after_state_write_hook() {
+    let hook = CLAIM_AFTER_STATE_WRITE_HOOK.with(|installed| installed.borrow_mut().take());
     if let Some(hook) = hook {
         hook();
     }

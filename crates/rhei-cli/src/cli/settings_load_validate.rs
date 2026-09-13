@@ -266,7 +266,8 @@ fn validate_effective_static_agent_modes(
 
     for (state_name, state) in &machine.states {
         let uses_selector = state.target.is_some() || !state.all_targets.is_empty();
-        if state.terminal || state.gating || state.program.is_some() || uses_selector {
+        let inactive = state.terminal || state.gating || state.program.is_some();
+        if uses_selector || (inactive && state.agent_mode.is_none()) {
             continue;
         }
 

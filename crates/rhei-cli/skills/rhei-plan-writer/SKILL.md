@@ -53,7 +53,33 @@ Apply these rules:
 
 Run `rhei states` in the project to discover the allowed state values, their agent instructions, and the declared transitions for the state machine the plan will follow. Use `rhei states --state-machine <path>` to target a specific YAML file (e.g. the one a plan's `**States:**` line references), and `--json` when machine-readable output is preferred. Use only state values reported by that command, follow the printed instructions when describing task work, and respect the declared transitions when choosing initial states.
 
-If the `rhei` CLI is unavailable, read the YAML directly. A plan declaring no `**States:**` (in a Panta project, neither the rhei nor `index.panta.md`) runs the built-in machine in [default-states.md](references/default-states.md). Otherwise open the `states.yaml` whose `name:` equals the declared value. Look first in the rhei's own directory, but only when the rhei declares a machine other than the project default: a rhei that restates the default's name counts as declaring nothing, and its machine is found exactly as the default's is, without this first step. Next look at the project root, or, outside a project, in the plan's directory or at the Directory Workspace root. Last, look in every rhei directory, its own included: if exactly one has a `states.yaml` with that name, use it. Nothing else is searched ([§FS-rhei-plan-language.1.3](../../../../docs/functional-spec/rhei-plan-language.spec.md#13-state-machine-resolution)).
+#### No-CLI state-machine resolution
+
+If the `rhei` CLI is unavailable, resolve the effective declaration using this
+table and then read the selected YAML directly. An explicit matching
+`--state-machine <path>` remains a whole-scope override and is read first.
+
+| Invocation scope | Effective `**States:**` | Matching file available | Resolution |
+|---|---|---|---|
+| Panta project default (inherited or restated) | `rhei` | project-root `states.yaml` | project-root file |
+| Panta project default (inherited or restated) | `rhei` | member-root `states.yaml` only | built-in `rhei` |
+| Standalone single-file plan | `rhei` | sibling `states.yaml` | sibling file |
+| Standalone Directory Workspace | `rhei` | workspace-root `states.yaml` | workspace-root file |
+| Panta custom project default | non-`rhei` | one matching member-root `states.yaml` | unique member-root file |
+
+A plan with no effective `**States:**` declaration uses the built-in machine in
+[default-states.md](references/default-states.md) and ignores automatically
+discovered files. For a declared `rhei`, use a matching file only at the local
+lookup location shown above; without one, use that same built-in machine and its
+`pending`/`completed` states. In particular, a member that inherits or restates
+a Panta project default named `rhei` cannot replace it with a member-root file.
+
+For a non-`rhei` declaration, a member's own declaration that differs from the
+project default checks its execution root first. Otherwise check the Panta
+project root; if it is absent or names a different machine, use a matching file
+from the rhei roots only when exactly one exists. Multiple matches are an error,
+as is an unreadable candidate. No other automatic location is searched
+([§FS-rhei-plan-language.1.3](../../../../docs/functional-spec/rhei-plan-language.spec.md#13-state-machine-resolution)).
 
 Each node's initial state comes from the machine's `profiles.<name>.initial` via `node_policy` — **not** from a state-level `initial: true` flag. In the built-in `rhei` machine the initial state is `pending`, so every task in a new plan under that machine starts in `pending`.
 

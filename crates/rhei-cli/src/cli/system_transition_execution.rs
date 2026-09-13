@@ -220,10 +220,9 @@ fn execute_transition_with_origin(
             from
         ));
     }
-    // The explicit operation context is a relationship claim about the
-    // locked, re-read tree. Validate it immediately after compare-and-swap,
-    // before target policy, edge selection, callbacks, artifacts, or effects.
-    // §FS-rhei-transition-cmd.3
+    // The explicit operation context is a relationship claim about the locked tree.
+    // Validate it after compare-and-swap, before target policy, edge selection,
+    // callbacks, artifacts, or effects. §FS-rhei-transition-cmd.3
     let supervising_owner =
         nearest_in_scope_supervising_owner(machine, &task_info.ancestors);
     if let Err(err) = ensure_operation_supervisor_matches(

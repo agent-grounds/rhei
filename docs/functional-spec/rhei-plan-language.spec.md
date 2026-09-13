@@ -209,22 +209,30 @@ State-machine resolution is normative for all commands:
    effective value; if the effective field is omitted, the loaded file's `name`
    becomes the active state-machine name for this invocation.
 2. For a rhei inside a Panta Project, the effective `**States:**` declaration is
-   resolved per rhei. A declaration in the rhei itself wins — the rhei runs
-   under the machine it names, which may differ from its siblings'
+   resolved per rhei. A declaration in the rhei itself that differs from the
+   project default wins — the rhei runs under the machine it names, which may
+   differ from its siblings'
    ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)). Its definition file resolves from the rhei's own
    execution root (`<rhei>/states.yaml`) when that file's `name` matches, then
-   by the project-level name-match rules. If the rhei omits `**States:**`, it
-   inherits the declaration from `index.panta.md` when that manifest declares
-   one. The inherited declaration is resolved from the Panta project root
-   (`<project>/states.yaml`) unless `--state-machine` supplied an override.
+   by the project-level name-match rules. A rhei that omits `**States:**` or
+   restates the project default resolves that default from the Panta project
+   root (`<project>/states.yaml`) unless `--state-machine` supplied an override.
 3. When `**States:**` is omitted after Panta inheritance has been applied, the
    plan or rhei uses the built-in `rhei` state machine. Sibling, workspace, or
    project `states.yaml` files are ignored in this case.
 4. When `**States:** rhei` is declared and no override is supplied, a matching
-   auto-discovered `states.yaml` named `rhei` may be used from the same lookup
-   location that would serve a non-`rhei` declaration; otherwise — including for
-   a member whose Panta default names a different machine — the plan falls back
-   to the built-in `rhei` state machine.
+   `states.yaml` named `rhei` may be used only from the invocation's local
+   lookup location: beside a standalone single-file plan, at a standalone
+   Directory Workspace root, or at the Panta project root for the project's
+   effective default. A member whose own declaration differs from the
+   project's effective default instead resolves the same way rule 5 describes
+   for a non-`rhei` declaration — its own execution root first, then a unique
+   `name`-match among the project's candidate roots. Otherwise — including
+   when that candidate search finds nothing for a member whose Panta default
+   names a different machine — the plan falls back to the built-in `rhei`
+   state machine. In particular, when a Panta project's effective default is
+   `rhei`, a member that inherits or restates that default does not let a
+   matching file found only in a member rhei root replace the built-in fallback.
 5. When a non-`rhei` `**States:** <name>` is declared and no override is
    supplied, the CLI resolves the file from a sibling `states.yaml` for a
    single-file plan, from `<workspace>/states.yaml` for a Directory Workspace,
@@ -232,7 +240,9 @@ State-machine resolution is normative for all commands:
    declaration, or from `<project>/states.yaml` when the declaration was
    inherited from `index.panta.md` — falling back, in every project case, to a
    unique `name`-match among the project's candidate roots ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)).
-   A resolved file's `name` must match `<name>`.
+   This candidate-root fallback does not apply to the effective Panta project
+   default `rhei` governed by rule 4. A resolved file's `name` must match
+   `<name>`.
 6. A declared non-`rhei` state machine without a matching auto-discovered file
    is a validation error; it never falls back to the built-in machine.
 

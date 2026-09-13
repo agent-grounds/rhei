@@ -262,6 +262,53 @@ fn a_restated_default_found_in_the_rheis_own_root_runs_from_there() {
     );
 }
 
+/// A Panta project whose effective default is the built-in `rhei` machine does
+/// not adopt a matching machine found only in a member root. The inheriting
+/// member remains valid on `pending`; the restating member's `drafting` state is
+/// rejected, and `rhei states` reports the built-in source.
+/// §FS-rhei-plan-language.1.3
+#[test]
+fn issue_244_contract_builtin_project_default_ignores_a_member_only_rhei_machine() {
+    let dir = unique_temp_dir("placement-builtin-project-default");
+    let home = dir.join(".home");
+    let project = dir.join("project");
+    for rhei in ["audit", "billing"] {
+        std::fs::create_dir_all(project.join(rhei).join("tasks")).expect("create the rhei");
+    }
+    write_fixture_file(&project, "index.panta.md", "# Panta: Built-in Default\n**States:** rhei\n");
+
+    let audit = project.join("audit");
+    write_fixture_file(&audit, "index.rhei.md", "# Rhei: Audit\n");
+    write_fixture_file(&audit.join("tasks"), "01.md", "### Task 1: Audit\n**State:** pending\n");
+
+    let billing = project.join("billing");
+    write_fixture_file(&billing, "index.rhei.md", "# Rhei: Billing\n**States:** rhei\n");
+    write_fixture_file(&billing, "states.yaml", &machine("rhei", "drafting", "filed"));
+    write_fixture_file(&billing.join("tasks"), "01.md", "### Task 1: Draft\n**State:** drafting\n");
+
+    let project_arg = project.display().to_string();
+    let states = rhei_in(&dir, &home, &["states", &project_arg]);
+    assert_success(&states);
+    assert!(
+        states.stdout.contains("Source: the built-in default state machine")
+            && !states.stdout.contains(&billing.join("states.yaml").display().to_string()),
+        "`rhei states` should select the built-in source, not the member file; got:\n{}",
+        states.stdout
+    );
+    println!("passing `rhei states` control:\n{}", states.stdout);
+
+    let validation = rhei_in(&dir, &home, &["validate", &project_arg]);
+    assert_failure(&validation, "drafting");
+    let said = flattened_output(&validation);
+    assert!(
+        said.contains("built-in default state machine")
+            && said.contains("invalid state 'drafting'")
+            && said.contains("Allowed: [pending, completed]"),
+        "validation should reject the member-only custom state under built-in rhei; got:\n{said}"
+    );
+    println!("passing `rhei validate` control:\n{said}");
+}
+
 /// `docs/states.yaml` is not a place resolution looks: the plan fails with the
 /// not-found error, and the same file loads only through `--state-machine` —
 /// the issue's cases A and C. §FS-rhei-plan-language.1.3

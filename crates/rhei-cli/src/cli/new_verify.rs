@@ -54,7 +54,7 @@ fn new_write_failure(
                 return Some(CreateFailure {
                     report: validation_report(
                         target,
-                        pass.state_machine.as_deref(),
+                        &pass.state_machine_sources,
                         &introduced,
                         &pass.help,
                     ),

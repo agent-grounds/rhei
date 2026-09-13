@@ -586,10 +586,10 @@ fn file_io_report(path: &Path, action: &str, err: impl FileIoCause) -> Report {
 /// the `help` rather than in the error text is what lets a create tell the
 /// errors it introduced from the ones it inherited, while the reader still sees
 /// every word.
-// §FS-rhei-new.5.2
+// §FS-rhei-new.5.2 §FS-rhei-validate.6
 fn validation_report(
     input: &Path,
-    state_machine: Option<&Path>,
+    state_machine_sources: &[ValidationMachineSource],
     errors: &[String],
     guidance: &[String],
 ) -> Report {
@@ -597,7 +597,7 @@ fn validation_report(
     help.push("fix the errors above, then re-check with: rhei validate <plan>".to_string());
     miette!(
         help = help.join("\n"),
-        "{}", render_validation_diagnostic(input, state_machine, errors)
+        "{}", render_validation_diagnostic(input, state_machine_sources, errors)
     )
 }
 
@@ -636,7 +636,7 @@ fn render_parse_diagnostic(
 
 fn render_validation_diagnostic(
     input: &Path,
-    state_machine: Option<&Path>,
+    state_machine_sources: &[ValidationMachineSource],
     errors: &[String],
 ) -> String {
     let mut lines = vec![
@@ -644,10 +644,31 @@ fn render_validation_diagnostic(
         format!("in {}", display_path(input)),
     ];
     lines.push(String::new());
-    lines.push(format!(
-        "I validated this plan using {}, but found a problem.",
-        state_machine_label(state_machine),
-    ));
+    if let [source] = state_machine_sources {
+        lines.push(format!(
+            "I validated this plan using {}, but found a problem.",
+            state_machine_label(source.path.as_deref()),
+        ));
+    } else {
+        // Multi-source failures expose the exact resolution used by the pass;
+        // the one-source branch above stays byte-for-byte compatible. §FS-rhei-validate.6
+        lines.push("I validated this plan using these state-machine sources:".to_string());
+        for source in state_machine_sources {
+            let mut ownership = Vec::new();
+            if source.project_default {
+                ownership.push("project default".to_string());
+            }
+            if !source.rheis.is_empty() {
+                ownership.push(format!("rhei: {}", source.rheis.join(", ")));
+            }
+            lines.push(format!(
+                "  - {} ({})",
+                state_machine_label(source.path.as_deref()),
+                ownership.join("; "),
+            ));
+        }
+        lines.push("but found a problem.".to_string());
+    }
     lines.push(String::new());
     lines.push(format_validation_errors(errors));
     lines.push(String::new());

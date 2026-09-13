@@ -1116,8 +1116,9 @@ struct ValidationPass {
     /// create elsewhere can change, kept out of the error text so the pre/post
     /// diff stays stable. §FS-rhei-new.5.2
     help: Vec<String>,
-    /// The states file the pass resolved, for an error report to name.
-    state_machine: Option<PathBuf>,
+    /// Every state-machine source the pass resolved, for an error report to
+    /// attribute exactly. §FS-rhei-validate.6
+    state_machine_sources: Vec<ValidationMachineSource>,
 }
 
 /// Run the whole validation pass, failing on the first error report and
@@ -1135,7 +1136,7 @@ fn validation_warnings_or_error(
     if !pass.errors.is_empty() {
         return Err(validation_report(
             input,
-            pass.state_machine.as_deref(),
+            &pass.state_machine_sources,
             &pass.errors,
             &pass.help,
         ));
@@ -1203,7 +1204,7 @@ fn validation_pass(input: &Path, state_machine: Option<&Path>) -> MietteResult<V
         errors: report.errors,
         warnings: report.warnings,
         help: report.help,
-        state_machine: resolved.default.path.clone(),
+        state_machine_sources: resolved.validation_sources(&loaded.rhei_ids),
     })
 }
 

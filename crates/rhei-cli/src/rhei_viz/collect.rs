@@ -151,15 +151,22 @@ fn resolve_project_machines(
             continue;
         }
 
-        if let Some(root) = loaded.rhei_roots.get(rhei_id) {
-            let candidate = root.join("states.yaml");
-            if candidate.is_file() {
-                // Static collection gives every explicit declaration local
-                // first refusal, including a repeated default name. §FS-rhei-plan-language.1.3
-                let machine = load_machine(&candidate)?;
-                if machine.name == *machine_name {
-                    per_rhei.insert(rhei_id.clone(), machine);
-                    continue;
+        let restates_builtin_default =
+            *machine_name == default.name && *machine_name == StateMachine::builtin_default().name;
+        if !restates_builtin_default {
+            // Restating the built-in default stays equivalent to omission in
+            // every respect (§AR-rhei-panta.4): only a custom same-name
+            // declaration gives its own candidate local first refusal.
+            if let Some(root) = loaded.rhei_roots.get(rhei_id) {
+                let candidate = root.join("states.yaml");
+                if candidate.is_file() {
+                    // Static collection gives every explicit declaration local
+                    // first refusal, including a repeated default name. §FS-rhei-plan-language.1.3
+                    let machine = load_machine(&candidate)?;
+                    if machine.name == *machine_name {
+                        per_rhei.insert(rhei_id.clone(), machine);
+                        continue;
+                    }
                 }
             }
         }

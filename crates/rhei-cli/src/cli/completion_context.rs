@@ -421,15 +421,23 @@ fn resolve_declared_rhei_machine(
     machine_name: &str,
     default: &ResolvedStateMachine,
 ) -> MietteResult<ResolvedStateMachine> {
+    let builtin_name = &rhei_validator::StateMachine::builtin_default().name;
+    let restates_builtin_default =
+        machine_name == default.machine.name && machine_name == builtin_name;
     let mut candidates: Vec<PathBuf> = Vec::new();
-    if let Some(root) = loaded.rhei_roots.get(rhei_id) {
-        let candidate = root.join("states.yaml");
-        if candidate.is_file() {
-            // An explicit declaration always gives its own candidate first
-            // refusal, even when it repeats the default name. §FS-rhei-plan-language.1.3
-            let machine = load_state_machine(Some(&candidate))?;
-            if machine.name == machine_name {
-                return Ok(ResolvedStateMachine { machine, path: Some(candidate) });
+    if !restates_builtin_default {
+        // Restating the built-in default stays equivalent to omission in
+        // every respect (§AR-rhei-panta.4): only a custom same-name
+        // declaration gives its own candidate first refusal.
+        if let Some(root) = loaded.rhei_roots.get(rhei_id) {
+            let candidate = root.join("states.yaml");
+            if candidate.is_file() {
+                // An explicit declaration always gives its own candidate first
+                // refusal, even when it repeats the default name. §FS-rhei-plan-language.1.3
+                let machine = load_state_machine(Some(&candidate))?;
+                if machine.name == machine_name {
+                    return Ok(ResolvedStateMachine { machine, path: Some(candidate) });
+                }
             }
         }
     }

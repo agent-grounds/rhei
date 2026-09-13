@@ -29,22 +29,18 @@ or `rhei run`. Inline state `personality` and `instructions` remain valid.
 
 ## 1. Template Discovery
 
-Templates are resolved in order, first match wins:
+Templates are resolved per name in order, first match wins:
 
 | Priority | Location | Scope |
 |----------|----------|-------|
-| 1 | `<project>/.agent-grounds/rhei/templates/<name>/` | Project-local |
-| 2 | `<project>/.agents/rhei/templates/<name>/` | Project-local, deprecated |
-| 3 | `~/.agent-grounds/rhei/templates/<name>/` | User-global |
-| 4 | `~/.agents/rhei/templates/<name>/` | User-global, deprecated |
-| 5 | compiled into the `rhei` binary | Built-in |
+| 1 | each `<ancestor>/.agent-grounds/rhei/templates/<name>/`, then `<ancestor>/.agents/rhei/templates/<name>/` | Project-local, nearest ancestor outward; deprecated second at each level |
+| 2 | `~/.agent-grounds/rhei/templates/<name>/` | User-global |
+| 3 | `~/.agents/rhei/templates/<name>/` | User-global, deprecated |
+| 4 | compiled into the `rhei` binary | Built-in |
 
-`<project>` is the **nearest** level at or above the working directory holding
-either name, not the repository root; §1.2 gives the walk that finds it. The
-table is therefore the order *within* one level, once the walk has fixed which
-level that is — a child holding only `.agents/rhei/templates` wins over a
-parent holding `.agent-grounds/rhei/templates`, because the walk stops at the
-child and the parent's rows are never reached.
+`<ancestor>` ranges from the working directory through every filesystem parent
+to the filesystem root. Section 1.2 defines the project-local walk. Every
+project ancestor is searched before the user-global and built-in tiers.
 
 The `<name>` is the directory name and serves as the template identifier used in CLI commands.
 
@@ -83,9 +79,12 @@ repository has to be able to edit, so they cannot live behind that protection.
 `.agents/skills/` is agent instruction, is discovered there by other runtimes,
 and does not move.
 
-Both names exist at every tier that has a project-local or user-global root,
-and the new name is searched first at that tier. A template present under both
-names at one tier resolves to the `.agent-grounds` copy and is listed once.
+Both names exist at every tier that has a project-local or user-global root.
+The new name is searched first at a user-global tier and first at each
+project-local ancestor level. A template present under both names at the same
+level resolves to the `.agent-grounds` copy and is listed once. A nearer
+project-local copy under the deprecated name still precedes a farther copy
+under the current name.
 
 Rhei never *writes* to `.agents/rhei/`. Every path that creates project-local
 rhei material — a template's root `settings.json` on instantiation (§4), the
@@ -95,23 +94,34 @@ about.
 
 ### 1.2. The ancestor walk checks both names at each level
 
-The project-local root is the **nearest** one at or above the working
-directory. Discovery walks upward from the working directory and, at each
-level, checks `.agent-grounds/rhei/templates` and then `.agents/rhei/templates`
-**before ascending to the parent**. The first level holding either directory
-wins, and within that level the `.agent-grounds` name wins.
+The project-local roots are an ordered ancestor sequence, not one selected
+level. Discovery walks upward from the working directory through the filesystem
+root. At each level it checks `.agent-grounds/rhei/templates` and then
+`.agents/rhei/templates` **before ascending to the parent**. No Git repository,
+Panta project, rhei home, or other project marker ends this walk.
 
-Checking both names per level is what preserves nearest-directory-wins. Walking
-the whole ancestry for `.agent-grounds` and then walking it again for `.agents`
-would let a distant ancestor's new-style directory beat the enclosing
-repository's old-style one. A child holding `.agents/rhei/templates` under a
-parent holding `.agent-grounds/rhei/templates` therefore resolves to the
-**child**.
+Resolution is per template name. The first directory named `<name>` in that
+sequence wins. A settings-only rhei home, an empty templates directory, or a
+templates directory containing only other names therefore cannot hide an
+ancestor copy of `<name>`. The same order aggregates listings and completion
+candidates, with the first copy of each name included once. Named detail,
+no-name instantiation, and named instantiation inherit that discovery order.
+For a valid winning copy, its source, path, manifest content, and rendered
+content must agree across those commands.
 
-The level the walk settles on contributes **both** names whether or not both
-exist, so a listing of what was searched never advertises the deprecated home
-alone. When no ancestor holds either directory, the project root supplies the
-base and `.agent-grounds/rhei/templates` is preferred there too.
+Checking both names per level preserves nearest-copy-wins without giving the
+current name global precedence. A child copy under `.agents/rhei/templates`
+therefore beats a parent copy of the same name under
+`.agent-grounds/rhei/templates`; at one level, the `.agent-grounds` copy still
+beats the `.agents` copy. Every project-local ancestor remains ahead of both
+user-global homes and the built-in fallback.
+
+Each level holding either templates directory contributes both candidate paths
+in current-then-deprecated order, whether or not both directories exist, so a
+searched-path display never advertises the deprecated home alone. When no
+ancestor holds either templates directory, the project root supplies the same
+current/deprecated fallback pair for the `Searched:` diagnostic. This fallback
+does not cut off or otherwise redefine the ancestor walk.
 
 ### 1.3. The deprecation warning
 
@@ -522,7 +532,15 @@ Input arguments are parsed as follows:
 #### 6.1.2. Behavior
 
 1. **Show choices when omitted.** If no template is provided, print the same human-readable discovered-template list as `rhei templates` and exit successfully.
-2. **Locate template.** Resolve `<template>` through the discovery chain unless it is already a filesystem path. Direct paths include absolute paths, relative paths containing `/`, and dot-prefixed relative paths such as `./my-template` or `../templates/review`. When a named template is not found and a discovered template name is sufficiently similar, include that closest name as a suggestion in the lookup error.
+2. **Locate template.** Resolve `<template>` through the per-name discovery
+   chain in §1.2 unless it is already a filesystem path. The first matching
+   directory wins; named instantiation loads that copy and reports its load or
+   validation error rather than falling through to a farther copy. Direct paths
+   include absolute paths, relative paths containing `/`, and dot-prefixed
+   relative paths such as `./my-template` or `../templates/review`. A direct
+   path bypasses discovery. When a named template is not found and a discovered
+   template name is sufficiently similar, include that closest name as a
+   suggestion in the lookup error.
 3. **Load manifest.** Parse `template.yaml`, validate schema.
 4. **Collect inputs.** Resolve inputs using this precedence order: manifest defaults < `--values` files from left to right < positional input values < `KEY=VALUE` input arguments and `--set` flags from left to right < `--set-file` flags from left to right. Error on missing required inputs, unknown input names, ambiguous positional values, or duplicate `positional` declarations. Validate types and `validate` patterns. For `array` / `object` inputs, positional values, `KEY=VALUE`, `--set`, and `--set-file` values are parsed as YAML/JSON snippets before validation.
 5. **Render templates.** Walk all materialized text files in the template directory and render them through the restricted MiniJinja environment. `template.yaml` is parsed before this step and is never rendered into the output. Error on any unresolved instantiation template reference.
@@ -727,16 +745,27 @@ Options:
 ```
 
 Without a positional, prints a table of discovered templates with name,
-version, description, source path, and required input count.
+version, description, source path, and required input count. Project-local
+names are aggregated across every ancestor in §1.2 and appear once each; user
+and built-in copies appear only when no project ancestor already contributed
+that name. `--source` filters this listing by tier without changing named
+lookup precedence.
 
 With a template name (or a path to a template directory), prints that
 template's detail: source, path, and the same input schema
 `rhei instantiate <template> --list-inputs` prints, followed by an
 instantiation hint. Naming a template is the natural gesture after reading
 the list — it must answer with the template, not an argument error. `--json`
-emits the single template as one object in the list's entry shape.
+emits the single template as one object in the list's entry shape. For valid
+copies, named detail selects the same source, path, and manifest that an
+unfiltered listing and named instantiation select.
 
-When discovery encounters an invalid template directory, `rhei templates` skips it and prints a warning instead of failing the entire listing.
+When discovery encounters an unreadable or invalid template directory,
+`rhei templates` skips it and prints the existing warning instead of failing
+the entire listing or detail lookup. This skip may expose the next valid copy.
+It does not change named instantiation's rule in §6.1.2: instantiation stops at
+the first matching directory and reports that copy's error. Deprecated-home
+warnings remain governed by §1.3 and fire only for copies actually read.
 
 #### 6.3.1. The JSON entry carries the whole input schema
 

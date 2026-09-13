@@ -155,3 +155,48 @@ fn warn_deprecated_rhei_home(read: &Path, move_to: &Path) {
         move_to.display()
     );
 }
+
+#[cfg(test)]
+mod template_root_order_tests {
+    use super::*;
+
+    /// Test-only spelling of the approved root order. The end-to-end tests pin
+    /// that production discovery consumes this whole sequence.
+    /// §FS-rhei-templates.1.2
+    fn ancestor_template_roots(start: &Path) -> Vec<RheiHomePath> {
+        start
+            .ancestors()
+            .flat_map(|level| rhei_home_paths(level, "templates"))
+            .collect()
+    }
+
+    #[test]
+    fn template_ancestor_discovery_orders_roots_through_the_filesystem_root() {
+        let temp = tempfile::tempdir().expect("create root-order fixture");
+        let marker = temp.path().join("workspace");
+        let start = marker.join("panta/member");
+        std::fs::create_dir_all(marker.join(".git")).expect("create Git marker");
+        std::fs::create_dir_all(&start).expect("create nested start");
+        std::fs::write(marker.join("index.panta.md"), "# Panta: Marker\n")
+            .expect("create Panta marker");
+
+        let roots = ancestor_template_roots(&start);
+        let levels = start.ancestors().collect::<Vec<_>>();
+        assert_eq!(roots.len(), levels.len() * 2);
+        for (level, pair) in levels.iter().zip(roots.chunks_exact(2)) {
+            let expected = rhei_home_paths(level, "templates");
+            assert_eq!(pair[0].path(), expected[0].path());
+            assert_eq!(pair[1].path(), expected[1].path());
+        }
+
+        let marker_current = rhei_home_paths(&marker, "templates")[0].path().to_path_buf();
+        assert!(
+            roots.iter().any(|root| root.path() == marker_current),
+            "Git and Panta markers must not remove their level or any parent"
+        );
+        let filesystem_root = levels.last().expect("an absolute temp path has a root");
+        let final_pair = rhei_home_paths(filesystem_root, "templates");
+        assert_eq!(roots[roots.len() - 2].path(), final_pair[0].path());
+        assert_eq!(roots[roots.len() - 1].path(), final_pair[1].path());
+    }
+}

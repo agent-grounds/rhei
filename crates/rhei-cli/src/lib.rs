@@ -50,6 +50,7 @@ include!("cli/loop_budget.rs");
 include!("cli/metadata_conditions.rs");
 include!("cli/metadata_rewrite.rs");
 include!("cli/subtree_supervision.rs");
+include!("cli/subtree_supervision_owner.rs");
 include!("cli/subtree_supervision_barrier.rs");
 include!("cli/transition_context.rs");
 include!("cli/checkout_roots.rs");
@@ -195,6 +196,7 @@ mod tests {
     include!("cli/tests_supervised.rs");
     include!("cli/tests_subtree_supervision.rs");
     include!("cli/tests_subtree_supervision_scope.rs");
+    include!("cli/tests_subtree_supervision_owner.rs");
     include!("cli/tests_subtree_supervision_barrier.rs");
     include!("cli/tests_run_descriptor.rs");
     include!("cli/tests_stop_pidfd.rs");

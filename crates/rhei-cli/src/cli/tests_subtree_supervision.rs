@@ -210,12 +210,13 @@ transitions:
         let task = find_task_by_id(&plan.tasks, &target).expect("task in plan");
         let ancestors: Vec<rhei_core::ast::Task> =
             ancestor_chain(&plan.tasks, &target).into_iter().cloned().collect();
+        let supervising_owner = nearest_in_scope_supervising_owner(&machine, &ancestors);
         apply_supervision_transition(
             plan.metadata.as_ref(),
             SupervisionTransition {
                 machine: &machine,
                 task,
-                ancestors: &ancestors,
+                supervising_owner,
                 metadata_key: &target,
                 metadata_prefix: "",
                 local_id,
@@ -398,12 +399,13 @@ transitions:
         let task = find_task_by_id(&plan.tasks, &target).expect("child in plan");
         let ancestors: Vec<rhei_core::ast::Task> =
             ancestor_chain(&plan.tasks, &target).into_iter().cloned().collect();
+        let supervising_owner = nearest_in_scope_supervising_owner(&machine, &ancestors);
         let delivered = apply_supervision_transition(
             None,
             SupervisionTransition {
                 machine: &machine,
                 task,
-                ancestors: &ancestors,
+                supervising_owner,
                 metadata_key: &target,
                 metadata_prefix: "",
                 local_id: "1.1",

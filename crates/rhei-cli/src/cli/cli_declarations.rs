@@ -305,11 +305,10 @@ enum Commands {
         /// when `--to` is a final state and the ticket has no result yet
         #[arg(long)]
         result: Option<String>,
-        /// The supervisor issuing this move. Suppresses the checkpoint the
-        /// move would otherwise deliver to it, so a supervisor acting on its
-        /// own held descendant is not woken by its own doing. A value naming a
-        /// task other than the transitioning task's nearest in-scope
-        /// supervising ancestor is accepted and has no effect
+        /// The supervisor issuing this move. Must name the moving task's
+        /// nearest in-scope supervising ancestor, and suppresses the checkpoint
+        /// the move would otherwise deliver to it. Grants no authority: a held
+        /// descendant is directly movable with or without this flag
         // Kept to one paragraph: clap renders only the first as the option's
         // short help, and the flag is documented, never hidden.
         // §FS-rhei-transition-cmd.2

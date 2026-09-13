@@ -16,6 +16,16 @@
   where the capture is prescribed, alongside the one its neighbour already had.
   No command behaviour changes. (PR #238)
 
+- **`rhei transition --supervisor` now refuses a real task that is not the
+  moving task's nearest in-scope supervising ancestor.** The invalid value used
+  to be accepted and silently ignored, so the move succeeded and could wake the
+  actual owner with a phantom checkpoint. It now fails before callbacks,
+  artifacts, state, result, ledger, or checkpoint effects, and tells the caller
+  which supervisor is valid or to omit the flag when there is none. Correct
+  local and qualified values suppress the owner's checkpoint as documented.
+  **Breaking:** scripts that supplied a different real task and relied on the
+  transition succeeding must pass the actual owner or omit the flag. (PR #246)
+
 - **`rhei cost` and `rhei summary` read the accounting of the rhei they were
   pointed at.** Both resolved their accounting root one level above where a run
   laid into a Panta work root writes its records, so every spelling of a member

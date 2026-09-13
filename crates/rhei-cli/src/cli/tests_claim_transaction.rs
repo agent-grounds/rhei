@@ -258,6 +258,9 @@ fn claim_transaction_restoration_double_fault_reports_errors_and_paths() {
     assert!(error.contains("ledger restore denied"));
     assert!(error.contains(&fixture.task.display().to_string()));
     assert!(error.contains(&fixture.metadata.display().to_string()));
-    assert!(error.contains(&fixture.dir.path().join("runtime/state-transitions.log").display().to_string()));
+    // The ledger canonicalizes its root (§REQ-cross-platform.5), which can
+    // differ from the fixture's raw temp-dir spelling on Windows.
+    let ledger_root = rhei_core::platform::canonical_path(fixture.dir.path()).unwrap();
+    assert!(error.contains(&ledger_root.join("runtime").join("state-transitions.log").display().to_string()));
     assert!(!error.contains("retryable"));
 }

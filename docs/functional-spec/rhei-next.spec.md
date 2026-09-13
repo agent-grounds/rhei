@@ -120,11 +120,32 @@ reported as held by its supervisor rather than as blocked.
    task the scan selected is never lost at re-read, and the re-read rejects a
    heading keyword the plan did not declare.
 7. If the selected task is in a non-runnable initial state whose first
-   applicable forward transition targets another non-terminal state, apply that
-   transition before rendering. Otherwise keep the task in its current state.
-8. Set `**Assignee:** <current-agent>` on the task, where `<current-agent>` is the agent id resolved for the rendered state via the [agent resolution order](rhei-agents.spec.md) (state `agent:` field → project settings → global settings). When no agent is configured, write the reserved assignee value `manual` so the task still leaves the claimable set durably and concurrent `rhei next` calls cannot claim it twice.
-9. Write the task file atomically (temp file + rename), release lock.
-10. Build the state's effective prompt text from its selected
+   applicable forward transition targets another non-terminal state, send that
+   edge and the claim intent through the shared transition executor. The
+   executor applies `on_leave`, validates a redirect before persistence,
+   validates source outputs and effective-target inputs
+   ([§FS-rhei-transitions.4.5](rhei-transitions.spec.md#45-artifact-enforcement)),
+   and resolves the assignee from the effective non-terminal state. A leave
+   rejection leaves the source untouched, and a redirect to a terminal state
+   remains a refusal rather than finishing work during a claim. Otherwise keep
+   the task in its current state and resolve the assignee there.
+8. Set `**Assignee:** <current-agent>` on the task, where `<current-agent>` is
+   the agent id resolved for the rendered state via the
+   [agent resolution order](rhei-agents.spec.md) (state `agent:` field →
+   project settings → global settings). When no agent is configured, write
+   the reserved assignee value `manual` so the task still leaves the claimable
+   set durably and concurrent `rhei next` calls cannot claim it twice.
+9. For an auto-advancing claim, retain the original task and metadata bytes and
+   the transition ledger's pre-append length. Write the effective state and
+   metadata atomically, run `on_enter` against that target-state view, write the
+   resolved assignee while the claim still owns the task, then append exactly
+   one transition entry. Ledger appends are serialized so this append can be
+   reversed without truncating a different writer's successful entry. The
+   state, ownership, and transition entry together establish the claim's
+   commit boundary. For an already-runnable initial task, revalidate under the
+   lock and atomically write its assignee once; staying in the same state
+   creates no transition entry.
+10. Release the lock, then build the state's effective prompt text from its selected
    `prompt_template`, if any, plus inline `instructions` and `personality`,
    then resolve runtime template variables (see
    [Template Variables](rhei-states.spec.md#4-template-variables-in-instructions-and-personality)
@@ -132,6 +153,33 @@ reported as held by its supervisor rather than as blocked.
 11. Print the task id, title, current state, and resolved instructions to stdout.
 
 If no claimable task exists, print a status summary (see [No Tasks Ready](#5-no-tasks-ready)).
+
+An auto-advancing claim is not committed until its effective state, resolved
+ownership, and transition bookkeeping have all been recorded. An ordinary
+returned artifact-validation, state-persistence, assignee-persistence, or
+ledger error before that boundary restores the original task and metadata
+bytes and the original ledger contents before releasing the claim lock. This
+includes a failure after ledger preflight and a partial ledger append. The task
+is then unchanged and retryable after the cause is removed; `rhei reset` is not
+required.
+
+An `on_enter` failure first restores the source state and original ownership,
+then follows the configured recovery contract
+([§FS-rhei-transitions.4.9](rhei-transitions.spec.md#49-error-handling-configuration)).
+When that contract commits a declared recovery transition, the recovery's own
+state and bookkeeping are the outcome. Rhei does not undo arbitrary external
+callback effects. If a second, independent I/O error prevents restoration, the
+diagnostic reports both errors and every affected path and does not claim that
+the task is retryable. Abrupt process or machine termination is outside this
+ordinary-return guarantee.
+
+Prompt construction and output happen after the commit boundary. A rendering
+failure therefore leaves the durable claim in place. `--no-callbacks` changes
+only callback execution; `--peek`, `--task`, and `--rhei` keep the selection,
+read-only, and scope behavior defined here. The claim intent is exclusive to
+`next`: ordinary `transition`, `complete`, dashboard human-gate transitions,
+and `run` retain their existing persistence, callback, recovery, and output
+contracts, sharing only serialized ledger appends.
 
 ### 3.2. Output (claim mode)
 

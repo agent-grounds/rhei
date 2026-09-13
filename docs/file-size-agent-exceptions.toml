@@ -557,7 +557,7 @@ match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
 max_accepted = { value = 1100, unit = "lines" }
-until = "Separate grammar and semantic declarations exist and live citations to FS-rhei-plan-language sections have been repointed to them."
+until = "A follow-up defines child declarations for the tutorial and data-model boundaries, maps every moved section to a stable ID, and migrates all inbound citations."
 reason = """
-The canonical plan-language declaration currently owns both the formal Markdown grammar and its semantic constraints. Neither subject has a narrower declaration to receive a whole section, and creating those declarations plus repointing the live citations is a repository-wide specification restructure that does not belong in this localized fallback clarification.
+The plan-language declaration has no approved split map for separating its tutorial, grammar, and data-model sections while preserving their live section IDs and inbound citations; this issue must extend the owning FS-rhei-plan-language.1.3 point in place.
 """

@@ -184,14 +184,18 @@ rhei's machine. The resolved source of each machine is surfaced in diagnostics
 built-in `rhei` fallback.
 
 A machine's *definition file* resolves per declaration. For a rhei's own
-declaration, the rhei's execution root `states.yaml` resolves it first when its
-`name:` matches — the shape every instantiated template ships. Otherwise, and
-for the manifest's default declaration, resolution proceeds as before: the
-project root's `states.yaml` first; when that is absent or names a different
-machine, a `states.yaml` in a discovered rhei's root whose declared `name:`
-matches — but only a **unique** match. When several candidate roots hold files
-declaring that name, resolution is ambiguous and errors, naming the candidates
-and the fixes (move the definitive file to the project root, or pass
+declaration that differs from the project default, the rhei's execution root
+`states.yaml` resolves it first when its `name:` matches — the shape every
+instantiated template ships. Otherwise, and
+for a custom manifest default, the project root's `states.yaml` resolves first;
+when that is absent or names a different machine, a `states.yaml` in a
+discovered rhei's root whose declared `name:` matches may resolve it — but only
+a **unique** match. The built-in project default `rhei` is the exception: only
+a matching project-root file replaces the built-in machine. A member that
+inherits or restates that default cannot make a member-root file the project
+default. When several candidate roots hold files declaring a custom default's
+name, resolution is ambiguous and errors, naming the candidates and the fixes
+(move the definitive file to the project root, or pass
 `--state-machine`): a stale copy silently driving tickets would be far worse
 than asking once. A candidate that fails to load is likewise an error, not a
 silent non-match — it would otherwise surface as a misleading "no states file

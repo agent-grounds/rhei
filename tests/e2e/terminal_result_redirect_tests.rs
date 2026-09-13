@@ -202,3 +202,74 @@ transitions:
         "a refused claim must not create the result file"
     );
 }
+
+/// A result left by an earlier visit cannot satisfy away `next`'s stronger
+/// rule: claiming never redirects into a terminal state. Every existing byte
+/// remains untouched on refusal. §FS-rhei-next.3.1
+#[test]
+fn next_terminal_redirect_is_refused_even_when_a_result_already_exists() {
+    let machine = format!(
+        r#"name: next-redirect-terminal-with-result
+version: 1
+states:
+  planning:
+    initial: true
+    description: Setup only
+  pending:
+    description: Ready for work
+  completed:
+    final: true
+    description: Done
+transitions:
+  - from: planning
+    to: pending
+    on_leave: {callback}
+  - from: planning
+    to: completed
+  - from: pending
+    to: completed
+"#,
+        callback = python_callback_yaml(
+            "import json,sys;sys.stdout.write(json.dumps({'success': True, 'nextState': 'completed'}))"
+        )
+    );
+    let plan = r#"# Rhei: Next Redirect With Result
+
+---
+metadata:
+  tasks:
+    1:
+      priority: 4
+---
+
+## Tasks
+
+### Task 1: Do the work
+**State:** planning
+"#;
+    let dir = unique_temp_dir("terminal-result-next-redirect-existing-result");
+    let plan_path = write_fixture_file(&dir, "plan.rhei.md", plan);
+    let machine_path = write_fixture_file(&dir, "states.yaml", &machine);
+    let runtime = dir.join("runtime");
+    let results = runtime.join("results");
+    fs::create_dir_all(&results).expect("results directory");
+    let result_path = results.join("plan.1.md");
+    let result_contents = "## Result\n\nEarlier work.\n";
+    fs::write(&result_path, result_contents).expect("existing result");
+    let ledger_path = runtime.join("state-transitions.log");
+    let ledger_contents = "plan.9 pending@completed\n";
+    fs::write(&ledger_path, ledger_contents).expect("existing ledger");
+
+    let result = run_cli("next", &plan_path, &machine_path, &[]);
+
+    assert!(!result.status.success(), "a claim must not finish the ticket");
+    assert_stderr_contains(
+        &result,
+        "Task plan.1 cannot enter terminal state 'completed' during a claim",
+    );
+    let persisted = fs::read_to_string(&plan_path).expect("persisted plan");
+    assert_eq!(persisted, plan, "task and counted metadata must be unchanged");
+    assert!(!persisted.contains("**Assignee:**"), "original lack of ownership must remain");
+    assert_eq!(fs::read_to_string(result_path).unwrap(), result_contents);
+    assert_eq!(fs::read_to_string(ledger_path).unwrap(), ledger_contents);
+}

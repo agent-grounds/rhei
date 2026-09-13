@@ -133,6 +133,7 @@ fn execute_transition_with_origin(
     to: &str,
     no_callbacks: bool,
     origin: TransitionOrigin,
+    claim: Option<&ClaimEligibilityContext<'_>>,
 ) -> MietteResult<String> {
     let task_file = files.task_file;
     let metadata_file = files.metadata_file;
@@ -153,6 +154,11 @@ fn execute_transition_with_origin(
             help = unknown_state_help(),
             "'{}' is not a valid state. Allowed: [{}]", to, allowed
         ));
+    }
+
+    #[cfg(test)]
+    if origin.claim {
+        run_claim_before_lock_hook();
     }
 
     // Open the file(s) with an exclusive lock for the duration of the operation.
@@ -259,6 +265,15 @@ fn execute_transition_with_origin(
     // §FS-rhei-transition-cmd.2
     let operation_supervisor =
         origin.supervisor.as_ref().and(supervising_owner.map(|owner| &owner.id));
+    if let Some(claim) = claim {
+        if let Err(err) = ensure_claimable_under_lock(claim, files.artifact_id) {
+            if let Some(task_handle) = &task_handle {
+                task_handle.release();
+            }
+            metadata_handle.release();
+            return Err(err);
+        }
+    }
     if let Err(err) = ensure_task_profile_allows_state(
         machine,
         files.artifact_id,
@@ -622,10 +637,8 @@ fn execute_transition_with_origin(
         &settings,
         &format!("Task {} cannot enter state {}.", files.artifact_id, to),
     )?;
-    // Ownership comes from the effective target, including an on-leave
-    // redirect. Resolution failures retain `next`'s established manual
-    // fallback; the output path will print its existing warning after commit.
-    // §FS-rhei-next.3.1
+    // Ownership comes from the effective target, including a redirect. Resolution failures
+    // retain the manual fallback; output prints its existing warning after commit. §FS-rhei-next.3.1
     let claim_assignee = resolve_claim_assignee(origin.claim, machine, to, &settings, &task_info.task);
     // A caller that knows the outcome carries the message; otherwise the
     // engine's own account stands in, but only where it is true.
@@ -661,6 +674,21 @@ fn execute_transition_with_origin(
         return Err(err);
     }
 
+    // A claim redirect cannot finish work. The generic result check retains its no-result
+    // diagnostic, but an existing result cannot satisfy this refusal. §FS-rhei-next.3.1
+    if origin.claim && machine.states.get(to).map(|def| def.terminal).unwrap_or(false) {
+        if let Some(task_handle) = &task_handle {
+            task_handle.release();
+        }
+        metadata_handle.release();
+        return Err(miette!(
+            help = "finish the work explicitly with `rhei complete`; `rhei next` only takes ownership of non-terminal work",
+            "Task {} cannot enter terminal state '{}' during a claim",
+            files.artifact_id,
+            to
+        ));
+    }
+
     let rendered_to_state = format_task_state_value(to, to_visit_count, machine);
     // §FS-rhei-supervision.3.4: the release self-loop ends the visit, so it
     // ends the claim the visit was taken under.
@@ -690,10 +718,8 @@ fn execute_transition_with_origin(
         )?)
     };
 
-    // A claim preflights and exclusively holds the ledger before the first
-    // plan byte changes. Ordinary transitions keep their established write
-    // path and take the same ledger serialization only when recording.
-    // §FS-rhei-next.3.1
+    // A claim holds the ledger before plan writes; ordinary transitions take the same
+    // serialization only when recording. §FS-rhei-next.3.1
     let mut claim_transaction = if origin.claim {
         Some(ClaimTransaction::begin(
             files,

@@ -87,6 +87,61 @@ struct LockedTransitionLedger {
     original_len: u64,
 }
 
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LedgerLockEvent {
+    Contended,
+    Acquired,
+}
+
+#[cfg(test)]
+thread_local! {
+    static LEDGER_LOCK_OBSERVER: std::cell::RefCell<Option<mpsc::Sender<LedgerLockEvent>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+fn set_ledger_lock_observer(observer: mpsc::Sender<LedgerLockEvent>) {
+    LEDGER_LOCK_OBSERVER.with(|installed| *installed.borrow_mut() = Some(observer));
+}
+
+#[cfg(test)]
+fn notify_ledger_lock_observer(event: LedgerLockEvent) {
+    LEDGER_LOCK_OBSERVER.with(|installed| {
+        let observer = installed.borrow().clone();
+        if let Some(observer) = observer {
+            let _ = observer.send(event);
+        }
+        if event == LedgerLockEvent::Acquired {
+            installed.borrow_mut().take();
+        }
+    });
+}
+
+fn lock_transition_ledger(file: &fs::File, path: &Path) -> MietteResult<()> {
+    #[cfg(test)]
+    if LEDGER_LOCK_OBSERVER.with(|installed| installed.borrow().is_some()) {
+        match file.try_lock_exclusive() {
+            Ok(()) => {
+                notify_ledger_lock_observer(LedgerLockEvent::Acquired);
+                return Ok(());
+            }
+            Err(err) if lock_is_contended(&err) => {
+                notify_ledger_lock_observer(LedgerLockEvent::Contended);
+            }
+            Err(err) => {
+                return Err(file_io_report(path, "failed to lock state transition log", err));
+            }
+        }
+    }
+
+    file.lock_exclusive()
+        .map_err(|err| file_io_report(path, "failed to lock state transition log", err))?;
+    #[cfg(test)]
+    notify_ledger_lock_observer(LedgerLockEvent::Acquired);
+    Ok(())
+}
+
 impl LockedTransitionLedger {
     fn open(workspace_root: &Path) -> MietteResult<Self> {
     let runtime_dir = workspace_root.join("runtime");
@@ -98,18 +153,15 @@ impl LockedTransitionLedger {
     let transitions_file = runtime_dir.join("state-transitions.log");
 
         let file = fs::OpenOptions::new()
-        .create(true)
-            .read(true)
+            .create(true)
             .write(true)
-        .append(true)
-        .open(&transitions_file)
-        .map_err(|err| miette!(
-            help = transition_log_help(),
-            "failed to open state transition log: {err}"
+            .append(true)
+            .open(&transitions_file)
+            .map_err(|err| miette!(
+                help = transition_log_help(),
+                "failed to open state transition log: {err}"
             ))?;
-        file.lock_exclusive().map_err(|err| {
-            file_io_report(&transitions_file, "failed to lock state transition log", err)
-        })?;
+        lock_transition_ledger(&file, &transitions_file)?;
         let original_len = file
             .metadata()
             .map_err(|err| {
@@ -205,158 +257,6 @@ fn ensure_result_file(workspace_root: &Path, task_id: &str) -> MietteResult<()> 
     }
     fs::write(&result_file, "")
         .map_err(|err| file_io_report(&result_file, "failed to create result file", err))
-}
-
-/// Write `**Assignee:** <value>` into the given task's metadata block on disk.
-///
-/// The rewrite is atomic (temp file + rename) and holds an exclusive lock on
-/// the file for the duration of the operation. While locked, it re-checks the
-/// task state and existing assignee so a stale claim cannot overwrite another
-/// worker's claim.
-// §FS-rhei-next.3.1: Re-check claimability under the file lock before claiming.
-struct TaskAssigneeClaimContext<'a> {
-    workspace_root: &'a Path,
-    metadata: Option<&'a Metadata>,
-    /// Node kinds the rhei that owns the task file declared, so the re-read
-    /// parses it under the same kinds the scan did. `None` means the caller
-    /// has no declaration to apply. §FS-rhei-next.3.1
-    structure: Option<&'a rhei_core::ast::Structure>,
-    state_def: &'a rhei_validator::StateDef,
-    settings: &'a RheiSettings,
-}
-
-fn write_task_assignee(
-    task_file: &Path,
-    task_id: &str,
-    qualified_id: &str,
-    expected_state: &str,
-    machine: &rhei_validator::StateMachine,
-    claim: TaskAssigneeClaimContext<'_>,
-    assignee: &str,
-) -> MietteResult<()> {
-    let locked = LockedPlanFile::open(task_file)?;
-    let raw = locked.read_to_string("failed to read plan file")?;
-    let target = parse_task_id(task_id);
-    let task = parse_claim_task_from_raw(&raw, task_file, claim.structure, &target, task_id)?;
-    let current_state = normalized_state_name(task.state.as_str(), machine);
-    if current_state != expected_state {
-        locked.release();
-        return Err(miette!(
-            help = task_moved_help(),
-            "conflict: Task {} is in state '{}', expected '{}'",
-            qualified_id,
-            task.state,
-            expected_state
-        ));
-    }
-    if let Some(existing) = task.assignee.as_deref() {
-        locked.release();
-        // §FS-rhei-release.1: hand-editing the plan is not the remedy.
-        return Err(miette!(
-            help = format!(
-                "release it with: rhei release {qualified_id} — or work on a different task."
-            ),
-            "Task {} is already assigned to {}", qualified_id, existing
-        ));
-    }
-    // §AR-rhei-panta.2: `{task_id}` artifact templates render the qualified
-    // id — the same paths transition-time checks and agents see.
-    ensure_state_inputs_exist_for_transition(
-        claim.workspace_root,
-        Some(&task),
-        qualified_id,
-        &current_state,
-        claim.state_def,
-        // `claim.metadata` is the merged project graph's, so `stateVisits`
-        // is keyed by the qualified id — not the rhei-local id the raw file
-        // parse yields. §AR-rhei-panta.2
-        Some(render_visit_count(
-            claim.metadata,
-            &parse_task_id(qualified_id),
-            &current_state,
-            task.state.as_str(),
-            machine,
-        )),
-        machine,
-        claim.settings,
-        &format!("Task {} cannot be claimed in state {}.", qualified_id, current_state),
-    )?;
-
-    let rewritten = insert_task_assignee(&raw, task_id, assignee)?;
-
-    let parent = task_file.parent().unwrap_or(Path::new("."));
-    let mut tmp = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|err| miette!(
-            help = temp_write_help(),
-            "failed to create temp file: {err}"
-        ))?;
-    tmp.write_all(rewritten.as_bytes())
-        .map_err(|err| miette!(
-            help = temp_write_help(),
-            "failed to write temp file: {err}"
-        ))?;
-    persist_locked(tmp, task_file, Some(&locked)).map_err(|err| miette!(
-        help = temp_write_help(),
-        "failed to persist temp file: {err}"
-    ))?;
-
-    locked.release();
-    Ok(())
-}
-
-/// Read the node kinds declared by the rhei that owns `route`'s task file.
-///
-/// The kinds are the owning rhei's own, never the merged project graph's: a
-/// project unions every rhei's declaration, which would let a claim parse a
-/// keyword the owning rhei never declared. A rhei whose metadata lives in the
-/// task file itself declares them in that file's frontmatter, so there is
-/// nothing to thread. §FS-rhei-next.3.1 §FS-rhei-panta.6.1
-fn claim_node_kinds(route: &TaskRoute) -> MietteResult<Option<rhei_core::ast::Structure>> {
-    if route.metadata_file == route.task_file {
-        return Ok(None);
-    }
-    let raw = fs::read_to_string(&route.metadata_file)
-        .map_err(|err| file_io_report(&route.metadata_file, "failed to read plan file", err))?;
-    Ok(Some(parse_metadata_manifest(&route.metadata_file, &raw)?.structure))
-}
-
-/// Find the task being claimed in the raw markdown just read under the lock.
-///
-/// `workspace_structure` carries the node kinds the owning rhei's index
-/// declared; a task file declares none of its own, so without them the parse
-/// would accept `Task` alone and lose a task the scan had already selected.
-/// §FS-rhei-next.3.1
-fn parse_claim_task_from_raw(
-    raw: &str,
-    task_file: &Path,
-    workspace_structure: Option<&rhei_core::ast::Structure>,
-    target: &TaskId,
-    task_id: &str,
-) -> MietteResult<rhei_core::ast::Task> {
-    // A single-file rhei is its own metadata file, so its frontmatter reaches
-    // the parser here and this branch already honours the declared kinds.
-    if let Ok(rhei) = rhei_core::parse(raw) {
-        if let Some(task) = find_task_by_id(&rhei.tasks, target) {
-            return Ok(task.clone());
-        }
-    }
-
-    // A caller with no declaration keeps the `Task`-only default, which is what
-    // a plan that declared nothing means. §FS-rhei-plan-language.3.7
-    let workspace_tasks = match workspace_structure {
-        Some(structure) => rhei_core::parser::parse_workspace_tasks_with_structure(raw, structure),
-        None => rhei_core::parser::parse_workspace_tasks(raw),
-    };
-    if let Ok(tasks) = workspace_tasks {
-        if let Some(task) = find_task_by_id(&tasks, target) {
-            return Ok(task.clone());
-        }
-    }
-
-    Err(miette!(
-        help = task_id_help(),
-        "task '{}' not found in {}", task_id, task_file.display()
-    ))
 }
 
 /// Rewrite a task's markdown after completion: remove `**Assignee:**` and,

@@ -4,6 +4,16 @@
 
 ### Fixed
 
+- **A failed `rhei next` claim now leaves its task unchanged and retryable.**
+  Auto-advancing a task previously wrote the target state and counted-visit
+  metadata before it wrote the assignee or transition ledger, so a later I/O
+  failure could strand the task advanced and unowned. Claiming now revalidates
+  and resolves the effective state and owner under the task lock, preflights
+  and serializes the ledger, and restores the original task, metadata, and
+  ledger bytes if any pre-commit persistence step fails. State, ownership, and
+  one ledger entry commit together; prompt-rendering failures after that point
+  leave the durable claim intact. (PR #245)
+
 - **The worker skill's capture instruction now says when it can be followed.**
   `rhei-plan-worker` is handed one plan and forbidden from looking for a project
   around it, so it routinely works a lone `.rhei.md`. *Capturing Work You Did

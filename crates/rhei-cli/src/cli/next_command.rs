@@ -339,14 +339,13 @@ fn next_command(
         // Gated above, so no *declared* edge lands terminal and there is nothing
         // to carry; an `on_leave` redirect into one is refused on the shared path.
         // §FS-rhei-next.3 §FS-rhei-states.3.3
-        execute_transition(
+        execute_claim_transition(
             TransitionFiles { task_file: &route.task_file, metadata_file: &route.metadata_file, metadata_id: &route.metadata_id, artifact_root: &route.execution_root, artifact_id: &task_id_str },
             callback_paths,
             machine,
             &route.local_id,
             &current_state,
             &to_state,
-            None,
             no_callbacks,
         )?
     } else {
@@ -384,8 +383,12 @@ fn next_command(
     // Claim mode only: write `**Assignee:**` to the task file so a second
     // `rhei next` cannot re-claim the same task. Skipped in peek mode and
     // when the task already has an assignee set.
-    let mut claimed_as: Option<String> = None;
-    if !peek && task.assignee.is_none() {
+    let mut claimed_as = if auto_transition_initial && !peek {
+        task.assignee.clone()
+    } else {
+        None
+    };
+    if !peek && !auto_transition_initial && task.assignee.is_none() {
         let assignee = agent_id_str.as_deref().unwrap_or("manual");
         claimed_as = Some(assignee.to_string());
         let final_state_def = machine

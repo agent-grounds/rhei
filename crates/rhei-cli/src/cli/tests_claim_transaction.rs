@@ -258,6 +258,6 @@ fn claim_transaction_restoration_double_fault_reports_errors_and_paths() {
     assert!(error.contains("ledger restore denied"));
     assert!(error.contains(&fixture.task.display().to_string()));
     assert!(error.contains(&fixture.metadata.display().to_string()));
-    assert!(error.contains("runtime/state-transitions.log"));
+    assert!(error.contains(&fixture.dir.path().join("runtime/state-transitions.log").display().to_string()));
     assert!(!error.contains("retryable"));
 }

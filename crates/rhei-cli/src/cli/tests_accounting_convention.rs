@@ -33,6 +33,7 @@ fn repro_price_book() -> PriceBook {
                 input_cached_read_micro: 400_000,
                 input_cache_write_micro: 4_000_000,
                 output_total_micro: 20_000_000,
+                extensions: BTreeMap::new(),
             },
             PriceBookEntry {
                 provider: "anthropic".to_string(),
@@ -43,8 +44,10 @@ fn repro_price_book() -> PriceBook {
                 input_cached_read_micro: 200_000,
                 input_cache_write_micro: 2_500_000,
                 output_total_micro: 10_000_000,
+                extensions: BTreeMap::new(),
             },
         ],
+        extensions: BTreeMap::new(),
     }
 }
 

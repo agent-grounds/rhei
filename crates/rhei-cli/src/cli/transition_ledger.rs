@@ -82,9 +82,11 @@ fn append_state_transition_log_entry(
 /// commit or reversal, so truncating its own partial append cannot erase a
 /// different writer's successful line. §FS-rhei-next.3.1 §FS-rhei-viz.4
 struct LockedTransitionLedger {
-    file: fs::File,
+    _ledger_lock: fs::File,
+    file: Option<fs::File>,
     path: PathBuf,
     original_len: u64,
+    created_by_open: bool,
 }
 
 #[cfg(test)]
@@ -144,31 +146,64 @@ fn lock_transition_ledger(file: &fs::File, path: &Path) -> MietteResult<()> {
 
 impl LockedTransitionLedger {
     fn open(workspace_root: &Path) -> MietteResult<Self> {
-    let runtime_dir = workspace_root.join("runtime");
-    fs::create_dir_all(&runtime_dir)
-        .map_err(|err| miette!(
-            help = runtime_dir_help(),
-            "failed to create runtime directory: {err}"
-        ))?;
-    let transitions_file = runtime_dir.join("state-transitions.log");
-
-        let file = fs::OpenOptions::new()
+        let runtime_dir = workspace_root.join("runtime");
+        fs::create_dir_all(&runtime_dir)
+            .map_err(|err| miette!(
+                help = runtime_dir_help(),
+                "failed to create runtime directory: {err}"
+            ))?;
+        let transitions_file = runtime_dir.join("state-transitions.log");
+        let ledger_lock_path = runtime_dir.join("state-transitions.log.lock");
+        let ledger_lock = fs::OpenOptions::new()
             .create(true)
+            .read(true)
+            .write(true)
+            .open(&ledger_lock_path)
+            .map_err(|err| miette!(
+                help = transition_log_help(),
+                "failed to open state transition log lock: {err}"
+            ))?;
+        lock_transition_ledger(&ledger_lock, &ledger_lock_path)?;
+
+        let (file, created_by_open) = match fs::OpenOptions::new()
+            .create_new(true)
             .write(true)
             .append(true)
             .open(&transitions_file)
-            .map_err(|err| miette!(
-                help = transition_log_help(),
-                "failed to open state transition log: {err}"
-            ))?;
-        lock_transition_ledger(&file, &transitions_file)?;
+        {
+            Ok(file) => (file, true),
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
+                let file = fs::OpenOptions::new()
+                    .write(true)
+                    .append(true)
+                    .open(&transitions_file)
+                    .map_err(|err| miette!(
+                        help = transition_log_help(),
+                        "failed to open state transition log: {err}"
+                    ))?;
+                (file, false)
+            }
+            Err(err) => {
+                return Err(miette!(
+                    help = transition_log_help(),
+                    "failed to open state transition log: {err}"
+                ));
+            }
+        };
+
         let original_len = file
             .metadata()
             .map_err(|err| {
                 file_io_report(&transitions_file, "failed to inspect state transition log", err)
             })?
             .len();
-        Ok(Self { file, path: transitions_file, original_len })
+        Ok(Self {
+            _ledger_lock: ledger_lock,
+            file: Some(file),
+            path: transitions_file,
+            original_len,
+            created_by_open,
+        })
     }
 
     fn path(&self) -> &Path {
@@ -176,40 +211,49 @@ impl LockedTransitionLedger {
     }
 
     fn append(&mut self, task_id: &str, from: &str, to: &str) -> MietteResult<()> {
+        let file = self.file.as_mut().expect("ledger file held until drop");
         #[cfg(test)]
         if let Some(message) = take_claim_fault(ClaimFaultPoint::LedgerAppend) {
             // Model a write that reached the file only in part. The claim
             // reversal must truncate precisely this writer's bytes while its
             // exclusive ledger hold keeps every other writer outside.
-            self.file.write_all(task_id.as_bytes()).map_err(|err| {
+            file.write_all(task_id.as_bytes()).map_err(|err| {
                 file_io_report(&self.path, "failed to inject partial transition entry", err)
             })?;
-            self.file.flush().map_err(|err| {
+            file.flush().map_err(|err| {
                 file_io_report(&self.path, "failed to flush partial transition entry", err)
             })?;
             return Err(miette!("ledger append injection after partial write: {message}"));
         }
-        writeln!(self.file, "{} {}@{}", task_id, from, to).map_err(|err| {
+        writeln!(file, "{} {}@{}", task_id, from, to).map_err(|err| {
             miette!(
                 help = transition_log_help(),
                 "failed to write state transition log entry: {err}"
             )
         })?;
-        self.file.flush().map_err(|err| {
+        file.flush().map_err(|err| {
             file_io_report(&self.path, "failed to flush state transition log", err)
         })
     }
 
     fn restore(&mut self) -> MietteResult<()> {
-        self.file.set_len(self.original_len).map_err(|err| {
+        let file = self.file.as_mut().expect("ledger file held until drop");
+        file.set_len(self.original_len).map_err(|err| {
             file_io_report(&self.path, "failed to restore state transition log", err)
         })?;
-        self.file.seek(std::io::SeekFrom::End(0)).map_err(|err| {
+        file.seek(std::io::SeekFrom::End(0)).map_err(|err| {
             file_io_report(&self.path, "failed to seek restored state transition log", err)
         })?;
-        self.file.flush().map_err(|err| {
+        file.flush().map_err(|err| {
             file_io_report(&self.path, "failed to flush restored state transition log", err)
-        })
+        })?;
+        if self.created_by_open {
+            self.file.take();
+            fs::remove_file(&self.path).map_err(|err| {
+                file_io_report(&self.path, "failed to remove restored state transition log", err)
+            })?;
+        }
+        Ok(())
     }
 }
 

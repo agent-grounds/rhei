@@ -167,7 +167,7 @@ fn plan_lock_path(path: &Path) -> MietteResult<PathBuf> {
     let parent = rhei_core::platform::canonical_path(parent)
         .map_err(|err| file_io_report(parent, "failed to resolve plan lock directory", err))?;
     let name = path.file_name().ok_or_else(|| {
-        miette!("failed to derive plan lock file for {}", path.display())
+        miette!(help = "the plan path must name a file", "failed to derive plan lock file for {}", path.display())
     })?;
     let mut lock_name = name.to_os_string();
     lock_name.push(".lock");

@@ -402,6 +402,15 @@ fn resolve_declared_rhei_machine(
         }
     }
 
+    // An explicit built-in name falls back only after the matching-file lookup
+    // finds nothing. §FS-rhei-plan-language.1.3
+    if matches.is_empty() {
+        let builtin = rhei_validator::StateMachine::builtin_default();
+        if machine_name == builtin.name {
+            return Ok(ResolvedStateMachine { machine: builtin, path: None });
+        }
+    }
+
     match matches.len() {
         0 => Err(miette!(
 help = missing_state_machine_help(),

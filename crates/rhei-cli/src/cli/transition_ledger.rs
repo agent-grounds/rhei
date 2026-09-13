@@ -72,6 +72,23 @@ fn append_state_transition_log_entry(
     from: &str,
     to: &str,
 ) -> MietteResult<()> {
+    let mut ledger = LockedTransitionLedger::open(workspace_root)?;
+    ledger.append(task_id, from, to)
+}
+
+/// One exclusive hold on the central ledger.
+///
+/// Every writer uses this type. A claim keeps it from preflight through either
+/// commit or reversal, so truncating its own partial append cannot erase a
+/// different writer's successful line. §FS-rhei-next.3.1 §FS-rhei-viz.4
+struct LockedTransitionLedger {
+    file: fs::File,
+    path: PathBuf,
+    original_len: u64,
+}
+
+impl LockedTransitionLedger {
+    fn open(workspace_root: &Path) -> MietteResult<Self> {
     let runtime_dir = workspace_root.join("runtime");
     fs::create_dir_all(&runtime_dir)
         .map_err(|err| miette!(
@@ -80,23 +97,68 @@ fn append_state_transition_log_entry(
         ))?;
     let transitions_file = runtime_dir.join("state-transitions.log");
 
-    use std::fs::OpenOptions;
-    let mut file = OpenOptions::new()
+        let file = fs::OpenOptions::new()
         .create(true)
+            .read(true)
+            .write(true)
         .append(true)
         .open(&transitions_file)
         .map_err(|err| miette!(
             help = transition_log_help(),
             "failed to open state transition log: {err}"
-        ))?;
+            ))?;
+        file.lock_exclusive().map_err(|err| {
+            file_io_report(&transitions_file, "failed to lock state transition log", err)
+        })?;
+        let original_len = file
+            .metadata()
+            .map_err(|err| {
+                file_io_report(&transitions_file, "failed to inspect state transition log", err)
+            })?
+            .len();
+        Ok(Self { file, path: transitions_file, original_len })
+    }
 
-    writeln!(file, "{} {}@{}", task_id, from, to)
-        .map_err(|err| miette!(
-            help = transition_log_help(),
-            "failed to write state transition log entry: {err}"
-        ))?;
+    fn path(&self) -> &Path {
+        &self.path
+    }
 
-    Ok(())
+    fn append(&mut self, task_id: &str, from: &str, to: &str) -> MietteResult<()> {
+        #[cfg(test)]
+        if let Some(message) = take_claim_fault(ClaimFaultPoint::LedgerAppend) {
+            // Model a write that reached the file only in part. The claim
+            // reversal must truncate precisely this writer's bytes while its
+            // exclusive ledger hold keeps every other writer outside.
+            self.file.write_all(task_id.as_bytes()).map_err(|err| {
+                file_io_report(&self.path, "failed to inject partial transition entry", err)
+            })?;
+            self.file.flush().map_err(|err| {
+                file_io_report(&self.path, "failed to flush partial transition entry", err)
+            })?;
+            return Err(miette!("ledger append injection after partial write: {message}"));
+        }
+        writeln!(self.file, "{} {}@{}", task_id, from, to).map_err(|err| {
+            miette!(
+                help = transition_log_help(),
+                "failed to write state transition log entry: {err}"
+            )
+        })?;
+        self.file.flush().map_err(|err| {
+            file_io_report(&self.path, "failed to flush state transition log", err)
+        })
+    }
+
+    fn restore(&mut self) -> MietteResult<()> {
+        self.file.set_len(self.original_len).map_err(|err| {
+            file_io_report(&self.path, "failed to restore state transition log", err)
+        })?;
+        self.file.seek(std::io::SeekFrom::End(0)).map_err(|err| {
+            file_io_report(&self.path, "failed to seek restored state transition log", err)
+        })?;
+        self.file.flush().map_err(|err| {
+            file_io_report(&self.path, "failed to flush restored state transition log", err)
+        })
+    }
 }
 
 /// Record one applied transition: history for every move, plus the terminal

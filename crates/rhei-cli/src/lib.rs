@@ -56,6 +56,7 @@ include!("cli/transition_context.rs");
 include!("cli/checkout_roots.rs");
 include!("cli/artifacts.rs");
 include!("cli/transition_checks.rs");
+include!("cli/claim_transaction.rs");
 include!("cli/system_transition_triggers.rs");
 include!("cli/transition_result_files.rs");
 include!("cli/system_transition_execution.rs");
@@ -175,6 +176,7 @@ mod tests {
     include!("cli/tests_prompt_templates.rs");
     include!("cli/tests_complete_reset_tooling.rs");
     include!("cli/tests_file_locks.rs");
+    include!("cli/tests_claim_transaction.rs");
     include!("cli/tests_headless_console_log.rs");
     include!("cli/tests_agent_resolution.rs");
     include!("cli/tests_agent_prompt_transport.rs");

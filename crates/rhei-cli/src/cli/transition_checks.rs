@@ -348,3 +348,30 @@ fn execute_transition(
         },
     )
 }
+
+/// Apply the setup edge and take ownership as one retry-safe `next` claim.
+///
+/// The ordinary transition wrappers deliberately cannot select this path;
+/// claim rollback and its commit boundary belong only to `rhei next`.
+// §FS-rhei-next.3.1
+#[allow(clippy::too_many_arguments)]
+fn execute_claim_transition(
+    files: TransitionFiles<'_>,
+    callback_paths: &CallbackPaths,
+    machine: &rhei_validator::StateMachine,
+    task_id_str: &str,
+    from: &str,
+    to: &str,
+    no_callbacks: bool,
+) -> MietteResult<String> {
+    execute_transition_with_origin(
+        files,
+        callback_paths,
+        machine,
+        task_id_str,
+        from,
+        to,
+        no_callbacks,
+        TransitionOrigin { claim: true, ..TransitionOrigin::default() },
+    )
+}

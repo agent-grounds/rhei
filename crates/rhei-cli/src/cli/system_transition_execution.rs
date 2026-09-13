@@ -188,6 +188,23 @@ fn execute_transition_with_origin(
         &target_id,
         task_id_str,
     )?;
+    if origin.claim {
+        if let Some(existing) = task_info.task.assignee.as_deref() {
+            if let Some(task_handle) = &task_handle {
+                task_handle.release();
+            }
+            metadata_handle.release();
+            return Err(miette!(
+                help = format!(
+                    "release it with: rhei release {} — or work on a different task.",
+                    files.artifact_id
+                ),
+                "Task {} is already assigned to {}",
+                files.artifact_id,
+                existing
+            ));
+        }
+    }
     let current_state_raw = task_info.task.state.clone();
     let current_state = normalized_state_name(&current_state_raw, machine);
     let metadata = if task_file == metadata_file {
@@ -605,6 +622,11 @@ fn execute_transition_with_origin(
         &settings,
         &format!("Task {} cannot enter state {}.", files.artifact_id, to),
     )?;
+    // Ownership comes from the effective target, including an on-leave
+    // redirect. Resolution failures retain `next`'s established manual
+    // fallback; the output path will print its existing warning after commit.
+    // §FS-rhei-next.3.1
+    let claim_assignee = resolve_claim_assignee(origin.claim, machine, to, &settings, &task_info.task);
     // A caller that knows the outcome carries the message; otherwise the
     // engine's own account stands in, but only where it is true.
     // §FS-rhei-states.3.3 §FS-rhei-run.3
@@ -668,6 +690,22 @@ fn execute_transition_with_origin(
         )?)
     };
 
+    // A claim preflights and exclusively holds the ledger before the first
+    // plan byte changes. Ordinary transitions keep their established write
+    // path and take the same ledger serialization only when recording.
+    // §FS-rhei-next.3.1
+    let mut claim_transaction = if origin.claim {
+        Some(ClaimTransaction::begin(
+            files,
+            &metadata_handle,
+            task_handle.as_ref(),
+            &metadata_raw,
+            &task_raw,
+        )?)
+    } else {
+        None
+    };
+
     // Atomic write(s): write to temp file in the same directory, then rename.
     //
     // On Windows each of these may have released its lock to get the rename
@@ -675,10 +713,15 @@ fn execute_transition_with_origin(
     // than the plan. Everything after this point — the `on_enter` callback, and
     // the rollback writes when it fails — therefore runs with the plan
     // unlocked, and another command may rewrite it in between. #95
-    write_file_atomic_locked(metadata_file, &metadata_raw_updated, Some(&metadata_handle))?;
-    if let Some(ref task_raw_updated) = task_raw_updated {
-        write_file_atomic_locked(task_file, task_raw_updated, task_handle.as_ref())?;
-    }
+    persist_transition_state(
+        &mut claim_transaction,
+        metadata_file,
+        task_file,
+        &metadata_handle,
+        task_handle.as_ref(),
+        &metadata_raw_updated,
+        task_raw_updated.as_deref(),
+    )?;
 
     // Execute on_enter callback after the state change (not model-looped).
     let triggered_by = origin.triggered_by.unwrap_or(if redirect_next_state.is_some() {
@@ -711,18 +754,56 @@ fn execute_transition_with_origin(
     if !no_callbacks {
         if let Some(ref cb) = matching_rule.on_enter {
             let executor = ShellCallbackExecutor;
-            let result = executor.execute(cb, &callback_ctx).map_err(|e| miette!(
-                help = state_machine_help(),
-                "{e}"
-            ))?;
+            let result = match executor.execute(cb, &callback_ctx) {
+                Ok(result) => result,
+                Err(err) if origin.claim => {
+                    let original = miette!(help = state_machine_help(), "{err}");
+                    return Err(finish_failed_claim_enter(
+                        &mut claim_transaction,
+                        original,
+                        files,
+                        callback_paths,
+                        machine,
+                        task_id_str,
+                        from,
+                        no_callbacks,
+                        task_handle.as_ref(),
+                        &metadata_handle,
+                    ));
+                }
+                Err(err) => return Err(miette!(help = state_machine_help(), "{err}")),
+            };
             if !result.success {
                 // Spec §Example 8: on_enter failure rolls back the state
                 // write to the original, then the error_handling policy
                 // applies. We implement the rollback; policy execution is
                 // a follow-up.
-                let rollback_err =
-                    write_file_atomic_locked(metadata_file, &metadata_raw, Some(&metadata_handle))
-                        .err();
+                let message =
+                    result.error.clone().unwrap_or_else(|| "on_enter callback failed".to_string());
+                let original = miette!(
+                    help = callback_command_help(),
+                    "on_enter callback '{}' failed: {message}", cb.0
+                );
+                if origin.claim {
+                    return Err(finish_failed_claim_enter(
+                        &mut claim_transaction,
+                        original,
+                        files,
+                        callback_paths,
+                        machine,
+                        task_id_str,
+                        from,
+                        no_callbacks,
+                        task_handle.as_ref(),
+                        &metadata_handle,
+                    ));
+                }
+                let rollback_err = write_file_atomic_locked(
+                    metadata_file,
+                    &metadata_raw,
+                    Some(&metadata_handle),
+                )
+                .err();
                 let task_rollback_err = if task_raw_updated.is_some() {
                     write_file_atomic_locked(task_file, &task_raw, task_handle.as_ref()).err()
                 } else {
@@ -732,8 +813,6 @@ fn execute_transition_with_origin(
                     task_handle.release();
                 }
                 metadata_handle.release();
-                let message =
-                    result.error.clone().unwrap_or_else(|| "on_enter callback failed".to_string());
                 if rollback_err.is_some() || task_rollback_err.is_some() {
                     return Err(miette!(
                         help = callback_command_help(),
@@ -749,19 +828,33 @@ fn execute_transition_with_origin(
         }
     }
 
+    commit_claim(
+        claim_transaction.as_mut(),
+        claim_assignee.as_deref(),
+        &metadata_raw_updated,
+        task_raw_updated.as_deref(),
+        task_id_str,
+        from,
+        to,
+    )?;
+
     // Inside the lock, after `on_enter` had its chance to roll the write back,
     // so no caller can apply a transition and forget the ledger or the result.
     // §FS-rhei-complete.3 §FS-rhei-transition-cmd.3
-    let record = record_transition_result(
-        files.artifact_root,
-        files.task_file,
-        task_id_str,
-        machine,
-        files.artifact_id,
-        from,
-        to,
-        recorded_message.as_deref(),
-    );
+    let record = if origin.claim {
+        Ok(())
+    } else {
+        record_transition_result(
+            files.artifact_root,
+            files.task_file,
+            task_id_str,
+            machine,
+            files.artifact_id,
+            from,
+            to,
+            recorded_message.as_deref(),
+        )
+    };
 
     if let Some(task_handle) = task_handle {
         task_handle.release();

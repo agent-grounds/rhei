@@ -80,29 +80,66 @@ fn resolve_target_agent_with_model_override(
     resolve_target_agent(&target.selector(), state_def, settings)
 }
 
+/// Select the legacy model without checking the registry. Runtime and static
+/// validation both build later selections from this precedence. §FS-rhei-agents.1.4
+fn select_legacy_model(
+    state_def: Option<&rhei_validator::StateDef>,
+    settings: &RheiSettings,
+    opts: &RunOptions,
+    model_override: Option<String>,
+) -> Option<String> {
+    model_override
+        .or_else(|| opts.model_override().map(str::to_string))
+        .or_else(|| state_def.and_then(|state| state.model.clone()))
+        .or_else(|| settings.defaults.model.clone())
+        .or_else(|| settings.model.clone())
+}
+
+/// Select the legacy agent, including the resolved model's default, without
+/// checking the registry. §FS-rhei-agents.1.4
+fn select_legacy_agent(
+    state_def: Option<&rhei_validator::StateDef>,
+    settings: &RheiSettings,
+    opts: &RunOptions,
+    model_profile: Option<&ModelProfile>,
+) -> Option<AgentConfig> {
+    opts.agent_override()
+        .map(AgentConfig::from)
+        .or_else(|| state_def.and_then(|state| state.agent.clone()))
+        .or_else(|| settings.defaults.agent.clone())
+        .or_else(|| settings.agent.clone())
+        .or_else(|| {
+            model_profile
+                .and_then(|profile| profile.default_agent.as_deref())
+                .map(AgentConfig::from)
+        })
+}
+
+/// Select the effective legacy mode in the one order shared by validation and
+/// execution. Validation supplies default run options, leaving the CLI-only
+/// tier for `rhei run`. §FS-rhei-agents.1.4.1
+fn select_legacy_agent_mode(
+    state_def: Option<&rhei_validator::StateDef>,
+    settings: &RheiSettings,
+    opts: &RunOptions,
+    profile: &CustomAgentProfile,
+) -> Option<String> {
+    opts.agent_mode_override()
+        .map(str::to_string)
+        .or_else(|| state_def.and_then(|state| state.agent_mode.clone()))
+        .or_else(|| settings.defaults.agent_mode.clone())
+        .or_else(|| settings.agent_mode.clone())
+        .or_else(|| profile.modes.keys().next().cloned())
+}
+
 fn resolve_legacy_agent_with_model(
     state_def: Option<&rhei_validator::StateDef>,
     settings: &RheiSettings,
     opts: &RunOptions,
     model_override: Option<String>,
 ) -> MietteResult<Option<ResolvedAgent>> {
-    // Resolve the model id first so that step 5 of the agent resolution chain
-    // — `models.<id>.default_agent` — has something to look up. Precedence
-    // matches the resolution order: CLI > state > nested `defaults.model` >
-    // legacy top-level `model`.
-
     // §FS-rhei-agents.1.4: Agent/model resolution precedence.
-    let model = if let Some(ovr) = model_override {
-        Some(ovr)
-    } else if let Some(ovr) = opts.model_override() {
-        Some(ovr.to_string())
-    } else if let Some(m) = state_def.and_then(|d| d.model.clone()) {
-        Some(m)
-    } else if let Some(m) = settings.defaults.model.clone() {
-        Some(m)
-    } else {
-        settings.model.clone()
-    };
+    let model = select_legacy_model(state_def, settings, opts, model_override);
 
     let model_profile = match model.as_deref() {
         Some(id) => Some(settings.models.get(id).ok_or_else(|| {
@@ -124,19 +161,7 @@ fn resolve_legacy_agent_with_model(
         None => None,
     };
 
-    // Agent id resolution: CLI > state > nested `defaults.agent` > legacy
-    // top-level `agent` > `models.<id>.default_agent`.
-    let agent = if let Some(ovr) = opts.agent_override() {
-        Some(AgentConfig::from(ovr))
-    } else if let Some(a) = state_def.and_then(|d| d.agent.clone()) {
-        Some(a)
-    } else if let Some(a) = settings.defaults.agent.clone() {
-        Some(a)
-    } else if let Some(a) = settings.agent.clone() {
-        Some(a)
-    } else {
-        model_profile.and_then(|p| p.default_agent.clone()).map(AgentConfig::from)
-    };
+    let agent = select_legacy_agent(state_def, settings, opts, model_profile);
 
     let Some(agent) = agent else {
         return Ok(None);
@@ -152,17 +177,7 @@ fn resolve_legacy_agent_with_model(
         miette!(help = help, "agent '{}' is not defined", agent.id())
     })?;
 
-    let mode = if let Some(ovr) = opts.agent_mode_override() {
-        Some(ovr.to_string())
-    } else if let Some(m) = state_def.and_then(|d| d.agent_mode.clone()) {
-        Some(m)
-    } else if let Some(m) = settings.defaults.agent_mode.clone() {
-        Some(m)
-    } else if let Some(m) = settings.agent_mode.clone() {
-        Some(m)
-    } else {
-        profile.modes.keys().next().cloned()
-    };
+    let mode = select_legacy_agent_mode(state_def, settings, opts, &profile);
 
     if let Some(name) = &mode {
         if !profile.modes.is_empty() && !profile.modes.contains_key(name) {

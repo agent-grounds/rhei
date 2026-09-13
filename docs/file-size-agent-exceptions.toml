@@ -541,3 +541,13 @@ issue = "agent-grounds/rhei#197"
 reason = """
 This file carries two responsibilities under one include: merging the settings documents into one registry (load_merged_settings and its JSON helpers), and validating a machine's and a plan's references against that registry (validate_machine_settings_references, validate_task_execution_override_settings_references, and the hint builders they print). The second half has no module of its own, so there is no destination to move it to; creating one is a structural change to the CLI's module layout, and it cannot ride inside a supervised diagnostic fix whose whole code change is eleven lines in two hint builders.
 """
+[[exceptions]]
+path = "README.md"
+match = "exact"
+rules = ["entrypoint-doc"]
+kind = "deferred"
+max_accepted = { value = 300, unit = "lines" }
+until = "a dedicated README information-architecture change creates and links the narrower overview document"
+reason = """
+No narrower document owns the multi-feature product overview; extracting unrelated landing-page sections in this behavioral fix would broaden its scope.
+"""

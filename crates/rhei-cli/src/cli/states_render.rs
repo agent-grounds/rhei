@@ -1172,12 +1172,9 @@ fn validation_pass(input: &Path, state_machine: Option<&Path>) -> MietteResult<V
     };
     let workspace_root = execution_workspace_root(input);
     let settings = load_merged_settings(&workspace_root)?;
-    for machine in machines.distinct() {
-        report.errors.extend(validate_machine_settings_references(machine, &settings));
-    }
     report
         .errors
-        .extend(validate_task_execution_override_settings_references(&loaded.rhei, &settings));
+        .extend(validate_plan_settings_references(&loaded.rhei, &machines, &settings));
     report.errors.extend(validate_snapshot_plan_context(&loaded, &resolved));
     report.warnings.extend(snapshot_orphan_validation_warnings(
         &workspace_root,

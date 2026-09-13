@@ -47,6 +47,13 @@
   collisions, while unrelated content is named as an occupied destination.
   (PR #249)
 
+- **An explicit Panta member state-machine declaration now gives its matching
+  local `states.yaml` precedence even when it repeats the project default.**
+  Such a member now uses the local definition's states, transitions, profiles,
+  callbacks, and artifact contracts; a newly consulted malformed local
+  candidate now reports its load error. Omit the member declaration to inherit
+  the resolved project machine wholesale. (PR #254)
+
 - **The worker skill's capture instruction now says when it can be followed.**
   `rhei-plan-worker` is handed one plan and forbidden from looking for a project
   around it, so it routinely works a lone `.rhei.md`. *Capturing Work You Did

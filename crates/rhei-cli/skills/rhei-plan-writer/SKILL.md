@@ -67,24 +67,33 @@ table and then read the selected YAML directly. An explicit matching
 | Standalone Directory Workspace | `rhei` | workspace-root `states.yaml` | workspace-root file |
 | Panta custom project default | non-`rhei` | one matching member-root `states.yaml` | unique member-root file |
 | Panta custom project default | `rhei` (member's own, differing) | none found anywhere | built-in `rhei` |
+| Panta custom project default, restated by the member's own declaration | non-`rhei` (equal to the default) | matching own-execution-root `states.yaml` | own-root file |
+| Panta custom project default, restated by the member's own declaration | non-`rhei` (equal to the default) | own-root file absent, or names another machine | already-resolved project default |
 
 A plan with no effective `**States:**` declaration uses the built-in machine in
 [default-states.md](references/default-states.md) and ignores automatically
 discovered files. For a declared `rhei`, use a matching file only at the local
 lookup location shown above; without one, use that same built-in machine and its
 `pending`/`completed` states. In particular, a member that inherits or restates
-a Panta project default named `rhei` cannot replace it with a member-root file.
+a Panta project default named `rhei` cannot replace it with a member-root file —
+including its own: restating the built-in default is equivalent to omission in
+every respect, unlike restating a custom default.
 
 For a non-`rhei` declaration outside a Panta project, use a matching sibling
 `states.yaml` for a single-file plan or a matching `states.yaml` at a Directory
-Workspace root. In a Panta project, a member's own declaration that differs
-from the project default checks its execution root first. Otherwise check the
-Panta project root; if it is absent or names a different machine, use a matching
-file from the rhei roots only when exactly one exists. A missing match is an
-error — except that a member's own differing declaration of `rhei` itself falls
-back to the built-in machine instead of erroring. Multiple matches or an
-unreadable candidate remain errors in every case, and no other automatic
-location is searched
+Workspace root. In a Panta project, a member's own declaration of a custom name
+checks its execution root first — whether that name differs from the project
+default or restates it. For a restated name, an absent or differently-named
+own-root file falls back directly to the already-resolved project default and
+nothing further is checked. For a differing name, when the own-root file is
+absent or names another machine, check the Panta project root next, or,
+outside a project, the plan's directory or Directory Workspace root; if that
+is absent or names a different machine, look in every rhei directory, its own
+included: if exactly one has a `states.yaml` with that name, use it. A missing
+match is an error — except that a member's own differing declaration of `rhei`
+itself falls back to the built-in machine instead of erroring. Multiple
+matches or an unreadable candidate remain errors in every case, and no other
+automatic location is searched
 ([§FS-rhei-plan-language.1.3](../../../../docs/functional-spec/rhei-plan-language.spec.md#13-state-machine-resolution)).
 
 Each node's initial state comes from the machine's `profiles.<name>.initial` via `node_policy` — **not** from a state-level `initial: true` flag. In the built-in `rhei` machine the initial state is `pending`, so every task in a new plan under that machine starts in `pending`.

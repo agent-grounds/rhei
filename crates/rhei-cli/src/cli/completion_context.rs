@@ -163,6 +163,7 @@ fn load_state_machine(path: Option<&Path>) -> MietteResult<rhei_validator::State
     }
 }
 
+#[derive(Clone)]
 struct ResolvedStateMachine {
     machine: rhei_validator::StateMachine,
     path: Option<PathBuf>,
@@ -376,24 +377,28 @@ fn resolve_state_machines_for_loaded_plan(
     let mut declared: Vec<(&String, &String)> = loaded.rhei_machines.iter().collect();
     declared.sort();
     for (rhei_id, machine_name) in declared {
-        // Restating the default means the same thing as omitting the line.
-        if *machine_name == default.machine.name {
-            continue;
-        }
         if let Some(override_path) = state_machine_path {
-            return Err(miette!(
+            if *machine_name != default.machine.name {
+                return Err(miette!(
 help = "--state-machine replaces resolution for the whole scope. Narrow the scope with --rhei, or drop the override and let each rhei resolve its own machine.",
 
-                "--state-machine '{}' declares '{}', but rhei '{rhei_id}' declares state \
-                 machine '{machine_name}'. The override replaces resolution for the whole \
-                 scope; it cannot reinterpret that rhei's states under another machine. \
-                 Narrow the invocation or drop the override.",
-                override_path.display(),
-                default.machine.name,
-            ));
+                    "--state-machine '{}' declares '{}', but rhei '{rhei_id}' declares state \
+                     machine '{machine_name}'. The override replaces resolution for the whole \
+                     scope; it cannot reinterpret that rhei's states under another machine. \
+                     Narrow the invocation or drop the override.",
+                    override_path.display(),
+                    default.machine.name,
+                ));
+            }
+            continue;
         }
-        let resolved =
-            resolve_declared_rhei_machine(input, loaded, rhei_id, machine_name)?;
+        let resolved = resolve_declared_rhei_machine(
+            input,
+            loaded,
+            rhei_id,
+            machine_name,
+            &default,
+        )?;
         per_rhei.insert(rhei_id.clone(), resolved);
     }
 
@@ -402,16 +407,29 @@ help = "--state-machine replaces resolution for the whole scope. Narrow the scop
 
 /// Resolve one self-declaring rhei's machine file: the rhei's own execution
 /// root first — the shape every instantiated template ships — then the
-/// project-level name-match rules. §AR-rhei-panta.4 §FS-rhei-plan-language.1.3
+/// resolved default for a same-name declaration or the project-level
+/// name-match rules. §FS-rhei-plan-language.1.3 §AR-rhei-panta.4
 fn resolve_declared_rhei_machine(
     input: &Path,
     loaded: &LoadedPlan,
     rhei_id: &str,
     machine_name: &str,
+    default: &ResolvedStateMachine,
 ) -> MietteResult<ResolvedStateMachine> {
     let mut candidates: Vec<PathBuf> = Vec::new();
     if let Some(root) = loaded.rhei_roots.get(rhei_id) {
-        candidates.push(root.join("states.yaml"));
+        let candidate = root.join("states.yaml");
+        if candidate.is_file() {
+            // An explicit declaration always gives its own candidate first
+            // refusal, even when it repeats the default name. §FS-rhei-plan-language.1.3
+            let machine = load_state_machine(Some(&candidate))?;
+            if machine.name == machine_name {
+                return Ok(ResolvedStateMachine { machine, path: Some(candidate) });
+            }
+        }
+    }
+    if machine_name == default.machine.name {
+        return Ok(default.clone());
     }
     candidates.push(auto_state_machine_path(input));
     let mut roots: Vec<&PathBuf> = loaded.rhei_roots.values().collect();
@@ -431,15 +449,6 @@ fn resolve_declared_rhei_machine(
         // here would surface as a misleading "not found" instead.
         let machine = load_state_machine(Some(&candidate))?;
         if machine.name == machine_name {
-            // The rhei's own root wins outright; other locations must be a
-            // unique match. §AR-rhei-panta.4
-            let own_root = loaded
-                .rhei_roots
-                .get(rhei_id)
-                .is_some_and(|root| candidate == root.join("states.yaml"));
-            if own_root {
-                return Ok(ResolvedStateMachine { machine, path: Some(candidate) });
-            }
             matches.push((candidate, machine));
         }
     }

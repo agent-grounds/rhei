@@ -150,11 +150,9 @@ fn resolve_state_machines_for_create(
     let mut declared: Vec<(&String, &String)> = loaded.rhei_machines.iter().collect();
     declared.sort();
     for (rhei_id, machine_name) in declared {
-        // Restating the default means the same thing as omitting the line.
-        if *machine_name == default.machine.name {
-            continue;
-        }
-        match resolve_declared_rhei_machine(input, loaded, rhei_id, machine_name) {
+        // Creation preserves explicit declaration provenance when selecting
+        // both the initial state and an explicit state. §FS-rhei-plan-language.1.3
+        match resolve_declared_rhei_machine(input, loaded, rhei_id, machine_name, &default) {
             Ok(resolved) => {
                 per_rhei.insert(rhei_id.clone(), resolved);
             }

@@ -187,15 +187,21 @@ impl LockedTransitionLedger {
                 "failed to create runtime directory: {err}"
             ))?;
 
-        let (file, created_by_open) = match fs::OpenOptions::new()
+        // Plain `write(true)`, not `append(true)`: on Windows an append-mode
+        // handle is granted `FILE_APPEND_DATA` but not `FILE_WRITE_DATA`, so
+        // `restore`'s `set_len` truncation back to `original_len` fails with
+        // access denied. The exclusive `_ledger_lock` already serializes every
+        // writer, so this handle can safely seek to end itself instead of
+        // relying on the kernel's O_APPEND positioning.
+        let (mut file, created_by_open) = match fs::OpenOptions::new()
             .create_new(true)
-            .append(true)
+            .write(true)
             .open(&locked.path)
         {
             Ok(file) => (file, true),
             Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
                 let file = fs::OpenOptions::new()
-                    .append(true)
+                    .write(true)
                     .open(&locked.path)
                     .map_err(|err| miette!(
                         help = transition_log_help(),
@@ -217,6 +223,9 @@ impl LockedTransitionLedger {
                 file_io_report(&locked.path, "failed to inspect state transition log", err)
             })?
             .len();
+        file.seek(std::io::SeekFrom::End(0)).map_err(|err| {
+            file_io_report(&locked.path, "failed to seek state transition log", err)
+        })?;
         locked.file = Some(file);
         locked.original_len = original_len;
         locked.created_by_open = created_by_open;

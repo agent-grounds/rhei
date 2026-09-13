@@ -66,6 +66,7 @@ table and then read the selected YAML directly. An explicit matching
 | Standalone single-file plan | `rhei` | sibling `states.yaml` | sibling file |
 | Standalone Directory Workspace | `rhei` | workspace-root `states.yaml` | workspace-root file |
 | Panta custom project default | non-`rhei` | one matching member-root `states.yaml` | unique member-root file |
+| Panta custom project default | `rhei` (member's own, differing) | none found anywhere | built-in `rhei` |
 
 A plan with no effective `**States:**` declaration uses the built-in machine in
 [default-states.md](references/default-states.md) and ignores automatically
@@ -79,9 +80,11 @@ For a non-`rhei` declaration outside a Panta project, use a matching sibling
 Workspace root. In a Panta project, a member's own declaration that differs
 from the project default checks its execution root first. Otherwise check the
 Panta project root; if it is absent or names a different machine, use a matching
-file from the rhei roots only when exactly one exists. A missing match, multiple
-matches, or an unreadable candidate is an error. No other automatic location is
-searched
+file from the rhei roots only when exactly one exists. A missing match is an
+error — except that a member's own differing declaration of `rhei` itself falls
+back to the built-in machine instead of erroring. Multiple matches or an
+unreadable candidate remain errors in every case, and no other automatic
+location is searched
 ([§FS-rhei-plan-language.1.3](../../../../docs/functional-spec/rhei-plan-language.spec.md#13-state-machine-resolution)).
 
 Each node's initial state comes from the machine's `profiles.<name>.initial` via `node_policy` — **not** from a state-level `initial: true` flag. In the built-in `rhei` machine the initial state is `pending`, so every task in a new plan under that machine starts in `pending`.

@@ -178,6 +178,7 @@ mod tests {
     include!("cli/tests_complete_reset_tooling.rs");
     include!("cli/tests_file_locks.rs");
     include!("cli/tests_claim_transaction.rs");
+    include!("cli/tests_claim_writer_exclusion.rs");
     include!("cli/tests_claim_revalidation.rs");
     include!("cli/tests_headless_console_log.rs");
     include!("cli/tests_agent_resolution.rs");

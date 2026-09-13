@@ -137,6 +137,7 @@ under `crates/rhei-cli/src/cli/`:
   `diagnostics` contain the remaining command families, the cross-platform
   file-lock helpers every locking command shares, and shared diagnostics.
 - `tests_cli_render`, `tests_complete_reset_tooling`, `tests_file_locks`,
+  `tests_claim_writer_exclusion`,
   `tests_agent_resolution`, `tests_agent_execution_validation`,
   `tests_settings_tooling`, `tests_path_guards`, `tests_snapshots_gc`,
   `tests_snapshot_pointer`, and `tests_snapshot_runtime` contain CLI unit tests

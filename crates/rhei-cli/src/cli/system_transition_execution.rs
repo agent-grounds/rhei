@@ -161,7 +161,8 @@ fn execute_transition_with_origin(
         run_claim_before_lock_hook();
     }
 
-    // Open the file(s) with an exclusive lock for the duration of the operation.
+    // Stable sidecars survive every replacement. All writers take metadata,
+    // then a distinct task file, then the ledger. §AR-agent-orchestrator-workflow.3.3.1
     let metadata_handle = LockedPlanFile::open(metadata_file)?;
     let task_handle = if task_file == metadata_file {
         None
@@ -733,12 +734,8 @@ fn execute_transition_with_origin(
     };
 
     // Atomic write(s): write to temp file in the same directory, then rename.
-    //
-    // On Windows each of these may have released its lock to get the rename
-    // through, and the lock object left behind names the replaced file rather
-    // than the plan. Everything after this point — the `on_enter` callback, and
-    // the rollback writes when it fails — therefore runs with the plan
-    // unlocked, and another command may rewrite it in between. #95
+    // The sidecars remain held across every replacement and any restoration.
+    // §AR-agent-orchestrator-workflow.3.3.1
     persist_transition_state(
         &mut claim_transaction,
         metadata_file,
@@ -748,6 +745,11 @@ fn execute_transition_with_origin(
         &metadata_raw_updated,
         task_raw_updated.as_deref(),
     )?;
+
+    #[cfg(test)]
+    if origin.claim {
+        run_claim_after_state_write_hook();
+    }
 
     // Execute on_enter callback after the state change (not model-looped).
     let triggered_by = origin.triggered_by.unwrap_or(if redirect_next_state.is_some() {
@@ -863,6 +865,11 @@ fn execute_transition_with_origin(
         from,
         to,
     )?;
+
+    // Release the claim ledger before task and metadata, the reverse of the
+    // shared acquisition order. Ordinary recording below scopes its own ledger
+    // hold the same way. §AR-agent-orchestrator-workflow.3.3.1
+    drop(claim_transaction.take());
 
     // Inside the lock, after `on_enter` had its chance to roll the write back,
     // so no caller can apply a transition and forget the ledger or the result.

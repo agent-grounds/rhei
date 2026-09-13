@@ -313,9 +313,10 @@ fn record_poll_self_loop_if_needed(
     // clear_poll_state_metadata removes.
     let route = loaded.task_route(&task.id.to_string(), input);
     let metadata_key = parse_task_id(&route.metadata_id);
-    let raw = fs::read_to_string(&route.metadata_file).map_err(|err| {
-        file_io_report(&route.metadata_file, "failed to read plan metadata file", err)
-    })?;
+    // Poll bookkeeping is a metadata writer and follows the same stable
+    // exclusion as task transitions. §AR-agent-orchestrator-workflow.3.3.1
+    let metadata_lock = LockedPlanFile::open(&route.metadata_file)?;
+    let raw = metadata_lock.read_to_string("failed to read plan metadata file")?;
     let on_disk = parse_metadata_from_raw(&route.metadata_file, &raw)?;
     let updated = set_poll_next_attempt_metadata(
         on_disk.as_ref(),
@@ -325,7 +326,7 @@ fn record_poll_self_loop_if_needed(
         next_attempt_count,
     );
     let rewritten = rewrite_frontmatter(&raw, &updated)?;
-    write_file_atomic(&route.metadata_file, &rewritten)?;
+    write_file_atomic_locked(&route.metadata_file, &rewritten, Some(&metadata_lock))?;
     Ok(true)
 }
 

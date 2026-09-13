@@ -253,6 +253,36 @@ The orchestrator manages workflow execution through state transitions:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+#### 3.3.1. Stable Writer Exclusion
+
+Every command that rewrites plan or metadata Markdown locks a persistent
+sidecar beside the destination before it reads the authoritative pathname. The
+sidecar identity is the canonical parent directory plus the destination's exact
+file name and the suffix `.lock`: `tasks/01-work.md` is guarded by
+`tasks/01-work.md.lock`. Atomic replacement changes the destination inode but
+never this identity, so a writer that waited across one or more replacements
+opens and reads the current destination only after it acquires the sidecar.
+[§FS-rhei-next.3.1](../functional-spec/rhei-next.spec.md#31-behavior)
+[§FS-rhei-transition-cmd.3](../functional-spec/rhei-transition-cmd.spec.md#3-execution)
+
+Rhei creates a sidecar when the destination is first locked and leaves the
+empty file in place permanently. It never renames, truncates, or removes one,
+including during reset, rollback, or failed-create cleanup. The file itself is
+not evidence that a writer is live: ownership is the operating-system lock on
+its open handle, which closes on ordinary release or process exit. Keeping the
+pathname stable prevents cleanup from installing a second lock identity while
+a prior handle is still held.
+
+Writers use one order: metadata sidecar, then a distinct task-file sidecar,
+then the transition ledger. They release in reverse order. A single-file plan
+uses its one sidecar for both metadata and task content. Creation treats its
+scope file as metadata and an existing destination as the task file. Callback
+redirects and terminal finalization reuse the locks already held; configured
+recovery releases the ledger and plan sidecars before it invokes a separate
+ordinary transition. The destination-file handle used for mandatory-lock
+platform compatibility may be released to permit an atomic rename, but the
+sidecar remains held through commitment or restoration.
+
 ### 3.4. Durable State and Git Boundary
 
 Rhei-owned durable state is the authored plan/workspace task state plus the

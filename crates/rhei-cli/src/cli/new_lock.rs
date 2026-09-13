@@ -125,8 +125,8 @@ impl NewCreateLocks<'_> {
 
 /// The file that stands for the whole create scope: the project manifest for a
 /// project, the index for a bare workspace, the plan file itself for a lone
-/// plan. Each already exists wherever a create is legal, so locking adds no
-/// artifact to the tree and nothing new to ignore.
+/// plan. Each already exists wherever a create is legal, so its persistent
+/// sibling sidecar has one stable identity before any destination is chosen.
 // §FS-rhei-new.4
 fn new_create_lock_path(target: &Path) -> PathBuf {
     if let Some(project_dir) = workspace::panta_project_dir(target) {

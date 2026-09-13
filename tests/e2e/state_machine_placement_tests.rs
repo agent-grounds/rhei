@@ -232,6 +232,71 @@ fn an_explicit_same_name_member_uses_its_local_machine() {
     );
 }
 
+/// Whole-project inspection groups by complete content, regardless of source
+/// path, leaving the default unqualified for the omitted `audit` member.
+/// Narrowed inspection retains `billing`'s selected local source.
+/// §FS-rhei-states-cmd.3 §FS-rhei-plan-language.1.3
+#[test]
+fn same_name_member_grouping_uses_content_independent_of_source() {
+    let dir = unique_temp_dir("placement-same-name-grouping");
+    let home = dir.join(".home");
+    let project = two_machine_project(&dir);
+    let billing = project.join("billing");
+    write_fixture_file(&billing, "index.rhei.md", "# Rhei: Billing\n**States:** alpha\n");
+    write_fixture_file(&billing, "states.yaml", &machine("alpha", "drafting", "filed"));
+    let project_arg = project.display().to_string();
+    let default_source = format!("Source: '{}'", project.join("states.yaml").display());
+    let local_source =
+        format!("Source: '{}' (rhei: billing)", billing.join("states.yaml").display());
+
+    for identical in [false, true] {
+        if identical {
+            std::fs::copy(project.join("states.yaml"), billing.join("states.yaml"))
+                .expect("copy identical content to a different source path");
+            write_fixture_file(
+                &billing.join("tasks"),
+                "01.md",
+                "### Task 1: Survey locally\n**State:** surveying\n",
+            );
+        }
+        assert_validates(&rhei_in(&dir, &home, &["validate", &project_arg]));
+
+        let whole = rhei_in(&dir, &home, &["states", &project_arg]);
+        assert_success(&whole);
+        let expected_sources = if identical {
+            vec![default_source.as_str()]
+        } else {
+            vec![default_source.as_str(), local_source.as_str()]
+        };
+        let sources =
+            whole.stdout.lines().filter(|line| line.starts_with("Source:")).collect::<Vec<_>>();
+        assert_eq!(sources, expected_sources, "identical={identical}:\n{}", whole.stdout);
+        assert_eq!(
+            whole.stdout.matches("State machine: alpha (version: 1)").count(),
+            expected_sources.len(),
+            "one block per distinct complete machine; identical={identical}:\n{}",
+            whole.stdout
+        );
+
+        let narrowed = rhei_in(&dir, &home, &["states", &project_arg, "--rhei", "billing"]);
+        assert_success(&narrowed);
+        let sources =
+            narrowed.stdout.lines().filter(|line| line.starts_with("Source:")).collect::<Vec<_>>();
+        assert_eq!(
+            sources,
+            vec![local_source.as_str()],
+            "identical={identical}:\n{}",
+            narrowed.stdout
+        );
+        assert_eq!(
+            narrowed.stdout.matches("State machine: alpha (version: 1)").count(),
+            1,
+            "narrowed inspection should show only billing's machine:\n{}",
+            narrowed.stdout
+        );
+    }
+}
+
 /// A same-name declaration falls back to the resolved project default when
 /// the member has no local candidate or its valid local file names another
 /// machine. §FS-rhei-plan-language.1.3

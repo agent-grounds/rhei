@@ -84,6 +84,7 @@ mod terminal_result_stall_tests;
 mod terminal_result_tests;
 mod transition_tests;
 mod validate_retry_cache_tests;
+mod validation_source_tests;
 mod waiting_on_person_tests;
 mod worker_capture_precondition_tests;
 

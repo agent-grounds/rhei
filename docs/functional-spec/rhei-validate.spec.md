@@ -158,8 +158,46 @@ Validation succeeded
 warning: <diagnostic>
 ```
 
-On failure, diagnostics are emitted through the normal CLI error renderer and
-the process exits non-zero.
+On a semantic validation failure, the diagnostic names the resolved
+state-machine sources that the validation pass used. When the pass used one
+source, the existing sentence is retained byte-for-byte, including for a
+compatible explicit override and a pass using only the built-in machine:
+
+```text
+I validated this plan using '<project>/states.yaml', but found a problem.
+```
+
+When the pass used several sources, the diagnostic lists every source before
+the existing batched errors. Each file is grouped by source identity, not by
+equal machine contents, and names the rheis governed by it. The project default
+comes first; remaining groups are ordered by owning rhei id, and owners sharing
+a source are ordered by rhei id. Rheis that inherit the project default are
+named on its entry. A checked default with no inheriting rheis is identified as
+`project default` without claiming a rhei owner.
+
+```text
+I validated this plan using these state-machine sources:
+  - '<project>/states.yaml' (project default; rhei: audit)
+  - '<project>/billing/states.yaml' (rhei: billing)
+but found a problem.
+```
+
+A built-in source is called `the built-in default state machine`; the
+diagnostic never fabricates a path for it. The source set is the same resolved
+set used by validation, so reporting does not repeat or alter resolution.
+
+This source presentation is shared by persistent-source semantic validation
+failures reached through `validate`, validate watch mode, `new`, `next`,
+`complete`, and `run`. The watch startup banner is separate and unchanged.
+`instantiate` retains the single-source presentation for its rendered output,
+because that output is removed when validation fails and therefore cannot
+serve as a persistent source to inspect.
+
+All other failure content is unchanged: the semantic errors and allowed-state
+lists, remedy and help, validation scope, and non-zero exit behavior. Success
+and warning output are unchanged, as are `rhei states` text and JSON output. A
+conflicting per-rhei declaration under an explicit override remains a
+resolution refusal rather than a semantic validation report.
 
 ## Related Specifications
 

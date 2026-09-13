@@ -84,19 +84,34 @@ fn resolve_rhei_home_file(base: &Path, leaf: &str) -> Option<RheiHomePath> {
     rhei_home_paths(base, leaf).into_iter().find(|candidate| candidate.path.is_file())
 }
 
-/// Every ancestor level holding either template-home name, nearest first. Each
-/// contributing level includes both names in current-then-deprecated order. A
-/// walk with no such level uses `fallback` for empty-search diagnostics.
-/// Filesystem, Git, and Panta boundaries do not stop the ancestor walk.
+/// Every genuine project ancestor holding either template-home name, nearest
+/// first. Each contributing level includes both names in current-then-deprecated
+/// order. The configured user roots are excluded without stopping the walk; a
+/// walk with no other level uses `fallback` for empty-search diagnostics.
+/// Filesystem, user-home, Git, and Panta boundaries do not stop the walk.
 /// §FS-rhei-templates.1.2
-fn ancestor_template_roots(start: &Path, fallback: &Path) -> Vec<RheiHomePath> {
+fn ancestor_template_roots(
+    start: &Path,
+    fallback: &Path,
+    user_home: Option<&Path>,
+) -> Vec<RheiHomePath> {
+    let user_roots = user_home.map(|home| rhei_home_paths(home, "templates"));
+    let is_user_root = |candidate: &RheiHomePath| {
+        user_roots
+            .as_ref()
+            .is_some_and(|roots| roots.iter().any(|root| root.path() == candidate.path()))
+    };
     let roots = start
         .ancestors()
         .filter(|level| !existing_rhei_home_dirs(level, "templates").is_empty())
         .flat_map(|level| rhei_home_paths(level, "templates"))
+        .filter(|candidate| !is_user_root(candidate))
         .collect::<Vec<_>>();
     if roots.is_empty() {
-        rhei_home_paths(fallback, "templates").into_iter().collect()
+        rhei_home_paths(fallback, "templates")
+            .into_iter()
+            .filter(|candidate| !is_user_root(candidate))
+            .collect()
     } else {
         roots
     }

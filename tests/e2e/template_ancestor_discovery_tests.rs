@@ -3,10 +3,11 @@
 
 use std::path::{Path, PathBuf};
 
-use super::agent_grounds_support::run_in;
+use super::agent_grounds_support::{assert_deprecation_warning, run_in};
 use super::*;
 
 const TEMPLATES: &str = ".agent-grounds/rhei/templates";
+const DEPRECATED_TEMPLATES: &str = ".agents/rhei/templates";
 const TARGET: &str = "grounded-ticket";
 const WORKSPACE_DESCRIPTION: &str = "WORKSPACE copy";
 const USER_DESCRIPTION: &str = "USER copy";
@@ -123,6 +124,15 @@ fn path_tail(root: &Path, path: &Path) -> String {
 
 fn json_path_ends_with(value: &serde_json::Value, tail: &str) -> bool {
     value["path"].as_str().is_some_and(|path| path.replace('\\', "/").ends_with(tail))
+}
+
+fn named_entry<'a>(entries: &'a serde_json::Value, name: &str) -> &'a serde_json::Value {
+    entries
+        .as_array()
+        .expect("listing should be a JSON array")
+        .iter()
+        .find(|entry| entry["name"] == name)
+        .unwrap_or_else(|| panic!("listing should contain '{name}':\n{entries}"))
 }
 
 /// A settings file is not a template candidate and therefore never bounded the
@@ -265,4 +275,215 @@ fn invalid_and_unreadable_nearer_copies_preserve_command_specific_errors() {
     }
 
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}
+
+/// A HOME on the ancestor chain contributes only user-tier roots, while the
+/// project walk continues above it. Both user home names retain their own
+/// precedence, classification, paths, and warning behavior.
+/// §FS-rhei-templates.1.2 §FS-rhei-templates.6.3
+#[test]
+fn nested_user_home_stays_out_of_project_tier_without_ending_the_walk() {
+    let root = unique_temp_dir("template-ancestors-nested-home");
+    let home = root.join("home");
+    let member = home.join("workspace/member/panta");
+    std::fs::create_dir_all(&member).expect("create workspace beneath isolated HOME");
+
+    let project_target = write_template(
+        &root.join(TEMPLATES),
+        TARGET,
+        "PROJECT ABOVE HOME",
+        "PROJECT ABOVE HOME RENDERED",
+    );
+    write_template(
+        &home.join(TEMPLATES),
+        TARGET,
+        "USER SHADOWED BY PROJECT",
+        "USER SHADOWED RENDERED",
+    );
+    let user_current = write_template(
+        &home.join(TEMPLATES),
+        "user-current",
+        "USER CURRENT",
+        "USER CURRENT RENDERED",
+    );
+    let user_deprecated = write_template(
+        &home.join(DEPRECATED_TEMPLATES),
+        "user-deprecated",
+        "USER DEPRECATED",
+        "USER DEPRECATED RENDERED",
+    );
+    let user_preferred = write_template(
+        &home.join(TEMPLATES),
+        "user-preferred",
+        "USER CURRENT WINS",
+        "USER CURRENT WINS RENDERED",
+    );
+    write_template(
+        &home.join(DEPRECATED_TEMPLATES),
+        "user-preferred",
+        "USER DEPRECATED SHADOWED",
+        "USER DEPRECATED SHADOWED RENDERED",
+    );
+
+    let project = run_in(&["templates", "--source", "project", "--json"], &member, &home);
+    let project_json = json(&project);
+    let project_names = project_json.as_array().expect("project listing should be an array");
+    let project_entry = named_entry(&project_json, TARGET);
+    let project_tail = path_tail(&root, &project_target);
+    assert!(
+        project_names.iter().all(|entry| {
+            !matches!(
+                entry["name"].as_str(),
+                Some("user-current" | "user-deprecated" | "user-preferred")
+            )
+        }),
+        "user-only templates must not enter the project tier:\n{}",
+        project.stdout
+    );
+    assert!(
+        project_entry["source"] == "project"
+            && project_entry["description"] == "PROJECT ABOVE HOME"
+            && json_path_ends_with(project_entry, &project_tail),
+        "the genuine ancestor above HOME should remain project-local at '{project_tail}':\n{}",
+        project.stdout
+    );
+
+    let project_detail = run_in(&["templates", TARGET, "--json"], &member, &home);
+    let project_detail_json = json(&project_detail);
+    assert!(
+        project_detail_json["source"] == "project"
+            && project_detail_json["description"] == "PROJECT ABOVE HOME"
+            && json_path_ends_with(&project_detail_json, &project_tail),
+        "named detail should select the project ancestor above HOME at '{project_tail}':\n{}",
+        project_detail.stdout
+    );
+
+    let user = run_in(&["templates", "--source", "user", "--json"], &member, &home);
+    let user_json = json(&user);
+    for (name, description, path) in [
+        ("user-current", "USER CURRENT", &user_current),
+        ("user-deprecated", "USER DEPRECATED", &user_deprecated),
+        ("user-preferred", "USER CURRENT WINS", &user_preferred),
+    ] {
+        let entry = named_entry(&user_json, name);
+        let expected_tail = path_tail(&root, path);
+        assert!(
+            entry["source"] == "user"
+                && entry["description"] == description
+                && json_path_ends_with(entry, &expected_tail),
+            "user listing should select '{description}' at '{expected_tail}':\n{}",
+            user.stdout
+        );
+    }
+    assert_deprecation_warning(
+        &user,
+        &root,
+        &format!("home/{DEPRECATED_TEMPLATES}"),
+        &format!("home/{TEMPLATES}"),
+    );
+    assert_eq!(
+        user.stderr.to_lowercase().matches("deprecated").count(),
+        1,
+        "the deprecated user root is read once per command path; stderr was:\n{}",
+        user.stderr
+    );
+
+    let all = run_in(&["templates", "--json"], &member, &home);
+    let all_json = json(&all);
+    for (name, source, path) in [
+        (TARGET, "project", &project_target),
+        ("user-current", "user", &user_current),
+        ("user-deprecated", "user", &user_deprecated),
+        ("user-preferred", "user", &user_preferred),
+    ] {
+        let entry = named_entry(&all_json, name);
+        let expected_tail = path_tail(&root, path);
+        assert!(
+            entry["source"] == source && json_path_ends_with(entry, &expected_tail),
+            "unfiltered listing should preserve '{source}' path '{expected_tail}' for '{name}':\n{}",
+            all.stdout
+        );
+    }
+
+    let detail = run_in(&["templates", "user-preferred", "--json"], &member, &home);
+    let detail_json = json(&detail);
+    let preferred_tail = path_tail(&root, &user_preferred);
+    assert!(
+        detail_json["source"] == "user"
+            && detail_json["description"] == "USER CURRENT WINS"
+            && json_path_ends_with(&detail_json, &preferred_tail),
+        "named detail should use the current user copy at '{preferred_tail}':\n{}",
+        detail.stdout
+    );
+
+    let deprecated_detail =
+        run_in(&["templates", "user-deprecated", "--source", "user", "--json"], &member, &home);
+    let deprecated_json = json(&deprecated_detail);
+    let deprecated_tail = path_tail(&root, &user_deprecated);
+    assert!(
+        deprecated_json["source"] == "user"
+            && deprecated_json["description"] == "USER DEPRECATED"
+            && json_path_ends_with(&deprecated_json, &deprecated_tail),
+        "named detail should identify the deprecated user copy at '{deprecated_tail}':\n{}",
+        deprecated_detail.stdout
+    );
+    assert_eq!(
+        deprecated_detail.stderr.to_lowercase().matches("deprecated").count(),
+        1,
+        "repeated discovery in one detail command should warn once per read path; stderr was:\n{}",
+        deprecated_detail.stderr
+    );
+
+    let instantiated = run_in(&["instantiate", TARGET, "--dry-run"], &member, &home);
+    assert_success(&instantiated);
+    assert!(
+        instantiated.stdout.contains("PROJECT ABOVE HOME RENDERED")
+            && !instantiated.stdout.contains("USER SHADOWED RENDERED"),
+        "instantiation should keep walking above HOME to the project winner\nstdout:\n{}\nstderr:\n{}",
+        instantiated.stdout,
+        instantiated.stderr
+    );
+}
+
+/// If HOME is the only ancestor with template directories, excluding its user
+/// roots leaves the project tier empty. The diagnostic fallback must not add
+/// those same roots back with a project label. §FS-rhei-templates.1.2
+#[test]
+fn nested_user_home_is_not_reinserted_by_project_diagnostic_fallback() {
+    let root = unique_temp_dir("template-ancestors-user-fallback");
+    let home = root.join("home");
+    let member = home.join("workspace/member");
+    std::fs::create_dir_all(&member).expect("create workspace beneath isolated HOME");
+    write_template(
+        &home.join(TEMPLATES),
+        "user-current-only",
+        "USER CURRENT ONLY",
+        "USER CURRENT ONLY RENDERED",
+    );
+    write_template(
+        &home.join(DEPRECATED_TEMPLATES),
+        "user-deprecated-only",
+        "USER DEPRECATED ONLY",
+        "USER DEPRECATED ONLY RENDERED",
+    );
+
+    let project = run_in(&["templates", "--source", "project", "--json"], &member, &home);
+    let project_json = json(&project);
+    assert_eq!(
+        project_json,
+        serde_json::json!([]),
+        "user roots must not return through the empty-project fallback:\n{}",
+        project.stdout
+    );
+
+    let diagnostic = run_in(&["templates", "--source", "project"], &member, &home);
+    assert_success(&diagnostic);
+    let home_current_tail = path_tail(&root, &home.join(TEMPLATES));
+    let home_deprecated_tail = path_tail(&root, &home.join(DEPRECATED_TEMPLATES));
+    let normalized = diagnostic.stdout.replace('\\', "/");
+    assert!(
+        !normalized.contains(&home_current_tail) && !normalized.contains(&home_deprecated_tail),
+        "project diagnostics must not relabel either user root:\n{}",
+        diagnostic.stdout
+    );
 }

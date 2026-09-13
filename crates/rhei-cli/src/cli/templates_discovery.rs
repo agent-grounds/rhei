@@ -89,15 +89,22 @@
         filter: TemplateSourceFilter,
     ) -> MietteResult<Vec<(TemplateSource, RheiHomePath)>> {
         let mut roots = Vec::new();
+        let user_home = match filter {
+            TemplateSourceFilter::User | TemplateSourceFilter::All => Some(home_dir()?),
+            TemplateSourceFilter::Project => home_dir().ok(),
+            TemplateSourceFilter::Builtin => None,
+        };
 
         if filter.includes(TemplateSource::Project) {
             roots.extend(
-                project_template_roots()?.into_iter().map(|root| (TemplateSource::Project, root)),
+                project_template_roots(user_home.as_deref())?
+                    .into_iter()
+                    .map(|root| (TemplateSource::Project, root)),
             );
         }
         if filter.includes(TemplateSource::User) {
             roots.extend(
-                rhei_home_paths(&home_dir()?, "templates")
+                rhei_home_paths(user_home.as_deref().expect("user filter resolved HOME"), "templates")
                     .into_iter()
                     .map(|root| (TemplateSource::User, root)),
             );
@@ -115,15 +122,15 @@
         Ok(roots)
     }
 
-    /// Every template-home ancestor, nearest first and without marker cutoffs;
-    /// the project root supplies empty-search diagnostic paths. §FS-rhei-templates.1.2
-    fn project_template_roots() -> MietteResult<Vec<RheiHomePath>> {
+    /// Genuine project template homes without marker or user-home cutoffs;
+    /// project-root fallback supplies diagnostics. §FS-rhei-templates.1.2
+    fn project_template_roots(user_home: Option<&Path>) -> MietteResult<Vec<RheiHomePath>> {
         let cwd = std::env::current_dir()
             .map_err(|e| miette!(
                 help = cwd_help(),
                 "failed to determine working directory: {e}"
             ))?;
-        Ok(ancestor_template_roots(&cwd, &find_project_root()?))
+        Ok(ancestor_template_roots(&cwd, &find_project_root()?, user_home))
     }
 
     /// A template resolved to a directory the instantiation pipeline can read.

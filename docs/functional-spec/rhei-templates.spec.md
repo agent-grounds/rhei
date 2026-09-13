@@ -39,7 +39,8 @@ Templates are resolved per name in order, first match wins:
 | 4 | compiled into the `rhei` binary | Built-in |
 
 `<ancestor>` ranges from the working directory through every filesystem parent
-to the filesystem root. Section 1.2 defines the project-local walk. Every
+to the filesystem root. Section 1.2 defines the project-local walk, including
+how it keeps the configured user-global roots in their own tier. Every genuine
 project ancestor is searched before the user-global and built-in tiers.
 
 The `<name>` is the directory name and serves as the template identifier used in CLI commands.
@@ -100,6 +101,13 @@ root. At each level it checks `.agent-grounds/rhei/templates` and then
 `.agents/rhei/templates` **before ascending to the parent**. No Git repository,
 Panta project, rhei home, or other project marker ends this walk.
 
+When the configured user home is itself on that ancestor chain, its exact
+`.agent-grounds/rhei/templates` and `.agents/rhei/templates` roots are reserved
+for the user-global tier and are not also project-local candidates. This
+exclusion removes only those two roots: discovery still examines every parent
+above the user home through the filesystem root. It therefore neither turns the
+user home into a boundary nor hides a genuine project ancestor above it.
+
 Resolution is per template name. The first directory named `<name>` in that
 sequence wins. A settings-only rhei home, an empty templates directory, or a
 templates directory containing only other names therefore cannot hide an
@@ -116,12 +124,14 @@ therefore beats a parent copy of the same name under
 beats the `.agents` copy. Every project-local ancestor remains ahead of both
 user-global homes and the built-in fallback.
 
-Each level holding either templates directory contributes both candidate paths
-in current-then-deprecated order, whether or not both directories exist, so a
-searched-path display never advertises the deprecated home alone. When no
-ancestor holds either templates directory, the project root supplies the same
-current/deprecated fallback pair for the `Searched:` diagnostic. This fallback
-does not cut off or otherwise redefine the ancestor walk.
+Except for the two user-global roots reserved above, each level holding either
+templates directory contributes both candidate paths in current-then-deprecated
+order, whether or not both directories exist, so a searched-path display never
+advertises the deprecated home alone. When no genuine project ancestor holds
+either templates directory, the project root supplies the same
+current/deprecated fallback pair for the `Searched:` diagnostic. The fallback
+cannot reintroduce an excluded user-global root as project-local, and it does
+not cut off or otherwise redefine the ancestor walk.
 
 ### 1.3. The deprecation warning
 

@@ -67,6 +67,8 @@ mod supervision_no_spawn_release_tests;
 mod supervision_release_rule_tests;
 mod supervision_surfaces_tests;
 mod supervision_tests;
+mod supervisor_validation_scope_tests;
+mod supervisor_validation_tests;
 mod template_example_sync_tests;
 mod template_transition_guard_tests;
 mod templates_render_tests;

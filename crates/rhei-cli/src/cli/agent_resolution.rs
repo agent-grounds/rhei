@@ -254,7 +254,8 @@ fn resolve_agent_invocations_for_task(
 
     let state_def = machine.states.get(state_name);
     if let Some(state_def) = state_def {
-        let apply_task_override = state_declares_autonomous_agent_work(state_def);
+        let apply_task_override =
+            task_execution_override_applies_to_state(state_def, settings, opts);
         let task_target_override =
             apply_task_override.then(|| task.and_then(|task| task.target.as_deref())).flatten();
         let task_model_override = if apply_task_override && opts.model_override().is_none() {
@@ -355,6 +356,30 @@ fn state_declares_autonomous_agent_work(state_def: &rhei_validator::StateDef) ->
         || !state_def.all_models.is_empty()
         || state_def.target.is_some()
         || !state_def.all_targets.is_empty()
+}
+
+/// A task override follows autonomous work selected by either the state or
+/// merged settings, but cannot turn non-agent work into an agent run.
+/// §FS-rhei-plan-language.3.11
+fn task_execution_override_applies_to_state(
+    state_def: &rhei_validator::StateDef,
+    settings: &RheiSettings,
+    opts: &RunOptions,
+) -> bool {
+    if opts.no_agent()
+        || state_def.terminal
+        || state_def.gating
+        || state_def.program.is_some()
+    {
+        return false;
+    }
+    if state_declares_autonomous_agent_work(state_def) {
+        return true;
+    }
+
+    let model = select_legacy_model(Some(state_def), settings, opts, None);
+    let model_profile = model.as_deref().and_then(|id| settings.models.get(id));
+    select_legacy_agent(Some(state_def), settings, opts, model_profile).is_some()
 }
 
 fn resolve_agent_for_task(

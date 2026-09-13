@@ -81,6 +81,18 @@ const TASK_TARGET_PLAN: &str = r#"# Rhei: Task target shadow
 **Target:** codex[yolo]:openai:gpt-5.6-luna
 "#;
 
+const MIXED_TASK_TARGET_PLAN: &str = r#"# Rhei: Mixed task target shadow
+
+## Tasks
+
+### Task 1: Targeted work
+**State:** pending
+**Target:** codex[yolo]:openai:gpt-5.6-luna
+
+### Task 2: Settings-selected work
+**State:** pending
+"#;
+
 fn settings_path(home: &str) -> String {
     format!("{home}/settings.json")
 }
@@ -235,6 +247,25 @@ fn validate_task_target_shadows_undeclared_defaults_agent_mode() {
         "task target must bypass the settings mode; stdout:\n{}\nstderr:\n{}",
         result.stdout,
         result.stderr
+    );
+}
+
+/// One task's target cannot hide the invalid fallback still used by another
+/// task on the same machine. §FS-rhei-validate.4 §FS-rhei-plan-language.3.11
+#[test]
+fn validate_mixed_task_targets_still_refuses_undeclared_default_agent_mode() {
+    let dir = unique_temp_dir("registry-location-mixed-task-target-shadow");
+    let plan = write_fixture_file(&dir, "plan.rhei.md", MIXED_TASK_TARGET_PLAN);
+    let machine = write_fixture_file(&dir, "states.yaml", UNTARGETED_MACHINE);
+    write_default_mode_settings(&dir, "bogus", true);
+
+    let result = run_cli("validate", &plan, &machine, &[]);
+    let output = flattened(&result);
+
+    assert!(!result.status.success(), "the untargeted task must keep the refusal: {output}");
+    assert!(
+        output.contains("agent 'codex' has no mode 'bogus'"),
+        "the refusal must identify the unshadowed settings selection: {output}"
     );
 }
 

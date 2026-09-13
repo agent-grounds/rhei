@@ -11,36 +11,6 @@
 // The shared transition path
 // ---------------------------------------------------------------------------
 
-/// The chain from `target`'s parent up to its root, nearest ancestor first.
-fn ancestor_chain<'a>(
-    tasks: &'a [rhei_core::ast::Task],
-    target: &TaskId,
-) -> Vec<&'a rhei_core::ast::Task> {
-    fn walk<'a>(
-        tasks: &'a [rhei_core::ast::Task],
-        target: &TaskId,
-        stack: &mut Vec<&'a rhei_core::ast::Task>,
-    ) -> bool {
-        for task in tasks {
-            if &task.id == target {
-                return true;
-            }
-            stack.push(task);
-            if walk(&task.children, target, stack) {
-                return true;
-            }
-            stack.pop();
-        }
-        false
-    }
-    let mut stack = Vec::new();
-    if walk(tasks, target, &mut stack) {
-        stack.reverse();
-        return stack;
-    }
-    Vec::new()
-}
-
 /// Whether a supervisor is working right now, so a move under it is its own
 /// doing rather than news for it.
 ///
@@ -60,9 +30,10 @@ fn supervisor_is_in_flight(
 /// One applied transition, as supervision reads it.
 struct SupervisionTransition<'a> {
     machine: &'a rhei_validator::StateMachine,
-    /// The transitioning task and its ancestors, as re-read from the plan.
+    /// The transitioning task, as re-read from the plan.
     task: &'a rhei_core::ast::Task,
-    ancestors: &'a [rhei_core::ast::Task],
+    /// Owner selected by scope before the move's event is considered.
+    supervising_owner: Option<&'a rhei_core::ast::Task>,
     /// `metadata.tasks.<id>` key of the transitioning task.
     metadata_key: &'a TaskId,
     /// What turns a rhei-local id into a metadata key. Empty outside the basin,
@@ -98,22 +69,11 @@ impl SupervisionTransition<'_> {
                 return None;
             }
         }
-        // §FS-rhei-supervision.2.2: exactly one task hears about it — the
-        // nearest supervising ancestor whose scope includes this one; a move a
-        // `child-*` supervisor declines climbs past it, or reaches nobody.
-        let (supervisor, execute_on) =
-            self.ancestors.iter().enumerate().find_map(|(distance, ancestor)| {
-                let execute_on = execute_on_of(
-                    self.machine,
-                    &normalized_state_name(ancestor.state.as_str(), self.machine),
-                )?;
-                let in_scope = match execute_on.scope() {
-                    // Distance 0 is the transitioning task's own parent.
-                    rhei_validator::SupervisionScope::Child => distance == 0,
-                    rhei_validator::SupervisionScope::Descendant => true,
-                };
-                in_scope.then_some((ancestor, execute_on))
-            })?;
+        let supervisor = self.supervising_owner?;
+        let execute_on = execute_on_of(
+            self.machine,
+            &normalized_state_name(supervisor.state.as_str(), self.machine),
+        )?;
         // §FS-rhei-supervision.2.1: the event narrows what the move has to be,
         // once the scope has said whose move it is.
         if execute_on.event() == rhei_validator::SupervisionEvent::Terminal && !self.to_is_terminal()
@@ -291,6 +251,7 @@ fn supervision_after_transition(
     task_info: &TransitionTaskInfo,
     files: TransitionFiles<'_>,
     applied: AppliedTransition<'_>,
+    supervising_owner: Option<&rhei_core::ast::Task>,
     operation_supervisor: Option<&TaskId>,
 ) -> Option<Metadata> {
     let AppliedTransition { metadata_key, local_id, from, to, to_visit } = applied;
@@ -300,7 +261,7 @@ fn supervision_after_transition(
         SupervisionTransition {
             machine,
             task: &task_info.task,
-            ancestors: &task_info.ancestors,
+            supervising_owner,
             metadata_key,
             metadata_prefix: files.metadata_id.strip_suffix(local_id).unwrap_or(""),
             local_id,

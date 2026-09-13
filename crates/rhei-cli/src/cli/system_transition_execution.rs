@@ -220,6 +220,29 @@ fn execute_transition_with_origin(
             from
         ));
     }
+    // The explicit operation context is a relationship claim about the
+    // locked, re-read tree. Validate it immediately after compare-and-swap,
+    // before target policy, edge selection, callbacks, artifacts, or effects.
+    // §FS-rhei-transition-cmd.3
+    let supervising_owner =
+        nearest_in_scope_supervising_owner(machine, &task_info.ancestors);
+    if let Err(err) = ensure_operation_supervisor_matches(
+        origin.supervisor.as_ref(),
+        supervising_owner,
+        task_id_str,
+        files.artifact_id,
+    ) {
+        if let Some(task_handle) = &task_handle {
+            task_handle.release();
+        }
+        metadata_handle.release();
+        return Err(err);
+    }
+    // The CLI resolver carries a project-qualified id; checkpoint suppression
+    // compares the same accepted identity in the locked file's local id space.
+    // §FS-rhei-transition-cmd.2
+    let operation_supervisor =
+        origin.supervisor.as_ref().and(supervising_owner.map(|owner| &owner.id));
     if let Err(err) = ensure_task_profile_allows_state(
         machine,
         files.artifact_id,
@@ -538,7 +561,8 @@ fn execute_transition_with_origin(
             to,
             to_visit: to_visit_count.unwrap_or(1),
         },
-        origin.supervisor.as_ref(),
+        supervising_owner,
+        operation_supervisor,
     ) {
         updated_metadata = Some(next);
     }

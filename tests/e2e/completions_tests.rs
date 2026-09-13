@@ -297,6 +297,35 @@ fn template_ancestor_discovery_completion_crosses_project_markers() {
     );
 }
 
+/// The configured user home is a tier distinction, not an ancestor boundary.
+/// Completion must skip its user copy as project-local and keep walking to the
+/// genuine project copy above it. §FS-rhei-templates.1.2
+#[test]
+fn template_completion_crosses_a_nested_user_home() {
+    let root = unique_temp_dir("completions-template-nested-home");
+    let home = root.join("home");
+    let dir = home.join("workspace/member");
+    fs::create_dir_all(&dir).expect("create workspace beneath isolated HOME");
+    write_project_template(&root, "shared-review", "Project review above HOME");
+    write_project_template(&home, "shared-review", "User review at HOME");
+
+    let result =
+        run_dynamic_completion(&dir, &home, "fish", &["--", "rhei", "instantiate", "shared"]);
+
+    assert!(
+        result.status.success(),
+        "template completion should succeed\nstdout:\n{}\nstderr:\n{}",
+        result.stdout,
+        result.stderr
+    );
+    assert!(
+        result.stdout.contains("shared-review\tProject review above HOME")
+            && !result.stdout.contains("User review at HOME"),
+        "completion should expose the project copy above HOME; stdout was:\n{}",
+        result.stdout
+    );
+}
+
 #[test]
 fn dynamic_completion_lists_template_input_assignments() {
     let home = unique_temp_dir("completions-template-input-home");

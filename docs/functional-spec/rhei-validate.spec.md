@@ -120,7 +120,10 @@ A parse error must read the same whether the plan was reached directly
 (`rhei validate plans/auth.rhei.md`) or through its project (`rhei validate`
 inside a Panta project). Both forms report **every** recoverable problem in the
 offending file, not just the first, and both render the file path relative to
-the invocation directory when that is shorter than the absolute path.
+the invocation directory when that is shorter than the absolute path. Whichever
+spelling is selected, the complete path is emitted on one physical diagnostic
+line even when it is longer than the renderer's wrap width; `/`, `\`, and `-`
+inside a path are not line-break opportunities.
 
 Parity matters most for the errors that cascade. A task heading authored under a
 content section rather than `## Tasks` fails first as *"Metadata field appears

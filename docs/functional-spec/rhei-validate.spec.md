@@ -63,7 +63,12 @@ pass `--state-machine`.
    counted-loop syntax, and artifact contracts. [§FS-rhei-plan-language](rhei-plan-language.spec.md#fs-rhei-plan-language-rhei-plan-language-specification) [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification)
 3. Load merged global and project settings, then validate referenced agents,
    models, MCP servers, skills, and snapshot settings used by the state
-   machine. [§FS-rhei-agents](rhei-agents.spec.md#fs-rhei-agents-rhei-agents-specification) [§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification)
+   machine. For each execution that uses static agent and mode selection,
+   validation resolves the effective pair and rejects a selected mode that the
+   selected agent's non-empty `modes` map does not declare. This check follows
+   the same precedence and selector-bypass rules as execution, so it does not
+   reject a shadowed settings fallback or speculate about a mode when no agent
+   is effective. [§FS-rhei-agents.1.4.1](rhei-agents.spec.md#141-mode-resolution-order) [§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification)
 4. Validate snapshot plan context and report orphaned snapshot diagnostics as
    warnings when a snapshot cache exists. [§FS-rhei-snapshot-operations](rhei-snapshot-operations.spec.md#fs-rhei-snapshot-operations-rhei-snapshot-operations-specification)
 5. Report every ticket that reached a successful terminal state while one of

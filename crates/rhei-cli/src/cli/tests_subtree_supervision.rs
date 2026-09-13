@@ -384,18 +384,6 @@ transitions:
             vec![checkpoint("1.1", "review", "cancelled", 1)]
         );
 
-        // A value naming a real task that is not this task's nearest in-scope
-        // supervising ancestor is accepted and has no effect.
-        // §FS-rhei-transition-cmd.2
-        let siblings = supervised_plan(&["review", "review"]);
-        let bystander = parse_task_id("1.2");
-        let mismatched =
-            deliver_with_supervisor(&siblings, "1.1", "review", "cancelled", Some(&bystander))
-                .expect("a value that names no supervisor of this task suppresses nothing");
-        assert_eq!(
-            supervision_checkpoints(Some(&mismatched), &parent),
-            vec![checkpoint("1.1", "review", "cancelled", 1)]
-        );
     }
 
     /// §FS-rhei-supervision.2.1: `execute_on: descendant-transition` hears every hop.

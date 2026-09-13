@@ -190,10 +190,13 @@ instantiated template ships. Otherwise, and
 for a custom manifest default, the project root's `states.yaml` resolves first;
 when that is absent or names a different machine, a `states.yaml` in a
 discovered rhei's root whose declared `name:` matches may resolve it — but only
-a **unique** match. The built-in project default `rhei` is the exception: only
-a matching project-root file replaces the built-in machine. A member that
-inherits or restates that default cannot make a member-root file the project
-default. When several candidate roots hold files declaring a custom default's
+a **unique** match. The explicitly declared built-in project default
+`**States:** rhei` is the exception: only a matching project-root file replaces
+the built-in machine. A member that inherits or restates that explicit default
+cannot make a member-root file the project default. When the effective
+declaration is omitted after inheritance, automatic project-root and member-root
+files are ignored and built-in `rhei` is used. When several candidate roots
+hold files declaring a custom default's
 name, resolution is ambiguous and errors, naming the candidates and the fixes
 (move the definitive file to the project root, or pass
 `--state-machine`): a stale copy silently driving tickets would be far worse

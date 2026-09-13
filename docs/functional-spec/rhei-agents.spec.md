@@ -405,18 +405,39 @@ fields are rejected and auto-emit is skipped.
 
 #### 1.4.1. Mode Resolution Order
 
-When the resolved agent declares `modes`, `rhei run` picks one at spawn time:
+When the resolved agent declares `modes`, Rhei selects one in this order:
 
 1. **CLI override** — `--agent-mode <MODE>`
 2. **State-level** — `agent_mode` on the state definition in `states.yaml`
-3. **Project defaults** — `.agent-grounds/rhei/settings.json` `defaults.agent_mode`
-4. **Global defaults** — `~/.config/rhei/settings.json` `defaults.agent_mode`
+3. **Merged nested default** — `defaults.agent_mode`, with the project setting
+   overriding the global setting
+4. **Merged legacy default** — the backward-compatible top-level
+   `agent_mode`, with the project setting overriding the global setting; used
+   only when the nested default is absent
 5. **Registry default** — the first declared mode in the agent entry's
    `modes` map
 6. **None** — if the agent entry has no `modes`, no mode flags are appended
 
-The resolved mode name must be a key in the agent entry's `modes` map when
-the map is non-empty. A missing mode is a spawn-time error.
+An explicit state `target` or `all_targets` selector, or a task
+`**Target:**`, carries its own optional mode and bypasses this legacy
+resolution order. A state-level mode shadows both settings defaults. Selection
+of the effective agent still follows §1.4, including state, merged settings,
+and model-default agents.
+
+Before execution, validation applies this order without the run-only CLI
+override to every applicable static selection. If both an agent and a mode are
+effective and the agent's `modes` map is non-empty, the mode must be a key in
+that map; otherwise validation refuses the plan and identifies the mode, the
+agent, `agents.<id>.modes`, and the effective project and global settings
+locations ([§FS-rhei-errors.1.4](rhei-errors.spec.md#14-where-the-refused-name-is-declared)). An explicit selector remains subject to its
+own selector validation and does not also validate a shadowed legacy fallback.
+No mode is rejected when no agent is effective or when the effective agent
+declares no modes.
+
+`--agent-mode` remains a `rhei run` option and is not accepted by
+`rhei validate`; run checks that dynamic selection at runtime. `rhei run` also
+performs the static validation pass first, so an invalid static selection is
+refused before scheduling or spawn.
 
 When `rhei run` composes the tool surface for a state, it resolves the
 effective MCP server and skill sets:

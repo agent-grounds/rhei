@@ -55,6 +55,32 @@ transitions:
     to: completed
 "#;
 
+/// The issue #234 shape: the state selects `codex`, while merged settings
+/// select its mode. §FS-rhei-agents.1.4.1
+const SETTINGS_MODE_MACHINE: &str = r#"name: settings-mode
+version: 1
+states:
+  pending:
+    initial: true
+    description: Work the task
+    agent: codex
+  completed:
+    final: true
+    description: Done
+transitions:
+  - from: pending
+    to: completed
+"#;
+
+const TASK_TARGET_PLAN: &str = r#"# Rhei: Task target shadow
+
+## Tasks
+
+### Task 1: Work
+**State:** pending
+**Target:** codex[yolo]:openai:gpt-5.6-luna
+"#;
+
 fn settings_path(home: &str) -> String {
     format!("{home}/settings.json")
 }
@@ -105,6 +131,17 @@ fn write_settings(dir: &Path, home: &str) {
     );
 }
 
+fn write_default_mode_settings(dir: &Path, mode: &str, default_agent: bool) {
+    let settings_dir = dir.join(GROUNDS);
+    fs::create_dir_all(&settings_dir).expect("create settings directory");
+    let agent = if default_agent { r#", "agent": "codex""# } else { "" };
+    write_fixture_file(
+        &settings_dir,
+        "settings.json",
+        &format!(r#"{{ "defaults": {{ "agent_mode": "{mode}"{agent} }} }}"#),
+    );
+}
+
 fn assert_refuses_the_mode(output: &str) {
     assert!(
         output.contains("unknown target mode 'xhigh'"),
@@ -135,6 +172,69 @@ fn a_refused_mode_names_the_key_and_both_settings_files() {
     assert!(
         output.contains(&location_clause("agents.codex.modes", &settings_path(GROUNDS))),
         "the refusal must name where a mode is declared; output was:\n{output}"
+    );
+}
+
+/// Validation resolves the settings-selected mode before execution and gives
+/// the same declaration guidance as other registry refusals.
+/// §FS-rhei-validate.4 §FS-rhei-agents.1.4.1
+#[test]
+fn validate_refuses_undeclared_effective_defaults_agent_mode() {
+    let dir = unique_temp_dir("registry-location-default-mode-invalid");
+    let plan = write_fixture_file(&dir, "plan.rhei.md", PLAN);
+    let machine = write_fixture_file(&dir, "states.yaml", SETTINGS_MODE_MACHINE);
+    write_default_mode_settings(&dir, "bogus", false);
+
+    let result = run_cli("validate", &plan, &machine, &[]);
+    let output = flattened(&result);
+
+    assert!(!result.status.success(), "the undeclared effective mode must fail: {output}");
+    assert!(
+        output.contains("agent 'codex' has no mode 'bogus'"),
+        "the refusal must identify the effective agent and mode: {output}"
+    );
+    assert!(
+        output.contains(&location_clause("agents.codex.modes", &settings_path(GROUNDS))),
+        "the refusal must name where the effective mode is declared: {output}"
+    );
+}
+
+/// A declared merged-settings mode remains a valid static selection.
+/// §FS-rhei-validate.4 §FS-rhei-agents.1.4.1
+#[test]
+fn validate_accepts_declared_effective_defaults_agent_mode() {
+    let dir = unique_temp_dir("registry-location-default-mode-valid");
+    let plan = write_fixture_file(&dir, "plan.rhei.md", PLAN);
+    let machine = write_fixture_file(&dir, "states.yaml", SETTINGS_MODE_MACHINE);
+    write_default_mode_settings(&dir, "yolo", false);
+
+    let result = run_cli("validate", &plan, &machine, &[]);
+
+    assert!(
+        result.status.success(),
+        "a declared effective mode must validate; stdout:\n{}\nstderr:\n{}",
+        result.stdout,
+        result.stderr
+    );
+    assert!(result.stdout.contains("Validation succeeded"));
+}
+
+/// A task selector owns its agent and mode, so a fallback it bypasses is not
+/// rejected merely because it exists. §FS-rhei-agents.1.4.1
+#[test]
+fn validate_task_target_shadows_undeclared_defaults_agent_mode() {
+    let dir = unique_temp_dir("registry-location-task-target-shadow");
+    let plan = write_fixture_file(&dir, "plan.rhei.md", TASK_TARGET_PLAN);
+    let machine = write_fixture_file(&dir, "states.yaml", UNTARGETED_MACHINE);
+    write_default_mode_settings(&dir, "bogus", true);
+
+    let result = run_cli("validate", &plan, &machine, &[]);
+
+    assert!(
+        result.status.success(),
+        "task target must bypass the settings mode; stdout:\n{}\nstderr:\n{}",
+        result.stdout,
+        result.stderr
     );
 }
 

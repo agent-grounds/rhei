@@ -63,8 +63,8 @@ is an argument.
 
 | Flag                    | Default              | Description                                                    |
 |-------------------------|----------------------|----------------------------------------------------------------|
-| `--dir`                 | off                  | Create a Directory Workspace rhei instead of a single file (§2.1) |
-| `--states <NAME>`       | project default      | Write a `**States:**` declaration, binding this rhei to its own state machine ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)) |
+| `--dir`                 | off                  | Create a Directory Workspace rhei, or adopt the prospective workspace §2.1.1 permits |
+| `--states <NAME>`       | project default      | Write a `**States:**` declaration; normal binding resolves it from the created rhei's execution root ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)) |
 | `--max-levels <N>`      | unset                | Write `structure.maxLevels`                                    |
 | `--node-kinds <K,...>`  | unset                | Write `structure.nodeKinds`                                    |
 
@@ -161,6 +161,31 @@ announces it ([§FS-rhei-validate.1.1](rhei-validate.spec.md#11-why-there-is-no-
 lone plan or a bare workspace does the command say so and point at `rhei init`
 — a rhei is a *member* of a project, and there is nowhere to put a second one
 otherwise.
+
+#### 2.1.1. Prospective Directory Workspace adoption
+
+`--dir` may create its index and task directory inside a same-id directory that
+already exists but is not yet a rhei. The directory is adoptable only when it is
+empty, or when its entries are exactly an authored `states.yaml` and an optional
+`prompt_templates/` directory. `prompt_templates/` must be a directory and is
+admissible only beside `states.yaml`; a template directory alone, a pre-existing
+`tasks/`, or any other entry makes the destination occupied. The refusal happens
+before writing, names the obstruction, and tells the author to move or remove it.
+
+The allowlist classifies filesystem shape, not machine validity. Once the new
+`index.rhei.md` makes the directory a rhei, the ordinary project load resolves a
+declared `--states <NAME>` from that rhei's execution root and the ordinary
+post-write validation accepts or rejects the authored machine. This is the only
+resolution path: creation does not search a prospective root before the index
+exists and does not add a second state-machine precedence rule. A successful
+adoption adds only `index.rhei.md` and an empty `tasks/`; it preserves the
+authored machine and prompt templates byte-for-byte.
+
+Without `--dir`, creation remains the single-file layout at `<id>.rhei.md`, with
+the project directory as its execution root. A same-id non-rhei directory is a
+layout conflict: the command does not search it for a machine or leave the
+single-file destination behind, and points to `--dir` when the directory has an
+adoptable shape.
 
 ## 3. Creating a ticket
 
@@ -353,10 +378,11 @@ every `**Prior:**` and a generated name is a worse identifier than a number.
 `--id` bypasses derivation in both modes and is validated, not sanitized: an
 id that is not legal is refused with the reason, never quietly repaired.
 
-Three ids are refused outright:
+The following ids are refused outright:
 
 - one that **collides** with an existing rhei or sibling ticket, naming the
-  holder and pointing at `--id`;
+  holder and pointing at `--id`; a same-id `*.rhei.md` or a directory containing
+  `index.rhei.md` is an existing rhei in either requested create layout;
 - `basin` as a *rhei* id, which is permanently reserved for the synthetic
   basin rhei ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)) — the refusal is at create time rather than at
   the next load, where it would arrive as a broken project;
@@ -366,6 +392,12 @@ Three ids are refused outright:
   well;
 - an id that is not a legal single-segment rhei id ([§AR-rhei-panta.3](../architecture/rhei-panta.spec.md#3-identity-and-id-namespacing)) or a
   legal ticket id segment.
+
+A same-id directory that has no `index.rhei.md` is not an existing-rhei
+collision. For `--dir` it is either the prospective workspace admitted by
+§2.1.1 or an occupied destination; for the default single-file layout it is a
+layout conflict. These refusals describe the filesystem conflict truthfully and
+leave both the existing directory and the selected output path untouched.
 
 Concurrent creates are serialized by two locks, taken in a fixed order.
 
@@ -430,6 +462,13 @@ new task file is derived from the id and the title, so a file already sitting
 at that name holds someone else's work — the refusal names the path and points
 at `--id`, before anything is written. Creating is not editing (§6), and an
 unconditional write is editing with the diff thrown away.
+
+Adopting a prospective Directory Workspace does not make its existing root or
+authored bundle part of the create. The write's ownership record distinguishes
+the pre-existing directory, `states.yaml`, and `prompt_templates/` tree from the
+`index.rhei.md` and `tasks/` it adds. Verification and every later cleanup use
+that record, so no pre-existing path is claimed merely because the create writes
+another entry beside it.
 
 After writing, `rhei new` loads and validates the project the way
 `rhei validate` does, then compares the *whole set of ids* the project holds
@@ -497,8 +536,11 @@ step was refused for an error the first step's own rhei list had reworded.
 
 - Errors the create introduced — a `--prior` naming nothing, a `--states`
   naming a machine no `states.yaml` provides — undo the write: a created file
-  is removed, and a modified file is restored byte-for-byte. The report lists
-  only those new errors, with the validator's own code frames.
+  is removed, and a modified file is restored byte-for-byte. For an adopted
+  workspace, this removes only the invocation-created index and task directory;
+  the pre-existing root, state machine, and prompt templates survive
+  byte-for-byte. The report lists only those new errors, with the validator's
+  own code frames.
 - Errors that were already there do not. When the post-write errors are the
   ones the pre-write pass already found, the write is **kept** and the command
   succeeds, with a warning saying the project was already failing validation
@@ -548,7 +590,8 @@ Rolling back a create's *own* errors is still the right default, because that
 failure is nearly always in the flags rather than in the file: re-running with a
 fixed flag is the fix, and a half-created ticket in the way of that re-run is
 pure friction. `--keep-on-error` keeps the write for inspection, and then says
-that the project is left failing validation.
+that the project is left failing validation. In an adopted workspace it keeps
+the new index and task directory as well as the authored bundle it never owned.
 
 ### 5.3. Mode confusion is an error
 
@@ -604,7 +647,10 @@ the project is reloaded. `--dry-run` is the flag reached for *before* writing,
 so previewing happily and then failing for real is the one answer it must never
 give; a dry run that would have failed reports the real failure and exits
 non-zero. Because the rollback is unconditional, `--keep-on-error` has no effect
-alongside it.
+alongside it. The same ownership boundary applies to an adopted workspace: dry
+run removes only its temporary index and task directory, and preserves the
+pre-existing directory, machine, and prompt-template tree byte-for-byte whether
+validation succeeds or fails.
 
 Together, `--dry-run --json` emits that same object with `"dry_run": true` and
 the block under `"markdown"`, so a script can preview a bulk create the same
@@ -615,9 +661,11 @@ one place a caller cannot notice it.
 
 ## 6. What `rhei new` does not do
 
-- It does not edit or move anything that already exists. No re-titling, no
-  re-parenting, no state changes — `rhei transition` and `rhei complete` own
-  state, and everything else is a file edit.
+- It does not edit or move anything that already exists. With `--dir`, §2.1.1
+  permits creating workspace-owned entries inside one narrowly admissible
+  directory, but its existing machine bundle remains authored content. There is
+  otherwise no re-titling, re-parenting, or state change — `rhei transition` and
+  `rhei complete` own state, and everything else is a file edit.
 - It does not scaffold from a template. `rhei instantiate` writes a rhei
   complete with its tickets and its own state machine ([§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification));
   `rhei new` writes an empty one. They are separate because a blank rhei should

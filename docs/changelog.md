@@ -9,6 +9,13 @@
   JSON values in every participating run-owned copy without affecting price
   selection, validation, coverage, or calculated amounts. (PR #257)
 
+- **The diagnostic path no-wrap regression now follows the CLI's shorter-path
+  selection contract.** The test previously required an absolute fixture path
+  even when the CLI correctly rendered a shorter relative spelling intact. It
+  now covers both relative-selected and absolute-selected paths beyond the
+  renderer's wrap width, without depending on checkout or temporary-directory
+  layout. (PR #259)
+
 - **The bundled authoring skills now resolve a built-in `rhei` project default
   the way the CLI does.** Their no-CLI guidance no longer lets a member-only
   `states.yaml` replace built-in `pending`/`completed` for an inheriting or

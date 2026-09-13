@@ -7,42 +7,88 @@
 /// and absolute spellings, intact on one physical line. §FS-rhei-validate.4.2
 #[test]
 fn diagnostics_never_break_a_file_path_across_lines() {
+    const RENDERER_WRAP_WIDTH: usize = 78;
+
     let root = unique_temp_dir("diag-long-path");
-    let deep = root
+    // Normalize the temporary root before deriving either spelling, including
+    // Windows's ordinary non-verbatim form. §REQ-cross-platform.5
+    let root_path = rhei_core::platform::canonical_path(&root)
+        .expect("canonicalize diagnostic fixture root");
+    let invocation_dir = root_path.join("relative-invocation");
+    let deep = invocation_dir
         .join("a-directory-with-hyphens")
         .join("and-another-long-segment")
         .join("plus-one-more-to-overflow-the-wrap-column");
     fs::create_dir_all(&deep).expect("create nested dirs");
     let plan_path = write_fixture_file(&deep, "broken.rhei.md", "# Not A Rhei Heading\n");
 
-    let output = rhei_command()
-        .arg("validate")
-        .arg(&plan_path)
-        .output()
-        .expect("validate command should run");
-    assert!(!output.status.success(), "the malformed plan must fail validation");
+    let assert_case = |case: &str, cwd: &Path, wanted: &Path| {
+        let output = rhei_command()
+            .current_dir(cwd)
+            .arg("validate")
+            .arg(&plan_path)
+            .output()
+            .expect("validate command should run");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let wanted = wanted.display().to_string();
+        let wanted_line = format!("│ {wanted}");
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let invocation_dir = std::env::current_dir().expect("read test invocation directory");
-    let rendered_path = stderr
-        .lines()
-        .skip_while(|line| line.trim() != "│ in")
-        .nth(1)
-        .map(str::trim)
-        .and_then(|line| line.strip_prefix("│ "))
-        .expect("parse diagnostic should name its file after `in`");
-    eprintln!("invocation directory: {}", invocation_dir.display());
-    eprintln!("fixture root: {}", root.display());
-    eprintln!("absolute path ({} chars): {}", plan_path.as_os_str().len(), plan_path.display());
-    eprintln!("selected diagnostic path ({} chars): {rendered_path}", rendered_path.len());
-    eprintln!("validation exit: {:?}", output.status.code());
-    eprintln!("parse error present: {}", stderr.contains("PARSE ERROR"));
-    let wanted = plan_path.display().to_string();
+        eprintln!("case: {case}");
+        eprintln!("invocation directory: {}", cwd.display());
+        eprintln!("fixture root: {}", root_path.display());
+        eprintln!(
+            "absolute path ({} chars): {}",
+            plan_path.display().to_string().len(),
+            plan_path.display()
+        );
+        eprintln!("selected path ({} chars): {wanted}", wanted.len());
+        eprintln!("validation exit: {:?}", output.status.code());
+        eprintln!("parse error present: {}", stderr.contains("PARSE ERROR"));
+
+        assert_eq!(
+            output.status.code(),
+            Some(1),
+            "{case}: the malformed plan must fail with parse-error status 1\n{stderr}"
+        );
+        assert!(stderr.contains("PARSE ERROR"), "{case}: expected a parse error\n{stderr}");
+        assert!(
+            wanted.len() > RENDERER_WRAP_WIDTH,
+            "{case}: selected path must exceed the renderer's wrap width: {wanted}"
+        );
+        assert!(
+            stderr.lines().any(|line| line.trim() == wanted_line),
+            "{case}: the complete selected path must appear on one physical line.\n\
+             wanted: {wanted}\ngot:\n{stderr}"
+        );
+    };
+
+    let relative_path = plan_path
+        .strip_prefix(&invocation_dir)
+        .expect("plan should be beneath the relative-case invocation directory");
     assert!(
-        stderr.lines().any(|line| line.contains(&wanted)),
-        "the path must appear intact on one line so it stays copy-pasteable.\n\
-         wanted: {wanted}\ngot:\n{stderr}"
+        relative_path.display().to_string().len() < plan_path.display().to_string().len(),
+        "relative-case setup must select the relative spelling"
     );
+    assert_case("relative spelling", &invocation_dir, relative_path);
+
+    let plan_from_root = plan_path
+        .strip_prefix(&root_path)
+        .expect("plan should be beneath fixture root");
+    let mut absolute_invocation_dir = root_path.join("absolute-invocation");
+    let mut path_from_absolute_invocation = PathBuf::from("..").join(plan_from_root);
+    while path_from_absolute_invocation.display().to_string().len()
+        <= plan_path.display().to_string().len()
+    {
+        absolute_invocation_dir.push("d");
+        path_from_absolute_invocation = PathBuf::from("..").join(path_from_absolute_invocation);
+    }
+    assert!(
+        path_from_absolute_invocation.display().to_string().len()
+            > plan_path.display().to_string().len(),
+        "absolute-case setup must select the absolute spelling"
+    );
+    fs::create_dir_all(&absolute_invocation_dir).expect("create absolute-case invocation directory");
+    assert_case("absolute spelling", &absolute_invocation_dir, &plan_path);
 }
 
 /// §FS-rhei-plan-language.1.2: one freshly created workspace directory used to

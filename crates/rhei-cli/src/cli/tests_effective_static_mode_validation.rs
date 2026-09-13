@@ -128,3 +128,63 @@
 
         assert!(errors.is_empty(), "a profile with no modes keeps no-mode behavior: {errors:?}");
     }
+
+    /// A task target follows settings-derived autonomous work and replaces the
+    /// invalid fallback tuple exactly as execution will use it.
+    /// §FS-rhei-plan-language.3.11 §FS-rhei-agents.1.4.1
+    #[test]
+    fn task_target_resolves_over_settings_derived_agent_mode() {
+        let mut settings = default_settings();
+        settings.defaults.agent = Some(AgentConfig::from("codex"));
+        settings.defaults.agent_mode = Some("bogus".to_string());
+        let machine = static_mode_machine("  pending:\n    initial: true\n    description: x\n");
+        let rhei = rhei_core::parse(
+            "# Rhei: Target override\n\n## Tasks\n\n### Task 1: Work\n**State:** pending\n**Target:** codex[yolo]:openai:gpt-5.6-luna\n",
+        )
+        .expect("valid plan");
+
+        let resolved = resolve_agent_invocations_for_task(
+            &machine,
+            "pending",
+            &settings,
+            &default_run_options(),
+            rhei.tasks.first(),
+        )
+        .expect("the task target must bypass the invalid settings mode");
+
+        assert_eq!(resolved.len(), 1);
+        let resolved = &resolved[0];
+        assert_eq!(resolved.agent.id(), "codex");
+        assert_eq!(resolved.mode.as_deref(), Some("yolo"));
+        assert_eq!(resolved.model_provider.as_deref(), Some("openai"));
+        assert_eq!(resolved.model_name.as_deref(), Some("gpt-5.6-luna"));
+        assert_eq!(
+            resolved.target.as_ref().map(ExecutionTarget::selector).as_deref(),
+            Some("codex[yolo]:openai:gpt-5.6-luna")
+        );
+    }
+
+    /// Settings may make an ordinary state autonomous, but a task override
+    /// cannot create agent work in a human, program, terminal, or unselected state.
+    /// §FS-rhei-plan-language.3.11
+    #[test]
+    fn task_override_agent_mode_applicability_preserves_non_agent_boundaries() {
+        let machine = static_mode_machine("  pending:\n    initial: true\n    description: x\n");
+        let state = machine.states.get("pending").expect("pending state");
+        let mut settings = default_settings();
+        let opts = default_run_options();
+
+        assert!(!task_execution_override_applies_to_state(state, &settings, &opts));
+        settings.defaults.agent = Some(AgentConfig::from("codex"));
+        assert!(task_execution_override_applies_to_state(state, &settings, &opts));
+
+        let mut non_agent = state.clone();
+        non_agent.gating = true;
+        assert!(!task_execution_override_applies_to_state(&non_agent, &settings, &opts));
+        non_agent.gating = false;
+        non_agent.program = Some(serde_yaml::Value::String("true".to_string()));
+        assert!(!task_execution_override_applies_to_state(&non_agent, &settings, &opts));
+        non_agent.program = None;
+        non_agent.terminal = true;
+        assert!(!task_execution_override_applies_to_state(&non_agent, &settings, &opts));
+    }

@@ -70,6 +70,7 @@ include!("cli/settings_types.rs");
 include!("cli/settings_load_validate.rs");
 include!("cli/tooling_resolution.rs");
 include!("cli/agent_resolution.rs");
+include!("cli/settings_validate_references.rs");
 include!("cli/agent_log_files.rs");
 include!("cli/agent_spawn_records.rs");
 include!("cli/run_helpers.rs");

@@ -49,9 +49,14 @@ The state machine is a property of the **rhei**, defaulted by the project.
    declares nothing, the synthetic `basin` rhei, and the Panta root's node
    policy.
 2. A rhei that declares its own `**States:**` runs under the machine it
-   names. Restating the default is legal and equivalent to omitting the line.
-   Divergence is not an error; it is the normal shape of a project holding
-   more than one instantiated template.
+   names. Restating a custom default is legal and equivalent to omitting the
+   line only for the effective machine name: the declaration remains explicit,
+   so its definition file still resolves per item 6. Restating the built-in
+   `rhei` default is the one case where that equivalence is total: item 6's
+   own-root precedence does not apply to it either. Omitting the line inherits
+   the already-resolved project machine wholesale. Divergence is not an error;
+   it is the normal shape of a project holding more than one instantiated
+   template.
 3. The merge **records** machine ownership instead of discarding it: the
    project model carries, per rhei, the declared machine name (when declared)
    and the rhei's execution root, and every consumer resolves a ticket's
@@ -64,9 +69,16 @@ The state machine is a property of the **rhei**, defaulted by the project.
    operation — state validity, transition legality, completion-target
    selection, artifact contracts, agent bindings — is a per-ticket question
    answered by the owning rhei's machine.
-6. Machine files resolve per declaration: a self-declaring rhei's execution
-   root `states.yaml` first (the shape every template ships), then the
-   existing project-root / unique-name-match rules. [§AR-rhei-panta.4](../../architecture/rhei-panta.spec.md#4-state-machine-binding)
+6. Machine files resolve per declaration: every self-declaring rhei's execution
+   root `states.yaml` first (the shape every template ships), even when its
+   declared name equals a *custom* project default. A matching local file
+   wins; an absent or valid differently named local file falls back to the
+   resolved default in that same-name case, while an invalid local candidate
+   errors. Restating the *built-in* `rhei` default is not a custom same-name
+   declaration and stays outside this precedence entirely — a rhei's own root
+   is not consulted for it, exactly as no other member root is. Other
+   declarations continue through the existing project-root /
+   unique-name-match rules. [§AR-rhei-panta.4](../../architecture/rhei-panta.spec.md#4-state-machine-binding)
 7. `--state-machine` stays a whole-scope override and errors when any
    in-scope rhei declares a name different from the override file's.
 8. Machine **adoption** is removed everywhere it existed — `rhei instantiate`

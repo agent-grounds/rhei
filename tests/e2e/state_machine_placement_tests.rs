@@ -195,45 +195,107 @@ fn a_member_declaring_an_unknown_machine_without_a_file_is_rejected() {
     );
 }
 
-/// A rhei whose `**States:**` restates the project default's name runs the
-/// default's file, and its own root gets no precedence: `billing` declares
-/// `alpha` beside a file of that name with other states, and its ticket
-/// validates on a state only the project root's `alpha` has.
-/// §FS-rhei-state-machine-writer.5 §DA-per-rhei-state-machines
+/// An explicitly declaring member gets local-file precedence even when its
+/// machine has the project default's name. Validation accepts the local-only
+/// state, and member-scoped inspection reports only that member's process.
+/// §FS-rhei-plan-language.1.3
 #[test]
-fn a_rhei_restating_the_default_runs_the_defaults_file() {
+fn an_explicit_same_name_member_uses_its_local_machine() {
     let dir = unique_temp_dir("placement-restated-default");
     let home = dir.join(".home");
     let project = two_machine_project(&dir);
     let billing = project.join("billing");
     write_fixture_file(&billing, "index.rhei.md", "# Rhei: Billing\n**States:** alpha\n");
     write_fixture_file(&billing, "states.yaml", &machine("alpha", "drafting", "filed"));
-    write_fixture_file(
-        &billing.join("tasks"),
-        "01.md",
-        "### Task 1: Draft\n**State:** surveying\n",
-    );
+    write_fixture_file(&billing.join("tasks"), "01.md", "### Task 1: Draft\n**State:** drafting\n");
     let project_arg = project.display().to_string();
 
-    assert_validates(&rhei_in(&dir, &home, &["validate", &project_arg]));
-
-    let states = rhei_in(&dir, &home, &["states", &project_arg]);
-    assert_success(&states);
-    let default_source = format!("Source: '{}'", project.join("states.yaml").display());
-    let own_file = billing.join("states.yaml").display().to_string();
+    let validation = rhei_in(&dir, &home, &["validate", &project_arg]);
+    let states = rhei_in(&dir, &home, &["states", &project_arg, "--rhei", "billing"]);
+    let own_source = format!("Source: '{}' (rhei: billing)", billing.join("states.yaml").display());
     assert!(
-        states.stdout.lines().any(|line| line == default_source)
-            && !states.stdout.contains(&own_file),
-        "`rhei states` should list only {default_source:?}; got:\n{}",
-        states.stdout
+        validation.status.success()
+            && validation.stdout.contains("Validation succeeded")
+            && states.status.success()
+            && states.stdout.lines().any(|line| line == own_source)
+            && states.stdout.contains("drafting")
+            && states.stdout.contains("filed")
+            && !states.stdout.contains("surveying")
+            && !states.stdout.contains("signed-off"),
+        "the member should validate and inspect through {own_source:?}\n\
+         validate stdout:\n{}\nvalidate stderr:\n{}\n\
+         states stdout:\n{}\nstates stderr:\n{}",
+        validation.stdout,
+        validation.stderr,
+        states.stdout,
+        states.stderr
     );
 }
 
-/// A restated default still resolves the way the default does, and that lookup
-/// searches the restating rhei's own root by name like any other: in the shape an
-/// adopted project has, with no file at the project root, `billing`'s own `alpha`
-/// is the file the whole project runs, `audit` declaring nothing included.
-/// §FS-rhei-state-machine-writer.5 §DA-per-rhei-state-machines
+/// A same-name declaration falls back to the resolved project default when
+/// the member has no local candidate or its valid local file names another
+/// machine. §FS-rhei-plan-language.1.3
+#[test]
+fn same_name_member_without_a_matching_local_file_uses_the_project_default() {
+    for local_machine in [None, Some(machine("beta", "queuing", "settled"))] {
+        let dir = unique_temp_dir("placement-restated-default-fallback");
+        let home = dir.join(".home");
+        let project = two_machine_project(&dir);
+        let billing = project.join("billing");
+        write_fixture_file(&billing, "index.rhei.md", "# Rhei: Billing\n**States:** alpha\n");
+        write_fixture_file(
+            &billing.join("tasks"),
+            "01.md",
+            "### Task 1: Survey\n**State:** surveying\n",
+        );
+        match local_machine {
+            Some(contents) => {
+                write_fixture_file(&billing, "states.yaml", &contents);
+            }
+            None => std::fs::remove_file(billing.join("states.yaml"))
+                .expect("remove the member-local machine"),
+        }
+        let project_arg = project.display().to_string();
+
+        assert_validates(&rhei_in(&dir, &home, &["validate", &project_arg]));
+        let states = rhei_in(&dir, &home, &["states", &project_arg, "--rhei", "billing"]);
+        assert_success(&states);
+        let default_source =
+            format!("Source: '{}' (rhei: billing)", project.join("states.yaml").display());
+        assert!(
+            states.stdout.lines().any(|line| line == default_source),
+            "same-name fallback should report {default_source:?}; got:\n{}",
+            states.stdout
+        );
+    }
+}
+
+/// A malformed member-local candidate is an error even when the explicit
+/// declaration repeats the resolved project default's name.
+/// §FS-rhei-plan-language.1.3
+#[test]
+fn an_invalid_same_name_local_candidate_reports_its_load_error() {
+    let dir = unique_temp_dir("placement-restated-default-invalid");
+    let home = dir.join(".home");
+    let project = two_machine_project(&dir);
+    let billing = project.join("billing");
+    write_fixture_file(&billing, "index.rhei.md", "# Rhei: Billing\n**States:** alpha\n");
+    write_fixture_file(&billing, "states.yaml", "name: alpha\nstates: [\n");
+    write_fixture_file(
+        &billing.join("tasks"),
+        "01.md",
+        "### Task 1: Survey\n**State:** surveying\n",
+    );
+    let project_arg = project.display().to_string();
+
+    let result = rhei_in(&dir, &home, &["validate", &project_arg]);
+    assert_failure(&result, &billing.join("states.yaml").display().to_string());
+}
+
+/// With no project-root file, default lookup may find the unique `alpha` in
+/// `billing`'s root. The explicit member selects that file locally while the
+/// omitted `audit` inherits the resolved default, preserving adopted projects
+/// without collapsing the two declaration semantics. §FS-rhei-plan-language.1.3
 #[test]
 fn a_restated_default_found_in_the_rheis_own_root_runs_from_there() {
     let dir = unique_temp_dir("placement-adopted-default");

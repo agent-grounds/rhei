@@ -346,6 +346,68 @@ fn starts_in_the_owning_rheis_initial_state() {
     assert!(result.stdout.contains("[todo]"), "got: {}", result.stdout);
 }
 
+/// A project and one explicitly declaring member both name `alpha`, but give
+/// it distinguishable initial states. §FS-rhei-plan-language.1.3
+fn same_name_creation_project(prefix: &str) -> TestDir {
+    let dir = unique_temp_dir(prefix);
+    write_fixture_file(&dir, "index.panta.md", "# Panta: Billing\n**States:** alpha\n");
+    write_fixture_file(
+        &dir,
+        "states.yaml",
+        "name: alpha\nversion: 1\nstates:\n  surveying:\n    initial: true\n    description: Survey\n  signed-off:\n    final: true\n    description: Signed off\ntransitions:\n  - from: surveying\n    to: signed-off\n",
+    );
+    let billing = dir.join("billing");
+    fs::create_dir_all(billing.join("tasks")).expect("create billing workspace");
+    write_fixture_file(&billing, "index.rhei.md", "# Rhei: Billing\n**States:** alpha\n");
+    write_fixture_file(
+        &billing,
+        "states.yaml",
+        "name: alpha\nversion: 1\nstates:\n  drafting:\n    initial: true\n    description: Drafting\n  filed:\n    final: true\n    description: Filed\ntransitions:\n  - from: drafting\n    to: filed\n",
+    );
+    dir
+}
+
+/// A ticket created under an explicit same-name member starts in that member's
+/// local initial state. §FS-rhei-plan-language.1.3 §FS-rhei-new.3.2
+#[test]
+fn starts_in_an_explicit_same_name_members_local_initial_state() {
+    let dir = same_name_creation_project("new-ticket-same-name-initial");
+    let result = new_run(&["new", "Invoice", "--under", "billing"], &dir);
+
+    assert_success(&result);
+    assert!(result.stdout.contains("[drafting]"), "got: {}", result.stdout);
+    let ticket = fs::read_to_string(dir.join("billing/tasks/001-invoice.md"))
+        .expect("created invoice ticket");
+    assert!(ticket.contains("**State:** drafting"), "got:\n{ticket}");
+}
+
+/// Explicit state validation uses the same member-local machine: a local-only
+/// state is accepted and a project-only state is refused.
+/// §FS-rhei-plan-language.1.3 §FS-rhei-new.3.2
+#[test]
+fn explicit_state_is_checked_against_an_explicit_same_name_members_machine() {
+    let accepts = same_name_creation_project("new-ticket-same-name-state-accepts");
+    let accepted =
+        new_run(&["new", "Draft invoice", "--under", "billing", "--state", "drafting"], &accepts);
+    let refuses = same_name_creation_project("new-ticket-same-name-state-refuses");
+    let refused =
+        new_run(&["new", "Survey invoice", "--under", "billing", "--state", "surveying"], &refuses);
+
+    assert!(
+        accepted.status.success()
+            && accepted.stdout.contains("[drafting]")
+            && !refused.status.success()
+            && flattened_output(&refused).contains("has no state 'surveying'"),
+        "explicit state checks should use billing/states.yaml\n\
+         accepted stdout:\n{}\naccepted stderr:\n{}\n\
+         refused stdout:\n{}\nrefused stderr:\n{}",
+        accepted.stdout,
+        accepted.stderr,
+        refused.stdout,
+        refused.stderr
+    );
+}
+
 #[test]
 fn explicit_state_is_checked_against_that_machine() {
     let dir = project_with_rhei("new-ticket-badstate");

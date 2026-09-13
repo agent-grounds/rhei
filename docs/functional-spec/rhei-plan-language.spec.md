@@ -208,15 +208,21 @@ State-machine resolution is normative for all commands:
    inherits a Panta default declaration, the loaded file's `name` must match that
    effective value; if the effective field is omitted, the loaded file's `name`
    becomes the active state-machine name for this invocation.
-2. For a rhei inside a Panta Project, the effective `**States:**` declaration is
-   resolved per rhei. A declaration in the rhei itself that differs from the
-   project default wins — the rhei runs under the machine it names, which may
-   differ from its siblings'
-   ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)). Its definition file resolves from the rhei's own
-   execution root (`<rhei>/states.yaml`) when that file's `name` matches, then
-   by the project-level name-match rules. A rhei that omits `**States:**` or
-   restates the project default resolves that default from the Panta project
-   root (`<project>/states.yaml`) unless `--state-machine` supplied an override.
+2. For a rhei inside a Panta Project, both the presence and the value of its
+   `**States:**` declaration are resolved per rhei. After rule 1, a declaration
+   in the rhei itself gives its execution root first refusal: a matching
+   `<rhei>/states.yaml` wins even when the declared name equals the resolved
+   project default. An absent local file, or a valid local file with another
+   name, falls back to that already-resolved default in the same-name case and
+   otherwise continues through the project-level name-match rules. An invalid
+   local candidate is a load error, not a fallback. If the rhei omits
+   `**States:**`, it inherits the resolved project machine wholesale and its
+   own root is not consulted. Thus restating a custom default is equivalent to
+   omission only for the effective machine *name*, not for definition-file
+   precedence ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)). Restating the project's effective
+   built-in `rhei` default is the one exception where that equivalence is
+   total: rule 4 governs that case, and the rhei's own root is not consulted
+   there either.
 3. When `**States:**` is omitted after Panta inheritance has been applied, the
    plan or rhei uses the built-in `rhei` state machine. Sibling, workspace, or
    project `states.yaml` files are ignored in this case.
@@ -236,10 +242,11 @@ State-machine resolution is normative for all commands:
 5. When a non-`rhei` `**States:** <name>` is declared and no override is
    supplied, the CLI resolves the file from a sibling `states.yaml` for a
    single-file plan, from `<workspace>/states.yaml` for a Directory Workspace,
-   from the declaring rhei's execution root for a member rhei's own
-   declaration, or from `<project>/states.yaml` when the declaration was
-   inherited from `index.panta.md` — falling back, in every project case, to a
-   unique `name`-match among the project's candidate roots ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)).
+   from the declaring rhei's execution root for any member rhei's own
+   declaration, or from the already-resolved project machine when the
+   declaration was inherited from `index.panta.md` — falling back, where rule
+   2 requires project-level name lookup, to a unique `name`-match among the
+   project's candidate roots ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)).
    This candidate-root fallback does not apply to the effective Panta project
    default `rhei` governed by rule 4. A resolved file's `name` must match
    `<name>`.

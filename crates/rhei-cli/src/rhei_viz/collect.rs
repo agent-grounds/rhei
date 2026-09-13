@@ -386,4 +386,39 @@ transitions:
             .expect("local state is rendered");
         assert_eq!(local.instructions.as_deref(), Some("Use the local machine."));
     }
+
+    /// A member row is normalized through its matching local definition even
+    /// when that definition has the project default's name.
+    // §FS-rhei-plan-language.1.3
+    #[test]
+    fn same_name_member_row_uses_its_local_machine() {
+        let temp = TempDir::new("same-name-member");
+        fs::write(temp.path().join("index.panta.md"), "# Panta: Billing\n**States:** alpha\n")
+            .unwrap();
+        fs::write(
+            temp.path().join("states.yaml"),
+            "name: alpha\nversion: 1\nstates:\n  surveying:\n    initial: true\n  signed-off:\n    final: true\ntransitions:\n  - from: surveying\n    to: signed-off\n",
+        )
+        .unwrap();
+        let billing = temp.path().join("billing");
+        fs::create_dir_all(billing.join("tasks")).unwrap();
+        fs::write(billing.join("index.rhei.md"), "# Rhei: Billing\n**States:** alpha\n").unwrap();
+        fs::write(
+            billing.join("states.yaml"),
+            "name: alpha\nversion: 1\nstates:\n  drafting:\n    initial: true\n    visits: 3\n  filed:\n    final: true\ntransitions:\n  - from: drafting\n    to: drafting\n  - from: drafting\n    to: filed\n",
+        )
+        .unwrap();
+        fs::write(billing.join("tasks/01.md"), "### Task 1: Draft\n**State:** drafting-2\n")
+            .unwrap();
+
+        let plans = collect_plans(temp.path(), "project", None).expect("collect project");
+        let row =
+            plans["project"].tasks.iter().find(|task| task.id == "billing.1").expect("billing row");
+        assert_eq!(row.state, "drafting");
+        assert_eq!(row.visit_count, Some(2));
+        assert!(
+            plans["project"].machine.states.iter().any(|state| state.name == "drafting"),
+            "the rendered machine union should include the member-local process"
+        );
+    }
 }

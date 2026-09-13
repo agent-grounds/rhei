@@ -138,23 +138,36 @@ fn resolve_project_machines(
     let mut declared: Vec<(&String, &String)> = loaded.rhei_machines.iter().collect();
     declared.sort();
     for (rhei_id, machine_name) in declared {
+        if machine_override.is_some() {
+            if *machine_name != default.name {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "--states declares '{}', but rhei '{rhei_id}' declares state machine                      '{machine_name}'; the override cannot reinterpret that rhei's states",
+                        default.name
+                    ),
+                ));
+            }
+            continue;
+        }
+
+        if let Some(root) = loaded.rhei_roots.get(rhei_id) {
+            let candidate = root.join("states.yaml");
+            if candidate.is_file() {
+                // Static collection gives every explicit declaration local
+                // first refusal, including a repeated default name. §FS-rhei-plan-language.1.3
+                let machine = load_machine(&candidate)?;
+                if machine.name == *machine_name {
+                    per_rhei.insert(rhei_id.clone(), machine);
+                    continue;
+                }
+            }
+        }
         if *machine_name == default.name {
             continue;
         }
-        if machine_override.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "--states declares '{}', but rhei '{rhei_id}' declares state machine                      '{machine_name}'; the override cannot reinterpret that rhei's states",
-                    default.name
-                ),
-            ));
-        }
-        let mut candidates = Vec::new();
-        if let Some(root) = loaded.rhei_roots.get(rhei_id) {
-            candidates.push(root.join("states.yaml"));
-        }
-        candidates.push(path.join("states.yaml"));
+
+        let candidates = [path.join("states.yaml")];
         let mut resolved = None;
         for candidate in candidates {
             if !candidate.is_file() {

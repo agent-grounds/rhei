@@ -1,6 +1,6 @@
 {
   "name": "rhei",
-  "version": "0.5.0",
+  "version": "0.5.1-dev",
   "description": "Command-line driver for the Rhei agent runtime.",
   "license": "MIT OR Apache-2.0",
   "repository": {

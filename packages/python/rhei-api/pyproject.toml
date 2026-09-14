@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rhei-api"
-version = "0.5.0"
+version = "0.5.1-dev"
 description = "Python API helpers for Rhei markdown plans."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -13,7 +13,7 @@ authors = [
   { name = "Rhei contributors" }
 ]
 dependencies = [
-  "rhei-cli==0.5.0"
+  "rhei-cli==0.5.1-dev"
 ]
 keywords = ["agents", "markdown", "planning", "workflow", "api"]
 classifiers = [

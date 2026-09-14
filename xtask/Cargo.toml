@@ -6,10 +6,10 @@ publish = false
 license.workspace = true
 
 [dependencies]
-rhei-core = { package = "rhei-plan", path = "../crates/rhei-core", version = "=0.5.0" }
+rhei-core = { package = "rhei-plan", path = "../crates/rhei-core", version = "=0.5.1-dev" }
 # The visualization subsystems live inside the CLI library since the publish
 # set collapsed to `rhei-plan` and `rhei-cli`. §FS-rhei-distribution.1
-rhei-cli = { path = "../crates/rhei-cli", version = "=0.5.0" }
+rhei-cli = { path = "../crates/rhei-cli", version = "=0.5.1-dev" }
 
 [[bin]]
 name = "xtask"

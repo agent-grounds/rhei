@@ -419,6 +419,12 @@ fn execute_transition_with_origin(
     // `to` for rejection checks, but their redirects are ignored.
     let mut redirect_next_state: Option<String> = None;
 
+    // One identity spans model fan-out, redirects, and the enter phase. It is
+    // allocated only after the pre-callback guards accept. §FS-rhei-transitions.1.2
+    let callback_bearing = matching_rule.on_leave.is_some() || matching_rule.on_enter.is_some();
+    let firing_id = (!no_callbacks && callback_bearing).then(|| uuid::Uuid::new_v4().to_string());
+    let ledger_status = rhei_core::callback::TransitionLedgerStatus::Pending;
+
     // Execute on_leave callback before the state change.
     if !no_callbacks {
         if let Some(ref cb) = matching_rule.on_leave {
@@ -431,6 +437,11 @@ fn execute_transition_with_origin(
                     files.artifact_id,
                     from,
                     to,
+                    from,
+                    firing_id
+                        .as_deref()
+                        .expect("callback-bearing transition has a firing identity"),
+                    ledger_status,
                     origin.triggered_by.unwrap_or("user"),
                     &transition_data,
                     &callback_paths.working_dir,
@@ -442,6 +453,8 @@ fn execute_transition_with_origin(
                     task_id_local: task_id_str,
                     from_state: from,
                     to_state: to,
+                    firing_id: firing_id.as_deref(),
+                    ledger_status: Some(ledger_status),
                     plan_path: &callback_paths.plan_path,
                     callback_cwd: &callback_paths.working_dir,
                     model,
@@ -757,30 +770,37 @@ fn execute_transition_with_origin(
     } else {
         "user"
     });
-    let on_enter_context_json = build_transition_context_json(
-        plan_for_context.as_ref(),
-        &callback_paths.plan_path,
-        task_id_str,
-        files.artifact_id,
-        from,
-        to,
-        triggered_by,
-        &transition_data,
-        &callback_paths.working_dir,
-    );
-    let callback_ctx = CallbackContext {
-        task_id: files.artifact_id,
-        task_id_local: task_id_str,
-        from_state: from,
-        to_state: to,
-        plan_path: &callback_paths.plan_path,
-        callback_cwd: &callback_paths.working_dir,
-        model: None,
-        agent: None,
-        context_json: Some(&on_enter_context_json),
-    };
     if !no_callbacks {
         if let Some(ref cb) = matching_rule.on_enter {
+            let on_enter_context_json = build_transition_context_json(
+                plan_for_context.as_ref(),
+                &callback_paths.plan_path,
+                task_id_str,
+                files.artifact_id,
+                from,
+                to,
+                to,
+                firing_id
+                    .as_deref()
+                    .expect("callback-bearing transition has a firing identity"),
+                ledger_status,
+                triggered_by,
+                &transition_data,
+                &callback_paths.working_dir,
+            );
+            let callback_ctx = CallbackContext {
+                task_id: files.artifact_id,
+                task_id_local: task_id_str,
+                from_state: from,
+                to_state: to,
+                firing_id: firing_id.as_deref(),
+                ledger_status: Some(ledger_status),
+                plan_path: &callback_paths.plan_path,
+                callback_cwd: &callback_paths.working_dir,
+                model: None,
+                agent: None,
+                context_json: Some(&on_enter_context_json),
+            };
             let executor = ShellCallbackExecutor;
             let result = match executor.execute(cb, &callback_ctx) {
                 Ok(result) => result,

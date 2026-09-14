@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- **Transition callbacks now receive a stable identity for each firing and an
+  explicit pending ledger status.** Canonical JSON exposes `firingId` and
+  `ledgerStatus`, and CLI callbacks receive equal environment values, so an
+  `on_enter` integration can include the in-progress transition without
+  inferring it from file-write timing. Both ledger formats remain unchanged;
+  strict callback JSON decoders must permit additive fields. (PR #262)
+
 ## 2. [0.5.0] - 2026-09-14
 
 ### Fixed

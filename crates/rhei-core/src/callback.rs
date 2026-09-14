@@ -35,6 +35,12 @@ pub struct CallbackContext<'a> {
     pub from_state: &'a str,
     /// State the task is entering.
     pub to_state: &'a str,
+    /// Opaque identity of this callback-bearing transition firing, when the
+    /// caller is Rhei's shared transition executor. §FS-rhei-transitions.1.2
+    pub firing_id: Option<&'a str>,
+    /// Central transition-ledger status for this firing.
+    /// §FS-rhei-transitions.1.2
+    pub ledger_status: Option<TransitionLedgerStatus>,
     /// Path to the plan file.
     pub plan_path: &'a Path,
     /// Working directory used to execute shell callbacks.
@@ -45,6 +51,23 @@ pub struct CallbackContext<'a> {
     pub agent: Option<&'a str>,
     /// Full `TransitionContext` payload to deliver on stdin, if available.
     pub context_json: Option<&'a JsonValue>,
+}
+
+/// Callback-visible status of a transition firing in the central ledger.
+/// §FS-rhei-transitions.1.2
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransitionLedgerStatus {
+    /// The firing's row has not been appended yet.
+    Pending,
+}
+
+impl TransitionLedgerStatus {
+    /// Canonical callback representation of this status.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+        }
+    }
 }
 
 /// Outcome of a callback invocation.
@@ -131,6 +154,8 @@ pub trait CallbackExecutor {
 ///   - `RHEI_TASK_ID_LOCAL` — the task id as written in its rhei file (`1`)
 ///   - `RHEI_FROM_STATE` — the state being left
 ///   - `RHEI_TO_STATE` — the state being entered
+///   - `RHEI_TRANSITION_FIRING_ID` — opaque transition firing identity
+///   - `RHEI_TRANSITION_LEDGER_STATUS` — central-ledger status (`pending`)
 ///   - `RHEI_PLAN_PATH` — path to the plan file
 ///   - `RHEI_MODEL` — model identifier when the state declares one
 ///   - `RHEI_AGENT` — agent identifier when the state declares one
@@ -180,6 +205,14 @@ impl CallbackExecutor for ShellCallbackExecutor {
         }
         if let Some(agent) = context.agent {
             cmd.env("RHEI_AGENT", agent);
+        }
+        // Callback-only delivery mirrors the canonical JSON transition fields.
+        // §FS-rhei-transitions.4.7
+        if let Some(firing_id) = context.firing_id {
+            cmd.env("RHEI_TRANSITION_FIRING_ID", firing_id);
+        }
+        if let Some(ledger_status) = context.ledger_status {
+            cmd.env("RHEI_TRANSITION_LEDGER_STATUS", ledger_status.as_str());
         }
 
         let mut child =
@@ -339,6 +372,8 @@ mod tests {
             task_id_local: "1",
             from_state: "pending",
             to_state: "in-progress",
+            firing_id: None,
+            ledger_status: None,
             plan_path,
             callback_cwd: cwd,
             model: None,

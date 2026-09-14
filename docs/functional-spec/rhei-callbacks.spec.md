@@ -10,6 +10,7 @@ This document provides practical examples of state transition callbacks across a
 4. [State Redirection](#4-state-redirection)
 5. [Accessing Custom Metadata](#5-accessing-custom-metadata)
 6. [Environment-Aware Logic](#6-environment-aware-logic)
+7. [Publishing Complete Transition History](#7-publishing-complete-transition-history)
 
 ---
 
@@ -773,6 +774,35 @@ EOF
     fi
 }
 ```
+
+---
+
+## 7. Publishing Complete Transition History
+
+An `on_enter` publisher can combine the committed central-ledger prefix with
+the pending firing in its context. It must not wait for or guess this firing's
+ledger row: the row is appended only after the callback succeeds
+([§FS-rhei-transitions.1.2](rhei-transitions.spec.md#12-firing-identity-and-callback-time-visibility)).
+
+```typescript
+const committed = await readLines('runtime/state-transitions.log');
+const current = `${ctx.task.id} ${ctx.transition.from}@${ctx.transition.to}`;
+const completeHistory =
+  ctx.transition.ledgerStatus === 'pending' ? [...committed, current] : committed;
+await publish({ history: completeHistory, firingId: ctx.transition.firingId });
+```
+
+The equivalent Python properties are `firing_id` and `ledger_status`; Java
+uses `getFiringId()` and `getLedgerStatus()`. A CLI callback reads the canonical
+JSON names above or the equal environment values
+`RHEI_TRANSITION_FIRING_ID` and `RHEI_TRANSITION_LEDGER_STATUS`.
+
+A consumer may remember `firingId` to suppress a replay of captured input.
+That is a local policy, not authentication or an exactly-once guarantee. A
+direct operator invocation of the callback receives no fresh Rhei-issued ID,
+and a later real transition—even an identical edge or self-loop—receives a new
+one. Decoders must allow unknown JSON fields so additive callback context
+changes remain compatible.
 
 ---
 

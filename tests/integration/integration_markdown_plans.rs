@@ -6,6 +6,8 @@ include!("integration_markdown_plans/transitions_success.rs");
 include!("integration_markdown_plans/transitions_failures_completion.rs");
 include!("integration_markdown_plans/callbacks_execution.rs");
 include!("integration_markdown_plans/callbacks_redirect_context.rs");
+include!("integration_markdown_plans/callback_firing_context.rs");
+include!("integration_markdown_plans/callback_firing_outcomes.rs");
 include!("integration_markdown_plans/run_basic.rs");
 include!("integration_markdown_plans/run_programs_callbacks.rs");
 include!("integration_markdown_plans/run_poll_respawn_budget.rs");

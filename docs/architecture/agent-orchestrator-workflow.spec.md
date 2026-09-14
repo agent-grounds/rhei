@@ -451,7 +451,11 @@ The orchestrator responds to different trigger sources:
 1. **Agent Creates Plan**: User-directed agent generates a `.rhei.md` file with hierarchical tasks
 2. **Validation Loop**: Rhei lexer/parser and validator check syntax and semantics; agent fixes any errors
 3. **Orchestrator Executes**: Once valid, the orchestrator loads the state machine and manages transitions
-4. **State Progression**: Tasks advance through states via callbacks (`on_leave` → state update → `on_enter`)
+4. **State Progression**: Tasks advance through one firing context
+   (`on_leave` → state update → `on_enter` → central-ledger append); a run
+   invocation's release event follows transition processing. The firing ID is
+   allocated after pre-callback guards, remains stable through redirects and
+   callback fan-out, and is not a ledger ordinal.
 5. **Completion**: Workflow finishes when all tasks reach final states (`completed`, `cancelled`, etc.)
 
 ## Related Documentation

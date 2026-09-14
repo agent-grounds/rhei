@@ -69,9 +69,10 @@ fn execution_workspace_root(plan_path: &Path) -> PathBuf {
 ///
 /// Shape matches the TransitionContext data structure.
 /// The `triggered_by` field must be one of `"user" | "callback" | "system" | "engine"`.
+/// `firing_id` and `ledger_status` are the callback attempt's transient ledger context.
 /// `transition_data` seeds the `transitionData` slot; pass `serde_json::Value::Object(Map::new())`
 /// for the initial `on_leave` call, and the accumulated data from `on_leave` for `on_enter`.
-// §FS-rhei-transitions.1: TransitionContext callback payload.
+// §FS-rhei-transitions.1 §FS-rhei-transitions.4.7: canonical callback payload.
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::too_many_arguments)]
 fn build_transition_context_json(
@@ -81,6 +82,9 @@ fn build_transition_context_json(
     qualified_id: &str,
     from_state: &str,
     to_state: &str,
+    task_state: &str,
+    firing_id: &str,
+    ledger_status: rhei_core::callback::TransitionLedgerStatus,
     triggered_by: &str,
     transition_data: &serde_json::Value,
     working_dir: &Path,
@@ -98,7 +102,7 @@ fn build_transition_context_json(
             "kind": task.kind,
             "title": task.title,
             "content": task.content,
-            "metadata": task_metadata_json(plan, task_id_str, from_state),
+            "metadata": task_metadata_json(plan, task_id_str, task_state),
             "children": task.children.iter().map(task_summary_json).collect::<Vec<_>>(),
         }),
         None => json!({
@@ -128,6 +132,8 @@ fn build_transition_context_json(
         "transition": {
             "from": from_state,
             "to": to_state,
+            "firingId": firing_id,
+            "ledgerStatus": ledger_status.as_str(),
             "triggeredBy": triggered_by,
             "timestamp": current_iso8601(),
         },

@@ -44,6 +44,7 @@ serde_yaml = "0.9"
 sha2 = "0.10"
 fs2 = "0.4.3"
 tempfile = "3.27.0"
+uuid = { version = "=1.11.0", features = ["v4"] }
 nix = { version = "0.29", features = ["signal", "process"] }
 # Compiles `templates/` into the binary so `rhei templates` is populated on a
 # bare `cargo install`, with no `share/` layout to install alongside it.

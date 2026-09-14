@@ -70,10 +70,12 @@ records are produced from those capture streams when the process exits.
 `tasks/` and `summary.json` are derived indexes and may be regenerated from
 invocation records and the current plan tree.
 
-`invocation_id` is the logical identity inside the JSON record. It may contain
-task ids, states, target slugs, and visit numbers. File names must use
-`invocation_file_id`, which is path-safe: a UUID/ULID, encoded id, or hash.
-Raw `invocation_id` text must not be used as the file name.
+`invocation_id` is the logical identity inside the JSON record. New records
+identify one spawned process — one attempt — rather than only its state visit;
+§3.7 defines the spelling and the compatibility identity of older records.
+File names use `invocation_file_id`, which is an opaque, path-safe UUID/ULID,
+encoded id, or hash. Raw `invocation_id` text must not be used as the file
+name.
 
 Task rollup JSON contains the raw `task_id`; `task_file_id` must be a path-safe,
 collision-resistant encoding of that id so distinct valid task ids do not
@@ -86,7 +88,7 @@ Each supported agent spawn writes one JSON object:
 ```json
 {
   "schema": "rhei.accounting.invocation.v1",
-  "invocation_id": "plan.1::pending::claude-code-anthropic-sonnet::visit-1",
+  "invocation_id": "plan.1::pending::claude-code-anthropic-sonnet::visit-1::run-b3ed70::move-0::attempt-2",
   "run_id": "b3ed70",
   "task_id": "plan.1",
   "state": "pending",
@@ -272,7 +274,7 @@ Such a record is **unattributed**.
 | Where | Required behavior |
 | --- | --- |
 | Writing | Every record written for an agent spawned inside `rhei run` carries `run_id`. |
-| Reading | A record with no `run_id` parses and counts toward every whole-workspace total. |
+| Reading | A record with no `run_id` parses, remains a candidate in §3.7's legacy identity inference, and counts toward every whole-workspace total. |
 | Aggregating | An unattributed record is never dropped and never folded into a named run. Selection and grouping by run give it an explicit place of its own (§6.1). |
 
 Unattributed records are not an error condition: they are the history a
@@ -307,6 +309,42 @@ An agent this table does not name has no known convention. Its record is read
 as stored, because nothing about it is known to be wrong, and no aggregate
 holding it reports `complete` (§6.2).
 
+### 3.7. Attempt Identity
+
+One `invocation_id` identifies one spawned agent process. Before either the
+sequential or parallel scheduler spawns it, Rhei creates the id once from the
+shared persisted spawn plan and carries that value through every streamed
+usage report, the final report, and the durable invocation record. Reports
+from one process therefore have one stable id; a retry, a later `rhei run`, or
+a later entry into the same state has a different id.
+
+New ids retain the readable `<task>::<state>::<target>::visit-<visit>` prefix
+and append `run-<run-id>::move-<moves>::attempt-<attempt>`. `run-id` is the
+current run's id, `moves` is the spawn plan's persisted visit key, and
+`attempt` is its one-based attempt number. Each component is encoded so the
+whole value remains an opaque string to consumers. The same shared spawn plan
+supplies sequential spawns, parallel spawns, attempt-budget checks, retry
+narration, and log naming; this identity rule does not introduce another
+counter or change attempt budgets, interruption charging, log names, or reset
+behavior.
+
+A v1 id without those suffix components is a **legacy id**. Readers infer a
+legacy attempt identity from:
+
+1. `invocation_id` and the record's task, state, visit, and target facts;
+2. `run_id`, when present; and
+3. the `started_at`/`ended_at` interval.
+
+Exact record copies have one identity and count once, including when copied
+between accounting roots. Records with the same legacy id are separate
+attempts when their base facts agree and either their run ids differ or their
+well-formed intervals distinguish them. A missing `run_id` leaves a record
+unattributed under §3.5; it does not remove that record from whole-workspace
+history. Equal identity evidence with unequal record contents, timing that is
+missing or malformed and leaves identity ambiguous, or disagreement in the
+base facts is an identity conflict under §11. Readers do not rewrite or
+migrate any of these records.
+
 ## 4. Extraction Flow
 
 Accounting is separate from snapshots. Snapshot support may provide a useful
@@ -315,9 +353,10 @@ accounting for `claude-code`, `codex`, or `pi`. [§FS-rhei-snapshots](rhei-snaps
 
 For each agent invocation:
 
-1. Before spawn, the extractor declares any extra arguments, environment
-   variables, or capture paths needed for structured usage. Rhei's built-in
-   capture contract sets `RHEI_ACCOUNTING_USAGE_PATH` and
+1. Before spawn, Rhei creates the attempt identity under §3.7 and the
+   extractor declares any extra arguments, environment variables, or capture
+   paths needed for structured usage. Rhei's built-in capture contract sets
+   `RHEI_ACCOUNTING_USAGE_PATH` and
    `RHEI_ACCOUNTING_USAGE_SCHEMA=rhei.accounting.usage.v1`.
 2. `rhei run` spawns the agent normally.
 3. The extractor observes structured usage as it is produced and appends
@@ -651,10 +690,12 @@ pub enum RunEvent {
 }
 ```
 
-`UsageReported` may arrive repeatedly for the same invocation id as a streaming
+`UsageReported` may arrive repeatedly for the same attempt id as a streaming
 extractor observes additional turns, and may also arrive after `SlotReleased`;
 frontends must upsert by invocation id and update task, slot history, and run
-totals without assuming the slot is still active. [§FS-rhei-run-tui](rhei-run-tui.spec.md#fs-rhei-run-tui-rhei-run-tui-and-run-event-journal)
+totals without assuming the slot is still active. Reports for another attempt
+have another id and contribute a separate row and amount to task and run
+totals. [§FS-rhei-run-tui](rhei-run-tui.spec.md#fs-rhei-run-tui-rhei-run-tui-and-run-event-journal)
 
 `RunSummary.accounting` contains an optional `AccountingRunSummary` with the
 same dimension, cost, currency, coverage, and pricing-status shape as
@@ -663,8 +704,9 @@ accounting records were produced.
 
 ### 7.1. Line-Oriented Frontends
 
-One invocation emits several `UsageReported` events, and `report` is what tells
-them apart.
+One attempt may emit several `UsageReported` events, and `report` is what tells
+them apart. Every report for that attempt carries the id §3.7 assigned before
+spawn, including the final report derived from the durable record.
 
 A **streamed** report is emitted while the agent is still running, once for each
 turn a streaming extractor recognizes. Each one is re-summed from the whole
@@ -786,6 +828,14 @@ removal, rename, type change, or semantic change to an existing field requires
 a new schema id. Fields documented as optional, including `duration_ms`,
 `cli_session`, `run_id`, and `token_convention`, remain optional so artifacts
 from older Rhei versions still validate.
+
+Attempt-scoped `invocation_id` values remain
+`rhei.accounting.invocation.v1`. The field is still a string identifying one
+spawned process; no field or one-process meaning changed, only the opaque value
+new writers choose. New readers accept historical v1 spellings under §3.7
+without migration. Schema-conforming older readers accept the new strings and,
+because attempts no longer share them, count each attempt correctly; parsing
+the example spelling is not a published contract.
 
 ### 8.2. Selecting Records
 
@@ -977,6 +1027,7 @@ Invocation details are served from a separate loopback endpoint such as
 | Missing price | Record measured tokens with `unpriced` or `partial-price`. |
 | Accounting write failure | Warn in the run journal and mark run accounting coverage partial. Do not hide the agent log or transition outcome. |
 | Malformed accounting artifact | `rhei cost` reports the bad path and continues reading other valid records. With `--json`, it returns a structured error. |
+| Accounting identity conflict | Inspection retains the first valid record, reports the conflicting record and both paths, and continues read-only. Run preflight refuses before mutation or spawn with an accounting-identity diagnostic naming both paths; it must not describe the conflict as a selected-currency failure. |
 | Unreadable accounting root | Name the root, read every other root in scope, and do not report `complete` (§6.2). With `--json`, a structured error naming the root, and its `roots` entry carries the count it could contribute. |
 | Concurrent writes | Write to a unique staging path, then atomically rename to `<invocation_file_id>.json`. Rollup files may be regenerated after pass writes complete. |
 

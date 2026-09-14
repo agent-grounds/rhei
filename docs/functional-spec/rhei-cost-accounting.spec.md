@@ -328,6 +328,10 @@ narration, and log naming; this identity rule does not introduce another
 counter or change attempt budgets, interruption charging, log names, or reset
 behavior.
 
+A failed best-effort publication of `runtime/run.json` does not change the
+current run's in-memory identity or prevent agent execution. Both schedulers
+use that same identity for accounting even when no descriptor was published.
+
 A v1 id without those suffix components is a **legacy id**. Readers infer a
 legacy attempt identity from:
 
@@ -1027,7 +1031,7 @@ Invocation details are served from a separate loopback endpoint such as
 | Missing price | Record measured tokens with `unpriced` or `partial-price`. |
 | Accounting write failure | Warn in the run journal and mark run accounting coverage partial. Do not hide the agent log or transition outcome. |
 | Malformed accounting artifact | `rhei cost` reports the bad path and continues reading other valid records. With `--json`, it returns a structured error. |
-| Accounting identity conflict | Inspection retains the first valid record, reports the conflicting record and both paths, and continues read-only. Run preflight refuses before mutation or spawn with an accounting-identity diagnostic naming both paths; it must not describe the conflict as a selected-currency failure. |
+| Accounting identity conflict | Inspection retains the first valid record, reports the conflicting record and both paths, and continues read-only. Run preflight checks the complete in-scope root union, using the root selection and shared-root task filtering in [§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary), before per-root currency checks. A conflict within or across those roots refuses before mutation or spawn with an accounting-identity diagnostic naming both paths; it must not describe the conflict as a selected-currency failure. |
 | Unreadable accounting root | Name the root, read every other root in scope, and do not report `complete` (§6.2). With `--json`, a structured error naming the root, and its `roots` entry carries the count it could contribute. |
 | Concurrent writes | Write to a unique staging path, then atomically rename to `<invocation_file_id>.json`. Rollup files may be regenerated after pass writes complete. |
 

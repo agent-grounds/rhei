@@ -140,6 +140,7 @@ mod spawn_records {
             record: spawn_record_path(&runtime, "plan.1", "review-fix", None),
             moves: 0,
             attempt: 1,
+            accounting: None,
             charged: 0,
             previous: None,
         };

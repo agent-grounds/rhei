@@ -128,23 +128,29 @@ fn write_price_book(accounting_root: &Path, price_book: &PriceBook) -> MietteRes
     write_json_atomic(&path, price_book)
 }
 
-/// Refuse identity conflicts first, then preserve one currency across the
-/// invocation records that a durable scalar rollup can combine. Called for
-/// every root before any of them is mutated.
+/// Refuse conflicts over the same root union and shared-root task scope that
+/// inspection reads, before currency checks or any accounting mutation.
+// §FS-rhei-panta.6.5 §FS-rhei-cost-accounting.11
+fn validate_accounting_identity(roots: &[AccountingRoot], scope: &RheiScope) -> MietteResult<()> {
+    let inspection = read_cost_inspection_over(roots, scope);
+    if let Some(error) = inspection.identity_conflicts.first() {
+        return Err(miette!(
+            help = "repair or remove the conflicting invocation record before starting another run",
+            "accounting identity conflict: {error}"
+        ));
+    }
+    Ok(())
+}
+
+/// Currency is a per-root invariant, including records outside a narrowed task
+/// scope. Identity has already been checked over the scoped union separately.
 // §FS-rhei-cost-accounting.5.1 §FS-rhei-cost-accounting.11
 fn validate_price_book_currency(
     accounting_root: &Path,
     price_book: &PriceBook,
 ) -> MietteResult<()> {
-    let inspection = read_cost_inspection(accounting_root);
-    if let Some(error) = inspection.identity_conflicts.first() {
-        return Err(miette!(
-            help = "repair or remove the conflicting invocation record before starting another run",
-            "accounting identity conflict in root '{}': {error}",
-            accounting_root.display()
-        ));
-    }
-    if let Some(error) = inspection.errors.first() {
+    let (records, errors, _) = read_accounting_root(accounting_root);
+    if let Some(error) = errors.first() {
         return Err(miette!(
             help = "repair or remove the unreadable invocation record before starting another run",
             "cannot verify selected currency '{}' in accounting root '{}': {error}",
@@ -152,8 +158,8 @@ fn validate_price_book_currency(
             accounting_root.display()
         ));
     }
-    for held in inspection.invocations {
-        let Some(record_currency) = held.record.pricing.currency else {
+    for (_, record) in records {
+        let Some(record_currency) = record.pricing.currency else {
             continue;
         };
         if record_currency != price_book.currency {

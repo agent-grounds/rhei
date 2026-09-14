@@ -29,6 +29,7 @@ fn spawn_parallel_agent_work_item(
     opts: &RunOptions,
     workspace_root: &Path,
     runtime_dir: &Path,
+    run_id: &str,
     snapshot_override_selection: Option<&SnapshotOverrideRunSelection>,
     sink: &Arc<dyn rhei_tui::EventSink>,
     intervene: Option<&Arc<RunInterveneSink>>,
@@ -73,6 +74,7 @@ fn spawn_parallel_agent_work_item(
         resolved_agent_log_suffix(&item.resolved, Some(visit_count)).as_deref(),
         &item.resolved,
         visit_count,
+        run_id,
     );
     let budget =
         resolve_attempt_budget(machine.states.get(item.current_state.as_str()), settings);

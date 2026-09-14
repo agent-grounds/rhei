@@ -1,3 +1,4 @@
+mod accounting_attempt_identity_tests;
 mod accounting_contract_tests;
 mod accounting_convention_tests;
 mod accounting_duration_tests;

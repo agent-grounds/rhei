@@ -43,24 +43,14 @@ fn the_streaming_emitter_reports_streamed() {
     assert_eq!(recorded_reports(&recorder), [rhei_tui::UsageReport::Streamed; 2]);
 }
 
-/// The record-writing emitter fires once, after the durable record, and names
-/// its one report `Final` — the only report a line-oriented frontend prints.
-// §FS-rhei-cost-accounting.7.1
+/// The attempt identity created before spawn survives a streamed report, the
+/// final report, and the durable record unchanged. The record-writing emitter
+/// names its one report `Final` — the only one a line frontend prints.
+// §FS-rhei-cost-accounting.3.7 §FS-rhei-cost-accounting.7.1
 #[test]
-fn the_record_writing_emitter_reports_final() {
+fn attempt_identity_is_stable_across_streamed_final_and_durable_reporting() {
     let dir = tempfile::tempdir().expect("tmpdir");
     let capture_path = dir.path().join("usage.jsonl");
-    append_usage_capture_event(
-        &capture_path,
-        ExtractedUsage {
-            input_total: Some(1_500_000),
-            output_total: Some(2_000),
-            ..ExtractedUsage::default()
-        },
-        false,
-    )
-    .expect("write usage capture");
-
     let mut profile = built_in_agents().remove("codex").expect("codex profile");
     profile.command = vec!["true".to_string()];
     let resolved = ResolvedAgent {
@@ -79,6 +69,31 @@ fn the_record_writing_emitter_reports_final() {
             .expect("parse plan");
     let recorder = Arc::new(RecordingSink::default());
     let sink_trait: Arc<dyn rhei_tui::EventSink> = recorder.clone();
+    let capture = usage_capture_for_spawn(
+        &resolved,
+        Some(&capture_path),
+        "1",
+        "work",
+        1,
+        0,
+        &builtin_price_book(),
+    )
+    .expect("codex has a capture");
+    capture_agent_output_usage(
+        Some(&capture),
+        rhei_tui::AgentStream::Stdout,
+        &serde_json::json!({
+            "type": "turn.completed",
+            "usage": {
+                "input_tokens": 1_500_000,
+                "cached_input_tokens": 0,
+                "cache_creation_input_tokens": 0,
+                "output_tokens": 2_000
+            }
+        })
+        .to_string(),
+        &sink_trait,
+    );
 
     record_agent_accounting_invocation(AgentAccountingInvocation {
         workspace_root: dir.path(),
@@ -98,7 +113,23 @@ fn the_record_writing_emitter_reports_final() {
     .expect("record accounting")
     .expect("the invocation was measured");
 
-    assert_eq!(recorded_reports(&recorder), [rhei_tui::UsageReport::Final]);
+    assert_eq!(
+        recorded_reports(&recorder),
+        [rhei_tui::UsageReport::Streamed, rhei_tui::UsageReport::Final]
+    );
+    let ids = recorded_invocation_ids(&recorder);
+    assert_eq!(ids, [capture.invocation_id.clone(), capture.invocation_id.clone()]);
+    let record_path = fs::read_dir(dir.path().join("runtime/accounting/invocations"))
+        .expect("invocations directory")
+        .next()
+        .expect("one invocation")
+        .expect("invocation entry")
+        .path();
+    let record: AccountingInvocationRecord = serde_json::from_str(
+        &fs::read_to_string(record_path).expect("read invocation record"),
+    )
+    .expect("parse invocation record");
+    assert_eq!(record.invocation_id, capture.invocation_id);
 }
 
 /// Which report each `UsageReported` the sink saw carries, in order.
@@ -110,6 +141,22 @@ fn recorded_reports(recorder: &Arc<RecordingSink>) -> Vec<rhei_tui::UsageReport>
         .iter()
         .filter_map(|event| match event {
             rhei_tui::RunEvent::UsageReported { report, .. } => Some(*report),
+            _ => None,
+        })
+        .collect()
+}
+
+fn recorded_invocation_ids(recorder: &Arc<RecordingSink>) -> Vec<String> {
+    recorder
+        .events
+        .lock()
+        .expect("recording sink lock")
+        .iter()
+        .filter_map(|event| match event {
+            rhei_tui::RunEvent::UsageReported { invocation_id, usage, .. } => {
+                assert_eq!(invocation_id, &usage.invocation_id);
+                Some(invocation_id.clone())
+            }
             _ => None,
         })
         .collect()

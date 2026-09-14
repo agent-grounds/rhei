@@ -436,9 +436,17 @@ enumeration is not one-to-one in either direction:
    root everywhere would report every single-file rhei under a `--rhei` naming
    one of them.
 
-One record is counted once, keyed by `invocation_id`. A root that holds no
-accounting directory, or an empty one, contributes nothing and is not an
-error — a member that has never been run is an ordinary member.
+One attempt is counted once. New records use their attempt-scoped
+`invocation_id`; historical records use the legacy inference in
+[§FS-rhei-cost-accounting.3.7](rhei-cost-accounting.spec.md#37-attempt-identity). Exact copies count once within one root or across roots, while
+distinct same-run or cross-run attempts remain separate and each contributes
+its measured usage and cost. A historical record without `run_id` remains
+unattributed and contributes to whole-workspace history. Conflicts are handled
+under [§FS-rhei-cost-accounting.11](rhei-cost-accounting.spec.md#11-failure-modes), never silently collapsed.
+
+A root that holds no accounting directory, or an empty one, contributes
+nothing and is not an error — a member that has never been run is an ordinary
+member.
 
 `rhei cost --task <id>` is bounded by that same scope, exactly as §6.1 bounds
 `rhei next --task`. A ticket named with `--task` must itself be in scope,
@@ -451,10 +459,10 @@ genuinely cost nothing — the confusion this point exists to remove. A `--task`
 id **no rhei in the project holds** is not that error: it is unknown, and the
 reading goes on to report it as unknown, which is a different thing to be told.
 
-Neither command writes, and neither widens what it reads beyond the scope it
-resolved. Where the records are *written* is not changed by any of this: a run
-writes each invocation record under the execution root of the rhei that owns
-the ticket, and its capture streams under the run root
+Neither command writes, migrates records, or widens what it reads beyond the
+scope it resolved. Where the records are *written* is not changed by any of
+this: a run writes each invocation record under the execution root of the rhei
+that owns the ticket, and its capture streams under the run root
 ([§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection)). This point is about the reading.
 
 ## Related Specifications

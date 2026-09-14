@@ -7,8 +7,9 @@
 
 // §AR-source-file-size.3 §FS-rhei-cost-accounting.9
 
-    /// The ticket's own invocation id shape: `<task>::<state>::<agent>::<visit>`.
-    const INVOCATION: &str = "t1::work::codex::visit-1";
+    /// One attempt identity assigned before its spawn. §FS-rhei-cost-accounting.3.7
+    const INVOCATION: &str =
+        "t1::work::codex::visit-1::run-fixture::move-0::attempt-1";
 
     /// A dimension an extractor measured, as one invocation reports it.
     fn measured(value: u64) -> rhei_tui::DimensionSummary {
@@ -251,9 +252,9 @@
     /// between the reports, is one invocation on both surfaces — not two, and
     /// not twice the tokens. Appending the second report made an aborted run's
     /// cost strip and every run's task cost row read double.
-    // §FS-rhei-cost-accounting.9
+    // §FS-rhei-cost-accounting.3.7 §FS-rhei-cost-accounting.9
     #[test]
-    fn repeated_usage_report_for_one_invocation_counts_once() {
+fn attempt_identity_repeated_usage_for_one_attempt_counts_once() {
         let sink = SummarySink::new();
         assign_slot(&sink, "t1");
         report_usage(&sink, "t1", Some(0), usage(INVOCATION, 1_280_000, 96_000, 21_000));
@@ -305,7 +306,7 @@
     /// case that was always right.
     // §FS-rhei-cost-accounting.9
     #[test]
-    fn distinct_invocation_ids_still_roll_up_to_their_sum() {
+fn attempt_identity_distinct_attempts_still_roll_up_to_their_sum() {
         let sink = SummarySink::new();
         assign_slot(&sink, "t1");
         report_usage(&sink, "t1", Some(0), usage(INVOCATION, 400_000, 30_000, 7_000));
@@ -314,7 +315,12 @@
             &sink,
             "t1",
             Some(0),
-            usage("t1::review::codex::visit-1", 1_280_000, 96_000, 21_000),
+            usage(
+                "t1::work::codex::visit-1::run-fixture::move-0::attempt-2",
+                1_280_000,
+                96_000,
+                21_000,
+            ),
         );
 
         for (level, rollup) in [

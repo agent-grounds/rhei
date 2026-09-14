@@ -1,0 +1,13 @@
+# §FS-rhei-cost-accounting.11: a refused startup must not advance this task.
+name: cross-root-identity-review
+version: 1
+states:
+  work:
+    initial: true
+    description: Work
+  completed:
+    final: true
+    description: Done
+transitions:
+  - from: work
+    to: completed

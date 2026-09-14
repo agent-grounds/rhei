@@ -413,20 +413,21 @@ fn plan_agent_spawn_attempt(
     suffix: Option<&str>,
     resolved: &ResolvedAgent,
     visit: u64,
+    run_id: &str,
 ) -> SpawnPlan {
     let mut plan = plan_spawn_attempt(runtime_dir, task_root, task_id, state_name, suffix);
-    let run_id = current_run_id().expect("agent spawn planning happens inside a published run");
+    // §FS-rhei-cost-accounting.3.7: the caller's run identity survives descriptor publication failure.
     plan.accounting = Some(AccountingAttemptIdentity {
         invocation_id: accounting_attempt_invocation_id(
             task_id,
             state_name,
             resolved,
             visit,
-            &run_id,
+            run_id,
             plan.moves,
             plan.attempt,
         ),
-        run_id: Some(run_id),
+        run_id: Some(run_id.to_string()),
     });
     plan
 }
@@ -512,6 +513,10 @@ fn spawn_plan_for_test(log: &Path) -> SpawnPlan {
         record: log.with_extension("spawn.json"),
         moves: 0,
         attempt: 1,
+        accounting: Some(AccountingAttemptIdentity {
+            invocation_id: "test::pending::mock::visit-1::run-test::move-0::attempt-1".into(),
+            run_id: Some("test".into()),
+        }),
         charged: 0,
         previous: None,
     }

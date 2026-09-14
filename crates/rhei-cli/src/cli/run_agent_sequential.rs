@@ -23,6 +23,7 @@ fn run_sequential_agent_invocation(
     opts: &RunOptions,
     workspace_root: &Path,
     runtime_dir: &Path,
+    run_id: &str,
     snapshot_override_selection: Option<&SnapshotOverrideRunSelection>,
     sink: &Arc<dyn rhei_tui::EventSink>,
     intervene: Option<&Arc<RunInterveneSink>>,
@@ -128,6 +129,7 @@ fn run_sequential_agent_invocation(
         resolved_agent_log_suffix(resolved, Some(visit_count)).as_deref(),
         resolved,
         visit_count,
+        run_id,
     );
     let budget = resolve_attempt_budget(machine.states.get(current_state), settings);
     if let Some(spent_budget) = plan.budget_spent(budget) {

@@ -6,7 +6,7 @@
 
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::*;
 
@@ -98,7 +98,7 @@ fn historical_record(
     })
 }
 
-fn write_record(root: &Path, name: &str, record: &serde_json::Value) {
+pub(super) fn write_record(root: &Path, name: &str, record: &serde_json::Value) {
     let invocations = root.join("runtime/accounting/invocations");
     fs::create_dir_all(&invocations).expect("create invocation directory");
     fs::write(
@@ -225,7 +225,68 @@ fn durable_records(root: &Path) -> Vec<serde_json::Value> {
     records
 }
 
-fn assert_retry_identity(parallel: usize, task_count: usize) {
+pub(super) fn write_attempt_prices(root: &Path) -> PathBuf {
+    let path = root.join("attempt-prices.json");
+    let book = serde_json::json!({
+        "schema": "rhei.accounting.prices.v1",
+        "price_book_id": "attempt-fixture-luna",
+        "currency": "USD",
+        "entries": [{
+            "provider": "openai", "model": "gpt-5.6-luna",
+            "effective_at": "2026-09-01T00:00:00Z", "unit": "1m_tokens",
+            "input_total_micro": 2_000_000,
+            "input_cached_read_micro": 250_000,
+            "input_cache_write_micro": 4_000_000,
+            "output_total_micro": 10_000_000
+        }]
+    });
+    fs::write(&path, serde_json::to_vec_pretty(&book).expect("serialize prices"))
+        .expect("write fixture prices");
+    path
+}
+
+/// The journal's current run, every streamed/final report, and durable records
+/// must name the same attempts even without a published run descriptor.
+// §FS-rhei-cost-accounting.3.7
+fn assert_attempt_reports(root: &Path, task_count: usize, attempt: u64) -> String {
+    let journal = fs::read_to_string(root.join("runtime/events.jsonl")).expect("read journal");
+    let events = journal
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).expect("parse event"))
+        .collect::<Vec<_>>();
+    let runs = events.iter().filter(|event| event["event"] == "run_started").collect::<Vec<_>>();
+    assert_eq!(runs.len(), 1);
+    let run_id = runs[0]["run_id"].as_str().expect("run has an id");
+    let records = durable_records(root);
+    let current = records.iter().filter(|record| record["run_id"] == run_id).collect::<Vec<_>>();
+    assert_eq!(current.len(), task_count, "every executed task belongs to this run");
+    let reports =
+        events.iter().filter(|event| event["event"] == "usage_reported").collect::<Vec<_>>();
+    for record in &current {
+        let id = record["invocation_id"].as_str().expect("attempt id");
+        assert!(id.ends_with(&format!("::run-{run_id}::move-0::attempt-{attempt}")));
+        assert_eq!(record["tokens"]["total"]["value"], attempt * 1_010);
+        for report in ["streamed", "final"] {
+            assert!(
+                reports
+                    .iter()
+                    .any(|event| { event["invocation_id"] == id && event["report"] == report }),
+                "missing {report} report for {id}"
+            );
+        }
+    }
+    assert!(
+        reports.iter().all(|event| current.iter().any(|record| {
+            event["invocation_id"] == record["invocation_id"] && event["task"] == record["task_id"]
+        })),
+        "reports must not invent another attempt identity"
+    );
+    let report = fs::read_to_string(root.join("runtime/run-report.md")).expect("read run report");
+    assert!(report.contains(run_id), "report must name the same run");
+    run_id.to_string()
+}
+
+fn assert_retry_identity(parallel: usize, task_count: usize, block_descriptor: bool) {
     let dir = unique_temp_dir(&format!("attempt-writer-{parallel}"));
     let workspace = dir.join("workspace");
     let tasks = workspace.join("tasks");
@@ -241,13 +302,35 @@ fn assert_retry_identity(parallel: usize, task_count: usize) {
     }
     let machine = write_fixture_file(&dir, "states.yaml", RETRY_MACHINE);
     write_retrying_codex(&workspace);
+    let prices = write_attempt_prices(&dir);
+    let prices_arg = prices.to_string_lossy();
     let parallel_arg = parallel.to_string();
-    let args = ["--no-tui", "--no-callbacks", "--parallel", parallel_arg.as_str()];
+    let args = [
+        "--no-tui",
+        "--no-callbacks",
+        "--parallel",
+        parallel_arg.as_str(),
+        "--prices",
+        &prices_arg,
+    ];
+    if block_descriptor {
+        fs::create_dir_all(workspace.join("runtime/run.json")).expect("block descriptor write");
+    }
 
     let first = run_cli("run", &workspace, &machine, &args);
     assert!(!first.status.success(), "the first attempt deliberately leaves its result missing");
+    let first_run = block_descriptor.then(|| assert_attempt_reports(&workspace, task_count, 1));
     let second = run_cli("run", &workspace, &machine, &args);
     assert_success(&second);
+    if block_descriptor {
+        let second_run = assert_attempt_reports(&workspace, task_count, 2);
+        assert_ne!(first_run.as_deref(), Some(second_run.as_str()));
+        for output in [&first, &second] {
+            assert!(output.stderr.contains("could not publish the run descriptor"));
+            assert!(!output.stderr.contains("panicked"));
+        }
+        assert!(workspace.join("runtime/run.json").is_dir());
+    }
     let later = run_cli("run", &workspace, &machine, &args);
     assert_success(&later);
     assert!(
@@ -268,6 +351,22 @@ fn assert_retry_identity(parallel: usize, task_count: usize) {
         assert!(id.contains("::move-0::attempt-"), "attempt id names its visit and attempt: {id}");
     }
 
+    // §FS-rhei-cost-accounting.5.1: cost reads the book and amounts persisted by run.
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(
+            &fs::read(workspace.join("runtime/accounting/prices.json"))
+                .expect("read durable prices")
+        )
+        .expect("parse durable prices"),
+        serde_json::from_slice::<serde_json::Value>(
+            &fs::read(&prices).expect("read selected prices")
+        )
+        .expect("parse selected prices")
+    );
+    assert!(records.iter().all(|record| {
+        record["pricing"]["price_book_id"] == "attempt-fixture-luna"
+            && record["pricing"]["currency"] == "USD"
+    }));
     let payload = cost_payload(&workspace, &machine);
     assert_eq!(payload["selection"]["invocation_count"], (task_count * 2) as u64);
     assert_eq!(payload["summary"]["total"]["value"], (task_count as u64) * 3_030);
@@ -275,6 +374,7 @@ fn assert_retry_identity(parallel: usize, task_count: usize) {
         .iter()
         .map(|record| record["pricing"]["amount_micro"].as_u64().expect("priced attempt"))
         .sum();
+    assert_eq!(stored_cost, (task_count as u64) * 6_300);
     assert_eq!(payload["summary"]["cost_micro"], stored_cost);
 }
 
@@ -282,14 +382,28 @@ fn assert_retry_identity(parallel: usize, task_count: usize) {
 // §FS-rhei-cost-accounting.3.7 §FS-rhei-cost-accounting.7.1
 #[test]
 fn attempt_identity_sequential_retry_writes_two_ids_and_allows_a_later_run() {
-    assert_retry_identity(1, 1);
+    assert_retry_identity(1, 1, false);
 }
 
 /// The worker pool has the same identity contract as the sequential path.
 // §FS-rhei-cost-accounting.3.7 §FS-rhei-cost-accounting.7.1
 #[test]
 fn attempt_identity_parallel_retries_write_distinct_ids_and_allow_a_later_run() {
-    assert_retry_identity(2, 2);
+    assert_retry_identity(2, 2, false);
+}
+
+/// Failed best-effort publication must preserve execution and attempt identity.
+// §FS-rhei-cost-accounting.3.7
+#[test]
+fn attempt_identity_sequential_survives_descriptor_publication_failure() {
+    assert_retry_identity(1, 1, true);
+}
+
+/// Three tasks exercise both the initial pool fill and the refill path.
+// §FS-rhei-cost-accounting.3.7
+#[test]
+fn attempt_identity_parallel_survives_descriptor_publication_failure() {
+    assert_retry_identity(2, 3, true);
 }
 
 /// A contradictory pair remains a refusal, but it is an identity failure and

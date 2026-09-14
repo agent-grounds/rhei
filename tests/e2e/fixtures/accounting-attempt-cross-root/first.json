@@ -1,0 +1,38 @@
+{
+  "schema": "rhei.accounting.invocation.v1",
+  "invocation_id": "alpha.1::work::codex::visit-1",
+  "run_id": "same-run",
+  "task_id": "alpha.1",
+  "state": "work",
+  "visit": 1,
+  "target_slug": "codex",
+  "agent": "codex",
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "started_at": "2026-09-01T10:00:00Z",
+  "ended_at": "2026-09-01T10:00:01Z",
+  "duration_ms": 1000,
+  "extraction_status": "measured",
+  "scope": "aggregate-agent-process",
+  "token_convention": "input-total-includes-cache",
+  "tokens": {
+    "total": { "value": 100, "source": "agent-usage-capture" },
+    "input": {
+      "total": { "value": 90, "source": "agent-usage-capture" },
+      "cached_read": { "value": 0, "source": "agent-usage-capture" },
+      "cache_write": { "value": 0, "source": "agent-usage-capture" }
+    },
+    "output": {
+      "total": { "value": 10, "source": "agent-usage-capture" },
+      "cached_read": { "status": "unsupported" },
+      "cache_write": { "status": "unsupported" }
+    }
+  },
+  "pricing": {
+    "status": "priced",
+    "currency": "USD",
+    "amount_micro": 1000,
+    "priced_amount_micro": 1000,
+    "price_book_id": "fixture"
+  }
+}

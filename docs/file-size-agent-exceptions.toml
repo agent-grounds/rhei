@@ -583,3 +583,14 @@ until = "template discovery is decomposed into cohesive root-order, listing, and
 reason = """
 No stable module boundary separates root ordering from discovery consumers; extracting this call site alone would create a one-function fragment.
 """
+
+[[exceptions]]
+path = "docs/functional-spec/rhei-cost-accounting.spec.md"
+match = "exact"
+rules = ["citable-spec"]
+kind = "deferred"
+max_accepted = { value = 850, unit = "lines" }
+until = "A dedicated accounting-inspection reference owns section 8 and its inbound citations have migrated, bringing this reference below the 750-line soft budget."
+reason = """
+The accounting inspection surface in section 8 has no separate canonical declaration yet. Extracting it requires migrating its inbound section citations together; issue #253 fix round 1 is limited to four findings and preserves the accepted accounting contract points. This round adds only the descriptor-failure and scoped-preflight clarifications.
+"""

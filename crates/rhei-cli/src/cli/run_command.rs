@@ -322,6 +322,11 @@ fn run_command(
     }
 
     if !opts.dry_run() {
+        // §FS-rhei-cost-accounting.11 §FS-rhei-panta.6.5: identity spans the selected root union.
+        validate_accounting_identity(
+            &accounting_roots(&loaded, &workspace_root, &rhei_scope),
+            &rhei_scope,
+        )?;
         let accounting_roots = run_accounting_roots(&loaded, &workspace_root, &rhei_scope);
         // Every root is preflighted while all run locks are held and before
         // any root is mutated or execution starts. §FS-rhei-cost-accounting.5.1

@@ -274,12 +274,14 @@ fn spawn_and_wait_agent(
     if let Some(parent) = usage_capture_path.as_ref().and_then(|path| path.parent()) {
         let _ = fs::create_dir_all(parent);
     }
-    let usage_capture = usage_capture_for_spawn(
+    let usage_capture = usage_capture_for_attempt(
         resolved,
         usage_capture_path.as_deref(),
+        plan.accounting
+            .as_ref()
+            .expect("agent spawn plans carry accounting identity"),
         task_id,
         state_name,
-        visit_count,
         slot,
         price_book,
     );

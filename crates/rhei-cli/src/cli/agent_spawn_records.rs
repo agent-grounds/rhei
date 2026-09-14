@@ -181,6 +181,10 @@ struct SpawnPlan {
     moves: u64,
     /// 1 for the first spawn of this visit.
     attempt: u64,
+    /// One accounting identity for this agent process, created with the same
+    /// persisted visit and attempt facts that name its log and budget charge.
+    // §FS-rhei-cost-accounting.3.7
+    accounting: Option<AccountingAttemptIdentity>,
     /// What this visit has already spent of its budget. §FS-rhei-agents.3.2.3
     charged: u64,
     /// The previous attempt *of this same visit*, when there was one. A record
@@ -391,9 +395,40 @@ fn plan_spawn_attempt(
         record: record_path,
         moves,
         attempt,
+        accounting: None,
         charged,
         previous,
     }
+}
+
+/// Plan an agent process and create its accounting identity before it can be
+/// spawned. Programs use [`plan_spawn_attempt`] directly because they do not
+/// produce agent-accounting records. §FS-rhei-cost-accounting.3.7
+#[allow(clippy::too_many_arguments)]
+fn plan_agent_spawn_attempt(
+    runtime_dir: &Path,
+    task_root: &Path,
+    task_id: &str,
+    state_name: &str,
+    suffix: Option<&str>,
+    resolved: &ResolvedAgent,
+    visit: u64,
+) -> SpawnPlan {
+    let mut plan = plan_spawn_attempt(runtime_dir, task_root, task_id, state_name, suffix);
+    let run_id = current_run_id().expect("agent spawn planning happens inside a published run");
+    plan.accounting = Some(AccountingAttemptIdentity {
+        invocation_id: accounting_attempt_invocation_id(
+            task_id,
+            state_name,
+            resolved,
+            visit,
+            &run_id,
+            plan.moves,
+            plan.attempt,
+        ),
+        run_id: Some(run_id),
+    });
+    plan
 }
 
 /// The most recent worker that actually ran in this state on this ticket, of

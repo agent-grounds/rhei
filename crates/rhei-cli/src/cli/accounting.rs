@@ -127,6 +127,15 @@ struct AgentAccountingInvocation<'a> {
     sink: &'a Arc<dyn rhei_tui::EventSink>,
 }
 
+/// The identity facts fixed by the shared spawn plan before the process starts.
+/// The durable `run_id` and the id suffix therefore cannot drift apart.
+// §FS-rhei-cost-accounting.3.7
+#[derive(Clone, Debug)]
+struct AccountingAttemptIdentity {
+    invocation_id: String,
+    run_id: Option<String>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
 enum CostGroup {
     Agent,
@@ -140,8 +149,11 @@ enum CostGroup {
     Day,
 }
 
-fn record_agent_accounting_invocation(
+/// Finish accounting with the identity the spawn plan created before launch.
+// §FS-rhei-cost-accounting.3.7
+fn record_agent_accounting_attempt(
     invocation: AgentAccountingInvocation<'_>,
+    identity: &AccountingAttemptIdentity,
 ) -> MietteResult<Option<rhei_tui::UsageSummary>> {
     // §FS-rhei-cost-accounting.3.2: Built-ins must not silently omit records.
     if !agent_has_accounting_extractor(invocation.resolved.agent.id()) {
@@ -176,18 +188,14 @@ fn record_agent_accounting_invocation(
     let pricing =
         price_tokens(invocation.price_book, provider.as_deref(), model.as_deref(), &tokens);
     let target_slug = resolved_agent_target_slug(invocation.resolved);
-    let invocation_id = accounting_invocation_id(
-        &invocation.task.id.to_string(),
-        invocation.state,
-        invocation.resolved,
-        invocation.visit,
-    );
     let record = AccountingInvocationRecord {
         schema: ACCOUNTING_INVOCATION_SCHEMA.to_string(),
-        invocation_id: invocation_id.clone(),
+        // §FS-rhei-cost-accounting.3.7: use the identity created by the
+        // persisted spawn plan rather than recomputing a visit-level key.
+        invocation_id: identity.invocation_id.clone(),
         // §FS-rhei-cost-accounting.3.5: every record written inside a run names
         // it, so attributing spend to a run is a fact rather than an inference.
-        run_id: current_run_id(),
+        run_id: identity.run_id.clone(),
         task_id: invocation.task.id.to_string(),
         state: invocation.state.to_string(),
         visit: invocation.visit,
@@ -218,11 +226,30 @@ fn record_agent_accounting_invocation(
     invocation.sink.emit(rhei_tui::RunEvent::UsageReported {
         slot: invocation.slot,
         task: invocation.task.id.to_string(),
-        invocation_id,
+        invocation_id: identity.invocation_id.clone(),
         report: rhei_tui::UsageReport::Final,
         usage: usage.clone(),
     });
     Ok(Some(usage))
+}
+
+/// Compatibility entry point for record-writing unit fixtures that exercise
+/// extraction independently from the scheduler-owned spawn plan.
+// §FS-rhei-cost-accounting.3.7
+#[cfg(test)]
+fn record_agent_accounting_invocation(
+    invocation: AgentAccountingInvocation<'_>,
+) -> MietteResult<Option<rhei_tui::UsageSummary>> {
+    let identity = AccountingAttemptIdentity {
+        invocation_id: accounting_invocation_id(
+            &invocation.task.id.to_string(),
+            invocation.state,
+            invocation.resolved,
+            invocation.visit,
+        ),
+        run_id: current_run_id(),
+    };
+    record_agent_accounting_attempt(invocation, &identity)
 }
 
 /// What one run spent, told apart from what its workspace has ever spent.
@@ -532,19 +559,40 @@ fn accounting_invocation_id(
     let target_slug = resolved_agent_target_slug(resolved);
     format!(
         "{}::{}::{}::visit-{}",
-        task_id,
-        state,
-        target_slug.as_deref().unwrap_or(resolved.agent.id()),
+        safe_accounting_file_segment(task_id),
+        safe_accounting_file_segment(state),
+        safe_accounting_file_segment(target_slug.as_deref().unwrap_or(resolved.agent.id())),
         visit
     )
 }
 
-fn usage_capture_for_spawn(
-    resolved: &ResolvedAgent,
-    capture_path: Option<&Path>,
+/// The opaque identity of one attempt, built from the run and the persisted
+/// spawn-plan facts rather than a second retry counter.
+// §FS-rhei-cost-accounting.3.7 §FS-rhei-cost-accounting.8.1
+fn accounting_attempt_invocation_id(
     task_id: &str,
     state: &str,
+    resolved: &ResolvedAgent,
     visit: u64,
+    run_id: &str,
+    moves: u64,
+    attempt: u64,
+) -> String {
+    format!(
+        "{}::run-{}::move-{moves}::attempt-{attempt}",
+        accounting_invocation_id(task_id, state, resolved, visit),
+        safe_accounting_file_segment(run_id),
+    )
+}
+
+/// Configure streamed usage with the spawn plan's already-created identity.
+// §FS-rhei-cost-accounting.3.7 §FS-rhei-cost-accounting.7.1
+fn usage_capture_for_attempt(
+    resolved: &ResolvedAgent,
+    capture_path: Option<&Path>,
+    identity: &AccountingAttemptIdentity,
+    task_id: &str,
+    state: &str,
     slot: rhei_tui::Slot,
     price_book: &PriceBook,
 ) -> Option<AgentUsageCapture> {
@@ -554,7 +602,9 @@ fn usage_capture_for_spawn(
         replace_usage_capture: resolved.agent.id() == "claude-code"
             && agent_stdin_format(resolved) == AgentStdinFormat::ClaudeCodeStreamJson,
         path: capture_path?.to_path_buf(),
-        invocation_id: accounting_invocation_id(task_id, state, resolved, visit),
+        // §FS-rhei-cost-accounting.3.7: streamed usage keeps the identity
+        // created before spawn unchanged.
+        invocation_id: identity.invocation_id.clone(),
         task_id: task_id.to_string(),
         state: state.to_string(),
         agent: resolved.agent.id().to_string(),
@@ -564,6 +614,32 @@ fn usage_capture_for_spawn(
         slot,
         cli_session: Arc::new(Mutex::new(None)),
     })
+}
+
+#[cfg(test)]
+// §FS-rhei-cost-accounting.3.7
+fn usage_capture_for_spawn(
+    resolved: &ResolvedAgent,
+    capture_path: Option<&Path>,
+    task_id: &str,
+    state: &str,
+    visit: u64,
+    slot: rhei_tui::Slot,
+    price_book: &PriceBook,
+) -> Option<AgentUsageCapture> {
+    let identity = AccountingAttemptIdentity {
+        invocation_id: accounting_invocation_id(task_id, state, resolved, visit),
+        run_id: current_run_id(),
+    };
+    usage_capture_for_attempt(
+        resolved,
+        capture_path,
+        &identity,
+        task_id,
+        state,
+        slot,
+        price_book,
+    )
 }
 
 fn configure_agent_accounting_args(cmd: &mut std::process::Command, resolved: &ResolvedAgent) {

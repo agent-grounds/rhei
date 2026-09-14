@@ -65,12 +65,14 @@ fn spawn_parallel_agent_work_item(
     // Settled before anything is composed or staged, as in the sequential path:
     // a spawn this visit may not have costs nothing to decline.
     // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.1
-    let plan = plan_spawn_attempt(
+    let plan = plan_agent_spawn_attempt(
         runtime_dir,
         &task_workspace_root,
         &item.task_id_str,
         &item.current_state,
         resolved_agent_log_suffix(&item.resolved, Some(visit_count)).as_deref(),
+        &item.resolved,
+        visit_count,
     );
     let budget =
         resolve_attempt_budget(machine.states.get(item.current_state.as_str()), settings);
@@ -359,24 +361,30 @@ fn spawn_parallel_agent_work_item(
             );
             let usage_capture_path =
                 result.as_ref().ok().and_then(|outcome| outcome.usage_capture_path.as_ref());
-            let accounting_result = record_agent_accounting_invocation(AgentAccountingInvocation {
-                workspace_root: &workspace_root_for_thread,
-                task: &task_for_accounting,
-                state: &sname,
-                resolved: &resolved,
-                visit: visit_count,
-                started_at: started_wall,
-                ended_at: finished_wall,
-                slot: Some(slot),
-                usage_capture_path: usage_capture_path.map(PathBuf::as_path),
-                cli_session: result
+            let accounting_result = record_agent_accounting_attempt(
+                AgentAccountingInvocation {
+                    workspace_root: &workspace_root_for_thread,
+                    task: &task_for_accounting,
+                    state: &sname,
+                    resolved: &resolved,
+                    visit: visit_count,
+                    started_at: started_wall,
+                    ended_at: finished_wall,
+                    slot: Some(slot),
+                    usage_capture_path: usage_capture_path.map(PathBuf::as_path),
+                    cli_session: result
+                        .as_ref()
+                        .ok()
+                        .and_then(|outcome| outcome.cli_session.as_ref()),
+                    log_path: Some(&log_for_thread),
+                    price_book: &price_book_for_thread,
+                    sink: &sink_for_thread,
+                },
+                plan_for_thread
+                    .accounting
                     .as_ref()
-                    .ok()
-                    .and_then(|outcome| outcome.cli_session.as_ref()),
-                log_path: Some(&log_for_thread),
-                price_book: &price_book_for_thread,
-                sink: &sink_for_thread,
-            });
+                    .expect("agent spawn plans carry accounting identity"),
+            );
             let (accounting_recorded, accounting_warning) = match accounting_result {
                 Ok(Some(_)) => (true, None),
                 Ok(None) => (false, None),

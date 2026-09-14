@@ -101,7 +101,11 @@ ticket, under that rhei's own rhei-local heading ([§FS-rhei-panta.6.1](rhei-pan
    currently applicable, so a move the machine never offered — unlisted or
    condition-blocked — is reported as such rather than as an open subtree: a
    user is not sent to finish descendants for a move that was never available.
-8. Execute the `on_leave` callback on the source state, if any, unless `--no-callbacks` is set.
+8. After all preceding guards accept the attempt, allocate its transient
+   callback firing identity immediately before executing `on_leave`. Execute
+   `on_leave` on the source state, if any, unless `--no-callbacks` is set. All
+   callbacks for the attempt share the identity and see its central-ledger
+   status as pending ([§FS-rhei-transitions.1.2](rhei-transitions.spec.md#12-firing-identity-and-callback-time-visibility)).
 9. Verify that every required `outputs:` artifact declared on the source state
    exists (see [Plan Language Specification — State Artifact
    Contracts](rhei-plan-language.spec.md#310-state-artifact-contracts)). Missing
@@ -117,7 +121,7 @@ ticket, under that rhei's own rhei-local heading ([§FS-rhei-panta.6.1](rhei-pan
     `runtime/results/<task-id>.md` already has content or `--result` carried a
     message. Neither, and the transition is refused with the plan untouched.
 12. Rewrite the task's `**State:**` line to the new state value (with counted-visit suffix when applicable) and write the file atomically (temp file + rename).
-13. Execute the `on_enter` callback on the target state, if any, unless `--no-callbacks` is set. The write comes first so the callback observes the plan already in the state it is entering; a callback that fails rolls the write back to the file's previous contents, and the transition fails. When the rollback itself fails, the error says so — the plan file may then be inconsistent.
+13. Execute the `on_enter` callback on the target state, if any, unless `--no-callbacks` is set. The write comes first so the callback observes the plan already in the state it is entering; the callback still sees the attempt's central-ledger status as pending. A callback that fails rolls the write back to the file's previous contents, and the transition fails. When the rollback itself fails, the error says so — the plan file may then be inconsistent.
 14. Append one state-transition entry to `runtime/state-transitions.log` as
     `<task-id> <from>@<to>`, creating the `runtime/` directory if needed. The
     file is the central, deterministic audit trail for all task state changes.

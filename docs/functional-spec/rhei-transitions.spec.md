@@ -113,6 +113,10 @@ interface Rhei {
 interface TransitionInfo {
   from: string;
   to: string;
+  /** Opaque identity shared by every callback in this firing attempt. */
+  firingId: string;
+  /** Whether this firing's central transition-ledger row has been appended. */
+  ledgerStatus: 'pending';
   /**
    * How this transition was initiated:
    * - 'user': Explicitly triggered via API (CLI command, programmatic call)
@@ -226,6 +230,62 @@ rhei.onLeave('pending', 'processing', async (ctx: TransitionContext): Promise<Tr
 ```
 
 > **More examples:** See [Transition Callback Examples](rhei-callbacks.spec.md) for comprehensive examples across all supported languages (TypeScript, Python, Java, Bash) covering dependency validation, data passing, state redirection, custom metadata access, and environment-aware logic.
+
+### 1.2. Firing Identity and Callback-Time Visibility
+
+Every callback-bearing transition attempt for which callbacks are enabled gets
+one opaque, non-empty `firingId`. The shared transition executor allocates it
+after compare-and-swap, supervisor, edge, condition, and descendants-first
+guards have accepted the attempt and immediately before the `on_leave` phase
+(whether or not that edge declares an `on_leave` callback). Every `on_leave`
+invocation in model fan-out and the eventual
+`on_enter` invocation receive that same value, including when `on_leave`
+redirects the effective target. A later real firing, including a repetition of
+the same edge or a self-loop, gets a different value. An ID can therefore be
+spent by a rejected or rolled-back attempt; it identifies a firing attempt,
+not a successful move or a ledger row.
+
+The value is transient callback input. Rhei does not persist it, derive it from
+ledger length, expose its representation as an ordering contract, reserve a
+future ordinal for it, or promise that lexicographic identity order matches
+commit order. Concurrent firings have independent identities; successful
+central-ledger rows retain the append order chosen by the existing ledger
+lock.
+
+During every callback, `transition.ledgerStatus` is the literal `"pending"`.
+It means that this firing's line is not yet present in
+`runtime/state-transitions.log`; it does not mean that the firing will
+eventually succeed. The observable order is:
+
+1. `on_leave` sees the task in the source state, the firing ID, pending status,
+   no central-ledger row for this firing, and no run-journal release event for
+   the invocation.
+2. After successful leave callbacks and pre-write checks, Rhei atomically
+   writes the effective target. `on_enter` sees that state and the same ID and
+   pending status, while the firing's central row and the invocation's later
+   `end@<from>` event are still absent.
+3. Successful `on_enter` is followed by exactly the existing
+   `<task-id> <from>@<effective-to>` central-ledger append and existing terminal
+   finalization. For `rhei run`, transition processing returns before the
+   invocation's release event is appended.
+
+Leave rejection preserves the source state and appends no row. Enter failure
+preserves the existing rollback behavior and appends no row. A valid redirect
+keeps the ID while changing the target observed by `on_enter` and the eventual
+row to the effective edge. Both ledger formats and all existing rejection,
+rollback, redirect, and terminal-finalization behavior remain unchanged.
+
+Captured callback input is ordinary data: replaying it retains the captured
+ID and `pending` status, while directly invoking a callback outside Rhei gets
+no newly issued identity. This is useful for consumer-side deduplication but
+provides neither replay authentication nor exactly-once callback execution.
+
+The canonical JSON names are `transition.firingId` and
+`transition.ledgerStatus`. TypeScript and JavaScript models use `firingId` and
+`ledgerStatus`; Python models use `firing_id` and `ledger_status`; Java models
+expose `getFiringId()` and `getLedgerStatus()`. These names define the typed
+callback models even where a native callback-registration implementation is
+not shipped yet.
 
 ---
 
@@ -884,6 +944,17 @@ callbacks:
 ```
 
 Both models are valid. They must not be mixed within a single transition (a callback value is either prefixed or logical, not both). When both a prefix and a `callbacks:` mapping exist for the same name, the prefix takes precedence.
+
+Every callback platform receives the firing identity and ledger status defined
+by [§FS-rhei-transitions.1.2](#12-firing-identity-and-callback-time-visibility).
+The canonical JSON payload is delivered on stdin to a shipped `cli:` callback.
+Its environment additionally contains `RHEI_TRANSITION_FIRING_ID` with the
+same value as `transition.firingId` and
+`RHEI_TRANSITION_LEDGER_STATUS=pending`, alongside the existing callback
+variables. These are callback-only inputs: ordinary program-state subprocesses
+do not receive them. Additive JSON fields can break consumers that reject
+unknown properties; callback decoders must permit fields added by a compatible
+Rhei release.
 
 ### 4.8. Callback Mappings
 

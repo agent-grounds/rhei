@@ -536,6 +536,15 @@ Rules:
 
 A `SlotAssigned` produces one line; its paired `SlotReleased` produces a second line on the same state (recording exit status and duration). For multi-invocation states (`all_targets`), each invocation is a distinct pair of lines with the target suffix visible in the log path.
 
+When an invocation selects a task transition, Rhei completes that transition's
+processing—including successful `on_enter`, the central
+`runtime/state-transitions.log` append, and terminal finalization—before it
+emits the invocation's `SlotReleased` event. Consequently the transition's
+callbacks do not yet observe this invocation's `end@<from>` journal line; the
+line is present after the run releases the slot. This is the run-journal side
+of the callback visibility contract in
+[§FS-rhei-transitions.1.2](rhei-transitions.spec.md#12-firing-identity-and-callback-time-visibility).
+
 ### 1.8. Failure Modes
 
 - **Panic in the execution engine** — a panic hook registered by `TuiSink` calls `ratatui::restore()` before re-raising, so the terminal is never left in raw mode.

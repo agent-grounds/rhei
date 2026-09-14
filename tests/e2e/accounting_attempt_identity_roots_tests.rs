@@ -82,9 +82,11 @@ fn attempt_identity_cross_root_conflict_refuses_before_mutation() {
     let task_before = fs::read(&task).expect("read working task");
     let project_before = tree_snapshot(&project.join("runtime/accounting"));
     let alpha_before = tree_snapshot(&alpha.join("runtime/accounting"));
+    // Three `.join()` calls, matching how the CLI builds the same path: on
+    // Windows a one-string join renders its embedded slashes differently.
     let paths = [
-        project.join("runtime/accounting/invocations/first.json"),
-        alpha.join("runtime/accounting/invocations/second.json"),
+        project.join("runtime/accounting").join("invocations").join("first.json"),
+        alpha.join("runtime/accounting").join("invocations").join("second.json"),
     ];
 
     let payload = cost(&project, &machine, &[]);

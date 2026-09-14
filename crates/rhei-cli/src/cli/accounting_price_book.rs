@@ -128,14 +128,22 @@ fn write_price_book(accounting_root: &Path, price_book: &PriceBook) -> MietteRes
     write_json_atomic(&path, price_book)
 }
 
-/// Preserve one currency across the invocation records that a durable scalar
-/// rollup can combine. Called for every root before any of them is mutated.
-// §FS-rhei-cost-accounting.5.1
+/// Refuse identity conflicts first, then preserve one currency across the
+/// invocation records that a durable scalar rollup can combine. Called for
+/// every root before any of them is mutated.
+// §FS-rhei-cost-accounting.5.1 §FS-rhei-cost-accounting.11
 fn validate_price_book_currency(
     accounting_root: &Path,
     price_book: &PriceBook,
 ) -> MietteResult<()> {
     let inspection = read_cost_inspection(accounting_root);
+    if let Some(error) = inspection.identity_conflicts.first() {
+        return Err(miette!(
+            help = "repair or remove the conflicting invocation record before starting another run",
+            "accounting identity conflict in root '{}': {error}",
+            accounting_root.display()
+        ));
+    }
     if let Some(error) = inspection.errors.first() {
         return Err(miette!(
             help = "repair or remove the unreadable invocation record before starting another run",

@@ -120,12 +120,14 @@ fn run_sequential_agent_invocation(
     // Settled before anything is composed or staged: a spawn this visit may not
     // have costs nothing to decline, and every step below it costs something.
     // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.1
-    let plan = plan_spawn_attempt(
+    let plan = plan_agent_spawn_attempt(
         runtime_dir,
         &task_workspace_root,
         task_id_str,
         current_state,
         resolved_agent_log_suffix(resolved, Some(visit_count)).as_deref(),
+        resolved,
+        visit_count,
     );
     let budget = resolve_attempt_budget(machine.states.get(current_state), settings);
     if let Some(spent_budget) = plan.budget_spent(budget) {
@@ -300,7 +302,8 @@ fn run_sequential_agent_invocation(
         },
     );
     // §FS-rhei-cost-accounting.4: Extraction happens after agent exit.
-    match record_agent_accounting_invocation(AgentAccountingInvocation {
+    match record_agent_accounting_attempt(
+        AgentAccountingInvocation {
         workspace_root: &task_workspace_root,
         task,
         state: current_state,
@@ -320,7 +323,11 @@ fn run_sequential_agent_invocation(
         log_path: Some(&log),
         price_book: opts.price_book(),
         sink,
-    }) {
+        },
+        plan.accounting
+            .as_ref()
+            .expect("agent spawn plans carry accounting identity"),
+    ) {
         Ok(Some(_)) => {
             if let Err(err) = regenerate_accounting_indexes(workspace_root, &loaded.rhei)
             {

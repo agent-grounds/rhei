@@ -24,6 +24,14 @@
   ancestor copies to shadow fallback copies. Pass an explicit template path to
   select one exact directory. (PR #258)
 
+- **Retried agent attempts now keep distinct accounting identities and totals.**
+  The shared spawn plan carries one run/move/attempt identity through streamed,
+  final, and durable usage reporting, so sequential and parallel retries no
+  longer collapse into one live row or block later runs. Existing visit-level
+  records are retained as separate attempts when run ids or disjoint valid
+  intervals distinguish them; exact copies still count once, while genuine
+  conflicts now stop startup with an accounting-identity diagnostic. (PR #260)
+
 - **The bundled authoring skills now resolve a built-in `rhei` project default
   the way the CLI does.** Their no-CLI guidance no longer lets a member-only
   `states.yaml` replace built-in `pending`/`completed` for an inheriting or

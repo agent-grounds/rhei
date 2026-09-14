@@ -153,6 +153,10 @@ struct CostInspection {
     /// held anything. §FS-rhei-cost-accounting.8
     roots: Vec<AccountingRootReading>,
     errors: Vec<String>,
+    /// The subset of `errors` caused by contradictory attempt identity. Run
+    /// preflight names these independently from price-book validation.
+    // §FS-rhei-cost-accounting.11
+    identity_conflicts: Vec<String>,
     /// A root existed and could not be read, so the reading saw less than it
     /// was asked for and no aggregate over it reports `complete`.
     // §FS-rhei-cost-accounting.6.2
@@ -198,6 +202,7 @@ impl CostInspection {
                 invocation_count: 0,
             }],
             errors: Vec::new(),
+            identity_conflicts: Vec::new(),
             unreadable_root: false,
         }
     }
@@ -259,19 +264,77 @@ fn same_stored_record(
     )
 }
 
+/// Whether this id already carries the run/move/attempt suffix written by
+/// current Rhei. A repeated current id always means the same attempt; only a
+/// legacy visit-level id is eligible for inference.
+// §FS-rhei-cost-accounting.3.7
+fn is_attempt_scoped_invocation_id(id: &str) -> bool {
+    let Some((before_attempt, attempt)) = id.rsplit_once("::attempt-") else { return false };
+    let Some((before_move, moves)) = before_attempt.rsplit_once("::move-") else { return false };
+    let Some((_, run_id)) = before_move.rsplit_once("::run-") else { return false };
+    !run_id.is_empty() && moves.parse::<u64>().is_ok() && attempt.parse::<u64>().is_ok()
+}
+
+/// Stable facts carried both beside and inside a legacy visit-level id. A
+/// disagreement means the records cannot describe retries of one visit.
+// §FS-rhei-cost-accounting.3.7
+fn same_legacy_base_facts(
+    left: &AccountingInvocationRecord,
+    right: &AccountingInvocationRecord,
+) -> bool {
+    left.task_id == right.task_id
+        && left.state == right.state
+        && left.visit == right.visit
+        && left.target_slug == right.target_slug
+}
+
+/// A stored interval that can distinguish one legacy process from another.
+// §FS-rhei-cost-accounting.3.7
+fn valid_invocation_interval(
+    record: &AccountingInvocationRecord,
+) -> Option<(std::time::SystemTime, std::time::SystemTime)> {
+    let started = rhei_tui::parse_rfc3339(&record.started_at)?;
+    let ended = rhei_tui::parse_rfc3339(&record.ended_at)?;
+    (ended >= started).then_some((started, ended))
+}
+
+/// Independent run evidence or non-overlapping forward intervals distinguish
+/// two legacy attempts. Missing run attribution is deliberately not failure:
+/// interval evidence can still retain that history.
+// §FS-rhei-cost-accounting.3.5 §FS-rhei-cost-accounting.3.7
+fn distinct_legacy_attempts(
+    left: &AccountingInvocationRecord,
+    right: &AccountingInvocationRecord,
+) -> bool {
+    if !same_legacy_base_facts(left, right) {
+        return false;
+    }
+    if matches!((&left.run_id, &right.run_id), (Some(left), Some(right)) if left != right) {
+        return true;
+    }
+    match (valid_invocation_interval(left), valid_invocation_interval(right)) {
+        (Some((left_start, left_end)), Some((right_start, right_end))) => {
+            left_end <= right_start || right_end <= left_start
+        }
+        _ => false,
+    }
+}
+
 /// Read every root of one reading as a single set.
 ///
 /// The root decides which records are in scope, except where one root is shared
 /// by an out-of-scope rhei — there the record's `task_id` decides, because
-/// deciding by root would report every rhei sharing it. One record is counted
-/// once, keyed by `invocation_id`: an identical repeat is dropped silently, and
-/// one that differs is dropped and reported. §FS-rhei-panta.6.5
+/// deciding by root would report every rhei sharing it. Attempt-scoped ids are
+/// keys directly; legacy visit ids use run and interval evidence. Exact copies
+/// are dropped, while ambiguous or contradictory records are reported.
+/// §FS-rhei-panta.6.5 §FS-rhei-cost-accounting.3.7
 fn read_cost_inspection_over(roots: &[AccountingRoot], scope: &RheiScope) -> CostInspection {
     let mut readings: Vec<AccountingRootReading> = Vec::new();
     let mut invocations: Vec<InspectedRecord> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
     let mut unreadable_root = false;
-    let mut seen: HashMap<String, usize> = HashMap::new();
+    let mut seen: HashMap<String, Vec<usize>> = HashMap::new();
+    let mut identity_conflicts: Vec<String> = Vec::new();
 
     for root in roots {
         let index = readings.len();
@@ -283,18 +346,33 @@ fn read_cost_inspection_over(roots: &[AccountingRoot], scope: &RheiScope) -> Cos
             if root.shared && !task_in_rhei_scope(scope, &record.task_id) {
                 continue;
             }
-            if let Some(first) = seen.get(&record.invocation_id).copied() {
-                if !same_stored_record(&invocations[first].record, &record) {
-                    errors.push(format!(
+            if let Some(prior) = seen.get(&record.invocation_id) {
+                if prior
+                    .iter()
+                    .any(|index| same_stored_record(&invocations[*index].record, &record))
+                {
+                    continue;
+                }
+                let conflict_with = if is_attempt_scoped_invocation_id(&record.invocation_id) {
+                    prior.first()
+                } else {
+                    prior.iter().find(|index| {
+                        !distinct_legacy_attempts(&invocations[**index].record, &record)
+                    })
+                };
+                if let Some(first) = conflict_with {
+                    let error = format!(
                         "{}: a different record is already read as invocation '{}' from {}",
                         path.display(),
                         record.invocation_id,
-                        invocations[first].path.display()
-                    ));
+                        invocations[*first].path.display()
+                    );
+                    errors.push(error.clone());
+                    identity_conflicts.push(error);
+                    continue;
                 }
-                continue;
             }
-            seen.insert(record.invocation_id.clone(), invocations.len());
+            seen.entry(record.invocation_id.clone()).or_default().push(invocations.len());
             invocations.push(InspectedRecord { path, record, root: index });
             invocation_count += 1;
         }
@@ -323,6 +401,7 @@ fn read_cost_inspection_over(roots: &[AccountingRoot], scope: &RheiScope) -> Cos
         invocations,
         roots: readings,
         errors,
+        identity_conflicts,
         unreadable_root,
     };
     let summary = summarize_records(inspection.scoped())

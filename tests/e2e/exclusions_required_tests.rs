@@ -31,7 +31,7 @@ result('Required artifact control completed.\n')
 /// §FS-rhei-plan-language.3.13 §FS-rhei-next.3.1
 #[test]
 fn exclusions_required_inputs_resolve_all_visits_and_directory_overlap() {
-    for state in ["review-1", "review-2"] {
+    for state in ["review", "review-2"] {
         for (path, excluded, blocked) in [
             ("runtime/brief-{visit_count}.md", "runtime/brief-2.md", true),
             ("runtime/briefs/{visit_count}.md", "runtime/briefs/", true),

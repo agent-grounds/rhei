@@ -63,7 +63,7 @@ fn exclusion_workspace(prefix: &str) -> (TestDir, PathBuf, PathBuf) {
             "03-blind.md",
             r#"### Task blind: Blind participant
 **State:** work
-**Excludes:** source:statement, artifact=runtime/results/ws.source.md
+**Excludes:** source:statement, artifact=runtime/results/workspace.source.md
 "#,
         ),
     ];
@@ -80,15 +80,19 @@ result('## Result\n\nCaptured exclusions prompt.\n')
     );
     write_settings(&workspace, &fixture_command(&agent), false);
 
-    fs::create_dir_all(workspace.join("runtime/exports/ws.source")).expect("export directory");
+    fs::create_dir_all(workspace.join("runtime/exports/workspace.source"))
+        .expect("export directory");
     fs::create_dir_all(workspace.join("runtime/results")).expect("results directory");
     fs::write(
-        workspace.join("runtime/exports/ws.source/statement.md"),
+        workspace.join("runtime/exports/workspace.source/statement.md"),
         format!("## Statement\n\n{SECRET}\n"),
     )
     .expect("pre-created sibling export");
-    fs::write(workspace.join("runtime/results/ws.source.md"), format!("## Result\n\n{SECRET}\n"))
-        .expect("pre-created sibling result");
+    fs::write(
+        workspace.join("runtime/results/workspace.source.md"),
+        format!("## Result\n\n{SECRET}\n"),
+    )
+    .expect("pre-created sibling result");
     (dir, workspace, machine)
 }
 
@@ -110,10 +114,10 @@ fn assert_blind_run(prefix: &str, parallel: &str) {
         fs::read_to_string(workspace.join("runtime/prompts/blind.md")).expect("blind prompt");
     assert!(!blind.contains(SECRET), "excluded bytes leaked into the prompt:\n{blind}");
     for visible in [
-        "# Task ws.blind: Blind participant",
-        "Task ws.source: Source statement",
+        "# Task workspace.blind: Blind participant",
+        "Task workspace.source: Source statement",
         "completed",
-        "runtime/results/ws.source.md",
+        "runtime/results/workspace.source.md",
         "Every rhei in this project and its execution root",
     ] {
         assert!(blind.contains(visible), "navigation {visible:?} was lost:\n{blind}");
@@ -142,8 +146,12 @@ fn next_filters_excluded_history_and_reports_composition_only() {
     let next = run_cli("next", &workspace, &machine, &["--task", "blind", "--peek"]);
     assert_success(&next);
     assert!(!next.stdout.contains(SECRET), "got:\n{}", next.stdout);
-    assert!(next.stdout.contains("Task ws.source: Source statement"), "got:\n{}", next.stdout);
-    assert!(next.stdout.contains("runtime/results/ws.source.md"), "got:\n{}", next.stdout);
+    assert!(
+        next.stdout.contains("Task workspace.source: Source statement"),
+        "got:\n{}",
+        next.stdout
+    );
+    assert!(next.stdout.contains("runtime/results/workspace.source.md"), "got:\n{}", next.stdout);
     assert!(
         next.stdout
             .contains("composition only; paths remain readable outside Rhei-composed context"),
@@ -217,7 +225,7 @@ fn validate_rejects_malformed_unresolved_duplicate_and_consumed_exclusions() {
     );
     assert_exclusion_error(
         "exclude-consumed-ancestor",
-        "artifact=runtime/exports/source/",
+        "artifact=runtime/exports/plan.source/",
         "**Consumes:** source:statement\n",
         "contains consumed export",
     );
@@ -254,6 +262,7 @@ transitions: [{ from: pending, to: completed }]
 "#;
     let (dir, plan_path, machine_path) = setup_single_file("exclude-required", plan);
     fs::write(&machine_path, machine).expect("required-input machine");
+    fs::create_dir_all(dir.join("runtime")).expect("runtime directory");
     fs::write(dir.join("runtime/brief.md"), "required\n").expect("required input");
     let validate = run_cli("validate", &plan_path, &machine_path, &[]);
     assert!(!validate.status.success());
@@ -345,8 +354,9 @@ fn deny_read_adapter_blocks_file_directory_descendant_and_export_reads() {
     fs::create_dir_all(workspace.join("private-dir-copy")).expect("directory-name neighbor");
     fs::write(workspace.join("private-dir-copy/child.txt"), "allowed directory-name neighbor\n")
         .expect("directory-name neighbor child");
-    fs::create_dir_all(workspace.join("runtime/exports/ws.source")).expect("exports");
-    fs::write(workspace.join("runtime/exports/ws.source/statement.md"), SECRET).expect("export");
+    fs::create_dir_all(workspace.join("runtime/exports/workspace.source")).expect("exports");
+    fs::write(workspace.join("runtime/exports/workspace.source/statement.md"), SECRET)
+        .expect("export");
 
     let allowed = serde_json::to_string(&workspace.join("allowed.txt")).unwrap();
     let denied_file = serde_json::to_string(&workspace.join("private.txt")).unwrap();
@@ -355,7 +365,8 @@ fn deny_read_adapter_blocks_file_directory_descendant_and_export_reads() {
     let directory_neighbor =
         serde_json::to_string(&workspace.join("private-dir-copy/child.txt")).unwrap();
     let denied_export =
-        serde_json::to_string(&workspace.join("runtime/exports/ws.source/statement.md")).unwrap();
+        serde_json::to_string(&workspace.join("runtime/exports/workspace.source/statement.md"))
+            .unwrap();
     let body = format!(
         r#"args = sys.argv[1:]
 separator = args.index('--') if '--' in args else len(args)

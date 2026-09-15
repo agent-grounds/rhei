@@ -218,7 +218,7 @@ states:
   implement:
     initial: true
     outputs:
-      - { name: implementation, kind: handoff, path: runtime/handoffs/{task_id}/implementation.md }
+      - { name: implementation, kind: handoff, path: 'runtime/handoffs/{task_id}/implementation.md' }
   review:
     handoff:
       inherit:

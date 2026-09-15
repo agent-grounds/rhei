@@ -44,7 +44,7 @@ fn exclusions_filter_every_runtime_backed_prompt_section() {
             r#"### Task blind: Blind parent
 **State:** review
 **Prior:** prior
-**Excludes:** artifact=runtime/results/ws.prior.md, artifact=runtime/results/ws.blind.child.md, artifact=runtime/results/ws.blind.md, artifact=runtime/supervise/ws.blind.md, artifact=runtime/handoffs/ws.blind/implementation.md
+**Excludes:** artifact=runtime/results/workspace.prior.md, artifact=runtime/results/workspace.blind.child.md, artifact=runtime/results/workspace.blind.md, artifact=runtime/supervise/workspace.blind.md, artifact=runtime/handoffs/workspace.blind/implementation.md
 
 #### Task blind.child: Finished child
 **State:** completed
@@ -61,7 +61,7 @@ states:
     initial: true
     agent: mock
     outputs:
-      - { name: implementation, kind: handoff, path: runtime/handoffs/{task_id}/implementation.md }
+      - { name: implementation, kind: handoff, path: 'runtime/handoffs/{task_id}/implementation.md' }
   review:
     agent: mock
     handoff:
@@ -85,29 +85,32 @@ result('## Result\n\nFinished without excluded context.\n')
     settings(&workspace, &agent, false);
 
     for relative in [
-        "runtime/results/ws.prior.md",
-        "runtime/results/ws.blind.child.md",
-        "runtime/results/ws.blind.md",
-        "runtime/supervise/ws.blind.md",
-        "runtime/handoffs/ws.blind/implementation.md",
+        "runtime/results/workspace.prior.md",
+        "runtime/results/workspace.blind.child.md",
+        "runtime/results/workspace.blind.md",
+        "runtime/supervise/workspace.blind.md",
+        "runtime/handoffs/workspace.blind/implementation.md",
     ] {
         let path = workspace.join(relative);
         fs::create_dir_all(path.parent().unwrap()).expect("runtime parent");
         fs::write(path, format!("## Result\n\n{SECRET} in {relative}\n")).expect("runtime source");
     }
-    fs::write(workspace.join("runtime/state-transitions.log"), "ws.blind implement@review\n")
-        .expect("transition history");
+    fs::write(
+        workspace.join("runtime/state-transitions.log"),
+        "workspace.blind implement@review\n",
+    )
+    .expect("transition history");
 
     let run = run_cli("run", &workspace, &machine, &["--no-tui", "--no-callbacks"]);
     assert_success(&run);
     let prompt = fs::read_to_string(workspace.join("runtime/captured.md")).expect("prompt");
     assert!(!prompt.contains(SECRET), "excluded runtime bytes leaked:\n{prompt}");
     for navigation in [
-        "Task ws.prior: Prior work",
-        "Task ws.blind.child: Finished child",
-        "runtime/results/ws.prior.md",
-        "runtime/results/ws.blind.md",
-        "runtime/supervise/ws.blind.md",
+        "Task workspace.prior: Prior work",
+        "Task workspace.blind.child: Finished child",
+        "runtime/results/workspace.prior.md",
+        "runtime/results/workspace.blind.md",
+        "runtime/supervise/workspace.blind.md",
     ] {
         assert!(prompt.contains(navigation), "missing {navigation:?}:\n{prompt}");
     }
@@ -130,6 +133,20 @@ fn retry_reapplies_the_same_exclusion_policy() {
 **Excludes:** artifact=runtime/results/plan.prior.md
 "#;
     let (dir, plan_path, machine) = setup_single_file("exclude-retry", plan);
+    fs::write(
+        &machine,
+        r#"name: exclusion-retry
+version: 1
+states:
+  pending:
+    initial: true
+    agent: mock
+    attempts: 2
+  completed: { final: true }
+transitions: [{ from: pending, to: completed }]
+"#,
+    )
+    .expect("retry machine");
     let agent = write_python_agent(
         &dir,
         "retry.py",

@@ -9,6 +9,7 @@ fn exclusions_recheck_actual_invocation_before_composition() {
     let machine = rhei_validator::StateMachine::from_yaml_str(
         r#"name: actual-invocation
 version: 1
+models: [model-a, model-b]
 states:
   review:
     initial: true
@@ -24,7 +25,10 @@ transitions: [{ from: review, to: completed }]
     .unwrap();
     let settings: RheiSettings = serde_json::from_value(serde_json::json!({
         "agents": {"mock": {"command": ["mock"]}},
-        "models": {"model-a": {"provider": "mock", "model": "model-a"}}
+        "models": {
+            "model-a": {"provider": "mock", "model": "model-a"},
+            "model-b": {"provider": "mock", "model": "model-b"}
+        }
     }))
     .unwrap();
     let policy = loaded_task_exclusions(

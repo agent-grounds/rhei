@@ -148,6 +148,24 @@ fn a_failed_outcome_carries_its_reason() {
     }
 }
 
+/// Startup validation warnings use the ordinary message vocabulary, so JSON
+/// can preserve the exact text without contaminating its record stream.
+// §FS-rhei-run-json.1 §FS-rhei-run-tui.1.1
+#[test]
+fn a_consumes_advisory_encodes_as_an_exact_warning_message() {
+    let text = "warning: **Consumes:** declares export data-flow for prompt injection, not filesystem visibility. Workers can read undeclared sibling exports under runtime/exports/. For a blind round, schedule participants concurrently and brief them not to inspect sibling exports; neither measure enforces blindness once an export exists.";
+    let record = encode(
+        Some(2),
+        &RunEvent::Message { level: MessageLevel::Warn, text: text.to_string() },
+        at(),
+        None,
+    );
+
+    assert_eq!(record["event"], "message");
+    assert_eq!(record["level"], "warn");
+    assert_eq!(record["text"], text);
+}
+
 /// The value this vocabulary gained. A wait must survive the stream in both
 /// directions, or `rhei attach --json` shows an attached reader a completion
 /// where the run itself wrote a wait.

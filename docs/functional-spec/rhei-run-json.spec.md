@@ -22,7 +22,10 @@ and attachment.
 clean byte stream. `--json --dry-run` emits the dry-run preview as JSON
 (§4). Human-oriented engine prose that the plain frontend prints is carried in
 `message` records rather than dropped, so a JSON consumer sees the same
-diagnostics an operator does.
+diagnostics an operator does. That includes every warning from the initial
+validation report: each follows `run_started`, precedes scheduling, and appears
+once as a `message` record with `level: "warn"`, while stderr remains reserved
+for failures that do not enter the stream (§FS-rhei-run.3).
 
 **Errors do not enter the stream.** A run that fails before or during
 execution writes the `{ "error": { "message", "help" } }` envelope of
@@ -167,7 +170,8 @@ by `run_started` and `run_finished`, and exits with the status [§FS-rhei-run.4]
 defines. A dry run writes no `runtime/events.jsonl` and publishes no run
 descriptor, because it is side-effect-free — but the frontend the caller asked
 for is still the frontend it gets, so §1's "nothing else is ever written to
-stdout" holds for a preview exactly as it does for a run.
+stdout" holds for a preview exactly as it does for a run. Initial validation
+warnings use the same `message` records and startup ordering as a real run.
 
 ## 5. Exit Codes
 

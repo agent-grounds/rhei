@@ -1318,6 +1318,11 @@ following rules. Violations are errors unless marked otherwise.
   not consume agent transcripts).
 - `snapshot.inherit` on a state with `poll:` set is an error in v1. Polling
   states may emit only on their terminal exit transition.
+- A task with `**Excludes:**` may not enter a state with named
+  `snapshot.inherit` in v1. An inherited native transcript is opaque and may
+  already contain excluded payload; Rhei neither scrubs old transcripts nor
+  claims to recognize copied prose. Auto-emitted snapshots of a filtered
+  invocation remain allowed.
 - `snapshot.inherit.from: ancestor` on a root-task state is an error. There
   is no ancestor.
 - `snapshot.inherit.required`, when present, must be a boolean.

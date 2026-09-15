@@ -38,12 +38,18 @@ execution root, so no terminal task in the project is unreachable from any
 other. The ledger of each execution root ([§FS-rhei-complete.3.1](rhei-complete.spec.md#31-state-transition-ledger)) gives the
 order in which they finished.
 
+Reachability is navigation, not permission to read every payload. A task's
+resolved `**Excludes:**` policy ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)) may remove source bytes, but it never removes a task's
+qualified id, title, state, relationships, result location, or the complete
+project and execution-root map. An excluded result therefore remains findable
+as a location even when its contents are not composed.
+
 ### 1.2. Composition Is Algorithmic
 
 The prompt is a **pure function** of: the merged project graph, the `runtime/`
 tree of every execution root, the resolved state machines, the resolved
 settings, the invocation identity (task, state, visit count, execution
-identity), and the set of invocations of the current `rhei run` still in flight
+identity), the invocation's resolved exclusions, and the set of invocations of the current `rhei run` still in flight
 when the prompt is composed (§4.3.5). Composition performs no summarization,
 ranking, or selection beyond the rules written in §4: a summary is a fixed
 slice of a file, an order is a stated order, a cap is a stated number, and a
@@ -98,6 +104,8 @@ The four sections below join the prompt of [§FS-rhei-agents.3](rhei-agents.spec
 Orientation comes before the instructions so the instructions are read with
 the goal in mind; the broader memory comes after the task's own inputs because
 the inputs are what the task acts on and the history is what it acts *within*.
+Every source payload named below is filtered before its file bytes are read;
+the navigation-only fields remain as §1.1 requires.
 
 ### 3.1. `## Position`
 
@@ -148,7 +156,9 @@ Panta: {panta-title} › rhei `{rhei-id}`: {rhei-title} › {Kind} {ancestor-id}
   consumes one of its exports carries ` — waits on this task`. A root task has
   no sibling list; `## Plan History` and `### In Flight` cover the rest of the
   rhei.
-- `### Parent` pastes the nearest ancestor's body in full, fenced. Higher
+- `### Parent` pastes the nearest ancestor's body in full, fenced, unless that
+  task source is excluded; in that case the heading identifies the parent and
+  names its source location without reading or rendering the body. Higher
   ancestors contribute one line each to the chain and nothing more — a
   four-level tree does not paste four bodies. The parent's body is the memory
   that matters most to a leaf: it is where the decomposition was decided and
@@ -161,7 +171,9 @@ Panta: {panta-title} › rhei `{rhei-id}`: {rhei-title} › {Kind} {ancestor-id}
   Context` paste the content sections of the owning rhei and of the Panta
   manifest, verbatim and in authored order. These are the plan writer's
   standing notes, and until now only a worker that opened the file read them.
-  A bare rhei with no Panta manifest has no `### Project Context`.
+  A bare rhei with no Panta manifest has no `### Project Context`. Excluded
+  source files contribute no payload; required current task and machine
+  sources cannot reach composition because validation rejects that overlap.
 - For a supervising task, omit both context headings and their bodies. The
   rest of `## Position` is unchanged, and the prompt still carries the task's
   own content, child map, checkpoints, supervisor brief and declared inputs,
@@ -200,7 +212,9 @@ Finished work, oldest first. Full text: `runtime/results/<id>.md` under the owni
   **transitive prior** of this task in any rhei, including cancelled tasks —
   why something was not done is memory too. Tasks outside the owning rhei
   carry a trailing `(rhei `<id>`, prior)`.
-- `{summary}` is derived by the rule in §4.3, never written by a model. A task
+- `{summary}` is derived by the rule in §4.3, never written by a model. An
+  excluded result is not opened and renders `payload excluded` while keeping
+  the task, state, and result location visible. A task
   whose result is already pasted in full in this prompt — under `## Prior Task
   Results`, `## Child Task Results`, or `## Checkpoints` — shows `see above`
   instead.
@@ -244,7 +258,8 @@ this task. Its transcript is `{previous attempt log}`.
   task landed: a worker's `--result` message, and the engine's own entries when
   an earlier visit timed out or exited without its required outputs
   ([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)). An agent retrying a state that stalled must know
-  why it stalled.
+  why it stalled. When the result is excluded, its path and the state trail
+  remain but its contents are not read or pasted.
 - `Previous log:` names the log file of the previous visit of this same state
   by the naming rule of [§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming), only if that file exists. The
   log is not pasted; it is a transcript, and the path is enough.
@@ -296,6 +311,9 @@ no checkout-root context, renders every such path absolute. `Leaving a trail`
 describes artifacts and permitted edits; it says nothing about when to stop or
 how completion is detected, which stay with the completion condition
 ([§FS-rhei-agents.3.1](rhei-agents.spec.md#31-completion-authority)).
+The map is never filtered by exclusions. A listed path may therefore identify
+an excluded source; `## Exclusions` in the agent prompt states the applicable
+guarantee and prevents the map from being mistaken for permission.
 
 ## 4. Composition Algorithm
 
@@ -311,6 +329,17 @@ Given an invocation `I = (task, state, visit_count, identity)`:
 4. The `runtime/` directory of the invoking run — the one it writes `logs/`
    under ([§FS-rhei-agents.8](rhei-agents.spec.md#8-log-capture)), which is the root the run was started from and
    need not be `root(R₀)`.
+5. `X` — the task's exclusions resolved against its effective checkout, every
+   owning-rhei execution root, and the authored project graph immediately
+   before composition ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)).
+
+Before opening any candidate payload in §4.2–§4.4 or the prompt sections owned
+by [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition), compare its logical and canonical source to `X`. Omit an exact file match or a descendant of an
+excluded directory. This check precedes reading, summarizing, truncating,
+fencing, or rendering. It covers exports, prior/child/current results, history,
+parent and project context, checkpoints, briefs, state handoffs, and previous
+visits. Required invocation inputs have already been rejected on overlap; they
+are never silently omitted here.
 
 ### 4.2. Position
 
@@ -340,7 +369,8 @@ Given an invocation `I = (task, state, visit_count, identity)`:
    plan order.
 2. `priors` = the transitive closure of `Prior(task)` minus `own`, in plan
    order, each tagged `(rhei <R>, prior)`.
-3. `summary(T)` = the first non-blank line of the **last** `## Result` entry
+3. When `T`'s result source is excluded, do not open it and render `payload
+   excluded`; otherwise `summary(T)` = the first non-blank line of the **last** `## Result` entry
    of `runtime/results/<T>.md` under `root(rhei(T))`, excluding the heading
    line, cut to the first 120 characters followed by `…` — characters, not
    display columns; `(no result)` when the file is missing or empty. An entry
@@ -386,7 +416,9 @@ Given an invocation `I = (task, state, visit_count, identity)`:
    ` → <state> (this visit, visit <visit_count>)`. A self-loop leaves the state
    in `trail` twice and both stay: the second is the previous visit, not this
    one.
-2. Paste `runtime/results/<task>.md`, fenced; cap 100 lines, keeping the
+   The ledger retains state-only navigation and is not filtered.
+2. If the current result source is excluded, keep its path but do not open it;
+   otherwise paste `runtime/results/<task>.md`, fenced; cap 100 lines, keeping the
    **last** 100 with the overflow line `… earlier entries omitted; read <path>`
    first. The legacy fallback of §4.3.3 applies here too, and `<path>` names
    whichever file was read.

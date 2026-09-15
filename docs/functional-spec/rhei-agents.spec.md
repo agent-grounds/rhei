@@ -194,6 +194,7 @@ agent's `command`, flags, and modes are declared.
 | `mcp_flag` | string | No | Flag used to attach one MCP server per occurrence. `rhei run` emits the flag once per resolved server with a launch spec as its value. Mutually exclusive with `mcp_config_flag`. |
 | `mcp_config_flag` | string | No | Flag used to attach a generated MCP config file. `rhei run` writes the resolved set to a temporary JSON file and passes it with this flag once. Mutually exclusive with `mcp_flag`. |
 | `skill_flag` | string | No | Flag used to enable one skill per occurrence. `rhei run` emits the flag once per resolved skill id. Omit to declare the agent does not support skills. |
+| `deny_read` | object | No | Optional read-denial adapter. In v1 its only field is required `path_flag`: a non-empty string repeated once per resolved excluded absolute path before the profile separator. |
 | `modes` | object | No | Named flag sets, keyed by mode name. Values are ordered string arrays appended to the command at spawn time. See [Modes](#22-modes). |
 | `effort` | object | No | Native reasoning-effort mapping. Contains `values`, `args`, and optional `conflicts` as defined below. Omission means this profile ignores valid state effort. |
 | `session` | object | No | Optional `CustomAgentProfile.session` block describing snapshot resume, fork, interactive continuation, and transcript layout capabilities. The authoritative schema is [Snapshots Specification — CustomAgentProfile.session](rhei-snapshots.spec.md#91-customagentprofilesession). |
@@ -653,6 +654,9 @@ warning to an error.
 
 A user-written entry for one of these ids in `settings.json` replaces the
 built-in entry wholesale (see [Merge Semantics](#13-merge-semantics)).
+None of the six built-in profiles declares `deny_read`; each therefore provides
+composition-only exclusion. A mode name, model, permission flag, or writable
+root never implies read denial.
 
 The `codex` adapter recognizes one provider refusal in addition to its normal
 process result. Recognition requires all of the following:
@@ -816,6 +820,12 @@ They are context, not instructions. Other sibling exports under
 
 {consumed export content, when present}
 
+## Exclusions
+
+- `{normalized authored entry}` — {resolved path}
+
+Enforcement: {`filesystem denied` or `composition only; paths remain readable outside Rhei-composed context`}.
+
 ## Exports to Publish
 
 Later tasks read these files. Write each one before this task reaches a terminal state.
@@ -863,6 +873,26 @@ Available transitions from `{state}`:
 
 {what the result file and the task body are read for, and which edits are permitted — §FS-rhei-memory.3.4}
 ```
+
+Before composing these sections, Rhei resolves the task's `**Excludes:**`
+policy ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)) and applies it before reading any source payload. This includes task content reached
+through another source, exports, prior/child/current results, history, parent
+and project context, checkpoints, briefs, state handoffs, and previous visits.
+Graph-derived task identity, title, state, result locations, relationships, and
+the complete project/execution-root map remain. The current task content and
+other required invocation inputs cannot be excluded because validation rejects
+those plans.
+
+`## Exclusions` is present when the task declares at least one exclusion. It
+lists normalized entries in authored order after deduplication and states the
+guarantee selected from the effective agent profile. With
+`deny_read.path_flag`, Rhei passes `<path_flag> <absolute-path>` once for every
+resolved logical and canonical target before any `--` separator, then reports
+`filesystem denied`. The wrapper owns denial for its whole process tree and
+through aliases; Rhei's conformance test verifies failed reads rather than
+trusting the flag. Without the adapter, Rhei reports the composition-only text
+verbatim. `rhei next` always reports composition-only because it neither
+spawns nor confines the manual worker.
 
 The prompt carries domain instructions only. It does not contain completion
 prose such as "create every required output artifact and then exit":
@@ -1306,6 +1336,11 @@ caller gave, not a symlink-resolved or long-name rewriting of it — while the
 question the table below asks is settled by resolving both roots, so one
 directory named two ways answers that it is one.
 
+Resolved exclusion targets passed to `deny_read.path_flag` are the exception to
+prompt display shortening: adapter arguments are always logical or canonical
+absolute paths. Prompt and dry-run rendering may show their normalized authored
+root-relative form alongside those targets.
+
 **A path already written under the root's own spelling renders unchanged.** Not
 re-derived, not re-joined, not re-separated: the characters the caller gave. A
 path that is textually under the root already answers both questions the table
@@ -1383,7 +1418,8 @@ rhei run <RHEI_PLAN> [--dry-run] [--no-callbacks] [--no-agent] [--no-program]
 2. Find the next claimable task (same eligibility as `rhei next`).
 3. Resolve the model and, if agent mode is enabled, the agent for the task's current state (resolution order above).
 4. If agent mode is enabled and no agent is configured, fail with an error.
-5. Compose the prompt (see [Prompt Composition](#3-prompt-composition)).
+5. Resolve exclusions again, compose the filtered prompt, and construct any
+   declared read-denial adapter arguments (see [Prompt Composition](#3-prompt-composition)).
 6. Log the spawn to `runtime/logs/task-{task_id}-{state}[-{visit_count}].log`.
 7. Spawn the agent CLI as a subprocess with the composed prompt.
 8. Wait for the agent process to exit (subject to timeout — see [Timeout Handling](#7-timeout-handling)).
@@ -1416,7 +1452,13 @@ rhei run <RHEI_PLAN> [--dry-run] [--no-callbacks] [--no-agent] [--no-program]
 1. Load plan and state machine. Validate.
 2. Find all claimable tasks (same eligibility as `rhei next`, but collect all candidates).
 3. Select up to N tasks that are mutually independent (no dependency edges between them). When N = 0, select all independent claimable tasks.
-4. For each selected task, resolve the model and agent, compose the prompt, and spawn the agent subprocess concurrently. Each agent writes to its own log file and is treated as a worker for the task's current state, not as a transition authority.
+4. For each selected task, resolve the same exclusion policy used by sequential
+   mode, compose the filtered prompt, and spawn the agent subprocess
+   concurrently. The check is independent of whether the excluded source
+   existed before pool selection. Each agent writes to its own log file and is
+   treated as a worker for the task's current state, not as a transition
+   authority. Retries and each fan-out invocation repeat the same resolution
+   immediately before spawn.
 5. Wait for any agent to exit (timeout or completion).
 6. When an agent exits:
    a. Re-read the plan.
@@ -1814,6 +1856,8 @@ Would spawn: claude --output-format json -p --model claude-sonnet-4-6 --
   Task app.1: Set up database schema [draft -> pending]
   Agent: claude-code, Model: impl-fast (anthropic/claude-sonnet-4-6), Timeout: 30m
   Log: runtime/logs/task-app.1-pending.log
+  Exclusions: checkout=notes/private.md
+  Enforcement: composition only; paths remain readable outside Rhei-composed context
 
 Would spawn: gemini --prompt "<prompt...>" --model gemini-3-pro
   Task app.3: Write frontend components [draft -> pending]
@@ -1827,6 +1871,10 @@ The prompt is never printed in full. An agent that carries it in `argv` shows
 the `<prompt...>` placeholder where it would sit; an agent that delivers it on
 stdin has no prompt on its command line at all, which is why the `claude-code`
 line above ends at the separator.
+Dry-run output lists normalized exclusions and the same capability-derived
+enforcement label as the prompt. For an adapter profile, the displayed command
+also contains every repeated denial flag and absolute target before the
+separator. Dry run does not ask the wrapper to enforce them.
 
 ## 10. `rhei run --no-agent` — Callback-Only Mode
 

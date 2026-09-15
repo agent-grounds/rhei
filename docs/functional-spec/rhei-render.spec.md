@@ -35,6 +35,9 @@ its project narrowed to that rhei.
 
 `--format json` emits the parsed plan AST as JSON. Compact JSON is the default;
 `--pretty` emits indented JSON for human inspection.
+Each task exposes its authored `excludes` as an ordered array of typed entries;
+an absent field renders as an empty array, preserving the unchanged-plan AST
+shape convention used by `provides` and `consumes`.
 
 The top-level `states` field is the machine of the document as authored — for a
 project, the manifest default. A merged project runs **one machine per rhei**
@@ -68,6 +71,9 @@ shapes.
 `--format github` emits Markdown suitable for GitHub issue-style review. By
 default it includes plan metadata and subtask content. `--no-metadata` and
 `--no-content` independently remove those sections.
+`**Excludes:**` is metadata: the default output preserves the line in grammar
+order, while `--no-metadata` omits it with the other task metadata. Progress
+output remains a state/dependency summary and does not add exclusions.
 
 ### 3.3. Progress
 

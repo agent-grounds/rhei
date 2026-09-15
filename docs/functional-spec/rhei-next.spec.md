@@ -145,11 +145,16 @@ reported as held by its supervisor rather than as blocked.
    commit boundary. For an already-runnable initial task, revalidate under the
    lock and atomically write its assignee once; staying in the same state
    creates no transition entry.
-10. Release the lock, then build the state's effective prompt text from its selected
+10. Release the lock, resolve the task's exclusions, then build the state's effective prompt text from its selected
    `prompt_template`, if any, plus inline `instructions` and `personality`,
    then resolve runtime template variables (see
    [Template Variables](rhei-states.spec.md#4-template-variables-in-instructions-and-personality)
    and [Prompt Templates](rhei-states.spec.md#44-prompt-templates)).
+    Apply the same source-payload filter as `rhei run` before any bytes are
+    read ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)). Because `rhei next` does not spawn the worker, its
+    `## Exclusions` section always reports `composition only; paths remain
+    readable outside Rhei-composed context`, even when the selected profile has
+    a `deny_read` adapter.
 11. Print the task id, title, current state, and resolved instructions to stdout.
 
 If no claimable task exists, print a status summary (see [No Tasks Ready](#5-no-tasks-ready)).

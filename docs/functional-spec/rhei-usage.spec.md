@@ -98,7 +98,7 @@ The commands that coordinate through the state machine:
 | `rhei run`         | Drives the full plan forward under orchestrator authority (`--rhei <id>` narrows a project-scoped run) |
 | `rhei next`        | Claims the next ready task for a manual worker (with `--peek` for read-only, `--rhei <id>` to narrow) |
 | `rhei transition`  | Atomically changes a task's state via compare-and-swap; `--result` carries the message a `final: true` target requires ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)) |
-| `rhei complete`    | Terminal transition invoked by a manual worker: the inferred one-hop terminal target plus the shared transition carrying `--result` |
+| `rhei complete`    | Terminal transition invoked by a manual worker: the inferred one-hop terminal target plus the shared transition carrying a literal `--result` or UTF-8 `--result-file` message |
 | `rhei reset`       | Returns each task to the state it was authored in ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)), removes `runtime/`; narrowed with `--rhei <id>` it removes only the in-scope tickets' keyed output ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)) |
 | `rhei snapshot`    | Lists, shows, prunes, or continues from session snapshots captured by `rhei run` |
 
@@ -258,7 +258,15 @@ rhei next plan.rhei.md
 
 # Complete: transition to terminal state, write result file, release assignment
 rhei complete plan.rhei.md --task 3 --result "Schema migration applied successfully"
+
+# Prefer a file (or `--result-file -` for stdin) for multiline or Markdown-heavy results
+rhei complete plan.rhei.md --task 3 --result-file result.md
 ```
+
+The file/stdin form keeps backticks, quotes, and line endings out of a
+shell-expanded argument. It carries the loaded text through the same terminal
+transition and result-artifact path as the inline form
+([§FS-rhei-complete.2.2](rhei-complete.spec.md#22-result-sources)).
 
 An auto-advancing claim commits only when the new state, resolved assignee, and
 transition entry are all durable ([§FS-rhei-next.3.1](rhei-next.spec.md#31-behavior)). An ordinary

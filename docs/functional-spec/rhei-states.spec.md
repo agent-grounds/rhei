@@ -636,10 +636,13 @@ terminal entry past it, and a refused move leaves the plan untouched.
    by the worker in the state being left, or appended by an earlier
    `rhei transition --result` on the same ticket.
 2. A result message carried by the caller through the transition
-   (`rhei complete --result`, `rhei transition --result`, or a failure route
-   under `rhei run` the engine genuinely owns — a timeout, unavailable tooling,
-   an exit code that matched no route or only a `"nonzero"` catch-all, an edge
-   walked with no subprocess). An exit that fired an *exact* `exit_code:`
+   (`rhei complete --result`, `rhei complete --result-file`, `rhei transition
+   --result`, or a failure route under `rhei run` the engine genuinely owns —
+   a timeout, unavailable tooling, an exit code that matched no route or only a
+   `"nonzero"` catch-all, an edge walked with no subprocess). `--result-file`
+   changes only how `rhei complete` loads that caller message; after source
+   validation it satisfies the same obligation without weakening the
+   non-empty requirement. An exit that fired an *exact* `exit_code:`
    transition is the program's declared route rather than the engine's failure
    ([§FS-rhei-programs.3.2](rhei-programs.spec.md#32-evaluation-order)), so
    nothing is carried on it and the program owes the result itself. The message is appended in the existing

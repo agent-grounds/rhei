@@ -255,6 +255,7 @@ does not silently drift from the current CLI surface.
 | `complete` | `RHEI_PLAN` | Rhei plan/workspace path completion |
 | `complete` | `--task` | Task ids from the selected plan/workspace |
 | `complete` | `--result` | No fixed candidates; shell should preserve free text |
+| `complete` | `--result-file` | File path completion |
 | `complete` | `--no-callbacks` | Static flag completion |
 | `transition` | `RHEI_PLAN` | Rhei plan/workspace path completion |
 | `transition` | `--task` | Task ids from the selected plan/workspace |
@@ -515,8 +516,8 @@ The completion test suite should cover at least:
 
 - Every subcommand appears at `rhei <TAB>`.
 - Every value enum completes from the parser's enum source.
-- `RHEI_PLAN`, `--state-machine`, `--values`, `--output`, and `--set-file`
-  path completion use the expected path domain.
+- `RHEI_PLAN`, `--state-machine`, `--values`, `--output`, `--set-file`, and
+  `complete --result-file` path completion use the expected path domain.
 - `instantiate` completes project/user template names with project precedence.
 - `instantiate` completes positional `type: path` inputs as paths.
 - `instantiate` completes remaining input keys as `KEY=`.

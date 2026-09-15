@@ -3,6 +3,7 @@ mod accounting_attempt_identity_tests;
 mod accounting_contract_tests;
 mod accounting_convention_tests;
 mod accounting_duration_tests;
+mod accounting_extraction_diagnostic_tests;
 mod accounting_line_tests;
 mod accounting_presentation_tests;
 mod accounting_prices_tests;

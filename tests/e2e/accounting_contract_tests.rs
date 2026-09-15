@@ -336,6 +336,57 @@ fn accounting_prices_schema_opens_document_and_entry_objects() {
     assert_eq!(schema["$defs"]["entry"]["additionalProperties"], true);
 }
 
+/// The three additive v1 schema changes describe the diagnostic at every
+/// published layer that can carry it. §FS-rhei-cost-accounting.8.1
+#[test]
+fn published_schemas_describe_extraction_diagnostics_without_new_ids() {
+    let dir = unique_temp_dir("accounting-diagnostic-schemas");
+    let usage = schema_output(&dir.join("home"), "rhei.accounting.usage.v1");
+    let invocation = schema_output(&dir.join("home"), "rhei.accounting.invocation.v1");
+    let cost = schema_output(&dir.join("home"), "rhei.accounting.cost.v1");
+    for result in [&usage, &invocation, &cost] {
+        assert_success(result);
+    }
+    let usage: serde_json::Value = serde_json::from_str(&usage.stdout).expect("usage schema");
+    let invocation: serde_json::Value =
+        serde_json::from_str(&invocation.stdout).expect("invocation schema");
+    let cost: serde_json::Value = serde_json::from_str(&cost.stdout).expect("cost schema");
+
+    assert_eq!(usage["$id"], "rhei.accounting.usage.v1");
+    let usage_diagnostic = &usage["oneOf"][1]["properties"]["diagnostic"];
+    assert_eq!(usage_diagnostic["type"], "string");
+    assert_eq!(usage_diagnostic["minLength"], 1);
+    assert_eq!(usage_diagnostic["maxLength"], 240);
+    assert!(usage_diagnostic["pattern"].as_str().is_some(), "single-line pattern");
+    assert!(!usage["oneOf"][1]["required"]
+        .as_array()
+        .expect("usage required fields")
+        .iter()
+        .any(|field| field == "diagnostic"));
+
+    assert_eq!(invocation["$id"], "rhei.accounting.invocation.v1");
+    let invocation_diagnostics = &invocation["properties"]["extraction_diagnostics"];
+    assert_eq!(invocation_diagnostics["type"], "array");
+    assert_eq!(invocation_diagnostics["uniqueItems"], true);
+    assert_eq!(invocation_diagnostics["items"]["minLength"], 1);
+    assert_eq!(invocation_diagnostics["items"]["maxLength"], 240);
+    assert!(invocation_diagnostics["items"]["pattern"].as_str().is_some());
+    assert!(!invocation["required"]
+        .as_array()
+        .expect("invocation required fields")
+        .iter()
+        .any(|field| field == "extraction_diagnostics"));
+
+    assert_eq!(cost["$id"], "rhei.accounting.cost.v1");
+    let cost_diagnostics = &cost["$defs"]["invocation"]["properties"]["extraction_diagnostics"];
+    assert_eq!(cost_diagnostics, invocation_diagnostics);
+    assert!(!cost["$defs"]["invocation"]["required"]
+        .as_array()
+        .expect("cost invocation required fields")
+        .iter()
+        .any(|field| field == "extraction_diagnostics"));
+}
+
 /// One actual run produces all six artifact/output shapes accepted by their
 /// published schemas, including exact CLI session identity and duration.
 // §FS-rhei-cost-accounting.3.1 §FS-rhei-cost-accounting.3.4 §FS-rhei-cost-accounting.5

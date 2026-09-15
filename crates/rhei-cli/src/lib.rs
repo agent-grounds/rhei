@@ -194,6 +194,7 @@ mod tests {
     include!("cli/tests_mode_selection.rs");
     include!("cli/tests_usage_report.rs");
     include!("cli/tests_accounting.rs");
+    include!("cli/tests_accounting_extraction_diagnostics.rs");
     include!("cli/tests_accounting_contract.rs");
     include!("cli/tests_accounting_convention.rs");
     include!("cli/tests_accounting_prices.rs");

@@ -129,6 +129,12 @@ Each supported agent spawn writes one JSON object:
 }
 ```
 
+An invocation record may also carry `extraction_diagnostics`, an array of
+distinct diagnostic strings in first-seen order. A new record whose
+`extraction_status` is `extractor-failed` always carries a non-empty array.
+Records written by older v1 writers may omit it; readers treat that as an empty
+array, and inspection republishes such a record without adding the field.
+
 ### 3.1. Token Dimensions
 
 | Dimension | Meaning |
@@ -201,6 +207,10 @@ tokens cannot be measured.
 | `extractor-unavailable` | The configured extractor could not run. |
 | `extractor-failed` | The extractor ran but could not parse usage data. |
 | `no-usage-emitted` | The agent exited without producing supported usage data. |
+
+Only `extractor-failed` carries `extraction_diagnostics`. New writers do not
+attach extraction diagnostics to the other four statuses, whose meanings and
+precedence remain unchanged.
 
 Unsupported custom agents may omit records only when the resolved agent profile
 has no accounting extractor. Built-in `claude-code`, `codex`, and `pi` must not
@@ -392,9 +402,27 @@ writes through the capture contract is already in Rhei's convention and is not
 converted again.
 
 If an upstream CLI changes format, the extractor records `extractor-failed`
-with a concise diagnostic. It must not guess from nearby human-readable text.
-Rhei must not parse arbitrary agent stdout/stderr JSON as billing telemetry; it
-only accepts structured capture events that identify the accounting schema.
+with a concise diagnostic. The failure variant of a
+`rhei.accounting.usage.v1` event carries that reason in the optional string
+field `diagnostic`. Structured extractors generate stable reasons that are a
+single line of at most 240 characters and do not quote raw agent output. For a
+Claude result envelope that has `type: "result"` and usage but no textual
+`result`, the reason is exactly `claude-code result envelope is missing
+required \`result\` text`.
+
+Capture aggregation copies failure reasons into the durable invocation's
+`extraction_diagnostics`. It retains distinct reasons in first-seen order and
+does not let a measured event override any retained failure. When an older
+failure event has no diagnostic, a new invocation writer uses exactly `usage
+capture reported extractor-failed without a diagnostic`. Claude cumulative
+result replacement is unchanged: a later valid cumulative result replaces the
+earlier capture content, including its failures, and produces a measured
+record.
+
+Diagnostics come only from structured parsing. Rhei must not guess from nearby
+human-readable text, quote the rejected output, or parse arbitrary agent
+stdout/stderr JSON as billing telemetry; it only accepts structured capture
+events that identify the accounting schema.
 
 ## 5. Pricing
 
@@ -771,6 +799,19 @@ subtree cost. `--task <ID>` shows that node's direct and subtree totals plus
 the contributing invocation records. `--json` emits the same data with stable
 field names matching the runtime artifact schema.
 
+Task-detail JSON includes the `invocations` array and republishes each stored
+invocation's `extraction_diagnostics` when present. In task-detail text, every
+diagnostic of a contributing failed invocation appears directly below that
+invocation, in array order:
+
+```text
+    <invocation-id> <agent> <model> unpriced
+      extractor-failed: <reason>
+```
+
+A historical failed invocation without the array keeps the existing single
+invocation line and gains no diagnostic line.
+
 The two halves of a `--task` payload are not read the same way. Its
 `invocations` are the durable records themselves, emitted as stored and never
 rewritten (§5.1), while the `direct` and `subtree` rollups beside them have
@@ -832,6 +873,14 @@ removal, rename, type change, or semantic change to an existing field requires
 a new schema id. Fields documented as optional, including `duration_ms`,
 `cli_session`, `run_id`, and `token_convention`, remain optional so artifacts
 from older Rhei versions still validate.
+
+Within those same v1 ids, the usage schema defines the optional string
+`diagnostic` on its `extractor-failed` variant. The invocation schema and the
+nested invocation definition in the cost schema define optional
+`extraction_diagnostics` as an array of unique, non-empty, single-line strings
+of at most 240 characters. Newly written artifacts satisfy the stronger
+requirements in §3 and §4; optionality in the schemas preserves historical v1
+artifacts.
 
 Attempt-scoped `invocation_id` values remain
 `rhei.accounting.invocation.v1`. The field is still a string identifying one
@@ -898,6 +947,13 @@ stdout sees one more line. Nothing else moves. A reading that **found** records
 prints what it printed before, byte for byte, and over a standalone workspace —
 whose one root is both the run root and its rhei's, so the union is a single
 read — that is every non-empty reading it has.
+
+There is one narrow exception for extraction diagnostics: `rhei cost --task`
+adds the indented lines specified in §8 beneath a contributing
+`extractor-failed` invocation when that record carries diagnostics. Successful
+invocations and historical failed invocations without diagnostics keep their
+previous text byte for byte. Default cost output and every other text surface
+remain unchanged.
 
 `--json` gains fields rather than changing existing ones. Whatever flags were
 given, the `rhei.accounting.cost.v1` payload carries `selection`,
@@ -1027,7 +1083,7 @@ Invocation details are served from a separate loopback endpoint such as
 
 | Failure | Required behavior |
 | --- | --- |
-| Extractor failure | Write an invocation record with `extractor-failed`, emit `UsageReported`, and continue normal transition handling. |
+| Extractor failure | Write an invocation record with `extractor-failed` and the non-empty reasons required by §3 and §4, expose those reasons in task inspection, emit `UsageReported`, and continue normal completion and transition handling. |
 | Missing price | Record measured tokens with `unpriced` or `partial-price`. |
 | Accounting write failure | Warn in the run journal and mark run accounting coverage partial. Do not hide the agent log or transition outcome. |
 | Malformed accounting artifact | `rhei cost` reports the bad path and continues reading other valid records. With `--json`, it returns a structured error. |

@@ -68,8 +68,7 @@ pub(crate) fn run_lock_conflict(root: &Path) -> miette::Report {
 /// Launch a detached run and report its id. §FS-rhei-run-headless.1
 pub(crate) fn launch_headless_run(
     input: &Path,
-    json: bool,
-    announce_dashboard: bool,
+    options: &RunOptions,
 ) -> MietteResult<()> {
     let workspace_root = execution_workspace_root(&normalize_workspace_input(input));
     // Held from here to the end of the handshake. §FS-rhei-run-headless.1.1
@@ -103,17 +102,17 @@ pub(crate) fn launch_headless_run(
     }
 
     let log_path = run_console_log_path(&workspace_root);
-    let mut child = spawn_detached_run(&log_path)?;
+    let mut child = spawn_detached_run(&log_path, options)?;
     let pid = child.id();
 
     match await_child_ready(&mut child, pid, &workspace_root) {
         Ok(LaunchOutcome::Running(descriptor)) => {
-            report_launched(&descriptor, json, announce_dashboard);
+            report_launched(&descriptor, options.json(), options.announces_dashboard());
             warn_if_unregistered(&descriptor);
             Ok(())
         }
         Ok(LaunchOutcome::FinishedEarly(descriptor)) => {
-            report_finished_early(&descriptor, json);
+            report_finished_early(&descriptor, options.json());
             warn_if_unregistered(&descriptor);
             Ok(())
         }
@@ -367,7 +366,7 @@ fn open_console_log(log_path: &Path) -> std::io::Result<fs::File> {
 
 /// Re-execute this binary's `rhei run` invocation, minus the launcher-only
 /// flags, in a new session with its console redirected.
-fn spawn_detached_run(log_path: &Path) -> MietteResult<std::process::Child> {
+fn spawn_detached_run(log_path: &Path, options: &RunOptions) -> MietteResult<std::process::Child> {
     if !cfg!(unix) {
         return Err(miette!(
             help = "run it in the foreground instead: rhei run --no-tui <plan>",
@@ -397,7 +396,7 @@ fn spawn_detached_run(log_path: &Path) -> MietteResult<std::process::Child> {
 
     let mut command = std::process::Command::new(exe);
     command.args(child_arguments());
-    command.env(HEADLESS_CHILD_ENV, "1");
+    command.env(HEADLESS_CHILD_ENV, headless_child_marker(options));
     command.stdin(std::process::Stdio::null());
     command.stdout(std::process::Stdio::from(log));
     command.stderr(std::process::Stdio::from(stderr));
@@ -409,6 +408,25 @@ fn spawn_detached_run(log_path: &Path) -> MietteResult<std::process::Child> {
             "could not start the detached run: {err}"
         )
     })
+}
+
+/// Preserve launcher-only flags for diagnostics rendered by the detached
+/// child, whose executable arguments intentionally omit them.
+fn headless_child_marker(options: &RunOptions) -> String {
+    let mut flags = vec!["--headless"];
+    if options.standalone.json {
+        flags.push("--json");
+    }
+    if options.standalone.json_agent_output {
+        flags.push("--json-agent-output");
+    }
+    flags.join(",")
+}
+
+fn headless_launcher_flag_was_supplied(flag: &str) -> bool {
+    std::env::var(HEADLESS_CHILD_ENV)
+        .ok()
+        .is_some_and(|marker| marker.split(',').any(|candidate| candidate == flag))
 }
 
 /// Put the child in its own session, so the launching terminal's `SIGHUP`

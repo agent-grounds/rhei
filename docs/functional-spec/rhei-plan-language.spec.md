@@ -1242,7 +1242,7 @@ prompt.
 `**Consumes:**` declares export data-flow for prompt injection; it is not a
 filesystem visibility or access-control boundary. A worker can read undeclared
 sibling exports under `runtime/exports/`, consistently with the project memory
-map ([§FS-rhei-memory.1.1](rhei-memory.spec.md#11-one-map) [§FS-rhei-memory.3.4](rhei-memory.spec.md#34-project-navigation-and-leaving-a-trail)). A template that needs a blind round should schedule its
+map ([§FS-rhei-memory.1.1](rhei-memory.spec.md#11-everything-before-is-reachable) [§FS-rhei-memory.3.4](rhei-memory.spec.md#3-the-sections)). A template that needs a blind round should schedule its
 participants concurrently and brief them not to inspect sibling exports. Those
 measures reduce accidental cross-reading; neither enforces blindness once an
 export exists. `**Prior:**`, not `**Consumes:**`, determines readiness.

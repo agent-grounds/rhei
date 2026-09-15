@@ -1222,9 +1222,9 @@ fn validation_pass_for_loaded(
         report.warnings.dedup();
         report
     };
-    report.errors.extend(validate_loaded_exclusions(&loaded, &resolved, input));
     let workspace_root = execution_workspace_root(input);
     let settings = load_merged_settings(settings_root.unwrap_or(&workspace_root))?;
+    report.errors.extend(validate_loaded_exclusions(&loaded, &resolved, input, &settings));
     report
         .errors
         .extend(validate_plan_settings_references(&loaded.rhei, &machines, &settings));

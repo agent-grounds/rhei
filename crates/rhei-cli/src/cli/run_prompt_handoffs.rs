@@ -44,6 +44,20 @@ fn last_recorded_source_state_for_current(
     Ok(found)
 }
 
+/// Reuse the source identities resolved for exclusions, including task overrides
+/// and settings. Empty policies preserve the existing handoff behavior.
+// §FS-rhei-plan-language.3.13 §FS-rhei-states.3.2
+fn source_handoff_contexts<'a>(
+    context: &'a RuntimeTemplateContext<'_>,
+    source_def: &'a rhei_validator::StateDef,
+    source_state: &str,
+) -> Vec<TransitionInvocationContext<'a>> {
+    let invocations = context.memory
+        .and_then(|memory| memory.exclusions.invocations.get(source_state))
+        .map(Vec::as_slice).unwrap_or_default();
+    transition_contexts_for_state(source_def, invocations)
+}
+
 /// Resolve one handoff artifact path under a single execution identity.
 fn resolve_source_handoff_path(
     render_context: &RuntimeTemplateContext<'_>,
@@ -77,7 +91,7 @@ fn source_handoff_candidate_paths(
     source_state: &str,
     visit_count: Option<u64>,
 ) -> Vec<String> {
-    transition_contexts_for_state(source_def, &[])
+    source_handoff_contexts(render_context, source_def, source_state)
         .iter()
         .map(|identity| {
             let (_, path) = resolve_source_handoff_path(
@@ -111,7 +125,7 @@ fn read_source_state_handoff(
     source_state: &str,
     visit_count: Option<u64>,
 ) -> MietteResult<Option<String>> {
-    for identity in transition_contexts_for_state(source_def, &[]) {
+    for identity in source_handoff_contexts(render_context, source_def, source_state) {
         let (_, path) = resolve_source_handoff_path(
             render_context,
             artifact,

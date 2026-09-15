@@ -422,6 +422,8 @@ fn next_command(
         &callback_paths.plan_path,
         machine,
         callback_paths.state_machine_path.as_deref(),
+        &settings,
+        &no_agent_opts,
     )
     .map_err(exclusion_report)?;
     let mut memory =
@@ -457,6 +459,7 @@ fn next_command(
         tooling: Some(&tooling),
         memory: Some(&memory),
     };
+    validate_invocation_exclusions(&render_context)?;
     let instructions = resolve_runtime_template_text(
         state_instructions(machine, &final_state).as_str(),
         &render_context,

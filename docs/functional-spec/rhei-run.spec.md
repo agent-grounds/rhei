@@ -139,6 +139,13 @@ the identity belongs to the run, not to `--headless`.
 
 Mode selection: `rhei run` uses orchestrated subprocess execution whenever any reachable non-terminal, non-gating state declares autonomous work via `program`, `agent`, `target`, `all_targets`, `model`, or `all_models`. Callback-only advancement is entered only when no such state exists, or when the caller explicitly disables spawning with `--no-agent` and/or `--no-program`. If a state declares model/target-driven work but no agent transport resolves, `rhei run` fails with a missing-agent configuration error; it does not silently fall back to callback-only transitions for that state.
 
+For mode selection only, a spawn-enabled program poll that satisfies every
+ordinary readiness, scope, and selection constraint except that its persisted
+poll deadline is still in the future counts as reachable autonomous work. The
+deadline continues to exclude the task from the ready set until it elapses; it
+delays the next subprocess attempt rather than hiding that attempt from mode
+selection.
+
 The built-in `pending` -> `completed` machine is manual-only, not
 callback-complete work. If a ready task under that built-in machine is in its
 profile's initial `pending` state, `rhei run` must fail without changing the

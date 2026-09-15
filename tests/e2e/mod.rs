@@ -49,6 +49,7 @@ mod next_claim_boundary_tests;
 mod next_node_kinds_tests;
 mod next_tests;
 mod parallel_target_override_tests;
+mod poll_resume_program_tests;
 mod poll_wait_outcome_tests;
 mod registry_location_tests;
 mod rendered_stderr;

@@ -61,6 +61,7 @@ include!("cli/subtree_supervision_barrier.rs");
 include!("cli/transition_context.rs");
 include!("cli/checkout_roots.rs");
 include!("cli/exclusion_policy.rs");
+include!("cli/exclusion_requirements.rs");
 include!("cli/artifacts.rs");
 include!("cli/transition_checks.rs");
 include!("cli/claim_transaction.rs");
@@ -235,6 +236,7 @@ mod tests {
     include!("cli/tests_new_verify.rs");
     include!("cli/tests_new_rhei.rs");
     include!("cli/tests_prompt_memory.rs");
+    include!("cli/tests_exclusion_requirements.rs");
     include!("cli/tests_prompt_memory_supervisors.rs");
     include!("cli/tests_prompt_memory_history.rs");
     include!("cli/tests_prompt_memory_caps.rs");

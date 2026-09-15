@@ -1321,8 +1321,15 @@ An exclusion is invalid when its exact or canonical target, or an excluded
 ancestor directory, overlaps any of these invocation requirements:
 
 - an export named by the same task's `**Consumes:**`;
-- the current task's authored source file or the active state-machine source;
+- the current task's authored source file, the active state-machine source,
+  or the selected `prompt_templates/<name>.md` instruction source;
 - a required state `inputs:` artifact or required handoff.
+
+The selected template is a required instruction source, including when reached
+through a canonical alias or covered by an excluded directory. Reject that
+conflict before composing instructions in both `run` and `next`; never silently
+drop the selected template. Loading templates to validate a machine does not
+authorize composing their bytes for a task that excludes their source.
 
 An optional prior, child, history, result, brief, checkpoint, context, or
 handoff payload may be excluded. Its bytes are then omitted, while the graph

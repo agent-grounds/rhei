@@ -167,6 +167,9 @@ impl StateEffort {
 pub struct PromptTemplateDef {
     /// Reusable agent-facing instructions: the Markdown file's contents.
     pub instructions: String,
+    /// Required instruction provenance for task exclusions. §FS-rhei-plan-language.3.13
+    #[serde(skip)]
+    pub source: Option<PathBuf>,
 }
 
 /// Per-state reference to a reusable prompt template.

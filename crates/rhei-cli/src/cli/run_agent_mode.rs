@@ -834,6 +834,8 @@ fn run_agent_mode(
                             &callbacks.plan_path,
                             machine,
                             callbacks.state_machine_path.as_deref(),
+                            settings,
+                            opts,
                         )
                         .map_err(exclusion_report)?;
                         run_info!(

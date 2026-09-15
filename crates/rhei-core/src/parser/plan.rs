@@ -687,7 +687,11 @@ pub fn parse(input: &str) -> Result<Rhei> {
             for raw_entry in line.strip_prefix("**Excludes:**").unwrap_or_default().split(',') {
                 let entry = raw_entry.trim();
                 if entry.is_empty() {
-                    continue;
+                    // §FS-rhei-plan-language.2: every comma separates two real entries.
+                    return Err(ParseError::new(
+                        "Empty **Excludes:** entry: name a path or export between commas, or drop the field",
+                        Some(line_number),
+                    ));
                 }
                 let parsed = if let Some(path) = entry.strip_prefix("checkout=") {
                     parse_exclusion_path(path, "checkout", line_number)?

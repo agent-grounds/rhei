@@ -291,6 +291,7 @@ fn resolve_program(
 
 /// Compose the prompt that will be sent to the agent.
 fn compose_agent_prompt(render_context: &RuntimeTemplateContext<'_>) -> MietteResult<String> {
+    validate_invocation_exclusions(render_context)?;
     let instructions = resolve_runtime_template_text(
         state_instructions(render_context.machine, render_context.state_name).as_str(),
         render_context,

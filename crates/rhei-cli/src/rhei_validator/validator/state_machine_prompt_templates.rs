@@ -21,6 +21,13 @@ pub fn prompt_templates_dir(state_machine_path: &Path) -> PathBuf {
 }
 
 impl StateMachine {
+    /// The selected required instruction source, before its bytes are composed.
+    /// §FS-rhei-plan-language.3.13
+    pub fn prompt_template_source(&self, state: &StateDef) -> Option<&Path> {
+        let reference = state.prompt_template.as_ref()?;
+        self.prompt_templates.get(reference.name().trim())?.source.as_deref()
+    }
+
     /// Effective agent instructions for a state: reusable template text first,
     /// then the state's own inline text.
     // §FS-rhei-states.4.4: template prompt text is emitted before inline state text.
@@ -222,7 +229,7 @@ fn load_prompt_templates_dir(
             )));
         }
         let instructions = std::fs::read_to_string(&prompt_path)?;
-        templates.insert(template_name, PromptTemplateDef { instructions });
+        templates.insert(template_name, PromptTemplateDef { instructions, source: Some(prompt_path) });
     }
 
     Ok(templates)

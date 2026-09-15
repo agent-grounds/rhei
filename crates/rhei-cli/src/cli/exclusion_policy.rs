@@ -15,9 +15,11 @@ struct ResolvedExclusion {
 
 /// Resolved immediately before an invocation, so symlink changes cannot make
 /// validation-time identity stale. §FS-rhei-agents.5.2.1
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 struct ResolvedExclusions {
     entries: Vec<ResolvedExclusion>,
+    /// Effective source identities shared by validation and handoff composition.
+    invocations: HashMap<String, Vec<ResolvedAgent>>,
 }
 
 impl ResolvedExclusions {
@@ -36,13 +38,17 @@ impl ResolvedExclusions {
     /// Every logical and canonical target the enforcing adapter must deny.
     /// Stable de-duplication keeps flag order deterministic.
     // §FS-rhei-agents.1.1.2 §FS-rhei-agents.4.1
-    fn adapter_paths(&self) -> Vec<PathBuf> {
+    fn adapter_paths(&self) -> Vec<String> {
         let mut seen = BTreeSet::new();
         let mut paths = Vec::new();
         for entry in &self.entries {
             for path in [&entry.logical, &entry.canonical] {
-                if seen.insert(path.clone()) {
-                    paths.push(path.clone());
+                if seen.insert((path.clone(), entry.recursive)) {
+                    let mut argument = path.to_string_lossy().into_owned();
+                    if entry.recursive {
+                        argument.push('/');
+                    }
+                    paths.push(argument);
                 }
             }
         }
@@ -260,7 +266,7 @@ fn resolve_task_exclusions(
             Err(error) => errors.push(format!("Task {} has invalid **Excludes:**: {error}", task.id)),
         }
     }
-    let policy = ResolvedExclusions { entries };
+    let policy = ResolvedExclusions { entries, ..Default::default() };
 
     for consumed in &task.consumes {
         let path = root_for_task(task_roots, &consumed.task, artifact_root)
@@ -297,32 +303,15 @@ fn resolve_task_exclusions(
         ));
     }
 
-    let allowed_states: Vec<&str> = machine
-        .profile_for_node(&task.kind, task.profile_level())
-        .map(|profile| profile.allowed.iter().map(String::as_str).collect())
-        .unwrap_or_else(|| machine.states.keys().map(String::as_str).collect());
-    for applicable_state in allowed_states {
+    for applicable_state in exclusion_applicable_states(task, machine) {
         let Some(state) = machine.states.get(applicable_state) else {
             continue;
         };
-        for input in state.inputs.iter().filter(|input| !input.optional) {
-            let (_, path) = resolve_artifact_path(
-                artifact_root,
-                input,
-                &task.id.to_string(),
-                applicable_state,
-                Some(1),
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-            );
-            if !policy.allows(&path) {
+        if let Some(path) = machine.prompt_template_source(state) {
+            if !policy.allows(path) {
                 errors.push(format!(
-                    "Task {} excludes required input '{}' at '{}'",
-                    task.id, input.name, input.path
+                    "Task {} excludes required prompt-template source '{}' in state '{}'",
+                    task.id, path.display(), applicable_state
                 ));
             }
         }
@@ -332,42 +321,12 @@ fn resolve_task_exclusions(
                 task.id, applicable_state
             ));
         }
-        if let Some(handoff) = &state.handoff {
-            for inherit in handoff.inherit.iter().filter(|inherit| inherit.required) {
-                for rule in machine.transitions.iter().filter(|rule| rule.to.0 == applicable_state) {
-                    let Some(source) = machine.states.get(&rule.from.0) else { continue };
-                    for output in source.outputs.iter().filter(|output| {
-                        output.kind.as_deref() == Some("handoff")
-                            && inherit.name.as_ref().is_none_or(|name| name == &output.name)
-                    }) {
-                        let (_, path) = resolve_artifact_path(
-                            artifact_root,
-                            output,
-                            &task.id.to_string(),
-                            &rule.from.0,
-                            Some(1),
-                            None,
-                            None,
-                            None,
-                            None,
-                            None,
-                            None,
-                        );
-                        if !policy.allows(&path) {
-                            errors.push(format!(
-                                "Task {} excludes required handoff '{}' at '{}'",
-                                task.id, output.name, output.path
-                            ));
-                        }
-                    }
-                }
-            }
-        }
     }
 
     if errors.is_empty() { Ok(policy) } else { Err(errors) }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn loaded_task_exclusions(
     loaded: &LoadedPlan,
     task: &rhei_core::ast::Task,
@@ -376,10 +335,12 @@ fn loaded_task_exclusions(
     task_source_fallback: &Path,
     machine: &rhei_validator::StateMachine,
     machine_source: Option<&Path>,
+    settings: &RheiSettings,
+    opts: &RunOptions,
 ) -> Result<ResolvedExclusions, Vec<String>> {
     let task_id = task.id.to_string();
     let task_source = loaded.task_file(&task_id, task_source_fallback);
-    resolve_task_exclusions(
+    let mut policy = resolve_task_exclusions(
         task,
         &loaded.rhei.tasks,
         &loaded.task_roots,
@@ -388,7 +349,12 @@ fn loaded_task_exclusions(
         &task_source,
         machine_source,
         machine,
-    )
+    )?;
+    if !policy.entries.is_empty() {
+        resolve_exclusion_requirements(&mut policy, task, machine, settings, opts,
+            artifact_root, loaded.rhei.metadata.as_ref())?;
+    }
+    Ok(policy)
 }
 
 fn exclusion_report(errors: Vec<String>) -> miette::Report {
@@ -406,6 +372,7 @@ fn validate_loaded_exclusions(
     loaded: &LoadedPlan,
     machines: &ResolvedMachineSet,
     input: &Path,
+    settings: &RheiSettings,
 ) -> Vec<String> {
     let fallback_root = execution_workspace_root(input);
     let mut errors = Vec::new();
@@ -427,6 +394,8 @@ fn validate_loaded_exclusions(
             input,
             &resolved_machine.machine,
             resolved_machine.path.as_deref(),
+            settings,
+            &default_run_options(),
         ) {
             errors.append(&mut task_errors);
         }
@@ -448,7 +417,7 @@ fn agent_with_exclusion_adapter(
     };
     for path in exclusions.adapter_paths() {
         adapted.profile.command.push(deny_read.path_flag.clone());
-        adapted.profile.command.push(path.to_string_lossy().into_owned());
+        adapted.profile.command.push(path);
     }
     adapted
 }

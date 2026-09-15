@@ -31,6 +31,8 @@ mod effort_support;
 mod error_guidance_tests;
 mod examples_tests;
 mod exclusions_context_tests;
+mod exclusions_regressions_tests;
+mod exclusions_required_tests;
 mod exclusions_tests;
 mod exclusions_validation_tests;
 mod handoff_tests;

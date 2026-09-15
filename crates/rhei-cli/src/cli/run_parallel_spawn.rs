@@ -181,6 +181,8 @@ fn spawn_parallel_agent_work_item(
         &callback_paths.plan_path,
         machine,
         callback_paths.state_machine_path.as_deref(),
+        settings,
+        opts,
     )
     .map_err(exclusion_report)?;
     let mut memory = prompt_memory(&loaded, input, runtime_dir, run_in_flight.clone());

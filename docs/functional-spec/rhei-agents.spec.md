@@ -227,6 +227,18 @@ The built-in registry declares these mappings:
 | `pi` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh` | `--thinking {value}` |
 | `gemini`, `cursor` | none | valid state effort is ignored |
 
+**Read-denial path arguments.** Each `deny_read.path_flag` value is an absolute
+path. A recursive directory value ends in `/` on every platform; an exact-file
+value has no trailing separator. Preserve this distinction for both logical
+and canonical targets, including targets absent at spawn. Wrappers must decode
+the trailing `/` before normalizing the path and enforce it for the process
+tree: creating a directory later does not turn an exact-file denial into a
+recursive denial, and a recursive denial covers descendants created later.
+For example, `--deny-read /checkout/private` denies only that exact target;
+`--deny-read /checkout/private/` also denies `/checkout/private/child.txt`.
+These pairs precede the profile separator, using the existing `path_flag`
+schema. A wrapper must not infer recursion from the current filesystem type.
+
 **A prompt flag set alongside `stdin_prompt` is emitted, with no value.** The
 two fields answer different questions — which flag makes the agent
 non-interactive, and where the prompt text travels — so declaring both is not a

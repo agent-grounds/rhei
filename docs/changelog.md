@@ -10,7 +10,10 @@
   required-input conflicts. Rhei filters matching payloads from serial,
   parallel, retry, fan-out, and `rhei next` context while retaining navigation.
   Built-in profiles are composition-only; custom profiles may declare a
-  `deny_read.path_flag` adapter for process-tree enforcement. (PR #274)
+  `deny_read.path_flag` adapter for process-tree enforcement, preserving exact
+  file versus recursive directory semantics for future paths. Selected prompt
+  templates and required artifacts across visits and execution identities
+  cannot be excluded. (PR #274)
 
 - **Per-session reports and declared metrics are now specified.**
   §FS-rhei-session-reports defines one readable Markdown report rendered from

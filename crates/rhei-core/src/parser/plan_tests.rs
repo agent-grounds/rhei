@@ -855,3 +855,24 @@ fn a_content_section_round_trips_the_authored_block() {
 
     assert_eq!(rhei.content_sections[0].content, block);
 }
+
+/// Every separator needs an entry; surrounding whitespace remains legal.
+/// §FS-rhei-plan-language.2
+#[test]
+fn exclusions_reject_empty_list_elements() {
+    for entries in
+        [",checkout=a", "checkout=a,,artifact=b", "checkout=a,", "checkout=a,   ,artifact=b", "   "]
+    {
+        let input = format!("# Rhei: Empty entries\n## Tasks\n\n### Task 1: Work\n**State:** pending\n**Excludes:** {entries}\n");
+        let error = parse(&input).expect_err("empty exclusion entry must fail");
+        assert!(error.message.contains("Empty **Excludes:** entry"), "{}", error.message);
+    }
+}
+
+/// §FS-rhei-plan-language.2
+#[test]
+fn exclusions_accept_whitespace_around_real_entries() {
+    let input = "# Rhei: Whitespace\n## Tasks\n\n### Task 1: Work\n**State:** pending\n**Excludes:**   checkout=a  ,   artifact=b/  \n";
+    let plan = parse(input).expect("surrounding whitespace is allowed");
+    assert_eq!(plan.tasks[0].excludes.len(), 2);
+}

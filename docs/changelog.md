@@ -23,6 +23,12 @@
   `rhei cost --task` exposes them in both text and JSON without quoting raw
   agent output. (PR #267)
 
+- **Plan commands now classify existing directories without a Rhei manifest.**
+  The diagnostic identifies the path as neither a Panta Project nor a Directory
+  Workspace, presents `index.panta.md` and `index.rhei.md` as alternatives, and
+  points `rhei run DIRECTORY --rhei ID` at a recognized `DIRECTORY/ID` workspace
+  instead of suggesting permissions or free-space checks. (PR #268)
+
 ## 2. [0.5.0] - 2026-09-14
 
 ### Fixed

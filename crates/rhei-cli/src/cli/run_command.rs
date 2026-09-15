@@ -244,7 +244,7 @@ fn run_command(
     install_interrupt_handlers();
     let input_buf = run_artifact_root(input);
     let input = input_buf.as_path();
-    let loaded = load_plan(input)?;
+    let loaded = load_plan_for_run(input, opts.rhei_scope())?;
     let rhei_scope = resolve_rhei_scope(&loaded, opts.rhei_scope())?;
     report_panta_scope_narrowed(&loaded, "run", &rhei_scope);
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;

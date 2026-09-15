@@ -102,10 +102,39 @@ fn expected_shell_command(arguments: &[String]) -> String {
     arguments.iter().map(|argument| shell_quote(argument)).collect::<Vec<_>>().join(" ")
 }
 
+/// Read the correction through ordinary help wrapping and the headless
+/// launcher's nested diagnostic. Strip only known line prefixes, preserving
+/// quotes, internal spaces, and literal gutter characters. §FS-rhei-errors.1.2
+fn rendered_correction(diagnostic: &str) -> String {
+    let mut lines = diagnostic.lines();
+    let start = lines
+        .find_map(|line| line.split_once("Run that workspace directly with:"))
+        .expect("diagnostic must offer a direct workspace command");
+    let nested = start.0.starts_with("  │ ");
+    let mut command = start.1.strip_prefix(' ').unwrap_or(start.1).to_string();
+    for line in lines {
+        let continuation = if nested {
+            // Inner help indentation, outer rewrap indentation, then its gutter.
+            line.strip_prefix("  │           ")
+                .or_else(|| line.strip_prefix("  │  "))
+                .or_else(|| line.strip_prefix("  │ "))
+        } else {
+            line.strip_prefix("        ")
+        };
+        let Some(continuation) = continuation else { break };
+        if !command.is_empty() {
+            command.push(' ');
+        }
+        command.push_str(continuation);
+    }
+    command
+}
+
 fn assert_corrected_run_command(result: &CliRun, arguments: &[String], invocation: &str) {
     let expected = expected_shell_command(arguments);
-    assert!(
-        result.stderr.contains(&format!("Run that workspace directly with: {expected}")),
+    assert_eq!(
+        rendered_correction(&result.stderr),
+        expected,
         "{invocation} must preserve the complete invocation while correcting only its plan path; expected:\n{expected}\ngot:\n{}",
         result.stderr
     );
@@ -239,6 +268,70 @@ fn run_correction_preserves_supplied_flags_and_shell_sensitive_values() {
         ],
         "rhei run with supplied flags and shell-sensitive values",
     );
+}
+
+/// Execute the displayed correction with the binary under test. Accepted
+/// equals-form values must remain values, and dry-run must remain a preview.
+/// The fixture has only a completed task, even if a flag is lost. §FS-rhei-errors.1.2
+#[cfg(unix)]
+#[test]
+fn run_correction_accepts_leading_hyphen_values_when_pasted() {
+    let fixture = fixture("unrecognized directory's pasted correction");
+    let captured_args = fixture._root.join("pasted-arguments");
+    for model in ["-weird", "-model's $HOME │ choice"] {
+        let model_arg = format!("--model={model}");
+        let rejected =
+            run_dry(&fixture.home, &fixture.container, &["--rhei", "workspace", &model_arg]);
+        assert_unrecognized_directory(
+            &rejected,
+            &fixture.container,
+            "rhei run with --model=-VALUE",
+        );
+        assert_eq!(
+            rejected.status.code(),
+            Some(1),
+            "the original invocation must pass CLI parsing"
+        );
+        let correction = rendered_correction(&rejected.stderr);
+
+        // The shell consumes the actual suggestion. The function only records
+        // argv and selects our binary; it adds or repairs no run arguments.
+        let script = format!(
+            "rhei() {{\n  printf '%s\\0' \"$@\" > \"$RHEI_CORRECTION_ARGS\"\n  \
+             \"$RHEI_CORRECTION_BINARY\" \"$@\"\n}}\n{correction}"
+        );
+        let output = rhei_process_at("sh")
+            .args(["-c", &script])
+            .current_dir(&fixture.workspace)
+            .env("HOME", &fixture.home)
+            .env("XDG_STATE_HOME", fixture.home.join("state"))
+            .env("RHEI_CORRECTION_ARGS", &captured_args)
+            .env("RHEI_CORRECTION_BINARY", rhei_binary())
+            .output()
+            .expect("execute the rendered correction through the shell");
+        let pasted = CliRun::from(&output);
+        assert!(
+            pasted.status.success() && pasted.stdout.contains("Dry run complete"),
+            "the pasted correction must succeed as a dry-run: {correction}\nstdout:\n{}\nstderr:\n{}",
+            pasted.stdout,
+            pasted.stderr
+        );
+        let recorded = fs::read_to_string(&captured_args).expect("read the shell's actual argv");
+        assert_eq!(
+            recorded.split_terminator('\0').collect::<Vec<_>>(),
+            [
+                "run",
+                fixture.workspace.to_str().unwrap(),
+                "--dry-run",
+                "--no-callbacks",
+                "--rhei",
+                "workspace",
+                "--no-tui",
+                &model_arg,
+            ],
+            "pasting must preserve ordered arguments and literal shell-sensitive content"
+        );
+    }
 }
 
 /// The invocation from agent-grounds/rhei#264 must report the startup failure

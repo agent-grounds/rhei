@@ -123,8 +123,13 @@ fn push_flag(arguments: &mut Vec<String>, flag: &str, enabled: bool) {
 }
 
 fn push_option(arguments: &mut Vec<String>, flag: &str, value: String) {
-    arguments.push(flag.to_string());
-    arguments.push(value);
+    // Keep leading hyphens in a value from becoming CLI options on paste. §FS-rhei-errors.1.2
+    if value.starts_with('-') {
+        arguments.push(format!("{flag}={value}"));
+    } else {
+        arguments.push(flag.to_string());
+        arguments.push(value);
+    }
 }
 
 fn push_string_option(arguments: &mut Vec<String>, flag: &str, value: Option<&str>) {

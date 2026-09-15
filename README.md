@@ -275,6 +275,21 @@ Render a plan as pretty JSON:
 cargo run -p rhei-cli -- render examples/release-automation.rhei.md --format json --pretty
 ```
 
+Inspect the effective agents, models, and defaults for a plan:
+
+```bash
+cargo run -p rhei-cli -- roster examples/release-automation.rhei.md
+```
+
+Emit the complete merged roster and its provenance as JSON:
+
+```bash
+cargo run -p rhei-cli -- roster examples/release-automation.rhei.md --json
+```
+
+Both views use the execution settings merge; see
+[Agents and models](docs/functional-spec/rhei-agents.spec.md#11-global-and-project-settings).
+
 Render a plan as GitHub-style markdown without metadata or subtask body text:
 
 ```bash

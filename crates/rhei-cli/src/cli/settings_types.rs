@@ -364,12 +364,17 @@ fn built_in_agents() -> BTreeMap<String, CustomAgentProfile> {
 struct SettingsDocument {
     raw: serde_json::Value,
     typed: RheiSettings,
+    /// The selected file when one was actually read. Roster inspection uses
+    /// this fact instead of guessing from an empty parsed object.
+    /// §FS-rhei-agents.1.1.7
+    source_path: Option<PathBuf>,
 }
 
 fn empty_settings_document() -> SettingsDocument {
     SettingsDocument {
         raw: serde_json::Value::Object(serde_json::Map::new()),
         typed: RheiSettings::default(),
+        source_path: None,
     }
 }
 
@@ -396,5 +401,5 @@ fn load_settings_document(path: &Path) -> MietteResult<SettingsDocument> {
             help = settings_help(),
             "failed to decode settings '{}': {err}", path.display()
         ))?;
-    Ok(SettingsDocument { raw, typed })
+    Ok(SettingsDocument { raw, typed, source_path: Some(path.to_path_buf()) })
 }

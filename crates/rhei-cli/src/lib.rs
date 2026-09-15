@@ -72,6 +72,7 @@ include!("cli/run_options.rs");
 include!("cli/run_frontend.rs");
 include!("cli/settings_types.rs");
 include!("cli/settings_load_validate.rs");
+include!("cli/roster_command.rs");
 include!("cli/tooling_resolution.rs");
 include!("cli/agent_resolution.rs");
 include!("cli/agent_model_resolution.rs");
@@ -206,6 +207,7 @@ mod tests {
     include!("cli/tests_accounting_attempt_identity.rs");
     include!("cli/tests_summary.rs");
     include!("cli/tests_settings_tooling.rs");
+    include!("cli/tests_roster.rs");
     include!("cli/tests_snapshots_gc.rs");
     include!("cli/tests_snapshot_pointer.rs");
     include!("cli/tests_snapshot_runtime.rs");

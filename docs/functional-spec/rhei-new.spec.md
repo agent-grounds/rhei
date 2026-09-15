@@ -78,11 +78,15 @@ is an argument.
 | `--prior <ID>`             | none               | `**Prior:**` entry; repeatable, and a comma-separated list is accepted |
 | `--provides <NAME>`        | none               | `**Provides:**` entry; repeatable ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)) |
 | `--consumes <ID:NAME>`     | none               | `**Consumes:**` entry; repeatable. Selects export prompt injection, not filesystem visibility or readiness: undeclared sibling exports remain readable, and ordering comes from `--prior` ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)) |
+| `--excludes <ENTRY>`       | none               | `**Excludes:**` entry; repeatable. Each value is one `checkout=<path>`, `artifact=<path>`, or export reference ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)) |
 | `--assignee <WHO>`         | none               | `**Assignee:**`, which is a claim: `rhei next` and `rhei run` skip an assigned ticket until `rhei release <id>`, and the create says so (§5.4) |
 | `--model <MODEL>`          | none               | `**Model:**`; mutually exclusive with `--target` ([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)) |
 | `--target <TARGET>`        | none               | `**Target:**`; mutually exclusive with `--model`, which the identity already carries ([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)) |
 
 Repeatable fields are written in the order given, comma-separated, on one line.
+`--excludes` preserves the authored entry order and writes its line after
+`**Consumes:**` and before `**Assignee:**`; create-time validation applies the
+same graph and path rules as `rhei validate`.
 A `--prior` value is written through unchanged, so both authored forms work:
 `--prior "Task 1"` keeps the node-kind keyword the plan language allows, and
 `--prior auth.1` writes the bare cross-rhei reference. `rhei new` deliberately

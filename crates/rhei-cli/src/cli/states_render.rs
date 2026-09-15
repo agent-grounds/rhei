@@ -880,8 +880,12 @@ fn load_plan(path: &Path) -> MietteResult<LoadedPlan> {
 
 /// Load the initial `rhei run` input with enough invocation context to correct
 /// a container path that sits above the selected workspace. §FS-rhei-errors.3.2
-fn load_plan_for_run(path: &Path, rhei_scope: &[String]) -> MietteResult<LoadedPlan> {
-    load_plan_with(path, false, Some(rhei_scope))
+fn load_plan_for_run(
+    path: &Path,
+    options: &RunOptions,
+    state_machine: Option<&Path>,
+) -> MietteResult<LoadedPlan> {
+    load_plan_with(path, false, Some(RunPlanInput { options, state_machine }))
 }
 
 /// Load a plan, and for a project skip rheis that fail to load rather than
@@ -894,7 +898,7 @@ fn load_plan_leniently(path: &Path) -> MietteResult<LoadedPlan> {
 fn load_plan_with(
     path: &Path,
     lenient: bool,
-    run_rhei_scope: Option<&[String]>,
+    run: Option<RunPlanInput<'_>>,
 ) -> MietteResult<LoadedPlan> {
     if let Some(project_dir) = workspace::panta_project_dir(path) {
         let project = if lenient {
@@ -925,7 +929,7 @@ fn load_plan_with(
             .map_err(|err| nested_parse_report(&err))?;
         Ok(implicit_loaded_plan(project, LoadedPlanKind::Workspace))
     } else if path.is_dir() {
-        Err(unrecognized_plan_directory_report(path, run_rhei_scope)?)
+        Err(unrecognized_plan_directory_report(path, run)?)
     } else {
         let input = read_input_file(path)?;
         let rhei = rhei_core::parse(&input).map_err(|err| parse_report(path, &input, &err))?;
@@ -982,6 +986,12 @@ fn load_plan_for_validation(path: &Path) -> MietteResult<LoadedPlan> {
 
     if let Some(ws_dir) = workspace::workspace_dir(path) {
         return load_workspace_for_validation(&ws_dir);
+    }
+
+    if path.is_dir() {
+        // Validation keeps its collect-errors parser for files, but a real
+        // directory with neither manifest is a plan-shape error. §FS-rhei-errors.3.2
+        return Err(unrecognized_plan_directory_report(path, None)?);
     }
 
     let raw = read_input_file(path)?;

@@ -52,12 +52,16 @@ fn run_reported_headless(fixture: &UnrecognizedDirectoryFixture) -> CliRun {
     CliRun::from(&output)
 }
 
-fn assert_unrecognized_directory(
-    result: &CliRun,
-    container: &Path,
-    workspace: &Path,
-    invocation: &str,
-) {
+fn validate(home: &Path, input: &Path) -> CliRun {
+    let output = rhei_command(home)
+        .arg("validate")
+        .arg(input)
+        .output()
+        .expect("rhei validate should execute");
+    CliRun::from(&output)
+}
+
+fn assert_unrecognized_directory(result: &CliRun, container: &Path, invocation: &str) {
     assert!(
         !result.status.success(),
         "{invocation} must reject the unrecognized directory\nstdout:\n{}\nstderr:\n{}",
@@ -81,9 +85,8 @@ fn assert_unrecognized_directory(
         diagnostic
     );
     assert!(
-        diagnostic.contains("rhei run") && diagnostic.contains(&workspace.display().to_string()),
-        "{invocation} must correct the wrong-level input with the directly addressable workspace '{}'; got:\n{}",
-        workspace.display(),
+        diagnostic.contains("pass the actual plan or workspace path"),
+        "{invocation} must explain how to address an existing plan or workspace; got:\n{}",
         diagnostic
     );
     for misleading in ["permission", "writable", "free space"] {
@@ -93,6 +96,37 @@ fn assert_unrecognized_directory(
             diagnostic
         );
     }
+}
+
+fn expected_shell_command(arguments: &[String]) -> String {
+    arguments.iter().map(|argument| shell_quote(argument)).collect::<Vec<_>>().join(" ")
+}
+
+fn assert_corrected_run_command(result: &CliRun, arguments: &[String], invocation: &str) {
+    let expected = expected_shell_command(arguments);
+    assert!(
+        result.stderr.contains(&format!("Run that workspace directly with: {expected}")),
+        "{invocation} must preserve the complete invocation while correcting only its plan path; expected:\n{expected}\ngot:\n{}",
+        result.stderr
+    );
+}
+
+/// Validation shares the plan input boundary but retains its collect-errors
+/// path for a real Single-File Plan. §FS-rhei-errors.3.2
+#[test]
+fn validate_classifies_an_unrecognized_directory_and_keeps_file_validation() {
+    let fixture = fixture("unrecognized-directory-validate");
+
+    let file_control = validate(&fixture.home, &fixture.single_file);
+    assert!(
+        file_control.status.success(),
+        "Single-File Plan validation must retain its behavior\nstdout:\n{}\nstderr:\n{}",
+        file_control.stdout,
+        file_control.stderr
+    );
+
+    let rejected = validate(&fixture.home, &fixture.container);
+    assert_unrecognized_directory(&rejected, &fixture.container, "rhei validate DIRECTORY");
 }
 
 /// The ordinary run path rejects the reported container while preserving all
@@ -126,8 +160,84 @@ fn run_classifies_an_unrecognized_directory_and_points_to_its_workspace() {
     assert_unrecognized_directory(
         &rejected,
         &fixture.container,
-        &fixture.workspace,
         "rhei run DIRECTORY --rhei workspace --dry-run",
+    );
+    assert_corrected_run_command(
+        &rejected,
+        &[
+            "rhei".to_string(),
+            "run".to_string(),
+            fixture.workspace.display().to_string(),
+            "--dry-run".to_string(),
+            "--no-callbacks".to_string(),
+            "--rhei".to_string(),
+            "workspace".to_string(),
+            "--no-tui".to_string(),
+        ],
+        "rhei run DIRECTORY --rhei workspace --dry-run --no-tui --no-callbacks",
+    );
+}
+
+/// A pasteable correction carries option values and quotes shell-sensitive
+/// paths and values, changing only the wrong-level plan path. §FS-rhei-errors.1.2
+#[test]
+fn run_correction_preserves_supplied_flags_and_shell_sensitive_values() {
+    let fixture = fixture("unrecognized directory's options");
+    let state_machine = fixture._root.join("state machine's.yaml");
+    let prices = fixture._root.join("price book's.json");
+    let agent = "agent's choice";
+    let mode = "mode with spaces";
+    let model = "provider:model with spaces";
+    let timeout = "2 minutes";
+    let output = rhei_command(&fixture.home)
+        .arg("run")
+        .arg(&fixture.container)
+        .arg("--state-machine")
+        .arg(&state_machine)
+        .args(["--rhei", "workspace", "--dry-run", "--no-tui", "--no-callbacks"])
+        .args(["--continue-on-error", "--parallel", "3"])
+        .arg("--prices")
+        .arg(&prices)
+        .args(["--agent", agent, "--agent-mode", mode, "--model", model])
+        .args(["--no-program", "--program-timeout", timeout])
+        .output()
+        .expect("rhei run should execute");
+    let rejected = CliRun::from(&output);
+
+    assert_unrecognized_directory(
+        &rejected,
+        &fixture.container,
+        "rhei run with supplied flags and shell-sensitive values",
+    );
+    assert_corrected_run_command(
+        &rejected,
+        &[
+            "rhei".to_string(),
+            "run".to_string(),
+            fixture.workspace.display().to_string(),
+            "--state-machine".to_string(),
+            state_machine.display().to_string(),
+            "--dry-run".to_string(),
+            "--no-callbacks".to_string(),
+            "--continue-on-error".to_string(),
+            "--parallel".to_string(),
+            "3".to_string(),
+            "--prices".to_string(),
+            prices.display().to_string(),
+            "--rhei".to_string(),
+            "workspace".to_string(),
+            "--no-tui".to_string(),
+            "--agent".to_string(),
+            agent.to_string(),
+            "--agent-mode".to_string(),
+            mode.to_string(),
+            "--model".to_string(),
+            model.to_string(),
+            "--no-program".to_string(),
+            "--program-timeout".to_string(),
+            timeout.to_string(),
+        ],
+        "rhei run with supplied flags and shell-sensitive values",
     );
 }
 
@@ -143,7 +253,18 @@ fn headless_run_propagates_the_unrecognized_directory_diagnosis() {
     assert_unrecognized_directory(
         &rejected,
         &fixture.container,
-        &fixture.workspace,
+        "rhei run --headless DIRECTORY --rhei workspace",
+    );
+    assert_corrected_run_command(
+        &rejected,
+        &[
+            "rhei".to_string(),
+            "run".to_string(),
+            fixture.workspace.display().to_string(),
+            "--rhei".to_string(),
+            "workspace".to_string(),
+            "--headless".to_string(),
+        ],
         "rhei run --headless DIRECTORY --rhei workspace",
     );
 }

@@ -232,7 +232,7 @@ fn run_command(
 
     // §FS-rhei-run-headless.1
     if opts.headless() && !is_headless_child() {
-        return launch_headless_run(input, opts.json(), opts.announces_dashboard());
+        return launch_headless_run(input, &opts);
     }
     // From here on, a human-oriented line goes to stderr. §FS-rhei-run-json.1
     if opts.json() {
@@ -244,7 +244,7 @@ fn run_command(
     install_interrupt_handlers();
     let input_buf = run_artifact_root(input);
     let input = input_buf.as_path();
-    let loaded = load_plan_for_run(input, opts.rhei_scope())?;
+    let loaded = load_plan_for_run(input, &opts, state_machine_path)?;
     let rhei_scope = resolve_rhei_scope(&loaded, opts.rhei_scope())?;
     report_panta_scope_narrowed(&loaded, "run", &rhei_scope);
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;

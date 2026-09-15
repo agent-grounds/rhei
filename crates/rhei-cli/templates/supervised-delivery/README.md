@@ -81,10 +81,14 @@ product review of one round.
 
 Steps hand each other work product through `**Provides:**` / `**Consumes:**`
 (§FS-rhei-plan-language.3.12), so the channel is declared in the plan and
-injected into prompts. Each export is one file holding exactly one fenced
-`json` block, at `runtime/exports/<task-id>/<name>.md`. The same paths are
-declared as the state's `outputs:`, so the completion condition refuses to
-finish a step that did not publish its export.
+injected into prompts. These declarations are data-flow, not a filesystem
+visibility boundary: workers can still read undeclared sibling exports under
+`runtime/exports/`. Concurrent scheduling and explicit briefs can reduce
+accidental cross-reading, but cannot enforce blindness once an export exists.
+Each export is one file holding exactly one fenced `json` block, at
+`runtime/exports/<task-id>/<name>.md`. The same paths are declared as the
+state's `outputs:`, so the completion condition refuses to finish a step that
+did not publish its export.
 
 `findings` — written by `review-k` and `pm-k`:
 

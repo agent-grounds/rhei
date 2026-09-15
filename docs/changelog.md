@@ -4,6 +4,13 @@
 
 ### Added
 
+- **Plans that declare `Consumes` now receive a non-fatal validation and run
+  advisory that the field selects export prompt injection, not filesystem
+  visibility.** Run frontends retain the warning in their native output, and
+  authoring guidance now explains that workers can still read undeclared
+  sibling exports. Scripts that consume successful validation or run output
+  for such plans must allow the additive warning. (PR #269)
+
 - **Transition callbacks now receive a stable identity for each firing and an
   explicit pending ledger status.** Canonical JSON exposes `firingId` and
   `ledgerStatus`, and CLI callbacks receive equal environment values, so an

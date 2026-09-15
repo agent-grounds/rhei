@@ -128,6 +128,22 @@ fn dry_run_sink(workspace_root: &Path, opts: &RunOptions) -> Arc<dyn rhei_tui::E
     }
 }
 
+/// Carry the initial validation report into the selected frontend after the
+/// run has started. Validator entries are bodies; run messages include the
+/// complete human-readable warning prefix.
+// §FS-rhei-run.3 §FS-rhei-run-json.1 §FS-rhei-run-tui.1.1
+fn emit_initial_validation_warnings(
+    sink: &Arc<dyn rhei_tui::EventSink>,
+    warnings: &[String],
+) {
+    for warning in warnings {
+        sink.emit(rhei_tui::RunEvent::Message {
+            level: rhei_tui::MessageLevel::Warn,
+            text: format!("warning: {warning}"),
+        });
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn start_run_frontend(
     workspace_root: &Path,

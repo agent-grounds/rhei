@@ -42,8 +42,12 @@ rhei run . --parallel 2
 ## The structured channel is plan exports
 
 Steps hand each other work product through `**Provides:**` / `**Consumes:**`
-exports, not through prose. Each export is one file holding exactly one fenced
-`json` block, at `runtime/exports/<task-id>/<name>.md`:
+exports, not through prose. These declarations select prompt data-flow, not
+filesystem visibility: workers can still read undeclared sibling exports under
+`runtime/exports/`. Concurrent scheduling and explicit briefs can reduce
+accidental cross-reading, but cannot enforce blindness once an export exists.
+Each export is one file holding exactly one fenced `json` block, at
+`runtime/exports/<task-id>/<name>.md`:
 
 | Export | Written by | Read by |
 |---|---|---|

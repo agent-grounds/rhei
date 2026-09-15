@@ -122,8 +122,10 @@ struct NewOptions {
     )]
     provides: Vec<String>,
     /// Export this ticket reads, as `<task-id>:<name>` (repeatable;
-    /// comma-separated list also accepted). Not a dependency: a consumer is
-    /// ready before its producer runs, so order it with --prior
+    /// comma-separated list also accepted). Selects export prompt injection,
+    /// not filesystem visibility. Not a dependency: a consumer is ready
+    /// before its producer runs, so order it with --prior
+    // §FS-rhei-new.1.3 §FS-rhei-plan-language.3.12
     #[arg(
         long,
         value_name = "ID:NAME",

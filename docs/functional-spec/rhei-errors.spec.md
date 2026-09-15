@@ -174,6 +174,34 @@ execution target selector ([§FS-rhei-agents](rhei-agents.spec.md#fs-rhei-agents
 value reports the input name, the offending value, the accepted shapes, and a
 corrected, shell-quoted example built from the value the user supplied.
 
+### 3.2. Unrecognized Plan Directories
+
+When a command's plan argument is an existing directory containing neither
+`index.panta.md` nor `index.rhei.md`, Rhei rejects it at the input boundary with
+a nonzero exit. The message names the directory and identifies it as neither a
+recognized Panta Project nor a Directory Workspace. It presents the two valid
+shapes as alternatives: `index.panta.md` makes the directory a Panta Project
+([§FS-rhei-plan-language.1.5](rhei-plan-language.spec.md#15-panta-project)), while `index.rhei.md` makes it a Directory Workspace
+([§FS-rhei-plan-language.1.2](rhei-plan-language.spec.md#12-directory-workspace-agent-teams-high-concurrency)). It must not imply that both manifests belong in one
+directory.
+
+Help points to the correction that matches the directory's intended level. It
+either tells the caller which one manifest to add or tells them to pass the
+actual plan or workspace path. In particular, when `rhei run DIRECTORY --rhei
+ID` was given a container whose `DIRECTORY/ID` is a recognized Directory
+Workspace, the help explains that `DIRECTORY` is one level above the workspace
+and gives a runnable command targeting `DIRECTORY/ID` directly.
+
+A missing manifest is a plan-shape failure, not evidence of a filesystem
+failure. Its diagnostic therefore gives no permissions, writability, or free
+space advice. Genuine filesystem failures retain their cause-derived guidance
+from §6. A headless run reports the same startup diagnosis and nonzero outcome
+through [§FS-rhei-run-headless.1.1](rhei-run-headless.spec.md#11-startup-handshake-no-false-success) rather than hiding it in the detached run's log.
+
+This refusal does not change what Rhei accepts: recognized Panta Projects,
+directly addressed Directory Workspaces, and Single-File Plans retain their
+existing discovery and loading behavior.
+
 ## 4. Paths in Errors
 
 An error never points at a path the user cannot inspect. Temporary directories

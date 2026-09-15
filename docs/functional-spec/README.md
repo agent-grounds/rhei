@@ -24,6 +24,8 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-states-cmd](rhei-states-cmd.spec.md#fs-rhei-states-cmd-rhei-states) | `rhei states` command behavior |
 | [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run) | `rhei run` command behavior |
 | [§FS-rhei-run-report](rhei-run-report.spec.md#fs-rhei-run-report-per-run-report) | Durable per-run Markdown report and dashboard affordance |
+| [§FS-rhei-session-reports](rhei-session-reports.spec.md#fs-rhei-session-reports-per-session-reports) | Readable Markdown report rendered from each agent session log |
+| [§FS-rhei-metrics](rhei-metrics.spec.md#fs-rhei-metrics-declared-metrics) | Declared metrics: iteration-bound measurement records and their presentation |
 | [§FS-rhei-run-tui](rhei-run-tui.spec.md#fs-rhei-run-tui-rhei-run-tui-and-run-event-journal) | `rhei run` TUI and transition journal |
 | [§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting) | Agent token/cost accounting and visualization |
 | [§FS-rhei-summary](rhei-summary.spec.md#fs-rhei-summary-rhei-summary) | `rhei summary`: a pull-request-ready Markdown account of a run |

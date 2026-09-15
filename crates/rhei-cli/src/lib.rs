@@ -20,6 +20,7 @@ include!("cli/completion_candidates.rs");
 include!("cli/completion_context.rs");
 include!("cli/list_command.rs");
 include!("cli/error_guidance.rs");
+include!("cli/plan_input_guidance.rs");
 include!("cli/help_strings.rs");
 include!("cli/rhei_home.rs");
 

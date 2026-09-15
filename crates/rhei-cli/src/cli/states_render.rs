@@ -875,17 +875,27 @@ fn report_panta_scope_narrowed(loaded: &LoadedPlan, command: &str, scope: &RheiS
 
 /// Load a plan from a file or directory workspace.
 fn load_plan(path: &Path) -> MietteResult<LoadedPlan> {
-    load_plan_with(path, false)
+    load_plan_with(path, false, None)
+}
+
+/// Load the initial `rhei run` input with enough invocation context to correct
+/// a container path that sits above the selected workspace. §FS-rhei-errors.3.2
+fn load_plan_for_run(path: &Path, rhei_scope: &[String]) -> MietteResult<LoadedPlan> {
+    load_plan_with(path, false, Some(rhei_scope))
 }
 
 /// Load a plan, and for a project skip rheis that fail to load rather than
 /// failing the whole project. Only read-only surfaces that can report the skip
 /// may use this: a partial graph cannot decide readiness. §FS-rhei-panta.6
 fn load_plan_leniently(path: &Path) -> MietteResult<LoadedPlan> {
-    load_plan_with(path, true)
+    load_plan_with(path, true, None)
 }
 
-fn load_plan_with(path: &Path, lenient: bool) -> MietteResult<LoadedPlan> {
+fn load_plan_with(
+    path: &Path,
+    lenient: bool,
+    run_rhei_scope: Option<&[String]>,
+) -> MietteResult<LoadedPlan> {
     if let Some(project_dir) = workspace::panta_project_dir(path) {
         let project = if lenient {
             workspace::load_panta_project_lenient(&project_dir)
@@ -914,6 +924,8 @@ fn load_plan_with(path: &Path, lenient: bool) -> MietteResult<LoadedPlan> {
         let project = workspace::wrap_rhei_as_implicit_panta(ws, &ws_dir)
             .map_err(|err| nested_parse_report(&err))?;
         Ok(implicit_loaded_plan(project, LoadedPlanKind::Workspace))
+    } else if path.is_dir() {
+        Err(unrecognized_plan_directory_report(path, run_rhei_scope)?)
     } else {
         let input = read_input_file(path)?;
         let rhei = rhei_core::parse(&input).map_err(|err| parse_report(path, &input, &err))?;

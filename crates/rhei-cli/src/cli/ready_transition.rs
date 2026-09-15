@@ -256,6 +256,19 @@ fn find_ready_tasks<'a>(
     roots: &ReadySetRoots<'_>,
     spawned: &HashSet<String>,
 ) -> Vec<&'a rhei_core::ast::Task> {
+    find_ready_tasks_in_view(rhei, machines, roots, spawned, ReadySetView::RunnableNow)
+}
+
+/// Apply the one readiness implementation through either its ordinary
+/// runnable-now view or the program mode probe that alone overlooks a future
+/// poll deadline. Every other eligibility rule remains shared. §FS-rhei-run.3
+fn find_ready_tasks_in_view<'a>(
+    rhei: &'a rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    roots: &ReadySetRoots<'_>,
+    spawned: &HashSet<String>,
+    view: ReadySetView,
+) -> Vec<&'a rhei_core::ast::Task> {
     use std::collections::HashMap;
 
     let mut all_tasks = Vec::new();
@@ -299,7 +312,8 @@ fn find_ready_tasks<'a>(
             continue;
         }
 
-        if machine.states.get(&normalized_state).and_then(|def| def.poll.as_ref()).is_some()
+        if view == ReadySetView::RunnableNow
+            && machine.states.get(&normalized_state).and_then(|def| def.poll.as_ref()).is_some()
             && poll_next_attempt_at(rhei.metadata.as_ref(), &task.id, &normalized_state)
                 .is_some_and(|deadline| deadline > current_unix_secs())
         {
@@ -332,24 +346,6 @@ fn find_ready_tasks<'a>(
     }
 
     ready
-}
-
-/// Find tasks that `rhei run` may schedule autonomously.
-///
-/// This keeps the readiness semantics used by the run loop, but skips
-/// tasks that already carry an assignee so a manual claim cannot be stolen by
-/// the orchestrator.
-// §AR-rhei-panta.5: inputs resolve against the owning rhei's execution root.
-fn find_runnable_tasks<'a>(
-    rhei: &'a rhei_core::ast::Rhei,
-    machines: &rhei_validator::MachineSet,
-    roots: &ReadySetRoots<'_>,
-    spawned: &HashSet<String>,
-) -> Vec<&'a rhei_core::ast::Task> {
-    find_ready_tasks(rhei, machines, roots, spawned)
-        .into_iter()
-        .filter(|task| task.assignee.is_none())
-        .collect()
 }
 
 /// Ready tickets `rhei run` will not touch because someone already holds them.

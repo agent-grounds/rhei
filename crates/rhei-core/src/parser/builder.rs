@@ -1,4 +1,4 @@
-use crate::ast::{ConsumedExport, Task, TaskId};
+use crate::ast::{ConsumedExport, Task, TaskExclusion, TaskId};
 
 use super::{ParseError, Result};
 
@@ -12,6 +12,7 @@ pub(super) struct NodeBuilder {
     pub(super) prior_kinds: Vec<Option<String>>,
     pub(super) provides: Vec<String>,
     pub(super) consumes: Vec<ConsumedExport>,
+    pub(super) excludes: Vec<TaskExclusion>,
     pub(super) assignee: Option<String>,
     pub(super) model: Option<String>,
     pub(super) target: Option<String>,
@@ -50,6 +51,7 @@ fn finalize_builder(b: NodeBuilder) -> Result<Task> {
         prior_kinds: b.prior_kinds,
         provides: b.provides,
         consumes: b.consumes,
+        excludes: b.excludes,
         assignee: b.assignee,
         model: b.model,
         target: b.target,

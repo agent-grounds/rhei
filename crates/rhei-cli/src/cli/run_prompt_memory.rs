@@ -58,6 +58,12 @@ struct PromptMemory {
     /// worse than either.
     // §FS-rhei-memory.3.4
     absolute_paths: bool,
+    /// The task's resolved negative source policy. Empty preserves legacy
+    /// composition byte-for-byte. §FS-rhei-memory.1.2 §FS-rhei-memory.4.1
+    exclusions: ResolvedExclusions,
+    /// True only when the selected profile declares a denial adapter. Manual
+    /// `rhei next` output always leaves this false. §FS-rhei-agents.3
+    exclusions_filesystem_denied: bool,
 }
 
 /// Every cap §FS-rhei-memory.4 states, in one place, so a reader can check the
@@ -106,6 +112,8 @@ fn prompt_memory(
         run_in_flight,
         pastes_task_inputs: true,
         absolute_paths: false,
+        exclusions: ResolvedExclusions::default(),
+        exclusions_filesystem_denied: false,
     }
 }
 
@@ -387,6 +395,11 @@ fn task_history_summary(
 ) -> MietteResult<String> {
     if pasted_in_full.contains(&task_id.to_string()) {
         return Ok("see above".to_string());
+    }
+    if let Some(path) = resolved_result_path(render_context, task_id) {
+        if !prompt_source_allowed(render_context, &path) {
+            return Ok("payload excluded".to_string());
+        }
     }
     let Some(body) = read_task_result(render_context, task_id)? else {
         return Ok("(no result)".to_string());

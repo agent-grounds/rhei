@@ -59,6 +59,7 @@ fn new_ticket_write(
         prior: &options.prior,
         provides: &options.provides,
         consumes: &options.consumes,
+        excludes: &options.excludes,
         assignee: options.assignee.as_deref(),
         model: options.model.as_deref(),
         target: options.target.as_deref(),
@@ -183,7 +184,12 @@ fn reject_unloadable_reference_rheis(
         .consumes
         .iter()
         .filter_map(|value| value.split_once(':').map(|(task, _)| ("--consumes", task)));
-    for (flag, reference) in priors.chain(consumed) {
+    let excluded = options.excludes.iter().filter_map(|value| {
+        (!value.starts_with("checkout=") && !value.starts_with("artifact="))
+            .then(|| value.split_once(':').map(|(task, _)| ("--excludes", task)))
+            .flatten()
+    });
+    for (flag, reference) in priors.chain(consumed).chain(excluded) {
         let Some(rhei_id) = referenced_rhei_id(reference) else {
             continue;
         };
@@ -247,6 +253,21 @@ help = "name the ticket and the export it publishes, separated by a colon. Repea
 
                 "--consumes '{reference}' is not a valid reference: it is \
                  '<task-id>:<export-name>' (`--consumes auth.1:api-contract`)"
+            ));
+        }
+    }
+    // Parse exclusions through the language parser so `rhei new` and an
+    // edited plan accept exactly the same portable grammar. §FS-rhei-new.1.3
+    for exclusion in &options.excludes {
+        let probe = format!(
+            "# Rhei: Probe\n\n## Tasks\n\n### Task 1: Probe\n**State:** pending\n**Excludes:** {exclusion}\n"
+        );
+        if let Err(error) = rhei_core::parse(&probe) {
+            return Err(miette!(
+                help = "use checkout=<relative-path>, artifact=<relative-path>, or <task-id>:<export-name>; repeat --excludes for several entries.",
+                "--excludes '{}' is not valid: {}",
+                exclusion.trim(),
+                error.message
             ));
         }
     }

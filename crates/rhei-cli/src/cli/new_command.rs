@@ -166,6 +166,7 @@ fn reject_mode_confusion(options: &NewOptions) -> MietteResult<()> {
         ("--prior", !options.prior.is_empty()),
         ("--provides", !options.provides.is_empty()),
         ("--consumes", !options.consumes.is_empty()),
+        ("--excludes", !options.excludes.is_empty()),
         ("--assignee", options.assignee.is_some()),
         ("--model", options.model.is_some()),
         ("--target", options.target.is_some()),

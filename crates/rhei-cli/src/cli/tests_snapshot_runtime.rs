@@ -391,6 +391,7 @@ transitions:
             prior_kinds: Vec::new(),
             provides: Vec::new(),
             consumes: Vec::new(),
+            excludes: Vec::new(),
             assignee: None,
             model: None,
             target: None,

@@ -160,6 +160,15 @@ pub(super) fn qualify_task(task: &mut Task, rhei_id: &str, local_ids: &HashSet<T
             consumed.task = qualify_local_id(&consumed.task, rhei_id);
         }
     }
+    // Export exclusions use the same local-first qualification rule as
+    // consumed exports. §FS-rhei-plan-language.3.13
+    for exclusion in &mut task.excludes {
+        if let crate::ast::TaskExclusion::Export(export) = exclusion {
+            if local_ids.contains(&export.task) || !is_cross_rhei_reference(&export.task) {
+                export.task = qualify_local_id(&export.task, rhei_id);
+            }
+        }
+    }
     for child in &mut task.children {
         qualify_task(child, rhei_id, local_ids);
     }

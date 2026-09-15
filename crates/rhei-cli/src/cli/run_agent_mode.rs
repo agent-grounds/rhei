@@ -823,6 +823,19 @@ fn run_agent_mode(
                 let machine = machines.for_task_str(task_id_str);
                 if let Some(task) = find_task_by_id(&loaded.rhei.tasks, &target_id) {
                     if let Some(to_state) = find_next_transition(task, &loaded.rhei, machine)? {
+                        let task_root = loaded.task_root(task_id_str, &workspace_root);
+                        let checkout = resolve_agent_checkout_root(&task_root, task_id_str)?;
+                        let callbacks = machines.callbacks_for_str(task_id_str);
+                        let exclusions = loaded_task_exclusions(
+                            &loaded,
+                            task,
+                            &task_root,
+                            &checkout.path,
+                            &callbacks.plan_path,
+                            machine,
+                            callbacks.state_machine_path.as_deref(),
+                        )
+                        .map_err(exclusion_report)?;
                         run_info!(
                             "{}",
                             format_dry_run_agent_transition(
@@ -831,6 +844,7 @@ fn run_agent_mode(
                                 &to_state,
                                 resolved,
                                 machine,
+                                &exclusions,
                             )
                         );
                     }

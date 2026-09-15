@@ -204,6 +204,27 @@ pub struct ConsumedExport {
     pub name: String,
 }
 
+/// One task-authored read exclusion. Paths retain their portable authored
+/// spelling; resolution against the checkout or execution root happens at the
+/// invocation boundary. §FS-rhei-plan-language.3.13
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TaskExclusion {
+    Checkout { path: String, recursive: bool },
+    Artifact { path: String, recursive: bool },
+    Export(ConsumedExport),
+}
+
+impl TaskExclusion {
+    /// Render the entry in the plan language's canonical spelling.
+    pub fn authored(&self) -> String {
+        match self {
+            Self::Checkout { path, .. } => format!("checkout={path}"),
+            Self::Artifact { path, .. } => format!("artifact={path}"),
+            Self::Export(export) => format!("{}:{}", export.task, export.name),
+        }
+    }
+}
+
 /// A single node in the task tree.
 ///
 /// Every authored `### Task <id>: ...`, `#### Task <id>: ...`, or equivalent
@@ -239,6 +260,9 @@ pub struct Task {
     /// order they were authored.
     // §FS-rhei-plan-language.3.12: Task exports are a plan-level handoff.
     pub consumes: Vec<ConsumedExport>,
+    /// Files, directories, and declared exports this task must not read.
+    // §FS-rhei-plan-language.3.13: Task-level read exclusions.
+    pub excludes: Vec<TaskExclusion>,
     /// Assignee value captured from the optional `**Assignee:**` metadata
     /// field. `None` when the field is absent.
     pub assignee: Option<String>,

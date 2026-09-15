@@ -1,5 +1,6 @@
 use crate::ast::{
-    ConsumedExport, ContentSection, Metadata, Rhei, Structure, Task, MAX_ALLOWED_LEVELS,
+    ConsumedExport, ContentSection, Metadata, Rhei, Structure, Task, TaskExclusion,
+    MAX_ALLOWED_LEVELS,
 };
 use crate::text::parse_task_id;
 use regex::Regex;
@@ -33,6 +34,7 @@ pub fn parse(input: &str) -> Result<Rhei> {
         Regex::new(&format!(r#"^({task_id_pattern}):({export_name_pattern})$"#)).unwrap();
     let re_provides_like = Regex::new(r#"^\*\*Provides\b.*$"#).unwrap();
     let re_consumes_like = Regex::new(r#"^\*\*Consumes\b.*$"#).unwrap();
+    let re_excludes_like = Regex::new(r#"^\*\*Excludes\b.*$"#).unwrap();
     let re_assignee = Regex::new(r#"^\*\*Assignee:\*\*\s*(.+)$"#).unwrap();
     let re_assignee_like = Regex::new(r#"^\*\*Assignee\b.*$"#).unwrap();
     let re_model = Regex::new(r#"^\*\*Model:\*\*\s*(.+)$"#).unwrap();
@@ -205,6 +207,9 @@ pub fn parse(input: &str) -> Result<Rhei> {
 
             if re_state_like.is_match(line)
                 || re_prior_like.is_match(line)
+                || re_provides_like.is_match(line)
+                || re_consumes_like.is_match(line)
+                || re_excludes_like.is_match(line)
                 || re_assignee_like.is_match(line)
                 || re_model_like.is_match(line)
                 || re_target_like.is_match(line)
@@ -348,6 +353,7 @@ pub fn parse(input: &str) -> Result<Rhei> {
                 prior_kinds: Vec::new(),
                 provides: Vec::new(),
                 consumes: Vec::new(),
+                excludes: Vec::new(),
                 assignee: None,
                 model: None,
                 target: None,
@@ -416,6 +422,12 @@ pub fn parse(input: &str) -> Result<Rhei> {
             if top.state.is_none() {
                 return Err(ParseError::new(
                     format!("**State:** must appear before **Prior:** for Task {}", top.id),
+                    Some(line_number),
+                ));
+            }
+            if !top.provides.is_empty() || !top.consumes.is_empty() || !top.excludes.is_empty() {
+                return Err(ParseError::new(
+                    format!("**Prior:** must appear before export metadata for Task {}", top.id),
                     Some(line_number),
                 ));
             }
@@ -494,6 +506,12 @@ pub fn parse(input: &str) -> Result<Rhei> {
                     Some(line_number),
                 ));
             }
+            if !top.excludes.is_empty() {
+                return Err(ParseError::new(
+                    format!("**Provides:** must appear before **Excludes:** for Task {}", top.id),
+                    Some(line_number),
+                ));
+            }
             let mut names = Vec::new();
             for item in line.strip_prefix("**Provides:**").unwrap_or_default().split(',') {
                 let item = item.trim();
@@ -567,6 +585,12 @@ pub fn parse(input: &str) -> Result<Rhei> {
                     Some(line_number),
                 ));
             }
+            if !top.excludes.is_empty() {
+                return Err(ParseError::new(
+                    format!("**Consumes:** must appear before **Excludes:** for Task {}", top.id),
+                    Some(line_number),
+                ));
+            }
             let mut refs = Vec::new();
             for item in line.strip_prefix("**Consumes:**").unwrap_or_default().split(',') {
                 let item = item.trim();
@@ -625,6 +649,83 @@ pub fn parse(input: &str) -> Result<Rhei> {
             }
             return Err(ParseError::new(
                 "Metadata field appears outside a task",
+                Some(line_number),
+            ));
+        }
+
+        // **Excludes:** metadata — sources this task must not read.
+        // §FS-rhei-plan-language.2 §FS-rhei-plan-language.3.13
+        if line.starts_with("**Excludes:**") {
+            let Some(top) = node_stack.last_mut() else {
+                return Err(ParseError::new(
+                    "Metadata field appears outside a task",
+                    Some(line_number),
+                ));
+            };
+            if top.metadata_closed {
+                return Err(ParseError::new(
+                    "Metadata fields must appear immediately after the task heading before task content",
+                    Some(line_number),
+                ));
+            }
+            if top.state.is_none() {
+                return Err(ParseError::new(
+                    format!("**State:** must appear before **Excludes:** for Task {}", top.id),
+                    Some(line_number),
+                ));
+            }
+            if top.assignee.is_some() || top.model.is_some() || top.target.is_some() {
+                return Err(ParseError::new(
+                    format!(
+                        "**Excludes:** must appear before **Assignee:**, **Model:**, and **Target:** for Task {}",
+                        top.id
+                    ),
+                    Some(line_number),
+                ));
+            }
+            let mut entries = Vec::new();
+            for raw_entry in line.strip_prefix("**Excludes:**").unwrap_or_default().split(',') {
+                let entry = raw_entry.trim();
+                if entry.is_empty() {
+                    continue;
+                }
+                let parsed = if let Some(path) = entry.strip_prefix("checkout=") {
+                    parse_exclusion_path(path, "checkout", line_number)?
+                } else if let Some(path) = entry.strip_prefix("artifact=") {
+                    parse_exclusion_path(path, "artifact", line_number)?
+                } else if let Some(caps) = re_consumes_ref.captures(entry) {
+                    let task = caps
+                        .get(1)
+                        .and_then(|m| parse_task_id(m.as_str()))
+                        .expect("exclusion regex captures a valid task id");
+                    TaskExclusion::Export(ConsumedExport {
+                        task,
+                        name: caps.get(2).unwrap().as_str().to_string(),
+                    })
+                } else {
+                    return Err(ParseError::new(
+                        format!(
+                            "Malformed **Excludes:** entry '{entry}': expected checkout=<path>, \
+                             artifact=<path>, or <task-id>:<export-name>"
+                        ),
+                        Some(line_number),
+                    ));
+                };
+                entries.push(parsed);
+            }
+            if entries.is_empty() {
+                return Err(ParseError::new(
+                    "Empty **Excludes:** field: name at least one path or export, or drop the line",
+                    Some(line_number),
+                ));
+            }
+            top.excludes.extend(entries);
+            continue;
+        }
+
+        if re_excludes_like.is_match(line) {
+            return Err(ParseError::new(
+                "Malformed metadata field: expected '**Excludes:** checkout=<path>, artifact=<path>, or <task-id>:<export-name>'",
                 Some(line_number),
             ));
         }
@@ -776,7 +877,7 @@ pub fn parse(input: &str) -> Result<Rhei> {
                         format!(
                             "Unknown metadata field '**{field}:**' for Task {}. Task metadata \
                              is one of **State:**, **Prior:**, **Provides:**, **Consumes:**, \
-                             **Assignee:**, **Model:**, **Target:**. Leave a blank line before \
+                             **Excludes:**, **Assignee:**, **Model:**, **Target:**. Leave a blank line before \
                              this line to keep it as task content.",
                             top.id
                         ),
@@ -850,5 +951,36 @@ pub fn parse(input: &str) -> Result<Rhei> {
         metadata: rhei_metadata,
         content_sections: rhei_content,
         tasks,
+    })
+}
+
+/// Parse and lexically validate one portable path exclusion. Files and
+/// directories share a spelling; a trailing slash alone selects recursive
+/// directory semantics. §FS-rhei-plan-language.3.13
+fn parse_exclusion_path(path: &str, kind: &str, line_number: usize) -> Result<TaskExclusion> {
+    let recursive = path.ends_with('/');
+    let body = path.strip_suffix('/').unwrap_or(path);
+    let invalid_component =
+        body.split('/').find(|part| part.is_empty() || *part == "." || *part == "..");
+    let prefixed = body.starts_with('/')
+        || body.starts_with('\\')
+        || body.as_bytes().get(1).is_some_and(|byte| *byte == b':');
+    if body.is_empty() || prefixed || body.contains('\\') || invalid_component.is_some() {
+        let reason = match invalid_component {
+            Some("..") => "must not contain '..'",
+            Some(".") => "must not contain '.' components",
+            Some("") => "must not contain empty path components",
+            _ if body.is_empty() => "must not be empty",
+            _ if prefixed => "must be relative to its declared root",
+            _ => "must use '/' separators",
+        };
+        return Err(ParseError::new(
+            format!("Malformed **Excludes:** {kind} path '{path}': {reason}"),
+            Some(line_number),
+        ));
+    }
+    Ok(match kind {
+        "checkout" => TaskExclusion::Checkout { path: path.to_string(), recursive },
+        _ => TaskExclusion::Artifact { path: path.to_string(), recursive },
     })
 }

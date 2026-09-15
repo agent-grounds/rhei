@@ -122,6 +122,9 @@ fn read_source_state_handoff(
         if !path.exists() {
             continue;
         }
+        if !prompt_source_allowed(render_context, &path) {
+            continue;
+        }
         let content = fs::read_to_string(&path)
             .map_err(|err| file_io_report(&path, "failed to read state handoff", err))?;
         if content.trim().is_empty() {

@@ -197,6 +197,10 @@ pub struct CustomAgentProfile {
     /// Omit to declare the agent does not support skills.
     #[serde(default)]
     pub skill_flag: Option<String>,
+    /// Optional adapter that accepts one repeated absolute path flag and owns
+    /// denial for the spawned process tree. §FS-rhei-agents.1.1.2
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deny_read: Option<DenyReadAdapter>,
     /// Named modes. Each mode is an ordered flag list appended to the
     /// command at spawn time. A well-known mode name is `yolo`, but any
     /// name is allowed — Rhei does not interpret mode names.
@@ -214,6 +218,12 @@ pub struct CustomAgentProfile {
     // §FS-rhei-snapshots.9.1: CustomAgentProfile.session schema.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DenyReadAdapter {
+    pub path_flag: String,
 }
 
 /// Registry entry for an MCP server profile.

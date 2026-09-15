@@ -176,7 +176,14 @@ fn render_position(render_context: &RuntimeTemplateContext<'_>) -> String {
     out.push_str(&render_position_chain(render_context, memory, &ancestors));
     if let Some(parent) = ancestors.first() {
         out.push_str(&render_siblings(render_context, parent));
-        out.push_str(&render_parent_body(render_context, memory, parent));
+        let parent_source = memory
+            .task_sources
+            .get(&parent.id.to_string())
+            .map(PathBuf::as_path)
+            .unwrap_or(render_context.plan_path);
+        if prompt_source_allowed(render_context, parent_source) {
+            out.push_str(&render_parent_body(render_context, memory, parent));
+        }
     }
     // Supervisors keep the navigation map rendered later in the prompt, so
     // repository-scale standing context remains reachable without being pasted.
@@ -185,21 +192,26 @@ fn render_position(render_context: &RuntimeTemplateContext<'_>) -> String {
         return out;
     }
     let rhei_id = owning_rhei_id(render_context);
-    out.push_str(&render_context_block(
-        "Rhei Context",
-        &scoped_content_sections(memory, rhei_id.as_deref()),
-        &rhei_id
-            .as_deref()
-            .and_then(|id| memory.rhei_plans.get(id))
-            .map(|path| memory_path(render_context, path))
-            .unwrap_or_else(|| memory_path(render_context, render_context.plan_path)),
-    ));
-    if let Some(manifest) = memory.panta_manifest.as_deref() {
+    let rhei_source = rhei_id
+        .as_deref()
+        .and_then(|id| memory.rhei_plans.get(id))
+        .map(PathBuf::as_path)
+        .unwrap_or(render_context.plan_path);
+    if prompt_source_allowed(render_context, rhei_source) {
         out.push_str(&render_context_block(
-            "Project Context",
-            &scoped_content_sections(memory, None),
-            &memory_path(render_context, manifest),
+            "Rhei Context",
+            &scoped_content_sections(memory, rhei_id.as_deref()),
+            &memory_path(render_context, rhei_source),
         ));
+    }
+    if let Some(manifest) = memory.panta_manifest.as_deref() {
+        if prompt_source_allowed(render_context, manifest) {
+            out.push_str(&render_context_block(
+                "Project Context",
+                &scoped_content_sections(memory, None),
+                &memory_path(render_context, manifest),
+            ));
+        }
     }
     out
 }

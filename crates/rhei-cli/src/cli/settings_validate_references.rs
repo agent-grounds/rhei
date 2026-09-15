@@ -122,6 +122,12 @@ fn validate_intrinsic_settings(settings: &RheiSettings) -> Vec<String> {
                 id
             ));
         }
+        if profile.deny_read.as_ref().is_some_and(|adapter| adapter.path_flag.trim().is_empty()) {
+            errors.push(format!(
+                "agent '{}' has an empty 'deny_read.path_flag'; the adapter flag must be non-empty",
+                id
+            ));
+        }
     }
 
     // MCP server registry self-validation: exactly one of `command`/`url`;

@@ -93,6 +93,28 @@ fn task_json(t: &Task) -> Value {
     obj.insert("title".to_string(), Value::String(t.title.clone()));
     obj.insert("state".to_string(), Value::String(t.state.clone()));
     obj.insert("prior".to_string(), Value::Array(prior));
+    let exclusions = t
+        .excludes
+        .iter()
+        .map(|entry| match entry {
+            rhei_core::ast::TaskExclusion::Checkout { path, recursive: false } => {
+                json!({ "kind": "checkout", "path": path })
+            }
+            rhei_core::ast::TaskExclusion::Artifact { path, recursive: false } => {
+                json!({ "kind": "artifact", "path": path })
+            }
+            rhei_core::ast::TaskExclusion::Checkout { path, recursive: true } => {
+                json!({ "kind": "checkout", "path": path, "recursive": true })
+            }
+            rhei_core::ast::TaskExclusion::Artifact { path, recursive: true } => {
+                json!({ "kind": "artifact", "path": path, "recursive": true })
+            }
+            rhei_core::ast::TaskExclusion::Export(export) => json!({
+                "kind": "export", "task": export.task.to_string(), "name": export.name
+            }),
+        })
+        .collect();
+    obj.insert("excludes".to_string(), Value::Array(exclusions));
     if let Some(ref assignee) = t.assignee {
         obj.insert("assignee".to_string(), Value::String(assignee.clone()));
     }

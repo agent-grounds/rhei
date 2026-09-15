@@ -173,7 +173,19 @@ fn spawn_parallel_agent_work_item(
     }
     let tooling = gate.tooling;
     let checkout_root = resolve_agent_checkout_root(workspace_root, &item.task_id_str)?;
-    let memory = prompt_memory(&loaded, input, runtime_dir, run_in_flight.clone());
+    let exclusions = loaded_task_exclusions(
+        &loaded,
+        task,
+        workspace_root,
+        &checkout_root.path,
+        &callback_paths.plan_path,
+        machine,
+        callback_paths.state_machine_path.as_deref(),
+    )
+    .map_err(exclusion_report)?;
+    let mut memory = prompt_memory(&loaded, input, runtime_dir, run_in_flight.clone());
+    memory.exclusions = exclusions.clone();
+    memory.exclusions_filesystem_denied = item.resolved.profile.deny_read.is_some();
     let render_context = RuntimeTemplateContext {
         workspace_root,
         task_roots: Some(&loaded.task_roots),
@@ -281,7 +293,9 @@ fn spawn_parallel_agent_work_item(
         wall_clock: started_wall,
     });
 
-    let resolved_for_thread = item.resolved.clone();
+    // Each fan-out identity receives its own freshly resolved adapter paths.
+    // §FS-rhei-agents.5.2.2
+    let resolved_for_thread = agent_with_exclusion_adapter(&item.resolved, &exclusions);
     let tooling_for_thread = tooling.clone();
     let sink_for_thread = sink.clone();
     let intervene_for_thread = intervene.cloned();

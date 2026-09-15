@@ -133,6 +133,17 @@ struct NewOptions {
         help_heading = "Creating a ticket"
     )]
     consumes: Vec<String>,
+    /// Source this ticket must not read: `checkout=<path>`,
+    /// `artifact=<path>`, or `<task-id>:<export-name>` (repeatable;
+    /// comma-separated list also accepted)
+    // §FS-rhei-new.1.3
+    #[arg(
+        long,
+        value_name = "ENTRY",
+        value_delimiter = ',',
+        help_heading = "Creating a ticket"
+    )]
+    excludes: Vec<String>,
     /// Claim the new ticket for someone. An assignee means "in progress":
     /// `rhei next` and `rhei run` skip it until `rhei release <id>`
     #[arg(long, value_name = "WHO", help_heading = "Creating a ticket")]

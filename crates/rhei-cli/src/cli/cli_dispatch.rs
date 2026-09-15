@@ -445,6 +445,7 @@ fn command_wants_json(command: &Commands) -> bool {
     match command {
         Commands::Next { json, .. } => *json,
         Commands::States { json, .. } => *json,
+        Commands::Roster { json, .. } => *json,
         Commands::List { json, .. } => *json,
         Commands::Snapshot { command: SnapshotCommand::List { format, .. }, .. } => {
             matches!(format, SnapshotListFormat::Json)
@@ -506,6 +507,7 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
         Commands::States { input, rhei, json, state_machine } => {
             states_command(input, state_machine.or(before_subcommand).as_deref(), &rhei, json)
         }
+        Commands::Roster { input, json } => roster_command(input, json),
         Commands::List {
             input,
             rhei,

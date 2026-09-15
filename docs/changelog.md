@@ -23,6 +23,11 @@
   text, with `-` selecting stdin, while the existing inline `--result` form
   and its literal dash behavior remain unchanged. (PR #270)
 
+- **The new `rhei roster [RHEI_PLAN] [--json]` command prints the effective
+  agent, model, and defaults registry.** Its machine-readable form includes
+  source metadata and per-merge-unit provenance, so dispatchers can use Rhei's
+  built-ins and precedence rules without copying or reimplementing them. (PR #271)
+
 - **Transition callbacks now receive a stable identity for each firing and an
   explicit pending ledger status.** Canonical JSON exposes `firingId` and
   `ledgerStatus`, and CLI callbacks receive equal environment values, so an

@@ -21,15 +21,20 @@ fn merge_model_agent_binding(
     existing: &mut ModelAgentBinding,
     project: ModelAgentBinding,
     project_raw: &serde_json::Value,
+    provenance: &mut BTreeMap<String, RosterOrigin>,
 ) {
+    // Origin changes beside the value, so the two cannot drift. §FS-rhei-agents.1.1.7
     if json_field_present(project_raw, "args") {
         existing.args = project.args;
+        provenance.insert("args".to_string(), RosterOrigin::Project);
     }
     if json_field_present(project_raw, "autonomous_args") {
         existing.autonomous_args = project.autonomous_args;
+        provenance.insert("autonomous_args".to_string(), RosterOrigin::Project);
     }
     if json_field_present(project_raw, "timeout") {
         existing.timeout = project.timeout;
+        provenance.insert("timeout".to_string(), RosterOrigin::Project);
     }
 }
 
@@ -37,6 +42,61 @@ fn load_merged_settings_for_completion(plan_root: &Path) -> RheiSettings {
     // Shell completion must not fail because a project settings file is half-written.
     load_merged_settings(plan_root)
         .unwrap_or_else(|_| RheiSettings { agents: built_in_agents(), ..Default::default() })
+}
+
+fn raw_object_keys(raw: &serde_json::Value) -> BTreeSet<String> {
+    // Wholesale agents still preserve omission versus explicit defaults. §FS-rhei-agents.1.1.7
+    raw.as_object()
+        .map(|object| object.keys().cloned().collect())
+        .unwrap_or_default()
+}
+
+fn built_in_agent_fields(profile: &CustomAgentProfile) -> BTreeSet<String> {
+    // Programmatic built-ins supply only their non-default optional fields. §FS-rhei-agents.1.1.7
+    let mut fields = BTreeSet::from(["command".to_string()]);
+    for (name, supplied) in [
+        ("prompt_flag", profile.prompt_flag.is_some()),
+        ("model_flag", profile.model_flag.is_some()),
+        ("stdin_prompt", profile.stdin_prompt),
+        ("intervene_stdin", profile.intervene_stdin),
+        ("timeout", profile.timeout.is_some()),
+        ("mcp_flag", profile.mcp_flag.is_some()),
+        ("mcp_config_flag", profile.mcp_config_flag.is_some()),
+        ("skill_flag", profile.skill_flag.is_some()),
+        ("modes", !profile.modes.is_empty()),
+        ("session", profile.session.is_some()),
+    ] {
+        if supplied {
+            fields.insert(name.to_string());
+        }
+    }
+    fields
+}
+
+fn field_origins(raw: &serde_json::Value, fields: &[&str], origin: RosterOrigin) -> BTreeMap<String, RosterOrigin> {
+    // Raw presence distinguishes omission from a supplied clear. §FS-rhei-agents.1.1.7
+    fields
+        .iter()
+        .filter(|field| json_field_present(raw, field))
+        .map(|field| ((*field).to_string(), origin))
+        .collect()
+}
+
+fn model_provenance(raw: &serde_json::Value, origin: RosterOrigin) -> ModelRosterProvenance {
+    // Models and bindings merge one field at a time. §FS-rhei-agents.1.1.7
+    let fields = field_origins(raw, &["provider", "model", "default_agent"], origin);
+    let agents = json_child(raw, "agents")
+        .as_object()
+        .into_iter()
+        .flat_map(|bindings| bindings.iter())
+        .map(|(id, binding)| {
+            (
+                id.clone(),
+                field_origins(binding, &["args", "autonomous_args", "timeout"], origin),
+            )
+        })
+        .collect();
+    ModelRosterProvenance { fields, agents }
 }
 
 /// The settings file's name under either home. §FS-rhei-agents.1.1
@@ -65,9 +125,11 @@ fn project_settings_path(plan_root: &Path) -> PathBuf {
     project_settings_home(plan_root).into_path()
 }
 
-/// Load merged settings: built-ins, then global, then project-level overrides.
-fn load_merged_settings(plan_root: &Path) -> MietteResult<RheiSettings> {
-    let global = match home_dir() {
+/// Load merged settings plus the source decisions that produced every roster
+/// value. Execution discards the additional record; inspection renders it
+/// without re-reading or re-merging settings. §FS-rhei-agents.1.1.7
+fn load_merged_roster(plan_root: &Path) -> MietteResult<MergedRoster> {
+    let global_document = match home_dir() {
         Ok(home) => load_settings_document(&home.join(".config/rhei/settings.json"))?,
         Err(_) => empty_settings_document(),
     };
@@ -81,18 +143,44 @@ fn load_merged_settings(plan_root: &Path) -> MietteResult<RheiSettings> {
         None => ProjectSettingsFile::Current,
     };
     project_settings.warn_if_deprecated();
-    let project = load_settings_document(project_settings.path())?;
-    let project_raw = &project.raw;
-    let global = global.typed;
-    let project = project.typed;
+    let project_document = load_settings_document(project_settings.path())?;
+    let sources = RosterSources {
+        global: global_document.source_path.clone(),
+        project: project_document
+            .source_path
+            .clone()
+            .map(|path| (path, project_settings_file)),
+    };
+    let global_raw = &global_document.raw;
+    let project_raw = &project_document.raw;
+    let global = global_document.typed;
+    let project = project_document.typed;
 
     // Agent registry: built-ins seed the map; global then project entries
     // replace an id wholesale when present.
     let mut agents = built_in_agents();
+    let mut agent_fields: BTreeMap<String, BTreeSet<String>> = agents
+        .iter()
+        .map(|(id, profile)| (id.clone(), built_in_agent_fields(profile)))
+        .collect();
+    let mut provenance = RosterProvenance {
+        agents: agents.keys().map(|id| (id.clone(), RosterOrigin::BuiltIn)).collect(),
+        ..Default::default()
+    };
     for (id, profile) in global.agents {
+        agent_fields.insert(
+            id.clone(),
+            raw_object_keys(json_child(json_child(global_raw, "agents"), &id)),
+        );
+        provenance.agents.insert(id.clone(), RosterOrigin::Global);
         agents.insert(id, profile);
     }
     for (id, profile) in project.agents {
+        agent_fields.insert(
+            id.clone(),
+            raw_object_keys(json_child(json_child(project_raw, "agents"), &id)),
+        );
+        provenance.agents.insert(id.clone(), RosterOrigin::Project);
         agents.insert(id, profile);
     }
 
@@ -109,18 +197,33 @@ fn load_merged_settings(plan_root: &Path) -> MietteResult<RheiSettings> {
     // is deep-merged by agent id.
     // §FS-rhei-agents.1.3: Merge models by id and model-agent bindings by agent id.
     let mut models = global.models.clone();
+    provenance.models = models
+        .keys()
+        .map(|id| {
+            let raw = json_child(json_child(global_raw, "models"), id);
+            (id.clone(), model_provenance(raw, RosterOrigin::Global))
+        })
+        .collect();
     for (id, project_profile) in project.models {
         let project_model_raw = json_child(json_child(project_raw, "models"), &id);
         match models.get_mut(&id) {
             Some(existing) => {
+                let model_origins = provenance.models.entry(id.clone()).or_default();
                 if json_field_present(project_model_raw, "provider") {
                     existing.provider = project_profile.provider;
+                    model_origins
+                        .fields
+                        .insert("provider".to_string(), RosterOrigin::Project);
                 }
                 if json_field_present(project_model_raw, "model") {
                     existing.model = project_profile.model;
+                    model_origins.fields.insert("model".to_string(), RosterOrigin::Project);
                 }
                 if json_field_present(project_model_raw, "default_agent") {
                     existing.default_agent = project_profile.default_agent;
+                    model_origins
+                        .fields
+                        .insert("default_agent".to_string(), RosterOrigin::Project);
                 }
                 for (agent_id, binding) in project_profile.agents {
                     let project_binding_raw =
@@ -130,14 +233,27 @@ fn load_merged_settings(plan_root: &Path) -> MietteResult<RheiSettings> {
                             existing_binding,
                             binding,
                             project_binding_raw,
+                            model_origins.agents.entry(agent_id).or_default(),
                         ),
                         None => {
+                            model_origins.agents.insert(
+                                agent_id.clone(),
+                                field_origins(
+                                    project_binding_raw,
+                                    &["args", "autonomous_args", "timeout"],
+                                    RosterOrigin::Project,
+                                ),
+                            );
                             existing.agents.insert(agent_id, binding);
                         }
                     }
                 }
             }
             None => {
+                provenance.models.insert(
+                    id.clone(),
+                    model_provenance(project_model_raw, RosterOrigin::Project),
+                );
                 models.insert(id, project_profile);
             }
         }
@@ -145,6 +261,34 @@ fn load_merged_settings(plan_root: &Path) -> MietteResult<RheiSettings> {
 
     // `defaults.mcp_servers` / `defaults.skills`: project replaces global
     // wholesale when present (including an explicit empty list).
+    provenance.defaults = field_origins(
+        json_child(global_raw, "defaults"),
+        &[
+            "model",
+            "agent",
+            "agent_mode",
+            "agent_timeout",
+            "program_timeout",
+            "attempts",
+            "mcp_servers",
+            "skills",
+        ],
+        RosterOrigin::Global,
+    );
+    for field in [
+        "model",
+        "agent",
+        "agent_mode",
+        "agent_timeout",
+        "program_timeout",
+        "attempts",
+        "mcp_servers",
+        "skills",
+    ] {
+        if json_nested_field_present(project_raw, "defaults", field) {
+            provenance.defaults.insert(field.to_string(), RosterOrigin::Project);
+        }
+    }
     let defaults = SettingsDefaults {
         model: if json_nested_field_present(project_raw, "defaults", "model") {
             project.defaults.model
@@ -188,7 +332,7 @@ fn load_merged_settings(plan_root: &Path) -> MietteResult<RheiSettings> {
         },
     };
 
-    Ok(RheiSettings {
+    let settings = RheiSettings {
         project_settings_file,
         agent: if json_field_present(project_raw, "agent") { project.agent } else { global.agent },
         agent_mode: if json_field_present(project_raw, "agent_mode") {
@@ -217,352 +361,15 @@ fn load_merged_settings(plan_root: &Path) -> MietteResult<RheiSettings> {
         } else {
             merge_snapshot_settings(global.snapshots, project.snapshots)
         },
-    })
+    };
+
+    Ok(MergedRoster { settings, sources, provenance, agent_fields })
 }
 
-/// The agents the merged registry knows, so an error does not leave an author
-/// guessing at names nothing else lists — and where to declare the one they
-/// wanted, which the listing alone never says. §FS-rhei-agents.1.1
-/// §FS-rhei-errors.1.4
-fn known_agents_hint(settings: &RheiSettings) -> String {
-    let location =
-        settings_entry_location("agents.<id>", settings.project_settings_file.relative_path());
-    if settings.agents.is_empty() {
-        return format!("no agents are configured; declare one under {location}");
-    }
-    let names: Vec<&str> = settings.agents.keys().map(String::as_str).collect();
-    format!("known agents: {}; declare another under {location}", names.join(", "))
-}
-
-/// The modes one agent declares, listed the way an invalid state lists its
-/// allowed states, and where the missing one is declared. §FS-rhei-agents.1.1
-/// §FS-rhei-errors.1.4
-fn known_modes_hint(settings: &RheiSettings, id: &str, profile: &CustomAgentProfile) -> String {
-    let location = settings_entry_location(
-        &format!("agents.{id}.modes"),
-        settings.project_settings_file.relative_path(),
-    );
-    if profile.modes.is_empty() {
-        // Both ways out, as spawn time offers them: the brackets are usually
-        // the mistake, and declaring the mode is the other. §FS-rhei-errors.1.2
-        return format!(
-            "it declares no modes; drop the brackets from the selector, \
-             or declare one under {location}"
-        );
-    }
-    let modes: Vec<&str> = profile.modes.keys().map(String::as_str).collect();
-    format!("known modes: {}; declare another under {location}", modes.join(", "))
-}
-
-/// Validate legacy executions with runtime's precedence; selector-owned modes
-/// remain under the existing selector checks. §FS-rhei-agents.1.4.1
-fn validate_effective_static_agent_modes(
-    machine: &rhei_validator::StateMachine,
-    settings: &RheiSettings,
-    errors: &mut Vec<String>,
-    shadowed_by_task_target: impl Fn(&rhei_validator::StateDef) -> bool,
-) {
-    let opts = default_run_options();
-    let mut refused = BTreeSet::new();
-
-    for (state_name, state) in &machine.states {
-        let uses_selector = state.target.is_some() || !state.all_targets.is_empty();
-        let inactive = state.terminal || state.gating || state.program.is_some();
-        if uses_selector
-            || (inactive && state.agent_mode.is_none())
-            || shadowed_by_task_target(state)
-        {
-            continue;
-        }
-
-        let model_overrides: Vec<Option<String>> = if state.all_models.is_empty() {
-            vec![None]
-        } else {
-            state.all_models.iter().cloned().map(Some).collect()
-        };
-
-        for model_override in model_overrides {
-            let model = select_legacy_model(Some(state), settings, &opts, model_override);
-            let model_profile = model.as_deref().and_then(|id| settings.models.get(id));
-            let Some(agent) = select_legacy_agent(Some(state), settings, &opts, model_profile)
-            else {
-                continue;
-            };
-            let Some(profile) = settings.agents.get(agent.id()) else {
-                continue;
-            };
-            let Some(mode) = select_legacy_agent_mode(Some(state), settings, &opts, profile) else {
-                continue;
-            };
-            if profile.modes.is_empty() || profile.modes.contains_key(&mode) {
-                continue;
-            }
-            if refused.insert((agent.id().to_string(), mode.clone())) {
-                errors.push(format!(
-                    "agent '{}' has no mode '{}' in state '{}' ({})",
-                    agent.id(),
-                    mode,
-                    state_name,
-                    known_modes_hint(settings, agent.id(), profile)
-                ));
-            }
-        }
-    }
-}
-
-#[cfg(test)]
-fn validate_machine_settings_references(
-    machine: &rhei_validator::StateMachine,
-    settings: &RheiSettings,
-) -> Vec<String> {
-    validate_machine_settings_references_inner(machine, settings, true)
-}
-
-fn validate_machine_settings_references_inner(
-    machine: &rhei_validator::StateMachine,
-    settings: &RheiSettings,
-    validate_static_modes: bool,
-) -> Vec<String> {
-    let mut errors = Vec::new();
-
-    // Agent registry self-validation: `command` is required, and
-    // `mcp_flag` and `mcp_config_flag` are mutually exclusive per
-    // §FS-rhei-agents.1.1.2: Validate agent transport profile settings.
-    for (id, profile) in &settings.agents {
-        if profile.command.is_empty() {
-            errors.push(format!(
-                "agent '{}' has an empty 'command'; the `command` field is required",
-                id
-            ));
-        }
-        if profile.mcp_flag.is_some() && profile.mcp_config_flag.is_some() {
-            errors.push(format!(
-                "agent '{}' declares both 'mcp_flag' and 'mcp_config_flag'; \
-                 they are mutually exclusive",
-                id
-            ));
-        }
-    }
-
-    // MCP server registry self-validation: exactly one of `command`/`url`;
-    // §FS-rhei-agents.1.1.4: Validate MCP server registry entries.
-    for (id, profile) in &settings.mcp_servers {
-        match (profile.command.is_some(), profile.url.is_some()) {
-            (false, false) => errors.push(format!(
-                "mcp_servers.'{}' must declare exactly one of 'command' or 'url'",
-                id
-            )),
-            (true, true) => errors.push(format!(
-                "mcp_servers.'{}' declares both 'command' and 'url'; they are \
-                 mutually exclusive",
-                id
-            )),
-            (false, true) => {
-                if profile.transport.as_deref().map_or(true, str::is_empty) {
-                    errors.push(format!(
-                        "mcp_servers.'{}' uses 'url' but does not declare 'transport'; \
-                         set transport to 'sse' or 'websocket'",
-                        id
-                    ));
-                }
-            }
-            (true, false) => {}
-        }
-    }
-
-    // Model registry self-validation: `provider` and `model` are required
-    // §FS-rhei-agents.1.1.3: Validate model profile registry entries.
-    for (id, profile) in &settings.models {
-        if profile.provider.as_deref().map_or(true, str::is_empty) {
-            errors.push(format!("models.'{}' is missing required field 'provider'", id));
-        }
-        if profile.model.as_deref().map_or(true, str::is_empty) {
-            errors.push(format!("models.'{}' is missing required field 'model'", id));
-        }
-    }
-
-    validate_mcp_entries_known(
-        "defaults.mcp_servers",
-        settings.defaults.mcp_servers.as_deref(),
-        &settings.mcp_servers,
-        &mut errors,
-    );
-    validate_skill_entries_known(
-        "defaults.skills",
-        settings.defaults.skills.as_deref(),
-        &settings.skills,
-        &mut errors,
-    );
-
-    if validate_static_modes {
-        validate_effective_static_agent_modes(machine, settings, &mut errors, |_| false);
-    }
-
-    for (state_name, state) in &machine.states {
-        validate_mcp_entries_known(
-            &format!("state '{state_name}' mcp_servers"),
-            state.mcp_servers.as_deref(),
-            &settings.mcp_servers,
-            &mut errors,
-        );
-        validate_skill_entries_known(
-            &format!("state '{state_name}' skills"),
-            state.skills.as_deref(),
-            &settings.skills,
-            &mut errors,
-        );
-
-        if let Some(agent) = state.agent.as_ref() {
-            if !settings.agents.contains_key(agent.id()) {
-                errors.push(format!(
-                    "state '{}' references unknown agent '{}' ({})",
-                    state_name,
-                    agent.id(),
-                    known_agents_hint(settings)
-                ));
-                continue;
-            }
-        }
-
-        let selectors = state
-            .target
-            .iter()
-            .cloned()
-            .chain(state.all_targets.iter().cloned())
-            .collect::<Vec<_>>();
-        for selector in selectors {
-            match parse_execution_target(&selector) {
-                Ok(target) => {
-                    let Some(profile) = settings.agents.get(target.agent.as_str()) else {
-                        errors.push(format!(
-                            "state '{}' references unknown target agent '{}' in '{}' ({})",
-                            state_name,
-                            target.agent,
-                            selector,
-                            known_agents_hint(settings)
-                        ));
-                        continue;
-                    };
-                    if let Some(mode) = target.mode.as_deref() {
-                        if !profile.modes.contains_key(mode) {
-                            errors.push(format!(
-                                "state '{}' references unknown target mode '{}' for agent '{}' in '{}' ({})",
-                                state_name,
-                                mode,
-                                target.agent,
-                                selector,
-                                known_modes_hint(settings, &target.agent, profile)
-                            ));
-                        }
-                    }
-                }
-                Err(err) => errors.push(format!(
-                    "state '{}' has invalid target selector '{}': {}",
-                    state_name, selector, err
-                )),
-            }
-        }
-
-        if state.snapshot.as_ref().and_then(|snapshot| snapshot.emit.as_ref()).is_some()
-            || state.snapshot.as_ref().and_then(|snapshot| snapshot.inherit.as_ref()).is_some()
-        {
-            // Settings-aware snapshot checks need the merged agent/model
-            // registry, so they live in the CLI validation layer rather than
-            // §FS-rhei-snapshots.9.2 §FS-rhei-snapshots.11: Registry-aware checks.
-            match resolve_agent_invocations(machine, state_name, settings, &default_run_options()) {
-                Ok(invocations) if invocations.is_empty() => {
-                    errors.push(format!(
-                        "state '{}' declares snapshot operations but no effective target tuple resolves (snapshot-requires-target)",
-                        state_name
-                    ));
-                }
-                Ok(invocations) => {
-                    let mut seen_slugs: HashMap<String, String> = HashMap::new();
-                    for invocation in &invocations {
-                        let Some(slug) = resolved_agent_target_slug(invocation) else {
-                            errors.push(format!(
-                                "state '{}' declares snapshot operations but agent '{}' does not resolve provider and model (snapshot-requires-target)",
-                                state_name,
-                                invocation.agent.id()
-                            ));
-                            continue;
-                        };
-                        if let Some(previous) =
-                            seen_slugs.insert(slug.clone(), invocation.agent.id().to_string())
-                        {
-                            errors.push(format!(
-                                "state '{}' has multiple resolved invocations for agents '{}' and '{}' that normalize to snapshot target slug '{}'",
-                                state_name,
-                                previous,
-                                invocation.agent.id(),
-                                slug
-                            ));
-                        }
-                        if state
-                            .snapshot
-                            .as_ref()
-                            .and_then(|snapshot| snapshot.emit.as_ref())
-                            .is_some()
-                            && !profile_has_snapshot_layout(&invocation.profile.session)
-                        {
-                            errors.push(format!(
-                                "state '{}' declares snapshot.emit but agent '{}' has no supported snapshot session layout (unsupported-snapshot-session){}",
-                                state_name,
-                                invocation.agent.id(),
-                                snapshot_removal_hint(state)
-                            ));
-                        }
-                        if state
-                            .snapshot
-                            .as_ref()
-                            .and_then(|snapshot| snapshot.inherit.as_ref())
-                            .is_some_and(|inherit| inherit.required == Some(true))
-                            && !profile_has_snapshot_preload(&invocation.profile.session)
-                        {
-                            errors.push(format!(
-                                "state '{}' declares required snapshot.inherit but agent '{}' has no supported snapshot preload strategy (unsupported-snapshot-session){}",
-                                state_name,
-                                invocation.agent.id(),
-                                snapshot_removal_hint(state)
-                            ));
-                        }
-                    }
-                }
-                Err(err) => errors.push(format!(
-                    "state '{}' declares snapshot operations but no effective target tuple resolves: {} (snapshot-requires-target)",
-                    state_name, err
-                )),
-            }
-        }
-    }
-
-    errors
-}
-
-fn validate_mcp_entries_known(
-    label: &str,
-    entries: Option<&[StateMcpEntry]>,
-    registry: &BTreeMap<String, McpServerProfile>,
-    errors: &mut Vec<String>,
-) {
-    for entry in entries.unwrap_or(&[]) {
-        if !entry.is_inline() && !registry.contains_key(entry.id()) {
-            errors.push(format!("{label} references unknown mcp server '{}'", entry.id()));
-        }
-    }
-}
-
-fn validate_skill_entries_known(
-    label: &str,
-    entries: Option<&[StateSkillEntry]>,
-    registry: &BTreeMap<String, SkillProfile>,
-    errors: &mut Vec<String>,
-) {
-    for entry in entries.unwrap_or(&[]) {
-        if !entry.is_inline() && !registry.contains_key(entry.id()) {
-            errors.push(format!("{label} references unknown skill '{}'", entry.id()));
-        }
-    }
+/// Preserve execution's settings-only interface while sharing exactly the
+/// merge used by roster inspection. §FS-rhei-agents.1.1.7
+fn load_merged_settings(plan_root: &Path) -> MietteResult<RheiSettings> {
+    Ok(load_merged_roster(plan_root)?.settings)
 }
 
 fn validate_snapshot_plan_context(

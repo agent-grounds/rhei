@@ -55,6 +55,7 @@ Inspection:
   validate    Validate a markdown plan against the configured states
   render      Render a markdown plan into a selected output format
   states      Print the states and allowed transitions for the configured state machine
+  roster      Print the effective agent, model, and defaults registry
   list        List tasks in a plan with optional filters
   schema      Print or list published accounting JSON Schemas
   viz         Render a self-contained HTML flow visualization of a plan or workspace
@@ -204,6 +205,17 @@ enum Commands {
         #[arg(long = "rhei", value_name = "RHEI_ID", add = ArgValueCompleter::new(complete_rhei_id))]
         rhei: Vec<String>,
         /// Emit the state machine as JSON instead of plain text
+        #[arg(long)]
+        json: bool,
+    },
+    /// Print the effective agent, model, and defaults registry
+    // §FS-rhei-agents.1.1.7: Read-only effective roster inspection.
+    Roster {
+        /// Path to the markdown plan file (.rhei.md); omitted, the nearest
+        /// enclosing project, workspace, or lone plan is used
+        #[arg(value_name = "RHEI_PLAN", add = ArgValueCompleter::new(complete_rhei_plan_path))]
+        input: Option<PathBuf>,
+        /// Emit the complete versioned registry as JSON
         #[arg(long)]
         json: bool,
     },

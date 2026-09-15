@@ -324,10 +324,12 @@ path = "crates/rhei-cli/src/cli/cli_declarations.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 700, unit = "lines" }
+max_accepted = { value = 800, unit = "lines" }
 until = "Subcommand groups move to their own Subcommand enums that the root flattens, so each group's declarations travel with its command."
 reason = """
-Over budget before this change; the touch that surfaced it added three subcommands. It is one clap derive tree, and a subcommand's declaration must sit inside the enum that clap parses.
+The clap derive tree must name every subcommand in one enum. Its prior accepted
+growth added three commands; roster adds one inspection command, while the
+recorded grouped-subcommand split remains the boundary that retires this exception.
 """
 [[exceptions]]
 path = "crates/rhei-cli/src/cli/cli_dispatch.rs"
@@ -529,17 +531,6 @@ max_accepted = { value = 800, unit = "lines" }
 until = "The dashboard fixture is shared from a test-support module so the state-application, snapshot, and HTTP-surface tests can live beside the code each covers."
 reason = """
 Over budget before this change; the touch that surfaced it added one line, the report field on a constructed `UsageReported`. One test module covers state application, the `/snapshot` payload, and the served HTTP surface because all three are driven through the one DashboardState and DashboardSink fixture built in this file, and none of them can move out until that fixture does.
-"""
-[[exceptions]]
-path = "crates/rhei-cli/src/cli/settings_load_validate.rs"
-match = "exact"
-rules = ["source"]
-kind = "deferred"
-max_accepted = { value = 700, unit = "lines" }
-until = "crates/rhei-cli/src/cli/settings_validate_references.rs exists and carries the registry-reference validators with their hint builders"
-issue = "agent-grounds/rhei#197"
-reason = """
-This file carries two responsibilities under one include: merging the settings documents into one registry (load_merged_settings and its JSON helpers), and validating a machine's and a plan's references against that registry (validate_machine_settings_references, validate_task_execution_override_settings_references, and the hint builders they print). The second half has no module of its own, so there is no destination to move it to; creating one is a structural change to the CLI's module layout, and it cannot ride inside a supervised diagnostic fix whose whole code change is eleven lines in two hint builders.
 """
 [[exceptions]]
 path = "README.md"

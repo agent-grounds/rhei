@@ -327,10 +327,9 @@ fn write_roster_stdout(rendered: &str) -> MietteResult<()> {
     }
 }
 
-/// Resolve only the project/settings boundary, validate the complete selected
-/// documents, then emit one atomic payload. Plan task bodies are never loaded.
-/// §FS-rhei-agents.1.1.7 §FS-rhei-panta.6
-fn roster_command(input: Option<PathBuf>, json: bool) -> MietteResult<()> {
+/// Accept only the plan shapes shared discovery recognizes, without loading
+/// their task bodies. §FS-rhei-agents.1.1.7 §FS-rhei-panta.6
+fn roster_project_root(input: Option<PathBuf>) -> MietteResult<PathBuf> {
     let target = resolve_plan_target(input).map_err(|err| {
         miette!(
             help = "pass a plan or project path: rhei roster <RHEI_PLAN>",
@@ -338,8 +337,43 @@ fn roster_command(input: Option<PathBuf>, json: bool) -> MietteResult<()> {
         )
     })?;
     let normalized = normalize_workspace_input(target.path());
-    let root = execution_workspace_root(&normalized);
-    let roster = load_merged_roster(&root)?;
+    let is_single_file_plan = normalized.is_file()
+        && normalized
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.ends_with(".rhei.md"));
+    if workspace::panta_project_dir(&normalized).is_some()
+        || workspace::workspace_dir(&normalized).is_some()
+        || is_single_file_plan
+    {
+        return Ok(execution_workspace_root(&normalized));
+    }
+    if normalized.is_dir() {
+        return Err(unrecognized_plan_directory_report(&normalized, None)?);
+    }
+    Err(miette!(
+        help = "pass a `*.rhei.md` plan, a Directory Workspace, or a Panta Project: \
+                rhei roster <RHEI_PLAN>",
+        "'{}' is not a recognized Rhei plan or project",
+        normalized.display()
+    ))
+}
+
+fn warn_deprecated_roster_source(root: &Path, sources: &RosterSources) {
+    let Some((read, ProjectSettingsFile::Deprecated)) = sources.project.as_ref() else {
+        return;
+    };
+    // Successful inspection retains the warning, after every fallible
+    // settings and output step has completed. §FS-rhei-agents.1.1.7
+    warn_deprecated_rhei_home(read, &rhei_home_write_path(root, PROJECT_SETTINGS_FILE));
+}
+
+/// Resolve only the project/settings boundary, validate the complete selected
+/// documents, then emit one atomic payload. Plan task bodies are never loaded.
+/// §FS-rhei-agents.1.1.7 §FS-rhei-panta.6
+fn roster_command(input: Option<PathBuf>, json: bool) -> MietteResult<()> {
+    let root = roster_project_root(input)?;
+    let roster = load_merged_roster(&root, false)?;
     let errors = validate_intrinsic_settings(&roster.settings);
     if !errors.is_empty() {
         return Err(miette!(
@@ -356,5 +390,7 @@ fn roster_command(input: Option<PathBuf>, json: bool) -> MietteResult<()> {
     } else {
         render_roster_text(&payload)
     };
-    write_roster_stdout(&rendered)
+    write_roster_stdout(&rendered)?;
+    warn_deprecated_roster_source(&root, &roster.sources);
+    Ok(())
 }

@@ -64,7 +64,7 @@ mod roster_unit_tests {
               "defaults": {"agent": null, "agent_mode": null, "skills": []}
             }"#,
         );
-        let roster = load_merged_roster(&plan_root).expect("merge roster");
+        let roster = load_merged_roster(&plan_root, false).expect("merge roster");
         (root, roster)
     }
 

@@ -115,6 +115,55 @@ fn roster_unreadable_settings_emit_one_json_error_and_no_partial_payload() {
     assert!(error["error"]["help"].as_str().is_some(), "JSON error omitted help: {error:#}");
 }
 
+/// A deprecated-home warning must not prefix the JSON parse failure.
+/// §FS-rhei-agents.1.1.7 §FS-rhei-usage.2.2
+#[test]
+fn roster_malformed_deprecated_settings_emit_only_one_json_error() {
+    let root = unique_temp_dir("roster-malformed-deprecated-settings");
+    let home = root.join("home");
+    let plan = valid_plan(&root);
+    let settings = write_settings(&root, DEPRECATED_SETTINGS, "{ not valid JSON");
+
+    let result = run_roster(&home, &root, Some(&plan), true);
+    assert!(!result.status.success(), "malformed settings must be refused");
+    assert!(result.stdout.is_empty(), "failure emitted a partial roster: {}", result.stdout);
+    let error: serde_json::Value = serde_json::from_str(result.stderr.trim())
+        .unwrap_or_else(|why| panic!("stderr must be one JSON object: {why}\n{}", result.stderr));
+    assert!(
+        error["error"]["message"].as_str().is_some_and(|message| {
+            message.contains("failed to parse settings")
+                && message.contains(&settings.display().to_string())
+        }),
+        "JSON error did not identify the malformed deprecated file: {error:#}"
+    );
+    assert!(error["error"]["help"].as_str().is_some(), "JSON error omitted help: {error:#}");
+}
+
+/// Intrinsic validation also completes before a deprecated warning is emitted,
+/// leaving the complete stderr stream as one JSON object on failure.
+/// §FS-rhei-agents.1.1.7 §FS-rhei-usage.2.2
+#[test]
+fn roster_invalid_deprecated_settings_emit_only_one_json_error() {
+    let root = unique_temp_dir("roster-invalid-deprecated-settings");
+    let home = root.join("home");
+    let plan = valid_plan(&root);
+    write_settings(&root, DEPRECATED_SETTINGS, r#"{"agents":{"invalid":{"command":[]}}}"#);
+
+    let result = run_roster(&home, &root, Some(&plan), true);
+    assert!(!result.status.success(), "intrinsically invalid settings must be refused");
+    assert!(result.stdout.is_empty(), "failure emitted a partial roster: {}", result.stdout);
+    let error: serde_json::Value = serde_json::from_str(result.stderr.trim())
+        .unwrap_or_else(|why| panic!("stderr must be one JSON object: {why}\n{}", result.stderr));
+    assert!(
+        error["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("invalid merged settings")
+                && message.contains("empty 'command'")),
+        "JSON error did not report intrinsic validation: {error:#}"
+    );
+    assert!(error["error"]["help"].as_str().is_some(), "JSON error omitted help: {error:#}");
+}
+
 /// Text is a compact, ordered human summary: sources and defaults first,
 /// agents and modes next, models and binding field origins last.
 /// §FS-rhei-agents.1.1.7

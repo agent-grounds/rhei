@@ -66,6 +66,39 @@ fn roster_without_a_discoverable_target_fails_with_target_guidance() {
     );
 }
 
+/// Existing paths are not enough: an explicit target must have a recognized
+/// plan, workspace, or project shape. §FS-rhei-agents.1.1.7 §FS-rhei-panta.6
+#[test]
+fn roster_rejects_explicit_unrecognized_directory_and_file_with_json_guidance() {
+    let root = unique_temp_dir("roster-unrecognized-target");
+    let home = root.join("home");
+    let directory = root.join("ordinary-directory");
+    fs::create_dir_all(&directory).expect("create ordinary directory");
+    let file = write_fixture_file(&root, "notes.md", "not a Rhei plan\n");
+
+    for target in [&directory, &file] {
+        let result = run_roster(&home, &root, Some(target), true);
+        assert!(!result.status.success(), "roster accepted {}", target.display());
+        assert!(result.stdout.is_empty(), "failure emitted a roster: {}", result.stdout);
+        let error: serde_json::Value =
+            serde_json::from_str(result.stderr.trim()).unwrap_or_else(|why| {
+                panic!("stderr must be one JSON error object: {why}\n{}", result.stderr)
+            });
+        assert!(
+            error["error"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("not a recognized")),
+            "error did not classify the target: {error:#}"
+        );
+        assert!(
+            error["error"]["help"]
+                .as_str()
+                .is_some_and(|help| help.contains("plan") || help.contains("Plan")),
+            "error did not guide the caller to a plan target: {error:#}"
+        );
+    }
+}
+
 /// The current project home wins and suppresses the deprecated warning; only
 /// after it is absent may the deprecated file supply the entire project layer.
 /// §FS-rhei-agents.1.1 §FS-rhei-agents.1.1.7

@@ -196,7 +196,7 @@ A missing manifest is a plan-shape failure, not evidence of a filesystem
 failure. Its diagnostic therefore gives no permissions, writability, or free
 space advice. Genuine filesystem failures retain their cause-derived guidance
 from §6. A headless run reports the same startup diagnosis and nonzero outcome
-through [§FS-rhei-run-headless.1.1](rhei-run-headless.spec.md#11-startup-handshake-no-false-success) rather than hiding it in the detached run's log.
+through [§FS-rhei-run-headless.1.1](rhei-run-headless.spec.md#11-startup-is-synchronous) rather than hiding it in the detached run's log.
 
 This refusal does not change what Rhei accepts: recognized Panta Projects,
 directly addressed Directory Workspaces, and Single-File Plans retain their

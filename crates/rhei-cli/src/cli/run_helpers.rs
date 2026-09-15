@@ -354,6 +354,9 @@ fn compose_agent_prompt(render_context: &RuntimeTemplateContext<'_>) -> MietteRe
     prompt.push_str(&render_supervision_checkpoints(render_context)?);
     prompt.push_str(&render_prior_task_results(render_context)?);
     prompt.push_str(&render_consumed_exports(render_context)?);
+    if let Some(memory) = render_context.memory {
+        prompt.push_str(&memory.exclusions.render(memory.exclusions_filesystem_denied));
+    }
     prompt.push_str(&render_declared_exports(render_context));
     prompt.push_str(&render_terminal_result(render_context));
     for section in resolve_state_handoff_sections(render_context)? {

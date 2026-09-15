@@ -13,6 +13,12 @@ Rhei is the only agent runtime that combines all of:
   diff, and edit in any editor — not a database, not a chat scratchpad.
 - **Explicit prerequisite DAG.** `**Prior:**` declares dependencies, validated
   for cycles, missing references, and kind mismatches.
+- **Opt-in blind tasks.** `**Excludes:**` names checkout files, runtime
+  artifacts, directories, or another task's declared export that Rhei must not
+  paste into a task's context. Validation rejects exclusions that hide required
+  inputs. Built-in agents provide composition-only filtering; a custom profile
+  can declare `deny_read.path_flag` to enforce the resolved paths for its
+  process tree.
 - **Hierarchical tasks** with configurable depth (`structure.maxLevels` 1–4,
   default 2). A child is the same keyword one heading deeper — `### Task 1:`
   holds `#### Task 1.1:` — so nesting needs no configuration.
@@ -94,6 +100,8 @@ Also in the workspace, unpublished:
 
 The runtime currently supports:
 - parsing Rhei, task, and subtask structure from Markdown workflows
+- resolving task-level `**Excludes:**` boundaries for validation, prompt
+  composition, manual work, and enforcing custom agent adapters
 - validating task metadata, dependencies, state machines, and artifact
   contracts against [`docs/functional-spec/states.yaml`](docs/functional-spec/states.yaml)
 - selecting ready work deterministically with `rhei next`

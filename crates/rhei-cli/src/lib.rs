@@ -60,6 +60,7 @@ include!("cli/subtree_supervision_owner.rs");
 include!("cli/subtree_supervision_barrier.rs");
 include!("cli/transition_context.rs");
 include!("cli/checkout_roots.rs");
+include!("cli/exclusion_policy.rs");
 include!("cli/artifacts.rs");
 include!("cli/transition_checks.rs");
 include!("cli/claim_transaction.rs");

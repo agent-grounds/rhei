@@ -205,6 +205,20 @@ impl<'a> Iterator for Tokenizer<'a> {
                 return Some(Token::MetadataConsumes { exports });
             }
 
+            // Metadata: Excludes. Detailed validation belongs to the parser.
+            // §FS-rhei-plan-language.4
+            if line.starts_with("**Excludes:**") {
+                let entries = line
+                    .strip_prefix("**Excludes:**")
+                    .unwrap_or_default()
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|entry| !entry.is_empty())
+                    .map(str::to_string)
+                    .collect();
+                return Some(Token::MetadataExcludes { entries });
+            }
+
             // Metadata: Assignee
             if let Some(caps) = self.re_assignee.captures(line) {
                 let name = caps.get(1).map(|m| m.as_str().trim()).unwrap_or_default();

@@ -140,6 +140,9 @@ fn checkpoint_source_outputs(
         if !path.exists() {
             continue;
         }
+        if !prompt_source_allowed(render_context, &path) {
+            continue;
+        }
         let content = fs::read_to_string(&path)
             .map_err(|err| file_io_report(&path, "failed to read checkpoint artifact", err))?;
         if content.trim().is_empty() {
@@ -235,6 +238,9 @@ fn render_supervisor_brief(render_context: &RuntimeTemplateContext<'_>) -> Miett
         supervisor_brief_paths(root, &render_context.task.id, render_context.state_name)
     {
         if !path.exists() {
+            continue;
+        }
+        if !prompt_source_allowed(render_context, &path) {
             continue;
         }
         let content = fs::read_to_string(&path)

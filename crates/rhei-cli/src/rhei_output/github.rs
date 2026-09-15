@@ -103,6 +103,35 @@ impl GithubIssuesOutput {
                 out.push_str(&fmt_prior_list(&task.prior));
                 out.push('\n');
             }
+            if !task.provides.is_empty() {
+                out.push_str("**Provides:** ");
+                out.push_str(&task.provides.join(", "));
+                out.push('\n');
+            }
+            if !task.consumes.is_empty() {
+                out.push_str("**Consumes:** ");
+                out.push_str(
+                    &task
+                        .consumes
+                        .iter()
+                        .map(|export| format!("{}:{}", export.task, export.name))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                );
+                out.push('\n');
+            }
+            if !task.excludes.is_empty() {
+                out.push_str("**Excludes:** ");
+                out.push_str(
+                    &task
+                        .excludes
+                        .iter()
+                        .map(|entry| entry.authored())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                );
+                out.push('\n');
+            }
             if let Some(ref assignee) = task.assignee {
                 out.push_str("- Assignee: ");
                 out.push_str(assignee);

@@ -4,6 +4,14 @@
 
 ### Added
 
+- **Tasks can declare explicit read exclusions for blind work.** `**Excludes:**`
+  accepts checkout paths, runtime files or directories, and declared exports;
+  validation rejects malformed, escaping, duplicate, unresolved, or
+  required-input conflicts. Rhei filters matching payloads from serial,
+  parallel, retry, fan-out, and `rhei next` context while retaining navigation.
+  Built-in profiles are composition-only; custom profiles may declare a
+  `deny_read.path_flag` adapter for process-tree enforcement. (PR #274)
+
 - **Per-session reports and declared metrics are now specified.**
   §FS-rhei-session-reports defines one readable Markdown report rendered from
   each agent session log under `runtime/reports/`, and §FS-rhei-metrics defines

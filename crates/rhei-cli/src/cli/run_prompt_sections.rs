@@ -73,6 +73,9 @@ fn read_task_result(
     task_id: &TaskId,
 ) -> MietteResult<Option<String>> {
     let Some(path) = resolved_result_path(render_context, task_id) else { return Ok(None) };
+    if !prompt_source_allowed(render_context, &path) {
+        return Ok(None);
+    }
     let content = fs::read_to_string(&path)
         .map_err(|err| file_io_report(&path, "failed to read task result", err))?;
     Ok(Some(content.trim().to_string()).filter(|content| !content.is_empty()))
@@ -239,6 +242,9 @@ fn render_consumed_exports(render_context: &RuntimeTemplateContext<'_>) -> Miett
         let root = export_root_for_task(render_context, &consumed.task);
         let path = root.join(task_export_relative_path(&consumed.task, &consumed.name));
         if !path.exists() {
+            continue;
+        }
+        if !prompt_source_allowed(render_context, &path) {
             continue;
         }
         let content = fs::read_to_string(&path)

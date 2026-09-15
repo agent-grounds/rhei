@@ -61,6 +61,7 @@ transitions:
             prior,
             provides: Vec::new(),
             consumes: Vec::new(),
+            excludes: Vec::new(),
             assignee: None,
             model: None,
             target: None,

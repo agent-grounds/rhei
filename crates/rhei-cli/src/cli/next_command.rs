@@ -413,8 +413,22 @@ fn next_command(
     let tooling = resolve_tooling(machine, &final_state, &settings);
     // A manual worker is handed the same memory `rhei run` composes; nothing of
     // a run is in flight here. §FS-rhei-memory.5
+    let checkout_root = resolve_agent_checkout_root(&task_workspace_root, &task_id_str)?;
+    let exclusions = loaded_task_exclusions(
+        &loaded,
+        task,
+        &task_workspace_root,
+        &checkout_root.path,
+        &callback_paths.plan_path,
+        machine,
+        callback_paths.state_machine_path.as_deref(),
+    )
+    .map_err(exclusion_report)?;
     let mut memory =
         prompt_memory(&loaded, input, &workspace_root.join("runtime"), BTreeSet::new());
+    memory.exclusions = exclusions;
+    // Manual work has no Rhei-owned process boundary. §FS-rhei-next.3.1
+    memory.exclusions_filesystem_denied = false;
     // §FS-rhei-memory.4.3: `rhei next` prints neither `## Prior Task Results`
     // nor `## Child Task Results`, so a summary here has nothing to defer to.
     memory.pastes_task_inputs = false;
@@ -425,7 +439,7 @@ fn next_command(
         workspace_root: &task_workspace_root,
         task_roots: Some(&loaded.task_roots),
         plan_tasks: Some(&loaded.rhei.tasks),
-        checkout_root: &task_workspace_root,
+        checkout_root: &checkout_root.path,
         plan_path: &callback_paths.plan_path,
         state_machine_path: callback_paths.state_machine_path.as_deref(),
         plan_title: &loaded.rhei.title,
@@ -467,6 +481,7 @@ fn next_command(
     } else {
         format!("\n## Rhei Navigation\n{navigation}")
     };
+    let exclusions = memory.exclusions.render(false);
     // What `rhei run` carries in `## Rhei Commands` and `## Result`, neither of
     // which `rhei next` renders. §FS-rhei-supervision.3.4
     let release_command = format!(
@@ -498,6 +513,7 @@ fn next_command(
         plan_history: &plan_history,
         previous_visits: &previous_visits,
         navigation: &navigation,
+        exclusions: &exclusions,
         agent_id: agent_id_str.as_deref(),
         model_id: model_id_str.as_deref(),
     });

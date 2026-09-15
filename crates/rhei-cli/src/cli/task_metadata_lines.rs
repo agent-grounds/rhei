@@ -42,7 +42,11 @@ fn insert_task_assignee(raw: &str, task_id: &str, assignee: &str) -> MietteResul
         }
         if !in_code_block
             && in_target_task
-            && (line.starts_with("**State:**") || line.starts_with("**Prior:**"))
+            && (line.starts_with("**State:**")
+                || line.starts_with("**Prior:**")
+                || line.starts_with("**Provides:**")
+                || line.starts_with("**Consumes:**")
+                || line.starts_with("**Excludes:**"))
         {
             last_metadata_idx = Some(result.len());
         }

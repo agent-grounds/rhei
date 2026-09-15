@@ -46,6 +46,9 @@ struct NextOutput<'a> {
     plan_history: &'a str,
     previous_visits: &'a str,
     navigation: &'a str,
+    /// Resolved source boundary; manual work is always composition-only.
+    // §FS-rhei-next.3.1
+    exclusions: &'a str,
     agent_id: Option<&'a str>,
     model_id: Option<&'a str>,
 }
@@ -109,6 +112,7 @@ fn print_next_output(output: NextOutput<'_>) {
             ("plan_history", output.plan_history),
             ("previous_visits", output.previous_visits),
             ("navigation", output.navigation),
+            ("exclusions", output.exclusions),
         ] {
             if !section.is_empty() {
                 obj[field] = serde_json::json!(section.trim());
@@ -182,6 +186,7 @@ fn print_next_output(output: NextOutput<'_>) {
         // `## Rhei Commands` does, so it precedes that section's map here too.
         // §FS-rhei-supervision.3.4 §FS-rhei-memory.5
         for section in [
+            output.exclusions,
             output.position,
             output.checkpoints,
             output.supervisor_brief,

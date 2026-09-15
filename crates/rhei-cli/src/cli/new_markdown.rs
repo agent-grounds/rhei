@@ -48,7 +48,7 @@ fn render_rhei_file(header: &RheiHeader<'_>, with_tasks_section: bool) -> String
 }
 
 /// Every metadata field a new ticket can carry, in plan-language order.
-// §FS-rhei-plan-language.2: metadata = state, prior, provides, consumes,
+// §FS-rhei-plan-language.2: metadata = state, prior, provides, consumes, excludes,
 // assignee, execution override.
 struct TicketFields<'a> {
     kind: &'a str,
@@ -58,6 +58,7 @@ struct TicketFields<'a> {
     prior: &'a [String],
     provides: &'a [String],
     consumes: &'a [String],
+    excludes: &'a [String],
     assignee: Option<&'a str>,
     model: Option<&'a str>,
     target: Option<&'a str>,
@@ -80,6 +81,7 @@ fn render_ticket(fields: &TicketFields<'_>) -> String {
         ("Prior", fields.prior),
         ("Provides", fields.provides),
         ("Consumes", fields.consumes),
+        ("Excludes", fields.excludes),
     ] {
         if !values.is_empty() {
             let joined =

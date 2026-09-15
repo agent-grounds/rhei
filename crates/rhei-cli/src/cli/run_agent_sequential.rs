@@ -166,7 +166,19 @@ fn run_sequential_agent_invocation(
     let checkout_root = resolve_agent_checkout_root(&task_workspace_root, task_id_str)?;
     // A sequential pass runs one invocation at a time, so nothing else of this
     // run is in flight. §FS-rhei-memory.4.3
-    let memory = prompt_memory(&loaded, input, runtime_dir, BTreeSet::new());
+    let exclusions = loaded_task_exclusions(
+        &loaded,
+        task,
+        &task_workspace_root,
+        &checkout_root.path,
+        &callback_paths.plan_path,
+        machine,
+        callback_paths.state_machine_path.as_deref(),
+    )
+    .map_err(exclusion_report)?;
+    let mut memory = prompt_memory(&loaded, input, runtime_dir, BTreeSet::new());
+    memory.exclusions = exclusions.clone();
+    memory.exclusions_filesystem_denied = resolved.profile.deny_read.is_some();
     let render_context = RuntimeTemplateContext {
         workspace_root: &task_workspace_root,
         task_roots: Some(&loaded.task_roots),
@@ -257,8 +269,11 @@ fn run_sequential_agent_invocation(
         wall_clock: started_wall,
     });
 
+    // Re-resolved policy is materialized into adapter flags only for a profile
+    // that explicitly declares the capability. §FS-rhei-agents.5.2.1
+    let spawn_resolved = agent_with_exclusion_adapter(resolved, &exclusions);
     let spawn_result = spawn_and_wait_agent(
-        resolved,
+        &spawn_resolved,
         opts.price_book(),
         &prompt,
         &task_workspace_root,

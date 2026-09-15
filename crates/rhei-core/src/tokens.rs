@@ -37,6 +37,10 @@ pub enum Token {
     /// Metadata "Consumes": `**Consumes:** <task-id>:<name>, ...`.
     // §FS-rhei-plan-language.3.12: Task exports.
     MetadataConsumes { exports: Vec<ConsumedExport> },
+    /// Metadata "Excludes" entries are parsed by the plan parser because
+    /// path spellings are intentionally richer than export references.
+    /// §FS-rhei-plan-language.4
+    MetadataExcludes { entries: Vec<String> },
 
     /// Metadata "State": `**State:** <state>`.
     MetadataState { state: String },

@@ -232,12 +232,17 @@ fn format_dry_run_agent_transition(
     to: &str,
     resolved: &ResolvedAgent,
     machine: &rhei_validator::StateMachine,
+    exclusions: &ResolvedExclusions,
 ) -> String {
     let base = format_dry_run_transition(task_id, from, to, machine);
-    match resolved_agent_target_slug(resolved) {
+    let target = match resolved_agent_target_slug(resolved) {
         Some(target_slug) => format!("{base} [target={target_slug}]"),
         None => base,
-    }
+    };
+    format!(
+        "{target}{}",
+        exclusions.dry_run_suffix(resolved.profile.deny_read.is_some())
+    )
 }
 
 fn agent_template_context(resolved: &ResolvedAgent) -> rhei_viz_model::TemplateContext {

@@ -19,7 +19,9 @@ fn resolve_complete_result(result: String, result_file: Option<&Path>) -> Miette
         None => result,
     };
 
-    if message.trim().is_empty() {
+    if result_file.is_none() {
+        require_non_blank_result(Some(&message), "complete")?;
+    } else if message.trim().is_empty() {
         return Err(miette!(
             help = "pass a non-empty message with `--result`, or read one with `--result-file <path>` (`-` for standard input).",
             "completion result carries no message"

@@ -170,6 +170,14 @@ were once written here as commands that "stay on the path they were given",
 which described neither half correctly — the load always widened, and the
 accounting root widened with it, which is the defect §6.5 exists to settle.
 
+`rhei roster` uses the same explicit and omitted target discovery, but widens
+every member target to its project root because settings are project-wide. It
+does not parse task bodies or accept `--rhei`: narrowing members cannot change
+the effective settings registry it reports. Omitted discovery must still find
+an existing project, workspace, or lone rhei; roster inspection does not turn
+an otherwise unrecognized current directory into a project. Its registry and
+provenance contract is [§FS-rhei-agents.1.1.7](rhei-agents.spec.md#117-inspecting-the-effective-roster).
+
 An **empty project** — an `index.panta.md` with no rheis yet, the state
 `rhei init` leaves behind — is a valid project, not an error. Read commands
 treat it as zero tickets: `rhei list` says the project has no tickets yet and

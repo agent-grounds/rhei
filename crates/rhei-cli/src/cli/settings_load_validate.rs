@@ -128,7 +128,10 @@ fn project_settings_path(plan_root: &Path) -> PathBuf {
 /// Load merged settings plus the source decisions that produced every roster
 /// value. Execution discards the additional record; inspection renders it
 /// without re-reading or re-merging settings. §FS-rhei-agents.1.1.7
-fn load_merged_roster(plan_root: &Path) -> MietteResult<MergedRoster> {
+fn load_merged_roster(
+    plan_root: &Path,
+    warn_before_project_load: bool,
+) -> MietteResult<MergedRoster> {
     let global_document = match home_dir() {
         Ok(home) => load_settings_document(&home.join(".config/rhei/settings.json"))?,
         Err(_) => empty_settings_document(),
@@ -142,7 +145,12 @@ fn load_merged_roster(plan_root: &Path) -> MietteResult<MergedRoster> {
         Some(_) => ProjectSettingsFile::Deprecated,
         None => ProjectSettingsFile::Current,
     };
-    project_settings.warn_if_deprecated();
+    if warn_before_project_load {
+        // Execution retains the existing warning timing. Roster defers it
+        // until inspection succeeds so JSON errors stay singular.
+        // §FS-rhei-agents.1.1.7
+        project_settings.warn_if_deprecated();
+    }
     let project_document = load_settings_document(project_settings.path())?;
     let sources = RosterSources {
         global: global_document.source_path.clone(),
@@ -369,7 +377,7 @@ fn load_merged_roster(plan_root: &Path) -> MietteResult<MergedRoster> {
 /// Preserve execution's settings-only interface while sharing exactly the
 /// merge used by roster inspection. §FS-rhei-agents.1.1.7
 fn load_merged_settings(plan_root: &Path) -> MietteResult<RheiSettings> {
-    Ok(load_merged_roster(plan_root)?.settings)
+    Ok(load_merged_roster(plan_root, true)?.settings)
 }
 
 fn validate_snapshot_plan_context(

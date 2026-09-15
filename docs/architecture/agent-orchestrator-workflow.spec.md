@@ -323,6 +323,16 @@ The orchestrator therefore treats Git commit creation as an external side
 effect, not as a state-transition persistence mechanism. [§FS-rhei-agents.3.1](../functional-spec/rhei-agents.spec.md#31-completion-authority)
 [§FS-rhei-run.3](../functional-spec/rhei-run.spec.md#3-execution-loop)
 
+Two runtime artifact families sit on opposite sides of this durability line.
+Metric iteration records under `runtime/metrics/` are engine-owned durable
+facts: the orchestrator appends each record at the moment it confirms a
+measurement, because only at that moment does it know first-hand which sessions
+ran inside the measurement's window — a later reader must never have to
+reconstruct that binding from transition history or file timestamps.
+[§FS-rhei-metrics.3](../functional-spec/rhei-metrics.spec.md#3-iteration-record) Session reports under `runtime/reports/` are the
+opposite: derived views computed from session logs and recorded facts,
+regenerable at any time and never load-bearing. [§FS-rhei-session-reports.1](../functional-spec/rhei-session-reports.spec.md#1-report-artifact)
+
 At `rhei run` entry, the CLI records the repository root and `HEAD` only when
 the execution workspace is inside Git. At successful run exit, it re-reads
 `HEAD`; if `HEAD` moved, the CLI performs a read-only tracked-status check over

@@ -101,6 +101,7 @@ The commands that coordinate through the state machine:
 | `rhei complete`    | Terminal transition invoked by a manual worker: the inferred one-hop terminal target plus the shared transition carrying a literal `--result` or UTF-8 `--result-file` message |
 | `rhei reset`       | Returns each task to the state it was authored in ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)), removes `runtime/`; narrowed with `--rhei <id>` it removes only the in-scope tickets' keyed output ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)) |
 | `rhei snapshot`    | Lists, shows, prunes, or continues from session snapshots captured by `rhei run` |
+| `rhei roster`      | Inspects the effective agents, models, bindings, defaults, sources, and merge provenance for a project ([§FS-rhei-agents.1.1.7](rhei-agents.spec.md#117-inspecting-the-effective-roster)) |
 
 `rhei run` and the manual-worker flow (`next` / `transition` / `complete`) are mutually exclusive per execution — they never overlap on the same task because `rhei run` holds transition responsibility for the states it drives. The typical manual-worker loop is `next` (claim) → work → `transition` (advance as needed) → `complete` (finish, record result, release).
 
@@ -130,6 +131,9 @@ Human-readable output, machine formats (`--json`, `--format json`), and the
 rendered documents all go to stdout; diagnostics and warnings go to stderr, so
 `rhei list 2>/dev/null` is a clean ticket listing even when a rhei fails to
 load ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
+`rhei roster --json` follows the same split: its one schema object is stdout,
+while a deprecated-settings warning or its single JSON error-with-help object
+is stderr ([§FS-rhei-agents.1.1.7](rhei-agents.spec.md#117-inspecting-the-effective-roster)).
 
 A consumer may stop reading stdout before a command finishes writing it —
 `rhei list | head`, `rhei states | grep -q`, quitting a pager. That is normal

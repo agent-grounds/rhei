@@ -40,6 +40,9 @@ Files:
 Both files use the same schema. Project settings compose with global settings by
 key rather than replacing the whole file.
 
+The effective agent/model roster and the exact files selected for this merge
+are inspectable with `rhei roster`; its output contract is §1.1.7.
+
 **The project settings file is resolved by first match, and the two project
 paths are never merged.** `.agent-grounds/rhei/settings.json` is read when it
 exists; only when it does not is `.agents/rhei/settings.json` read. Merging the
@@ -315,6 +318,92 @@ keeps state machines portable across agents that do not implement skills.
 storage, redaction, cache TTLs, and experimental adapter gates. This spec only
 declares where the block lives in settings; field definitions and defaults are
 authoritative in [Snapshot Operations Specification — Configuration](rhei-snapshot-operations.spec.md#4-configuration).
+
+#### 1.1.7. Inspecting the effective roster
+
+`rhei roster [RHEI_PLAN]` is a read-only view of the settings registry that
+execution would use for the selected project. It reports the complete effective
+`agents` registry, including every mode, the complete effective `models`
+registry and its per-agent bindings, and the canonical nested `defaults`. It
+does not report deprecated top-level default keys, state or task selectors,
+run-time overrides, MCP/skill/snapshot registries, template source settings, or
+settings copied into rendered plans.
+
+The optional target uses the shared explicit and omitted target discovery in
+[Panta project scope](rhei-panta.spec.md#6-project-scope-and-command-behavior).
+A member rhei widens to its project root before settings are selected, including
+a member of a Panta project. With no target, discovery must find an enclosing
+project or workspace, or the lone rhei in the invocation directory; the current
+directory alone is not treated as a project. Failure uses the ordinary
+actionable plan/project discovery diagnostic. The command has no `--rhei`
+narrowing because all members of a project use the same merged settings.
+Finding the settings root does not parse or validate task bodies, so malformed
+task Markdown does not prevent registry inspection.
+
+`--json` writes one pretty-printed JSON object to stdout. Schema version 1 has
+exactly these stable top-level fields:
+
+| Field | Value |
+|-------|-------|
+| `schema_version` | Integer `1` |
+| `project_root` | Resolved path of the root whose settings were merged |
+| `sources` | The built-in, global, and project source metadata below |
+| `agents` | Effective agent profiles keyed by agent id, using the fields in §1.1.2 |
+| `models` | Effective model profiles and bindings keyed by id, using the fields in §1.1.3 |
+| `defaults` | Effective canonical nested defaults, using the fields in §1.1.1 |
+| `provenance` | Origins for the independently merged values below |
+
+`sources` always contains all three keys. `sources.built_in` is an object with
+the running Rhei `version`. `sources.global` is `null` when no global settings
+file was read, otherwise an object containing its resolved `path`.
+`sources.project` is `null` when no project settings file was read, otherwise
+an object containing its resolved `path` and `home`, whose value is `current`
+for `.agent-grounds/rhei/settings.json` or `deprecated` for the fallback
+`.agents/rhei/settings.json`. The current home wins when both exist; the two
+files are never merged. Reading the deprecated home retains its existing
+stderr warning.
+
+Every provenance leaf is one of the source keys `built_in`, `global`, or
+`project`:
+
+- `provenance.agents.<id>` is one origin for the whole agent profile because an
+  agent entry is replaced wholesale.
+- `provenance.models.<id>.<field>` records the origin of each supplied
+  `provider`, `model`, and `default_agent` field.
+- `provenance.models.<id>.agents.<agent-id>.<field>` records the origin of each
+  supplied `args`, `autonomous_args`, and `timeout` binding field.
+- `provenance.defaults.<field>` records the origin of each supplied canonical
+  default.
+
+The settings loader records these origins in the same decisions that perform
+the merge in §1.3. The roster renderer consumes that merged result and must not
+re-read settings documents or perform a second merge. Existing execution
+callers receive unchanged effective settings. A mixed model or binding reports
+the origin of each inherited and overriding field rather than assigning one
+origin to the containing object.
+
+An optional field never supplied by any layer is absent from both its value
+object and provenance object. An explicit clear remains present: `null` for an
+optional scalar, and `[]` for list-valued defaults or binding arguments, with
+the clearing layer as its provenance. Empty registry maps remain objects. This
+distinguishes omission, inheritance, and clearing without changing the field
+names used in settings.
+
+Without `--json`, output is a compact human summary in this order: the selected
+sources and canonical defaults; agents, each with its source and mode names;
+then models and bindings, with a compact source annotation for every displayed
+field. The text view need not repeat full transport commands or binding values;
+the JSON view is the complete machine-readable contract.
+
+Selected settings are read and validated before either renderer writes a
+payload. An unreadable, malformed, undecodable, or intrinsically invalid
+selected file therefore emits no partial stdout. Under `--json`, failure keeps
+the single JSON error-with-help object on stderr; text failures and all warnings
+also stay on stderr. Both successful renderings treat an early stdout closure
+as normal pipeline termination under [§FS-rhei-usage.2.2](rhei-usage.spec.md#22-command-surface).
+
+Inspection has no execution side effects: it writes no file, creates no
+runtime tree, performs no transition or migration, and spawns no subprocess.
 
 ### 1.2. Per-State Settings
 

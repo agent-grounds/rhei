@@ -282,29 +282,56 @@ fn complete_result_input_resolves_relative_and_absolute_file_paths() {
 // §FS-rhei-complete.2.2 §FS-rhei-complete.4
 #[test]
 fn complete_result_input_rejects_bad_sources_before_plan_loading_or_mutation() {
-    for label in ["missing", "unreadable", "invalid-utf8", "blank-file", "blank-stdin"] {
-        let case = setup_case(&format!("complete-result-invalid-{label}"), PlanShape::SingleFile);
-        let source = case._root.join(format!("{label}.input"));
-        let (argument, stdin): (&OsStr, Option<&[u8]>) = match label {
-            "missing" => (source.as_os_str(), None),
-            "unreadable" => {
-                fs::create_dir(&source).expect("create non-file input");
-                (source.as_os_str(), None)
-            }
-            "invalid-utf8" => {
-                fs::write(&source, [0xff, 0xfe, 0xfd]).expect("write invalid UTF-8");
-                (source.as_os_str(), None)
-            }
-            "blank-file" => {
-                fs::write(&source, b" \r\n\t").expect("write blank input");
-                (source.as_os_str(), None)
-            }
-            "blank-stdin" => (OsStr::new("-"), Some(b" \n\t")),
-            _ => unreachable!(),
-        };
-        let before = durable_snapshot(&case);
-        let run = run_complete(&case, &case._root, &[OsStr::new("--result-file"), argument], stdin);
-        assert_failed_without_mutation(&case, &before, &run);
+    for shape in [PlanShape::SingleFile, PlanShape::Workspace] {
+        for label in [
+            "missing",
+            "unreadable",
+            "invalid-utf8",
+            "invalid-utf8-stdin",
+            "blank-file",
+            "blank-stdin",
+            "empty-file",
+            "empty-stdin",
+        ] {
+            let case = setup_case(
+                &format!(
+                    "complete-result-invalid-{shape_name}-{label}",
+                    shape_name = match shape {
+                        PlanShape::SingleFile => "single-file",
+                        PlanShape::Workspace => "workspace",
+                    }
+                ),
+                shape,
+            );
+            let source = case._root.join(format!("{label}.input"));
+            let (argument, stdin): (&OsStr, Option<&[u8]>) = match label {
+                "missing" => (source.as_os_str(), None),
+                "unreadable" => {
+                    fs::create_dir(&source).expect("create non-file input");
+                    (source.as_os_str(), None)
+                }
+                "invalid-utf8" => {
+                    fs::write(&source, [0xff, 0xfe, 0xfd]).expect("write invalid UTF-8");
+                    (source.as_os_str(), None)
+                }
+                "invalid-utf8-stdin" => (OsStr::new("-"), Some(&[0xff, 0xfe, 0xfd])),
+                "blank-file" => {
+                    fs::write(&source, b" \r\n\t").expect("write blank input");
+                    (source.as_os_str(), None)
+                }
+                "blank-stdin" => (OsStr::new("-"), Some(b" \n\t")),
+                "empty-file" => {
+                    fs::write(&source, b"").expect("write empty input");
+                    (source.as_os_str(), None)
+                }
+                "empty-stdin" => (OsStr::new("-"), Some(b"")),
+                _ => unreachable!(),
+            };
+            let before = durable_snapshot(&case);
+            let run =
+                run_complete(&case, &case._root, &[OsStr::new("--result-file"), argument], stdin);
+            assert_failed_without_mutation(&case, &before, &run);
+        }
     }
 
     let root = unique_temp_dir("complete-result-error-precedence");

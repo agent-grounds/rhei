@@ -15,6 +15,7 @@ fn accounting_test_record() -> AccountingInvocationRecord {
         duration_ms: None,
         cli_session: None,
         extraction_status: "measured".to_string(),
+        extraction_diagnostics: Vec::new(),
         scope: "aggregate-agent-process".to_string(),
         token_convention: None,
         tokens: AccountingTokens::default(),

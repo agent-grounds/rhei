@@ -36,6 +36,13 @@ struct AccountingInvocationRecord {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     cli_session: Option<AccountingCliSession>,
     extraction_status: String,
+    /// Distinct structured-extraction failures, in first-seen order.
+    ///
+    /// Empty only for historical records and non-failure statuses; current
+    /// failed writers always persist at least one reason.
+    // §FS-rhei-cost-accounting.3 §FS-rhei-cost-accounting.3.2
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    extraction_diagnostics: Vec<String>,
     scope: String,
     /// Which convention this record's token dimensions follow.
     ///

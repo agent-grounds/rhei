@@ -39,6 +39,20 @@ enum ExtractedUsageStatus {
     ExtractorFailed,
 }
 
+/// A capture's existing status plus the reasons retained when that status is
+/// `extractor-failed`. Keeping the status enum unchanged preserves every
+/// consumer that only needs accounting coverage. §FS-rhei-cost-accounting.4
+struct ExtractedUsageResult {
+    status: ExtractedUsageStatus,
+    extraction_diagnostics: Vec<String>,
+}
+
+const MISSING_CLAUDE_RESULT_DIAGNOSTIC: &str =
+    "claude-code result envelope is missing required `result` text";
+const HISTORICAL_EXTRACTION_FAILURE_DIAGNOSTIC: &str =
+    "usage capture reported extractor-failed without a diagnostic";
+const INVALID_USAGE_CAPTURE_DIAGNOSTIC: &str = "usage capture contains invalid JSON";
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum AgentUsageExtractor {
     Claude,
@@ -165,23 +179,23 @@ fn record_agent_accounting_attempt(
     write_price_book(&accounting_root, invocation.price_book)?;
 
     // §FS-rhei-cost-accounting.11: Extraction failures affect coverage only.
-    let (tokens, extraction_status) =
-        match extract_usage(
-            invocation.usage_capture_path,
-            invocation.log_path,
-            invocation.resolved.agent.id(),
-        ) {
-            ExtractedUsageStatus::Measured(usage) => (tokens_from_usage(usage), "measured"),
-            ExtractedUsageStatus::NoUsageEmitted => {
-                (AccountingTokens::default(), "no-usage-emitted")
-            }
-            ExtractedUsageStatus::ExtractorUnavailable => {
-                (AccountingTokens::default(), "extractor-unavailable")
-            }
-            ExtractedUsageStatus::ExtractorFailed => {
-                (AccountingTokens::default(), "extractor-failed")
-            }
-        };
+    let extraction = extract_usage_with_diagnostics(
+        invocation.usage_capture_path,
+        invocation.log_path,
+        invocation.resolved.agent.id(),
+    );
+    let (tokens, extraction_status) = match extraction.status {
+        ExtractedUsageStatus::Measured(usage) => (tokens_from_usage(usage), "measured"),
+        ExtractedUsageStatus::NoUsageEmitted => {
+            (AccountingTokens::default(), "no-usage-emitted")
+        }
+        ExtractedUsageStatus::ExtractorUnavailable => {
+            (AccountingTokens::default(), "extractor-unavailable")
+        }
+        ExtractedUsageStatus::ExtractorFailed => {
+            (AccountingTokens::default(), "extractor-failed")
+        }
+    };
     let provider = invocation.resolved.model_provider.clone();
     let model =
         invocation.resolved.model_name.clone().or_else(|| invocation.resolved.model.clone());
@@ -209,6 +223,9 @@ fn record_agent_accounting_attempt(
         duration_ms: Some(accounting_duration_ms(invocation.started_at, invocation.ended_at)),
         cli_session: invocation.cli_session.cloned(),
         extraction_status: extraction_status.to_string(),
+        // A current failed writer always received either a retained parser
+        // reason or the historical-event fallback. §FS-rhei-cost-accounting.4
+        extraction_diagnostics: extraction.extraction_diagnostics,
         scope: "aggregate-agent-process".to_string(),
         // §FS-rhei-cost-accounting.3.6: every record Rhei writes says which
         // convention its dimensions follow, so a reader of a mixed archive
@@ -683,7 +700,8 @@ fn capture_agent_output_usage(
         OutputUsage::Measured(usage) => usage,
         OutputUsage::Ignored => return,
         OutputUsage::Failed => {
-            let _ = append_extractor_failure_event(&capture.path);
+            let diagnostic = extraction_failure_diagnostic(capture.extractor, line);
+            let _ = append_extractor_failure_event_with_diagnostic(&capture.path, diagnostic);
             return;
         }
     };
@@ -764,6 +782,26 @@ fn extract_usage_from_output_line(
         AgentUsageExtractor::Pi => extract_pi_json_usage(line)
             .map(OutputUsage::Measured)
             .unwrap_or(OutputUsage::Ignored),
+    }
+}
+
+/// Explain a structured parser rejection without copying the rejected output.
+/// The fixed vocabulary is stable, single-line, and safely below the durable
+/// 240-character bound. §FS-rhei-cost-accounting.4
+fn extraction_failure_diagnostic(extractor: AgentUsageExtractor, line: &str) -> &'static str {
+    match extractor {
+        AgentUsageExtractor::Claude => {
+            let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
+                return "claude-code output line is not valid JSON";
+            };
+            if value.get("result").and_then(serde_json::Value::as_str).is_none() {
+                MISSING_CLAUDE_RESULT_DIAGNOSTIC
+            } else {
+                "claude-code result envelope has invalid or missing usage"
+            }
+        }
+        AgentUsageExtractor::Codex => "codex structured usage event could not be parsed",
+        AgentUsageExtractor::Pi => "pi structured usage event could not be parsed",
     }
 }
 
@@ -1068,66 +1106,129 @@ fn append_usage_capture_event(
     writeln!(file, "{}", event)
 }
 
+#[cfg(test)]
 fn append_extractor_failure_event(path: &Path) -> std::io::Result<()> {
+    append_extractor_failure_event_value(path, None)
+}
+
+fn append_extractor_failure_event_with_diagnostic(
+    path: &Path,
+    diagnostic: &str,
+) -> std::io::Result<()> {
+    append_extractor_failure_event_value(path, Some(diagnostic))
+}
+
+/// Current writers include the parser reason; accepting `None` keeps the
+/// historical event shape available to compatibility readers and fixtures.
+/// §FS-rhei-cost-accounting.4
+fn append_extractor_failure_event_value(
+    path: &Path,
+    diagnostic: Option<&str>,
+) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let event = serde_json::json!({
+    let mut event = serde_json::json!({
         "schema": ACCOUNTING_USAGE_EVENT_SCHEMA,
         "status": "extractor-failed",
     });
+    if let Some(diagnostic) = diagnostic {
+        event["diagnostic"] = serde_json::Value::String(normalize_extraction_diagnostic(
+            Some(diagnostic),
+        ));
+    }
     let mut file = fs::OpenOptions::new().create(true).append(true).open(path)?;
     writeln!(file, "{}", event)
 }
 
+#[cfg(test)]
 fn extract_usage(
     capture_path: Option<&Path>,
     log_path: Option<&Path>,
     agent: &str,
 ) -> ExtractedUsageStatus {
-    match extract_usage_from_capture(capture_path) {
+    extract_usage_with_diagnostics(capture_path, log_path, agent).status
+}
+
+fn extract_usage_with_diagnostics(
+    capture_path: Option<&Path>,
+    log_path: Option<&Path>,
+    agent: &str,
+) -> ExtractedUsageResult {
+    let captured = extract_usage_from_capture_with_diagnostics(capture_path);
+    match &captured.status {
         ExtractedUsageStatus::NoUsageEmitted => {
             // §FS-rhei-cost-accounting.4: Claude usage comes only from its
             // typed result envelope, never from human-readable log text.
             if agent == "claude-code" {
-                ExtractedUsageStatus::NoUsageEmitted
+                captured
             } else {
-                extract_usage_from_agent_log(log_path)
-                    .unwrap_or(ExtractedUsageStatus::NoUsageEmitted)
+                ExtractedUsageResult {
+                    status: extract_usage_from_agent_log(log_path)
+                        .unwrap_or(ExtractedUsageStatus::NoUsageEmitted),
+                    extraction_diagnostics: Vec::new(),
+                }
             }
         }
-        other => other,
+        _ => captured,
     }
 }
 
 fn extract_usage_from_capture(capture_path: Option<&Path>) -> ExtractedUsageStatus {
+    extract_usage_from_capture_with_diagnostics(capture_path).status
+}
+
+/// Aggregate usage and retain distinct failure reasons in first-seen order.
+/// A failure still outranks measurements, while replacement happens earlier
+/// when the cumulative provider event truncates the capture. §FS-rhei-cost-accounting.4
+fn extract_usage_from_capture_with_diagnostics(
+    capture_path: Option<&Path>,
+) -> ExtractedUsageResult {
     // §FS-rhei-cost-accounting.4: Only Rhei-declared structured usage events are accepted.
     let Some(capture_path) = capture_path else {
-        return ExtractedUsageStatus::ExtractorUnavailable;
+        return ExtractedUsageResult {
+            status: ExtractedUsageStatus::ExtractorUnavailable,
+            extraction_diagnostics: Vec::new(),
+        };
     };
     if !capture_path.is_file() {
-        return ExtractedUsageStatus::NoUsageEmitted;
+        return ExtractedUsageResult {
+            status: ExtractedUsageStatus::NoUsageEmitted,
+            extraction_diagnostics: Vec::new(),
+        };
     }
     let Ok(text) = fs::read_to_string(capture_path) else {
-        return ExtractedUsageStatus::ExtractorUnavailable;
+        return ExtractedUsageResult {
+            status: ExtractedUsageStatus::ExtractorUnavailable,
+            extraction_diagnostics: Vec::new(),
+        };
     };
     let mut aggregate = ExtractedUsage::default();
     let mut saw = false;
-    let mut failed = false;
+    let mut extraction_diagnostics = Vec::new();
     for line in text.lines().map(str::trim) {
         if line.is_empty() {
             continue;
         }
         let value = match serde_json::from_str::<serde_json::Value>(line) {
             Ok(value) => value,
-            Err(_) => return ExtractedUsageStatus::ExtractorFailed,
+            Err(_) => {
+                push_distinct_extraction_diagnostic(
+                    &mut extraction_diagnostics,
+                    INVALID_USAGE_CAPTURE_DIAGNOSTIC,
+                );
+                continue;
+            }
         };
         if value.get("schema").and_then(serde_json::Value::as_str)
             == Some(ACCOUNTING_USAGE_EVENT_SCHEMA)
             && value.get("status").and_then(serde_json::Value::as_str)
                 == Some("extractor-failed")
         {
-            failed = true;
+            let diagnostic = normalize_extraction_diagnostic(
+                value.get("diagnostic").and_then(serde_json::Value::as_str),
+            );
+            push_distinct_extraction_diagnostic(&mut extraction_diagnostics, &diagnostic);
             continue;
         }
         if let Some(usage) = usage_from_structured_event_value(&value) {
@@ -1135,14 +1236,38 @@ fn extract_usage_from_capture(capture_path: Option<&Path>) -> ExtractedUsageStat
             saw = true;
         }
     }
-    if failed {
-        return ExtractedUsageStatus::ExtractorFailed;
+    if !extraction_diagnostics.is_empty() {
+        return ExtractedUsageResult {
+            status: ExtractedUsageStatus::ExtractorFailed,
+            extraction_diagnostics,
+        };
     }
-    if saw && aggregate.has_total() {
+    let status = if saw && aggregate.has_total() {
         ExtractedUsageStatus::Measured(aggregate)
     } else {
         ExtractedUsageStatus::NoUsageEmitted
+    };
+    ExtractedUsageResult { status, extraction_diagnostics }
+}
+
+fn push_distinct_extraction_diagnostic(diagnostics: &mut Vec<String>, diagnostic: &str) {
+    if !diagnostics.iter().any(|retained| retained == diagnostic) {
+        diagnostics.push(diagnostic.to_string());
     }
+}
+
+/// Constrain a retained event reason to the published safe string shape. An
+/// absent or empty historical reason receives one stable factual fallback.
+/// §FS-rhei-cost-accounting.4
+fn normalize_extraction_diagnostic(diagnostic: Option<&str>) -> String {
+    let diagnostic = diagnostic.unwrap_or(HISTORICAL_EXTRACTION_FAILURE_DIAGNOSTIC);
+    let single_line = diagnostic.split_whitespace().collect::<Vec<_>>().join(" ");
+    let source = if single_line.is_empty() {
+        HISTORICAL_EXTRACTION_FAILURE_DIAGNOSTIC
+    } else {
+        &single_line
+    };
+    source.chars().take(240).collect()
 }
 
 fn extract_usage_from_agent_log(log_path: Option<&Path>) -> Option<ExtractedUsageStatus> {

@@ -10,6 +10,7 @@
       "properties": {
         "schema": { "const": "rhei.accounting.usage.v1" },
         "status": false,
+        "diagnostic": false,
         "usage": {
           "type": "object",
           "additionalProperties": true,
@@ -45,6 +46,12 @@
       "properties": {
         "schema": { "const": "rhei.accounting.usage.v1" },
         "status": { "const": "extractor-failed" },
+        "diagnostic": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240,
+          "pattern": "^[^\\r\\n]+$"
+        },
         "usage": false
       }
     }

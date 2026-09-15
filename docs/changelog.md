@@ -4,6 +4,13 @@
 
 ### Added
 
+- **Per-session reports and declared metrics are now specified.**
+  §FS-rhei-session-reports defines one readable Markdown report rendered from
+  each agent session log under `runtime/reports/`, and §FS-rhei-metrics defines
+  the optional `metrics:` declaration in `states.yaml` with engine-recorded
+  iteration bindings under `runtime/metrics/`. Documentation only; no runtime
+  behavior changes in this entry. (PR #272)
+
 - **Plans that declare `Consumes` now receive a non-fatal validation and run
   advisory that the field selects export prompt injection, not filesystem
   visibility.** Run frontends retain the warning in their native output, and

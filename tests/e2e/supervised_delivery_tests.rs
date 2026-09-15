@@ -161,9 +161,11 @@ fn spawns(workspace: &Path) -> Vec<String> {
         .collect()
 }
 
-/// §FS-rhei-templates.6.1: the template instantiates from its defaults, its
-/// rendered workspace validates without a warning, and a dry run shows the one
-/// shape supervision gives it — the supervisor ready, everything else held.
+/// §FS-rhei-templates.6.1: the template instantiates from its defaults and a
+/// dry run shows the one shape supervision gives it — the supervisor ready,
+/// everything else held. Validation emits only the required `Consumes`
+/// advisory (§FS-rhei-validate.6), with no supervisor configuration warning
+/// under §FS-rhei-supervision.1.2.
 #[test]
 fn the_default_instantiation_validates_clean_and_holds_every_child() {
     let dir = unique_temp_dir("supervised-delivery-defaults");
@@ -187,14 +189,22 @@ fn the_default_instantiation_validates_clean_and_holds_every_child() {
     let machine = workspace.join("states.yaml");
     let validated = run_cli("validate", &workspace, &machine, &[]);
     assert_success(&validated);
-    assert!(validated.stdout.contains("Validation succeeded"), "got:\n{}", validated.stdout);
-    // §FS-rhei-supervision.1.2: a supervising state with no `openDescendants`
-    // edge, or with no visit budget, is warned about. This one has both.
-    assert!(
-        !validated.stdout.to_lowercase().contains("warning")
-            && !validated.stderr.to_lowercase().contains("warning"),
-        "the supervisor's edges must not warn:\nstdout:\n{}\nstderr:\n{}",
+    assert_eq!(
         validated.stdout,
+        concat!(
+            "Validation succeeded\n",
+            "warning: **Consumes:** declares export data-flow for prompt injection, not filesystem visibility. ",
+            "Workers can read undeclared sibling exports under runtime/exports/. For a blind round, schedule ",
+            "participants concurrently and brief them not to inspect sibling exports; neither measure enforces ",
+            "blindness once an export exists.\n",
+        ),
+        "validation must emit only the exact Consumes advisory after success"
+    );
+    // §FS-rhei-supervision.1.2: this graph has both required supervisor
+    // controls, so stderr must not contain a supervisor configuration warning.
+    assert!(
+        !validated.stderr.to_lowercase().contains("warning"),
+        "the supervisor's configuration must not add a warning:\nstderr:\n{}",
         validated.stderr
     );
 

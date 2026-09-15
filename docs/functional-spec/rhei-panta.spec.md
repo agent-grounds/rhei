@@ -329,6 +329,22 @@ across rheis is bounded, and each spawned unit is attributed to its rhei in logs
 and accounting. The loop stops when no eligible ticket remains in scope or a
 gating state requires a human.
 
+For an unrestricted project run, the set of rheis is live rather than frozen at
+startup. At the admission checkpoints defined by [§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop),
+the same loop strictly reloads the project and admits each successfully
+published member that was not present in its initialized set. Admission must
+finish the member's project-context validation and per-rhei initialization
+before any of its tickets become eligible. An invalid visible member therefore
+fails the strict reload; it is never skipped to keep the old graph running.
+
+An admitted member uses the ordinary merged graph, dependency and supervision
+rules, gates, execution filters, attempt and poll budgets, and `--parallel`
+limit. Its work is attributed under its own project-qualified ids, execution
+root, machine, callbacks, results, logs, snapshots, and accounting root. This
+is membership growth inside the existing recorded run, not a nested or sibling
+run. Consequently an unrestricted run may execute more work and last longer
+than the membership visible when it began.
+
 Before spawning, `rhei run` reports the resolved scope and the rheis it will
 touch (§6). A bare rhei runs as the single rhei of its implicit Panta, so the
 project-wide loop is the only execution path.

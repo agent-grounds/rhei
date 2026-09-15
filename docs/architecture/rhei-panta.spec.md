@@ -97,6 +97,14 @@ tickets are project-qualified exactly as in a multi-rhei project, so a bare
 structural difference between an implicit and an explicit Panta is the number of
 rheis and the presence of a manifest; there is one loader and one graph shape.
 
+A live unrestricted project run repeats this same strict load at scheduler
+checkpoints. The resulting graph may contain member ids absent from the run's
+initialized set; each delta is handed to admission before its nodes enter the
+ready set. The source map and project-qualified identities come from the new
+load rather than being synthesized piecemeal. Explicit candidate narrowing is
+retained separately from this full graph, so `--rhei` does not turn reload into
+a partial load.
+
 ## 3. Identity and id namespacing
 
 Ids are dotted paths rooted at Panta. A rhei contributes its id as the prefix for
@@ -227,6 +235,14 @@ name different from the override file's `name:` — an override that silently
 reinterpreted one rhei's states under another rhei's process would corrupt
 exactly the runs the flag exists to debug.
 
+For a member discovered by a live run, machine resolution is repeated from its
+own declaration and source root before admission. The run initializes that
+machine's callback base and validates the refreshed graph and execution
+references with freshly merged settings. Cached bindings for existing members
+may be reused only when equivalent to that refreshed context. A whole-run
+override still governs the new member, and a name mismatch is an admission
+error rather than permission to bind it to another member's machine.
+
 The state-machine profile that previously resolved the level-0 `rhei` root now
 resolves the `panta` root: Panta resolves through `node_policy.root`. A rhei node
 resolves through the dedicated `node_policy.rhei` key when declared; when it is
@@ -262,24 +278,33 @@ snapshots, and the unified visualization. Distinct subtrees
 them from colliding, exactly as a standalone plan coexists its results and
 accounting in one `runtime/`.
 
+Live admission extends the run's routing tables before eligibility: the new
+member receives its own execution root, result/log/snapshot paths, accounting
+root, and execution-root lock, while the project descriptor and event journal
+remain those of the already recorded run. Initialization is all-or-nothing
+from the scheduler's perspective; discovery alone never supplies enough state
+to schedule a ticket.
+
 ## 6. Command scope mechanics
 
-`rhei run` resolves the single project state machine (§4) once and applies it to
-every ticket it transitions; cross-rhei dependency readiness judges the prior
-ticket against that same machine and requires a successful terminal state
-(`final: true` and a normalized state name other than `cancelled`). This is the
-same predicate normal in-rhei scheduling uses; implementations may share one
-predicate, resolve the prior directly, or read an exported/cached readiness
-result, but only when that result is behaviorally equivalent and fresh. A
-dependency fails closed — the dependent stays blocked — whenever the prior
-state or its state-machine meaning cannot be resolved reliably. Per-rhei
-machines — and with them, readiness judged against the prior's own machine —
-are deferred (§4). The ready-set
-scan, claim selection, and rollup all walk the single merged graph (§2), so
-project-wide is the natural default and `--rhei` is a filter applied to candidate
-nodes after the merge. The fan-out commands — `rhei run` and `rhei reset` —
-report the resolved scope and the set of rheis they will touch before acting;
-other mutating commands act without a scope report ([§FS-rhei-panta.6](../functional-spec/rhei-panta.spec.md#6-project-scope-and-command-behavior)).
+`rhei run` resolves each ticket through its owning rhei's machine (§4).
+Cross-rhei dependency readiness judges the prior ticket against the prior's
+machine and requires a successful terminal state (`final: true` and a
+normalized state name other than `cancelled`). This is the same predicate
+normal in-rhei scheduling uses; implementations may share one predicate,
+resolve the prior directly, or read an exported/cached readiness result, but
+only when that result is behaviorally equivalent and fresh. A dependency fails
+closed — the dependent stays blocked — whenever the prior state or its
+state-machine meaning cannot be resolved reliably.
+
+The ready-set scan, claim selection, and rollup all walk the current single
+merged graph (§2), so project-wide is the natural default and `--rhei` is a
+candidate filter applied after the merge. A live run replaces that graph only
+at the admission checkpoints of [§FS-rhei-run.3](../functional-spec/rhei-run.spec.md#3-execution-loop), after every new member has a complete entry in the
+per-rhei machine and runtime maps. The fan-out commands — `rhei run` and
+`rhei reset` — report the resolved scope and the set of rheis they will touch
+before acting; other mutating commands act without a scope report
+([§FS-rhei-panta.6](../functional-spec/rhei-panta.spec.md#6-project-scope-and-command-behavior)).
 
 ## 7. Invisibility surface
 

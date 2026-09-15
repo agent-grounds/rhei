@@ -121,8 +121,9 @@ fn complete_command(
     result_msg: &str,
     no_callbacks: bool,
 ) -> MietteResult<()> {
-    // §FS-rhei-complete.4: a blank `--result` is rejected before anything is
-    // written — the flag is mandatory here precisely so the ticket records why.
+    // Keep the shared command boundary defensive for internal callers; CLI
+    // file/stdin loading and validation have already happened before plan
+    // resolution. §FS-rhei-complete.4
     let result_msg = require_non_blank_result(Some(result_msg), "complete")?
         .expect("a Some input yields a Some result");
     let input_buf = normalize_workspace_input(input);

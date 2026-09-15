@@ -664,7 +664,17 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
                 &target.scope_with(&rhei),
             )
         }
-        Commands::Complete { input, task, result, no_callbacks, state_machine } => {
+        Commands::Complete {
+            input,
+            task,
+            result,
+            result_file,
+            no_callbacks,
+            state_machine,
+        } => {
+            // Result source failures take precedence over target and plan
+            // resolution and cannot mutate either. §FS-rhei-complete.4
+            let result = resolve_complete_result(result, result_file.as_deref())?;
             let (input, task) = split_complete_ticket_target(input, task)?;
             let target = resolve_plan_target(input)?;
             complete_command(

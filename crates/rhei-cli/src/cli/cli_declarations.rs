@@ -588,6 +588,12 @@ enum Commands {
     },
     /// Complete a task: transition to terminal state, write the state ledger and
     /// result artifact, link it from the task, and remove the assignee.
+    // §FS-rhei-complete.2.2
+    #[command(group(
+        clap::ArgGroup::new("result_source")
+            .required(true)
+            .args(["result", "result_file"])
+    ))]
     Complete {
         /// Path to a states YAML file (uses built-in default when omitted)
         #[arg(long, value_name = "PATH", add = ArgValueCompleter::new(complete_yaml_path))]
@@ -604,8 +610,19 @@ enum Commands {
         #[arg(long, add = ArgValueCompleter::new(complete_task_id))]
         task: Option<String>,
         /// Result message written to `runtime/results/<task-id>.md`
-        #[arg(long)]
+        // The hidden empty default lets the alternative file source omit this
+        // concrete legacy field; the required group checks explicit CLI
+        // occurrences. §FS-rhei-complete.2.2
+        #[arg(long, default_value = "", hide_default_value = true)]
         result: String,
+        /// Read the result message from a UTF-8 file; `-` reads standard input
+        // §FS-rhei-complete.2.2 §FS-rhei-completions.7
+        #[arg(
+            long,
+            value_name = "PATH",
+            add = ArgValueCompleter::new(complete_any_path)
+        )]
+        result_file: Option<PathBuf>,
         /// Skip execution of on_leave/on_enter callbacks
         #[arg(long)]
         no_callbacks: bool,

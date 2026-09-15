@@ -11,6 +11,11 @@
   sibling exports. Scripts that consume successful validation or run output
   for such plans must allow the additive warning. (PR #269)
 
+- **`rhei complete` now accepts result messages from a file or standard
+  input.** `--result-file <PATH>` safely carries multiline or Markdown-heavy
+  text, with `-` selecting stdin, while the existing inline `--result` form
+  and its literal dash behavior remain unchanged. (PR #270)
+
 - **Transition callbacks now receive a stable identity for each firing and an
   explicit pending ledger status.** Canonical JSON exposes `firingId` and
   `ledgerStatus`, and CLI callbacks receive equal environment values, so an

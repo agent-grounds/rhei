@@ -235,6 +235,13 @@ and run totals without assuming the slot is still active. [§FS-rhei-cost-accoun
 
 `Message` carries human-oriented engine diagnostics with `info`, `warn`, or `error` severity. `RunLink` carries URLs or file links produced by the run process, such as dashboard links or callback-emitted artifacts. Terminal frontends render messages in the Journal view and links in the shared links strip; neither represents a task state change.
 
+Warnings from the initial validation report are ordinary `Message` events at
+`Warn` level, emitted after `RunStarted` and before the first scheduling event
+(§FS-rhei-run.3). Consequently the TUI and dashboard retain them in their
+journal model, the JSON frontend and durable event log retain warning message
+records, and the plain/headless frontend writes them to stderr. Reusing this
+event path preserves the wording and frequency of existing validation warnings.
+
 `RunFinished` is emitted once with aggregate counts for spawned agents, spawned programs, terminal tasks, total tasks, and accounting totals when available.
 
 `Tee` is a composite sink implementing `EventSink` by forwarding each event to a fixed list of inner sinks.

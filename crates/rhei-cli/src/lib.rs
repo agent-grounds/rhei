@@ -176,6 +176,7 @@ mod tests {
     include!("cli/tests_python_fixture.rs");
     include!("cli/tests_path_guards.rs");
     include!("cli/tests_cli_render.rs");
+    include!("cli/tests_consumes.rs");
     include!("cli/tests_cli_option_surface.rs");
     include!("cli/tests_error_guidance.rs");
     include!("cli/tests_prompt_templates.rs");

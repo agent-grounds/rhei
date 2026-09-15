@@ -330,6 +330,92 @@ structure:
         );
     }
 
+    /// One consumer is enough to trigger the advisory, while a second consumer
+    /// must not duplicate a graph-level warning.
+    // §FS-rhei-validate.4 §FS-rhei-plan-language.3.12
+    #[test]
+    fn consumes_is_one_graph_level_advisory_for_any_number_of_consumers() {
+        let input = r#"# Rhei: Example
+## Tasks
+
+### Task 1: Producer
+**State:** completed
+**Provides:** evidence
+
+### Task 2: Consumer one
+**State:** pending
+**Prior:** Task 1
+**Consumes:** 1:evidence
+
+### Task 3: Consumer two
+**State:** pending
+**Prior:** Task 1
+**Consumes:** 1:evidence
+"#;
+        let rhei = parse(input).expect("parse ok");
+        let report = validate_with_machine(&rhei, &sample_machine());
+
+        assert!(!report.has_errors(), "the advisory is non-fatal: {:?}", report.errors);
+        assert_eq!(
+            report.warnings,
+            vec!["**Consumes:** declares export data-flow for prompt injection, not filesystem visibility. Workers can read undeclared sibling exports under runtime/exports/. For a blind round, schedule participants concurrently and brief them not to inspect sibling exports; neither measure enforces blindness once an export exists."]
+        );
+    }
+
+    /// Plans without `Consumes` do not pay for advice that does not apply.
+    // §FS-rhei-validate.4
+    #[test]
+    fn a_graph_without_consumes_gets_no_consumes_advisory() {
+        let rhei = parse(
+            r#"# Rhei: Example
+## Tasks
+
+### Task 1: Ordinary work
+**State:** pending
+"#,
+        )
+        .expect("parse ok");
+        let report = validate_with_machine(&rhei, &sample_machine());
+
+        assert!(
+            report.warnings.iter().all(|warning| !warning.contains("**Consumes:**")),
+            "unexpected advisory: {:?}",
+            report.warnings
+        );
+    }
+
+    /// Watch mode asks the validator for a fresh report on each pass. Each
+    /// report owns one graph-level advisory, with no per-consumer duplication.
+    // §FS-rhei-validate.5
+    #[test]
+    fn consumes_advisory_occurs_once_in_each_validation_pass() {
+        let rhei = parse(
+            r#"# Rhei: Example
+## Tasks
+
+### Task 1: Producer
+**State:** completed
+**Provides:** evidence
+
+### Task 2: Consumer
+**State:** pending
+**Consumes:** 1:evidence
+"#,
+        )
+        .expect("parse ok");
+
+        for pass in 1..=2 {
+            let report = validate_with_machine(&rhei, &sample_machine());
+            assert_eq!(
+                report.warnings.iter().filter(|warning| warning.starts_with("**Consumes:**"))
+                    .count(),
+                1,
+                "validation pass {pass}: {:?}",
+                report.warnings
+            );
+        }
+    }
+
     #[test]
     fn rejects_child_prior_to_parent() {
         let input = r#"# Rhei: Example

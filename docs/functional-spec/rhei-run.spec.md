@@ -154,11 +154,14 @@ work, and finish it with `rhei complete`. This prevents the built-in machine
 from silently completing fresh tasks without executing them.
 
 1. Load the state machine and plan. Validate. Errors stop the run; the
-   validation **warnings** ([§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior)) are printed once at start, in
-   the same words `rhei validate` prints them. A machine that warns is still a
-   legal machine, so the run proceeds — but the operator hears about it before
-   the run spends an hour proving the warning right, rather than only if they
-   happened to run `rhei validate` first.
+   initial report's validation **warnings** ([§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior)) are emitted once,
+   in report order and in the same words `rhei validate` prints them. After the
+   selected frontend emits `RunStarted` and before scheduling begins, the run
+   emits each through `RunEvent::Message` at warning level. Plain and headless
+   frontends write it to stderr; JSON writes one `message` record with
+   `level: "warn"`; TUI, dashboard, and the durable event log retain that same
+   event. A warning does not change run success. This validation scope and
+   frequency are the same for ordinary, `--parallel`, and `--rhei` execution.
 2. Scan all task nodes, including child and grandchild tasks, and compute the
    *ready set*: tasks all of whose descendants are terminal, whose `**Prior:**`
    are all in successful terminal states
@@ -586,6 +589,12 @@ would transition: Task <ID>  <from> -> <to>
 ```
 
 No file lock is acquired, no markdown is rewritten, and no runtime artifacts are created.
+
+Plain and JSON dry runs use their selected run frontend and carry initial
+validation warnings through it with the ordering and frequency in §3. JSON
+stdout remains pure JSONL. The warnings do not change the predicted exit status,
+and neither dry-run form creates a run descriptor, journal, event log, report,
+or any other runtime file.
 
 A dry run **reports** the manual-only condition of §3 instead of aborting on
 the first task that hits it:

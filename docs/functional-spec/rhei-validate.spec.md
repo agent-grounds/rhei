@@ -83,7 +83,18 @@ pass `--state-machine`.
    legitimate authoring moves. It is therefore a warning, never an error:
    validation must surface the inconsistency without making an existing plan
    unloadable.
-6. Exit non-zero when any validation error remains. Warnings do not make the
+6. When at least one task in the loaded graph declares `**Consumes:**`, add
+   exactly one graph-level warning, regardless of how many tasks or references
+   consume exports:
+
+   ```text
+   **Consumes:** declares export data-flow for prompt injection, not filesystem visibility. Workers can read undeclared sibling exports under runtime/exports/. For a blind round, schedule participants concurrently and brief them not to inspect sibling exports; neither measure enforces blindness once an export exists.
+   ```
+
+   The warning is advisory: it does not change plan validity, export
+   resolution, readiness, or the filesystem a worker can read
+   (§FS-rhei-plan-language.3.12).
+7. Exit non-zero when any validation error remains. Warnings do not make the
    command fail.
 
 `rhei validate` does not acquire task locks, run callbacks, spawn agents,
@@ -143,8 +154,10 @@ With `--watch`, the command resolves the same state machine once, prints a
 watch-start message, runs an initial validation pass, and then re-runs
 validation when the plan file or resolved states file changes.
 
-Watch mode reports each pass independently. A failed pass does not terminate
-the watcher; file watcher initialization errors do.
+Watch mode reports each pass independently. Each successful pass reports the
+`**Consumes:**` warning once when that pass's graph contains a consumer; file
+events do not repeat it outside a validation pass. A failed pass does not
+terminate the watcher; file watcher initialization errors do.
 
 ## 6. Output
 
@@ -160,6 +173,12 @@ Warnings are printed after the success line:
 Validation succeeded
 warning: <diagnostic>
 ```
+
+For a graph with `**Consumes:**`, successful output is the success line followed
+by the exact advisory from §4 with the normal `warning: ` prefix. A graph
+without `**Consumes:**` retains the existing `Validation succeeded\n` output
+byte for byte. Existing warnings retain their wording and occur once at their
+existing trigger frequency.
 
 On a semantic validation failure, the diagnostic names the resolved
 state-machine sources that the validation pass used. When the pass used one

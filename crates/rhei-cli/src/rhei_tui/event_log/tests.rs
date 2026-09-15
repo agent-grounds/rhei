@@ -26,6 +26,24 @@ fn records_are_sequenced_from_one_and_flushed_per_line() {
     assert_eq!(sink.last_seq(), 2);
 }
 
+/// Initial validation advisories are structural messages and therefore remain
+/// available to dashboards and attach clients in the durable event log.
+// §FS-rhei-run-tui.1.1 §FS-rhei-run-json.3
+#[test]
+fn the_consumes_advisory_is_retained_in_the_durable_event_log() {
+    let tmp = tempfile::tempdir().unwrap();
+    let sink = EventLogSink::create(tmp.path()).unwrap();
+    let text = "warning: **Consumes:** declares export data-flow for prompt injection, not filesystem visibility. Workers can read undeclared sibling exports under runtime/exports/. For a blind round, schedule participants concurrently and brief them not to inspect sibling exports; neither measure enforces blindness once an export exists.";
+    sink.emit(RunEvent::Message { level: MessageLevel::Warn, text: text.to_string() });
+
+    let contents = fs::read_to_string(sink.path()).unwrap();
+    let record = event_json::decode(contents.trim()).expect("warning record");
+    assert!(matches!(
+        record.event,
+        RunEvent::Message { level: MessageLevel::Warn, text: actual } if actual == text
+    ));
+}
+
 #[test]
 fn agent_output_stays_out_of_the_durable_log() {
     let tmp = tempfile::tempdir().unwrap();

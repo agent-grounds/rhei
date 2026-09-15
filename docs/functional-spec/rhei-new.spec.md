@@ -77,7 +77,7 @@ is an argument.
 | `--state <STATE>`          | the machine's initial | `**State:**`, checked against the owning rhei's machine (§3.2) |
 | `--prior <ID>`             | none               | `**Prior:**` entry; repeatable, and a comma-separated list is accepted |
 | `--provides <NAME>`        | none               | `**Provides:**` entry; repeatable ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)) |
-| `--consumes <ID:NAME>`     | none               | `**Consumes:**` entry; repeatable. Not a dependency — a consumer is `--ready` before its producer runs, so ordering comes from `--prior` ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)) |
+| `--consumes <ID:NAME>`     | none               | `**Consumes:**` entry; repeatable. Selects export prompt injection, not filesystem visibility or readiness: undeclared sibling exports remain readable, and ordering comes from `--prior` ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)) |
 | `--assignee <WHO>`         | none               | `**Assignee:**`, which is a claim: `rhei next` and `rhei run` skip an assigned ticket until `rhei release <id>`, and the create says so (§5.4) |
 | `--model <MODEL>`          | none               | `**Model:**`; mutually exclusive with `--target` ([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)) |
 | `--target <TARGET>`        | none               | `**Target:**`; mutually exclusive with `--model`, which the identity already carries ([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)) |

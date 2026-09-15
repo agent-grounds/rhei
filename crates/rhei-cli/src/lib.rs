@@ -142,6 +142,7 @@ include!("cli/run_summary_usage.rs");
 include!("cli/run_summary_accounting.rs");
 include!("cli/run_summary.rs");
 include!("cli/ready_transition.rs");
+include!("cli/ready_run_views.rs");
 include!("cli/ready_halt_causes.rs");
 include!("cli/subtree_supervision_release.rs");
 include!("cli/next_diagnostics.rs");

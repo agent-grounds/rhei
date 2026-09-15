@@ -381,6 +381,19 @@ fn should_use_agent_mode(
         return Ok(true);
     }
 
+    // A future retry deadline chooses when the program runs, not whether this
+    // invocation keeps the subprocess engine capable of running it. The probe
+    // shares every non-temporal readiness constraint. §FS-rhei-run.3
+    if !opts.no_program()
+        && !narrow_to_rhei_scope(
+            find_runnable_program_polls_for_mode_selection(rhei, machines, roots),
+            &rhei_scope_set(opts.rhei_scope()),
+        )
+        .is_empty()
+    {
+        return Ok(true);
+    }
+
     for task in narrow_to_rhei_scope(
         find_runnable_tasks(rhei, machines, roots, &HashSet::new()),
         &rhei_scope_set(opts.rhei_scope()),

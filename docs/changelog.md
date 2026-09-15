@@ -11,6 +11,13 @@
   inferring it from file-write timing. Both ledger formats remain unchanged;
   strict callback JSON decoders must permit additive fields. (PR #262)
 
+### Fixed
+
+- **Resumed program polls now invoke their next subprocess attempt after the
+  persisted retry deadline.** A future deadline no longer sends the run into
+  callback-only mode, where an exit-zero route could fire without a matching
+  program exit; ordinary readiness still prevents an early spawn. (PR #266)
+
 ## 2. [0.5.0] - 2026-09-14
 
 ### Fixed

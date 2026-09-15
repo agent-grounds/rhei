@@ -125,8 +125,26 @@ fn run_plain_dry_run_routes_the_consumes_advisory_once_to_stderr() {
 // §FS-rhei-run.3 §FS-rhei-run.4 §FS-rhei-run-json.1
 #[test]
 fn run_json_dry_run_routes_the_consumes_advisory_once_after_run_started() {
-    let (json_dir, json_plan, json_machine) =
-        setup_single_file("run-consumes-advisory-json", TWO_CONSUMERS);
+    let (json_dir, json_plan, json_machine) = create_workspace(
+        "run-consumes-advisory-json",
+        "# Rhei: Consumes Advisory\n",
+        &[
+            (
+                "01-producer.md",
+                "### Task 1: Publish\n**State:** completed\n**Provides:** evidence\n",
+            ),
+            (
+                "02-consumer.md",
+                "### Task 2: First consumer\n**State:** draft\n**Prior:** Task 1\n\
+                 **Consumes:** 1:evidence\n",
+            ),
+            (
+                "03-consumer.md",
+                "### Task 3: Second consumer\n**State:** draft\n**Prior:** Task 1\n\
+                 **Consumes:** 1:evidence\n",
+            ),
+        ],
+    );
     let json =
         run_cli("run", &json_plan, &json_machine, &["--json", "--dry-run", "--parallel", "2"]);
     assert_success(&json);

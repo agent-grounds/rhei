@@ -312,14 +312,10 @@ fn run_command(
             &report.help,
         ));
     }
-    // A machine that warns is legal, so the run proceeds — but the operator
-    // heard it only if they happened to validate first.
-
+    // A warning is legal, so the run proceeds. Keep one ordered copy of each
+    // initial warning for the selected frontend to emit after `RunStarted`.
     // §FS-rhei-validate.4 §FS-rhei-run.3
     report.warnings.dedup();
-    for warning in &report.warnings {
-        eprintln!("warning: {warning}");
-    }
 
     if !opts.dry_run() {
         // §FS-rhei-cost-accounting.11 §FS-rhei-panta.6.5: identity spans the selected root union.
@@ -347,9 +343,24 @@ fn run_command(
         should_use_agent_mode(&loaded.rhei, &machines.set, &settings, &opts, &roots)?;
 
     let result = if use_standalone_mode {
-        run_agent_mode(input, &machines, &settings, &opts, effective_parallel, &identity)
+        run_agent_mode(
+            input,
+            &machines,
+            &settings,
+            &opts,
+            effective_parallel,
+            &report.warnings,
+            &identity,
+        )
     } else {
-        run_callback_mode(input, &machines, &opts, effective_parallel, &identity)
+        run_callback_mode(
+            input,
+            &machines,
+            &opts,
+            effective_parallel,
+            &report.warnings,
+            &identity,
+        )
     };
     result?;
     // An interrupted run made no claim of durable success, so the commit

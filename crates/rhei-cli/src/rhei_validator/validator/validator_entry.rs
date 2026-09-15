@@ -32,6 +32,16 @@ pub fn parse_task_state(raw: &str, machine: &StateMachine) -> ParsedTaskState {
 // Semantic Validator (Task 5)
 // ========================================
 
+/// Advisory attached once to every validated graph that declares consumed
+/// exports. Renderers add the diagnostic prefix appropriate to their surface.
+// §FS-rhei-plan-language.3.12 §FS-rhei-validate.4
+pub(crate) const CONSUMES_ADVISORY: &str = concat!(
+    "**Consumes:** declares export data-flow for prompt injection, not filesystem visibility. ",
+    "Workers can read undeclared sibling exports under runtime/exports/. For a blind round, ",
+    "schedule participants concurrently and brief them not to inspect sibling exports; neither ",
+    "measure enforces blindness once an export exists."
+);
+
 /// The state machines governing one loaded plan: the project default plus the
 /// machine of every rhei that declared its own `**States:**`. A ticket's
 /// machine resolves through its owning rhei — the leading segment of its
@@ -137,6 +147,7 @@ impl Validator {
         if let Some(base) = base_path {
             validate_markdown_links(rhei, base, &mut report);
         }
+        validate_consumes_advisory(&index, &mut report);
 
         report
     }
@@ -215,6 +226,18 @@ fn build_task_index(rhei: &Rhei) -> HashMap<TaskId, &Task> {
         visit(t, &mut map);
     }
     map
+}
+
+/// `Consumes` selects graph-resolved prompt context; it does not constrain
+/// which sibling export files a worker can open.
+// §FS-rhei-plan-language.3.12 §FS-rhei-validate.4
+fn validate_consumes_advisory(
+    index: &HashMap<TaskId, &Task>,
+    report: &mut ValidationReport,
+) {
+    if index.values().any(|task| !task.consumes.is_empty()) {
+        report.warnings.push(CONSUMES_ADVISORY.to_string());
+    }
 }
 
 // §FS-rhei-states.9.3: Validate node policy selectors against plan structure.

@@ -5,6 +5,7 @@ fn run_callback_mode(
     machines: &ExecutionMachines,
     opts: &RunOptions,
     max_parallel: usize,
+    initial_warnings: &[String],
     identity: &RunIdentity,
 ) -> MietteResult<()> {
     use rhei_tui::{MessageLevel, RunEvent, RunSummary};
@@ -71,6 +72,7 @@ fn run_callback_mode(
         parallel: frontend_parallel,
         total_tasks: initial_total_tasks,
     });
+    emit_initial_validation_warnings(&sink, initial_warnings);
     frontend.announce_dashboard();
 
     macro_rules! run_message {

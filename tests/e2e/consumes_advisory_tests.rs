@@ -127,7 +127,8 @@ fn run_plain_dry_run_routes_the_consumes_advisory_once_to_stderr() {
 fn run_json_dry_run_routes_the_consumes_advisory_once_after_run_started() {
     let (json_dir, json_plan, json_machine) =
         setup_single_file("run-consumes-advisory-json", TWO_CONSUMERS);
-    let json = run_cli("run", &json_plan, &json_machine, &["--json", "--dry-run"]);
+    let json =
+        run_cli("run", &json_plan, &json_machine, &["--json", "--dry-run", "--parallel", "2"]);
     assert_success(&json);
     assert!(json.stderr.is_empty(), "JSON warnings are records, not stderr:\n{}", json.stderr);
     let records: Vec<serde_json::Value> = json
@@ -146,12 +147,62 @@ fn run_json_dry_run_routes_the_consumes_advisory_once_after_run_started() {
         .collect();
     assert_eq!(warning_indexes.len(), 1, "records: {records:#?}");
     let started = records.iter().position(|record| record["event"] == "run_started").unwrap();
+    assert_eq!(records[started]["parallel"], 2);
     let scheduled = records.iter().position(|record| record["event"] == "pass_started").unwrap();
     assert!(
         started < warning_indexes[0] && warning_indexes[0] < scheduled,
         "records: {records:#?}"
     );
     assert!(!json_dir.join("runtime").exists(), "JSON dry run must not create runtime files");
+}
+
+/// `--rhei` narrows scheduling, not the initial project validation report: a
+/// consumer elsewhere in the loaded graph still triggers the one advisory.
+// §FS-rhei-run.3 §FS-rhei-panta.6.2
+#[test]
+fn consumes_advisory_keeps_project_validation_scope_under_rhei_selection() {
+    let project = unique_temp_dir("consumes-advisory-rhei-scope");
+    write_fixture_file(&project, "index.panta.md", "# Panta: Advisory Scope\n");
+    write_fixture_file(
+        &project,
+        "alpha.rhei.md",
+        r#"# Rhei: Alpha
+
+## Tasks
+
+### Task 1: Producer
+**State:** completed
+**Provides:** evidence
+
+### Task 2: Consumer outside selected scope
+**State:** draft
+**Prior:** Task 1
+**Consumes:** 1:evidence
+"#,
+    );
+    write_fixture_file(
+        &project,
+        "beta.rhei.md",
+        r#"# Rhei: Beta
+
+## Tasks
+
+### Task 1: Selected work
+**State:** draft
+"#,
+    );
+    let machine = write_fixture_file(&project, "states.yaml", STATE_MACHINE);
+
+    let result = run_cli("run", &project, &machine, &["--rhei", "beta", "--json", "--dry-run"]);
+    assert_success(&result);
+    let warning_count = result
+        .stdout
+        .lines()
+        .map(|line| serde_json::from_str::<serde_json::Value>(line).expect("pure JSONL"))
+        .filter(|record| record["event"] == "message" && record["text"] == ADVISORY)
+        .count();
+    assert_eq!(warning_count, 1, "stdout:\n{}\nstderr:\n{}", result.stdout, result.stderr);
+    assert!(!project.join("runtime").exists());
 }
 
 /// The warning documents existing reachability; it must not turn `Consumes`

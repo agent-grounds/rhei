@@ -1,7 +1,8 @@
 // Required artifact checks share execution identities with readiness and carry
-// those identities into handoff composition. The actual invocation is checked
-// once more before any prompt section is composed.
-// §AR-source-file-size.3 §FS-rhei-plan-language.3.13 §FS-rhei-validate.4
+// those identities into handoff composition; the actual invocation is checked
+// before prompt composition. §AR-source-file-size.3
+
+// §FS-rhei-plan-language.3.13 §FS-rhei-validate.4
 
 fn exclusion_applicable_states<'a>(
     task: &rhei_core::ast::Task,

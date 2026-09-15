@@ -41,6 +41,7 @@ fn run_dry(home: &Path, input: &Path, extra: &[&str]) -> CliRun {
     CliRun::from(&command.output().expect("rhei run should execute"))
 }
 
+#[cfg(unix)]
 fn run_reported_headless(fixture: &UnrecognizedDirectoryFixture) -> CliRun {
     let output = rhei_command(&fixture.home)
         .arg("run")

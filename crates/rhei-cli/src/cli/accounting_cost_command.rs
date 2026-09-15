@@ -307,6 +307,12 @@ fn print_task_cost(
             held.record.model.as_deref().unwrap_or("-"),
             format_usage_cost(&usage)
         );
+        // Historical records have no array and retain their old one-line
+        // rendering; current failures explain each distinct reason beneath
+        // the contributing invocation. §FS-rhei-cost-accounting.8
+        for diagnostic in &held.record.extraction_diagnostics {
+            println!("      extractor-failed: {diagnostic}");
+        }
     }
 }
 

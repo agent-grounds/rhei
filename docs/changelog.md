@@ -18,6 +18,11 @@
   callback-only mode, where an exit-zero route could fire without a matching
   program exit; ordinary readiness still prevents an early spawn. (PR #266)
 
+- **Structured accounting extraction failures now explain why capture parsing
+  failed.** Capture and invocation records preserve concise diagnostics, and
+  `rhei cost --task` exposes them in both text and JSON without quoting raw
+  agent output. (PR #267)
+
 ## 2. [0.5.0] - 2026-09-14
 
 ### Fixed

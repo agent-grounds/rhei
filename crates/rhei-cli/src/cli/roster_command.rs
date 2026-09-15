@@ -323,7 +323,10 @@ fn write_roster_stdout(rendered: &str) -> MietteResult<()> {
     match stdout.write_all(rendered.as_bytes()).and_then(|()| stdout.write_all(b"\n")) {
         Ok(()) => Ok(()),
         Err(err) if err.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
-        Err(err) => Err(miette!("failed to write roster output: {err}")),
+        Err(err) => Err(miette!(
+            help = internal_error_help(),
+            "failed to write roster output: {err}"
+        )),
     }
 }
 

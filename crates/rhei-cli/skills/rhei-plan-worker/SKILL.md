@@ -30,7 +30,16 @@ Execute this loop until no eligible task remains or a human gate stops you:
     - If `rhei next` fails with a missing-artifact error, the current state requires an input file that does not exist — surface it; do not skip ahead.
 5. **Work in the current state.** Follow the printed instructions verbatim. The state you are handed is where the work happens — `rhei next` does **not** advance state. Implement child task nodes in order, logging per child (see *Progress Logging*). If the ticket you were handed is itself a parent, its subtree is already terminal — the work is the parent's own (see *Parent tasks*).
 6. **Advance state only when the workflow demands it.** Use `rhei transition` for intermediate hops; for terminal completion use `rhei complete` (see *State Transitions*).
-7. **Finalize with `rhei complete`.** Run `rhei complete <plan> --task <id> --result "<one-line summary>"`. It transitions to the first reachable non-cancelled terminal, appends a `## Result` entry with the message to `runtime/results/<task-id>.md`, links that file via `> **Result:**`, and removes `**Assignee:**`. `<task-id>` is the project-qualified id (`plan.1` for `plan.rhei.md`); `rhei next` prints qualified ids, and `--task` accepts both the qualified id and the rhei-local shorthand. The message is not paperwork: no task enters a `final: true` state without one, so write the sentence a reader six months from now needs.
+7. **Finalize with `rhei complete`.** For a short plain result, run `rhei complete <plan> --task <id> --result "<one-line summary>"`. For multiline or Markdown-heavy text, prefer `--result-file <path>` or pipe a quoted heredoc to `--result-file -`, so backticks and quotes never enter a shell-expanded argument:
+
+    ```bash
+    rhei complete <plan> --task <id> --result-file - <<'EOF'
+    Replayed onto `origin/main`.
+    Preserved the review notes verbatim.
+    EOF
+    ```
+
+    It transitions to the first reachable non-cancelled terminal, appends a `## Result` entry with the message to `runtime/results/<task-id>.md`, links that file via `> **Result:**`, and removes `**Assignee:**`. `<task-id>` is the project-qualified id (`plan.1` for `plan.rhei.md`); `rhei next` prints qualified ids, and `--task` accepts both the qualified id and the rhei-local shorthand. The input file is only the caller's message; it is not the worker-authored `runtime/results/<task-id>.md` artifact, which Rhei preserves and appends to. The message is not paperwork: no task enters a `final: true` state without one, so write what a reader six months from now needs.
 8. **Stop at terminal or gating states.** `completed` is final in the built-in machine. Any state with `gating: true` in a custom machine halts the worker — do not transition out of it autonomously, and do not try to `rhei complete` through it.
 9. **Loop.** Return to step 4. Re-read the plan on every pass; the markdown file is the single source of truth.
 

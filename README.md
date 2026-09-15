@@ -330,6 +330,20 @@ Complete a task and record the result:
 cargo run -p rhei-cli -- complete examples/release-automation.rhei.md --task 1 --result "Brief approved"
 ```
 
+For a multiline or Markdown-heavy result, read a named file or standard input
+instead of placing its contents in a shell-expanded argument:
+
+```bash
+cargo run -p rhei-cli -- complete examples/release-automation.rhei.md --task 1 \
+  --result-file result.md
+
+cargo run -p rhei-cli -- complete examples/release-automation.rhei.md --task 1 \
+  --result-file - <<'EOF'
+Replayed onto `origin/main`.
+Kept the result text verbatim.
+EOF
+```
+
 Print crate versions surfaced by the CLI:
 
 ```bash

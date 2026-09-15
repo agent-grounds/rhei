@@ -190,6 +190,7 @@ mod tests {
     include!("cli/tests_program_exit_routes.rs");
     include!("cli/tests_agent_execution_validation.rs");
     include!("cli/tests_effective_static_mode_validation.rs");
+    include!("cli/tests_mode_selection.rs");
     include!("cli/tests_usage_report.rs");
     include!("cli/tests_accounting.rs");
     include!("cli/tests_accounting_contract.rs");

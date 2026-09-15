@@ -61,7 +61,11 @@ Flags are grouped by concern:
 `rhei run` drives a whole project by default: every load yields a Panta-rooted
 graph, and a bare rhei is simply the single rhei of its implicit Panta
 ([§FS-rhei-panta.6.2](rhei-panta.spec.md#62-rhei-run)). `--rhei <RHEI_ID>` is repeatable and narrows the run to
-the named rheis.
+the named rheis. With no `--rhei`, successfully published project members may
+join the candidate set while the run is live (§3). With one or more `--rhei`
+flags, the candidate set is exactly the member ids resolved at startup: later
+members still participate in strict graph validation, dependency resolution,
+and project-wide locking, but never become candidates in that run.
 
 - An id that names no rhei in the project is an error listing the available
   rhei ids.
@@ -102,6 +106,15 @@ two multi-root runs cannot deadlock. `--dry-run` takes no locks
 (§4). Narrowing with `--rhei` does not narrow the lock set: a narrowed run
 still locks the whole project, keeping lock behavior independent of scheduling
 scope.
+
+When a strict reload discovers a published member whose execution root was not
+known at startup, the run acquires that root's `.rhei/run.lock` before admitting
+the member. This applies even when an explicit `--rhei` keeps the member out of
+the candidate set: scope never weakens exclusion. New roots are added in the
+same canonical order and use the same announced, interruptible foreground wait
+or immediate detached-child refusal as startup locks. The project lock remains
+held throughout; `--dry-run` remains lock-free and makes no live-admission
+promise.
 
 A **foreground** run blocks on a lock another run holds — waiting for your turn
 is a queueing idiom people use on purpose — but says so first, naming the run it
@@ -152,6 +165,30 @@ profile's initial `pending` state, `rhei run` must fail without changing the
 task. The manual worker loop must claim such a task with `rhei next`, do the
 work, and finish it with `rhei complete`. This prevents the built-in machine
 from silently completing fresh tasks without executing them.
+
+Every reload made for scheduling is also a live-member admission checkpoint.
+The run performs one after processing each completed worker, before choosing
+the next sequential task or refilling a parallel slot, and once immediately
+before its normal no-work or gate stopping decision. At a checkpoint the run
+strictly reloads the complete project and compares its discovered member ids
+with the initialized set. A membership delta becomes eligible only after all
+of the following succeed as one admission: merged settings reload; member
+machine and callback-base resolution; complete graph and execution-reference
+validation; acquisition of every new execution-root lock; and initialization
+of the member's execution and accounting roots. Whole-run state-machine,
+agent, and model overrides apply normally. An incompatible member fails
+admission instead of inheriting an already initialized member's machine or
+runtime paths.
+
+Admission does not introduce a directory watcher or an unbounded idle wait. A
+member visible in the final checkpoint snapshot is considered before stopping;
+a member published after that snapshot waits for another run. Existing
+interactive and headless gate waits keep their existing reload cadence. A
+producer may therefore instantiate a follow-on member as its final program
+action and have that work considered by the enclosing run, while a future
+publication alone cannot keep a run alive indefinitely. Admission and failure
+messages use the existing run-message and event-journal channel on text, TUI,
+headless, and JSONL surfaces; no new output record family is introduced.
 
 1. Load the state machine and plan. Validate. Errors stop the run; the
    initial report's validation **warnings** ([§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior)) are emitted once,
@@ -700,8 +737,10 @@ With `--parallel N`, up to `N` subprocesses run concurrently. The orchestrator:
   `SlotReleased`; see [Run TUI Specification — Run Event Journal](rhei-run-tui.spec.md#17-journal-format).
 - Serializes every state write through its own file lock, so two agents completing at once cannot corrupt the plan.
 - Refills freed slots immediately: after any subprocess exits and its result is
-  processed, the orchestrator re-reads the plan, recomputes the ready set, and
-  starts newly ready work while the rest of the pool keeps running. Each task
+  processed, the orchestrator performs the admission checkpoint in §3,
+  recomputes the ready set, and starts newly ready work while the rest of the
+  pool keeps running. Admitted work consumes the same ordinary slots; it never
+  expands the pool. Each task
   selected during that refill is resolved from its reloaded task metadata with
   the normal execution precedence, including the full task `**Target:**`
   override defined by §FS-rhei-plan-language.3.11.

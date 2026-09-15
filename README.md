@@ -46,7 +46,9 @@ Rhei is the only agent runtime that combines all of:
 - **Runtime orchestration from CLI or API.** `rhei run` advances ready work
   through state machines, spawns agents or deterministic programs, captures
   logs and artifacts, and exposes the same model through reusable crates and
-  bindings.
+  bindings. An unrestricted Panta run also admits a valid member instantiated
+  while it is live, so a program can publish a follow-on workflow and let the
+  same recorded run carry it forward; explicit `--rhei` selections stay fixed.
 - **Parents that supervise, not just integrate.** A state declaring
   `execute_on: <scope>-<event>` turns the task holding it into a *supervisor*: the
   orchestrator wakes it after every finished child, every child transition,

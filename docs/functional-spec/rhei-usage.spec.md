@@ -443,6 +443,35 @@ A Rhei plan can model a CI/CD pipeline where each task is a pipeline stage. The 
 
 Task 5 starts as `draft` — it will only be promoted to `pending` after staging is verified. The pipeline advances automatically through callbacks, but human gates can be inserted at any stage.
 
+### 3.13. Pattern 11: A program creates follow-on work for its run
+
+An unrestricted Panta run may grow by complete members while it is live. A
+program state can finish by instantiating a template directly into its project,
+and the enclosing run admits the published member at its next scheduling
+checkpoint:
+
+```yaml
+states:
+  prepare-follow-on:
+    program:
+      command:
+        - rhei
+        - instantiate
+        - release-review
+        - release=v2.0
+        - --output
+        - panta/release-v2-review
+```
+
+The program deliberately omits `--execute`: publication hands the new member
+to the existing project-wide loop and recorded run. `--execute` instead asks
+for a separate run and remains unsuitable inside a project run that already
+holds the project lock. The follow-on keeps its own declared state machine,
+execution root, logs, results, snapshots, and accounting. An explicit
+`rhei run --rhei seed` does not widen; use an unrestricted project run when
+the workflow is intended to compose new members dynamically
+([§FS-rhei-run.2.5](rhei-run.spec.md#25-project-scope---rhei), [§FS-rhei-panta.6.2](rhei-panta.spec.md#62-rhei-run)).
+
 ## 4. The Plan as Shared Memory
 
 The central design principle: **the plan file is the single source of truth**. Agents do not maintain internal state about what has been done or what comes next. They read the plan, act on it, write back to it, and validate. This has several consequences:

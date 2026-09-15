@@ -60,7 +60,8 @@ pass `--state-machine`.
    fail-fast because later task-file diagnostics may depend on index structure.
 2. Resolve the state machine and validate plan semantics, including state
    values, task ids, dependencies, node policy, terminal and gating states,
-   counted-loop syntax, and artifact contracts. [§FS-rhei-plan-language](rhei-plan-language.spec.md#fs-rhei-plan-language-rhei-plan-language-specification) [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification)
+   counted-loop syntax, artifact contracts, and task read exclusions.
+   [§FS-rhei-plan-language](rhei-plan-language.spec.md#fs-rhei-plan-language-rhei-plan-language-specification) [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification)
 3. Load merged global and project settings, then validate referenced agents,
    models, MCP servers, skills, and snapshot settings used by the state
    machine. For each execution that uses static agent and mode selection,
@@ -88,6 +89,23 @@ pass `--state-machine`.
 
 `rhei validate` does not acquire task locks, run callbacks, spawn agents,
 spawn programs, create runtime files, or rewrite the plan.
+
+For each `**Excludes:**` entry, validation applies
+[§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions) and rejects:
+
+- malformed kinds or paths, root escapes, and symlink escapes;
+- a task or export reference that does not resolve in the authored graph;
+- duplicate logical, canonical-alias, or contained targets;
+- an exact, canonical-alias, or ancestor-directory overlap with a consumed
+  export, the current task source, the active state-machine source, or a
+  required state input or handoff; and
+- an excluded task that can enter a named snapshot-inheritance state.
+
+Resolution uses declared exports rather than runtime file existence, so an
+unwritten future export is valid. Diagnostics name the task, authored entry,
+resolved target when available, and the conflicting declaration. Readable-root
+support is not a validation precondition: a profile with no `deny_read`
+adapter is valid and receives composition-only enforcement.
 
 ### 4.1. Unresolved `**Prior:**` references
 

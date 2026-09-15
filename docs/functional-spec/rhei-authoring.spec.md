@@ -163,6 +163,23 @@ CLI JSON) or `task.metadata.depends_on` (Python). See
 [Transitions Specification — Naming conventions](rhei-transitions.spec.md#21-naming-conventions)
 for the full table.
 
+### 4.3. Read Exclusions
+
+Use `**Excludes:**` when a task must not receive a source payload, for example
+when several reviewers must form independent views:
+
+```markdown
+**Excludes:** checkout=notes/private.md, artifact=runtime/reviews/, review.2:statement
+```
+
+Use `checkout=` for repository/worktree sources, `artifact=` for the owning
+rhei's runtime tree, and an export reference for another task's declared
+export. A trailing `/` excludes a directory recursively. Do not both consume
+and exclude one export, and do not exclude required invocation inputs; validate
+the whole project so cross-rhei references resolve. The exact grammar and the
+difference between composition-only and filesystem enforcement are in
+[§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions) and [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition).
+
 ## 5. Using a Custom State Machine
 
 To reuse one state machine across plans, declare it on the line directly

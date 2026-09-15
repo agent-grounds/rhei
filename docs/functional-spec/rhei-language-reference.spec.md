@@ -70,6 +70,9 @@ Language changes must preserve a single discoverable entry point:
 
 - New syntax in plan markdown belongs in [§FS-rhei-plan-language](rhei-plan-language.spec.md#fs-rhei-plan-language-rhei-plan-language-specification) and must be
   linked from this page.
+- Task read boundaries are authored with `**Excludes:**`; their syntax and
+  validation are owned by [§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions), while prompt and process enforcement are owned by
+  [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition).
 - Adding, removing, or renaming a user-authored project or rhei file kind or
   directory must update the file-kind map in §1 in the same change as the
   owning spec edit.

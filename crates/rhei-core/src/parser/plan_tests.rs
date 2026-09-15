@@ -638,6 +638,47 @@ fn parses_provides_and_consumes_metadata() {
     );
 }
 
+/// The read boundary is a closed metadata field after `**Consumes:**` and
+/// accepts checkout, artifact, and graph-resolved export forms.
+/// §FS-rhei-plan-language.2 §FS-rhei-plan-language.3.13
+#[test]
+fn parses_exclusions_after_consumes_and_before_assignee() {
+    let input = r#"# Rhei: Example
+## Tasks
+
+### Task 1: Publish
+**State:** completed
+**Provides:** statement
+
+### Task 2: Review blind
+**State:** pending
+**Consumes:** 1:statement
+**Excludes:** checkout=notes/private file.md, artifact=runtime/reviews/, 1:other
+**Assignee:** manual
+"#;
+
+    parse(input).expect("all exclusion forms parse in metadata order");
+}
+
+#[test]
+fn exclusions_before_consumes_is_a_parse_error() {
+    let input = r#"# Rhei: Example
+## Tasks
+
+### Task 1: Review
+**State:** pending
+**Excludes:** checkout=private.md
+**Consumes:** 2:statement
+"#;
+
+    let err = parse(input).expect_err("Excludes must follow Consumes");
+    assert!(
+        err.message.contains("**Consumes:** must appear before **Excludes:**"),
+        "error should state metadata order, got: {}",
+        err.message
+    );
+}
+
 #[test]
 fn provides_before_state_is_parse_error() {
     let input = r#"# Rhei: Example
@@ -758,8 +799,10 @@ fn unknown_metadata_error_lists_the_export_fields() {
     let err = parse(input).unwrap_err();
     assert!(err.message.contains("Unknown metadata field '**Provide:**'"), "{}", err.message);
     assert!(
-        err.message.contains("**Provides:**") && err.message.contains("**Consumes:**"),
-        "error should list both export fields, got: {}",
+        err.message.contains("**Provides:**")
+            && err.message.contains("**Consumes:**")
+            && err.message.contains("**Excludes:**"),
+        "error should list exports and exclusions, got: {}",
         err.message
     );
 }

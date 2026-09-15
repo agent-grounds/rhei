@@ -442,7 +442,7 @@ task_id_segment = NUMBER | IDENTIFIER ;
    execution override — either `**Model:**` or `**Target:**`, never both. See
    section 3.11. *)
 (* The metadata block is closed: `**State:**`, `**Prior:**`, `**Provides:**`,
-   `**Consumes:**`, `**Assignee:**`, `**Model:**`, and `**Target:**` are the
+   `**Consumes:**`, `**Excludes:**`, `**Assignee:**`, `**Model:**`, and `**Target:**` are the
    only fields. A `**<name>:**` line
    with any other name, appearing in the block before a blank line has
    separated it from the heading, is a parse error naming the unknown field.
@@ -452,7 +452,7 @@ task_id_segment = NUMBER | IDENTIFIER ;
    Past a blank line the same line is ordinary bold text and is kept as task
    content. *)
 metadata        = state_field, [ prior_field ], [ provides_field ],
-                  [ consumes_field ], [ assignee_field ],
+                  [ consumes_field ], [ excludes_field ], [ assignee_field ],
                   [ execution_override ] ;
 
 assignee_field  = "**Assignee:** ", title, NEWLINE ;
@@ -503,11 +503,27 @@ provides_field  = "**Provides:** ", export_name_list, NEWLINE ;
 
 consumes_field  = "**Consumes:** ", export_ref_list, NEWLINE ;
 
+excludes_field  = "**Excludes:** ", exclusion_list, NEWLINE ;
+
 export_name_list = export_name, { ", ", export_name } ;
 
 export_ref_list = export_ref, { ", ", export_ref } ;
 
 export_ref      = task_id, ":", export_name ;
+
+exclusion_list  = exclusion, { ", ", exclusion } ;
+
+exclusion       = "checkout=", exclusion_path
+                | "artifact=", exclusion_path
+                | export_ref ;
+
+(* Authored paths always use `/`. A final `/` makes the target recursive;
+   otherwise it names one exact file, including when it does not yet exist. *)
+exclusion_path  = path_component, { "/", path_component }, [ "/" ] ;
+
+path_component  = exclusion_char, { exclusion_char } ;
+
+exclusion_char  = ? any Unicode character except NEWLINE, "/", "\\", and "," ? ;
 
 (* An export name keys a path segment, so it excludes separators and spaces. *)
 export_name     = ( LETTER | DIGIT ), { LETTER | DIGIT | "." | "_" | "-" } ;
@@ -1239,10 +1255,73 @@ export it declares ([§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-compositio
 written, or that is empty, is skipped: the section is simply absent from the
 prompt.
 
-Rhei does not yet check that a `**Consumes:**` reference resolves to a
-declared `**Provides:**`, that the producer is a prior, or that a declared
-export was written before its producer went terminal. Until it does, a mistyped
-export name reads as a missing file and is silently skipped.
+Validation resolves every consumed export to a task and a name in that task's
+`**Provides:**`, even when the export file has not been written yet. A producer
+need not be a prior: `**Consumes:**` declares data flow, while `**Prior:**`
+declares scheduling. A declared export that was not written remains an optional
+prompt input and is silently skipped unless a state declares the same artifact
+as a required input. An exclusion may never overlap a consumed export; §3.13
+defines the overlap rule and makes that contradiction a validation error.
+
+### 3.13. Task Read Exclusions
+
+A task may declare source artifacts that its agent must not read. The field is
+task-level, optional, and occurs after `**Consumes:**` and before assignee or
+execution overrides:
+
+```markdown
+**Excludes:** checkout=notes/private.md, artifact=runtime/reviews/, review.2:statement
+```
+
+`checkout=<path>` is relative to the task's effective checkout, including a
+task-specific worktree. `artifact=<path>` is relative to the execution root of
+the rhei that owns the task. An export reference uses the grammar of
+`**Consumes:**`: a local task wins; otherwise a name-led dotted id remains
+project-qualified and resolves through the merged graph. The referenced task
+and export name must be declared, but the export file need not exist.
+
+Authored paths use `/` on every platform and may contain spaces. They may not
+be empty, absolute or platform-prefixed, contain `\` or `,`, or contain empty,
+`.` or `..` components. A trailing `/` names a directory recursively; without
+it, the entry names exactly one file even before that file exists. Resolution
+uses path components, never string prefixes: `private/` covers
+`private/note.md`, not `private-copy/note.md`.
+
+Rhei resolves every entry to a logical absolute target beneath its declared
+root. It canonicalizes the longest existing ancestor and appends the remaining
+components, so aliases through an existing symlink cannot evade the boundary
+when the leaf does not yet exist. A symlink and its in-root canonical target
+are both targets. A symlink that escapes the declared root is invalid.
+Resolution and canonicalization run during validation and again immediately
+before each agent spawn. This second pass is authoritative when the filesystem
+changed after validation.
+
+Two authored entries are duplicates when their logical or canonical targets
+are identical, or when one directory entry contains the other target; the
+validator reports the redundant spellings rather than silently selecting one.
+Containment and equality use normalized path components and resolved identity.
+Rhei does not track hard links or content copied to a different artifact: this
+is a source-artifact boundary, not content-provenance control.
+
+An exclusion is invalid when its exact or canonical target, or an excluded
+ancestor directory, overlaps any of these invocation requirements:
+
+- an export named by the same task's `**Consumes:**`;
+- the current task's authored source file or the active state-machine source;
+- a required state `inputs:` artifact or required handoff.
+
+An optional prior, child, history, result, brief, checkpoint, context, or
+handoff payload may be excluded. Its bytes are then omitted, while the graph
+identity and navigation metadata that name the task and artifact remain. A
+required-input conflict is invalid rather than being converted to optional
+omission. A task that can enter a state with named `snapshot.inherit` may not
+declare `**Excludes:**` in v1 ([§FS-rhei-snapshots.11](rhei-snapshots.spec.md#11-validation-rules)).
+
+The resolved entries form one policy reused by prompt composition and process
+launch ([§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition)). Plans with no `**Excludes:**` preserve their prior
+parse, validation, composition, and execution behavior. Program states,
+callbacks, `--no-agent`, and `rhei snapshot continue` do not launch a new agent
+under this contract and are unchanged.
 
 ## 4. Token Types
 
@@ -1265,6 +1344,7 @@ For lexer implementation, the following token types are a reasonable minimum:
 | `MetadataPrior` | `\*\*Prior:\*\* .*` | `**Prior:** Bug 1.2` |
 | `MetadataProvides` | `\*\*Provides:\*\* .*` | `**Provides:** api-contract` |
 | `MetadataConsumes` | `\*\*Consumes:\*\* .*` | `**Consumes:** 1:api-contract` |
+| `MetadataExcludes` | `\*\*Excludes:\*\* .*` | `**Excludes:** checkout=private.md` |
 | `MetadataAssignee` | `\*\*Assignee:\*\* .*` | `**Assignee:** alice` |
 | `MetadataModel` | `\*\*Model:\*\* .*` | `**Model:** claude-opus-4-7` |
 | `MetadataTarget` | `\*\*Target:\*\* .*` | `**Target:** codex[safe]:openai:gpt-5-codex` |
@@ -1300,6 +1380,7 @@ struct TaskNode {
     prior: Vec<TaskId>,
     provides: Vec<String>,          // export names published (**Provides:**)
     consumes: Vec<ConsumedExport>,  // exports read from prior tasks (**Consumes:**)
+    excludes: Vec<Exclusion>,       // authored read exclusions (**Excludes:**)
     assignee: Option<String>,
     model: Option<String>,    // per-task model override (**Model:**)
     target: Option<String>,   // per-task full execution identity (**Target:**)

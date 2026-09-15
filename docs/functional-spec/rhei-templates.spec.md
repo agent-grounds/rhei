@@ -356,6 +356,12 @@ per-task metadata and cannot be written once for a loop the engine repeats:
 {% endfor %}
 ```
 
+Blind rounds should also generate task-level `**Excludes:**` entries for the
+other participants' statement exports. Serial scheduling and prompt prose are
+not blindness guarantees; the instantiated plan must carry the boundary, and
+each generated export reference must resolve in the resulting graph
+([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)).
+
 The same arithmetic sizes a state's own budget from the inputs that shaped the
 plan — `visits: {{ 3 * review_rounds + docs_rounds + 3 }}`. Contrast this with
 a counted loop (`visits:` plus a `visitCount`-conditioned transition), which

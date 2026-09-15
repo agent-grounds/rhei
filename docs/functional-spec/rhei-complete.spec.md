@@ -4,8 +4,9 @@ Atomically complete a task: transition to a terminal state, write the result to 
 
 `rhei complete` is sugar. It owns exactly one thing no other verb does —
 inferring the one-hop non-cancelled terminal target (§4.1) — and reaches it
-through the same shared transition path as every other verb, carrying
-`--result` (§4). The result file, its link, the dropped assignee, the ledger
+through the same shared transition path as every other verb, carrying the
+message selected by `--result` or `--result-file` (§2.2, §4). The result file,
+its link, the dropped assignee, the ledger
 line, and the refusal of a terminal entry with no result are all properties of
 entering a `final: true` state ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)), not of this command.
 
@@ -13,7 +14,9 @@ entering a `final: true` state ([§FS-rhei-states.3.3](rhei-states.spec.md#33-te
 
 ```bash
 rhei complete <TICKET_ID> --result <MESSAGE>
+rhei complete <TICKET_ID> --result-file <PATH>
 rhei complete [RHEI_PLAN] --task <TASK_ID> --result <MESSAGE>
+rhei complete [RHEI_PLAN] --task <TASK_ID> --result-file <PATH>
 ```
 
 The first form is the everyday one: every other ticket surface (`rhei list`,
@@ -24,11 +27,12 @@ must work as pasted. The positional argument is disambiguated in §2.1; the
 
 ## 2. Options
 
-| Flag             | Required | Default | Description                                       |
-|------------------|----------|---------|---------------------------------------------------|
-| `--task <ID>`    | No       |         | Ticket identifier: project-qualified (`auth.1`) or rhei-local (`1`). Alternative to the positional ticket id; exactly one of the two must name the ticket. See §2.1. |
-| `--result <MSG>` | Yes      |         | Result message for the task. Rejected when empty or whitespace-only. |
-| `--no-callbacks` | No       | false   | Skip execution of `on_leave`/`on_enter` callbacks |
+| Flag                   | Required | Default | Description                                       |
+|------------------------|----------|---------|---------------------------------------------------|
+| `--task <ID>`          | No       |         | Ticket identifier: project-qualified (`auth.1`) or rhei-local (`1`). Alternative to the positional ticket id; exactly one of the two must name the ticket. See §2.1. |
+| `--result <MSG>`       | One of   |         | Literal result message for the task. Rejected when empty or whitespace-only. |
+| `--result-file <PATH>` | One of   |         | Read the result message from a UTF-8 file, or from stdin when `PATH` is exactly `-`. See §2.2. |
+| `--no-callbacks`       | No       | false   | Skip execution of `on_leave`/`on_enter` callbacks |
 
 ### 2.1. Ticket Targets
 
@@ -55,6 +59,27 @@ other command) and the ticket id, resolved in this order:
 
 With neither a positional ticket nor `--task`, the error shows the positional
 form first: `rhei complete <ticket-id> --result <message>`.
+
+### 2.2. Result Sources
+
+Exactly one of `--result <MSG>` and `--result-file <PATH>` is required.
+Supplying both or neither is an argument error. `--result` always carries its
+value literally, including the value `-`; it never reads stdin.
+
+`--result-file` reads the named source in full as UTF-8. The exact value `-`
+reads stdin through EOF. Every other value names a filesystem path, so a file
+literally named `-` can be selected as `./-` or by another non-sentinel path.
+Relative paths resolve from the invocation's working directory, including
+when the selected Single-File Plan or Directory Workspace is elsewhere;
+absolute paths are used as given. This input-path rule is independent of the
+fixed output-artifact routing in §4.2–4.3.
+
+The selected message must contain something other than whitespace. Rhei may
+trim only to make that test; it does not trim or otherwise rewrite accepted
+text. It preserves every valid UTF-8 byte, including backticks, quotes,
+embedded line feeds, and trailing LF or CRLF sequences, when passing the
+message to completion. A missing or unreadable source, invalid UTF-8, or empty
+or whitespace-only loaded text is an input error.
 
 ## 3. Result File
 
@@ -144,11 +169,19 @@ message entry:
 ```
 
 Any verb that carries a message appends one such entry — `rhei complete
---result`, `rhei transition --result`, and `rhei run`'s engine-owned failure
-routes alike — so the file reads the same however the ticket was driven. Rhei
+--result`, `rhei complete --result-file`, `rhei transition --result`, and `rhei
+run`'s engine-owned failure routes alike — so the file reads the same however
+the ticket was driven. Rhei
 writes the entry as the heading, a blank line, the message, and a trailing
 blank line, so successive entries stay separated. The ordered audit trail of
 state transitions lives in `runtime/state-transitions.log`.
+
+For `--result-file`, the accepted source bytes are the `<message>` inside this
+Rhei-owned framing. Embedded and trailing LF or CRLF bytes remain unchanged;
+the entry's heading, leading blank line, and final blank line are added around
+them. The source is a caller message, not an artifact import: if a worker has
+already written the task's result file, that artifact remains verbatim and the
+new caller message is appended through the normal completion path.
 
 A file a **worker** wrote itself ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)) is taken verbatim: Rhei
 reads it to decide the obligation is met and never rewrites it. So the two
@@ -167,18 +200,19 @@ Added avatar_url column and migration 0042
 
 ## 4. Behavior
 
-`rhei complete <ticket> --result <MSG>` is exactly:
+`rhei complete <ticket>` with either result source is exactly:
 
 > the readiness checks a scheduling verb owns (points 4–6) + the inferred
 > one-hop terminal target (§4.1) + `rhei transition <ticket> --from <current>
-> --to <inferred> --result <MSG>` on the shared transition path.
+> --to <inferred> --result <selected-message>` on the shared transition path.
 
-1. Reject an empty or whitespace-only `--result` before anything is read or
-   written. This is an argument check, not a plan check: it needs no plan, no
-   machine, and no task, so it runs first and its message is about the flag the
-   caller typed. Ordering it after the plan load would answer `--task 99
-   --result "  "` with "task not found" — true, but not the thing the caller
-   got wrong, and a caller who fixes the id then gets the second complaint.
+1. Select exactly one result source, read file or stdin input when selected,
+   decode it as UTF-8, and reject an empty or whitespace-only message before
+   the plan, machine, task, or runtime artifacts are read or written. These are
+   input checks, not plan checks, so their diagnostic takes precedence even
+   when the plan path or ticket is also invalid. Any failure in this phase
+   leaves the plan state, result artifacts, and transition ledger unchanged.
+   The accepted message itself is not normalized (§2.2).
 2. Load the state machine and plan (single file or directory workspace). Validate.
 3. Locate the task by ID. Fail if the task does not exist.
 4. Reject if the task is already in a terminal state.
@@ -195,7 +229,8 @@ Added avatar_url column and migration 0042
    escape hatch a gating state uses in point 5.
 7. Find the completion target: the first non-cancelled terminal state reachable via a declared transition from the current state. Fail if none exists (e.g., from `agent-review-fix` there is no direct path to a terminal state — the agent must transition to `agent-review` first). `cancelled` is never treated as a successful completion target. The order of transitions in the YAML `transitions` list is significant when selecting the target; editors and formatters should preserve declaration order.
 8. Run the shared transition ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)) from the current state
-   to that target, carrying `--result`: compare-and-swap under the file lock,
+   to that target, carrying the selected message as `--result` does:
+   compare-and-swap under the file lock,
    the descendants-first guard ([§FS-rhei-transition-cmd.3.1](rhei-transition-cmd.spec.md#31-descendants-first-on-terminal-entry)), `on_leave`,
    source `outputs:`, target `inputs:`, the terminal-result obligation
    ([§FS-rhei-transition-cmd.3.2](rhei-transition-cmd.spec.md#32-terminal-result-on-entry)), the atomic state write, `on_enter`, the
@@ -274,6 +309,12 @@ rhei complete plan.rhei.md --task 3 \
 # State: pending -> completed
 # Result: runtime/results/plan.3.md
 # Assignee: removed
+
+# Preserve a Markdown-heavy or multiline result without putting it in argv
+rhei complete plan.rhei.md --task 3 --result-file result.md
+
+# The same safe input can be streamed to EOF
+generate-result | rhei complete plan.rhei.md --task 3 --result-file -
 
 # Worker in a living workspace completes a review-seed task. The Directory
 # Workspace `my-workspace/` is the rhei `my-workspace`, so the ticket is

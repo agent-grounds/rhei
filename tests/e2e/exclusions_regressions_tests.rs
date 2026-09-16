@@ -196,6 +196,7 @@ result('Future directory reads attempted.\n')
         } else {
             "private=read\nprivate-copy=read"
         };
-        assert_eq!(fs::read_to_string(dir.join("runtime/observed.txt")).unwrap(), expected);
+        let observed = fs::read_to_string(dir.join("runtime/observed.txt")).unwrap();
+        assert_eq!(observed.lines().collect::<Vec<_>>().join("\n"), expected);
     }
 }

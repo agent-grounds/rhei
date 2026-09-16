@@ -38,7 +38,7 @@ fn next_command(
     let loaded = load_plan(input)?;
     let scope = resolve_rhei_scope(&loaded, rhei_scope)?;
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
-    let machines = ExecutionMachines::build(&resolved, input)?;
+    let machines = ExecutionMachines::build(&resolved, input, &loaded)?;
     let workspace_root = execution_workspace_root(&machines.default_callbacks.plan_path);
 
     // Validate the plan first.

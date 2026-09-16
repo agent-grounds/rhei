@@ -178,6 +178,19 @@
             Ok(())
         }
 
+        /// Preserve reconciled settings beside retained hidden output when
+        /// publication cannot use the requested path. §FS-rhei-templates.6.1.2
+        pub(super) fn restore_staged(&self) -> MietteResult<()> {
+            if let Some(parent) = self.source.parent() {
+                fs::create_dir_all(parent).map_err(|err| {
+                    file_io_report(parent, "failed to retain staged settings directory", err)
+                })?;
+            }
+            fs::write(&self.source, &self.rendered).map_err(|err| {
+                file_io_report(&self.source, "failed to retain staged settings", err)
+            })
+        }
+
         /// Put the project's settings back the way a discarded instantiation
         /// found them: the merge removed along with the directories written
         /// for it, or the pre-merge content restored. Instantiation validates

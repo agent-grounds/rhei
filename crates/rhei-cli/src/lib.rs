@@ -32,6 +32,7 @@ mod templates {
     include!("cli/templates_list.rs");
     include!("cli/templates_instantiate.rs");
     include!("cli/templates_publication.rs");
+    include!("cli/templates_rename.rs");
     include!("cli/templates_project.rs");
     include!("cli/templates_discovery.rs");
     include!("cli/templates_inputs.rs");
@@ -44,6 +45,7 @@ mod templates {
     #[cfg(test)]
     mod tests {
         include!("cli/tests_templates_render.rs");
+        include!("cli/tests_templates_publication.rs");
     }
 }
 
@@ -188,6 +190,7 @@ mod tests {
     include!("cli/tests_prompt_templates.rs");
     include!("cli/tests_complete_reset_tooling.rs");
     include!("cli/tests_complete_result_input.rs");
+    include!("cli/tests_member_execution_context.rs");
     include!("cli/tests_file_locks.rs");
     include!("cli/tests_claim_transaction.rs");
     include!("cli/tests_claim_writer_exclusion.rs");

@@ -59,7 +59,7 @@ impl LiveRunContext {
             &loaded,
             self.state_machine_override.as_deref(),
         )?;
-        let machines = ExecutionMachines::build(&resolved, input)?
+        let machines = ExecutionMachines::build(&resolved, input, &loaded)?
             .with_state_machine_override(self.state_machine_override.as_deref());
         let settings = load_merged_settings(workspace_root)?;
         let mut report = rhei_validator::validate_with_machine_set(&loaded.rhei, &machines.set);

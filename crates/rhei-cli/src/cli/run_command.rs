@@ -239,7 +239,7 @@ fn run_command(
     report_panta_scope_narrowed(&loaded, "run", &rhei_scope);
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
     let machines =
-        ExecutionMachines::build(&resolved, input)?.with_state_machine_override(state_machine_path);
+        ExecutionMachines::build(&resolved, input, &loaded)?.with_state_machine_override(state_machine_path);
     let workspace_root = run_execution_root(input);
     let custom_price_book = opts.prices_path().map(Path::to_path_buf);
     if let Some(path) = custom_price_book.as_deref() {
@@ -336,10 +336,8 @@ fn run_command(
         &opts,
         &roots,
     )? || (loaded.is_panta_project() && opts.rhei_scope().is_empty() && !opts.dry_run());
-    // Agent mode is the superset scheduler: it also advances callback-only
-    // work. An unrestricted live project must keep that engine available
-    // because an admitted member may introduce an agent or program even when
-    // the startup graph had neither. §FS-rhei-panta.6.2 §FS-rhei-run.3
+    // Agent mode also advances callback-only work and can execute agents or
+    // programs introduced by admitted members. §FS-rhei-panta.6.2 §FS-rhei-run.3
 
     let mut live = LiveRunContext::new(
         &loaded,

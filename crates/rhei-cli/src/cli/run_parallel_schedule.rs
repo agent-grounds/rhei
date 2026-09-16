@@ -235,10 +235,8 @@ fn refill_parallel_worker_pool(
         return Ok(ParallelScheduleOutcome { spawned: 0, advanced: false, skipped: Vec::new() });
     }
 
-    // A completion frees capacity only after the full project has been
-    // refreshed and any new member has been initialized. The existing free
-    // slot is then reused; admission never enlarges the pool. §FS-rhei-run.3
-    // §FS-rhei-run.5
+    // Refresh and initialize new members before reusing a freed slot;
+    // admission never enlarges the pool. §FS-rhei-run.3 §FS-rhei-run.5
     let (reloaded, admitted) = live.checkpoint(input, workspace_root, opts, identity)?;
     if !admitted.is_empty() {
         emit_run_message(

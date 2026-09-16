@@ -34,8 +34,12 @@ The remaining three surfaces:
 
 - State machines: `states.yaml`. Owned by [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) and
   [§FS-rhei-transitions](rhei-transitions.spec.md#fs-rhei-transitions-rhei-transitions-specification).
-- Templates: template directories with `template.yaml` plus rendered plan and
-  state files. Owned by [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification).
+- Templates and composable blocks: template directories with `template.yaml`
+  plus rendered plan and state files. Template discovery, rendering, and
+  single-template instantiation are owned by
+  [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification);
+  recursive mounts, ports, seams, qualification, and lowering are owned by
+  [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks).
 - Execution references: agent, model, MCP server, skill, snapshot, and program
   references. Owned by [§FS-rhei-agents](rhei-agents.spec.md#fs-rhei-agents-rhei-agents-specification), [§FS-rhei-programs](rhei-programs.spec.md#fs-rhei-programs-rhei-program-states-specification), and
   [§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification).
@@ -61,6 +65,9 @@ Use this order when learning or auditing the language:
    rules, callbacks, visits, polling, or artifact enforcement.
 6. Read [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification) when the authored source is a reusable template
    rather than a concrete plan workspace.
+7. Read [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks)
+   when one template mounts reusable blocks or `rhei instantiate` composes
+   several blocks directly.
 
 Command specs such as [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate), [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next), [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition),
 [§FS-rhei-complete](rhei-complete.spec.md#fs-rhei-complete-rhei-complete), and [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run) define command behavior over the language;
@@ -87,6 +94,10 @@ Language changes must preserve a single discoverable entry point:
   [§FS-rhei-agents.2.2](rhei-agents.spec.md#22-modes).
 - New template syntax or manifest fields belong in [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification) and must
   be linked from this page.
+- Block-composition semantics belong in
+  [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks);
+  additions to `template.yaml` or `rhei instantiate` must also update
+  [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification).
 - New execution references that appear in authored files must identify their
   owner spec from this page.
 

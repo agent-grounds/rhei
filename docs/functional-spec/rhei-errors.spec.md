@@ -124,6 +124,21 @@ state, which is both the state being left and the state whose budget was spent,
 so the rule reads the same either way: the subject is whatever the check
 measured.
 
+### 1.6. Composed block context
+
+A composition error names the mount alias or public endpoint the user wrote and
+the manifest path that declared it. When two declarations disagree, it names
+both paths. A nested failure includes the complete root-to-failure alias chain;
+a recursion failure includes the repeated block and whole cycle. Unknown ports,
+data endpoints, inputs, and aliases list the small valid set or suggest the
+closest name under §1.3.
+
+The help line gives the nearest accepted edit or a command that reveals the
+surface, such as `rhei instantiate ... --list-inputs`. An ownership or identity
+collision must name both owners and tell the author which alias, declaration,
+or compatibility mapping to change. It must not surface as a later duplicate
+state, task, path, or parser failure stripped of its mount context.
+
 ## 2. Copy-Paste Safety
 
 Any command Rhei prints — in an error, a help line, or a success summary — must

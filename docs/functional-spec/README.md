@@ -37,6 +37,7 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-list](rhei-list.spec.md#fs-rhei-list-rhei-list) | `rhei list` command behavior |
 | [§FS-rhei-viz](rhei-viz.spec.md#fs-rhei-viz-flow-visualization) | Flow visualization: the primary plan/machine visualization surface |
 | [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification) | Rhei template format and instantiation behavior |
+| [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks) | Composable block manifests, qualification, seams, routing, and data passes |
 | [§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification) | Session snapshot/inheritance model, storage, runtime, and per-agent integration |
 | [§FS-rhei-snapshot-operations](rhei-snapshot-operations.spec.md#fs-rhei-snapshot-operations-rhei-snapshot-operations-specification) | Snapshot CLI, run override, settings, redaction, and rollout |
 | [§FS-rhei-completions](rhei-completions.spec.md#fs-rhei-completions-rhei-completion-ux-specification) | Shell completion UX |

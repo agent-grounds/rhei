@@ -1,11 +1,14 @@
     #[allow(clippy::too_many_arguments)]
     pub(super) fn instantiate_command(
         template: Option<&str>,
+        mounts: &[String],
         input_args: &[String],
         execute_args: &[String],
         set_values: &[String],
         set_files: &[String],
         values_files: &[PathBuf],
+        seams: &[String],
+        passes: &[String],
         output: Option<&Path>,
         execute: bool,
         dry_run: bool,
@@ -20,6 +23,35 @@
             ));
         }
 
+        // Explicit mounts opt into composition; with no mount the positional
+        // grammar below stays byte-for-byte the legacy template grammar.
+        // §FS-rhei-library.3
+        if !mounts.is_empty() {
+            if template.is_some() || !input_args.is_empty() {
+                return Err(miette!(
+                    help = "use only repeatable `--mount alias=block` operands and qualified `--set alias.input=value` inputs.",
+                    "direct block composition cannot be combined with a positional template or positional inputs"
+                ));
+            }
+            return instantiate_direct_blocks(
+                mounts,
+                seams,
+                passes,
+                values_files,
+                set_values,
+                set_files,
+                output,
+                execute,
+                dry_run,
+                keep_on_error,
+                list_inputs,
+                execute_args,
+            );
+        }
+        if !seams.is_empty() || !passes.is_empty() {
+            return Err(miette!("--seam and --pass require at least one --mount"));
+        }
+
         let Some(template) = template else {
             // §FS-rhei-templates.6.1.2: an omitted template lists available templates.
             return templates_command(false, "all", None);
@@ -28,6 +60,26 @@
         let resolved_template = resolve_template_reference(template)?;
         let template_dir = resolved_template.path();
         let manifest = load_template_manifest(template_dir)?;
+
+        if !manifest.block.mounts.is_empty() {
+            let template_input_args =
+                template_input_args_without_execute_args(input_args, execute_args)?;
+            return instantiate_curated_block(
+                template,
+                template_dir,
+                &manifest,
+                &template_input_args,
+                set_values,
+                set_files,
+                values_files,
+                output,
+                execute,
+                dry_run,
+                keep_on_error,
+                list_inputs,
+                execute_args,
+            );
+        }
 
         if list_inputs {
             print_template_inputs(&manifest, template);

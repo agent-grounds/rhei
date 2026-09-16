@@ -530,7 +530,13 @@ enum Commands {
         )]
         source: String,
     },
-    /// Instantiate a template into a concrete plan or workspace
+    /// Instantiate a template or compose mounted blocks into one workspace
+    ///
+    /// Legacy: `rhei instantiate changeset-review HEAD~3`
+    ///
+    /// Composition: `rhei instantiate --mount review=code-review --mount
+    /// fix=fix --set review.change_ref=HEAD~3 --seam
+    /// review.done=fix.entry --pass review.decision=fix.decision`
     Instantiate {
         /// Template name or path to a template directory
         #[arg(
@@ -538,6 +544,9 @@ enum Commands {
             add = ArgValueCompleter::new(templates::complete_template_reference)
         )]
         template: Option<String>,
+        /// Mount a reusable block as ALIAS=BLOCK (repeatable)
+        #[arg(long, value_name = "ALIAS=BLOCK")]
+        mount: Vec<String>,
         /// Set an input value (repeatable)
         #[arg(
             long = "set",
@@ -555,6 +564,12 @@ enum Commands {
         /// Load input values from a YAML or JSON file (repeatable)
         #[arg(long, value_name = "FILE", add = ArgValueCompleter::new(complete_values_path))]
         values: Vec<PathBuf>,
+        /// Link a public completion port to the next block's entry
+        #[arg(long, value_name = "SOURCE=TARGET")]
+        seam: Vec<String>,
+        /// Pass one public runtime-data output to an input
+        #[arg(long, value_name = "SOURCE=TARGET")]
+        pass: Vec<String>,
         /// Output directory (default: <project>/<template-name>/ inside a Panta
         /// project, else ./<template-name>/, where <template-name> is the
         /// directory basename of the resolved template)

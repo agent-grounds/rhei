@@ -10,6 +10,7 @@
 //! from [`crate::ast`].
 
 pub mod ast;
+pub mod blocks;
 pub mod callback;
 pub mod lexer;
 pub mod parser;

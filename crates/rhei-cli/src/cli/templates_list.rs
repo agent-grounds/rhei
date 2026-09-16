@@ -60,6 +60,10 @@
         description: String,
         #[serde(default)]
         inputs: Vec<TemplateInputDef>,
+        /// Typed composition surface; absent fields retain legacy identity.
+        /// §FS-rhei-library.1 §AR-rhei-library.1
+        #[serde(flatten)]
+        block: rhei_core::blocks::BlockManifest,
     }
 
     impl TemplateManifest {
@@ -90,7 +94,7 @@
         }
     }
 
-    #[derive(Debug, Clone, Deserialize)]
+    #[derive(Debug, Clone, Deserialize, PartialEq)]
     struct TemplateInputDef {
         name: String,
         description: String,
@@ -110,7 +114,7 @@
         }
     }
 
-    #[derive(Debug, Clone, Deserialize)]
+    #[derive(Debug, Clone, Deserialize, PartialEq)]
     struct TemplateValueSchema {
         #[serde(default, rename = "type")]
         value_type: TemplateInputType,

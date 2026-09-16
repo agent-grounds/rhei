@@ -203,7 +203,7 @@ fn ensure_state_outputs_exist(
             // A caller aiming at a final state has a second way out the help
             // hides: abandon the step through its cancellation role. §FS-rhei-states.1.4
             let cancel_hint = if entering_final {
-                " A transition into the reserved `cancelled` state skips this check; other abandonment terminals may declare `role: cancellation`."
+                " A transition into the reserved `cancelled` state skips this check. Other abandonment terminals may declare `role: cancellation`."
             } else {
                 ""
             };

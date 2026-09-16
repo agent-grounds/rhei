@@ -46,7 +46,8 @@
   live.** A validated member is published atomically, initialized with its own
   machine, callbacks, execution root, lock, and accounting context, then enters
   the existing sequential or parallel scheduler without starting another run.
-  Runs narrowed with `--rhei` keep their startup candidate set fixed. (PR #275)
+  Publication refuses a destination created during staging. Runs narrowed with
+  `--rhei` keep their startup candidate set fixed. (PR #275)
 
 - **Transition callbacks now receive a stable identity for each firing and an
   explicit pending ledger status.** Canonical JSON exposes `firingId` and

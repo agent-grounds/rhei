@@ -560,6 +560,16 @@ Input arguments are parsed as follows:
 9. **Print invocation.** Print a shell-safe `rhei instantiate ... --output <path>` command that shows how to instantiate the same template and input values again. The printed command uses the resolved output path, so shell expressions such as `$(date ...)` appear as the concrete path value seen by the CLI.
 10. **Execute (optional).** When `--execute` is passed, invoke `rhei run <output>` after successful validation. `rhei run` uses the instantiated output's root `states.yaml` by default when present; otherwise it falls back to the built-in default.
 
+Publication must atomically refuse any existing destination, including a path
+created after staging began. It never replaces or removes that competing path.
+If the platform or filesystem cannot perform a no-replace atomic directory
+rename, publication fails without exposing the staged member. Linux/Android,
+Apple platforms, Redox, and Windows use their native no-replace operations;
+other platforms currently fail closed. On publication failure, prior project
+settings are restored. With `--keep-on-error`, if the requested path cannot be
+used safely, keep the rendered tree and reconciled settings in hidden staging
+and report that location for inspection; otherwise remove staging as usual.
+
 #### 6.1.3. Instantiation Summary Output
 
 After successful validation, `rhei instantiate` prints a compact report before

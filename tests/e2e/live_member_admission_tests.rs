@@ -33,7 +33,7 @@ fn write_follow_on_template(project: &Path, tasks: usize, parallel_probe: bool) 
         if parallel_probe {
             r#"import json
 
-root = pathlib.Path.cwd()
+root = pathlib.Path(env('RHEI_ROOT'))
 project = root.parent
 local = env('RHEI_TASK_ID_LOCAL')
 marker = project / ('follow-started-' + local)
@@ -58,7 +58,8 @@ else:
 write(root / 'follow-observation-' / (local + '.json'), json.dumps({
     'task': env('RHEI_TASK_ID'),
     'plan': env('RHEI_PLAN_PATH'),
-    'cwd': str(root),
+    'root': str(root),
+    'checkout_cwd': str(pathlib.Path.cwd()),
     'result': env('RHEI_RESULT_PATH'),
 }, sort_keys=True))
 result('follow-on task ' + local + ' completed\n')
@@ -66,7 +67,7 @@ result('follow-on task ' + local + ' completed\n')
         } else {
             r#"import json
 
-root = pathlib.Path.cwd()
+root = pathlib.Path(env('RHEI_ROOT'))
 lock_path = root / '.rhei' / 'run.lock'
 lock_path.parent.mkdir(parents=True, exist_ok=True)
 with lock_path.open('a+b') as lock:
@@ -100,13 +101,16 @@ with lock_path.open('a+b') as lock:
 write(root / 'follow-observation.json', json.dumps({
     'task': env('RHEI_TASK_ID'),
     'plan': env('RHEI_PLAN_PATH'),
-    'cwd': str(root),
+    'root': str(root),
+    'checkout_cwd': str(pathlib.Path.cwd()),
     'result': env('RHEI_RESULT_PATH'),
 }, sort_keys=True))
 result('follow-on task completed\n')
 "#
         },
     );
+    // Override a supported identity with Python so the real accounting path
+    // records this local fixture's no-usage invocation. §FS-rhei-cost-accounting.3.2
     let command = fixture_command(&agent);
     let template = project.join(".agent-grounds/rhei/templates/follow-on");
     fs::create_dir_all(template.join("tasks")).expect("create follow-on template");
@@ -131,7 +135,7 @@ states:
     initial: true
     description: Execute the admitted follow-on
     concurrent: true
-    target: follow-on[yolo]:fixture:follow-on-model
+    target: codex[yolo]:fixture:follow-on-model
     agent_timeout: 10s
   delivered:
     final: true
@@ -154,7 +158,7 @@ transitions:
         &format!(
             r#"{{
   "agents": {{
-    "follow-on": {{
+    "codex": {{
       "command": {command},
       "stdin_prompt": true,
       "timeout": "10s",
@@ -165,7 +169,7 @@ transitions:
     "follow-on-model": {{
       "provider": "fixture",
       "model": "follow-on-model",
-      "default_agent": "follow-on"
+      "default_agent": "codex"
     }}
   }}
 }}
@@ -292,6 +296,56 @@ fn assert_follow_on_finished(project: &Path, tasks: usize) {
     }
 }
 
+// §FS-rhei-panta.6.2: both schedulers must attribute the actual invocation to
+// the member runtime and the enclosing recorded run.
+fn assert_follow_on_artifacts(project: &Path, task: usize, observed: &serde_json::Value) {
+    let follow = project.join("follow");
+    let task_id = format!("follow.{task}");
+    assert_eq!(observed["task"], task_id);
+    assert_eq!(Path::new(observed["root"].as_str().unwrap()), follow);
+    assert_eq!(Path::new(observed["plan"].as_str().unwrap()), follow);
+    let result = follow.join(format!("runtime/results/{task_id}.md"));
+    assert_eq!(Path::new(observed["result"].as_str().unwrap()), result);
+    assert!(result.is_file());
+
+    let stem = format!("task-{task_id}-review-codex-yolo-fixture-follow-on-model");
+    let log = follow.join(format!("runtime/logs/{stem}.log"));
+    assert!(log.is_file(), "member transcript missing: {}", log.display());
+    let spawn: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(follow.join(format!("runtime/spawns/{stem}.json")))
+            .expect("member spawn record"),
+    )
+    .expect("spawn JSON");
+    assert_eq!(spawn["task"], task_id);
+    assert_eq!(Path::new(spawn["log"].as_str().unwrap()), log);
+    assert!(!project.join(format!("runtime/logs/{stem}.log")).exists());
+    assert!(!project.join(format!("runtime/spawns/{stem}.json")).exists());
+
+    let descriptor: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(project.join("runtime/run.json")).expect("project run descriptor"),
+    )
+    .expect("descriptor JSON");
+    let run_id = descriptor["id"].as_str().expect("run id");
+    assert!(!follow.join("runtime/run.json").exists(), "admission must not create a sibling run");
+    let records: Vec<serde_json::Value> =
+        fs::read_dir(follow.join("runtime/accounting/invocations"))
+            .expect("member accounting root")
+            .map(|entry| {
+                serde_json::from_str(
+                    &fs::read_to_string(entry.expect("record entry").path())
+                        .expect("accounting record"),
+                )
+                .expect("accounting JSON")
+            })
+            .filter(|record: &serde_json::Value| record["task_id"] == task_id)
+            .collect();
+    assert_eq!(records.len(), 1, "one accounting invocation per admitted task");
+    assert_eq!(records[0]["run_id"], run_id);
+    assert_eq!(records[0]["agent"], "codex");
+    assert_eq!(records[0]["model"], "follow-on-model");
+    assert_eq!(records[0]["extraction_status"], "no-usage-emitted");
+}
+
 /// The producer's final program action publishes a distinct-machine member;
 /// the unrestricted run must initialize and execute it before stopping.
 // §FS-rhei-panta.6.2 §FS-rhei-run.2.6 §FS-rhei-run.3
@@ -308,24 +362,7 @@ fn issue_205_unrestricted_run_admits_a_final_program_handoff_into_the_same_run()
             .expect("follow-on agent should record its context"),
     )
     .expect("observation is JSON");
-    assert_eq!(observed["task"], "follow.1");
-    assert_eq!(Path::new(observed["cwd"].as_str().unwrap()), follow);
-    assert_eq!(Path::new(observed["plan"].as_str().unwrap()), follow);
-    assert!(observed["result"].as_str().unwrap().ends_with("follow/runtime/results/follow.1.md"));
-    assert!(follow.join("runtime/logs/task-follow.1-review.log").is_file());
-    assert!(follow.join("runtime/results/follow.1.md").is_file());
-
-    let descriptor: serde_json::Value = serde_json::from_str(
-        &fs::read_to_string(fixture.project.join("runtime/run.json")).expect("run descriptor"),
-    )
-    .expect("descriptor JSON");
-    let run_id = descriptor["id"].as_str().expect("run id");
-    let accounting = fs::read_dir(follow.join("runtime/accounting/invocations"))
-        .expect("follow-on accounting root")
-        .filter_map(Result::ok)
-        .map(|entry| fs::read_to_string(entry.path()).expect("accounting record"))
-        .collect::<String>();
-    assert!(accounting.contains(run_id), "follow-on accounting belongs to the existing run");
+    assert_follow_on_artifacts(&fixture.project, 1, &observed);
 }
 
 /// Narrowing fixes candidate membership at startup even though the producer
@@ -340,7 +377,7 @@ fn issue_205_explicit_rhei_selection_does_not_admit_a_new_candidate() {
         .expect("producer should publish the member");
     assert!(follow.contains("**State:** review"), "narrowed run must not execute it:\n{follow}");
     assert!(!fixture.project.join("follow/follow-observation.json").exists());
-    assert!(!fixture.project.join("follow/runtime/logs/task-follow.1-review.log").exists());
+    assert!(!fixture.project.join("follow/runtime/spawns").exists());
 }
 
 /// A refill after publication uses only the slot freed by the producer. The
@@ -356,4 +393,14 @@ fn issue_205_parallel_admission_refills_without_exceeding_the_slot_limit() {
     assert!(fixture.project.join("seed-blocker-finished").is_file());
     assert!(fixture.project.join("follow-started-1").is_file());
     assert!(fixture.project.join("follow-started-2").is_file());
+    for task in 1..=2 {
+        let observed: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(
+                fixture.project.join(format!("follow/follow-observation-/{task}.json")),
+            )
+            .expect("parallel worker observation"),
+        )
+        .expect("observation JSON");
+        assert_follow_on_artifacts(&fixture.project, task, &observed);
+    }
 }

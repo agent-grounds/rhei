@@ -254,7 +254,7 @@ fn transition_command(
         .map(|id| resolve_cli_task_id(&loaded, id, &scope).map(|id| parse_task_id(&id)))
         .transpose()?;
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
-    let machines = ExecutionMachines::build(&resolved, input)?;
+    let machines = ExecutionMachines::build(&resolved, input, &loaded)?;
     // The explicit ticket target's own machine and callback base govern.
     // §DA-per-rhei-state-machines
     let machine = machines.for_task_str(task_id_str);

@@ -328,12 +328,22 @@ struct ExecutionMachines {
 }
 
 impl ExecutionMachines {
-    fn build(resolved: &ResolvedMachineSet, input: &Path) -> MietteResult<Self> {
+    fn build(resolved: &ResolvedMachineSet, input: &Path, loaded: &LoadedPlan) -> MietteResult<Self> {
         let default_callbacks = resolve_callback_paths(resolved.default.path.as_deref(), input)?;
         let mut per_rhei_callbacks = BTreeMap::new();
-        for (rhei_id, machine) in &resolved.per_rhei {
-            per_rhei_callbacks
-                .insert(rhei_id.clone(), resolve_callback_paths(machine.path.as_deref(), input)?);
+        // Every project member needs its own plan path, even with an inherited
+        // machine; the machine file still supplies the callback working dir.
+        // §FS-rhei-panta.6.2 §AR-rhei-panta.5
+        if loaded.is_panta_project() {
+            for (rhei_id, root) in &loaded.rhei_roots {
+                let machine = resolved.per_rhei.get(rhei_id).unwrap_or(&resolved.default);
+                let plan = loaded.rhei_plans.get(rhei_id).unwrap_or(root);
+                let plan = rhei_core::workspace::workspace_dir(plan).unwrap_or_else(|| plan.clone());
+                per_rhei_callbacks.insert(
+                    rhei_id.clone(),
+                    resolve_callback_paths(machine.path.as_deref(), &plan)?,
+                );
+            }
         }
         Ok(Self {
             set: resolved.validator_set(),

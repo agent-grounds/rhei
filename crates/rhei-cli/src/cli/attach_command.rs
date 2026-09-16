@@ -475,5 +475,5 @@ fn attach_machines(descriptor: &RunDescriptor) -> MietteResult<rhei_validator::M
         &loaded,
         descriptor.state_machine.as_deref(),
     )?;
-    Ok(ExecutionMachines::build(&resolved, &descriptor.plan)?.set)
+    Ok(ExecutionMachines::build(&resolved, &descriptor.plan, &loaded)?.set)
 }

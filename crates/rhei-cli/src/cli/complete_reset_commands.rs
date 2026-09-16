@@ -134,7 +134,7 @@ fn complete_command(
     let scope = resolve_rhei_scope(&loaded, rhei_scope)?;
     let task_id_str = &resolve_cli_task_id(&loaded, task_id_str, &scope)?;
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
-    let machines = ExecutionMachines::build(&resolved, input)?;
+    let machines = ExecutionMachines::build(&resolved, input, &loaded)?;
     // One ticket is the whole scope: its machine and callback base govern.
     let machine = machines.for_task_str(task_id_str).clone();
     let callback_paths = machines.callbacks_for_str(task_id_str).clone();

@@ -131,7 +131,7 @@
                 if !keep_on_error {
                     let _ = remove_path(&target_dir, false);
                 } else if prospective_member {
-                    let _ = fs::rename(&target_dir, &output_dir);
+                    publish_staged_member(&target_dir, &output_dir, None, true)?;
                 }
                 return Err(err);
             }
@@ -146,7 +146,7 @@
                         if !keep_on_error {
                             let _ = remove_path(&target_dir, false);
                         } else if prospective_member {
-                            let _ = fs::rename(&target_dir, &output_dir);
+                            publish_staged_member(&target_dir, &output_dir, None, true)?;
                         }
                         return Err(err);
                     }
@@ -169,19 +169,9 @@
         };
         if let Err(err) = validation {
             if keep_on_error && prospective_member {
-                if let Some(prepared) = &prepared_settings {
-                    prepared.commit()?;
-                }
-                if let Err(rename_err) = fs::rename(&target_dir, &output_dir) {
-                    if let Some(prepared) = &prepared_settings {
-                        prepared.undo();
-                    }
-                    return Err(file_io_report(
-                        &output_dir,
-                        "failed to retain invalid instantiated member",
-                        rename_err,
-                    ));
-                }
+                publish_staged_member(
+                    &target_dir, &output_dir, prepared_settings.as_ref(), true,
+                )?;
             } else if !keep_on_error {
                 let _ = remove_path(&target_dir, false);
             }
@@ -212,25 +202,10 @@
         }
 
         if prospective_member {
-            if let Some(prepared) = &prepared_settings {
-                if let Err(err) = prepared.commit() {
-                    let _ = remove_path(&target_dir, false);
-                    return Err(err);
-                }
-            }
-            // Same-parent rename is the only point at which project discovery
-            // can observe the validated member. §FS-rhei-templates.6.1.2
-            if let Err(err) = fs::rename(&target_dir, &output_dir) {
-                if let Some(prepared) = &prepared_settings {
-                    prepared.undo();
-                }
-                let _ = remove_path(&target_dir, false);
-                return Err(file_io_report(
-                    &output_dir,
-                    "failed to publish instantiated member",
-                    err,
-                ));
-            }
+            // No-replace rename is the only publication point. §FS-rhei-templates.6.1.2
+            publish_staged_member(
+                &target_dir, &output_dir, prepared_settings.as_ref(), keep_on_error,
+            )?;
             materialized.output_dir = output_dir.clone();
         }
 

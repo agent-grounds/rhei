@@ -8,7 +8,10 @@ fn hidden_staging_path(output: &Path) -> MietteResult<PathBuf> {
     let name = output
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| miette!("output path '{}' has no usable final name", output.display()))?;
+        .ok_or_else(|| miette!(
+            help = "choose --output with a new, named directory beneath the project",
+            "output path '{}' has no usable final name", output.display()
+        ))?;
     for sequence in 0..1024u32 {
         let candidate =
             parent.join(format!(".rhei-instantiate-{name}-{}-{sequence}", std::process::id()));
@@ -35,7 +38,10 @@ fn validate_staged_project_member(
     let intended_id = output
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| miette!("output path '{}' has no UTF-8 member id", output.display()))?;
+        .ok_or_else(|| miette!(
+            help = "choose --output with a UTF-8 directory name; that name becomes the member id",
+            "output path '{}' has no UTF-8 member id", output.display()
+        ))?;
     let loaded = load_project_with_member_for_validation(project, intended_id, staged)?;
     let pass = validation_pass_for_loaded(
         project,
@@ -52,5 +58,45 @@ fn validate_staged_project_member(
         ));
     }
     print_validation_report(&pass.warnings);
+    Ok(())
+}
+
+/// Commit settings and publish once, restoring the project on failure. A
+/// competing output always belongs to its creator, including with retention.
+/// §FS-rhei-templates.6.1.2 §FS-rhei-templates.6.2
+fn publish_staged_member(
+    staged: &Path,
+    output: &Path,
+    settings: Option<&PreparedProjectSettings>,
+    keep_on_error: bool,
+) -> MietteResult<()> {
+    let publication = (|| {
+        if let Some(settings) = settings {
+            settings.commit()?;
+        }
+        rename_member_noreplace(staged, output)
+            .map_err(|err| file_io_report(output, "failed to publish instantiated member", err))
+    })();
+    if let Err(err) = publication {
+        if let Some(settings) = settings {
+            settings.undo();
+        }
+        let retention = if keep_on_error {
+            if let Some(settings) = settings {
+                settings.restore_staged()?;
+            }
+            format!("rendered output is retained at '{}' for inspection", staged.display())
+        } else {
+            let _ = remove_path(staged, false);
+            "staged output was discarded".to_string()
+        };
+        return Err(miette!(
+            help = format!(
+                "{retention}. Choose a free --output path and retry on a filesystem supporting \
+                 atomic no-replace directory rename; an existing destination is never replaced."
+            ),
+            "failed to publish instantiated member at '{}': {err}", output.display()
+        ));
+    }
     Ok(())
 }

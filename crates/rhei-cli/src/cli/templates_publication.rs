@@ -90,12 +90,21 @@ fn publish_staged_member(
             let _ = remove_path(staged, false);
             "staged output was discarded".to_string()
         };
+        let message = if keep_on_error {
+            format!(
+                "failed to publish instantiated member at '{}': {err}; rendered output is retained at:\n{}",
+                output.display(),
+                staged.display()
+            )
+        } else {
+            format!("failed to publish instantiated member at '{}': {err}", output.display())
+        };
         return Err(miette!(
             help = format!(
                 "{retention}. Choose a free --output path and retry on a filesystem supporting \
                  atomic no-replace directory rename; an existing destination is never replaced."
             ),
-            "failed to publish instantiated member at '{}': {err}", output.display()
+            "{}", message
         ));
     }
     Ok(())

@@ -108,6 +108,7 @@ impl LiveRunContext {
         }
 
         self.machines = machines;
+        self.machines.member_local_runtimes.extend(admitted.iter().cloned());
         self.settings = settings;
         self.initialized_rheis = current;
         Ok((loaded, admitted))

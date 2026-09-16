@@ -36,6 +36,7 @@ include!("validator/validator_links.rs");
 mod tests {
     include!("validator/tests_state_machine.rs");
     include!("validator/tests_plan_validation.rs");
+    include!("validator/tests_task_exports.rs");
     include!("validator/tests_links_tooling.rs");
     include!("validator/tests_links_fences.rs");
     include!("validator/tests_profiles.rs");

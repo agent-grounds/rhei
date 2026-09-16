@@ -120,26 +120,30 @@ ticket, under that rhei's own rhei-local heading ([§FS-rhei-panta.6.1](rhei-pan
    outputs abort the transition before the state write. This check is skipped
    when the effective target is the `cancelled` state: cancellation abandons the
    work, so the source state's artifact contract is moot. Nothing else on the
-   path changes — step 7's descendants-first guard, step 10's target inputs, step
-   11's terminal-result obligation, and the callbacks all still apply, so a
+   path changes — step 7's descendants-first guard, step 11's target inputs, step
+   12's terminal-result obligation, and the callbacks all still apply, so a
    cancel into `cancelled` still needs `--result` or a result on disk.
-10. Resolve the target state's `inputs:` artifacts. Missing required inputs abort the transition before the state write; optional inputs are resolved but do not block entry.
-11. Apply the terminal-result obligation (§3.2) against the same effective
+10. When the effective target is `final: true` and is not the reserved
+    `cancelled` state, verify every export declared by the task's
+    `**Provides:**` as specified in §3.3. Missing or blank exports abort the
+    transition before any target-side or persistence effect.
+11. Resolve the target state's `inputs:` artifacts. Missing required inputs abort the transition before the state write; optional inputs are resolved but do not block entry.
+12. Apply the terminal-result obligation (§3.2) against the same effective
     target, before the state write: when the target is `final: true`, either
     `runtime/results/<task-id>.md` already has content or `--result` carried a
     message. Neither, and the transition is refused with the plan untouched.
-12. Rewrite the task's `**State:**` line to the new state value (with counted-visit suffix when applicable) and write the file atomically (temp file + rename).
-13. Execute the `on_enter` callback on the target state, if any, unless `--no-callbacks` is set. The write comes first so the callback observes the plan already in the state it is entering; the callback still sees the attempt's central-ledger status as pending. A callback that fails rolls the write back to the file's previous contents, and the transition fails. When the rollback itself fails, the error says so — the plan file may then be inconsistent.
-14. Append one state-transition entry to `runtime/state-transitions.log` as
+13. Rewrite the task's `**State:**` line to the new state value (with counted-visit suffix when applicable) and write the file atomically (temp file + rename).
+14. Execute the `on_enter` callback on the target state, if any, unless `--no-callbacks` is set. The write comes first so the callback observes the plan already in the state it is entering; the callback still sees the attempt's central-ledger status as pending. A callback that fails rolls the write back to the file's previous contents, and the transition fails. When the rollback itself fails, the error says so — the plan file may then be inconsistent.
+15. Append one state-transition entry to `runtime/state-transitions.log` as
     `<task-id> <from>@<to>`, creating the `runtime/` directory if needed. The
     file is the central, deterministic audit trail for all task state changes.
     Append `--result`, when given, to `runtime/results/<task-id>.md`; when the
     effective target is `final: true`, also perform the terminal finalization
     of [§FS-rhei-complete.3](rhei-complete.spec.md#3-result-file) — ensure the result file, drop `**Assignee:**`, and
     link the result from the task body.
-15. Release the sidecar lock.
+16. Release the sidecar lock.
 
-Steps 11 and 14 are the same code on every verb that can move a task, so a
+Steps 10, 12, and 15 are the same code on every verb that can move a task, so a
 `rhei transition --result` into a terminal state leaves a ledger line, a result
 file, a `> **Result:**` link, and an absent `**Assignee:**` indistinguishable
 from the ones `rhei complete` and `rhei run` leave for the same edge.
@@ -236,6 +240,23 @@ Error: Task auth.1 cannot enter terminal state 'completed' without a result.
         (rhei complete auth.1 --result "<what happened>" for the everyday finish),
         or write runtime/results/auth.1.md before the move.
 ```
+
+### 3.3. Declared Exports on Terminal Entry
+
+The shared transition path enforces the producer obligation of
+[§FS-rhei-plan-language.3.12.3](rhei-plan-language.spec.md#3123-producer-completion-obligation). After `on_leave` callbacks settle any redirect, an effective terminal target other
+than reserved `cancelled` requires every declared export to contain
+non-whitespace text. State `outputs:` run first when applicable. Export checks
+then precede target `inputs:`, terminal-result recording, the state write,
+`on_enter`, ledger append, and result linking.
+
+The refusal names the task, every missing or blank export, and every path
+checked. It leaves state, assignee, result, transition metadata, ledger, and
+result link untouched. A later retry after writing the exports traverses the
+ordinary edge. Because this is the common executor, `transition`, `complete`,
+agent and program exits, callback-only advancement, and redirected edges have
+one rule. A terminal state merely named `failed` is ordinary and does not gain
+the reserved cancellation waiver.
 
 ## 4. Compare-and-Swap Conflicts
 

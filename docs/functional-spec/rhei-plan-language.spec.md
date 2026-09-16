@@ -1255,11 +1255,7 @@ name within one task's `**Provides:**`, or repeating a reference within one
 task's `**Consumes:**`, is a parse error: the first leaves a consumer no way to
 say which export it meant, the second is a leftover from an edit.
 
-**Runtime semantics.** Rhei injects each consumed export that exists into the
-consuming agent's prompt, and tells a producing agent where to write each
-export it declares ([§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition)). A consumed export that was never
-written, or that is empty, is skipped: the section is simply absent from the
-prompt.
+#### 3.12.1. Declaration Integrity
 
 `**Consumes:**` declares export data-flow for prompt injection; it is not a
 filesystem visibility or access-control boundary. A worker can read undeclared
@@ -1269,13 +1265,60 @@ participants concurrently and brief them not to inspect sibling exports. Those
 measures reduce accidental cross-reading; neither enforces blindness once an
 export exists. `**Prior:**`, not `**Consumes:**`, determines readiness.
 
-Rhei does not yet check that a `**Consumes:**` reference resolves to a
-declared `**Provides:**`, that the producer is a prior, or that a declared
-export was written before its producer went terminal. Until it does, a mistyped
-export name reads as a missing file and is silently skipped.
+Every `**Consumes:** <producer>:<name>` reference must satisfy all of these
+conditions when the plan is validated:
+
+- `<producer>` resolves to another task, and is neither the consumer itself nor
+  one of its ancestors;
+- that producer declares `<name>` in its own `**Provides:**`; and
+- that producer appears directly in the consumer's own `**Prior:**` field.
+
+A transitive dependency does not satisfy the last condition, and
+`**Consumes:**` never creates or implies a dependency. Keeping the direct edge
+authored makes readiness, `rhei list --blocked`, and graph rendering agree with
+the handoff a reader sees. An unused `**Provides:**` is valid: an export may be
+for a human or a consumer not yet written. Consumes is data flow, not an access
+boundary; it neither restricts which files a worker may read nor changes
+readiness independently of `**Prior:**`.
 
 When a consumed export reference resolves, an exclusion may never overlap it;
 §3.13 defines the overlap rule and makes that contradiction a validation error.
+
+#### 3.12.2. Consumer Availability
+
+Before composing a consuming agent's prompt, Rhei resolves every referenced
+file under the producing task's execution root and requires it to contain at
+least one non-whitespace character. Missing, zero-byte, and whitespace-only
+exports are unavailable. All unavailable exports are reported together and the
+consumer is not spawned; its state remains unchanged so the same task can be
+retried after repair. A cross-rhei producer, including one outside a narrowed
+run's candidate set, keeps its own execution root.
+
+Only after this preflight succeeds does Rhei inject the exports under
+`## Consumed Exports`, in `**Consumes:**` order
+([§FS-rhei-agents.3.3](rhei-agents.spec.md#33-consumed-export-preflight)). A declared export's path remains a normal
+root-confined artifact path: an escaping relative path is refused, and a file
+left under a pre-qualification task id is diagnosed with a rename hint rather
+than treated as valid content.
+
+#### 3.12.3. Producer Completion Obligation
+
+Before a task enters a `final: true` state, every export named by its
+`**Provides:**` must exist under that task's execution root and contain at least
+one non-whitespace character. The check uses the effective target after any
+`on_leave` callback redirect and happens before target inputs, terminal-result
+recording, the state write, `on_enter`, the transition ledger, or the result
+link. A refusal therefore leaves no false successful completion behind. Source
+state `outputs:` are checked first when they apply; their file-existence
+semantics do not change.
+
+Only the reserved `cancelled` state (including its accepted `canceled`
+spelling) waives this obligation. Any other terminal state, including one named
+`failed`, owes its exports. The obligation is shared by manual transition and
+completion commands, agent or program exits, callback-only advancement, and
+callback redirects ([§FS-rhei-transition-cmd.3.3](rhei-transition-cmd.spec.md#33-declared-exports-on-terminal-entry)). Export files are plain nonblank text;
+schemas, required headings, and per-export validation commands are outside this
+contract.
 
 ### 3.13. Task Read Exclusions
 

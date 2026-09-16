@@ -73,6 +73,7 @@ Execution:
   intervene   Send a message to a running agent's stdin during a live run
   cost        Inspect run token and cost accounting artifacts
   summary     Print a compact Markdown run summary for a pull request body
+  report      Render readable Markdown reports from agent session logs
   snapshot    Inspect, prune, or continue from session snapshots
   next        Transition the next ready task to the next state
   complete    Complete a task: transition to terminal state, write ledger/result,\n              link it from the task, and remove the assignee
@@ -470,6 +471,22 @@ enum Commands {
         /// Wrap the summary in a collapsed <details> block
         #[arg(long)]
         details: bool,
+    },
+    /// Render readable Markdown reports from agent session logs
+    // §FS-rhei-session-reports.4: on-demand rendering, historical runs included.
+    Report {
+        /// Workspace directory holding runtime/logs/, or the runtime directory itself
+        #[arg(value_name = "RHEI_WORKSPACE", default_value = ".")]
+        input: PathBuf,
+        /// Only logs whose file name contains this task id
+        #[arg(long, value_name = "ID", add = ArgValueCompleter::new(complete_task_id))]
+        task: Option<String>,
+        /// Only logs whose file name contains this state name
+        #[arg(long, value_name = "STATE")]
+        state: Option<String>,
+        /// Render without tool-output truncation
+        #[arg(long)]
+        full: bool,
     },
     /// Render a self-contained HTML flow visualization of a plan or workspace
     Viz {

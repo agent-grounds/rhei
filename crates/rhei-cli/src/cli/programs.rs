@@ -105,6 +105,16 @@ fn build_program_command(
     if let Some(model) = render_context.model {
         cmd.env("RHEI_MODEL", model);
     }
+    // A measuring state's invocation is handed the iteration its success
+    // would confirm, so a new workspace can name its artifacts from Rhei's
+    // counter instead of keeping a second one. §FS-rhei-metrics.2
+    if let Some(iteration) = next_metric_iteration(
+        render_context.workspace_root,
+        render_context.machine,
+        render_context.state_name,
+    ) {
+        cmd.env("RHEI_ITERATION", iteration.to_string());
+    }
 
     // Expose declared input artifact paths and existence flags so programs
     // can branch on optional inputs without shelling out to test -f.

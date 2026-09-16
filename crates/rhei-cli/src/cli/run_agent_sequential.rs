@@ -308,6 +308,18 @@ fn run_sequential_agent_invocation(
     let duration_ms = started_at.elapsed().as_millis() as u64;
     let finished_wall = SystemTime::now();
     let (outcome, exit_code) = slot_outcome(&spawn_result);
+    // The session just ended; its report and metrics note are epilogues of
+    // the spawn, not of the transition that follows.
+    // §FS-rhei-session-reports.4 §FS-rhei-metrics.2
+    finish_agent_session_artifacts(
+        !machine.metrics.is_empty(),
+        &agent_runtime_dir,
+        task_id_str,
+        current_state,
+        &plan,
+        &log,
+        spawn_result.as_ref().ok(),
+    );
     // Held rather than emitted: whether this attempt was a handled wait is
     // known only once the completion below selects its transition.
     // §FS-rhei-states.2.2

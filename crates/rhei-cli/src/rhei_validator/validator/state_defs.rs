@@ -474,6 +474,12 @@ pub struct StateMachine {
     /// §FS-rhei-states.9: Node-policy block that binds nodes to profiles.
     #[serde(default)]
     pub node_policy: Option<NodePolicy>,
+    /// Declared metrics the engine records iteration bindings for. Empty when
+    /// the workspace declares none; declared metrics change nothing about
+    /// scheduling or transitions.
+    // §FS-rhei-metrics.1
+    #[serde(default)]
+    pub metrics: IndexMap<String, MetricDef>,
 }
 
 /// The built-in default states YAML shipped with rhei.

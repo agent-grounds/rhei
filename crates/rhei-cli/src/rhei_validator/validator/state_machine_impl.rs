@@ -33,6 +33,7 @@ impl StateMachine {
         self.validate_tooling_configuration()?;
         self.validate_template_conditions()?;
         self.validate_poll_configuration()?;
+        self.validate_metrics_configuration()?;
         // Every surface reads the stored label, so normalize it once here
         // rather than on each read. §FS-rhei-states.2.5
         self.normalize_poll_waiting_on();

@@ -22,7 +22,6 @@ fn run_sequential_program_work_items(
     settings: &RheiSettings,
     opts: &RunOptions,
     workspace_root: &Path,
-    runtime_dir: &Path,
     sink: &Arc<dyn rhei_tui::EventSink>,
     progress: &mut AgentPassProgress<'_>,
 ) -> MietteResult<()> {
@@ -46,6 +45,8 @@ fn run_sequential_program_work_items(
         let Some(task) = task else { continue };
         // §FS-rhei-panta.6.2: programs run against the owning rhei's root.
         let task_workspace_root = loaded.task_root(task_id_str, workspace_root);
+        // §AR-rhei-panta.5: program transcripts and spawn records share the member runtime.
+        let task_runtime_dir = task_workspace_root.join("runtime");
         let render_context = RuntimeTemplateContext {
             workspace_root: &task_workspace_root,
             task_roots: Some(&loaded.task_roots),
@@ -72,7 +73,7 @@ fn run_sequential_program_work_items(
         // same reason an agent does — and gets the same attempt log and the
         // same per-visit budget. §FS-rhei-agents.8.1 §FS-rhei-agents.3.2.3
         let plan = plan_spawn_attempt(
-            runtime_dir,
+            &task_runtime_dir,
             &task_workspace_root,
             task_id_str,
             current_state,

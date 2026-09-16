@@ -666,7 +666,6 @@ fn run_agent_mode(
                 settings,
                 opts,
                 &workspace_root,
-                &runtime_dir,
                 &sink,
                 &mut progress,
             )?;

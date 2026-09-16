@@ -64,7 +64,6 @@ fn run_agent_worker_pool(
         &live.machines,
         &live.settings,
         workspace_root,
-        runtime_dir,
         sink,
         &mut free_slots,
         &mut next_extra_slot,

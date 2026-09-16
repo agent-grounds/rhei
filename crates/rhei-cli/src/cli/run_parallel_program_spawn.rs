@@ -16,7 +16,6 @@ fn spawn_parallel_program_work_item(
     machines: &ExecutionMachines,
     settings: &RheiSettings,
     workspace_root: &Path,
-    runtime_dir: &Path,
     sink: &Arc<dyn rhei_tui::EventSink>,
 ) -> MietteResult<ParallelProgramSpawnOutcome> {
     // As for agents: a slot was reserved for this item before the interrupt,
@@ -35,10 +34,12 @@ fn spawn_parallel_program_work_item(
 
     // Programs run against the owning rhei's execution root. §FS-rhei-panta.6.2
     let task_workspace_root = loaded.task_root(&item.task_id_str, workspace_root);
+    // §AR-rhei-panta.5: program transcripts and spawn records share the member runtime.
+    let task_runtime_dir = task_workspace_root.join("runtime");
     // Same attempt log and same per-visit budget as an agent: a program state
     // is never skipped at scheduling either. §FS-rhei-agents.8.1
     let plan = plan_spawn_attempt(
-        runtime_dir,
+        &task_runtime_dir,
         &task_workspace_root,
         &item.task_id_str,
         &item.current_state,

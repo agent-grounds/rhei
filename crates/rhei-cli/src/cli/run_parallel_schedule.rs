@@ -115,7 +115,6 @@ fn schedule_program_work_items(
     machines: &ExecutionMachines,
     settings: &RheiSettings,
     workspace_root: &Path,
-    runtime_dir: &Path,
     sink: &Arc<dyn rhei_tui::EventSink>,
     free_slots: &mut BTreeSet<rhei_tui::Slot>,
     next_extra_slot: &mut rhei_tui::Slot,
@@ -145,7 +144,6 @@ fn schedule_program_work_items(
             machines,
             settings,
             workspace_root,
-            runtime_dir,
             sink,
         )? {
             ParallelProgramSpawnOutcome::Spawned(spawned_program) => {
@@ -283,7 +281,6 @@ fn refill_parallel_worker_pool(
         machines,
         settings,
         workspace_root,
-        runtime_dir,
         sink,
         free_slots,
         next_extra_slot,

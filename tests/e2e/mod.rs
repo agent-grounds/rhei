@@ -44,6 +44,7 @@ mod laid_output_root_tests;
 mod list_ready_tests;
 mod live_member_admission_tests;
 mod live_member_lock_tests;
+mod live_member_program_tests;
 mod loop_budget_refusal_tests;
 mod member_publication_tests;
 mod memory_map_tests;

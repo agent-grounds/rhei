@@ -300,6 +300,41 @@ transitions:
         );
     }
 
+    /// An expired identity record is inactive for admission but remains an
+    /// immediate scheduler wake-up until the queued task is rescanned.
+    /// §FS-rhei-run.3.3 §FS-rhei-run.5.1
+    #[test]
+    fn expired_identity_deadline_requests_immediate_scheduler_rescan() {
+        let mut rhei = rhei_core::parse(
+            "# Rhei: Limits\n\n## Tasks\n\n### Task 1: First\n**State:** working\n",
+        )
+        .unwrap();
+        let now = current_unix_secs();
+        let identity = ProviderIdentity { agent: "codex".into(), provider: "openai".into() };
+        let limit = ProviderLimit {
+            identity: identity.clone(),
+            signal: "signal".into(),
+            observed_at: deadline(now - 2),
+            next_attempt_at: deadline(now - 1),
+        };
+        let (metadata, _) =
+            set_provider_limit_metadata(None, &parse_task_id("1"), "working", &limit);
+        rhei.metadata = Some(metadata);
+        let machines = rhei_validator::MachineSet::single(provider_machine(false));
+        let resolved = codex_openai();
+
+        assert_eq!(
+            resolved_provider_deadline(&rhei, &machines, &resolved, now),
+            None,
+            "expired records no longer suppress admission"
+        );
+        assert_eq!(
+            resolved_provider_eligibility_deadline(&rhei, &machines, &resolved, now),
+            Some(now),
+            "the scheduler must rescan instead of concluding the run"
+        );
+    }
+
     /// Poll and provider waits share one scheduler eligibility instant: the
     /// task cannot resume until the later condition permits it. §FS-rhei-run.5.1
     #[test]

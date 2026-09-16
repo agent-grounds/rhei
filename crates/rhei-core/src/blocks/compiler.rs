@@ -1,4 +1,5 @@
 //! Typed expansion and lowering. §AR-rhei-library.2–3
+use super::links::{control, data, endpoint_context};
 use super::*;
 use crate::ast::{Rhei, Structure, Task};
 use crate::state_machine::{NodePolicy, Profile, StateMachine};
@@ -60,6 +61,8 @@ pub struct CompiledBlock {
     pub(crate) flow_name: Option<String>,
     pub(crate) stable_primary_profiles: BTreeSet<String>,
     pub origins: Vec<String>,
+    pub(crate) source: PathBuf,
+    pub(crate) chain: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -125,6 +128,8 @@ impl Block {
         });
         let order = linear_seam_order(&aliases, &seams)?;
         let mut result = CompiledBlock::empty(&self.name);
+        result.source = self.source.clone();
+        result.chain = chain.to_vec();
         let local_present = self.local.is_some();
         if let Some(local) = self.local {
             result.fragment = local;
@@ -165,11 +170,25 @@ impl Block {
         let mut links = Vec::new();
         let mut passes = Vec::new();
         for seam in &seams {
-            let from = control(&seam.from, false, &result, &children)?;
-            let to = control(&seam.to, true, &result, &children)?;
+            let context = format!(
+                "seam {} -> {}",
+                endpoint_context(&seam.from, &children),
+                endpoint_context(&seam.to, &children)
+            );
+            let from = control(&seam.from, false, &result, &children)
+                .map_err(|e| format!("{context}: {e}"))?;
+            let to = control(&seam.to, true, &result, &children)
+                .map_err(|e| format!("{context}: {e}"))?;
             links.push((from, to));
             for (from, to) in &seam.pass {
-                passes.push((data(from, true, &children)?, data(to, false, &children)?));
+                let context = format!(
+                    "pass {} -> {}",
+                    endpoint_context(from, &children),
+                    endpoint_context(to, &children)
+                );
+                let source = data(from, true, &children).map_err(|e| format!("{context}: {e}"))?;
+                let target = data(to, false, &children).map_err(|e| format!("{context}: {e}"))?;
+                passes.push((source, target, context));
             }
         }
         let compatibility =
@@ -204,8 +223,8 @@ impl Block {
             });
         }
         result.extend_internal_routes(&links);
-        for (source, target) in passes {
-            result.lower_pass(source, target)?;
+        for (source, target, context) in passes {
+            result.lower_pass(source, target).map_err(|e| format!("{context}: {e}"))?;
         }
         super::compatibility::apply(&mut result, compatibility)?;
         result.origins.insert(
@@ -262,6 +281,8 @@ impl CompiledBlock {
             flow_name: None,
             stable_primary_profiles: BTreeSet::new(),
             origins: vec![],
+            source: PathBuf::new(),
+            chain: vec![],
         }
     }
 
@@ -417,47 +438,4 @@ pub(crate) fn merge_map<T>(
         into.insert(key, value);
     }
     Ok(())
-}
-
-fn control(
-    value: &str,
-    entry: bool,
-    local: &CompiledBlock,
-    children: &BTreeMap<String, CompiledBlock>,
-) -> CompileResult<String> {
-    if let Some((alias, port)) = split_endpoint(value) {
-        let child = children
-            .get(alias)
-            .ok_or_else(|| format!("unknown child '{alias}' in control endpoint '{value}'"))?;
-        if entry && port == "entry" {
-            return Ok(child.entry.clone());
-        }
-        if !entry {
-            return child.exits.get(port).cloned().ok_or_else(|| {
-                format!("unknown control port '{value}'; public exits: {:?}", child.exits.keys())
-            });
-        }
-        return Err(format!("control entry '{value}' must name {alias}.entry"));
-    }
-    let state = local.fragment.machine.states.get(value).ok_or_else(|| {
-        format!("unknown local control state '{value}'; declare it in states.yaml")
-    })?;
-    if !entry && !state.terminal {
-        return Err(format!("exit '{value}' must be terminal before composition"));
-    }
-    Ok(value.into())
-}
-
-fn data(
-    value: &str,
-    output: bool,
-    children: &BTreeMap<String, CompiledBlock>,
-) -> CompileResult<Endpoint> {
-    let (alias, name) =
-        split_endpoint(value).ok_or_else(|| format!("invalid data endpoint '{value}'"))?;
-    let child = children.get(alias).ok_or_else(|| format!("unknown data mount '{alias}'"))?;
-    let ports = if output { &child.outputs } else { &child.inputs };
-    ports.get(name).cloned().ok_or_else(|| {
-        format!("unknown data endpoint '{value}'; public endpoints: {:?}", ports.keys())
-    })
 }

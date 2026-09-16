@@ -284,6 +284,7 @@ mod compatibility;
 mod compiler;
 mod data;
 mod emit;
+mod links;
 mod qualify;
 mod references;
 mod settings;

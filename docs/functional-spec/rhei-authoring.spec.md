@@ -185,6 +185,26 @@ rhei validate plans/content-refresh.rhei.md
 
 See the [States Specification](rhei-states.spec.md) for the states file format.
 
+State `effort` lets phases reuse one execution target and permission mode while
+choosing how much reasoning each phase requests. It is optional; omitting it
+leaves the selected agent's arguments and defaults unchanged:
+
+```yaml
+states:
+  check:
+    target: codex[yolo]:openai:gpt-5.6-sol
+    effort: low
+  implement:
+    target: codex[yolo]:openai:gpt-5.6-sol
+    effort: high
+```
+
+The canonical values are `off`, `minimal`, `low`, `medium`, `high`, `xhigh`,
+and `max`. An agent profile translates only the values it declares; profiles
+without an effort mapping ignore the field. See
+[§FS-rhei-states.5](rhei-states.spec.md#5-agent-field) and
+[§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents).
+
 Inside a Panta project, an explicit declaration also selects where the
 definition is resolved. For example, if `index.panta.md` declares `alpha` and
 the project-root `states.yaml` defines `surveying → signed-off`, a `billing`

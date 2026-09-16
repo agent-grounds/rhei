@@ -96,6 +96,7 @@ can start in different states within the same state machine.
 | `model` | string | No | A single model profile identifier from the machine-level `models` list |
 | `agent` | string | No | The coding agent CLI that executes work in this state. Must be an agent id resolved against the merged `agents` registry (built-ins → global → project `settings.json`). Inline agent objects are not permitted — define custom agents in the `agents` registry. See [Agents Specification](rhei-agents.spec.md). |
 | `agent_mode` | string | No | Named flag set applied to the resolved agent for this state. Must match a key in the resolved agent's `modes` map. See [Agents Specification — Modes](rhei-agents.spec.md#22-modes). |
+| `effort` | string | No | Agent reasoning effort, independent of execution target, model, agent, and permission/configuration mode. One of `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. See [Agent Field](#5-agent-field). |
 | `agent_timeout` | string | No | Maximum time an agent may work in this state before being killed (e.g., `30m`, `1h`). See [Agents Specification — Timeout Handling](rhei-agents.spec.md#7-timeout-handling). |
 | `attempts` | integer | No | How many times **one visit** to this state may be spawned before `rhei run` halts the ticket. Distinct from `visits`, which bounds how many times the ticket may *enter* the state. Defaults to `2` — the invocation plus one informed retry. See [Agents Specification — Attempt Budget](rhei-agents.spec.md#323-attempt-budget). |
 | `program` | string or object | No | The program command to execute in this state. String form runs via shell. Object form specifies `command`, `env`, `working_directory`, and `shell`. Mutually exclusive with `agent`. See [Program States Specification](rhei-programs.spec.md). |
@@ -176,6 +177,18 @@ implicit rather than declared: see [Terminal Result](#33-terminal-result).
 - `state.agent` on a `final: true` state is a validation error (terminal states have no work to execute).
 - `state.agent` on a `gating: true` state is a validation warning (gating states are human-only; the agent will never be invoked by `rhei run`).
 - `state.agent_mode`, when present, must be a non-empty string and requires `state.agent` to be set. The mode name must match a key in the resolved agent's `modes` map, or the agent must declare no modes. See [Agents Specification — Mode Resolution Order](rhei-agents.spec.md#141-mode-resolution-order).
+- `state.effort`, when present, must be the string `off`, `minimal`, `low`,
+  `medium`, `high`, `xhigh`, or `max`. Type and vocabulary errors are rejected
+  while the state machine loads. It is valid only on a state eligible for
+  autonomous agent work, including one whose agent is selected from settings;
+  it is rejected on `program` and `gating: true` states.
+- A valid effort is checked against the effective agent profile after agent
+  resolution and before scheduling or spawn. A profile without an `effort`
+  mapping ignores it. A profile with a mapping must declare the selected
+  canonical value or validation fails. Static selections are checked during
+  plan validation; dynamically changed selections are checked before they are
+  scheduled. Remote model-specific restrictions remain the native agent's
+  responsibility.
 - `state.agent_timeout`, when present, must be a valid duration string (e.g., `30s`, `5m`, `1h`, `2h30m`).
 - `state.attempts`, when present, must be a positive integer. A value below `1` is raised to `1`: a visit always gets the invocation that makes it a visit.
 - A state must not declare both `agent` and `program`.
@@ -978,6 +991,19 @@ must be declared in the registry first.
 The optional `agent_mode` field selects a named flag set from the resolved
 agent's `modes` map. See [Agents Specification — Modes](rhei-agents.spec.md#22-modes)
 for the common `yolo` / `safe` conventions and the full mode resolution order.
+
+The optional `effort` field is workflow policy, not execution identity or a
+mode. It therefore does not change the selected executor, provider, model,
+agent, mode, or permission flags. It combines with legacy `agent`/`model`
+selection and explicit `target`, survives task `**Model:**` and `**Target:**`
+overrides, and is translated through the profile of the newly effective agent.
+`target_locked` keeps its identity-override meaning and adds no effort rule.
+
+For `all_targets` and `all_models`, the same authored effort is applied
+separately to every member. Supporting profiles translate it and unsupported
+profiles ignore it. If any supporting member cannot represent the value,
+validation fails before any fanout member runs. The existing prohibition on
+task execution overrides for fanout is unchanged.
 
 ```yaml
 states:

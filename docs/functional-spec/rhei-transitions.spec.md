@@ -644,6 +644,7 @@ states:
     model: <string>             # Optional: one declared model profile allowed for this state
     agent: <string>             # Optional: coding agent id for this state (see Agents Specification)
     agent_mode: <string>        # Optional: named mode on the resolved agent
+    effort: <string>            # Optional: off|minimal|low|medium|high|xhigh|max
     agent_timeout: <duration>   # Optional: max time an agent may work in this state (e.g., "30m")
     program: <string|object>    # Optional: deterministic program to execute (see Program States Specification)
     program_timeout: <duration> # Optional: max time a program may run in this state (e.g., "10m")
@@ -666,6 +667,7 @@ states:
 | `model` | string | No | Restricts the state to one model profile declared in the machine-level `models` list |
 | `agent` | string | No | Coding agent id for this state. Must resolve against the merged `agents` registry (built-ins + `settings.json`). Inline agent objects are not accepted — declare custom agents in `agents.<id>` first. See [Agents Specification](rhei-agents.spec.md). |
 | `agent_mode` | string | No | Named flag set from the resolved agent's `modes` map (e.g., `yolo`, `safe`). See [Agents Specification — Modes](rhei-agents.spec.md#22-modes). |
+| `effort` | string | No | Canonical reasoning effort (`off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`) applied independently of execution identity and mode. See [States Specification — Agent Field](rhei-states.spec.md#5-agent-field). |
 | `agent_timeout` | string | No | Maximum time an agent may work in this state (e.g., `30m`, `1h`). When exceeded, `rhei run` kills the agent and fires a timeout transition if one is declared. |
 | `program` | string or object | No | Deterministic program command for this state. String form runs via shell. Object form specifies `command`, `env`, `working_directory`. Mutually exclusive with `agent`. See [Program States Specification](rhei-programs.spec.md). |
 | `program_timeout` | string | No | Maximum time a program may run in this state (e.g., `10m`, `1h`). Same timeout mechanism as `agent_timeout`. |

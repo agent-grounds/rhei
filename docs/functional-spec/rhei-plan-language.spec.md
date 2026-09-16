@@ -1133,6 +1133,12 @@ this at two altitudes:
   in [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification). It replaces the agent, mode, provider, and model the state
   would otherwise resolve.
 
+Neither override replaces state `effort`. Effort is state policy rather than
+execution identity: `**Model:**` carries it to the substituted model, and
+`**Target:**` maps it through the newly effective agent profile. A
+`target_locked` state continues to reject both overrides for the existing
+identity reason; the lock does not otherwise alter effort.
+
 Both fields, when present, apply in **every** state in which the task is run by
 an autonomous agent — the override follows the work item across its lifecycle
 rather than belonging to a single phase. They have no effect in states that

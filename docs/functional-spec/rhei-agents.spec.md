@@ -195,7 +195,36 @@ agent's `command`, flags, and modes are declared.
 | `mcp_config_flag` | string | No | Flag used to attach a generated MCP config file. `rhei run` writes the resolved set to a temporary JSON file and passes it with this flag once. Mutually exclusive with `mcp_flag`. |
 | `skill_flag` | string | No | Flag used to enable one skill per occurrence. `rhei run` emits the flag once per resolved skill id. Omit to declare the agent does not support skills. |
 | `modes` | object | No | Named flag sets, keyed by mode name. Values are ordered string arrays appended to the command at spawn time. See [Modes](#22-modes). |
+| `effort` | object | No | Native reasoning-effort mapping. Contains `values`, `args`, and optional `conflicts` as defined below. Omission means this profile ignores valid state effort. |
 | `session` | object | No | Optional `CustomAgentProfile.session` block describing snapshot resume, fork, interactive continuation, and transcript layout capabilities. The authoritative schema is [Snapshots Specification — CustomAgentProfile.session](rhei-snapshots.spec.md#91-customagentprofilesession). |
+
+An `effort` mapping has this shape:
+
+```json
+"effort": {
+  "values": { "low": "low", "high": "high" },
+  "args": ["--effort", "{value}"],
+  "conflicts": [["--effort", "{value}"], ["--effort={value}"]]
+}
+```
+
+`values` is a non-empty object whose keys are canonical state values and whose
+string values are native spellings. `args` is a non-empty token array
+containing exactly one `{value}` placeholder. `conflicts`, when present, is an
+array of non-empty token patterns, each containing exactly one `{value}`.
+`args` is always an implicit conflict pattern, whether or not it is repeated in
+`conflicts`. Settings loading rejects unknown canonical keys, empty native
+values, malformed placeholders, and malformed conflict patterns.
+
+The built-in registry declares these mappings:
+
+| Agent | Canonical values | Native arguments |
+|-------|------------------|------------------|
+| `claude-code` | `low`, `medium`, `high`, `xhigh`, `max` | `--effort {value}` |
+| `codex` | `minimal`, `low`, `medium`, `high`, `xhigh` | `-c model_reasoning_effort=\"{value}\"` |
+| `kilocode` | `minimal`, `low`, `high`, `max` | `--variant {value}` |
+| `pi` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh` | `--thinking {value}` |
+| `gemini`, `cursor` | none | valid state effort is ignored |
 
 **A prompt flag set alongside `stdin_prompt` is emitted, with no value.** The
 two fields answer different questions — which flag makes the agent
@@ -413,6 +442,8 @@ optional `agent`, `mcp_servers`, and `skills` fields remain supported for
 compatibility. See
 [States Specification — Agent Field](rhei-states.spec.md#5-agent-field) and
 [States Specification — MCP Servers and Skills](rhei-states.spec.md#7-mcp-servers-and-skills).
+State `effort` is also a per-state execution setting, but it is resolved after
+the effective agent and never participates in target or mode selection.
 
 ### 1.3. Merge Semantics
 
@@ -512,6 +543,12 @@ An explicit state `target` or `all_targets` selector, or a task
 resolution order. A state-level mode shadows both settings defaults. Selection
 of the effective agent still follows §1.4, including state, merged settings,
 and model-default agents.
+
+State effort follows that effective selection without modifying it. A task
+`**Model:**` keeps the effort on the existing profile; a task `**Target:**`
+uses the replacement profile's mapping. Same-id registry overrides remain
+wholesale, so replacing a built-in profile without redeclaring `effort` makes
+that effective profile unsupported and the authored value is ignored.
 
 Before execution, validation applies this order without the run-only CLI
 override to every applicable static selection. If both an agent and a mode are
@@ -690,7 +727,8 @@ agent, the resolved mode's flags are appended right after the base
 `command`, before the prompt and model flags. The full flag order is:
 
 ```
-<command...> <mode flags...> <autonomous_args...> <accounting flags...>
+<command...> <mode flags...> <autonomous_args...> <effort args...>
+  <accounting flags...>
   <prompt_flag> <prompt>?
   <model_flag> <model>?
   <snapshot strategy flags...>
@@ -709,6 +747,15 @@ separator is not an error the agent reports: it is read as prompt text and
 ignored, so a state that declared an MCP server would run without it and nothing
 would say so. The stdin pipe is then closed to provide EOF for non-interactive
 agents unless `intervene_stdin` is set for a genuinely streaming stdin transport.
+
+When state effort is explicit, Rhei first removes every complete argument span
+matching the profile's declared effort conflicts from the base command
+arguments, selected mode flags, and model-binding `autonomous_args`. Literal
+tokens and the placeholder position must match; partial spans do not. It then
+emits exactly one translated span after mode and model-binding arguments and
+before accounting, prompt, model, snapshot, tooling, and the final separator.
+Unrelated arguments retain their order. When effort is omitted, Rhei performs
+no filtering or insertion, preserving the existing argv byte for byte.
 
 Mode names are free-form. `yolo` is a widely-used convention for
 "autonomous, dangerous posture"; `safe`, `review`, `plan`, and `audit` are

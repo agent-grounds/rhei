@@ -355,7 +355,13 @@ fn run_agent_mode(
                     Some(task),
                 )?;
                 if invocations.is_empty() {
-                    if opts.no_agent() {
+                    // Unrestricted project runs use this scheduler so a
+                    // member admitted later can introduce agent work. Keep
+                    // the existing callback-only behavior for a project
+                    // whose current task has no agent configured.
+                    let project_callback_fallback =
+                        loaded.is_panta_project() && opts.rhei_scope().is_empty();
+                    if opts.no_agent() || project_callback_fallback {
                         callback_tasks.push((task_id_str, current_state_raw, current_state, false));
                         continue;
                     }

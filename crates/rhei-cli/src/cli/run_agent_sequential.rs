@@ -109,9 +109,9 @@ fn run_sequential_agent_invocation(
         return Ok(());
     }
     let tooling = gate.tooling;
-    // §FS-rhei-panta.6.2 §AR-rhei-panta.5: task artifacts belong to the member runtime.
+    // Agent transcripts and spawn records remain under the run's project runtime;
+    // only the agent's task artifacts belong to the member runtime. §FS-rhei-agents.8.1
     let task_workspace_root = loaded.task_root(task_id_str, workspace_root);
-    let task_runtime_dir = task_workspace_root.join("runtime");
     let visit_count = render_visit_count(
         loaded.rhei.metadata.as_ref(),
         &task.id,
@@ -123,7 +123,7 @@ fn run_sequential_agent_invocation(
     // have costs nothing to decline, and every step below it costs something.
     // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.1
     let plan = plan_agent_spawn_attempt(
-        &task_runtime_dir,
+        runtime_dir,
         &task_workspace_root,
         task_id_str,
         current_state,
@@ -266,7 +266,7 @@ fn run_sequential_agent_invocation(
         visit_count,
         &tooling,
         &log,
-        &task_runtime_dir,
+        runtime_dir,
         Some(&snapshot_preload),
         0,
         sink.clone(),

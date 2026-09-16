@@ -50,7 +50,7 @@ brief scopes them, and publish one `resolutions` export covering both.
 
 #### Task deliver.review-2: Code review round 2
 **State:** review
-**Prior:** Task deliver.fix-1
+**Prior:** Task deliver.fix-1, Task deliver.review-1
 **Consumes:** deliver.fix-1:resolutions, deliver.review-1:findings
 **Provides:** findings
 
@@ -60,7 +60,7 @@ misbehaves.
 
 #### Task deliver.pm-2: Product review round 2
 **State:** pm-review
-**Prior:** Task deliver.fix-1
+**Prior:** Task deliver.fix-1, Task deliver.pm-1
 **Consumes:** deliver.fix-1:resolutions, deliver.pm-1:findings
 **Provides:** findings
 
@@ -79,7 +79,7 @@ brief scopes them, and publish one `resolutions` export covering both.
 
 #### Task deliver.coverage-1: Test coverage audit round 1
 **State:** coverage
-**Prior:** Task deliver.fix-1
+**Prior:** Task deliver.fix-1, Task deliver.implement
 **Consumes:** deliver.implement:report
 **Provides:** gaps
 
@@ -97,10 +97,9 @@ what each gap became.
 
 #### Task deliver.docs-1: Documentation round 1
 **State:** docs
-**Prior:** Task deliver.coverage-fix-1
+**Prior:** Task deliver.implement, Task deliver.coverage-fix-1
 **Consumes:** deliver.implement:report, deliver.coverage-fix-1:resolutions
 **Provides:** report
 
 Update the documentation the delivery made stale and publish a `report` export
 naming every file touched.
-

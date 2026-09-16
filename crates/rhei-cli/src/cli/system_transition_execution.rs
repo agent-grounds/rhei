@@ -647,6 +647,18 @@ fn execute_transition_with_origin(
             machine.states.get(to).map(|def| def.terminal).unwrap_or(false),
         )?;
     }
+    // `on_leave` has settled the effective target and source outputs have had
+    // first refusal. Guard the producer contract now, before target inputs or
+    // any durable terminal effect. Only reserved cancellation waives it.
+    // §FS-rhei-transition-cmd.3.3 §FS-rhei-plan-language.3.12.3
+    if to_state_def.terminal && !cancelling {
+        ensure_declared_task_exports_exist(
+            files.artifact_root,
+            &task_info.task,
+            files.artifact_id,
+            to,
+        )?;
+    }
     ensure_state_inputs_exist_for_transition(
         files.artifact_root,
         Some(&task_info.task),

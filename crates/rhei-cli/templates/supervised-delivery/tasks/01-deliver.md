@@ -21,7 +21,7 @@ so every later step works from one description of what landed.
 {% for k in range(1, review_rounds + 1) %}
 #### Task deliver.review-{{k}}: Code review round {{k}}
 **State:** review
-**Prior:** Task deliver.{% if k == 1 %}implement{% else %}fix-{{ k - 1 }}{% endif %}
+**Prior:** Task deliver.{% if k == 1 %}implement{% else %}fix-{{ k - 1 }}, Task deliver.review-{{ k - 1 }}{% endif %}
 **Consumes:** {% if k == 1 %}deliver.implement:report{% else %}deliver.fix-{{ k - 1 }}:resolutions, deliver.review-{{ k - 1 }}:findings{% endif %}
 **Provides:** findings
 
@@ -31,7 +31,7 @@ misbehaves.
 
 #### Task deliver.pm-{{k}}: Product review round {{k}}
 **State:** pm-review
-**Prior:** Task deliver.{% if k == 1 %}implement{% else %}fix-{{ k - 1 }}{% endif %}
+**Prior:** Task deliver.{% if k == 1 %}implement{% else %}fix-{{ k - 1 }}, Task deliver.pm-{{ k - 1 }}{% endif %}
 **Consumes:** {% if k == 1 %}deliver.implement:report{% else %}deliver.fix-{{ k - 1 }}:resolutions, deliver.pm-{{ k - 1 }}:findings{% endif %}
 **Provides:** findings
 
@@ -50,7 +50,7 @@ brief scopes them, and publish one `resolutions` export covering both.
 {% endfor %}{% for k in range(1, coverage_rounds + 1) %}
 #### Task deliver.coverage-{{k}}: Test coverage audit round {{k}}
 **State:** coverage
-**Prior:** Task deliver.{% if k == 1 %}fix-1{% else %}coverage-fix-{{ k - 1 }}{% endif %}
+**Prior:** Task deliver.{% if k == 1 %}fix-1{% else %}coverage-fix-{{ k - 1 }}{% endif %}, Task deliver.implement
 **Consumes:** deliver.implement:report{% if k > 1 %}, deliver.coverage-fix-{{ k - 1 }}:resolutions{% endif %}
 **Provides:** gaps
 
@@ -68,7 +68,7 @@ what each gap became.
 {% endfor %}{% for k in range(1, docs_rounds + 1) %}
 #### Task deliver.docs-{{k}}: Documentation round {{k}}
 **State:** docs
-**Prior:** Task deliver.{% if k == 1 %}coverage-fix-1{% else %}docs-{{ k - 1 }}{% endif %}
+**Prior:** Task deliver.implement, Task deliver.coverage-fix-{{coverage_rounds}}{% if k > 1 %}, Task deliver.docs-{{ k - 1 }}{% endif %}
 **Consumes:** deliver.implement:report, deliver.coverage-fix-{{coverage_rounds}}:resolutions
 **Provides:** report
 

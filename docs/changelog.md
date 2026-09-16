@@ -4,6 +4,13 @@
 
 ### Added
 
+- **Task exports are now checked handoffs instead of best-effort prompt
+  context.** Validation requires every consumed name to be declared by a
+  directly listed prior, agent startup batches missing or blank consumed
+  exports, and successful producer completion refuses missing or blank
+  declarations. Existing plans must add the producer directly to `**Prior:**`
+  and publish nonblank files before the handoff runs. (PR #278)
+
 - **Agent sessions now render readable Markdown reports, and workspaces can
   declare metrics whose trajectories Rhei records.** Every agent session log
   renders to `runtime/reports/<log stem>.md` — automatically at session end

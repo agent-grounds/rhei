@@ -63,6 +63,10 @@ Every child state declares a required input at
 that step's brief. A dry run therefore shows one ready ticket and ten held
 ones:
 
+Each `**Consumes:**` producer also appears directly in the consumer's
+`**Prior:**`; the explicit edges make export ordering visible to validation,
+blocked-task listings, and graph rendering.
+
 ```text
 Pass 1: 1 ready, 0 terminal, 11 total.
 Ready: Task supervised-delivery-example.deliver: Deliver subtree supervision

@@ -92,7 +92,8 @@ Use this table when you know the job you want to model:
   - a required `brief` input on every child state, so the supervisor's brief is
     what releases each step
   - `**Provides:**` / `**Consumes:**` exports declared as the producing state's
-    `outputs:`, so a step cannot finish without publishing its JSON
+    `outputs:`, with every producer also named directly in the consumer's
+    `**Prior:**`, so a step cannot finish without publishing nonblank JSON
   - Instantiated from the `supervised-delivery` built-in template; regenerate it
     with the command in its own README.
 

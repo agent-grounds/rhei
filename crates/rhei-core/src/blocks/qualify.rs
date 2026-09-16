@@ -2,7 +2,7 @@
 //! §FS-rhei-library.4–5
 use super::references::{tasks, Names};
 use super::*;
-use crate::state_machine::NodePolicyOverride;
+use crate::state_machine::{parse_task_state, NodePolicyOverride};
 use std::path::{Path, PathBuf};
 
 pub(crate) fn relative(path: &str) -> CompileResult<String> {
@@ -71,12 +71,12 @@ impl CompiledBlock {
         for name in machine.profiles.iter().flat_map(|p| p.keys()) {
             names.profiles.insert(name.clone(), q.qualify(name));
         }
-        for section in ["agents", "models", "mcp_servers", "skills"] {
+        for (section, owned) in names.settings.registries_mut() {
             if let Some(ids) =
                 self.fragment.settings.get(section).and_then(serde_json::Value::as_object)
             {
                 for name in ids.keys() {
-                    names.settings.insert(name.clone(), q.qualify(name));
+                    owned.insert(name.clone(), q.qualify(name));
                 }
             }
         }
@@ -203,7 +203,7 @@ impl CompiledBlock {
         let mut error = None;
         for file in &self.fragment.tasks {
             tasks(&file.tasks, &mut |t| {
-                if let Err(e) = check(&t.state) {
+                if let Err(e) = check(&parse_task_state(&t.state, m).state) {
                     error = Some(e);
                 }
                 for prior in &t.prior {

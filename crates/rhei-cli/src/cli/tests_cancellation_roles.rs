@@ -46,4 +46,25 @@ transitions:
         machine.transitions[0].to.0 = "done".into();
         assert!(rhei_validator::supervising_state_can_finish(&machine, "work"));
     }
+    #[test]
+    fn human_gate_escape_stays_manual_while_forward_selection_uses_the_seam() {
+        let mut machine = machine();
+        machine.states.get_mut("work").unwrap().gating = true;
+        machine.transitions[0].condition = None;
+        let plan = rhei_core::parse("# Rhei: T\n\n## Tasks\n\n### Task job: Work\n**State:** work\n").unwrap();
+        assert!(machine.transition_matches_source(&machine.transitions[2], "work"));
+        assert_eq!(find_next_transition(&plan.tasks[0], &plan, &machine).unwrap().as_deref(), Some("middle"));
+    }
+
+    #[test]
+    fn timeout_selection_keeps_exact_priority_and_scoped_source_limits() {
+        let mut machine = machine();
+        machine.transitions[2].timeout = Some("1s".into());
+        machine.transitions[0].timeout = Some("2s".into());
+        machine.transitions.swap(0, 2);
+        assert_eq!(find_timeout_transition(&machine, "work").as_deref(), Some("middle"));
+        assert_eq!(find_timeout_transition(&machine, "middle"), None);
+        assert_eq!(find_timeout_transition(&machine, "done"), None);
+    }
+
 }

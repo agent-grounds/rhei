@@ -38,7 +38,7 @@ fn fire_tooling_unavailable_transition(
     // §DA-per-rhei-state-machines
     let machine = machines.for_task_str(task_id_str);
     let callback_paths = machines.callbacks_for_str(task_id_str);
-    let matching_rule = machine.transitions.iter().find(|rule| {
+    let matching_rule = machine.transitions_from(from_state).find(|rule| {
         let trigger = match kind {
             ToolingKind::Mcp => rule.mcp_unavailable.as_ref(),
             ToolingKind::Skill => rule.skill_unavailable.as_ref(),
@@ -92,9 +92,8 @@ fn find_timeout_transition(
     from_state: &str,
 ) -> Option<String> {
     machine
-        .transitions
-        .iter()
-        .find(|rule| machine.transition_matches_source(rule, from_state) && rule.timeout.is_some())
+        .transitions_from(from_state)
+        .find(|rule| rule.timeout.is_some())
         .map(|rule| rule.to.0.clone())
 }
 
@@ -151,8 +150,7 @@ fn fire_selected_timeout_transition(
         .map(format_duration_human)
         .or_else(|| {
             machine
-                .transitions
-                .iter()
+                .transitions_from(from_state)
                 .find(|rule| {
                     machine.transition_matches_source(rule, from_state)
                         && rule.timeout.is_some()

@@ -77,7 +77,7 @@ fn block_cancellation_is_not_a_completion_target_or_automatic_fallback() {
             &root,
             if mounted { "mounted" } else { "identity" },
             r#"
-states: {work: {}, middle: {}, done: {final: true}, cancelled: {final: true}}
+states: {work: {target: codex:openai:gpt-5.5}, middle: {}, done: {final: true}, cancelled: {final: true}}
 transitions:
   - {from: work, to: middle, condition: 'visitCount > 9'}
   - {from: middle, to: done}
@@ -102,8 +102,17 @@ node_policy: {root: primary, default: primary}
             ),
             &["no transition to a terminal state"],
         );
-        let run =
-            run_compose(&root, &["run", output.to_str().unwrap(), "--no-tui", "--no-callbacks"]);
+        let run = run_compose(
+            &root,
+            &[
+                "run",
+                output.to_str().unwrap(),
+                "--no-agent",
+                "--no-program",
+                "--no-tui",
+                "--no-callbacks",
+            ],
+        );
         assert!(
             !run.status.success(),
             "conditional edge must leave work stalled: {} {}",

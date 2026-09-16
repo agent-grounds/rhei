@@ -16,6 +16,7 @@ pub mod lexer;
 pub mod parser;
 pub mod platform;
 pub mod source;
+pub mod state_machine;
 pub(crate) mod text;
 pub mod tokens;
 pub mod workspace;

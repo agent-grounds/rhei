@@ -372,7 +372,7 @@ reason = """
 Over budget before this change; the touch that surfaced it deleted the blocking run-lock helper the interruptible wait replaced. The run lock has no module of its own: every run, liveness probe, and headless launcher takes or reads it, yet it lives beside snapshot-continue selection because that was the first caller, and there is no lock boundary for the others to call.
 """
 [[exceptions]]
-path = "crates/rhei-cli/src/rhei_validator/validator/state_defs.rs"
+path = "crates/rhei-core/src/state_machine/validator/state_defs.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
@@ -473,7 +473,7 @@ reason = """
 The module is the viz model's builder plus one group that could leave it whole: the history readers and their merge. They are not moved here because collect.rs is the only sibling part and it owns plan collection, not history; the history part has to be created before anything can move into it.
 """
 [[exceptions]]
-path = "crates/rhei-cli/src/rhei_validator/validator/tests_plan_validation.rs"
+path = "crates/rhei-core/src/state_machine/validator/tests_plan_validation.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
@@ -483,7 +483,7 @@ reason = """
 This file is already one part of the validator's split test module, and the next cut is across the rule families rather than along them: most cases pair a plan fixture with a machine fixture written inline for that one case, so a family cannot move until the fixtures it shares with its neighbours are named and hoisted. Naming them is a change of its own.
 """
 [[exceptions]]
-path = "crates/rhei-cli/src/rhei_validator/validator/tests_links_tooling.rs"
+path = "crates/rhei-core/src/state_machine/validator/tests_links_tooling.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
@@ -493,7 +493,7 @@ reason = """
 One include-part holding two subjects that arrived together because both are validated from the same pass. They can separate, but each half then needs the machine fixture the other half writes inline; the shared fixture builder that would let them is not written yet.
 """
 [[exceptions]]
-path = "crates/rhei-cli/src/rhei_validator/validator/tests_state_machine.rs"
+path = "crates/rhei-core/src/state_machine/validator/tests_state_machine.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"

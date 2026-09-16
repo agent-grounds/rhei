@@ -16,7 +16,7 @@ inputs:
     description: Execution target that applies the fix.
     type: string
     format: execution-target
-    default: codex[xhigh]:openai:gpt-5.5
+    default: fix-codex[xhigh]:openai:gpt-5.5
 ports:
   entry: prepare-workspace
   exits:
@@ -26,6 +26,6 @@ data:
   inputs:
     decision: { kind: state-file, state: prepare-workspace, name: final-decision }
   outputs:
-    workspace: { kind: state-file, state: prepare-workspace, name: workspace }
-    final-fix: { kind: state-file, state: final-fix, name: final-fix }
+    workspace: { kind: state-file, state: prepare-workspace, name: workspace-ref }
+    final-fix: { kind: state-file, state: final-fix, name: final-fix-note }
     commit-ref: { kind: state-file, state: commit-fix, name: commit-ref }

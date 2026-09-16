@@ -47,7 +47,7 @@ transitions:
 
     /// Build a merged-project-shaped task (qualified id, offset 1).
     fn qualified_task(rhei_id: &str, local: u32, state: &str, prior: Vec<TaskId>) -> Task {
-        use rhei_core::ast::TaskIdSegment;
+        use crate::ast::TaskIdSegment;
         Task {
             id: TaskId::from_segments(vec![
                 TaskIdSegment::Named(rhei_id.to_string()),
@@ -106,8 +106,8 @@ transitions:
                     1,
                     "done",
                     vec![TaskId::from_segments(vec![
-                        rhei_core::ast::TaskIdSegment::Named("plain".to_string()),
-                        rhei_core::ast::TaskIdSegment::Number(1),
+                        crate::ast::TaskIdSegment::Named("plain".to_string()),
+                        crate::ast::TaskIdSegment::Number(1),
                     ])],
                 ),
                 qualified_task("review", 2, "draft", Vec::new()),

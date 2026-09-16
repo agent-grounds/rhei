@@ -1,0 +1,12 @@
+{
+  "agents": {
+    "fix-codex": {
+      "command": ["codex", "exec"],
+      "model_flag": "--model",
+      "stdin_prompt": true,
+      "modes": {
+        "xhigh": ["--sandbox", "danger-full-access", "-c", "approval_policy=\"never\"", "-c", "model_reasoning_effort=\"xhigh\""]
+      }
+    }
+  }
+}

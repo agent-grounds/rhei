@@ -10,13 +10,13 @@ impl StateMachine {
     /// machine parsed from a string always has an empty template map; use
     /// [`Self::from_yaml_file`] when states select a `prompt_template`.
     pub fn from_yaml_str(yaml: &str) -> Result<Self, StateMachineLoadError> {
-        Self::parse_unvalidated(yaml)?.validate()
+        Self::parse_fragment(yaml)?.validate()
     }
 
     /// Parse and run the pre-deserialization rejections shared by every entry
     /// point, without validating. Both loaders funnel through here so a new
     /// check cannot be added to one and silently skipped by the other.
-    fn parse_unvalidated(yaml: &str) -> Result<Self, StateMachineLoadError> {
+    pub fn parse_fragment(yaml: &str) -> Result<Self, StateMachineLoadError> {
         // One raw parse feeds every check that has to see the YAML as written
         // rather than as serde collapsed it.
         let raw: serde_yaml::Value = serde_yaml::from_str(yaml)?;
@@ -96,7 +96,7 @@ impl StateMachine {
     pub fn from_yaml_file<P: AsRef<Path>>(path: P) -> Result<Self, StateMachineLoadError> {
         let path = path.as_ref();
         let text = std::fs::read_to_string(path)?;
-        let mut sm = Self::parse_unvalidated(&text)?;
+        let mut sm = Self::parse_fragment(&text)?;
         reject_legacy_prompt_templates_file(path)?;
         sm.prompt_templates = load_prompt_templates_dir(&prompt_templates_dir(path))?;
         sm.validate()

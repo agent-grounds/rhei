@@ -1,43 +1,62 @@
+# Reusable fix duties and stage contracts. §FS-rhei-library.7
 name: fix
 version: 1.0.0
 states:
   prepare-workspace:
-    description: Prepare the workspace and read the approved decision.
+    description: Set up an isolated workspace ({{fix_prepare}}) before applying final fixes.
     target: {{smart_target}}
     inputs:
       - name: final-decision
         path: runtime/decisions/{task_id}-final-decision.md
+    prompt_template: prepare-workspace
     outputs:
-      - name: workspace
+      - name: workspace-ref
         path: runtime/workspaces/{task_id}.yaml
+        description: Location and branch of the isolated final-fix workspace
+
   final-fix:
-    description: Apply and verify the approved fixes.
+    description: Smart target applies the accepted final fixes.
     target: {{smart_target}}
     inputs:
       - name: final-decision
         path: runtime/decisions/{task_id}-final-decision.md
-      - name: workspace
+      - name: workspace-ref
         path: runtime/workspaces/{task_id}.yaml
+    personality: |
+      You are the final fix agent. Apply only the accepted fixes from the
+      final decision. Do not broaden scope. If an accepted item turns out to
+      require a much wider change than the final decision described, stop and
+      record it as not fixed instead of expanding the patch.
+    prompt_template: final-fix
     outputs:
-      - name: final-fix
+      - name: final-fix-note
         path: runtime/fixes/{task_id}-final-fix.md
+        description: Summary of final fixes applied by the smart target
+
   commit-fix:
-    description: Commit or publish the applied fix.
+    description: Smart target commits or publishes the final fixes ({{fix_commit}}).
     target: {{smart_target}}
     inputs:
-      - name: final-fix
+      - name: final-fix-note
         path: runtime/fixes/{task_id}-final-fix.md
-      - name: workspace
+      - name: workspace-ref
         path: runtime/workspaces/{task_id}.yaml
+    prompt_template: commit-fix
     outputs:
       - name: commit-ref
         path: runtime/commits/{task_id}.yaml
+        description: Commit SHA and optional remote/PR reference
+
   completed:
-    description: Fix is complete.
+    description: Task is done.
+    prompt_template: completed
     final: true
+
   cancelled:
-    description: Fix was cancelled.
+    description: Task was cancelled before completion.
+    prompt_template: cancelled
     final: true
+
 transitions:
   - { from: prepare-workspace, to: final-fix }
   - { from: final-fix, to: commit-fix }
@@ -47,6 +66,4 @@ profiles:
   primary:
     initial: prepare-workspace
     allowed: [prepare-workspace, final-fix, commit-fix, completed, cancelled]
-node_policy:
-  root: primary
-  default: primary
+node_policy: {root: primary, default: primary}

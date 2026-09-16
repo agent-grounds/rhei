@@ -568,12 +568,12 @@ transitions:
     // prefix keeps validating; the qualified form stays canonical.
     #[test]
     fn result_block_accepts_legacy_rhei_local_link_and_qualified_link() {
-        fn qualified_plan(link: &str) -> rhei_core::ast::Rhei {
+        fn qualified_plan(link: &str) -> crate::ast::Rhei {
             let input = format!(
                 "# Rhei: Legacy\n\n## Tasks\n\n### Task 1: Old work\n**State:** completed\n\n> **Result:** {link}\n"
             );
             let rhei = parse(&input).expect("parse ok");
-            let workspace = rhei_core::workspace::implicit_panta_from_file_rhei(
+            let workspace = crate::workspace::implicit_panta_from_file_rhei(
                 rhei,
                 std::path::Path::new("legacy.rhei.md"),
             )

@@ -23,7 +23,5 @@
 /// separate check, and the callers that care make it separately.
 // §FS-rhei-states.1.3
 pub(crate) fn path_is_rooted(path: impl AsRef<Path>) -> bool {
-    path.as_ref().components().any(|component| {
-        matches!(component, std::path::Component::Prefix(_) | std::path::Component::RootDir)
-    })
+    rhei_core::platform::path_is_rooted(path)
 }

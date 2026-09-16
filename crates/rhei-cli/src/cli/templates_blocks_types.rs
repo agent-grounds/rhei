@@ -1,9 +1,6 @@
     // Typed CLI-side ownership and compiler records bridge manifest values to
     // one ordinary workspace. §AR-rhei-library.1–3
-    use rhei_core::blocks::{
-        linear_seam_order, split_endpoint, BlockManifest, DataEndpoint, DataKind, Mount, Qualifier,
-        Seam,
-    };
+    use rhei_core::blocks::{split_endpoint, Block, BlockManifest, CompiledBlock, CompiledFile, Fragment, Mount, Seam, TaskFile};
 
     /// Values already reduced through the direct-composition precedence
     /// chain, keyed by `<mount>.<input>`. §FS-rhei-library.3
@@ -79,68 +76,4 @@
             }
             Ok(())
         }
-    }
-
-    #[derive(Clone)]
-    struct ResolvedDataEndpoint {
-        kind: DataKind,
-        state: Option<String>,
-        task: Option<String>,
-        name: String,
-        manifest: PathBuf,
-    }
-
-    #[derive(Clone)]
-    struct CompiledNode {
-        name: String,
-        manifest: PathBuf,
-        entry: String,
-        exits: BTreeMap<String, String>,
-        inputs: BTreeMap<String, ResolvedDataEndpoint>,
-        outputs: BTreeMap<String, ResolvedDataEndpoint>,
-        primary_states: Vec<String>,
-    }
-
-    struct CompiledLeaf {
-        name: String,
-        version: String,
-        source: PathBuf,
-        qualifier: Qualifier,
-        machine: YamlValue,
-        tasks: Vec<(PathBuf, String)>,
-        custom_kinds: BTreeSet<String>,
-        settings: Option<serde_json::Value>,
-        rendered: PathBuf,
-    }
-
-    struct ResolvedPass {
-        source: ResolvedDataEndpoint,
-        target: ResolvedDataEndpoint,
-        source_label: String,
-        target_label: String,
-    }
-
-    #[derive(Clone)]
-    struct ResolvedSeam {
-        from: String,
-        to: String,
-    }
-
-    #[derive(Default)]
-    struct ResolvedCompatibility {
-        states: BTreeMap<String, String>,
-        tasks: BTreeMap<String, String>,
-        profiles: BTreeMap<String, String>,
-        settings: BTreeMap<String, String>,
-        artifacts: Vec<(String, ResolvedDataEndpoint)>,
-    }
-
-    struct BlockCompiler {
-        scratch: tempfile::TempDir,
-        leaves: Vec<CompiledLeaf>,
-        seams: Vec<ResolvedSeam>,
-        passes: Vec<ResolvedPass>,
-        stack: Vec<(String, PathBuf, String)>,
-        value_counter: usize,
-        compatibility: Option<ResolvedCompatibility>,
     }

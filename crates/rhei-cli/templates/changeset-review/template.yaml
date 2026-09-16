@@ -113,3 +113,10 @@ compatibility:
     runtime/workspaces/{task_id}.yaml: fix.workspace
     runtime/fixes/{task_id}-final-fix.md: fix.final-fix
     runtime/commits/{task_id}.yaml: fix.commit-ref
+    runtime/manifests/{task_id}-architecture.md: review.architecture
+    runtime/manifests/{task_id}-parts.md: review.parts
+    runtime/findings/{task_id}-{target.slug}.md: review.findings
+    runtime/issues/{task_id}-candidate-issues.md: review.issues
+    runtime/validations/{task_id}-{target.slug}.md: review.validation
+    runtime/proposals/{task_id}-{target.slug}.md: review.proposal
+    runtime/proposals/{task_id}-proposal-matrix.md: review.matrix

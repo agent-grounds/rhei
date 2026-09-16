@@ -253,6 +253,17 @@ fn validate_machine_settings_references_inner(
             }
         }
 
+        // Static selections are resolved as a set so every fanout member is
+        // representable before validation succeeds; resolution performs no
+        // scheduling or spawn. §FS-rhei-states.1.3
+        if validate_static_modes && state.effort.is_some() {
+            if let Err(error) =
+                resolve_agent_invocations(machine, state_name, settings, &default_run_options())
+            {
+                errors.push(format!("state '{state_name}' has invalid effort selection: {error}"));
+            }
+        }
+
         if state.snapshot.as_ref().and_then(|snapshot| snapshot.emit.as_ref()).is_some()
             || state.snapshot.as_ref().and_then(|snapshot| snapshot.inherit.as_ref()).is_some()
         {
@@ -403,9 +414,48 @@ fn validate_plan_settings_references(
                         && task_execution_override_applies_to_state(state, settings, &opts)
                 })
         });
+        validate_effective_state_efforts(machine, settings, &tasks, &mut errors);
     }
     errors.extend(validate_task_execution_override_settings_references(rhei, settings));
     errors
+}
+
+/// Resolve each state effort against every task identity that can reach it.
+/// Full target overrides therefore validate the replacement profile instead
+/// of a shadowed state profile, and fanout resolves completely before success.
+/// §FS-rhei-states.1.3 §FS-rhei-plan-language.3.11
+fn validate_effective_state_efforts(
+    machine: &rhei_validator::StateMachine,
+    settings: &RheiSettings,
+    tasks: &[&rhei_core::ast::Task],
+    errors: &mut Vec<String>,
+) {
+    let opts = default_run_options();
+    let mut refused = BTreeSet::new();
+    for (state_name, state) in &machine.states {
+        if state.effort.is_none() {
+            continue;
+        }
+        if tasks.is_empty() {
+            if let Err(error) = resolve_agent_invocations(machine, state_name, settings, &opts) {
+                refused.insert(format!(
+                    "state '{state_name}' has invalid effort selection: {error}"
+                ));
+            }
+            continue;
+        }
+        for task in tasks {
+            if let Err(error) =
+                resolve_agent_invocations_for_task(machine, state_name, settings, &opts, Some(task))
+            {
+                refused.insert(format!(
+                    "state '{state_name}' has invalid effort selection for Task {}: {error}",
+                    task.id
+                ));
+            }
+        }
+    }
+    errors.extend(refused);
 }
 
 fn validate_task_execution_override_settings_references(

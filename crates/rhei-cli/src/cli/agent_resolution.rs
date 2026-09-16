@@ -6,7 +6,7 @@ fn resolve_target_agent(
     let target = parse_execution_target(selector)
         .map_err(|err| miette!(help = err, "invalid target selector '{}'", selector))?;
     let agent = AgentConfig::from(target.agent.clone());
-    let profile = settings.agents.get(agent.id()).cloned().ok_or_else(|| {
+    let mut profile = settings.agents.get(agent.id()).cloned().ok_or_else(|| {
         // §FS-rhei-errors.1.3: `settings.agents` is the merged registry and is
         // already seeded with the built-ins, so it is the whole candidate set.
         let known = settings.agents.keys().cloned().collect::<Vec<_>>();
@@ -52,7 +52,14 @@ fn resolve_target_agent(
             settings.defaults.agent_timeout.as_deref().and_then(rhei_validator::parse_duration_secs)
         });
 
-    let autonomous_args = binding.map(|b| b.autonomous_args.clone()).unwrap_or_default();
+    let mut autonomous_args = binding.map(|b| b.autonomous_args.clone()).unwrap_or_default();
+    apply_state_effort(
+        state_def,
+        &mut profile,
+        target.mode.as_deref(),
+        &mut autonomous_args,
+        agent.id(),
+    )?;
 
     Ok(ResolvedAgent {
         agent,
@@ -148,7 +155,7 @@ fn resolve_legacy_agent_with_model(
         return Ok(None);
     };
 
-    let profile = settings.agents.get(agent.id()).cloned().ok_or_else(|| {
+    let mut profile = settings.agents.get(agent.id()).cloned().ok_or_else(|| {
         // §FS-rhei-errors.1.2: a value carrying a mode or a model is a flag
         // mistake, not a missing settings entry.
         let known = settings.agents.keys().cloned().collect::<Vec<_>>();
@@ -186,7 +193,14 @@ fn resolve_legacy_agent_with_model(
     let model_provider = model_profile.and_then(|p| p.provider.clone());
     let model_name = model_profile.and_then(|p| p.model.clone()).or_else(|| model.clone());
 
-    let autonomous_args = binding.map(|b| b.autonomous_args.clone()).unwrap_or_default();
+    let mut autonomous_args = binding.map(|b| b.autonomous_args.clone()).unwrap_or_default();
+    apply_state_effort(
+        state_def,
+        &mut profile,
+        mode.as_deref(),
+        &mut autonomous_args,
+        agent.id(),
+    )?;
 
     Ok(Some(ResolvedAgent {
         agent,

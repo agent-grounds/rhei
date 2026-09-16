@@ -75,6 +75,7 @@ include!("cli/settings_types.rs");
 include!("cli/settings_load_validate.rs");
 include!("cli/roster_command.rs");
 include!("cli/tooling_resolution.rs");
+include!("cli/agent_effort.rs");
 include!("cli/agent_resolution.rs");
 include!("cli/agent_model_resolution.rs");
 include!("cli/settings_validate_references.rs");

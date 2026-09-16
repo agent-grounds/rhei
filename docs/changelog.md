@@ -36,6 +36,12 @@
   `provider_limited` outcome instead of reporting an ordinary agent failure.
   (PR #277)
 
+- **States can select reasoning effort independently of their agent target,
+  model, and permission mode.** Built-in and custom supporting profiles map the
+  canonical effort to native arguments, while unsupported profiles ignore it;
+  an existing authored `effort` key that was previously ignored now takes
+  effect or fails validation when its value is invalid. (PR #276)
+
 - **Transition callbacks now receive a stable identity for each firing and an
   explicit pending ledger status.** Canonical JSON exposes `firingId` and
   `ledgerStatus`, and CLI callbacks receive equal environment values, so an

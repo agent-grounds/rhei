@@ -14,6 +14,7 @@
 
 // §AR-source-file-size: The validator is split into bounded include parts.
 include!("validator/preamble.rs");
+include!("validator/agent_effort.rs");
 include!("validator/state_defs.rs");
 include!("validator/state_machine_impl.rs");
 include!("validator/state_machine_prompt_templates.rs");

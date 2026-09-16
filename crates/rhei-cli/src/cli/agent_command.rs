@@ -56,7 +56,7 @@ fn remove_outer_rhei_identity(cmd: &mut std::process::Command) {
 /// Build a `Command` for the resolved agent.
 ///
 /// Flag order:
-/// `<command...> <mode flags...> <autonomous_args...> <accounting flags...>
+/// `<command...> <mode flags...> <autonomous_args...> <effort args...> <accounting flags...>
 ///  <prompt_flag> <prompt>? <model_flag> <model>? <snapshot_args...>
 ///  <mcp/skill flags...> --?`
 /// `--` is appended last when `stdin_prompt` is `true`, to match

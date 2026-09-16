@@ -89,34 +89,44 @@ seams:
     pass:
       review.decision: fix.decision
 
-compatibility:
-  states:
-    split: review.split
-    review: review.review
-    aggregate-reviews: review.aggregate-reviews
-    validate-review: review.validate-review
-    propose-fixes: review.propose-fixes
-    aggregate-proposals: review.aggregate-proposals
-    decide: review.decide
-    human-review: review.human-review
-    prepare-workspace: fix.prepare-workspace
-    final-fix: fix.final-fix
-    commit-fix: fix.commit-fix
-    completed: fix.completed
-    cancelled: fix.cancelled
-  tasks:
-    coordinate: review.coordinate
-  settings:
-    codex: review.codex
-  artifacts:
-    runtime/decisions/{task_id}-final-decision.md: review.decision
-    runtime/workspaces/{task_id}.yaml: fix.workspace
-    runtime/fixes/{task_id}-final-fix.md: fix.final-fix
-    runtime/commits/{task_id}.yaml: fix.commit-ref
-    runtime/manifests/{task_id}-architecture.md: review.architecture
-    runtime/manifests/{task_id}-parts.md: review.parts
-    runtime/findings/{task_id}-{target.slug}.md: review.findings
-    runtime/issues/{task_id}-candidate-issues.md: review.issues
-    runtime/validations/{task_id}-{target.slug}.md: review.validation
-    runtime/proposals/{task_id}-{target.slug}.md: review.proposal
-    runtime/proposals/{task_id}-proposal-matrix.md: review.matrix
+# Select only contracts that exist in this mode. §FS-rhei-library.7.2
+select: |
+  compatibility:
+    states:
+      split: review.split
+      review: review.review
+      aggregate-reviews: review.aggregate-reviews
+      validate-review: review.validate-review
+      propose-fixes: review.propose-fixes
+      aggregate-proposals: review.aggregate-proposals
+      decide: review.decide
+      human-review: review.human-review
+      {% if fix_prepare != 'none' %}
+      prepare-workspace: fix.prepare-workspace
+      {% endif %}
+      final-fix: fix.final-fix
+      {% if fix_commit != 'none' %}
+      commit-fix: fix.commit-fix
+      {% endif %}
+      completed: fix.completed
+      cancelled: fix.cancelled
+    tasks:
+      coordinate: review.coordinate
+    settings:
+      codex: review.codex
+    artifacts:
+      runtime/decisions/{task_id}-final-decision.md: review.decision
+      {% if fix_prepare != 'none' %}
+      runtime/workspaces/{task_id}.yaml: fix.workspace
+      {% endif %}
+      runtime/fixes/{task_id}-final-fix.md: fix.final-fix
+      {% if fix_commit != 'none' %}
+      runtime/commits/{task_id}.yaml: fix.commit-ref
+      {% endif %}
+      runtime/manifests/{task_id}-architecture.md: review.architecture
+      runtime/manifests/{task_id}-parts.md: review.parts
+      runtime/findings/{task_id}-{target.slug}.md: review.findings
+      runtime/issues/{task_id}-candidate-issues.md: review.issues
+      runtime/validations/{task_id}-{target.slug}.md: review.validation
+      runtime/proposals/{task_id}-{target.slug}.md: review.proposal
+      runtime/proposals/{task_id}-proposal-matrix.md: review.matrix

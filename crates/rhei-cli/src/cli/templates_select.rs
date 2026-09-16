@@ -1,0 +1,62 @@
+// The manifest stays static; only these three groups may be selected.
+// §FS-rhei-library.1.1
+fn select_block_declarations(
+    manifest: &TemplateManifest,
+    values: &BTreeMap<String, serde_json::Value>,
+    dir: &Path,
+    reference: &str,
+) -> MietteResult<TemplateManifest> {
+    let Some(source) = &manifest.select else { return Ok(manifest.clone()); };
+    let path = dir.join("template.yaml");
+    let selected = (|| {
+        let text = render_template_text(source, values, &path, reference)?;
+        let raw: YamlValue = serde_yaml::from_str(&text)
+            .map_err(|e| miette!("invalid selected YAML: {e}"))?;
+        selected_keys(&raw, "select", &["ports", "data", "compatibility"])?;
+        let mut result = manifest.clone();
+        result.select = None;
+        for (key, value) in raw.as_mapping().expect("checked mapping") {
+            let group = key.as_str().expect("checked key");
+            if manifest.static_declarations.contains(group) {
+                return Err(miette!("'{group}' is both static and selected; author the group in only one place"));
+            }
+            match group {
+                "ports" => {
+                    selected_keys(value, "ports", &["entry", "exits"])?;
+                    result.block.ports = Some(serde_yaml::from_value(value.clone()).map_err(|e| miette!("ports: {e}"))?);
+                }
+                "data" => {
+                    selected_keys(value, "data", &["inputs", "outputs"])?;
+                    for direction in ["inputs", "outputs"] {
+                        if let Some(endpoints) = value.get(direction) {
+                            let endpoints = endpoints.as_mapping().ok_or_else(|| miette!("data.{direction} must be a mapping"))?;
+                            for (name, endpoint) in endpoints {
+                                selected_keys(endpoint, &format!("data.{direction}.{name:?}"), &["kind", "state", "task", "name"])?;
+                            }
+                        }
+                    }
+                    result.block.data = serde_yaml::from_value(value.clone()).map_err(|e| miette!("data: {e}"))?;
+                }
+                "compatibility" => {
+                    selected_keys(value, "compatibility", &["states", "terminals", "tasks", "profiles", "settings", "artifacts"])?;
+                    result.block.compatibility = serde_yaml::from_value(value.clone()).map_err(|e| miette!("compatibility: {e}"))?;
+                }
+                _ => unreachable!("checked group"),
+            }
+        }
+        let ident = Regex::new(r"^[A-Za-z][A-Za-z0-9_-]*$").unwrap();
+        validate_block_manifest(&result, dir, &ident)?;
+        Ok(result)
+    })();
+    selected.map_err(|e: Report| e.wrap_err(format!("{} select: correct the selected ports, data, or compatibility declarations", path.display())))
+}
+
+fn selected_keys(value: &YamlValue, group: &str, allowed: &[&str]) -> MietteResult<()> {
+    let mapping = value.as_mapping().ok_or_else(|| miette!("{group} must select a mapping, not null or a scalar"))?;
+    for key in mapping.keys() {
+        if !key.as_str().is_some_and(|key| allowed.contains(&key)) {
+            return Err(miette!("unsupported field {key:?} in {group}; allowed fields: {}", allowed.join(", ")));
+        }
+    }
+    Ok(())
+}

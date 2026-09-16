@@ -17,15 +17,19 @@ inputs:
     type: string
     format: execution-target
     default: fix-codex[xhigh]:openai:gpt-5.5
-ports:
-  entry: prepare-workspace
-  exits:
-    done: completed
-    cancelled: cancelled
-data:
-  inputs:
-    decision: { kind: state-file, state: prepare-workspace, name: final-decision }
-  outputs:
-    workspace: { kind: state-file, state: prepare-workspace, name: workspace-ref }
-    final-fix: { kind: state-file, state: final-fix, name: final-fix-note }
-    commit-ref: { kind: state-file, state: commit-fix, name: commit-ref }
+# Input-selected contracts omit absent stages. §FS-rhei-library.1.1 §FS-rhei-library.7.2
+select: |
+  ports:
+    entry: {% if fix_prepare == 'none' %}final-fix{% else %}prepare-workspace{% endif %}
+    exits: {done: completed, cancelled: cancelled}
+  data:
+    inputs:
+      decision: {kind: state-file, state: {% if fix_prepare == 'none' %}final-fix{% else %}prepare-workspace{% endif %}, name: final-decision}
+    outputs:
+      {% if fix_prepare != 'none' %}
+      workspace: {kind: state-file, state: prepare-workspace, name: workspace-ref}
+      {% endif %}
+      final-fix: {kind: state-file, state: final-fix, name: final-fix-note}
+      {% if fix_commit != 'none' %}
+      commit-ref: {kind: state-file, state: commit-fix, name: commit-ref}
+      {% endif %}

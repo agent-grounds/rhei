@@ -10,6 +10,13 @@ impl StateMachine {
             && rule.sources.as_ref().is_none_or(|sources| sources.contains(&state))
     }
 
+    /// Applicable source rules in exact-before-wildcard declaration order.
+    /// §FS-rhei-transitions.4.6
+    pub fn transitions_from<'a>(&'a self, state: &'a str) -> impl Iterator<Item = &'a TransitionRule> {
+        self.transitions.iter().filter(move |rule| rule.from.0 != "*" && self.transition_matches_source(rule, state))
+            .chain(self.transitions.iter().filter(move |rule| rule.from.0 == "*" && self.transition_matches_source(rule, state)))
+    }
+
     /// Shared by final validation and the compiler before qualification.
     /// §FS-rhei-states.1.4 §FS-rhei-transitions.4.6
     pub fn validate_cancellation_and_sources(&self) -> Result<(), StateMachineLoadError> {

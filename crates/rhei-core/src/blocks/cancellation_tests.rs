@@ -57,3 +57,17 @@ fn source_sets_and_cancellation_roles_are_validated_before_lowering() {
     let escape = &compiled.fragment.machine.transitions[1];
     assert_eq!(escape.sources.as_ref().unwrap(), &["m1_a__work"]);
 }
+
+#[test]
+fn scoped_escapes_do_not_make_another_owners_gate_reachable() {
+    let yaml = r#"name: scoped
+version: 1
+states: {work: {gating: true}, other: {gating: true}, done: {final: true}}
+transitions: [{from: '*', sources: [other], to: done}]
+"#;
+    let error = crate::state_machine::StateMachine::from_yaml_str(yaml).unwrap_err().to_string();
+    assert!(error.contains("work") && error.contains("no wildcard matches"), "{error}");
+    let valid = yaml.replace("[other]", "[work, other, done]");
+    let machine = crate::state_machine::StateMachine::from_yaml_str(&valid).unwrap();
+    assert!(!machine.transition_matches_source(&machine.transitions[0], "done"));
+}

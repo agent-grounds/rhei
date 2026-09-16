@@ -172,6 +172,10 @@ fn render_state_machine_text(machine: &rhei_validator::StateMachine) -> String {
         for rule in &machine.transitions {
             out.push_str(&format!("  {} -> {}", rule.from.0, rule.to.0));
             let mut annotations = Vec::new();
+            // Show the same scope used by runtime matching. §FS-rhei-transitions.4.6
+            if let Some(sources) = &rule.sources {
+                annotations.push(format!("sources=[{}]", sources.join(", ")));
+            }
             if let Some(cb) = rule.on_leave.as_ref() {
                 annotations.push(format!("on_leave={}", cb.0));
             }

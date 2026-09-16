@@ -171,7 +171,9 @@ from silently completing fresh tasks without executing them.
    use the same full task tree. Tasks whose current state declares `poll:` and whose
    `metadata.tasks.<id>.pollNextAttemptAt.<state-name>` is later than the
    current wall-clock time are excluded from the ready set until the interval
-   elapses. See [Next Command](rhei-next.spec.md#3-default-behavior-claim-mode)
+   elapses. A task with an applicable provider-limit record (§3.3) is also
+   excluded until its `nextAttemptAt`; queued work sharing that record's
+   identity is suppressed for the same interval. See [Next Command](rhei-next.spec.md#3-default-behavior-claim-mode)
    for the manual claimability rule and [Polling States](#51-polling-states) for
    the poll scheduling rule.
 
@@ -580,6 +582,65 @@ what the run did is in the task files, which are already current. A terminal
 that goes away *after* the run has ended finds the report already on disk
 ([§FS-rhei-run-tui.1.8](rhei-run-tui.spec.md#18-failure-modes)).
 
+### 3.3. Provider-Limit Parking
+
+A recognized Codex/OpenAI provider limit (§FS-rhei-agents.2) parks the
+invocation instead of routing its non-zero exit as an agent failure. The task
+keeps its authored state, no transition or callback fires, no snapshot is
+emitted, and the invocation does not spend the state visit's `attempts:`
+budget. Its log, spawn record, and any reported usage remain available.
+
+The observation instant is the subprocess-completion wall clock captured before
+classification. Rhei resolves the reported reset against that instant's local
+date in the named zone. The safe boundary is the first instant of the minute following the
+reported minute. If that boundary is not strictly later than the observation,
+Rhei resolves the same local minute on the next local date. Both the reported
+minute and its following-minute boundary must resolve uniquely; Rhei does not
+guess through a daylight-saving overlap or gap. The resulting
+`nextAttemptAt` is stored as an RFC 3339 UTC instant. A later valid deadline
+for the same task, state, and identity replaces an earlier one; an earlier or
+equal deadline does not shorten an active wait.
+
+The wait is runtime-owned frontmatter metadata with this state-qualified
+shape:
+
+```yaml
+metadata:
+  tasks:
+    <task-id>:
+      providerLimits:
+        <state-name>:
+          identity:
+            agent: codex
+            provider: openai
+          signal: "You've hit your session limit · resets 10:20pm (Europe/Zurich)"
+          observedAt: "2026-09-16T19:03:12Z"
+          nextAttemptAt: "2026-09-16T20:21:00Z"
+```
+
+The execution identity is the pair of resolved agent registry id and resolved
+provider. Model, mode, and task are deliberately not part of it: the supported
+signal describes the Codex/OpenAI provider session, while the current
+transport exposes no reliable account identifier. Only the reporting task's
+record is persisted, but every active record suppresses not-yet-started work
+with that identity. Already-running work and work with any other identity
+continue. If several active records share an identity, suppression lasts until
+their latest applicable deadline.
+
+The record survives interruption and process restart. It applies only while
+the named task remains in the keyed state; a stale record never blocks or
+describes another state. Rhei removes it when that task successfully resumes,
+when the task transitions out of the state, or when `rhei reset` removes the
+task's runtime metadata. Failed or repeated provider-limited resumptions retain
+or update it under the rules above.
+
+A parked task is in deliberate waiting, not stalled, failed, or in Attention.
+When no other runnable work remains, a foreground or headless run stays alive
+and sleeps until provider-limited work becomes eligible. An operator interrupt
+ends the run under §FS-rhei-run.3.2 without losing the wait; a later run uses
+the persisted deadline. Headless launch still returns its run id immediately,
+and attach reads the same provider and deadline from the run event stream.
+
 ## 4. Dry Run
 
 With `--dry-run`, `rhei run` performs the same scan and selection logic but prints each planned transition instead of executing subprocesses or callbacks. Output format:
@@ -664,6 +725,13 @@ States that declare a [`poll:`](rhei-states.spec.md#2-polling-states) block are 
 - Does not hold a timer thread; the next pass re-scans and picks the task up again only once `pollNextAttemptAt` is in the past.
 
 If, at the end of a pass, every remaining non-terminal task is either in a gating state, blocked behind a gating dependency, or blocked by a pending `pollNextAttemptAt`, `rhei run` sleeps until the earliest `pollNextAttemptAt` across all blocked poll tasks (bounded below by 1 s to avoid busy-looping) and then begins a new pass. If no poll deadline is pending and only gating remains, the run exits as it does today.
+
+Provider-limit waits join this same deadline scan. For one task, eligibility is
+the later of its applicable poll deadline and provider-limit deadline. The run
+sleeps until the earliest such effective eligibility deadline among all
+waiting tasks, bounded below by 1 s, and does not emit `run_finished` merely
+because all remaining work is provider-limited. Poll attempt counters,
+self-loop selection, and exhaustion are unchanged.
 
 Once `stateVisits.<state-name>` reaches `poll.max_attempts`, the engine refuses to select a self-loop transition and picks the first matching non-self-loop instead. If no non-self-loop transition matches, the run halts that task with a "polling exhausted with no matching non-self-loop transition" error — `--continue-on-error` applies as with any other task failure. A non-self-loop exit at any attempt clears both `pollNextAttemptAt.<state-name>` and `stateVisits.<state-name>`.
 

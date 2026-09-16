@@ -42,6 +42,7 @@ pub enum TaskOutcome {
     Completed,
     Failed(String),
     Waiting,
+    ProviderLimited { provider: String, next_attempt_at: String },
     Cancelled,
     TimedOut,
     Interrupted,
@@ -530,6 +531,7 @@ lightweight. [§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-co
 2026-04-21T14:03:22Z  task-plan.042  start@pending           runtime/logs/task-plan.042-pending.log
 2026-04-21T14:07:11Z  task-plan.042  end@pending             runtime/logs/task-plan.042-pending.log  exit=0,duration=3m49s,outcome=completed
 2026-04-21T14:12:05Z  task-plan.043  end@ci-wait             runtime/logs/task-plan.043-ci-wait.log  exit=75,duration=1s,outcome=waiting
+2026-04-21T14:13:05Z  task-plan.044  end@implement           runtime/logs/task-plan.044-implement.log  exit=1,duration=1s,outcome=provider_limited,provider=openai,next_attempt_at=2026-04-21T20:21:00Z
 ```
 
 Rules:
@@ -537,7 +539,8 @@ Rules:
 - The event column uses `start@<state>` for `SlotAssigned` and `end@<state>` for `SlotReleased`.
 - Paths are workspace-relative if inside the workspace, otherwise absolute.
 - Trailing metadata is only added on `SlotReleased` events (`exit`, `duration`, `outcome`).
-- `outcome` is one of `completed`, `failed`, `waiting`, `cancelled`, `timeout`, `interrupted` — the vocabulary [§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records) serializes.
+- `outcome` is one of `completed`, `failed`, `waiting`, `provider_limited`, `cancelled`, `timeout`, `interrupted` — the vocabulary [§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records) serializes.
+- A provider-limited release adds `provider` and `next_attempt_at`; its task column is the reporting task. The TUI renders that slot as a calm wait carrying the same provider and deadline, never as failed attention.
 - A released invocation whose selected transition is a poll state's self-loop records `outcome=waiting`, whatever its exit code: the machine declared that exit as "not done yet", so the attempt is neither a failure nor a finished state ([§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics)). The third line above is one — exit `75` matched a declared self-loop, so the attempt reads as the wait it was. The attempt that *leaves* the state, including by the exhaustion edge, keeps the outcome its own exit earns.
 - The file is safe to `tail -f` from other shells while `rhei run` is active.
 

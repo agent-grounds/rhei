@@ -54,6 +54,7 @@ mod next_tests;
 mod parallel_target_override_tests;
 mod poll_resume_program_tests;
 mod poll_wait_outcome_tests;
+mod provider_limit_parking_tests;
 mod registry_location_tests;
 mod rendered_stderr;
 mod roster_behavior_tests;

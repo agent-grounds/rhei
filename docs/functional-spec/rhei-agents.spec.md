@@ -617,6 +617,28 @@ warning to an error.
 A user-written entry for one of these ids in `settings.json` replaces the
 built-in entry wholesale (see [Merge Semantics](#13-merge-semantics)).
 
+The `codex` adapter recognizes one provider refusal in addition to its normal
+process result. Recognition requires all of the following:
+
+- the resolved agent id is exactly `codex` and its resolved provider is exactly
+  `openai`;
+- the invocation exited non-zero and was neither timed out nor interrupted;
+- after stripping terminal-control decoration and trimming surrounding
+  whitespace from each captured stdout and stderr line, exactly one line is
+  `You've hit your session limit · resets <h>:<mm><am|pm> (<zone>)`, where
+  `<h>` is `1` through `12`, `<mm>` is two digits from `00` through `59`, the
+  meridiem is lowercase, and `<zone>` is an installed IANA time-zone name whose
+  local time is valid and unambiguous. Terminal decoration means ANSI escape
+  sequences; removing it must not otherwise rewrite the line.
+
+Matching is case-sensitive and does not search inside prose. An exit of `0`, a
+different transport, absent or malformed reset information, an absent or
+invalid zone, a nonexistent or ambiguous local time, or a second matching line
+is an ordinary process result. Timeout and interruption classification happen
+before this recognition, so their output can never turn them into a provider
+limit. The recognized result is the provider-limited ending specified in
+§FS-rhei-run.3.3.
+
 ### 2.1. Custom Agents
 
 When the built-in profiles don't fit, declare a new agent in the `agents`
@@ -1147,6 +1169,13 @@ loop earlier than the machine's author said it should. The re-spawn note of
 §3.2.1 still names a budget on a poll state — `poll.max_attempts` itself, not
 this exemption's internal encoding of "no budget applies here".
 
+A recognized provider-limited invocation (§FS-rhei-run.3.3) also does not
+spend the state visit's budget. It is a completed spawn with a retained log and
+spawn record, but the provider refused to begin the requested work; repeated
+recognized refusals therefore cannot exhaust `attempts:`. Poll counters and
+`poll.max_attempts` remain separate and are neither advanced nor refunded by
+provider-limit recognition.
+
 ## 4. Environment Variables
 
 An autonomous agent subprocess must not receive the outer run's execution
@@ -1325,6 +1354,10 @@ rhei run <RHEI_PLAN> [--dry-run] [--no-callbacks] [--no-agent] [--no-program]
     than the worker pool does ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 5); `--continue-on-error`
     governs non-zero exits and does not enter into it.
 12. If the agent exited non-zero:
+    - If the result is a recognized provider limit, park it under
+      §FS-rhei-run.3.3 and continue the scheduling loop. This path fires no
+      transition or callback and is the same with or without
+      `--continue-on-error`.
     - Without `--continue-on-error`: log the error and stop.
     - With `--continue-on-error`: log the error, skip this task, continue.
 13. Repeat until every claimable task has advanced or stalled. A pass ends when
@@ -1343,6 +1376,11 @@ rhei run <RHEI_PLAN> [--dry-run] [--no-callbacks] [--no-agent] [--no-program]
    b. Process the result using the same rules as sequential mode: if an external actor already changed the task state, respect it; otherwise, on exit `0`, let `rhei run` evaluate and execute the next matching forward transition; on non-zero exit, apply the error path.
    c. Scan for newly claimable tasks (dependencies may have been unblocked).
    d. If new tasks are claimable and the pool is below N, spawn agents for them.
+   A recognized provider limit releases the reporting slot immediately. The
+   refill scan excludes queued invocations with the same active provider-limit
+   identity, but may fill the slot with unrelated work. Workers already
+   running under that identity are not stopped and each result is classified
+   independently.
 7. Repeat until no claimable tasks remain or all tasks are terminal.
 
 **Independence rule:** Two tasks are independent when neither appears in the other's transitive `**Prior:**` chain. The engine must not spawn two agents that could produce conflicting edits to the same task file. For directory workspaces, each task lives in a separate file, so file conflicts are avoided by construction.
@@ -1661,6 +1699,7 @@ and again as a machine-readable flag inside it:
 | --- | --- | --- |
 | Timeout (§7.3) | `agent timed out after {duration}` | `timed_out: true` |
 | Run interrupted ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) | `agent interrupted by run shutdown after {duration}` | `interrupted: true` |
+| Provider limited (§FS-rhei-run.3.3) | `agent provider-limited until {nextAttemptAt}` | `provider_limited: true` |
 
 A program log (`=== rhei program log v1 ===`) carries the same two lines with
 `program` in place of `agent`. Neither flag appears on a normal exit, so a
@@ -1700,7 +1739,13 @@ place by each further attempt of the same invocation. It holds:
 | `kind`, `worker` | `agent` or `program`, and the resolved agent id or command |
 | `log` | the transcript this spawn wrote |
 | `started`, `ended`, `duration`, `code` | when it ran, for how long, and how it exited |
-| `ending` | `exited`, `timed out`, or `interrupted` — why it stopped |
+| `ending` | `exited`, `timed out`, `interrupted`, or `provider_limited` — why it stopped |
+| `attempt_charged` | whether this invocation consumed the state visit's `attempts:` budget |
+
+A provider-limited record keeps the subprocess's real non-zero `code`, uses
+`ending: provider_limited`, and sets `attempt_charged: false`. Its log, timing,
+resolved worker identity, and any usage the worker reported remain ordinary
+auditable spawn evidence.
 
 `task` and `state` are stored as fields and matched as fields. A reader looking
 for "a worker that ran in state `review`" must not match record *file names* by

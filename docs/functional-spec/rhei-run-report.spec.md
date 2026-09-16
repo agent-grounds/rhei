@@ -219,6 +219,13 @@ the summary prints five stacked groups:
    person-waiting poll is a poll, and it already counted as deliberate waiting
    there while its backoff window was open.
 
+   A task parked by a recognized provider limit (§FS-rhei-run.3.3) also
+   belongs in **Waiting**, never **Attention**. Its row names `provider openai`,
+   the reporting task, and the UTC `nextAttemptAt`, with automatic resumption as
+   the next action. It does not count as failed or `could not advance`; an
+   assignee, prior, or gate that independently prevents it from reaching the
+   retry keeps the existing higher-priority classification.
+
    The blocker and next action come from a **plan-wide classification** of why
    each non-terminal task node is not moving, in this order: an open descendant
    subtree; a gating state awaiting a decision; a live `**Assignee:**`; an
@@ -523,6 +530,13 @@ and from a failing exit code — nothing about the ticket is known to be wrong,
 and the marker used for it in live surfaces (`⏹`) is calm chrome rather than
 attention color, for the same reason. The ticket's own row keeps whatever
 marker its unchanged state earns.
+
+A provider-limited invocation has `driver: agent`, destination `-`, and reason
+`provider openai limited until <nextAttemptAt>`. Its invocation entry retains
+the real exit code and log while its outcome is `provider_limited`; the ledger
+does not call it blocked or failed and records no transition. Repeated parked
+invocations remain separate auditable invocations even though none consumes an
+agent attempt.
 
 `driver: blocked` is used for non-terminal tasks that remain in place at run end.
 The row's `reason` must name the first concrete blocker Rhei can prove, such as

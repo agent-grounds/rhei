@@ -40,7 +40,7 @@ rather than a silent no-op (§5.3).
 | `--id <ID>`           | derived          | Explicit id: for a rhei, the one otherwise derived from the title; for a ticket, the segment otherwise taken from the sibling numbering — a name works there too, so `--id review --under plat` writes `plat.review` (§4) |
 | `--description <TEXT>`| empty            | Body content — the ticket's description, or the rhei's lead paragraph (§3.4) |
 | `--description-file <PATH>` | —          | Read the description from a file; `-` reads standard input (§3.4) |
-| `--dry-run`           | off              | Preview the create: it is written, validated, and then always rolled back (§5.4) |
+| `--dry-run`           | off              | Preview the create: plan data is written, validated, and always rolled back; permanent coordination artifacts may remain (§5.4) |
 | `--json`              | off              | Emit the created id, kind, path, and state as JSON                |
 | `--keep-on-error`     | off              | Keep the write when validation fails, instead of rolling it back (§5.2) |
 
@@ -169,12 +169,18 @@ otherwise.
 #### 2.1.1. Prospective Directory Workspace adoption
 
 `--dir` may create its index and task directory inside a same-id directory that
-already exists but is not yet a rhei. The directory is adoptable only when it is
-empty, or when its entries are exactly an authored `states.yaml` and an optional
-`prompt_templates/` directory. `prompt_templates/` must be a directory and is
+already exists but is not yet a rhei. The directory is adoptable only when its
+entries are an authored `states.yaml` and optional `prompt_templates/`
+directory, as before, plus at most the exact coordination entry
+`index.rhei.md.lock`. That entry must be an empty regular file and is also
+admissible by itself in an otherwise empty directory. Its presence proves
+neither ownership nor origin: creation acquires it before the authoritative
+admission and absence decision. `prompt_templates/` must be a directory and is
 admissible only beside `states.yaml`; a template directory alone, a pre-existing
-`tasks/`, or any other entry makes the destination occupied. The refusal happens
-before writing, names the obstruction, and tells the author to move or remove it.
+`tasks/`, any differently named lock, a nonempty or non-regular index sidecar,
+or any other entry makes the destination occupied. The refusal happens before
+plan publication, names the obstruction, and tells the author to move or remove
+it.
 
 The allowlist classifies filesystem shape, not machine validity. Once the new
 `index.rhei.md` makes the directory a rhei, the ordinary project load resolves a
@@ -182,8 +188,9 @@ declared `--states <NAME>` from that rhei's execution root and the ordinary
 post-write validation accepts or rejects the authored machine. This is the only
 resolution path: creation does not search a prospective root before the index
 exists and does not add a second state-machine precedence rule. A successful
-adoption adds only `index.rhei.md` and an empty `tasks/`; it preserves the
-authored machine and prompt templates byte-for-byte.
+adoption adds `index.rhei.md`, an empty `tasks/`, and establishes or reuses the
+permanent empty `index.rhei.md.lock`; it preserves every pre-existing authored
+byte and never treats the sidecar as owned plan data.
 
 Without `--dir`, creation remains the single-file layout at `<id>.rhei.md`, with
 the project directory as its execution root. A same-id non-rhei directory is a
@@ -207,8 +214,9 @@ neither is an error listing the rhei ids in the project.
 
 `--under basin` is how a ticket gets captured without choosing a domain rhei
 first ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)), inside a Panta project and nowhere else (§3.5).
-The basin directory is created on demand; nothing
-else is generated, because the basin's manifest is synthetic by design
+The basin directory is created on demand together with the permanent sidecar
+for the chosen task destination; no authored basin manifest is generated,
+because the basin's manifest is synthetic by design
 ([§AR-rhei-panta.1](../architecture/rhei-panta.spec.md#1-on-disk-layout)). Filing it into a domain rhei later stays a file move.
 
 The written ticket carries the fields that were asked for, in plan-language
@@ -403,49 +411,40 @@ collision. For `--dir` it is either the prospective workspace admitted by
 layout conflict. These refusals describe the filesystem conflict truthfully and
 leave both the existing directory and the selected output path untouched.
 
-Concurrent creates are serialized by two locks, taken in a fixed order.
+Concurrent creates are serialized by canonical sibling sidecars, taken in a
+fixed order. They are the sole writer locks: Rhei never locks a plan
+destination, and every authoritative read is through the current destination
+pathname after acquisition.
 
-The **scope lock** comes first and is held for the whole invocation — before the
-first load, through the write, through both validation passes, and through any
-rollback — on the project manifest (`index.panta.md`) for a project, or on the
-plan file itself for a lone plan or a bare workspace. Both files always exist,
-so the lock adds no artifact to the tree and raises no `.gitignore` question,
-and holding it project-wide is what the pre/post validation diff (§5.2) needs
-anyway.
+The **scope sidecar** comes first and is held for the whole invocation — before
+the first load or selection, through the write, both validation passes, success
+or rollback — beside the project manifest (`index.panta.md`) for a project, or
+beside the plan file for a lone plan or bare workspace. Holding it project-wide
+is what the pre/post validation diff (§5.2) needs.
 
-The **destination lock** comes second, on the plan file the create actually
-writes. That is the same object `rhei complete`, `rhei transition`, `rhei reset`,
-and `rhei run` lock, and the scope lock is not: no other command takes the scope
-lock, so a create holding only it serializes against other creates and against
-nothing else — a create that reads a whole file, splices a ticket into it, and
-writes it back while a completion is rewriting a `**State:**` line in the same
-file silently drops the completion, and both commands exit 0. The destination is
-only known after the create has decided what to write, which is why this lock
-cannot come first; taking it always second means the pair is only ever acquired
-scope-then-destination, and no cycle is possible. Two cases take one lock rather
-than two: a lone plan, where the scope file *is* the destination, and a
-destination that does not exist yet, which holds no ticket any other command
-could be rewriting.
+The **destination sidecar** comes second, beside the plan file the create
+actually writes. That is the identity `rhei complete`, `rhei transition`,
+`rhei reset`, and `rhei run` use; the scope sidecar alone does not exclude
+them. For an absent destination, creation prepares the necessary missing parent
+directories while holding the scope sidecar, establishes the destination
+sidecar, and only then makes the authoritative absence or adoption decision and
+first publication. A coincident scope and destination identity is acquired
+once. Taking distinct identities only scope-then-destination prevents a cycle.
 
-Because the destination is read while the write is decided but locked only
-afterwards, the file is **witnessed before the lock and compared after it**. A
-create that finds it changed decides again, against the file as it now is, up to
-three times before giving up and saying another command is rewriting that plan.
-Without that check the second lock would close the window it was added for only
-partway: a completion landing between the read and the lock would still be read
-as absent and written over, which is the same lost write arriving through a
-narrower door. Re-deciding rather than failing keeps the promise the blocking
-locks already make — a create waits for a busy project instead of handing the
-caller back the race.
+Because a provisional destination is selected before its sidecar is acquired,
+the decision bytes are **witnessed before the lock and compared after it**. A
+create that finds them changed decides again, against the current pathname, up
+to three times before giving up and saying another command is rewriting that
+plan. Sidecars established for abandoned candidates remain permanent.
 
-Both are released on every exit path, and the OS releases them if the process
-dies, so neither can go stale.
-
-Where a file lock is mandatory and belongs to the handle that took it — Windows,
-and not Linux or macOS — this process's own second open of a plan it has locked
-is refused, so a read that the process's own lock refuses is served through that
-lock's handle, always after the read by path has been tried first, since a writer
-that took the lock before us has left a different file at that path.
+Both sidecar locks are released on every exit path, and the OS releases them if
+the process dies. Their empty files and every containing directory needed to
+preserve their pathname identities do not go away: success, failed validation,
+rollback, dry run, re-decision, and later cleanup all retain them. Presence or
+age is not ownership; only the OS lock on the open sidecar handle is.
+Preparation or lock failure prevents publication. This is participating-writer
+exclusion, not read-only observer isolation, external-writer exclusion, atomic
+first publication, or crash recovery.
 
 What the lock guarantees is that every create which exits 0 is in the file
 afterwards: sibling numbering, the write, and the verification all happen inside
@@ -456,6 +455,11 @@ overwrites the winner's ticket, and one that then rolls back restores a snapshot
 taken *before* the winner's write, deleting committed work and reporting
 success. Agent fan-out is the thing Rhei exists to make ordinary, so a bulk
 create is an expected use rather than a race worth one re-run.
+
+Plan directories shared with older binaries have an upgrade boundary: stop all
+older writers, upgrade every writer, and then resume. Persistent sidecars are
+reused and must not be deleted, but their presence does not prove that the
+upgrade is complete; live mixed-version writing is unsupported.
 
 ## 5. Write, validate, report
 
@@ -468,11 +472,12 @@ at `--id`, before anything is written. Creating is not editing (§6), and an
 unconditional write is editing with the diff thrown away.
 
 Adopting a prospective Directory Workspace does not make its existing root or
-authored bundle part of the create. The write's ownership record distinguishes
-the pre-existing directory, `states.yaml`, and `prompt_templates/` tree from the
-`index.rhei.md` and `tasks/` it adds. Verification and every later cleanup use
-that record, so no pre-existing path is claimed merely because the create writes
-another entry beside it.
+authored bundle part of the create. Before preparation, the write's ownership
+record distinguishes pre-existing authored content, removable plan data the
+invocation creates, and permanent coordination sidecars and ancestors.
+Verification and every later cleanup use those three classes, so no
+pre-existing path is claimed merely because the create writes another entry
+beside it, and no retained coordination path becomes owned plan data.
 
 After writing, `rhei new` loads and validates the project the way
 `rhei validate` does, then compares the *whole set of ids* the project holds
@@ -543,8 +548,9 @@ step was refused for an error the first step's own rhei list had reworded.
   is removed, and a modified file is restored byte-for-byte. For an adopted
   workspace, this removes only the invocation-created index and task directory;
   the pre-existing root, state machine, and prompt templates survive
-  byte-for-byte. The report lists only those new errors, with the validator's
-  own code frames.
+  byte-for-byte. Permanent sidecars and the directories necessary to preserve
+  their identities also survive and are not described as authored output. The
+  report lists only those new errors, with the validator's own code frames.
 - Errors that were already there do not. When the post-write errors are the
   ones the pre-write pass already found, the write is **kept** and the command
   succeeds, with a warning saying the project was already failing validation
@@ -640,8 +646,9 @@ not run.
 `--json` emits the same facts as an object (`kind`, `id`, `title`, `path`, and
 `state` for a ticket) for scripts that create tickets in bulk.
 
-`--dry-run` prints the target path and the exact markdown block, and leaves the
-tree exactly as it found it. It gets there by doing the whole create — the
+`--dry-run` prints the target path and the exact markdown block, and restores
+all plan data while allowing only permanent coordination sidecars and their
+necessary containing directories to remain. It gets there by doing the whole create — the
 write, both validation passes, the id-set comparison, the reload — and then
 rolling back *unconditionally*, success included. Skipping the write would make
 the preview a report of the flags: every failure worth previewing (a `--prior`
@@ -652,9 +659,11 @@ so previewing happily and then failing for real is the one answer it must never
 give; a dry run that would have failed reports the real failure and exits
 non-zero. Because the rollback is unconditional, `--keep-on-error` has no effect
 alongside it. The same ownership boundary applies to an adopted workspace: dry
-run removes only its temporary index and task directory, and preserves the
+run removes only its temporary index and task directory, preserves the
 pre-existing directory, machine, and prompt-template tree byte-for-byte whether
-validation succeeds or fails.
+validation succeeds or fails, and retains established scope and destination
+sidecars and necessary ancestors. JSON fields remain unchanged; residue
+guidance belongs on stderr so neither prose nor JSON stdout changes shape.
 
 Together, `--dry-run --json` emits that same object with `"dry_run": true` and
 the block under `"markdown"`, so a script can preview a bulk create the same

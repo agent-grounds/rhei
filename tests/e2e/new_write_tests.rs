@@ -58,6 +58,53 @@ fn rollback_removes_a_file_it_created() {
     assert_eq!(fs::read_dir(dir.join("billing/tasks")).expect("tasks dir").count(), 0);
 }
 
+/// First publication in every create layout establishes the same permanent
+/// sibling identity ordinary writers will use. Existing-file child splices
+/// reuse that identity rather than creating a second one.
+// §FS-rhei-new.3 §FS-rhei-new.4 §FS-rhei-new.5.1
+#[test]
+fn issue_95_creation_establishes_sidecars_for_every_plan_shape() {
+    let dir = empty_project("new-sidecars-all-shapes");
+
+    assert_success(&new_run(&["new", "Authentication"], &dir));
+    assert_success(&new_run(&["new", "Billing", "--dir"], &dir));
+    assert_success(&new_run(&["new", "Top", "--under", "billing"], &dir));
+    assert_success(&new_run(&["new", "Nested", "--under", "billing.1"], &dir));
+    assert_success(&new_run(&["new", "Inbox", "--under", "basin"], &dir));
+
+    for sidecar in [
+        "authentication.rhei.md.lock",
+        "billing/index.rhei.md.lock",
+        "billing/tasks/001-top.md.lock",
+        "basin/001-inbox.md.lock",
+    ] {
+        let path = dir.join(sidecar);
+        assert!(path.is_file(), "missing permanent sidecar {}", path.display());
+        assert_eq!(fs::metadata(&path).expect("sidecar metadata").len(), 0, "sidecars stay empty");
+    }
+    let task = fs::read_to_string(dir.join("billing/tasks/001-top.md")).expect("task file");
+    assert!(task.contains("#### Task 1.1: Nested"), "child splice must survive");
+}
+
+/// Dry-run of a new task performs the real publication and validation but
+/// rolls back its plan file even with `--keep-on-error`, retaining the task
+/// sidecar and its already-required `tasks/` ancestor.
+// §FS-rhei-new.4 §FS-rhei-new.5.4
+#[test]
+fn issue_95_dry_run_ticket_retains_its_sidecar_but_no_plan_data() {
+    let dir = empty_project("new-ticket-dry-sidecar");
+    assert_success(&new_run(&["new", "Billing", "--dir"], &dir));
+
+    let result =
+        new_run(&["new", "Preview", "--under", "billing", "--dry-run", "--keep-on-error"], &dir);
+    assert_success(&result);
+    assert!(!dir.join("billing/tasks/001-preview.md").exists(), "task plan data must roll back");
+    assert!(
+        dir.join("billing/tasks/001-preview.md.lock").is_file(),
+        "task coordination sidecar must remain"
+    );
+}
+
 #[test]
 fn keep_on_error_leaves_the_write_in_place() {
     let dir = empty_project("new-keep");

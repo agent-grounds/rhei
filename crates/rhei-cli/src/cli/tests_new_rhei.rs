@@ -30,6 +30,38 @@ mod new_rhei_destination_tests {
         assert_eq!(classify(project.path(), true), NewRheiDestination::AdoptableDirectory);
     }
 
+    /// A prior failed create or dry run leaves the exact empty coordination
+    /// entry behind; retry must admit and reuse it.
+    // §FS-rhei-new.2.1.1
+    #[test]
+    fn issue_95_exact_empty_index_sidecar_is_adoptable() {
+        let project = tempfile::tempdir().expect("tempdir");
+        let billing = project.path().join("billing");
+        fs::create_dir(&billing).expect("prospective workspace");
+        fs::write(billing.join("index.rhei.md.lock"), b"").expect("coordination sidecar");
+
+        assert_eq!(classify(project.path(), true), NewRheiDestination::AdoptableDirectory);
+    }
+
+    /// Similar names and objects that cannot be the empty regular sidecar stay
+    /// authored obstructions; the allowlist is exact.
+    // §FS-rhei-new.2.1.1
+    #[test]
+    fn issue_95_nonempty_and_nonregular_index_sidecars_are_obstructions() {
+        let nonempty = tempfile::tempdir().expect("tempdir");
+        let billing = nonempty.path().join("billing");
+        fs::create_dir(&billing).expect("prospective workspace");
+        let sidecar = billing.join("index.rhei.md.lock");
+        fs::write(&sidecar, b"not coordination\n").expect("nonempty sidecar");
+        assert_eq!(classify(nonempty.path(), true), NewRheiDestination::Occupied(sidecar));
+
+        let nonregular = tempfile::tempdir().expect("tempdir");
+        let billing = nonregular.path().join("billing");
+        let sidecar = billing.join("index.rhei.md.lock");
+        fs::create_dir_all(&sidecar).expect("sidecar-shaped directory");
+        assert_eq!(classify(nonregular.path(), true), NewRheiDestination::Occupied(sidecar));
+    }
+
     #[test]
     fn prompt_templates_without_a_machine_are_occupied() {
         let project = tempfile::tempdir().expect("tempdir");

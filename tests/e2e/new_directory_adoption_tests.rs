@@ -85,6 +85,20 @@ fn adopts_an_empty_directory() {
     assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md", "tasks"]);
 }
 
+/// Retry after a failed create or dry run reuses the exact empty sidecar and
+/// preserves it as permanent coordination state.
+// §FS-rhei-new.2.1.1 §FS-rhei-new.5.1
+#[test]
+fn issue_95_adopts_a_workspace_containing_only_its_empty_index_sidecar() {
+    let dir = project("new-adopt-sidecar");
+    fs::create_dir(dir.join("billing")).expect("create prospective workspace");
+    fs::write(dir.join("billing/index.rhei.md.lock"), b"").expect("sidecar");
+
+    let result = new_run(&["new", "Billing", "--project", ".", "--dir"], &dir);
+    assert_success(&result);
+    assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md", "index.rhei.md.lock", "tasks"]);
+}
+
 /// Prompt templates are part of the authored machine bundle and survive
 /// adoption byte-for-byte. §FS-rhei-new.2.1.1 §FS-rhei-new.5.1
 #[test]
@@ -226,6 +240,48 @@ fn dry_run_preserves_an_adopted_workspace_on_success_and_failure() {
     assert!(!flattened_output(&result).contains("already exists"));
     assert_eq!(entry_names(&invalid.join("billing")), ["states.yaml"]);
     assert_eq!(fs::read(invalid.join("billing/states.yaml")).expect("machine"), broken);
+}
+
+/// Dry-run rollback restores plan data but keeps the destination sidecar and
+/// the directory required to preserve that lock identity. `--keep-on-error`
+/// cannot turn a dry run into retained plan data.
+// §FS-rhei-new.5.4
+#[test]
+fn issue_95_dry_run_of_a_new_workspace_retains_only_coordination_state() {
+    for extra in [&[][..], &["--keep-on-error"][..]] {
+        let dir = project("new-dry-coordination");
+        let mut args = vec!["new", "Billing", "--project", ".", "--dir", "--dry-run"];
+        args.extend_from_slice(extra);
+
+        let result = new_run(&args, &dir);
+        assert_success(&result);
+        assert!(!dir.join("billing/index.rhei.md").exists(), "plan data must roll back");
+        assert!(!dir.join("billing/tasks").exists(), "owned plan directory must roll back");
+        assert!(
+            dir.join("billing/index.rhei.md.lock").is_file(),
+            "the permanent destination sidecar must remain"
+        );
+        assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md.lock"]);
+    }
+}
+
+/// A validation failure follows the same coordination/data ownership split,
+/// whether ordinary rollback or dry-run's unconditional rollback selects it.
+// §FS-rhei-new.5.2 §FS-rhei-new.5.4
+#[test]
+fn issue_95_failed_workspace_creation_retains_coordination_but_not_plan_data() {
+    for extra in [&[][..], &["--dry-run", "--keep-on-error"][..]] {
+        let dir = project("new-failed-coordination");
+        let mut args = vec!["new", "Billing", "--project", ".", "--dir", "--states", "missing"];
+        args.extend_from_slice(extra);
+
+        let result = new_run(&args, &dir);
+        assert!(!result.status.success(), "missing machine must fail");
+        assert!(!dir.join("billing/index.rhei.md").exists(), "plan data must roll back");
+        assert!(!dir.join("billing/tasks").exists(), "owned plan directory must roll back");
+        assert!(dir.join("billing/index.rhei.md.lock").is_file(), "sidecar must remain");
+        assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md.lock"]);
+    }
 }
 
 /// Outside dry run, `--keep-on-error` keeps the newly created workspace

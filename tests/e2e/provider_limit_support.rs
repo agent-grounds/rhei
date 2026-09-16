@@ -41,6 +41,22 @@ pub(super) fn wait_for(what: &str, mut condition: impl FnMut() -> bool) {
 }
 
 pub(super) fn markdown_text(path: &Path) -> String {
+    fn read_markdown(path: &Path) -> String {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            match fs::read_to_string(path) {
+                Ok(text) => return text,
+                Err(_error) if Instant::now() < deadline => {
+                    // Windows briefly locks a task file while the parallel
+                    // workers atomically replace it. The assertion observes
+                    // the settled workspace, not that transient lock.
+                    thread::sleep(Duration::from_millis(10));
+                }
+                Err(error) => panic!("read markdown '{}': {error}", path.display()),
+            }
+        }
+    }
+
     fn visit(path: &Path, text: &mut String) {
         for entry in fs::read_dir(path).expect("read workspace") {
             let path = entry.expect("workspace entry").path();
@@ -49,7 +65,7 @@ pub(super) fn markdown_text(path: &Path) -> String {
                     visit(&path, text);
                 }
             } else if path.extension().and_then(|extension| extension.to_str()) == Some("md") {
-                text.push_str(&fs::read_to_string(path).expect("read markdown"));
+                text.push_str(&read_markdown(&path));
             }
         }
     }

@@ -100,7 +100,8 @@ Text output includes:
   `concurrent`.
 - Per-state execution details such as visits, the supervision trigger
   ([§FS-rhei-supervision.1.1](rhei-supervision.spec.md#11-the-execute_on-field)), polling, targets, models, agent, agent mode,
-  timeouts, program presence, MCP servers, skills, snapshots, inputs, outputs,
+  authored effort (`Effort: <value>`), timeouts, program presence, MCP servers,
+  skills, snapshots, inputs, outputs,
   personality, and instructions. A supervising state's `execute_on:` is spelled
   as *when the supervisor wakes*, on an `Executes on:` line: `every finished
   child`, `every child transition`, `every finished descendant`, or `every
@@ -138,6 +139,11 @@ Each state's `poll` object mirrors the authored block: `interval`,
 ([§FS-rhei-states.2.5](rhei-states.spec.md#25-waiting-on-a-person)). Presence is the meaning of that field, so it is
 *omitted* rather than emitted as `null` when absent — which also makes the
 JSON for every machine authored without it byte-for-byte what it was.
+
+Each state that authors `effort` includes an `"effort": "<value>"` member.
+When the field is omitted, JSON omits the member rather than emitting
+`"effort": null`; text likewise adds no empty `Effort:` line. This preserves
+the inspection shape of machines that do not opt in.
 
 When JSON output is selected, command errors are rendered as a single JSON
 object on stderr.

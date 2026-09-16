@@ -75,6 +75,11 @@ Language changes must preserve a single discoverable entry point:
   owning spec edit.
 - New state-machine fields belong in [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) or [§FS-rhei-transitions](rhei-transitions.spec.md#fs-rhei-transitions-rhei-transitions-specification)
   and must be linked from this page when users author them directly.
+- Per-state `effort` is authored in `states.yaml`; its syntax and applicability
+  are owned by [§FS-rhei-states.1](rhei-states.spec.md#1-schema-additions), while
+  agent-native mappings and argument composition are owned by
+  [§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents) and
+  [§FS-rhei-agents.2.2](rhei-agents.spec.md#22-modes).
 - New template syntax or manifest fields belong in [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification) and must
   be linked from this page.
 - New execution references that appear in authored files must identify their

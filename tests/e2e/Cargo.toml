@@ -21,6 +21,10 @@ autotests = false
 name = "e2e"
 path = "mod.rs"
 
+[[bin]]
+name = "effort-fixture"
+path = "fixtures/effort_fixture.rs"
+
 [dev-dependencies]
 rhei-core = { package = "rhei-plan", path = "../../crates/rhei-core" }
 rhei-cli = { path = "../../crates/rhei-cli" }

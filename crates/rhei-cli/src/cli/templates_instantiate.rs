@@ -61,6 +61,7 @@
         let template_dir = resolved_template.path();
         let manifest = load_template_manifest(template_dir)?;
 
+        // Selected interfaces take the same typed compilation path. §FS-rhei-library.1.1
         if !manifest.block.mounts.is_empty() || manifest.select.is_some() {
             let template_input_args =
                 template_input_args_without_execute_args(input_args, execute_args)?;

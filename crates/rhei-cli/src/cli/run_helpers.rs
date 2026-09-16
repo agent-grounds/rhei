@@ -299,7 +299,7 @@ fn compose_agent_prompt(render_context: &RuntimeTemplateContext<'_>) -> MietteRe
     let personality = state_personality(render_context.machine, render_context.state_name)
         .map(|text| resolve_runtime_template_text(text.as_str(), render_context));
 
-    // Build available transitions list.
+    // List only matching owned escapes and exact edges. §FS-rhei-transitions.4.6
     let mut transitions_list = String::new();
     for rule in &render_context.machine.transitions {
         if render_context.machine.transition_matches_source(rule, render_context.state_name) {

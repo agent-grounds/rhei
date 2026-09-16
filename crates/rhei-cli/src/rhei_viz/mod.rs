@@ -508,8 +508,7 @@ pub fn flatten_machine(machine: &StateMachine) -> Machine {
                     wildcard: false,
                 })
                 .collect();
-            // Attach `from: "*"` wildcard edges to every non-terminal state so
-            // the inspector shows the real set of legal exits.
+            // Show wildcard edges only on matching sources. §FS-rhei-transitions.4.6
             if !def.terminal {
                 for rule in machine.transitions.iter().filter(|rule| {
                     rule.from.0 == "*" && machine.transition_matches_source(rule, name)

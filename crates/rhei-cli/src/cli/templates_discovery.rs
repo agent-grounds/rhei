@@ -217,6 +217,7 @@
                 help = template_manifest_help(),
                 "failed to parse '{}': {err}", manifest_path.display()
             ))?;
+        // Presence, including an empty group, forbids a selected duplicate. §FS-rhei-library.1.1
         if manifest.select.is_some() {
             let source: YamlValue = serde_yaml::from_str(&raw).map_err(|e| miette!("{e}"))?;
             manifest.static_declarations = ["ports", "data", "compatibility"].into_iter()

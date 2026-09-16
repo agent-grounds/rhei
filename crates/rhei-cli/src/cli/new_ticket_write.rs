@@ -23,6 +23,13 @@ struct PlacedTicket {
     dirs: Vec<PathBuf>,
 }
 
+/// The rendered ticket data that determines its destination and contents.
+struct RenderedTicket<'a> {
+    local_id: &'a str,
+    title: &'a str,
+    block: &'a str,
+}
+
 /// Locate the rhei that owns a ticket, in whichever layout it uses.
 fn resolve_rhei_entry(
     target: &Path,
@@ -135,11 +142,9 @@ fn rhei_entry_structure(entry: &RheiEntry, target: &Path) -> MietteResult<RheiSt
 fn place_ticket(
     entry: &RheiEntry,
     placement: &TicketParent,
-    local_id: &str,
     loaded: &LoadedPlan,
     target: &Path,
-    title: &str,
-    block: &str,
+    ticket: &RenderedTicket<'_>,
     decision: NewDecision,
 ) -> MietteResult<PlacedTicket> {
     if let Some(parent_local) = &placement.parent_local {
@@ -151,7 +156,8 @@ fn place_ticket(
             _ => loaded.task_file(&qualified_parent, target),
         };
         let raw = read_input_file(&path)?;
-        let contents = insert_ticket_after_subtree(&raw, parent_local, block).ok_or_else(|| {
+        let contents =
+            insert_ticket_after_subtree(&raw, parent_local, ticket.block).ok_or_else(|| {
             miette!(
 help = "re-run after `rhei validate` passes, so the plan on disk and the ids agree.",
 
@@ -167,27 +173,31 @@ help = "re-run after `rhei validate` passes, so the plan on disk and the ids agr
             let raw = read_input_file(path)?;
             Ok(PlacedTicket {
                 path: path.clone(),
-                contents: append_ticket(&raw, block),
+                contents: append_ticket(&raw, ticket.block),
                 dirs: Vec::new(),
             })
         }
         RheiEntry::Workspace(dir) => {
             let tasks_dir = dir.join("tasks");
-            let path = tasks_dir.join(task_file_name(local_id, title));
+            let path = tasks_dir.join(task_file_name(ticket.local_id, ticket.title));
             // Absence becomes authoritative only after this path's sidecar is
             // held by the repeated decision. §FS-rhei-new.4
             if decision == NewDecision::Authoritative {
                 reject_existing_destination(&path)?;
             }
-            Ok(PlacedTicket { path, contents: block.to_string(), dirs: vec![tasks_dir] })
+            Ok(PlacedTicket {
+                path,
+                contents: ticket.block.to_string(),
+                dirs: vec![tasks_dir],
+            })
         }
         RheiEntry::Basin(dir) => {
-            let path = dir.join(task_file_name(local_id, title));
+            let path = dir.join(task_file_name(ticket.local_id, ticket.title));
             // Same protocol as a workspace task file. §FS-rhei-new.4
             if decision == NewDecision::Authoritative {
                 reject_existing_destination(&path)?;
             }
-            Ok(PlacedTicket { path, contents: block.to_string(), dirs: vec![dir.clone()] })
+            Ok(PlacedTicket { path, contents: ticket.block.to_string(), dirs: vec![dir.clone()] })
         }
     }
 }

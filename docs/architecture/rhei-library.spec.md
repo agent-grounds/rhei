@@ -52,7 +52,9 @@ enter qualification as parsed task structures, not as markdown search/replace.
 Compilation is ordered:
 
 1. Resolve the root block or ordered direct mounts.
-2. Resolve typed inputs and render each manifest's own files in isolation.
+2. Parse the static input schema, resolve typed inputs, select the opt-in
+   declaration groups (§FS-rhei-library.1.1), and render each manifest's own
+   files in isolation. Only the selected groups pass through MiniJinja.
 3. Parse plan and state fragments into shared typed representations.
 4. Recursively expand `use`, retaining resolved source and alias-chain data.
 5. Validate aliases, cycles, ports, binds, seams, passes, ownership, and
@@ -85,9 +87,20 @@ reported as such rather than resolved by overwriting.
 
 Project settings still use their existing project-values-win policy after
 block-owned ids and references are qualified. Compatibility lowering is an
-explicit checked rename at the root, not an exception to ownership.
+explicit checked rename at each wrapper boundary. The only many-to-one
+exception is checked terminal equivalence (§FS-rhei-library.7.1): compare
+effective operative contracts before removing any duplicate definition, then
+rewrite every typed reference with the same visitor. All other merges remain
+injective and collision-refusing.
 
 ## 5. Runtime invariants
+
+The flat schema has two general, backward-compatible properties used by the
+compiler: cancellation roles (§FS-rhei-states.1.4) and scoped wildcard sources
+(§FS-rhei-transitions.4.6). Ordinary consumers interpret these properties without
+discovering blocks. Qualification records inferred cancellation before renaming
+and scopes wildcards without turning them into exact forward edges. This is the
+bounded exception to an entirely unchanged flat schema/runtime.
 
 The compiler's output must pass every ordinary plan, state, profile,
 node-policy, settings, artifact, and reference validator. Existing commands see

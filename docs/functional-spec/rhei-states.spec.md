@@ -83,6 +83,7 @@ can start in different states within the same state machine.
 |-------|------|----------|-------------|
 | `prompt_template` | string or object | No | Reusable prompt selected from sibling `prompt_templates/<id>.md`. String form is the template id. Object form is `{name, values}` where `values` supplies concrete scalar values for placeholders in that template. |
 | `personality` | string | No | State-specific role framing printed by `rhei next` for that state |
+| `role` | string | No | `cancellation` classifies abandonment independently of spelling; requires `final: true`. Omitted roles preserve bare-name inference. §1.4 |
 | `gating` | boolean | No | When `true`, autonomous commands (`rhei next`, `rhei complete`, engine-triggered transitions) must not transition out of this state. Only explicit human-initiated transitions are allowed. |
 | `concurrent` | boolean | No | When `true`, `rhei run` may work multiple ready tasks in this state simultaneously (up to `--parallel`). When `false` (the default), at most one ready task per pass is scheduled for this state and the rest are deferred to a later pass. This is a scheduling hint only — state entry, exit, and transition semantics are unchanged. Fanout invocations from a single task (`all_targets` / `all_models`) are not affected by this flag. |
 | `poll` | object | No | Marks this state as a time-triggered *polling* state. Contains `interval` (duration string, e.g. `5m`) and `max_attempts` (integer ≥ 1). On each attempt the state's `agent` or `program` runs once and the engine evaluates transitions normally; a self-loop (`from: X, to: X`) is interpreted as "not done yet, retry after `interval`". Between attempts the `--parallel` slot is released and the task is not ready again until the interval elapses. After `max_attempts` attempts the engine will not take a self-loop and instead selects a matching exhaustion transition (typically `condition: pollAttempts >= pollMaxAttempts`); if none matches, the task fails. May also carry `waiting_on` (a short label naming the person or role the poll waits for), which declares the wait as a *person* wait rather than machine backoff. Mutually exclusive with `visits`. See [Polling States](#2-polling-states) below and [Run Specification — Polling States](rhei-run.spec.md#51-polling-states). |
@@ -248,9 +249,15 @@ budget. The same scoping rule applies to `all_models`.
 
 ### 1.4. Reserved State Names
 
-A machine names its own states, with one exception: **`cancelled` is reserved**.
-It is the one state name the engine reads as *the work was abandoned* rather
-than as a state like any other, and five rules key on it:
+A state may declare `role: cancellation` to classify abandonment independently
+of its name. This optional string accepts only `cancellation`; unknown roles
+are rejected with the state name and supported value. An explicit cancellation
+role requires `final: true`. When omitted, the bare names `cancelled` and
+`canceled` still infer cancellation with their historical behavior; other names
+have no cancellation role. Counted task states resolve to their declared base
+before classification. No generated-name prefix has semantic meaning.
+
+Five rules key on this effective cancellation classification:
 
 - a `**Prior:**` in it does **not** satisfy a dependency, so a cancelled ticket
   never unblocks downstream work ([§FS-rhei-plan-language.3](rhei-plan-language.spec.md#3-semantic-constraints));
@@ -264,12 +271,10 @@ than as a state like any other, and five rules key on it:
   the run halts on it, exactly as one with no exit at all
   ([§FS-rhei-supervision.1.2](rhei-supervision.spec.md#12-validation-rules)).
 
-`canceled` is accepted as the same name; the two spellings are one reserved
-name, not two states. Any other name — `dropped`, `abandoned`, `wontfix` — is an
-ordinary terminal state and gets none of the five rules. A machine that wants
-cancellation semantics must spell the state `cancelled`; the outputs refusal on
-a transition into a `final: true` state says so, because that is where the
-mistake shows up.
+`canceled` retains the same inference as `cancelled`. Other names — `dropped`,
+`abandoned`, `wontfix` — are ordinary terminals unless they explicitly declare
+`role: cancellation`. An explicit role preserves the same five rules through
+renaming and composition.
 
 ## 2. Polling States
 

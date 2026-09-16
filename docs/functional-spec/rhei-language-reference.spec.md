@@ -40,13 +40,16 @@ The remaining three surfaces:
   [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification);
   recursive mounts, ports, seams, qualification, and lowering are owned by
   [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks).
+  Input-selected declaration groups are owned by §FS-rhei-library.1.1, and
+  checked terminal equivalence by §FS-rhei-library.7.1.
 - Execution references: agent, model, MCP server, skill, snapshot, and program
   references. Owned by [§FS-rhei-agents](rhei-agents.spec.md#fs-rhei-agents-rhei-agents-specification), [§FS-rhei-programs](rhei-programs.spec.md#fs-rhei-programs-rhei-program-states-specification), and
   [§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification).
 
 The plan and project markdown surface is the primary source of truth for project
 membership, task state, dependencies, hierarchy, assignees, and result links.
-State machines constrain which states and transitions are legal. Templates are a
+State machines constrain which states and transitions are legal. Cancellation roles (§FS-rhei-states.1.4) and scoped wildcard source sets
+(§FS-rhei-transitions.4.6) are ordinary flat-machine properties. Templates are a
 preprocessing layer that materializes ordinary plan markdown and optional state
 machines before runtime parsing.
 

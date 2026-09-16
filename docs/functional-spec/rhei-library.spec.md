@@ -13,7 +13,8 @@ preserving the predictable output required by
 A block uses the existing template directory and `template.yaml`; there is no
 second manifest or discovery catalog. The existing `name`, `version`,
 `description`, and `inputs` fields retain their meanings. A manifest may also
-declare `ports`, `data`, `use`, `bind`, `seams`, and `compatibility`.
+declare `ports`, `data`, `use`, `bind`, `seams`, `compatibility`, and the
+opt-in `select` declaration template below.
 
 `ports` declares the control surface:
 
@@ -72,6 +73,46 @@ A manifest with `use` may omit a local plan entry point and local
 `states.yaml`; its children then supply the complete fragment. Otherwise the
 existing exactly-one-plan-entry rule remains. This is what permits a curated
 flow to be only composition rather than a placeholder task or machine.
+
+### 1.1. Input-selected declarations
+
+`select` is an optional YAML block scalar containing a restricted MiniJinja
+template whose result is a mapping with only `ports`, `data`, and
+`compatibility`. It uses the same restricted environment as materialized files
+([§FS-rhei-templates.5](rhei-templates.spec.md#5-instantiation-variables)).
+
+```yaml
+select: |
+  ports:
+    entry: {% if fix_prepare == 'none' %}final-fix{% else %}prepare-workspace{% endif %}
+    exits: { done: completed, cancelled: cancelled }
+  data:
+    outputs:
+      final-fix: {kind: state-file, state: final-fix, name: final-fix-note}
+      {% if fix_commit != 'none' %}
+      commit-ref: {kind: state-file, state: commit-fix, name: commit-ref}
+      {% endif %}
+```
+
+Parse and validate the static manifest, including the unchanged input schema,
+first. Resolve typed input values using the established precedence and binding
+rules. Render `select` once from those values, parse its result as the closed
+declaration schema, and render the local files with the same values. Check all
+selected declarations against the typed rendered fragments and expanded child
+interfaces before qualification, seams, or compatibility lowering. No runtime
+value participates in selection. The core receives ordinary typed declarations,
+never MiniJinja source.
+
+A group may be authored statically or selected, never both in one manifest;
+duplicate groups are errors, even if the static group is empty. An omitted
+selected group retains its static value or ordinary absent default. An empty
+mapping selects nothing. Null/non-mapping output, unknown fields at any selected
+declaration level, invalid types, unresolved references, and rendering errors
+are refused. Diagnostics name the authored `template.yaml`, `select`, the
+offending group/endpoint, the mount chain, and how to correct it. `inputs`,
+`use`, `bind`, `seams`, and every other manifest field remain static. The
+manifest itself is never rendered and legacy parsing is unchanged without
+`select`.
 
 ## 2. Mounts, bindings, and seams
 
@@ -220,6 +261,16 @@ Task-state qualification uses the shared counted-state parser: exact state
 names take precedence, otherwise the owned base state is qualified and its
 explicit visit count is preserved (`work-2` becomes `m1_a__work-2`).
 
+Cancellation classification is captured before renaming as the ordinary flat
+state property `role: cancellation` (§FS-rhei-states.1.4). Wildcard transitions
+retain `from: "*"` and receive an explicit `sources` set containing the owner's
+states, or their already authored subset (§FS-rhei-transitions.4.6). Both these
+references and pre-existing source sets are qualified and compatibility-rewritten.
+The source set includes owned terminal states; the runtime excludes final
+sources when matching, so a consumed exit becomes eligible only once a seam
+makes it non-final. No wildcard is expanded into ordinary exact edges, and no
+runtime consumer infers ownership or cancellation from generated prefixes.
+
 Mounted relative runtime paths are placed below
 `runtime/blocks/<encoded-alias-chain>/`, followed by the complete normalized
 local relative path. Retaining the complete path makes `runtime/x` and `x`
@@ -248,6 +299,12 @@ exit. A consumed exit loses `final: true` and receives the one seam transition.
 The tail's unconsumed `done` exit and every unconsumed alternate exit, including
 cancellation exits, retain their authored terminality. Internal transitions
 are preserved.
+
+A cancellation-role exit cannot be consumed by a completion seam. A consumed
+human gate keeps its declared cancellation escape as a human transition;
+automatic progress follows the exact completion seam, with existing gate rules
+unchanged. Scoped wildcard terminal edges remain escapes, never automatic
+fallback when a conditional exact edge is inapplicable.
 
 The compiler derives an outer profile whose initial state is the head mount's
 entry and whose allowed states contain each mounted primary lane in seam order.
@@ -314,6 +371,58 @@ its current public input names, controls, state/task/profile names, shipped
 settings references, artifact paths, output placement, and behavior while its
 review and fix portions become reusable blocks connected by a real artifact
 pass.
+
+### 7.1. Equivalent terminal identities
+
+`compatibility.terminals` explicitly maps a stable state name to a list of at
+least two distinct child state identities. Existing one-target `states` maps
+retain their meaning:
+
+```yaml
+compatibility:
+  states: { final-fix: fix.final-fix }
+  terminals:
+    completed: [review.completed, fix.completed]
+    cancelled: [review.cancelled, fix.cancelled]
+```
+
+Each target must resolve to an unconsumed terminal. A target can be claimed
+once across both state maps, and stable names cannot collide with each other or
+an existing definition. Before coalescing, compare the definitions after typed
+compatibility/path/reference rewrites and data passes. All members must have
+the same effective cancellation role and operative contract: execution selectors
+and settings references, effective bound instructions/personality, input/output
+artifacts and requiredness, gates, polling/visits, snapshots/handoffs, tooling,
+and transition callbacks/conditions. Descriptive prose, declaration order, and
+prompt filenames alone are not operative differences; prompt content after
+binding is. Missing/unbound prompt templates are errors, never empty contracts.
+Terminals with outgoing exact transitions are refused for coalescing.
+
+Only after equality is established may one definition represent the group.
+Rewrite every typed reference, including task states, profiles, ports, scoped
+wildcard sources, and snapshot references, and deduplicate state sets. Divergent
+roles or contracts fail with the stable identity, both child identities and
+manifest paths, and the differing contract field; no winner silently overwrites
+another definition. This is the sole many-to-one ownership exception. At an
+outer mount the stable terminal receives exactly one further qualification.
+
+### 7.2. Extracted workflow modes
+
+For both the reusable `fix` and `changeset-review`, `fix_prepare=none` omits
+`prepare-workspace` and every `workspace-ref` input/output; entry is `final-fix`.
+Other preparation modes enter `prepare-workspace` and require its workspace
+output before fixing. `fix_commit=none` omits `commit-fix` and `commit-ref`,
+and `final-fix` leads directly to `completed`. Other commit modes retain the
+commit stage and its required output. Selected ports, data endpoints and
+compatibility maps must name only present contracts. Every decision consumer
+receives the passed decision path. Worktree/fork and commit/PR instructions keep
+their respective duties. The five required shapes are none/none, none/commit,
+worktree/none, worktree/commit, and fork/pr, at root and mounted boundaries.
+
+Both review and fix completion/cancellation routes use the wrapper's public
+`completed`/`cancelled` pair through §7.1. Human review can still cancel through
+its owner escape; successful approval follows the completion seam. Standalone
+blocks retain their own terminal pair and remain independently composable.
 
 The proving extraction ships the review portion as the discoverable block
 `code-review` (`split` through `human-review`) and the fix portion as `fix`

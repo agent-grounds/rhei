@@ -813,6 +813,7 @@ Each transition in the `transitions` array specifies an allowed state change:
 ```yaml
 transitions:
   - from: <state-name|"*">  # Required: Source state or wildcard
+    sources: [<state-name>] # Optional: restrict a wildcard to these states
     to: <state-name>        # Required: Target state
     description: <string>   # Required: Explanation of when/why this transition occurs
     on_leave: <callback>    # Optional: Callback invoked when leaving the source state
@@ -829,6 +830,7 @@ transitions:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `from` | string | Yes | Source state name, or `"*"` for wildcard (matches any non-final state) |
+| `sources` | string array | No | Explicit source set for `from: "*"`; absent means every state. See §4.6. |
 | `to` | string | Yes | Target state name |
 | `description` | string | Yes | Human-readable explanation of the transition's purpose and when it occurs |
 | `on_leave` | string | No | Callback function identifier invoked before leaving the source state |
@@ -848,13 +850,12 @@ State artifact contracts (see [States Specification — Artifact Contracts](rhei
 1. After `on_leave` callbacks complete, but before the state write is
    committed, the runtime resolves `source.outputs` and rejects the transition
    if any required output file does not exist. One exception: when the
-   transition's effective target is the reserved `cancelled` state — in either
-   accepted spelling ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)) — source outputs are
+   transition's effective target has the cancellation role, explicitly or by
+   legacy spelling ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)) — source outputs are
    not enforced. Cancellation abandons the work rather than finishing it, so
    the source state's artifact contract is moot; the target's `inputs` and the
    terminal-result obligation still apply. The refusal on a transition into any
-   other `final: true` state names the waiver, so a machine that spelled its
-   abandon state something else learns why it was refused.
+   other `final: true` state names the waiver and `role: cancellation` remedy.
 2. Before writing the target state and invoking `on_enter`, the runtime resolves
    `target.inputs` and rejects the transition if any required input file does
    not exist. Optional inputs are resolved but do not block entry.
@@ -874,6 +875,16 @@ The special value `"*"` in the `from` field matches any state with these rules:
 - Matches any state **except** final states (states with `final: true`)
 - Specific transitions take precedence over wildcard transitions
 - A transition from a final state is always forbidden, even with wildcards
+
+Optional `sources: [work, review]` restricts a `from: "*"` rule to exactly the
+listed declared state names. An absent set means all states; an empty set
+matches none. Entries must be unique existing names, and `sources` on an exact
+`from` is invalid. Errors name the rule and invalid source, suggesting a declared
+state or removal of `sources`. Final states may occur in the set but never
+match while final. The field is a source filter, not an exact edge: all wildcard
+precedence, escape, completion, callback, automatic-selection, and reachability
+rules below apply unchanged. Every ordinary consumer uses this same matching
+rule, including manual transitions, diagnostics, and graph views.
 
 Wildcards are optional. When a machine omits wildcards, only explicitly declared transitions are valid. Engines must not synthesize wildcard transitions; if cancellation from a particular state is desired, it must be declared explicitly by that machine.
 
@@ -901,7 +912,7 @@ counts whatever its target, including an explicit edge to `cancelled` — the
 engine takes a declared edge for the state it names, so a machine whose author
 means a state to end only in cancellation says so with that edge.
 
-Exactly one question reverses the first of those and keys on the reserved name:
+Exactly one question reverses the first of those and keys on cancellation role:
 whether a supervising state can *finish*, which reaching `cancelled` does not
 answer, because abandonment is not the work being declared done
 ([§FS-rhei-supervision.1.2](rhei-supervision.spec.md#12-validation-rules)). It

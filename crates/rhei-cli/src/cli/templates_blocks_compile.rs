@@ -1,5 +1,5 @@
     // The CLI resolves and renders; recursive graph lowering belongs to core.
-    // §AR-rhei-library.1–3
+    // §AR-rhei-library.1–3 §FS-rhei-library.8
     struct BlockFrontend {
         scratch: tempfile::TempDir,
         stack: Vec<(PathBuf, String)>,
@@ -36,7 +36,7 @@
             let effective = if let Some(parent) = relative_to {
                 if template_reference_is_path(reference) { parent.join(reference).display().to_string() } else { reference.into() }
             } else { reference.into() };
-            let resolved = resolve_template_reference(&effective).map_err(|e| miette!("block '{reference}' mounted as '{alias}': {e}; check rhei templates"))?;
+            let resolved = resolve_template_reference(&effective).map_err(|e| e.wrap_err(format!("block '{reference}' mounted as '{alias}'; check rhei templates")))?;
             let dir = fs::canonicalize(resolved.path()).map_err(|e| file_io_report(resolved.path(), "resolve block source", e))?;
             let manifest_path = if resolved._extracted.is_some() { PathBuf::from(format!("built-in/{reference}/template.yaml")) } else { dir.join("template.yaml") };
             if self.stack.iter().any(|(path, _)| path == &manifest_path) {
@@ -50,7 +50,7 @@
             let chain = self.stack.iter().map(|(_,a)| a.as_str()).collect::<Vec<_>>().join(".");
             let result = self.prepare_inner(&dir, reference, &manifest, &values)
                 .map(|mut block| { block.source = manifest_path.clone(); block })
-                .map_err(|e| miette!("{} [mount {chain}]: {}", manifest_path.display(), e.to_string().replace(&dir.display().to_string(), &manifest_path.parent().unwrap().display().to_string())));
+                .map_err(|e| e.wrap_err(format!("{} [mount {chain}]", manifest_path.display())));
             self.stack.pop();
             result
         }
@@ -77,12 +77,12 @@
                     }
                 };
                 let child_resolved = resolve_template_reference(&child_reference).map_err(|err| {
-                    miette!(
-                        "failed to resolve child block '{}' mounted as '{}' from '{}': {err}",
+                    err.wrap_err(format!(
+                        "failed to resolve child block '{}' mounted as '{}' from '{}'",
                         mount.block,
                         mount.alias,
                         dir.join("template.yaml").display()
-                    )
+                    ))
                 })?;
                 let child_manifest = load_template_manifest(child_resolved.path())?;
                 let mut child_values = BTreeMap::new();

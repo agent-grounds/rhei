@@ -256,3 +256,6 @@ fn missing_ports_nonterminal_exits_and_seam_guards_fail_without_panics() {
 
 #[path = "reference_tests.rs"]
 mod reference_tests;
+
+#[path = "links_tests.rs"]
+mod links_tests;

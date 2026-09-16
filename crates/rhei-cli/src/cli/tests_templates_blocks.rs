@@ -66,4 +66,22 @@ mod templates_blocks_tests {
         let error = serde_yaml::from_str::<TemplateManifest>(text).unwrap_err();
         assert!(error.to_string().contains("unknown field"));
     }
+
+    /// Context wrapping must retain diagnostic help through recursive preparation.
+    /// §FS-rhei-library.8
+    #[test]
+    fn invalid_builtin_bind_keeps_structured_input_help() {
+        let template = materialize_builtin_template("changeset-review").unwrap();
+        let path = template.path().join("template.yaml");
+        let manifest = fs::read_to_string(&path).unwrap();
+        fs::write(&path, manifest.replace("to: review.change_ref", "to: review.missing")).unwrap();
+        let supplied = BTreeMap::from([("change_ref".into(), YamlValue::String("HEAD~3".into()))]);
+        let error = BlockFrontend::new().unwrap()
+            .prepare(template.path().to_str().unwrap(), None, &supplied, "outer").unwrap_err();
+        assert!(error.help().unwrap().to_string().contains("review.change_ref"));
+        let rendered = format!("{error:?}");
+        for part in ["review.missing", "template.yaml", "outer"] {
+            assert!(rendered.contains(part), "{rendered}");
+        }
+    }
 }

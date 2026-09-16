@@ -112,7 +112,16 @@ fn assert_resolution_contract(skill: &str) {
 
 fn binary_outside_checkout(dir: &Path) -> PathBuf {
     let destination = dir.join("rhei");
-    fs::copy(rhei_binary(), &destination).expect("copy the rhei binary outside checkout discovery");
+    // Copy in a separate process so parallel test forks cannot inherit the
+    // destination's write descriptor and keep this executable ETXTBSY.
+    let copy = Command::new(python_command())
+        .args(["-c", "import shutil, sys; shutil.copy2(sys.argv[1], sys.argv[2])"])
+        .arg(rhei_binary())
+        .arg(&destination)
+        .output()
+        .expect("copy the rhei binary outside checkout discovery");
+    let copy = CliRun::from(&copy);
+    assert!(copy.status.success(), "copy failed: {}", copy.stderr);
     destination
 }
 

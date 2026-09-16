@@ -28,7 +28,7 @@ fn roster_help_documents_the_surface_and_rejects_narrowing_or_run_overrides() {
     assert_success(&help);
     assert!(
         help.stdout.contains("Usage:")
-            && help.stdout.contains("rhei roster")
+            && help.stdout.contains(&format!("rhei{} roster", std::env::consts::EXE_SUFFIX))
             && help.stdout.contains("[RHEI_PLAN]"),
         "help was:\n{}",
         help.stdout
@@ -74,9 +74,9 @@ fn roster_invalid_settings_emit_one_json_error_and_no_partial_payload() {
         "JSON error did not classify the selected settings: {error:#}"
     );
     assert!(
-        error["error"]["message"]
-            .as_str()
-            .is_some_and(|message| message.contains(&settings.display().to_string())),
+        error["error"]["message"].as_str().is_some_and(|message| message
+            .replace('\\', "/")
+            .contains(&settings.display().to_string().replace('\\', "/"))),
         "JSON error did not name the selected file: {error:#}"
     );
     assert!(error["error"]["help"].as_str().is_some(), "JSON error omitted help: {error:#}");
@@ -107,9 +107,9 @@ fn roster_unreadable_settings_emit_one_json_error_and_no_partial_payload() {
         "JSON error did not classify the selected settings: {error:#}"
     );
     assert!(
-        error["error"]["message"]
-            .as_str()
-            .is_some_and(|message| message.contains(&settings.display().to_string())),
+        error["error"]["message"].as_str().is_some_and(|message| message
+            .replace('\\', "/")
+            .contains(&settings.display().to_string().replace('\\', "/"))),
         "JSON error did not name the selected file: {error:#}"
     );
     assert!(error["error"]["help"].as_str().is_some(), "JSON error omitted help: {error:#}");
@@ -132,7 +132,9 @@ fn roster_malformed_deprecated_settings_emit_only_one_json_error() {
     assert!(
         error["error"]["message"].as_str().is_some_and(|message| {
             message.contains("failed to parse settings")
-                && message.contains(&settings.display().to_string())
+                && message
+                    .replace('\\', "/")
+                    .contains(&settings.display().to_string().replace('\\', "/"))
         }),
         "JSON error did not identify the malformed deprecated file: {error:#}"
     );

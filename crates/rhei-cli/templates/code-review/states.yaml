@@ -1,11 +1,14 @@
 # Reusable review duties and stage contracts. §FS-rhei-library.7
 name: code-review
 version: 1.0.0
+# Bind runtime tokens for the later runtime pass. §FS-rhei-states.4.4
 states:
   split:
     description: Coordinator writes an architectural overview of the change, then spawns one review task per logical part plus an aggregate task.
     target: {{smart_target}}
-    prompt_template: split
+    prompt_template:
+      name: split
+      values: { task_id: "{task_id}", task_title: "{task_title}" }
     outputs:
       - name: architecture-overview
         path: runtime/manifests/{task_id}-architecture.md
@@ -24,7 +27,9 @@ states:
       You are {target}, a rigorous reviewer. Focus on correctness,
       regressions, and material risks specific to the assigned part. Skip
       pure style nits unless they indicate a real defect.
-    prompt_template: review
+    prompt_template:
+      name: review
+      values: { target: "{target}", task_id: "{task_id}", task_title: "{task_title}" }
     outputs:
       - name: part-findings
         path: runtime/findings/{task_id}-{target.slug}.md
@@ -36,7 +41,9 @@ states:
     personality: |
       You are the review aggregator. Deduplicate aggressively, preserve
       evidence, and do not invent issues beyond what reviewers reported.
-    prompt_template: aggregate-reviews
+    prompt_template:
+      name: aggregate-reviews
+      values: { task_id: "{task_id}", task_title: "{task_title}" }
     outputs:
       - name: review-issues
         path: runtime/issues/{task_id}-candidate-issues.md
@@ -54,7 +61,9 @@ states:
     personality: |
       You are {target}, a skeptical validator. Confirm whether each candidate
       issue is real, actionable, and supported by the code/spec evidence.
-    prompt_template: validate-review
+    prompt_template:
+      name: validate-review
+      values: { target: "{target}", task_id: "{task_id}", task_title: "{task_title}" }
     outputs:
       - name: validation
         path: runtime/validations/{task_id}-{target.slug}.md
@@ -74,7 +83,9 @@ states:
       Do not edit files in this state. Be cautious about scope: if a nit or
       low-value issue would require a broad or invasive change, recommend
       rejecting or deferring it instead of proposing a wide fix.
-    prompt_template: propose-fixes
+    prompt_template:
+      name: propose-fixes
+      values: { target: "{target}", task_id: "{task_id}", task_title: "{task_title}" }
     outputs:
       - name: fix-proposal
         path: runtime/proposals/{task_id}-{target.slug}.md
@@ -90,7 +101,9 @@ states:
       You are the proposal aggregator. Compare proposed fixes without editing
       files. Preserve disagreements so the final adjudicator can decide them
       explicitly.
-    prompt_template: aggregate-proposals
+    prompt_template:
+      name: aggregate-proposals
+      values: { task_id: "{task_id}", task_title: "{task_title}" }
     outputs:
       - name: proposal-matrix
         path: runtime/proposals/{task_id}-proposal-matrix.md
@@ -110,7 +123,9 @@ states:
       fix. Prefer no-op over speculative edits. If fixing a nit would require
       broad rewrites, cross-cutting refactors, or risky behavior changes,
       reject or defer it.
-    prompt_template: decide
+    prompt_template:
+      name: decide
+      values: { task_id: "{task_id}", task_title: "{task_title}" }
     outputs:
       - name: final-decision
         path: runtime/decisions/{task_id}-final-decision.md
@@ -123,15 +138,21 @@ states:
     inputs:
       - name: final-decision
         path: runtime/decisions/{task_id}-final-decision.md
-    prompt_template: human-review
+    prompt_template:
+      name: human-review
+      values: { task_id: "{task_id}", task_title: "{task_title}" }
   completed:
     description: Task is done.
-    prompt_template: completed
+    prompt_template:
+      name: completed
+      values: { task_id: "{task_id}" }
     final: true
 
   cancelled:
     description: Task was cancelled before completion.
-    prompt_template: cancelled
+    prompt_template:
+      name: cancelled
+      values: { task_id: "{task_id}" }
     final: true
 
 transitions:

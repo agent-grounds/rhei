@@ -1,6 +1,7 @@
 # Reusable fix duties and stage contracts. §FS-rhei-library.7
 name: fix
 version: 1.0.0
+# Bind runtime tokens for the later runtime pass. §FS-rhei-states.4.4
 states:
   prepare-workspace:
     description: Set up an isolated workspace ({{fix_prepare}}) before applying final fixes.
@@ -8,7 +9,9 @@ states:
     inputs:
       - name: final-decision
         path: runtime/decisions/{task_id}-final-decision.md
-    prompt_template: prepare-workspace
+    prompt_template:
+      name: prepare-workspace
+      values: { task_id: "{task_id}", task_title: "{task_title}" }
     outputs:
       - name: workspace-ref
         path: runtime/workspaces/{task_id}.yaml
@@ -27,7 +30,9 @@ states:
       final decision. Do not broaden scope. If an accepted item turns out to
       require a much wider change than the final decision described, stop and
       record it as not fixed instead of expanding the patch.
-    prompt_template: final-fix
+    prompt_template:
+      name: final-fix
+      values: { task_id: "{task_id}", task_title: "{task_title}" }
     outputs:
       - name: final-fix-note
         path: runtime/fixes/{task_id}-final-fix.md
@@ -41,7 +46,9 @@ states:
         path: runtime/fixes/{task_id}-final-fix.md
       - name: workspace-ref
         path: runtime/workspaces/{task_id}.yaml
-    prompt_template: commit-fix
+    prompt_template:
+      name: commit-fix
+      values: { task_id: "{task_id}", task_title: "{task_title}" }
     outputs:
       - name: commit-ref
         path: runtime/commits/{task_id}.yaml
@@ -49,12 +56,16 @@ states:
 
   completed:
     description: Task is done.
-    prompt_template: completed
+    prompt_template:
+      name: completed
+      values: { task_id: "{task_id}" }
     final: true
 
   cancelled:
     description: Task was cancelled before completion.
-    prompt_template: cancelled
+    prompt_template:
+      name: cancelled
+      values: { task_id: "{task_id}" }
     final: true
 
 transitions:

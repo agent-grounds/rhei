@@ -123,18 +123,18 @@ result("## Result\n\nConsumer completed.\n")
     );
     let settings_dir = output.join(".agent-grounds/rhei");
     fs::create_dir_all(&settings_dir).expect("settings directory");
-    fs::write(
-        settings_dir.join("settings.json"),
-        format!(
-            r#"{{
-  "defaults": {{"agent": "capture", "agent_timeout": "10s"}},
-  "agents": {{"capture": {{"command": {}, "stdin_prompt": true, "timeout": "10s"}}}}
-}}
-"#,
-            fixture_command(&agent)
-        ),
-    )
-    .expect("runtime settings");
+    let path = settings_dir.join("settings.json");
+    let mut settings: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).expect("compiled settings"))
+            .expect("valid compiled settings");
+    settings["defaults"] = serde_json::json!({"agent": "capture", "agent_timeout": "10s"});
+    settings["agents"]["capture"] = serde_json::json!({
+        "command": [python_command(), agent.to_str().expect("capture agent path")],
+        "stdin_prompt": true,
+        "timeout": "10s",
+    });
+    fs::write(path, serde_json::to_string_pretty(&settings).expect("runtime settings JSON"))
+        .expect("runtime settings");
 }
 
 fn run_export_case(dir: &Path, label: &str, contents: Option<&str>) -> String {
@@ -161,14 +161,25 @@ fn run_export_case(dir: &Path, label: &str, contents: Option<&str>) -> String {
         "missing qualified Consumes:\n{plan}"
     );
 
+    // Publishing is complete in this fixture; only the consumer remains runnable.
+    // `run --task` selects a snapshot override, not an execution scope.
+    for entry in fs::read_dir(output.join("tasks/m6_review__")).expect("producer tasks") {
+        let path = entry.expect("producer task file").path();
+        let text = fs::read_to_string(&path)
+            .expect("producer task text")
+            .replace("**State:** m6_review__review", "**State:** m3_fix__done")
+            .replace("**State:** m6_review__panel", "**State:** m3_fix__done");
+        fs::write(path, text).expect("finish fixture producers");
+    }
     if let Some(contents) = contents {
-        let export = output.join("runtime/exports/m6_review__job/m6_review__findings.md");
+        let rhei_id = output.file_name().expect("rhei directory").to_str().expect("rhei id");
+        let export =
+            output.join(format!("runtime/exports/{rhei_id}.m6_review__job/m6_review__findings.md"));
         fs::create_dir_all(export.parent().expect("export parent")).expect("export directory");
         fs::write(export, contents).expect("write export");
     }
     write_runtime_agent(&output);
-    let run =
-        run_compose(&output, &["run", ".", "--task", "m3_fix__job", "--no-tui", "--no-callbacks"]);
+    let run = run_compose(&output, &["run", ".", "--no-tui", "--no-callbacks"]);
     assert_success(&run);
     fs::read_to_string(output.join("runtime/export-prompt.txt")).expect("captured prompt")
 }

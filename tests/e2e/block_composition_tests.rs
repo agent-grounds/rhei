@@ -164,7 +164,10 @@ fn recursive_and_repeated_mounts_match_direct_control_and_routing() {
 #[test]
 fn mounted_inputs_preserve_precedence_listing_and_output_modes() {
     let dir = unique_temp_dir("blocks-inputs");
-    let fixtures = write_composition_fixtures(&dir);
+    write_fixture_file(&dir, "index.panta.md", "# Panta: Review fixture\n");
+    let hidden_sources = dir.join(".fixtures");
+    fs::create_dir_all(&hidden_sources).expect("hidden fixture sources");
+    let fixtures = write_composition_fixtures(&hidden_sources);
     let review = mount_arg("review", &fixtures.review);
     let fix = mount_arg("fix", &fixtures.fix);
 

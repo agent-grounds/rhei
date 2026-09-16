@@ -235,6 +235,16 @@ impl StateMachine {
                     )));
                 }
             }
+            // A state selected through settings need not declare an agent here,
+            // but deterministic and human-only states can never consume effort.
+            // §FS-rhei-states.1.3
+            if state.effort.is_some()
+                && (state.program.is_some() || state.gating || state.terminal)
+            {
+                return Err(StateMachineLoadError::Invalid(format!(
+                    "state '{state_name}' declares 'effort' but is not eligible for autonomous agent work"
+                )));
+            }
             if let Some(timeout) = &state.agent_timeout {
                 if parse_duration_secs(timeout).is_none() {
                     return Err(StateMachineLoadError::Invalid(format!(

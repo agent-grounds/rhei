@@ -125,6 +125,50 @@ fn project_settings_path(plan_root: &Path) -> PathBuf {
     project_settings_home(plan_root).into_path()
 }
 
+/// Reject effort capabilities that cannot translate one canonical value into
+/// one deterministic argument span. §FS-rhei-agents.1.1.2
+fn validate_agent_effort_profiles(
+    agents: &BTreeMap<String, CustomAgentProfile>,
+) -> MietteResult<()> {
+    for (id, profile) in agents {
+        let Some(effort) = profile.effort.as_ref() else { continue };
+        if effort.values.is_empty() {
+            return Err(miette!("agent '{id}' has an empty 'effort.values' mapping"));
+        }
+        for (canonical, native) in &effort.values {
+            if !rhei_validator::StateEffort::is_canonical(canonical) {
+                return Err(miette!(
+                    "agent '{id}' maps unknown canonical effort value '{canonical}'"
+                ));
+            }
+            if native.trim().is_empty() {
+                return Err(miette!(
+                    "agent '{id}' maps effort '{canonical}' to an empty native value"
+                ));
+            }
+        }
+
+        let validate_pattern = |field: &str, pattern: &[String]| -> MietteResult<()> {
+            if pattern.is_empty() {
+                return Err(miette!("agent '{id}' has an empty '{field}' effort pattern"));
+            }
+            let placeholders =
+                pattern.iter().map(|token| token.matches("{value}").count()).sum::<usize>();
+            if placeholders != 1 {
+                return Err(miette!(
+                    "agent '{id}' effort '{field}' pattern must contain exactly one '{{value}}' placeholder"
+                ));
+            }
+            Ok(())
+        };
+        validate_pattern("args", &effort.args)?;
+        for pattern in &effort.conflicts {
+            validate_pattern("conflicts", pattern)?;
+        }
+    }
+    Ok(())
+}
+
 /// Load merged settings plus the source decisions that produced every roster
 /// value. Execution discards the additional record; inspection renders it
 /// without re-reading or re-merging settings. §FS-rhei-agents.1.1.7
@@ -191,6 +235,7 @@ fn load_merged_roster(
         provenance.agents.insert(id.clone(), RosterOrigin::Project);
         agents.insert(id, profile);
     }
+    validate_agent_effort_profiles(&agents)?;
 
     // Registries merge by id: start with global, override by project.
     let mut mcp_servers = global.mcp_servers.clone();

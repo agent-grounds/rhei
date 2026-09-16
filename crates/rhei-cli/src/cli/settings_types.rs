@@ -225,6 +225,13 @@ fn built_in_agents() -> BTreeMap<String, CustomAgentProfile> {
         modes
     };
 
+    // §FS-rhei-agents.1.1.2: Built-in profiles expose the approved native mappings.
+    let effort = |values: &[&str], args: &[&str]| rhei_validator::AgentEffortProfile {
+        values: values.iter().map(|value| ((*value).to_string(), (*value).to_string())).collect(),
+        args: flags(args),
+        conflicts: Vec::new(),
+    };
+
     let mut agents = BTreeMap::new();
 
     // claude-code: the prompt travels on stdin, so a brief is not bounded by one
@@ -240,6 +247,10 @@ fn built_in_agents() -> BTreeMap<String, CustomAgentProfile> {
             mcp_config_flag: Some("--mcp-config".to_string()),
             skill_flag: Some("--skill".to_string()),
             modes: modes_yolo_only(flags(&["--permission-mode", "bypassPermissions"])),
+            effort: Some(effort(
+                &["low", "medium", "high", "xhigh", "max"],
+                &["--effort", "{value}"],
+            )),
             ..Default::default()
         },
     );
@@ -270,6 +281,10 @@ fn built_in_agents() -> BTreeMap<String, CustomAgentProfile> {
                 "-c",
                 "approval_policy=\"never\"",
             ])),
+            effort: Some(effort(
+                &["minimal", "low", "medium", "high", "xhigh"],
+                &["-c", "model_reasoning_effort=\"{value}\""],
+            )),
             session: Some(serde_json::json!({
                 "resume": {"flag": "resume"},
                 "interactive": {"command": ["codex"]},
@@ -312,6 +327,10 @@ fn built_in_agents() -> BTreeMap<String, CustomAgentProfile> {
             model_flag: Some("--model".to_string()),
             stdin_prompt: false,
             modes: modes_yolo_only(flags(&["--yolo"])),
+            effort: Some(effort(
+                &["minimal", "low", "high", "max"],
+                &["--variant", "{value}"],
+            )),
             ..Default::default()
         },
     );
@@ -345,6 +364,10 @@ fn built_in_agents() -> BTreeMap<String, CustomAgentProfile> {
             model_flag: Some("--model".to_string()),
             stdin_prompt: false,
             skill_flag: Some("--skill".to_string()),
+            effort: Some(effort(
+                &["off", "minimal", "low", "medium", "high", "xhigh"],
+                &["--thinking", "{value}"],
+            )),
             session: Some(serde_json::json!({
                 "resume": {"flag": "--continue"},
                 "fork": {"flag": "--fork"},

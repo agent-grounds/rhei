@@ -113,6 +113,10 @@ fn render_state_machine_text(machine: &rhei_validator::StateMachine) -> String {
             if let Some(mode) = def.agent_mode.as_deref() {
                 out.push_str(&format!("      Agent mode: {mode}\n"));
             }
+            // Omission preserves the established text shape. §FS-rhei-states-cmd.4
+            if let Some(effort) = def.effort {
+                out.push_str(&format!("      Effort: {}\n", effort.as_str()));
+            }
             if let Some(timeout) = def.agent_timeout.as_deref() {
                 out.push_str(&format!("      Agent timeout: {timeout}\n"));
             }
@@ -195,7 +199,7 @@ fn render_state_machine_json(machine: &rhei_validator::StateMachine) -> Result<S
         .states
         .iter()
         .map(|(name, def)| {
-            serde_json::json!({
+            let mut rendered = serde_json::json!({
                 "name": name,
                 "description": &def.description,
                 "prompt_template": &def.prompt_template,
@@ -224,7 +228,16 @@ fn render_state_machine_json(machine: &rhei_validator::StateMachine) -> Result<S
                 "snapshot": &def.snapshot,
                 "inputs": &def.inputs,
                 "outputs": &def.outputs,
-            })
+            });
+            // Authored effort is inspectable, but an omitted field is not
+            // materialized as null. §FS-rhei-states-cmd.5
+            if let Some(effort) = def.effort {
+                rendered
+                    .as_object_mut()
+                    .expect("state JSON is an object")
+                    .insert("effort".to_string(), serde_json::json!(effort.as_str()));
+            }
+            rendered
         })
         .collect();
 

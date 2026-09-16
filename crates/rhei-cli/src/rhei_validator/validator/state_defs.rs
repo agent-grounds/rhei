@@ -86,6 +86,11 @@ pub struct StateDef {
     /// name a key in the resolved agent's `modes` map, if any.
     #[serde(default)]
     pub agent_mode: Option<String>,
+    /// Optional reasoning effort policy, translated by the effective agent
+    /// profile without changing its identity or permission mode.
+    // §FS-rhei-states.1.2: Canonical per-state effort policy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<StateEffort>,
     /// Maximum time an agent may work in this state (e.g., `"30m"`, `"1h"`).
     #[serde(default)]
     pub agent_timeout: Option<String>,
@@ -117,6 +122,38 @@ pub struct StateDef {
     /// Agent skills enabled for this state. Same tri-state semantics as `mcp_servers`.
     #[serde(default)]
     pub skills: Option<Vec<StateSkillEntry>>,
+}
+
+/// The portable reasoning-effort vocabulary accepted in `states.yaml`.
+// §FS-rhei-states.1.3: Effort values are validated while the machine loads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StateEffort {
+    Off,
+    Minimal,
+    Low,
+    Medium,
+    High,
+    Xhigh,
+    Max,
+}
+
+impl StateEffort {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Off => "off",
+            Self::Minimal => "minimal",
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::Xhigh => "xhigh",
+            Self::Max => "max",
+        }
+    }
+
+    pub fn is_canonical(value: &str) -> bool {
+        matches!(value, "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max")
+    }
 }
 
 /// Reusable agent prompt defined at the state-machine level.

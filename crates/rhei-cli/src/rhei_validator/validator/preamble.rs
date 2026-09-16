@@ -202,6 +202,10 @@ pub struct CustomAgentProfile {
     /// name is allowed — Rhei does not interpret mode names.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub modes: IndexMap<String, Vec<String>>,
+    /// Optional native translation for the portable state effort vocabulary.
+    // §FS-rhei-agents.1.1.2: Agent profiles own effort capabilities.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<AgentEffortProfile>,
     /// Optional snapshot session block describing resume / fork / interactive
     /// continuation support and transcript layout for the agent. The schema
     /// is authoritative for `CustomAgentProfile.session`; the field is retained here so settings

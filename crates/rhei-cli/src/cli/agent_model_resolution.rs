@@ -62,5 +62,16 @@ fn resolve_legacy_agent_with_task_model(
     resolved.timeout_secs =
         resolve_legacy_agent_timeout(state_def, settings, &resolved.profile, binding);
     resolved.autonomous_args = binding.map(|b| b.autonomous_args.clone()).unwrap_or_default();
+    // A task model changes the binding, not the state's effort policy; remap
+    // the new binding arguments through the already selected agent profile.
+    // §FS-rhei-plan-language.3.11 §FS-rhei-agents.1.4.1
+    let agent_id = resolved.agent.id().to_string();
+    apply_state_effort(
+        state_def,
+        &mut resolved.profile,
+        resolved.mode.as_deref(),
+        &mut resolved.autonomous_args,
+        &agent_id,
+    )?;
     Ok(Some(resolved))
 }

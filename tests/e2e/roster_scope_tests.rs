@@ -138,6 +138,7 @@ fn roster_selects_current_settings_before_deprecated_fallback() {
     assert!(deprecated_payload["agents"].get("current-only").is_none());
     assert!(deprecated_payload["agents"].get("deprecated-only").is_some());
     assert!(fallback.stderr.to_lowercase().contains("deprecated"));
-    assert!(fallback.stderr.contains(".agents/rhei/settings.json"));
-    assert!(fallback.stderr.contains(".agent-grounds/rhei/settings.json"));
+    let warning = fallback.stderr.replace('\\', "/");
+    assert!(warning.contains(".agents/rhei/settings.json"));
+    assert!(warning.contains(".agent-grounds/rhei/settings.json"));
 }

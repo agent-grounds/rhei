@@ -61,3 +61,55 @@ inputs:
     type: string
     default: none
     validate: "^(none|commit|push|pr)$"
+
+ports:
+  entry: review.entry
+  exits:
+    done: fix.done
+    cancelled: fix.cancelled
+
+use:
+  - { block: code-review, as: review }
+  - { block: fix, as: fix }
+
+bind:
+  - { input: change_ref, to: review.change_ref }
+  - { input: review_targets, to: review.review_targets }
+  - { input: validation_targets, to: review.validation_targets }
+  - { input: proposal_targets, to: review.proposal_targets }
+  - { input: review_focus, to: review.review_focus }
+  - { input: smart_target, to: review.smart_target }
+  - { input: smart_target, to: fix.smart_target }
+  - { input: fix_prepare, to: fix.fix_prepare }
+  - { input: fix_commit, to: fix.fix_commit }
+
+seams:
+  - from: review.done
+    to: fix.entry
+    pass:
+      review.decision: fix.decision
+
+compatibility:
+  states:
+    split: review.split
+    review: review.review
+    aggregate-reviews: review.aggregate-reviews
+    validate-review: review.validate-review
+    propose-fixes: review.propose-fixes
+    aggregate-proposals: review.aggregate-proposals
+    decide: review.decide
+    human-review: review.human-review
+    prepare-workspace: fix.prepare-workspace
+    final-fix: fix.final-fix
+    commit-fix: fix.commit-fix
+    completed: fix.completed
+    cancelled: fix.cancelled
+  tasks:
+    coordinate: review.coordinate
+  settings:
+    codex: review.codex
+  artifacts:
+    runtime/decisions/{task_id}-final-decision.md: review.decision
+    runtime/workspaces/{task_id}.yaml: fix.workspace
+    runtime/fixes/{task_id}-final-fix.md: fix.final-fix
+    runtime/commits/{task_id}.yaml: fix.commit-ref

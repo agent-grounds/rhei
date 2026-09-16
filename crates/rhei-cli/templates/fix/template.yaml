@@ -1,0 +1,31 @@
+name: fix
+version: 1.0.0
+description: Apply an approved code-review decision and optionally prepare and commit the work.
+inputs:
+  - name: fix_prepare
+    description: Workspace preparation mode.
+    type: string
+    default: none
+    validate: "^(none|branch|worktree|fork)$"
+  - name: fix_commit
+    description: Commit and publication mode.
+    type: string
+    default: none
+    validate: "^(none|commit|push|pr)$"
+  - name: smart_target
+    description: Execution target that applies the fix.
+    type: string
+    format: execution-target
+    default: codex[xhigh]:openai:gpt-5.5
+ports:
+  entry: prepare-workspace
+  exits:
+    done: completed
+    cancelled: cancelled
+data:
+  inputs:
+    decision: { kind: state-file, state: prepare-workspace, name: final-decision }
+  outputs:
+    workspace: { kind: state-file, state: prepare-workspace, name: workspace }
+    final-fix: { kind: state-file, state: final-fix, name: final-fix }
+    commit-ref: { kind: state-file, state: commit-fix, name: commit-ref }

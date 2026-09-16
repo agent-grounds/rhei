@@ -5,6 +5,11 @@ two-agent review loop: independent review, smart aggregation, independent
 validation, independent fix proposals, smart adjudication, and smart final
 fixing.
 
+The reusable halves are also shipped as the independently discoverable
+`code-review` and `fix` blocks. They can be recomposed with
+`--pass review.decision=fix.decision`; the established `changeset-review`
+command remains the compatibility surface for existing callers.
+
 Instantiate this workspace inside the repository being reviewed. The
 instantiated directory is a scratchpad, not the source tree itself, so agents
 must resolve the Git toplevel first and inspect or edit files from there (or
@@ -31,8 +36,10 @@ you want every default review pass to use only xhigh-capable targets.
 
 ## State Machine
 
-The diagram lives as a comment at the top of [`states.yaml`](./states.yaml).
-Per-task paths through the machine:
+The wrapper compiles the state fragments from
+[`code-review`](../code-review/states.yaml) and [`fix`](../fix/states.yaml),
+then applies its checked compatibility map so existing state and artifact names
+remain stable. Per-task paths through the machine:
 
 | Task | Path through the machine |
 |---|---|
@@ -68,7 +75,21 @@ rhei instantiate changeset-review \
   --output ./.agent-grounds/scratchpad/changeset-review/
 ```
 
+The equivalent reusable block boundary is:
+
+```bash
+rhei instantiate \
+  --mount review=code-review --mount fix=fix \
+  --set review.change_ref=PR#42 \
+  --seam review.done=fix.entry \
+  --pass review.decision=fix.decision
+```
+
 ## Example
 
 A pre-rendered example lives at [`examples/changeset-review-example/`](../../../../examples/changeset-review-example/)
 and passes `rhei validate` as shipped.
+
+Regenerate it with the command in the example README after changing the
+compatibility template; regenerate direct block output with the command above
+when changing either extracted block.

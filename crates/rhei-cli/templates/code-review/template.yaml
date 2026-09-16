@@ -1,0 +1,40 @@
+name: code-review
+version: 1.0.0
+description: Review a code change, validate findings, and produce an approved decision artifact.
+inputs:
+  - name: change_ref
+    description: Commit, range, pull request, branch, or patch to review.
+    type: string
+  - name: review_targets
+    description: Execution targets that review the change.
+    type: array
+    items: { type: string, format: execution-target }
+    default: [codex[xhigh]:openai:gpt-5.5]
+  - name: validation_targets
+    description: Execution targets that validate findings.
+    type: array
+    items: { type: string, format: execution-target }
+    default: [codex[xhigh]:openai:gpt-5.5]
+  - name: proposal_targets
+    description: Execution targets that propose fixes.
+    type: array
+    items: { type: string, format: execution-target }
+    default: [codex[xhigh]:openai:gpt-5.5]
+  - name: review_focus
+    description: Optional review focus areas.
+    type: array
+    items: { type: string }
+    default: []
+  - name: smart_target
+    description: Execution target that aggregates and decides.
+    type: string
+    format: execution-target
+    default: codex[xhigh]:openai:gpt-5.5
+ports:
+  entry: split
+  exits:
+    done: human-review
+    cancelled: cancelled
+data:
+  outputs:
+    decision: { kind: state-file, state: human-review, name: final-decision }

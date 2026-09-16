@@ -1,0 +1,52 @@
+name: fix
+version: 1.0.0
+states:
+  prepare-workspace:
+    description: Prepare the workspace and read the approved decision.
+    target: {{smart_target}}
+    inputs:
+      - name: final-decision
+        path: runtime/decisions/{task_id}-final-decision.md
+    outputs:
+      - name: workspace
+        path: runtime/workspaces/{task_id}.yaml
+  final-fix:
+    description: Apply and verify the approved fixes.
+    target: {{smart_target}}
+    inputs:
+      - name: final-decision
+        path: runtime/decisions/{task_id}-final-decision.md
+      - name: workspace
+        path: runtime/workspaces/{task_id}.yaml
+    outputs:
+      - name: final-fix
+        path: runtime/fixes/{task_id}-final-fix.md
+  commit-fix:
+    description: Commit or publish the applied fix.
+    target: {{smart_target}}
+    inputs:
+      - name: final-fix
+        path: runtime/fixes/{task_id}-final-fix.md
+      - name: workspace
+        path: runtime/workspaces/{task_id}.yaml
+    outputs:
+      - name: commit-ref
+        path: runtime/commits/{task_id}.yaml
+  completed:
+    description: Fix is complete.
+    final: true
+  cancelled:
+    description: Fix was cancelled.
+    final: true
+transitions:
+  - { from: prepare-workspace, to: final-fix }
+  - { from: final-fix, to: commit-fix }
+  - { from: commit-fix, to: completed }
+  - { from: "*", to: cancelled }
+profiles:
+  primary:
+    initial: prepare-workspace
+    allowed: [prepare-workspace, final-fix, commit-fix, completed, cancelled]
+node_policy:
+  root: primary
+  default: primary

@@ -920,19 +920,7 @@ fn load_plan_with(
             workspace::load_panta_project(&project_dir)
         }
         .map_err(|err| nested_parse_report(&err))?;
-        Ok(LoadedPlan {
-            rhei: project.rhei,
-            kind: LoadedPlanKind::PantaProject,
-            task_sources: project.task_sources,
-            task_roots: project.task_roots,
-            content_section_roots: project.content_section_roots,
-            rhei_ids: project.rhei_ids,
-            rhei_machines: project.rhei_machines,
-            rhei_roots: project.rhei_roots,
-            rhei_titles: project.rhei_titles,
-            rhei_plans: project.rhei_plans,
-            unloadable: project.unloadable,
-        })
+        Ok(panta_loaded_plan(project))
     } else if let Some(ws_dir) = workspace::workspace_dir(path) {
         // §AR-rhei-panta.2: a bare Directory Workspace is the single rhei of
         // an implicit Panta; the graph shape matches an explicit project.
@@ -976,25 +964,41 @@ fn implicit_loaded_plan(
     }
 }
 
+fn panta_loaded_plan(project: rhei_core::workspace::PantaProject) -> LoadedPlan {
+    LoadedPlan {
+        rhei: project.rhei,
+        kind: LoadedPlanKind::PantaProject,
+        task_sources: project.task_sources,
+        task_roots: project.task_roots,
+        content_section_roots: project.content_section_roots,
+        rhei_ids: project.rhei_ids,
+        rhei_machines: project.rhei_machines,
+        rhei_roots: project.rhei_roots,
+        rhei_titles: project.rhei_titles,
+        rhei_plans: project.rhei_plans,
+        unloadable: project.unloadable,
+    }
+}
+
+/// Load a prospective project member from hidden staging while qualifying it
+/// by its intended published id. §FS-rhei-templates.6.1.2 §AR-rhei-panta.2
+fn load_project_with_member_for_validation(
+    project: &Path,
+    rhei_id: &str,
+    staged_entry: &Path,
+) -> MietteResult<LoadedPlan> {
+    let project = workspace::load_panta_project_with_member(project, rhei_id, staged_entry)
+        .map_err(|err| nested_parse_report(&err))?;
+    Ok(panta_loaded_plan(project))
+}
+
 /// Load a plan for `rhei validate`, collecting recoverable parse errors where
 /// validation promises batch diagnostics.
 fn load_plan_for_validation(path: &Path) -> MietteResult<LoadedPlan> {
     if let Some(project_dir) = workspace::panta_project_dir(path) {
         let project = workspace::load_panta_project(&project_dir)
             .map_err(|err| nested_parse_report(&err))?;
-        return Ok(LoadedPlan {
-            rhei: project.rhei,
-            kind: LoadedPlanKind::PantaProject,
-            task_sources: project.task_sources,
-            task_roots: project.task_roots,
-            content_section_roots: project.content_section_roots,
-            rhei_ids: project.rhei_ids,
-            rhei_machines: project.rhei_machines,
-            rhei_roots: project.rhei_roots,
-            rhei_titles: project.rhei_titles,
-            rhei_plans: project.rhei_plans,
-            unloadable: project.unloadable,
-        });
+        return Ok(panta_loaded_plan(project));
     }
 
     if let Some(ws_dir) = workspace::workspace_dir(path) {
@@ -1182,6 +1186,17 @@ fn validation_warnings_or_error(
 /// The validation pass itself, reported as data. §FS-rhei-new.5.2
 fn validation_pass(input: &Path, state_machine: Option<&Path>) -> MietteResult<ValidationPass> {
     let loaded = load_plan_for_validation(input)?;
+
+    validation_pass_for_loaded(input, state_machine, loaded)
+}
+
+/// Validate a preloaded graph through the same machine, link, settings, and
+/// snapshot checks as `rhei validate`. §FS-rhei-templates.6.1.2
+fn validation_pass_for_loaded(
+    input: &Path,
+    state_machine: Option<&Path>,
+    loaded: LoadedPlan,
+) -> MietteResult<ValidationPass> {
 
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine)?;
     let machines = resolved.validator_set();

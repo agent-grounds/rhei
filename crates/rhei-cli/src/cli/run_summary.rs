@@ -368,7 +368,9 @@ fn collect_initial_states(
 /// happy path disarms it after the full report is written. §FS-rhei-run-report.1
 struct RunReportGuard<'a> {
     input: &'a std::path::Path,
-    machines: &'a rhei_validator::MachineSet,
+    // Owned so live Panta admission can replace the active machine set while
+    // this fallback remains armed. §FS-rhei-run.3 §AR-rhei-panta.4
+    machines: rhei_validator::MachineSet,
     runtime_dir: std::path::PathBuf,
     run_started: std::time::Instant,
     run_started_wall: std::time::SystemTime,
@@ -410,7 +412,7 @@ impl Drop for RunReportGuard<'_> {
         let programs = ledger.iter().filter(|r| r.driver == "program").count() as u32;
         emit_run_report(
             self.input,
-            self.machines,
+            &self.machines,
             &summary,
             &self.runtime_dir,
             RunStats {

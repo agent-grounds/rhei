@@ -144,17 +144,32 @@ pub fn discover_rhei_entries(project_dir: &Path) -> parser::Result<Vec<PathBuf>>
 /// Load a Panta project, merging all contained rheis into one graph with
 /// project-qualified task ids. §AR-rhei-panta.2 §AR-rhei-panta.3
 pub fn load_panta_project(dir: &Path) -> parser::Result<PantaProject> {
-    load_panta_project_with(dir, false)
+    load_panta_project_with(dir, false, None)
+}
+
+/// Load a project as if `entry` were already published under `rhei_id`.
+/// Template instantiation uses this overlay while the bytes remain in a hidden
+/// same-parent staging directory. §AR-rhei-panta.2 §AR-rhei-panta.4
+pub fn load_panta_project_with_member(
+    dir: &Path,
+    rhei_id: &str,
+    entry: &Path,
+) -> parser::Result<PantaProject> {
+    load_panta_project_with(dir, false, Some((rhei_id, entry)))
 }
 
 /// Load a project, skipping rheis that fail to load instead of failing the
 /// whole project, and recording why in [`PantaProject::unloadable`].
 /// §FS-rhei-panta.6
 pub fn load_panta_project_lenient(dir: &Path) -> parser::Result<PantaProject> {
-    load_panta_project_with(dir, true)
+    load_panta_project_with(dir, true, None)
 }
 
-fn load_panta_project_with(dir: &Path, lenient: bool) -> parser::Result<PantaProject> {
+fn load_panta_project_with(
+    dir: &Path,
+    lenient: bool,
+    prospective: Option<(&str, &Path)>,
+) -> parser::Result<PantaProject> {
     let manifest_path = dir.join(PANTA_INDEX_FILE);
     let manifest_content = crate::source::read_to_string(&manifest_path).map_err(|e| {
         ParseError::new(format!("failed to read {}: {e}", manifest_path.display()), None)
@@ -165,12 +180,26 @@ fn load_panta_project_with(dir: &Path, lenient: bool) -> parser::Result<PantaPro
     let mut rheis = Vec::new();
     let mut unloadable: Vec<String> = Vec::new();
     let mut seen_ids: HashMap<String, PathBuf> = HashMap::new();
-    let entries = discover_rhei_entries(dir)?;
-    for entry in entries {
+    let mut entries: Vec<(PathBuf, Option<String>)> =
+        discover_rhei_entries(dir)?.into_iter().map(|entry| (entry, None)).collect();
+    if let Some((id, entry)) = prospective {
+        entries.push((entry.to_path_buf(), Some(id.to_string())));
+    }
+    // The prospective entry occupies its final id's canonical position even
+    // though its staging pathname is deliberately undiscoverable.
+    entries.sort_by(|(a_path, a_id), (b_path, b_id)| {
+        let key = |path: &Path, id: &Option<String>| {
+            id.clone().unwrap_or_else(|| {
+                path.strip_prefix(dir).unwrap_or(path).to_string_lossy().replace('\\', "/")
+            })
+        };
+        key(a_path, a_id).cmp(&key(b_path, b_id))
+    });
+    for (entry, prospective_id) in entries {
         // An unusable *id* — malformed, reserved, or already taken — keeps an
         // entry out of the project exactly as a parse failure does, so a
         // lenient load skips it the same way. §FS-rhei-panta.6
-        let id = match rhei_id_for_entry(&entry) {
+        let id = match prospective_id.map(Ok).unwrap_or_else(|| rhei_id_for_entry(&entry)) {
             Ok(id) => id,
             Err(err) if lenient => {
                 unloadable.push(format!(

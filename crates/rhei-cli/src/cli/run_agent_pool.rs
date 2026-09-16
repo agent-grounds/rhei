@@ -20,8 +20,7 @@ fn run_agent_worker_pool(
     frontend_parallel: rhei_tui::Slot,
     pass: u32,
     input: &Path,
-    machines: &ExecutionMachines,
-    settings: &RheiSettings,
+    live: &mut LiveRunContext,
     opts: &RunOptions,
     workspace_root: &Path,
     runtime_dir: &Path,
@@ -30,6 +29,7 @@ fn run_agent_worker_pool(
     sink: &Arc<dyn rhei_tui::EventSink>,
     intervene: Option<&Arc<RunInterveneSink>>,
     progress: &mut AgentPassProgress<'_>,
+    identity: &RunIdentity,
 ) -> MietteResult<()> {
     use rhei_tui::MessageLevel;
     macro_rules! run_message { ($level:expr, $($arg:tt)*) => {{ emit_run_message(sink, $level, format!($($arg)*)); }}; }
@@ -61,8 +61,8 @@ fn run_agent_worker_pool(
         task_limit,
         &tx,
         input,
-        machines,
-        settings,
+        &live.machines,
+        &live.settings,
         workspace_root,
         runtime_dir,
         sink,
@@ -97,8 +97,8 @@ fn run_agent_worker_pool(
         &mut *progress.unpromptable_tasks,
         &tx,
         input,
-        machines,
-        settings,
+        &live.machines,
+        &live.settings,
         opts,
         workspace_root,
         runtime_dir,
@@ -143,7 +143,7 @@ fn run_agent_worker_pool(
                 let completed_task_id = completion.task_id_str.clone();
                 let effect = handle_parallel_program_completion(
                     input,
-                    machines,
+                    &live.machines,
                     opts,
                     workspace_root,
                     sink,
@@ -163,8 +163,7 @@ fn run_agent_worker_pool(
                     task_limit,
                     &tx,
                     input,
-                    machines,
-                    settings,
+                    live,
                     opts,
                     workspace_root,
                     runtime_dir,
@@ -176,6 +175,7 @@ fn run_agent_worker_pool(
                     &mut active_invocation_counts,
                     &mut active_state_counts,
                     &mut handles,
+                    identity,
                 )?;
                 active_worker_count += refill_outcome.spawned;
                 *progress.advanced_any |= refill_outcome.advanced;
@@ -309,8 +309,8 @@ fn run_agent_worker_pool(
                         outcome,
                     },
                     input,
-                    machines,
-                    settings,
+                    &live.machines,
+                    &live.settings,
                     opts,
                     workspace_root,
                     sink,
@@ -352,8 +352,7 @@ fn run_agent_worker_pool(
             task_limit,
             &tx,
             input,
-            machines,
-            settings,
+            live,
             opts,
             workspace_root,
             runtime_dir,
@@ -365,6 +364,7 @@ fn run_agent_worker_pool(
             &mut active_invocation_counts,
             &mut active_state_counts,
             &mut handles,
+            identity,
         )?;
         active_worker_count += refill_outcome.spawned;
         *progress.advanced_any |= refill_outcome.advanced;

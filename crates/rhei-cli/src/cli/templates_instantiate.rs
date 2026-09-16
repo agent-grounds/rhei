@@ -87,14 +87,20 @@
         } else {
             None
         };
-        let target_dir = scratch
-            .as_ref()
-            .map(|dir| dir.path().join("instantiate-output"))
-            .unwrap_or_else(|| output_dir.clone());
+        let prospective_member = !dry_run
+            && layout == TemplateLayout::Workspace
+            && owning_project_of(&output_dir).is_some();
+        let target_dir = if let Some(scratch) = scratch.as_ref() {
+            scratch.path().join("instantiate-output")
+        } else if prospective_member {
+            hidden_staging_path(&output_dir)?
+        } else {
+            output_dir.clone()
+        };
 
         // §FS-rhei-errors.4: a --dry-run target is scratch space the user never
         // chose and never sees, so failures there name template-relative paths.
-        let materialized =
+        let mut materialized =
             match materialize_template(
                 template_dir,
                 template,
@@ -112,8 +118,8 @@
                 }
             };
 
-        let entrypoint = materialized.entrypoint();
-        let state_machine_path = materialized.state_machine_path();
+        let staged_entrypoint = materialized.entrypoint();
+        let staged_state_machine_path = materialized.state_machine_path();
 
         // Place relative to the owning project before validating. The
         // template's machine needs no reconciling: a member rhei's own
@@ -122,7 +128,15 @@
         // The hoist below runs before validation, so whatever discards the
         // output takes the hoist with it. §FS-rhei-templates.6.2
         let discard_output = |hoisted: Option<&HoistedSettings>| {
-            if !dry_run && !keep_on_error {
+            if dry_run {
+                return;
+            }
+            if keep_on_error && prospective_member {
+                // Diagnostic retention is intentionally visible at the name
+                // the caller requested, never at an implementation staging
+                // name. §FS-rhei-templates.6.1.2
+                let _ = fs::rename(&target_dir, &output_dir);
+            } else if !keep_on_error {
                 let _ = remove_path(&target_dir, false);
                 if let Some(hoisted) = hoisted {
                     hoisted.undo();
@@ -155,8 +169,12 @@
         // the workspace in isolation is what let a project-breaking result be
         // reported as "Validation succeeded".
         let validation = match placement.project() {
-            Some(project) if !dry_run => run_validation_once(project, None),
-            _ => run_validation_once(&entrypoint, state_machine_path.as_deref()),
+            Some(project) if !dry_run => validate_staged_project_member(
+                project,
+                &output_dir,
+                &materialized.output_dir,
+            ),
+            _ => run_validation_once(&staged_entrypoint, staged_state_machine_path.as_deref()),
         };
         if let Err(err) = validation {
             discard_output(hoisted_settings.as_ref());
@@ -172,7 +190,7 @@
             print_instantiated_workspace_summary(
                 &materialized,
                 &output_dir,
-                state_machine_path.as_deref(),
+                staged_state_machine_path.as_deref(),
                 true,
             )?;
             print_template_instantiation_command(
@@ -185,6 +203,19 @@
             );
             return Ok(());
         }
+
+        if prospective_member {
+            // Same-parent rename is the only point at which project discovery
+            // can observe the validated member. §FS-rhei-templates.6.1.2
+            if let Err(err) = fs::rename(&target_dir, &output_dir) {
+                discard_output(hoisted_settings.as_ref());
+                return Err(file_io_report(&output_dir, "failed to publish instantiated member", err));
+            }
+            materialized.output_dir = output_dir.clone();
+        }
+
+        let entrypoint = materialized.entrypoint();
+        let state_machine_path = materialized.state_machine_path();
 
         println!(
             "Instantiated template '{}' into '{}'.",

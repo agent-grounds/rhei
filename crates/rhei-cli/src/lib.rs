@@ -31,6 +31,7 @@ mod templates {
     include!("cli/templates_builtin.rs");
     include!("cli/templates_list.rs");
     include!("cli/templates_instantiate.rs");
+    include!("cli/templates_publication.rs");
     include!("cli/templates_project.rs");
     include!("cli/templates_discovery.rs");
     include!("cli/templates_inputs.rs");
@@ -127,6 +128,7 @@ include!("cli/new_ticket.rs");
 include!("cli/new_ticket_write.rs");
 include!("cli/new_verify.rs");
 include!("cli/run_command.rs");
+include!("cli/run_live_admission.rs");
 include!("cli/run_slot_release.rs");
 include!("cli/run_work_items.rs");
 include!("cli/run_parallel_spawn.rs");

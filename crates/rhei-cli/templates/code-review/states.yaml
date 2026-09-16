@@ -1,0 +1,62 @@
+name: code-review
+version: 1.0.0
+states:
+  split:
+    description: Split the change into reviewable parts.
+    target: {{smart_target}}
+  review:
+    description: Review the parts independently.
+    all_targets:
+{% for target in review_targets %}
+      - {{target}}
+{% endfor %}
+  aggregate-reviews:
+    description: Aggregate reviewer findings.
+    target: {{smart_target}}
+  validate-review:
+    description: Validate candidate findings.
+    all_targets:
+{% for target in validation_targets %}
+      - {{target}}
+{% endfor %}
+  propose-fixes:
+    description: Propose fixes for valid findings.
+    all_targets:
+{% for target in proposal_targets %}
+      - {{target}}
+{% endfor %}
+  aggregate-proposals:
+    description: Aggregate proposed fixes.
+    target: {{smart_target}}
+  decide:
+    description: Decide the final fix plan.
+    target: {{smart_target}}
+  human-review:
+    description: Wait for human approval of the decision.
+    gating: true
+    final: true
+    outputs:
+      - name: final-decision
+        path: runtime/decisions/{task_id}-final-decision.md
+  completed:
+    description: A coordination or part-review task is complete.
+    final: true
+  cancelled:
+    description: Review was cancelled.
+    final: true
+transitions:
+  - { from: split, to: completed }
+  - { from: review, to: completed }
+  - { from: aggregate-reviews, to: validate-review }
+  - { from: validate-review, to: propose-fixes }
+  - { from: propose-fixes, to: aggregate-proposals }
+  - { from: aggregate-proposals, to: decide }
+  - { from: decide, to: human-review }
+  - { from: "*", to: cancelled }
+profiles:
+  primary:
+    initial: split
+    allowed: [split, review, aggregate-reviews, validate-review, propose-fixes, aggregate-proposals, decide, human-review, completed, cancelled]
+node_policy:
+  root: primary
+  default: primary

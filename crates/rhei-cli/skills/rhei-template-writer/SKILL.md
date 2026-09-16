@@ -105,6 +105,35 @@ inputs:
       <property-name>: { type: <...>, required: <boolean>, default: <value> }
 ```
 
+Composable templates add one typed block surface to the same manifest; there
+is no separate block catalog. A mounted block must declare `ports`, and may
+declare runtime `data` endpoints. A curated block recursively mounts children:
+
+```yaml
+ports:
+  entry: review.entry
+  exits: { done: fix.done }
+use:
+  - { block: code-review, as: review }
+  - { block: fix, as: fix }
+bind:
+  - { input: change_ref, to: review.change_ref }
+seams:
+  - from: review.done
+    to: fix.entry
+    pass: { review.decision: fix.decision }
+```
+
+Aliases, ports, and endpoint names start with a letter and contain only
+letters, digits, `_`, or `-`. A composition-only wrapper may omit its local
+plan and `states.yaml`. Every mounted state, task, profile, setting, prompt,
+and owned path is private and qualified in generated output; parents may cross
+a boundary only through inputs, declared control ports, or declared data
+endpoints. `bind` is instantiate-time typed input wiring. `pass` is runtime
+wiring between two endpoints of the same kind and never supplies MiniJinja.
+Omit `seams` for mount-order chaining; once any seam is authored, the set must
+form the complete linear chain.
+
 Rules the writer enforces at author time:
 
 - `name` matches the directory name; `description` is non-empty after trimming; input names are unique.
@@ -238,8 +267,25 @@ Templates are resolved by `rhei instantiate <name>` in this order (first match w
 
 `rhei instantiate <template> [inputs...] [options]`. Inputs are supplied four ways (precedence low → high): manifest `default` < `--values <file>` (YAML/JSON; repeatable) < bare positional values (for inputs declaring `positional`, or the single-required-input fallback) < `KEY=VALUE` and `--set KEY=VALUE` < `--set-file KEY=<path>` (sets the input to a file's contents — for long prose like a brief).
 
+Direct composition uses no positional template or input values:
+
+```bash
+rhei instantiate \
+  --mount review=code-review --mount fix=fix \
+  --set review.change_ref=HEAD~3 \
+  --seam review.done=fix.entry \
+  --pass review.decision=fix.decision
+```
+
+Mounted `--set` and `--set-file` keys are `<alias>.<input>`; `--values`
+nests each block's inputs under its alias. `--list-inputs` prints that
+qualified union. The default output directory joins aliases in mount order.
+
 | Flag | Use |
 |---|---|
+| `--mount ALIAS=BLOCK` | Mount a discovered name or template path; repeat in desired default seam order. |
+| `--seam SOURCE=TARGET` | Declare one completion-to-entry edge; explicit seams must cover every mount. |
+| `--pass SOURCE=TARGET` | Wire a declared data output to an input on the unique seam between their mounts. |
 | `--values <file>` | The only sane way to pass `array` / `object` inputs (parsed as YAML/JSON). Always smoke-test structured inputs through this. |
 | `--set-file KEY=<path>` | Inject long text (briefs, descriptions) without shell-quoting hell. |
 | `--dry-run` | Render + validate into a scratch dir, write nothing. Catches rendering and validation errors. |

@@ -2,6 +2,8 @@
 
 A pre-rendered instantiation of the [`changeset-review`](../../crates/rhei-cli/templates/changeset-review/)
 template used as a smoke test that the template produces a valid workspace.
+The source template retains this public example while the independently
+mountable `code-review` and `fix` blocks expose the reusable boundary.
 
 Inputs used when rendering:
 

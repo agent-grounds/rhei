@@ -98,16 +98,6 @@ reason = """
 `next` command E2E scenarios share command fixtures.
 """
 [[exceptions]]
-path = "crates/rhei-cli/templates/changeset-review/states.yaml"
-match = "exact"
-rules = ["source"]
-kind = "deferred"
-max_accepted = { value = 600, unit = "lines" }
-until = "Split by template support if Rhei gains multi-file state machines."
-reason = """
-Template state machine must be copied as one instantiable workflow artifact.
-"""
-[[exceptions]]
 path = "tests/e2e/run_tests.rs"
 match = "exact"
 rules = ["source"]

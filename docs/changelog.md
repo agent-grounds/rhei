@@ -4,6 +4,16 @@
 
 ### Added
 
+- **`rhei instantiate` now composes reusable, parameterized blocks into one
+  ordinary workspace.** Direct `--mount` composition and recursive manifest
+  `use` qualify owned states, tasks, profiles, settings, prompts, and runtime
+  paths; completion seams preserve block-local fan-out and can pass declared
+  state files or task exports. Existing single-template commands keep their
+  visible identities, and the bundled review and fix blocks can be mounted
+  independently. Catalog UX, a replacement authoring language, richer
+  provenance/exposure modes, and conditional seam expressions remain deferred
+  follow-ups. (PR #282)
+
 - **Task exports are now checked handoffs instead of best-effort prompt
   context.** Validation requires every consumed name to be declared by a
   directly listed prior, agent startup batches missing or blank consumed

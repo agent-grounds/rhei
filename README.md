@@ -67,13 +67,26 @@ Rhei is the only agent runtime that combines all of:
 - **Full validator.** `rhei validate` checks syntax, state validity, dependency
   integrity, hierarchy/id alignment, link integrity, terminal-tree coherence,
   artifact contracts, and execution references resolved from merged settings.
-- **Templates: automate your complex daily routines in minutes.** Capture a
+- **Templates and composable blocks: automate your complex daily routines in
+  minutes.** Capture a
   recurring workflow — code review loops, release checklists, onboarding,
   audits — once as a parameterized template (plan skeleton + state machine +
   typed inputs), then `rhei instantiate` it with concrete values to spin up a
-  ready-to-execute workspace. Eleven templates ship inside the binary, so
+  ready-to-execute workspace. Mount several blocks when a run needs reusable
+  stages with isolated names:
+
+  ```bash
+  rhei instantiate changeset-review HEAD~3
+  rhei instantiate --mount review=code-review --mount fix=fix \
+    --set review.change_ref=HEAD~3 \
+    --seam review.done=fix.entry \
+    --pass review.decision=fix.decision
+  ```
+
+  Thirteen templates and blocks ship inside the binary, so
   `rhei templates` is populated the moment `rhei` is installed. See
-  [`docs/functional-spec/rhei-templates.spec.md`](docs/functional-spec/rhei-templates.spec.md).
+  [`docs/functional-spec/rhei-templates.spec.md`](docs/functional-spec/rhei-templates.spec.md)
+  and [`docs/functional-spec/rhei-library.spec.md`](docs/functional-spec/rhei-library.spec.md).
 
 See [`docs/functional-spec/comparison.md`](docs/functional-spec/comparison.md) for a detailed comparison against
 beads, beans, opencode, Claude Code TodoWrite, Cline, Cursor, Roo, Devin, and

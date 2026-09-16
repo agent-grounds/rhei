@@ -30,13 +30,19 @@ fn validate_staged_project_member(
     project: &Path,
     output: &Path,
     staged: &Path,
+    staged_settings: bool,
 ) -> MietteResult<()> {
     let intended_id = output
         .file_name()
         .and_then(|name| name.to_str())
         .ok_or_else(|| miette!("output path '{}' has no UTF-8 member id", output.display()))?;
     let loaded = load_project_with_member_for_validation(project, intended_id, staged)?;
-    let pass = validation_pass_for_loaded(project, None, loaded)?;
+    let pass = validation_pass_for_loaded(
+        project,
+        None,
+        loaded,
+        staged_settings.then_some(staged),
+    )?;
     if !pass.errors.is_empty() {
         return Err(validation_report(
             project,

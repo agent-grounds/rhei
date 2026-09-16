@@ -125,39 +125,29 @@
         // template's machine needs no reconciling: a member rhei's own
         // declaration overrides the project default. §FS-rhei-templates.6.2
 
-        // The hoist below runs before validation, so whatever discards the
-        // output takes the hoist with it. §FS-rhei-templates.6.2
-        let discard_output = |hoisted: Option<&HoistedSettings>| {
-            if dry_run {
-                return;
-            }
-            if keep_on_error && prospective_member {
-                // Diagnostic retention is intentionally visible at the name
-                // the caller requested, never at an implementation staging
-                // name. §FS-rhei-templates.6.1.2
-                let _ = fs::rename(&target_dir, &output_dir);
-            } else if !keep_on_error {
-                let _ = remove_path(&target_dir, false);
-                if let Some(hoisted) = hoisted {
-                    hoisted.undo();
-                }
-            }
-        };
         let placement = match plan_project_placement(&output_dir, &materialized.output_dir) {
             Ok(placement) => placement,
             Err(err) => {
-                discard_output(None);
+                if !keep_on_error {
+                    let _ = remove_path(&target_dir, false);
+                } else if prospective_member {
+                    let _ = fs::rename(&target_dir, &output_dir);
+                }
                 return Err(err);
             }
         };
 
-        let mut hoisted_settings = None;
+        let mut prepared_settings = None;
         if !dry_run {
             if let Some(project) = placement.project() {
-                match hoist_workspace_settings_into_project(&materialized.output_dir, project) {
-                    Ok(hoisted) => hoisted_settings = hoisted,
+                match prepare_workspace_settings_for_project(&materialized.output_dir, project) {
+                    Ok(prepared) => prepared_settings = prepared,
                     Err(err) => {
-                        discard_output(None);
+                        if !keep_on_error {
+                            let _ = remove_path(&target_dir, false);
+                        } else if prospective_member {
+                            let _ = fs::rename(&target_dir, &output_dir);
+                        }
                         return Err(err);
                     }
                 }
@@ -173,11 +163,28 @@
                 project,
                 &output_dir,
                 &materialized.output_dir,
+                prepared_settings.is_some(),
             ),
             _ => run_validation_once(&staged_entrypoint, staged_state_machine_path.as_deref()),
         };
         if let Err(err) = validation {
-            discard_output(hoisted_settings.as_ref());
+            if keep_on_error && prospective_member {
+                if let Some(prepared) = &prepared_settings {
+                    prepared.commit()?;
+                }
+                if let Err(rename_err) = fs::rename(&target_dir, &output_dir) {
+                    if let Some(prepared) = &prepared_settings {
+                        prepared.undo();
+                    }
+                    return Err(file_io_report(
+                        &output_dir,
+                        "failed to retain invalid instantiated member",
+                        rename_err,
+                    ));
+                }
+            } else if !keep_on_error {
+                let _ = remove_path(&target_dir, false);
+            }
             return Err(err);
         }
 
@@ -205,11 +212,24 @@
         }
 
         if prospective_member {
+            if let Some(prepared) = &prepared_settings {
+                if let Err(err) = prepared.commit() {
+                    let _ = remove_path(&target_dir, false);
+                    return Err(err);
+                }
+            }
             // Same-parent rename is the only point at which project discovery
             // can observe the validated member. §FS-rhei-templates.6.1.2
             if let Err(err) = fs::rename(&target_dir, &output_dir) {
-                discard_output(hoisted_settings.as_ref());
-                return Err(file_io_report(&output_dir, "failed to publish instantiated member", err));
+                if let Some(prepared) = &prepared_settings {
+                    prepared.undo();
+                }
+                let _ = remove_path(&target_dir, false);
+                return Err(file_io_report(
+                    &output_dir,
+                    "failed to publish instantiated member",
+                    err,
+                ));
             }
             materialized.output_dir = output_dir.clone();
         }
@@ -222,7 +242,7 @@
             manifest.name,
             display_path(&output_dir).display()
         );
-        report_project_placement(&placement, hoisted_settings.as_ref());
+        report_project_placement(&placement, prepared_settings.as_ref());
         if matches!(placement, ProjectPlacement::Standalone) {
             report_standalone_versioning(&output_dir);
         }
@@ -324,31 +344,6 @@
             Ok(rel) if rel.as_os_str().is_empty() => Some(PathBuf::from(".")),
             Ok(rel) => Some(rel.to_path_buf()),
             Err(_) => None,
-        }
-    }
-
-    /// Say what joining a project did to it. The hoist moves a settings file —
-    /// a write outside the output directory, so it may not happen silently.
-    /// §FS-rhei-templates.6.2
-    fn report_project_placement(placement: &ProjectPlacement, hoisted: Option<&HoistedSettings>) {
-        let Some(project) = placement.project() else {
-            return;
-        };
-        println!("Added to the Panta project at {}.", display_path(project).display());
-        if let Some(hoisted) = hoisted {
-            println!(
-                "  Merged the template's agent settings into {}.",
-                display_path(&project_settings_write_path(project)).display()
-            );
-            if !hoisted.added.is_empty() {
-                println!("    added: {}", hoisted.added.join(", "));
-            }
-            if !hoisted.kept.is_empty() {
-                println!(
-                    "    kept your existing values for: {} (the template's differ)",
-                    hoisted.kept.join(", ")
-                );
-            }
         }
     }
 

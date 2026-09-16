@@ -17,6 +17,34 @@
         }
     }
 
+    /// Say what joining a project did to it. The settings commit is a write
+    /// outside the member directory, so it may not happen silently.
+    /// §FS-rhei-templates.6.2
+    fn report_project_placement(
+        placement: &ProjectPlacement,
+        prepared: Option<&PreparedProjectSettings>,
+    ) {
+        let Some(project) = placement.project() else {
+            return;
+        };
+        println!("Added to the Panta project at {}.", display_path(project).display());
+        if let Some(prepared) = prepared {
+            println!(
+                "  Merged the template's agent settings into {}.",
+                display_path(&project_settings_write_path(project)).display()
+            );
+            if !prepared.added.is_empty() {
+                println!("    added: {}", prepared.added.join(", "));
+            }
+            if !prepared.kept.is_empty() {
+                println!(
+                    "    kept your existing values for: {} (the template's differ)",
+                    prepared.kept.join(", ")
+                );
+            }
+        }
+    }
+
     /// The project a *new* rhei created from the current directory belongs to,
     /// following the same walk `rhei` uses to resolve an omitted target:
     /// the directory itself, then its `panta/` child. §FS-rhei-panta.6
@@ -103,18 +131,53 @@
 
     /// What happened to a template's shipped agent settings when its workspace
     /// joined a project.
-    pub(super) struct HoistedSettings {
+    pub(super) struct PreparedProjectSettings {
         pub(super) added: Vec<String>,
         pub(super) kept: Vec<String>,
-        /// The project file the merge was written to, what stood there before
-        /// it — `None` when nothing did — and the project the write happened
-        /// under, so `undo` can put all three back. §FS-rhei-templates.6.2
+        /// The project file the merge will be written to, what stands there
+        /// now, and the hidden source carrying the reconciled validation copy.
         target: PathBuf,
         previous: Option<String>,
         project: PathBuf,
+        workspace: PathBuf,
+        source: PathBuf,
+        rendered: String,
+        superseded: Option<PathBuf>,
     }
 
-    impl HoistedSettings {
+    impl PreparedProjectSettings {
+        /// Commit the reconciled document only after prospective validation.
+        /// The hidden workspace copy is removed before member publication.
+        // §FS-rhei-templates.6.1.2 §FS-rhei-templates.6.2
+        pub(super) fn commit(&self) -> MietteResult<()> {
+            if let Some(parent) = self.target.parent() {
+                fs::create_dir_all(parent).map_err(|err| {
+                    file_io_report(parent, "failed to create the project settings directory", err)
+                })?;
+            }
+            if let Err(err) = fs::write(&self.target, &self.rendered) {
+                self.undo();
+                return Err(file_io_report(
+                    &self.target,
+                    "failed to write project settings",
+                    err,
+                ));
+            }
+            if let Err(err) = fs::remove_file(&self.source) {
+                self.undo();
+                return Err(file_io_report(
+                    &self.source,
+                    "failed to remove staged workspace settings",
+                    err,
+                ));
+            }
+            prune_empty_parents(&self.source, &self.workspace);
+            if let Some(superseded) = &self.superseded {
+                warn_settings_superseded_by_hoist(superseded, &self.target);
+            }
+            Ok(())
+        }
+
         /// Put the project's settings back the way a discarded instantiation
         /// found them: the merge removed along with the directories written
         /// for it, or the pre-merge content restored. Instantiation validates
@@ -135,18 +198,18 @@
         }
     }
 
-    /// Move a member workspace's settings file up to the project and merge it
-    /// into what is already there, keeping existing project values so a
-    /// template never redefines a configured agent. §FS-rhei-agents.1.1
+    /// Prepare the project settings merge in hidden staging. Existing project
+    /// values win, so a template never redefines a configured agent.
+    /// §FS-rhei-agents.1.1 §FS-rhei-templates.6.2
     ///
     /// Both ends resolve `.agent-grounds/rhei/` before the deprecated
     /// `.agents/rhei/`, and the merged result is written to the current home
     /// whichever one it was read from: rhei never writes the deprecated path.
     /// §FS-rhei-templates.1.1
-    pub(super) fn hoist_workspace_settings_into_project(
+    pub(super) fn prepare_workspace_settings_for_project(
         workspace: &Path,
         project: &Path,
-    ) -> MietteResult<Option<HoistedSettings>> {
+    ) -> MietteResult<Option<PreparedProjectSettings>> {
         let Some(source) = resolve_rhei_home_file(workspace, WORKSPACE_SETTINGS_FILE) else {
             return Ok(None);
         };
@@ -170,37 +233,32 @@
         let mut kept = Vec::new();
         merge_settings_value(&mut merged, &incoming, "", &mut added, &mut kept);
 
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).map_err(|err| {
-                file_io_report(parent, "failed to create the project settings directory", err)
-            })?;
-        }
         let rendered = serde_json::to_string_pretty(&merged)
             .map_err(|err| miette!(
 help = template_manifest_help(),
 "failed to render merged settings: {err}"))?;
-        // Read before the write, so a discarded instantiation can restore what
-        // the merge overwrote — or remove it. §FS-rhei-templates.6.2
+        let rendered = format!("{rendered}\n");
+        // Keep the project untouched for prospective validation. The ordinary
+        // settings loader reads this reconciled document from staging instead.
+        // §FS-rhei-templates.6.1.2
         let previous = fs::read_to_string(&target).ok();
-        fs::write(&target, format!("{rendered}\n"))
-            .map_err(|err| file_io_report(&target, "failed to write project settings", err))?;
+        fs::write(source.path(), &rendered).map_err(|err| {
+            file_io_report(source.path(), "failed to stage reconciled project settings", err)
+        })?;
 
-        if let Some(superseded) = existing.as_ref().and_then(RheiHomePath::deprecated_path) {
-            warn_settings_superseded_by_hoist(superseded, &target);
-        }
-
-        // Leaving the workspace copy in place would keep advertising settings
-        // nothing reads.
-        fs::remove_file(source.path())
-            .map_err(|err| file_io_report(source.path(), "failed to remove workspace settings", err))?;
-        prune_empty_parents(source.path(), workspace);
-
-        Ok(Some(HoistedSettings {
+        Ok(Some(PreparedProjectSettings {
             added,
             kept,
             target,
             previous,
             project: project.to_path_buf(),
+            workspace: workspace.to_path_buf(),
+            source: source.path().to_path_buf(),
+            rendered,
+            superseded: existing
+                .as_ref()
+                .and_then(RheiHomePath::deprecated_path)
+                .map(Path::to_path_buf),
         }))
     }
 

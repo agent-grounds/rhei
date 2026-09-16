@@ -158,18 +158,8 @@ fn acquire_run_locks(
     workspace_root: &Path,
     opts: &RunOptions,
 ) -> MietteResult<Vec<HeldRunLock>> {
-    let mut locks = Vec::new();
-    for root in run_lock_roots(loaded, workspace_root) {
-        match try_acquire_run_lock(&root)? {
-            Some(lock) => locks.push(lock),
-            None if is_headless_child() => return Err(run_lock_conflict(&root)),
-            None => {
-                announce_run_lock_wait(&root, opts.json());
-                locks.push(wait_for_run_lock(&root)?);
-            }
-        }
-    }
-    Ok(locks)
+    let roots = run_lock_roots(loaded, workspace_root);
+    acquire_run_locks_for_roots(roots.iter(), opts)
 }
 
 /// How often a queued run re-tries the lock it is waiting for.
@@ -339,14 +329,30 @@ fn run_command(
     }
 
     let roots = ReadySetRoots { workspace_root: &workspace_root, task_roots: &loaded.task_roots };
-    let use_standalone_mode =
-        should_use_agent_mode(&loaded.rhei, &machines.set, &settings, &opts, &roots)?;
+    let use_standalone_mode = should_use_agent_mode(
+        &loaded.rhei,
+        &machines.set,
+        &settings,
+        &opts,
+        &roots,
+    )? || (loaded.is_panta_project() && opts.rhei_scope().is_empty() && !opts.dry_run());
+    // Agent mode is the superset scheduler: it also advances callback-only
+    // work. An unrestricted live project must keep that engine available
+    // because an admitted member may introduce an agent or program even when
+    // the startup graph had neither. §FS-rhei-panta.6.2 §FS-rhei-run.3
 
+    let mut live = LiveRunContext::new(
+        &loaded,
+        machines,
+        settings,
+        run_locks,
+        &workspace_root,
+        state_machine_path,
+    );
     let result = if use_standalone_mode {
         run_agent_mode(
             input,
-            &machines,
-            &settings,
+            &mut live,
             &opts,
             effective_parallel,
             &report.warnings,
@@ -355,7 +361,7 @@ fn run_command(
     } else {
         run_callback_mode(
             input,
-            &machines,
+            &mut live,
             &opts,
             effective_parallel,
             &report.warnings,

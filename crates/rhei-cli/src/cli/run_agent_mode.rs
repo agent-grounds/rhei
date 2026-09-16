@@ -10,8 +10,7 @@
 /// Agent-driven execution mode: spawn coding agents for tasks.
 fn run_agent_mode(
     input: &Path,
-    machines: &ExecutionMachines,
-    settings: &RheiSettings,
+    live: &mut LiveRunContext,
     opts: &RunOptions,
     max_parallel: usize,
     initial_warnings: &[String],
@@ -32,14 +31,17 @@ fn run_agent_mode(
 
     let (initial_total_tasks, initial_states) = {
         let loaded = load_plan(input)?;
-        (total_task_count(&loaded.rhei), collect_initial_states(&loaded.rhei, &machines.set))
+        (
+            total_task_count(&loaded.rhei),
+            collect_initial_states(&loaded.rhei, &live.machines.set),
+        )
     };
     // §FS-rhei-run-report.1: declared before the frontend so it drops *after* the
     // terminal is restored; the happy path disarms it once the full report is
     // written, so it only fires when the run returns early with an error.
     let mut report_guard = RunReportGuard {
         input,
-        machines: &machines.set,
+        machines: live.machines.set.clone(),
         runtime_dir: runtime_dir.clone(),
         run_started,
         run_started_wall,
@@ -61,7 +63,7 @@ fn run_agent_mode(
     let frontend = start_run_frontend(
         &workspace_root,
         input,
-        machines,
+        &live.machines,
         opts,
         frontend_parallel,
         initial_total_tasks,
@@ -116,7 +118,7 @@ fn run_agent_mode(
     }
 
     let loaded = load_plan(input)?;
-    let initial_terminal_count = terminal_task_count(&loaded.rhei, &machines.set);
+    let initial_terminal_count = terminal_task_count(&loaded.rhei, &live.machines.set);
     run_info!(
         "Running {} '{}' with {} task(s) ({} terminal at start).",
         if workspace::is_workspace(input) { "workspace" } else { "plan" },
@@ -181,7 +183,16 @@ fn run_agent_mode(
             }
             break;
         }
-        let loaded = load_plan(input)?;
+        // This is both the ordinary graph reload and the admission checkpoint.
+        // A final producer action therefore becomes visible before the next
+        // scheduling or stopping decision. §FS-rhei-panta.6.2 §FS-rhei-run.3
+        let (loaded, admitted) = live.checkpoint(input, &workspace_root, opts, identity)?;
+        if !admitted.is_empty() {
+            run_info!("Admitted {} new rhei member(s): {}", admitted.len(), admitted.join(", "));
+            report_guard.machines = live.machines.set.clone();
+        }
+        let machines = &live.machines;
+        let settings = &live.settings;
         // §AR-rhei-panta.5: every look at this pass's ready set — the scan, the
         // held-ticket pass, and the halt report that explains what it refused —
         // resolves artifacts under the roots the loaded plan gives its tickets.
@@ -867,8 +878,7 @@ fn run_agent_mode(
                 frontend_parallel,
                 pass,
                 input,
-                machines,
-                settings,
+                live,
                 opts,
                 &workspace_root,
                 &runtime_dir,
@@ -877,7 +887,9 @@ fn run_agent_mode(
                 &sink,
                 intervene.as_ref(),
                 &mut progress,
+                identity,
             )?;
+            report_guard.machines = live.machines.set.clone();
         }
 
         sink.emit(RunEvent::PassEnded { pass, progressed: advanced_any });
@@ -967,11 +979,14 @@ fn run_agent_mode(
     } else if agents_spawned == 0 && programs_spawned == 0 {
         if callback_transitions_made == 0 {
             let loaded = load_plan(input)?;
-            run_info!("{}", no_advancement_summary(&loaded.rhei, &machines.set, &rhei_scope));
+            run_info!(
+                "{}",
+                no_advancement_summary(&loaded.rhei, &live.machines.set, &rhei_scope)
+            );
             (0usize, 0usize)
         } else {
             let loaded = load_plan(input)?;
-            let terminal_count = terminal_task_count(&loaded.rhei, &machines.set);
+            let terminal_count = terminal_task_count(&loaded.rhei, &live.machines.set);
             let total_tasks = total_task_count(&loaded.rhei);
             // An interrupted run did not complete; saying so twice — once as
             // a warning and once as "Run complete" — is worse than either.
@@ -1001,7 +1016,7 @@ fn run_agent_mode(
         }
     } else {
         let loaded = load_plan(input)?;
-        let terminal_count = terminal_task_count(&loaded.rhei, &machines.set);
+        let terminal_count = terminal_task_count(&loaded.rhei, &live.machines.set);
         let total_tasks = total_task_count(&loaded.rhei);
         // §FS-rhei-run.3.2: the run stopped; it did not complete.
         if interrupted_run {
@@ -1071,7 +1086,7 @@ fn run_agent_mode(
     // guard so its fallback only fires on an early error.
     emit_run_report(
         input,
-        &machines.set,
+        &live.machines.set,
         &summary_sink,
         &runtime_dir,
         RunStats {
@@ -1108,8 +1123,12 @@ fn run_agent_mode(
         let loaded = load_plan(input)?;
         // §FS-rhei-panta.6.1: a narrowed run halts on in-scope work only —
         // out-of-scope tickets left non-terminal are not a failure.
-        if scoped_unfinished_task_exists(&loaded.rhei, &machines.set, &rhei_scope)
-            && !remaining_work_is_only_gating_or_poll_blocked(&loaded.rhei, &machines.set, &rhei_scope)
+        if scoped_unfinished_task_exists(&loaded.rhei, &live.machines.set, &rhei_scope)
+            && !remaining_work_is_only_gating_or_poll_blocked(
+                &loaded.rhei,
+                &live.machines.set,
+                &rhei_scope,
+            )
         {
             return Err(miette!(
                 help = nothing_claimable_help(),

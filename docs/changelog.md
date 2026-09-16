@@ -42,6 +42,12 @@
   an existing authored `effort` key that was previously ignored now takes
   effect or fails validation when its value is invalid. (PR #276)
 
+- **Unrestricted project runs now admit members instantiated while the run is
+  live.** A validated member is published atomically, initialized with its own
+  machine, callbacks, execution root, lock, and accounting context, then enters
+  the existing sequential or parallel scheduler without starting another run.
+  Runs narrowed with `--rhei` keep their startup candidate set fixed. (PR #275)
+
 - **Transition callbacks now receive a stable identity for each firing and an
   explicit pending ledger status.** Canonical JSON exposes `firingId` and
   `ledgerStatus`, and CLI callbacks receive equal environment values, so an

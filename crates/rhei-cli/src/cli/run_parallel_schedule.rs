@@ -205,8 +205,7 @@ fn refill_parallel_worker_pool(
     task_limit: usize,
     tx: &std::sync::mpsc::Sender<ParallelAgentThreadMessage>,
     input: &Path,
-    machines: &ExecutionMachines,
-    settings: &RheiSettings,
+    live: &mut LiveRunContext,
     opts: &RunOptions,
     workspace_root: &Path,
     runtime_dir: &Path,
@@ -218,6 +217,7 @@ fn refill_parallel_worker_pool(
     active_invocation_counts: &mut HashMap<String, usize>,
     active_state_counts: &mut HashMap<String, usize>,
     handles: &mut Vec<std::thread::JoinHandle<()>>,
+    identity: &RunIdentity,
 ) -> MietteResult<ParallelScheduleOutcome> {
     // A freed slot is not refilled once the run is interrupted: the shutdown
     // drains what is in flight, it does not start more. §FS-rhei-run.3.2
@@ -235,7 +235,20 @@ fn refill_parallel_worker_pool(
         return Ok(ParallelScheduleOutcome { spawned: 0, advanced: false, skipped: Vec::new() });
     }
 
-    let reloaded = load_plan(input)?;
+    // A completion frees capacity only after the full project has been
+    // refreshed and any new member has been initialized. The existing free
+    // slot is then reused; admission never enlarges the pool. §FS-rhei-run.3
+    // §FS-rhei-run.5
+    let (reloaded, admitted) = live.checkpoint(input, workspace_root, opts, identity)?;
+    if !admitted.is_empty() {
+        emit_run_message(
+            sink,
+            rhei_tui::MessageLevel::Info,
+            format!("Admitted {} new rhei member(s): {}", admitted.len(), admitted.join(", ")),
+        );
+    }
+    let machines = &live.machines;
+    let settings = &live.settings;
     let active_task_ids = active_invocation_counts.keys().cloned().collect::<HashSet<_>>();
     let active_nonconcurrent_states = active_state_counts.keys().cloned().collect::<HashSet<_>>();
     let (mut program_items, program_deferred) = collect_ready_program_work_items(

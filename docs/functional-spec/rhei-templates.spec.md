@@ -181,7 +181,15 @@ The warning's contract:
 └── ...                    # Additional files (text rendered; binary copied)
 ```
 
-A template must contain exactly one plan entry point: either `plan.rhei.md` (single-file) or `index.rhei.md` (directory workspace). Containing both is an error. For single-file templates the entry-point filename also determines the ticket-id prefix of every instantiated workspace: the file stem is the rhei id, so `plan.rhei.md` yields tickets `plan.1`, `plan.2`, ..., regardless of the `--output` directory name.
+A template must contain exactly one plan entry point: either `plan.rhei.md`
+(single-file) or `index.rhei.md` (directory workspace). Containing both is an
+error. A composition-only block declaring `use` is the exception: it may omit a
+local plan because its mounted children supply the compiled plan
+([§FS-rhei-library.1](rhei-library.spec.md#1-block-manifests-and-encapsulation)).
+For single-file templates the entry-point filename also determines the
+ticket-id prefix of every instantiated workspace: the file stem is the rhei id,
+so `plan.rhei.md` yields tickets `plan.1`, `plan.2`, ..., regardless of the
+`--output` directory name.
 
 **A template's task ids must not repeat the template name.** Every ticket id is
 already qualified by its rhei ([§FS-rhei-panta.5](rhei-panta.spec.md#5-identity)), and for an instantiated
@@ -219,7 +227,15 @@ inputs:
         type: <...>
         required: <boolean>
         default: <value>
-        ...
+      ...
+
+# Optional composition fields are specified by §FS-rhei-library.1–2.
+ports: <control-port mapping>
+data: <declared runtime endpoint mappings>
+use: <ordered mount sequence>
+bind: <static input bindings>
+seams: <complete control/data seam sequence>
+compatibility: <checked stable-identity mappings>
 ```
 
 ### 3.1. Validation Rules
@@ -243,6 +259,10 @@ inputs:
 - `type: path` values are rendered exactly as supplied by the user or manifest `default`; instantiation does not rewrite them to absolute paths. Relative `path` values are interpreted relative to the instantiating process `cwd` only when the CLI itself must resolve that path for its own file operations. The exception is an omitted optional `path` input with no `default`, which resolves to the empty string.
 - `validate`, when present, is a Rust `regex`-crate pattern applied to the string representation of the resolved scalar value and anchored to the entire rendered value. It is enforced on every scalar it is declared on, including scalars nested inside `object` `properties` and `array` `items`; a failing match aborts instantiation with a path-qualified error (for example, `input 'agents[0].id' does not match validation pattern '…'`).
 - `format`, when present, names a built-in value check applied at instantiation time, before any file is rendered. The only format in v1 is `execution-target`, which parses the value as an execution target selector ([§FS-rhei-agents](rhei-agents.spec.md#fs-rhei-agents-rhei-agents-specification)) and reports a malformed value against the input the user supplied rather than against the rendered state machine ([§FS-rhei-errors.3.1](rhei-errors.spec.md#31-execution-target-inputs)). Like `validate`, it is only valid on scalar input types and is enforced on nested `properties` and `items` scalars. `format` and `validate` may be combined; both must pass.
+- `ports`, `data`, `use`, `bind`, `seams`, and `compatibility`, when present,
+  are validated under
+  [§FS-rhei-library.1](rhei-library.spec.md#1-block-manifests-and-encapsulation)
+  and [§FS-rhei-library.2](rhei-library.spec.md#2-mounts-bindings-and-seams).
 
 ## 4. Template-Shipped Settings
 
@@ -461,6 +481,7 @@ Create a concrete plan workspace from a template.
 
 ```
 rhei instantiate [template] [input ...] [options]
+rhei instantiate --mount <alias>=<block> [--mount ...] [options]
 
 Arguments:
   [template]                   Template name or path to a template directory
@@ -480,6 +501,11 @@ Options:
   --dry-run                    Show what would be generated without writing files
   --keep-on-error              Keep output directory on validation failure
   --list-inputs                Print the template's input schema and exit
+  --mount <alias>=<block>      Mount a block for direct composition (repeatable)
+  --seam <exit>=<entry>        Replace default ordering with an explicit seam
+                               (repeatable; the supplied set is the whole chain)
+  --pass <output>=<input>      Attach a declared runtime data pass to the unique
+                               seam between its endpoint mounts (repeatable)
 ```
 
 #### 6.1.1. Input UX
@@ -545,6 +571,12 @@ Input arguments are parsed as follows:
 - `--set-file KEY=PATH` remains the file-content form and has higher precedence
   than positional values, `KEY=VALUE`, and `--set`.
 
+With one or more `--mount` options, inputs are qualified and positional
+template/input arguments are unavailable. Mount, seam, pass, nested values,
+and qualified-input behavior is specified by
+[§FS-rhei-library.3](rhei-library.spec.md#3-command-line-composition-and-inputs).
+With no `--mount`, every rule above is unchanged.
+
 #### 6.1.2. Behavior
 
 1. **Show choices when omitted.** If no template is provided, print the same human-readable discovered-template list as `rhei templates` and exit successfully.
@@ -575,6 +607,14 @@ other platforms currently fail closed. On publication failure, prior project
 settings are restored. With `--keep-on-error`, if the requested path cannot be
 used safely, keep the rendered tree and reconciled settings in hidden staging
 and report that location for inspection; otherwise remove staging as usual.
+
+For a curated block with `use`, or for direct `--mount` composition, steps 2–7
+expand and compile the block graph as
+[§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks)
+requires. The result then rejoins this procedure at ordinary output placement,
+validation, summary, reproducible invocation, and optional execution. Direct
+composition's default output name is the ordered aliases joined by `-`; a
+curated block retains its template name.
 
 #### 6.1.3. Instantiation Summary Output
 
@@ -1019,7 +1059,9 @@ All `{{...}}` are resolved during instantiation. All `{...}` remain for runtime.
 
 ## 8. Grammar Extension
 
-The `rhei_document` and `workspace_index` productions are unchanged. Templates are a pre-processing layer that produces valid Rhei documents — the parser never sees `{{...}}` syntax.
+The `rhei_document` and `workspace_index` productions are unchanged. Templates
+and blocks are a pre-processing layer that produces valid Rhei documents — the
+parser never sees `{{...}}`, `use`, mount, binding, seam, or data-port syntax.
 
 No changes to the Rhei plan grammar are required.
 
@@ -1033,6 +1075,12 @@ No changes to the Rhei plan grammar are required.
 | `version` | YAML scalar | Yes | Informational metadata only in v1. |
 | `description` | string | Yes | Must be non-empty after trimming. |
 | `inputs` | sequence of mappings | No | Defaults to an empty list when omitted. |
+| `ports` | mapping | No | Public control entry and exits; required when mounted. §FS-rhei-library.1 |
+| `data` | mapping | No | Public typed runtime input/output endpoints. §FS-rhei-library.1 |
+| `use` | sequence of mappings | No | Ordered recursive child mounts. §FS-rhei-library.2 |
+| `bind` | sequence of mappings | No | Compile-time root-input to child-input bindings. §FS-rhei-library.2 |
+| `seams` | sequence of mappings | No | Complete explicit completion chain and optional runtime passes. §FS-rhei-library.2 |
+| `compatibility` | mapping | No | Checked stable identities for a curated wrapper. §FS-rhei-library.7 |
 
 Each `inputs[]` entry is a YAML mapping with these fields:
 

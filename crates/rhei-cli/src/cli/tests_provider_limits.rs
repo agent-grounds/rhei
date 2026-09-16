@@ -163,7 +163,58 @@ mod provider_limits {
         assert!(provider_limit_for_task_state(Some(&cleared), &task, "working").is_none());
     }
 
+    /// Both OSC terminators preserve a hyperlink's visible standalone signal;
+    /// decoration removal must not relax standalone matching. §FS-rhei-agents.2
+    #[test]
+    fn provider_limit_osc_links_preserve_visible_text() {
+        let resolved = codex_openai();
+        let observed = std::time::UNIX_EPOCH + Duration::from_secs(1_789_579_200);
+        let signal = "You've hit your session limit · resets 10:20pm (Europe/Zurich)";
+        for open_end in ["\x07", "\x1b\\"] {
+            for close_end in ["\x07", "\x1b\\"] {
+                let linked = format!("\x1b]8;;https://example.invalid/reset{open_end}{signal}\x1b]8;;{close_end}");
+                assert_eq!(strip_terminal_decoration(&linked), signal);
+                let parsed = classify_provider_limit(
+                    &resolved, status(1), false, false, std::slice::from_ref(&linked), observed,
+                ).expect("one visible linked signal");
+                assert_eq!(parsed.signal, signal);
+                assert_eq!(parsed.next_attempt_at, "2026-09-16T20:21:00Z");
+                for invalid in [format!("quoted: {linked}"), format!("{linked} trailing")] {
+                    assert!(classify_provider_limit(
+                        &resolved, status(1), false, false, &[invalid], observed,
+                    ).is_none());
+                }
+            }
+        }
+    }
+
+    /// Cleanup belongs to a matching invocation started at or after the wait,
+    /// never an earlier sibling or a different transport. §FS-rhei-run.3.3
+    #[test]
+    fn provider_limit_cleanup_requires_eligible_resumption() {
+        let resolved = codex_openai();
+        let limit = ProviderLimit {
+            identity: resolved_provider_identity(&resolved).unwrap(),
+            signal: "signal".into(),
+            observed_at: deadline(100),
+            next_attempt_at: deadline(200),
+        };
+        let started = |at| std::time::UNIX_EPOCH + Duration::from_secs(at);
+        assert!(!provider_limit_resumed(&limit, &resolved, started(199)));
+        assert!(provider_limit_resumed(&limit, &resolved, started(200)));
+        let mut unrelated = resolved.clone();
+        unrelated.model_provider = Some("other".into());
+        assert!(!provider_limit_resumed(&limit, &unrelated, started(201)));
+        let extended = ProviderLimit { next_attempt_at: deadline(300), ..limit };
+        assert!(!provider_limit_resumed(&extended, &resolved, started(200)));
+    }
+
     fn provider_machine(poll: bool) -> rhei_validator::StateMachine {
+        let self_loop = if poll {
+            "  - from: working\n    to: working\n    condition: pollAttempts < pollMaxAttempts\n"
+        } else {
+            ""
+        };
         let poll = if poll {
             "    poll:\n      interval: 1m\n      max_attempts: 3\n"
         } else {
@@ -179,12 +230,8 @@ states:
 {poll}  completed:
     final: true
 transitions:
-  - from: working
-    to: working
-    exit_code: 75
-  - from: working
+{self_loop}  - from: working
     to: completed
-    exit_code: 0
 "#
         ))
         .expect("provider-limit state machine")

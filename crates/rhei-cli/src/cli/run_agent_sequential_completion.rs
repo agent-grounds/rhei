@@ -14,6 +14,7 @@
 struct SequentialAgentCompletion<'a> {
     task_id_str: String,
     state_name: String,
+    started_at: std::time::SystemTime,
     task: &'a rhei_core::ast::Task,
     /// The slot release read off the finished agent, not emitted yet: a poll
     /// state's self-loop makes the attempt a wait, and the transition that says
@@ -59,6 +60,7 @@ fn handle_sequential_agent_completion(
     let SequentialAgentCompletion {
         task_id_str,
         state_name,
+        started_at,
         task,
         mut release,
         task_workspace_root,
@@ -135,7 +137,7 @@ fn handle_sequential_agent_completion(
                 return Ok(());
             }
             if status.success() && stayed_in_state {
-                clear_persisted_provider_limit(input, &reloaded, task_id_str, current_state)?;
+                clear_persisted_provider_limit(input, &reloaded, task_id_str, current_state, resolved, started_at)?;
             }
             // Condition (3) selects that edge against the plan as re-read here,
             // so a child this invocation appended is an open descendant of it.

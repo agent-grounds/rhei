@@ -395,6 +395,7 @@ fn spawn_parallel_agent_work_item(
             ParallelAgentThreadMessage::Completed(ParallelAgentCompletion {
                 task_id_str: tid,
                 state_name: sname,
+                started_at: started_wall,
                 release,
                 resolved: resolved_for_result,
                 log: log_for_result,

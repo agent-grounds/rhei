@@ -118,7 +118,17 @@ fn run_agent_worker_pool(
         program_schedule_outcome.spawned + schedule_outcome.spawned;
 
     while active_worker_count > 0 {
-        let completion = match rx.recv() {
+        // A provider wait must refill free capacity without waiting for an
+        // unrelated worker to exit. Re-read in bounded slices, as the outer
+        // sleep does, so persisted deadline edits also wake us. §FS-rhei-run.3.3
+        let provider_wait = active_invocation_counts.len() < task_limit
+            && has_pending_provider_wait(&load_plan(input)?.rhei, &machines.set);
+        let message = if provider_wait {
+            rx.recv_timeout(Duration::from_secs(1))
+        } else {
+            rx.recv().map_err(|_| std::sync::mpsc::RecvTimeoutError::Disconnected)
+        };
+        let completion = match message {
             Ok(ParallelAgentThreadMessage::Completed(completion)) => completion,
             Ok(ParallelAgentThreadMessage::ProgramCompleted(completion)) => {
                 active_worker_count = active_worker_count.saturating_sub(1);
@@ -200,7 +210,37 @@ fn run_agent_worker_pool(
                 progress.stalled_tasks.insert(task_id_str.clone());
                 continue;
             }
-            Err(_) => break,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                // The ordinary refill preserves capacity, authored readiness,
+                // active workers, and effective poll/provider eligibility.
+                // §FS-rhei-run.3.3 §FS-rhei-run.5.1
+                let refill_outcome = refill_parallel_worker_pool(
+                    &mut *progress.unpromptable_tasks,
+                    &*progress.stalled_tasks,
+                    pass,
+                    task_limit,
+                    &tx,
+                    input,
+                    machines,
+                    settings,
+                    opts,
+                    workspace_root,
+                    runtime_dir,
+                    run_id,
+                    sink,
+                    intervene,
+                    &mut free_slots,
+                    &mut next_extra_slot,
+                    &mut active_invocation_counts,
+                    &mut active_state_counts,
+                    &mut handles,
+                )?;
+                active_worker_count += refill_outcome.spawned;
+                *progress.advanced_any |= refill_outcome.advanced;
+                progress.stalled_tasks.extend(refill_outcome.skipped.iter().cloned());
+                continue;
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
         };
 
         active_worker_count = active_worker_count.saturating_sub(1);
@@ -216,6 +256,7 @@ fn run_agent_worker_pool(
         let ParallelAgentCompletion {
             task_id_str,
             state_name,
+            started_at,
             // Read off the finished agent by the worker, left to the thread
             // that learns whether the attempt was a handled wait, and emitted
             // by whoever owns it last. §FS-rhei-states.2.2
@@ -255,6 +296,7 @@ fn run_agent_worker_pool(
                     ParallelAgentExit {
                         task_id_str,
                         state_name,
+                        started_at,
                         release,
                         resolved,
                         log,

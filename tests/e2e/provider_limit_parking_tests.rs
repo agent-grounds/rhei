@@ -2,100 +2,16 @@
 
 use std::fs;
 use std::path::Path;
-use std::process::{Child, Stdio};
+use std::process::Stdio;
 use std::thread;
 use std::time::{Duration, Instant};
 
 use super::*;
 
-const LIMIT_SIGNAL: &str = "You've hit your session limit · resets 10:20pm (Europe/Zurich)";
-
-struct RunningChild(Option<Child>);
-
-impl RunningChild {
-    fn child(&mut self) -> &mut Child {
-        self.0.as_mut().expect("run child")
-    }
-
-    fn stop(&mut self) {
-        if let Some(mut child) = self.0.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-    }
-}
-
-impl Drop for RunningChild {
-    fn drop(&mut self) {
-        self.stop();
-    }
-}
-
-fn wait_for(what: &str, mut condition: impl FnMut() -> bool) {
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while Instant::now() < deadline {
-        if condition() {
-            return;
-        }
-        thread::sleep(Duration::from_millis(25));
-    }
-    panic!("timed out waiting for {what}");
-}
+use super::provider_limit_support::*;
 
 fn count_files(path: &Path) -> usize {
     fs::read_dir(path).map(|entries| entries.filter_map(Result::ok).count()).unwrap_or(0)
-}
-
-fn markdown_text(path: &Path) -> String {
-    fn visit(path: &Path, text: &mut String) {
-        for entry in fs::read_dir(path).expect("read workspace") {
-            let path = entry.expect("workspace entry").path();
-            if path.is_dir() {
-                if path.file_name().and_then(|name| name.to_str()) != Some("runtime") {
-                    visit(&path, text);
-                }
-            } else if path.extension().and_then(|extension| extension.to_str()) == Some("md") {
-                text.push_str(&fs::read_to_string(path).expect("read markdown"));
-            }
-        }
-    }
-
-    let mut text = String::new();
-    visit(path, &mut text);
-    text
-}
-
-fn expire_provider_deadlines(path: &Path) {
-    for entry in fs::read_dir(path).expect("read workspace") {
-        let path = entry.expect("workspace entry").path();
-        if path.is_dir() {
-            if path.file_name().and_then(|name| name.to_str()) != Some("runtime") {
-                expire_provider_deadlines(&path);
-            }
-            continue;
-        }
-        if path.extension().and_then(|extension| extension.to_str()) != Some("md") {
-            continue;
-        }
-        let original = fs::read_to_string(&path).expect("read markdown");
-        let mut changed = false;
-        let rewritten = original
-            .lines()
-            .map(|line| {
-                if line.trim_start().starts_with("nextAttemptAt:") {
-                    if let Some(indent) = line.strip_suffix(line.trim_start()) {
-                        changed = true;
-                        return format!("{indent}nextAttemptAt: \"2000-01-01T00:00:00Z\"");
-                    }
-                }
-                line.to_string()
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-        if changed {
-            fs::write(path, format!("{rewritten}\n")).expect("expire provider deadline");
-        }
-    }
 }
 
 fn provider_limit_workspace() -> (TestDir, std::path::PathBuf, std::path::PathBuf) {

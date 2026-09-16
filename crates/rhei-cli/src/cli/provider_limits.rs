@@ -48,7 +48,7 @@ fn resolved_provider_identity(resolved: &ResolvedAgent) -> Option<ProviderIdenti
 fn strip_terminal_decoration(line: &str) -> std::borrow::Cow<'_, str> {
     static ANSI: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     ANSI.get_or_init(|| {
-        Regex::new(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
+        Regex::new(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*?(?:\x07|\x1b\\))")
             .expect("ANSI decoration regex is valid")
     })
     .replace_all(line, "")
@@ -271,20 +271,26 @@ fn persist_provider_limit(
     Ok(effective)
 }
 
-/// Clear a successfully resumed invocation's record without touching poll or
-/// visit counters. §FS-rhei-run.3.3
+/// Clear only a successful invocation of the reporting identity that started
+/// after eligibility. An already-running sibling cannot consume this wait,
+/// even if it finishes after the deadline. §FS-rhei-run.3.3
 fn clear_persisted_provider_limit(
     input: &Path,
     loaded: &LoadedPlan,
     task_id: &str,
     state_name: &str,
+    resolved: &ResolvedAgent,
+    started_at: std::time::SystemTime,
 ) -> MietteResult<()> {
     let route = loaded.task_route(task_id, input);
     let metadata_id = parse_task_id(&route.metadata_id);
     let lock = LockedPlanFile::open(&route.metadata_file)?;
     let raw = lock.read_to_string("failed to read plan metadata file")?;
     let on_disk = parse_metadata_from_raw(&route.metadata_file, &raw)?;
-    if provider_limit_for_task_state(on_disk.as_ref(), &metadata_id, state_name).is_none() {
+    let Some(limit) = provider_limit_for_task_state(on_disk.as_ref(), &metadata_id, state_name) else {
+        return Ok(());
+    };
+    if !provider_limit_resumed(&limit, resolved, started_at) {
         return Ok(());
     }
     let Some(updated) =
@@ -294,6 +300,31 @@ fn clear_persisted_provider_limit(
     };
     let rewritten = rewrite_frontmatter(&raw, &updated)?;
     write_file_atomic_locked(&route.metadata_file, &rewritten, Some(&lock))
+}
+
+fn provider_limit_resumed(
+    limit: &ProviderLimit,
+    resolved: &ResolvedAgent,
+    started_at: std::time::SystemTime,
+) -> bool {
+    resolved_provider_identity(resolved).as_ref() == Some(&limit.identity)
+        && limit.deadline_epoch().is_some_and(|deadline| {
+            started_at >= std::time::UNIX_EPOCH + Duration::from_secs(deadline)
+        })
+}
+
+/// Keep a pool with free capacity responsive to durable provider waits, even
+/// after their deadline expires. The refill applies poll and identity readiness.
+/// Stale-state records do not add a timer. §FS-rhei-run.3.3 §FS-rhei-run.5.1
+fn has_pending_provider_wait(rhei: &rhei_core::ast::Rhei, machines: &rhei_validator::MachineSet) -> bool {
+    let mut tasks = Vec::new();
+    visit_tasks(&rhei.tasks, &mut tasks);
+    tasks.into_iter().any(|task| {
+        !is_terminal_state(task.state.as_str(), machines.for_task(&task.id))
+            && task_provider_limit(rhei, machines, task)
+                .and_then(|limit| limit.deadline_epoch())
+                .is_some()
+    })
 }
 
 fn visit_tasks<'a>(tasks: &'a [rhei_core::ast::Task], out: &mut Vec<&'a rhei_core::ast::Task>) {

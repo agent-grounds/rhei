@@ -352,6 +352,7 @@ fn run_sequential_agent_invocation(
         SequentialAgentCompletion {
             task_id_str: task_id_str.clone(),
             state_name: current_state.clone(),
+            started_at: started_wall,
             task,
             release,
             task_workspace_root,

@@ -88,11 +88,9 @@ fn validate_dependency_integrity(
             }
         }
 
-        // A task export is a declared graph handoff, not a best-effort file
-        // lookup. Check its producer, declaration, and directly authored
-        // ordering edge while the ancestors are still available. Missing and
-        // forbidden producers are primary errors, so their derivative checks
-        // are deliberately suppressed. §FS-rhei-plan-language.3.12.1
+        // Check each declared handoff's producer, declaration, and direct edge.
+        // Suppress derivative checks when the producer is missing or forbidden.
+        // §FS-rhei-plan-language.3.12.1
         for consumed in &task.consumes {
             let producer = &consumed.task;
             if producer == &task.id {

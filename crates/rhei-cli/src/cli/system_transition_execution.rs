@@ -647,9 +647,8 @@ fn execute_transition_with_origin(
             machine.states.get(to).map(|def| def.terminal).unwrap_or(false),
         )?;
     }
-    // `on_leave` has settled the effective target and source outputs have had
-    // first refusal. Guard the producer contract now, before target inputs or
-    // any durable terminal effect. Only reserved cancellation waives it.
+    // After `on_leave` settles the target and source outputs get first refusal,
+    // guard exports before target inputs or terminal effects; cancellation waives it.
     // §FS-rhei-transition-cmd.3.3 §FS-rhei-plan-language.3.12.3
     if to_state_def.terminal && !cancelling {
         ensure_declared_task_exports_exist(

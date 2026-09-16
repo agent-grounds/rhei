@@ -321,9 +321,9 @@
         let history = render_plan_history(&context).expect("history");
         assert!(
             history.contains(
-                "### Dependents\n\n\
+                 "### Dependents\n\n\
                  - Task plan.1.2: Review round 1 [completed] \u{2014} prior\n\
-                 - Task plan.1.3: Fix round 1 [review] \u{2014} consumes `findings`\n"
+                 - Task plan.1.3: Fix round 1 [review] \u{2014} prior, consumes `findings`\n"
             ),
             "got:\n{history}"
         );
@@ -356,6 +356,7 @@
         let dir = memory_plan_dir(&[
             ("runtime/state-transitions.log", "plan.1.2 review@completed\n"),
             ("runtime/results/plan.1.2.md", "## Result\n\nTwo bugs found.\n"),
+            ("runtime/exports/plan.1.1/findings.md", "Parser findings.\n"),
         ]);
         let plan_path = dir.path().join("plan.rhei.md");
         let loaded = load_plan(&plan_path).expect("plan loads");
@@ -382,6 +383,7 @@
             ("runtime/state-transitions.log", "plan.1.3 pending@review\n"),
             ("runtime/results/plan.1.3.md", "## Result\n\nFirst attempt stalled.\n"),
             ("runtime/results/plan.1.2.md", "## Result\n\nTwo bugs found.\n"),
+            ("runtime/exports/plan.1.1/findings.md", "Parser findings.\n"),
         ]);
         let plan_path = dir.path().join("plan.rhei.md");
         let loaded = load_plan(&plan_path).expect("plan loads");

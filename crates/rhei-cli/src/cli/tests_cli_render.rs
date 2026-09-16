@@ -1257,10 +1257,11 @@ transitions:
         assert!(!prompt.contains("`runtime/results/1.md`"), "{prompt}");
     }
 
-    /// An export a prior task never wrote is skipped, not raised: enforcement
-    /// belongs to a validator, and a missing file must not block the spawn.
+    /// Prompt composition refuses a promised export that its producer has not
+    /// written, instead of silently spawning with partial context.
+    /// §FS-rhei-agents.3.3 §FS-rhei-plan-language.3.12.2
     #[test]
-    fn compose_agent_prompt_skips_an_unwritten_export() {
+    fn compose_agent_prompt_refuses_an_unwritten_export() {
         let rhei = rhei_core::parse(
             r#"# Rhei: Exports
 
@@ -1321,7 +1322,10 @@ transitions:
             memory: None,
         };
 
-        let prompt = compose_agent_prompt(&context).expect("prompt");
+        let error = compose_agent_prompt(&context).expect_err("missing export should fail");
+        let message = format!("{error:?}");
 
-        assert!(!prompt.contains("## Consumed Exports"), "{prompt}");
+        assert!(message.contains("missing or blank consumed exports"), "{message}");
+        assert!(message.contains("1:api-contract"), "{message}");
+        assert!(message.contains("runtime/exports/1/api-contract.md"), "{message}");
     }

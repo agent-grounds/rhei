@@ -171,10 +171,10 @@ fn assert_program_handoff(parallel: bool) {
     assert!(task.contains("**State:** delivered"), "admitted program did not complete: {task}");
     let observed = read_json(&follow.join("observation.json"));
     assert_eq!(observed["task"], "follow.1");
-    assert_eq!(Path::new(observed["root"].as_str().unwrap()), follow);
-    assert_eq!(Path::new(observed["plan"].as_str().unwrap()), follow);
+    assert_same_path(Path::new(observed["root"].as_str().unwrap()), &follow);
+    assert_same_path(Path::new(observed["plan"].as_str().unwrap()), &follow);
     let result = follow.join("runtime/results/follow.1.md");
-    assert_eq!(Path::new(observed["result"].as_str().unwrap()), result);
+    assert_same_path(Path::new(observed["result"].as_str().unwrap()), &result);
     assert!(fs::read_to_string(result).unwrap().contains("admitted program completed"));
     let log = follow.join("runtime/logs/task-follow.1-run.log");
     let transcript = fs::read_to_string(&log).expect("member program transcript");
@@ -187,7 +187,7 @@ fn assert_program_handoff(parallel: bool) {
     assert_eq!(spawn["attempt"], 1);
     assert_eq!(spawn["code"], 0);
     assert_eq!(spawn["ending"], "exited");
-    assert_eq!(Path::new(spawn["log"].as_str().unwrap()), log);
+    assert_same_path(Path::new(spawn["log"].as_str().unwrap()), &log);
     for directory in ["logs", "spawns"] {
         let path = project.join("runtime").join(directory);
         if path.exists() {
@@ -220,7 +220,7 @@ fn assert_program_handoff(parallel: bool) {
     let starts: Vec<_> = events.iter().filter(|event| event["event"] == "run_started").collect();
     assert_eq!(starts.len(), 1);
     assert_eq!(starts[0]["run_id"], original["id"]);
-    assert_eq!(Path::new(starts[0]["workspace"].as_str().unwrap()), project);
+    assert_same_path(Path::new(starts[0]["workspace"].as_str().unwrap()), &project);
     let position = |kind: &str, task: &str| {
         let matches: Vec<_> = events
             .iter()
@@ -236,7 +236,7 @@ fn assert_program_handoff(parallel: bool) {
     let completed = position("slot_released", "follow.1");
     assert!(published < admitted && admitted < completed);
     for event in [&events[admitted], &events[completed]] {
-        assert_eq!(project.join(event["log_path"].as_str().unwrap()), log);
+        assert_same_path(&project.join(event["log_path"].as_str().unwrap()), &log);
     }
     if parallel {
         assert!(project.join("seed-blocker-finished").is_file());

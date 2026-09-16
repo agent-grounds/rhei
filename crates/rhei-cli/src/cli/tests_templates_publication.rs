@@ -57,7 +57,13 @@ mod templates_publication_tests {
                 assert!(fs::read_to_string(staged.join(".agent-grounds/rhei/settings.json"))
                     .unwrap()
                     .contains("publication-fixture"));
-                assert!(format!("{err:?}").contains(&staged.display().to_string()));
+                let rendered = err.to_string();
+                let canonical = fs::canonicalize(&staged).unwrap();
+                assert!(
+                    rendered.contains(&staged.display().to_string())
+                        || rendered.contains(&canonical.display().to_string()),
+                    "retention error did not name the staged output: {rendered}"
+                );
             }
         }
     }

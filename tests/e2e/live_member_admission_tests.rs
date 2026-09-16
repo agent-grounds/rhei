@@ -302,10 +302,10 @@ fn assert_follow_on_artifacts(project: &Path, task: usize, observed: &serde_json
     let follow = project.join("follow");
     let task_id = format!("follow.{task}");
     assert_eq!(observed["task"], task_id);
-    assert_eq!(Path::new(observed["root"].as_str().unwrap()), follow);
-    assert_eq!(Path::new(observed["plan"].as_str().unwrap()), follow);
+    assert_same_path(Path::new(observed["root"].as_str().unwrap()), &follow);
+    assert_same_path(Path::new(observed["plan"].as_str().unwrap()), &follow);
     let result = follow.join(format!("runtime/results/{task_id}.md"));
-    assert_eq!(Path::new(observed["result"].as_str().unwrap()), result);
+    assert_same_path(Path::new(observed["result"].as_str().unwrap()), &result);
     assert!(result.is_file());
 
     let stem = format!("task-{task_id}-review-codex-yolo-fixture-follow-on-model");
@@ -317,7 +317,7 @@ fn assert_follow_on_artifacts(project: &Path, task: usize, observed: &serde_json
     )
     .expect("spawn JSON");
     assert_eq!(spawn["task"], task_id);
-    assert_eq!(Path::new(spawn["log"].as_str().unwrap()), log);
+    assert_same_path(Path::new(spawn["log"].as_str().unwrap()), &log);
     assert!(!project.join(format!("runtime/logs/{stem}.log")).exists());
     assert!(!project.join(format!("runtime/spawns/{stem}.json")).exists());
 

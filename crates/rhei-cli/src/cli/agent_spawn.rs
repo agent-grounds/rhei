@@ -65,6 +65,9 @@ fn agent_stream_label(stream: rhei_tui::AgentStream) -> &'static str {
     }
 }
 
+/// Keep the thread's independently owned inputs explicit, as in `spawn_and_wait_agent`.
+/// Raw capture is separate from usage parsing and display for provider recognition. §FS-rhei-agents.2
+#[allow(clippy::too_many_arguments)]
 fn spawn_agent_output_reader<R>(
     reader: R,
     stream: rhei_tui::AgentStream,

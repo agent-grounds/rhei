@@ -72,7 +72,8 @@ result('## Result\n\nPoll done.\n')
         assert!(final_task["stateVisits"]["working"].is_null());
         let ledger =
             fs::read_to_string(fixture.root.join("runtime/state-transitions.log")).unwrap();
-        assert_eq!(ledger.matches("working@working").count(), 1);
+        // Poll self-loops appear as waiting outcomes, not state moves. §FS-rhei-run.3
+        assert_eq!(ledger.matches("working@working").count(), 0);
         assert_eq!(ledger.matches("working@completed").count(), 1);
     }
 }

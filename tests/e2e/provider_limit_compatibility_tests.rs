@@ -199,7 +199,11 @@ fn provider_limit_signal_does_not_override_timeout() {
 fn provider_limit_signal_does_not_override_interruption() {
     for continue_on_error in [false, true] {
         let fixture = precedence_fixture(false);
-        let args = if continue_on_error { vec!["--continue-on-error"] } else { vec![] };
+        // Synchronize on explicitly enabled output events. §FS-rhei-run-json.2.3
+        let mut args = vec!["--json-agent-output"];
+        if continue_on_error {
+            args.push("--continue-on-error");
+        }
         let mut run = fixture.start(&args);
         wait_for("captured provider text before interrupt", || {
             fixture

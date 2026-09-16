@@ -338,6 +338,11 @@ fn record_transition_result(
     message: Option<&str>,
 ) -> MietteResult<()> {
     append_result_entry(artifact_root, task_id, from, to, message)?;
+    // Leaving a measuring state is the moment a declared metric's next
+    // iteration is decided, and this shared path is where every verb that
+    // moves a ticket already lands. Recording failures warn, never wedge a
+    // transition. §FS-rhei-metrics.2
+    confirm_metric_iterations(artifact_root, machine, task_id, from);
     if is_terminal_state(to, machine) {
         // A message already created the file; a terminal move satisfied by an
         // existing result must not link a path that does not exist.

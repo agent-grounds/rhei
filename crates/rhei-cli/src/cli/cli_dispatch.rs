@@ -606,6 +606,9 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             let scope = target.scope_with(&rhei);
             summary_command(target.path(), &scope, before_subcommand.as_deref(), details)
         }
+        Commands::Report { input, task, state, full } => {
+            report_command(&input, task.as_deref(), state.as_deref(), full)
+        }
         Commands::Attach { run, json, since, wait } => {
             attach_command(run.as_deref(), json, since, wait)
         }

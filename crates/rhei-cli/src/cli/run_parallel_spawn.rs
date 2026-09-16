@@ -329,6 +329,10 @@ fn spawn_parallel_agent_work_item(
     let price_book_for_thread = opts.price_book().clone();
     let task_id_for_panic = tid.clone();
     let state_for_panic = sname.clone();
+    // Read before the plan moves into the worker, like the outlook above:
+    // only here are the machine and the thread's inputs both in hand.
+    // §FS-rhei-metrics.2
+    let metrics_declared_for_thread = !machines.for_task_str(&tid).metrics.is_empty();
     // The worker spawns this run's subprocess, so the run's shutdown guard —
     // and no other — owns the group it leads. §FS-rhei-run.3.2
     let run_owner = current_run_owner();
@@ -364,6 +368,18 @@ fn spawn_parallel_agent_work_item(
             let duration_ms = started_at.elapsed().as_millis() as u64;
             let (outcome, exit_code) = slot_outcome(&result);
             let finished_wall = std::time::SystemTime::now();
+            // The session just ended; its report and metrics note are
+            // epilogues of the spawn, exactly as on the sequential path.
+            // §FS-rhei-session-reports.4 §FS-rhei-metrics.2
+            finish_agent_session_artifacts(
+                metrics_declared_for_thread,
+                &runtime_dir_for_thread,
+                &tid,
+                &sname,
+                &plan_for_thread,
+                &log_for_thread,
+                result.as_ref().ok(),
+            );
             // Read here, where the process was reaped, and emitted by the main
             // thread once it knows whether this attempt was a poll state's
             // handled wait. §FS-rhei-states.2.2

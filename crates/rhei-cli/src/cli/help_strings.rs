@@ -343,3 +343,20 @@ fn local_install_help() -> &'static str {
     "--local writes into the current project. Run it inside a git repository or a \
      Panta project, or install for your user with --user."
 }
+
+/// Help for reading or writing session reports under runtime/reports/.
+// §FS-rhei-session-reports.1
+fn session_report_help() -> &'static str {
+    "session reports are derived views rendered under runtime/reports/ from the \
+     logs in runtime/logs/. Check both directories are readable and writable; \
+     regenerating with `rhei report` is always safe."
+}
+
+/// Help for a declared metric whose value could not be resolved or recorded.
+// §FS-rhei-metrics.1 §FS-rhei-metrics.3
+fn metric_value_help() -> &'static str {
+    "a declared metric's value comes from the measurement artifacts its \
+     states.yaml declaration names (artifact/value_artifact/pointer/program). \
+     Check the declaration against what the measure state actually wrote; \
+     iteration records live under runtime/metrics/."
+}

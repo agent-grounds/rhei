@@ -79,7 +79,7 @@ flow to be only composition rather than a placeholder task or machine.
 `select` is an optional YAML block scalar containing a restricted MiniJinja
 template whose result is a mapping with only `ports`, `data`, and
 `compatibility`. It uses the same restricted environment as materialized files
-([§FS-rhei-templates.5](rhei-templates.spec.md#5-instantiation-variables)).
+([§FS-rhei-templates.5](rhei-templates.spec.md#5-instantiation-template-syntax)).
 
 ```yaml
 select: |

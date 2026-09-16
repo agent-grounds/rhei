@@ -1,0 +1,14 @@
+name: |-
+  changeset-review-legacy-surface
+  human-review:
+    gating: true
+
+  - from: decide
+    to: human-review
+  - from: human-review
+    to: prepare-workspace
+  - from: human-review
+    to: final-fix
+version: 1
+states: {}
+transitions: []

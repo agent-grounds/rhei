@@ -132,6 +132,9 @@ fn run_agent_mode(
     let mut pass = 0u32;
     // One-time notice so the gate-wait below does not spam the journal each tick.
     let mut awaiting_gate_announced = false;
+    // Re-check persisted deadlines and task states in short slices without
+    // repeating the same foreground notice on every slice. §FS-rhei-run.3.3
+    let mut awaiting_deadline_announced: Option<u64> = None;
     // Manual-only tasks reported by a dry run; the command still exits
     // non-zero once the scan is complete. §FS-rhei-run.4
     let mut manual_only_dry_run: Vec<String> = Vec::new();
@@ -205,17 +208,27 @@ fn run_agent_mode(
                     interruptible_sleep(Duration::from_millis(500));
                     continue;
                 }
-                if let Some(deadline) =
-                    earliest_pending_poll_deadline(&loaded.rhei, &machines.set, &rhei_scope)
+                if let Some(deadline) = earliest_pending_agent_deadline(
+                    &loaded.rhei,
+                    &machines.set,
+                    settings,
+                    opts,
+                    &rhei_scope,
+                )
                 {
                     let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
-                    run_info!(
-                        "No ready tasks; sleeping {}s until the next poll attempt.",
-                        sleep_secs
-                    );
+                    if awaiting_deadline_announced != Some(deadline) {
+                        run_info!(
+                            "No ready tasks; sleeping {}s until the next scheduled attempt.",
+                            sleep_secs
+                        );
+                        awaiting_deadline_announced = Some(deadline);
+                    }
                     // A poll deadline is minutes away; the token must not wait
                     // it out. §FS-rhei-run.3.2
-                    interruptible_sleep(Duration::from_secs(sleep_secs));
+                    interruptible_sleep(
+                        Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),
+                    );
                     continue;
                 }
             }
@@ -404,6 +417,16 @@ fn run_agent_mode(
                 }
 
                 for resolved in pending {
+                    if resolved_provider_deadline(
+                        &loaded.rhei,
+                        &machines.set,
+                        &resolved,
+                        current_unix_secs(),
+                    )
+                    .is_some()
+                    {
+                        continue;
+                    }
                     agent_tasks.push((
                         task_id_str.clone(),
                         current_state_raw.clone(),
@@ -653,6 +676,28 @@ fn run_agent_mode(
                     sink.emit(RunEvent::PassEnded { pass, progressed: false });
                     continue;
                 }
+                if let Some(deadline) = earliest_pending_agent_deadline(
+                    &loaded.rhei,
+                    &machines.set,
+                    settings,
+                    opts,
+                    &rhei_scope,
+                ) {
+                    let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
+                    if awaiting_deadline_announced != Some(deadline) {
+                        run_info!(
+                            "No ready tasks; sleeping {}s until the next scheduled attempt.",
+                            sleep_secs
+                        );
+                        awaiting_deadline_announced = Some(deadline);
+                    }
+                    stalled_tasks.clear();
+                    progress_since_stall_reset = false;
+                    interruptible_sleep(
+                        Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),
+                    );
+                    continue;
+                }
                 run_info!("No program, agent, or callback-only tasks could advance.");
                 sink.emit(RunEvent::PassEnded { pass, progressed: false });
                 break;
@@ -861,6 +906,29 @@ fn run_agent_mode(
         if progress_since_stall_reset && !stalled_tasks.is_empty() {
             stalled_tasks.clear();
             progress_since_stall_reset = false;
+            continue;
+        }
+        let loaded = load_plan(input)?;
+        if let Some(deadline) = earliest_pending_agent_deadline(
+            &loaded.rhei,
+            &machines.set,
+            settings,
+            opts,
+            &rhei_scope,
+        ) {
+            let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
+            if awaiting_deadline_announced != Some(deadline) {
+                run_info!(
+                    "No ready tasks; sleeping {}s until the next scheduled attempt.",
+                    sleep_secs
+                );
+                awaiting_deadline_announced = Some(deadline);
+            }
+            stalled_tasks.clear();
+            progress_since_stall_reset = false;
+            interruptible_sleep(
+                Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),
+            );
             continue;
         }
         break;

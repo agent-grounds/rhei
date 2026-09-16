@@ -492,6 +492,7 @@ impl UiState {
                     // The state is not done and nothing went wrong with it: the
                     // machine asked for another attempt. §FS-rhei-states.2.2
                     TaskOutcome::Waiting => "⏳",
+                    TaskOutcome::ProviderLimited { .. } => "⏳",
                     TaskOutcome::Cancelled => "⊘",
                     TaskOutcome::TimedOut => "⏱",
                     // Distinct from cancelled's `⊘`: nothing about the ticket
@@ -504,13 +505,18 @@ impl UiState {
                 // A handled wait claims no attention: it reads at the level a
                 // completion does, not a failure's. §FS-rhei-states.2.2
                 let level = match outcome {
-                    TaskOutcome::Completed | TaskOutcome::Waiting => MessageLevel::Info,
+                    TaskOutcome::Completed
+                    | TaskOutcome::Waiting
+                    | TaskOutcome::ProviderLimited { .. } => MessageLevel::Info,
                     _ => MessageLevel::Warn,
                 };
                 // Carried through rather than rewritten, so the line says what
                 // the run said even where the symbol cannot.
                 // §FS-rhei-run-json.2.2
                 let unknown = match outcome {
+                    TaskOutcome::ProviderLimited { provider, next_attempt_at } => {
+                        format!(" {provider} until {next_attempt_at}")
+                    }
                     TaskOutcome::Unrecognized(name) => format!(" {name}"),
                     _ => String::new(),
                 };

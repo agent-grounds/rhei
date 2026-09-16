@@ -611,6 +611,7 @@
             3,
             "task-live".to_string(),
             None,
+            Arc::new(Mutex::new(Vec::new())),
         );
 
         drain_agent_output_reader(handle, rhei_tui::AgentStream::Stdout).expect("reader drains");
@@ -669,6 +670,7 @@
             3,
             "task-live".to_string(),
             Some(capture),
+            Arc::new(Mutex::new(Vec::new())),
         );
         handle.join().expect("reader thread joins").expect("reader drains");
 

@@ -173,6 +173,58 @@ transitions:
     (dir, workspace, machine)
 }
 
+fn sequential_provider_limit_workspace(
+    prefix: &str,
+) -> (TestDir, std::path::PathBuf, std::path::PathBuf) {
+    let tasks = [("01-limited.md", "### Task 1: Limited task\n**State:** working\n")];
+    let (dir, workspace, machine) =
+        create_workspace(prefix, "# Rhei: Sequential provider limit\n", &tasks);
+    let agent = write_python_agent(
+        &dir,
+        "sequential-limited-codex.py",
+        &format!(
+            r#"root = pathlib.Path(env('RHEI_ROOT'))
+marker = root / 'runtime' / 'provider-limit-refused.txt'
+starts = root / 'runtime' / 'provider-limit-starts.txt'
+write(starts, (starts.read_text() if starts.exists() else '') + env('RHEI_ATTEMPT') + '\n')
+if not marker.exists():
+    write(marker, 'refused\n')
+    print({LIMIT_SIGNAL:?}, file=sys.stderr, flush=True)
+    raise SystemExit(1)
+result('## Result\n\nResumed after the provider wait.\n')
+"#
+        ),
+    );
+    let settings_dir = workspace.join(".agent-grounds/rhei");
+    fs::create_dir_all(&settings_dir).expect("create settings directory");
+    fs::write(
+        settings_dir.join("settings.json"),
+        format!(
+            r#"{{"agents":{{"codex":{{"command":{},"stdin_prompt":true,"timeout":"10s"}}}}}}"#,
+            fixture_command(&agent)
+        ),
+    )
+    .expect("write settings");
+    fs::write(
+        &machine,
+        r#"name: sequential-provider-limit
+version: 1
+states:
+  working:
+    initial: true
+    target: codex:openai:gpt-5.6-sol
+    attempts: 1
+  completed:
+    final: true
+transitions:
+  - from: working
+    to: completed
+"#,
+    )
+    .expect("write machine");
+    (dir, workspace, machine)
+}
+
 /// Eight simultaneous reset-bearing Codex refusals remain parked, auditable,
 /// uncharged, and resumable instead of ending the run as eight failures.
 /// §FS-rhei-agents.2 §FS-rhei-agents.3.2.3 §FS-rhei-agents.5.2.2
@@ -251,6 +303,73 @@ fn eight_parallel_codex_limits_park_and_resume_without_spending_attempts() {
         !markdown_text(&workspace).contains("providerLimits:"),
         "successful resumption must clear provider-limit records"
     );
+}
+
+/// A sequential foreground run re-reads durable waits while sleeping, so a
+/// controlled deadline advance wakes the same process and resumes uncharged.
+/// §FS-rhei-agents.5.2.1 §FS-rhei-run.3.3 §FS-rhei-run.5.1
+#[test]
+fn sequential_provider_limit_wakes_and_resumes_in_process() {
+    let (_dir, workspace, machine) =
+        sequential_provider_limit_workspace("provider-limit-sequential-wakeup");
+    let mut command = rhei_command(workspace.join(".home"));
+    command
+        .arg("--state-machine")
+        .arg(&machine)
+        .arg("run")
+        .arg(&workspace)
+        .args(["--no-tui", "--no-dashboard", "--no-callbacks"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    let mut run = RunningChild(Some(command.spawn().expect("spawn rhei run")));
+    wait_for("the sequential provider wait", || {
+        markdown_text(&workspace).contains("nextAttemptAt:")
+    });
+    expire_provider_deadlines(&workspace);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let status = loop {
+        if let Some(status) = run.child().try_wait().expect("inspect run status") {
+            break status;
+        }
+        assert!(Instant::now() < deadline, "the parked run did not resume");
+        thread::sleep(Duration::from_millis(25));
+    };
+    assert!(status.success());
+    assert_all_tasks_in_state(&workspace, &machine, "completed");
+    let starts = fs::read_to_string(workspace.join("runtime/provider-limit-starts.txt")).unwrap();
+    assert_eq!(starts.lines().collect::<Vec<_>>(), ["1", "2"]);
+}
+
+/// Restarting before expiry preserves the wait and does not spend or launch a
+/// second attempt early. §FS-rhei-run.3.3
+#[test]
+fn restart_before_provider_deadline_remains_parked() {
+    let (_dir, workspace, machine) =
+        sequential_provider_limit_workspace("provider-limit-restart-future");
+    let spawn = || {
+        let mut command = rhei_command(workspace.join(".home"));
+        command
+            .arg("--state-machine")
+            .arg(&machine)
+            .arg("run")
+            .arg(&workspace)
+            .args(["--no-tui", "--no-dashboard", "--no-callbacks"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        RunningChild(Some(command.spawn().expect("spawn rhei run")))
+    };
+    let mut first = spawn();
+    wait_for("the persisted provider wait", || {
+        markdown_text(&workspace).contains("nextAttemptAt:")
+    });
+    first.stop();
+
+    let mut restarted = spawn();
+    thread::sleep(Duration::from_millis(750));
+    assert!(restarted.child().try_wait().unwrap().is_none(), "restart must keep waiting");
+    let starts = fs::read_to_string(workspace.join("runtime/provider-limit-starts.txt")).unwrap();
+    assert_eq!(starts.lines().collect::<Vec<_>>(), ["1"]);
+    restarted.stop();
 }
 
 fn ordinary_failure_case(prefix: &str, continue_on_error: bool) -> (CliRun, usize) {

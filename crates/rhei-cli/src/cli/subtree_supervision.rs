@@ -247,7 +247,8 @@ fn clear_supervision_for_task(existing: Option<&Metadata>, task_id: &TaskId) -> 
 // §FS-rhei-supervision.3.3 §FS-rhei-reset
 fn clear_runtime_task_metadata(existing: Option<&Metadata>) -> Option<Metadata> {
     let without_visits = clear_runtime_state_visits(existing)?;
-    let cleared = clear_runtime_supervision(Some(&without_visits))?;
+    let without_limits = clear_runtime_provider_limits(Some(&without_visits))?;
+    let cleared = clear_runtime_supervision(Some(&without_limits))?;
     Some(drop_empty_task_metadata(cleared))
 }
 

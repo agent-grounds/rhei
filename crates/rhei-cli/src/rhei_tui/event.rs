@@ -22,6 +22,12 @@ pub enum TaskOutcome {
     /// matched the edge. It carries no reason the way [`Self::Failed`] does —
     /// the exit that matched is already on the same record. §FS-rhei-states.2.2
     Waiting,
+    /// A supported provider refused the invocation until a durable UTC
+    /// deadline. This is a wait, not a failure. §FS-rhei-run-tui.1.1
+    ProviderLimited {
+        provider: String,
+        next_attempt_at: String,
+    },
     Cancelled,
     TimedOut,
     /// The engine ended the invocation because the run was interrupted. The

@@ -332,7 +332,18 @@ fn collect_ready_agent_work_items(
             &current_state,
             state_def,
             invocations,
-        );
+        )
+        .into_iter()
+        .filter(|resolved| {
+            resolved_provider_deadline(
+                &loaded.rhei,
+                &machines.set,
+                resolved,
+                current_unix_secs(),
+            )
+            .is_none()
+        })
+        .collect::<Vec<_>>();
 
         if pending.is_empty() {
             continue;

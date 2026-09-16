@@ -29,6 +29,8 @@ clap_complete = { version = "=4.5.60", features = ["unstable-dynamic"] }
 # Cargo 1.82-compatible release instead of letting resolution float to 1.1.x.
 clap_lex = "=1.0.0"
 anyhow = "1"
+chrono = { version = "0.4.42", default-features = false, features = ["clock", "std"] }
+chrono-tz = "0.10.4"
 # Constrain serde_yaml's transitive resolver for Rust 1.82-compatible package verification.
 indexmap = { version = "=2.2.6", features = ["serde"] }
 miette = { version = "7", default-features = false, features = ["fancy-no-backtrace", "derive"] }

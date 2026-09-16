@@ -41,7 +41,7 @@ fn handle_parallel_agent_exit(
         accounting_recorded,
         outcome,
     } = exit;
-    let AgentSpawnOutcome { status, timed_out, timeout_secs, .. } = outcome;
+    let AgentSpawnOutcome { status, timed_out, timeout_secs, provider_limit, .. } = outcome;
     // The completed ticket's own machine drives its post-exit
     // handling; callbacks resolve inside each helper from the
     // same set. §DA-per-rhei-state-machines
@@ -63,6 +63,31 @@ fn handle_parallel_agent_exit(
         }
     }
     let task_after = find_task_by_id(&reloaded.rhei.tasks, &target_id);
+    let stayed_in_state = task_after.is_some_and(|task| {
+        normalized_state_name(task.state.as_str(), machine)
+            == normalized_state_name(&state_name, machine)
+    });
+    // The worker has released its slot; classify and persist the wait before
+    // any generic failure transition, callback, or snapshot path can run.
+    // §FS-rhei-agents.5.2.2 §FS-rhei-run.3.3
+    if let Some(observed) = provider_limit {
+        let effective = if stayed_in_state {
+            persist_provider_limit(input, &reloaded, &task_id_str, &state_name, &observed)?
+        } else {
+            observed
+        };
+        release.provider_limited(&effective);
+        run_info!(
+            "  Task {} provider-limited by {} until {}; state unchanged.",
+            task_id_str,
+            effective.identity.provider,
+            effective.next_attempt_at
+        );
+        return Ok(());
+    }
+    if status.success() && stayed_in_state {
+        clear_persisted_provider_limit(input, &reloaded, &task_id_str, &state_name)?;
+    }
     let mut missing_required_outputs = Vec::new();
     let mut snapshot_completion_for_emit = None;
     let mut failure_selected_to_state = None;

@@ -167,6 +167,54 @@ fn earliest_pending_poll_deadline(
         .min()
 }
 
+/// Earliest effective eligibility instant in agent mode. A task subject to
+/// both polling and a provider limit waits for the later one; the run wakes for
+/// the earliest task that can actually become runnable. §FS-rhei-run.5.1
+fn earliest_pending_agent_deadline(
+    rhei: &rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    settings: &RheiSettings,
+    opts: &RunOptions,
+    scope: &RheiScope,
+) -> Option<u64> {
+    let now = current_unix_secs();
+    let mut tasks = Vec::new();
+    collect_plan_tasks(&rhei.tasks, &mut tasks);
+    tasks
+        .into_iter()
+        .filter(|task| task_in_rhei_scope(scope, &task.id.to_string()))
+        .filter_map(|task| {
+            let machine = machines.for_task(&task.id);
+            let state = normalized_state_name(task.state.as_str(), machine);
+            let state_def = machine.states.get(&state)?;
+            if state_def.terminal || state_def.gating {
+                return None;
+            }
+            let poll = state_def
+                .poll
+                .as_ref()
+                .and_then(|_| poll_next_attempt_at(rhei.metadata.as_ref(), &task.id, &state))
+                .filter(|deadline| *deadline > now);
+            let provider = if state_def.program.is_some() {
+                None
+            } else {
+                resolve_agent_invocations_for_task(machine, &state, settings, opts, Some(task))
+                    .ok()?
+                    .iter()
+                    .filter_map(|resolved| {
+                        resolved_provider_deadline(rhei, machines, resolved, now)
+                    })
+                    .max()
+            };
+            match (poll, provider) {
+                (Some(poll), Some(provider)) => Some(poll.max(provider)),
+                (Some(deadline), None) | (None, Some(deadline)) => Some(deadline),
+                (None, None) => None,
+            }
+        })
+        .min()
+}
+
 /// Whether any non-terminal task sits in a gating state — work the run cannot
 /// advance without a human decision. Lets an interactive run stay alive so the
 /// gate stays resolvable in the UI. §FS-rhei-run-tui.1.5.5

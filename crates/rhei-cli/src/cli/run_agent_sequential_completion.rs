@@ -88,7 +88,13 @@ fn handle_sequential_agent_completion(
                 interrupted_task_warning(task_id_str, current_state, Some(&log))
             );
         }
-        Ok(AgentSpawnOutcome { status, timed_out, timeout_secs, .. }) => {
+        Ok(AgentSpawnOutcome {
+            status,
+            timed_out,
+            timeout_secs,
+            provider_limit,
+            ..
+        }) => {
             *progress.agents_spawned += 1;
             let state_def = machine.states.get(current_state).ok_or_else(|| {
                 miette!(
@@ -101,6 +107,36 @@ fn handle_sequential_agent_completion(
             // exit selects lands on a `final: true` state.
             let reloaded = load_plan(input)?;
             let task_after = find_task_by_id(&reloaded.rhei.tasks, &target_id);
+            let stayed_in_state = task_after.is_some_and(|task| {
+                normalized_state_name(task.state.as_str(), machine)
+                    == normalized_state_name(current_state, machine)
+            });
+            // Provider classification outranks generic failure and snapshots; persist only while
+            // the task occupies the reporting state. §FS-rhei-agents.5.2.1 §FS-rhei-run.3.3
+            if let Some(observed) = provider_limit {
+                let effective = if stayed_in_state {
+                    persist_provider_limit(
+                        input,
+                        &reloaded,
+                        task_id_str,
+                        current_state,
+                        &observed,
+                    )?
+                } else {
+                    observed
+                };
+                release.provider_limited(&effective);
+                run_info!(
+                    "  Task {} provider-limited by {} until {}; state unchanged.",
+                    task_id_str,
+                    effective.identity.provider,
+                    effective.next_attempt_at
+                );
+                return Ok(());
+            }
+            if status.success() && stayed_in_state {
+                clear_persisted_provider_limit(input, &reloaded, task_id_str, current_state)?;
+            }
             // Condition (3) selects that edge against the plan as re-read here,
             // so a child this invocation appended is an open descendant of it.
             // §FS-rhei-agents.3.2 §FS-rhei-supervision.4.1

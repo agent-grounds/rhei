@@ -303,6 +303,32 @@ fn slot_release_clears_live_marker() {
     assert!(!state.is_live("1"));
 }
 
+/// A provider wait is calm terminal chrome for the released slot and keeps
+/// its provider/deadline visible to an attached operator. §FS-rhei-run-tui.1.1
+#[test]
+fn provider_limit_release_is_a_calm_visible_wait() {
+    let mut state = state_with_plan();
+    state.apply(&RunEvent::SlotReleased {
+        slot: 0,
+        task: "1".into(),
+        from: "in-progress".into(),
+        to: "in-progress".into(),
+        log_path: PathBuf::from("1.log"),
+        outcome: TaskOutcome::ProviderLimited {
+            provider: "openai".into(),
+            next_attempt_at: "2026-09-16T20:21:00Z".into(),
+        },
+        finished_at: Instant::now(),
+        wall_clock: SystemTime::now(),
+        exit_code: Some(1),
+        duration_ms: 1200,
+    });
+
+    let entry = state.journal.back().expect("release journal entry");
+    assert_eq!(entry.level, MessageLevel::Info);
+    assert!(entry.text.contains("⏳ slot 0: 1 openai until 2026-09-16T20:21:00Z"));
+}
+
 #[test]
 fn journal_filter_keeps_only_warnings() {
     let mut state = state_with_plan();

@@ -18,6 +18,9 @@ struct AgentSpawnOutcome {
     timeout_secs: Option<u64>,
     usage_capture_path: Option<PathBuf>,
     cli_session: Option<AccountingCliSession>,
+    /// A strict provider refusal recognized after output drain and before the
+    /// generic non-zero completion paths run. §FS-rhei-agents.2
+    provider_limit: Option<ProviderLimit>,
 }
 
 #[cfg(not(test))]
@@ -70,6 +73,7 @@ fn spawn_agent_output_reader<R>(
     slot: rhei_tui::Slot,
     task_id: String,
     usage_capture: Option<AgentUsageCapture>,
+    captured_lines: Arc<Mutex<Vec<String>>>,
 ) -> std::thread::JoinHandle<std::io::Result<()>>
 where
     R: Read + Send + 'static,
@@ -85,6 +89,9 @@ where
             }
 
             let raw_line = output_line(&buf);
+            if let Ok(mut captured) = captured_lines.lock() {
+                captured.push(raw_line.clone());
+            }
             let display_line = display_agent_output_line(usage_capture.as_ref(), stream, &raw_line);
             let is_claude_result = stream == rhei_tui::AgentStream::Stdout
                 && usage_capture
@@ -344,6 +351,7 @@ fn spawn_and_wait_agent(
                 timeout_secs: resolved.timeout_secs,
                 usage_capture_path: None,
                 cli_session: None,
+                provider_limit: None,
             });
         }
         // A command line too large to hand over fails here exactly as a missing
@@ -352,6 +360,7 @@ fn spawn_and_wait_agent(
     };
     let child = &mut supervised.child;
 
+    let captured_lines = Arc::new(Mutex::new(Vec::new()));
     let stdout_handle = child.stdout.take().map(|stdout| {
         spawn_agent_output_reader(
             stdout,
@@ -361,6 +370,7 @@ fn spawn_and_wait_agent(
             slot,
             task_id.to_string(),
             usage_capture.clone(),
+            captured_lines.clone(),
         )
     });
     let stderr_handle = child.stderr.take().map(|stderr| {
@@ -372,6 +382,7 @@ fn spawn_and_wait_agent(
             slot,
             task_id.to_string(),
             None,
+            captured_lines.clone(),
         )
     });
 
@@ -481,6 +492,16 @@ fn spawn_and_wait_agent(
     let elapsed = start.elapsed();
     let duration = format_duration_human(elapsed.as_secs());
     let ended_wall = std::time::SystemTime::now();
+    let provider_limit = captured_lines.lock().ok().and_then(|lines| {
+        classify_provider_limit(
+            resolved,
+            status,
+            timed_out,
+            interrupted,
+            &lines,
+            ended_wall,
+        )
+    });
     let timeout_message =
         if timed_out { resolved.timeout_secs.map(format_duration_human) } else { None };
     // The spawn ran. Say so where the next pass, the next run, and the engine's
@@ -494,7 +515,9 @@ fn spawn_and_wait_agent(
         ended: &format_iso8601_utc(ended_wall),
         duration: &duration,
         code: status.code(),
-        ending: if timed_out {
+        ending: if provider_limit.is_some() {
+            "provider_limited"
+        } else if timed_out {
             "timed out"
         } else if interrupted {
             "interrupted"
@@ -503,7 +526,9 @@ fn spawn_and_wait_agent(
         },
     });
     with_agent_log(&log_file, |f| {
-        if let Some(duration) = &timeout_message {
+        if let Some(limit) = &provider_limit {
+            writeln!(f, "\nagent provider-limited until {}", limit.next_attempt_at)?;
+        } else if let Some(duration) = &timeout_message {
             writeln!(f, "\nagent timed out after {duration}")?;
         } else if interrupted {
             // The run was shutting down, not the agent failing. §FS-rhei-run.3.2
@@ -518,6 +543,9 @@ fn spawn_and_wait_agent(
         }
         if interrupted {
             writeln!(f, "interrupted: true")?;
+        }
+        if provider_limit.is_some() {
+            writeln!(f, "provider_limited: true")?;
         }
         writeln!(f, "===")?;
         f.flush()
@@ -536,5 +564,6 @@ fn spawn_and_wait_agent(
         timeout_secs: resolved.timeout_secs,
         usage_capture_path,
         cli_session,
+        provider_limit,
     })
 }

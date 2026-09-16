@@ -38,6 +38,11 @@ struct SpawnRecord {
     // §FS-rhei-run.3.2 §FS-rhei-agents.3.2.3
     #[serde(default)]
     charged: u64,
+    /// Whether this invocation itself spent the visit budget. Kept beside the
+    /// cumulative counter so old records still drive retries correctly.
+    // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.4
+    #[serde(default = "default_attempt_charged")]
+    attempt_charged: bool,
     /// `agent` or `program`, so the account of a state says which kind ran
     /// rather than assuming the one the state would resolve to today.
     kind: String,
@@ -52,6 +57,10 @@ struct SpawnRecord {
     /// reports the ending it is retrying, and these are different rules.
     // §FS-rhei-agents.3.2.1
     ending: String,
+}
+
+fn default_attempt_charged() -> bool {
+    true
 }
 
 /// The `ending` of an attempt whose edge §FS-rhei-supervision.3.6 took away.
@@ -81,6 +90,7 @@ impl SpawnRecord {
             (_, Some(0)) | (_, None) => {
                 "exited 0 without meeting this state's completion condition".to_string()
             }
+            ("provider_limited", _) => "was provider-limited".to_string(),
             (_, Some(code)) => format!("exited {code}"),
         }
     }
@@ -269,6 +279,7 @@ impl SpawnPlan {
                 return;
             }
         }
+        let attempt_charged = !matches!(ended.ending, "interrupted" | "provider_limited");
         let record = SpawnRecord {
             task: ended.task_id.to_string(),
             state: ended.state_name.to_string(),
@@ -277,7 +288,8 @@ impl SpawnPlan {
             // An interrupted invocation is not an attempt the ticket spent: the
             // run ended it and the next one re-executes it. It keeps its
             // attempt log all the same. §FS-rhei-run.3.2 §FS-rhei-agents.3.2.3
-            charged: self.charged + u64::from(ended.ending != "interrupted"),
+            charged: self.charged + u64::from(attempt_charged),
+            attempt_charged,
             kind: ended.kind.to_string(),
             worker: ended.worker.to_string(),
             log: self.log.clone(),

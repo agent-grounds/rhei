@@ -51,6 +51,7 @@ include!("cli/states_render.rs");
 include!("cli/loop_budget.rs");
 include!("cli/metadata_conditions.rs");
 include!("cli/metadata_rewrite.rs");
+include!("cli/provider_limits.rs");
 include!("cli/subtree_supervision.rs");
 include!("cli/subtree_supervision_owner.rs");
 include!("cli/subtree_supervision_barrier.rs");
@@ -191,6 +192,7 @@ mod tests {
     include!("cli/tests_claim_revalidation.rs");
     include!("cli/tests_headless_console_log.rs");
     include!("cli/tests_agent_resolution.rs");
+    include!("cli/tests_provider_limits.rs");
     include!("cli/tests_agent_prompt_transport.rs");
     include!("cli/tests_spawn_records.rs");
     include!("cli/tests_program_exit_routes.rs");

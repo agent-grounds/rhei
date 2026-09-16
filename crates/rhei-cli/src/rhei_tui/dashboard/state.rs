@@ -165,6 +165,9 @@ impl DashboardState {
                     // Carries no reason: the exit that matched the self-loop is
                     // in the cell beside it. §FS-rhei-states.2.2
                     TaskOutcome::Waiting => "waiting".to_string(),
+                    TaskOutcome::ProviderLimited { provider, next_attempt_at } => {
+                        format!("provider limited: {provider} until {next_attempt_at}")
+                    }
                     TaskOutcome::Cancelled => "cancelled".to_string(),
                     TaskOutcome::TimedOut => "timed out".to_string(),
                     TaskOutcome::Interrupted => "interrupted".to_string(),

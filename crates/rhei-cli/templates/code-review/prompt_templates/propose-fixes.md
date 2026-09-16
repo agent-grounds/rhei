@@ -1,4 +1,4 @@
-Use the current state `{state}` and states.yaml to identify this block's
+Use the current task state and states.yaml to identify this block's
 states. Local state names in these instructions mean the state with the
 same encoded prefix as the current state; identity wrappers have no prefix.
 For completion, use the current state's exact outgoing completion edge.

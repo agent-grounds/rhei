@@ -186,6 +186,18 @@ If an older `/usr/local/bin/rhei` appears before `~/.cargo/bin/rhei`, either adj
 ~/.cargo/bin/rhei version
 ```
 
+When upgrading every Rhei process that shares a plan directory, stop all older
+writers first, upgrade every writer, and only then resume them. Current writers
+coordinate through permanent empty sibling sidecars and do not support live
+mixed-version writing with older destination-locking binaries. Existing
+sidecars are reused; their presence proves neither ownership nor that an
+upgrade finished, and they must not be deleted to clear a suspected lock.
+
+If authored plan data is versioned, ignore coordination artifacts in that plan
+tree with scoped patterns such as `*.md.lock` and
+`runtime.state-transitions.log.lock`; avoid a repository-wide `*.lock` rule,
+which can hide unrelated dependency lockfiles. §FS-rhei-authoring.7.2
+
 ### npm
 
 Install the CLI from npm:

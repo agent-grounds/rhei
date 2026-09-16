@@ -62,7 +62,7 @@ fn reset_plan_file_states(
         help = temp_write_help(),
         "failed to write temp file: {err}"
     ))?;
-    persist_locked(tmp, path, Some(locked)).map_err(|err| miette!(
+    persist_locked(tmp, path).map_err(|err| miette!(
         help = temp_write_help(),
         "failed to persist temp file: {err}"
     ))?;
@@ -109,7 +109,7 @@ fn clear_runtime_metadata_in_file(
         help = temp_write_help(),
         "failed to write temp file: {err}"
     ))?;
-    persist_locked(tmp, path, Some(locked)).map_err(|err| miette!(
+    persist_locked(tmp, path).map_err(|err| miette!(
         help = temp_write_help(),
         "failed to persist temp file: {err}"
     ))?;

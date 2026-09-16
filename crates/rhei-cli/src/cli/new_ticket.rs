@@ -23,6 +23,7 @@ fn new_ticket_write(
     options: &NewOptions,
     parent: &str,
     description: Option<&str>,
+    decision: NewDecision,
 ) -> MietteResult<NewWrite> {
     reject_malformed_export_flags(options)?;
     // Leniently, so that one unreadable rhei does not take out creates into
@@ -66,7 +67,16 @@ fn new_ticket_write(
         description,
     });
 
-    let placed = place_ticket(&entry, &placement, &local_id, &loaded, target, &options.title, &block)?;
+    let placed = place_ticket(
+        &entry,
+        &placement,
+        &local_id,
+        &loaded,
+        target,
+        &options.title,
+        &block,
+        decision,
+    )?;
 
     Ok(NewWrite {
         kind: "ticket",

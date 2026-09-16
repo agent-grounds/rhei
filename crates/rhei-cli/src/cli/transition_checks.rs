@@ -228,7 +228,7 @@ fn ensure_state_outputs_exist(
 
 /// Execute the `transition` subcommand: atomic compare-and-swap state change.
 ///
-/// Acquires an exclusive file lock, verifies the task's current state matches
+/// Acquires the plan's exclusive sibling sidecar, verifies the task's current state matches
 /// `from`, validates the transition against the state machine, rewrites the
 /// `**State:**` line, and writes the file atomically (temp + rename).
 #[allow(clippy::too_many_arguments)]
@@ -309,11 +309,11 @@ fn require_non_blank_result<'a>(
 
 /// Core transition logic shared by `transition` and `run` commands.
 ///
-/// Validates states and transition legality, acquires an exclusive file lock,
+/// Validates states and transition legality, acquires the exclusive plan sidecar,
 /// performs compare-and-swap verification, executes callbacks, and atomically
 /// rewrites the plan file. Returns an error if any step fails.
 ///
-/// `task_file` is the specific file to lock and rewrite (for directory
+/// `task_file` is the specific file whose sidecar is locked before rewriting (for directory
 /// workspaces this is the file inside `tasks/` that contains the task;
 /// for single-file plans it equals `plan_path`).
 ///

@@ -45,7 +45,7 @@ fn rolls_back_a_create_that_fails_validation() {
 
     let result = new_run(&["new", "Broken", "--under", "auth", "--prior", "99"], &dir);
     assert!(!result.status.success(), "an unresolvable prior must fail");
-    assert!(result.stderr.contains("nothing was written"), "got: {}", result.stderr);
+    assert!(result.stderr.contains("plan data was rolled back"), "got: {}", result.stderr);
     assert_eq!(fs::read_to_string(dir.join("auth.rhei.md")).expect("rhei file"), before);
 }
 
@@ -55,7 +55,8 @@ fn rollback_removes_a_file_it_created() {
     assert_success(&new_run(&["new", "Billing", "--dir"], &dir));
     let result = new_run(&["new", "Broken", "--under", "billing", "--prior", "99"], &dir);
     assert!(!result.status.success());
-    assert_eq!(fs::read_dir(dir.join("billing/tasks")).expect("tasks dir").count(), 0);
+    assert!(!dir.join("billing/tasks/001-broken.md").exists());
+    assert!(dir.join("billing/tasks/001-broken.md.lock").is_file());
 }
 
 /// First publication in every create layout establishes the same permanent
@@ -113,10 +114,11 @@ fn keep_on_error_leaves_the_write_in_place() {
         new_run(&["new", "Broken", "--under", "billing", "--prior", "99", "--keep-on-error"], &dir);
     assert!(!result.status.success());
     assert!(result.stderr.contains("left failing validation"), "got: {}", result.stderr);
-    assert_eq!(fs::read_dir(dir.join("billing/tasks")).expect("tasks dir").count(), 1);
+    assert!(dir.join("billing/tasks/001-broken.md").is_file());
+    assert!(dir.join("billing/tasks/001-broken.md.lock").is_file());
 }
 
-/// §FS-rhei-new.5.4: `--dry-run` prints the block and touches nothing.
+/// §FS-rhei-new.5.4: `--dry-run` prints the block and restores plan data.
 #[test]
 fn dry_run_writes_nothing() {
     let dir = project_with_rhei("new-dry-run");
@@ -250,20 +252,21 @@ fn a_create_that_adds_an_error_rolls_back_and_reports_only_that_error() {
         !said.contains("Task broken.1"),
         "an error the create did not introduce is not its business:\n{said}"
     );
-    assert!(result.stderr.contains("nothing was written"), "got: {}", result.stderr);
+    assert!(result.stderr.contains("plan data was rolled back"), "got: {}", result.stderr);
     assert_eq!(fs::read_to_string(dir.join("auth.rhei.md")).expect("rhei file"), before);
 }
 
-/// §FS-rhei-new.5.2: a rollback removes the directories the create made, not
-/// just the file it wrote.
+/// §FS-rhei-new.5.2: rollback removes owned plan directories while retaining
+/// the parent and sidecar needed for the destination's permanent identity.
 #[test]
-fn rolling_back_a_dir_rhei_removes_the_directory_it_made() {
+fn rolling_back_a_dir_rhei_retains_only_its_coordination_identity() {
     let dir = empty_project("new-write-dir-rollback");
     let result = new_run(&["new", "Billing", "--dir", "--states", "nowhere"], &dir);
 
     assert_says(&result, "no states file declaring it was found");
     assert!(!dir.join("billing/tasks").exists(), "tasks/ must be removed");
-    assert!(!dir.join("billing").exists(), "the rhei directory must be removed");
+    assert!(!dir.join("billing/index.rhei.md").exists(), "plan data must be removed");
+    assert!(dir.join("billing/index.rhei.md.lock").is_file(), "sidecar must remain");
 }
 
 // ---------------------------------------------------------------------------
@@ -404,14 +407,16 @@ fn a_dry_run_reports_the_failure_the_real_create_would_hit() {
     assert_eq!(fs::read_to_string(dir.join("auth.rhei.md")).expect("rhei file"), before);
 }
 
-/// A dry run of a *rhei* leaves no file and no directory behind either.
+/// A dry run of a *rhei* leaves no plan data, but retains coordination state.
 // §FS-rhei-new.5.4
 #[test]
-fn a_dry_run_of_a_workspace_rhei_leaves_nothing_behind() {
+fn a_dry_run_of_a_workspace_rhei_leaves_only_coordination_behind() {
     let dir = empty_project("new-dry-run-dir");
     let result = new_run(&["new", "Billing", "--dir", "--dry-run"], &dir);
     assert_success(&result);
-    assert!(!dir.join("billing").exists(), "the workspace directory must be rolled back");
+    assert!(!dir.join("billing/index.rhei.md").exists(), "plan data must be rolled back");
+    assert!(!dir.join("billing/tasks").exists(), "owned plan directory must roll back");
+    assert!(dir.join("billing/index.rhei.md.lock").is_file(), "sidecar must remain");
 }
 
 // ---------------------------------------------------------------------------
@@ -438,6 +443,7 @@ fn numeric_task_files_are_zero_padded_so_plan_order_survives_ten() {
     let mut names: Vec<String> = fs::read_dir(dir.join("basin"))
         .expect("basin")
         .map(|entry| entry.expect("entry").file_name().to_string_lossy().into_owned())
+        .filter(|name| name.ends_with(".md"))
         .collect();
     names.sort();
     assert_eq!(names.first().map(String::as_str), Some("001-step-1.md"));

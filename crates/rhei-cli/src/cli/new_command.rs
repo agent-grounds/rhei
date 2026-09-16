@@ -32,6 +32,15 @@ struct NewWrite {
     notes: Vec<String>,
 }
 
+/// Whether a create is only selecting the sidecar identity or is making its
+/// filesystem admission decision while that identity is held.
+// §FS-rhei-new.4
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum NewDecision {
+    Provisional,
+    Authoritative,
+}
+
 fn new_command(options: &NewOptions) -> MietteResult<()> {
     reject_unusable_title(&options.title)?;
     reject_mode_confusion(options)?;
@@ -50,23 +59,21 @@ fn new_command(options: &NewOptions) -> MietteResult<()> {
     // §FS-rhei-new.4
     let scope_lock = lock_new_create(&target)?;
 
-    let (write, destination_lock) =
+    let (write, _destination_lock) =
         decide_under_destination_lock(&target, options, description.as_deref(), &scope_lock)?;
-    let locks = NewCreateLocks { scope: &scope_lock, destination: destination_lock.as_ref() };
 
-    apply_new_write(&target, &write, options, &locks)
+    apply_new_write(&target, &write, options)
 }
 
-/// Decide the write, take the destination's own lock, and confirm the file did
-/// not change between the two.
+/// Decide the write, establish the destination's permanent sidecar, and decide
+/// again authoritatively while holding it.
 ///
 /// The destination can only be locked once its path is known, and its path is
 /// only known once the write has been decided — which reads that same file. A
-/// `rhei complete` landing in that window would be read as absent and written
-/// over, which is the whole failure the second lock exists to prevent, just
-/// narrower. So the file is witnessed before the lock and compared after it,
-/// and a create that lost the race simply decides again against the file as it
-/// now is. Re-deciding rather than failing keeps the command's promise: a
+/// `rhei complete` landing in that window would otherwise be read as absent and
+/// written over. The provisional decision supplies a pathname; its parent and
+/// sidecar are prepared without publishing plan data, then the whole decision
+/// is repeated under that identity. Re-deciding rather than failing keeps the command's promise: a
 /// create waits for a busy project instead of handing the caller back the race.
 // §FS-rhei-new.4
 fn decide_under_destination_lock(
@@ -81,20 +88,18 @@ fn decide_under_destination_lock(
     const ATTEMPTS: usize = 3;
 
     for _ in 0..ATTEMPTS {
-        let write = decide_new_write(target, options, description)?;
-        // Both reads go through whichever lock this create already holds on the
-        // file, so the comparison is between two readings of the plan and not
-        // between one reading and a refusal. §FS-rhei-new.4
-        let before = NewCreateLocks { scope: scope_lock, destination: None };
-        let witnessed = before.read(&write.path);
-        let destination_lock = lock_new_destination(scope_lock, &write.path)?;
-        let after =
-            NewCreateLocks { scope: scope_lock, destination: destination_lock.as_ref() };
-        if after.read(&write.path) == witnessed {
-            return Ok((write, destination_lock));
+        let provisional =
+            decide_new_write(target, options, description, NewDecision::Provisional)?;
+        prepare_destination_lock_parent(&provisional.path)?;
+        let destination_lock = lock_new_destination(scope_lock, &provisional.path)?;
+        let authoritative =
+            decide_new_write(target, options, description, NewDecision::Authoritative)?;
+        if same_path(&authoritative.path, &provisional.path) {
+            return Ok((authoritative, destination_lock));
         }
-        // Release before re-reading, so the next attempt locks the file it
-        // actually decided against.
+        // The abandoned sidecar and its necessary parent remain permanent;
+        // release ownership before choosing the next candidate identity.
+        // §FS-rhei-new.4 §FS-rhei-new.5.1
         drop(destination_lock);
     }
     Err(miette!(
@@ -105,16 +110,27 @@ help = "another command is rewriting that plan. Let it finish, then re-run.",
     ))
 }
 
+/// Prepare exactly the directory needed to establish an absent destination's
+/// sibling sidecar. Once established, this path is coordination state and is
+/// deliberately excluded from plan-data rollback.
+// §FS-rhei-new.4 §FS-rhei-new.5.1
+fn prepare_destination_lock_parent(path: &Path) -> MietteResult<()> {
+    let parent = path.parent().unwrap_or(Path::new("."));
+    fs::create_dir_all(parent)
+        .map_err(|err| file_io_report(parent, "failed to prepare plan lock directory", err))
+}
+
 /// The mode split: `--under` creates a ticket, its absence creates a rhei.
 // §FS-rhei-new.1
 fn decide_new_write(
     target: &Path,
     options: &NewOptions,
     description: Option<&str>,
+    decision: NewDecision,
 ) -> MietteResult<NewWrite> {
     match options.under.as_deref() {
-        Some(parent) => new_ticket_write(target, options, parent, description),
-        None => new_rhei_write(target, options, description),
+        Some(parent) => new_ticket_write(target, options, parent, description, decision),
+        None => new_rhei_write(target, options, description, decision),
     }
 }
 
@@ -228,7 +244,6 @@ struct AppliedWrite {
 fn perform_new_write(
     target: &Path,
     write: &NewWrite,
-    locks: &NewCreateLocks<'_>,
 ) -> MietteResult<AppliedWrite> {
     // Both passes run before the write as well, so what follows can be read as
     // a difference rather than as a verdict on the whole project.
@@ -236,12 +251,12 @@ fn perform_new_write(
     let inherited = create_validation_errors(target);
     let before = create_plan_ids(target);
 
-    let previous = locks.read(&write.path);
+    let previous = fs::read_to_string(&write.path).ok();
     let created_dirs = invocation_created_directories(&write.dirs)?;
     for dir in &write.dirs {
         fs::create_dir_all(dir).map_err(|err| file_io_report(dir, "failed to create", err))?;
     }
-    write_plan_file_atomically(&write.path, &write.contents, locks.covering(&write.path))?;
+    write_plan_file_atomically(&write.path, &write.contents)?;
 
     let failure = new_write_failure(target, write, &inherited, before.as_ref());
     Ok(AppliedWrite { previous, created_dirs, inherited, failure })
@@ -269,9 +284,8 @@ fn apply_new_write(
     target: &Path,
     write: &NewWrite,
     options: &NewOptions,
-    locks: &NewCreateLocks<'_>,
 ) -> MietteResult<()> {
-    let applied = perform_new_write(target, write, locks)?;
+    let applied = perform_new_write(target, write)?;
     if options.dry_run {
         return report_new_dry_run(write, applied, options.json);
     }
@@ -291,11 +305,12 @@ fn apply_new_write(
         return Err(failure.report);
     }
     roll_back_new_write(&write.path, applied.previous.as_deref(), &applied.created_dirs);
-    // Say it before the validator's own report: a create that reports only a
-    // validation error reads as though something half-landed. §FS-rhei-new.5.2
+    // Say it before the validator's own report and distinguish plan data from
+    // the permanent writer identity. §FS-rhei-new.5.2
     eprintln!(
-        "note: nothing was written — the create was rolled back because {}. Re-run with \
-         `--keep-on-error` to inspect it.",
+        "note: plan data was rolled back because {}; its permanent writer sidecar and any \
+         necessary parent directories remain. Re-run with `--keep-on-error` to inspect a \
+         future failed create.",
         failure.reason
     );
     Err(failure.report)
@@ -353,16 +368,16 @@ fn roll_back_new_write(path: &Path, previous: Option<&str>, created_dirs: &[Path
 /// writing.
 ///
 /// Under `--json` success is the same object the real create emits, plus the
-/// fact that nothing was written and the block that would have been: a flag
+/// fact that no plan data remains and the block that would have been: a flag
 /// that selects the output format keeps working under a flag that only selects
 /// whether the write happens.
 // §FS-rhei-new.5.4
 fn report_new_dry_run(write: &NewWrite, applied: AppliedWrite, json: bool) -> MietteResult<()> {
     roll_back_new_write(&write.path, applied.previous.as_deref(), &applied.created_dirs);
+    report_new_coordination_residue(&write.path);
     if let Some(failure) = applied.failure {
         eprintln!(
-            "note: nothing was written — this was a dry run, and the real create would have \
-             been rolled back because {}.",
+            "note: this was a dry run, and plan data was rolled back because {}.",
             failure.reason
         );
         return Err(failure.report);
@@ -379,6 +394,17 @@ fn report_new_dry_run(write: &NewWrite, applied: AppliedWrite, json: bool) -> Mi
     println!();
     print!("{}", write.preview);
     Ok(())
+}
+
+/// Disclose the only filesystem residue a real dry-run creation may retain.
+// §FS-rhei-new.5.4
+fn report_new_coordination_residue(path: &Path) {
+    if let Ok(lock_path) = plan_lock_path(path) {
+        eprintln!(
+            "note: retained permanent writer coordination at {}; do not delete the sidecar",
+            display_path(&lock_path)
+        );
+    }
 }
 
 /// The facts `--json` reports, shared by the real create and the dry run so the

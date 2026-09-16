@@ -41,14 +41,13 @@ mod file_lock_tests {
     }
 
     #[test]
-    fn a_locked_plan_reads_back_while_the_lock_is_held() {
+    fn a_sidecar_locked_plan_reads_back_by_its_current_path() {
         let dir = tempfile::tempdir().expect("tmpdir");
         let path = plan_file(&dir, "locked\n");
         let locked = LockedPlanFile::open(&path).expect("lock the plan");
 
-        // The Windows case, asserted everywhere: a mandatory byte-range lock
-        // refuses this process its own read by path, and the read falls back to
-        // the handle it is holding rather than failing the command.
+        // The sidecar never denies this process a current-path read, including
+        // on mandatory-lock platforms. §FS-rhei-transition-cmd.3
         assert_eq!(locked.read_to_string("failed to read plan file").expect("read"), "locked\n");
         locked.release();
     }
@@ -128,7 +127,7 @@ mod file_lock_tests {
     }
 
     /// The same waiter observes authoritative absence after rollback; it never
-    /// reads a provisional or stale destination handle.
+    /// reads provisional or stale destination bytes.
     // §AR-agent-orchestrator-workflow.3.3.1 §FS-rhei-new.4
     #[test]
     fn issue_95_first_publication_waiter_observes_rollback_absence() {
@@ -185,7 +184,7 @@ mod file_lock_tests {
 
         let mut replacement = tempfile::NamedTempFile::new_in(dir.path()).expect("temp file");
         replacement.write_all(b"after\n").expect("write replacement");
-        persist_locked(replacement, &path, Some(&locked)).expect("replace the plan");
+        persist_locked(replacement, &path).expect("replace the plan");
         assert!(
             matches!(done_rx.recv_timeout(Duration::from_millis(50)), Err(RecvTimeoutError::Timeout)),
             "the waiter completed before the replacing writer released its stable sidecar"
@@ -212,42 +211,9 @@ mod file_lock_tests {
         locked.release();
         locked.release();
 
-        // A released lock still reads: the path is the source of truth, and the
-        // handle was only ever the fallback.
+        // A released lock still reads because the current pathname remains the
+        // sole source of truth.
         assert_eq!(locked.read_to_string("failed to read plan file").expect("read"), "once\n");
-    }
-
-    /// A handle whose lock has been let go is never a source of content: after
-    /// `persist_locked`'s rename it names an orphan, so the caller keeps its
-    /// original refusal instead. §FS-rhei-new.4
-    #[test]
-    fn a_released_handle_serves_no_read() {
-        let handle: PlanLockHandle = Arc::new(Mutex::new(None));
-        assert!(
-            read_through_handle(&handle).is_none(),
-            "a released handle must not answer a read"
-        );
-    }
-
-    /// And it is gone from the registry too, so nothing else in the process
-    /// finds it either — including the loader's own path reader.
-    // §FS-rhei-new.4
-    #[test]
-    fn a_released_lock_is_deregistered() {
-        let dir = tempfile::tempdir().expect("tmpdir");
-        let path = plan_file(&dir, "registered\n");
-        let locked = LockedPlanFile::open(&path).expect("lock the plan");
-        assert!(
-            read_through_held_lock(&path).is_some(),
-            "a held lock must be reachable by path"
-        );
-
-        locked.release();
-
-        assert!(
-            read_through_held_lock(&path).is_none(),
-            "a released lock must leave nothing behind to read through"
-        );
     }
 
     #[test]
@@ -258,7 +224,7 @@ mod file_lock_tests {
 
         let mut tmp = tempfile::NamedTempFile::new_in(dir.path()).expect("temp file");
         tmp.write_all(b"after\n").expect("write temp");
-        persist_locked(tmp, &path, Some(&locked)).expect("persist over the locked plan");
+        persist_locked(tmp, &path).expect("persist over the unlocked plan");
         locked.release();
 
         assert_eq!(fs::read_to_string(&path).expect("read back"), "after\n");

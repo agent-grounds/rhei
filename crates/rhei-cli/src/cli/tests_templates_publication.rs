@@ -11,7 +11,7 @@ mod templates_publication_tests {
         let staged = hidden_staging_path(&output).unwrap();
         fs::create_dir_all(staged.join("tasks")).unwrap();
         fs::write(staged.join("index.rhei.md"), "# Rhei: Follow\n").unwrap();
-        fs::write(staged.join("tasks/01-work.md"), "### Task 1: Work\n**State:** draft\n").unwrap();
+        fs::write(staged.join("tasks/01-work.md"), "### Task 1: Work\n**State:** pending\n").unwrap();
         let settings_path = Path::new(".agent-grounds/rhei/settings.json");
         fs::create_dir_all(staged.join(settings_path).parent().unwrap()).unwrap();
         fs::write(

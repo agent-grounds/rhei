@@ -97,14 +97,9 @@ transitions:
     assert!(result.status.success(), "order fixture should transition: {}", result.stderr);
 
     let observations = read_callback_observations(&dir);
-    // Windows cannot read the plan file from on_leave: rhei still holds its
-    // exclusive lock there, unlike on_enter, which runs after the write that
-    // releases it.
-    if cfg!(windows) {
-        assert!(observations[0]["state"].is_null(), "leave cannot read the locked plan file");
-    } else {
-        assert_eq!(observations[0]["state"], "pending");
-    }
+    // The sidecar spans both callbacks without locking the destination, so
+    // on_leave reads the pre-transition state. §FS-rhei-transition-cmd.3
+    assert_eq!(observations[0]["state"], "pending");
     assert_eq!(observations[1]["state"], "active");
     assert!(observations.iter().all(|item| item["ledger"].as_array().unwrap().is_empty()));
     assert_eq!(
@@ -193,14 +188,9 @@ transitions:
             "the invocation release must be absent during callbacks"
         );
     }
-    // See the note above transition_firing_existing_order_baseline's
-    // equivalent assertion: on_leave cannot read the still-locked plan file
-    // on Windows.
-    if cfg!(windows) {
-        assert!(leave["state"].is_null(), "leave cannot read the locked plan file");
-    } else {
-        assert_eq!(leave["state"], "working");
-    }
+    // The sidecar spans both callbacks without locking the destination, so
+    // on_leave reads the pre-transition state. §FS-rhei-transition-cmd.3
+    assert_eq!(leave["state"], "working");
     assert_eq!(enter["state"], "completed");
     assert_eq!(leave["context"]["task"]["metadata"]["state"], "working");
     assert_eq!(enter["context"]["task"]["metadata"]["state"], "completed");

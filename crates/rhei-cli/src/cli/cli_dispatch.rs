@@ -635,9 +635,12 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
         }
         Commands::Instantiate {
             template,
+            mount,
             set_values,
             set_files,
             values,
+            seam,
+            pass,
             output,
             execute,
             dry_run,
@@ -646,11 +649,14 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             input_args,
         } => templates::instantiate_command(
             template.as_deref(),
+            &mount,
             &input_args,
             &instantiate_execute_args_from_env(),
             &set_values,
             &set_files,
             &values,
+            &seam,
+            &pass,
             output.as_deref(),
             execute,
             dry_run,

@@ -30,6 +30,14 @@ mod templates {
 
     include!("cli/templates_builtin.rs");
     include!("cli/templates_list.rs");
+    // §AR-source-file-size.3: block compilation is split by pipeline stage.
+    include!("cli/templates_blocks_types.rs");
+    include!("cli/templates_blocks_compile.rs");
+    include!("cli/templates_blocks_qualify.rs");
+    include!("cli/templates_blocks_tasks.rs");
+    include!("cli/templates_blocks_compatibility.rs");
+    include!("cli/templates_blocks_lower.rs");
+    include!("cli/templates_blocks_cli.rs");
     include!("cli/templates_instantiate.rs");
     include!("cli/templates_publication.rs");
     include!("cli/templates_rename.rs");
@@ -45,6 +53,7 @@ mod templates {
     #[cfg(test)]
     mod tests {
         include!("cli/tests_templates_render.rs");
+        include!("cli/tests_templates_blocks.rs");
         include!("cli/tests_templates_publication.rs");
     }
 }

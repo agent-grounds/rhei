@@ -329,8 +329,78 @@
             }
         }
 
-        let _ = detect_template_layout(template_dir)?;
+        match detect_template_layout(template_dir) {
+            Ok(_) => {}
+            Err(_) if !manifest.block.mounts.is_empty()
+                && !template_dir.join("plan.rhei.md").is_file()
+                && !template_dir.join("index.rhei.md").is_file() => {}
+            Err(err) => return Err(err),
+        }
 
+        validate_block_manifest(manifest, template_dir, &ident)?;
+
+        Ok(())
+    }
+
+    /// Validate manifest-local block syntax before resolution or rendering.
+    /// Cross-block references are checked after recursive expansion.
+    /// §FS-rhei-library.1–2 §FS-rhei-library.8
+    fn validate_block_manifest(
+        manifest: &TemplateManifest,
+        template_dir: &Path,
+        ident: &Regex,
+    ) -> MietteResult<()> {
+        let source = template_dir.join("template.yaml");
+        let block = &manifest.block;
+        if !block.is_block() {
+            return Ok(());
+        }
+        let Some(ports) = block.ports.as_ref() else {
+            return Err(miette!(
+                help = "declare `ports.entry` and at least the public exits this block exposes.",
+                "block manifest '{}' must declare ports",
+                source.display()
+            ));
+        };
+        if ports.exits.is_empty() {
+            return Err(miette!("block manifest '{}' must declare at least one exit port", source.display()));
+        }
+        for name in ports.exits.keys().chain(block.data.inputs.keys()).chain(block.data.outputs.keys()) {
+            if !ident.is_match(name) {
+                return Err(miette!(
+                    help = "names must start with a letter and continue with letters, digits, '_' or '-'.",
+                    "block manifest '{}' contains invalid public identifier '{}'",
+                    source.display(),
+                    name
+                ));
+            }
+        }
+        let mut aliases = BTreeMap::<&str, &str>::new();
+        for mount in &block.mounts {
+            if !ident.is_match(&mount.alias) {
+                return Err(miette!(
+                    help = "a mount alias must start with a letter and continue with letters, digits, '_' or '-'.",
+                    "invalid mount alias '{}' in '{}'",
+                    mount.alias,
+                    source.display()
+                ));
+            }
+            if let Some(previous) = aliases.insert(&mount.alias, &mount.block) {
+                return Err(miette!(
+                    "duplicate mount alias '{}' in '{}': '{}' and '{}'",
+                    mount.alias,
+                    source.display(),
+                    previous,
+                    mount.block
+                ));
+            }
+        }
+        if let Some((first, second, target)) = block.compatibility.collision() {
+            return Err(miette!(
+                "compatibility collision in '{}': stable identities '{}' and '{}' both target '{}'",
+                source.display(), first, second, target
+            ));
+        }
         Ok(())
     }
 

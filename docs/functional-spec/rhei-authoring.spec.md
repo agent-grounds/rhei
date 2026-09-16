@@ -180,6 +180,31 @@ the whole project so cross-rhei references resolve. The exact grammar and the
 difference between composition-only and filesystem enforcement are in
 [§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions) and [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition).
 
+### 4.4. Checked task exports
+
+Write a task handoff as two explicit halves: the producer names the file with
+`**Provides:**`, and the consumer names both the producer in its own direct
+`**Prior:**` and the data it reads in `**Consumes:**`:
+
+```markdown
+### Task 1: Design the API
+**State:** completed
+**Provides:** api-contract
+
+### Task 2: Build the client
+**State:** pending
+**Prior:** Task 1
+**Consumes:** 1:api-contract
+```
+
+The direct prior is required even when another dependency path already reaches
+Task 1; `**Consumes:**` never creates ordering. The producer writes nonblank
+text to `runtime/exports/<task-id>/<name>.md` before successful completion, and
+the consumer is not spawned until that file is available under the producer's
+execution root. To upgrade an older plan, add the direct prior, correct any
+unmatched export name, and make the producer write non-whitespace content
+([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)).
+
 ## 5. Using a Custom State Machine
 
 To reuse one state machine across plans, declare it on the line directly

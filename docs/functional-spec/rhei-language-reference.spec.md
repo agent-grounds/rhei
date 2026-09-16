@@ -52,7 +52,9 @@ Use this order when learning or auditing the language:
 
 1. Read [§FS-rhei-authoring](rhei-authoring.spec.md#fs-rhei-authoring-rhei-plan-language-usage-guide) for practical authoring patterns.
 2. Read [§FS-rhei-plan-language](rhei-plan-language.spec.md#fs-rhei-plan-language-rhei-plan-language-specification) for the formal markdown grammar and semantic
-   constraints, including Panta Project layout.
+   constraints, including Panta Project layout and the checked
+   `**Provides:**` / `**Consumes:**` handoff contract
+   ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)).
 3. Read [§FS-rhei-panta](rhei-panta.spec.md#fs-rhei-panta-panta-the-project-root-above-all-rheis) for project-root behavior and command scope.
 4. Read [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) for the state-machine schema and default states.
 5. Read [§FS-rhei-transitions](rhei-transitions.spec.md#fs-rhei-transitions-rhei-transitions-specification) when a workflow depends on explicit transition

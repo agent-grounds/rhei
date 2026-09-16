@@ -922,12 +922,11 @@ configured in `states.yaml`.
 
 Task exports are resolved from the current task's `**Consumes:**` and
 `**Provides:**` metadata ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)). Each consumed export
-that exists and is non-empty is injected under `## Consumed Exports` in
-`**Consumes:**` order, read from the execution root of the rhei that owns the
-producing task; one that was never written is skipped, leaving no section
-behind. Each declared `**Provides:**` entry is listed under `## Exports to
-Publish` with the path the agent must write. Like prior task results, this is
-graph-level context and is not configured in `states.yaml`.
+is injected under `## Consumed Exports` in `**Consumes:**` order only after the
+preflight in §3.3 accepts all of them. Each declared `**Provides:**` entry is
+listed under `## Exports to Publish` with the path the agent must write. Like
+prior task results, this is graph-level context and is not configured in
+`states.yaml`.
 
 The consumed-export introduction must identify `**Consumes:**` as prompt
 selection and must not imply isolation: undeclared sibling exports under
@@ -1264,6 +1263,21 @@ spawn record, but the provider refused to begin the requested work; repeated
 recognized refusals therefore cannot exhaust `attempts:`. Poll counters and
 `poll.max_attempts` remain separate and are neither advanced nor refunded by
 provider-limit recognition.
+
+### 3.3. Consumed Export Preflight
+
+Prompt composition is all-or-nothing for declared consumed exports. Before a
+worker is spawned, Rhei resolves every `**Consumes:**` file under that
+producer's execution root and requires non-whitespace text, as specified by
+[§FS-rhei-plan-language.3.12.2](rhei-plan-language.spec.md#3122-consumer-availability). A missing or blank export is not silently omitted: composition fails with one
+diagnostic that names every unavailable producer/export pair and the path
+checked for each.
+
+The check uses the same root-confinement refusal and pre-qualification-id
+rename guidance as state artifacts. It runs for same-rhei and cross-rhei
+producers, including a producer outside the candidate set of a narrowed run.
+Failure happens before spawn and does not change task state. Repairing the
+files and rerunning composes the prompt normally.
 
 ## 4. Environment Variables
 

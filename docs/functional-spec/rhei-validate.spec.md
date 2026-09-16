@@ -166,6 +166,30 @@ The project loader still stops at the first failing rhei entry: a project whose
 second rhei also fails reports the first one, and the next run reports the next.
 Completeness is promised *within* a file, not across a project.
 
+### 4.3. Task export diagnostics
+
+Validation enforces the declaration relationships of
+[§FS-rhei-plan-language.3.12.1](rhei-plan-language.spec.md#3121-declaration-integrity) without reading export files. A consumed producer
+must exist, must directly appear in the consumer's `**Prior:**`, and must
+declare the named export. Self- and ancestor-consumption receive their own
+errors. A missing-export error lists every export that the resolved producer
+does declare, including an explicit empty list, so a typo can be repaired from
+one diagnostic.
+
+One authored mistake produces one primary error for a consumed reference. A
+missing producer already reported through the same unresolved `**Prior:**` is
+not reported again through `**Consumes:**`. A missing producer named only by
+`**Consumes:**` gets one missing-producer error and no derivative missing-edge
+error. Self- or ancestor-consumption gets its specific error without pairing or
+direct-edge follow-ons. These suppressions do not hide independent errors on
+other references.
+
+Unused `**Provides:**` entries produce no diagnostic. Duplicate provided names
+and duplicate consumed references remain parse errors. The successful-terminal
+consumer warning in §4 remains the sole coherence warning when a direct
+producer is non-terminal; export validation does not add a second warning for
+the same ordering contradiction.
+
 ## 5. Watch Mode
 
 With `--watch`, the command resolves the same state machine once, prints a

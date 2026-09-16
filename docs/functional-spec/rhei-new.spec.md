@@ -77,7 +77,7 @@ is an argument.
 | `--state <STATE>`          | the machine's initial | `**State:**`, checked against the owning rhei's machine (§3.2) |
 | `--prior <ID>`             | none               | `**Prior:**` entry; repeatable, and a comma-separated list is accepted |
 | `--provides <NAME>`        | none               | `**Provides:**` entry; repeatable ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)) |
-| `--consumes <ID:NAME>`     | none               | `**Consumes:**` entry; repeatable. Selects export prompt injection, not filesystem visibility or readiness: undeclared sibling exports remain readable, and ordering comes from `--prior` ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)) |
+| `--consumes <ID:NAME>`     | none               | `**Consumes:**` entry; repeatable. Selects prompt injection, not filesystem visibility. Undeclared sibling exports remain readable; pair every producer with `--prior <ID>` or validation rejects the created ticket ([§FS-rhei-plan-language.3.12.1](rhei-plan-language.spec.md#3121-declaration-integrity)) |
 | `--excludes <ENTRY>`       | none               | `**Excludes:**` entry; repeatable. Each value is one `checkout=<path>`, `artifact=<path>`, or export reference ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)) |
 | `--assignee <WHO>`         | none               | `**Assignee:**`, which is a claim: `rhei next` and `rhei run` skip an assigned ticket until `rhei release <id>`, and the create says so (§5.4) |
 | `--model <MODEL>`          | none               | `**Model:**`; mutually exclusive with `--target` ([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)) |
@@ -688,5 +688,8 @@ one place a caller cannot notice it.
 - It does not write a `states.yaml`. `--states` declares which machine a rhei
   runs under; authoring the machine is `rhei-state-machine-writer` territory
   ([§FS-rhei-state-machine-writer](rhei-state-machine-writer.spec.md#fs-rhei-state-machine-writer-rhei-state-machine-writer)).
-- It does not check that a `**Consumes:**` reference resolves to a declared
-  `**Provides:**` — nothing does yet ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)).
+- It does not infer `--prior` from `--consumes`, create the producer's
+  `**Provides:**`, or repair either side. The normal post-write validation
+  rejects an incomplete handoff and rolls the create back; authors must state
+  both the data-flow reference and its direct ordering edge
+  ([§FS-rhei-plan-language.3.12.1](rhei-plan-language.spec.md#3121-declaration-integrity)).

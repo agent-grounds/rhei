@@ -335,7 +335,10 @@ fn run_command(
         &settings,
         &opts,
         &roots,
-    )? || (loaded.is_panta_project() && opts.rhei_scope().is_empty() && !opts.dry_run());
+    )? || (loaded.is_panta_project()
+        && opts.rhei_scope().is_empty()
+        && !opts.dry_run()
+        && !(opts.no_agent() && opts.no_program()));
     // Agent mode also advances callback-only work and can execute agents or
     // programs introduced by admitted members. §FS-rhei-panta.6.2 §FS-rhei-run.3
 

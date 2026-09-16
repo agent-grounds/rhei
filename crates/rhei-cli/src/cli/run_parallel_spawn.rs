@@ -53,10 +53,9 @@ fn spawn_parallel_agent_work_item(
     let task = find_task_by_id(&loaded.rhei.tasks, &target_id);
     let Some(task) = task else { return Ok(ParallelAgentSpawnOutcome::Skipped) };
 
-    // Prompts, logs, and spawn records use the member's execution root.
-    // §FS-rhei-panta.6.2 §AR-rhei-panta.5
+    // Agent transcripts and spawn records remain under the run's project
+    // runtime; the agent's task artifacts use the member execution root. §FS-rhei-agents.8.1
     let task_workspace_root = loaded.task_root(&item.task_id_str, workspace_root);
-    let task_runtime_dir = task_workspace_root.join("runtime");
     let visit_count = render_visit_count(
         loaded.rhei.metadata.as_ref(),
         &task.id,
@@ -68,7 +67,7 @@ fn spawn_parallel_agent_work_item(
     // a spawn this visit may not have costs nothing to decline.
     // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.1
     let plan = plan_agent_spawn_attempt(
-        &task_runtime_dir,
+        runtime_dir,
         &task_workspace_root,
         &item.task_id_str,
         &item.current_state,
@@ -286,7 +285,7 @@ fn spawn_parallel_agent_work_item(
     let from_for_thread = from_state;
     let to_for_thread = item.current_state.clone();
     let tid_for_event = item.task_id_str.clone();
-    let runtime_dir_for_thread = task_runtime_dir;
+    let runtime_dir_for_thread = runtime_dir.to_path_buf();
     // Read before the plan moves into the worker: only here are the plan and
     // the resolved budget both in hand. §FS-rhei-agents.3.2.1
     let outlook_for_result = plan.retry_outlook(budget);

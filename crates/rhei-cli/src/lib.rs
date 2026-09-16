@@ -35,10 +35,10 @@ mod templates {
     include!("cli/templates_blocks_compile.rs");
     include!("cli/templates_blocks_qualify.rs");
     include!("cli/templates_blocks_tasks.rs");
-    include!("cli/templates_blocks_compatibility.rs");
     include!("cli/templates_blocks_lower.rs");
     include!("cli/templates_blocks_cli.rs");
     include!("cli/templates_instantiate.rs");
+    include!("cli/templates_finish.rs");
     include!("cli/templates_publication.rs");
     include!("cli/templates_rename.rs");
     include!("cli/templates_project.rs");

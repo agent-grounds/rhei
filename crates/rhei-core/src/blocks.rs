@@ -79,6 +79,7 @@ pub struct InputBinding {
 
 /// Completion-only control edge, with optional runtime data wiring.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct Seam {
     pub from: String,
     pub to: String,
@@ -180,7 +181,11 @@ impl Qualifier {
     }
 
     pub fn prefix(&self) -> String {
-        self.chain.iter().map(|alias| format!("m{}_{}__", alias.len(), alias)).collect()
+        use std::fmt::Write;
+        self.chain.iter().fold(String::new(), |mut prefix, alias| {
+            write!(prefix, "m{}_{}__", alias.len(), alias).expect("writing a string cannot fail");
+            prefix
+        })
     }
 
     pub fn qualify(&self, local: &str) -> String {
@@ -274,3 +279,17 @@ mod tests {
         assert_eq!(linear_seam_order(&aliases, &seams).unwrap(), aliases);
     }
 }
+
+mod compatibility;
+mod compiler;
+mod data;
+mod emit;
+mod qualify;
+mod references;
+mod settings;
+pub use compiler::{
+    Block, CompileResult, CompiledBlock, CompiledFile, Endpoint, Fragment, TaskFile,
+};
+
+#[cfg(test)]
+mod compiler_tests;

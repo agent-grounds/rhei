@@ -172,6 +172,13 @@ pub fn canonical_path(path: &Path) -> std::io::Result<PathBuf> {
     path.canonicalize().map(plain_path)
 }
 
+/// Whether a path has a platform root or drive prefix. §FS-rhei-states.1.3
+pub fn path_is_rooted(path: impl AsRef<Path>) -> bool {
+    path.as_ref()
+        .components()
+        .any(|part| matches!(part, std::path::Component::Prefix(_) | std::path::Component::RootDir))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

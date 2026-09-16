@@ -194,7 +194,7 @@ node_policy:
     fn supervision_warnings_for(yaml: &str) -> Vec<String> {
         let machine = StateMachine::from_yaml_str(yaml).expect("machine loads");
         let rhei =
-            rhei_core::parse("# Rhei: T\n\n## Tasks\n\n### Task 1: Root\n**State:** supervising\n")
+            crate::parse("# Rhei: T\n\n## Tasks\n\n### Task 1: Root\n**State:** supervising\n")
                 .expect("plan parses");
         validate_with_machine(&rhei, &machine).warnings
     }

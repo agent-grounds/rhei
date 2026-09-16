@@ -1,5 +1,5 @@
     fn validate_export_plan(input: &str) -> ValidationReport {
-        let rhei = rhei_core::parse(input).expect("export plan should parse");
+        let rhei = crate::parse(input).expect("export plan should parse");
         validate_with_machine(&rhei, &sample_machine())
     }
 

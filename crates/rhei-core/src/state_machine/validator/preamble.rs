@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use regex::Regex;
-pub use rhei_core::ast::{CallbackRef, StateName, TransitionRule};
-use rhei_core::ast::{Rhei, Structure, Task, TaskId, TaskIdSegment};
+pub use crate::ast::{CallbackRef, StateName, TransitionRule};
+use crate::ast::{Rhei, Structure, Task, TaskId, TaskIdSegment};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::path::{Component, Path, PathBuf};

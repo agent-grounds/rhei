@@ -1,5 +1,5 @@
     use super::*;
-    use rhei_core::parse;
+    use crate::parse;
     use std::fs;
 
     fn sample_machine() -> StateMachine {

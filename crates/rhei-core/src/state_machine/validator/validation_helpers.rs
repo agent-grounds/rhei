@@ -400,7 +400,7 @@ fn validate_artifact_definitions(
         // Not `is_absolute()`: on Windows that is false for both a
         // rooted-but-driveless `/tmp/out.md` and a drive-relative `C:out.md`,
         // and neither is a workspace path. §FS-rhei-states.1.3
-        if crate::path_is_rooted(path) {
+        if crate::platform::path_is_rooted(path) {
             return Err(StateMachineLoadError::Invalid(format!(
                 "state '{state_name}' artifact '{name}' in '{field_name}' must use a relative path, got '{path}'"
             )));

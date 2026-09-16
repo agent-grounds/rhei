@@ -115,32 +115,16 @@
         let seams = parse_cli_seams(raw_seams, raw_passes)?;
         let root_name = aliases.join("-");
 
-        let mut compiler = BlockCompiler::new()?;
-        let mut nodes = BTreeMap::new();
+        let mut frontend = BlockFrontend::new()?;
+        let mut children = Vec::new();
         for mount in &mounts {
-            let node = compiler.compile_node(
-                &mount.block,
-                None,
-                Qualifier::new(vec![mount.alias.clone()]),
-                &inputs.for_alias(&mount.alias),
-                &mount.alias,
-            )?;
-            nodes.insert(mount.alias.clone(), node);
+            children.push((mount.alias.clone(), frontend.prepare(&mount.block, None, &inputs.for_alias(&mount.alias), &mount.alias)?));
         }
-        let synthetic = BlockManifest {
-            ports: None,
-            data: Default::default(),
-            mounts: mounts.clone(),
-            bind: Vec::new(),
-            seams,
-            compatibility: Default::default(),
-        };
-        let order = compiler.connect_mounts(&synthetic, &nodes, Path::new("<command line>"))?;
-        let ordered_nodes = order.iter().map(|alias| nodes[alias].clone()).collect::<Vec<_>>();
+        let block = Block { name: root_name.clone(), source: PathBuf::from("<command line>"), version: "1".into(), manifest: BlockManifest { mounts, seams, ..Default::default() }, local: None, children };
+        let compiled = block.compile().map_err(|e| miette!("{e}"))?;
         instantiate_compiled_workspace(
-            compiler,
+            compiled,
             &root_name,
-            &ordered_nodes,
             output,
             execute,
             dry_run,
@@ -185,56 +169,16 @@
                     .map_err(|err| miette!("failed to lower curated input '{}': {err}", key))
             })
             .collect::<MietteResult<BTreeMap<_, _>>>()?;
-        let mut compiler = BlockCompiler::new()?;
-        let root = compiler.compile_node(template, None, Qualifier::default(), &supplied, &manifest.name)?;
+        let mut frontend = BlockFrontend::new()?;
+        let block = frontend.prepare(template, None, &supplied, &manifest.name)?;
+        let compiled = block.compile().map_err(|e| miette!("{e}"))?;
         instantiate_compiled_workspace(
-            compiler,
+            compiled,
             &manifest.name,
-            &[root],
             output,
             execute,
             dry_run,
             keep_on_error,
             execute_args,
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn instantiate_compiled_workspace(
-        compiler: BlockCompiler,
-        root_name: &str,
-        ordered_nodes: &[CompiledNode],
-        output: Option<&Path>,
-        execute: bool,
-        dry_run: bool,
-        keep_on_error: bool,
-        execute_args: &[String],
-    ) -> MietteResult<()> {
-        let compiled_parent = tempfile::tempdir()
-            .map_err(|err| miette!("failed to create compiler output scratch directory: {err}"))?;
-        let compiled = compiled_parent.path().join(root_name);
-        compiler.write_workspace(root_name, ordered_nodes, &compiled)?;
-        fs::write(
-            compiled.join("template.yaml"),
-            format!(
-                "name: {root_name}\nversion: 1\ndescription: Compiled block composition\n"
-            ),
-        )
-        .map_err(|err| file_io_report(&compiled, "failed to write compiled manifest", err))?;
-        instantiate_command(
-            Some(compiled.to_str().expect("compiler path is UTF-8")),
-            &[],
-            &[],
-            execute_args,
-            &[],
-            &[],
-            &[],
-            &[],
-            &[],
-            output,
-            execute,
-            dry_run,
-            keep_on_error,
-            false,
         )
     }

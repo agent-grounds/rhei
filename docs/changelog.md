@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Compile block graphs over shared state and task types, retain compiled settings
+  and support files without rendering twice, and restore extracted review/fix
+  stage instructions and artifact contracts. (PR #282)
+
 ### Added
 
 - **`rhei instantiate` now composes reusable, parameterized blocks into one

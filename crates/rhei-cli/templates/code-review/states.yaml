@@ -1,62 +1,172 @@
+# Reusable review duties and stage contracts. §FS-rhei-library.7
 name: code-review
 version: 1.0.0
 states:
   split:
-    description: Split the change into reviewable parts.
+    description: Coordinator writes an architectural overview of the change, then spawns one review task per logical part plus an aggregate task.
     target: {{smart_target}}
+    prompt_template: split
+    outputs:
+      - name: architecture-overview
+        path: runtime/manifests/{task_id}-architecture.md
+        description: Architectural overview of the change
+      - name: parts-manifest
+        path: runtime/manifests/{task_id}-parts.md
+        description: Stable list of change parts and scopes
+
   review:
-    description: Review the parts independently.
+    description: Independent per-target review of one part of the change.
     all_targets:
-{% for target in review_targets %}
-      - {{target}}
-{% endfor %}
+{%- for t in review_targets %}
+      - {{ t }}
+{%- endfor %}
+    personality: |
+      You are {target}, a rigorous reviewer. Focus on correctness,
+      regressions, and material risks specific to the assigned part. Skip
+      pure style nits unless they indicate a real defect.
+    prompt_template: review
+    outputs:
+      - name: part-findings
+        path: runtime/findings/{task_id}-{target.slug}.md
+        description: One target's findings for one part of the change
+
   aggregate-reviews:
-    description: Aggregate reviewer findings.
+    description: Smart target deduplicates reviewer findings into candidate issues.
     target: {{smart_target}}
+    personality: |
+      You are the review aggregator. Deduplicate aggressively, preserve
+      evidence, and do not invent issues beyond what reviewers reported.
+    prompt_template: aggregate-reviews
+    outputs:
+      - name: review-issues
+        path: runtime/issues/{task_id}-candidate-issues.md
+        description: Deduplicated candidate review issues
+
   validate-review:
-    description: Validate candidate findings.
+    description: Independent per-target validation that candidate issues are correct.
     all_targets:
-{% for target in validation_targets %}
-      - {{target}}
-{% endfor %}
+{%- for t in validation_targets %}
+      - {{ t }}
+{%- endfor %}
+    inputs:
+      - name: review-issues
+        path: runtime/issues/{task_id}-candidate-issues.md
+    personality: |
+      You are {target}, a skeptical validator. Confirm whether each candidate
+      issue is real, actionable, and supported by the code/spec evidence.
+    prompt_template: validate-review
+    outputs:
+      - name: validation
+        path: runtime/validations/{task_id}-{target.slug}.md
+        description: One target's validation of candidate review issues
+
   propose-fixes:
-    description: Propose fixes for valid findings.
+    description: Independent per-target fix proposals for the validated issue set.
     all_targets:
-{% for target in proposal_targets %}
-      - {{target}}
-{% endfor %}
+{%- for t in proposal_targets %}
+      - {{ t }}
+{%- endfor %}
+    inputs:
+      - name: review-issues
+        path: runtime/issues/{task_id}-candidate-issues.md
+    personality: |
+      You are {target}, a fix designer. Propose minimal, concrete changes.
+      Do not edit files in this state. Be cautious about scope: if a nit or
+      low-value issue would require a broad or invasive change, recommend
+      rejecting or deferring it instead of proposing a wide fix.
+    prompt_template: propose-fixes
+    outputs:
+      - name: fix-proposal
+        path: runtime/proposals/{task_id}-{target.slug}.md
+        description: One target's proposed fixes for candidate issues
+
   aggregate-proposals:
-    description: Aggregate proposed fixes.
+    description: Smart target aggregates fix proposals into a discrepancy matrix.
     target: {{smart_target}}
+    inputs:
+      - name: review-issues
+        path: runtime/issues/{task_id}-candidate-issues.md
+    personality: |
+      You are the proposal aggregator. Compare proposed fixes without editing
+      files. Preserve disagreements so the final adjudicator can decide them
+      explicitly.
+    prompt_template: aggregate-proposals
+    outputs:
+      - name: proposal-matrix
+        path: runtime/proposals/{task_id}-proposal-matrix.md
+        description: Aggregated fix proposal matrix and discrepancy summary
+
   decide:
-    description: Decide the final fix plan.
+    description: Smart target adjudicates validation/proposal discrepancies and writes the final fix plan.
     target: {{smart_target}}
-  human-review:
-    description: Wait for human approval of the decision.
-    gating: true
-    final: true
+    inputs:
+      - name: review-issues
+        path: runtime/issues/{task_id}-candidate-issues.md
+      - name: proposal-matrix
+        path: runtime/proposals/{task_id}-proposal-matrix.md
+    personality: |
+      You are the final adjudicator. Resolve discrepancies conservatively:
+      accept only issues that are supported by evidence and have a bounded
+      fix. Prefer no-op over speculative edits. If fixing a nit would require
+      broad rewrites, cross-cutting refactors, or risky behavior changes,
+      reject or defer it.
+    prompt_template: decide
     outputs:
       - name: final-decision
         path: runtime/decisions/{task_id}-final-decision.md
+        description: Smart-target adjudication and final fix plan
+
+  human-review:
+    final: true
+    description: Human approval gate before autonomous final fixes run.
+    gating: true
+    inputs:
+      - name: final-decision
+        path: runtime/decisions/{task_id}-final-decision.md
+    prompt_template: human-review
   completed:
-    description: A coordination or part-review task is complete.
+    description: Task is done.
+    prompt_template: completed
     final: true
+
   cancelled:
-    description: Review was cancelled.
+    description: Task was cancelled before completion.
+    prompt_template: cancelled
     final: true
+
 transitions:
-  - { from: split, to: completed }
-  - { from: review, to: completed }
-  - { from: aggregate-reviews, to: validate-review }
-  - { from: validate-review, to: propose-fixes }
-  - { from: propose-fixes, to: aggregate-proposals }
-  - { from: aggregate-proposals, to: decide }
-  - { from: decide, to: human-review }
-  - { from: "*", to: cancelled }
+  - from: split
+    to: completed
+    description: Coordinator emitted the part manifest and spawned review plus aggregate tasks.
+
+  - from: review
+    to: completed
+    description: Every configured review target wrote findings for this part.
+
+  - from: aggregate-reviews
+    to: validate-review
+    description: Candidate issues are deduplicated and ready for validation.
+
+  - from: validate-review
+    to: propose-fixes
+    description: Validation targets classified candidate issues.
+
+  - from: propose-fixes
+    to: aggregate-proposals
+    description: Proposal targets wrote issue-by-issue fix proposals.
+
+  - from: aggregate-proposals
+    to: decide
+    description: Proposal matrix is written; smart target decides discrepancies.
+
+  - from: decide
+    to: human-review
+    description: Final decision is written; wait for human approval.
+
+  - from: "*"
+    to: cancelled
 profiles:
   primary:
     initial: split
     allowed: [split, review, aggregate-reviews, validate-review, propose-fixes, aggregate-proposals, decide, human-review, completed, cancelled]
-node_policy:
-  root: primary
-  default: primary
+node_policy: {root: primary, default: primary}

@@ -7,7 +7,7 @@
 /// Crate-visible because the prompt composer reads result files by the same
 /// rule: a heading inside a fence is a quotation there too.
 // §FS-rhei-plan-language.3.6
-pub(crate) fn code_fence_run(line: &str) -> Option<(char, usize, bool)> {
+pub fn code_fence_run(line: &str) -> Option<(char, usize, bool)> {
     let trimmed = line.trim_start();
     let marker = trimmed.chars().next()?;
     if marker != '`' && marker != '~' {

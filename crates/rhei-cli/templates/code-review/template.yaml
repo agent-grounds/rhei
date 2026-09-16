@@ -9,17 +9,17 @@ inputs:
     description: Execution targets that review the change.
     type: array
     items: { type: string, format: execution-target }
-    default: [codex[xhigh]:openai:gpt-5.5]
+    default: ["codex[xhigh]:openai:gpt-5.5"]
   - name: validation_targets
     description: Execution targets that validate findings.
     type: array
     items: { type: string, format: execution-target }
-    default: [codex[xhigh]:openai:gpt-5.5]
+    default: ["codex[xhigh]:openai:gpt-5.5"]
   - name: proposal_targets
     description: Execution targets that propose fixes.
     type: array
     items: { type: string, format: execution-target }
-    default: [codex[xhigh]:openai:gpt-5.5]
+    default: ["codex[xhigh]:openai:gpt-5.5"]
   - name: review_focus
     description: Optional review focus areas.
     type: array
@@ -37,4 +37,11 @@ ports:
     cancelled: cancelled
 data:
   outputs:
-    decision: { kind: state-file, state: human-review, name: final-decision }
+    decision: { kind: state-file, state: decide, name: final-decision }
+    architecture: { kind: state-file, state: split, name: architecture-overview }
+    parts: { kind: state-file, state: split, name: parts-manifest }
+    findings: { kind: state-file, state: review, name: part-findings }
+    issues: { kind: state-file, state: aggregate-reviews, name: review-issues }
+    validation: { kind: state-file, state: validate-review, name: validation }
+    proposal: { kind: state-file, state: propose-fixes, name: fix-proposal }
+    matrix: { kind: state-file, state: aggregate-proposals, name: proposal-matrix }

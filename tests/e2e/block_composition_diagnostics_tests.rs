@@ -12,18 +12,21 @@ fn direct_failure(dir: &Path, review: &Path, fix: &Path, extra: &[&str]) -> CliR
     run_compose(dir, &args)
 }
 
-/// Alias errors are reported at the composition boundary, with the refused
-/// alias, both declarations for a duplicate, and a usable correction.
 /// §FS-rhei-library.8 §FS-rhei-errors.1.6
 #[test]
-fn composition_alias_and_lookup_diagnostics_keep_mount_context() {
+fn invalid_alias_diagnostic_names_the_refused_alias_and_grammar() {
     let dir = unique_temp_dir("blocks-diagnostics-alias");
     let fixtures = write_composition_fixtures(&dir);
-
     let bad_alias = mount_arg("bad.alias", &fixtures.review);
     let invalid = run_compose(&dir, &["instantiate", "--mount", bad_alias.as_str()]);
     assert_failed_with(&invalid, &["bad.alias", "alias", "letter"]);
+}
 
+/// §FS-rhei-library.8 §FS-rhei-errors.1.6
+#[test]
+fn duplicate_alias_diagnostic_names_both_manifests() {
+    let dir = unique_temp_dir("blocks-diagnostics-duplicate-alias");
+    let fixtures = write_composition_fixtures(&dir);
     let first = mount_arg("same", &fixtures.review);
     let second = mount_arg("same", &fixtures.fix);
     let duplicate =
@@ -37,19 +40,21 @@ fn composition_alias_and_lookup_diagnostics_keep_mount_context() {
             fixtures.fix.to_str().expect("fix path"),
         ],
     );
+}
 
+/// §FS-rhei-library.8 §FS-rhei-errors.1.3
+#[test]
+fn unknown_block_diagnostic_keeps_the_mount_alias_and_next_action() {
+    let dir = unique_temp_dir("blocks-diagnostics-unknown-block");
     let absent = run_compose(&dir, &["instantiate", "--mount", "work=no-such-block"]);
     assert_failed_with(&absent, &["no-such-block", "work", "template"]);
 }
 
-/// Refused control/data endpoints list valid public alternatives and retain
-/// both declaring manifests; internals never become an accidental API.
-/// §FS-rhei-library.1–2, §FS-rhei-library.8
+/// §FS-rhei-library.1–2 §FS-rhei-library.8
 #[test]
-fn composition_endpoint_and_kind_diagnostics_are_actionable() {
+fn unknown_control_port_diagnostic_lists_public_alternatives() {
     let dir = unique_temp_dir("blocks-diagnostics-endpoint");
     let fixtures = write_composition_fixtures(&dir);
-
     let port = direct_failure(
         &dir,
         &fixtures.review,
@@ -57,7 +62,13 @@ fn composition_endpoint_and_kind_diagnostics_are_actionable() {
         &["--seam", "review.internal=fix.entry"],
     );
     assert_failed_with(&port, &["review.internal", "done", "cancelled", "review-block"]);
+}
 
+/// §FS-rhei-library.1–2 §FS-rhei-library.8
+#[test]
+fn unknown_data_endpoint_diagnostic_lists_public_alternatives() {
+    let dir = unique_temp_dir("blocks-diagnostics-data-endpoint");
+    let fixtures = write_composition_fixtures(&dir);
     let endpoint = direct_failure(
         &dir,
         &fixtures.review,
@@ -65,7 +76,13 @@ fn composition_endpoint_and_kind_diagnostics_are_actionable() {
         &["--seam", "review.done=fix.entry", "--pass", "review.unknown=fix.report"],
     );
     assert_failed_with(&endpoint, &["review.unknown", "report", "findings", "review-block"]);
+}
 
+/// §FS-rhei-library.6 §FS-rhei-library.8
+#[test]
+fn data_kind_mismatch_diagnostic_names_both_manifests_and_kinds() {
+    let dir = unique_temp_dir("blocks-diagnostics-kind");
+    let fixtures = write_composition_fixtures(&dir);
     let kind = direct_failure(
         &dir,
         &fixtures.review,
@@ -120,14 +137,11 @@ fn recursive_cycle_diagnostic_prints_the_whole_chain() {
     );
 }
 
-/// Bad binds, dangling owned references, and conflicting stable identities are
-/// diagnosed before a generated parser error can erase their mount context.
-/// §FS-rhei-library.2, §FS-rhei-library.4, §FS-rhei-library.7–8
+/// §FS-rhei-library.2 §FS-rhei-library.8
 #[test]
-fn bind_ownership_and_identity_diagnostics_name_both_sides() {
-    let dir = unique_temp_dir("blocks-diagnostics-ownership");
+fn bad_bind_diagnostic_names_both_manifests_and_the_valid_input() {
+    let dir = unique_temp_dir("blocks-diagnostics-bind");
     let fixtures = write_composition_fixtures(&dir);
-
     let flow_manifest = fixtures.flow.join("template.yaml");
     let original = fs::read_to_string(&flow_manifest).expect("flow manifest");
     fs::write(&flow_manifest, original.replace("to: review.subject", "to: review.missing"))
@@ -142,8 +156,13 @@ fn bind_ownership_and_identity_diagnostics_name_both_sides() {
             fixtures.review.join("template.yaml").to_str().expect("review manifest"),
         ],
     );
+}
 
-    fs::write(&flow_manifest, &original).expect("restore flow fixture");
+/// §FS-rhei-library.4 §FS-rhei-library.8
+#[test]
+fn dangling_owned_reference_diagnostic_keeps_its_mount_and_source() {
+    let dir = unique_temp_dir("blocks-diagnostics-owned-reference");
+    let fixtures = write_composition_fixtures(&dir);
     let states_path = fixtures.review.join("states.yaml");
     let states = fs::read_to_string(&states_path).expect("review states");
     fs::write(&states_path, states.replace("to: done", "to: absent-state"))
@@ -153,8 +172,15 @@ fn bind_ownership_and_identity_diagnostics_name_both_sides() {
         &ownership,
         &["absent-state", "review", states_path.to_str().expect("states path"), "state"],
     );
+}
 
-    fs::write(&states_path, states).expect("restore states fixture");
+/// §FS-rhei-library.7–8
+#[test]
+fn compatibility_collision_diagnostic_names_both_stable_identities() {
+    let dir = unique_temp_dir("blocks-diagnostics-identity-map");
+    let fixtures = write_composition_fixtures(&dir);
+    let flow_manifest = fixtures.flow.join("template.yaml");
+    let original = fs::read_to_string(&flow_manifest).expect("flow manifest");
     fs::write(
         &flow_manifest,
         format!(

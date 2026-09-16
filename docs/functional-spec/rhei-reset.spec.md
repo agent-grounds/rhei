@@ -45,7 +45,12 @@ Deliberate automation states the intent once with `--yes`.
 ## 2. Behavior
 
 1. Load the state machine and plan. Validate the plan (reset refuses to operate on an invalid plan).
-2. Acquire a file lock on the plan file (single-file) or on `index.rhei.md` (workspace).
+2. Resolve the whole selected scope and acquire its canonical sibling sidecars
+   in the shared order: sorted and deduplicated metadata paths, then distinct
+   task paths, then ledger roots. Leave every replaceable destination unlocked.
+   Re-read the current plan and ledger pathnames only after their sidecars are
+   held, and retain the complete stack through preview, confirmation,
+   restoration, scoped pruning or full cleanup, and the success summary.
 3. For every task node in the merged task graph (including all descendants):
    - Recover the task's authored state (§2.2) and rewrite the task's
      `**State:**` line to it. A task that never moved is already in that state,
@@ -59,7 +64,8 @@ Deliberate automation states the intent once with `--yes`.
      `metadata.tasks.<id>.providerLimits` are deleted, together with the task's
      `supervision` block ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)). A `metadata.tasks.<id>` entry left empty by those deletions is removed as well, and so are `metadata.tasks` and `metadata` when nothing else remains in them: an empty entry is a record of nothing, and the next reader would have to decide whether it meant something.
 4. After every plan file is rewritten — the ledger step 3 reads lives there — for a directory workspace, delete the `runtime/` directory at the workspace root if it exists. For a single-file plan, delete the `runtime/` directory next to the plan file if it exists. This removes result files, findings, logs, and journaled transition records.
-5. Write each modified task file atomically (temp file + rename). Release the lock.
+5. Write each modified task file atomically (temp file + rename). Release the
+   sidecar stack in reverse order.
 
 Reset does **not**:
 
@@ -181,7 +187,13 @@ where the ledger says that task has been.
 
 Reset is destructive with respect to runtime state: it deletes results, exports, logs, and the transition ledger. It is not destructive with respect to authored plan content — §2.2 moves a task only to a state that task's own history records, so a reset can never invent a state and can never be worse for the plan than not running it. `--dry-run` previews both halves (§1.1) and confirmation gates the rest (§1.2).
 
-Because reset operates under a file lock, it is safe against concurrent `rhei next` / `rhei transition` / `rhei complete` calls: those calls either run before the reset acquires the lock or after it releases.
+Because reset holds its whole selected-scope sidecar stack over the decision
+snapshot, it is safe against concurrent `rhei next` / `rhei transition` /
+`rhei complete` calls: those calls run wholly before the preview or after the
+reset persistence boundary, never between consent and destruction. A cancelled
+or refused reset releases without mutation. Persistent plan and ledger
+sidecars, and the directories required to preserve their pathname identities,
+survive scoped pruning and full runtime cleanup.
 
 ## 4. Output
 

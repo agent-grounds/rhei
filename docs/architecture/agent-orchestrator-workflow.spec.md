@@ -262,6 +262,11 @@ file name and the suffix `.lock`: `tasks/01-work.md` is guarded by
 `tasks/01-work.md.lock`. Atomic replacement changes the destination inode but
 never this identity, so a writer that waited across one or more replacements
 opens and reads the current destination only after it acquires the sidecar.
+This sidecar is the writer's sole filesystem lock: Rhei never locks the
+replaceable destination itself, never substitutes a handle read for a failed
+pathname read, and never drops exclusion to make a rename possible. A failed
+authoritative pathname read is an I/O failure, not permission to use stale
+bytes or write without the shared protocol.
 [§FS-rhei-next.3.1](../functional-spec/rhei-next.spec.md#31-behavior)
 [§FS-rhei-transition-cmd.3](../functional-spec/rhei-transition-cmd.spec.md#3-behavior)
 
@@ -272,6 +277,17 @@ not evidence that a writer is live: ownership is the operating-system lock on
 its open handle, which closes on ordinary release or process exit. Keeping the
 pathname stable prevents cleanup from installing a second lock identity while
 a prior handle is still held.
+
+Every containing directory needed to keep an established sidecar at that
+pathname is permanent coordination state too. Creation prepares missing
+parents while holding its scope sidecar, then establishes the destination
+sidecar before deciding authoritatively whether the destination is absent or
+admissible. Failed creates, dry runs, and candidates abandoned during
+re-decision retain those coordination paths; cleanup may remove only other
+empty directories the invocation created. Sidecars are empty regular files.
+Their presence and age prove neither ownership, origin, nor that an upgrade is
+complete; only successful acquisition of the operating-system lock proves
+ownership.
 
 The central transition ledger uses the same stable-identity rule across
 replacement of both its data file and its containing runtime directory. Its
@@ -287,12 +303,15 @@ replacement synchronization identity. [§FS-rhei-reset.3](../functional-spec/rhe
 Writers use one order: metadata sidecar, then a distinct task-file sidecar,
 then the transition ledger. They release in reverse order. A single-file plan
 uses its one sidecar for both metadata and task content. Creation treats its
-scope file as metadata and an existing destination as the task file. Callback
+scope file as metadata and every chosen destination, including an absent one,
+as the task file. It takes the scope sidecar before its first load, prepares
+missing destination parents, and takes or reuses the destination sidecar before
+the authoritative admission or absence check and first publication. Callback
 redirects and terminal finalization reuse the locks already held; configured
 recovery releases the ledger and plan sidecars before it invokes a separate
-ordinary transition. The destination-file handle used for mandatory-lock
-platform compatibility may be released to permit an atomic rename, but the
-sidecar remains held through commitment or restoration.
+ordinary transition. Every lock remains held through the command's existing
+commitment or restoration boundary, including callbacks, rollback,
+bookkeeping, results, redirects, and terminal finalization.
 
 Reset applies that order across the whole selected scope: it sorts and
 deduplicates metadata paths, then distinct task paths, then ledger roots. It
@@ -307,6 +326,12 @@ boundary, never between consent and destruction.
 [§FS-rhei-reset.1.2](../functional-spec/rhei-reset.spec.md#12-confirmation)
 [§FS-rhei-reset.3](../functional-spec/rhei-reset.spec.md#3-safety)
 [§FS-rhei-reset.4](../functional-spec/rhei-reset.spec.md#4-output)
+
+This protocol has an upgrade boundary: stop every older writer that shares a
+plan directory, upgrade every writer, and only then resume writing. Existing
+sidecars remain and are reused, but Rhei does not detect or support concurrent
+mixed-version writing. In particular, the presence of a sidecar does not prove
+that every writer follows this protocol.
 
 ### 3.4. Durable State and Git Boundary
 

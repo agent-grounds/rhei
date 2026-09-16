@@ -270,14 +270,17 @@ rhei transition my-plan.rhei.md --task 1 --from pending --to in-progress
 
 The command:
 
-1. **Acquires a file lock** on the plan to prevent concurrent writes.
-2. **Reads the current state** of the specified task.
+1. **Acquires the plan's canonical sibling sidecar** as its sole writer lock,
+   leaving the replaceable plan file itself unlocked.
+2. **Reads the current state** from the current plan pathname after acquiring
+   that sidecar.
 3. **Compare-and-swap** — if the task's current state does not match
    `--from`, the command fails with a conflict error. This prevents two
    agents from claiming the same task.
 4. **Validates the transition** against the state machine — illegal
    transitions are rejected before any write occurs.
-5. **Writes the new state** to the markdown and releases the lock.
+5. **Writes the new state** to the markdown and releases the sidecar after all
+   callback, result, ledger, finalization, or rollback work finishes.
 
 ### 7.1. Flags
 
@@ -301,6 +304,15 @@ compare-and-swap guard, only one agent can win a race on the same task —
 the loser gets a clean error and picks a different task. See
 [How Rhei Is Used — Pattern 3](rhei-usage.spec.md) for the full
 parallel-workers pattern.
+
+Sidecars are empty files named by appending `.lock` to the exact destination
+filename, beside that destination. Rhei retains them and any directories needed
+to keep their path stable after success, rollback, failed creation, and dry
+run. Do not delete them to clear a suspected lock: only the operating-system
+lock on an open handle denotes a live owner. When upgrading writers that share
+a plan directory, stop all older writers, upgrade every writer, and only then
+resume. Existing sidecars are reused; live mixed-version writing is unsupported
+and a sidecar's presence does not prove the upgrade is complete.
 
 ## 8. Next Steps
 

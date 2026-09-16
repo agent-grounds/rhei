@@ -53,6 +53,114 @@ mod file_lock_tests {
         locked.release();
     }
 
+    /// The stable sibling sidecar is the sole writer lock. Keeping the plan
+    /// destination unlocked is what lets callbacks and atomic replacement open
+    /// the current pathname on mandatory-lock platforms.
+    // §AR-agent-orchestrator-workflow.3.3.1 §FS-rhei-transition-cmd.3
+    #[test]
+    fn issue_95_writer_sidecar_does_not_lock_the_plan_destination() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let path = plan_file(&dir, "available by pathname\n");
+        let locked = LockedPlanFile::open(&path).expect("take writer sidecar");
+
+        let destination = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&path)
+            .expect("open unlocked destination");
+        destination
+            .try_lock_exclusive()
+            .expect("Rhei must leave the replaceable plan destination unlocked");
+        fs2::FileExt::unlock(&destination).expect("release observation lock");
+        locked.release();
+    }
+
+    /// Creation establishes the destination's permanent writer identity before
+    /// first publication, so locking cannot require the plan to exist already.
+    // §AR-agent-orchestrator-workflow.3.3.1 §FS-rhei-new.4
+    #[test]
+    fn issue_95_writer_sidecars_guard_three_absent_candidates_permanently() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        for candidate in ["first.rhei.md", "second.rhei.md", "third.rhei.md"] {
+            let path = dir.path().join(candidate);
+            let locked = LockedPlanFile::open(&path).expect("lock before publication");
+            assert!(!path.exists(), "taking the sidecar must not publish the plan");
+            locked.release();
+        }
+        for sidecar in ["first.rhei.md.lock", "second.rhei.md.lock", "third.rhei.md.lock"] {
+            assert!(
+                dir.path().join(sidecar).is_file(),
+                "an abandoned candidate must keep its coordination identity"
+            );
+        }
+    }
+
+    /// A participant waiting across first publication opens the current path
+    /// only after acquisition and therefore observes the published bytes.
+    // §AR-agent-orchestrator-workflow.3.3.1 §FS-rhei-new.4
+    #[test]
+    fn issue_95_first_publication_excludes_a_waiter_until_success() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let path = dir.path().join("future.rhei.md");
+        let locked = LockedPlanFile::open(&path).expect("lock before publication");
+        let waiting_path = path.clone();
+        let (lock_tx, lock_rx) = mpsc::channel();
+        let waiter = std::thread::spawn(move || {
+            set_plan_lock_observer(lock_tx);
+            let waiting = LockedPlanFile::open(&waiting_path).expect("wait for publication");
+            let raw = waiting.read_to_string("read published plan");
+            waiting.release();
+            raw.map_err(|error| error.to_string())
+        });
+        assert_eq!(
+            lock_rx.recv_timeout(Duration::from_secs(2)).expect("waiter lock attempt"),
+            PlanLockEvent::Contended
+        );
+
+        fs::write(&path, "published\n").expect("publish plan");
+        locked.release();
+
+        assert_eq!(
+            lock_rx.recv_timeout(Duration::from_secs(2)).expect("waiter acquisition"),
+            PlanLockEvent::Acquired
+        );
+        assert_eq!(waiter.join().expect("waiter thread").expect("waiter read"), "published\n");
+    }
+
+    /// The same waiter observes authoritative absence after rollback; it never
+    /// reads a provisional or stale destination handle.
+    // §AR-agent-orchestrator-workflow.3.3.1 §FS-rhei-new.4
+    #[test]
+    fn issue_95_first_publication_waiter_observes_rollback_absence() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let path = dir.path().join("future.rhei.md");
+        let locked = LockedPlanFile::open(&path).expect("lock before publication");
+        let waiting_path = path.clone();
+        let observed_path = path.clone();
+        let (lock_tx, lock_rx) = mpsc::channel();
+        let waiter = std::thread::spawn(move || {
+            set_plan_lock_observer(lock_tx);
+            let waiting = LockedPlanFile::open(&waiting_path).expect("wait for rollback");
+            let exists = observed_path.exists();
+            waiting.release();
+            exists
+        });
+        assert_eq!(
+            lock_rx.recv_timeout(Duration::from_secs(2)).expect("waiter lock attempt"),
+            PlanLockEvent::Contended
+        );
+
+        fs::write(&path, "provisional\n").expect("provisional publication");
+        fs::remove_file(&path).expect("roll back plan data");
+        locked.release();
+
+        assert_eq!(
+            lock_rx.recv_timeout(Duration::from_secs(2)).expect("waiter acquisition"),
+            PlanLockEvent::Acquired
+        );
+        assert!(!waiter.join().expect("waiter thread"), "waiter must observe rolled-back absence");
+    }
+
     #[test]
     fn a_waiter_reads_the_current_path_after_replacement() {
         let dir = tempfile::tempdir().expect("tmpdir");

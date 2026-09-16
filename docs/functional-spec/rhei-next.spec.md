@@ -105,8 +105,11 @@ reported as held by its supervisor rather than as blocked.
    missing, stop immediately and fail with an explicit missing-artifact error.
    Do not skip ahead to later tasks.
 4. Select the first candidate in plan order.
-5. Acquire a file lock on the plan file.
-6. Re-read and re-validate the task's claimability under the lock, including
+5. Acquire the plan file's canonical sibling sidecar as the sole writer lock,
+   leaving the replaceable plan destination unlocked
+   (§FS-rhei-transition-cmd.3).
+6. Re-read the current destination pathname and re-validate the task's
+   claimability under the sidecar, including
    re-checking required `inputs` (guards against concurrent claims and moved
    files). The re-read parses the selected task's file under the same node
    kinds the scan did. In a directory workspace those are the kinds the
@@ -145,7 +148,9 @@ reported as held by its supervisor rather than as blocked.
    commit boundary. For an already-runnable initial task, revalidate under the
    lock and atomically write its assignee once; staying in the same state
    creates no transition entry.
-10. Release the lock, resolve the task's exclusions, then build the state's effective prompt text from its selected
+10. Release the sidecar after the state, ownership, metadata, ledger, callback,
+    and any ordinary-return restoration work is complete, resolve the task's
+    exclusions, then build the state's effective prompt text from its selected
    `prompt_template`, if any, plus inline `instructions` and `personality`,
    then resolve runtime template variables (see
    [Template Variables](rhei-states.spec.md#4-template-variables-in-instructions-and-personality)

@@ -230,7 +230,8 @@ Added avatar_url column and migration 0042
 7. Find the completion target: the first non-cancelled terminal state reachable via a declared transition from the current state. Fail if none exists (e.g., from `agent-review-fix` there is no direct path to a terminal state — the agent must transition to `agent-review` first). `cancelled` is never treated as a successful completion target. The order of transitions in the YAML `transitions` list is significant when selecting the target; editors and formatters should preserve declaration order.
 8. Run the shared transition ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)) from the current state
    to that target, carrying the selected message as `--result` does:
-   compare-and-swap under the file lock,
+   compare-and-swap under the shared
+   canonical sibling sidecar while the plan destination remains unlocked,
    the descendants-first guard ([§FS-rhei-transition-cmd.3.1](rhei-transition-cmd.spec.md#31-descendants-first-on-terminal-entry)), `on_leave`,
    source `outputs:`, target `inputs:`, the terminal-result obligation
    ([§FS-rhei-transition-cmd.3.2](rhei-transition-cmd.spec.md#32-terminal-result-on-entry)), the atomic state write, `on_enter`, the

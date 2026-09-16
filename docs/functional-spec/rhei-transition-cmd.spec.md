@@ -84,8 +84,16 @@ ticket, under that rhei's own rhei-local heading ([§FS-rhei-panta.6.1](rhei-pan
 
 1. Load the state machine and plan (single-file or directory workspace). Validate.
 2. Locate the task by id. Fail if it does not exist.
-3. Acquire a file lock on the plan file (single-file plan) or on the task file that contains the task (directory workspace).
-4. Re-read the task's current state under the lock. If it does not equal `--from`, fail with a compare-and-swap conflict error and print the actual current state.
+3. Acquire the canonical sibling sidecar for the plan file (single-file plan)
+   or task file that contains the task (directory workspace), following the
+   shared writer protocol in
+   [§AR-agent-orchestrator-workflow.3.3.1](../architecture/agent-orchestrator-workflow.spec.md#331-stable-writer-exclusion).
+   The sidecar is the sole writer lock; the replaceable plan destination stays
+   unlocked. Hold the sidecar through callbacks, replacement, ledger and result
+   writes, terminal finalization, success, or restoration.
+4. Re-read the task's current state from the current destination pathname under
+   the sidecar. If it does not equal `--from`, fail with a compare-and-swap
+   conflict error and print the actual current state.
 5. If `--supervisor` was supplied and resolved, validate under the lock that it
    equals the re-read task's nearest in-scope supervising ancestor as defined
    in §2. Refuse a mismatch or the absence of such an ancestor with the §2
@@ -129,7 +137,7 @@ ticket, under that rhei's own rhei-local heading ([§FS-rhei-panta.6.1](rhei-pan
     effective target is `final: true`, also perform the terminal finalization
     of [§FS-rhei-complete.3](rhei-complete.spec.md#3-result-file) — ensure the result file, drop `**Assignee:**`, and
     link the result from the task body.
-15. Release the lock.
+15. Release the sidecar lock.
 
 Steps 11 and 14 are the same code on every verb that can move a task, so a
 `rhei transition --result` into a terminal state leaves a ledger line, a result
@@ -155,6 +163,16 @@ Because the resulting plan then contradicts its own declared dependencies,
 letting it pass unremarked.
 
 Counted-visit accounting: if the target state declares a `visits` budget and `--to` is a loop-back re-entry, the runtime increments `metadata.tasks.<id>.stateVisits.<target>` and renders the new visit number in `**State:**` using the `-<n>` suffix. See [Transitions Specification — Counted Loops](rhei-transitions.spec.md#43-counted-loops).
+
+All plan-writing verbs that use this path share that identity, acquisition
+order, authoritative-read rule, and lifetime. Metadata is acquired before a
+distinct task sidecar, the ledger last, and release is in reverse order;
+canonical identity deduplication makes a single-file plan one acquisition.
+Configured recovery first releases this stack and then runs as a separate
+ordinary transition. `next --peek` and `release --dry-run` remain read-only and
+establish no sidecar. Operators upgrading a shared directory must stop older
+writers, upgrade every writer, and then resume; live mixed-version writing is
+unsupported, and existing sidecars are retained and reused.
 
 ### 3.1. Descendants-First on Terminal Entry
 

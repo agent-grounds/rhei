@@ -16,7 +16,6 @@ pub(crate) fn resolve(
         ("state", &map.states, &mut result.states),
         ("task", &map.tasks, &mut result.tasks),
         ("profile", &map.profiles, &mut result.profiles),
-        ("setting", &map.settings, &mut result.settings),
     ] {
         let mut all = owned(local, kind);
         for child in children.values() {
@@ -39,6 +38,37 @@ pub(crate) fn resolve(
                 ));
             }
             output.insert(target, stable.clone());
+        }
+    }
+    // Apply setting aliases only in the registries that own the target.
+    // Same-spelled external references keep their identity. §FS-rhei-library.4
+    for (stable, value) in &map.settings {
+        let (alias, name) = value.split_once('.').ok_or_else(|| {
+            format!("compatibility setting target '{value}' must be <alias>.<local-name>")
+        })?;
+        let child = children
+            .get(alias)
+            .ok_or_else(|| format!("compatibility target '{value}' names unknown child"))?;
+        let target = Qualifier::new(vec![alias.into()]).qualify(name);
+        let mut found = false;
+        for (kind, output) in result.settings.registries_mut() {
+            if !owned(child, kind).contains(&target) {
+                continue;
+            }
+            found = true;
+            if stable != &target
+                && std::iter::once(local)
+                    .chain(children.values())
+                    .any(|block| owned(block, kind).contains(stable))
+            {
+                return Err(format!(
+                    "compatibility {kind} '{stable}' collides with an existing identity"
+                ));
+            }
+            output.insert(target.clone(), stable.clone());
+        }
+        if !found {
+            return Err(format!("unresolved compatibility setting target '{value}'; correct its identity in the child manifest"));
         }
     }
     for (stable, value) in &map.artifacts {
@@ -79,17 +109,13 @@ fn owned(block: &CompiledBlock, kind: &str) -> BTreeSet<String> {
         "profile" => {
             block.fragment.machine.profiles.iter().flat_map(|p| p.keys().cloned()).collect()
         }
-        "setting" => ["agents", "models", "mcp_servers", "skills"]
-            .iter()
-            .flat_map(|s| {
-                block
-                    .fragment
-                    .settings
-                    .get(*s)
-                    .and_then(serde_json::Value::as_object)
-                    .into_iter()
-                    .flat_map(|m| m.keys().cloned())
-            })
+        "agents" | "models" | "mcp_servers" | "skills" => block
+            .fragment
+            .settings
+            .get(kind)
+            .and_then(serde_json::Value::as_object)
+            .into_iter()
+            .flat_map(|m| m.keys().cloned())
             .collect(),
         "task" => {
             let mut result = BTreeSet::new();

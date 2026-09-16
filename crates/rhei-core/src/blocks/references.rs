@@ -3,7 +3,8 @@
 use super::*;
 use crate::ast::{Task, TaskId, TaskIdSegment};
 use crate::state_machine::{
-    parse_execution_target, StateMcpEntry, StatePromptTemplateRef, StateSkillEntry,
+    parse_execution_target, parse_task_state, StateMcpEntry, StatePromptTemplateRef,
+    StateSkillEntry,
 };
 
 #[derive(Default)]
@@ -12,7 +13,7 @@ pub(crate) struct Names {
     pub tasks: BTreeMap<String, String>,
     pub kinds: BTreeMap<String, String>,
     pub profiles: BTreeMap<String, String>,
-    pub settings: BTreeMap<String, String>,
+    pub settings: super::settings::SettingNames,
     pub exports: BTreeMap<String, String>,
     pub prompts: BTreeMap<String, String>,
     pub paths: BTreeMap<String, String>,
@@ -23,10 +24,10 @@ pub(crate) fn rename(value: &mut String, names: &BTreeMap<String, String>) {
         *value = to.clone();
     }
 }
-pub(crate) fn target(value: &mut String, names: &BTreeMap<String, String>) {
+pub(crate) fn target(value: &mut String, names: &super::settings::SettingNames) {
     if let Ok(mut parsed) = parse_execution_target(value) {
-        rename(&mut parsed.agent, names);
-        rename(&mut parsed.model, names);
+        rename(&mut parsed.agent, &names.agents);
+        rename(&mut parsed.model, &names.models);
         *value = parsed.selector();
     }
 }
@@ -71,10 +72,10 @@ impl CompiledBlock {
                 }
             }
             for model in state.model.iter_mut().chain(&mut state.all_models) {
-                rename(model, &names.settings);
+                rename(model, &names.settings.models);
             }
             if let Some(agent) = &mut state.agent {
-                rename(&mut agent.0, &names.settings);
+                rename(&mut agent.0, &names.settings.agents);
             }
             for selector in state.target.iter_mut().chain(&mut state.all_targets) {
                 target(selector, &names.settings);
@@ -92,9 +93,9 @@ impl CompiledBlock {
             if let Some(entries) = &mut state.mcp_servers {
                 for entry in entries {
                     match entry {
-                        StateMcpEntry::Id(id) => rename(id, &names.settings),
+                        StateMcpEntry::Id(id) => rename(id, &names.settings.mcp_servers),
                         StateMcpEntry::Object(obj) => {
-                            rename(&mut obj.id, &names.settings);
+                            rename(&mut obj.id, &names.settings.mcp_servers);
                             if let Some(p) = &mut obj.working_directory {
                                 rename(p, &names.paths);
                             }
@@ -105,9 +106,9 @@ impl CompiledBlock {
             if let Some(entries) = &mut state.skills {
                 for entry in entries {
                     match entry {
-                        StateSkillEntry::Id(id) => rename(id, &names.settings),
+                        StateSkillEntry::Id(id) => rename(id, &names.settings.skills),
                         StateSkillEntry::Object(obj) => {
-                            rename(&mut obj.id, &names.settings);
+                            rename(&mut obj.id, &names.settings.skills);
                             if let Some(p) = &mut obj.path {
                                 rename(p, &names.paths);
                             }
@@ -122,25 +123,25 @@ impl CompiledBlock {
                 }
             }
         }
-        rename_keys(&mut machine.states, &names.states)?;
         rename_keys(&mut machine.prompt_templates, &names.prompts)?;
         for rule in &mut machine.transitions {
             rename(&mut rule.from.0, &names.states);
             rename(&mut rule.to.0, &names.states);
-            for field in
-                [&mut rule.mcp_unavailable, &mut rule.skill_unavailable].into_iter().flatten()
-            {
-                if let serde_yaml::Value::Sequence(ids) = field {
+            for (field, registry) in [
+                (&mut rule.mcp_unavailable, &names.settings.mcp_servers),
+                (&mut rule.skill_unavailable, &names.settings.skills),
+            ] {
+                if let Some(serde_yaml::Value::Sequence(ids)) = field {
                     for id in ids {
                         if let serde_yaml::Value::String(id) = id {
-                            rename(id, &names.settings);
+                            rename(id, registry);
                         }
                     }
                 }
             }
         }
         for model in &mut machine.models {
-            rename(model, &names.settings);
+            rename(model, &names.settings.models);
         }
         if let Some(profiles) = &mut machine.profiles {
             for profile in profiles.values_mut() {
@@ -169,7 +170,15 @@ impl CompiledBlock {
             tasks_mut(&mut file.tasks, &mut |task| {
                 id(&mut task.id, &names.tasks);
                 rename(&mut task.kind, &names.kinds);
-                rename(&mut task.state, &names.states);
+                // Parse before renaming definitions: exact names beat visit suffixes.
+                // §FS-rhei-library.4
+                let parsed = parse_task_state(&task.state, machine);
+                if let Some(state) = names.states.get(&parsed.state) {
+                    task.state = match parsed.visit {
+                        Some(visit) => format!("{state}-{visit}"),
+                        None => state.clone(),
+                    };
+                }
                 for prior in &mut task.prior {
                     id(prior, &names.tasks);
                 }
@@ -186,13 +195,14 @@ impl CompiledBlock {
                     rename(&mut export.name, &names.exports);
                 }
                 if let Some(model) = &mut task.model {
-                    rename(model, &names.settings);
+                    rename(model, &names.settings.models);
                 }
                 if let Some(t) = &mut task.target {
                     target(t, &names.settings);
                 }
             });
         }
+        rename_keys(&mut machine.states, &names.states)?;
         for kind in &mut self.fragment.plan.structure.node_kinds {
             rename(kind, &names.kinds);
         }

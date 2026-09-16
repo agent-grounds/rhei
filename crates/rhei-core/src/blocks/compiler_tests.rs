@@ -253,3 +253,6 @@ fn missing_ports_nonterminal_exits_and_seam_guards_fail_without_panics() {
         assert!(result.unwrap_err().to_string().contains("unknown field"));
     }
 }
+
+#[path = "reference_tests.rs"]
+mod reference_tests;

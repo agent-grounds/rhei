@@ -212,7 +212,13 @@ for:
 Text search and replacement is forbidden. A reference to a setting not shipped
 by the block remains external and unqualified; a reference to a block-shipped
 setting is owned and qualified. Dangling references after this classification
-are errors.
+are errors. Ownership is resolved within the reference's registry kind: an
+owned agent does not capture an external model, MCP server, or skill with the
+same spelling.
+
+Task-state qualification uses the shared counted-state parser: exact state
+names take precedence, otherwise the owned base state is qualified and its
+explicit visit count is preserved (`work-2` becomes `m1_a__work-2`).
 
 Mounted relative runtime paths are placed below
 `runtime/blocks/<encoded-alias-chain>/`, followed by the complete normalized

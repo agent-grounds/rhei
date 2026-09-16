@@ -1187,7 +1187,7 @@ fn validation_warnings_or_error(
 fn validation_pass(input: &Path, state_machine: Option<&Path>) -> MietteResult<ValidationPass> {
     let loaded = load_plan_for_validation(input)?;
 
-    validation_pass_for_loaded(input, state_machine, loaded)
+    validation_pass_for_loaded(input, state_machine, loaded, None)
 }
 
 /// Validate a preloaded graph through the same machine, link, settings, and
@@ -1196,6 +1196,7 @@ fn validation_pass_for_loaded(
     input: &Path,
     state_machine: Option<&Path>,
     loaded: LoadedPlan,
+    settings_root: Option<&Path>,
 ) -> MietteResult<ValidationPass> {
 
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine)?;
@@ -1222,7 +1223,7 @@ fn validation_pass_for_loaded(
         report
     };
     let workspace_root = execution_workspace_root(input);
-    let settings = load_merged_settings(&workspace_root)?;
+    let settings = load_merged_settings(settings_root.unwrap_or(&workspace_root))?;
     report
         .errors
         .extend(validate_plan_settings_references(&loaded.rhei, &machines, &settings));

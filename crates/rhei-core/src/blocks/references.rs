@@ -134,7 +134,9 @@ impl CompiledBlock {
                 for source in sources.iter_mut() {
                     rename(source, &names.states);
                 }
-                deduplicate(sources);
+                if !names.terminal_groups.is_empty() {
+                    deduplicate(sources);
+                }
             }
             for (field, registry) in [
                 (&mut rule.mcp_unavailable, &names.settings.mcp_servers),
@@ -158,7 +160,9 @@ impl CompiledBlock {
                 for s in &mut profile.allowed {
                     rename(s, &names.states);
                 }
-                deduplicate(&mut profile.allowed);
+                if !names.terminal_groups.is_empty() {
+                    deduplicate(&mut profile.allowed);
+                }
             }
             rename_keys(profiles, &names.profiles)?;
         }
@@ -236,7 +240,9 @@ impl CompiledBlock {
         for state in self.exits.values_mut().chain(&mut self.primary) {
             rename(state, &names.states);
         }
-        deduplicate(&mut self.primary);
+        if !names.terminal_groups.is_empty() {
+            deduplicate(&mut self.primary);
+        }
         for endpoint in self.inputs.values_mut().chain(self.outputs.values_mut()) {
             match endpoint {
                 Endpoint::File { state, path, .. } => {

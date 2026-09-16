@@ -38,6 +38,7 @@ fn fire_tooling_unavailable_transition(
     // §DA-per-rhei-state-machines
     let machine = machines.for_task_str(task_id_str);
     let callback_paths = machines.callbacks_for_str(task_id_str);
+    // Preserve source scope and exact precedence for failure routes. §FS-rhei-transitions.4.6
     let matching_rule = machine.transitions_from(from_state).find(|rule| {
         let trigger = match kind {
             ToolingKind::Mcp => rule.mcp_unavailable.as_ref(),

@@ -1,4 +1,4 @@
-# Reusable fix duties and stage contracts. §FS-rhei-library.7
+# Reusable fix duties and stage contracts. §FS-rhei-library.7.2
 name: fix
 version: 1.0.0
 # Bind runtime tokens for the later runtime pass. §FS-rhei-states.4.4

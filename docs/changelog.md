@@ -4,6 +4,18 @@
 
 ### Added
 
+- **Agent sessions now render readable Markdown reports, and workspaces can
+  declare metrics whose trajectories Rhei records.** Every agent session log
+  renders to `runtime/reports/<log stem>.md` — automatically at session end
+  and via the new `rhei report` command — with the full prompt, structured
+  tool calls, files produced, and outcome; tool outputs truncate at 10 KiB
+  unless `--full`. A validated top-level `metrics:` mapping in `states.yaml`
+  makes the engine bind each successful measurement, confirmed by
+  boundary-artifact existence, to the sessions in its window as append-only
+  records under `runtime/metrics/`, rendered into a metrics summary and
+  per-session strips; measuring program states receive `RHEI_ITERATION`.
+  (PR #283)
+
 - **Tasks can declare explicit read exclusions for blind work.** `**Excludes:**`
   accepts checkout paths, runtime files or directories, and declared exports;
   validation rejects malformed, escaping, duplicate, unresolved, or

@@ -511,7 +511,9 @@ pub fn flatten_machine(machine: &StateMachine) -> Machine {
             // Attach `from: "*"` wildcard edges to every non-terminal state so
             // the inspector shows the real set of legal exits.
             if !def.terminal {
-                for rule in machine.transitions.iter().filter(|rule| rule.from.0 == "*") {
+                for rule in machine.transitions.iter().filter(|rule| {
+                    rule.from.0 == "*" && machine.transition_matches_source(rule, name)
+                }) {
                     if rule.to.0 != *name && !transitions.iter().any(|t| t.to == rule.to.0) {
                         transitions.push(Transition {
                             to: rule.to.0.clone(),

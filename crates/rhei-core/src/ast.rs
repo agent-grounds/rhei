@@ -334,6 +334,9 @@ pub struct CallbackRef(pub String);
 pub struct TransitionRule {
     /// Source state name, or `"*"` for wildcard semantics.
     pub from: StateName,
+    /// Optional owner-independent wildcard source set. §FS-rhei-transitions.4.6
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sources: Option<Vec<String>>,
     /// Target state name.
     pub to: StateName,
     /// Optional callback invoked before leaving the source state.
@@ -480,6 +483,7 @@ mod tests {
     #[test]
     fn transition_rule_serializes_with_optional_fields_omitted() {
         let rule = TransitionRule {
+            sources: None,
             from: StateName("pending".to_string()),
             to: StateName("running".to_string()),
             on_leave: None,
@@ -504,6 +508,7 @@ mod tests {
     #[test]
     fn transition_rule_full_roundtrip_with_callbacks_and_edge_values() {
         let original = TransitionRule {
+            sources: None,
             from: StateName("*".to_string()),
             to: StateName("cancelled".to_string()),
             on_leave: Some(CallbackRef("js:package_for_review".to_string())),
@@ -569,6 +574,7 @@ mod tests {
     #[test]
     fn transition_rule_json_field_names_match_spec() {
         let rule = TransitionRule {
+            sources: None,
             from: StateName("in-progress".to_string()),
             to: StateName("human-review".to_string()),
             on_leave: Some(CallbackRef("cli:package_for_review".to_string())),

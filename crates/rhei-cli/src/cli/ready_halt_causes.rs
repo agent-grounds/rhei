@@ -273,7 +273,7 @@ impl HaltCause {
 fn suggested_final_state(machine: &rhei_validator::StateMachine, state: &str) -> String {
     let is_success_terminal = |name: &str| {
         machine.states.get(name).map(|def| def.terminal).unwrap_or(false)
-            && !rhei_validator::is_cancelled_state_name(name)
+            && !machine.is_cancellation(name)
     };
     machine
         .transitions()

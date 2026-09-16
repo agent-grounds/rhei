@@ -125,7 +125,7 @@ fn find_next_transition_from(
 
     // Fall back to wildcard, but only to non-terminal states (forward progress).
     for rule in machine.transitions() {
-        if rule.from.0 == "*" {
+        if rule.from.0 == "*" && machine.transition_matches_source(rule, current_state.as_str()) {
             let is_terminal =
                 machine.states.get(&rule.to.0).map(|def| def.terminal).unwrap_or(false);
             if !is_terminal

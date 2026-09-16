@@ -19,6 +19,9 @@ pub struct StateDef {
     /// Marks this state as a final/terminal state in the state machine.
     #[serde(default, rename = "final")]
     pub terminal: bool,
+    /// Explicit cancellation classification, independent of spelling. §FS-rhei-states.1.4
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
     /// When `true`, autonomous commands must not transition out of this state.
     #[serde(default)]
     pub gating: bool,

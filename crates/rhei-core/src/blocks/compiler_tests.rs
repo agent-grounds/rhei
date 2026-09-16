@@ -259,3 +259,6 @@ mod reference_tests;
 
 #[path = "links_tests.rs"]
 mod links_tests;
+
+#[path = "cancellation_tests.rs"]
+mod cancellation_tests;

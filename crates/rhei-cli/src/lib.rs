@@ -205,6 +205,7 @@ mod tests {
     include!("cli/tests_error_guidance.rs");
     include!("cli/tests_prompt_templates.rs");
     include!("cli/tests_complete_reset_tooling.rs");
+    include!("cli/tests_cancellation_roles.rs");
     include!("cli/tests_complete_result_input.rs");
     include!("cli/tests_member_execution_context.rs");
     include!("cli/tests_file_locks.rs");

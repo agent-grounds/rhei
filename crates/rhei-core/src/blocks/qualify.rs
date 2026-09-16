@@ -30,20 +30,15 @@ impl CompiledBlock {
         }
         let mut names = Names::default();
         let machine = &mut self.fragment.machine;
-        // Expand only authored nonterminal sources, after exact edges. This
-        // preserves owner boundaries and leaves consumed exits for seams.
-        // Reserved cancellation identity still requires the contract decision
-        // recorded for R1-03; no runtime predicate is changed here.
-        let rules = std::mem::take(&mut machine.transitions);
-        machine.transitions.extend(rules.iter().filter(|r| r.from.0 != "*").cloned());
-        for rule in rules.iter().filter(|r| r.from.0 == "*") {
-            for (source, state) in &machine.states {
-                if state.terminal || source == &rule.to.0 {
-                    continue;
-                }
-                let mut exact = rule.clone();
-                exact.from.0 = source.clone();
-                machine.transitions.push(exact);
+        // Preserve cancellation and escape classification before renaming. §FS-rhei-library.4
+        for (name, state) in &mut machine.states {
+            if crate::state_machine::is_cancelled_state_name(name) {
+                state.role = Some("cancellation".into());
+            }
+        }
+        for rule in &mut machine.transitions {
+            if rule.from.0 == "*" && rule.sources.is_none() {
+                rule.sources = Some(machine.states.keys().cloned().collect());
             }
         }
         for name in machine.states.keys() {
@@ -158,6 +153,7 @@ impl CompiledBlock {
 
     pub(crate) fn validate_references(&self) -> CompileResult<()> {
         let m = &self.fragment.machine;
+        m.validate_cancellation_and_sources().map_err(|e| e.to_string())?;
         let check = |state: &str| {
             if m.states.contains_key(state) {
                 Ok(())

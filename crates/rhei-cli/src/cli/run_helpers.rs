@@ -302,7 +302,7 @@ fn compose_agent_prompt(render_context: &RuntimeTemplateContext<'_>) -> MietteRe
     // Build available transitions list.
     let mut transitions_list = String::new();
     for rule in &render_context.machine.transitions {
-        if rule.from.0 == render_context.state_name || rule.from.0 == "*" {
+        if render_context.machine.transition_matches_source(rule, render_context.state_name) {
             transitions_list.push_str(&format!("- {} -> {}", render_context.state_name, rule.to.0));
             if let Some(cond) = &rule.condition {
                 transitions_list.push_str(&format!(" (when {})", cond));

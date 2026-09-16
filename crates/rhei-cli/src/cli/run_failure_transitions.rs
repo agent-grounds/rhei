@@ -43,7 +43,7 @@ fn fire_tooling_unavailable_transition(
             ToolingKind::Mcp => rule.mcp_unavailable.as_ref(),
             ToolingKind::Skill => rule.skill_unavailable.as_ref(),
         };
-        (rule.from.0 == from_state || rule.from.0 == "*")
+        machine.transition_matches_source(rule, from_state)
             && trigger.map(|value| tooling_trigger_matches(value, unavailable)).unwrap_or(false)
     });
     let Some(rule) = matching_rule else {
@@ -94,7 +94,7 @@ fn find_timeout_transition(
     machine
         .transitions
         .iter()
-        .find(|rule| (rule.from.0 == from_state || rule.from.0 == "*") && rule.timeout.is_some())
+        .find(|rule| machine.transition_matches_source(rule, from_state) && rule.timeout.is_some())
         .map(|rule| rule.to.0.clone())
 }
 
@@ -154,7 +154,7 @@ fn fire_selected_timeout_transition(
                 .transitions
                 .iter()
                 .find(|rule| {
-                    (rule.from.0 == from_state || rule.from.0 == "*")
+                    machine.transition_matches_source(rule, from_state)
                         && rule.timeout.is_some()
                         && rule.to.0 == to_state
                 })

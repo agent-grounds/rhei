@@ -494,7 +494,7 @@ fn state_is_failure(state: &str) -> bool {
 fn classify_marker(state: &str, machine: &rhei_validator::StateMachine) -> Marker {
     match state {
         // §FS-rhei-states.1.4: the reserved cancel name, in either spelling.
-        _ if rhei_validator::is_cancelled_state_name(state) => return Marker::Cancelled,
+        _ if machine.is_cancellation(state) => return Marker::Cancelled,
         _ if state_is_failure(state) => return Marker::Attention,
         _ => {}
     }

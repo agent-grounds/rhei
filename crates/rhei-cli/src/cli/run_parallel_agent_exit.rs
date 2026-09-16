@@ -29,6 +29,7 @@ fn handle_parallel_agent_exit(
     let ParallelAgentExit {
         task_id_str,
         state_name,
+        started_at,
         // Emitted when this function returns. §FS-rhei-states.2.2
         mut release,
         resolved,
@@ -86,7 +87,7 @@ fn handle_parallel_agent_exit(
         return Ok(());
     }
     if status.success() && stayed_in_state {
-        clear_persisted_provider_limit(input, &reloaded, &task_id_str, &state_name)?;
+        clear_persisted_provider_limit(input, &reloaded, &task_id_str, &state_name, &resolved, started_at)?;
     }
     let mut missing_required_outputs = Vec::new();
     let mut snapshot_completion_for_emit = None;

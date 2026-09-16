@@ -319,17 +319,8 @@ fn find_ready_tasks_in_view<'a>(
         {
             continue;
         }
-        if view == ReadySetView::RunnableNow
-            && provider_limit_for_task_state(
-                rhei.metadata.as_ref(),
-                &task.id,
-                &normalized_state,
-            )
-            .and_then(|limit| limit.deadline_epoch())
-            .is_some_and(|deadline| deadline > current_unix_secs())
-        {
-            continue;
-        }
+        // Provider waits filter resolved invocations, not whole tasks: another
+        // identity in the same fanout remains runnable. §FS-rhei-run.3.3
 
         // Check that all prior dependencies are satisfied — each judged under
         // the machine of the rhei that owns the prior. §FS-rhei-panta.6.1

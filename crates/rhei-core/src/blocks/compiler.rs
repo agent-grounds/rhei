@@ -200,6 +200,12 @@ impl Block {
             return Err("block supplies no state fragment; add states.yaml or mount a block".into());
         }
         for (from, to) in &links {
+            // Completion seams cannot turn abandonment into progress. §FS-rhei-library.5
+            if result.fragment.machine.is_cancellation(from) {
+                return Err(format!(
+                    "seam source '{from}' has cancellation role; use a completion exit"
+                ));
+            }
             let state = result
                 .fragment
                 .machine
@@ -211,6 +217,7 @@ impl Block {
             }
             state.terminal = false;
             result.fragment.machine.transitions.push(crate::ast::TransitionRule {
+                sources: None,
                 from: crate::ast::StateName(from.clone()),
                 to: crate::ast::StateName(to.clone()),
                 on_leave: None,

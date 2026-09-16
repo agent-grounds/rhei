@@ -294,7 +294,7 @@ fn validate_prior_order_coherence(
                 let machine = machines.for_task(id);
                 let state = parse_task_state(dep.state.as_str(), machine).state;
                 // §FS-rhei-states.1.4: the reserved cancel name, either spelling.
-                !is_cancelled_state_name(&state)
+                !machine.is_cancellation(&state)
                     && machine.states.get(&state).map(|def| def.terminal).unwrap_or(false)
             })
             .unwrap_or(false)
@@ -305,7 +305,7 @@ fn validate_prior_order_coherence(
         let state = parse_task_state(task.state.as_str(), machine).state;
         // Only a *successful* terminal state is a contradiction: a cancelled
         // ticket never claimed its prerequisites ran.
-        if is_cancelled_state_name(&state)
+        if machine.is_cancellation(&state)
             || !machine.states.get(&state).map(|def| def.terminal).unwrap_or(false)
         {
             return;

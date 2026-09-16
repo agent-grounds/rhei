@@ -43,7 +43,7 @@ fn newly_discovered_tasks(
 /// not unblock downstream work.
 fn dependency_is_satisfied(state: &str, machine: &rhei_validator::StateMachine) -> bool {
     // §FS-rhei-states.1.4: the reserved cancel name, in either spelling.
-    !rhei_validator::is_cancelled_state_name(&normalized_state_name(state, machine))
+    !machine.is_cancellation(&normalized_state_name(state, machine))
         && is_terminal_state(state, machine)
 }
 

@@ -347,7 +347,7 @@ fn applicable_alternatives(
 ) -> Vec<String> {
     let mut out = Vec::new();
     for rule in machine.transitions() {
-        if rule.from.0 != from && rule.from.0 != "*" {
+        if !machine.transition_matches_source(rule, from) {
             continue;
         }
         match transition_rule_is_applicable(
@@ -380,6 +380,10 @@ fn transition_rule_is_applicable(
     current_state: &str,
     current_state_raw: &str,
 ) -> MietteResult<bool> {
+    // Source sets retain wildcard semantics. §FS-rhei-transitions.4.6
+    if !machine.transition_matches_source(rule, current_state) {
+        return Ok(false);
+    }
     if !loop_reentry_allowed(
         machine,
         metadata,

@@ -293,7 +293,7 @@ fn execute_transition_with_origin(
     // declared transitions permit `from -> to`.
     let matching_rule =
         machine.transitions().iter().find(|rule| rule.from.0 == from && rule.to.0 == to).or_else(
-            || machine.transitions().iter().find(|rule| rule.from.0 == "*" && rule.to.0 == to),
+            || machine.transitions().iter().find(|rule| rule.from.0 == "*" && machine.transition_matches_source(rule, from) && rule.to.0 == to),
         );
     let Some(matching_rule) = matching_rule else {
         if let Some(task_handle) = &task_handle {
@@ -521,7 +521,7 @@ fn execute_transition_with_origin(
             return Err(err);
         } else if let Some(rule) =
             machine.transitions().iter().find(|r| r.from.0 == from && r.to.0 == redirect).or_else(
-                || machine.transitions().iter().find(|r| r.from.0 == "*" && r.to.0 == redirect),
+                || machine.transitions().iter().find(|r| r.from.0 == "*" && machine.transition_matches_source(r, from) && r.to.0 == redirect),
             )
         {
             (redirect.to_string(), rule)
@@ -627,9 +627,8 @@ fn execute_transition_with_origin(
     // moot; the target's inputs and the terminal result below still apply.
     // §FS-rhei-transitions.4.5
 
-    // Only the reserved name waives it, in either spelling; anything else gets
-    // the ordinary check and a refusal that says so. §FS-rhei-states.1.4
-    let cancelling = rhei_validator::is_cancelled_state_name(&normalized_state_name(to, machine));
+    // Explicit roles and legacy spellings share one waiver. §FS-rhei-states.1.4
+    let cancelling = machine.is_cancellation(&normalized_state_name(to, machine));
     // Whether the source state's outputs were actually established on this
     // edge. The engine's own account of a callback-only move reports this
     // rather than asserting it. §FS-rhei-run.3

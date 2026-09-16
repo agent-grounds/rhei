@@ -587,7 +587,7 @@ fn complete_transition_to_state(current: &OsStr) -> Vec<CompletionCandidate> {
     if let Some(from) = from {
         let normalized = normalized_state_name(&from, &machine);
         for rule in machine.transitions() {
-            if rule.from.0 == normalized || rule.from.0 == "*" {
+            if machine.transition_matches_source(rule, &normalized) {
                 targets.insert(rule.to.0.clone());
             }
         }

@@ -127,6 +127,9 @@ impl CompiledBlock {
         for rule in &mut machine.transitions {
             rename(&mut rule.from.0, &names.states);
             rename(&mut rule.to.0, &names.states);
+            for source in rule.sources.iter_mut().flatten() {
+                rename(source, &names.states);
+            }
             for (field, registry) in [
                 (&mut rule.mcp_unavailable, &names.settings.mcp_servers),
                 (&mut rule.skill_unavailable, &names.settings.skills),

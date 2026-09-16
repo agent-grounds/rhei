@@ -201,10 +201,9 @@ fn ensure_state_outputs_exist(
         }
         if !path.exists() {
             // A caller aiming at a final state has a second way out the help
-            // hides: abandon the step. Only the reserved name waives the check,
-            // so a machine that spelled it otherwise learns why. §FS-rhei-states.1.4
+            // hides: abandon the step through its cancellation role. §FS-rhei-states.1.4
             let cancel_hint = if entering_final {
-                " A transition into the reserved `cancelled` state skips this check."
+                " A transition into the reserved `cancelled` state skips this check; other abandonment terminals may declare `role: cancellation`."
             } else {
                 ""
             };

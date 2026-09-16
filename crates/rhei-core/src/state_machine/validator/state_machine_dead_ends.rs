@@ -23,7 +23,7 @@ fn transition_leaves_state(machine: &StateMachine, state: &str, rule: &Transitio
     if rule.from.0 == state {
         return true;
     }
-    if rule.from.0 != "*" {
+    if !machine.transition_matches_source(rule, state) {
         return false;
     }
     machine.states.get(state).is_some_and(|def| def.gating) || !state_is_terminal(machine, &rule.to.0)
@@ -87,7 +87,7 @@ impl FinalReached {
     /// Whether arriving at `state` answers this question.
     fn arrives_at(self, machine: &StateMachine, state: &str) -> bool {
         state_is_terminal(machine, state)
-            && (self == FinalReached::Any || !is_cancelled_state_name(state))
+            && (self == FinalReached::Any || !machine.is_cancellation(state))
     }
 }
 
@@ -160,7 +160,7 @@ fn dead_end_reason(machine: &StateMachine, state: &str, allowed: Option<&HashSet
     let mut escapes: Vec<&str> = Vec::new();
     for rule in &machine.transitions {
         let target = rule.to.0.as_str();
-        if rule.from.0 == "*" && state_is_terminal(machine, target) && !escapes.contains(&target) {
+        if rule.from.0 == "*" && machine.transition_matches_source(rule, state) && state_is_terminal(machine, target) && !escapes.contains(&target) {
             escapes.push(target);
         }
     }

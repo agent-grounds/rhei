@@ -70,7 +70,7 @@ fn transition_command_lines(
     machine
         .transitions()
         .iter()
-        .filter(|rule| rule.from.0 == state_name || rule.from.0 == "*")
+        .filter(|rule| machine.transition_matches_source(rule, state_name))
         .filter(|rule| {
             task_profile_allows_state(
                 machine,

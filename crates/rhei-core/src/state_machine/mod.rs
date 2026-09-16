@@ -25,6 +25,7 @@ include!("validator/state_machine_profiles.rs");
 include!("validator/validation_helpers.rs");
 include!("validator/state_machine_dead_ends.rs");
 include!("validator/reserved_names.rs");
+include!("validator/transition_sources.rs");
 include!("validator/supervisor_finish.rs");
 include!("validator/state_machine_warnings.rs");
 include!("validator/validator_dependencies.rs");

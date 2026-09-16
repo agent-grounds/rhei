@@ -320,6 +320,10 @@ struct ExecutionMachines {
     set: rhei_validator::MachineSet,
     default_callbacks: CallbackPaths,
     per_rhei_callbacks: BTreeMap<String, CallbackPaths>,
+    /// Members admitted after startup route agent runtime artifacts to their
+    /// own execution root; initial members retain the project runtime.
+    /// §FS-rhei-panta.6.2
+    member_local_runtimes: BTreeSet<String>,
     /// The `--state-machine` this invocation resolved under, when one was
     /// given. A run records it so an attached surface renders the machine the
     /// run is executing instead of whatever the default resolves to.
@@ -349,6 +353,7 @@ impl ExecutionMachines {
             set: resolved.validator_set(),
             default_callbacks,
             per_rhei_callbacks,
+            member_local_runtimes: BTreeSet::new(),
             state_machine_override: None,
         })
     }
@@ -372,6 +377,11 @@ impl ExecutionMachines {
     fn callbacks_for_str(&self, task_id: &str) -> &CallbackPaths {
         let rhei_id = task_id.split('.').next().unwrap_or(task_id);
         self.per_rhei_callbacks.get(rhei_id).unwrap_or(&self.default_callbacks)
+    }
+
+    fn uses_member_local_runtime(&self, task_id: &str) -> bool {
+        let rhei_id = task_id.split('.').next().unwrap_or(task_id);
+        self.member_local_runtimes.contains(rhei_id)
     }
 }
 

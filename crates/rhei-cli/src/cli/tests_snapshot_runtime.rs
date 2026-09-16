@@ -15,6 +15,7 @@
                 working_dir: PathBuf::from("."),
             },
             per_rhei_callbacks: BTreeMap::new(),
+            member_local_runtimes: BTreeSet::new(),
             state_machine_override: None,
         }
     }

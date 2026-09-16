@@ -63,6 +63,7 @@ include!("cli/checkout_roots.rs");
 include!("cli/exclusion_policy.rs");
 include!("cli/exclusion_requirements.rs");
 include!("cli/artifacts.rs");
+include!("cli/task_exports.rs");
 include!("cli/transition_checks.rs");
 include!("cli/claim_transaction.rs");
 include!("cli/claim_revalidation.rs");

@@ -90,6 +90,11 @@ Each export is one file holding exactly one fenced `json` block, at
 state's `outputs:`, so the completion condition refuses to finish a step that
 did not publish its export.
 
+Every consumed producer is also named directly in that step's `**Prior:**`.
+That explicit edge is required even when another task already gives a
+transitive path: `Prior` owns scheduling and blocking, while `Consumes` names
+the data that is injected after the producer has published nonblank content.
+
 `findings` — written by `review-k` and `pm-k`:
 
 ```json

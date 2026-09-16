@@ -121,7 +121,7 @@ Acceptance: every child lands its own result.
 
 #### Task 1.3: Fix round 1
 **State:** review
-**Prior:** 1.2
+**Prior:** 1.1, 1.2
 **Consumes:** 1.1:findings
 
 #### Task 1.4: Review round 2
@@ -219,7 +219,7 @@ Acceptance: every child lands its own result.
             "got:\n{position}"
         );
 
-        // The export consumer of 1.1 waits on it too, by `**Consumes:**` alone.
+        // The export consumer of 1.1 names the producer as a direct prior.
         let producer = find_task_by_id_str(&loaded.rhei.tasks, "plan.1.1").expect("task 1.1");
         let producer_context =
             memory_context(dir.path(), &plan_path, &loaded, &memory, &machine, producer, "review");

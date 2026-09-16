@@ -99,16 +99,6 @@ fn render_prior_task_results(render_context: &RuntimeTemplateContext<'_>) -> Mie
     Ok(out)
 }
 
-/// Workspace-relative location of one task export.
-///
-/// Exports are keyed by the publishing task, not by the state that wrote them:
-/// a consumer resolves the path from the plan graph alone, with no knowledge of
-/// which state of the producer happened to produce it.
-// §FS-rhei-plan-language.3.12: exports live at a convention-derived path.
-fn task_export_relative_path(task_id: &TaskId, name: &str) -> String {
-    format!("runtime/exports/{}/{}.md", task_id, name)
-}
-
 /// Execution root that owns a task's runtime artifacts.
 ///
 /// In a Panta project a prior routinely lives in another rhei, whose exports
@@ -142,7 +132,7 @@ fn render_declared_exports(render_context: &RuntimeTemplateContext<'_>) -> Strin
     // the rhei that owns this task's runtime. §FS-rhei-agents.4.1
     let root = export_root_for_task(render_context, &render_context.task.id);
     for name in &render_context.task.provides {
-        let relative = task_export_relative_path(&render_context.task.id, name);
+        let relative = task_export_relative_path(&render_context.task.id.to_string(), name);
         out.push_str(&format!(
             "\n- `{}` → `{}`\n",
             name,
@@ -230,28 +220,53 @@ fn terminal_result_path_shown(render_context: &RuntimeTemplateContext<'_>) -> Op
     Some(prompt_path_shown(render_context, render_context.workspace_root, relative))
 }
 
-/// Render the exports this task consumes from prior tasks.
+/// Preflight and render the exports this task consumes from prior tasks.
 ///
-/// A missing or empty export is skipped rather than raised: enforcement is a
-/// validator's job, and this path must not turn an unwritten export into a
-/// failure to spawn.
-// §FS-rhei-agents.3 §FS-rhei-plan-language.3.12: consumed exports are prompt context, not access control.
+/// The preflight is deliberately all-or-nothing: collecting every unavailable
+/// reference before returning lets the author repair one batch, and returning
+/// before the prompt exists keeps the worker from spawning with partial
+/// context. §FS-rhei-agents.3.3
 fn render_consumed_exports(render_context: &RuntimeTemplateContext<'_>) -> MietteResult<String> {
-    let mut out = String::new();
+    let mut available = Vec::new();
+    let mut unavailable = Vec::new();
     for consumed in &render_context.task.consumes {
+        let task_id = consumed.task.to_string();
+        // The producer selects the root even when a narrowed project run did
+        // not include it among candidate workers. §FS-rhei-plan-language.3.12.2
         let root = export_root_for_task(render_context, &consumed.task);
-        let path = root.join(task_export_relative_path(&consumed.task, &consumed.name));
-        if !path.exists() {
-            continue;
-        }
+        let (_, path) = resolve_task_export_path(root, &task_id, &consumed.name)?;
+        // Required consumed exports cannot be excluded. §FS-rhei-plan-language.3.13
         if !prompt_source_allowed(render_context, &path) {
-            continue;
+            return Err(miette!(
+                "Task {} excludes required consumed export '{}:{}'",
+                render_context.task.id,
+                consumed.task,
+                consumed.name
+            ));
         }
-        let content = fs::read_to_string(&path)
-            .map_err(|err| file_io_report(&path, "failed to read consumed export", err))?;
-        if content.trim().is_empty() {
-            continue;
+        match load_task_export(root, &task_id, &consumed.name)? {
+            TaskExportContent::Available(content) => available.push((consumed, content)),
+            TaskExportContent::Unavailable { relative, path, legacy } => {
+                unavailable.push(unavailable_task_export_line(
+                    &format!("{}:{}", consumed.task, consumed.name),
+                    &relative,
+                    &path,
+                    legacy.as_ref(),
+                ));
+            }
         }
+    }
+    if !unavailable.is_empty() {
+        return Err(miette!(
+            help = "write nonblank text to every consumed export under its producer's execution root, then retry the task",
+            "Task {} has missing or blank consumed exports:\n{}",
+            render_context.task.id,
+            unavailable.join("\n")
+        ));
+    }
+
+    let mut out = String::new();
+    for (consumed, content) in available {
         if out.is_empty() {
             out.push_str(
                 "\n## Consumed Exports\n\n\
@@ -266,7 +281,7 @@ fn render_consumed_exports(render_context: &RuntimeTemplateContext<'_>) -> Miett
             "\n### {} from Task {}\n\n{}\n",
             consumed.name,
             consumed.task,
-            fenced_markdown(content.trim())
+            fenced_markdown(&content)
         ));
     }
     Ok(out)

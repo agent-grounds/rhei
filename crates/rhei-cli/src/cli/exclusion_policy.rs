@@ -161,7 +161,7 @@ fn resolve_one_exclusion(
             (
                 exclusion.authored(),
                 root,
-                task_export_relative_path(&export.task, &export.name),
+                task_export_relative_path(&export.task.to_string(), &export.name),
                 false,
             )
         }
@@ -270,7 +270,7 @@ fn resolve_task_exclusions(
 
     for consumed in &task.consumes {
         let path = root_for_task(task_roots, &consumed.task, artifact_root)
-            .join(task_export_relative_path(&consumed.task, &consumed.name));
+            .join(task_export_relative_path(&consumed.task.to_string(), &consumed.name));
         if !policy.allows(&path) {
             let exact_export = task.excludes.iter().any(|entry| {
                 matches!(

@@ -87,6 +87,69 @@ fn validate_dependency_integrity(
                 ));
             }
         }
+
+        // A task export is a declared graph handoff, not a best-effort file
+        // lookup. Check its producer, declaration, and directly authored
+        // ordering edge while the ancestors are still available. Missing and
+        // forbidden producers are primary errors, so their derivative checks
+        // are deliberately suppressed. §FS-rhei-plan-language.3.12.1
+        for consumed in &task.consumes {
+            let producer = &consumed.task;
+            if producer == &task.id {
+                report.errors.push(format!(
+                    "Task {} cannot consume its own export '{}'",
+                    task.id, consumed.name
+                ));
+                continue;
+            }
+            if ancestors.iter().any(|ancestor| ancestor == producer) {
+                report.errors.push(format!(
+                    "Task {} cannot consume export '{}' from ancestor Task {}",
+                    task.id, consumed.name, producer
+                ));
+                continue;
+            }
+            let Some(producing_task) = index.get(producer) else {
+                // The ordinary Prior diagnostic already names this producer.
+                // One authored bad reference gets one primary error.
+                // §FS-rhei-validate.4.3
+                if !task.prior.iter().any(|prior| prior == producer) {
+                    let (tail, guidance) =
+                        missing_prior_hint(&task.id, producer, index, rhei_ids);
+                    if let Some(guidance) = guidance {
+                        report.help.push(guidance.replace("**Prior:**", "**Consumes:**"));
+                    }
+                    report.errors.push(format!(
+                        "Task {} consumes export '{}' from missing producer Task {}{}",
+                        task.id, consumed.name, producer, tail
+                    ));
+                }
+                continue;
+            };
+
+            if !producing_task.provides.iter().any(|name| name == &consumed.name) {
+                let mut available = producing_task.provides.clone();
+                available.sort();
+                let available = if available.is_empty() {
+                    "(none)".to_string()
+                } else {
+                    available.join(", ")
+                };
+                report.errors.push(format!(
+                    "Task {} consumes export '{}' from Task {}, but that task does not declare it in **Provides:**. Available exports: {}",
+                    task.id,
+                    consumed.name,
+                    producer,
+                    available
+                ));
+            }
+            if !task.prior.iter().any(|prior| prior == producer) {
+                report.errors.push(format!(
+                    "Task {} consumes export '{}' from Task {} and must list Task {} directly in **Prior:**",
+                    task.id, consumed.name, producer, producer
+                ));
+            }
+        }
         ancestors.push(task.id.clone());
         for child in &task.children {
             recurse(child, ancestors, index, rhei_ids, structure, report);

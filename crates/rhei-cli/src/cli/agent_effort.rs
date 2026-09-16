@@ -46,7 +46,12 @@ fn apply_state_effort(
     let Some(value) = state_def.and_then(|state| state.effort) else { return Ok(()) };
     let Some(mapping) = profile.effort.clone() else { return Ok(()) };
     let native = mapping.values.get(value.as_str()).ok_or_else(|| {
-        miette!("agent '{}' cannot represent state effort '{}'", agent_id, value.as_str())
+        miette!(
+            help = "Configure a native mapping for this canonical effort value, or use a supported value.",
+            "agent '{}' cannot represent state effort '{}'",
+            agent_id,
+            value.as_str()
+        )
     })?;
 
     let mut patterns = mapping.conflicts;

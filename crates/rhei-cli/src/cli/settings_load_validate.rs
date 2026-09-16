@@ -133,16 +133,21 @@ fn validate_agent_effort_profiles(
     for (id, profile) in agents {
         let Some(effort) = profile.effort.as_ref() else { continue };
         if effort.values.is_empty() {
-            return Err(miette!("agent '{id}' has an empty 'effort.values' mapping"));
+            return Err(miette!(
+                help = "Provide at least one canonical effort value and native mapping.",
+                "agent '{id}' has an empty 'effort.values' mapping"
+            ));
         }
         for (canonical, native) in &effort.values {
             if !rhei_validator::StateEffort::is_canonical(canonical) {
                 return Err(miette!(
+                    help = "Use one of the documented canonical effort values.",
                     "agent '{id}' maps unknown canonical effort value '{canonical}'"
                 ));
             }
             if native.trim().is_empty() {
                 return Err(miette!(
+                    help = "Provide a non-empty native value for this effort mapping.",
                     "agent '{id}' maps effort '{canonical}' to an empty native value"
                 ));
             }
@@ -150,12 +155,16 @@ fn validate_agent_effort_profiles(
 
         let validate_pattern = |field: &str, pattern: &[String]| -> MietteResult<()> {
             if pattern.is_empty() {
-                return Err(miette!("agent '{id}' has an empty '{field}' effort pattern"));
+                return Err(miette!(
+                    help = "Provide a token pattern containing the {value} placeholder.",
+                    "agent '{id}' has an empty '{field}' effort pattern"
+                ));
             }
             let placeholders =
                 pattern.iter().map(|token| token.matches("{value}").count()).sum::<usize>();
             if placeholders != 1 {
                 return Err(miette!(
+                    help = "Include exactly one {value} placeholder in the pattern.",
                     "agent '{id}' effort '{field}' pattern must contain exactly one '{{value}}' placeholder"
                 ));
             }

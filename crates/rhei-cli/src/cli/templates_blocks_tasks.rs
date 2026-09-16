@@ -8,7 +8,7 @@
             let layout = if has_plan { detect_template_layout(dir)? } else { TemplateLayout::Workspace };
             materialize_template(dir, reference, layout, &rendered, values, true)?;
             let source = dir.join("states.yaml");
-            let machine = if rendered.join("states.yaml").is_file() {
+            let mut machine = if rendered.join("states.yaml").is_file() {
                 let text = fs::read_to_string(rendered.join("states.yaml")).map_err(|e| file_io_report(&source, "read rendered state fragment", e))?;
                 rhei_validator::StateMachine::parse_fragment(&text).map_err(|e| miette!("{}: {e}; fix the authored state fragment", source.display()))?
             } else if has_plan && !has_children {
@@ -19,6 +19,14 @@
             let mut files = BTreeMap::new();
             read_compiled_files(&rendered, &rendered, &mut files)?;
             files.remove(Path::new("states.yaml"));
+            // The compiler compares effective bound prompts, not filenames. §FS-rhei-library.7.1
+            for (path, file) in &files {
+                if path.parent() == Some(Path::new("prompt_templates")) && path.extension().is_some_and(|extension| extension == "md") {
+                    let name = path.file_stem().and_then(|name| name.to_str()).ok_or_else(|| miette!("invalid prompt path {}", path.display()))?;
+                    let instructions = String::from_utf8(file.bytes.clone()).map_err(|e| miette!("{}: {e}", path.display()))?;
+                    machine.prompt_templates.insert(name.into(), rhei_validator::PromptTemplateDef { instructions, source: Some(rendered.join(path)) });
+                }
+            }
             let settings = files.remove(Path::new(".agent-grounds/rhei/settings.json"))
                 .map(|s| serde_json::from_slice(&s.bytes).map_err(|e| miette!("{}/settings.json: {e:?}", dir.display())))
                 .transpose()?.unwrap_or_else(|| serde_json::json!({}));

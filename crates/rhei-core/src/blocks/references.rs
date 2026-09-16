@@ -10,6 +10,7 @@ use crate::state_machine::{
 #[derive(Default)]
 pub(crate) struct Names {
     pub states: BTreeMap<String, String>,
+    pub terminal_groups: Vec<super::terminal_equivalence::TerminalGroup>,
     pub tasks: BTreeMap<String, String>,
     pub kinds: BTreeMap<String, String>,
     pub profiles: BTreeMap<String, String>,
@@ -124,11 +125,16 @@ impl CompiledBlock {
             }
         }
         rename_keys(&mut machine.prompt_templates, &names.prompts)?;
+        // Compare bound contracts after typed state rewrites, before coalescing. §FS-rhei-library.7.1
+        let redundant = super::terminal_equivalence::validate(machine, &names.terminal_groups)?;
         for rule in &mut machine.transitions {
             rename(&mut rule.from.0, &names.states);
             rename(&mut rule.to.0, &names.states);
-            for source in rule.sources.iter_mut().flatten() {
-                rename(source, &names.states);
+            if let Some(sources) = &mut rule.sources {
+                for source in sources.iter_mut() {
+                    rename(source, &names.states);
+                }
+                deduplicate(sources);
             }
             for (field, registry) in [
                 (&mut rule.mcp_unavailable, &names.settings.mcp_servers),
@@ -152,6 +158,7 @@ impl CompiledBlock {
                 for s in &mut profile.allowed {
                     rename(s, &names.states);
                 }
+                deduplicate(&mut profile.allowed);
             }
             rename_keys(profiles, &names.profiles)?;
         }
@@ -205,6 +212,9 @@ impl CompiledBlock {
                 }
             });
         }
+        for state in redundant {
+            machine.states.shift_remove(&state);
+        }
         rename_keys(&mut machine.states, &names.states)?;
         for kind in &mut self.fragment.plan.structure.node_kinds {
             rename(kind, &names.kinds);
@@ -226,6 +236,7 @@ impl CompiledBlock {
         for state in self.exits.values_mut().chain(&mut self.primary) {
             rename(state, &names.states);
         }
+        deduplicate(&mut self.primary);
         for endpoint in self.inputs.values_mut().chain(self.outputs.values_mut()) {
             match endpoint {
                 Endpoint::File { state, path, .. } => {
@@ -255,4 +266,9 @@ pub(crate) fn rename_keys<T>(
         }
     }
     Ok(())
+}
+
+fn deduplicate(values: &mut Vec<String>) {
+    let mut seen = BTreeSet::new();
+    values.retain(|value| seen.insert(value.clone()));
 }

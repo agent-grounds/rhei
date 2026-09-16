@@ -121,7 +121,7 @@
             children.push((mount.alias.clone(), frontend.prepare(&mount.block, None, &inputs.for_alias(&mount.alias), &mount.alias)?));
         }
         let block = Block { name: root_name.clone(), source: PathBuf::from("<command line>"), version: "1".into(), manifest: BlockManifest { mounts, seams, ..Default::default() }, local: None, children };
-        let compiled = block.compile().map_err(|e| miette!("{e}"))?;
+        let compiled = block.compile().map_err(|e| miette!("block declarations (static or template.yaml select): {e}"))?;
         instantiate_compiled_workspace(
             compiled,
             &root_name,
@@ -171,7 +171,7 @@
             .collect::<MietteResult<BTreeMap<_, _>>>()?;
         let mut frontend = BlockFrontend::new()?;
         let block = frontend.prepare(template, None, &supplied, &manifest.name)?;
-        let compiled = block.compile().map_err(|e| miette!("{e}"))?;
+        let compiled = block.compile().map_err(|e| miette!("block declarations (static or template.yaml select): {e}"))?;
         instantiate_compiled_workspace(
             compiled,
             &manifest.name,

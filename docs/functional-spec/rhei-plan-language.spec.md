@@ -41,7 +41,7 @@ Render the avatar in the profile header and comment list. Fall back to initials 
 
 `**Prior:**` declares dependencies — Task 2 cannot be claimed until Task 1 is
 in a successful terminal state as defined by the active state machine
-(`final: true` and not normalized `cancelled`; in the built-in `rhei` machine,
+(`final: true` and without cancellation role (§FS-rhei-states.1.4); in the built-in `rhei` machine,
 `completed`). Tasks without `**Prior:**` are immediately dependency-ready.
 
 Tasks may also be decomposed hierarchically when the plan's optional
@@ -656,7 +656,7 @@ hold/release rule is specified in [§FS-rhei-supervision.3](rhei-supervision.spe
 
 Dependency readiness requires successful terminal dependencies: a task is ready
 with respect to `**Prior:**` only when every referenced dependency is in a
-terminal state whose normalized state name is not `cancelled`. State-machine
+terminal state without cancellation role (§FS-rhei-states.1.4). State-machine
 `instructions` text is descriptive guidance for agents and must not narrow or
 override this readiness rule unless the machine introduces a separate normative
 field for that purpose.
@@ -1100,8 +1100,8 @@ This section is canonical for artifact enforcement order across commands:
 | Command | Enforced artifacts | Ordering |
 |---------|--------------------|----------|
 | `rhei next` | Current-state `inputs` only | Before a task is claimable, resolve the current state's inputs. Required inputs must exist; optional inputs are resolved and exposed but missing optional inputs do not block. Claim mode acquires the selected plan destination's canonical sibling sidecar and re-reads the current pathname before re-checking immediately before writing `**Assignee:**`. `next --peek` does not acquire a writer sidecar, check outputs, run callbacks, write state, or write result files; claim mode may auto-advance non-runnable initial states as defined in the next-command spec. |
-| `rhei transition` | Source-state `outputs`; target-state `inputs`; the target's terminal result | After the compare-and-swap guard and edge validation, execute `on_leave` unless skipped. Then check required source outputs — skipped when the effective target is `cancelled`, which abandons the work rather than finishing it — resolve target inputs for the final target state, and reject before the state write if any required artifact is missing. Optional target inputs are skipped for blocking but still resolved. When the final target is `final: true`, its implicit terminal result is checked at the same point ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)): a non-empty `runtime/results/<task-id>.md` or a `--result` message, or the transition is rejected before the state write. Write the target state, execute `on_enter` unless skipped, atomically persist the task file, then append the transition audit entry to `runtime/state-transitions.log` and, for a terminal target, the terminal finalization. |
-| `rhei complete` | Source-state `outputs`; completion-target `inputs`; the completion target's terminal result | Select the non-cancelled terminal completion target first, then use the same transition artifact order as `rhei transition`, carrying `--result` as the terminal result. `rhei complete` adds no artifact rule of its own; its target is never `cancelled`, so the cancellation waiver never applies to it. |
+| `rhei transition` | Source-state `outputs`; target-state `inputs`; the target's terminal result | After the compare-and-swap guard and edge validation, execute `on_leave` unless skipped. Then check required source outputs — skipped when the effective target has cancellation role (§FS-rhei-states.1.4), which abandons the work rather than finishing it — resolve target inputs for the final target state, and reject before the state write if any required artifact is missing. Optional target inputs are skipped for blocking but still resolved. When the final target is `final: true`, its implicit terminal result is checked at the same point ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)): a non-empty `runtime/results/<task-id>.md` or a `--result` message, or the transition is rejected before the state write. Write the target state, execute `on_enter` unless skipped, atomically persist the task file, then append the transition audit entry to `runtime/state-transitions.log` and, for a terminal target, the terminal finalization. |
+| `rhei complete` | Source-state `outputs`; completion-target `inputs`; the completion target's terminal result | Select the non-cancelled terminal completion target first, then use the same transition artifact order as `rhei transition`, carrying `--result` as the terminal result. `rhei complete` adds no artifact rule of its own; its target never has cancellation role, so the cancellation waiver never applies to it. |
 | `rhei run` | Current-state `inputs`; source-state `outputs` for successful work; target-state `inputs`; the selected target's terminal result | Before spawning work, the ready-set scan checks current-state required inputs and skips missing optional inputs for blocking. After a subprocess exits `0`, required source outputs are part of the completion condition; if any are missing, no transition fires, the task stays in its current state, it is not spawned again within the pass, and the run continues with the other claimable tickets in both execution modes ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 5). When the transition the run would select lands on a `final: true` state, the ticket's non-empty `runtime/results/<task-id>.md` — or, per invocation of a fanned-out state, its own fragment under `runtime/results/<task-id>/<state>/<visit_count>/` — is part of that same completion condition and a missing one is reported exactly like a missing required output ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop), [§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition), [§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)). Non-zero, timeout, and tooling-failure routes select error transitions as specified by `rhei run`, do not require normal source outputs, and carry an engine-written result message when they land on a terminal state. For any selected target transition, required target inputs are checked before the state write and optional target inputs do not block. A successful-work transition also re-checks source outputs after `on_leave` and before the state write. Result-file writes, if any, happen only after the transition succeeds. |
 
 One artifact in the table is never declared: the terminal result. Every `final:
@@ -1114,10 +1114,10 @@ and expose the path and existence flag to templates, agents, and programs.
 `optional: true` is valid only on inputs. Outputs are always required when
 declared, and a missing output blocks the transition out of the source state
 except for the `rhei run` failure, timeout, and tooling-unavailable routes
-described above, and except on a transition into the `cancelled` state.
+described above, and except on a transition into a cancellation-role state (§FS-rhei-states.1.4).
 Cancellation abandons the work, so the source state's artifact contract is
 moot: there is no output to require of a step that is not being finished. The
-terminal-result obligation is *not* waived with it — a cancel into `cancelled`
+terminal-result obligation is *not* waived with it — a cancel into a cancellation-role terminal
 still needs a `--result` message or a result already on disk, because a
 cancelled ticket still has to say why.
 

@@ -108,8 +108,10 @@ select: |
       {% if fix_commit != 'none' %}
       commit-fix: fix.commit-fix
       {% endif %}
-      completed: fix.completed
-      cancelled: fix.cancelled
+    # Checked shared public terminal identities. §FS-rhei-library.7.1
+    terminals:
+      completed: [review.completed, fix.completed]
+      cancelled: [review.cancelled, fix.cancelled]
     tasks:
       coordinate: review.coordinate
     settings:

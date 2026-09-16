@@ -157,12 +157,12 @@ in it is worked once, after its whole subtree is terminal
   about as it is today.
 
   A final state the supervisor can finish in is any `final: true` state except
-  the reserved cancellation terminal
+  a terminal with cancellation role
   ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)). This is
   the one place the question parts company with the one asked by
   [§FS-rhei-transitions.4.6](rhei-transitions.spec.md#46-wildcard-semantics),
   which is deliberately written against terminality rather than against the
-  reserved name. "Can this state be left" asks whether the engine has anywhere
+  cancellation role. "Can this state be left" asks whether the engine has anywhere
   to take the task, and abandonment is somewhere; "can this supervisor finish"
   asks whether the work it supervises can ever be declared done, and
   abandonment is not. So an `openDescendants` edge whose every path ends only
@@ -791,9 +791,9 @@ engine; a supervisor that wants a fresh one overwrites it.
   does not have to satisfy the cancelled step's own `outputs:` — cancellation
   abandons the work, so that contract is moot ([§FS-rhei-transitions.4.5](rhei-transitions.spec.md#45-artifact-enforcement)) — but
   it does have to say why: the terminal-result obligation stands, so every
-  cancel carries `--result "<why>"`. The waiver keys on the reserved state name
-  ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)): a machine whose abandon state is spelled anything else
-  gets the ordinary outputs check, and the refusal says which name skips it.
+  cancel carries `--result "<why>"`. The waiver keys on the effective cancellation role
+  ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)): an abandonment terminal with another name declares `role: cancellation`;
+  legacy `cancelled`/`canceled` spellings keep the same waiver.
 - **Reset.** `rhei reset` on a supervisor clears its `supervision` block;
   resetting a descendant does not touch the supervisor's phase.
 - **Resumed runs.** A checkpoint reports a transition, not that work was done.

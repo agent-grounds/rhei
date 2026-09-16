@@ -79,7 +79,7 @@ impl StateMachine {
         Ok(())
     }
 
-    fn validate_state_prompt_template(
+    pub fn validate_state_prompt_template(
         &self,
         state_name: &str,
         state: &StateDef,

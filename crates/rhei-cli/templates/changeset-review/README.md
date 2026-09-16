@@ -39,7 +39,18 @@ you want every default review pass to use only xhigh-capable targets.
 The wrapper compiles the state fragments from
 [`code-review`](../code-review/states.yaml) and [`fix`](../fix/states.yaml),
 then applies its checked compatibility map so existing state and artifact names
-remain stable. Per-task paths through the machine:
+remain stable. `compatibility.terminals` checks that both child terminal pairs
+have matching effective contracts before sharing public `completed`/`cancelled`
+identities. Cancellation remains available at the human approval gate.
+
+The manifest's opt-in `select: |` scalar selects only `ports`, `data`, or
+`compatibility` after resolving its static inputs. Here it omits mappings for
+preparation/commit stages when the respective input is `none`; the reusable
+`fix` block selects matching entry/data ports. No placeholder state or extra
+workspace/commit artifact is required. The static input schema, mounts, binds,
+and seams are unchanged. See §FS-rhei-library.1.1 and §FS-rhei-library.7.1–2.
+
+Per-task paths through the machine:
 
 | Task | Path through the machine |
 |---|---|

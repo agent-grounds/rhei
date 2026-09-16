@@ -203,19 +203,21 @@ transitions:
     /// each rather than calling every row "held". §FS-rhei-run-report.3.1
     #[test]
     fn the_waiting_tally_names_each_kind_it_holds() {
-        let row = |waits_on_person: bool| AttentionRow {
+        let row = |waits_on_person: bool, provider_limited: bool| AttentionRow {
             id: "1".to_string(),
             state: "s".to_string(),
             reason: "r".to_string(),
             next: "n".to_string(),
             is_gate: true,
             waits_on_person,
+            provider_limited,
         };
-        assert_eq!(waiting_tally(&[row(false), row(false)]), "2 held");
-        assert_eq!(waiting_tally(&[row(true)]), "1 waiting on a person");
+        assert_eq!(waiting_tally(&[row(false, false), row(false, false)]), "2 held");
+        assert_eq!(waiting_tally(&[row(true, false)]), "1 waiting on a person");
+        assert_eq!(waiting_tally(&[row(false, true)]), "1 provider-limited");
         assert_eq!(
-            waiting_tally(&[row(false), row(true), row(true)]),
-            "1 held \u{b7} 2 waiting on a person"
+            waiting_tally(&[row(false, false), row(true, false), row(false, true)]),
+            "1 held \u{b7} 1 waiting on a person \u{b7} 1 provider-limited"
         );
     }
 

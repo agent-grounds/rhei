@@ -37,6 +37,9 @@ enum HaltCause {
     /// for hours looking exactly like a running agent.
     // §FS-rhei-states.2.5 §FS-rhei-run-report.3.1
     WaitingOnPerson { label: String },
+    /// A supported provider has supplied a durable safe retry deadline. This
+    /// is deliberate waiting, not attention. §FS-rhei-run-report.3.1
+    ProviderLimited { provider: String, next_attempt_at: String },
     /// A supervising ancestor is owed a visit or is working, so nothing beneath
     /// it is dispatched. Named so a held subtree is never read as a stall.
     // §FS-rhei-supervision.3.4
@@ -190,6 +193,10 @@ impl HaltCause {
                 format!(
                     "nothing to do on Task {id}; the poll resumes itself when {label} answers"
                 ),
+            ),
+            HaltCause::ProviderLimited { provider, next_attempt_at } => (
+                format!("provider {provider} limited until {next_attempt_at}"),
+                format!("nothing to do on Task {id}; rhei resumes it automatically"),
             ),
             HaltCause::Claimed { assignee } => (
                 format!("claimed by {assignee}"),
@@ -386,6 +393,14 @@ fn classify_halt(
     }
     if let Some(prior) = first_blocking_prior(task, state_map, machines, scope) {
         return HaltCause::BlockedByPrior { prior };
+    }
+    if let Some(limit) = task_provider_limit(rhei, machines, task)
+        .filter(|limit| limit.deadline_epoch().is_some_and(|deadline| deadline > current_unix_secs()))
+    {
+        return HaltCause::ProviderLimited {
+            provider: limit.identity.provider,
+            next_attempt_at: limit.next_attempt_at,
+        };
     }
     // Behind the claim and the prior, unlike the gate above: both really do
     // stop a poll from ever coming back, so "it resumes itself" would be a

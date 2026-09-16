@@ -127,6 +127,44 @@ mod spawn_records {
         );
     }
 
+    /// Provider refusals retain numbered invocation evidence while leaving the
+    /// visit's authored attempt budget untouched. §FS-rhei-agents.3.2.3
+    /// §FS-rhei-agents.8.4
+    #[test]
+    fn provider_limited_spawns_are_auditable_but_uncharged() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        ledger(dir.path(), "plan.1 draft@implement\n");
+
+        let first = plan_for(dir.path());
+        ended(&first, "provider_limited", 1);
+        let record = read_spawn_record(&first.record).expect("provider-limited record");
+        assert_eq!(record.ending, "provider_limited");
+        assert_eq!(record.code, Some(1));
+        assert!(!record.attempt_charged);
+        assert_eq!(record.charged, 0);
+
+        let second = plan_for(dir.path());
+        assert_eq!(second.attempt, 2, "the first transcript stays separately named");
+        assert!(second.budget_spent(AttemptBudget::Visit(1)).is_none());
+        ended(&second, "provider_limited", 1);
+        assert!(plan_for(dir.path()).budget_spent(AttemptBudget::Visit(1)).is_none());
+    }
+
+    /// Records from before `attempt_charged` remain readable, and preserve the
+    /// historical default that an ordinary completed invocation was charged.
+    /// §FS-rhei-agents.8.4
+    #[test]
+    fn spawn_records_without_attempt_charged_remain_compatible() {
+        let old = r#"{
+            "task":"1","state":"working","moves":0,"attempt":1,"charged":1,
+            "kind":"agent","worker":"codex","log":"one.log",
+            "started":"s","ended":"e","duration":"1s","code":1,"ending":"exited"
+        }"#;
+        let record: SpawnRecord = serde_json::from_str(old).expect("old spawn record");
+        assert!(record.attempt_charged);
+        assert_eq!(record.charged, 1);
+    }
+
     /// A state's account of its own worker is matched on the record's fields,
     /// never on the file name it happens to have: `review` and `review-fix`
     /// share a prefix, and one used to answer with the other's transcript.

@@ -59,6 +59,7 @@ enum LedgerOutcome {
     /// The invocation selected its state's poll self-loop, so it neither failed
     /// nor finished the state: it waited. §FS-rhei-states.2.2
     Waiting,
+    ProviderLimited { provider: String, next_attempt_at: String },
     Cancelled,
     TimedOut,
     /// The run was interrupted and the engine ended the invocation; no
@@ -188,6 +189,10 @@ impl rhei_tui::EventSink for SummarySink {
                     rhei_tui::TaskOutcome::Completed => LedgerOutcome::Completed,
                     rhei_tui::TaskOutcome::Failed(msg) => LedgerOutcome::Failed(msg),
                     rhei_tui::TaskOutcome::Waiting => LedgerOutcome::Waiting,
+                    rhei_tui::TaskOutcome::ProviderLimited {
+                        provider,
+                        next_attempt_at,
+                    } => LedgerOutcome::ProviderLimited { provider, next_attempt_at },
                     rhei_tui::TaskOutcome::Cancelled => LedgerOutcome::Cancelled,
                     rhei_tui::TaskOutcome::TimedOut => LedgerOutcome::TimedOut,
                     rhei_tui::TaskOutcome::Interrupted => LedgerOutcome::Interrupted,
@@ -522,7 +527,11 @@ fn marker_for_task(
     // Attention row. §FS-rhei-supervision.3.4
     if matches!(
         halt_causes.get(id),
-        Some(HaltCause::HeldBySupervisor { .. } | HaltCause::WaitingOnPerson { .. })
+        Some(
+            HaltCause::HeldBySupervisor { .. }
+                | HaltCause::WaitingOnPerson { .. }
+                | HaltCause::ProviderLimited { .. }
+        )
     ) && !state_is_failure(state)
     {
         return Marker::Gate;
@@ -586,6 +595,9 @@ struct AttentionRow {
     /// its count line names each rather than calling both "held".
     // §FS-rhei-states.2.5 §FS-rhei-run-report.3.1
     waits_on_person: bool,
+    /// True for a durable provider wait, counted separately from supervision
+    /// holds and human polling. §FS-rhei-run-report.3.1
+    provider_limited: bool,
 }
 
 /// Run-level facts the summary needs beyond the plan itself. §FS-rhei-run-report.8
@@ -1307,13 +1319,21 @@ fn collect_rows(
                     halt_causes.get(&id),
                     Some(HaltCause::WaitingOnPerson { .. })
                 ),
+                provider_limited: matches!(
+                    halt_causes.get(&id),
+                    Some(HaltCause::ProviderLimited { .. })
+                ),
             };
             // A held subtree and a person wait are both somebody else's turn:
             // Waiting holds them, undiluting the rows a human must act on.
             // §FS-rhei-supervision.3.4 §FS-rhei-states.2.5
             if matches!(
                 halt_causes.get(&id),
-                Some(HaltCause::HeldBySupervisor { .. } | HaltCause::WaitingOnPerson { .. })
+                Some(
+                    HaltCause::HeldBySupervisor { .. }
+                        | HaltCause::WaitingOnPerson { .. }
+                        | HaltCause::ProviderLimited { .. }
+                )
             ) {
                 waiting.push(row);
             } else {
@@ -1468,13 +1488,17 @@ fn result_phrase(
 // §FS-rhei-run-report.3.1 §FS-rhei-states.2.5
 fn waiting_tally(waiting: &[AttentionRow]) -> String {
     let people = waiting.iter().filter(|row| row.waits_on_person).count();
-    let held = waiting.len() - people;
+    let provider = waiting.iter().filter(|row| row.provider_limited).count();
+    let held = waiting.len() - people - provider;
     let mut parts = Vec::new();
     if held > 0 {
         parts.push(format!("{held} held"));
     }
     if people > 0 {
         parts.push(format!("{people} waiting on a person"));
+    }
+    if provider > 0 {
+        parts.push(format!("{provider} provider-limited"));
     }
     parts.join(" \u{b7} ")
 }
@@ -1528,6 +1552,9 @@ fn ledger_outcome_reason(outcome: &LedgerOutcome, exit_code: Option<i32>) -> Str
             Some(code) => format!("poll delay, exit {code}"),
             None => "poll delay".to_string(),
         },
+        LedgerOutcome::ProviderLimited { provider, next_attempt_at } => {
+            format!("provider {provider} limited until {next_attempt_at}")
+        }
         LedgerOutcome::Cancelled => "cancelled".to_string(),
         LedgerOutcome::TimedOut => "timed out".to_string(),
         // Not a verdict on the ticket: the run stopped the worker. §FS-rhei-run.3.2
@@ -1570,7 +1597,11 @@ fn build_ledger(
                 ledger.push(LedgerEntry {
                     task: row.id.clone(),
                     from: rec.from.clone(),
-                    to: rec.to.clone(),
+                    to: if matches!(rec.outcome, LedgerOutcome::ProviderLimited { .. }) {
+                        "-".to_string()
+                    } else {
+                        rec.to.clone()
+                    },
                     driver: rec.driver,
                     invocation: format!("{} / {}", rec.driver, log),
                     reason: ledger_outcome_reason(&rec.outcome, rec.exit_code),

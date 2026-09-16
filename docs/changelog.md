@@ -28,6 +28,14 @@
   source metadata and per-merge-unit provenance, so dispatchers can use Rhei's
   built-ins and precedence rules without copying or reimplementing them. (PR #271)
 
+- **`rhei run` now parks supported Codex/OpenAI session limits and resumes
+  automatically.** A reset-bearing refusal keeps the task in its authored
+  state, releases its worker slot, persists the safe retry deadline across
+  interruption or restart, and leaves foreground/headless runs waiting while
+  unrelated work continues. Journals and JSON streams expose the additive
+  `provider_limited` outcome instead of reporting an ordinary agent failure.
+  (PR #277)
+
 - **Transition callbacks now receive a stable identity for each firing and an
   explicit pending ledger status.** Canonical JSON exposes `firingId` and
   `ledgerStatus`, and CLI callbacks receive equal environment values, so an

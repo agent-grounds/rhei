@@ -105,6 +105,7 @@ impl EventSink for JournalSink {
                     TaskOutcome::Completed => "completed",
                     TaskOutcome::Failed(_) => "failed",
                     TaskOutcome::Waiting => "waiting",
+                    TaskOutcome::ProviderLimited { .. } => "provider_limited",
                     TaskOutcome::Cancelled => "cancelled",
                     TaskOutcome::TimedOut => "timeout",
                     TaskOutcome::Interrupted => "interrupted",
@@ -118,6 +119,10 @@ impl EventSink for JournalSink {
                 }
                 meta_parts.push(format!("duration={}", format_duration(duration_ms)));
                 meta_parts.push(format!("outcome={outcome_str}"));
+                if let TaskOutcome::ProviderLimited { provider, next_attempt_at } = &outcome {
+                    meta_parts.push(format!("provider={provider}"));
+                    meta_parts.push(format!("next_attempt_at={next_attempt_at}"));
+                }
                 let meta = meta_parts.join(",");
                 let move_str =
                     if from == to { format!("end@{to}") } else { format!("{from}\u{2192}{to}") };
@@ -281,5 +286,34 @@ mod tests {
         }
         let contents = std::fs::read_to_string(tmp.path().join("runtime/transitions.log")).unwrap();
         assert_eq!(contents.lines().count(), 2);
+    }
+
+    /// The durable invocation ledger preserves the provider and UTC retry
+    /// instant while recording no authored transition. §FS-rhei-run-tui.1.7
+    #[test]
+    fn provider_limit_release_is_auditable_without_a_transition() {
+        let tmp = tempfile::tempdir().unwrap();
+        let sink = JournalSink::open(tmp.path()).unwrap();
+        sink.emit(RunEvent::SlotReleased {
+            slot: 0,
+            task: "task-1".to_string(),
+            from: "working".to_string(),
+            to: "working".to_string(),
+            log_path: tmp.path().join("runtime/logs/task-1-working.log"),
+            outcome: TaskOutcome::ProviderLimited {
+                provider: "openai".to_string(),
+                next_attempt_at: "2026-09-16T20:21:00Z".to_string(),
+            },
+            finished_at: Instant::now(),
+            wall_clock: fixed_time(),
+            exit_code: Some(1),
+            duration_ms: 10,
+        });
+
+        let contents = std::fs::read_to_string(sink.path()).unwrap();
+        assert!(contents.contains("end@working"), "{contents}");
+        assert!(contents.contains("outcome=provider_limited"), "{contents}");
+        assert!(contents.contains("provider=openai"), "{contents}");
+        assert!(contents.contains("next_attempt_at=2026-09-16T20:21:00Z"), "{contents}");
     }
 }

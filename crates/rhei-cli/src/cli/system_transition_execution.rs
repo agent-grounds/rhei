@@ -579,6 +579,13 @@ fn execute_transition_with_origin(
             from,
         );
     }
+    if to != from {
+        updated_metadata = clear_provider_limit_state_metadata(
+            updated_metadata.as_ref().or(metadata_for_checks),
+            &metadata_key,
+            from,
+        );
+    }
     let from_visit_count = Some(render_visit_count(
         metadata_for_checks,
         &metadata_key,

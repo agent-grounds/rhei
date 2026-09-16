@@ -98,6 +98,10 @@ The runtime currently supports:
 - atomically advancing work with `rhei transition`, `rhei complete`, and
   `rhei reset`
 - orchestrating agents and deterministic programs with `rhei run`
+- durably parking reset-bearing Codex/OpenAI session limits: foreground and
+  headless runs release the slot, wait without failing the task, and resume
+  automatically after the persisted UTC deadline; an interrupted run resumes
+  the same wait on its next invocation
 - recording runtime logs, results, snapshots, and dashboard state under
   `runtime/`
 - rendering plans as JSON, GitHub-style markdown, or terminal-oriented progress

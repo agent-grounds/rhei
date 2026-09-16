@@ -195,6 +195,42 @@ fn a_waiting_outcome_round_trips_and_carries_no_reason() {
     }
 }
 
+/// Provider parking is an additive typed release with enough information for
+/// headless and attached clients to schedule and explain it. §FS-rhei-run-json.2.1
+#[test]
+fn a_provider_limited_outcome_round_trips_with_its_deadline() {
+    let event = RunEvent::SlotReleased {
+        slot: 0,
+        task: "auth.1".to_string(),
+        from: "working".to_string(),
+        to: "working".to_string(),
+        log_path: PathBuf::from("l"),
+        outcome: TaskOutcome::ProviderLimited {
+            provider: "openai".to_string(),
+            next_attempt_at: "2026-09-16T20:21:00Z".to_string(),
+        },
+        finished_at: Instant::now(),
+        wall_clock: at(),
+        exit_code: Some(1),
+        duration_ms: 1,
+    };
+    let record = encode(Some(1), &event, at(), None);
+    assert_eq!(record["outcome"], "provider_limited");
+    assert_eq!(record["provider"], "openai");
+    assert_eq!(record["next_attempt_at"], "2026-09-16T20:21:00Z");
+    let decoded = decode(&record.to_string()).expect("decode");
+    match decoded.event {
+        RunEvent::SlotReleased { outcome, .. } => assert_eq!(
+            outcome,
+            TaskOutcome::ProviderLimited {
+                provider: "openai".to_string(),
+                next_attempt_at: "2026-09-16T20:21:00Z".to_string(),
+            }
+        ),
+        other => panic!("expected a released slot, got {other:?}"),
+    }
+}
+
 /// The rule that lets the vocabulary grow without moving `schema`: a reader
 /// that meets a word it does not know passes the record on wearing it, rather
 /// than rewriting the field to one it does. `rhei attach --json` decodes and

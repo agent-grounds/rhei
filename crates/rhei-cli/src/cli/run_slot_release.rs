@@ -65,6 +65,17 @@ impl PendingSlotRelease {
             release.outcome = rhei_tui::TaskOutcome::Waiting;
         }
     }
+
+    /// A recognized provider refusal is a calm, typed wait with the same
+    /// provider and UTC deadline on every event surface. §FS-rhei-run-tui.1.1
+    fn provider_limited(&mut self, limit: &ProviderLimit) {
+        if let Some(release) = self.release.as_mut() {
+            release.outcome = rhei_tui::TaskOutcome::ProviderLimited {
+                provider: limit.identity.provider.clone(),
+                next_attempt_at: limit.next_attempt_at.clone(),
+            };
+        }
+    }
 }
 
 impl Drop for PendingSlotRelease {

@@ -93,6 +93,10 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
             if let TaskOutcome::Failed(reason) = outcome {
                 put("reason", json!(reason));
             }
+            if let TaskOutcome::ProviderLimited { provider, next_attempt_at } = outcome {
+                put("provider", json!(provider));
+                put("next_attempt_at", json!(next_attempt_at));
+            }
             put("exit_code", json!(exit_code));
             put("duration_ms", json!(duration_ms));
         }
@@ -197,6 +201,7 @@ fn outcome_name(outcome: &TaskOutcome) -> &str {
         TaskOutcome::Completed => "completed",
         TaskOutcome::Failed(_) => "failed",
         TaskOutcome::Waiting => "waiting",
+        TaskOutcome::ProviderLimited { .. } => "provider_limited",
         TaskOutcome::Cancelled => "cancelled",
         TaskOutcome::TimedOut => "timeout",
         TaskOutcome::Interrupted => "interrupted",
@@ -332,7 +337,12 @@ fn decode_event(kind: &str, v: &Value, wall_clock: SystemTime) -> Option<RunEven
             from: text("from"),
             to: text("to"),
             log_path: path("log_path"),
-            outcome: decode_outcome(v.get("outcome").and_then(Value::as_str)?, opt_text("reason")),
+            outcome: decode_outcome(
+                v.get("outcome").and_then(Value::as_str)?,
+                opt_text("reason"),
+                opt_text("provider"),
+                opt_text("next_attempt_at"),
+            ),
             finished_at: Instant::now(),
             wall_clock,
             exit_code: v.get("exit_code").and_then(Value::as_i64).map(|code| code as i32),
@@ -393,11 +403,20 @@ fn decode_event(kind: &str, v: &Value, wall_clock: SystemTime) -> Option<RunEven
 /// met would turn that into an outage, and one that renamed it would report the
 /// run as something it never said.
 // §FS-rhei-run-json.2.1 §FS-rhei-run-json.2.2
-fn decode_outcome(name: &str, reason: Option<String>) -> TaskOutcome {
+fn decode_outcome(
+    name: &str,
+    reason: Option<String>,
+    provider: Option<String>,
+    next_attempt_at: Option<String>,
+) -> TaskOutcome {
     match name {
         "completed" => TaskOutcome::Completed,
         "failed" => TaskOutcome::Failed(reason.unwrap_or_default()),
         "waiting" => TaskOutcome::Waiting,
+        "provider_limited" => TaskOutcome::ProviderLimited {
+            provider: provider.unwrap_or_default(),
+            next_attempt_at: next_attempt_at.unwrap_or_default(),
+        },
         "cancelled" => TaskOutcome::Cancelled,
         "timeout" => TaskOutcome::TimedOut,
         "interrupted" => TaskOutcome::Interrupted,

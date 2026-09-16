@@ -194,6 +194,15 @@ pub fn unique_scratchpad_dir(prefix: &str) -> TestDir {
     TestDir::create(repo_root().join("scratchpad").join(format!("rhei-integ-{prefix}-{nanos}")))
 }
 
+/// Compare existing paths by filesystem identity rather than spelling. macOS
+/// exposes temporary directories through both `/var` and `/private/var`.
+pub fn assert_same_path(actual: &Path, expected: &Path) {
+    assert_eq!(
+        fs::canonicalize(actual).expect("actual path should resolve"),
+        fs::canonicalize(expected).expect("expected path should resolve")
+    );
+}
+
 pub fn write_fixture_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
     let path = dir.join(name);
     fs::write(&path, contents).expect("fixture file should be written");

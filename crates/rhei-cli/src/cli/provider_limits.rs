@@ -334,13 +334,12 @@ fn visit_tasks<'a>(tasks: &'a [rhei_core::ast::Task], out: &mut Vec<&'a rhei_cor
     }
 }
 
-/// Latest active deadline for one execution identity. Stale-state and expired
-/// records do not suppress work. §FS-rhei-run.3.3
-fn active_provider_deadline_for_identity(
+/// Latest authored deadline for one execution identity in the tasks' current
+/// states. Stale-state records do not participate. §FS-rhei-run.3.3
+fn provider_deadline_for_identity(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     identity: &ProviderIdentity,
-    now: u64,
 ) -> Option<u64> {
     let mut tasks = Vec::new();
     visit_tasks(&rhei.tasks, &mut tasks);
@@ -351,8 +350,18 @@ fn active_provider_deadline_for_identity(
             let limit = provider_limit_for_task_state(rhei.metadata.as_ref(), &task.id, &state)?;
             (limit.identity == *identity).then(|| limit.deadline_epoch()).flatten()
         })
-        .filter(|deadline| *deadline > now)
         .max()
+}
+
+/// Latest active deadline for one execution identity. Expired records do not
+/// suppress work. §FS-rhei-run.3.3
+fn active_provider_deadline_for_identity(
+    rhei: &rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    identity: &ProviderIdentity,
+    now: u64,
+) -> Option<u64> {
+    provider_deadline_for_identity(rhei, machines, identity).filter(|deadline| *deadline > now)
 }
 
 fn resolved_provider_deadline(
@@ -363,6 +372,21 @@ fn resolved_provider_deadline(
 ) -> Option<u64> {
     let identity = resolved_provider_identity(resolved)?;
     active_provider_deadline_for_identity(rhei, machines, &identity, now)
+}
+
+/// The next instant at which an identity can be scheduled. A matching expired
+/// record means "now", so a deadline changed between a worker-pool refill and
+/// the outer scheduler check causes an immediate rescan rather than a false
+/// end-of-run decision. §FS-rhei-run.3.3 §FS-rhei-run.5.1
+fn resolved_provider_eligibility_deadline(
+    rhei: &rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    resolved: &ResolvedAgent,
+    now: u64,
+) -> Option<u64> {
+    let identity = resolved_provider_identity(resolved)?;
+    provider_deadline_for_identity(rhei, machines, &identity)
+        .map(|deadline| deadline.max(now))
 }
 
 fn task_provider_limit(

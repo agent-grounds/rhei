@@ -202,7 +202,7 @@ fn earliest_pending_agent_deadline(
                     .ok()?
                     .iter()
                     .filter_map(|resolved| {
-                        resolved_provider_deadline(rhei, machines, resolved, now)
+                        resolved_provider_eligibility_deadline(rhei, machines, resolved, now)
                     })
                     .max()
             };

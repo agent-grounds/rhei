@@ -70,11 +70,9 @@ fn new_ticket_write(
     let placed = place_ticket(
         &entry,
         &placement,
-        &local_id,
         &loaded,
         target,
-        &options.title,
-        &block,
+        &RenderedTicket { local_id: &local_id, title: &options.title, block: &block },
         decision,
     )?;
 

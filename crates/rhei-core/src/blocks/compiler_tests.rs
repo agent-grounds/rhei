@@ -262,3 +262,6 @@ mod links_tests;
 
 #[path = "cancellation_tests.rs"]
 mod cancellation_tests;
+
+#[path = "terminal_tests.rs"]
+mod terminal_tests;

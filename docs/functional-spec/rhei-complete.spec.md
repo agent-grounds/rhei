@@ -227,7 +227,7 @@ Added avatar_url column and migration 0042
    A deliberate out-of-order move stays available through the explicit
    human-initiated `rhei transition` ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)), the same
    escape hatch a gating state uses in point 5.
-7. Find the completion target: the first non-cancelled terminal state reachable via a declared transition from the current state. Fail if none exists (e.g., from `agent-review-fix` there is no direct path to a terminal state — the agent must transition to `agent-review` first). `cancelled` is never treated as a successful completion target. The order of transitions in the YAML `transitions` list is significant when selecting the target; editors and formatters should preserve declaration order.
+7. Find the completion target: the first non-cancelled terminal state reachable via a declared transition from the current state. Fail if none exists (e.g., from `agent-review-fix` there is no direct path to a terminal state — the agent must transition to `agent-review` first). Any state with cancellation role (§FS-rhei-states.1.4), explicit or inferred from `cancelled`/`canceled`, is excluded from successful completion. The order of transitions in the YAML `transitions` list is significant when selecting the target; editors and formatters should preserve declaration order.
 8. Run the shared transition ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)) from the current state
    to that target, carrying the selected message as `--result` does:
    compare-and-swap under the shared
@@ -285,7 +285,7 @@ verb drove the terminal edge.
 
 ### 4.1. Completion Target Selection
 
-The command scans declared transitions for a non-cancelled terminal state reachable in one hop from the task's current state. If multiple terminal states are reachable, the first non-cancelled one wins. If only `cancelled` is reachable, the command fails.
+The command scans declared transitions for a non-cancelled terminal state reachable in one hop from the task's current state. If multiple terminal states are reachable, the first non-cancelled one wins. If only cancellation-role terminals are reachable, the command fails (§FS-rhei-states.1.4).
 
 ### 4.2. Single-File Plans
 

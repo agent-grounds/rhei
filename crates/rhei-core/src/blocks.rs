@@ -92,6 +92,9 @@ pub struct Seam {
 pub struct CompatibilityMap {
     #[serde(default)]
     pub states: BTreeMap<String, String>,
+    /// Explicit equivalence classes of terminal identities. §FS-rhei-library.7.1
+    #[serde(default)]
+    pub terminals: BTreeMap<String, Vec<String>>,
     #[serde(default)]
     pub tasks: BTreeMap<String, String>,
     #[serde(default)]
@@ -105,6 +108,7 @@ pub struct CompatibilityMap {
 impl CompatibilityMap {
     pub fn is_empty(&self) -> bool {
         self.states.is_empty()
+            && self.terminals.is_empty()
             && self.tasks.is_empty()
             && self.profiles.is_empty()
             && self.settings.is_empty()
@@ -288,6 +292,7 @@ mod links;
 mod qualify;
 mod references;
 mod settings;
+mod terminal_equivalence;
 pub use compiler::{
     Block, CompileResult, CompiledBlock, CompiledFile, Endpoint, Fragment, TaskFile,
 };

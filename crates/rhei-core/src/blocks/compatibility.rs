@@ -100,6 +100,7 @@ pub(crate) fn resolve(
             return Err(format!("compatibility artifact '{value}' is claimed twice"));
         }
     }
+    super::terminal_equivalence::resolve(map, children, local, &mut result)?;
     Ok(result)
 }
 

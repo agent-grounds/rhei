@@ -19,6 +19,7 @@ mod block_composition_diagnostics_tests;
 mod block_composition_runtime_tests;
 mod block_composition_support;
 mod block_composition_tests;
+mod block_terminal_compatibility_tests;
 mod complete_result_input_tests;
 mod completions_tests;
 mod consumes_advisory_tests;

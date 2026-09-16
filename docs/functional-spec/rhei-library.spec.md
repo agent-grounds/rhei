@@ -357,8 +357,8 @@ compatibility:
   artifacts: { runtime/final.md: fix.final-result }
 ```
 
-The supported maps are `states`, `tasks`, `profiles`, `settings`, and
-`artifacts`. State/task/profile/settings values are `<alias>.<local-name>`;
+The one-target maps are `states`, `tasks`, `profiles`, `settings`, and
+`artifacts`; `terminals` is the checked exception in §7.1. State/task/profile/settings values are `<alias>.<local-name>`;
 artifact values are declared data endpoints. Every source and target must
 resolve and kinds must agree. Stable keys are unique across the corresponding
 compiled namespace, and two keys may not claim the same target. A collision or

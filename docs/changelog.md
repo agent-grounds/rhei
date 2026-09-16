@@ -6,7 +6,10 @@
   and support files without rendering twice, and restore extracted review/fix
   stage instructions and artifact contracts. Keep the built-in bundles loadable,
   preserve counted task states and registry-specific setting ownership, and retain
-  endpoint sources and input help in composition diagnostics. (PR #282)
+  endpoint sources and input help in composition diagnostics. Preserve cancellation
+  with explicit flat-state roles and scoped wildcard sources; restore omitted
+  preparation/commit stages through input-selected declarations and share checked
+  equivalent review/fix terminals under the wrapper's public names. (PR #282)
 
 ### Added
 

@@ -121,7 +121,7 @@ fn run_agent_worker_pool(
         // unrelated worker to exit. Re-read in bounded slices, as the outer
         // sleep does, so persisted deadline edits also wake us. §FS-rhei-run.3.3
         let provider_wait = active_invocation_counts.len() < task_limit
-            && has_pending_provider_wait(&load_plan(input)?.rhei, &machines.set);
+            && has_pending_provider_wait(&load_plan(input)?.rhei, &live.machines.set);
         let message = if provider_wait {
             rx.recv_timeout(Duration::from_secs(1))
         } else {
@@ -220,8 +220,7 @@ fn run_agent_worker_pool(
                     task_limit,
                     &tx,
                     input,
-                    machines,
-                    settings,
+                    live,
                     opts,
                     workspace_root,
                     runtime_dir,
@@ -233,6 +232,7 @@ fn run_agent_worker_pool(
                     &mut active_invocation_counts,
                     &mut active_state_counts,
                     &mut handles,
+                    identity,
                 )?;
                 active_worker_count += refill_outcome.spawned;
                 *progress.advanced_any |= refill_outcome.advanced;

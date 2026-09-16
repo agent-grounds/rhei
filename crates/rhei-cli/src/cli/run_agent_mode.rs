@@ -928,8 +928,8 @@ fn run_agent_mode(
         let loaded = load_plan(input)?;
         if let Some(deadline) = earliest_pending_agent_deadline(
             &loaded.rhei,
-            &machines.set,
-            settings,
+            &live.machines.set,
+            &live.settings,
             opts,
             &rhei_scope,
         ) {

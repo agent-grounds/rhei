@@ -54,7 +54,10 @@ Deliberate automation states the intent once with `--yes`.
      cleared whether or not the state name changes.
    - Remove the `**Assignee:**` line if present.
    - Remove the `> **Result:**` link block from the task body if present.
-   - Clear any counted-visit suffix; `stateVisits` entries for the task in frontmatter `metadata.tasks.<id>.stateVisits` are deleted, together with the task's `supervision` block ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)). A `metadata.tasks.<id>` entry left empty by those deletions is removed as well, and so are `metadata.tasks` and `metadata` when nothing else remains in them: an empty entry is a record of nothing, and the next reader would have to decide whether it meant something.
+   - Clear any counted-visit suffix; `stateVisits` entries and provider-limit
+     waits for the task in frontmatter `metadata.tasks.<id>.stateVisits` and
+     `metadata.tasks.<id>.providerLimits` are deleted, together with the task's
+     `supervision` block ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)). A `metadata.tasks.<id>` entry left empty by those deletions is removed as well, and so are `metadata.tasks` and `metadata` when nothing else remains in them: an empty entry is a record of nothing, and the next reader would have to decide whether it meant something.
 4. After every plan file is rewritten — the ledger step 3 reads lives there — for a directory workspace, delete the `runtime/` directory at the workspace root if it exists. For a single-file plan, delete the `runtime/` directory next to the plan file if it exists. This removes result files, findings, logs, and journaled transition records.
 5. Write each modified task file atomically (temp file + rename). Release the lock.
 

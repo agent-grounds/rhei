@@ -105,6 +105,15 @@ The commands that coordinate through the state machine:
 
 `rhei run` and the manual-worker flow (`next` / `transition` / `complete`) are mutually exclusive per execution — they never overlap on the same task because `rhei run` holds transition responsibility for the states it drives. The typical manual-worker loop is `next` (claim) → work → `transition` (advance as needed) → `complete` (finish, record result, release).
 
+When the Codex/OpenAI adapter reports the supported reset-bearing session-limit
+signal, `rhei run` parks that work until the displayed UTC deadline instead of
+reporting an ordinary failure. Foreground runs remain attached while waiting;
+headless launch still returns a run id and `rhei attach` shows the provider,
+reporting task, and deadline. Interrupting the wait is safe: the task stays in
+its authored state, and a later `rhei run` resumes from the persisted deadline.
+`rhei reset` deliberately discards that wait with the rest of the task's
+runtime state. §FS-rhei-run.3.3
+
 Ticket ids in command output are project-qualified — `<rhei-id>.<task-id>`, e.g. `plan.1` for a single-file `plan.rhei.md` — and `rhei list` accepts the same `--rhei <id>` narrowing as `run`, `next`, and `reset` ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
 
 #### Naming a ticket

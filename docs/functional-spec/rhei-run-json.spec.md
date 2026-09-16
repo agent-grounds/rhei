@@ -72,7 +72,7 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `run_started` | Once, at the head of the stream | `schema`, `run_id`, `workspace`, `parallel`, `total_tasks` |
 | `pass_started` | Each scheduler pass begins | `pass`, `ready` (task ids in source order) |
 | `slot_assigned` | A worker is spawned | `slot`, `task`, `from`, `to`, `agent` (null for programs), `log_path` |
-| `slot_released` | That worker exits | `slot`, `task`, `from`, `to`, `log_path`, `outcome`, `exit_code`, `duration_ms` |
+| `slot_released` | That worker exits | `slot`, `task`, `from`, `to`, `log_path`, `outcome`, `exit_code`, `duration_ms`; a provider-limited release also has `provider` and `next_attempt_at` |
 | `pass_ended` | Each scheduler pass ends | `pass`, `progressed` |
 | `tasks_deferred` | Ready tasks yielded a same-state slot | `pass`, `tasks` |
 | `task_outputs_missing` | A worker exited `0` without its required artifacts | `task`, `state`, `entries` |
@@ -82,13 +82,19 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `agent_output` | A live agent output line (§2.3) | `slot`, `task`, `stream`, `line` |
 | `run_finished` | Once, when the run loop ends (§2.4) | `summary` |
 
-`outcome` is one of `completed`, `failed`, `waiting`, `cancelled`, `timeout`,
-`interrupted`, matching the journal vocabulary of [§FS-rhei-run-tui.1.7](rhei-run-tui.spec.md#17-journal-format).
+`outcome` is one of `completed`, `failed`, `waiting`, `provider_limited`,
+`cancelled`, `timeout`, `interrupted`, matching the journal vocabulary of [§FS-rhei-run-tui.1.7](rhei-run-tui.spec.md#17-journal-format).
 `waiting` is emitted when the released invocation selected a poll state's
 self-loop, whatever its exit code — a handled wait, not a failure and not a
 finished state ([§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics)). Paths
 are workspace-relative when inside the workspace and absolute otherwise, as in
 the journal.
+
+`provider_limited` is emitted for the recognized parked result of
+§FS-rhei-run.3.3. The record's `task` identifies the reporter, `provider` is
+`openai`, and `next_attempt_at` is its RFC 3339 UTC safe deadline. It is not a
+`failed` outcome. The stream remains open while the ordinary run loop waits;
+`run_finished` is emitted only when that loop later finishes or halts.
 
 `usage_reported.report` is `streamed` for a running total observed
 mid-invocation and `final` for the one report that follows the durable record;

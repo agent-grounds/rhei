@@ -1,11 +1,8 @@
 //! Reading a plan, a workspace index, or a project manifest off disk.
 //!
-//! One function rather than `fs::read_to_string` at each site, because a
-//! command may be holding the file's own lock while it asks the loader to read
-//! it. Where a lock is mandatory — a Windows byte range belongs to the handle
-//! that took it — that read is refused, and only the process holding the lock
-//! can answer it. The driver installs a reader that can; a library consumer
-//! that takes no locks never notices.
+//! One function rather than `fs::read_to_string` at each site preserves the
+//! public reader override for embedders. The CLI's writer protocol leaves plan
+//! destinations unlocked and therefore uses the default current-path reader.
 
 use std::path::Path;
 
@@ -13,9 +10,9 @@ type Reader = fn(&Path) -> std::io::Result<String>;
 
 static READER: std::sync::OnceLock<Reader> = std::sync::OnceLock::new();
 
-/// Install the reader every plan source goes through. First call wins, and a
-/// second is ignored rather than fatal: this is a process-wide convenience, not
-/// a contract between two callers.
+/// Install an embedding reader every plan source goes through. First call wins,
+/// and a second is ignored rather than fatal: this is a process-wide
+/// convenience, not a contract between two callers.
 // §FS-rhei-new.4
 pub fn set_reader(reader: Reader) {
     let _ = READER.set(reader);

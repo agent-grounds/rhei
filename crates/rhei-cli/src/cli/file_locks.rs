@@ -8,22 +8,23 @@
 
 // §AR-source-file-size.3 §AR-agent-orchestrator-workflow.3.3.1
 
-/// A plan pathname held under one stable exclusive writer lock.
+/// A plan pathname held under its sole stable writer lock.
 ///
-/// `writer_lock` is a persistent sibling sidecar that atomic plan replacement
-/// never touches. `file` retains the destination handle required by mandatory
-/// locking platforms; a rename may release that handle, but never the sidecar.
+/// The lock is a permanent sibling sidecar, so replacing the destination never
+/// changes the identity held by writers or prevents a current-path read.
+// §FS-rhei-transition-cmd.3
 struct LockedPlanFile {
     writer_lock: Mutex<Option<fs::File>>,
-    file: PlanLockHandle,
     path: PathBuf,
 }
 
 impl LockedPlanFile {
-    /// Take the stable sidecar before opening the destination it protects.
+    /// Take the stable sidecar without opening the destination it protects.
     ///
-    /// A waiter therefore opens the current destination only after the prior
-    /// writer's last replacement and cannot retain a stale plan inode.
+    /// This also establishes writer exclusion before an absent destination's
+    /// first publication. A waiter reads the current pathname only after the
+    /// prior writer's last replacement or rollback.
+    // §AR-agent-orchestrator-workflow.3.3.1 §FS-rhei-new.4
     fn open(path: &Path) -> MietteResult<Self> {
         let lock_path = plan_lock_path(path)?;
         let writer_lock = fs::OpenOptions::new()
@@ -34,69 +35,21 @@ impl LockedPlanFile {
             .open(&lock_path)
             .map_err(|err| file_io_report(&lock_path, "failed to open plan lock file", err))?;
         lock_plan_writer(&writer_lock, &lock_path)?;
-
-        let file = fs::File::open(path)
-            .map_err(|err| file_io_report(path, "failed to open plan file", err))?;
-        file.lock_exclusive()
-            .map_err(|err| file_io_report(path, "failed to acquire file lock", err))?;
-        let file = Arc::new(Mutex::new(Some(file)));
-        // The loader reads a plan, a workspace index, or a project manifest
-        // through `rhei_core::source`, which knows nothing about locks until
-        // this process tells it where to ask. §FS-rhei-new.4
-        rhei_core::source::set_reader(plan_source_reader);
-        held_plan_locks().lock().expect("held plan locks").push((path.to_path_buf(), file.clone()));
-        Ok(Self {
-            writer_lock: Mutex::new(Some(writer_lock)),
-            file,
-            path: path.to_path_buf(),
-        })
+        Ok(Self { writer_lock: Mutex::new(Some(writer_lock)), path: path.to_path_buf() })
     }
 
-    /// Read the locked file, by path first.
-    ///
-    /// That ordering is the point: every plan rewrite in rhei replaces the file
-    /// by renaming a temp file over it, so a writer that took the lock before
-    /// us has left a *different* file at `path` and this handle still names the
-    /// one it replaced. Reading by path is what makes the lock protect content
-    /// rather than merely serialize.
-    ///
-    /// The fallback is for Windows, where a second handle onto a file *this*
-    /// process has locked is refused outright — the writer locks the plan and
-    /// then cannot read it.
-    ///
-    /// No cooperating writer can replace `path` while this object holds its
-    /// sidecar. The handle fallback is therefore authoritative precisely when
-    /// this process's own mandatory destination lock refused the path read.
+    /// Read the authoritative current destination pathname under the sidecar.
     ///
     /// `action` names the read the way `file_io_report` wants it, so a caller's
     /// diagnostic reads the same as it did when this was `fs::read_to_string`.
+    // §FS-rhei-transition-cmd.3
     fn read_to_string(&self, action: &str) -> MietteResult<String> {
-        let err = match fs::read_to_string(&self.path) {
-            Ok(raw) => return Ok(raw),
-            Err(err) => err,
-        };
-        if !lock_is_contended(&err) {
-            return Err(file_io_report(&self.path, action, err));
-        }
-        read_through_handle(&self.file)
-            .unwrap_or(Err(err))
+        fs::read_to_string(&self.path)
             .map_err(|err| file_io_report(&self.path, action, err))
     }
 
-    /// Release only the replaceable destination handle, retaining the sidecar.
-    fn release_destination(&self) {
-        if let Some(file) = self.file.lock().expect("plan lock handle").take() {
-            let _ = fs2::FileExt::unlock(&file);
-        }
-        held_plan_locks()
-            .lock()
-            .expect("held plan locks")
-            .retain(|(_, handle)| !Arc::ptr_eq(handle, &self.file));
-    }
-
-    /// Release the destination and then the stable writer sidecar. Idempotent.
+    /// Release the stable writer sidecar. Idempotent.
     fn release(&self) {
-        self.release_destination();
         if let Some(file) = self.writer_lock.lock().expect("plan writer lock").take() {
             let _ = fs2::FileExt::unlock(&file);
         }
@@ -108,23 +61,6 @@ impl Drop for LockedPlanFile {
         self.release();
     }
 }
-
-/// Every plan file this process currently holds locked.
-///
-/// On Windows a byte-range lock belongs to the handle that took it, so a second
-/// open of the same file — from this very process — is refused. A command that
-/// locks a plan and then hands the *path* to something that reads it therefore
-/// reads nothing: `rhei new` locks the plan and then asks the loader to
-/// validate it, and the loader knows about paths, not about locks. This is
-/// where such a reader finds the handle that already holds the file.
-// §FS-rhei-new.4
-fn held_plan_locks() -> &'static Mutex<Vec<(PathBuf, PlanLockHandle)>> {
-    static HELD_PLAN_LOCKS: OnceLock<Mutex<Vec<(PathBuf, PlanLockHandle)>>> = OnceLock::new();
-    HELD_PLAN_LOCKS.get_or_init(|| Mutex::new(Vec::new()))
-}
-
-/// The open, locked file, shared between the lock object and the registry.
-type PlanLockHandle = Arc<Mutex<Option<fs::File>>>;
 
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -196,89 +132,18 @@ fn lock_plan_writer(file: &fs::File, path: &Path) -> MietteResult<()> {
     Ok(())
 }
 
-/// Read the whole file behind a lock handle, from the start.
-///
-/// `None` when the lock has already been released, which leaves the caller with
-/// the original refusal to report. That is a rule and not an accident: a
-/// released handle names whatever file it named before, and after
-/// [`persist_locked`]'s rename that is an orphan nobody can reach by path. A
-/// read served from it would be content no writer will ever see again.
-fn read_through_handle(handle: &Mutex<Option<fs::File>>) -> Option<std::io::Result<String>> {
-    let guard = handle.lock().expect("plan lock handle");
-    // `None` once released — the caller keeps its original error. §FS-rhei-new.4
-    let file = guard.as_ref()?;
-    let mut reader = file;
-    Some((|| {
-        reader.seek(std::io::SeekFrom::Start(0))?;
-        let mut raw = String::new();
-        reader.read_to_string(&mut raw)?;
-        Ok(raw)
-    })())
-}
-
-/// Read `path` through whichever lock this process holds on it, if any.
-fn read_through_held_lock(path: &Path) -> Option<std::io::Result<String>> {
-    let held = {
-        let locks = held_plan_locks().lock().expect("held plan locks");
-        locks
-            .iter()
-            .find(|(locked_path, _)| same_path(locked_path, path))
-            .map(|(_, handle)| handle.clone())
-    }?;
-    read_through_handle(&held)
-}
-
-/// Read `path`, by path first and through this process's own lock when the path
-/// read is the one that lock refuses.
-///
-/// The ordering is [`LockedPlanFile::read_to_string`]'s, for its reasons: a
-/// writer that took the lock before us has left a different file at `path`, and
-/// only reading by path sees it. The fallback covers the case that reading by
-/// path cannot: the file is one *we* locked, and Windows will not open it twice.
-/// A destination handle released for replacement is deregistered and never
-/// read through; its stable writer sidecar still excludes other writers.
-///
-/// The `io::Error` is passed through rather than wrapped, because the loader
-/// this is installed into branches on its kind.
-// §FS-rhei-new.4
-fn plan_source_reader(path: &Path) -> std::io::Result<String> {
-    let err = match fs::read_to_string(path) {
-        Ok(raw) => return Ok(raw),
-        Err(err) => err,
-    };
-    if !lock_is_contended(&err) {
-        return Err(err);
-    }
-    read_through_held_lock(path).unwrap_or(Err(err))
-}
-
-/// [`plan_source_reader`] with the diagnostic a CLI caller wants; `action` names
-/// the read the way `file_io_report` does.
-// §FS-rhei-new.4
+/// Read a plan source by its current pathname. The public core reader hook is
+/// retained for API compatibility, but CLI writers no longer install a private
+/// held-handle fallback because the destination itself is never locked.
+// §FS-rhei-transition-cmd.3
 fn read_plan_source(path: &Path, action: &str) -> MietteResult<String> {
-    plan_source_reader(path).map_err(|err| file_io_report(path, action, err))
+    fs::read_to_string(path).map_err(|err| file_io_report(path, action, err))
 }
 
-/// Rename a temp file over `path`, which `locked` may be holding.
-///
-/// A mandatory destination lock may refuse the first replace. Release only
-/// that replaceable handle and retry once; [`LockedPlanFile::writer_lock`]
-/// continues excluding every cooperating writer across the retry.
+/// Rename a temp file over the unlocked destination pathname.
 // §AR-agent-orchestrator-workflow.3.3.1
-fn persist_locked(
-    tmp: tempfile::NamedTempFile,
-    path: &Path,
-    locked: Option<&LockedPlanFile>,
-) -> Result<(), tempfile::PersistError> {
-    let refused = match tmp.persist(path) {
-        Ok(_) => return Ok(()),
-        Err(refused) => refused,
-    };
-    let Some(locked) = locked else {
-        return Err(refused);
-    };
-    locked.release_destination();
-    refused.file.persist(path).map(|_| ())
+fn persist_locked(tmp: tempfile::NamedTempFile, path: &Path) -> Result<(), tempfile::PersistError> {
+    tmp.persist(path).map(|_| ())
 }
 
 /// Whether a failed try-lock — or a read a lock refused — means *somebody

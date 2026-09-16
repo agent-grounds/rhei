@@ -82,7 +82,7 @@ fn adopts_an_empty_directory() {
 
     let result = new_run(&["new", "Billing", "--project", ".", "--dir"], &dir);
     assert_success(&result);
-    assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md", "tasks"]);
+    assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md", "index.rhei.md.lock", "tasks"]);
 }
 
 /// Retry after a failed create or dry run reuses the exact empty sidecar and
@@ -113,7 +113,7 @@ fn preserves_the_authored_machine_and_prompt_templates() {
     assert_success(&create_billing(&dir, &[]));
     assert_eq!(
         entry_names(&dir.join("billing")),
-        ["index.rhei.md", "prompt_templates", "states.yaml", "tasks"]
+        ["index.rhei.md", "index.rhei.md.lock", "prompt_templates", "states.yaml", "tasks"]
     );
     assert_eq!(fs::read(dir.join("billing/states.yaml")).expect("machine"), custom.as_bytes());
     assert_eq!(fs::read(dir.join("billing/prompt_templates/review.md")).expect("prompt"), prompt);
@@ -143,7 +143,10 @@ fn refuses_non_bundle_content_before_writing_and_names_the_obstruction() {
         let said = flattened_output(&result);
         assert!(!said.contains("already exists"), "a non-rhei was called a rhei:\n{said}");
         assert!(said.contains("move") || said.contains("remove"), "no next action:\n{said}");
-        assert_eq!(entry_names(&dir.join("billing")), before);
+        let mut expected = before;
+        expected.push("index.rhei.md.lock".to_string());
+        expected.sort();
+        assert_eq!(entry_names(&dir.join("billing")), expected);
         assert!(!dir.join("billing/index.rhei.md").exists());
     }
 }
@@ -159,7 +162,7 @@ fn protects_actual_single_file_and_directory_rheis_in_both_create_layouts() {
         args.extend(extra);
         assert_failure(&new_run(&args, &single), "already exists");
     }
-    assert!(!single.join("billing").exists());
+    assert_eq!(entry_names(&single.join("billing")), ["index.rhei.md.lock"]);
 
     let workspace = project("new-adopt-collision-dir");
     fs::create_dir_all(workspace.join("billing/tasks")).expect("create existing workspace");
@@ -169,7 +172,10 @@ fn protects_actual_single_file_and_directory_rheis_in_both_create_layouts() {
         args.extend(extra);
         assert_failure(&new_run(&args, &workspace), "already exists");
     }
-    assert_eq!(entry_names(&workspace.join("billing")), ["index.rhei.md", "tasks"]);
+    assert_eq!(
+        entry_names(&workspace.join("billing")),
+        ["index.rhei.md", "index.rhei.md.lock", "tasks"]
+    );
 }
 
 /// The default create remains single-file and reports an adoptable same-id
@@ -212,7 +218,7 @@ fn validation_failure_rolls_back_only_invocation_owned_entries() {
             said.contains("states.yaml") || said.contains("state machine"),
             "wrong failure:\n{said}"
         );
-        assert_eq!(entry_names(&dir.join("billing")), ["states.yaml"]);
+        assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md.lock", "states.yaml"]);
         assert_eq!(
             fs::read(dir.join("billing/states.yaml")).expect("machine"),
             authored.as_bytes()
@@ -221,7 +227,7 @@ fn validation_failure_rolls_back_only_invocation_owned_entries() {
 }
 
 /// Dry run always removes its own index and task directory, even with
-/// `--keep-on-error`, while preserving the adopted root and bundle.
+/// `--keep-on-error`, while preserving the adopted root, bundle, and sidecar.
 /// §FS-rhei-new.5.4
 #[test]
 fn dry_run_preserves_an_adopted_workspace_on_success_and_failure() {
@@ -229,7 +235,7 @@ fn dry_run_preserves_an_adopted_workspace_on_success_and_failure() {
     let custom = machine("custom", "drafting", "filed");
     prospective_billing(&valid, &custom);
     assert_success(&create_billing(&valid, &["--dry-run", "--keep-on-error"]));
-    assert_eq!(entry_names(&valid.join("billing")), ["states.yaml"]);
+    assert_eq!(entry_names(&valid.join("billing")), ["index.rhei.md.lock", "states.yaml"]);
     assert_eq!(fs::read(valid.join("billing/states.yaml")).expect("machine"), custom.as_bytes());
 
     let invalid = project("new-adopt-dry-invalid");
@@ -238,7 +244,7 @@ fn dry_run_preserves_an_adopted_workspace_on_success_and_failure() {
     let result = create_billing(&invalid, &["--dry-run", "--keep-on-error"]);
     assert!(!result.status.success());
     assert!(!flattened_output(&result).contains("already exists"));
-    assert_eq!(entry_names(&invalid.join("billing")), ["states.yaml"]);
+    assert_eq!(entry_names(&invalid.join("billing")), ["index.rhei.md.lock", "states.yaml"]);
     assert_eq!(fs::read(invalid.join("billing/states.yaml")).expect("machine"), broken);
 }
 

@@ -264,14 +264,12 @@ fn write_file_atomic(path: &Path, content: &str) -> MietteResult<()> {
     write_file_atomic_locked(path, content, None)
 }
 
-/// `write_file_atomic` for a destination this process holds the lock on.
-///
-/// The handle is what lets the replace succeed where a lock refuses one; see
-/// `persist_locked`.
+/// `write_file_atomic` while the caller keeps the destination's sidecar held.
+// §FS-rhei-transition-cmd.3
 fn write_file_atomic_locked(
     path: &Path,
     content: &str,
-    locked: Option<&LockedPlanFile>,
+    _locked: Option<&LockedPlanFile>,
 ) -> MietteResult<()> {
     let parent = path.parent().unwrap_or(Path::new("."));
     let mut tmp = tempfile::NamedTempFile::new_in(parent)
@@ -283,7 +281,7 @@ fn write_file_atomic_locked(
         help = temp_write_help(),
         "failed to write temp file: {err}"
     ))?;
-    persist_locked(tmp, path, locked).map_err(|err| miette!(
+    persist_locked(tmp, path).map_err(|err| miette!(
         help = temp_write_help(),
         "failed to persist temp file: {err}"
     ))?;

@@ -69,6 +69,15 @@
 
 ### Fixed
 
+- **Plan rewrites now use their permanent sibling sidecar as the sole writer
+  lock.** The replaceable plan pathname stays readable through callbacks and
+  atomic replacement on Windows, while the sidecar remains held through
+  commit or rollback. Creation establishes the same identity before first
+  publication; failed creates and dry runs retain empty sidecars and necessary
+  parent directories while rolling back plan data. Before upgrading a shared
+  plan directory, stop every older writer, upgrade them all, then resume; live
+  mixed-version writing is unsupported. (PR #279)
+
 - **Resumed program polls now invoke their next subprocess attempt after the
   persisted retry deadline.** A future deadline no longer sends the run into
   callback-only mode, where an exit-zero route could fire without a matching

@@ -140,6 +140,7 @@ fn place_ticket(
     target: &Path,
     title: &str,
     block: &str,
+    decision: NewDecision,
 ) -> MietteResult<PlacedTicket> {
     if let Some(parent_local) = &placement.parent_local {
         let qualified_parent = format!("{}.{}", placement.rhei_id, parent_local);
@@ -173,12 +174,19 @@ help = "re-run after `rhei validate` passes, so the plan on disk and the ids agr
         RheiEntry::Workspace(dir) => {
             let tasks_dir = dir.join("tasks");
             let path = tasks_dir.join(task_file_name(local_id, title));
-            reject_existing_destination(&path)?;
+            // Absence becomes authoritative only after this path's sidecar is
+            // held by the repeated decision. §FS-rhei-new.4
+            if decision == NewDecision::Authoritative {
+                reject_existing_destination(&path)?;
+            }
             Ok(PlacedTicket { path, contents: block.to_string(), dirs: vec![tasks_dir] })
         }
         RheiEntry::Basin(dir) => {
             let path = dir.join(task_file_name(local_id, title));
-            reject_existing_destination(&path)?;
+            // Same protocol as a workspace task file. §FS-rhei-new.4
+            if decision == NewDecision::Authoritative {
+                reject_existing_destination(&path)?;
+            }
             Ok(PlacedTicket { path, contents: block.to_string(), dirs: vec![dir.clone()] })
         }
     }

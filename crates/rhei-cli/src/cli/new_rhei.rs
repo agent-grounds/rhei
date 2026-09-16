@@ -5,6 +5,7 @@ fn new_rhei_write(
     target: &Path,
     options: &NewOptions,
     description: Option<&str>,
+    decision: NewDecision,
 ) -> MietteResult<NewWrite> {
     // A rhei is a *member* of a project; a lone plan has nowhere to put a
     // second one. §FS-rhei-new.2.1
@@ -19,7 +20,11 @@ help = "create a project first: `rhei init` writes index.panta.md, and `rhei new
         ));
     };
     let id = resolve_new_rhei_id(&options.title, options.id.as_deref())?;
-    admit_new_rhei_destination(&project_dir, &id, options.dir)?;
+    // The provisional pass selects the pathname; only the repeated pass under
+    // its sidecar can authorize absence or adoption. §FS-rhei-new.4
+    if decision == NewDecision::Authoritative {
+        admit_new_rhei_destination(&project_dir, &id, options.dir)?;
+    }
 
     let header = RheiHeader {
         title: &options.title,
@@ -140,6 +145,17 @@ fn prospective_workspace_obstruction(dir: &Path) -> MietteResult<Option<PathBuf>
         match entry.file_name().to_str() {
             Some("states.yaml") if file_type.is_file() => has_states = true,
             Some("prompt_templates") if file_type.is_dir() => prompt_templates = Some(path),
+            Some("index.rhei.md.lock") if file_type.is_file() => {
+                let metadata = entry
+                    .metadata()
+                    .map_err(|err| file_io_report(&path, "failed to inspect", err))?;
+                if metadata.len() != 0 {
+                    return Ok(Some(path));
+                }
+                // The exact empty regular destination sidecar is permanent
+                // coordination state, not authored workspace content.
+                // §FS-rhei-new.2.1.1
+            }
             _ => return Ok(Some(path)),
         }
     }

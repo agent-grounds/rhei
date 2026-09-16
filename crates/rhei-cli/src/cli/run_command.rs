@@ -279,7 +279,7 @@ fn run_command(
             if let Some(shared) = &shared_file {
                 eprintln!(
                     "warning: --parallel > 1 schedules tickets from the same rhei file \
-                     concurrently ({}); plan-file writes serialize on the file lock, but \
+                     concurrently ({}); plan-file writes serialize on the sibling sidecar, but \
                      agents may still collide in the shared checkout.",
                     shared.display()
                 );

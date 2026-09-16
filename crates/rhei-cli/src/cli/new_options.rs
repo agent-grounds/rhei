@@ -161,8 +161,9 @@ struct NewOptions {
         help_heading = "Creating a ticket"
     )]
     target: Option<String>,
-    /// Preview the create: it is written, validated, and then always rolled
-    /// back, so the preview reports what the real create would do
+    /// Preview the create: plan data is written, validated, and always rolled
+    /// back; permanent `.lock` sidecars and necessary parent directories remain
+    // §FS-rhei-new.1.1 §FS-rhei-new.5.4
     #[arg(long)]
     dry_run: bool,
     /// Emit the created id, kind, path, and state as JSON

@@ -1,10 +1,10 @@
-// Repeating `rhei next`'s complete claimability decision under the plan lock,
+// Repeating `rhei next`'s complete claimability decision under the plan sidecar,
 // and the in-place assignee write that consumes that decision.
 
 // §AR-source-file-size.3 §FS-rhei-next.3.1
 
 /// Project data needed to repeat the selected task's complete claimability
-/// decision after its plan files are locked.
+/// decision after its plan sidecars are locked.
 struct ClaimEligibilityContext<'a> {
     input: &'a Path,
     machines: &'a ExecutionMachines,
@@ -161,7 +161,7 @@ impl TaskAssigneeRevalidation for TaskAssigneeClaimContext<'_> {
 }
 
 /// Atomically add the assignee after repeating the selected task's applicable
-/// revalidation policy under the metadata and task-file locks.
+/// revalidation policy under the metadata and task-file sidecars.
 // §FS-rhei-next.3.1
 fn write_task_assignee(
     task_file: &Path,
@@ -225,7 +225,7 @@ fn write_task_assignee(
     tmp.write_all(rewritten.as_bytes())
         .map_err(|err| miette!(help = temp_write_help(), "failed to write temp file: {err}"))?;
     let task_lock = task_lock.as_ref().unwrap_or(&metadata_lock);
-    persist_locked(tmp, task_file, Some(task_lock))
+    persist_locked(tmp, task_file)
         .map_err(|err| miette!(help = temp_write_help(), "failed to persist temp file: {err}"))?;
 
     task_lock.release();

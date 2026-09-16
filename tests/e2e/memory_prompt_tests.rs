@@ -61,6 +61,10 @@ Write the one-line summary first.
 fn a_spawned_agent_receives_its_position_history_and_map() {
     let (dir, plan_path, machine_path) =
         setup_supervision("memory-run", MEMORY_PLAN, MEMORY_MACHINE, "");
+    let export_root = dir.join("runtime/exports/plan.1");
+    fs::create_dir_all(&export_root).expect("create findings export directory");
+    // §FS-rhei-plan-language.3.12.3: a declared producer export must be nonblank before terminal entry.
+    write_fixture_file(&export_root, "findings.md", "Indexed findings.\n");
 
     let result = run_cli("run", &plan_path, &machine_path, &["--no-callbacks", "--no-tui"]);
     assert_success(&result);

@@ -212,11 +212,16 @@
         let raw = fs::read_to_string(&manifest_path).map_err(|err| {
             file_io_report(&manifest_path, "failed to read template manifest", err)
         })?;
-        let manifest: TemplateManifest = serde_yaml::from_str(&raw)
+        let mut manifest: TemplateManifest = serde_yaml::from_str(&raw)
             .map_err(|err| miette!(
                 help = template_manifest_help(),
                 "failed to parse '{}': {err}", manifest_path.display()
             ))?;
+        if manifest.select.is_some() {
+            let source: YamlValue = serde_yaml::from_str(&raw).map_err(|e| miette!("{e}"))?;
+            manifest.static_declarations = ["ports", "data", "compatibility"].into_iter()
+                .filter(|key| source.get(*key).is_some()).map(str::to_string).collect();
+        }
         validate_template_manifest(&manifest, template_dir)?;
         Ok(manifest)
     }
@@ -352,27 +357,25 @@
     ) -> MietteResult<()> {
         let source = template_dir.join("template.yaml");
         let block = &manifest.block;
-        if !block.is_block() {
+        if !block.is_block() && manifest.select.is_none() {
             return Ok(());
         }
-        let Some(ports) = block.ports.as_ref() else {
-            return Err(miette!(
-                help = "declare `ports.entry` and at least the public exits this block exposes.",
-                "block manifest '{}' must declare ports",
-                source.display()
-            ));
-        };
-        if ports.exits.is_empty() {
-            return Err(miette!("block manifest '{}' must declare at least one exit port", source.display()));
+        if block.ports.is_none() && manifest.select.is_none() {
+            return Err(miette!(help = "declare ports.entry and the public exits", "block manifest '{}' must declare ports", source.display()));
         }
-        for name in ports.exits.keys().chain(block.data.inputs.keys()).chain(block.data.outputs.keys()) {
+        if let Some(ports) = &block.ports {
+            if ports.exits.is_empty() {
+                return Err(miette!("block manifest '{}' must declare at least one exit port", source.display()));
+            }
+            for name in ports.exits.keys() {
+                if !ident.is_match(name) {
+                    return Err(miette!("block manifest '{}' contains invalid public identifier '{name}'; use a letter then letters, digits, '_' or '-'", source.display()));
+                }
+            }
+        }
+        for name in block.data.inputs.keys().chain(block.data.outputs.keys()) {
             if !ident.is_match(name) {
-                return Err(miette!(
-                    help = "names must start with a letter and continue with letters, digits, '_' or '-'.",
-                    "block manifest '{}' contains invalid public identifier '{}'",
-                    source.display(),
-                    name
-                ));
+                return Err(miette!("block manifest '{}' contains invalid public identifier '{name}'; use a letter then letters, digits, '_' or '-'", source.display()));
             }
         }
         let mut aliases = BTreeMap::<&str, &str>::new();

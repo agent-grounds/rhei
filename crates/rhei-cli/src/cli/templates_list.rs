@@ -60,6 +60,11 @@
         description: String,
         #[serde(default)]
         inputs: Vec<TemplateInputDef>,
+        /// Opt-in declaration selection after resolving static inputs. §FS-rhei-library.1.1
+        #[serde(default)]
+        select: Option<String>,
+        #[serde(skip)]
+        static_declarations: BTreeSet<String>,
         /// Typed composition surface; absent fields retain legacy identity.
         /// §FS-rhei-library.1 §AR-rhei-library.1
         #[serde(flatten)]

@@ -55,6 +55,7 @@
             result
         }
         fn prepare_inner(&mut self, dir: &Path, reference: &str, manifest: &TemplateManifest, values: &BTreeMap<String, serde_json::Value>) -> MietteResult<Block> {
+            let manifest = select_block_declarations(manifest, values, dir, reference)?;
             for binding in &manifest.block.bind {
                 let Some((alias, _)) = split_endpoint(&binding.to) else {
                     return Err(miette!("invalid bind target '{}' in '{}'", binding.to, dir.join("template.yaml").display()));

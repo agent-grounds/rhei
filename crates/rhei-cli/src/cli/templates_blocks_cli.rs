@@ -5,7 +5,7 @@
         let mut seen = BTreeMap::<String, String>::new();
         for value in raw {
             let Some((alias, block)) = value.split_once('=') else {
-                return Err(miette!("--mount expects ALIAS=BLOCK, got '{}'", value));
+                return Err(miette!(help = "use --mount ALIAS=BLOCK", "--mount expects ALIAS=BLOCK, got '{}'", value));
             };
             if !rhei_core::blocks::valid_identifier(alias) {
                 return Err(miette!(
@@ -16,6 +16,7 @@
             }
             if let Some(previous) = seen.insert(alias.to_string(), block.to_string()) {
                 return Err(miette!(
+                    help = "use distinct aliases for the mounted blocks",
                     "duplicate mount alias '{}': manifests '{}' and '{}'",
                     alias, previous, block
                 ));
@@ -30,25 +31,25 @@
             if raw_passes.is_empty() {
                 return Ok(None);
             }
-            return Err(miette!("--pass requires a declared --seam between its endpoint mounts"));
+            return Err(miette!(help = "declare --seam SOURCE=TARGET before using --pass", "--pass requires a declared --seam between its endpoint mounts"));
         }
         let mut seams = raw_seams
             .iter()
             .map(|raw| {
                 let (from, to) = raw.split_once('=').ok_or_else(|| {
-                    miette!("--seam expects SOURCE=TARGET, got '{}'", raw)
+                    miette!(help = "use --seam SOURCE=TARGET", "--seam expects SOURCE=TARGET, got '{}'", raw)
                 })?;
                 Ok(Seam { from: from.into(), to: to.into(), pass: BTreeMap::new() })
             })
             .collect::<MietteResult<Vec<_>>>()?;
         for raw in raw_passes {
             let (from, to) = raw.split_once('=').ok_or_else(|| {
-                miette!("--pass expects SOURCE=TARGET, got '{}'", raw)
+                miette!(help = "use --pass SOURCE=TARGET", "--pass expects SOURCE=TARGET, got '{}'", raw)
             })?;
             let (from_alias, _) = split_endpoint(from)
-                .ok_or_else(|| miette!("invalid data endpoint '{}'", from))?;
+                .ok_or_else(|| miette!(help = "use a data endpoint in alias.name form", "invalid data endpoint '{}'", from))?;
             let (to_alias, _) = split_endpoint(to)
-                .ok_or_else(|| miette!("invalid data endpoint '{}'", to))?;
+                .ok_or_else(|| miette!(help = "use a data endpoint in alias.name form", "invalid data endpoint '{}'", to))?;
             let matching = seams
                 .iter_mut()
                 .filter(|seam| {
@@ -58,6 +59,7 @@
                 .collect::<Vec<_>>();
             if matching.len() != 1 {
                 return Err(miette!(
+                    help = "declare one seam between the producer and consumer mounts, then match it with --pass",
                     "pass '{}={}' must match exactly one declared seam between '{}' and '{}'",
                     from, to, from_alias, to_alias
                 ));
@@ -70,7 +72,7 @@
     fn print_mounted_inputs(mounts: &[Mount]) -> MietteResult<()> {
         for mount in mounts {
             let resolved = resolve_template_reference(&mount.block).map_err(|err| {
-                miette!("failed to resolve block '{}' mounted as '{}': {err}", mount.block, mount.alias)
+                miette!(help = "check the block name or path and its template manifest", "failed to resolve block '{}' mounted as '{}': {err}", mount.block, mount.alias)
             })?;
             let manifest = load_template_manifest(resolved.path())?;
             for input in &manifest.inputs {
@@ -104,7 +106,7 @@
     ) -> MietteResult<()> {
         let mounts = parse_mounts(raw_mounts)?;
         if mounts.is_empty() {
-            return Err(miette!("direct block composition requires at least one --mount"));
+            return Err(miette!(help = "provide at least one --mount ALIAS=BLOCK", "direct block composition requires at least one --mount"));
         }
         if list_inputs {
             return print_mounted_inputs(&mounts);
@@ -121,7 +123,7 @@
             children.push((mount.alias.clone(), frontend.prepare(&mount.block, None, &inputs.for_alias(&mount.alias), &mount.alias)?));
         }
         let block = Block { name: root_name.clone(), source: PathBuf::from("<command line>"), version: "1".into(), manifest: BlockManifest { mounts, seams, ..Default::default() }, local: None, children };
-        let compiled = block.compile().map_err(|e| miette!("block declarations (static or template.yaml select): {e}"))?;
+        let compiled = block.compile().map_err(|e| miette!(help = "fix the block declarations, then retry", "block declarations (static or template.yaml select): {e}"))?;
         instantiate_compiled_workspace(
             compiled,
             &root_name,
@@ -166,12 +168,12 @@
             .map(|(key, value)| {
                 serde_yaml::to_value(value)
                     .map(|value| (key.clone(), value))
-                    .map_err(|err| miette!("failed to lower curated input '{}': {err}", key))
+                    .map_err(|err| miette!(help = "provide a serializable value for the curated input", "failed to lower curated input '{}': {err}", key))
             })
             .collect::<MietteResult<BTreeMap<_, _>>>()?;
         let mut frontend = BlockFrontend::new()?;
         let block = frontend.prepare(template, None, &supplied, &manifest.name)?;
-        let compiled = block.compile().map_err(|e| miette!("block declarations (static or template.yaml select): {e}"))?;
+        let compiled = block.compile().map_err(|e| miette!(help = "fix the block declarations, then retry", "block declarations (static or template.yaml select): {e}"))?;
         instantiate_compiled_workspace(
             compiled,
             &manifest.name,

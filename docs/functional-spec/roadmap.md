@@ -283,6 +283,33 @@ and `rhei list --ready` excludes a held descendant by the ready set's own rule.
   predate that and still paste raw. Change them together, with one rule for
   every pasted body. [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition)
 
+## Planned: Block Library Follow-Ups
+
+Status: planned, deferred past 0.5.0 with no release assigned. The first
+increment of composable blocks ships in PR #282 for #47: `rhei instantiate`
+mounts blocks under aliases, links them with completion-only seams and direct
+data passes, and lowers the result to one ordinary workspace and one flat
+state machine ([§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks)). The capabilities below were
+deliberately left outside that contract ([§FS-rhei-library.8](rhei-library.spec.md#8-diagnostics-and-deferred-surface)) and are
+tracked as tool-report intake tickets, whose lifecycle publishes each upstream
+issue; the ids here are the intake ids.
+
+- Catalog and discovery for blocks beyond the template lookup composition
+  reuses today: a way to list mountable blocks and read their ports before
+  mounting one. Tracked as rhei.83.
+- A typed, total textual composition surface, evaluated against agent fluency
+  and predictability; composition is wired by `--mount`, `--seam`, `--pass`
+  and `--set` or a block's `use` today, and #47 chose no language. Tracked as
+  rhei.84.
+- Per-node provenance and richer lock metadata; generated output carries root
+  and block headers only. Tracked as rhei.85.
+- Additional exposure modes past the declared ports and inputs of a mount,
+  keeping encapsulation the default. Tracked as rhei.86.
+- Conditional or gated seams; a seam consumes exactly one terminal exit
+  today, and internal transitions stay untouched. Tracked as rhei.87.
+- Expressions and conversions on a pass; a pass wires two declared endpoints
+  of the same kind directly today. Tracked as rhei.88.
+
 ## Planned: Snapshot Adapter and Retention Work
 
 Status: planned. Snapshot v1 intentionally ships a conservative built-in

@@ -334,13 +334,18 @@ the cross-task mechanism.
 For `task-export`, lowering adds or rewrites the producer's qualified
 `Provides` and the consumer's qualified `Consumes` reference. The path is read
 from the qualified producer task's execution root. Present non-empty content is
-injected into the consumer prompt; an absent or empty export is skipped under
-[§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports).
-Composition does not strengthen that optional runtime behavior.
+injected into the consumer prompt; a missing or blank export fails the
+consumed-export preflight, so the consumer is not spawned and its state stays
+unchanged ([§FS-rhei-plan-language.3.12.2](rhei-plan-language.spec.md#3122-consumer-availability)).
+Composition neither weakens nor strengthens that runtime contract.
 
-A state-file/task-export conversion is invalid. A data mapping does not create
-a control dependency: the matching seam and the plan's task dependency remain
-the ordering authorities.
+A state-file/task-export conversion is invalid. A state-file pass does not
+create a control dependency: the matching seam and the plan's task dependency
+remain the ordering authorities. A task-export pass adds the qualified producer
+to the consumer's `Prior` when it is not already there, under the producer's
+own kind keyword, because a consumed export's producer must stand directly in
+the consumer's `Prior` ([§FS-rhei-plan-language.3.12.1](rhei-plan-language.spec.md#3121-declaration-integrity));
+the seam still carries the control flow between the blocks.
 
 ## 7. Identity compatibility
 

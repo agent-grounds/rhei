@@ -96,8 +96,8 @@ fn data_kind_mismatch_diagnostic_names_both_manifests_and_kinds() {
             "fix.findings",
             "state-file",
             "task-export",
-            fixtures.review.to_str().expect("review path"),
-            fixtures.fix.to_str().expect("fix path"),
+            resolved_path(&fixtures.review).as_str(),
+            resolved_path(&fixtures.fix).as_str(),
         ],
     );
 }
@@ -129,8 +129,8 @@ fn recursive_cycle_diagnostic_prints_the_whole_chain() {
             "cycle",
             "cycle-a",
             "cycle-b",
-            a.join("template.yaml").to_str().expect("a manifest"),
-            b.join("template.yaml").to_str().expect("b manifest"),
+            resolved_path(&a.join("template.yaml")).as_str(),
+            resolved_path(&b.join("template.yaml")).as_str(),
             "b",
             "a",
         ],
@@ -152,8 +152,8 @@ fn bad_bind_diagnostic_names_both_manifests_and_the_valid_input() {
         &[
             "review.missing",
             "review.subject",
-            flow_manifest.to_str().expect("flow manifest"),
-            fixtures.review.join("template.yaml").to_str().expect("review manifest"),
+            resolved_path(&flow_manifest).as_str(),
+            resolved_path(&fixtures.review.join("template.yaml")).as_str(),
         ],
     );
 }
@@ -170,7 +170,7 @@ fn dangling_owned_reference_diagnostic_keeps_its_mount_and_source() {
     let ownership = direct_failure(&dir, &fixtures.review, &fixtures.fix, &[]);
     assert_failed_with(
         &ownership,
-        &["absent-state", "review", states_path.to_str().expect("states path"), "state"],
+        &["absent-state", "review", resolved_path(&states_path).as_str(), "state"],
     );
 }
 

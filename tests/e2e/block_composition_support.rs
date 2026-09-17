@@ -246,6 +246,13 @@ pub(super) fn write_composition_fixtures(root: &Path) -> CompositionFixtures {
     CompositionFixtures { review, fix, flow }
 }
 
+/// The compiler names a block by its resolved manifest path, so a diagnostic
+/// on Windows prints the canonical `\\?\` spelling of a temp directory the
+/// test created under its 8.3 alias; compare against the same resolution.
+pub(super) fn resolved_path(path: &Path) -> String {
+    fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()).display().to_string()
+}
+
 pub(super) fn mount_arg(alias: &str, path: &Path) -> String {
     format!("{alias}={}", path.display())
 }

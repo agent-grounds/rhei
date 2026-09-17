@@ -138,7 +138,9 @@ impl CompiledBlock {
         }
         let original = std::mem::take(&mut self.fragment.files);
         for (path, bytes) in original {
-            let path = path.to_string_lossy();
+            // Keys come from the host file system, so a Windows block carries
+            // `prompt_templates\\x.md`; normalize before the prefix test.
+            let path = relative(&path.to_string_lossy())?;
             let target = if let Some(prompt) = path.strip_prefix("prompt_templates/") {
                 PathBuf::from("prompt_templates").join(q.qualify(prompt))
             } else {

@@ -1,11 +1,23 @@
 mod templates_blocks_tests {
     use super::super::*;
 
+    /// Template lookup walks the user tier and needs a home directory even
+    /// for a built-in block. Windows CI runs `cargo test` without `HOME`, so
+    /// point it at a scratch directory when it is absent; a set value is kept.
+    fn ensure_test_home() {
+        if std::env::var_os("HOME").is_none() {
+            let home = std::env::temp_dir().join("rhei-unit-test-home");
+            std::fs::create_dir_all(&home).expect("test home");
+            std::env::set_var("HOME", home);
+        }
+    }
+
     /// Both reusable blocks and the compatibility wrapper must load with their
     /// real default targets; prompt bindings retain tokens for runtime expansion.
     /// §FS-rhei-library.7 §FS-rhei-states.4.4
     #[test]
     fn extracted_builtin_prompts_load_at_identity_and_mounted_boundaries() {
+        ensure_test_home();
         for name in ["code-review", "fix", "changeset-review"] {
             let mut frontend = BlockFrontend::new().unwrap();
             let supplied = if name == "fix" {
@@ -48,6 +60,7 @@ mod templates_blocks_tests {
     /// input delimiters. §AR-rhei-library.3 §FS-rhei-library.4
     #[test]
     fn materialize_compiled_bytes_preserves_private_files_and_literals() {
+        ensure_test_home();
         let dir = tempfile::tempdir().unwrap();
         let files: BTreeMap<PathBuf, CompiledFile> = BTreeMap::from([
             (PathBuf::from("tasks/job.md"), b"literal {{not_an_input}}".to_vec().into()),
@@ -62,6 +75,7 @@ mod templates_blocks_tests {
     /// §FS-rhei-library.2 §FS-rhei-library.8
     #[test]
     fn manifest_seam_conditions_are_rejected_before_rendering() {
+        ensure_test_home();
         let text = "name: x\nversion: 1\ndescription: x\nports: {entry: a.entry, exits: {done: b.done}}\nseams: [{from: a.done, to: b.entry, condition: false}]\n";
         let error = serde_yaml::from_str::<TemplateManifest>(text).unwrap_err();
         assert!(error.to_string().contains("unknown field"));
@@ -71,6 +85,7 @@ mod templates_blocks_tests {
     /// §FS-rhei-library.8
     #[test]
     fn invalid_builtin_bind_keeps_structured_input_help() {
+        ensure_test_home();
         let template = materialize_builtin_template("changeset-review").unwrap();
         let path = template.path().join("template.yaml");
         let manifest = fs::read_to_string(&path).unwrap();

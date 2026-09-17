@@ -2,8 +2,20 @@
 mod templates_selection_tests {
     use super::super::*;
 
+    /// Template lookup walks the user tier and needs a home directory even
+    /// for a built-in block. Windows CI runs `cargo test` without `HOME`, so
+    /// point it at a scratch directory when it is absent; a set value is kept.
+    fn ensure_test_home() {
+        if std::env::var_os("HOME").is_none() {
+            let home = std::env::temp_dir().join("rhei-unit-test-home");
+            std::fs::create_dir_all(&home).expect("test home");
+            std::env::set_var("HOME", home);
+        }
+    }
+
     #[test]
     fn five_fix_modes_omit_absent_stages_and_keep_contracts_and_duties() {
+        ensure_test_home();
         for (prepare, commit) in [("none", "none"), ("none", "commit"), ("worktree", "none"), ("worktree", "commit"), ("fork", "pr")] {
             for name in ["fix", "changeset-review"] {
                 let mut supplied = BTreeMap::from([
@@ -61,6 +73,7 @@ mod templates_selection_tests {
 
     #[test]
     fn selected_declarations_reject_unsupported_fields_types_and_static_duplicates() {
+        ensure_test_home();
         let template = materialize_builtin_template("fix").unwrap();
         let original = load_template_manifest(template.path()).unwrap();
         let values = collect_template_inputs(&original, "fix", &[], &[], &[], &[]).unwrap();

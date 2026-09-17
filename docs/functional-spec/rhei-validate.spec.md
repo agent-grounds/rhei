@@ -188,7 +188,8 @@ Unused `**Provides:**` entries produce no diagnostic. Duplicate provided names
 and duplicate consumed references remain parse errors. The successful-terminal
 consumer warning in §4 remains the sole coherence warning when a direct
 producer is non-terminal; export validation does not add a second warning for
-the same ordering contradiction.
+the same ordering contradiction. The graph-level `**Consumes:**` visibility
+advisory in §4 remains present independently of export-integrity diagnostics.
 
 ## 5. Watch Mode
 

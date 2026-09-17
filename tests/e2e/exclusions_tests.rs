@@ -56,6 +56,7 @@ fn exclusion_workspace(prefix: &str) -> (TestDir, PathBuf, PathBuf) {
             "02-control.md",
             r#"### Task control: Unexcluded control
 **State:** work
+**Prior:** source
 **Consumes:** source:statement
 "#,
         ),

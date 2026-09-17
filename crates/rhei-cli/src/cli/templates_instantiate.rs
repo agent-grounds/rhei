@@ -49,7 +49,7 @@
             );
         }
         if !seams.is_empty() || !passes.is_empty() {
-            return Err(miette!("--seam and --pass require at least one --mount"));
+            return Err(miette!(help = "add --mount ALIAS=BLOCK before declaring a seam or pass", "--seam and --pass require at least one --mount"));
         }
 
         let Some(template) = template else {

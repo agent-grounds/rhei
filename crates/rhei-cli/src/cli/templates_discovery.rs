@@ -219,7 +219,7 @@
             ))?;
         // Presence, including an empty group, forbids a selected duplicate. §FS-rhei-library.1.1
         if manifest.select.is_some() {
-            let source: YamlValue = serde_yaml::from_str(&raw).map_err(|e| miette!("{e}"))?;
+            let source: YamlValue = serde_yaml::from_str(&raw).map_err(|e| miette!(help = "fix the YAML in template.yaml, then retry", "{e}"))?;
             manifest.static_declarations = ["ports", "data", "compatibility"].into_iter()
                 .filter(|key| source.get(*key).is_some()).map(str::to_string).collect();
         }
@@ -366,17 +366,17 @@
         }
         if let Some(ports) = &block.ports {
             if ports.exits.is_empty() {
-                return Err(miette!("block manifest '{}' must declare at least one exit port", source.display()));
+                return Err(miette!(help = "declare at least one public exit under ports.exits", "block manifest '{}' must declare at least one exit port", source.display()));
             }
             for name in ports.exits.keys() {
                 if !ident.is_match(name) {
-                    return Err(miette!("block manifest '{}' contains invalid public identifier '{name}'; use a letter then letters, digits, '_' or '-'", source.display()));
+                    return Err(miette!(help = "rename the public exit to a valid identifier", "block manifest '{}' contains invalid public identifier '{name}'; use a letter then letters, digits, '_' or '-'", source.display()));
                 }
             }
         }
         for name in block.data.inputs.keys().chain(block.data.outputs.keys()) {
             if !ident.is_match(name) {
-                return Err(miette!("block manifest '{}' contains invalid public identifier '{name}'; use a letter then letters, digits, '_' or '-'", source.display()));
+                return Err(miette!(help = "rename the data endpoint to a valid identifier", "block manifest '{}' contains invalid public identifier '{name}'; use a letter then letters, digits, '_' or '-'", source.display()));
             }
         }
         let mut aliases = BTreeMap::<&str, &str>::new();
@@ -391,6 +391,7 @@
             }
             if let Some(previous) = aliases.insert(&mount.alias, &mount.block) {
                 return Err(miette!(
+                    help = "use distinct aliases for the mounted blocks",
                     "duplicate mount alias '{}' in '{}': '{}' and '{}'",
                     mount.alias,
                     source.display(),
@@ -401,6 +402,7 @@
         }
         if let Some((first, second, target)) = block.compatibility.collision() {
             return Err(miette!(
+                help = "give each stable identity a distinct target",
                 "compatibility collision in '{}': stable identities '{}' and '{}' both target '{}'",
                 source.display(), first, second, target
             ));

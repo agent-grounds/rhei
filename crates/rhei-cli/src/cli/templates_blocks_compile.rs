@@ -8,7 +8,7 @@
     }
     impl BlockFrontend {
         fn new() -> MietteResult<Self> {
-            Ok(Self { scratch: tempfile::tempdir().map_err(|e| miette!("compiler scratch: {e}"))?, stack: Vec::new(), value_counter: 0, render_counter: 0 })
+            Ok(Self { scratch: tempfile::tempdir().map_err(|e| miette!(help = "check that the compiler temporary directory is writable", "compiler scratch: {e}"))?, stack: Vec::new(), value_counter: 0, render_counter: 0 })
         }
         fn resolve_values(
             &mut self,
@@ -25,7 +25,7 @@
                 .path()
                 .join(format!("values-{}.yaml", self.value_counter));
             let rendered = serde_yaml::to_string(supplied)
-                .map_err(|err| miette!("failed to serialize mounted input values: {err}"))?;
+                .map_err(|err| miette!(help = "provide serializable values for the mounted inputs", "failed to serialize mounted input values: {err}"))?;
             fs::write(&path, rendered)
                 .map_err(|err| file_io_report(&path, "failed to write compiler values", err))?;
             collect_template_inputs(manifest, template_ref, &[path], &[], &[], &[])
@@ -42,7 +42,7 @@
             if self.stack.iter().any(|(path, _)| path == &manifest_path) {
                 let mut chain = self.stack.iter().map(|(p,a)| format!("{} as {a}", p.display())).collect::<Vec<_>>();
                 chain.push(format!("{} as {alias}", manifest_path.display()));
-                return Err(miette!("block composition cycle: {}; break the recursive use chain", chain.join(" -> ")));
+                return Err(miette!(help = "remove one use: entry to break the recursive cycle", "block composition cycle: {}; break the recursive use chain", chain.join(" -> ")));
             }
             let manifest = load_template_manifest(&dir)?;
             let values = self.resolve_values(&manifest, reference, supplied)?;
@@ -58,10 +58,10 @@
             let manifest = select_block_declarations(manifest, values, dir, reference)?;
             for binding in &manifest.block.bind {
                 let Some((alias, _)) = split_endpoint(&binding.to) else {
-                    return Err(miette!("invalid bind target '{}' in '{}'", binding.to, dir.join("template.yaml").display()));
+                    return Err(miette!(help = "use a child input endpoint in alias.input form", "invalid bind target '{}' in '{}'", binding.to, dir.join("template.yaml").display()));
                 };
                 if !manifest.block.mounts.iter().any(|mount| mount.alias == alias) {
-                    return Err(miette!("bind target '{}' names unknown child alias '{}' in '{}'", binding.to, alias, dir.join("template.yaml").display()));
+                    return Err(miette!(help = "use one of the aliases declared by use", "bind target '{}' names unknown child alias '{}' in '{}'", binding.to, alias, dir.join("template.yaml").display()));
                 }
             }
             let mut children = Vec::new();
@@ -98,6 +98,7 @@
                         .find(|input| input.name == binding.input)
                         .ok_or_else(|| {
                         miette!(
+                            help = "declare the parent input before binding it",
                             "bind '{}' in '{}' names missing parent input '{}'",
                             binding.to,
                             dir.join("template.yaml").display(),
@@ -125,6 +126,7 @@
                         })?;
                     if !compatible_input_schema(&source_input.schema, &target_input.schema) {
                         return Err(miette!(
+                            help = "make the source and target input schemas compatible",
                             "bind '{}' connects incompatible input schemas in '{}' and '{}'",
                             binding.to,
                             dir.join("template.yaml").display(),
@@ -132,15 +134,15 @@
                         ));
                     }
                     if !bound_targets.insert(target) {
-                        return Err(miette!("bind target '{}' is assigned more than once", binding.to));
+                        return Err(miette!(help = "remove the duplicate bind for this child input", "bind target '{}' is assigned more than once", binding.to));
                     }
                     let value = values.get(&binding.input).ok_or_else(|| {
-                        miette!("resolved parent input '{}' is missing", binding.input)
+                        miette!(help = "supply the parent input before compiling the block", "resolved parent input '{}' is missing", binding.input)
                     })?;
                     child_values.insert(
                         target.to_string(),
                         serde_yaml::to_value(value).map_err(|err| {
-                            miette!("failed to lower binding '{}': {err}", binding.to)
+                            miette!(help = "use a serializable value for the bound input", "failed to lower binding '{}': {err}", binding.to)
                         })?,
                     );
                 }

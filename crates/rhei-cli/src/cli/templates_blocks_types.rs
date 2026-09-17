@@ -27,7 +27,7 @@
                     };
                     for (input, value) in nested {
                         let Some(input) = input.as_str() else {
-                            return Err(miette!("values for mount '{}' contain a non-string input name", alias));
+                            return Err(miette!(help = "use string input names in the mount mapping", "values for mount '{}' contain a non-string input name", alias));
                         };
                         values.insert(format!("{alias}.{input}"), value);
                     }

@@ -130,7 +130,7 @@
     }
 
     /// Provides may be written for a human, and a valid direct handoff adds no
-    /// warning beyond the existing dependency-coherence warning.
+    /// warning beyond the graph-level visibility advisory.
     // §FS-rhei-validate.4.3
     #[test]
     fn task_export_validation_keeps_unused_and_valid_exports_silent() {
@@ -150,7 +150,11 @@
         );
 
         assert!(report.errors.is_empty(), "valid handoff should pass: {report:?}");
-        assert!(report.warnings.is_empty(), "unused Provides is silent: {report:?}");
+        assert_eq!(
+            report.warnings,
+            vec![CONSUMES_ADVISORY],
+            "unused Provides adds no warning beyond the visibility advisory: {report:?}"
+        );
     }
 
     /// Export integrity does not invent another coherence warning for a
@@ -174,6 +178,12 @@
         );
 
         assert!(report.errors.is_empty(), "the declarations are valid: {report:?}");
-        assert_eq!(report.warnings.len(), 1, "only dependency coherence warns: {report:?}");
-        assert!(report.warnings[0].contains("prerequisites are unsatisfied"));
+        assert_eq!(
+            report.warnings,
+            vec![
+                "Task 2 is 'completed' but its prerequisites are unsatisfied: Task 1 (pending). The plan contradicts its own **Prior:** dependencies.",
+                CONSUMES_ADVISORY,
+            ],
+            "one coherence warning and the independent visibility advisory: {report:?}"
+        );
     }

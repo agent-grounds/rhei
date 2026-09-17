@@ -238,6 +238,7 @@ fn render_consumed_exports(render_context: &RuntimeTemplateContext<'_>) -> Miett
         // Required consumed exports cannot be excluded. §FS-rhei-plan-language.3.13
         if !prompt_source_allowed(render_context, &path) {
             return Err(miette!(
+                help = "remove the exclusion that overlaps this consumed export, then retry the task",
                 "Task {} excludes required consumed export '{}:{}'",
                 render_context.task.id,
                 consumed.task,

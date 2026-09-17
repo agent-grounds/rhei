@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::block_composition_support::*;
 use super::*;
@@ -137,7 +137,7 @@ result("## Result\n\nConsumer completed.\n")
         .expect("runtime settings");
 }
 
-fn run_export_case(dir: &Path, label: &str, contents: Option<&str>) -> String {
+fn run_export_case(dir: &Path, label: &str, contents: Option<&str>) -> (CliRun, PathBuf) {
     let fixture_root = dir.join(format!("fixtures-{label}"));
     fs::create_dir_all(&fixture_root).expect("fixture root");
     let fixtures = write_composition_fixtures(&fixture_root);
@@ -180,22 +180,30 @@ fn run_export_case(dir: &Path, label: &str, contents: Option<&str>) -> String {
     }
     write_runtime_agent(&output);
     let run = run_compose(&output, &["run", ".", "--no-tui", "--no-callbacks"]);
-    assert_success(&run);
-    fs::read_to_string(output.join("runtime/export-prompt.txt")).expect("captured prompt")
+    (run, output)
 }
 
 /// Export passes lower to qualified Provides/Consumes and then use the existing
-/// producer-root lookup and absent/empty skip behavior. §FS-rhei-library.6
+/// producer-root lookup and consumed-export preflight: present content is
+/// injected, while a missing or blank export leaves the consumer unspawned
+/// and its state unchanged. §FS-rhei-library.6 §FS-rhei-plan-language.3.12.2
 #[test]
-fn task_export_pass_uses_runtime_content_and_skips_missing_or_empty_exports() {
+fn task_export_pass_uses_runtime_content_and_refuses_missing_or_empty_exports() {
     let dir = unique_temp_dir("blocks-runtime-export-pass");
-    let present = run_export_case(&dir, "present", Some("decisive review findings\n"));
-    assert!(present.contains("decisive review findings"), "export absent from prompt:\n{present}");
+    let (present, output) = run_export_case(&dir, "present", Some("decisive review findings\n"));
+    assert_success(&present);
+    let prompt =
+        fs::read_to_string(output.join("runtime/export-prompt.txt")).expect("captured prompt");
+    assert!(prompt.contains("decisive review findings"), "export absent from prompt:\n{prompt}");
 
-    let missing = run_export_case(&dir, "missing", None);
-    assert!(!missing.contains("decisive review findings"));
-    assert!(!missing.contains("m6_review__findings"), "missing export created a prompt section");
-
-    let empty = run_export_case(&dir, "empty", Some(""));
-    assert!(!empty.contains("m6_review__findings"), "empty export created a prompt section");
+    for (label, contents) in [("missing", None), ("empty", Some(""))] {
+        let (run, output) = run_export_case(&dir, label, contents);
+        assert!(!run.status.success(), "{label} export should not spawn the consumer");
+        assert_stderr_contains(&run, "missing or blank consumed exports");
+        assert_stderr_contains(&run, "m6_review__job:m6_review__findings");
+        assert!(
+            !output.join("runtime/export-prompt.txt").exists(),
+            "{label} export must not reach the consumer prompt"
+        );
+    }
 }

@@ -66,6 +66,17 @@ impl CompiledBlock {
                         })
                         .collect(),
                 );
+                // §FS-rhei-plan-language.3.12.1: a consumed export's producer
+                // must stand directly in the consumer's Prior, so the pass adds
+                // that dependency under the producer's own kind keyword.
+                let mut producer_kind = None;
+                for file in &self.fragment.tasks {
+                    tasks(&file.tasks, &mut |task| {
+                        if task.id == producer {
+                            producer_kind = Some(capitalize(&task.kind));
+                        }
+                    });
+                }
                 let mut found = false;
                 for file in &mut self.fragment.tasks {
                     tasks_mut(&mut file.tasks, &mut |task| {
@@ -74,6 +85,10 @@ impl CompiledBlock {
                                 ConsumedExport { task: producer.clone(), name: name.clone() };
                             if !task.consumes.contains(&reference) {
                                 task.consumes.push(reference);
+                            }
+                            if !task.prior.contains(&producer) {
+                                task.prior.push(producer.clone());
+                                task.prior_kinds.push(producer_kind.clone());
                             }
                             found = true;
                         }
@@ -90,4 +105,12 @@ impl CompiledBlock {
         }
         Ok(())
     }
+}
+
+fn capitalize(kind: &str) -> String {
+    let mut chars = kind.chars();
+    chars
+        .next()
+        .map(|first| first.to_uppercase().collect::<String>() + chars.as_str())
+        .unwrap_or_default()
 }

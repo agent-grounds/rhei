@@ -237,6 +237,14 @@ fn validate_dependency_integrity(
                     producer,
                     available
                 ));
+                // Export declaration and direct ordering are independent
+                // authored obligations. §FS-rhei-validate.4.3
+                if !task.prior.iter().any(|prior| prior == producer) {
+                    report.errors.push(format!(
+                        "Task {} consumes export '{}' from Task {} and must list Task {} directly in **Prior:**",
+                        task.id, relationship.export, producer, producer
+                    ));
+                }
                 }
                 ExportRelationshipKind::MissingDirectPrior => {
                 report.errors.push(format!(

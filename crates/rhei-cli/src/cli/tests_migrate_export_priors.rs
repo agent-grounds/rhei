@@ -81,6 +81,23 @@ mod migrate_export_prior_tests {
         );
     }
 
+    /// An undeclared export remains an independent refusal even when its
+    /// producer also lacks a direct edge. §FS-rhei-migrate.1.2 §FS-rhei-validate.4.3
+    #[test]
+    fn migration_diagnostic_is_not_offered_for_an_independent_export_error() {
+        let report = validation_report(
+            Path::new("plan.rhei.md"),
+            &[],
+            &[
+                "Task 2 consumes export 'missing' from Task 1, but that task does not declare it in **Provides:**. Available exports: (none)".to_string(),
+                "Task 2 consumes export 'missing' from Task 1 and must list Task 1 directly in **Prior:**".to_string(),
+            ],
+            &[],
+        );
+        let help = report.help().expect("ordinary validation help").to_string();
+        assert!(!help.contains("rhei migrate export-priors"), "{help}");
+    }
+
     /// Insertion and append retain original newline spelling and every byte
     /// outside the one metadata line. §FS-rhei-migrate.2 §FS-rhei-migrate.2.1
     #[test]
@@ -112,7 +129,7 @@ mod migrate_export_prior_tests {
         assert_eq!(migration_reference_id("billing.2", "auth.1"), "auth.1");
 
         let rhei = rhei_core::parse(
-            "# Rhei: x\n\n## Tasks\n\n### Review 1: Producer\n**State:** pending\n**Provides:** a, b\n\n### Task 2: Consumer\n**State:** pending\n**Consumes:** 1:a, 1:b\n",
+            "# Rhei: x\n---\nstructure:\n  nodeKinds: [task, review]\n---\n\n## Tasks\n\n### Review 1: Producer\n**State:** pending\n**Provides:** a, b\n\n### Task 2: Consumer\n**State:** pending\n**Consumes:** 1:a, 1:b\n",
         )
         .expect("plan");
         let loaded = LoadedPlan {
@@ -144,7 +161,7 @@ mod migrate_export_prior_tests {
         let additions = vec![addition("2", "Task 1")];
         apply_additions_to_graph(&mut rhei.tasks, &additions);
         let machine = rhei_validator::StateMachine::from_yaml_str(
-            "name: migration\nversion: 1\nstates:\n  pending: { description: pending }\ntransitions: []\n",
+            "name: migration\nversion: 1\nstates:\n  pending: { initial: true, description: pending }\n  completed: { final: true, description: done }\ntransitions:\n  - { from: pending, to: completed }\n",
         )
         .expect("machine");
         let report = rhei_validator::validate_with_machine(&rhei, &machine);
@@ -211,7 +228,7 @@ mod migrate_export_prior_tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let plan = dir.path().join("plan.rhei.md");
         fs::write(dir.path().join("states.yaml"), MACHINE).unwrap();
-        let before = "# Rhei: x\n**States:** states\n\n## Tasks\n\n### Task 1: first\n**State:** pending\n**Provides:** x\n\n### Task 2: second\n**State:** pending\n**Provides:** x\n\n### Task 3: consumer\n**State:** pending\n**Consumes:** 1:x\n";
+        let before = "# Rhei: x\n**States:** migration\n\n## Tasks\n\n### Task 1: first\n**State:** pending\n**Provides:** x\n\n### Task 2: second\n**State:** pending\n**Provides:** x\n\n### Task 3: consumer\n**State:** pending\n**Consumes:** 1:x\n";
         fs::write(&plan, before).unwrap();
         let held = LockedPlanFile::open(&plan).expect("hold writer sidecar");
         let (events_tx, events_rx) = mpsc::channel();
@@ -244,7 +261,7 @@ mod migrate_export_prior_tests {
         fs::create_dir_all(consumer.join("tasks")).unwrap();
         fs::write(
             project.join("index.panta.md"),
-            "# Panta: p\n**States:** states\n",
+            "# Panta: p\n**States:** migration\n",
         )
         .unwrap();
         fs::write(project.join("states.yaml"), MACHINE).unwrap();
@@ -281,7 +298,7 @@ mod migrate_export_prior_tests {
         fs::create_dir_all(workspace.join("tasks")).unwrap();
         fs::write(
             workspace.join("index.rhei.md"),
-            "# Rhei: work\n**States:** states\n",
+            "# Rhei: work\n**States:** migration\n",
         )
         .unwrap();
         fs::write(workspace.join("states.yaml"), MACHINE).unwrap();

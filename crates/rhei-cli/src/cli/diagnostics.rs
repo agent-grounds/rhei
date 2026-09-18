@@ -620,9 +620,10 @@ fn validation_report(
     guidance: &[String],
 ) -> Report {
     let mut help = guidance.to_vec();
-    if errors.iter().any(|error| {
+    let missing_direct_prior = |error: &str| {
         error.contains("consumes export '") && error.contains("must list Task ")
-    }) {
+    };
+    if !errors.is_empty() && errors.iter().all(|error| missing_direct_prior(error)) {
         // The strict validator stays read-only; this is the explicit recovery
         // boundary for an otherwise-valid old authored shape. §FS-rhei-migrate.5
         let migration_target = validation_migration_target(input);

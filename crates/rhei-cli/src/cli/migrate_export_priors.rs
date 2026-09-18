@@ -24,10 +24,8 @@ fn migrate_export_priors_command(input: &Path, dry_run: bool) -> MietteResult<()
     let workspace_root = execution_workspace_root(input);
     let _run_locks = acquire_migration_run_locks(&initial, &workspace_root)?;
 
-    // A waiter must decide from bytes read after every relevant stable sidecar
-    // is held. If that reread discovers a newly affected file, release and
-    // reacquire the widened, canonically ordered set before deciding.
-    // §FS-rhei-migrate.4
+    // Decide from bytes reread after every relevant sidecar is held; widen and
+    // reacquire the canonical lock set if that reread finds another file. §FS-rhei-migrate.4
     let mut paths = migration_file_paths(input, &initial)?;
     loop {
         let locks = lock_migration_files(&paths)?;

@@ -206,7 +206,7 @@
 
 ### Task 1: producer
 **State:** pending
-**Provides:** good
+**Provides:** good, second
 
 #### Task 1.1: child
 **State:** pending
@@ -214,7 +214,7 @@
 
 ### Task 2: repairable
 **State:** pending
-**Consumes:** 1:good, 1:good
+**Consumes:** 1:good, 1:second
 
 ### Task 3: existing
 **State:** pending

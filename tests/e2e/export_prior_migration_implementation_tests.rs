@@ -2,6 +2,9 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::{Child, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use super::terminal_result_tests::write_mock_agent_settings;
 use super::*;
@@ -39,12 +42,14 @@ fn setup(prefix: &str, producer_state: &str) -> (TestDir, PathBuf) {
         &dir,
         "plan.rhei.md",
         &format!(
-            "# Rhei: boundaries\n**States:** states\n\n## Tasks\n\n\
+            "# Rhei: boundaries\n**States:** migration-boundaries\n\n## Tasks\n\n\
              ### Task 1: producer\n**State:** {producer_state}\n**Provides:** x\n\n\
              ### Task 2: consumer\n**State:** pending\n**Consumes:** 1:x\n"
         ),
     );
     write_fixture_file(&dir, "states.yaml", MACHINE);
+    let agent = write_python_agent(&dir, "consumer.py", AGENT);
+    write_mock_agent_settings(&dir, &agent);
     (dir, plan)
 }
 
@@ -105,8 +110,6 @@ fn migrated_consumer_remains_blocked_by_nonterminal_or_cancelled_producer() {
 fn migrated_consumer_still_refuses_missing_or_blank_export_content() {
     for (suffix, body) in [("missing", None), ("blank", Some(" \n\t"))] {
         let (dir, plan) = setup(&format!("export-prior-{suffix}-content"), "completed");
-        let agent = write_python_agent(&dir, "consumer.py", AGENT);
-        write_mock_agent_settings(&dir, &agent);
         if let Some(body) = body {
             let export = dir.join("runtime/exports/plan.1/x.md");
             fs::create_dir_all(export.parent().unwrap()).unwrap();
@@ -119,4 +122,165 @@ fn migrated_consumer_still_refuses_missing_or_blank_export_content() {
         assert!(output.contains("missing or blank consumed exports"), "{output}");
         assert!(!dir.join("runtime/spawned-plan.2.txt").exists());
     }
+}
+
+const DIAGNOSTIC_MACHINE: &str = r#"name: migration-diagnostics
+version: 1
+states:
+  pending:
+    initial: true
+    description: Work
+  completed:
+    final: true
+    description: Done
+transitions:
+  - from: pending
+    to: completed
+"#;
+
+const DIAGNOSTIC_PLAN: &str = r#"# Rhei: Migration diagnostics
+**States:** migration-diagnostics
+
+## Tasks
+
+### Task 1: Producer
+**State:** completed
+**Provides:** handoff
+
+### Task 2: Consumer
+**State:** pending
+**Consumes:** 1:handoff
+"#;
+
+struct ChildGuard(Option<Child>);
+
+impl ChildGuard {
+    fn child(&mut self) -> &mut Child {
+        self.0.as_mut().expect("guarded child")
+    }
+
+    fn stop(mut self) {
+        if let Some(mut child) = self.0.take() {
+            child.kill().expect("stop watch");
+            child.wait().expect("reap watch");
+        }
+    }
+}
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        if let Some(child) = self.0.as_mut() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+fn diagnostic_case(prefix: &str) -> (TestDir, PathBuf) {
+    let root = unique_temp_dir(prefix);
+    let directory = root.join(
+        "a deliberately long migration diagnostic path with spaces and an apostrophe's target",
+    );
+    fs::create_dir_all(&directory).expect("diagnostic fixture directory");
+    let plan = write_fixture_file(&directory, "plan.rhei.md", DIAGNOSTIC_PLAN);
+    write_fixture_file(&directory, "states.yaml", DIAGNOSTIC_MACHINE);
+    (root, plan)
+}
+
+fn expected_help(target: &Path) -> String {
+    format!("help: rhei migrate export-priors {}", shell_quote(&target.display().to_string()))
+}
+
+fn assert_complete_help_line(rendered: &str, target: &Path) {
+    let expected = expected_help(target);
+    assert!(
+        rendered.lines().any(|line| {
+            line.find("help: rhei migrate export-priors ")
+                .is_some_and(|start| line[start..] == expected)
+        }),
+        "expected one complete physical help line {expected:?}; got:\n{rendered}"
+    );
+    assert_eq!(
+        rendered.matches("rhei migrate export-priors").count(),
+        1,
+        "the recovery command should be rendered exactly once:\n{rendered}"
+    );
+}
+
+fn assert_authored_unchanged(plan: &Path, before: &[u8]) {
+    assert_eq!(fs::read(plan).expect("plan after refusal"), before);
+}
+
+/// Explicit validate and run-preview targets retain one shell-safe physical
+/// recovery line and remain read-only. §FS-rhei-migrate.5 §FS-rhei-errors.1.2
+#[test]
+fn explicit_validate_and_run_dry_run_render_copyable_migration_help() {
+    let (_root, plan) = diagnostic_case("migration-diagnostic-explicit");
+    let before = fs::read(&plan).expect("plan before refusal");
+
+    for (command, extras) in [("validate", &[][..]), ("run", &["--dry-run", "--no-tui"][..])] {
+        let output = rhei_command(isolated_home_for(&plan))
+            .arg(command)
+            .arg(&plan)
+            .args(extras)
+            .output()
+            .expect("diagnostic command");
+        assert!(!output.status.success(), "{command} unexpectedly succeeded");
+        assert_complete_help_line(&raw_stderr(&output), &plan);
+        assert_authored_unchanged(&plan, &before);
+    }
+}
+
+/// Omitted discovery feeds the complete discovered target through watch's
+/// initial pass without mutation. §FS-rhei-migrate.5 §FS-rhei-errors.1.2
+#[test]
+fn omitted_validate_watch_renders_copyable_migration_help() {
+    let (_root, plan) = diagnostic_case("migration-diagnostic-watch");
+    let before = fs::read(&plan).expect("plan before watch");
+    let directory = plan.parent().expect("plan directory");
+    let stderr_path = directory.join("watch-stderr.txt");
+    let stderr_file = fs::File::create(&stderr_path).expect("watch stderr");
+    let child = rhei_command(isolated_home_for(&plan))
+        .current_dir(directory)
+        .args(["validate", "--watch"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::from(stderr_file))
+        .spawn()
+        .expect("watch command");
+    let mut child = ChildGuard(Some(child));
+
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let rendered = loop {
+        let rendered = fs::read_to_string(&stderr_path).unwrap_or_default();
+        if rendered.contains("rhei migrate export-priors") {
+            break rendered;
+        }
+        assert!(Instant::now() < deadline, "watch did not render migration help:\n{rendered}");
+        if let Some(status) = child.child().try_wait().expect("inspect watch") {
+            panic!("watch exited early with {status}:\n{rendered}");
+        }
+        thread::sleep(Duration::from_millis(25));
+    };
+    child.stop();
+
+    assert_complete_help_line(&rendered, &plan);
+    assert_authored_unchanged(&plan, &before);
+}
+
+/// The detached startup path preserves the omitted discovered target when it
+/// relays the child's refusal. §FS-rhei-migrate.5 §FS-rhei-errors.1.2
+#[cfg(unix)]
+#[test]
+fn omitted_headless_startup_renders_copyable_migration_help() {
+    let (_root, plan) = diagnostic_case("migration-diagnostic-headless");
+    let before = fs::read(&plan).expect("plan before headless run");
+    let output = rhei_command(isolated_home_for(&plan))
+        .current_dir(plan.parent().expect("plan directory"))
+        .args(["run", "--headless"])
+        .output()
+        .expect("headless command");
+
+    assert!(!output.status.success(), "invalid headless run unexpectedly started");
+    assert_complete_help_line(&raw_stderr(&output), &plan);
+    assert_authored_unchanged(&plan, &before);
 }

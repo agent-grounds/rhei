@@ -125,6 +125,14 @@ or immediate detached-child refusal as startup locks. The project lock remains
 held throughout; `--dry-run` remains lock-free and makes no live-admission
 promise.
 
+An operator-forced transition acquires the same involved roots
+non-blocking—after confirmation and before its exclusive root guard—and holds
+them through marker removal (§FS-rhei-transition-cmd.6). It never queues behind
+a live run: the refusal names the recorded owner. Conversely, run startup
+checks the pending-recovery interlock before and after acquiring its shared root
+guards and refuses a marked root rather than completing or undoing the
+operator's transaction (§FS-rhei-recover.4).
+
 A **foreground** run blocks on a lock another run holds — waiting for your turn
 is a queueing idiom people use on purpose — but says so first, naming the run it
 is waiting for. Blocking in total silence is indistinguishable from a hang. The

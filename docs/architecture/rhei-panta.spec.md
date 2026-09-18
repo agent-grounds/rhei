@@ -105,6 +105,16 @@ load rather than being synthesized piecemeal. Explicit candidate narrowing is
 retained separately from this full graph, so `--rhei` does not turn reload into
 a partial load.
 
+Before any root contributes authored or runtime bytes to that graph, the load
+boundary checks `.rhei/forced-recovery.json`, acquires the root's shared access
+guard, checks again, and retains the guard for the lifetime of the operation
+that owns the loaded graph. The guard is stored in rhei's platform state
+directory under a canonical-root digest, not in the project, so a read-only
+load gains no project write requirement. Project/member loading, lenient
+listing, watches, and direct runtime consumers all enter through this boundary;
+a marker refuses the root rather than yielding a partial graph. Multi-root
+loads sort canonical roots before guard acquisition. §FS-rhei-panta.6.6
+
 ## 3. Identity and id namespacing
 
 Ids are dotted paths rooted at Panta. A rhei contributes its id as the prefix for

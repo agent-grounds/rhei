@@ -184,9 +184,12 @@ the selected task or subtask it shows, top to bottom:
   collapsed row is labeled `last state` and shows the state immediately before
   the current persisted state. Expanding the row shows the ordered earlier
   states derived from the command-written central state-transition ledger at
-  `runtime/state-transitions.log`. Each ledger line is deterministic and
-  timestamp-free: `<task-id> <from>@<to>`. New commands write state history to
-  that central ledger. The live and static renderers may combine the central
+  `runtime/state-transitions.log`. Ordinary movement rows are deterministic and
+  timestamp-free: `<task-id> <from>@<to>`. A validated adjacent
+  `!force-v1`/movement pair contributes that movement once and makes its
+  exceptional reason available to the inspector; malformed pairs are reported
+  rather than rendered as history (§FS-rhei-complete.3.1). New commands write
+  state history to that central ledger. The live and static renderers may combine the central
   ledger with `runtime/transitions.log` to repair older or partially written run
   histories; legacy per-task result headings are used only when no central
   history exists for that task. If no last state or earlier state is recorded,

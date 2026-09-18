@@ -546,6 +546,11 @@ Rules:
 
 A `SlotAssigned` produces one line; its paired `SlotReleased` produces a second line on the same state (recording exit status and duration). For multi-invocation states (`all_targets`), each invocation is a distinct pair of lines with the target suffix visible in the log path.
 
+A manual transition, including an operator-forced missing-edge recovery, is not
+an invocation and holds no run slot, so it emits no event here. Its ordinary or
+exceptional state history belongs only in `runtime/state-transitions.log`.
+§FS-rhei-transition-cmd.6.1
+
 When an invocation selects a task transition, Rhei completes that transition's
 processing—including successful `on_enter`, the central
 `runtime/state-transitions.log` append, and terminal finalization—before it

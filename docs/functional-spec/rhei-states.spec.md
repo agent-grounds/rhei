@@ -242,6 +242,12 @@ implicit rather than declared: see [Terminal Result](#33-terminal-result).
   the transition line to add. A declared edge counts whether or not its
   `condition` or `exit_code` can ever hold, because that is not decidable here:
   the rule under-reports, never over-reports.
+- A transition whose exact `from` names a `final: true` state is a load error
+  citing §FS-rhei-transitions.4.6. Wildcards already exclude final sources.
+  This keeps terminal exits outside the declared machine: when an operator
+  must reopen one, the missing-edge-only path is
+  §FS-rhei-transition-cmd.6. Machines that relied on exact terminal-source
+  edges are rejected even though older rhei versions executed them.
 - A state that declares both `poll` and `snapshot.inherit` is a validation
   error in v1. Polling states may still emit snapshots on terminal exit when
   otherwise snapshot-capable. See [Snapshots Specification — Counted Loops, Fanout, and Polling](rhei-snapshots.spec.md#103-counted-loops-fanout-and-polling).
@@ -675,6 +681,13 @@ terminal entry past it, and a refused move leaves the plan untouched.
    nothing is carried on it and the program owes the result itself. The message is appended in the existing
    `## Result` entry format ([§FS-rhei-complete.3.2](rhei-complete.spec.md#32-result-file-format)) after the transition
    succeeds.
+
+Those alternatives govern ordinary entries. A forced terminal entry always
+requires a fresh non-whitespace `--result` on that invocation, even when the
+file already has content; its operator reason and terminal result answer
+different questions. Leaving a terminal state preserves the result file as
+history while removing the task-body result link, and every later forced final
+re-entry appends a new result entry. §FS-rhei-transition-cmd.6
 
 A file that exists but is only whitespace counts as **no result**, on the same
 reading [§FS-rhei-states.3.2](rhei-states.spec.md#32-state-handoffs) applies to handoffs: an existence-only contract

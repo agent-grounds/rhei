@@ -520,6 +520,24 @@ filtering plus attempt-identity deduplication still apply, so one invocation is
 counted once and unrelated rheis, tasks, and runs do not enter the selected
 run's lead, steps, or accounting.
 
+### 6.6. Pending forced recovery
+
+Every root access is subject to §FS-rhei-recover.4 before ordinary strict or
+lenient loading. Commands check the root marker before and after taking their
+shared root-access guard and hold the guard until every read or write derived
+from that load finishes. Project loads acquire every member/project guard in
+sorted canonical-root order. Direct member loading, omitted-target discovery,
+watch refreshes, and direct runtime readers use the same boundary; no path can
+avoid it by selecting one rhei or by tolerating a broken neighbour.
+
+A pending marker makes even lenient `rhei list` refuse that root. Lenience can
+skip malformed authored input, but an in-doubt transaction means the bytes it
+would expose have no committed interpretation. The refusal prints the marker's
+recorded hop and the single `rhei recover <execution-root>` invocation. Readers
+do not need write permission to the project: root guards live in the platform
+state directory keyed by canonical root. With no marker, loading and command
+scope are unchanged.
+
 ## Related Specifications
 
 - [Plan Language](rhei-plan-language.spec.md) — grammar, the node hierarchy, and the virtual-root model [§FS-rhei-plan-language.3](rhei-plan-language.spec.md#3-semantic-constraints)

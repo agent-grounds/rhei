@@ -124,6 +124,12 @@ obligation.
 4. Remove the `**Assignee:**` line from the task (no-op if absent).
 5. Add the `> **Result:**` link to the task body if it is not already there.
 
+The operator-forced path computes those same effects into the durable images
+of §FS-rhei-transition-cmd.6.1. A forced exit from a terminal state performs
+the inverse link operation—remove the task-body result link—without deleting
+or rewriting the result file. A later forced final re-entry runs terminal
+finalization again and appends its mandatory fresh result.
+
 A non-terminal transition performs only steps 1 and 2. Step 2 with no message
 is a no-op, so a plain non-terminal `rhei transition` creates no result file.
 
@@ -135,11 +141,26 @@ Every task state **move** is appended to one central file:
 runtime/state-transitions.log
 ```
 
-Each line is deterministic and timestamp-free:
+An ordinary move is one deterministic, timestamp-free line:
 
 ```text
 <task-id> <from>@<to>
 ```
+
+An operator-forced missing-edge move is one adjacent, task-keyed pair:
+
+```text
+<task-id> !force-v1 <base64url(canonical-json)>
+<task-id> <from>@<to>
+```
+
+The second row retains the ordinary grammar byte-for-byte. Upgraded readers
+validate adjacency and the duplicated task/from/to fields, then consume one
+movement; legacy readers safely skip the `!force-v1` row because its second
+token contains no `@`, and continue to see the ordinary movement. A lone,
+reversed, mismatching, or non-adjacent pair is corrupt history rather than a
+forced transition. The payload and commit rules are
+§FS-rhei-transition-cmd.6.1.
 
 This file is the source of truth for task state history across `rhei
 transition`, `rhei complete`, `rhei run`, callbacks, system transitions, and

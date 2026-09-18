@@ -318,11 +318,13 @@ fn completion_must_be_one_immutable_report_and_active_evidence_wins() {
 
     let active = RepriceFixture::new("summary-reprice-active");
     active.seed_changed_rate_run();
+    let active_lock = hold_run_lock(&active.root, SELECTED_RUN);
     write_running_descriptor(&active.root, SELECTED_RUN);
     let active_result = selected_summary(&active, &[]);
     assert!(!active_result.status.success());
     assert!(active_result.stdout.is_empty());
     assert!(active_result.stderr.to_lowercase().contains("active"), "{}", said(&active_result));
+    drop(active_lock);
 }
 
 // §FS-rhei-panta.6.5 §FS-rhei-summary.5

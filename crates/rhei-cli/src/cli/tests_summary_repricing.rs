@@ -27,7 +27,31 @@ mod summary_repricing_activity_tests {
         if let Some(id) = owner {
             write_run_lock_owner(&mut lock, id, std::process::id()).expect("write lock owner");
         }
+        assert!(matches!(probe_run_lock(root), RunLockProbe::Held));
         lock
+    }
+
+    fn assert_invalid_owner_is_indeterminate(edit: impl FnOnce(&mut serde_json::Value)) {
+        let root = tempfile::tempdir().expect("workspace");
+        let mut lock = hold_lock(root.path(), Some("def456"));
+        lock.file.rewind().expect("rewind owner");
+        let mut owner: serde_json::Value = serde_json::from_reader(&lock.file).expect("owner");
+        edit(&mut owner);
+        let body = serde_json::to_vec(&owner).expect("serialize modified owner");
+        lock.file.rewind().expect("rewind owner");
+        lock.file.set_len(0).expect("clear owner");
+        lock.file.write_all(&body).expect("write modified owner");
+        lock.file.flush().expect("flush modified owner");
+
+        let activity = selected_root_activity(root.path(), "abc123");
+        let SelectedRunActivity::Unknown(reason) = activity else {
+            panic!("invalid ownership must be indeterminate, got {activity:?}");
+        };
+        assert!(reason.contains("run.lock"), "{reason}");
+        lock.file.rewind().expect("rewind inspected owner");
+        let mut after = Vec::new();
+        lock.file.read_to_end(&mut after).expect("read inspected owner");
+        assert_eq!(after, body, "inspection must not repair the owner record");
     }
 
     #[test]
@@ -76,5 +100,33 @@ mod summary_repricing_activity_tests {
             selected_root_activity(root.path(), "abc123"),
             SelectedRunActivity::Inactive
         );
+    }
+
+    #[test]
+    fn a_held_lock_with_an_unsupported_version_and_another_id_is_indeterminate() {
+        assert_invalid_owner_is_indeterminate(|owner| owner["version"] = 99.into());
+    }
+
+    #[test]
+    fn a_held_lock_with_malformed_ownership_and_another_id_is_indeterminate() {
+        assert_invalid_owner_is_indeterminate(|owner| owner["pid"] = "invalid".into());
+        assert_invalid_owner_is_indeterminate(|owner| owner["pid"] = 0.into());
+        assert_invalid_owner_is_indeterminate(|owner| owner["workspace"] = 42.into());
+        assert_invalid_owner_is_indeterminate(|owner| owner["id"] = " ".into());
+    }
+
+    #[test]
+    fn a_held_lock_with_legacy_ownership_containing_another_id_is_indeterminate() {
+        assert_invalid_owner_is_indeterminate(|owner| {
+            *owner = serde_json::json!({"id": "def456"});
+        });
+    }
+
+    #[test]
+    fn a_held_lock_with_ownership_for_another_workspace_is_indeterminate() {
+        let other = tempfile::tempdir().expect("other workspace");
+        assert_invalid_owner_is_indeterminate(|owner| {
+            owner["workspace"] = serde_json::json!(other.path());
+        });
     }
 }

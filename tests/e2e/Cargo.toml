@@ -26,6 +26,7 @@ name = "effort-fixture"
 path = "fixtures/effort_fixture.rs"
 
 [dev-dependencies]
+fs2 = "0.4.3"
 rhei-core = { package = "rhei-plan", path = "../../crates/rhei-core" }
 rhei-cli = { path = "../../crates/rhei-cli" }
 jsonschema = { version = "0.18.3", default-features = false }

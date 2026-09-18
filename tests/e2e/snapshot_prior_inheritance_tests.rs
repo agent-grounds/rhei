@@ -1,5 +1,5 @@
 //! Prior-edge session continuation and per-task inheritance controls.
-//! §FS-rhei-snapshots.4 §FS-rhei-plan-language.3.13
+//! §FS-rhei-snapshots.4 §FS-rhei-plan-language.3.14
 
 use std::fs;
 use std::path::{Path, PathBuf};

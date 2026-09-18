@@ -1,6 +1,6 @@
 /// Validate the effective task/state rule against the plan graph. State-only
 /// validation cannot judge task overlays or cross-rhei Prior/ancestor sources.
-// §FS-rhei-snapshots.11 §FS-rhei-plan-language.3.13
+// §FS-rhei-snapshots.11 §FS-rhei-plan-language.3.14
 fn effective_snapshot_emitter_error(
     task: &rhei_core::ast::Task,
     inherit: &rhei_validator::SnapshotInheritConfig,

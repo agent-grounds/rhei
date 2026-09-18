@@ -208,7 +208,7 @@ pub struct ConsumedExport {
 ///
 /// Absence preserves the state's rule, `Disabled` is the explicit `none`
 /// form, and `Rule` replaces only the effective name and lineage axis.
-// §FS-rhei-plan-language.3.13: Task snapshot inheritance overrides.
+// §FS-rhei-plan-language.3.14: Task snapshot inheritance overrides.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskSnapshotInherit {
     Disabled,
@@ -274,7 +274,7 @@ pub struct Task {
     // §FS-rhei-plan-language.3.1: validated against the referenced node's kind.
     pub prior_kinds: Vec<Option<String>>,
     /// Per-task snapshot inheritance overlay from `**Inherits:**`, if present.
-    // §FS-rhei-plan-language.3.13: Omission, overlay, and explicit opt-out.
+    // §FS-rhei-plan-language.3.14: Omission, overlay, and explicit opt-out.
     pub inherits: Option<TaskSnapshotInherit>,
     /// Export names this task publishes, from `**Provides:**`, in the order
     /// they were authored.

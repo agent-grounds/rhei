@@ -108,7 +108,7 @@ Task metadata may also control execution without changing the state machine:
 `**Target:**` and `**Model:**` select an execution identity
 ([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)),
 while `**Inherits:**` opts a task into or out of snapshot inheritance
-([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-snapshot-inheritance-overrides)).
+([§FS-rhei-plan-language.3.14](rhei-plan-language.spec.md#314-task-snapshot-inheritance-overrides)).
 The plan-language specification owns that markdown syntax; the snapshot
 specification owns its lineage, selection, compatibility, and fallback behavior
 ([§FS-rhei-snapshots.4](rhei-snapshots.spec.md#4-state-machine-yaml-grammar)).

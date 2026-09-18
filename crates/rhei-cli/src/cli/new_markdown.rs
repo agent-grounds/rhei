@@ -85,7 +85,7 @@ fn render_ticket(fields: &TicketFields<'_>) -> String {
     if let Some(inherits) = fields.inherits {
         // The parser performs the closed-grammar validation during the
         // create transaction; this renderer owns canonical placement.
-        // §FS-rhei-new.1.3 §FS-rhei-plan-language.3.13
+        // §FS-rhei-new.1.3 §FS-rhei-plan-language.3.14
         out.push_str(&format!("**Inherits:** {}\n", inherits.trim()));
     }
     for (label, values) in [

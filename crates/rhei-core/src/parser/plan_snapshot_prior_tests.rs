@@ -1,6 +1,6 @@
 use super::*;
 
-/// §FS-rhei-plan-language.3.13: both task snapshot forms are metadata, not
+/// §FS-rhei-plan-language.3.14: both task snapshot forms are metadata, not
 /// prose, and the parser accepts all three lineage axes.
 #[test]
 fn snapshot_prior_parses_task_inheritance_metadata() {
@@ -13,7 +13,7 @@ fn snapshot_prior_parses_task_inheritance_metadata() {
     }
 }
 
-/// §FS-rhei-plan-language.3.13: malformed and repeated controls are diagnosed
+/// §FS-rhei-plan-language.3.14: malformed and repeated controls are diagnosed
 /// as inheritance metadata rather than silently becoming task prose.
 #[test]
 fn snapshot_prior_rejects_malformed_and_duplicate_task_inheritance_metadata() {
@@ -43,7 +43,7 @@ fn snapshot_prior_rejects_malformed_and_duplicate_task_inheritance_metadata() {
     assert!(err.message.contains("more than once"), "unexpected diagnostic: {}", err.message);
 }
 
-/// §FS-rhei-plan-language.3.13: the closed metadata block has one canonical
+/// §FS-rhei-plan-language.3.14: the closed metadata block has one canonical
 /// order, immediately after Prior and before export/execution metadata.
 #[test]
 fn snapshot_prior_task_inheritance_metadata_has_canonical_order() {

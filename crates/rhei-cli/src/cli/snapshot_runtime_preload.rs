@@ -15,7 +15,7 @@ struct SnapshotPreloadRoots<'a> {
 ///
 /// The task form replaces only name/axis; all selectors and policy fields are
 /// retained. An explicit `none` removes the effective contract altogether.
-// §FS-rhei-snapshots.4.2 §FS-rhei-plan-language.3.13
+// §FS-rhei-snapshots.4.2 §FS-rhei-plan-language.3.14
 fn effective_snapshot_inherit(
     machine: &rhei_validator::StateMachine,
     task: &rhei_core::ast::Task,

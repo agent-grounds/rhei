@@ -183,7 +183,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 return Some(Token::MetadataPrior { task_ids: ids });
             }
 
-            // Metadata: task snapshot inheritance. §FS-rhei-plan-language.3.13
+            // Metadata: task snapshot inheritance. §FS-rhei-plan-language.3.14
             if let Some(caps) = self.re_inherits.captures(line) {
                 let inherit = if caps.get(1).is_some_and(|value| value.as_str() == "none") {
                     TaskSnapshotInherit::Disabled

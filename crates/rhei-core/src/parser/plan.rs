@@ -499,7 +499,7 @@ pub fn parse(input: &str) -> Result<Rhei> {
 
         // **Inherits:** metadata. Normalize the closed value grammar here so
         // renderers and runtime consumers share one representation.
-        // §FS-rhei-plan-language.3.13
+        // §FS-rhei-plan-language.3.14
         if let Some(caps) = re_inherits.captures(line) {
             let Some(top) = node_stack.last_mut() else {
                 return Err(ParseError::new(

@@ -221,7 +221,7 @@ The state rule is overlaid with task metadata before selection. Omitted
 the state has no rule, it supplies no selectors and defaults to native,
 optional inheritance. `**Inherits:** none` removes the effective rule for the
 task without changing emission or artifact behavior
-(§FS-rhei-plan-language.3.13).
+(§FS-rhei-plan-language.3.14).
 
 ### 4.3. Lineage Resolution
 
@@ -332,7 +332,7 @@ That artifact path remains the supported way to communicate durable facts
 across siblings, cousins, unrelated tasks, and different agents. `from: prior`
 transfers only native session lineage, reaches only declared Prior edges, and
 never makes an undeclared task addressable. The snapshot grammar has no
-`from: task` form. [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) [§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-snapshot-inheritance-overrides)
+`from: task` form. [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) [§FS-rhei-plan-language.3.14](rhei-plan-language.spec.md#314-task-snapshot-inheritance-overrides)
 
 ### 4.6. Fallback Behavior
 
@@ -1449,7 +1449,7 @@ following rules. Violations are errors unless marked otherwise.
 - Manifest validation requires `completion` to be `success`, `failure`, or
   `timeout` when `produced_by: orchestrator`, and only `success` or `failure`
   when `produced_by: operator`.
-- `**Inherits:**` obeys §FS-rhei-plan-language.3.13. A task value overlays only
+- `**Inherits:**` obeys §FS-rhei-plan-language.3.14. A task value overlays only
   state `name` and `from`; `none` removes the effective rule. The resulting
   rule is validated against every autonomous state the task may enter,
   including polling, fanout, target, required/compatibility, and source-shape

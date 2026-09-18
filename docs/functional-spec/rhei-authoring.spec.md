@@ -233,7 +233,7 @@ start inside the implementer's reasoning. Omission preserves the state rule;
 `none` is the explicit cold opt-out. Inheritance is a continuity tool, not a
 guaranteed cost saving: a large inherited prefix is read again on every later
 turn. Durable facts still belong in `**Provides:**` / `**Consumes:**` and state
-artifacts. See §FS-rhei-plan-language.3.13 and §FS-rhei-snapshots.4.
+artifacts. See §FS-rhei-plan-language.3.14 and §FS-rhei-snapshots.4.
 
 ## 5. Using a Custom State Machine
 

@@ -5,6 +5,7 @@ fn state_inputs_exist_for_ready_set(
     machine: &rhei_validator::StateMachine,
     task: &rhei_core::ast::Task,
     state_name: &str,
+    run_options: Option<&RunOptions>,
 ) -> bool {
     let Some(state_def) = machine.states.get(state_name) else {
         return false;
@@ -23,7 +24,8 @@ fn state_inputs_exist_for_ready_set(
         task.state.as_str(),
         machine,
     ));
-    ensure_state_inputs_exist_for_transition(
+    let default_options = default_run_options();
+    ensure_state_inputs_exist_for_transition_with_options(
         artifact_root,
         Some(task),
         &task.id.to_string(),
@@ -32,6 +34,7 @@ fn state_inputs_exist_for_ready_set(
         visit_count,
         machine,
         &settings,
+        run_options.unwrap_or(&default_options),
         "",
     )
     .is_ok()
@@ -256,7 +259,7 @@ fn find_ready_tasks<'a>(
     roots: &ReadySetRoots<'_>,
     spawned: &HashSet<String>,
 ) -> Vec<&'a rhei_core::ast::Task> {
-    find_ready_tasks_in_view(rhei, machines, roots, spawned, ReadySetView::RunnableNow)
+    find_ready_tasks_in_view(rhei, machines, roots, spawned, ReadySetView::RunnableNow, None)
 }
 
 /// Apply the one readiness implementation through either its ordinary
@@ -268,6 +271,7 @@ fn find_ready_tasks_in_view<'a>(
     roots: &ReadySetRoots<'_>,
     spawned: &HashSet<String>,
     view: ReadySetView,
+    run_options: Option<&RunOptions>,
 ) -> Vec<&'a rhei_core::ast::Task> {
     use std::collections::HashMap;
 
@@ -341,6 +345,7 @@ fn find_ready_tasks_in_view<'a>(
                 machine,
                 task,
                 &normalized_state,
+                run_options,
             )
         {
             ready.push(task);

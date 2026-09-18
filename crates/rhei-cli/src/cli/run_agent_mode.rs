@@ -199,7 +199,13 @@ fn run_agent_mode(
         let roots =
             ReadySetRoots { workspace_root: &workspace_root, task_roots: &loaded.task_roots };
         let ready = narrow_to_rhei_scope(
-            find_runnable_tasks(&loaded.rhei, &machines.set, &roots, &HashSet::new()),
+            find_runnable_tasks_with_options(
+                &loaded.rhei,
+                &machines.set,
+                &roots,
+                &HashSet::new(),
+                opts,
+            ),
             &rhei_scope,
         );
         if ready.is_empty() {

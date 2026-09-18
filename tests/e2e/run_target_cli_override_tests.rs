@@ -163,6 +163,172 @@ fn assert_single_identity(
     assert!(mismatches.is_empty(), "wrong launched identity:\n{}", mismatches.join("\n"));
 }
 
+fn run_target_artifact_case(
+    prefix: &str,
+    input_target: Option<&str>,
+    write_output: bool,
+    extra_args: &[&str],
+) -> (TestDir, CliRun) {
+    let dir = unique_temp_dir(prefix);
+    let output = if write_output {
+        "write(root / 'runtime' / 'outputs' / (env('RHEI_TARGET_SLUG') + '.txt'), env('RHEI_TARGET') + '\\n')\n"
+    } else {
+        ""
+    };
+    let agent_script = write_python_agent(
+        &dir,
+        "artifact-agent.py",
+        &format!(
+            r#"root = pathlib.Path(env('RHEI_ROOT'))
+{output}result('## Result\n\nTarget-scoped artifact handled.\n')
+"#
+        ),
+    );
+    let command = fixture_command(&agent_script);
+    let settings_dir = dir.join(".agent-grounds/rhei");
+    fs::create_dir_all(&settings_dir).expect("create settings directory");
+    fs::write(
+        settings_dir.join("settings.json"),
+        format!(
+            r#"{{
+  "agents": {{
+    "state-agent": {{
+      "command": {command},
+      "stdin_prompt": true,
+      "timeout": "5s",
+      "modes": {{ "yolo": [] }}
+    }},
+    "override-agent": {{
+      "command": {command},
+      "stdin_prompt": true,
+      "timeout": "5s",
+      "modes": {{ "yolo": [] }}
+    }}
+  }},
+  "models": {{
+    "state-model": {{ "provider": "registry", "model": "state-concrete" }},
+    "override-model": {{ "provider": "registry", "model": "override-concrete" }}
+  }}
+}}"#
+        ),
+    )
+    .expect("write settings");
+    let inputs = input_target.map_or(String::new(), |_| {
+        "    inputs:\n      - name: target-input\n        path: runtime/inputs/{target.slug}.txt\n"
+            .to_string()
+    });
+    let machine = format!(
+        "name: cli-target-artifacts\nversion: 1\nmodels: [state-model, override-model]\nstates:\n  work:\n    initial: true\n    concurrent: true\n    target: state-agent[yolo]:state-provider:state-model\n    agent_timeout: 5s\n{inputs}    outputs:\n      - name: target-output\n        path: runtime/outputs/{{target.slug}}.txt\n  completed:\n    final: true\ntransitions:\n  - from: work\n    to: completed\n"
+    );
+    if let Some(target) = input_target {
+        let input_dir = dir.join("runtime/inputs");
+        fs::create_dir_all(&input_dir).expect("create input directory");
+        fs::write(input_dir.join(format!("{target}.txt")), "ready\n")
+            .expect("write target-scoped input");
+    }
+    let plan_path = write_fixture_file(&dir, "plan.rhei.md", PLAN);
+    let machine_path = write_fixture_file(&dir, "states.yaml", &machine);
+    let result = run_cli(
+        "run",
+        &plan_path,
+        &machine_path,
+        &[&["--no-tui", "--no-callbacks"], extra_args].concat(),
+    );
+    (dir, result)
+}
+
+fn task_completed(dir: &Path) -> bool {
+    fs::read_to_string(dir.join("plan.rhei.md"))
+        .expect("read resulting plan")
+        .contains("**State:** completed")
+}
+
+/// Transition verification uses the identity that produced the output in both
+/// serial and parallel execution. §FS-rhei-agents.1.4
+#[test]
+fn run_target_cli_override_artifact_output_uses_the_effective_target() {
+    for parallel in ["1", "2"] {
+        let (dir, result) = run_target_artifact_case(
+            &format!("run-target-output-parallel-{parallel}"),
+            None,
+            true,
+            &["--agent", "override-agent", "--model", "override-model", "--parallel", parallel],
+        );
+        assert_success(&result);
+        assert!(task_completed(&dir), "task did not reach its terminal state");
+        assert!(
+            dir.join("runtime/outputs/override-agent-yolo-state-provider-override-model.txt")
+                .is_file(),
+            "effective target output is absent"
+        );
+        assert!(
+            !dir.join("runtime/outputs/state-agent-yolo-state-provider-state-model.txt").exists(),
+            "authored target output must not be required or synthesized"
+        );
+    }
+}
+
+/// Ready input resolution and transition output resolution share the composed
+/// run identity. §FS-rhei-agents.1.4 §FS-rhei-agents.1.5
+#[test]
+fn run_target_cli_override_artifact_input_uses_the_effective_target() {
+    let effective = "override-agent-yolo-state-provider-override-model";
+    let (dir, result) = run_target_artifact_case(
+        "run-target-effective-input",
+        Some(effective),
+        true,
+        &["--agent", "override-agent", "--model", "override-model"],
+    );
+    assert_success(&result);
+    assert!(task_completed(&dir), "task with its effective input did not complete");
+    assert_eq!(spawn_records(&dir).len(), 1, "effective input should admit one worker");
+}
+
+/// A file rendered for the authored identity cannot satisfy an overridden
+/// run's required input. §FS-rhei-agents.1.4
+#[test]
+fn run_target_cli_override_missing_effective_input_prevents_execution() {
+    let authored = "state-agent-yolo-state-provider-state-model";
+    let (dir, result) = run_target_artifact_case(
+        "run-target-missing-effective-input",
+        Some(authored),
+        true,
+        &["--agent", "override-agent", "--model", "override-model"],
+    );
+    assert!(!result.status.success(), "run ignored its missing effective input");
+    assert!(spawn_records(&dir).is_empty(), "worker ran without its effective input");
+    assert!(!task_completed(&dir), "task advanced without its effective input");
+}
+
+/// Missing output enforcement remains active after the target is recomposed.
+/// §FS-rhei-agents.1.4
+#[test]
+fn run_target_cli_override_missing_effective_output_prevents_transition() {
+    let (dir, result) = run_target_artifact_case(
+        "run-target-missing-effective-output",
+        None,
+        false,
+        &["--agent", "override-agent", "--model", "override-model"],
+    );
+    assert!(!result.status.success(), "run advanced without its effective output");
+    assert_eq!(spawn_records(&dir).len(), 1, "worker should run before output enforcement");
+    assert!(!task_completed(&dir), "task advanced without its effective output");
+}
+
+/// Without CLI overrides, the authored target continues to own target-scoped
+/// artifacts. §FS-rhei-agents.1.5
+#[test]
+fn run_target_cli_override_artifact_control_uses_the_authored_target() {
+    let (dir, result) =
+        run_target_artifact_case("run-target-authored-artifact-control", None, true, &[]);
+    assert_success(&result);
+    assert!(task_completed(&dir), "no-override control did not complete");
+    assert!(
+        dir.join("runtime/outputs/state-agent-yolo-state-provider-state-model.txt").is_file(),
+        "authored target output is absent"
+    );
+}
+
 #[test]
 fn run_target_cli_override_no_flags_preserves_the_state_target() {
     let (dir, result) = run_identity_case(

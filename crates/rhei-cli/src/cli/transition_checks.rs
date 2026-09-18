@@ -279,6 +279,7 @@ fn transition_command(
             ..TransitionOrigin::default()
         },
         None,
+        None,
     )?;
 
     println!("Task {} transitioned: '{}' → '{}'", task_id_str, from, effective_to);
@@ -347,6 +348,34 @@ fn execute_transition(
             ..TransitionOrigin::default()
         },
         None,
+        None,
+    )
+}
+
+/// Apply an autonomous run transition with the identity dimensions selected
+/// for this run. Artifact and callback contexts must match the worker that
+/// produced the source state's outputs. §FS-rhei-agents.1.4
+#[allow(clippy::too_many_arguments)]
+fn execute_run_transition(
+    files: TransitionFiles<'_>,
+    callback_paths: &CallbackPaths,
+    machine: &rhei_validator::StateMachine,
+    task_id_str: &str,
+    from: &str,
+    to: &str,
+    opts: &RunOptions,
+) -> MietteResult<String> {
+    execute_transition_with_origin(
+        files,
+        callback_paths,
+        machine,
+        task_id_str,
+        from,
+        to,
+        opts.no_callbacks(),
+        TransitionOrigin::default(),
+        None,
+        Some(opts),
     )
 }
 
@@ -376,5 +405,6 @@ fn execute_claim_transition(
         no_callbacks,
         TransitionOrigin { claim: true, ..TransitionOrigin::default() },
         Some(claim),
+        None,
     )
 }

@@ -97,13 +97,14 @@ fn task_has_pending_agent_invocations(
     metadata: Option<&Metadata>,
     state_def: &rhei_validator::StateDef,
     settings: &RheiSettings,
+    opts: &RunOptions,
     selected_to: Option<&str>,
 ) -> MietteResult<bool> {
     let invocations = resolve_agent_invocations_for_task(
         machine,
         state_name,
         settings,
-        &default_run_options(),
+        opts,
         Some(task),
     )?;
     let completion = InvocationCompletion {

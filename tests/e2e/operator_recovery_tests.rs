@@ -6,6 +6,7 @@ use super::*;
 const RECOVERY_ID: &str = "018f0000-0000-7000-8000-000000000001";
 const EMPTY_SHA256: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
+#[cfg_attr(windows, allow(dead_code))]
 struct RecoveryFixture {
     force: ForceFixture,
     before_plan: String,
@@ -57,6 +58,7 @@ fn recovery_fixture(prefix: &str) -> RecoveryFixture {
     RecoveryFixture { force, before_plan, after_plan, pair }
 }
 
+#[cfg_attr(windows, allow(dead_code))]
 fn recovery_confirmation(decision: &str) -> String {
     format!("recover {RECOVERY_ID} plan.1 human-gate -> implement {decision}")
 }
@@ -98,7 +100,12 @@ fn operator_recovery_marker_blocks_readers_and_mutators() {
     for (command, args) in cases {
         let fixture = recovery_fixture(&format!("recover-interlock-{command}"));
         let before = artifact_snapshot(&fixture.force.dir, &fixture.force.plan);
-        let recovery = format!("rhei recover {}", fixture.force.dir.display());
+        let canonical_root = rhei_core::platform::canonical_path(&fixture.force.dir)
+            .expect("canonical recovery root");
+        let recovery = format!(
+            "rhei recover {}",
+            rhei_core::platform::shell_quote(&canonical_root.display().to_string())
+        );
         let run = run_cli(command, &fixture.force.plan, &fixture.force.machine, &args);
         if run.status.success()
             || !run.stderr.contains("plan.1 human-gate -> implement")

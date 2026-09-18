@@ -36,8 +36,10 @@ Panta members or weaken the per-rhei state-machine boundary in
 ## 2. Typed core
 
 `rhei_core::blocks` owns typed `Block`, `Mount`, `ControlPort`, `DataPort`,
-`Binding`, `Seam`, `Pass`, `CompatibilityMap`, alias-chain, and owned-reference
-values. It exposes total operations for recursive expansion, sequencing,
+`Exposure`, `Binding`, `Seam`, `Pass`, `CompatibilityMap`, alias-chain,
+public-table, and owned-reference values. Public tables remain separated by
+state, task, agent, model, MCP-server, and skill kind. The module exposes total
+operations for recursive expansion, exposure resolution, sequencing,
 qualification, routing derivation, compatibility lowering, and compilation.
 The textual YAML surface deserializes into those values; an optional future
 builder API would construct the same values rather than sit above the YAML.
@@ -57,9 +59,10 @@ Compilation is ordered:
    files in isolation. Only the selected groups pass through MiniJinja.
 3. Parse plan and state fragments into shared typed representations.
 4. Recursively expand `use`, retaining resolved source and alias-chain data.
-5. Validate aliases, cycles, ports, binds, seams, passes, ownership, and
-   compatibility maps before lowering.
-6. Qualify every owned definition and typed reference with the injective alias
+5. Validate aliases, cycles, ports, binds, seams, passes, ownership, typed
+   exposure tables, and compatibility maps before lowering.
+6. Resolve exposed local or immediate-child identities into typed public
+   tables, then qualify every owned definition and typed reference with the injective alias
    encoding in [§FS-rhei-library.4](../functional-spec/rhei-library.spec.md#4-qualification-and-generated-workspace).
 7. Derive the outer control profile, retain internal lanes/fan-out, lower data
    passes and compatibility identities, and merge settings.
@@ -76,8 +79,11 @@ after stage 9 succeeds.
 Every parsed definition carries an owner: the root identity or one alias chain.
 References resolve against typed owner tables before qualification. Local
 definitions receive the same owner's prefix; declared cross-block endpoints
-resolve through the seam/binding tables; external settings references remain
-external. An unresolved or multiply owned reference is rejected.
+resolve through the seam/binding tables; declared public identity references
+resolve through the immediate child's same-kind public table; external settings
+references remain external. An unresolved or multiply owned reference is
+rejected. Each wrapper constructs a new public table only from its own
+declarations, so child tables are not transitively visible.
 
 The alias encoder and mounted-path rebasing are injective, so two valid owned
 definitions never collide. Merge is therefore total after validation: maps can
@@ -87,7 +93,9 @@ reported as such rather than resolved by overwriting.
 
 Project settings still use their existing project-values-win policy after
 block-owned ids and references are qualified. Compatibility lowering is an
-explicit checked rename at each wrapper boundary. The only many-to-one
+explicit checked rename at each wrapper boundary after exposure resolution.
+Exposure changes the public suffix used by qualification but never coalesces
+definitions. The only many-to-one
 exception is checked terminal equivalence (§FS-rhei-library.7.1): compare
 effective operative contracts before removing any duplicate definition, then
 rewrite every typed reference with the same visitor. All other merges remain

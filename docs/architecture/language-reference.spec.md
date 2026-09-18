@@ -25,6 +25,9 @@ The language-reference page is a map, not a duplicate specification:
 - It owns the recommended reading path for language questions.
 - It points each surface to its normative owner.
 - It must be updated when a feature adds or changes user-authored syntax.
+- For template composition syntax, it distinguishes input-selected declaration
+  groups and opt-in identity exposure and routes both to their specific block
+  contract sections.
 
 Detailed rules remain in the owning specs so grammar, state-machine, template,
 and command behavior can evolve independently without creating conflicting

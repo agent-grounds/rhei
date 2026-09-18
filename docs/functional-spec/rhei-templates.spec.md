@@ -232,6 +232,7 @@ inputs:
 # Optional composition fields are specified by §FS-rhei-library.1–2.
 ports: <control-port mapping>
 data: <declared runtime endpoint mappings>
+expose: <typed public state, task, and settings identities>
 use: <ordered mount sequence>
 bind: <static input bindings>
 seams: <complete control/data seam sequence>
@@ -392,7 +393,7 @@ per-round identity. Unrolling is for when they do.
 The renderer is **strict**:
 
 - Referencing an undefined variable or missing object property is an error.
-- `template.yaml` is parsed before rendering; only its opt-in `select` scalar is rendered under §FS-rhei-library.1.1.
+- `template.yaml` is parsed before rendering; only its opt-in `select` scalar is rendered under §FS-rhei-library.1.1. The scalar may select the entire `expose` group, never an individual public member.
 - The environment does not load external templates; includes/imports are unavailable.
 
 ### 5.1. Resolution Rules
@@ -592,7 +593,7 @@ With no `--mount`, every rule above is unchanged.
    suggestion in the lookup error.
 3. **Load manifest.** Parse `template.yaml`, validate schema.
 4. **Collect inputs.** Resolve inputs using this precedence order: manifest defaults < `--values` files from left to right < positional input values < `KEY=VALUE` input arguments and `--set` flags from left to right < `--set-file` flags from left to right. Error on missing required inputs, unknown input names, ambiguous positional values, or duplicate `positional` declarations. Validate types and `validate` patterns. For `array` / `object` inputs, positional values, `KEY=VALUE`, `--set`, and `--set-file` values are parsed as YAML/JSON snippets before validation.
-5. **Select declarations and render templates.** If `select` is present, render and type-check only its `ports`, `data`, and `compatibility` groups (§FS-rhei-library.1.1). Walk all materialized text files in the template directory and render them through the restricted MiniJinja environment. `template.yaml` is parsed before this step and is never rendered into the output. Error on any unresolved instantiation template reference.
+5. **Select declarations and render templates.** If `select` is present, render and type-check only its `ports`, `data`, `expose`, and `compatibility` groups (§FS-rhei-library.1.1). Walk all materialized text files in the template directory and render them through the restricted MiniJinja environment. `template.yaml` is parsed before this step and is never rendered into the output. Error on any unresolved instantiation template reference.
 6. **Write staged output.** In normal mode outside a Panta project, copy the resolved tree to `--output` as before. For a prospective project member, render into a uniquely named hidden sibling of `--output` under the same parent. Project discovery ignores this incomplete directory, and same-parent placement permits atomic publication. `--output` must not already exist; instantiation fails rather than merging into or overwriting it. In `--dry-run` mode, the CLI skips the output-path existence check, materializes into a temporary scratch directory instead of `--output`, validates that scratch output, and reports what would have been written. Preserve directory structure and file permissions. Hidden files and directories (names starting with `.`) and `template.yaml` itself are excluded from the output. A root-level `settings.json` in the template is moved to `.agent-grounds/rhei/settings.json` under the output root; all other files preserve their template-relative paths.
 7. **Validate and publish.** Validate a prospective member through its project under the intended final member id, using the staged files as that member's source. Reconcile template settings with project settings for this validation without exposing a half-applied member or settings merge. Resolve the member's own state machine, callbacks, and every `agent`, `model`, `mcp_servers`, and `skills` reference in that final project context. After validation succeeds, commit the reconciled project settings and atomically rename the hidden sibling to `--output`; that rename is the single publication point. A successful command publishes exactly one visible member. Validation or publication failure removes staged output and restores prior project settings unless `--keep-on-error` is passed. With `--keep-on-error`, retain the rendered output at the requested visible path together with the reconciled settings so it can be inspected; because the project loader is strict, invalid retained output makes project-scoped commands fail until it is repaired or removed. Standalone validation continues to use the output's `states.yaml` when present and the built-in default otherwise.
 8. **Print summary.** After successful validation, print a human-readable instantiation summary with the output path, task/state counts, instantiated output tree, rendered task tree, the last few rendered task definitions in source order, and a stop-point explanation. For normal instantiation without `--execute`, the stop point is the next ready task and the reason is that execution has not started.
@@ -615,7 +616,7 @@ expand and compile the block graph as
 requires. The result then rejoins this procedure at ordinary output placement,
 validation, summary, reproducible invocation, and optional execution. Direct
 composition's default output name is the ordered aliases joined by `-`; a
-curated block retains its template name.
+curated block retains its template name. Curated and direct mounts automatically consume the same author-declared `expose` surface without new CLI selection grammar (§FS-rhei-library.1.2, §FS-rhei-library.3).
 
 #### 6.1.3. Instantiation Summary Output
 
@@ -1078,11 +1079,12 @@ No changes to the Rhei plan grammar are required.
 | `inputs` | sequence of mappings | No | Defaults to an empty list when omitted. |
 | `ports` | mapping | No | Public control entry and exits; required when mounted. §FS-rhei-library.1 |
 | `data` | mapping | No | Public typed runtime input/output endpoints. §FS-rhei-library.1 |
+| `expose` | mapping | No | Public typed state, task, and owned-settings identities. §FS-rhei-library.1.2 |
 | `use` | sequence of mappings | No | Ordered recursive child mounts. §FS-rhei-library.2 |
 | `bind` | sequence of mappings | No | Compile-time root-input to child-input bindings. §FS-rhei-library.2 |
 | `seams` | sequence of mappings | No | Complete explicit completion chain and optional runtime passes. §FS-rhei-library.2 |
 | `compatibility` | mapping | No | Checked stable identities and equivalent terminals for a curated wrapper. §FS-rhei-library.7 |
-| `select` | string | No | Restricted MiniJinja producing only ports, data, and compatibility after static input resolution. §FS-rhei-library.1.1 |
+| `select` | string | No | Restricted MiniJinja producing only ports, data, expose, and compatibility after static input resolution. §FS-rhei-library.1.1 |
 
 Each `inputs[]` entry is a YAML mapping with these fields:
 

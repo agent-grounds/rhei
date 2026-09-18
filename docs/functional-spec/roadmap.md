@@ -303,8 +303,9 @@ issue; the ids here are the intake ids.
   rhei.84.
 - Per-node provenance and richer lock metadata; generated output carries root
   and block headers only. Tracked as rhei.85.
-- Additional exposure modes past the declared ports and inputs of a mount,
-  keeping encapsulation the default. Tracked as rhei.86.
+- Typed exposure of selected state, task, agent, model, MCP-server, and skill
+  identities while keeping encapsulation the default. Delivered by #285 under
+  §FS-rhei-library.1.2.
 - Conditional or gated seams; a seam consumes exactly one terminal exit
   today, and internal transitions stay untouched. Tracked as rhei.87.
 - Expressions and conversions on a pass; a pass wires two declared endpoints

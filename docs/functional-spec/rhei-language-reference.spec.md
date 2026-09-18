@@ -42,7 +42,9 @@ The remaining three surfaces:
   recursive mounts, ports, seams, qualification, and lowering are owned by
   [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks).
   Input-selected declaration groups are owned by §FS-rhei-library.1.1, and
-  checked terminal equivalence by §FS-rhei-library.7.1.
+  opt-in public state, task, and settings identities by
+  §FS-rhei-library.1.2. Checked terminal equivalence is owned by
+  §FS-rhei-library.7.1.
 - Execution references: agent, model, MCP server, skill, snapshot, and program
   references. Owned by [§FS-rhei-agents](rhei-agents.spec.md#fs-rhei-agents-rhei-agents-specification), [§FS-rhei-programs](rhei-programs.spec.md#fs-rhei-programs-rhei-program-states-specification), and
   [§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification).

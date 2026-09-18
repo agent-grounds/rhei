@@ -65,8 +65,8 @@ fn migrate(home: &Path, target: Option<&Path>, dry_run: bool) -> CliRun {
     CliRun::from(&command.output().expect("migration command"))
 }
 
-/// Omitted-target discovery reaches the same complete operation, and generated
-/// shell completions expose both nested command words. §FS-rhei-migrate.1 §FS-rhei-migrate.6
+/// Omitted-target discovery reaches the same complete operation, and shell
+/// completion callbacks offer both command levels. §FS-rhei-migrate.1 §FS-rhei-migrate.6
 #[test]
 fn omitted_target_and_shell_completion_discover_export_prior_migration() {
     let (dir, plan) = setup("export-prior-discovery", "completed");
@@ -78,12 +78,26 @@ fn omitted_target_and_shell_completion_discover_export_prior_migration() {
     assert!(preview.stdout.contains("Would add Task 1 to Task plan.2"));
     assert_eq!(fs::read(&plan).unwrap(), before);
 
-    let mut completions = rhei_command(dir.join(".home"));
-    completions.arg("completions").arg("bash");
-    let completions = CliRun::from(&completions.output().expect("bash completions"));
-    assert_success(&completions);
-    assert!(completions.stdout.contains("migrate"), "{}", completions.stdout);
-    assert!(completions.stdout.contains("export-priors"), "{}", completions.stdout);
+    for (words, candidate) in
+        [(&["rhei", "mig"][..], "migrate"), (&["rhei", "migrate", "ex"][..], "export-priors")]
+    {
+        let output = rhei_command(dir.join(".home"))
+            .arg("--")
+            .args(words)
+            .current_dir(&dir)
+            .env("COMPLETE", "fish")
+            .env_remove("XDG_CONFIG_HOME")
+            .env_remove("XDG_DATA_HOME")
+            .output()
+            .expect("dynamic fish completion callback");
+        let completions = CliRun::from(&output);
+        assert_success(&completions);
+        assert!(
+            completions.stdout.lines().any(|line| line.split('\t').next() == Some(candidate)),
+            "missing {candidate} completion for {words:?}: {}",
+            completions.stdout
+        );
+    }
 }
 
 /// The authored edge does not bypass ordinary readiness: nonterminal and

@@ -145,11 +145,7 @@ fn read_stored_record<'a>(
     record: &'a AccountingInvocationRecord,
     books: &ReachablePriceBooks,
 ) -> RecordReading<'a> {
-    let convention = record_token_convention(record);
-    let tokens = match convention {
-        TokenConvention::ExcludesCache => restate_tokens(&record.tokens),
-        TokenConvention::IncludesCache | TokenConvention::Unknown => record.tokens.clone(),
-    };
+    let (convention, tokens) = read_stored_tokens(record);
     let pricing = reread_pricing(record, convention, &tokens, books);
     RecordReading {
         record,
@@ -157,6 +153,43 @@ fn read_stored_record<'a>(
         pricing,
         convention_unknown: convention == TokenConvention::Unknown,
     }
+}
+
+/// Read one stored record through a caller-selected replacement book. Token
+/// repair is shared with ordinary historical reading, but stored money is not:
+/// the explicit book alone prices the in-memory result.
+/// §FS-rhei-cost-accounting.5.1 §FS-rhei-cost-accounting.5.2
+fn read_stored_record_with_price_book<'a>(
+    record: &'a AccountingInvocationRecord,
+    price_book: &PriceBook,
+) -> RecordReading<'a> {
+    let (convention, tokens) = read_stored_tokens(record);
+    let pricing = price_tokens(
+        price_book,
+        record.provider.as_deref(),
+        record.model.as_deref(),
+        &tokens,
+    );
+    RecordReading {
+        record,
+        tokens,
+        pricing,
+        convention_unknown: convention == TokenConvention::Unknown,
+    }
+}
+
+/// Restate a durable record into today's token convention without consulting
+/// any price book. Both ordinary rereading and explicit repricing start here.
+/// §FS-rhei-cost-accounting.5.2
+fn read_stored_tokens(
+    record: &AccountingInvocationRecord,
+) -> (TokenConvention, AccountingTokens) {
+    let convention = record_token_convention(record);
+    let tokens = match convention {
+        TokenConvention::ExcludesCache => restate_tokens(&record.tokens),
+        TokenConvention::IncludesCache | TokenConvention::Unknown => record.tokens.clone(),
+    };
+    (convention, tokens)
 }
 
 /// `input.total` becomes every input token the provider counted, and the whole

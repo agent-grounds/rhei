@@ -461,16 +461,8 @@ enum Commands {
     /// Print a compact Markdown run summary for a pull request body
     // §FS-rhei-summary.1: the positional resolves exactly as `rhei cost`'s does.
     Summary {
-        /// Path to the markdown plan file (.rhei.md) or workspace directory
-        #[arg(value_name = "RHEI_PLAN_OR_WORKSPACE", add = ArgValueCompleter::new(complete_rhei_plan_path))]
-        input: Option<PathBuf>,
-        /// Narrow to the named rhei (repeatable; one id per flag). A rhei id
-        /// is its file stem or directory name; default is the whole project
-        #[arg(long = "rhei", value_name = "RHEI_ID", add = ArgValueCompleter::new(complete_rhei_id))]
-        rhei: Vec<String>,
-        /// Wrap the summary in a collapsed <details> block
-        #[arg(long)]
-        details: bool,
+        #[command(flatten)]
+        options: SummaryOptions,
     },
     /// Render readable Markdown reports from agent session logs
     // §FS-rhei-session-reports.4: on-demand rendering, historical runs included.

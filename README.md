@@ -342,6 +342,17 @@ Render a terminal progress report without ANSI color:
 cargo run -p rhei-cli -- render examples/release-automation.rhei.md --format progress --no-color
 ```
 
+Reprice one completed run from its recorded measurements with a later book:
+
+```bash
+rhei cost WORKSPACE --by run
+rhei summary WORKSPACE --run RUN_ID --prices later-prices.json
+```
+
+This summary is read-only: ordinary accounting keeps its stored prices. The
+positional workspace and any repeatable `--rhei` flags bound which run records
+and immutable completion report may be selected.
+
 Render a self-contained HTML Flow visualization and open it in the browser:
 
 ```bash

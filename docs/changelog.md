@@ -110,6 +110,11 @@
   root, and records the selected profile with each new invocation. Explicit
   `--prices` books still take precedence, while unpriced profiles retain the
   existing built-in fallback. (PR #291)
+- **Completed runs can be summarized against a later price book without
+  changing their recorded accounting.** Paired `rhei summary --run <ID>
+  --prices <BOOK>` inputs select one exact finished run, keep ordinary summary
+  and cost defaults unchanged, and show priced, partial-price lower-bound, or
+  unpriced results with the selected book's provenance. (PR #292)
 
 - **Transition callbacks now receive a stable identity for each firing and an
   explicit pending ledger status.** Canonical JSON exposes `firingId` and

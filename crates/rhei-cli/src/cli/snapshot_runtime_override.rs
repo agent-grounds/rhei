@@ -2,7 +2,10 @@
 // automatic Prior selection share contract rules, but not their entry point.
 // §AR-source-file-size.3 §FS-rhei-snapshot-operations.2
 
-fn snapshot_override_applies_to_invocation(
+/// Consume only the selected invocation's override, once it reaches preload.
+/// A preload error aborts the run; a cold fallback still uses this attempt.
+/// §FS-rhei-snapshot-operations.2
+fn take_snapshot_override_for_invocation(
     override_selection: Option<&SnapshotOverrideRunSelection>,
     task: &rhei_core::ast::Task,
     target_slug: &str,
@@ -12,7 +15,9 @@ fn snapshot_override_applies_to_invocation(
         return false;
     }
     override_selection.is_none_or(|selection| {
-        selection.task_id == task.id.to_string() && selection.target_slug == target_slug
+        selection.task_id == task.id.to_string()
+            && selection.target_slug == target_slug
+            && !selection.consumed.replace(true)
     })
 }
 

@@ -145,7 +145,7 @@ fn preload_snapshot_inherit_before_spawn_with_prior_sources(
     let Some(target_slug) = target_slug else {
         return Ok(preload);
     };
-    let override_applies = snapshot_override_applies_to_invocation(
+    let override_applies = take_snapshot_override_for_invocation(
         override_selection,
         task,
         &target_slug,

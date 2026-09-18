@@ -4,11 +4,35 @@
 use std::fs;
 
 use super::new_tests::{new_run, project_with_rhei};
+use super::snapshot_tests::{write_fake_snapshot_agent, write_fake_snapshot_settings};
 use super::*;
 
 #[test]
 fn snapshot_prior_new_authors_task_inheritance_and_render_normalizes_it() {
     let dir = project_with_rhei("new-ticket-inherits");
+    let agent = write_fake_snapshot_agent(&dir);
+    write_fake_snapshot_settings(&dir, &agent);
+    write_fixture_file(&dir, "index.panta.md", "# Panta: Test\n**States:** authoring\n");
+    write_fixture_file(
+        &dir,
+        "states.yaml",
+        r#"name: authoring
+version: 1
+states:
+  pending:
+    initial: true
+    description: Can produce the inherited session
+    target: fake:acme:model-a
+    snapshot:
+      emit: { name: reviewed, on: always }
+  completed:
+    description: Done
+    final: true
+transitions:
+  - from: pending
+    to: completed
+"#,
+    );
     assert_success(&new_run(&["new", "Source", "--under", "auth"], &dir));
     let created = new_run(
         &[

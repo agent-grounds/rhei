@@ -156,7 +156,8 @@ enum ParallelProgramSpawnOutcome {
 }
 
 fn select_snapshot_override_run_invocation(
-    _machines: &ExecutionMachines,
+    input: &Path,
+    machines: &ExecutionMachines,
     opts: &RunOptions,
     invocations: &[(String, String, String, ResolvedAgent)],
 ) -> MietteResult<Option<SnapshotOverrideRunSelection>> {
@@ -164,12 +165,27 @@ fn select_snapshot_override_run_invocation(
         return Ok(None);
     }
 
+    let loaded = load_plan(input)?;
+    let explicit_task = opts.snapshot_task_selector();
     let mut candidates = Vec::new();
-    for (task_id, _raw_state, _current_state, resolved) in invocations {
-        // Task metadata is re-read at the spawn boundary, so the run-level
-        // override selector cannot discard an invocation based on state-only
-        // configuration here. The preload validates the effective contract.
-        // §FS-rhei-snapshot-operations.2 §FS-rhei-snapshots.4.4
+    for (task_id, _raw_state, current_state, resolved) in invocations {
+        let Some(task) = find_task_by_id_str(&loaded.rhei.tasks, task_id) else {
+            continue;
+        };
+        let machine = machines.for_task_str(task_id);
+        let has_effective_contract =
+            effective_snapshot_inherit(machine, task, current_state).is_some();
+        let explicitly_selected_opt_out = explicit_task == Some(task_id.as_str())
+            && matches!(
+                task.inherits.as_ref(),
+                Some(rhei_core::ast::TaskSnapshotInherit::Disabled)
+            );
+        if !has_effective_contract && !explicitly_selected_opt_out {
+            continue;
+        }
+        // Candidate selection uses freshly read task metadata and the active
+        // state rule; an explicit `none` survives only to report its opt-out.
+        // §FS-rhei-snapshot-operations.2 §FS-rhei-plan-language.3.13
         let target_slug = snapshot_target_slug_or_err(resolved)?;
         candidates.push(SnapshotOverrideRunSelection {
             task_id: task_id.clone(),

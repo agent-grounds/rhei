@@ -791,7 +791,7 @@ fn run_agent_mode(
         }
         let batch_size = batch.len();
         let snapshot_override_selection =
-            select_snapshot_override_run_invocation(machines, opts, &agent_tasks)?;
+            select_snapshot_override_run_invocation(input, machines, opts, &agent_tasks)?;
 
         if opts.dry_run() {
             if run_programs_in_worker_pool {

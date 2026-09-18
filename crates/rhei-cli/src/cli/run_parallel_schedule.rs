@@ -336,7 +336,7 @@ fn refill_parallel_worker_pool(
         })
         .collect::<Vec<_>>();
     let snapshot_override_selection =
-        select_snapshot_override_run_invocation(machines, opts, &refill_candidates)?;
+        select_snapshot_override_run_invocation(input, machines, opts, &refill_candidates)?;
     let agent_outcome = schedule_agent_work_items(
         agent_items,
         task_capacity,

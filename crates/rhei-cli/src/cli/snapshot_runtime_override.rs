@@ -1,6 +1,5 @@
-// Manual snapshot-source contract validation, kept apart from the spawn-time
-// preload pipeline because operators and automatic Prior resolution share the
-// same lineage and selector rules but not the same source-selection entry.
+// Manual source validation is separate from spawn-time preload: operator and
+// automatic Prior selection share contract rules, but not their entry point.
 // §AR-source-file-size.3 §FS-rhei-snapshot-operations.2
 
 fn snapshot_override_applies_to_invocation(

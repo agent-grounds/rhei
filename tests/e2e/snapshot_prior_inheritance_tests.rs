@@ -56,6 +56,17 @@ pub(super) fn required_prior_rule() -> &'static str {
 "#
 }
 
+pub(super) fn required_prior_rule_for_any_state() -> &'static str {
+    r#"    snapshot:
+      inherit:
+        name: implementation
+        from: prior
+        required: true
+        select:
+          target: same
+"#
+}
+
 pub(super) fn read_agent_log(dir: &Path) -> String {
     fs::read_to_string(dir.join("runtime/fake-agent.log")).expect("fake agent log")
 }
@@ -413,7 +424,7 @@ transitions:
   - from: consume
     to: completed
 "#,
-        required_prior_rule()
+        required_prior_rule_for_any_state()
     );
     let (_dir, plan, machine) = setup_flow("snapshot-prior-ambiguity", plan, &machine);
 

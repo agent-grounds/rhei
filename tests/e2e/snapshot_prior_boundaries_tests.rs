@@ -293,7 +293,13 @@ transitions:
     let (dir, plan, machine) = setup_flow("snapshot-prior-cancelled", plan, machine);
 
     let run = run_cli("run", &plan, &machine, &["--no-tui"]);
-    assert_success(&run);
+    assert!(!run.status.success(), "a cancelled Prior must leave the run blocked");
+    let output = format!("{}{}", run.stdout, run.stderr);
+    assert!(
+        output.contains("waiting on Task plan.source (cancelled)")
+            && output.contains("rhei run halted with non-terminal tasks remaining"),
+        "blocked run should explain the cancelled Prior:\n{output}"
+    );
     assert!(
         !dir.join("runtime/fake-agent.log").exists(),
         "optional inheritance must not make a cancelled Prior runnable"

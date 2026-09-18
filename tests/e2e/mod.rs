@@ -98,6 +98,7 @@ mod snapshot_codex_session_tests;
 mod snapshot_continue_root_tests;
 mod snapshot_prior_authoring_tests;
 mod snapshot_prior_boundaries_tests;
+mod snapshot_prior_fix_tests;
 mod snapshot_prior_inheritance_tests;
 mod snapshot_prior_selection_tests;
 mod snapshot_tests;

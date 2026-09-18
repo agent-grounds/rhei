@@ -464,6 +464,11 @@ fn validate_snapshot_plan_context(
                 task.id, state_name
             ));
         }
+        if let Some(inherit) = effective.as_ref() {
+            if let Some(error) = effective_snapshot_emitter_error(task, inherit, machines) {
+                errors.push(error);
+            }
+        }
         for child in &task.children {
             visit(child, machines, errors);
         }

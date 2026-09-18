@@ -265,7 +265,7 @@ fn omitted_validate_watch_renders_copyable_migration_help() {
 
     let deadline = Instant::now() + Duration::from_secs(10);
     let rendered = loop {
-        let rendered = fs::read_to_string(&stderr_path).unwrap_or_default();
+        let rendered = raw_stderr_from_file(&stderr_path);
         if rendered.contains("rhei migrate export-priors") {
             break rendered;
         }

@@ -12,7 +12,10 @@
 
 use std::process::{ExitStatus, Output};
 
-use super::{assert_stderr_contains, raw_stderr, repo_root, rhei_command, stderr, unique_temp_dir};
+use super::{
+    assert_stderr_contains, raw_stderr, raw_stderr_from_file, repo_root, rhei_command, stderr,
+    stderr_from_file, unique_temp_dir,
+};
 use super::{setup_single_file, CliRun, TestDir, LINEAR_PLAN};
 
 /// Captured output carrying `text` on stderr, so a rule about the reading can
@@ -63,6 +66,34 @@ fn a_wrapped_diagnostic_reads_as_the_sentence_the_binary_printed() {
         stderr(&out).contains(SENTENCE),
         "the guidance is one sentence and must read as one: {}",
         stderr(&out)
+    );
+}
+
+/// Redirected diagnostics retain their rendered form when physical layout is
+/// the assertion subject, while ordinary file assertions undo the same wrap.
+#[test]
+fn redirected_stderr_offers_raw_and_normalized_readings_of_the_same_file() {
+    let dir = unique_temp_dir("diagnostic-wrap-file");
+    let path = dir.join("watch.err");
+    let first_line = "x".repeat(70);
+    let rendered = format!("  \u{d7} {first_line}\n  \u{2502} migration help\n");
+    std::fs::write(&path, &rendered).expect("write rendered diagnostic");
+
+    let raw = raw_stderr_from_file(&path);
+    let normalized = stderr_from_file(&path);
+
+    assert_eq!(raw, rendered, "the raw file helper changed rendered stderr");
+    assert!(
+        raw.contains("\n  \u{2502} migration help"),
+        "the raw reading lost the physical continuation line:\n{raw}"
+    );
+    assert!(
+        normalized.contains(&format!("{first_line} migration help")),
+        "the normalized reading did not rejoin the soft wrap:\n{normalized}"
+    );
+    assert!(
+        !normalized.contains("\n  \u{2502} migration help"),
+        "the normalized reading retained the soft wrap:\n{normalized}"
     );
 }
 

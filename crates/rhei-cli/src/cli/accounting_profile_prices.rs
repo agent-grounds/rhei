@@ -73,25 +73,27 @@ fn profile_price_book(
     let builtin = builtin_price_book();
     let mut pairs: BTreeMap<(String, String), EffectivePricePair> = BTreeMap::new();
     for resolved in invocations {
-        let (Some(provider), Some(model)) = (
-            resolved.model_provider.as_deref(),
-            resolved.model_name.as_deref().or(resolved.model.as_deref()),
-        ) else {
-            continue;
-        };
-        let key = (provider.to_string(), model.to_string());
+        let provider = resolved.model_provider.as_deref();
+        let model = resolved.model_name.as_deref().or(resolved.model.as_deref());
         let profile_id = resolved.model_profile_id();
         let profile = profile_id.and_then(|id| settings.models.get(id));
+        let profile_prices = profile.and_then(|item| item.prices.as_ref());
+        if let (Some(id), Some(_)) = (profile_id, profile_prices) {
+            let declared_provider = profile.and_then(|item| item.provider.as_deref()).unwrap_or("");
+            let declared_model = profile.and_then(|item| item.model.as_deref()).unwrap_or("");
+            if provider != Some(declared_provider) || model != Some(declared_model) {
+                return Err(miette!(
+                    help = "use a profile whose declared provider/model pair matches the final execution identity, or remove its authored prices",
+                    "priced model profile '{id}' declares {declared_provider}/{declared_model}, but the final invocation resolves to {}/{}",
+                    provider.unwrap_or("<none>"),
+                    model.unwrap_or("<none>")
+                ));
+            }
+        }
+        let (Some(provider), Some(model)) = (provider, model) else { continue };
+        let key = (provider.to_string(), model.to_string());
         let (source, label) = match (profile_id, profile.and_then(|item| item.prices.as_ref())) {
             (Some(id), Some(prices)) => {
-                let declared_provider = profile.and_then(|item| item.provider.as_deref()).unwrap_or("");
-                let declared_model = profile.and_then(|item| item.model.as_deref()).unwrap_or("");
-                if provider != declared_provider || model != declared_model {
-                    return Err(miette!(
-                        help = "use a profile whose declared provider/model pair matches the final literal target, or remove its authored prices",
-                        "priced model profile '{id}' declares {declared_provider}/{declared_model}, but the final invocation resolves to {provider}/{model}"
-                    ));
-                }
                 (
                     EffectivePriceSource::Profile {
                         prices: prices.clone(),

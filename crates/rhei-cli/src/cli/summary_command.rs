@@ -317,16 +317,7 @@ fn summary_accounting_reading(
     alternate_book: Option<&PriceBook>,
 ) -> String {
     let Some(summary) = inspection.summary.as_ref().filter(|it| it.total.value.is_some()) else {
-        let Some(book) = alternate_book else {
-            return "Token accounting was not measured for this run.\n".to_string();
-        };
-        return format!(
-            "| Accounting | Value |\n| --- | ---: |\n\
-             | price book | {} |\n| currency | {} |\n| pricing | not-applicable |\n\n\
-             Token accounting was not measured for this run.\n",
-            md_cell(&book.price_book_id),
-            md_cell(&book.currency),
-        );
+        return "Token accounting was not measured for this run.\n".to_string();
     };
     let mut out = String::new();
     out.push_str("| Accounting | Value |\n| --- | ---: |\n");
@@ -369,7 +360,7 @@ fn alternate_pricing_label(status: rhei_tui::PricingStatus) -> &'static str {
         rhei_tui::PricingStatus::Priced => "priced",
         rhei_tui::PricingStatus::PartialPrice => "partial-price",
         rhei_tui::PricingStatus::Unpriced => "unpriced",
-        rhei_tui::PricingStatus::NotApplicable => "not-applicable",
+        rhei_tui::PricingStatus::NotApplicable => "unpriced",
     }
 }
 

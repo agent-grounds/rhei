@@ -222,6 +222,46 @@ pub fn write_record(
     .expect("write invocation record");
 }
 
+pub fn write_unmeasured_record(root: &Path, run_id: &str) {
+    let record = serde_json::json!({
+        "schema": "rhei.accounting.invocation.v1",
+        "invocation_id": "unmeasured-invocation",
+        "run_id": run_id,
+        "task_id": "plan.1",
+        "state": "completed",
+        "visit": 1,
+        "agent": "codex",
+        "provider": "openai",
+        "model": "gpt-5.6-luna",
+        "started_at": "2026-09-01T10:00:00Z",
+        "ended_at": "2026-09-01T10:05:00Z",
+        "extraction_status": "no-usage-emitted",
+        "scope": "aggregate-agent-process",
+        "token_convention": "input-total-includes-cache",
+        "tokens": {
+            "total": {"status": "unknown"},
+            "input": {
+                "total": {"status": "unknown"},
+                "cached_read": unavailable(),
+                "cache_write": unavailable()
+            },
+            "output": {
+                "total": {"status": "unknown"},
+                "cached_read": unavailable(),
+                "cache_write": unavailable()
+            }
+        },
+        "pricing": {"status": "not-applicable"}
+    });
+    let invocations = root.join("runtime/accounting/invocations");
+    fs::create_dir_all(&invocations).expect("create invocation directory");
+    fs::write(
+        invocations.join("unmeasured-invocation.json"),
+        serde_json::to_vec_pretty(&record).expect("serialize unmeasured record"),
+    )
+    .expect("write unmeasured record");
+}
+
 fn measured(value: u64) -> serde_json::Value {
     serde_json::json!({ "value": value, "source": "agent-usage-capture" })
 }

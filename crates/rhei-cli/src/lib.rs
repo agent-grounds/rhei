@@ -240,6 +240,7 @@ mod tests {
     include!("cli/tests_accounting_roots.rs");
     include!("cli/tests_accounting_attempt_identity.rs");
     include!("cli/tests_summary.rs");
+    include!("cli/tests_summary_repricing.rs");
     include!("cli/tests_settings_tooling.rs");
     include!("cli/tests_roster.rs");
     include!("cli/tests_snapshots_gc.rs");

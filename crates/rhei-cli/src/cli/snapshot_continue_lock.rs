@@ -690,7 +690,6 @@ fn resolved_agent_target_slug(resolved: &ResolvedAgent) -> Option<String> {
 
 struct HeldRunLock {
     file: fs::File,
-    #[cfg(target_os = "linux")]
     workspace: PathBuf,
 }
 
@@ -703,7 +702,6 @@ fn try_acquire_run_lock(workspace_root: &Path) -> MietteResult<Option<HeldRunLoc
     match file.try_lock_exclusive() {
         Ok(()) => Ok(Some(HeldRunLock {
             file,
-            #[cfg(target_os = "linux")]
             workspace: workspace_root.to_path_buf(),
         })),
         // A run already holds it — on Unix and on Windows alike. §FS-rhei-run.2.6

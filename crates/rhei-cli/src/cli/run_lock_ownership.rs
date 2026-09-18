@@ -1,6 +1,6 @@
-// Linux-only proof that a recorded process owns the run-lock inode after its
-// pathname has been renamed, unlinked, or replaced.
-// §FS-rhei-run-headless.3
+// Portable run identity on a held lock, plus Linux-only proof that the
+// recorded process owns a displaced run-lock inode.
+// §FS-rhei-run-headless.3 §FS-rhei-summary.5
 
 #[cfg(target_os = "linux")]
 enum ProcessProbe {
@@ -10,28 +10,34 @@ enum ProcessProbe {
     Unknown(String),
 }
 
-#[cfg(target_os = "linux")]
 #[derive(serde::Serialize, serde::Deserialize)]
 struct RunLockOwner {
     version: u8,
     id: String,
     pid: u32,
     workspace: PathBuf,
-    process_start_ticks: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    process_start_ticks: Option<u64>,
 }
 
 #[cfg(target_os = "linux")]
 const RUN_LOCK_OWNER_MAX_BYTES: u64 = 16 * 1024;
 
-/// Record enough identity on the held inode for a later `/proc` inspection to
-/// distinguish this process from a reuse of its numeric pid.
-// §FS-rhei-run-headless.3
-#[cfg(target_os = "linux")]
+/// Record exact run ownership on every platform. Linux adds enough stable
+/// identity for a later `/proc` inspection to distinguish pid reuse.
+/// §FS-rhei-run-headless.3 §FS-rhei-summary.5
 fn write_run_lock_owner(lock: &mut HeldRunLock, id: &str, pid: u32) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
     let stat_path = PathBuf::from(format!("/proc/{pid}/stat"));
+    #[cfg(target_os = "linux")]
     let stat = fs::read_to_string(&stat_path)
         .map_err(|err| format!("{} could not be read: {err}", stat_path.display()))?;
+    #[cfg(target_os = "linux")]
     let process_start_ticks = parse_linux_process_start_ticks(&stat)?;
+    #[cfg(not(target_os = "linux"))]
+    let process_start_ticks = None;
+    #[cfg(target_os = "linux")]
+    let process_start_ticks = Some(process_start_ticks);
     let owner = RunLockOwner {
         version: 1,
         id: id.to_string(),
@@ -203,7 +209,7 @@ fn probe_recorded_lock_owner_with(
             && owner.id == descriptor.id
             && owner.pid == descriptor.pid
             && owner.workspace == descriptor.workspace
-            && owner.process_start_ticks == process_start_ticks
+            && owner.process_start_ticks == Some(process_start_ticks)
         {
             return ProcessProbe::OwnsLock;
         }

@@ -66,23 +66,14 @@ mod run_descriptor_tests {
         }
     }
 
-    /// Hold the current run lock as the supplied descriptor's exact owner on
-    /// Linux, and with the platform's lock-only identity elsewhere.
+    /// Hold the current run lock as the supplied descriptor's exact owner.
     pub(super) fn held_run_lock_for(descriptor: &RunDescriptor) -> HeldRunLock {
-        let held = try_acquire_run_lock(&descriptor.workspace)
+        let mut held = try_acquire_run_lock(&descriptor.workspace)
             .expect("lock")
             .expect("available");
-        #[cfg(target_os = "linux")]
-        {
-            let mut held = held;
-            write_run_lock_owner(&mut held, &descriptor.id, descriptor.pid)
-                .expect("record lock owner");
-            held
-        }
-        #[cfg(not(target_os = "linux"))]
-        {
-            held
-        }
+        write_run_lock_owner(&mut held, &descriptor.id, descriptor.pid)
+            .expect("record lock owner");
+        held
     }
 
     #[cfg(unix)]
@@ -420,7 +411,7 @@ mod run_descriptor_tests {
             id: run.id.clone(),
             pid: run.pid,
             workspace: run.workspace.clone(),
-            process_start_ticks: 0,
+            process_start_ticks: Some(0),
         };
         held.file.set_len(0).expect("clear owner");
         serde_json::to_writer(&held.file, &stale_owner).expect("stale owner");

@@ -1,6 +1,12 @@
 //! Overlapping primary lanes share references, never definitions. §FS-rhei-library.4
 use super::*;
 
+fn emitted_states_yaml(compiled: &CompiledBlock) -> String {
+    let files = compiled.files().unwrap();
+    String::from_utf8(files.get(std::path::Path::new("states.yaml")).unwrap().bytes.clone())
+        .unwrap()
+}
+
 fn observing_wrapper() -> Block {
     let mut child = simple("child");
     child.manifest.expose = serde_yaml::from_str("states: {ready: {local: work}}").unwrap();
@@ -53,7 +59,7 @@ fn exposure_primary_lanes_preserve_first_occurrence_and_distinct_states() {
         assert!(machine.transitions.iter().any(|edge| {
             edge.from.0 == flow.initial && edge.to.0 == format!("{prefix}m5_child__done")
         }));
-        let yaml = serde_yaml::to_string(machine).unwrap();
+        let yaml = emitted_states_yaml(&compiled);
         crate::state_machine::StateMachine::from_yaml_str(&yaml).unwrap();
     }
 }
@@ -83,8 +89,8 @@ fn exposure_lane_overlap_does_not_hide_authored_profile_duplicates() {
             .unwrap()
             .allowed
             .push(state.into());
-        let machine = wrapper.compile().unwrap().fragment.machine;
-        let yaml = serde_yaml::to_string(&machine).unwrap();
+        let compiled = wrapper.compile().unwrap();
+        let yaml = emitted_states_yaml(&compiled);
         let error =
             crate::state_machine::StateMachine::from_yaml_str(&yaml).unwrap_err().to_string();
         assert!(error.contains("duplicate 'allowed' entry 'm5_child__ready'"), "{owner}: {error}");

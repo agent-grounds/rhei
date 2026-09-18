@@ -71,6 +71,13 @@ fn generated_settings_bypass_is_denied_before_output_publication() {
 fn external_settings_with_generated_spelling_survive_nested_composition() {
     let dir = unique_temp_dir("blocks-exposure-external-settings");
     let wrapper = private_wrapper(&dir, "    agent: m6_review__external-agent\n    model: m6_review__external-model\n    mcp_servers: [m6_review__external-tracker]\n    skills: [m6_review__external-skill]\n");
+    let states_path = wrapper.join("states.yaml");
+    let states = fs::read_to_string(&states_path).unwrap().replacen(
+        "version: 1\n",
+        "version: 1\nmodels: [m6_review__external-model]\n",
+        1,
+    );
+    fs::write(states_path, states).unwrap();
     let outer = dir.join("outer");
     fs::create_dir_all(outer.join("skills/checklist")).unwrap();
     write_fixture_file(&outer, "template.yaml", &format!(

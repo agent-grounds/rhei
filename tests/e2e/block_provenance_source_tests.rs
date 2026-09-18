@@ -8,7 +8,7 @@ use super::block_composition_support::*;
 use super::block_provenance_support::*;
 use super::*;
 
-fn git(repo: &Path, args: &[&str]) {
+pub(super) fn git(repo: &Path, args: &[&str]) {
     let status = Command::new("git")
         .args(args)
         .current_dir(repo)
@@ -17,17 +17,20 @@ fn git(repo: &Path, args: &[&str]) {
     assert!(status.success(), "git {args:?} should succeed");
 }
 
-fn instantiate_one(dir: &Path, source: &str, output_name: &str) -> std::path::PathBuf {
+pub(super) fn instantiate_one(dir: &Path, source: &str, output_name: &str) -> std::path::PathBuf {
     let output = dir.join(output_name);
     let mount = format!("sample={source}");
-    assert_success(&run_compose(
-        dir,
-        &["instantiate", "--mount", &mount, "--output", output.to_str().expect("output path")],
-    ));
+    let result = rhei_command(dir.join(".home"))
+        .current_dir(dir)
+        .env("GIT_CEILING_DIRECTORIES", fs::canonicalize(dir).expect("discovery ceiling"))
+        .args(["instantiate", "--mount", &mount, "--output", output.to_str().expect("output path")])
+        .output()
+        .expect("compose source fixture");
+    assert_success(&CliRun::from(&result));
     output
 }
 
-fn only_mounted_revision(lock: &serde_json::Value) -> &serde_json::Value {
+pub(super) fn only_mounted_revision(lock: &serde_json::Value) -> &serde_json::Value {
     let mount = lock["mounts"]
         .as_object()
         .expect("mount table")
@@ -99,6 +102,7 @@ fn source_identity_distinguishes_shipped_clean_dirty_untracked_local_and_unavail
         assert_eq!(revision["replay"], replay);
         assert!(revision["content"].as_str().is_some_and(|value| value.starts_with("sha256:")));
     }
+    assert_eq!(only_mounted_revision(&locks[4])["kind"], "local");
     assert!(only_mounted_revision(&locks[0])["release"].is_string());
     assert!(only_mounted_revision(&locks[1])["commit"].is_string());
     assert!(only_mounted_revision(&locks[5])["commit"].is_null());
@@ -111,4 +115,51 @@ fn source_identity_distinguishes_shipped_clean_dirty_untracked_local_and_unavail
             }
         }
     }
+}
+
+#[test]
+fn local_composition_survives_missing_git_but_preserves_source_errors() {
+    let dir = provenance_test_dir("missing-git");
+    let block = dir.join("block");
+    write_provenance_block(&block, false);
+    let empty_path = dir.join("empty-path");
+    fs::create_dir(&empty_path).unwrap();
+    let mount = mount_arg("sample", &block);
+    let compose = |name: &str| {
+        rhei_command(dir.join(".home"))
+            .current_dir(&dir)
+            .env("PATH", &empty_path)
+            .args(["instantiate", "--mount", &mount, "--output", dir.join(name).to_str().unwrap()])
+            .output()
+            .unwrap()
+    };
+    assert_success(&CliRun::from(&compose("output")));
+    let lock = read_lock(&dir.join("output"));
+    let revision = only_mounted_revision(&lock);
+    assert_eq!(revision["kind"], "unavailable");
+    assert_eq!(revision["status"], "unavailable");
+    assert_eq!(revision["replay"], "not-guaranteed");
+    assert!(revision["commit"].is_null());
+    assert!(revision["content"].as_str().unwrap().starts_with("sha256:"));
+    let source_id = lock["mounts"]["m6_sample__"]["source"].as_str().unwrap();
+    assert_eq!(
+        lock["sources"][source_id]["locator"]["requested"],
+        block.to_str().unwrap().replace('\\', "/")
+    );
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let git_path = empty_path.join("git");
+        fs::write(&git_path, "#!/bin/sh\nexit 1\n").unwrap();
+        fs::set_permissions(&git_path, fs::Permissions::from_mode(0o600)).unwrap();
+        assert_success(&CliRun::from(&compose("unexecutable")));
+        let unavailable = read_lock(&dir.join("unexecutable"));
+        assert_eq!(only_mounted_revision(&unavailable)["kind"], "unavailable");
+        assert_eq!(only_mounted_revision(&unavailable)["replay"], "not-guaranteed");
+    }
+
+    fs::write(block.join("states.yaml"), "invalid: [unterminated\n").unwrap();
+    assert_failed_with(&CliRun::from(&compose("invalid")), &["authored state fragment"]);
+    assert!(!dir.join("invalid").exists());
 }

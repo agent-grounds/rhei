@@ -111,6 +111,7 @@ impl CompiledBlock {
         super::settings::paths(&self.fragment.settings, q, &mut names.paths)?;
         // A level-only rule becomes one typed rule per owned kind. §FS-rhei-library.5
         if let Some(policy) = &mut machine.node_policy {
+            self.provenance.expand_overrides(&policy.overrides, names.kinds.len())?;
             let mut overrides = Vec::new();
             for rule in std::mem::take(&mut policy.overrides) {
                 if rule.match_.node_type.is_some() {

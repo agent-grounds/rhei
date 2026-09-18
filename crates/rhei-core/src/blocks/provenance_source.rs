@@ -4,6 +4,44 @@ use super::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+/// Reconciled diagnostic locators for one content identity. §FS-rhei-library.4.1
+#[derive(Debug, Clone, Serialize)]
+pub(super) struct SourceRecord {
+    pub locator: SourceLocator,
+    pub locators: Vec<SourceLocator>,
+    pub revision: SourceRevision,
+}
+
+impl From<&SourceIdentity> for SourceRecord {
+    fn from(source: &SourceIdentity) -> Self {
+        Self {
+            locator: source.locator.clone(),
+            locators: vec![source.locator.clone()],
+            revision: source.revision.clone(),
+        }
+    }
+}
+
+impl SourceRecord {
+    pub fn reconcile(&mut self, other: Self, id: &str) -> CompileResult<()> {
+        if self.revision != other.revision {
+            return Err(format!("source identity collision '{id}'"));
+        }
+        self.locators.extend(other.locators);
+        self.locators.sort_by(|a, b| {
+            (&a.requested, &a.tier, a.portable, &a.resolved).cmp(&(
+                &b.requested,
+                &b.tier,
+                b.portable,
+                &b.resolved,
+            ))
+        });
+        self.locators.dedup();
+        self.locator = self.locators[0].clone();
+        Ok(())
+    }
+}
+
 /// How a source was requested and which discovery tier supplied it. The
 /// locator is diagnostic data; only portable locators participate in identity.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -77,5 +115,33 @@ impl SourceIdentity {
             self.revision.content
         ]);
         Ok(format!("src:sha256:{}", super::provenance::digest_value(&tuple)?))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn locator_reconciliation_stays_canonical_and_refuses_revision_conflicts() {
+        let mut a = SourceIdentity::unavailable("/a");
+        a.locator.portable = false;
+        let mut b = a.clone();
+        b.locator.requested = "/b".into();
+        let id = a.id().unwrap();
+        assert_eq!(id, b.id().unwrap());
+        let mut first = SourceRecord::from(&a);
+        first.reconcile(SourceRecord::from(&b), &id).unwrap();
+        let mut second = SourceRecord::from(&b);
+        second.reconcile(SourceRecord::from(&a), &id).unwrap();
+        second.reconcile(SourceRecord::from(&a), &id).unwrap();
+        assert_eq!(first.locator, a.locator);
+        assert_eq!(first.locators.len(), 2);
+        assert_eq!(serde_json::to_value(&first).unwrap(), serde_json::to_value(&second).unwrap());
+        b.revision.replay = "exact".into();
+        assert!(first
+            .reconcile(SourceRecord::from(&b), &id)
+            .unwrap_err()
+            .contains("source identity collision"));
     }
 }

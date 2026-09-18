@@ -124,6 +124,16 @@ fn composition_lock_covers_flat_nodes_nested_mounts_renames_and_coalescing() {
         .as_array()
         .expect("coalesced completed origins");
     assert_eq!(completed.len(), 2, "coalescing should retain both terminal declarations");
+    assert_ne!(completed[0]["declaration"], completed[1]["declaration"]);
+    assert_eq!(
+        lock["declarations"]
+            .as_object()
+            .unwrap()
+            .values()
+            .map(|declaration| declaration["kind"].as_str().unwrap())
+            .collect::<BTreeSet<_>>(),
+        BTreeSet::from(["state", "task", "profile", "routing"])
+    );
     let coordinate = &lock["nodes"]["tasks"]["m5_inner__coordinate"];
     assert!(
         coordinate.as_array().expect("coordinate origins").iter().any(|origin| {
@@ -154,6 +164,7 @@ fn composition_lock_covers_flat_nodes_nested_mounts_renames_and_coalescing() {
         "synthesized routing should retain all contributors and its reason"
     );
     assert_complete_origins(&lock);
+    assert_declaration_fingerprints(&lock);
 
     let headers = fs::read_to_string(output.join("states.yaml")).expect("states header");
     assert!(headers.contains(LOCK_PATH) && headers.contains("src:sha256:"));
@@ -211,6 +222,11 @@ fn composition_lock_distinguishes_repeated_mounts_and_is_canonical() {
     let first_source = lock["mounts"]["m5_first__"]["source"].as_str().expect("first source");
     let second_source = lock["mounts"]["m6_second__"]["source"].as_str().expect("second source");
     assert_eq!(first_source, second_source, "repeated mounts should share source identity");
+    assert_eq!(lock["sources"][first_source]["locators"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        lock["nodes"]["states"]["m5_first__review"][0]["declaration"],
+        lock["nodes"]["states"]["m6_second__review"][0]["declaration"]
+    );
     for state in ["m5_first__review", "m6_second__review"] {
         assert!(lock["nodes"]["states"].get(state).is_some(), "missing repeated state {state}");
     }
@@ -227,6 +243,7 @@ fn composition_lock_distinguishes_repeated_mounts_and_is_canonical() {
             .is_some_and(|digest| digest.starts_with("sha256:")));
     }
     assert_complete_origins(&lock);
+    assert_declaration_fingerprints(&lock);
 }
 
 #[test]
@@ -247,7 +264,19 @@ fn dry_run_reports_and_validates_the_lock_without_writing_it() {
         ],
     );
     assert_success(&dry);
-    assert!(dry.stdout.contains(LOCK_PATH), "dry-run tree should report the lock:\n{}", dry.stdout);
+    let tree = dry.stdout.lines().collect::<Vec<_>>();
+    assert!(
+        tree.windows(3).any(|lines| {
+            lines[0] == "  |-- .agent-grounds/"
+                && lines[1] == "  |   `-- rhei/"
+                && matches!(
+                    lines[2],
+                    "  |       |-- composition.lock.json" | "  |       `-- composition.lock.json"
+                )
+        }),
+        "dry-run tree should list the lock under .agent-grounds/rhei:\n{}",
+        dry.stdout
+    );
     assert!(!output.exists(), "dry run wrote its output");
 
     let legacy = dir.join("legacy");

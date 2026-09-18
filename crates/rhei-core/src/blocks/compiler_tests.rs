@@ -30,7 +30,11 @@ fn leaf(name: &str, states: &str, tasks: &str) -> Block {
                 content_sections: vec![],
                 tasks: vec![],
             },
-            tasks: vec![TaskFile { path: "tasks/01-job.md".into(), tasks }],
+            tasks: vec![TaskFile {
+                source_path: "tasks/01-job.md".into(),
+                path: "tasks/01-job.md".into(),
+                tasks,
+            }],
             settings: serde_json::json!({}),
             files: BTreeMap::new(),
         }),

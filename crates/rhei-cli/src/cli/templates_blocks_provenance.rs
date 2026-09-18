@@ -8,7 +8,8 @@
     ) -> MietteResult<SourceIdentity> {
         let portable = !Path::new(requested).is_absolute() && !requested.starts_with('~');
         let tier = composition_source_tier(requested, resolved, dir)?;
-        let content = format!("sha256:{}", composition_tree_digest(dir)?);
+        let inventory = composition_inventory(dir)?;
+        let content = format!("sha256:{}", inventory.digest());
         let locator = SourceLocator {
             portable,
             requested: requested.replace('\\', "/"),
@@ -32,35 +33,23 @@
             });
         }
 
-        match git_source_revision(dir, &content)? {
-            Some(revision) => Ok(SourceIdentity { locator, revision }),
-            None if broken_git_marker(dir) => Ok(SourceIdentity {
-                locator,
-                revision: SourceRevision {
+        let revision = match git_source_revision(dir, &content, &inventory) {
+            Ok(Some(revision)) => revision,
+            discovered => {
+                let unavailable = discovered.is_err() || broken_git_marker(dir);
+                SourceRevision {
                     block_path: None,
                     commit: None,
                     content: Some(content),
-                    kind: "unavailable".into(),
+                    kind: if unavailable { "unavailable" } else { "local" }.into(),
                     replay: "not-guaranteed".into(),
                     release: None,
-                    status: "unavailable".into(),
+                    status: if unavailable { "unavailable" } else { "unversioned" }.into(),
                     template: None,
-                },
-            }),
-            None => Ok(SourceIdentity {
-                locator,
-                revision: SourceRevision {
-                    block_path: None,
-                    commit: None,
-                    content: Some(content),
-                    kind: "local".into(),
-                    replay: "not-guaranteed".into(),
-                    release: None,
-                    status: "unversioned".into(),
-                    template: None,
-                },
-            }),
-        }
+                }
+            }
+        };
+        Ok(SourceIdentity { locator, revision })
     }
 
     fn composition_source_tier(
@@ -84,12 +73,15 @@
         Ok("path")
     }
 
-    fn git_source_revision(dir: &Path, content: &str) -> MietteResult<Option<SourceRevision>> {
-        let root = git_output(dir, &["rev-parse", "--show-toplevel"])?;
+    // Metadata discovery failure is nonfatal; source reads above remain fallible. §FS-rhei-library.4.1
+    fn git_source_revision(
+        dir: &Path, content: &str, inventory: &CompositionInventory,
+    ) -> Result<Option<SourceRevision>, ()> {
+        let root = git_repository_root(dir)?;
         let Some(root) = root else { return Ok(None) };
-        let root = PathBuf::from(root.trim());
-        let commit = git_output(&root, &["rev-parse", "HEAD"])?;
-        let Some(commit) = commit else { return Ok(None) };
+        let root = fs::canonicalize(root.trim()).map_err(|_| ())?;
+        let commit = git_output(&root, &["rev-parse", "--verify", "HEAD^{commit}"])?;
+        let commit = commit.ok_or(())?;
         let block_path = dir
             .strip_prefix(&root)
             .ok()
@@ -97,7 +89,7 @@
             .filter(|path| !path.is_empty());
         let pathspec = block_path.as_deref().unwrap_or(".");
         let status = git_output(&root, &["status", "--porcelain=v1", "--untracked-files=all", "--", pathspec])?
-            .unwrap_or_default();
+            .ok_or(())?;
         let mut dirty = false;
         let mut untracked = false;
         for line in status.lines() {
@@ -107,8 +99,20 @@
                 dirty = true;
             }
         }
-        if !composition_entries_are_tracked(&root, dir)? {
-            untracked = true;
+        // Compare consumed bytes to HEAD, including hidden symlink dependencies.
+        // Index membership alone cannot establish immutable replay. §FS-rhei-library.4.1
+        for (path, bytes) in &inventory.dependencies {
+            let Ok(relative) = path.strip_prefix(&root) else {
+                untracked = true;
+                continue;
+            };
+            let object = format!("{}:{}", commit.trim(), slash_path(relative));
+            let recorded = git_bytes(&root, &["cat-file", "blob", &object])?;
+            match recorded {
+                None => untracked = true,
+                Some(recorded) if &recorded != bytes => dirty = true,
+                Some(_) => {}
+            }
         }
         let status = match (dirty, untracked) {
             (false, false) => "clean",
@@ -116,7 +120,7 @@
             (false, true) => "untracked",
             (true, true) => "dirty-untracked",
         };
-        let escaping = tree_has_escaping_symlink(dir)?;
+        let escaping = inventory.escaping;
         Ok(Some(SourceRevision {
             block_path,
             commit: Some(commit.trim().into()),
@@ -129,130 +133,45 @@
         }))
     }
 
-    fn git_output(dir: &Path, args: &[&str]) -> MietteResult<Option<String>> {
+    fn git_bytes(dir: &Path, args: &[&str]) -> Result<Option<Vec<u8>>, ()> {
         let output = std::process::Command::new("git")
-            .arg("-C")
-            .arg(dir)
-            .args(args)
-            .output()
-            .map_err(|err| miette!(help = "install Git or use a local source without Git metadata", "inspect composition source revision: {err}"))?;
-        Ok(output.status.success().then(|| String::from_utf8_lossy(&output.stdout).into_owned()))
+            .arg("-C").arg(dir).args(args).output().map_err(|_| ())?;
+        Ok(output.status.success().then_some(output.stdout))
     }
 
-    fn composition_entries_are_tracked(repository: &Path, source: &Path) -> MietteResult<bool> {
-        let mut entries = Vec::new();
-        collect_composition_entries(source, source, &mut entries)?;
-        for (relative, _, _) in entries {
-            let path = source.join(relative);
-            let path = path.strip_prefix(repository).unwrap_or(&path);
-            let output = std::process::Command::new("git")
-                .arg("-C")
-                .arg(repository)
-                .args(["ls-files", "--error-unmatch", "--"])
-                .arg(path)
-                .output()
-                .map_err(|err| miette!("inspect tracked composition source: {err}"))?;
-            if !output.status.success() {
-                return Ok(false);
-            }
+    fn git_repository_root(dir: &Path) -> Result<Option<String>, ()> {
+        let output = std::process::Command::new("git")
+            .env("LC_ALL", "C")
+            .arg("-C").arg(dir).args(["rev-parse", "--show-toplevel"])
+            .output().map_err(|_| ())?;
+        if output.status.success() {
+            Ok(Some(String::from_utf8_lossy(&output.stdout).into_owned()))
+        } else if String::from_utf8_lossy(&output.stderr).contains("not a git repository") {
+            Ok(None)
+        } else {
+            Err(())
         }
-        Ok(true)
+    }
+
+    fn git_output(dir: &Path, args: &[&str]) -> Result<Option<String>, ()> {
+        git_bytes(dir, args).map(|output| output.map(|bytes| String::from_utf8_lossy(&bytes).into_owned()))
     }
 
     fn broken_git_marker(dir: &Path) -> bool {
-        dir.ancestors().any(|ancestor| ancestor.join(".git").exists())
-    }
-
-    fn composition_tree_digest(root: &Path) -> MietteResult<String> {
-        use sha2::{Digest, Sha256};
-        let mut entries = Vec::<(String, &'static str, Vec<u8>)>::new();
-        collect_composition_entries(root, root, &mut entries)?;
-        entries.sort_by(|a, b| a.0.as_bytes().cmp(b.0.as_bytes()));
-        let mut digest = Sha256::new();
-        for (path, kind, bytes) in entries {
-            for field in [path.as_bytes(), kind.as_bytes(), bytes.as_slice()] {
-                digest.update((field.len() as u64).to_be_bytes());
-                digest.update(field);
+        // The fallback must obey the same discovery boundary as Git. §FS-rhei-library.4.1
+        let ceilings = std::env::var_os("GIT_CEILING_DIRECTORIES")
+            .map(|value| std::env::split_paths(&value)
+                .filter_map(|path| fs::canonicalize(path).ok()).collect::<Vec<_>>())
+            .unwrap_or_default();
+        for ancestor in dir.ancestors() {
+            if ancestor != dir && ceilings.iter().any(|ceiling| ceiling == ancestor) {
+                break;
+            }
+            if ancestor.join(".git").exists() {
+                return true;
             }
         }
-        Ok(format!("{:x}", digest.finalize()))
-    }
-
-    fn collect_composition_entries(
-        root: &Path,
-        dir: &Path,
-        entries: &mut Vec<(String, &'static str, Vec<u8>)>,
-    ) -> MietteResult<()> {
-        for entry in fs::read_dir(dir).map_err(|err| file_io_report(dir, "read source inventory", err))? {
-            let path = entry
-                .map_err(|err| miette!("read source inventory entry: {err}"))?
-                .path();
-            if path
-                .file_name()
-                .and_then(|name| name.to_str())
-                .is_some_and(|name| name.starts_with('.'))
-            {
-                continue;
-            }
-            let metadata = fs::symlink_metadata(&path)
-                .map_err(|err| file_io_report(&path, "inspect source inventory", err))?;
-            if metadata.file_type().is_symlink() {
-                let target = fs::read_link(&path)
-                    .map_err(|err| file_io_report(&path, "read source symlink", err))?;
-                entries.push((slash_path(path.strip_prefix(root).unwrap()), "symlink", target.as_os_str().to_string_lossy().as_bytes().to_vec()));
-            } else if metadata.is_dir() {
-                collect_composition_entries(root, &path, entries)?;
-            } else if metadata.is_file() {
-                let bytes = fs::read(&path).map_err(|err| file_io_report(&path, "read source bytes", err))?;
-                entries.push((slash_path(path.strip_prefix(root).unwrap()), "file", bytes));
-            }
-        }
-        Ok(())
-    }
-
-    fn tree_has_escaping_symlink(root: &Path) -> MietteResult<bool> {
-        fn visit(root: &Path, dir: &Path) -> std::io::Result<bool> {
-            for entry in fs::read_dir(dir)? {
-                let path = entry?.path();
-                if path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .is_some_and(|name| name.starts_with('.'))
-                {
-                    continue;
-                }
-                let metadata = fs::symlink_metadata(&path)?;
-                if metadata.file_type().is_symlink() {
-                    let target = fs::read_link(&path)?;
-                    let target = if target.is_absolute() {
-                        target
-                    } else {
-                        path.parent().unwrap_or(root).join(target)
-                    };
-                    if !lexically_normal(&target).starts_with(lexically_normal(root)) {
-                        return Ok(true);
-                    }
-                } else if metadata.is_dir() && visit(root, &path)? {
-                    return Ok(true);
-                }
-            }
-            Ok(false)
-        }
-        visit(root, root).map_err(|err| file_io_report(root, "inspect source symlinks", err))
-    }
-
-    fn lexically_normal(path: &Path) -> PathBuf {
-        let mut result = PathBuf::new();
-        for component in path.components() {
-            match component {
-                std::path::Component::CurDir => {}
-                std::path::Component::ParentDir => {
-                    result.pop();
-                }
-                other => result.push(other.as_os_str()),
-            }
-        }
-        result
+        false
     }
 
     fn slash_path(path: &Path) -> String {
@@ -263,36 +182,4 @@
             })
             .collect::<Vec<_>>()
             .join("/")
-    }
-
-    #[cfg(test)]
-    mod provenance_source_tests {
-        use super::*;
-
-        #[test]
-        fn source_digest_ignores_creation_order_and_hidden_host_metadata() {
-            let first = tempfile::tempdir().unwrap();
-            let second = tempfile::tempdir().unwrap();
-            fs::write(first.path().join("b"), "two").unwrap();
-            fs::write(first.path().join("a"), "one").unwrap();
-            fs::write(second.path().join("a"), "one").unwrap();
-            fs::write(second.path().join("b"), "two").unwrap();
-            fs::create_dir(first.path().join(".git")).unwrap();
-            fs::write(first.path().join(".git/config"), "host-only").unwrap();
-            assert_eq!(
-                composition_tree_digest(first.path()).unwrap(),
-                composition_tree_digest(second.path()).unwrap()
-            );
-        }
-
-        #[cfg(unix)]
-        #[test]
-        fn escaping_symlink_downgrades_exact_replay() {
-            use std::os::unix::fs::symlink;
-            let dir = tempfile::tempdir().unwrap();
-            let source = dir.path().join("source");
-            fs::create_dir(&source).unwrap();
-            symlink("../outside", source.join("escape")).unwrap();
-            assert!(tree_has_escaping_symlink(&source).unwrap());
-        }
     }

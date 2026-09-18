@@ -404,7 +404,7 @@ fn should_use_agent_mode(
     // shares every non-temporal readiness constraint. §FS-rhei-run.3
     if !opts.no_program()
         && !narrow_to_rhei_scope(
-            find_runnable_program_polls_for_mode_selection(rhei, machines, roots),
+            find_runnable_program_polls_for_mode_selection(rhei, machines, roots, opts),
             &rhei_scope_set(opts.rhei_scope()),
         )
         .is_empty()
@@ -413,7 +413,7 @@ fn should_use_agent_mode(
     }
 
     for task in narrow_to_rhei_scope(
-        find_runnable_tasks(rhei, machines, roots, &HashSet::new()),
+        find_runnable_tasks_with_options(rhei, machines, roots, &HashSet::new(), opts),
         &rhei_scope_set(opts.rhei_scope()),
     ) {
         let machine = machines.for_task(&task.id);

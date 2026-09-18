@@ -197,7 +197,7 @@ fn try_auto_advance_task(
     machines: &ExecutionMachines,
     task_id_str: &str,
     current_state: &str,
-    no_callbacks: bool,
+    opts: &RunOptions,
     mut before_transition: Option<BeforeTransitionCallback<'_>>,
 ) -> MietteResult<Option<AutoAdvance>> {
     // The advancing ticket's own machine and callback base govern it.
@@ -274,7 +274,7 @@ fn try_auto_advance_task(
                 machine,
                 current_state,
                 &settings,
-                &default_run_options(),
+                opts,
                 Some(task),
             )
             .unwrap_or_default();
@@ -298,15 +298,14 @@ fn try_auto_advance_task(
     // No message: the subprocess that worked this state knows the outcome and
     // writes `runtime/results/<task-id>.md` itself. A terminal edge with
     // nothing written is caught by the completion condition. §FS-rhei-run.3
-    let effective_to = execute_transition(
+    let effective_to = execute_run_transition(
         TransitionFiles { task_file: &route.task_file, metadata_file: &route.metadata_file, metadata_id: &route.metadata_id, artifact_root: &route.execution_root, artifact_id: task_id_str },
         callback_paths,
         machine,
         &route.local_id,
         current_state,
         &to_state,
-        None,
-        no_callbacks,
+        opts,
     )?;
 
     Ok(Some(AutoAdvance { to: effective_to, poll_wait: false }))

@@ -26,11 +26,38 @@ fn ensure_state_inputs_exist_for_transition(
     settings: &RheiSettings,
     context: &str,
 ) -> MietteResult<()> {
+    ensure_state_inputs_exist_for_transition_with_options(
+        workspace_root,
+        task,
+        task_id,
+        state_name,
+        state_def,
+        visit_count,
+        machine,
+        settings,
+        &default_run_options(),
+        context,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn ensure_state_inputs_exist_for_transition_with_options(
+    workspace_root: &Path,
+    task: Option<&rhei_core::ast::Task>,
+    task_id: &str,
+    state_name: &str,
+    state_def: &rhei_validator::StateDef,
+    visit_count: Option<u64>,
+    machine: &rhei_validator::StateMachine,
+    settings: &RheiSettings,
+    opts: &RunOptions,
+    context: &str,
+) -> MietteResult<()> {
     let invocations = resolve_agent_invocations_for_task(
         machine,
         state_name,
         settings,
-        &default_run_options(),
+        opts,
         task,
     )
     .unwrap_or_default();
@@ -116,6 +143,7 @@ fn ensure_state_outputs_exist_for_transition(
     visit_count: Option<u64>,
     machine: &rhei_validator::StateMachine,
     settings: &RheiSettings,
+    opts: &RunOptions,
     // `entering_final`: the refused edge lands in a `final: true` state, where
     // abandoning the step is the alternative worth naming. §FS-rhei-states.1.4
     entering_final: bool,
@@ -124,7 +152,7 @@ fn ensure_state_outputs_exist_for_transition(
         machine,
         state_name,
         settings,
-        &default_run_options(),
+        opts,
         task,
     )
     .unwrap_or_default();

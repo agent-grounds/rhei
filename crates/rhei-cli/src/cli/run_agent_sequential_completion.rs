@@ -333,6 +333,7 @@ fn handle_sequential_agent_completion(
                                 loaded.rhei.metadata.as_ref(),
                                 state_def,
                                 settings,
+                                opts,
                                 selected_to.as_deref(),
                             )
                         })
@@ -397,7 +398,7 @@ fn handle_sequential_agent_completion(
                             machines,
                             task_id_str,
                             state_before,
-                            opts.no_callbacks(),
+                            opts,
                             Some(&mut emit_before_transition),
                         ),
                     };

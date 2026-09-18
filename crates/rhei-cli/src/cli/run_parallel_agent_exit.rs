@@ -297,6 +297,7 @@ fn handle_parallel_agent_exit(
                                     reloaded.rhei.metadata.as_ref(),
                                     state_def,
                                     settings,
+                                    opts,
                                     selected_to.as_deref(),
                                 )
                             },
@@ -376,7 +377,7 @@ fn handle_parallel_agent_exit(
                     machines,
                     &task_id_str,
                     &state_name,
-                    opts.no_callbacks(),
+                    opts,
                     Some(&mut emit_before_transition),
                 ),
             };

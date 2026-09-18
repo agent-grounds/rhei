@@ -282,11 +282,12 @@ fn collect_ready_agent_work_items(
     // §FS-rhei-panta.6.1: `--rhei` narrows candidates, not prior resolution.
     let rhei_scope = rhei_scope_set(opts.rhei_scope());
     for task in narrow_to_rhei_scope(
-        find_runnable_tasks(
+        find_runnable_tasks_with_options(
             &loaded.rhei,
             &machines.set,
             &ReadySetRoots { workspace_root, task_roots: &loaded.task_roots },
             active_task_ids,
+            opts,
         ),
         &rhei_scope,
     ) {
@@ -410,11 +411,12 @@ fn collect_ready_program_work_items(
     // §FS-rhei-panta.6.1: `--rhei` narrows candidates, not prior resolution.
     let rhei_scope = rhei_scope_set(opts.rhei_scope());
     for task in narrow_to_rhei_scope(
-        find_runnable_tasks(
+        find_runnable_tasks_with_options(
             &loaded.rhei,
             &machines.set,
             &ReadySetRoots { workspace_root, task_roots: &loaded.task_roots },
             active_task_ids,
+            opts,
         ),
         &rhei_scope,
     ) {

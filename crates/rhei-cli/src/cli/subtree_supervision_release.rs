@@ -230,6 +230,7 @@ fn descendant_can_still_move(
             machine,
             task,
             &state,
+            None,
         )
 }
 

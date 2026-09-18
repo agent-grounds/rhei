@@ -134,11 +134,14 @@ fn execute_transition_with_origin(
     no_callbacks: bool,
     origin: TransitionOrigin,
     claim: Option<&ClaimEligibilityContext<'_>>,
+    run_options: Option<&RunOptions>,
 ) -> MietteResult<String> {
     let task_file = files.task_file;
     let metadata_file = files.metadata_file;
     let workspace_root = execution_workspace_root(&callback_paths.plan_path);
     let settings = load_merged_settings(&workspace_root)?;
+    let default_options = default_run_options();
+    let run_options = run_options.unwrap_or(&default_options);
 
     // Validate that both `from` and `to` are valid states.
     if !machine.is_valid_state(from) {
@@ -395,7 +398,7 @@ fn execute_transition_with_origin(
         machine,
         from,
         &settings,
-        &default_run_options(),
+        run_options,
         Some(&task_info.task),
     )
     .unwrap_or_default();
@@ -643,6 +646,7 @@ fn execute_transition_with_origin(
             from_visit_count,
             machine,
             &settings,
+            run_options,
             machine.states.get(to).map(|def| def.terminal).unwrap_or(false),
         )?;
     }
@@ -657,7 +661,7 @@ fn execute_transition_with_origin(
             to,
         )?;
     }
-    ensure_state_inputs_exist_for_transition(
+    ensure_state_inputs_exist_for_transition_with_options(
         files.artifact_root,
         Some(&task_info.task),
         files.artifact_id,
@@ -666,6 +670,7 @@ fn execute_transition_with_origin(
         to_visit_count,
         machine,
         &settings,
+        run_options,
         &format!("Task {} cannot enter state {}.", files.artifact_id, to),
     )?;
     // Ownership comes from the effective target, including a redirect. Resolution failures

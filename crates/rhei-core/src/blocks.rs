@@ -107,7 +107,7 @@ pub struct SettingsExposure {
 
 /// Closed author-owned public identity table for one block boundary.
 /// §FS-rhei-library.1.2 §AR-rhei-library.2
-#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Exposure {
     #[serde(default)]
@@ -344,6 +344,7 @@ mod compiler;
 mod data;
 mod emit;
 mod exposure;
+mod exposure_schema;
 mod links;
 mod qualify;
 mod references;

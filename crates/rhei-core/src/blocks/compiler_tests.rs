@@ -286,6 +286,9 @@ fn block_manifest_decodes_the_typed_exposure_table() {
 #[path = "reference_tests.rs"]
 mod reference_tests;
 
+#[path = "exposure_ownership_tests.rs"]
+mod exposure_ownership_tests;
+
 #[path = "links_tests.rs"]
 mod links_tests;
 

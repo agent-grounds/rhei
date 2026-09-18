@@ -95,11 +95,16 @@ Each arrow is a declared transition. Agents follow the `instructions` field on e
 
 ### 2.2. Command Surface
 
-The commands that coordinate through the state machine:
+Commands for authoring, inspecting, and running a workflow:
 
 | Command            | What it does                                                                    |
 |--------------------|---------------------------------------------------------------------------------|
 | `rhei init`        | Sets up a Panta project in a gitignored `panta/` folder (or in place with `--here`): manifest, ignore rules, agent-discovery note ([§FS-rhei-init](rhei-init.spec.md#fs-rhei-init-rhei-init)) |
+| `rhei validate`    | Checks plan structure, state-machine references, and workflow constraints ([§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate)) |
+| `rhei render`      | Renders a plan in the requested output format ([§FS-rhei-render](rhei-render.spec.md#fs-rhei-render-rhei-render)) |
+| `rhei viz`         | Opens the workflow visualization ([§FS-rhei-viz](rhei-viz.spec.md#fs-rhei-viz-flow-visualization)) |
+| `rhei intervene`   | Sends a message to a reachable running agent with `--task <id> -m "<message>"` ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)) |
+| `rhei version`     | Reports the installed version ([§FS-rhei-version](rhei-version.spec.md#fs-rhei-version-rhei-version)) |
 | `rhei run`         | Drives the full plan forward under orchestrator authority (`--rhei <id>` narrows a project-scoped run) |
 | `rhei next`        | Claims the next ready task for a manual worker; `--task` may advance one eligible passive edge, while `--peek` is read-only and `--rhei <id>` narrows scope |
 | `rhei transition`  | Atomically changes a task's state via compare-and-swap; `--result` carries the message a `final: true` target requires, and the attended `--force --reason` form repairs a missing edge ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result), §FS-rhei-transition-cmd.6) |

@@ -19,7 +19,7 @@ fn select_block_declarations(
             &fs::read_to_string(&path)
                 .map_err(|error| file_io_report(&path, "read selected block manifest", error))?,
         )
-        .map_err(|error| miette!("invalid template manifest: {error}"))?;
+        .map_err(|error| miette!(help = "fix the template manifest YAML", "invalid template manifest: {error}"))?;
         for (key, value) in raw.as_mapping().expect("checked mapping") {
             let group = key.as_str().expect("checked key");
             if manifest.static_declarations.contains(group)

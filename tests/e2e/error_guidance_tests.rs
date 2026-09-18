@@ -510,6 +510,10 @@ fn batched_remedies_are_labelled_and_survive_a_narrow_terminal() {
 #[test]
 fn instantiating_over_an_existing_directory_suggests_a_free_name() {
     let dir = unique_temp_dir("errors-collision");
+    // Keep the default destination inside this disposable fixture. Without a
+    // local project marker, the project walk can discover an unrelated
+    // ancestor project when TMPDIR is nested below the test checkout.
+    write_fixture_file(&dir, "index.panta.md", "# Panta: Error guidance fixture\n");
     write_agent_template(&dir);
 
     let first = run_raw(&["instantiate", "guided", "subject=a", "brief=b"], &dir);

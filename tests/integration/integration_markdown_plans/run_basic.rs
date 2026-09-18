@@ -77,6 +77,29 @@ fn run_run_command_in_dir(
     }
 }
 
+fn run_run_command_in_dir_with_env(
+    current_dir: &Path,
+    plan_path: &Path,
+    machine_path: &Path,
+    extra_args: &[&str],
+    envs: &[(&str, &str)],
+) -> CliRun {
+    let mut cmd = rhei_command();
+    cmd.current_dir(current_dir).arg("--state-machine").arg(machine_path).arg("run").arg(plan_path);
+    for arg in extra_args {
+        cmd.arg(arg);
+    }
+    for (key, value) in envs {
+        cmd.env(key, value);
+    }
+    let output = cmd.output().expect("run command should execute");
+    CliRun {
+        status: output.status,
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+    }
+}
+
 fn run_reset_command(plan_path: &Path, machine_path: &Path) -> CliRun {
     // §FS-rhei-reset.1.2: a test harness has no terminal to confirm on, so it
     // states the intent the way any unattended caller must.

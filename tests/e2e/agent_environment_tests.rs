@@ -202,6 +202,7 @@ transitions:
 
     let output = rhei_command(dir.join(".home"))
         .current_dir(&dir)
+        .env("GIT_CEILING_DIRECTORIES", dir.parent().expect("fixture has a temporary parent"))
         .arg("--state-machine")
         .arg(&machine_path)
         .arg("run")

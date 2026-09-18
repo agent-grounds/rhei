@@ -12,6 +12,8 @@
 
 use std::fs;
 
+use super::operator_attended_tests::attended;
+use super::operator_force_support::ForceFixture;
 use super::terminal_result_tests::write_mock_agent_settings;
 use super::*;
 
@@ -309,9 +311,10 @@ const CYCLE_PLAN: &str = r#"# Rhei: Re-entry
 **State:** a
 "#;
 
-/// `a → b → done`, and `done → a` so an operator can send the ticket round
-/// again. Every state finishes its work, so a second spawn of `a` can only mean
-/// a second *visit* — which is the case the engine used to read as a retry.
+/// `a → b → done`; an operator can send the ticket round again with the
+/// attended missing-edge recovery path. Every state finishes its work, so a
+/// second spawn of `a` can only mean a second *visit* — which is the case the
+/// engine used to read as a retry.
 // §FS-rhei-agents.8.1
 const CYCLE_MACHINE: &str = r#"name: reentry
 version: 1
@@ -333,8 +336,6 @@ transitions:
     to: b
   - from: b
     to: done
-  - from: done
-    to: a
 "#;
 
 /// Entering a state again is a new visit, so it starts over: the plain log name,
@@ -347,30 +348,44 @@ transitions:
 fn re_entering_a_state_is_a_new_visit_with_a_fresh_attempt_budget() {
     let (dir, plan_path, machine_path) =
         setup("attempts-reentry", CYCLE_PLAN, CYCLE_MACHINE, FINISHING_AGENT);
+    let fixture = ForceFixture { dir, plan: plan_path.clone(), machine: machine_path.clone() };
 
     let first = run_cli("run", &plan_path, &machine_path, &["--no-tui", "--no-callbacks"]);
     assert_success(&first);
     assert_task_state(&plan_path, &machine_path, "1", "done");
 
-    // Send it round again, the way an operator does: a hand transition out of
-    // the terminal state, and the finished ticket's result block goes with it.
-    assert_success(&run_transition(&plan_path, &machine_path, "1", "done", "a"));
-    let plan = fs::read_to_string(&plan_path).expect("read plan");
-    fs::write(
-        &plan_path,
-        plan.lines()
-            .filter(|line| !line.starts_with("> **Result:**"))
-            .collect::<Vec<_>>()
-            .join("\n"),
-    )
-    .expect("write plan");
+    // Send it round again through the attended operator recovery path. The
+    // recovery operation removes only the terminal task link while retaining
+    // the result history; no fixture-side ledger or plan edit is needed.
+    let (success, transcript) = attended(
+        &fixture,
+        &[
+            "--state-machine",
+            machine_path.to_str().expect("machine path"),
+            "transition",
+            plan_path.to_str().expect("plan path"),
+            "--task",
+            "1",
+            "--from",
+            "done",
+            "--to",
+            "a",
+            "--force",
+            "--reason",
+            "reopen visit",
+        ],
+        "force plan.1 done -> a\r\n",
+    );
+    assert!(success, "{transcript}");
+    let after_recovery = fs::read_to_string(&plan_path).expect("read plan after recovery");
+    assert!(!after_recovery.contains("> **Result:**"), "terminal task link is removed");
 
     let second = run_cli("run", &plan_path, &machine_path, &["--no-tui", "--no-callbacks"]);
     let combined = format!("{}{}", second.stdout, second.stderr);
     assert_success(&second);
     assert_task_state(&plan_path, &machine_path, "1", "done");
 
-    assert_eq!(spawn_count(&dir, "spawns-a.txt"), 2, "the second lap ran state 'a' again");
+    assert_eq!(spawn_count(&fixture.dir, "spawns-a.txt"), 2, "the second lap ran state 'a' again");
     assert!(
         !combined.contains("Re-spawning"),
         "a fresh entry is not a retry of the last one; got:\n{combined}"
@@ -380,7 +395,7 @@ fn re_entering_a_state_is_a_new_visit_with_a_fresh_attempt_budget() {
         "and it did not arrive with the first lap's budget already gone; got:\n{combined}"
     );
     assert_eq!(
-        log_names(&dir),
+        log_names(&fixture.dir),
         vec!["task-plan.1-a.log", "task-plan.1-b.log"],
         "each visit writes the plain name; `-attempt` is for retries within one visit"
     );

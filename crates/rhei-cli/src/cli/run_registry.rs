@@ -156,21 +156,20 @@ fn classify_registry_roots(
     mut sweep: RegistrySweep,
     pruning: Pruning,
 ) -> RegistrySweep {
-    let roots = descriptors.iter().map(|(_, run)| run.workspace.clone()).filter(|root| {
-        !matches!(fs::metadata(root), Err(error) if error.kind() == std::io::ErrorKind::NotFound)
-    });
-    let roots = roots.map(|root| rhei_core::root_access::input_roots(&root))
-        .collect::<std::io::Result<Vec<_>>>()
-        .and_then(|groups| rhei_core::root_access::shared_roots(groups.into_iter().flatten()));
-    match roots {
-        Ok(guards) => sweep.root_guards = guards,
+    let access = match registry_root_access(&descriptors, &mut sweep.root_guards) {
+        Ok(access) => access,
         Err(error) => {
             sweep.undecided.clear();
             sweep.access_error = Some(error.to_string());
             return sweep;
         }
-    }
-    for (path, descriptor) in descriptors {
+    };
+    for ((path, descriptor), access) in descriptors.into_iter().zip(access) {
+        // Registry-only unknowns never inspect the workspace or enter pruning. §FS-rhei-run-headless.3
+        if let Err(reason) = access {
+            sweep.undecided.push(UndecidedRun { path, descriptor: Some(descriptor), reason });
+            continue;
+        }
         match descriptor.liveness() {
             Liveness::Live => sweep.live.push(descriptor),
             Liveness::Ended => sweep.ended.push(descriptor),

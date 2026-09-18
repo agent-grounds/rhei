@@ -197,6 +197,15 @@ they accumulate: a two-character prefix that resolves today would otherwise
 start reporting "matches four runs" tomorrow, for runs the operator has
 forgotten.
 
+If access to a workspace cannot be checked, listing retains its external
+registry entry as **unknown**, names why it could not be checked, and does not
+read or mutate that root, declare the run ended, or prune the entry. That entry
+remains resolvable by id; an unrelated accessible run remains stoppable by exact
+id under its own guards and the existing signal-identity checks. An access
+failure must not invent a pending-recovery hop. An established recovery marker,
+even with unreadable or corrupt contents, retains the strict refusal in
+§FS-rhei-recover.4.
+
 An ambiguous prefix is an error that lists the matching runs rather than picking
 one. It lists **at most ten** and then says how many more there are: with a
 hundred retained entries, a full listing is not an answer to "which one did you

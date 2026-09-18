@@ -45,6 +45,14 @@ and each word is capitalized (`my-project` → `My Project`).
 
 ## 2. Behavior
 
+Before any initialization effect, discover the affected existing execution-root
+owners of both the host and destination and acquire their shared access guards
+in sorted canonical order (§FS-rhei-panta.6.6). Check pending recovery before
+and after acquisition and retain the guards through all writes
+(§FS-rhei-recover.4). This includes host ignore/agent-note updates and creation
+of a new destination: a missing `host/panta` never exempts an existing host from
+the boundary. Neither `--force` nor `--here` bypasses it.
+
 1. **Refuse an existing project** unless `--force`. When the project
    directory already contains `index.panta.md` — and, in default mode, also
    when the host itself is already a project — the command fails stating the

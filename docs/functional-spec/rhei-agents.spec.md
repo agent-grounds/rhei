@@ -312,6 +312,36 @@ one-shot invocation that does not consume follow-up stdin.
 | `model` | string | Yes | Concrete provider model name such as `o3` or `claude-sonnet-4-6` |
 | `default_agent` | string | No | Preferred agent id when `rhei run` needs to spawn this model autonomously |
 | `agents` | object | No | Per-agent launch overrides for this model, keyed by agent id |
+| `prices` | object or `null` | No | Static accounting rates for this profile, or `null` to clear inherited rates |
+
+When present and non-null, `models.<id>.prices` is one whole rate object:
+
+```json
+{
+  "currency": "USD",
+  "effective_at": "2026-09-18T00:00:00Z",
+  "input_total_micro": 4000000,
+  "input_cached_read_micro": 400000,
+  "input_cache_write_micro": 5000000,
+  "output_total_micro": 20000000,
+  "note": "priority tier, standard context",
+  "service_tier": "priority"
+}
+```
+
+`currency` and `effective_at` are required non-empty strings. All four rate
+fields are required non-negative `u64` integers in micro-units of that currency
+per one million tokens; zero is an explicit free rate. Fractions, negative
+values, and values greater than `u64::MAX` are invalid. The unit is always
+`1m_tokens` and is not authored. Validation diagnostics identify the full
+`models.<id>.prices.<field>` path, including for a missing required field.
+
+Other properties are explanatory metadata. Their JSON values are preserved in
+the generated price-book entry but do not affect matching or arithmetic. The
+generated entry keys `provider`, `model`, `unit`, `source`, and
+`model_profiles` are reserved and cannot be used as metadata; a diagnostic
+identifies the colliding path. Profile rates are static configuration: selecting
+one performs no tariff selection and no network fetch.
 
 Each `models.<id>.agents.<agent-id>` binding has this shape:
 
@@ -470,6 +500,9 @@ settings compose over the result:
   agent, redeclare the whole entry.
 - `models` merge by model id.
 - `models.<id>.agents` merge by agent id.
+- `models.<id>.prices` is one optional object: absence inherits it, an authored
+  object replaces it wholesale, and explicit `null` clears it. Its individual
+  rate and metadata fields never merge.
 - `mcp_servers` merge by server id.
 - `skills` merge by skill id.
 - `null` explicitly clears an inherited optional field.
@@ -482,7 +515,9 @@ level's effective tooling default is the one written there.
 
 This lets a project override only a model's concrete provider/model pair or
 only a model-agent binding's autonomous arguments without redefining unrelated
-global entries.
+global entries. In particular, overriding `provider` or `model` without a
+`prices` key retains inherited rates; an author changing identity without
+retaining those rates writes `"prices": null`.
 
 ### 1.4. Resolution Order
 
@@ -497,6 +532,15 @@ it resolves the model id in this order:
 The resolved model id must exist in the merged `models` registry. If no model
 is configured at any level, model-specific callback and template fields are
 omitted.
+
+The selected model id is retained as the invocation's profile identity through
+CLI, state, project/global default, legacy `all_models`, and task `**Model:**`
+precedence. An inline `target`, `all_targets`, or task `**Target:**` remains a
+literal execution identity and does not implicitly select a profile merely
+because its provider/model pair matches one. When a named profile with prices
+overrides a literal target's model while retaining the target's provider, the
+final provider/model pair must exactly equal the profile's declared pair or the
+run is refused before any agent starts.
 
 When `rhei run` is launching an autonomous agent, it resolves the agent id in
 this order:

@@ -22,7 +22,7 @@ Flags are grouped by concern:
 | `--no-callbacks`         | false   | Skip execution of `on_leave` / `on_enter` callbacks                        |
 | `--continue-on-error`    | false   | Continue to the next task when an agent or program exits non-zero          |
 | `--parallel <N>`         | 1       | Maximum number of agents or programs to run concurrently (0 = unlimited)   |
-| `--prices <PATH>`        | built-in | Price measured agent usage with a validated local price book and copy it into the run's accounting roots. See [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection). |
+| `--prices <PATH>`        | profile or built-in | Override profile-derived and built-in pricing with a validated local price book and copy it into the run's accounting roots. Without the flag, selected profiles with authored rates produce a generated snapshot before execution; otherwise built-in pricing is unchanged. See [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection). |
 | `--rhei <RHEI_ID>`       | all     | Narrow this run to the named rheis (repeatable). See §2.5.                  |
 | `--tui`                  | auto    | Force TUI mode even when stdout is not detected as a TTY                   |
 | `--no-tui`               | auto    | Force plain stdout output even when stdout is a TTY                        |

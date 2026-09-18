@@ -97,6 +97,7 @@ Each supported agent spawn writes one JSON object:
   "agent": "claude-code",
   "provider": "anthropic",
   "model": "claude-sonnet-4-6",
+  "model_profile": "review-sonnet",
   "started_at": "2026-05-20T10:30:00Z",
   "ended_at": "2026-05-20T10:34:23Z",
   "duration_ms": 263000,
@@ -128,6 +129,13 @@ Each supported agent spawn writes one JSON object:
   }
 }
 ```
+
+`model_profile` is optional provenance naming the selected settings profile.
+Rhei writes it for a named profile selected through CLI, state, defaults,
+`all_models`, or task `**Model:**` precedence, whether or not that profile
+supplies prices. Literal target selectors do not acquire a profile identity.
+Older `rhei.accounting.invocation.v1` records without this field remain valid
+and are read unchanged.
 
 An invocation record may also carry `extraction_diagnostics`, an array of
 distinct diagnostic strings in first-seen order. A new record whose
@@ -456,7 +464,8 @@ events that identify the accounting schema.
 ### 5.1. Price-Book Selection
 
 `rhei run ... --prices <PATH>` selects a caller-owned local price book for
-that run. Rhei reads and validates the file before starting any agent. The
+that run and takes precedence over profile-authored and built-in prices. Rhei
+reads and validates the file before starting any agent. The
 book must use the `rhei.accounting.prices.v1` schema shown above, provide a
 non-empty `price_book_id` and currency, use `1m_tokens` for every entry, and
 provide non-empty provider, model, and effective timestamp values. Duplicate
@@ -477,8 +486,56 @@ The selected in-memory book is shared by sequential and parallel agent
 execution. Before any agent starts, Rhei atomically copies a caller-owned book
 to `runtime/accounting/prices.json` in the run root and every participating
 rhei execution root. Invocation pricing records the selected book's id and
-currency. Omitting `--prices` retains the built-in book and its existing
-behavior, including its durable copy when accounting is recorded.
+currency. An explicit book bypasses profile-book construction and its conflict
+checks while retaining its existing validation and exact-match behavior.
+
+Without `--prices`, Rhei preflights every candidate invocation in the selected
+run scope. A named profile contributes its profile entry when it has prices;
+otherwise that invocation contributes the built-in exact match or an unpriced
+marker. A literal target contributes the same built-in-or-unpriced fallback and
+never a profile entry. Profile prices apply only when the invocation's final,
+case-sensitive provider/model pair exactly equals the pair declared by that
+profile; a mismatch is a pre-spawn error naming the profile and both pairs.
+
+If no candidate contributes profile prices, Rhei uses the built-in book
+unchanged, including its existing id and durable-copy behavior. Otherwise Rhei
+composes one generated book for sequential and parallel execution:
+
+- distinct provider/model pairs contribute distinct entries;
+- identical profile entries for one pair deduplicate and retain every
+  contributing profile id;
+- a profile entry and a built-in or unpriced fallback for the same pair
+  conflict, as do profile entries whose rates, effective timestamp, metadata,
+  or source kind differ; and
+- priced entries with different currencies conflict.
+
+Every conflict is refused before any frontend, callback, nested run, or agent
+starts. Its diagnostic names the pair and participating profile or literal
+sources. Unpriced markers take part in conflict detection but are not written
+as entries. Thus a selected profile's tier cannot price a literal invocation or
+another profile merely because their exact pairs coincide.
+
+Each generated entry carries `source` metadata. A profile entry uses
+`{"kind":"profile"}` and a sorted, deduplicated `model_profiles` string array;
+a fallback entry uses
+`{"kind":"builtin","price_book_id":"<built-in-id>"}` and no
+`model_profiles`. Entry order is ascending by provider then model. All object
+keys are recursively sorted for identity; arrays keep semantic order except
+that entries and `model_profiles` use the sorting just stated. The compact
+UTF-8 JSON encoding of the generated book's `schema`, `currency`, and entries,
+excluding `price_book_id`, is its canonical semantic content. Its id is
+`profiles-sha256-` followed by the lowercase hexadecimal SHA-256 digest of
+that content. Metadata and source provenance therefore participate in the id;
+source-file whitespace and object-key order do not.
+
+Before any agent starts, Rhei atomically writes the generated book to
+`runtime/accounting/prices.json` and to the immutable
+`runtime/accounting/price-books/<price_book_id>.json` in the run root and every
+participating rhei execution root. An existing archive with identical bytes is
+reused; an existing path with different bytes is an error. No root is changed
+unless durable identity and currency validation succeeds for every
+participating root. Explicit caller-owned books continue to be copied only to
+`prices.json`; this contract does not archive them.
 
 Every currency-bearing durable invocation record in a participating accounting
 root, including an unpriced record, must use the selected book's currency.
@@ -561,9 +618,21 @@ Take the record's convention from §3.6, then:
 Restating tokens needs no price book. Recomputing money needs one, and only one
 number out of it: the full input rate for the record's provider and model. A
 record's price book is **reachable** when its `price_book_id` is the built-in
-book's, or the id of the `prices.json` beside it in the accounting root it was
-read from. Selection never fetches a book over the network (§5.1), so a book
-named by id alone and absent from disk is unreachable.
+book's, the id of the `prices.json` beside it in the accounting root it was
+read from, or the id of a valid generated
+`price-books/<price_book_id>.json` archive beside it. Archive lookup accepts
+only a generated `profiles-sha256-…` id, requires the file's id and canonical
+content digest to match the requested id, and never searches another root.
+Selection never fetches a book over the network (§5.1), so any other book named
+by id alone and absent from the current `prices.json` is unreachable.
+
+A later run may replace `prices.json` and create a new generated archive after
+settings change. It does not rewrite or delete older archives and does not
+rewrite an older invocation's tokens, stored amount, currency, profile, or
+price-book id. Archive reachability permits the existing read-time correction
+below; it does not reprice history under a later rate book. Archiving explicit
+books and applying a later book to completed invocations are outside this
+contract.
 
 When a record's money must be recomputed and its book is unreachable, the
 record is read as `unpriced`: its measured tokens still count, and it

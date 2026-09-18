@@ -7,6 +7,8 @@ mod accounting_extraction_diagnostic_tests;
 mod accounting_line_tests;
 mod accounting_presentation_tests;
 mod accounting_prices_tests;
+mod accounting_profile_price_composition_tests;
+mod accounting_profile_prices_tests;
 mod accounting_support;
 mod agent_environment_tests;
 mod agent_grounds_settings_tests;

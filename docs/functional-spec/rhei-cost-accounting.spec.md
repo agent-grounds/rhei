@@ -612,6 +612,22 @@ writes equal `amount_micro` and `priced_amount_micro` values. A
 but never writes `amount_micro`. `amount_micro` is written only when status is
 `priced`.
 
+`rhei summary --run <ID> --prices <PATH>` is the one post-run exception to
+the run-time selection boundary above. It validates the same caller-owned v1
+book, then makes that book authoritative for an in-memory reading of the exact
+completed-run selection defined by §FS-rhei-summary.1. It uses the book's id,
+currency, exact provider/model match, integer arithmetic, cache semantics, and
+formula exactly as a run-time selection does. `effective_at` remains required
+but neither selects nor rejects an entry: the caller explicitly selected the
+book. The operation calculates in that currency; it does not convert a stored
+amount from another currency. A missing exact match remains unpriced and never
+falls back to stored money or the built-in book.
+
+Alternate-book selection does not weaken run-time behavior: `rhei run
+--prices` still copies its selected book and affects only that run's new
+records. The summary operation never copies its book, rewrites a record, or
+changes the book or pricing ordinary accounting reads use.
+
 ### 5.2. Recomputing a Stored Record
 
 Every rollup, report, and inspection surface computes from stored records (§6),
@@ -657,6 +673,15 @@ then follows the ordinary rules for a selection holding an unpriced record
 A record whose cache dimensions are zero or unavailable needs no correction at
 all: the recomputation and the stored amount agree, and it stays priced whether
 or not its book is reachable.
+
+An explicit alternate-book reading first restates every selected record's
+tokens through the convention table above, then discards the stored monetary
+result for this reading and prices the restated dimensions with the explicitly
+selected book under §5.1. Thus an old `input-total-excludes-cache` record has
+its cache dimensions joined into `input.total` before the replacement formula
+subtracts and prices those parts, while an `input-total-includes-cache` record
+uses its dimensions as stored. Neither token restatement nor replacement
+pricing changes the durable record.
 
 ## 6. Rollups
 
@@ -725,6 +750,13 @@ happens before aggregation. Three axes select, and they compose:
 | Window | Records whose `started_at` lies in the half-open interval `[since, until)`. A record with no `run_id` is selected by a window like any other. |
 | Plan tree | Records whose `task_id` is a node or a descendant of it — `direct` and `subtree` above. |
 
+The explicit summary selection adds a completed-run eligibility check around
+the Run axis. It accepts one exact id only after §FS-rhei-summary.1 establishes
+completion inside the roots selected by §FS-rhei-panta.6.5. Selection still
+happens before aggregation. One project run may contribute records from
+several selected roots, and ordinary attempt identity (§3.7) deduplicates exact
+copies across them before any token or price total is calculated.
+
 A grouping partitions the selection. Grouping by run keys on `run_id` and gives
 the records that name no run one explicit group of their own, keyed
 `(unattributed)`. Grouping by day keys on the UTC calendar date of `started_at`.
@@ -761,6 +793,21 @@ incomplete in a way no single record's status shows.
   table does not name is, and no aggregate holding one reports `complete`. A
   record whose money could not be recomputed (§5.2) is unpriced, and demotes the
   aggregate the way any unpriced record does.
+
+For an explicit alternate-book reading, pricing status describes exact-rate
+coverage in the selected book independently of measurement coverage:
+
+- **priced** means every selected record with measured billable tokens found
+  an exact provider/model entry; its aggregate has `cost_micro` and
+  `priced_cost_micro` in the selected book's currency;
+- **partial-price** means at least one such record matched and at least one did
+  not; only `priced_cost_micro` is present and is a lower bound; and
+- **unpriced** means none matched; neither monetary field is present.
+
+Unmeasured or otherwise not-applicable records do not turn a fully matched
+priced set into a missing-rate set; they continue to affect measurement
+coverage under the existing rules. The aggregate's price-book id and currency
+come from the selected book even when some or all exact rates are absent.
 
 ## 7. Run Events
 

@@ -7,15 +7,24 @@
 /// process-global env var.
 struct NoHome {
     previous: Option<std::ffi::OsString>,
+    previous_state: Option<std::ffi::OsString>,
+    _state: tempfile::TempDir,
+    _state_guard: std::sync::MutexGuard<'static, ()>,
     _guard: std::sync::MutexGuard<'static, ()>,
 }
 
 impl NoHome {
     fn new() -> Self {
         let guard = TEST_HOME_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+        let state_guard = run_descriptor_tests::REGISTRY_GUARD
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        let state = tempfile::tempdir().expect("state dir");
         let previous = std::env::var_os("HOME");
+        let previous_state = std::env::var_os("XDG_STATE_HOME");
+        std::env::set_var("XDG_STATE_HOME", state.path());
         std::env::remove_var("HOME");
-        NoHome { previous, _guard: guard }
+        NoHome { previous, previous_state, _state: state, _state_guard: state_guard, _guard: guard }
     }
 }
 
@@ -23,6 +32,10 @@ impl Drop for NoHome {
     fn drop(&mut self) {
         if let Some(prev) = self.previous.take() {
             std::env::set_var("HOME", prev);
+        }
+        match self.previous_state.take() {
+            Some(prev) => std::env::set_var("XDG_STATE_HOME", prev),
+            None => std::env::remove_var("XDG_STATE_HOME"),
         }
     }
 }

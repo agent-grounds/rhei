@@ -9,7 +9,7 @@ use std::time::Duration;
 
 /// Input is sent only after the child's prompt is observed, using a channel barrier.
 /// The harness is test-only; production has no environment authorization. §FS-rhei-recover.1
-fn attended(fixture: &ForceFixture, arguments: &[&str], answer: &str) -> (bool, String) {
+pub(super) fn attended(fixture: &ForceFixture, arguments: &[&str], answer: &str) -> (bool, String) {
     use portable_pty::{native_pty_system, CommandBuilder, PtySize};
     let source = rhei_command(fixture.dir.join("attended-home"));
     let mut command = CommandBuilder::new(source.get_program());

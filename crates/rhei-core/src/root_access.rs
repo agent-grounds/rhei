@@ -71,6 +71,7 @@ pub fn check_pending(root: &Path) -> io::Result<()> {
 fn lock_path(root: &Path) -> io::Result<PathBuf> {
     let base = std::env::var_os("XDG_STATE_HOME")
         .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
         .or_else(|| {
             if cfg!(windows) {
                 std::env::var_os("LOCALAPPDATA").map(PathBuf::from)

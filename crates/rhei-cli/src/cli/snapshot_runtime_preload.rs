@@ -11,6 +11,63 @@ struct SnapshotPreloadRoots<'a> {
     execution: &'a Path,
 }
 
+/// Overlay the task's authored control onto the active state's rule.
+///
+/// The task form replaces only name/axis; all selectors and policy fields are
+/// retained. An explicit `none` removes the effective contract altogether.
+// §FS-rhei-snapshots.4.2 §FS-rhei-plan-language.3.13
+fn effective_snapshot_inherit(
+    machine: &rhei_validator::StateMachine,
+    task: &rhei_core::ast::Task,
+    current_state: &str,
+) -> Option<rhei_validator::SnapshotInheritConfig> {
+    use rhei_core::ast::TaskSnapshotInherit;
+
+    let state_rule = machine
+        .states
+        .get(current_state)
+        .and_then(|state| state.snapshot.as_ref())
+        .and_then(|snapshot| snapshot.inherit.as_ref())
+        .cloned();
+    match task.inherits.as_ref() {
+        None => state_rule,
+        Some(TaskSnapshotInherit::Disabled) => None,
+        Some(TaskSnapshotInherit::Rule { name, from_axis }) => {
+            let mut effective = state_rule.unwrap_or(rhei_validator::SnapshotInheritConfig {
+                name: name.clone(),
+                from_axis: Some(from_axis.clone()),
+                compat: None,
+                required: None,
+                select: None,
+            });
+            effective.name.clone_from(name);
+            effective.from_axis = Some(from_axis.clone());
+            Some(effective)
+        }
+    }
+}
+
+/// Terminal, non-cancelled declared predecessors are the only tasks a Prior
+/// lookup may inspect. Each source is judged by its owning rhei's machine.
+// §FS-rhei-snapshots.4.3 §FS-rhei-panta.6.1
+fn eligible_prior_snapshot_sources(
+    task: &rhei_core::ast::Task,
+    plan_tasks: &[rhei_core::ast::Task],
+    machines: &ExecutionMachines,
+) -> Vec<String> {
+    task.prior
+        .iter()
+        .filter_map(|prior| {
+            let source = find_task_by_id(plan_tasks, prior)?;
+            let machine = machines.for_task(&source.id);
+            let state = normalized_state_name(&source.state, machine);
+            (is_terminal_state(&state, machine)
+                && !rhei_validator::is_cancelled_state_name(&state))
+            .then(|| source.id.to_string())
+        })
+        .collect()
+}
+
 /// Orchestration hook for snapshot inheritance preload, invoked before
 /// spawning the agent subprocess for a state that declares
 /// `snapshot.inherit:`.
@@ -31,6 +88,7 @@ struct SnapshotPreloadRoots<'a> {
 /// `unsupported-snapshot-session` error.
 // §FS-rhei-snapshots.10.1: Snapshot preload errors.
 #[allow(clippy::too_many_arguments)]
+#[allow(dead_code)]
 fn preload_snapshot_inherit_before_spawn(
     input: &Path,
     roots: SnapshotPreloadRoots<'_>,
@@ -44,13 +102,40 @@ fn preload_snapshot_inherit_before_spawn(
     override_selection: Option<&SnapshotOverrideRunSelection>,
     opts: &RunOptions,
 ) -> MietteResult<SnapshotPreload> {
+    preload_snapshot_inherit_before_spawn_with_prior_sources(
+        input,
+        roots,
+        spawn_working_dir,
+        machine,
+        task,
+        current_state,
+        resolved,
+        settings,
+        visit_count,
+        override_selection,
+        opts,
+        &[],
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn preload_snapshot_inherit_before_spawn_with_prior_sources(
+    input: &Path,
+    roots: SnapshotPreloadRoots<'_>,
+    spawn_working_dir: &Path,
+    machine: &rhei_validator::StateMachine,
+    task: &rhei_core::ast::Task,
+    current_state: &str,
+    resolved: &ResolvedAgent,
+    settings: &RheiSettings,
+    visit_count: u64,
+    override_selection: Option<&SnapshotOverrideRunSelection>,
+    opts: &RunOptions,
+    prior_sources: &[String],
+) -> MietteResult<SnapshotPreload> {
     let mut preload = SnapshotPreload::default();
-    let declares_inherit = machine
-        .states
-        .get(current_state)
-        .and_then(|state| state.snapshot.as_ref())
-        .and_then(|snapshot| snapshot.inherit.as_ref())
-        .is_some();
+    let effective_inherit = effective_snapshot_inherit(machine, task, current_state);
+    let declares_inherit = effective_inherit.is_some();
 
     let target_slug = if declares_inherit {
         Some(snapshot_target_slug_or_err(resolved)?)
@@ -67,6 +152,16 @@ fn preload_snapshot_inherit_before_spawn(
         opts.snapshot_override_ref().is_some(),
     );
     if override_applies && !declares_inherit {
+        if matches!(
+            task.inherits.as_ref(),
+            Some(rhei_core::ast::TaskSnapshotInherit::Disabled)
+        ) {
+            return Err(miette!(
+                help = snapshot_help(),
+                "--from-snapshot has no effective snapshot inheritance contract because Task {} declares **Inherits:** none; --override-inherit does not bypass the opt-out",
+                task.id
+            ));
+        }
         return Err(miette!(
             help = snapshot_help(),
             "--from-snapshot requires the target state '{}' to declare snapshot.inherit; --override-inherit does not bypass that authored contract",
@@ -130,12 +225,7 @@ fn preload_snapshot_inherit_before_spawn(
         }
     }
 
-    let Some(inherit) = machine
-        .states
-        .get(current_state)
-        .and_then(|state| state.snapshot.as_ref())
-        .and_then(|snapshot| snapshot.inherit.as_ref())
-    else {
+    let Some(inherit) = effective_inherit.as_ref() else {
         return Ok(preload);
     };
     let required = inherit.required.unwrap_or(false);
@@ -185,19 +275,21 @@ fn preload_snapshot_inherit_before_spawn(
                 inherit,
                 &target_slug,
                 visit_count,
+                prior_sources,
                 &record,
                 resolved,
             )?;
         }
         Some(record)
     } else {
-        resolve_inherit_snapshot_source(
+        resolve_inherit_snapshot_source_with_prior(
             &cache_root,
             task,
             current_state,
             inherit,
             &target_slug,
             visit_count,
+            prior_sources,
         )?
     };
 
@@ -253,7 +345,7 @@ fn preload_snapshot_inherit_before_spawn(
             ));
         }
         diag_warn!(
-            "warning: agent '{}' has no supported snapshot preload strategy; running cold",
+            "warning: unsupported-snapshot-session: agent '{}' has no supported snapshot preload strategy; running cold",
             resolved.agent.id()
         );
         return Ok(preload);
@@ -267,7 +359,7 @@ fn preload_snapshot_inherit_before_spawn(
             ));
         }
         diag_warn!(
-            "warning: agent '{}' has no supported snapshot preload strategy; running cold",
+            "warning: unsupported-snapshot-session: agent '{}' has no supported snapshot preload strategy; running cold",
             resolved.agent.id()
         );
         return Ok(preload);
@@ -312,329 +404,4 @@ fn preload_snapshot_inherit_before_spawn(
     }
     preload.parent_ref = Some(snapshot_parent_ref(&source));
     Ok(preload)
-}
-
-fn snapshot_override_applies_to_invocation(
-    override_selection: Option<&SnapshotOverrideRunSelection>,
-    task: &rhei_core::ast::Task,
-    target_slug: &str,
-    has_override_ref: bool,
-) -> bool {
-    if !has_override_ref {
-        return false;
-    }
-    override_selection.is_none_or(|selection| {
-        selection.task_id == task.id.to_string() && selection.target_slug == target_slug
-    })
-}
-
-#[allow(clippy::too_many_arguments)]
-fn validate_snapshot_override_contract(
-    cache_root: &Path,
-    task: &rhei_core::ast::Task,
-    current_state: &str,
-    inherit: &rhei_validator::SnapshotInheritConfig,
-    target_slug: &str,
-    visit_count: u64,
-    record: &SnapshotRecord,
-    resolved: &ResolvedAgent,
-) -> MietteResult<()> {
-    if record.snapshot_name != inherit.name {
-        return Err(miette!(
-            help = snapshot_inherit_help(),
-            "--from-snapshot selected snapshot name '{}', but snapshot.inherit requires '{}'",
-            record.snapshot_name,
-            inherit.name
-        ));
-    }
-    let task_id = task.id.to_string();
-    match inherit.from_axis.as_deref().unwrap_or("self") {
-        "self" => {
-            if record.task_id != task_id {
-                return Err(miette!(
-                    help = snapshot_inherit_help(),
-                    "--from-snapshot selected task '{}', but snapshot.inherit.from: self requires task '{}'",
-                    record.task_id,
-                    task_id
-                ));
-            }
-            if record.emitting_state == current_state && record.visit >= visit_count {
-                return Err(miette!(
-                    help = snapshot_inherit_help(),
-                    "--from-snapshot selected {} from the current or future visit; snapshot.inherit.from: self only permits prior visits",
-                    record.display_ref()
-                ));
-            }
-        }
-        "ancestor" => {
-            let ancestors = ancestor_task_ids(&task_id);
-            if !ancestors.iter().any(|ancestor| ancestor == &record.task_id) {
-                return Err(miette!(
-                    help = snapshot_inherit_help(),
-                    "--from-snapshot selected task '{}', but snapshot.inherit.from: ancestor requires an ancestor of task '{}'",
-                    record.task_id,
-                    task_id
-                ));
-            }
-        }
-        other => {
-            return Err(miette!(
-                help = state_machine_help(),
-                "unsupported snapshot.inherit.from '{}' while validating --from-snapshot",
-                other
-            ));
-        }
-    }
-
-    if let Some(select) = inherit.select.as_ref() {
-        if let Some(state) = select.state.as_deref() {
-            if record.emitting_state != state {
-                return Err(miette!(
-                    help = snapshot_inherit_help(),
-                    "--from-snapshot selected emitting state '{}', but snapshot.inherit.select.state requires '{}'",
-                    record.emitting_state,
-                    state
-                ));
-            }
-        }
-        if let Some(target) = select.target.as_deref() {
-            let required_target = if target == "same" { target_slug } else { target };
-            if record.target_slug != required_target {
-                return Err(miette!(
-                    help = snapshot_inherit_help(),
-                    "--from-snapshot selected target '{}', but snapshot.inherit.select.target requires '{}'",
-                    record.target_slug,
-                    required_target
-                ));
-            }
-        }
-        if let Some(visit) = select.visit.as_ref() {
-            validate_snapshot_override_visit(
-                cache_root,
-                task,
-                current_state,
-                inherit,
-                target_slug,
-                visit_count,
-                record,
-                visit,
-            )?;
-        } else {
-            validate_snapshot_override_default_visit(
-                cache_root,
-                task,
-                current_state,
-                inherit,
-                target_slug,
-                visit_count,
-                record,
-            )?;
-        }
-        if let Some(generation) = select.generation.as_ref() {
-            validate_snapshot_override_generation(
-                cache_root,
-                task,
-                current_state,
-                inherit,
-                target_slug,
-                visit_count,
-                record,
-                generation,
-            )?;
-        } else if !record.is_current {
-            return Err(miette!(
-                help = snapshot_inherit_help(),
-                "--from-snapshot selected {}, but snapshot.inherit.select.generation defaults to current",
-                record.display_ref()
-            ));
-        }
-    } else {
-        validate_snapshot_override_default_visit(
-            cache_root,
-            task,
-            current_state,
-            inherit,
-            target_slug,
-            visit_count,
-            record,
-        )?;
-        if !record.is_current {
-            return Err(miette!(
-                help = snapshot_inherit_help(),
-                "--from-snapshot selected {}, but snapshot.inherit.select.generation defaults to current",
-                record.display_ref()
-            ));
-        }
-    }
-
-    if inherit.compat.as_deref().unwrap_or("native") == "native"
-        && !snapshot_record_native_compatible(record, resolved)
-    {
-        return Err(miette!(
-            help = snapshot_inherit_help(),
-            "--from-snapshot selected snapshot {} is not native-compatible with agent '{}'",
-            record.display_ref(),
-            resolved.agent.id()
-        ));
-    }
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn validate_snapshot_override_visit(
-    cache_root: &Path,
-    task: &rhei_core::ast::Task,
-    current_state: &str,
-    inherit: &rhei_validator::SnapshotInheritConfig,
-    target_slug: &str,
-    visit_count: u64,
-    record: &SnapshotRecord,
-    visit: &YamlValue,
-) -> MietteResult<()> {
-    if let Some(required_visit) = yaml_selector_u64(visit) {
-        if record.visit != required_visit {
-            return Err(miette!(
-                help = snapshot_inherit_help(),
-                "--from-snapshot selected visit {}, but snapshot.inherit.select.visit requires {}",
-                record.visit,
-                required_visit
-            ));
-        }
-    } else if yaml_selector_string(visit) == Some("latest") {
-        let candidates = snapshot_override_contract_candidates(
-            cache_root,
-            task,
-            current_state,
-            inherit,
-            target_slug,
-            visit_count,
-        )?;
-        let latest_visit = candidates.iter().map(|candidate| candidate.visit).max();
-        if latest_visit != Some(record.visit) {
-            return Err(miette!(
-                help = snapshot_inherit_help(),
-                "--from-snapshot selected visit {}, but snapshot.inherit.select.visit requires latest visit {}",
-                record.visit,
-                latest_visit.unwrap_or(record.visit)
-            ));
-        }
-    }
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn validate_snapshot_override_default_visit(
-    cache_root: &Path,
-    task: &rhei_core::ast::Task,
-    current_state: &str,
-    inherit: &rhei_validator::SnapshotInheritConfig,
-    target_slug: &str,
-    visit_count: u64,
-    record: &SnapshotRecord,
-) -> MietteResult<()> {
-    let candidates = snapshot_override_contract_candidates(
-        cache_root,
-        task,
-        current_state,
-        inherit,
-        target_slug,
-        visit_count,
-    )?;
-    let latest_visit = candidates.iter().map(|candidate| candidate.visit).max();
-    if latest_visit != Some(record.visit) {
-        return Err(miette!(
-            help = snapshot_inherit_help(),
-            "--from-snapshot selected visit {}, but snapshot.inherit.select.visit defaults to latest visit {}",
-            record.visit,
-            latest_visit.unwrap_or(record.visit)
-        ));
-    }
-    Ok(())
-}
-
-#[allow(clippy::too_many_arguments)]
-fn validate_snapshot_override_generation(
-    cache_root: &Path,
-    task: &rhei_core::ast::Task,
-    current_state: &str,
-    inherit: &rhei_validator::SnapshotInheritConfig,
-    target_slug: &str,
-    visit_count: u64,
-    record: &SnapshotRecord,
-    generation: &YamlValue,
-) -> MietteResult<()> {
-    if let Some(required_generation) = yaml_selector_u64(generation) {
-        if record.generation != required_generation {
-            return Err(miette!(
-                help = snapshot_inherit_help(),
-                "--from-snapshot selected generation {}, but snapshot.inherit.select.generation requires {}",
-                record.generation,
-                required_generation
-            ));
-        }
-    } else if yaml_selector_string(generation) == Some("latest") {
-        let mut candidates = snapshot_override_contract_candidates(
-            cache_root,
-            task,
-            current_state,
-            inherit,
-            target_slug,
-            visit_count,
-        )?;
-        candidates.retain(|candidate| candidate.visit == record.visit);
-        let latest_generation = candidates.iter().map(|candidate| candidate.generation).max();
-        if latest_generation != Some(record.generation) {
-            return Err(miette!(
-                help = snapshot_inherit_help(),
-                "--from-snapshot selected generation {}, but snapshot.inherit.select.generation requires latest generation {}",
-                record.generation,
-                latest_generation.unwrap_or(record.generation)
-            ));
-        }
-    } else if yaml_selector_string(generation) == Some("current") && !record.is_current {
-        return Err(miette!(
-            help = snapshot_inherit_help(),
-            "--from-snapshot selected {}, but snapshot.inherit.select.generation requires current",
-            record.display_ref()
-        ));
-    }
-    Ok(())
-}
-
-fn snapshot_override_contract_candidates(
-    cache_root: &Path,
-    task: &rhei_core::ast::Task,
-    current_state: &str,
-    inherit: &rhei_validator::SnapshotInheritConfig,
-    target_slug: &str,
-    visit_count: u64,
-) -> MietteResult<Vec<SnapshotRecord>> {
-    let mut scoped = read_snapshot_records(cache_root)?
-        .into_iter()
-        .filter(|candidate| candidate.snapshot_name == inherit.name)
-        .filter(|candidate| candidate.produced_by == "orchestrator")
-        .filter(|candidate| match inherit.from_axis.as_deref().unwrap_or("self") {
-            "self" => {
-                candidate.task_id == task.id.to_string()
-                    && !(candidate.emitting_state == current_state && candidate.visit >= visit_count)
-            }
-            "ancestor" => ancestor_task_ids(&task.id.to_string())
-                .iter()
-                .any(|ancestor| ancestor == &candidate.task_id),
-            _ => false,
-        })
-        .collect::<Vec<_>>();
-    if let Some(select) = inherit.select.as_ref() {
-        if let Some(state) = select.state.as_deref() {
-            scoped.retain(|candidate| candidate.emitting_state == state);
-        }
-        if let Some(target) = select.target.as_deref() {
-            let required_target = if target == "same" { target_slug } else { target };
-            scoped.retain(|candidate| candidate.target_slug == required_target);
-        }
-        if let Some(visit) = select.visit.as_ref().and_then(yaml_selector_u64) {
-            scoped.retain(|candidate| candidate.visit == visit);
-        }
-    }
-    Ok(scoped)
 }

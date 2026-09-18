@@ -439,22 +439,37 @@ fn validate_snapshot_plan_context(
     machines: &ResolvedMachineSet,
 ) -> Vec<String> {
     let mut errors = Vec::new();
-    for task in &loaded.rhei.tasks {
+    fn visit(
+        task: &rhei_core::ast::Task,
+        machines: &ResolvedMachineSet,
+        errors: &mut Vec<String>,
+    ) {
         let machine = machines.machine_for_task_str(&task.id.to_string());
         let state_name = normalized_state_name(task.state.as_str(), machine);
-        if machine
-            .states
-            .get(&state_name)
-            .and_then(|state| state.snapshot.as_ref())
-            .and_then(|snapshot| snapshot.inherit.as_ref())
-            .and_then(|inherit| inherit.from_axis.as_deref())
+        let effective = effective_snapshot_inherit(machine, task, &state_name);
+        if effective.as_ref().and_then(|inherit| inherit.from_axis.as_deref())
             == Some("ancestor")
+            && task.profile_level() == 1
         {
             errors.push(format!(
-                "Task {} is a root task in state '{}' but that state declares snapshot.inherit.from: ancestor (snapshot root tasks have no ancestor)",
+                "Task {} is a root task in state '{}' but its effective snapshot inheritance uses from: ancestor (snapshot root tasks have no ancestor)",
                 task.id, state_name
             ));
         }
+        if effective.is_some()
+            && machine.states.get(&state_name).is_some_and(|state| state.poll.is_some())
+        {
+            errors.push(format!(
+                "Task {} has effective snapshot inheritance in polling state '{}'; polling states cannot inherit snapshots in v1",
+                task.id, state_name
+            ));
+        }
+        for child in &task.children {
+            visit(child, machines, errors);
+        }
+    }
+    for task in &loaded.rhei.tasks {
+        visit(task, machines, &mut errors);
     }
     errors
 }

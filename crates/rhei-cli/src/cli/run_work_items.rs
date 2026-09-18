@@ -156,7 +156,7 @@ enum ParallelProgramSpawnOutcome {
 }
 
 fn select_snapshot_override_run_invocation(
-    machines: &ExecutionMachines,
+    _machines: &ExecutionMachines,
     opts: &RunOptions,
     invocations: &[(String, String, String, ResolvedAgent)],
 ) -> MietteResult<Option<SnapshotOverrideRunSelection>> {
@@ -165,17 +165,11 @@ fn select_snapshot_override_run_invocation(
     }
 
     let mut candidates = Vec::new();
-    for (task_id, _raw_state, current_state, resolved) in invocations {
-        let declares_inherit = machines
-            .for_task_str(task_id)
-            .states
-            .get(current_state)
-            .and_then(|state| state.snapshot.as_ref())
-            .and_then(|snapshot| snapshot.inherit.as_ref())
-            .is_some();
-        if !declares_inherit {
-            continue;
-        }
+    for (task_id, _raw_state, _current_state, resolved) in invocations {
+        // Task metadata is re-read at the spawn boundary, so the run-level
+        // override selector cannot discard an invocation based on state-only
+        // configuration here. The preload validates the effective contract.
+        // §FS-rhei-snapshot-operations.2 §FS-rhei-snapshots.4.4
         let target_slug = snapshot_target_slug_or_err(resolved)?;
         candidates.push(SnapshotOverrideRunSelection {
             task_id: task_id.clone(),

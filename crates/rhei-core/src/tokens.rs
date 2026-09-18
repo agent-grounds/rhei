@@ -3,7 +3,7 @@
 //! These tokens cover the lexical elements defined in the plan language
 //! specification. Fielded variants mirror the specification exactly.
 
-use crate::ast::{ConsumedExport, TaskId};
+use crate::ast::{ConsumedExport, TaskId, TaskSnapshotInherit};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
@@ -29,6 +29,10 @@ pub enum Token {
 
     /// Metadata "Prior": `**Prior:** <kind> <id>, <kind> <id>, ...`.
     MetadataPrior { task_ids: Vec<TaskId> },
+
+    /// Metadata "Inherits": task snapshot inheritance overlay or opt-out.
+    // §FS-rhei-plan-language.3.13
+    MetadataInherits { inherit: TaskSnapshotInherit },
 
     /// Metadata "Provides": `**Provides:** <name>, <name>, ...`.
     // §FS-rhei-plan-language.3.12: Task exports.

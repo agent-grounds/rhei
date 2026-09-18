@@ -93,6 +93,11 @@ fn task_json(t: &Task) -> Value {
     obj.insert("title".to_string(), Value::String(t.title.clone()));
     obj.insert("state".to_string(), Value::String(t.state.clone()));
     obj.insert("prior".to_string(), Value::Array(prior));
+    if let Some(inherit) = &t.inherits {
+        // Report authored metadata only; state defaults remain in the machine.
+        // §FS-rhei-render.3.1
+        obj.insert("inherits".to_string(), Value::String(inherit.normalized()));
+    }
     let exclusions = t
         .excludes
         .iter()

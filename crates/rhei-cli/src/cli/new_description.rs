@@ -12,10 +12,11 @@
 /// parser reads it as a field of the surrounding node, which is either an error
 /// about metadata the author never wrote or a silently applied field.
 // §FS-rhei-plan-language.2
-const PLAN_METADATA_MARKERS: [&str; 8] = [
+const PLAN_METADATA_MARKERS: [&str; 9] = [
     "**State:**",
     "**States:**",
     "**Prior:**",
+    "**Inherits:**",
     "**Provides:**",
     "**Consumes:**",
     "**Assignee:**",

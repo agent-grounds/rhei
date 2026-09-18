@@ -13,6 +13,12 @@
 
 ### Added
 
+- **Tasks can explicitly continue a declared predecessor's native session.**
+  State machines accept `snapshot.inherit.from: prior`, while task
+  `**Inherits:**` metadata and `rhei new --inherits` provide per-ticket opt-in,
+  overlay, and `none` opt-out controls without exposing arbitrary task
+  addressing or changing artifact handoffs. (PR #290)
+
 - **`rhei instantiate` now composes reusable, parameterized blocks into one
   ordinary workspace.** Direct `--mount` composition and recursive manifest
   `use` qualify owned states, tasks, profiles, settings, prompts, and runtime

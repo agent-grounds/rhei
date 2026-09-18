@@ -294,6 +294,7 @@ fn snapshot_cache_benefit_reason(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(dead_code)]
 fn resolve_inherit_snapshot_source(
     cache_root: &Path,
     task: &rhei_core::ast::Task,
@@ -301,6 +302,27 @@ fn resolve_inherit_snapshot_source(
     inherit: &rhei_validator::SnapshotInheritConfig,
     target_slug: &str,
     visit_count: u64,
+) -> MietteResult<Option<SnapshotRecord>> {
+    resolve_inherit_snapshot_source_with_prior(
+        cache_root,
+        task,
+        current_state,
+        inherit,
+        target_slug,
+        visit_count,
+        &[],
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn resolve_inherit_snapshot_source_with_prior(
+    cache_root: &Path,
+    task: &rhei_core::ast::Task,
+    current_state: &str,
+    inherit: &rhei_validator::SnapshotInheritConfig,
+    target_slug: &str,
+    visit_count: u64,
+    prior_sources: &[String],
 ) -> MietteResult<Option<SnapshotRecord>> {
     let records = read_snapshot_records(cache_root)?
         .into_iter()
@@ -311,6 +333,19 @@ fn resolve_inherit_snapshot_source(
     let selected_target = inherit.select.as_ref().and_then(|select| select.target.as_deref());
     let selected_visit = inherit.select.as_ref().and_then(|select| select.visit.as_ref());
     let selected_generation = inherit.select.as_ref().and_then(|select| select.generation.as_ref());
+
+    if inherit.from_axis.as_deref() == Some("prior") {
+        return resolve_prior_inherit_snapshot_source(
+            records,
+            inherit,
+            target_slug,
+            prior_sources,
+            selected_state,
+            selected_target,
+            selected_visit,
+            selected_generation,
+        );
+    }
 
     let mut scoped = match inherit.from_axis.as_deref().unwrap_or("self") {
         "self" => records
@@ -397,6 +432,100 @@ fn resolve_inherit_snapshot_source(
             "ambiguous-lineage: snapshot.inherit '{}' matched multiple cached generations",
             inherit.name
         )),
+    }
+}
+
+/// Reduce each declared predecessor independently before deciding whether the
+/// cross-source result is missing, unique, or ambiguous.
+// §FS-rhei-snapshots.4.3: Prior lineage never uses a global-newest tie-break.
+#[allow(clippy::too_many_arguments)]
+fn resolve_prior_inherit_snapshot_source(
+    records: Vec<SnapshotRecord>,
+    inherit: &rhei_validator::SnapshotInheritConfig,
+    target_slug: &str,
+    prior_sources: &[String],
+    selected_state: Option<&str>,
+    selected_target: Option<&str>,
+    selected_visit: Option<&serde_yaml::Value>,
+    selected_generation: Option<&serde_yaml::Value>,
+) -> MietteResult<Option<SnapshotRecord>> {
+    let mut survivors = Vec::new();
+    for source in prior_sources {
+        let mut scoped = records
+            .iter()
+            .filter(|record| record.task_id == *source)
+            .filter(|record| selected_state.is_none_or(|state| record.emitting_state == state))
+            .filter(|record| match selected_target {
+                Some("same") => record.target_slug == target_slug,
+                Some(target) => record.target_slug == target,
+                None => true,
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if selected_target.is_none() {
+            let targets = scoped.iter().map(|record| &record.target_slug).collect::<BTreeSet<_>>();
+            if targets.len() > 1 {
+                survivors.extend(scoped);
+                continue;
+            }
+        }
+
+        match selected_visit {
+            Some(value) if yaml_selector_u64(value).is_some() => {
+                let visit = yaml_selector_u64(value).unwrap_or(1);
+                scoped.retain(|record| record.visit == visit);
+            }
+            Some(value) if yaml_selector_string(value) == Some("latest") => {
+                if let Some(latest) = scoped.iter().map(|record| record.visit).max() {
+                    scoped.retain(|record| record.visit == latest);
+                }
+            }
+            None => {
+                if let Some(latest) = scoped.iter().map(|record| record.visit).max() {
+                    scoped.retain(|record| record.visit == latest);
+                }
+            }
+            _ => {}
+        }
+        match selected_generation {
+            Some(value) if yaml_selector_u64(value).is_some() => {
+                let generation = yaml_selector_u64(value).unwrap_or(1);
+                scoped.retain(|record| record.generation == generation);
+            }
+            Some(value) if yaml_selector_string(value) == Some("latest") => {
+                if let Some(latest) = scoped.iter().map(|record| record.generation).max() {
+                    scoped.retain(|record| record.generation == latest);
+                }
+            }
+            Some(value) if yaml_selector_string(value) == Some("current") => {
+                scoped.retain(|record| record.is_current);
+            }
+            None => {
+                scoped.retain(|record| record.is_current);
+            }
+            _ => {}
+        }
+        survivors.extend(scoped);
+    }
+
+    match survivors.len() {
+        0 => Ok(None),
+        1 => Ok(survivors.pop()),
+        _ => {
+            survivors.sort_by(|a, b| a.task_id.cmp(&b.task_id).then_with(|| a.display_ref().cmp(&b.display_ref())));
+            let competing = survivors
+                .iter()
+                .map(|record| format!("{} ({})", record.task_id, record.display_ref()))
+                .collect::<Vec<_>>()
+                .join(", ");
+            Err(miette!(
+                help = snapshot_ambiguous_help(),
+                "ambiguous-lineage: snapshot.inherit '{}' matched multiple declared Prior sources: {}",
+                inherit.name,
+                competing
+            ))
+        }
     }
 }
 

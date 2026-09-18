@@ -266,7 +266,9 @@ fn spawn_parallel_agent_work_item(
         emit_run_message(sink, rhei_tui::MessageLevel::Info, note);
     }
 
-    let snapshot_preload = preload_snapshot_inherit_before_spawn(
+    let prior_snapshot_sources =
+        eligible_prior_snapshot_sources(task, &loaded.rhei.tasks, machines);
+    let snapshot_preload = preload_snapshot_inherit_before_spawn_with_prior_sources(
         input,
         snapshot_roots,
         &working_dir,
@@ -278,6 +280,7 @@ fn spawn_parallel_agent_work_item(
         visit_count,
         snapshot_override_selection,
         opts,
+        &prior_snapshot_sources,
     )?;
 
     let from_state = task.state.as_str().to_string();

@@ -180,6 +180,7 @@ fn reject_mode_confusion(options: &NewOptions) -> MietteResult<()> {
         ("--kind", options.kind.is_some()),
         ("--state", options.state.is_some()),
         ("--prior", !options.prior.is_empty()),
+        ("--inherits", options.inherits.is_some()),
         ("--provides", !options.provides.is_empty()),
         ("--consumes", !options.consumes.is_empty()),
         ("--excludes", !options.excludes.is_empty()),

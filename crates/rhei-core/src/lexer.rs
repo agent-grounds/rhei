@@ -4,7 +4,7 @@
 //! matches the `<kind> <id>: <title>` shape, plus section, state, and prior
 //! metadata tokens.
 
-use crate::ast::{ConsumedExport, TaskId};
+use crate::ast::{ConsumedExport, TaskId, TaskSnapshotInherit};
 use crate::text::parse_task_id;
 use crate::tokens::Token;
 use regex::Regex;
@@ -18,6 +18,7 @@ pub struct Tokenizer<'a> {
     re_node_header: Regex,
     re_prior_ref: Regex,
     re_consumes_ref: Regex,
+    re_inherits: Regex,
     re_states: Regex,
     re_state: Regex,
     re_assignee: Regex,
@@ -53,6 +54,11 @@ impl<'a> Tokenizer<'a> {
         let re_consumes_ref =
             Regex::new(&format!(r#"^({task_id_pattern}):([A-Za-z0-9][A-Za-z0-9._-]*)$"#)).unwrap();
 
+        let re_inherits = Regex::new(
+            r#"^\*\*Inherits:\*\*\s*(none|([a-z][a-z0-9-]*) from (self|ancestor|prior))$"#,
+        )
+        .unwrap();
+
         // For "**States:** name" (must be checked before re_state)
         let re_states = Regex::new(r#"^\*\*States:\*\*\s+(.+)$"#).unwrap();
 
@@ -75,6 +81,7 @@ impl<'a> Tokenizer<'a> {
             re_node_header,
             re_prior_ref,
             re_consumes_ref,
+            re_inherits,
             re_states,
             re_state,
             re_assignee,
@@ -174,6 +181,19 @@ impl<'a> Iterator for Tokenizer<'a> {
                     .filter_map(|c| c.get(2).and_then(|m| parse_task_id(m.as_str())))
                     .collect::<Vec<TaskId>>();
                 return Some(Token::MetadataPrior { task_ids: ids });
+            }
+
+            // Metadata: task snapshot inheritance. §FS-rhei-plan-language.3.13
+            if let Some(caps) = self.re_inherits.captures(line) {
+                let inherit = if caps.get(1).is_some_and(|value| value.as_str() == "none") {
+                    TaskSnapshotInherit::Disabled
+                } else {
+                    TaskSnapshotInherit::Rule {
+                        name: caps.get(2).expect("rule name capture").as_str().to_string(),
+                        from_axis: caps.get(3).expect("rule axis capture").as_str().to_string(),
+                    }
+                };
+                return Some(Token::MetadataInherits { inherit });
             }
 
             // Metadata: Provides §FS-rhei-plan-language.3.12

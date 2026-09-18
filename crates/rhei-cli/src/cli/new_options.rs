@@ -113,6 +113,10 @@ struct NewOptions {
         add = ArgValueCompleter::new(complete_task_id)
     )]
     prior: Vec<String>,
+    /// Per-ticket snapshot inheritance overlay or explicit opt-out
+    // §FS-rhei-new.1.3
+    #[arg(long, value_name = "RULE", help_heading = "Creating a ticket")]
+    inherits: Option<String>,
     /// Export this ticket publishes (repeatable; comma-separated also accepted)
     #[arg(
         long,

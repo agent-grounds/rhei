@@ -59,6 +59,7 @@ transitions:
             state: state.to_string(),
             prior_kinds: vec![None; prior.len()],
             prior,
+            inherits: None,
             provides: Vec::new(),
             consumes: Vec::new(),
             excludes: Vec::new(),

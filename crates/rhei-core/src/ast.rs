@@ -204,6 +204,27 @@ pub struct ConsumedExport {
     pub name: String,
 }
 
+/// Authored task-level snapshot inheritance control.
+///
+/// Absence preserves the state's rule, `Disabled` is the explicit `none`
+/// form, and `Rule` replaces only the effective name and lineage axis.
+// §FS-rhei-plan-language.3.13: Task snapshot inheritance overrides.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TaskSnapshotInherit {
+    Disabled,
+    Rule { name: String, from_axis: String },
+}
+
+impl TaskSnapshotInherit {
+    /// The normalized markdown/JSON value of the authored rule.
+    pub fn normalized(&self) -> String {
+        match self {
+            Self::Disabled => "none".to_string(),
+            Self::Rule { name, from_axis } => format!("{name} from {from_axis}"),
+        }
+    }
+}
+
 /// One task-authored read exclusion. Paths retain their portable authored
 /// spelling; resolution against the checkout or execution root happens at the
 /// invocation boundary. §FS-rhei-plan-language.3.13
@@ -252,6 +273,9 @@ pub struct Task {
     /// authored so errors can quote the source.
     // §FS-rhei-plan-language.3.1: validated against the referenced node's kind.
     pub prior_kinds: Vec<Option<String>>,
+    /// Per-task snapshot inheritance overlay from `**Inherits:**`, if present.
+    // §FS-rhei-plan-language.3.13: Omission, overlay, and explicit opt-out.
+    pub inherits: Option<TaskSnapshotInherit>,
     /// Export names this task publishes, from `**Provides:**`, in the order
     /// they were authored.
     // §FS-rhei-plan-language.3.12: Task exports are a plan-level handoff.

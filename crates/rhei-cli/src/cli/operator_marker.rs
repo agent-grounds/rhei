@@ -16,7 +16,11 @@ struct ForcedHop { task_id: String, from: String, to: String }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ForcedFile { path: String, roles: Vec<String>, before: ForcedImage, after: ForcedImage }
+struct ForcedFile {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    owner: Option<ForcedOwner>,
+    path: String, roles: Vec<String>, before: ForcedImage, after: ForcedImage,
+}
 
 /// Absence remains distinct from a present zero-byte file. §FS-rhei-recover.2
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -105,7 +109,7 @@ impl ForcedMarker {
     /// Canonical reserialization also catches duplicate keys and alternate JSON. §FS-rhei-recover.2
     fn parse(root: &Path, bytes: &[u8]) -> MietteResult<Self> {
         let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|err| miette!("{err}"))?;
-        if let Some(version) = value["version"].as_u64().filter(|version| *version != 1) {
+        if let Some(version) = value["version"].as_u64().filter(|version| ![1, 2].contains(version)) {
             return Err(miette!("unsupported forced-recovery marker version {version}"));
         }
         let marker: Self = serde_json::from_slice(bytes).map_err(|err| miette!("{err}"))?;
@@ -114,9 +118,13 @@ impl ForcedMarker {
             return Err(miette!("noncanonical marker or recovery id"));
         }
         let mut previous = None;
+        let mut paths = std::collections::BTreeSet::new();
         for file in &marker.files {
-            forced_image_path(root, &file.path)?;
-            if previous.is_some_and(|p: &str| p >= file.path.as_str())
+            let path = forced_file_path(root, file)?;
+            if (marker.version == 1 && file.owner.is_some()) || (marker.version == 2 && file.owner.is_none()) {
+                return Err(miette!("image owner does not match recovery marker version"));
+            }
+            if previous.is_some_and(|p| p >= file.key()) || !paths.insert(path)
                 || file.path == marker.ledger.path || file.path.starts_with(".rhei/")
                 || file.roles.is_empty() || file.roles.windows(2).any(|p| p[0] >= p[1])
                 || file.roles.iter().any(|r| !["task", "metadata", "checkpoint", "result"].contains(&r.as_str())) {
@@ -124,7 +132,11 @@ impl ForcedMarker {
             }
             file.before.bytes()?;
             file.after.bytes()?;
-            previous = Some(&file.path);
+            previous = Some(file.key());
+        }
+        if marker.version == 2 && (!marker.hop.task_id.starts_with("basin.")
+            || !marker.files.iter().any(|file| file.owner == Some(ForcedOwner::BasinProjectMetadata))) {
+            return Err(miette!("version 2 requires a basin project-metadata image"));
         }
         forced_image_path(root, &marker.ledger.path)?;
         if marker.files.is_empty() || !marker.files.iter().any(|file| file.roles.iter().any(|r| r == "task"))

@@ -28,6 +28,11 @@ help = cwd_help(),
 "failed to read the current directory: {err}"))?,
     };
     let project = if here { host.clone() } else { host.join("panta") };
+    // Reinitialization writes the basin's shared manifest too. §FS-rhei-recover.4
+    let _root_guards = if project.is_dir() {
+        rhei_core::root_access::for_input(&project).map_err(|err| miette!("{err}"))?
+    } else { Vec::new() };
+
 
     // §FS-rhei-init.2: a host that is itself a project refuses default mode
     // even under --force — a fresh `panta/` child nested inside it would lose

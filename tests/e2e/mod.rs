@@ -77,6 +77,7 @@ mod next_explicit_passive_claim_tests;
 mod next_node_kinds_tests;
 mod next_tests;
 mod operator_attended_tests;
+mod operator_basin_tests;
 mod operator_consumer_tests;
 mod operator_force_support;
 mod operator_force_tests;

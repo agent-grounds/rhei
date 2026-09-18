@@ -1,7 +1,10 @@
 // Boundary hooks exist only in unit-test binaries, never as CLI authority. §FS-rhei-recover.5
 #[cfg(test)]
+type ForcedBoundaryHook = Box<dyn FnMut(&str) -> MietteResult<()>>;
+
+#[cfg(test)]
 thread_local! {
-    static FORCED_BOUNDARY: std::cell::RefCell<Option<Box<dyn FnMut(&str) -> MietteResult<()>>>> =
+    static FORCED_BOUNDARY: std::cell::RefCell<Option<ForcedBoundaryHook>> =
         const { std::cell::RefCell::new(None) };
 }
 
@@ -87,7 +90,7 @@ fn forced_remove(path: &Path) -> MietteResult<()> {
 fn forced_install_images(root: &Path, marker: &ForcedMarker, forward: bool) -> MietteResult<()> {
     for (index, file) in marker.files.iter().enumerate() {
         forced_boundary(&format!("image-{index}-before"))?;
-        let path = forced_image_path(root, &file.path)?;
+        let path = forced_file_path(root, file)?;
         let image = if forward { &file.after } else { &file.before };
         match image.bytes()? {
             Some(bytes) => forced_replace(&path, &bytes)?,

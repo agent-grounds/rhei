@@ -15,7 +15,7 @@
 // §FS-rhei-transition-cmd.3
 struct LockedPlanFile {
     /// Retained across ordinary writes, including direct engine entry. §FS-rhei-recover.4
-    _root_guard: rhei_core::root_access::RootAccessGuard,
+    _root_guard: Vec<rhei_core::root_access::RootAccessGuard>,
     writer_lock: Mutex<Option<fs::File>>,
     path: PathBuf,
 }

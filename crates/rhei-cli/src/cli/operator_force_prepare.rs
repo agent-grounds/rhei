@@ -9,11 +9,6 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     let root = rhei_core::platform::canonical_path(&route.execution_root)
         .map_err(|err| file_io_report(&route.execution_root, "failed to resolve recovery root", err))?;
     forced_marker_location(&root)?;
-    let mut roots = loaded.rhei_roots.values().cloned().collect::<Vec<_>>();
-    roots.push(execution_workspace_root(&input));
-    let mut roots = roots.into_iter().map(|p| rhei_core::platform::canonical_path(&p))
-        .collect::<std::io::Result<Vec<_>>>().map_err(|err| miette!("{err}"))?;
-    roots.sort(); roots.dedup();
     let resolved = resolve_state_machines_for_loaded_plan(&input, &loaded, request.machine_path)?;
     let machines = ExecutionMachines::build(&resolved, &input, &loaded)?;
     let machine = machines.for_task_str(&task_id);
@@ -129,7 +124,11 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
         bytes.extend_from_slice(format!("## Result\n\n{result}\n\n").as_bytes());
         files.push(forced_file(&root, &path, &["result"], &bytes)?);
     }
-    files.sort_by(|left, right| left.path.cmp(&right.path));
+    if files.iter().any(|file| file.owner == Some(ForcedOwner::BasinProjectMetadata)) {
+        for file in &mut files { file.owner.get_or_insert(ForcedOwner::ExecutionRoot); }
+    }
+    files.sort_by(|left, right| left.key().cmp(&right.key()));
+    let roots = forced_owner_roots(&root, &files)?;
     Ok(Some(PreparedForce { root, roots, task_id, files }))
     })();
     match prepared {

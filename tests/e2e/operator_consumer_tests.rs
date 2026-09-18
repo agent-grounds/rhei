@@ -10,7 +10,10 @@ fn consumer_fixture(prefix: &str) -> ForceFixture {
         .replace("    description: Human decision", "    description: Human decision\n    outputs:\n      - name: ruling\n        kind: handoff\n        path: runtime/ruling.md")
         .replace("    description: Work", "    description: Work\n    agent: capture\n    agent_timeout: 30s\n    handoff:\n      inherit:\n        - from: transition.previous\n          required: true")
         .replace("    to: cancelled", "    to: completed");
-    let fixture = force_fixture(prefix, GATE_PLAN, &machine);
+    let dir = unique_temp_dir(prefix);
+    let plan = write_fixture_file(&dir, "plan.rhei.md", GATE_PLAN);
+    let machine = write_fixture_file(&dir, "states.yaml", &machine);
+    let fixture = ForceFixture { dir, plan, machine };
     let agent = write_python_agent(
         &fixture.dir,
         "capture.py",
@@ -24,6 +27,8 @@ result('## Result\n\nCompleted the isolated consumer scenario.\n')
     fs::write(settings.join("settings.json"), format!(
         r#"{{"defaults":{{"agent":"capture","agent_timeout":"30s"}},"agents":{{"capture":{{"command":{},"stdin_prompt":true,"timeout":"30s"}}}}}}"#,
         fixture_command(&agent))).unwrap();
+    // Agent configuration participates in valid-fixture validation. §FS-rhei-transition-cmd.6
+    assert_success(&run_cli("validate", &fixture.plan, &fixture.machine, &[]));
     fs::create_dir_all(fixture.dir.join("runtime")).unwrap();
     fs::write(fixture.dir.join("runtime/ruling.md"), "The operator's reviewed handoff.").unwrap();
     let (success, transcript) = attended(

@@ -23,7 +23,7 @@ struct Hold {
 
 thread_local! {
     // Re-entrant loads under this thread's exclusive transaction do not relock.
-    static HELD: RefCell<BTreeMap<PathBuf, Weak<Hold>>> = RefCell::new(BTreeMap::new());
+    static HELD: RefCell<BTreeMap<PathBuf, Weak<Hold>>> = const { RefCell::new(BTreeMap::new()) };
 }
 
 #[cfg(test)]
@@ -39,6 +39,13 @@ impl Drop for Hold {
 
 /// A marker always outranks authored-input lenience. §FS-rhei-recover.4
 pub fn check_pending(root: &Path) -> io::Result<()> {
+    for owner in pending_roots(root) {
+        check_marker(&owner)?;
+    }
+    Ok(())
+}
+
+fn check_marker(root: &Path) -> io::Result<()> {
     let marker = root.join(MARKER);
     let bytes = match fs::read(&marker) {
         Ok(bytes) => bytes,
@@ -171,58 +178,7 @@ impl RootAccessGuard {
 #[path = "root_access_tests.rs"]
 mod tests;
 
-/// Acquire a complete root set in canonical order before returning data. §FS-rhei-panta.6.6
-pub fn shared_roots(roots: impl IntoIterator<Item = PathBuf>) -> io::Result<Vec<RootAccessGuard>> {
-    let mut roots = roots
-        .into_iter()
-        .map(|p| crate::platform::canonical_path(&p))
-        .collect::<io::Result<Vec<_>>>()?;
-    roots.sort();
-    roots.dedup();
-    roots.iter().map(|root| RootAccessGuard::shared(root)).collect()
-}
-
-/// Discover only root identities before acquiring guards, never task bytes. §FS-rhei-panta.6.6
-pub fn for_input(path: &Path) -> io::Result<Vec<RootAccessGuard>> {
-    shared_roots(input_roots(path)?)
-}
-
-/// Combine several inputs' root identities before taking any shared locks. §FS-rhei-panta.6.6
-pub fn input_roots(path: &Path) -> io::Result<Vec<PathBuf>> {
-    let root = if path.is_dir() { path } else { crate::workspace::plan_parent_dir(path) };
-    let mut roots = vec![root.to_path_buf()];
-    check_pending(root)?;
-    if root.join(crate::workspace::PANTA_INDEX_FILE).is_file() {
-        for entry in fs::read_dir(root)? {
-            let entry = entry?;
-            let path = entry.path();
-            if entry.file_type()?.is_dir()
-                && (path.join(crate::workspace::RHEI_INDEX_FILE).is_file()
-                    || path.file_name().is_some_and(|name| name == "basin"))
-            {
-                roots.push(path);
-            }
-        }
-    }
-    Ok(roots)
-}
-
-/// Direct file consumers locate their owning workspace before taking access. §FS-rhei-recover.4
-pub fn for_file(path: &Path) -> io::Result<RootAccessGuard> {
-    let parent = crate::workspace::plan_parent_dir(path);
-    let root = parent
-        .ancestors()
-        .find(|dir| {
-            dir.join(MARKER).exists()
-                || dir.join(crate::workspace::RHEI_INDEX_FILE).is_file()
-                || dir.join(crate::workspace::PANTA_INDEX_FILE).is_file()
-                || dir.join(".rhei/run.lock").is_file()
-                || fs::read_dir(dir).is_ok_and(|entries| {
-                    entries.flatten().any(|entry| {
-                        entry.file_name().to_str().is_some_and(|name| name.ends_with(".rhei.md"))
-                    })
-                })
-        })
-        .unwrap_or(parent);
-    RootAccessGuard::shared(root)
-}
+#[path = "root_access_discovery.rs"]
+mod discovery;
+use discovery::pending_roots;
+pub use discovery::{for_file, for_input, input_roots, shared_roots};

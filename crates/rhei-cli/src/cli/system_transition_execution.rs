@@ -137,7 +137,7 @@ fn execute_transition_with_origin(
     run_options: Option<&RunOptions>,
 ) -> MietteResult<String> {
     // §FS-rhei-recover.4: direct engine/callback entries retain root access too.
-    let _root_guard = rhei_core::root_access::RootAccessGuard::shared(files.artifact_root).map_err(|err| miette!("{err}"))?;
+    let _root_guard = rhei_core::root_access::for_input(files.artifact_root).map_err(|err| miette!("{err}"))?;
     let task_file = files.task_file;
     let metadata_file = files.metadata_file;
     let workspace_root = execution_workspace_root(&callback_paths.plan_path);

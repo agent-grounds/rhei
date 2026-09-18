@@ -912,3 +912,5 @@ fn the_finished_screen_is_left_when_nobody_is_there_to_quit_it() {
     assert!(leave_finished_screen(false, &terminal_gone));
     assert!(leave_finished_screen(true, &terminal_gone));
 }
+
+include!("tests_operator_history.rs");

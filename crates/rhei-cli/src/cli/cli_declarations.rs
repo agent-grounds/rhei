@@ -66,6 +66,7 @@ Templates:
 
 Execution:
   transition  Atomically transition a task from one state to another (compare-and-swap)
+  recover     Resolve an interrupted forced transition with fresh operator confirmation
   run         Execute a plan by advancing tasks through the state machine in dependency order
   attach      Connect a live surface to a run this shell did not start
   runs        List the runs that are live on this machine

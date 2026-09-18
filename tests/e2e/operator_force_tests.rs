@@ -319,8 +319,26 @@ fn operator_recovery_command_surface_is_discoverable() {
         .args(["completions", "bash"])
         .output()
         .expect("bash completions");
-    let completion = stdout(&completion);
-    assert!(completion.contains("recover"), "completion omits recover");
-    assert!(completion.contains("--force"), "completion omits --force");
-    assert!(completion.contains("--reason"), "completion omits --reason");
+    assert!(completion.status.success(), "completion wrapper generation failed");
+    assert!(!stdout(&completion).is_empty());
+    // Generated Bash scripts delegate candidates to this protocol. §FS-rhei-completions.7
+    for (index, words, expected) in [
+        ("1", vec!["rhei", "rec"], "recover"),
+        ("2", vec!["rhei", "transition", "--for"], "--force"),
+        ("2", vec!["rhei", "transition", "--rea"], "--reason"),
+    ] {
+        let candidates = rhei_command(root.join("home"))
+            .env("COMPLETE", "bash")
+            .env("_CLAP_COMPLETE_INDEX", index)
+            .arg("--")
+            .args(words)
+            .output()
+            .expect("dynamic completion candidates");
+        assert!(candidates.status.success(), "completion failed for {expected}");
+        assert!(
+            stdout(&candidates).lines().any(|line| line == expected),
+            "completion omits {expected}: {}",
+            stdout(&candidates)
+        );
+    }
 }

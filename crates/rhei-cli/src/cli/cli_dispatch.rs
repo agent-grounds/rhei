@@ -484,13 +484,8 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             init_command(dir.as_deref(), title.as_deref(), no_agents, force, here)
         }
         Commands::New { options } => new_command(&options),
-        Commands::Validate { watch, input, state_machine } => {
-            // §FS-rhei-validate.1.1: validation never narrows — a member rhei
-            // validates the project it cannot resolve without.
-            let target = resolve_plan_target(input)?;
-            report_validation_widened(&target);
-            validate_command(target.path(), state_machine.or(before_subcommand).as_deref(), watch)
-        }
+        command @ Commands::Migrate { .. } => dispatch_target_command(command, before_subcommand),
+        command @ Commands::Validate { .. } => dispatch_target_command(command, before_subcommand),
         Commands::Render { input, format, pretty, no_color, no_metadata, no_content, state_machine } => {
             let target = resolve_plan_target(input)?;
             render_command(
@@ -575,12 +570,7 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
                 no_callbacks,
             )
         }
-        Commands::Run { input, standalone, agent, program, snapshot, state_machine } => {
-            let target = resolve_plan_target(input)?;
-            let mut opts: RunOptions = (standalone, agent, program, snapshot).into();
-            opts.narrow_to(target.scope_with(opts.rhei_scope()));
-            run_command(target.path(), state_machine.or(before_subcommand).as_deref(), opts)
-        }
+        command @ Commands::Run { .. } => dispatch_target_command(command, before_subcommand),
         // A member loads through its project like every other command, and the
         // rhei it named narrows which accounting roots are read rather than
         // being dropped here. §FS-rhei-panta.6.5

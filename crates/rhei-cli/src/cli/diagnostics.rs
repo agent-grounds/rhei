@@ -571,6 +571,32 @@ impl FileIoCause for String {}
 
 impl FileIoCause for &str {}
 
+thread_local! {
+    static VALIDATION_MIGRATION_TARGET: std::cell::RefCell<Option<PathBuf>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Preserve the operator's target spelling while a widened validate/run uses
+/// the enclosing project internally. §FS-rhei-migrate.5 §FS-rhei-errors.1.2
+fn with_validation_migration_target<T>(
+    target: &Path,
+    action: impl FnOnce() -> T,
+) -> T {
+    let previous = VALIDATION_MIGRATION_TARGET
+        .with(|current| current.replace(Some(target.to_path_buf())));
+    let result = action();
+    VALIDATION_MIGRATION_TARGET.with(|current| {
+        current.replace(previous);
+    });
+    result
+}
+
+fn validation_migration_target(fallback: &Path) -> PathBuf {
+    VALIDATION_MIGRATION_TARGET
+        .with(|current| current.borrow().clone())
+        .unwrap_or_else(|| fallback.to_path_buf())
+}
+
 /// Convert file I/O failures into a diagnostic that names the path and the
 /// remedy for that error kind. §FS-rhei-errors.6
 fn file_io_report(path: &Path, action: &str, err: impl FileIoCause) -> Report {
@@ -594,6 +620,17 @@ fn validation_report(
     guidance: &[String],
 ) -> Report {
     let mut help = guidance.to_vec();
+    if errors.iter().any(|error| {
+        error.contains("consumes export '") && error.contains("must list Task ")
+    }) {
+        // The strict validator stays read-only; this is the explicit recovery
+        // boundary for an otherwise-valid old authored shape. §FS-rhei-migrate.5
+        let migration_target = validation_migration_target(input);
+        help.push(format!(
+            "rhei migrate export-priors {}",
+            shell_quote(&migration_target.display().to_string())
+        ));
+    }
     help.push("fix the errors above, then re-check with: rhei validate <plan>".to_string());
     miette!(
         help = help.join("\n"),

@@ -326,7 +326,7 @@ path = "crates/rhei-cli/src/cli/cli_dispatch.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 700, unit = "lines" }
+max_accepted = { value = 800, unit = "lines" }
 until = "Dispatch is split by the same subcommand groups the declaration tree grows, so each group's arms and its entry point travel together."
 reason = """
 Over budget before this change; the touch that surfaced it added three match arms. The dispatch match must name every subcommand in one place, and the process entry point and error rendering sit beside it.

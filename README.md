@@ -312,6 +312,9 @@ Watch a plan and states file for changes:
 cargo run -p rhei-cli -- validate --watch examples/release-automation.rhei.md
 ```
 
+Repair missing export-prior edges with `rhei migrate export-priors --dry-run
+PATH`, then `rhei migrate export-priors PATH`; see [§FS-rhei-migrate](docs/functional-spec/rhei-migrate.spec.md#fs-rhei-migrate-rhei-migrate).
+
 Render a plan as pretty JSON:
 
 ```bash

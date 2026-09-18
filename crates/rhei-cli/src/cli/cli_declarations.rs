@@ -82,6 +82,7 @@ Execution:
 
 Authoring:
   new         Create a rhei under Panta, or a ticket inside one with --under
+  migrate     Rewrite an older authored plan into a current valid shape
 
 Setup:
   init            Set up a Panta project in a gitignored `panta/` folder (or in place with --here)
@@ -151,6 +152,12 @@ enum Commands {
     New {
         #[command(flatten)]
         options: NewOptions,
+    },
+    /// Rewrite an older authored plan into a current valid shape
+    // §FS-rhei-migrate.1 §FS-rhei-migrate.6
+    Migrate {
+        #[command(subcommand)]
+        command: MigrateCommand,
     },
     /// Validate a markdown plan against the configured states
     Validate {
@@ -763,6 +770,23 @@ enum Commands {
         #[arg(long, value_name = "PATH", add = ArgValueCompleter::new(complete_any_path))]
         output: Option<PathBuf>,
         /// Print the destination path without writing files
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+/// Explicit authored-plan compatibility operations. §FS-rhei-migrate.1
+#[derive(Subcommand, Debug)]
+enum MigrateCommand {
+    /// Add direct Prior edges required by declared Consumes relationships
+    ExportPriors {
+        /// Path to a plan, workspace, or Panta project; omitted, discover it
+        #[arg(
+            value_name = "RHEI_PLAN_OR_WORKSPACE",
+            add = ArgValueCompleter::new(complete_rhei_plan_path)
+        )]
+        input: Option<PathBuf>,
+        /// Show the exact additions without replacing authored files
         #[arg(long)]
         dry_run: bool,
     },

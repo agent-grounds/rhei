@@ -274,10 +274,8 @@ fn validate_machine_settings_references_inner(
             || state.snapshot.as_ref().and_then(|snapshot| snapshot.inherit.as_ref()).is_some()
             || state.session.is_some()
         {
-            // Settings-aware snapshot checks need the merged agent/model
-            // registry, so they live in the CLI validation layer rather than
-            // §FS-rhei-snapshots.4.7 §FS-rhei-snapshots.9.2
-            // §FS-rhei-snapshots.11: Registry-aware checks.
+            // Settings-aware snapshot checks use the merged agent/model registry in CLI validation.
+            // §FS-rhei-snapshots.4.7 §FS-rhei-snapshots.9.2 §FS-rhei-snapshots.11
             match resolve_agent_invocations(machine, state_name, settings, &default_run_options()) {
                 Ok(invocations) if invocations.is_empty() => {
                     errors.push(format!(

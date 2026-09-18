@@ -245,7 +245,11 @@ fn next_command(
         )
         .into_iter()
         .any(|candidate| candidate.id == task.id);
-        if !explicitly_claimable {
+        // A read-only supervisor preview still renders its screen after its
+        // release; only a real claim must pass the supervision ready-set
+        // decision. §FS-rhei-supervision.3.4
+        let supervisor_preview = peek && task_is_supervising(task, machine);
+        if !explicitly_claimable && !supervisor_preview {
             return Err(miette!(
                 help = format!(
                     "inspect the task and current ready work with: rhei list {}",

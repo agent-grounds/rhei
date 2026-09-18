@@ -74,16 +74,26 @@ fn resolve_target_agent(
     })
 }
 
-fn resolve_target_agent_with_model_override(
+/// Replace supplied target dimensions, preserving mode and provider, then
+/// validate the composed identity. §FS-rhei-agents.1.4 §FS-rhei-agents.1.5
+fn resolve_target_agent_with_overrides(
     selector: &str,
     state_def: Option<&rhei_validator::StateDef>,
     settings: &RheiSettings,
-    model_override: &str,
+    agent_override: Option<&str>,
+    model_override: Option<&str>,
 ) -> MietteResult<ResolvedAgent> {
     let mut target = parse_execution_target(selector)
         .map_err(|err| miette!(help = err, "invalid target selector '{}'", selector))?;
-    target.model = model_override.to_string();
-    // §FS-rhei-plan-language.3.11: `**Model:**` preserves state target agent/mode/provider.
+
+    if let Some(agent) = agent_override {
+        target.agent = agent.to_string();
+    }
+    if let Some(model) = model_override {
+        resolve_model_profile(settings, Some(model))?;
+        target.model = model.to_string();
+    }
+
     resolve_target_agent(&target.selector(), state_def, settings)
 }
 
@@ -275,24 +285,26 @@ fn resolve_agent_invocations_for_task(
         }
 
         if let Some(selector) = task_target_override {
-            // §FS-rhei-plan-language.3.11: `**Target:**` replaces the full execution identity.
-            if let Some(model) = opts.model_override() {
-                return Ok(vec![resolve_target_agent_with_model_override(
-                    selector,
-                    Some(state_def),
-                    settings,
-                    model,
-                )?]);
-            }
-            return Ok(vec![resolve_target_agent(selector, Some(state_def), settings)?]);
+            // §FS-rhei-plan-language.3.11: `**Target:**` supplies the full
+            // lower-precedence identity, then CLI dimensions overlay it.
+            return Ok(vec![resolve_target_agent_with_overrides(
+                selector,
+                Some(state_def),
+                settings,
+                opts.agent_override(),
+                opts.model_override(),
+            )?]);
         }
         if let Some(model) = task_model_override {
             if let Some(selector) = state_def.target.as_deref() {
-                return Ok(vec![resolve_target_agent_with_model_override(
+                // §FS-rhei-plan-language.3.11: CLI agent precedence composes
+                // with `**Model:**` while preserving target mode and provider.
+                return Ok(vec![resolve_target_agent_with_overrides(
                     selector,
                     Some(state_def),
                     settings,
-                    model,
+                    opts.agent_override(),
+                    Some(model),
                 )?]);
             }
             return Ok(resolve_legacy_agent_with_task_model(
@@ -313,7 +325,13 @@ fn resolve_agent_invocations_for_task(
             return Ok(resolved);
         }
         if let Some(selector) = state_def.target.as_deref() {
-            return Ok(vec![resolve_target_agent(selector, Some(state_def), settings)?]);
+            return Ok(vec![resolve_target_agent_with_overrides(
+                selector,
+                Some(state_def),
+                settings,
+                opts.agent_override(),
+                opts.model_override(),
+            )?]);
         }
         if !state_def.all_models.is_empty() {
             let mut resolved = Vec::with_capacity(state_def.all_models.len());

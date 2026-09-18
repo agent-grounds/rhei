@@ -73,13 +73,15 @@ struct AgentExecutionFlags {
     /// Disable agent spawning; use callback-only advancement
     #[arg(long)]
     no_agent: bool,
-    /// Override the agent for this run
+    /// Override the agent dimension on ordinary single targets; `all_targets` is unchanged.
+    /// §FS-rhei-run.2.2
     #[arg(long, value_name = "AGENT", add = ArgValueCompleter::new(complete_agent_name))]
     agent: Option<String>,
     /// Override the agent mode (named flag set) for this run
     #[arg(long, value_name = "MODE", add = ArgValueCompleter::new(complete_agent_mode))]
     agent_mode: Option<String>,
-    /// Override the model for this run
+    /// Override the model dimension on ordinary single targets; fanout keeps its declared models.
+    /// §FS-rhei-run.2.2
     #[arg(long, value_name = "MODEL", add = ArgValueCompleter::new(complete_model_name))]
     model: Option<String>,
 }

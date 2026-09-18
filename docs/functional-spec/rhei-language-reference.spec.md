@@ -73,7 +73,7 @@ Use this order when learning or auditing the language:
    when one template mounts reusable blocks or `rhei instantiate` composes
    several blocks directly.
 
-Command specs such as [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate), [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next), [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition),
+Command specs such as [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate), [§FS-rhei-migrate](rhei-migrate.spec.md#fs-rhei-migrate-rhei-migrate), [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next), [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition),
 [§FS-rhei-complete](rhei-complete.spec.md#fs-rhei-complete-rhei-complete), and [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run) define command behavior over the language;
 they are not the primary grammar reference.
 

@@ -47,6 +47,15 @@ A runnable command reproduces the invocation the user actually typed — the
 arguments they already supplied plus the correction — so it can be pasted
 without re-deriving anything.
 
+One correction changes authored dependency text rather than retrying the
+refused read-only command: when an otherwise-valid consumed producer is absent
+from the consumer's direct `**Prior:**`, both `validate` and `run` name the
+consumer and producer and print `help: rhei migrate export-priors TARGET`.
+The target retains a shell-safe supplied spelling, or is the explicitly
+discovered project/rhei path when the failed command omitted it. The help never
+suggests that validation or execution will migrate implicitly.
+[§FS-rhei-migrate.5](rhei-migrate.spec.md#5-recovery-sequence)
+
 A correction is offered in a form the CLI accepts. A value the user can assign
 is shown as the assignment; a scalar nested inside an array or object has no
 assignment syntax of its own, so the correction names the enclosing input and

@@ -1301,6 +1301,13 @@ for a human or a consumer not yet written. Consumes is data flow, not an access
 boundary; it neither restricts which files a worker may read nor changes
 readiness independently of `**Prior:**`.
 
+The rule has no inferred-age or unversioned legacy exception: identical plan
+text has identical validity whether it was just authored or laid before the
+rule existed. An otherwise-valid old-shape plan is brought into the current
+language explicitly with
+`rhei migrate export-priors` ([§FS-rhei-migrate](rhei-migrate.spec.md#fs-rhei-migrate-rhei-migrate)); validation and execution remain strict and read-only until that
+operation authors the missing direct edges.
+
 When a consumed export reference resolves, an exclusion may never overlap it;
 §3.13 defines the overlap rule and makes that contradiction a validation error.
 

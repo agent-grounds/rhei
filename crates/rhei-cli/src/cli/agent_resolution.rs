@@ -96,11 +96,9 @@ fn resolve_target_agent_with_overrides(
     let model_profile = resolve_model_profile(settings, Some(model_override))?
         .expect("a named model override has a model profile");
     target.model = model_override.to_string();
-    // `**Model:**`/CLI overrides preserve target agent/mode/provider and keep
-    // the named profile id as the target's own identity, so binding, timeout,
-    // and effort resolution inside `resolve_target_agent` already key off it
-    // correctly; only the concrete model and provenance need adding here for
-    // accounting. §FS-rhei-plan-language.3.11 §FS-rhei-agents.1.4 §FS-rhei-agents.1.5
+    // Keep the profile id as the target's model so binding/timeout/effort
+    // resolution below keys off it; only add the concrete model and
+    // provenance for accounting. §FS-rhei-agents.1.4 §FS-rhei-agents.1.5
     let mut resolved = resolve_target_agent(&target.selector(), state_def, settings)?;
     resolved.model_name = model_profile.model.clone().or_else(|| resolved.model.clone());
     if let Some(target) = resolved.target.as_mut() {

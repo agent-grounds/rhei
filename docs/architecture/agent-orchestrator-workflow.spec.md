@@ -327,6 +327,15 @@ boundary, never between consent and destruction.
 [§FS-rhei-reset.3](../functional-spec/rhei-reset.spec.md#3-safety)
 [§FS-rhei-reset.4](../functional-spec/rhei-reset.spec.md#4-output)
 
+The multi-file export-prior migration is another writer under this protocol.
+It refuses contended execution-root run locks, sorts and holds every affected
+plan sidecar, re-reads and replans the complete graph under those locks, stages
+and prevalidates all rewrites, and then performs same-directory atomic
+replacement per file. A failure before the first replacement writes no plan;
+a later-file failure may leave completed files but reports the completed and
+remaining sets so the idempotent operation can be retried.
+[§FS-rhei-migrate.4](../functional-spec/rhei-migrate.spec.md#4-exclusion-and-commitment)
+
 This protocol has an upgrade boundary: stop every older writer that shares a
 plan directory, upgrade every writer, and only then resume writing. Existing
 sidecars remain and are reused, but Rhei does not detect or support concurrent

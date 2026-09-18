@@ -208,6 +208,11 @@ headless, and JSONL surfaces; no new output record family is introduced.
    `level: "warn"`; TUI, dashboard, and the durable event log retain that same
    event. A warning does not change run success. This validation scope and
    frequency are the same for ordinary, `--parallel`, and `--rhei` execution.
+   A consumed producer missing only from the consumer's direct `**Prior:**`
+   remains such an error: run names both tasks, includes the copyable
+   `rhei migrate export-priors TARGET` help of
+   [§FS-rhei-migrate.5](rhei-migrate.spec.md#5-recovery-sequence), and exits without changing dependency text. Headless and
+   dry-run paths stop at the same boundary; none migrates implicitly.
 2. Scan all task nodes, including child and grandchild tasks, and compute the
    *ready set*: tasks all of whose descendants are terminal, whose `**Prior:**`
    are all in successful terminal states

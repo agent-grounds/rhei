@@ -161,6 +161,13 @@ One command does not narrow: `rhei validate` takes no `--rhei` at all
 ([§FS-rhei-validate.1.1](rhei-validate.spec.md#11-why-there-is-no---rhei)), so pointing it at a member rhei validates the whole
 project and says so.
 
+`rhei migrate export-priors` likewise takes no `--rhei`, and goes farther than
+ordinary action-command scope: any member target widens to its complete
+enclosing Panta project. Migration must see and prevalidate every cross-rhei
+relationship before rewriting consumer-owned files; a member cannot select a
+partial graph for mutation. A bare single-file plan or Directory Workspace is
+still its complete one-rhei project. [§FS-rhei-migrate.1](rhei-migrate.spec.md#1-export-prior-migration)
+
 `rhei cost` and `rhei summary` load through the project like every other
 command — they read the plan for its tickets and its state machine, and a
 member's cross-rhei `**Prior:**` has to resolve for that reading to be right.

@@ -205,6 +205,22 @@ execution root. To upgrade an older plan, add the direct prior, correct any
 unmatched export name, and make the producer write non-whitespace content
 ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)).
 
+When validation says the producer and export are valid but only the direct edge
+is absent, repair every eligible consumer in the target without per-task
+editing:
+
+```bash
+rhei migrate export-priors --dry-run path/to/plan-or-project
+rhei migrate export-priors path/to/plan-or-project
+rhei validate path/to/plan-or-project
+```
+
+Preview and migration refuse independent errors rather than guessing at them.
+Migration changes only authored `**Prior:**` edges; it does not publish missing
+exports, weaken current-plan validation, or alter runtime state. The exact
+scope, preservation, locking, and retry guarantees are in
+[§FS-rhei-migrate](rhei-migrate.spec.md#fs-rhei-migrate-rhei-migrate).
+
 ### 4.5. Continuing a Prior task's session
 
 When a successor genuinely needs most of a declared predecessor's native agent

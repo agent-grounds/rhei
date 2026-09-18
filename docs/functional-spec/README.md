@@ -20,6 +20,7 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-memory](rhei-memory.spec.md#fs-rhei-memory-mid-term-memory) | Mid-term memory: how an invocation reads what the project did before it, by a fixed algorithm |
 | [§FS-rhei-errors](rhei-errors.spec.md#fs-rhei-errors-cli-errors-and-guidance) | CLI error anatomy, help lines, and copy-paste safety |
 | [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate) | `rhei validate` command behavior |
+| [§FS-rhei-migrate](rhei-migrate.spec.md#fs-rhei-migrate-rhei-migrate) | Explicit compatibility migrations for authored plans |
 | [§FS-rhei-render](rhei-render.spec.md#fs-rhei-render-rhei-render) | `rhei render` command behavior |
 | [§FS-rhei-states-cmd](rhei-states-cmd.spec.md#fs-rhei-states-cmd-rhei-states) | `rhei states` command behavior |
 | [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run) | `rhei run` command behavior |

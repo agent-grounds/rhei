@@ -176,6 +176,13 @@ errors. A missing-export error lists every export that the resolved producer
 does declare, including an explicit empty list, so a typo can be repaired from
 one diagnostic.
 
+When the producer and declared export are otherwise valid and only the direct
+edge is absent, the error names both the consumer and producer and ends with
+the copyable `help: rhei migrate export-priors TARGET` action specified by
+[§FS-rhei-migrate.5](rhei-migrate.spec.md#5-recovery-sequence). Validation does not add the edge. This applies equally to
+newly authored and already-laid unversioned plans, and watch mode never invokes
+migration in response to a file event.
+
 One authored mistake produces one primary error for a consumed reference. A
 missing producer already reported through the same unresolved `**Prior:**` is
 not reported again through `**Consumes:**`. A missing producer named only by

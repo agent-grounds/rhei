@@ -184,7 +184,7 @@ fn run_sequential_program_work_items(
                         task_id_str,
                         current_state,
                         program_outcome.timeout_secs,
-                        opts.no_callbacks(),
+                        opts,
                     ) {
                         TimeoutTransitionOutcome::Fired => {}
                         TimeoutTransitionOutcome::NoRule => {

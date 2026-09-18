@@ -117,7 +117,8 @@
   explicit state and task targets instead of being silently ignored.** Each
   flag replaces only its named identity dimension, preserving the target's
   provider and optional mode; incompatible composed identities are refused
-  before spawn. Selector fanout keeps its authored identities. (PR #289)
+  before spawn. Timeout callbacks retain those overrides in serial and parallel
+  runs. Selector fanout keeps its authored identities. (PR #289)
 
 - **Plan rewrites now use their permanent sibling sidecar as the sole writer
   lock.** The replaceable plan pathname stays readable through callbacks and

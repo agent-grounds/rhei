@@ -201,7 +201,7 @@ fn execute_callback_only_transition(
 /// Variant of [`execute_transition`] that fires the rule with a system-set
 /// origin — currently used by the timeout watchdog to label the transition
 /// as `triggeredBy: 'system'` and to seed `transitionData.timeout`.
-// §FS-rhei-agents.7.5: System timeout transition origin.
+/// The active run options preserve effective callback identity. §FS-rhei-agents.7.5
 #[allow(clippy::too_many_arguments)]
 fn execute_system_timeout_transition(
     files: TransitionFiles<'_>,
@@ -211,7 +211,7 @@ fn execute_system_timeout_transition(
     from: &str,
     to: &str,
     timeout_label: &str,
-    no_callbacks: bool,
+    opts: &RunOptions,
 ) -> MietteResult<String> {
     let mut data = serde_json::Map::new();
     data.insert("timeout".to_string(), serde_json::Value::String(timeout_label.to_string()));
@@ -228,7 +228,7 @@ fn execute_system_timeout_transition(
         task_id_str,
         from,
         to,
-        no_callbacks,
+        opts.no_callbacks(),
         TransitionOrigin {
             claim: false,
             triggered_by: Some("system"),
@@ -239,7 +239,7 @@ fn execute_system_timeout_transition(
             terminal_result_fallback: None,
         },
         None,
-        None,
+        Some(opts),
     )
 }
 

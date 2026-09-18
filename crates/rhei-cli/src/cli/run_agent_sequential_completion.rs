@@ -484,7 +484,7 @@ fn handle_sequential_agent_completion(
                         state_before,
                         to_state,
                         timeout_secs,
-                        opts.no_callbacks(),
+                        opts,
                     ) {
                         TimeoutTransitionOutcome::Fired => *progress.advanced_any = true,
                         // Nowhere to go: the ticket is out of this

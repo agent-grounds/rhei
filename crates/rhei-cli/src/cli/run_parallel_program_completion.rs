@@ -80,7 +80,7 @@ fn handle_parallel_program_completion(
                     &task_id_str,
                     &state_name,
                     program_outcome.timeout_secs,
-                    opts.no_callbacks(),
+                    opts,
                 ) {
                     TimeoutTransitionOutcome::Fired => {}
                     TimeoutTransitionOutcome::NoRule => {

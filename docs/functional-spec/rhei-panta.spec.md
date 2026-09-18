@@ -320,6 +320,15 @@ Claim mode writes the `**Assignee:**` into the owning rhei's file, resolved
 through the source map ([§AR-rhei-panta.2](../architecture/rhei-panta.spec.md#2-load-model)). `--peek` is read-only and never
 writes.
 
+Snapshot `from: prior` follows these same project-qualified edges without
+changing readiness (§FS-rhei-snapshots.4.3). Candidate snapshots are read from
+each prior's owning rhei root and interpreted under that prior's owning state
+machine. A pending or cancelled prior still blocks scheduling; optional
+snapshot fallback cannot make the consumer runnable. Once the task is ready,
+only terminal, non-cancelled declared priors are snapshot sources, including a
+source in another rhei of this project. No project-global cache search may add
+an undeclared or unrelated task.
+
 ### 6.2. `rhei run`
 
 At project scope, `rhei run` orchestrates ready tickets across all in-scope rheis

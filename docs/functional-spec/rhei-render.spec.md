@@ -66,6 +66,12 @@ When JSON format is selected, command errors are rendered as a single JSON
 object on stderr so machine consumers do not need to parse two diagnostic
 shapes.
 
+Each rendered task has an optional string field `inherits`. When authored, its
+normalized value is either `"none"` or `"<name> from <axis>"`, matching
+§FS-rhei-plan-language.3.13. The key is absent, not `null` or an empty string,
+when `**Inherits:**` was omitted. This field reports authored task metadata;
+it does not expand or duplicate an inherited state-machine rule.
+
 ### 3.2. GitHub Markdown
 
 `--format github` emits Markdown suitable for GitHub issue-style review. By

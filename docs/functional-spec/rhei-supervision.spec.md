@@ -81,14 +81,13 @@ states:
 ```
 
 The `snapshot:` block is what makes each visit continue the last one, and it is
-the one part of this shape that is not universally available: of the built-in
-agent profiles only **`pi`** declares a snapshot session layout today, and only
-through a `target:` (or an equivalent `model` binding) that resolves a provider
-and a model — a bare `agent: pi` does not. Every other built-in profile —
-`claude-code`, `codex`, `gemini`, `cursor`, `kilocode` — must **omit** the
-block; declaring it is a hard `unsupported-snapshot-session` validation error,
-and the error says so. A supervisor without it still supervises: it runs each
-visit cold, carried by its checkpoints and its briefs (§6).
+not universally available. The built-in `pi` and `codex` profiles declare
+native session layouts; the resolved target must still supply the identity
+their snapshot rules require. Other profiles without a supported layout must
+omit the block or provide a custom session-capable profile; explicit snapshot
+use otherwise fails with `unsupported-snapshot-session`. A supervisor without
+snapshot support still supervises: it runs each visit cold, carried by its
+checkpoints and briefs (§6).
 
 The value is a *scope* and an *event*, in that order, and exactly four are
 legal:
@@ -772,7 +771,10 @@ engine; a supervisor that wants a fresh one overwrites it.
   transcript with `from: ancestor` ([§FS-rhei-snapshots.6](rhei-snapshots.spec.md#6-sub-task-inheritance)) when a step should
   start inside the supervisor's context. Agents without session support run
   each visit cold ([§FS-rhei-snapshots.9.3](rhei-snapshots.spec.md#93-per-agent-runtime-behavior)); supervision still works, carried
-  by the checkpoints and the briefs.
+  by the checkpoints and the briefs. `from: prior` and task `**Inherits:**`
+  are explicit capabilities, not lifecycle defaults: review and short iterative
+  green work remain cold unless an author deliberately opts a task in, and no
+  template promises savings without measuring total cache-read and write cost.
 - **Counted loops.** Each supervisor visit is a visit of the supervising
   state. `visits` budgets them; the exhaustion edge is the safety valve for a
   subtree that never converges.

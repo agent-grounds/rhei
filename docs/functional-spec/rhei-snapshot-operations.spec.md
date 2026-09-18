@@ -279,19 +279,27 @@ the `current` pointer chain.
 ## 2. Run Override
 
 For an ad-hoc run, `--from-snapshot <ref>` overrides the concrete source
-snapshot after the target state's authored `snapshot.inherit:` constraints have
-been applied. The target state must still declare `snapshot.inherit:` and the
-override must satisfy the declared name, `from`, `select.state`, target,
+snapshot after the target task's effective state/task inheritance constraints
+have been applied. An effective inheritance rule must exist and the override
+must satisfy its name, lineage axis, `select.state`, target,
 visit/generation, `required`, and `compat` constraints unless the operator also
 passes `--override-inherit`.
 
+For `from: prior`, a non-bypassed reference must identify a terminal,
+non-cancelled task in the inheriting task's declared Prior list; cross-rhei
+references remain constrained to the merged project graph. Effective task
+target/model resolution occurs before `select.target`, exactly as for an
+automatic lookup.
+
 `--override-inherit` is an explicit bypass for debugging source-selection and
-compatibility constraints. It does not bypass the authored contract: the target
-state must still declare `snapshot.inherit:`. Without `--override-inherit`,
+compatibility constraints. It does not create an authored contract: an
+effective inheritance rule must still exist. In particular,
+`**Inherits:** none` rejects `--from-snapshot` even when
+`--override-inherit` is also passed. Without `--override-inherit`,
 `--from-snapshot` is rejected when the authored source would be `compat: none`
 or when the referenced snapshot is not natively compatible; with
 `--override-inherit`, those source and compatibility checks may be bypassed,
-but the missing-`snapshot.inherit` rejection remains.
+but the missing-effective-rule rejection remains.
 
 When the run context is ambiguous, the operator must provide selectors such as
 `--task <id>` and `--target <slug>` so the command identifies exactly one task

@@ -41,6 +41,22 @@ transitions:
         assert!(err.to_string().contains("snapshot.inherit.compat"));
     }
 
+    /// §FS-rhei-snapshots.11: `prior` is a valid state-machine axis; source
+    /// eligibility is checked later with the merged plan graph.
+    #[test]
+    fn snapshot_prior_is_accepted_for_plan_aware_validation() {
+        let yaml = snapshot_machine(
+            r#"    snapshot:
+      inherit:
+        name: build
+        from: prior
+        required: false
+"#,
+        );
+
+        StateMachine::from_yaml_str(&yaml).expect("prior is a supported inheritance axis");
+    }
+
     #[test]
     fn rejects_snapshot_inherit_select_target_all() {
         let yaml = snapshot_machine(

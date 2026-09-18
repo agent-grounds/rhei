@@ -151,12 +151,12 @@ fn dry_run_then_migration_releases_the_open_consumer_without_manual_edits() {
 // §FS-rhei-migrate.2 §FS-rhei-migrate.2.1
 #[test]
 fn rewrite_is_minimal_ordered_kind_preserving_and_idempotent() {
-    let plan_text = r#"---
+    let plan_text = r#"# Rhei: Rewrite shape
+**States:** migrate
+---
 structure:
   nodeKinds: [task, review]
 ---
-# Rhei: Rewrite shape
-**States:** migrate
 
 Authored preface.
 
@@ -186,6 +186,8 @@ Keep this prose byte-for-byte.
     let dir = unique_temp_dir("export-prior-rewrite");
     let plan = write_fixture_file(&dir, "plan.rhei.md", plan_text);
     write_fixture_file(&dir, "states.yaml", MACHINE);
+    let agent = write_python_agent(&dir, "rewrite-agent.py", AGENT);
+    write_mock_agent_settings(&dir, &agent);
 
     let migrated = migrate(&plan, false);
     assert_success(&migrated);
@@ -231,6 +233,8 @@ fn directory_workspace_rewrites_only_the_consumer_owning_file() {
         ],
     );
     fs::write(workspace.join("states.yaml"), MACHINE).expect("workspace machine");
+    let agent = write_python_agent(&workspace, "directory-agent.py", AGENT);
+    write_mock_agent_settings(&workspace, &agent);
     let index = workspace.join("index.rhei.md");
     let producer = workspace.join("tasks/01-producer.md");
     let consumer = workspace.join("tasks/03-consumer.md");
@@ -261,6 +265,8 @@ fn panta_member_target_widens_and_preserves_local_vs_qualified_references() {
         "# Panta: Migration scope\n**States:** migrate\n",
     );
     write_fixture_file(&project, "states.yaml", MACHINE);
+    let agent = write_python_agent(&project, "panta-agent.py", AGENT);
+    write_mock_agent_settings(&project, &agent);
     let producer = write_fixture_file(
         &project,
         "producer.rhei.md",

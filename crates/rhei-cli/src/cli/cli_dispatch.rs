@@ -154,10 +154,16 @@ impl CompletionShell {
 /// points keeps prose wrapping while a long path overflows the wrap column
 /// intact, where the terminal soft-wraps it.
 fn install_diagnostic_handler() {
-    let _ = miette::set_hook(Box::new(|_| {
+    let _ = miette::set_hook(Box::new(|diagnostic| {
+        let help = diagnostic.help().map(|help| help.to_string()).unwrap_or_default();
+        // A recovery command is a copyable unit even when it appears inside a
+        // headless launcher's relayed diagnostic. §FS-rhei-migrate.5 §FS-rhei-errors.1.2
+        let keeps_migration_action_whole = help.contains("rhei migrate export-priors ")
+            || diagnostic.to_string().contains("rhei migrate export-priors ");
         Box::new(
             miette::MietteHandlerOpts::new()
                 .break_words(false)
+                .wrap_lines(!keeps_migration_action_whole)
                 .word_separator(textwrap::WordSeparator::AsciiSpace)
                 .word_splitter(textwrap::WordSplitter::NoHyphenation)
                 .build(),

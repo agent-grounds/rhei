@@ -93,7 +93,9 @@ fn issue_286_explicit_passive_claim_honors_one_non_terminal_redirect() {
     let callback = python_callback_yaml(
         "import json,sys;sys.stdout.write(json.dumps({'success': True, 'nextState': 'review'}))",
     );
-    let edge = format!("  - from: bridge\n    to: work\n    on_leave: {callback}\n");
+    let edge = format!(
+        "  - from: bridge\n    to: work\n    on_leave: {callback}\n  - from: bridge\n    to: review\n"
+    );
     let machine = machine(&edge, "", "");
     let (dir, plan_path, machine_path, _) = fixture("next-explicit-redirect", &machine);
 
@@ -120,7 +122,9 @@ fn issue_286_explicit_passive_claim_refuses_terminal_redirect_and_restores() {
     let callback = python_callback_yaml(
         "import json,sys;sys.stdout.write(json.dumps({'success': True, 'nextState': 'done'}))",
     );
-    let edge = format!("  - from: bridge\n    to: work\n    on_leave: {callback}\n");
+    let edge = format!(
+        "  - from: bridge\n    to: work\n    on_leave: {callback}\n  - from: bridge\n    to: done\n"
+    );
     let machine = machine(&edge, "", "");
     let (dir, plan_path, machine_path, original) =
         fixture("next-explicit-terminal-redirect", &machine);

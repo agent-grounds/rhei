@@ -604,6 +604,7 @@ enum Commands {
     /// Automatic selection considers initial-state work. An explicit `--task`
     /// may also claim ready non-initial work; a passive state can advance one
     /// applicable non-terminal edge as part of the atomic claim.
+    // §FS-rhei-next.3
     Next {
         /// Path to a states YAML file (uses built-in default when omitted)
         #[arg(long, value_name = "PATH", add = ArgValueCompleter::new(complete_yaml_path))]

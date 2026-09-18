@@ -44,8 +44,9 @@ and fails on the next, which is the worst shape a test failure can take.
 captured stderr into text is the harness's job and happens at one seam,
 `stderr(&output)` in `mod.rs`, which undoes the soft wrap. Do not convert
 `output.stderr` in a test file: `diagnostic_wrap_tests.rs` fails and names the
-file that did. `raw_stderr` is there for the one kind of test that is *about*
-the rendering.
+file that did. Redirected stderr goes through `stderr_from_file`; when physical
+rendering is itself the subject, use `raw_stderr` for output or
+`raw_stderr_from_file` for a redirected file.
 
 Undoing a wrap is not repairing one. A continuation is rejoined with the single
 space the wrap removed and never with nothing, so a token broken mid-word stays

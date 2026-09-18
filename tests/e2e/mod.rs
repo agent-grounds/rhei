@@ -366,37 +366,30 @@ pub fn stdout(out: &Output) -> String {
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
-/// Captured stderr exactly as the process wrote it — miette's gutter, its soft
-/// wrap and all.
+/// Captured stderr exactly as the process wrote it — miette's gutter, soft wrap, and all.
 ///
-/// Only a test whose subject is the *rendering* wants this. A test asserting
-/// what the binary said reads `stderr`, because where a line happened to break
-/// is a property of the terminal width, not of the message. §FS-rhei-errors.2
+/// Rendering tests use this; message assertions use `stderr` so terminal width cannot decide them. §FS-rhei-errors.2
 pub fn raw_stderr(out: &Output) -> String {
     String::from_utf8_lossy(&out.stderr).into_owned()
 }
 
-/// Captured stderr as an assertion should read it: the sentences the binary
-/// printed, with the renderer's soft wrap undone and nothing else changed.
-///
-/// This is the one seam between captured stderr bytes and a test's `contains`,
-/// so that no assertion's outcome turns on which space the wrap fell at — a
-/// column that moves with a pid, a temporary path or a run id, and so decides
-/// on one machine what it decides differently on the next.
-/// §FS-rhei-errors.2
+/// Redirected stderr exactly as rendered; missing while polling is empty. §FS-rhei-errors.2
+pub fn raw_stderr_from_file(path: impl AsRef<Path>) -> String {
+    fs::read_to_string(path).unwrap_or_default()
+}
+
+/// Captured stderr with renderer soft wraps undone and nothing else changed.
+/// This assertion seam keeps terminal-dependent break positions from changing
+/// `contains` outcomes. §FS-rhei-errors.2
 pub fn stderr(out: &Output) -> String {
     rendered_stderr::undo_soft_wrap(&raw_stderr(out))
 }
 
-/// Captured stderr a run redirected into a file, read the way an assertion
-/// should read it.
-///
-/// A `rhei run` under test writes its own stderr to a file rather than to a
-/// pipe, and miette lays a diagnostic out to the same column there, so the
-/// seam has to reach that door too. Empty when the file is not there yet,
-/// because the callers poll for the run to write one. §FS-rhei-errors.2
+/// Redirected stderr with renderer soft wraps undone for ordinary assertions.
+/// The file seam matches `stderr`; missing while a caller polls is empty.
+/// §FS-rhei-errors.2
 pub fn stderr_from_file(path: impl AsRef<Path>) -> String {
-    rendered_stderr::undo_soft_wrap(&fs::read_to_string(path).unwrap_or_default())
+    rendered_stderr::undo_soft_wrap(&raw_stderr_from_file(path))
 }
 
 /// Run an arbitrary rhei subcommand.

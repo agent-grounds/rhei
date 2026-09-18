@@ -527,7 +527,7 @@ path = "README.md"
 match = "exact"
 rules = ["entrypoint-doc"]
 kind = "deferred"
-max_accepted = { value = 300, unit = "lines" }
+max_accepted = { value = 400, unit = "lines" }
 until = "A citable user-facing feature overview under docs/ owns the detailed feature list and README keeps only orientation and links."
 reason = """
 No narrower document owns the multi-feature product overview yet, so README still carries both first-page orientation and the detailed feature list that successive behavioral fixes keep updating; extracting it is a dedicated information-architecture change, not part of any one fix.

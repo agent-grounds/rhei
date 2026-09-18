@@ -16,7 +16,17 @@ fn state_declares_autonomous_execution(def: &rhei_validator::StateDef) -> bool {
         || !def.all_targets.is_empty()
 }
 
-fn initial_state_has_non_terminal_forward_transition(
+/// Whether a state is passive enough for `next` to advance while claiming it.
+/// Poll and supervision triggers stay in place even if no ordinary executor is
+/// declared; all other passive states may use one selected non-terminal edge.
+// §FS-rhei-next.3
+fn state_allows_passive_claim_advance(def: &rhei_validator::StateDef) -> bool {
+    !state_declares_autonomous_execution(def)
+        && def.poll.is_none()
+        && def.execute_on().is_none()
+}
+
+fn state_has_non_terminal_forward_transition(
     task: &rhei_core::ast::Task,
     rhei: &rhei_core::ast::Rhei,
     machine: &rhei_validator::StateMachine,

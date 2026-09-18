@@ -48,6 +48,7 @@ Rhei is the only agent runtime that combines all of:
   conflicts; `rhei transition` provides atomic compare-and-swap on state.
 - **Deterministic ready-work selection.** `rhei next` claims the next eligible
   task by terminal-state prerequisites and node policy, no LLM guesswork.
+  A named ready task may be non-initial; passive work advances at most one edge.
   Pre-commit claim failures restore the task for retry unless restoration fails.
 - **Runtime orchestration from CLI or API.** `rhei run` advances ready work
   through state machines, spawns agents or deterministic programs, captures

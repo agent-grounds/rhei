@@ -601,10 +601,10 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
         Commands::Schema { name, list: _ } => accounting_schema_command(name.as_deref()),
         // `rhei summary` resolves its positional and its `--rhei` exactly as
         // `rhei cost` does, so the two narrow together. §FS-rhei-summary.1
-        Commands::Summary { input, rhei, details } => {
-            let target = resolve_plan_target(input)?;
-            let scope = target.scope_with(&rhei);
-            summary_command(target.path(), &scope, before_subcommand.as_deref(), details)
+        Commands::Summary { options } => {
+            let target = resolve_plan_target(options.input.clone())?;
+            let scope = target.scope_with(&options.rhei);
+            summary_command(target.path(), &scope, before_subcommand.as_deref(), &options)
         }
         Commands::Report { input, task, state, full } => {
             report_command(&input, task.as_deref(), state.as_deref(), full)

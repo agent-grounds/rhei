@@ -95,6 +95,7 @@ struct RetentionTruncation {
 // §FS-rhei-run-headless.6.1 §FS-rhei-run-headless.6.2
 pub(crate) fn runs_history_command(json: bool, query: &RunHistoryQuery) -> MietteResult<()> {
     let sweep = sweep_run_registry();
+    sweep.ensure_access()?;
     let truncated = query.truncation(&sweep.ended);
     let live: Vec<&RunDescriptor> =
         sweep.live.iter().filter(|run| query.selects(run)).collect();

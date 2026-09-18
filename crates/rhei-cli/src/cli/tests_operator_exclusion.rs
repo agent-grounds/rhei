@@ -95,3 +95,33 @@ fn operator_run_startup_wait_does_not_deadlock_recovery() {
     resume_tx.send(()).unwrap();
     assert!(worker.join().unwrap().unwrap().contains("plan.1 gate -> work"));
 }
+
+/// Runtime discovery refuses a marker before reading or pruning run records. §FS-rhei-recover.4
+#[test]
+fn operator_marker_blocks_run_discovery_and_intervention() {
+    let (dir, plan, machine) = operator_fixture();
+    let request = operator_request(&plan, &machine);
+    interrupt_force_at("marker-after");
+    assert!(commit_confirmed_force(&request, prepare_forced_transition(&request).unwrap(), "test").is_err());
+    clear_force_interrupt();
+    let error = descriptor_for_path(&plan).unwrap_err().to_string();
+    assert!(error.contains("plan.1 gate -> work"), "{error}");
+    let error = intervene_command(&plan, "1", None, "resume").unwrap_err().to_string();
+    assert!(error.contains("plan.1 gate -> work"), "{error}");
+    let descriptor = RunDescriptor {
+        id: "marked".into(), pid: std::process::id(), status: RunStatus::Running,
+        workspace: dir.path().to_path_buf(), plan, state_machine: Some(machine),
+        control_url: None, started_at: "2026-09-18T00:00:00Z".into(), headless: false,
+        parallel: 1, log: None, events: "runtime/events.jsonl".into(), exit_code: None,
+    };
+    let entry = dir.path().join("isolated-registry-entry.json");
+    fs::write(&entry, serde_json::to_vec(&descriptor).unwrap()).unwrap();
+    let before = fs::read(&entry).unwrap();
+    for pruning in [Pruning::Keep, Pruning::Prune] {
+        let sweep = classify_registry_roots(vec![(entry.clone(), descriptor.clone())], RegistrySweep::default(), pruning);
+        let error = sweep.ensure_access().unwrap_err().to_string();
+        assert!(error.contains("plan.1 gate -> work"), "{error}");
+        assert!(sweep.live.is_empty() && sweep.ended.is_empty() && sweep.undecided.is_empty());
+        assert_eq!(fs::read(&entry).unwrap(), before);
+    }
+}

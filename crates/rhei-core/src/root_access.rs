@@ -183,6 +183,11 @@ pub fn shared_roots(roots: impl IntoIterator<Item = PathBuf>) -> io::Result<Vec<
 
 /// Discover only root identities before acquiring guards, never task bytes. §FS-rhei-panta.6.6
 pub fn for_input(path: &Path) -> io::Result<Vec<RootAccessGuard>> {
+    shared_roots(input_roots(path)?)
+}
+
+/// Combine several inputs' root identities before taking any shared locks. §FS-rhei-panta.6.6
+pub fn input_roots(path: &Path) -> io::Result<Vec<PathBuf>> {
     let root = if path.is_dir() { path } else { crate::workspace::plan_parent_dir(path) };
     let mut roots = vec![root.to_path_buf()];
     check_pending(root)?;
@@ -198,7 +203,7 @@ pub fn for_input(path: &Path) -> io::Result<Vec<RootAccessGuard>> {
             }
         }
     }
-    shared_roots(roots)
+    Ok(roots)
 }
 
 /// Direct file consumers locate their owning workspace before taking access. §FS-rhei-recover.4

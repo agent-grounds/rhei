@@ -44,18 +44,19 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     let declared = machine.transitions().iter().find(|rule| rule.from.0 == from && rule.to.0 == to)
         .or_else(|| (!machine.states[from].terminal).then(|| machine.transitions().iter()
             .find(|rule| rule.from.0 == "*" && rule.to.0 == to)).flatten());
+    // Declaration is independent of applicability and every task-owned safeguard. §FS-rhei-transition-cmd.6
+    let prepared = (|| -> MietteResult<Option<PreparedForce>> {
     if let Some(rule) = declared {
         if !transition_rule_is_applicable(rule, machine, checked_metadata, &key, Some(task), from, &task.state)? {
             let reason = describe_blocked_transition(rule, machine, checked_metadata, &key, from, &task.state);
-            return Err(miette!("transition from '{from}' to '{to}' is not currently applicable: {reason}. --force does not bypass safeguards on declared edges"));
+            return Err(miette!("transition from '{from}' to '{to}' is not currently applicable: {reason}"));
         }
-        return Err(miette!("the state machine already declares this edge; drop --force"));
     }
     if let Some(spent) = spent_loop_budget(machine, checked_metadata, &key, from, &task.state, to) {
         return Err(miette!("{spent}"));
     }
     let terminal = machine.states[to].terminal;
-    if terminal && request.result.is_none_or(|result| result.trim().is_empty()) {
+    if terminal && declared.is_none() && request.result.is_none_or(|result| result.trim().is_empty()) {
         return Err(miette!("forced entry into terminal state '{to}' requires a fresh non-empty --result"));
     }
     require_non_blank_result(request.result, "transition")?;
@@ -97,6 +98,10 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     }
     ensure_state_inputs_exist_for_transition(&root, Some(task), &task_id, to, &machine.states[to], to_visit, machine, &settings,
         &format!("Task {task_id} cannot enter state {to}."))?;
+    if declared.is_some() {
+        ensure_terminal_result_available(machine, &root, &task_id, from, to, request.result, &input)?;
+        return Ok(None);
+    }
     // The shared pure supervision update includes counted visits and checkpoint delivery.
     // §FS-rhei-transition-cmd.6
     if let Some(next) = apply_supervision_transition(updated.as_ref().or(checked_metadata), SupervisionTransition {
@@ -125,7 +130,14 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
         files.push(forced_file(&root, &path, &["result"], &bytes)?);
     }
     files.sort_by(|left, right| left.path.cmp(&right.path));
-    Ok(PreparedForce { root, roots, task_id, files })
+    Ok(Some(PreparedForce { root, roots, task_id, files }))
+    })();
+    match prepared {
+        Ok(Some(prepared)) => Ok(prepared),
+        Ok(None) => Err(miette!("the state machine already declares this edge; drop --force")),
+        Err(error) if declared.is_some() => Err(miette!("{error}. --force does not bypass safeguards on declared edges")),
+        Err(error) => Err(error),
+    }
 }
 
 /// Rewriters operate on lines; images keep the source newline convention. §FS-rhei-recover.2

@@ -521,6 +521,11 @@ const COMPLETED_RUNS_OFFERED: usize = 10;
 fn complete_run_reference(current: &OsStr) -> Vec<CompletionCandidate> {
     let prefix = current.to_string_lossy();
     let registry = read_run_registry();
+    // Lenient discovery must still explain a marked-root refusal. §FS-rhei-recover.4
+    if let Err(error) = registry.ensure_access() {
+        eprintln!("{error}");
+        return Vec::new();
+    }
     let live = registry.live.iter().map(|run| (run, "live"));
     let undecided = registry
         .undecided

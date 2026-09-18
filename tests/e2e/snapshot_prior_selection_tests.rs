@@ -4,8 +4,8 @@
 use std::fs;
 
 use super::snapshot_prior_inheritance_tests::{
-    assert_consumer_resumed_source, read_agent_log, required_prior_rule, setup_flow,
-    state_rule_machine,
+    assert_consumer_resumed_source, read_agent_log, required_prior_rule,
+    required_prior_rule_for_any_state, setup_flow, state_rule_machine,
 };
 use super::snapshot_tests::{write_fake_snapshot_agent, write_fake_snapshot_settings};
 use super::*;
@@ -55,7 +55,7 @@ transitions:
   - from: consume
     to: completed
 "#,
-        required_prior_rule()
+        required_prior_rule_for_any_state()
     );
     let (dir, plan, machine) = setup_flow("snapshot-prior-target-filter", plan, &machine);
 

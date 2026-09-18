@@ -130,9 +130,8 @@ impl StateMachine {
                     }
                 }
 
-                // A Prior source may belong to another rhei and machine, so
-                // emitter existence, fanout shape, and static agent identity
-                // are validated with the merged plan graph instead.
+                // Prior emitters may use another rhei's machine, so their
+                // existence and source shape require the merged plan graph.
                 // §FS-rhei-snapshots.11 §FS-rhei-panta.6.1
                 if inherit.from_axis.as_deref() == Some("prior") {
                     continue;
@@ -155,10 +154,8 @@ impl StateMachine {
                     })
                     .collect();
 
-                // A task overlay may replace the snapshot name while retaining
-                // this explicit source-state selector. Defer that combination
-                // to plan-aware effective-rule validation; a wholly
-                // unconstrained missing name remains a machine error.
+                // A task overlay may replace the name while retaining this
+                // selector, so plan-aware validation owns that combination.
                 // §FS-rhei-snapshots.4.2 §FS-rhei-snapshots.11
                 if possible_emitters.is_empty() && selected_state.is_none() {
                     return Err(StateMachineLoadError::Invalid(format!(

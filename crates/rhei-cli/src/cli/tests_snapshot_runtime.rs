@@ -921,7 +921,7 @@ transitions:
             &format!("plan.1:impl:source@1:{slug_a}/g1"),
             false,
         );
-        let err = select_snapshot_override_run_invocation(&single_execution_machines(&machine), &opts, &invocations)
+        let err = select_snapshot_override_run_invocation(dir.path(), &single_execution_machines(&machine), &opts, &invocations)
             .expect_err("ambiguous run invocation is rejected");
         let msg = err.to_string();
         assert!(msg.contains("ambiguous"));
@@ -929,7 +929,7 @@ transitions:
         assert!(msg.contains(&format!("task=plan.1 target={slug_b}")));
 
         opts.snapshot.snapshot_target = Some(slug_a.clone());
-        let selection = select_snapshot_override_run_invocation(&single_execution_machines(&machine), &opts, &invocations)
+        let selection = select_snapshot_override_run_invocation(dir.path(), &single_execution_machines(&machine), &opts, &invocations)
             .expect("selected")
             .expect("selection");
         assert_eq!(selection.task_id, "plan.1");
@@ -1075,7 +1075,7 @@ transitions:
             .collect::<Vec<_>>();
         let mut opts = snapshot_override_options("plan.1:impl:source@1/g1", false);
         opts.snapshot.snapshot_target = Some(selected_run_slug.to_string());
-        let selection = select_snapshot_override_run_invocation(&single_execution_machines(&machine), &opts, &invocations)
+        let selection = select_snapshot_override_run_invocation(dir.path(), &single_execution_machines(&machine), &opts, &invocations)
             .expect("selected")
             .expect("selection");
         assert_eq!(selection.target_slug, selected_run_slug);

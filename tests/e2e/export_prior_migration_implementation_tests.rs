@@ -206,11 +206,19 @@ fn expected_help(target: &Path) -> String {
 }
 
 /// The target an omitted plan discovers is whatever the OS reports as the
-/// current directory, which on macOS resolves `/var`'s symlink to
-/// `/private/var`; canonicalize the same way so the expected line matches the
-/// rendered one instead of the fixture's pre-resolution spelling.
+/// current directory. `getcwd` resolves symlinks on Unix, so macOS rewrites
+/// `/var` to `/private/var`; `GetCurrentDirectoryW` on Windows does neither
+/// that nor `Path::canonicalize`'s 8.3-short-name expansion, so it keeps a
+/// runner's `RUNNER~1` spelling unchanged. Match each platform's own reading
+/// instead of the fixture's pre-resolution spelling.
+#[cfg(unix)]
 fn discovered_target(plan: &Path) -> PathBuf {
     rhei_core::platform::canonical_path(plan).unwrap_or_else(|_| plan.to_path_buf())
+}
+
+#[cfg(windows)]
+fn discovered_target(plan: &Path) -> PathBuf {
+    plan.to_path_buf()
 }
 
 fn assert_complete_help_line(rendered: &str, target: &Path) {

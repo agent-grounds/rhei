@@ -103,7 +103,10 @@ agent transcript). Auto snapshots use the reserved `snapshot_name` value
 author-chosen names must match `^[a-z][a-z0-9-]*$`. Auto-emit fires with
 `on: always` semantics, so failures and timeouts are captured. Auto
 snapshots exist solely so `rhei snapshot continue` can reach any past state
-for analysis; they are *not* candidates for `snapshot.inherit:` resolution.
+for analysis; they are *not* candidates for authored `snapshot.inherit:`
+resolution. The one exception is the fully determined, implicit previous-visit
+lookup performed by `session: continue` (§4.7); that path does not use the
+named-inheritance grammar.
 
 A *named* snapshot is produced when a state declares `snapshot.emit:`. The
 author chooses `name` and `on:`, and the snapshot is the source for any
@@ -296,23 +299,25 @@ state-machine rules with existing snapshot names, states, and target selectors.
 
 ### 4.4. Inheritance Timing
 
-Snapshot inheritance happens immediately before the state invocation that
-declares `snapshot.inherit:`:
+Snapshot preload happens immediately before the state invocation that declares
+`snapshot.inherit:` or `session: continue`:
 
 1. `rhei run` selects a ready task whose `Prior:` dependencies are terminal
    and whose required `inputs:` already exist. [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run)
 2. The orchestrator resolves the task's current state and effective execution
    target in normal precedence order (CLI, task, state, settings), then re-reads
    and overlays `**Inherits:**` for this spawn.
-3. If the resulting effective rule exists, the orchestrator resolves and
-   preloads the source snapshot before spawning the agent. `none` means no
-   effective rule and a cold spawn, not a failed lookup.
+3. If the resulting effective rule declares `snapshot.inherit:`, the
+   orchestrator resolves its named source; otherwise, if the state declares
+   `session: continue`, the orchestrator resolves the implicit source from
+   §4.7. A resolved source is preloaded before spawning the agent; `none`
+   means no effective rule and a cold spawn, not a failed lookup.
 4. The agent runs the state work.
 5. After the agent exits and the Completion Condition is evaluated, the same
    state may emit a new snapshot if it declares `snapshot.emit:`.
 
-Inheritance is therefore a property of the state and task being executed, not
-of the transition that led into that state and not of the next state after it.
+Preload is therefore a property of the state and task being executed, not of
+the transition that led into that state and not of the next state after it.
 The task overlay is re-read before every autonomous state and visit. Human,
 final, gating, and program states do not preload; polling restrictions remain
 unchanged. A state that declares both `inherit` and `emit` consumes first and
@@ -344,6 +349,86 @@ undeclared predecessor. `required: true` makes the same conditions errors
 before spawn at the resolver or preload boundary that discovers them.
 Authors who need a real fallback chain should model it explicitly as states
 and artifacts, so the plan records which branch was taken and why.
+
+`session: continue` has the same single-fallback rule: every unavailable or
+unusable implicit source runs the invocation cold. It never searches an older
+visit, another target, or another generation (§4.7).
+
+### 4.7. State-Local Continuation
+
+An agent state that revisits itself may request continuation without naming a
+second snapshot:
+
+```yaml
+states:
+  supervising:
+    target: codex:openai:gpt-5
+    execute_on: child-terminal
+    session: continue             # continue | cold; default cold
+transitions:
+  - from: supervising
+    to: supervising
+```
+
+`session: cold` and an omitted `session` field both preserve the ordinary cold
+start. For `session: continue`, visit `N = 1` logs that no preceding visit
+exists and runs cold. Before every invocation at visit `N > 1`, the
+orchestrator selects exactly this identity:
+
+```text
+(same task, _state, same state, visit N-1, same target slug, current generation)
+```
+
+Here `current generation` means the live `current` pointer written by the
+orchestrator for that `_state` identity. Operator generations do not advance
+that pointer (§7), so they do not replace the source. The selection never
+searches visit `N-2`, another target slug, or an older generation when the
+exact candidate is absent or unusable. A retry of visit `N` still selects
+visit `N-1`; an earlier attempt within visit `N` is not a completed preceding
+visit. For fanout, selection is independent per resolved target slug, so a new
+or changed target runs cold rather than borrowing another target's transcript.
+
+An ordinary failed visit is eligible because auto-emit has `on: always`
+semantics. A timed-out visit is not preloadable. Each of these conditions logs
+a message that names the reason and says `running cold`, then spawns without a
+parent:
+
+- the first visit;
+- no exact record or no valid `current` pointer for the identity above;
+- a changed or missing target slug;
+- an incompatible recorded session layout or agent identity;
+- no supported resume or fork strategy on the resolved profile;
+- an unreadable manifest or transcript; or
+- a source whose completion is `timeout`.
+
+The first-visit message is informational rather than an error, but still says
+that continuation starts cold. These conditions never produce
+`unsupported-snapshot-session`: continuation is optional by definition. An
+unsupported profile still executes every visit and still receives the normal
+prompt.
+
+When the source is usable, the existing native compatibility predicate and
+resume/fork strategy (§5 and §10.1) stage it before spawn. Both the following
+auto emission and any separately authored named emission record the selected
+`_state` identity in `parent_ref`. When selection or preload falls back cold,
+both record `parent_ref: null`. Continuation itself writes only the ordinary
+auto snapshot; it does not create a named transcript or a duplicate cached
+copy.
+
+The field is legal only on an agent-bearing, non-final, non-gating,
+non-program, non-poll state with a self-loop and a resolvable effective target
+tuple. These shape rules apply to explicitly authored `cold` too. `continue`
+and `snapshot.inherit` are mutually exclusive because one invocation has one
+authoritative preload source. A separately authored `snapshot.emit` may
+coexist and keeps its existing strict validation and independent write.
+`--from-snapshot` still requires authored `snapshot.inherit`; continuation
+does not create a second override grammar. All named snapshot resolution,
+cross-state and ancestor behavior, and selector semantics remain unchanged.
+
+Snapshot preload does not change prompt composition. Checkpoints, previous
+visits, supervisor briefs, preparation notes, and every other memory section
+are composed unconditionally under §FS-rhei-memory.1.2, whether continuation
+is warm or cold.
 
 ## 5. Compatibility Predicates
 
@@ -447,8 +532,11 @@ into the invocation that produced this emission:
   ran cold (missing snapshot under `required: false`, incompatible agent,
   unsupported session profile, or `compat: none`), `parent_ref` is `null`.
   Running cold breaks the lineage chain by design.
-- If the emitting state does not declare `snapshot.inherit:`, `parent_ref`
-  is `null`.
+- If the emitting state declares `session: continue`, a successfully preloaded
+  previous-visit `_state` source is recorded in `parent_ref`; any cold fallback
+  records `null`.
+- If the emitting state declares neither `snapshot.inherit:` nor a successful
+  `session: continue` preload, `parent_ref` is `null`.
 - A sub-task branch created by `snapshot.inherit.from: ancestor` records the
   selected ancestor snapshot in the child's first emitted generation after the
   successful preload. The copied transcript in the child's store is an
@@ -712,7 +800,7 @@ operator-driven concurrency without ever reusing a generation number.
 | `transcript_path` | string | Yes | Relative path within the generation directory. |
 | `transcript_sha256` | string | Yes | SHA-256 of the transcript file contents. |
 | `transcript_bytes` | integer | Yes | Transcript size in bytes. Used for CLI listings, diagnostics, and retention decisions. |
-| `parent_ref` | object or null | Yes | Reference to the snapshot whose transcript was successfully preloaded into this invocation, including `task_id`, `snapshot_name`, `emitting_state`, `visit`, `target_slug`, and `generation`. `null` when the invocation ran cold (no `inherit:`, missing source, incompatible agent, unsupported session profile, or `compat: none`). See [`parent_ref` Semantics](#61-parent_ref-semantics). |
+| `parent_ref` | object or null | Yes | Reference to the snapshot whose transcript was successfully preloaded into this invocation, including `task_id`, `snapshot_name`, `emitting_state`, `visit`, `target_slug`, and `generation`. The source may be named inheritance or the prior `_state` generation selected by `session: continue`. It is `null` when the invocation ran cold. See [`parent_ref` Semantics](#61-parent_ref-semantics). |
 | `created_at` | string (RFC 3339) | Yes | Wall-clock time of generation finalization. |
 | `completion` | enum | Yes | `success`, `failure`, or `timeout`. Matches the orchestrator's classification of the underlying subprocess exit. Operator emissions use `success` or `failure` only — the agent-timeout guardian does not run for `rhei snapshot continue` sessions. |
 | `produced_by` | enum | Yes | `orchestrator` for emissions produced by `rhei run`. `operator` for emissions produced by `rhei snapshot continue`. Operator emissions never advance `current`; they are sibling generations under the same identity as the source snapshot. |
@@ -1175,8 +1263,11 @@ home directory available, or an unrecognized `{name}` placeholder), the
 orchestrator logs "could not resolve snapshot dir_template ...;
 fixed-location snapshot tracking disabled for this spawn" and spawns without
 fixed-location tracking rather than failing the spawn: this invocation loses
-emit/preload for that agent, not the run. The numbered steps below are
-specific to `snapshot.inherit:`.
+emit/preload for that agent, not the run. The numbered steps below apply to
+authored `snapshot.inherit:`. State-local continuation uses the same
+compatibility, strategy, staging, and flag-order steps after selecting its
+exact implicit source under §FS-rhei-snapshots.4.7; its failures always take
+the optional cold path.
 
 For each spawn with an effective state/task inheritance rule:
 
@@ -1335,6 +1426,11 @@ own copy under its own `target.slug` generation directory; copies are
 independently addressable lineage roots even when their source content is the
 same.
 
+A fanout state with `session: continue` resolves the exact previous-visit
+`_state` source separately for every target slug. It never aggregates targets
+or substitutes a sibling target. A retry within one visit uses the preceding
+visit, not an emission from an earlier attempt of the current visit.
+
 Polling states (`poll:`) do not emit snapshots on self-loop attempts. Emit
 fires only on the terminal exit transition (the poll succeeded, or the
 exhaustion transition fired). `snapshot.inherit` on a polling state is rejected
@@ -1353,6 +1449,15 @@ following rules. Violations are errors unless marked otherwise.
 - `snapshot`, `snapshot.emit`, `snapshot.inherit`, and
   `snapshot.inherit.select` are closed objects. Unknown keys are validation
   errors.
+- `state.session`, when present, must be `cold` or `continue`; omission defaults
+  to `cold`.
+- An explicitly authored `state.session` is rejected on final, gating,
+  program, or polling states; on a state that is not agent-bearing; on a state
+  without a self-loop; or when no effective execution target tuple can be
+  resolved. These checks apply to explicit `cold` as well as `continue`.
+- `session: continue` combined with `snapshot.inherit` is an error.
+  `snapshot.emit` remains legal and retains its existing strict session-layout
+  validation.
 - `snapshot.emit.on`, when present, must be one of `success`, `failure`, or
   `always`.
 - `snapshot.inherit.from`, when present, must be `self`, `ancestor`, or

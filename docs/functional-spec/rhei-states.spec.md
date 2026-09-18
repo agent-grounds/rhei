@@ -94,6 +94,7 @@ can start in different states within the same state machine.
 | `target_locked` | boolean | No | When `true`, the state's execution identity is essential to the phase and must not be reassigned per task: any task-level `**Model:**` or `**Target:**` override ([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)) on a task entering this state is a validation error. Defaults to `false`. |
 | `all_models` | string array | No | The complete set of declared model profile identifiers allowed to work this state |
 | `snapshot` | object | No | Per-state session snapshot emit/inherit contract. Optional; details and closed-schema validation live in [Snapshots Specification](rhei-snapshots.spec.md). |
+| `session` | enum | No | Session behavior for repeated visits: `cold` (the default) or `continue`. Continuation preloads this state's immediately preceding visit when possible and otherwise runs cold; see §FS-rhei-snapshots.4.7. |
 | `model` | string | No | A single model profile identifier from the machine-level `models` list |
 | `agent` | string | No | The coding agent CLI that executes work in this state. Must be an agent id resolved against the merged `agents` registry (built-ins → global → project `settings.json`). Inline agent objects are not permitted — define custom agents in the `agents` registry. See [Agents Specification](rhei-agents.spec.md). |
 | `agent_mode` | string | No | Named flag set applied to the resolved agent for this state. Must match a key in the resolved agent's `modes` map. See [Agents Specification — Modes](rhei-agents.spec.md#22-modes). |
@@ -220,6 +221,14 @@ implicit rather than declared: see [Terminal Result](#33-terminal-result).
   re-enter it forever. Visits of such a state are counted regardless, so an
   authored `visitCount` exit works ([§FS-rhei-supervision.4.2](rhei-supervision.spec.md#42-self-loops-on-agent-states)).
 - `state.execute_on`, when present, must be one of `child-terminal`, `child-transition`, `descendant-terminal`, or `descendant-transition`, and the state must be agent-bearing. `execute_on` on a `final: true`, `gating: true`, `program:`, or `poll:` state is a validation error — a state has one trigger, `poll:` (time) or `execute_on:` (its subtree) — as is combining it with `all_targets` or `all_models`. A supervising state must declare a self-loop transition — its release edge. Warnings and the full rule set are in [§FS-rhei-supervision.1.2](rhei-supervision.spec.md#12-validation-rules).
+- `state.session`, when present, must be `cold` or `continue`; omission means
+  `cold`. Authoring either value is legal only on a non-final, non-gating,
+  non-program, non-poll agent state that declares a self-loop and whose
+  execution target resolves to an effective `(agent, mode?, provider, model)`
+  tuple. The legality rules apply to explicit `cold` as well as `continue` so
+  an authored field never becomes a misleading no-op. `continue` must not be
+  combined with `snapshot.inherit`; `snapshot.emit` may coexist. The full
+  runtime contract is §FS-rhei-snapshots.4.7.
 - Every non-final state must be able to reach some `final: true` state. A state
   is left by an edge whoever moves the task can take, which is what decides
   whether an edge counts here: every `from: <state>` edge counts, a `from: "*"`

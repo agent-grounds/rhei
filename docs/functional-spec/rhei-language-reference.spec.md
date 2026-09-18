@@ -33,7 +33,8 @@ map.
 The remaining three surfaces:
 
 - State machines: `states.yaml`. Owned by [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) and
-  [§FS-rhei-transitions](rhei-transitions.spec.md#fs-rhei-transitions-rhei-transitions-specification).
+  [§FS-rhei-transitions](rhei-transitions.spec.md#fs-rhei-transitions-rhei-transitions-specification); the per-state `session` field is owned jointly by
+  §FS-rhei-states.1.2 and §FS-rhei-snapshots.4.7.
 - Templates and composable blocks: template directories with `template.yaml`
   plus rendered plan and state files. Template discovery, rendering, and
   single-template instantiation are owned by

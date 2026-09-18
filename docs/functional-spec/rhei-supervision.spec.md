@@ -179,8 +179,10 @@ in it is worked once, after its whole subtree is terminal
   supervisor visits; the usual exhaustion rules apply
   ([§FS-rhei-transitions.4.3](rhei-transitions.spec.md#43-counted-loops)). `rhei validate` warns when a supervising state
   declares neither `visits` nor an exhaustion edge.
-- `snapshot.inherit` on a supervising state is allowed and recommended; the
-  lineage rules are unchanged ([§FS-rhei-snapshots.4.3](rhei-snapshots.spec.md#43-lineage-resolution)).
+- A supervising state that should continue its own conversation between visits
+  uses `session: continue` ([§FS-rhei-snapshots.4.7](rhei-snapshots.spec.md#47-state-local-continuation)). It remains valid when the resolved profile cannot preload;
+  those visits run cold with a reasoned diagnostic. The field's ordinary
+  state-shape and target-resolution validation still applies.
 
 ## 2. Checkpoints
 
@@ -765,10 +767,11 @@ engine; a supervisor that wants a fresh one overwrites it.
 
 ## 6. Interaction With Other Features
 
-- **Snapshots.** A supervising state should `emit` and `inherit` one snapshot
-  name `from: self` so each visit continues the previous one
-  ([§FS-rhei-snapshots.4.3](rhei-snapshots.spec.md#43-lineage-resolution)). A descendant may branch from the supervisor's
-  transcript with `from: ancestor` ([§FS-rhei-snapshots.6](rhei-snapshots.spec.md#6-sub-task-inheritance)) when a step should
+- **Snapshots.** A supervising state should use `session: continue` so each
+  visit preloads its immediately preceding auto snapshot when supported and
+  otherwise runs cold ([§FS-rhei-snapshots.4.7](rhei-snapshots.spec.md#47-state-local-continuation)). It should not duplicate that transcript with a named
+  self-emit/inherit pair. A descendant may still branch from a separately
+  named supervisor transcript with `from: ancestor` ([§FS-rhei-snapshots.6](rhei-snapshots.spec.md#6-sub-task-inheritance)) when a step should
   start inside the supervisor's context. Agents without session support run
   each visit cold ([§FS-rhei-snapshots.9.3](rhei-snapshots.spec.md#93-per-agent-runtime-behavior)); supervision still works, carried
   by the checkpoints and the briefs. `from: prior` and task `**Inherits:**`

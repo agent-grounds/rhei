@@ -206,3 +206,39 @@ states:
         let err = StateMachine::from_yaml_str(fanout).expect_err("fanout source");
         assert!(err.to_string().contains("fanout source"));
     }
+
+    /// `session` is a first-class state field, not permissive YAML that may be
+    /// discarded. §FS-rhei-states.1.2 §FS-rhei-snapshots.4.7
+    #[test]
+    fn session_continuation_is_a_preserved_closed_enum() {
+        let valid = r#"
+name: session-test
+version: 1
+states:
+  loop:
+    description: Loop
+    target: fake:acme:model
+    session: continue
+  done:
+    description: Done
+    final: true
+transitions:
+  - from: loop
+    to: loop
+  - from: loop
+    to: done
+"#;
+        let machine = StateMachine::from_yaml_str(valid).expect("continue is valid on a self-loop");
+        let encoded = serde_yaml::to_string(&machine).expect("serialize state machine");
+        assert!(
+            encoded.contains("session: continue"),
+            "the authored field must survive the typed model:\n{encoded}"
+        );
+
+        let invalid = valid.replace("session: continue", "session: warm");
+        let err = StateMachine::from_yaml_str(&invalid).expect_err("session is a closed enum");
+        assert!(
+            err.to_string().contains("cold") && err.to_string().contains("continue"),
+            "the diagnostic must name both legal values: {err}"
+        );
+    }

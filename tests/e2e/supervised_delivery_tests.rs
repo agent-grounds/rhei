@@ -382,45 +382,56 @@ fn the_supervisor_prompt_cancels_with_the_required_from() {
     fs::remove_dir_all(dir).expect("cleanup");
 }
 
-/// The `snapshot:` block that carries a supervisor's session between visits is
-/// legal only on a session-capable agent, so the template emits it only when
-/// asked and otherwise defaults to the shape `claude-code` accepts.
-// §FS-rhei-supervision.1.1
+/// The bundled supervisor authors the degradable state-local contract once.
+/// Its default target therefore needs no machine-specific template input or
+/// duplicate named snapshot. §FS-rhei-snapshots.4.7 §FS-rhei-supervision.6
 #[test]
-fn the_snapshot_block_appears_only_for_a_session_capable_supervisor() {
+fn session_continuation_replaces_the_template_session_knob() {
     let dir = unique_temp_dir("supervised-delivery-snapshot");
     let (workspace, instantiated) =
         instantiate(&dir, &["spec_path=docs/functional-spec/rhei-supervision.spec.md"]);
     assert!(instantiated.status.success(), "instantiate failed:\n{}", instantiated.stderr);
     let machine = fs::read_to_string(workspace.join("states.yaml")).expect("read machine");
-    // The header comment explains the block, so look for the emitted key.
     assert!(
-        !machine.contains("\n    snapshot:\n"),
-        "the default supervisor runs cold, because claude-code rejects the block; got:\n{machine}"
+        machine.contains("\n    session: continue\n"),
+        "the default supervisor declares degradable continuation; got:\n{machine}"
+    );
+    assert!(
+        !machine.contains("\n    snapshot:\n")
+            && !machine.contains("emit: { name: supervisor")
+            && !machine.contains("inherit: { name: supervisor"),
+        "continuation alone must not duplicate the transcript; got:\n{machine}"
     );
 
-    let session_dir = unique_temp_dir("supervised-delivery-snapshot-on");
-    let (session_workspace, session) = instantiate(
-        &session_dir,
-        &[
-            "spec_path=docs/functional-spec/rhei-supervision.spec.md",
-            "supervisor_session=true",
-            "supervisor_target=pi:anthropic:claude-sonnet-4-5",
-        ],
-    );
+    let template = fs::read_to_string(template_dir().join("template.yaml")).expect("manifest");
+    let values =
+        fs::read_to_string(template_dir().join(".example-values.yaml")).expect("example values");
+    let readme = fs::read_to_string(template_dir().join("README.md")).expect("template readme");
     assert!(
-        session.status.success(),
-        "a session-capable supervisor validates with the block:\nstdout:\n{}\nstderr:\n{}",
-        session.stdout,
-        session.stderr
+        !template.contains("supervisor_session")
+            && !values.contains("supervisor_session")
+            && !readme.contains("supervisor_session"),
+        "the machine-local continuity input must be removed"
     );
-    let session_machine =
-        fs::read_to_string(session_workspace.join("states.yaml")).expect("read machine");
+    let example = repo_root().join("examples/supervised-delivery-example");
+    let example_machine = fs::read_to_string(example.join("states.yaml")).expect("example machine");
+    let example_values =
+        fs::read_to_string(example.join("instantiation-values.yaml")).expect("example values");
     assert!(
-        session_machine.contains("emit: { name: supervisor, on: always }")
-            && session_machine.contains("inherit: { name: supervisor, from: self }"),
-        "each visit continues the last one; got:\n{session_machine}"
+        example_machine.contains("\n    session: continue\n")
+            && !example_machine.contains("emit: { name: supervisor")
+            && !example_values.contains("supervisor_session"),
+        "the checked-in example must match the migrated template"
     );
 
-    fs::remove_dir_all(session_dir).expect("cleanup");
+    let old_value = instantiate(
+        &unique_temp_dir("supervised-delivery-old-session-value"),
+        &["spec_path=docs/functional-spec/rhei-supervision.spec.md", "supervisor_session=true"],
+    )
+    .1;
+    assert!(
+        !old_value.status.success()
+            && format!("{}{}", old_value.stdout, old_value.stderr).contains("supervisor_session"),
+        "old values must be rejected as an unknown input after migration"
+    );
 }

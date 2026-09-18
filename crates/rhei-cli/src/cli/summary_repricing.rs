@@ -1,8 +1,5 @@
-// Completed-run selection for the read-only alternate-price summary. The
-// accounting reader owns record/root identity; this layer adds durable
-// completion evidence and keeps project-wide discovery bounded to the already
-// resolved Panta project.
-//
+// Completed-run selection adds durable completion evidence to accounting.
+// Project-wide discovery stays bounded to the resolved Panta project.
 // §FS-rhei-summary.1 §FS-rhei-summary.5 §FS-rhei-panta.6.5
 
 /// Aggregate stored measurements after restating them and applying one
@@ -66,11 +63,20 @@ fn select_completed_run_for_summary(
         ));
     }
 
-    if selected_roots_show_activity(roots, run_id) {
-        return Err(miette!(
-            help = "wait for the run to finish before applying an alternate price book",
-            "run '{run_id}' is active"
-        ));
+    match selected_roots_activity(roots, run_id) {
+        SelectedRunActivity::Active => {
+            return Err(miette!(
+                help = "wait for the run to finish before applying an alternate price book",
+                "run '{run_id}' is active"
+            ));
+        }
+        SelectedRunActivity::Unknown(reason) => {
+            return Err(miette!(
+                help = "inspect the run descriptor and .rhei/run.lock, then retry once activity can be established",
+                "activity cannot be determined for run '{run_id}': {reason}"
+            ));
+        }
+        SelectedRunActivity::Inactive => {}
     }
 
     let reports = immutable_reports_for_run(roots, run_id);
@@ -116,32 +122,104 @@ fn inspection_has_run(inspection: &CostInspection, run_id: &str) -> bool {
         .any(|held| held.record.run_id.as_deref() == Some(run_id))
 }
 
-/// A descriptor still recorded as running is active evidence. A held lock
-/// carrying this exact id is independent evidence, including when a terminal
-/// descriptor sits beside it.
-/// §FS-rhei-summary.1 §FS-rhei-summary.5
-fn selected_roots_show_activity(roots: &[AccountingRoot], run_id: &str) -> bool {
-    execution_roots(roots).into_iter().any(|root| {
-        let descriptor = read_descriptor(&run_descriptor_path(&root));
-        let live_descriptor = descriptor.as_ref().is_some_and(|descriptor| {
-            descriptor.id == run_id && !descriptor.status.is_terminal()
-        });
-        live_descriptor || held_lock_names_run(&root, run_id)
-    })
+#[derive(Debug, PartialEq, Eq)]
+enum SelectedRunActivity {
+    Active,
+    Inactive,
+    Unknown(String),
 }
 
-/// Require both exact-id ownership text and a contended lock; an unlocked
-/// historical owner record is not active evidence.
+/// Reconcile exact descriptor liveness with exact lock ownership. A held
+/// ownerless lock is uncertainty, while a lock naming another run is not
+/// attributed to this historical run.
 /// §FS-rhei-summary.1 §FS-rhei-summary.5
-fn held_lock_names_run(root: &Path, run_id: &str) -> bool {
+fn selected_roots_activity(roots: &[AccountingRoot], run_id: &str) -> SelectedRunActivity {
+    let mut unknown = None;
+    for root in execution_roots(roots) {
+        match selected_root_activity(&root, run_id) {
+            SelectedRunActivity::Active => return SelectedRunActivity::Active,
+            SelectedRunActivity::Unknown(reason) => unknown = Some(reason),
+            SelectedRunActivity::Inactive => {}
+        }
+    }
+    unknown.map_or(SelectedRunActivity::Inactive, SelectedRunActivity::Unknown)
+}
+
+fn selected_root_activity(root: &Path, run_id: &str) -> SelectedRunActivity {
+    let descriptor_read = read_descriptor_result(&run_descriptor_path(root));
+    let descriptor = match &descriptor_read {
+        DescriptorRead::Loaded(descriptor)
+            if descriptor.id == run_id && !descriptor.status.is_terminal() =>
+        {
+            Some(descriptor.as_ref())
+        }
+        _ => None,
+    };
+
+    match probe_run_lock(root) {
+        RunLockProbe::Held => match run_lock_owner_id(root) {
+            Ok(Some(owner)) if owner == run_id => SelectedRunActivity::Active,
+            Ok(Some(owner)) if descriptor.is_some() => SelectedRunActivity::Unknown(format!(
+                "the current lock names run '{owner}', but the non-terminal descriptor names '{run_id}'"
+            )),
+            Ok(Some(_)) => SelectedRunActivity::Inactive,
+            Ok(None) => SelectedRunActivity::Unknown(format!(
+                "{} is held but carries no run ownership record",
+                root.join(".rhei/run.lock").display()
+            )),
+            Err(reason) => SelectedRunActivity::Unknown(reason),
+        },
+        RunLockProbe::Free => match descriptor {
+            Some(descriptor) => activity_from_liveness(descriptor.liveness()),
+            None => match descriptor_read {
+                DescriptorRead::Unreadable(reason) => SelectedRunActivity::Unknown(format!(
+                    "{} could not be read: {reason}",
+                    run_descriptor_path(root).display()
+                )),
+                DescriptorRead::Loaded(_) | DescriptorRead::Missing => {
+                    SelectedRunActivity::Inactive
+                }
+            },
+        },
+        RunLockProbe::Missing(lock_reason) | RunLockProbe::Unknown(lock_reason) => {
+            match descriptor {
+                Some(descriptor) => activity_from_liveness(descriptor.liveness()),
+                None => match descriptor_read {
+                    DescriptorRead::Unreadable(reason) => SelectedRunActivity::Unknown(format!(
+                        "{} could not be read: {reason}; {lock_reason}",
+                        run_descriptor_path(root).display()
+                    )),
+                    DescriptorRead::Loaded(_) | DescriptorRead::Missing => {
+                        SelectedRunActivity::Inactive
+                    }
+                },
+            }
+        }
+    }
+}
+
+fn activity_from_liveness(liveness: Liveness) -> SelectedRunActivity {
+    match liveness {
+        Liveness::Live => SelectedRunActivity::Active,
+        Liveness::Ended | Liveness::Gone => SelectedRunActivity::Inactive,
+        Liveness::Unknown(reason) => SelectedRunActivity::Unknown(reason),
+    }
+}
+
+/// Read only the portable exact-id field. Contention is checked separately;
+/// ownership text left behind on a free lock is never active evidence.
+/// §FS-rhei-summary.1 §FS-rhei-summary.5
+fn run_lock_owner_id(root: &Path) -> Result<Option<String>, String> {
     let path = root.join(".rhei/run.lock");
-    let names_run = fs::read_to_string(&path)
-        .ok()
-        .and_then(|body| serde_json::from_str::<serde_json::Value>(&body).ok())
-        .and_then(|value| value.get("id").and_then(serde_json::Value::as_str).map(str::to_string))
-        .as_deref()
-        == Some(run_id);
-    names_run && matches!(probe_run_lock(root), RunLockProbe::Held)
+    let body = fs::read_to_string(&path)
+        .map_err(|err| format!("{} is held but could not be read: {err}", path.display()))?;
+    if body.trim().is_empty() {
+        return Ok(None);
+    }
+    let value: serde_json::Value = serde_json::from_str(&body).map_err(|err| {
+        format!("{} is held but its run ownership record is invalid: {err}", path.display())
+    })?;
+    Ok(value.get("id").and_then(serde_json::Value::as_str).map(str::to_string))
 }
 
 /// Find timestamped history reports that explicitly claim the exact run id.

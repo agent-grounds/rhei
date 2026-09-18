@@ -112,10 +112,9 @@ impl RunIdentity {
     }
 }
 
-/// Stamp each opened lock inode with the stable Linux process identity that a
-/// later read-only liveness probe needs after the pathname is displaced.
-// §FS-rhei-run-headless.3
-#[cfg(target_os = "linux")]
+/// Stamp each opened lock with portable exact-run ownership. Linux also stores
+/// stable process identity for displaced-inode liveness checks.
+/// §FS-rhei-run-headless.3 §FS-rhei-summary.5
 fn record_run_lock_ownership(
     locks: &mut [HeldRunLock],
     identity: &RunIdentity,
@@ -123,20 +122,12 @@ fn record_run_lock_ownership(
     for lock in locks {
         write_run_lock_owner(lock, &identity.id, std::process::id()).map_err(|reason| {
             miette!(
-                help = "check that /proc is mounted and the workspace lock file is writable",
+                help = "check that the workspace lock file is writable and process identity is available",
                 "could not record run-lock ownership for {}: {reason}",
                 lock.workspace.display()
             )
         })?;
     }
-    Ok(())
-}
-
-#[cfg(not(target_os = "linux"))]
-fn record_run_lock_ownership(
-    _locks: &mut [HeldRunLock],
-    _identity: &RunIdentity,
-) -> MietteResult<()> {
     Ok(())
 }
 

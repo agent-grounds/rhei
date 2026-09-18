@@ -175,6 +175,25 @@ fn exact_matching_and_authoritative_currency_distinguish_partial_and_unpriced() 
     assert!(!unpriced.stdout.contains("0 JPY"), "unpriced must not claim zero");
 }
 
+// §FS-rhei-summary.2.3
+#[test]
+fn an_all_unmeasured_run_uses_only_the_unmeasured_presentation() {
+    let fixture = RepriceFixture::new("summary-reprice-unmeasured");
+    write_unmeasured_record(&fixture.root, SELECTED_RUN);
+    write_report(&fixture.root, SELECTED_RUN, "2026-09-01T10:00:00Z", "completed");
+
+    let result = selected_summary(&fixture, &[]);
+    assert_success(&result);
+    assert_eq!(
+        result.stdout.matches("Token accounting was not measured for this run.").count(),
+        1,
+        "{}",
+        said(&result)
+    );
+    assert!(!result.stdout.contains("| Accounting | Value |"), "{}", said(&result));
+    assert!(!result.stdout.contains("not-applicable"), "{}", said(&result));
+}
+
 // §FS-rhei-summary.1 §FS-rhei-summary.3
 #[test]
 fn paired_flags_and_details_keep_one_selected_reading() {

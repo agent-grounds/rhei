@@ -43,9 +43,8 @@ help = ticket_id_required_help(),
     for target in &targets {
         let verb = if dry_run { "Would release" } else { "Released" };
         println!("{verb} Task {} (was assigned to {})", target.id, target.assignee);
-        // Automatic `next` only claims from the initial state. A ticket
-        // released later remains explicitly reclaimable, so name both that
-        // path and the deliberate state-reset alternative without moving it.
+        // Automatic `next` only claims from the initial state. A released ticket remains
+        // explicitly reclaimable or can be deliberately reset, without `release` moving it.
         // §FS-rhei-release.3.1
         if let Some(initial) = target.initial_state.as_deref() {
             let machine = machines.for_task_str(&target.id);

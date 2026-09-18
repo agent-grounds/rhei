@@ -155,7 +155,9 @@ fn issue_286_explicit_non_initial_claim_revalidates_real_contention_under_lock()
         &[],
     )
     .expect("an unchanged explicit non-initial claim must succeed");
-    assert!(fs::read_to_string(&baseline_plan).unwrap().contains("**State:** work\n**Assignee:** codex"));
+    let claimed = fs::read_to_string(&baseline_plan).unwrap();
+    assert!(claimed.contains("**State:** work"));
+    assert!(claimed.contains("**Assignee:** codex"));
 
     for (name, mutate, expected) in [
         (

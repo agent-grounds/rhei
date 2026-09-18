@@ -573,7 +573,7 @@ kind = "deferred"
 max_accepted = { value = 1000, unit = "lines" }
 until = "A dedicated accounting-inspection reference owns section 8 and its inbound citations have migrated, bringing this reference below the 750-line soft budget."
 reason = """
-The accounting inspection surface in section 8 has no separate canonical declaration yet. Extracting it requires migrating its inbound section citations together; until then, changes extend the stable numbered accounting contract points in place instead of relocating their public IDs.
+The accounting inspection surface in section 8 has no separate canonical declaration yet. Extracting it requires migrating its inbound section citations together; issues #253 and #165 extend specific accepted accounting points while preserving their established ownership until that boundary exists.
 """
 [[exceptions]]
 path = "crates/rhei-cli/src/cli/run_agent_sequential_completion.rs"

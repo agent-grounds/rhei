@@ -28,6 +28,17 @@ artifact lifecycle. A failed run still writes a report with the information
 available up to the failure point. A `--dry-run` is the one exception: it is a
 side-effect-free preview and writes no report file (§3.5).
 
+The timestamped history entry is the durable completion evidence for an exact
+`rhei summary --run <ID> --prices <BOOK>` selection
+(§FS-rhei-summary.1). Its `Run:` header associates the full report with that
+exact id; a filename prefix, the overwriteable latest report alone, or an
+invocation record alone does not establish that the run ended. “Completed” in
+this selection sense means the run reached its immutable end-of-run report,
+not that every task succeeded: interrupted and failed runs remain finished
+runs with the measurements their reports and records preserve. Live descriptor
+or held-lock evidence for the same id overrides a history entry until the run
+ends.
+
 The report uses relative links for logs and artifacts so it remains useful after
 the workspace is moved, committed, archived, or pasted into an issue.
 

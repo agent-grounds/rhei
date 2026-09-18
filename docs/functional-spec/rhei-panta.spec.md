@@ -498,6 +498,21 @@ this: a run writes each invocation record under the execution root of the rhei
 that owns the ticket, and its capture streams under the run root
 ([§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection)). This point is about the reading.
 
+`rhei summary --run <ID> --prices <BOOK>` preserves that boundary. It first
+resolves the positional and repeatable `--rhei` options, then searches for the
+exact run's records and completion evidence inside the resulting roots. It may
+inspect the rest of the already resolved project only to distinguish an exact
+id that is outside the selected member scope from an absent id; it does not
+search parent projects or arbitrary paths. Completion evidence and active
+descriptor or run-lock evidence are evaluated at the execution roots selected
+for the reading. §FS-rhei-summary.1
+
+A project-wide run may have records under several member execution roots. The
+run filter applies inside their deduplicated union, and shared-root task
+filtering plus attempt-identity deduplication still apply, so one invocation is
+counted once and unrelated rheis, tasks, and runs do not enter the selected
+run's lead, steps, or accounting.
+
 ## Related Specifications
 
 - [Plan Language](rhei-plan-language.spec.md) — grammar, the node hierarchy, and the virtual-root model [§FS-rhei-plan-language.3](rhei-plan-language.spec.md#3-semantic-constraints)

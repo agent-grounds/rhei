@@ -106,6 +106,8 @@ mod snapshot_prior_inheritance_tests;
 mod snapshot_prior_selection_tests;
 mod snapshot_tests;
 mod state_machine_placement_tests;
+mod summary_repricing_support;
+mod summary_repricing_tests;
 mod summary_tests;
 mod supervised_delivery_tests;
 mod supervision_appended_child_tests;

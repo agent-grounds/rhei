@@ -38,7 +38,11 @@ Panta members or weaken the per-rhei state-machine boundary in
 `rhei_core::blocks` owns typed `Block`, `Mount`, `ControlPort`, `DataPort`,
 `Exposure`, `Binding`, `Seam`, `Pass`, `CompatibilityMap`, alias-chain,
 public-table, and owned-reference values. Public tables remain separated by
-state, task, agent, model, MCP-server, and skill kind. The module exposes total
+state, task, agent, model, MCP-server, and skill kind. It also owns the typed
+source, mount, declaration, and node provenance store carried by
+`CompiledBlock`. Source resolution supplies identity before lowering, and
+selected/rendered fragments attach declaration identities before
+qualification. The module exposes total
 operations for recursive expansion, exposure resolution, sequencing,
 qualification, routing derivation, compatibility lowering, and compilation.
 The textual YAML surface deserializes into those values; an optional future
@@ -62,13 +66,16 @@ Compilation is ordered:
 5. Validate aliases, cycles, ports, binds, seams, passes, ownership, typed
    exposure tables, and compatibility maps before lowering.
 6. Resolve exposed local or immediate-child identities into typed public
-   tables, then qualify every owned definition and typed reference with the injective alias
-   encoding in [§FS-rhei-library.4](../functional-spec/rhei-library.spec.md#4-qualification-and-generated-workspace).
+   tables, attach declaration provenance, then qualify every owned definition,
+   its provenance, and typed references with the injective alias encoding in
+   [§FS-rhei-library.4](../functional-spec/rhei-library.spec.md#4-qualification-and-generated-workspace).
 7. Derive the outer control profile, retain internal lanes/fan-out, lower data
-   passes and compatibility identities, and merge settings.
-8. Emit one plan tree, one flat state machine, private mounted files, and short
-   provenance headers.
-9. Materialize through the CLI and run existing workspace/state validation.
+   passes and compatibility identities, merge settings, and carry or union
+   provenance through each rewrite.
+8. Emit one plan tree, one flat state machine, private mounted files, stable
+   provenance headers, and the composition lock from the same typed store.
+9. Materialize all emitted files through the CLI's existing transaction and
+   run existing workspace/state validation.
 
 No output from an earlier stage is treated as valid final output. `--dry-run`
 executes the same stages through validation in scratch; `--execute` begins only
@@ -98,8 +105,11 @@ Exposure changes the public suffix used by qualification but never coalesces
 definitions. The only many-to-one
 exception is checked terminal equivalence (§FS-rhei-library.7.1): compare
 effective operative contracts before removing any duplicate definition, then
-rewrite every typed reference with the same visitor. All other merges remain
-injective and collision-refusing.
+rewrite every typed reference with the same visitor and union every member's
+origin records. Qualification, settings/profile/routing synthesis, and
+one-target compatibility renames move provenance with their definitions; they
+may neither manufacture one owner nor drop a contributor. All other merges
+remain injective and collision-refusing.
 
 ## 5. Runtime invariants
 
@@ -110,9 +120,13 @@ discovering blocks. Qualification records inferred cancellation before renaming
 and scopes wildcards without turning them into exact forward edges. This is the
 bounded exception to an entirely unchanged flat schema/runtime.
 
-The compiler's output must pass every ordinary plan, state, profile,
-node-policy, settings, artifact, and reference validator. Existing commands see
-only that output and preserve their current behavior. In particular:
+The compiler's output-side provenance store serializes to
+`.agent-grounds/rhei/composition.lock.json` in the same transaction as the
+ordinary files. The lock is not part of the runtime schema. The compiler's flat
+output must pass every ordinary plan, state, profile, node-policy, settings,
+artifact, and reference validator. Existing commands ignore the sidecar, see
+only that flat output, and preserve their current behavior. Older workspaces
+without a lock remain valid. In particular:
 
 - state-file passes lower to existing state input/output paths and enforcement;
 - task-export passes lower to existing `Provides`/`Consumes` metadata;
@@ -121,5 +135,6 @@ only that output and preserve their current behavior. In particular:
 - execution roots remain those of the one generated rhei.
 
 Composition adds no project-global readiness rule and no cross-member runtime
-channel. Future authoring languages, catalogs, or provenance stores must lower
-through this same typed boundary if introduced.
+channel. This ticket adds no lock reader, inspection command, or replay
+operation. Future authoring languages, catalogs, or additional provenance
+stores must lower through this same typed boundary if introduced.

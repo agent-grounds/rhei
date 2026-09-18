@@ -186,7 +186,15 @@ impl CompiledBlock {
                 rename(&mut task.kind, &names.kinds);
                 // Parse before renaming definitions: exact names beat visit suffixes.
                 // §FS-rhei-library.4
-                let parsed = parse_task_state(&task.state, machine);
+                let mut parsed = parse_task_state(&task.state, machine);
+                if parsed.visit.is_none() && !names.states.contains_key(&parsed.state) {
+                    if let Some((base, visit)) = task.state.rsplit_once('-') {
+                        if names.states.contains_key(base) {
+                            parsed.state = base.to_string();
+                            parsed.visit = visit.parse::<u32>().ok();
+                        }
+                    }
+                }
                 if let Some(state) = names.states.get(&parsed.state) {
                     task.state = match parsed.visit {
                         Some(visit) => format!("{state}-{visit}"),

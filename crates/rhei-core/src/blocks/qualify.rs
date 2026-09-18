@@ -130,6 +130,9 @@ impl CompiledBlock {
             policy.overrides = overrides;
         }
         self.rewrite(&names)?;
+        // The authored keys stay fixed while their compiled identities follow
+        // the enclosing mount qualifier. §FS-rhei-library.1.2
+        self.public.rewrite_values(&names);
         for file in &mut self.fragment.tasks {
             let local = relative(&file.path.to_string_lossy())?;
             file.path = PathBuf::from("tasks")
@@ -153,11 +156,11 @@ impl CompiledBlock {
         Ok(())
     }
 
-    pub(crate) fn validate_references(&self) -> CompileResult<()> {
+    pub(crate) fn validate_references(&self, public: &Names) -> CompileResult<()> {
         let m = &self.fragment.machine;
         m.validate_cancellation_and_sources().map_err(|e| e.to_string())?;
         let check = |state: &str| {
-            if m.states.contains_key(state) {
+            if m.states.contains_key(state) || public.states.values().any(|name| name == state) {
                 Ok(())
             } else {
                 Err(format!("states.yaml names missing state '{state}'; fix the owned reference"))
@@ -201,11 +204,25 @@ impl CompiledBlock {
         let mut error = None;
         for file in &self.fragment.tasks {
             tasks(&file.tasks, &mut |t| {
-                if let Err(e) = check(&parse_task_state(&t.state, m).state) {
+                let parsed = parse_task_state(&t.state, m);
+                let state = if parsed.state == t.state {
+                    t.state
+                        .rsplit_once('-')
+                        .filter(|(base, visit)| {
+                            visit.parse::<u32>().is_ok()
+                                && public.states.values().any(|name| name == base)
+                        })
+                        .map_or(parsed.state.as_str(), |(base, _)| base)
+                } else {
+                    &parsed.state
+                };
+                if let Err(e) = check(state) {
                     error = Some(e);
                 }
                 for prior in &t.prior {
-                    if !ids.contains(&prior.to_string()) {
+                    if !ids.contains(&prior.to_string())
+                        && !public.tasks.values().any(|name| name == &prior.to_string())
+                    {
                         error = Some(format!("missing owned Prior '{prior}' in task '{}'", t.id));
                     }
                 }

@@ -63,6 +63,7 @@ pub struct CompiledBlock {
     pub origins: Vec<String>,
     pub(crate) source: PathBuf,
     pub(crate) chain: Vec<String>,
+    pub(crate) public: super::exposure::PublicNames,
 }
 
 #[derive(Debug, Clone)]
@@ -133,9 +134,6 @@ impl Block {
         let local_present = self.local.is_some();
         if let Some(local) = self.local {
             result.fragment = local;
-            result.validate_references().map_err(|e| {
-                format!("{}: {e}", self.source.with_file_name("states.yaml").display())
-            })?;
             result.primary = result
                 .fragment
                 .machine
@@ -147,10 +145,19 @@ impl Block {
             if let Some(policy) = &result.fragment.machine.node_policy {
                 result.primary_profiles.insert(policy.default.clone());
             }
-            result.inputs = result.resolve_data(&self.manifest.data.inputs, false)?;
-            result.outputs = result.resolve_data(&self.manifest.data.outputs, true)?;
         } else if !self.manifest.data.inputs.is_empty() || !self.manifest.data.outputs.is_empty() {
             return Err("local data endpoints require a local state fragment or plan".into());
+        }
+        let public_uses = super::exposure::public_uses(&children);
+        super::exposure::validate_uses(&result, &children)?;
+        // Only declared child keys enter the typed rewrite table. §FS-rhei-library.1.2
+        result.rewrite(&public_uses)?;
+        result
+            .validate_references(&public_uses)
+            .map_err(|e| format!("{}: {e}", self.source.with_file_name("states.yaml").display()))?;
+        if local_present {
+            result.inputs = result.resolve_data(&self.manifest.data.inputs, false)?;
+            result.outputs = result.resolve_data(&self.manifest.data.outputs, true)?;
         }
         let ports = self.manifest.ports.as_ref();
         if ports.is_none() && (!chain.is_empty() || aliases.is_empty()) {
@@ -191,14 +198,21 @@ impl Block {
                 passes.push((source, target, context));
             }
         }
-        let compatibility =
+        let mut compatibility =
             super::compatibility::resolve(&self.manifest.compatibility, &children, &result)?;
+        let exposure = super::exposure::resolve(&self.manifest.expose, &children, &result)?;
         for alias in order {
             result.merge(children.remove(&alias).unwrap())?;
         }
         if !local_present && result.fragment.machine.states.is_empty() {
             return Err("block supplies no state fragment; add states.yaml or mount a block".into());
         }
+        // Exposure rewrites the merged typed graph before compatibility performs
+        // its final root rename. §FS-rhei-library.4 §FS-rhei-library.7
+        result.rewrite(&exposure.renames)?;
+        super::exposure::rewrite_links(&mut links, &mut passes, &exposure.renames);
+        super::exposure::retarget_compatibility(&mut compatibility, &exposure.renames);
+        result.public = exposure.public;
         for (from, to) in &links {
             // Completion seams cannot turn abandonment into progress. §FS-rhei-library.5
             if result.fragment.machine.is_cancellation(from) {
@@ -233,6 +247,7 @@ impl Block {
         for (source, target, context) in passes {
             result.lower_pass(source, target).map_err(|e| format!("{context}: {e}"))?;
         }
+        result.public.rewrite_values(&compatibility);
         super::compatibility::apply(&mut result, compatibility)?;
         result.origins.insert(
             0,
@@ -290,6 +305,7 @@ impl CompiledBlock {
             origins: vec![],
             source: PathBuf::new(),
             chain: vec![],
+            public: super::exposure::PublicNames::default(),
         }
     }
 

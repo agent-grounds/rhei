@@ -42,17 +42,25 @@ through the source map.
 
 ## 3. Default Behavior (Claim Mode)
 
-Without `--peek`, `rhei next` atomically claims the next claimable task: it assigns the task to the current agent and prints the task instructions. The task's state is **not** advanced — the agent works in the current state and uses `rhei transition` or `rhei complete` to advance when ready. This is the standard entry point for agents beginning work.
+Without `--peek`, `rhei next` atomically claims the next claimable task: it
+assigns the task to the current agent and prints the task instructions. A
+runnable task is claimed in its current state; a qualifying passive state may
+advance by the single edge described below as part of that same claim. This is
+the standard entry point for agents beginning work.
 
 Initial states are not all treated the same: an initial state that declares
 runnable autonomous work (`program`, `agent`, `target`, `all_targets`, `model`,
-or `all_models`) is claimed and presented in place. A non-runnable initial
-state is auto-advanced only when its first applicable forward transition targets
-another non-terminal state. If its first applicable forward transition targets
-a terminal state, `rhei next` claims and presents the initial state in place so
-the agent can do the work before `rhei complete` finishes it. This keeps the
-built-in `pending` -> `completed` machine claimable without completing work at
-claim time.
+or `all_models`) is claimed and presented in place. A passive state declares
+none of those six execution fields and is neither polling nor supervising. A
+passive initial state selected automatically, or an eligible passive state
+selected explicitly with `--task`, advances exactly one applicable forward
+edge when the existing precedence, profile, and condition rules select an edge
+whose first target is non-terminal. The transition may redirect to another
+non-terminal state but never causes `next` to follow a second edge. If there is
+no applicable edge, or its first target is terminal, `rhei next` claims and
+presents the current state in place so the worker can do the work before
+`rhei complete` finishes it. A callback redirect to a terminal state is a
+refusal, not an in-place claim or completion.
 
 A task is *claimable* when:
 
@@ -68,16 +76,18 @@ A task is *claimable* when:
    later than the current wall-clock time, the task is not claimable until the
    interval elapses ([§FS-rhei-states.2](rhei-states.spec.md#2-polling-states)). This is the same exclusion `rhei run`
    applies to the ready set ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)).
-7. Its current state is the machine's initial state for that task node. Claim
-   mode enters a ticket at the top of its workflow; one already partway through
-   is being worked by whoever holds it, so automatic selection passes over it.
-   `--task` names a ticket explicitly and bypasses selection (§3.4).
+7. For automatic selection, its current state is the machine's initial state
+   for that task node. Automatic claim mode enters a ticket at the top of its
+   workflow, so it passes over one already partway through. `--task` names a
+   ticket explicitly and bypasses only this initial-state restriction (§3.4).
 
 Rules 1, 2, 4, 5 and 6 are the *ready set* — the one definition `rhei run`
 ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)) schedules from and `rhei list --ready` reports
-([§FS-rhei-list.3.1](rhei-list.spec.md#31-what---ready-means)). Rules 3 and 7 are this command's own narrowing, about
-availability rather than readiness, which is why a ticket `rhei list --ready`
-names can still be one `rhei next` declines to claim.
+([§FS-rhei-list.3.1](rhei-list.spec.md#31-what---ready-means)). Rule 3 and, for
+automatic selection, rule 7 are this command's own narrowing, about
+availability rather than readiness. Explicit selection preserves rule 3 and
+the whole ready set; it bypasses no scope, ownership, descendant, prior, input,
+gate, terminal-state, poll-deadline, or supervision-hold check.
 
 Rule 1 is the eligibility half of the non-leaf model
 ([§FS-rhei-plan-language.3](rhei-plan-language.spec.md#3-semantic-constraints)): a non-leaf task node is a task in its own right —
@@ -98,9 +108,11 @@ reported as held by its supervisor rather than as blocked.
 ### 3.1. Behavior
 
 1. Load the state machine and plan. Validate.
-2. Scan every task node in plan order, leaf and non-leaf alike. For each task
-   that satisfies the descendant, dependency, assignee, and state eligibility
-   rules above, resolve the current state's required `inputs`.
+2. With automatic selection, scan every task node in plan order, leaf and
+   non-leaf alike. With `--task`, select the named node without applying the
+   automatic initial-state restriction. In both modes apply the remaining
+   readiness and availability rules above and resolve the current state's
+   required `inputs`.
 3. If any required input file for the first otherwise-claimable task is
    missing, stop immediately and fail with an explicit missing-artifact error.
    Do not skip ahead to later tasks.
@@ -108,10 +120,16 @@ reported as held by its supervisor rather than as blocked.
 5. Acquire the plan file's canonical sibling sidecar as the sole writer lock,
    leaving the replaceable plan destination unlocked
    (§FS-rhei-transition-cmd.3).
-6. Re-read the current destination pathname and re-validate the task's
-   claimability under the sidecar, including
+6. Re-read the current destination pathname and repeat the task's complete
+   readiness and availability decision under the sidecar, including
    re-checking required `inputs` (guards against concurrent claims and moved
-   files). The re-read parses the selected task's file under the same node
+   files). Preserve whether selection was automatic or explicit: the locked
+   automatic check retains the initial-state restriction and the locked
+   explicit check bypasses only that restriction. A concurrent change to
+   state, ownership, priors, descendants, inputs, poll timing, or supervision
+   can therefore invalidate the claim, while an unchanged explicit
+   non-initial task cannot be mistaken for such a change. The re-read parses
+   the selected task's file under the same node
    kinds the scan did. In a directory workspace those are the kinds the
    workspace index declares in `structure.nodeKinds`
    ([§FS-rhei-plan-language.3.7](rhei-plan-language.spec.md#37-node-kind-validity)),
@@ -122,9 +140,11 @@ reported as held by its supervisor rather than as blocked.
    kinds omit `task` is therefore claimed exactly like one that declares it: a
    task the scan selected is never lost at re-read, and the re-read rejects a
    heading keyword the plan did not declare.
-7. If the selected task is in a non-runnable initial state whose first
-   applicable forward transition targets another non-terminal state, send that
-   edge and the claim intent through the shared transition executor. The
+7. If the selected task is in a qualifying passive state whose first applicable
+   forward transition targets another non-terminal state, send exactly that
+   edge and the claim intent through the shared transition executor. Automatic
+   selection reaches this rule only from an initial state; explicit selection
+   may reach it from an eligible non-initial state. The
    executor applies `on_leave`, validates a redirect before persistence,
    validates source outputs and effective-target inputs
    ([§FS-rhei-transitions.4.5](rhei-transitions.spec.md#45-artifact-enforcement)),
@@ -138,16 +158,16 @@ reported as held by its supervisor rather than as blocked.
    project settings → global settings). When no agent is configured, write
    the reserved assignee value `manual` so the task still leaves the claimable
    set durably and concurrent `rhei next` calls cannot claim it twice.
-9. For an auto-advancing claim, retain the original task and metadata bytes and
+9. For an advancing claim, retain the original task and metadata bytes and
    the transition ledger's pre-append length. Write the effective state and
    metadata atomically, run `on_enter` against that target-state view, write the
    resolved assignee while the claim still owns the task, then append exactly
    one transition entry. Ledger appends are serialized so this append can be
    reversed without truncating a different writer's successful entry. The
    state, ownership, and transition entry together establish the claim's
-   commit boundary. For an already-runnable initial task, revalidate under the
-   lock and atomically write its assignee once; staying in the same state
-   creates no transition entry.
+   commit boundary. For a task claimed in place, revalidate under the lock and
+   atomically write its assignee once; staying in the same state creates no
+   transition entry.
 10. Release the sidecar after the state, ownership, metadata, ledger, callback,
     and any ordinary-return restoration work is complete, resolve the task's
     exclusions, then build the state's effective prompt text from its selected
@@ -164,7 +184,7 @@ reported as held by its supervisor rather than as blocked.
 
 If no claimable task exists, print a status summary (see [No Tasks Ready](#5-no-tasks-ready)).
 
-An auto-advancing claim is not committed until its effective state, resolved
+An advancing claim is not committed until its effective state, resolved
 ownership, and transition bookkeeping have all been recorded. An ordinary
 returned artifact-validation, state-persistence, assignee-persistence, or
 ledger error before that boundary restores the original task and metadata
@@ -247,10 +267,10 @@ Missing required input artifact: findings (runtime/findings/auth.review-cache-ke
 
 ### 3.4. Claiming a Non-Leaf Ticket with `--task`
 
-`--task` names a ticket explicitly and bypasses selection, but not the
-descendant rule (§3, rule 1). Targeting a non-leaf ticket whose subtree is
-still open fails, naming every open descendant and pointing at what is
-claimable instead:
+`--task` names a ticket explicitly and bypasses the automatic initial-state
+restriction, but no other readiness or availability rule (§3). Targeting a
+non-leaf ticket whose subtree is still open fails, naming every open descendant
+and pointing at what is claimable instead:
 
 ```text
 Error: Task plan.2 cannot be claimed while 1 descendant task(s) are still open.
@@ -268,14 +288,19 @@ advances a parent when its children advance ([§FS-rhei-plan-language.3](rhei-pl
 refusal that told the caller to wait for the children to "advance the parent"
 would describe a mechanism that does not exist.
 
-Claiming does not advance state (§3), so claiming a parent is exactly that —
-taking the ticket. `rhei transition` and `rhei complete` move it afterwards,
-both subject to the descendants-first guard on the shared transition path
-([§FS-rhei-transition-cmd.3.1](rhei-transition-cmd.spec.md#31-descendants-first-on-terminal-entry)).
+Once eligible, an ordinary parent uses the same one-edge passive-state rule as
+a leaf (§3); a supervising parent retains its supervision-specific in-place
+claim behavior. `rhei transition` and `rhei complete` move claimed work
+afterwards, both subject to the descendants-first guard on the shared
+transition path ([§FS-rhei-transition-cmd.3.1](rhei-transition-cmd.spec.md#31-descendants-first-on-terminal-entry)).
 
 ## 4. Peek Mode (`--peek`)
 
-With `--peek`, `rhei next` performs a read-only scan and prints the next task that *would* be claimed, without modifying the plan or acquiring a lock. This is safe for PM-style navigation, scripting, and inspection.
+With `--peek`, `rhei next` performs a read-only scan and prints the next task
+that *would* be claimed, without modifying the plan or acquiring a lock. An
+explicit eligible non-initial task is shown in its current state: peek does not
+speculate about a passive edge or callback redirect. This is safe for PM-style
+navigation, scripting, and inspection.
 
 Peek mode does **not**:
 

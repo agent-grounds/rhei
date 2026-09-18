@@ -86,3 +86,112 @@ fn in_place_claim_rechecks_non_input_eligibility_after_selection() {
     assert!(!fs::read_to_string(&plan).unwrap().contains("**Assignee:**"));
     assert!(!dir.path().join("runtime/state-transitions.log").exists());
 }
+
+fn explicit_non_initial_revalidation_fixture(
+    prefix: &str,
+) -> (tempfile::TempDir, PathBuf, PathBuf, String) {
+    let dir = tempfile::Builder::new().prefix(prefix).tempdir().expect("tempdir");
+    let plan = dir.path().join("plan.rhei.md");
+    let machine = dir.path().join("states.yaml");
+    let original = r#"# Rhei: Explicit revalidation
+
+---
+structure:
+  maxLevels: 3
+---
+
+## Tasks
+
+### Task prerequisite: Finished prerequisite
+**State:** done
+
+### Task 1: Work
+**State:** bridge
+**Prior:** Task prerequisite
+"#
+    .to_string();
+    let state_machine = r#"name: explicit-revalidation
+version: 1
+states:
+  start:
+    initial: true
+    description: Initial
+  bridge:
+    description: Passive bridge
+  work:
+    description: Work
+    agent: codex
+  done:
+    description: Done
+    final: true
+transitions:
+  - from: start
+    to: bridge
+  - from: bridge
+    to: work
+  - from: work
+    to: done
+"#;
+    fs::write(&plan, &original).expect("plan");
+    fs::write(&machine, state_machine).expect("state machine");
+    (dir, plan, machine, original)
+}
+
+/// Explicit selection bypasses only the automatic initial-state filter. A
+/// baseline must first reach the non-initial transition, then stale state,
+/// ownership, priors, and descendants must each lose under the sidecar.
+// §FS-rhei-next.3.1
+#[test]
+fn issue_286_explicit_non_initial_claim_revalidates_real_contention_under_lock() {
+    let (_baseline_dir, baseline_plan, baseline_machine, _) =
+        explicit_non_initial_revalidation_fixture("explicit-revalidation-baseline");
+    next_command(
+        &baseline_plan,
+        Some(&baseline_machine),
+        Some("1"),
+        false,
+        true,
+        false,
+        &[],
+    )
+    .expect("an unchanged explicit non-initial claim must succeed");
+    assert!(fs::read_to_string(&baseline_plan).unwrap().contains("**State:** work\n**Assignee:** codex"));
+
+    for (name, mutate, expected) in [
+        (
+            "state",
+            "# Rhei: Explicit revalidation\n\n---\nstructure:\n  maxLevels: 3\n---\n\n## Tasks\n\n### Task prerequisite: Finished prerequisite\n**State:** done\n\n### Task 1: Work\n**State:** work\n**Prior:** Task prerequisite\n",
+            "expected 'bridge'",
+        ),
+        (
+            "ownership",
+            "# Rhei: Explicit revalidation\n\n---\nstructure:\n  maxLevels: 3\n---\n\n## Tasks\n\n### Task prerequisite: Finished prerequisite\n**State:** done\n\n### Task 1: Work\n**State:** bridge\n**Assignee:** other\n**Prior:** Task prerequisite\n",
+            "already assigned to other",
+        ),
+        (
+            "prior",
+            "# Rhei: Explicit revalidation\n\n---\nstructure:\n  maxLevels: 3\n---\n\n## Tasks\n\n### Task prerequisite: Reopened prerequisite\n**State:** bridge\n\n### Task 1: Work\n**State:** bridge\n**Prior:** Task prerequisite\n",
+            "no longer claimable",
+        ),
+        (
+            "descendant",
+            "# Rhei: Explicit revalidation\n\n---\nstructure:\n  maxLevels: 3\n---\n\n## Tasks\n\n### Task prerequisite: Finished prerequisite\n**State:** done\n\n### Task 1: Work\n**State:** bridge\n**Prior:** Task prerequisite\n\n#### Task 1.1: Concurrent child\n**State:** bridge\n",
+            "no longer claimable",
+        ),
+    ] {
+        let (dir, plan, machine, _) =
+            explicit_non_initial_revalidation_fixture(&format!("explicit-revalidation-{name}"));
+        let changed_path = plan.clone();
+        set_claim_before_lock_hook(move || fs::write(changed_path, mutate).expect("mutate plan"));
+
+        let error = next_command(&plan, Some(&machine), Some("1"), false, true, false, &[])
+            .expect_err("a concurrent eligibility change must refuse the claim");
+
+        assert!(
+            error.to_string().contains(expected),
+            "{name} mutation: expected {expected:?}, got {error:?}"
+        );
+        assert_eq!(fs::read_to_string(&plan).unwrap(), mutate);
+        assert!(!dir.path().join("runtime/state-transitions.log").exists());
+    }
+}

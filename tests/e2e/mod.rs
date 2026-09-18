@@ -67,6 +67,8 @@ mod new_tests;
 mod new_write_tests;
 mod next_claim_atomicity_tests;
 mod next_claim_boundary_tests;
+mod next_explicit_passive_atomicity_tests;
+mod next_explicit_passive_claim_tests;
 mod next_node_kinds_tests;
 mod next_tests;
 mod parallel_target_override_tests;

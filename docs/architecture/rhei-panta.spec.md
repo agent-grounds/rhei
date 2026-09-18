@@ -113,7 +113,14 @@ directory under a canonical-root digest, not in the project, so a read-only
 load gains no project write requirement. Project/member loading, lenient
 listing, watches, and direct runtime consumers all enter through this boundary;
 a marker refuses the root rather than yielding a partial graph. Multi-root
-loads sort canonical roots before guard acquisition. §FS-rhei-panta.6.6
+loads discover the complete canonical root set before guard acquisition.
+Filesystem identity alone discovers the parent project and its reserved basin
+marker, even when project metadata is in doubt. Basin access retains both
+owners; member and direct manifest access also checks the basin marker before
+and after acquisition. Nested loads reuse that complete set without inverted
+acquisition. The typed project-metadata image does not change public ownership:
+qualified basin counters/checkpoints remain in `index.panta.md`.
+§FS-rhei-panta.6.6 §FS-rhei-recover.2
 
 ## 3. Identity and id namespacing
 

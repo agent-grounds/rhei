@@ -363,7 +363,12 @@ removes the task body's result link and preserves the append-only result file;
 re-entering a final state appends the required fresh result and restores one
 link.
 
-After confirmation, the command acquires each affected execution root's run
+For a basin task, affected owners include its execution root and the immediate
+parent project whose `index.panta.md` owns qualified visit/checkpoint metadata.
+Derive the same owner set for preparation and replay under §FS-rhei-recover.2
+and §FS-rhei-recover.3, without moving or omitting that metadata.
+
+After confirmation, the command acquires each affected owner's run
 lock non-blocking and refuses with its recorded owner when held. It then takes
 the exclusive root-access guards of §FS-rhei-recover.4 and the stable metadata,
 task, and ledger locks. It refuses while a claim exists on the task, any
@@ -383,7 +388,10 @@ installs after-images. The marker records absence distinctly and covers the
 state and assignee rewrite, visits and suffix, supervision checkpoint, result
 append, and result-link addition or removal. It also records the original
 ledger byte offset and prefix digest. No effect precedes durable marker
-publication.
+publication. Basin transactions use version 2's typed project-metadata image,
+including the complete manifest before/after bytes; the single marker and sole
+ledger commit witness remain under the basin execution root. Version 1 remains
+compatible for root-contained transactions. §FS-rhei-recover.2
 
 Under the central ledger lock, the command appends these two adjacent lines as
 one logical record:

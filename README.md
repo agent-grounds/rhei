@@ -104,7 +104,9 @@ no callbacks run. Agents must not invoke operator recovery.
 If interrupted, commands refuse the root and print `rhei recover <execution-root>`.
 That command requires fresh confirmation and restores the complete recorded
 outcome without duplicate results or audit pairs. Older binaries cannot enforce
-the interlock and must not access a root with pending recovery.
+the interlock and must not access a root with pending recovery. Basin recovery
+uses `rhei recover <project>/basin` and restores its shared project manifest as
+part of the same operation; project and member access also waits for recovery.
 
 See [operator transitions](docs/functional-spec/rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)
 and [explicit recovery](docs/functional-spec/rhei-recover.spec.md) for audit,

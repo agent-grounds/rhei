@@ -36,8 +36,8 @@ and absence of one never disables operator recovery.
 ## 2. Marker format
 
 The marker is UTF-8 canonical JSON with a trailing newline. Unknown versions,
-unknown fields, duplicate keys, invalid base64url, paths outside the execution
-root, and a missing or malformed required field make it corrupt. Version 1 has
+unknown fields, duplicate keys, invalid base64url, paths outside their declared
+owner, and a missing or malformed required field make it corrupt. Version 1 has
 this shape:
 
 ```json
@@ -79,6 +79,29 @@ counted-visit metadata, supervision checkpoint, result append, assignee change,
 and result-link addition/removal are therefore all explicit before/after bytes,
 including when several roles share one physical plan file.
 
+Version 2 retains this shape and adds a required `owner` on every file image:
+`"execution-root"` for a contained image, or `"basin-project-metadata"` for the
+basin's shared manifest. Files are sorted uniquely by `(owner, path)`; duplicate
+resolved paths are forbidden. Version 1 has no owner field and retains exactly its
+root-contained meaning. Writers use version 2 only for a basin transaction
+with a project-metadata image; neither version changes the audit-pair format.
+
+The typed `basin-project-metadata` owner is allowed only when the canonical
+execution root is the regular, nonsymlink `basin/` directory immediately under
+a project. Its sole allowed path is `index.panta.md`, resolving to the canonical
+immediate parent's regular, nonsymlink manifest. Its roles are exactly
+`["checkpoint", "metadata"]`, and both images are present complete manifest
+bytes. The basin must have no authored `index.rhei.md`. No arbitrary parent or
+absolute paths, alternative filenames, unknown owners, symlink escapes, or
+ambiguous owner arrangements are allowed. All `execution-root` image paths
+retain version 1's containment checks. Counted visits and checkpoints remain
+in that manifest under qualified basin ids, with unrelated metadata and bytes
+included in both images. §FS-rhei-panta.6
+
+There is still exactly one marker, under `PROJECT/basin/.rhei/`, one explicit
+recovery invocation targeting that basin, and one commit witness in its
+`runtime/state-transitions.log`. The project has no second marker or witness.
+
 An image is either `{"kind":"absent"}` or
 `{"kind":"present","bytes":"<base64url>"}`. `bytes` is unpadded base64url
 of the complete file, including its original newline convention; `absent`
@@ -99,7 +122,13 @@ remains durable until every selected image and the ledger outcome are durable.
 Recovery acquires the same locks and in the same order as the force operation:
 all affected run locks in sorted canonical-root order, all exclusive root
 guards in that order, then sorted metadata/task files and the transition
-ledger (§FS-rhei-transition-cmd.6.1). Run-lock acquisition is non-blocking and
+ledger (§FS-rhei-transition-cmd.6.1). Derive the affected owners from canonical
+filesystem identities and the validated image owners, without parsing the
+in-doubt plan: the execution root, plus the immediate parent project for a
+version-2 basin manifest image, and filesystem-discovered project members
+needed by dependent project reads. Preparation, file-image resolution and replay
+use this same owner set. Recheck owner identities, image paths and marker
+validity under the complete lock set before replay. Run-lock acquisition is non-blocking and
 names the recorded owner on contention. After locking, recovery re-reads the
 marker and ledger and verifies that the previewed marker bytes, id, hop, and
 decision are unchanged. A changed or vanished marker refuses; it is never
@@ -146,7 +175,19 @@ per-account lock keyed by SHA-256 of the canonical root in rhei's platform
 state directory, so reading a read-only project does not require creating a
 file inside it. The force and recovery coordinators take the same guard
 exclusively before publishing, inspecting, or resolving a marker. Multi-root
-operations acquire guards in sorted canonical-root order.
+operations discover the complete owner set before acquiring guards in sorted
+canonical-root order, checking pending markers before and after acquisition.
+Project/manifest access discovers the reserved `basin/.rhei/forced-recovery.json`
+without parsing metadata; basin and project-member access includes the parent
+project owner and discovers the same marker. Direct manifest writers retain
+the complete guard set through their writes. An already active shared-manifest
+writer finishes before force captures its before-image; later access refuses
+while the marker survives. Nested loads reuse guards without reversing lock
+order. Headless startup holds the shared owner set before launcher-lock
+creation, descriptor reads, log truncation or spawning, through the parent
+handshake; its child acquires the discovered run locks nonblocking before its
+first shared acquisition, so it cannot queue behind a force waiting for the
+parent's shared guards. It revalidates the discovered roots after loading.
 
 When a marker is present, every entry point other than `rhei recover` refuses
 before returning plan, project, member, metadata, result, ledger, dashboard, or
@@ -176,4 +217,11 @@ after marker publication; before and after each image replacement; between the
 exception and movement rows; before and after ledger sync; and before and after
 marker removal. At each boundary a later explicit recovery produces either the
 complete original root with no pair or the complete after-root with exactly one
-pair, result append, checkpoint, and visit update—never a mixed root.
+pair, result append, checkpoint, and visit update—never a mixed root. Basin
+coverage includes each distinct task, whole project manifest and result image,
+both owners' run locks, an active manifest writer and queued readers, and a
+second interruption during every replay boundary. The basin ledger alone
+chooses the outcome; unrelated manifest data and sibling files remain intact,
+including updates completed before capture. Unknown owner/path arrangements,
+third image values, and ambiguous or torn ledger evidence are checked across
+both owners. Version-1 and ordinary workspace coverage remains required.

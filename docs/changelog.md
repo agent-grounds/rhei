@@ -22,7 +22,8 @@
 - **Attended operators can recover a missing state-machine edge with `transition
   --force --reason`.** Fresh confirmation, preserved transition safeguards and a
   durable exceptional audit pair make the correction recoverable with `rhei
-  recover`; pending recovery blocks readers and writers. (PR #297)
+  recover`, including basin tasks and their shared project metadata; pending
+  recovery blocks readers, writers and headless startup. (PR #297)
 
 - **Self-looping agent states can continue their immediately preceding visit
   with `session: continue`.** The runtime selects the exact current `_state`

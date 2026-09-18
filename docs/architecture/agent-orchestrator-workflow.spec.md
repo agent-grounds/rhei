@@ -255,6 +255,18 @@ The orchestrator manages workflow execution through state transitions:
 
 #### 3.3.1. Stable Writer Exclusion
 
+Before file-sidecar acquisition, ordinary writers retain the complete sorted
+shared owner guards of §FS-rhei-recover.4. A basin's project manifest is a
+shared owner: its writer checks the reserved basin marker without parsing the
+manifest and holds both owners across dependent reads and writes. Force and
+explicit replay derive identical affected owners from the canonical root and
+typed images, acquire their run locks nonblocking in canonical order, then
+exclusive owner guards in that order, then canonical sorted image sidecars and
+the basin ledger lock. They revalidate mutable inputs under those locks. An
+existing manifest writer completes before capture; no writer can slip between
+capture and recovery. Only the basin ledger pair is a commit witness.
+§FS-rhei-recover.3 §FS-rhei-transition-cmd.6.1
+
 Every command that rewrites plan or metadata Markdown locks a persistent
 sidecar beside the destination before it reads the authoritative pathname. The
 sidecar identity is the canonical parent directory plus the destination's exact

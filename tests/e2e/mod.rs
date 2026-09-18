@@ -8,6 +8,7 @@ mod accounting_line_tests;
 mod accounting_presentation_tests;
 mod accounting_prices_tests;
 mod accounting_profile_price_composition_tests;
+mod accounting_profile_price_lifecycle_tests;
 mod accounting_profile_prices_tests;
 mod accounting_support;
 mod agent_environment_tests;

@@ -18,8 +18,8 @@ struct EffectivePricePair {
     labels: Vec<String>,
 }
 
-/// Resolve the invocations which this run can select from the tasks' current
-/// states before any execution surface starts. §FS-rhei-cost-accounting.5.1
+/// Resolve current and later reachable invocations before any execution
+/// surface starts, using each task's execution selectors. §FS-rhei-cost-accounting.5.1
 fn selected_run_invocations(
     loaded: &LoadedPlan,
     machines: &ExecutionMachines,
@@ -31,23 +31,48 @@ fn selected_run_invocations(
         return Ok(Vec::new());
     }
     let mut selected = Vec::new();
-    for task in &loaded.rhei.tasks {
+    let mut tasks = Vec::new();
+    collect_plan_tasks(&loaded.rhei.tasks, &mut tasks);
+    for task in tasks {
         if !task_in_rhei_scope(scope, &task.id.to_string()) {
             continue;
         }
         let machine = machines.for_task(&task.id);
-        let state = normalized_state_name(task.state.as_str(), machine);
-        let Some(definition) = machine.states.get(&state) else { continue };
-        if definition.terminal || definition.gating || definition.program.is_some() {
-            continue;
+        let mut pending = vec![normalized_state_name(task.state.as_str(), machine)];
+        let mut visited = HashSet::new();
+        while let Some(state) = pending.pop() {
+            if !visited.insert(state.clone()) {
+                continue;
+            }
+            let Some(definition) = machine.states.get(&state) else { continue };
+            if definition.terminal {
+                continue;
+            }
+            if !definition.gating && definition.program.is_none() {
+                selected.extend(resolve_agent_invocations_for_task(
+                    machine,
+                    &state,
+                    settings,
+                    opts,
+                    Some(task),
+                )?);
+            }
+            // Outcomes and conditions are not known before execution. Follow every
+            // declared path, including wildcard and program/gate exits, within the
+            // task's allowed states. §FS-rhei-cost-accounting.5.1
+            for rule in machine.transitions() {
+                if (rule.from.0 == state || rule.from.0 == "*")
+                    && task_profile_allows_state(
+                        machine,
+                        task.kind.as_str(),
+                        task.profile_level(),
+                        &rule.to.0,
+                    )
+                {
+                    pending.push(rule.to.0.clone());
+                }
+            }
         }
-        selected.extend(resolve_agent_invocations_for_task(
-            machine,
-            &state,
-            settings,
-            opts,
-            Some(task),
-        )?);
     }
     Ok(selected)
 }
@@ -239,8 +264,11 @@ fn generated_price_book_id(book: &PriceBook) -> MietteResult<String> {
         "entries": book.entries.clone(),
     });
     let canonical = canonical_json(semantic);
-    let bytes = serde_json::to_vec(&canonical)
-        .map_err(|err| miette!("failed to serialize generated price-book identity: {err}"))?;
+    // §FS-rhei-errors.1.2: serialization of canonical internal values is a bug to report.
+    let bytes = serde_json::to_vec(&canonical).map_err(|err| miette!(
+        help = internal_error_help(),
+        "failed to serialize generated price-book identity: {err}"
+    ))?;
     Ok(format!("profiles-sha256-{:x}", Sha256::digest(bytes)))
 }
 

@@ -490,7 +490,19 @@ currency. An explicit book bypasses profile-book construction and its conflict
 checks while retaining its existing validation and exact-match behavior.
 
 Without `--prices`, Rhei preflights every candidate invocation in the selected
-run scope. A named profile contributes its profile entry when it has prices;
+run scope. Candidates include each selected task and its descendants, in their
+current state and in nonterminal states reachable through declared transitions
+under that task's node profile. Program and gating states contribute no agent
+invocation, but their outgoing paths can reach later agent work in the same run.
+Terminal states stop the walk. Readiness, transition conditions, and subprocess
+outcomes can change during execution, so current readiness or one predicted
+outcome must not exclude a later candidate. Unreachable states and tasks outside
+the selected rhei scope contribute nothing. Each candidate uses the same
+task/state/CLI selector precedence as execution. All these sources participate
+in the single pre-execution composition and conflict check, before even the
+first program starts.
+
+A named profile contributes its profile entry when it has prices;
 otherwise that invocation contributes the built-in exact match or an unpriced
 marker. A literal target contributes the same built-in-or-unpriced fallback and
 never a profile entry. Profile prices apply only when the invocation's final,

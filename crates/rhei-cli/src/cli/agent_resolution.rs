@@ -95,10 +95,11 @@ fn resolve_target_agent_with_overrides(
 
     let model_profile = resolve_model_profile(settings, Some(model_override))?
         .expect("a named model override has a model profile");
-    target.model = model_profile.model.clone().unwrap_or_else(|| model_override.to_string());
-    // `**Model:**`/CLI overrides preserve target agent/mode/provider while the
-    // named profile supplies its concrete model and durable identity.
-    // §FS-rhei-plan-language.3.11 §FS-rhei-agents.1.4
+    target.model = model_override.to_string();
+    // `**Model:**`/CLI overrides preserve target agent/mode/provider and keep
+    // the named profile id as the target's own identity; the profile supplies
+    // its concrete model and durable identity for accounting provenance only.
+    // §FS-rhei-plan-language.3.11 §FS-rhei-agents.1.4 §FS-rhei-agents.1.5
     let mut resolved = resolve_target_agent(&target.selector(), state_def, settings)?;
     let binding = model_profile.agents.get(resolved.agent.id());
     resolved.model = Some(model_override.to_string());
@@ -335,13 +336,7 @@ fn resolve_agent_invocations_for_task(
         if !state_def.all_targets.is_empty() {
             let mut resolved = Vec::with_capacity(state_def.all_targets.len());
             for selector in &state_def.all_targets {
-                resolved.push(resolve_target_agent_with_overrides(
-                    selector,
-                    Some(state_def),
-                    settings,
-                    None,
-                    opts.model_override(),
-                )?);
+                resolved.push(resolve_target_agent(selector, Some(state_def), settings)?);
             }
             return Ok(resolved);
         }

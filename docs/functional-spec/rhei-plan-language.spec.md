@@ -1407,7 +1407,7 @@ parse, validation, composition, and execution behavior. Program states,
 callbacks, `--no-agent`, and `rhei snapshot continue` do not launch a new agent
 under this contract and are unchanged.
 
-### 3.13. Task Snapshot Inheritance Overrides
+### 3.14. Task Snapshot Inheritance Overrides
 
 A task may override the name and lineage axis of the active state's
 `snapshot.inherit` rule, or explicitly disable that rule:
@@ -1427,8 +1427,8 @@ A task may override the name and lineage axis of the active state's
 The value is either `none` or `<snapshot-name> from <axis>`, where `<axis>` is
 `self`, `ancestor`, or `prior` and the name obeys the snapshot-name grammar in
 §FS-rhei-snapshots.4.2. The field appears after `**Prior:**` when both are
-present and before `**Provides:**`, `**Consumes:**`, `**Assignee:**`,
-`**Model:**`, or `**Target:**`. It may appear at most once. An empty value, an
+present and before `**Provides:**`, `**Consumes:**`, `**Excludes:**`,
+`**Assignee:**`, `**Model:**`, or `**Target:**`. It may appear at most once. An empty value, an
 unsupported axis, extra words, a duplicate, or a recognized metadata field in
 the wrong order is a parse error naming `**Inherits:**`.
 

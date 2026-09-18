@@ -212,7 +212,7 @@ fn select_snapshot_override_run_invocation(
         }
         // Candidate selection uses freshly read task metadata and the active
         // state rule; an explicit `none` survives only to report its opt-out.
-        // §FS-rhei-snapshot-operations.2 §FS-rhei-plan-language.3.13
+        // §FS-rhei-snapshot-operations.2 §FS-rhei-plan-language.3.14
         let target_slug = snapshot_target_slug_or_err(resolved)?;
         candidates.push(SnapshotOverrideRunSelection {
             task_id: task_id.clone(),

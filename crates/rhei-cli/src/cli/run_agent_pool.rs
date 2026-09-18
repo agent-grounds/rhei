@@ -225,6 +225,7 @@ fn run_agent_worker_pool(
                     workspace_root,
                     runtime_dir,
                     run_id,
+                    snapshot_override_selection,
                     sink,
                     intervene,
                     &mut free_slots,

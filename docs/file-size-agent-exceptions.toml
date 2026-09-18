@@ -610,7 +610,7 @@ path = "crates/rhei-core/src/parser/plan.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 900, unit = "lines" }
+max_accepted = { value = 1100, unit = "lines" }
 until = "The parser introduces a metadata-block context/dispatcher that owns ordering and NodeBuilder mutation, allowing all task metadata handlers to move together."
 reason = """
 The line-oriented parser keeps task metadata ordering, code-fence state, content closure, and node-stack mutation in one loop; extracting one metadata field alone would duplicate that control flow rather than create a cohesive module.

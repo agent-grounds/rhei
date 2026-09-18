@@ -31,7 +31,7 @@ pub enum Token {
     MetadataPrior { task_ids: Vec<TaskId> },
 
     /// Metadata "Inherits": task snapshot inheritance overlay or opt-out.
-    // §FS-rhei-plan-language.3.13
+    // §FS-rhei-plan-language.3.14
     MetadataInherits { inherit: TaskSnapshotInherit },
 
     /// Metadata "Provides": `**Provides:** <name>, <name>, ...`.

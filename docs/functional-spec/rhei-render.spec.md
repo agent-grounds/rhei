@@ -68,7 +68,7 @@ shapes.
 
 Each rendered task has an optional string field `inherits`. When authored, its
 normalized value is either `"none"` or `"<name> from <axis>"`, matching
-§FS-rhei-plan-language.3.13. The key is absent, not `null` or an empty string,
+§FS-rhei-plan-language.3.14. The key is absent, not `null` or an empty string,
 when `**Inherits:**` was omitted. This field reports authored task metadata;
 it does not expand or duplicate an inherited state-machine rule.
 

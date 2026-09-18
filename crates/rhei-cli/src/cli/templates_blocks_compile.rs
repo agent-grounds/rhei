@@ -44,7 +44,7 @@
                 chain.push(format!("{} as {alias}", manifest_path.display()));
                 return Err(miette!(help = "remove one use: entry to break the recursive cycle", "block composition cycle: {}; break the recursive use chain", chain.join(" -> ")));
             }
-            let manifest = load_template_manifest(&dir)?;
+            let manifest = self.load_manifest(&dir, alias)?;
             let values = self.resolve_values(&manifest, reference, supplied)?;
             self.stack.push((manifest_path.clone(), alias.into()));
             let chain = self.stack.iter().map(|(_,a)| a.as_str()).collect::<Vec<_>>().join(".");
@@ -53,6 +53,13 @@
                 .map_err(|e| e.wrap_err(format!("{} [mount {chain}]", manifest_path.display())));
             self.stack.pop();
             result
+        }
+        // Schema errors can precede rendering, but still belong to this mount chain. §FS-rhei-library.8
+        fn load_manifest(&self, dir: &Path, alias: &str) -> MietteResult<TemplateManifest> {
+            let chain = self.stack.iter().map(|(_, alias)| alias.as_str())
+                .chain(std::iter::once(alias)).collect::<Vec<_>>().join(".");
+            load_template_manifest(dir)
+                .map_err(|err| err.wrap_err(format!("{} [mount {chain}]", dir.join("template.yaml").display())))
         }
         fn prepare_inner(&mut self, dir: &Path, reference: &str, manifest: &TemplateManifest, values: &BTreeMap<String, serde_json::Value>) -> MietteResult<Block> {
             let manifest = select_block_declarations(manifest, values, dir, reference)?;
@@ -85,7 +92,7 @@
                         dir.join("template.yaml").display()
                     ))
                 })?;
-                let child_manifest = load_template_manifest(child_resolved.path())?;
+                let child_manifest = self.load_manifest(child_resolved.path(), &mount.alias)?;
                 let mut child_values = BTreeMap::new();
                 let mut bound_targets = BTreeSet::new();
                 for binding in manifest.block.bind.iter().filter(|binding| {

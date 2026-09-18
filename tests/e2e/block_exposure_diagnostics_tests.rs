@@ -231,9 +231,8 @@ fn static_and_selected_exposure_groups_are_mutually_exclusive() {
     let fixture = write_exposure_fixture(&dir);
     let manifest_path = fixture.leaf.join("template.yaml");
     let mut manifest = fs::read_to_string(&manifest_path).expect("leaf manifest");
-    manifest.push_str(
-        "select: |\n  expose:\n    states:\n      selected: { local: internal-ready }\n",
-    );
+    manifest
+        .push_str("select: |\n  expose:\n    states:\n      selected: { local: internal-ready }\n");
     fs::write(&manifest_path, manifest).expect("duplicate selected exposure");
     let output = dir.join("output");
     let result = instantiate_direct(&dir, &fixture.leaf, &output);
@@ -269,4 +268,82 @@ fn unresolved_child_exposure_names_the_mount_chain_and_public_alternatives() {
         assert!(combined.contains(expected), "missing {expected:?} in:\n{combined}");
     }
     assert!(!output.exists(), "unresolved re-exposure published partial output");
+}
+
+/// Static and selected schema failures keep the same typed path, authored
+/// manifest and nested mount context. §FS-rhei-library.8
+#[test]
+fn closed_exposure_schema_errors_keep_paths_in_static_and_selected_mounts() {
+    let dir = unique_temp_dir("blocks-exposure-schema-context");
+    let mut failures = Vec::new();
+    for selected in [false, true] {
+        for (label, from, to, path, offending, alternative) in [
+            (
+                "state-field",
+                "ready: { local: internal-ready }",
+                "ready: { local: internal-ready, surprise: true }",
+                "expose.states.ready",
+                "surprise",
+                "local",
+            ),
+            (
+                "settings-registry",
+                "    skills:",
+                "    secrets:",
+                "expose.settings",
+                "secrets",
+                "skills",
+            ),
+            (
+                "settings-target",
+                "reviewer: { local: internal-agent }",
+                "reviewer: { local: internal-agent, surprise: true }",
+                "expose.settings.agents.reviewer",
+                "surprise",
+                "mount",
+            ),
+            (
+                "target-type",
+                "ready: { local: internal-ready }",
+                "ready: { local: [internal-ready] }",
+                "expose.states.ready",
+                "sequence",
+                "string",
+            ),
+        ] {
+            let label = format!("{label}-selected-{selected}");
+            let case = dir.join(&label);
+            let fixture = write_exposure_fixture(&case);
+            let manifest_path = fixture.leaf.join("template.yaml");
+            replace_manifest(&manifest_path, from, to);
+            if selected {
+                let manifest = fs::read_to_string(&manifest_path).unwrap();
+                let (header, exposure) = manifest.split_once("expose:\n").unwrap();
+                let mut body = String::from("  expose:\n");
+                for line in exposure.lines() {
+                    body.push_str("  ");
+                    body.push_str(line);
+                    body.push('\n');
+                }
+                fs::write(&manifest_path, format!("{header}select: |\n{body}")).unwrap();
+            }
+            let wrapper =
+                write_observing_wrapper(&case, "observer-flow", &fixture.leaf, "review.ready");
+            let output = case.join("output");
+            let result = instantiate_curated(&case, &wrapper, &output);
+            let mut fragments = vec![
+                path,
+                offending,
+                alternative,
+                "template.yaml",
+                "mount",
+                "observer-flow.review",
+            ];
+            if selected {
+                fragments.push("select");
+            }
+            record_failure(&mut failures, &label, &result, &output, &fragments);
+        }
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }

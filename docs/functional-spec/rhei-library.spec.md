@@ -173,6 +173,11 @@ public name with the `mount` form at every boundary. A reference may contain
 only its immediate mount and public name, so `outer.review.ready` cannot bypass
 an `outer` wrapper that omitted the re-exposure. Undeclared local identities,
 child private names, and generated qualified spellings remain inaccessible.
+Settings references, including execution-target components, are checked against
+the immediate children's actual compiled ownership in the relevant registry
+before merging. An undotted spelling that names such a child-owned identity
+does not become external; genuinely external names and valid locally owned
+references remain valid, even when their spelling resembles a generated name.
 
 Public names are stable interface identities. Mounted as `review`, exposed
 state `ready` lowers to the ordinary generated identity `m6_review__ready`.
@@ -544,6 +549,9 @@ the authored manifest path, full mount chain, member kind and offending
 reference, and include valid public alternatives and a corrective action when
 applicable. Every exposure declaration is validated after rendering and before
 qualification. No partial output is accepted after one of these failures.
+Static and selected closed-schema failures retain the typed declaration path
+(for example, `expose.states.ready` or `expose.settings`), the unsupported field,
+and the allowed fields as corrective alternatives.
 
 Catalog/discovery UX beyond existing template discovery, a replacement textual
 authoring language, richer provenance, exposure of values, defaults, secrets,

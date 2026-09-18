@@ -94,6 +94,7 @@ pub(crate) fn validate_uses(
     block: &CompiledBlock,
     children: &BTreeMap<String, CompiledBlock>,
 ) -> CompileResult<()> {
+    check_settings(&block.fragment.settings, children)?;
     let machine = &block.fragment.machine;
     for rule in &machine.transitions {
         if rule.from.0 != "*" {
@@ -245,19 +246,29 @@ fn is_public(value: &str, kind: &str, children: &BTreeMap<String, CompiledBlock>
 }
 
 fn check(value: &str, kind: &str, children: &BTreeMap<String, CompiledBlock>) -> CompileResult<()> {
+    // Concrete child ownership cannot masquerade as an external setting, even
+    // after nested qualification or compatibility renaming. §FS-rhei-library.1.2
+    for (alias, child) in children {
+        if matches!(kind, "agents" | "models" | "mcp_servers" | "skills")
+            && child
+                .fragment
+                .settings
+                .get(kind)
+                .and_then(serde_json::Value::as_object)
+                .is_some_and(|registry| registry.contains_key(value))
+        {
+            return Err(format!(
+                "private generated {kind} '{value}' belongs to mount '{alias}' in {}; use an expose declaration and its qualified public name; public {kind} alternatives: {}",
+                child.source.display(), public_alternatives(alias, child, kind)
+            ));
+        }
+    }
     let Some((alias, name)) = value.split_once('.') else { return Ok(()) };
     let Some(child) = children.get(alias) else { return Ok(()) };
     if !name.contains('.') && child.public.registry(kind).contains_key(name) {
         return Ok(());
     }
-    let alternatives = child
-        .public
-        .registry(kind)
-        .keys()
-        .map(|public| format!("{alias}.{public}"))
-        .collect::<Vec<_>>();
-    let alternatives =
-        if alternatives.is_empty() { "none declared".to_string() } else { alternatives.join(", ") };
+    let alternatives = public_alternatives(alias, child, kind);
     if name.contains('.') {
         return Err(format!(
             "'{value}' crosses more than the immediate mount boundary at '{}'; explicitly re-expose the {kind} in '{}' first; public alternatives: {alternatives}",
@@ -275,6 +286,60 @@ fn check(value: &str, kind: &str, children: &BTreeMap<String, CompiledBlock>) ->
     Err(format!(
         "private or unknown public {kind} '{value}' is not exposed; add an expose declaration in the child or use a declared public {kind}: {alternatives}"
     ))
+}
+
+fn public_alternatives(alias: &str, child: &CompiledBlock, kind: &str) -> String {
+    let alternatives = child
+        .public
+        .registry(kind)
+        .keys()
+        .map(|public| format!("{alias}.{public}"))
+        .collect::<Vec<_>>();
+    if alternatives.is_empty() {
+        "none declared".into()
+    } else {
+        alternatives.join(", ")
+    }
+}
+
+/// Settings definitions contain typed references too; their ownership check
+/// precedes the same rewrite and merge as state/task uses. §FS-rhei-library.1.2
+fn check_settings(
+    settings: &serde_json::Value,
+    children: &BTreeMap<String, CompiledBlock>,
+) -> CompileResult<()> {
+    if let Some(defaults) = settings.get("defaults") {
+        for (field, kind) in [("agent", "agents"), ("model", "models")] {
+            if let Some(value) = defaults.get(field).and_then(serde_json::Value::as_str) {
+                check(value, kind, children)?;
+            }
+        }
+        for kind in ["mcp_servers", "skills"] {
+            for value in
+                defaults.get(kind).and_then(serde_json::Value::as_array).into_iter().flatten()
+            {
+                if let Some(id) = value.as_str().or_else(|| value.get("id")?.as_str()) {
+                    check(id, kind, children)?;
+                }
+            }
+        }
+    }
+    for model in settings
+        .get("models")
+        .and_then(serde_json::Value::as_object)
+        .into_iter()
+        .flat_map(|models| models.values())
+    {
+        if let Some(agent) = model.get("default_agent").and_then(serde_json::Value::as_str) {
+            check(agent, "agents", children)?;
+        }
+        if let Some(agents) = model.get("agents").and_then(serde_json::Value::as_object) {
+            for agent in agents.keys() {
+                check(agent, "agents", children)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 pub(crate) struct ResolvedExposure {

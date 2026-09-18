@@ -23,6 +23,7 @@ mod block_composition_runtime_tests;
 mod block_composition_support;
 mod block_composition_tests;
 mod block_exposure_diagnostics_tests;
+mod block_exposure_ownership_tests;
 mod block_exposure_support;
 mod block_exposure_tests;
 mod block_terminal_compatibility_tests;

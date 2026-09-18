@@ -72,17 +72,20 @@ Release never transitions a ticket, never writes a result, never appends to
 
 ### 3.1. Releasing from a non-initial state
 
-`rhei next` claims tickets from the state machine's initial state
-([§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next)). Under a machine whose claim also advances the state, a released
-ticket is unclaimed but not yet re-claimable — it sits in the state its
-abandoned run left it in.
+Automatic `rhei next` selection claims tickets from the state machine's initial
+state ([§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next)). Under a
+machine whose claim also advances the state, a released ticket is unclaimed but
+not automatically selectable — it sits in the state its abandoned run left it
+in. A later explicit `rhei next --task <id>` may re-claim that non-initial
+ticket and, when it is an eligible passive state, may advance its one applicable
+non-terminal edge under the explicit-claim rule.
 
-Release reports that rather than fixing it, naming the exact `rhei transition`
-that moves the ticket back. Rolling the state back automatically would discard a
-transition that genuinely happened: its `on_leave`/`on_enter` callbacks ran, its
-artifacts may exist, and its ledger entry is written. Whether that work is
-salvageable or should be redone is the operator's call, and the state is the
-only remaining evidence of it.
+Release reports that distinction rather than moving the ticket. Rolling the
+state back automatically would discard a transition that genuinely happened:
+its `on_leave`/`on_enter` callbacks ran, its artifacts may exist, and its ledger
+entry is written. Whether that work is salvageable, explicitly re-claimed, or
+should be moved elsewhere is the operator's call, and the state is the only
+remaining evidence of it.
 
 The note is **not** printed for two tickets it would be wrong about:
 

@@ -96,7 +96,7 @@ The commands that coordinate through the state machine:
 |--------------------|---------------------------------------------------------------------------------|
 | `rhei init`        | Sets up a Panta project in a gitignored `panta/` folder (or in place with `--here`): manifest, ignore rules, agent-discovery note ([§FS-rhei-init](rhei-init.spec.md#fs-rhei-init-rhei-init)) |
 | `rhei run`         | Drives the full plan forward under orchestrator authority (`--rhei <id>` narrows a project-scoped run) |
-| `rhei next`        | Claims the next ready task for a manual worker (with `--peek` for read-only, `--rhei <id>` to narrow) |
+| `rhei next`        | Claims the next ready task for a manual worker; `--task` may advance one eligible passive edge, while `--peek` is read-only and `--rhei <id>` narrows scope |
 | `rhei transition`  | Atomically changes a task's state via compare-and-swap; `--result` carries the message a `final: true` target requires ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)) |
 | `rhei complete`    | Terminal transition invoked by a manual worker: the inferred one-hop terminal target plus the shared transition carrying a literal `--result` or UTF-8 `--result-file` message |
 | `rhei reset`       | Returns each task to the state it was authored in ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)), removes `runtime/`; narrowed with `--rhei <id>` it removes only the in-scope tickets' keyed output ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)) |
@@ -264,8 +264,11 @@ For manual workers, coordination happens through `rhei next`, `rhei transition`,
 # Inspect what is next without claiming (read-only, safe for PM browsing)
 rhei next --peek plan.rhei.md
 
-# Claim the next ready task (assigns without transitioning, prints instructions)
+# Claim the next automatically selected task (assigns it and may advance one passive initial edge)
 rhei next plan.rhei.md
+
+# Explicitly claim ready non-initial work (may advance one eligible passive edge)
+rhei next plan.rhei.md --task 3
 
 # ... agent does the work ...
 

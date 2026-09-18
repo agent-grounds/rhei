@@ -144,8 +144,12 @@ fn validate_generated_price_book_archive(
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
         Err(err) => return Err(file_io_report(&path, "failed to read generated price-book archive", err)),
     };
+    // §FS-rhei-errors.1.2: serialization of validated internal values is a bug to report.
     let expected = serde_json::to_vec_pretty(price_book).map_err(|err| {
-        miette!("failed to serialize generated price-book archive '{}': {err}", path.display())
+        miette!(
+            help = internal_error_help(),
+            "failed to serialize generated price-book archive '{}': {err}", path.display()
+        )
     })?;
     if existing != expected {
         return Err(miette!(

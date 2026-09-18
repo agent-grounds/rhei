@@ -86,8 +86,3 @@ inputs:
     items:
       type: string
     default: []
-
-  - name: supervisor_session
-    description: Give the supervisor a snapshot session so each visit continues the previous transcript. Only set this true when `supervisor_target` names a session-capable agent - of the built-in profiles that is `pi` today. With the built-in `claude-code` profile a snapshot block is a hard validation error, so this stays false by default and the supervisor runs each visit cold, carried by its checkpoints and its briefs.
-    type: boolean
-    default: false

@@ -88,13 +88,12 @@ reports success:
 
 ## Session continuity
 
-`supervisor_session` is **false**, so the supervisor runs each visit cold. That
-is the supported shape for `claude-code`, `codex`, `gemini`, `cursor`, and
-`kilocode`, which reject a snapshot block outright. Nothing is lost that the
-workspace does not already carry: every visit is handed `## Checkpoints` —
-what moved and what it left behind — and the preparation note the supervisor
-wrote on its first visit. Set `supervisor_session=true` only with a
-session-capable target such as `pi`.
+The supervising state declares `session: continue`. After visit 1, a profile
+with native snapshot preload continues the immediately preceding visit's
+transcript. An unsupported profile, or an unavailable or unusable exact source,
+logs the reason and runs that visit cold. In both cases the ordinary prompt
+still includes `## Checkpoints`, previous visits, the supervisor brief, and the
+preparation note.
 
 ## Where work happens
 

@@ -58,14 +58,14 @@
 #   state's `outputs:`, so the completion condition refuses to finish a step
 #   that did not publish them.
 #
-# Snapshots
-# ---------
+# Session continuity
+# ------------------
 #
-#   The `snapshot:` block below exists only when `supervisor_session` is true.
-#   Of the built-in agent profiles only `pi` declares a snapshot session layout;
-#   `claude-code`, `codex`, `gemini`, `cursor`, and `kilocode` reject the block
-#   as a hard `unsupported-snapshot-session` error. Without it the supervisor
-#   runs each visit cold, carried by its checkpoints and its briefs.
+#   `session: continue` asks each visit after the first to preload this same
+#   state's immediately preceding auto snapshot. A capable profile continues
+#   warm; an unsupported or unusable source logs why and runs cold. Checkpoints,
+#   briefs, and preparation memory are composed in either case
+#   (§FS-rhei-snapshots.4.7).
 
 name: supervised-delivery
 version: 1.0.0
@@ -82,6 +82,7 @@ states:
     description: The delivery's one decision maker, woken after every child that finishes and holding the rest of the subtree in between.
     target: claude-code[yolo]:anthropic:claude-opus-4-7
     visits: 12
+    session: continue
     personality: |
       You supervise a delivery. You do not write the code, the reviews, or the
       docs; you decide what happens next and you say it in writing. Every step
@@ -105,10 +106,10 @@ states:
 
       `{input.preparation.path}` already holds the acceptance criteria, the
       risk areas, and the focus each role was given. Read it before you judge
-      anything: with no session carried between visits it is the only memory
-      this delivery has of what you decided at the start. Extend it when a
-      checkpoint changes what "done" means; never rewrite it to match what
-      happened.
+      anything: it is the durable project record of what you decided at the
+      start, whether this visit continued a transcript or started cold. Extend
+      it when a checkpoint changes what "done" means; never rewrite it to match
+      what happened.
       {else}
       ## Visit 1: prepare, then send the implementer
 

@@ -346,20 +346,3 @@ fn snapshot_override_contract_candidates(
                 .iter()
                 .any(|ancestor| ancestor == &candidate.task_id),
             "prior" => prior_sources.iter().any(|source| source == &candidate.task_id),
-            _ => false,
-        })
-        .collect::<Vec<_>>();
-    if let Some(select) = inherit.select.as_ref() {
-        if let Some(state) = select.state.as_deref() {
-            scoped.retain(|candidate| candidate.emitting_state == state);
-        }
-        if let Some(target) = select.target.as_deref() {
-            let required_target = if target == "same" { target_slug } else { target };
-            scoped.retain(|candidate| candidate.target_slug == required_target);
-        }
-        if let Some(visit) = select.visit.as_ref().and_then(yaml_selector_u64) {
-            scoped.retain(|candidate| candidate.visit == visit);
-        }
-    }
-    Ok(scoped)
-}

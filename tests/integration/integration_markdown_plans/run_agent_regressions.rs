@@ -383,7 +383,14 @@ fn run_agent_falls_back_to_invocation_cwd_when_no_git_root_exists() {
     let script_path = write_checkout_recording_script(&plan_dir);
     write_fake_agent_settings(&plan_dir, &script_path);
 
-    let result = run_run_command_in_dir(&cwd, &plan_path, &machine_path, &["--no-callbacks"]);
+    let ceiling = root.parent().expect("fixture has a temporary parent").to_str().expect("ceiling path");
+    let result = run_run_command_in_dir_with_env(
+        &cwd,
+        &plan_path,
+        &machine_path,
+        &["--no-callbacks"],
+        &[("GIT_CEILING_DIRECTORIES", ceiling)],
+    );
 
     assert!(
         result.status.success(),
@@ -507,7 +514,13 @@ result('## Result\n\nAgent finished {}.\n'.format(env('RHEI_STATE')))
     let script_path = write_python_agent(&dir, "agent.py", script);
     write_fake_agent_settings(&dir, &script_path);
 
-    let result = run_run_command(&plan_path, &machine_path, &["--no-callbacks"]);
+    let ceiling = dir.parent().expect("fixture has a temporary parent").to_str().expect("ceiling path");
+    let result = run_run_command_with_env(
+        &plan_path,
+        &machine_path,
+        &["--no-callbacks"],
+        &[("GIT_CEILING_DIRECTORIES", ceiling)],
+    );
 
     assert!(
         result.status.success(),
@@ -569,7 +582,13 @@ result('## Result\n\nAgent finished {}.\n'.format(env('RHEI_STATE')))
     let script_path = write_python_agent(&dir, "agent.py", script);
     write_fake_agent_settings(&dir, &script_path);
 
-    let result = run_run_command(&plan_path, &machine_path, &["--no-callbacks"]);
+    let ceiling = dir.parent().expect("fixture has a temporary parent").to_str().expect("ceiling path");
+    let result = run_run_command_with_env(
+        &plan_path,
+        &machine_path,
+        &["--no-callbacks"],
+        &[("GIT_CEILING_DIRECTORIES", ceiling)],
+    );
 
     assert!(
         result.status.success(),
@@ -1004,7 +1023,13 @@ result('## Result\n\nAgent finished {}.\n'.format(env('RHEI_STATE')))
         ),
     );
 
-    let result = run_run_command(&plan_path, &machine_path, &["--no-callbacks", "--parallel", "1"]);
+    let ceiling = dir.parent().expect("fixture has a temporary parent").to_str().expect("ceiling path");
+    let result = run_run_command_with_env(
+        &plan_path,
+        &machine_path,
+        &["--no-callbacks", "--parallel", "1"],
+        &[("GIT_CEILING_DIRECTORIES", ceiling)],
+    );
 
     assert!(
         result.status.success(),

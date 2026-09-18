@@ -1186,14 +1186,23 @@ override and the state in the agent/model resolution chain
 ([§FS-rhei-agents.1.4](rhei-agents.spec.md#14-resolution-order)):
 
 ```
-CLI override  >  task **Target:** / **Model:**  >  state target /
-all_targets / legacy model+agent  >  settings defaults
+CLI agent/model dimensions  >  task **Target:** / **Model:**  >
+ordinary state target / legacy model+agent  >  settings defaults
 ```
 
 `**Target:**` is resolved exactly as a state `target` selector. `**Model:**`
 resolves the state's identity normally and then substitutes the model segment,
 whether the state used a modern `target` selector or the legacy `agent`+`model`
-split.
+split. A supplied CLI agent or model then replaces only that dimension of the
+selected single identity; an unspecified CLI dimension retains the task or
+state value.
+
+The fanout and `target_locked` validation rules above restrict task metadata,
+not run-level flags. CLI agent/model dimensions therefore remain effective on
+an ordinary `target_locked` state. They do not alter `all_targets`, whose
+selectors retain their encoded identities, or the legacy `all_models` model
+fanout. Task overrides remain forbidden on both fanout forms and on
+`target_locked` states.
 
 Example — two sibling tasks in the same state, executed with different models:
 

@@ -89,6 +89,7 @@ mod roster_support;
 mod run_lock_wait_tests;
 mod run_shell_program_tests;
 mod run_signals_tests;
+mod run_target_cli_override_tests;
 mod run_tests;
 mod runs_history_tests;
 mod self_advancing_agent_tests;

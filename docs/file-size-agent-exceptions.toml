@@ -426,11 +426,11 @@ path = "docs/functional-spec/rhei-agents.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1500, unit = "lines" }
+max_accepted = { value = 1600, unit = "lines" }
 until = "The agent specification is split at its own top-level boundaries — the profile registry and built-in catalogue apart from prompt composition, and the run loop apart from timeouts and log capture — each half carrying its own declaration, with every `§FS-rhei-agents.<n>` citation repointed."
 issue = "agent-grounds/rhei#179"
 reason = """
-Three subjects share this declaration: what an agent profile is, what rhei composes when it spawns one, and what the run loop does around it. The split is real and is not this change's to make. What is edited here is one ticket's specification point — the claude-code prompt transport, the flag order that follows from it, and a dry-run illustration that stopped being true — and splitting the document in the same commit would move every section citation alongside a behaviour change, which is precisely what a spec-first commit must not hide.
+Three subjects share this declaration: what an agent profile is, what rhei composes when it spawns one, and what the run loop does around it. The split is real, is tracked by the linked issue, and is not this change's to make. This change extends only the existing resolution and partial-override points; splitting the document in the same commit would move every section citation alongside a behaviour contract, which is precisely what a spec-first commit must not hide.
 """
 [[exceptions]]
 path = "crates/rhei-cli/src/cli/agent_spawn.rs"
@@ -537,10 +537,10 @@ path = "docs/functional-spec/rhei-plan-language.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1200, unit = "lines" }
+max_accepted = { value = 1300, unit = "lines" }
 until = "A follow-up defines child declarations for the tutorial and data-model boundaries, maps every moved section to a stable ID, and migrates all inbound citations."
 reason = """
-The plan-language declaration has no approved split map for separating its tutorial, grammar, and data-model sections while preserving their live section IDs and inbound citations; this issue must extend the owning FS-rhei-plan-language.3.12 point in place.
+The plan-language declaration has no approved split map for separating its tutorial, grammar, and data-model sections while preserving their live section IDs and inbound citations. A focused behaviour change must extend its owning point in place; this change extends FS-rhei-plan-language.3.11 rather than combining a citation migration with the precedence contract.
 """
 
 [[exceptions]]

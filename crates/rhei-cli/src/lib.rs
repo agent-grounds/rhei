@@ -217,6 +217,7 @@ mod tests {
     include!("cli/tests_claim_revalidation.rs");
     include!("cli/tests_headless_console_log.rs");
     include!("cli/tests_agent_resolution.rs");
+    include!("cli/tests_cli_target_overrides.rs");
     include!("cli/tests_provider_limits.rs");
     include!("cli/tests_agent_prompt_transport.rs");
     include!("cli/tests_spawn_records.rs");

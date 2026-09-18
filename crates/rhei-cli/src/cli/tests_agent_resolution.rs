@@ -62,6 +62,7 @@
                 model: Some("claude-sonnet-4-6".to_string()),
                 default_agent: Some("claude-code".to_string()),
                 agents: BTreeMap::new(),
+                prices: None,
             },
         );
 
@@ -99,6 +100,7 @@
                 model: Some("claude-sonnet-4-6".to_string()),
                 default_agent: None,
                 agents,
+                prices: None,
             },
         );
         settings.defaults.agent_timeout = Some("30m".to_string());
@@ -129,6 +131,7 @@
                 model: Some("registry-concrete-model".to_string()),
                 default_agent: None,
                 agents,
+                prices: None,
             },
         );
 

@@ -85,16 +85,31 @@ fn resolve_target_agent_with_overrides(
 ) -> MietteResult<ResolvedAgent> {
     let mut target = parse_execution_target(selector)
         .map_err(|err| miette!(help = err, "invalid target selector '{}'", selector))?;
-
     if let Some(agent) = agent_override {
         target.agent = agent.to_string();
     }
-    if let Some(model) = model_override {
-        resolve_model_profile(settings, Some(model))?;
-        target.model = model.to_string();
-    }
 
-    resolve_target_agent(&target.selector(), state_def, settings)
+    let Some(model_override) = model_override else {
+        return resolve_target_agent(&target.selector(), state_def, settings);
+    };
+
+    let model_profile = resolve_model_profile(settings, Some(model_override))?
+        .expect("a named model override has a model profile");
+    target.model = model_profile.model.clone().unwrap_or_else(|| model_override.to_string());
+    // `**Model:**`/CLI overrides preserve target agent/mode/provider while the
+    // named profile supplies its concrete model and durable identity.
+    // §FS-rhei-plan-language.3.11 §FS-rhei-agents.1.4
+    let mut resolved = resolve_target_agent(&target.selector(), state_def, settings)?;
+    let binding = model_profile.agents.get(resolved.agent.id());
+    resolved.model = Some(model_override.to_string());
+    resolved.model_name = model_profile.model.clone().or_else(|| resolved.model.clone());
+    if let Some(target) = resolved.target.as_mut() {
+        target.model_profile = Some(model_override.to_string());
+    }
+    resolved.timeout_secs =
+        resolve_legacy_agent_timeout(state_def, settings, &resolved.profile, binding);
+    resolved.autonomous_args = binding.map(|item| item.autonomous_args.clone()).unwrap_or_default();
+    Ok(resolved)
 }
 
 /// Select the legacy model without checking the registry. Runtime and static
@@ -320,7 +335,13 @@ fn resolve_agent_invocations_for_task(
         if !state_def.all_targets.is_empty() {
             let mut resolved = Vec::with_capacity(state_def.all_targets.len());
             for selector in &state_def.all_targets {
-                resolved.push(resolve_target_agent(selector, Some(state_def), settings)?);
+                resolved.push(resolve_target_agent_with_overrides(
+                    selector,
+                    Some(state_def),
+                    settings,
+                    None,
+                    opts.model_override(),
+                )?);
             }
             return Ok(resolved);
         }

@@ -275,6 +275,18 @@ struct ResolvedAgent {
     autonomous_args: Vec<String>,
 }
 
+impl ResolvedAgent {
+    /// The selected named profile, kept distinct from a literal target. For a
+    /// named model over a target, `model` is the profile id while the target
+    /// carries the final concrete model. §FS-rhei-agents.1.4
+    fn model_profile_id(&self) -> Option<&str> {
+        match self.target.as_ref() {
+            Some(target) => target.model_profile.as_deref(),
+            None => self.model.as_deref(),
+        }
+    }
+}
+
 #[derive(Clone)]
 enum ProgramCommand {
     Shell(String),

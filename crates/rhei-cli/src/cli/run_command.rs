@@ -307,6 +307,19 @@ fn run_command(
     // §FS-rhei-validate.4 §FS-rhei-run.3
     report.warnings.dedup();
 
+    // An explicit caller book already won above. Otherwise resolve the whole
+    // selected invocation scope once and compose its effective profile book
+    // before any execution surface starts. §FS-rhei-cost-accounting.5.1
+    let generated_profile_book = if custom_price_book.is_none() {
+        let invocations = selected_run_invocations(&loaded, &machines, &settings, &opts, &rhei_scope)?;
+        profile_price_book(&settings, &invocations)?
+    } else {
+        None
+    };
+    if let Some(price_book) = generated_profile_book.clone() {
+        opts.select_price_book(price_book);
+    }
+
     if !opts.dry_run() {
         // §FS-rhei-cost-accounting.11 §FS-rhei-panta.6.5: identity spans the selected root union.
         validate_accounting_identity(
@@ -319,11 +332,23 @@ fn run_command(
         for root in &accounting_roots {
             validate_price_book_currency(&root.join("runtime/accounting"), opts.price_book())?;
         }
+        if let Some(price_book) = generated_profile_book.as_ref() {
+            for root in &accounting_roots {
+                validate_generated_price_book_archive(
+                    &root.join("runtime/accounting"),
+                    price_book,
+                )?;
+            }
+        }
         // The caller-owned book is durable everywhere this run can start an
         // agent before the first such process is spawned. §FS-rhei-cost-accounting.5.1
         if custom_price_book.is_some() {
-            for root in accounting_roots {
+            for root in &accounting_roots {
                 write_price_book(&root.join("runtime/accounting"), opts.price_book())?;
+            }
+        } else if let Some(price_book) = generated_profile_book.as_ref() {
+            for root in &accounting_roots {
+                write_generated_price_book(&root.join("runtime/accounting"), price_book)?;
             }
         }
     }

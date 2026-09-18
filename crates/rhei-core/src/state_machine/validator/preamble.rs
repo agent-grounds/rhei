@@ -381,6 +381,11 @@ pub struct ExecutionTarget {
     pub provider: Option<String>,
     /// Model identifier segment carried by the selector.
     pub model: String,
+    /// Named profile which overrode this otherwise literal target. This is
+    /// runtime provenance, not part of the selector's serialized identity.
+    /// §FS-rhei-agents.1.4
+    #[serde(skip)]
+    pub(crate) model_profile: Option<String>,
 }
 
 impl ExecutionTarget {
@@ -548,5 +553,6 @@ pub fn parse_execution_target(selector: &str) -> Result<ExecutionTarget, String>
         mode: mode.map(str::to_string),
         provider: provider.map(str::to_string),
         model: model.to_string(),
+        model_profile: None,
     })
 }

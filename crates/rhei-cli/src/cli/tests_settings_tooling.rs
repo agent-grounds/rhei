@@ -912,6 +912,7 @@ transitions: []
                 model: Some("claude-sonnet".to_string()),
                 default_agent: Some("codex".to_string()),
                 agents: BTreeMap::new(),
+                prices: None,
             },
         );
         assert!(should_use_agent_mode(&rhei, &rhei_validator::MachineSet::single(bare_machine.clone()), &defaults_model, &default_run_options(), &ReadySetRoots::plan_only(dir.path()))
@@ -925,6 +926,7 @@ transitions: []
                 model: Some("claude-sonnet".to_string()),
                 default_agent: Some("codex".to_string()),
                 agents: BTreeMap::new(),
+                prices: None,
             },
         );
         assert!(should_use_agent_mode(&rhei, &rhei_validator::MachineSet::single(model_machine.clone()), &model_default_agent, &default_run_options(), &ReadySetRoots::plan_only(dir.path()))

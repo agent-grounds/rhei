@@ -287,6 +287,12 @@ fn load_merged_roster(
                         .fields
                         .insert("default_agent".to_string(), RosterOrigin::Project);
                 }
+                // Rates are one authored object: absence inherits, while an
+                // object or `null` replaces/clears it wholesale.
+                // §FS-rhei-agents.1.3
+                if json_field_present(project_model_raw, "prices") {
+                    existing.prices = project_profile.prices;
+                }
                 for (agent_id, binding) in project_profile.agents {
                     let project_binding_raw =
                         json_child(json_child(project_model_raw, "agents"), &agent_id);

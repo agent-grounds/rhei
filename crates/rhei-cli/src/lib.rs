@@ -126,6 +126,7 @@ include!("cli/accounting_roots.rs");
 include!("cli/accounting.rs");
 include!("cli/accounting_cost_command.rs");
 include!("cli/accounting_presentation.rs");
+include!("cli/run_lock_owner_read.rs");
 include!("cli/summary_repricing.rs");
 include!("cli/summary_command.rs");
 include!("cli/programs.rs");

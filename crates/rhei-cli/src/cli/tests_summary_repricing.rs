@@ -31,6 +31,13 @@ mod summary_repricing_activity_tests {
         lock
     }
 
+    fn lock_body(lock: &mut HeldRunLock) -> Vec<u8> {
+        lock.file.rewind().expect("rewind owner");
+        let mut body = Vec::new();
+        lock.file.read_to_end(&mut body).expect("read owner");
+        body
+    }
+
     fn assert_invalid_owner_is_indeterminate(edit: impl FnOnce(&mut serde_json::Value)) {
         let root = tempfile::tempdir().expect("workspace");
         let mut lock = hold_lock(root.path(), Some("def456"));
@@ -70,12 +77,14 @@ mod summary_repricing_activity_tests {
     #[test]
     fn a_held_lock_with_exact_portable_ownership_is_active() {
         let root = tempfile::tempdir().expect("workspace");
-        let _lock = hold_lock(root.path(), Some("abc123"));
+        let mut lock = hold_lock(root.path(), Some("abc123"));
+        let before = lock_body(&mut lock);
 
         assert_eq!(
             selected_root_activity(root.path(), "abc123"),
             SelectedRunActivity::Active
         );
+        assert_eq!(lock_body(&mut lock), before);
     }
 
     #[test]
@@ -94,12 +103,14 @@ mod summary_repricing_activity_tests {
     #[test]
     fn a_lock_owned_by_another_exact_run_is_not_misattributed() {
         let root = tempfile::tempdir().expect("workspace");
-        let _lock = hold_lock(root.path(), Some("def456"));
+        let mut lock = hold_lock(root.path(), Some("def456"));
+        let before = lock_body(&mut lock);
 
         assert_eq!(
             selected_root_activity(root.path(), "abc123"),
             SelectedRunActivity::Inactive
         );
+        assert_eq!(lock_body(&mut lock), before);
     }
 
     #[test]

@@ -162,7 +162,6 @@ fn acquire_launch_lock(workspace_root: &Path) -> MietteResult<HeldRunLock> {
     match file.try_lock_exclusive() {
         Ok(()) => Ok(HeldRunLock {
             file,
-            #[cfg(target_os = "linux")]
             workspace: workspace_root.to_path_buf(),
         }),
         // Another launcher holds it — on Unix and on Windows alike.

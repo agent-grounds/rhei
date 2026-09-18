@@ -53,15 +53,6 @@ State machines constrain which states and transitions are legal. Cancellation ro
 preprocessing layer that materializes ordinary plan markdown and optional state
 machines before runtime parsing.
 
-Task metadata may also control execution without changing the state machine:
-`**Target:**` and `**Model:**` select an execution identity
-([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)),
-while `**Inherits:**` opts a task into or out of snapshot inheritance
-([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-snapshot-inheritance-overrides)).
-The plan-language specification owns that markdown syntax; the snapshot
-specification owns its lineage, selection, compatibility, and fallback behavior
-([§FS-rhei-snapshots.4](rhei-snapshots.spec.md#4-state-machine-schema)).
-
 ## 2. Reading Path
 
 Use this order when learning or auditing the language:
@@ -112,6 +103,15 @@ Language changes must preserve a single discoverable entry point:
   [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification).
 - New execution references that appear in authored files must identify their
   owner spec from this page.
+
+Task metadata may also control execution without changing the state machine:
+`**Target:**` and `**Model:**` select an execution identity
+([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)),
+while `**Inherits:**` opts a task into or out of snapshot inheritance
+([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-snapshot-inheritance-overrides)).
+The plan-language specification owns that markdown syntax; the snapshot
+specification owns its lineage, selection, compatibility, and fallback behavior
+([§FS-rhei-snapshots.4](rhei-snapshots.spec.md#4-state-machine-schema)).
 
 If a feature changes what a valid Rhei workflow can contain, this reference must
 be updated in the same change. The goal is not to centralize every rule here;

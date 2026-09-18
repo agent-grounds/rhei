@@ -205,6 +205,26 @@ it to the registry instead of inlining it on the state. Run-time overrides
 are available via `--agent <AGENT>`, `--agent-mode <MODE>`, and `--model
 <MODEL>` on `rhei run`.
 
+For example, an operator can rerun an ordinary state target on another agent
+and model without editing the machine:
+
+```yaml
+states:
+  review:
+    target: state-agent[yolo]:state-provider:state-model
+```
+
+```bash
+rhei run plan.rhei.md --agent override-agent --model override-model
+```
+
+The effective target is
+`override-agent[yolo]:state-provider:override-model`: the run flags replace
+only the agent and model, preserving the authored mode and provider. A target
+without a mode remains mode-less. This composition applies to ordinary state
+and task targets; `all_targets` fanout remains selector-owned and ignores both
+identity flags. [§FS-rhei-agents.1.5](rhei-agents.spec.md#15-partial-overrides)
+
 For parallel execution of independent tasks:
 
 ```bash

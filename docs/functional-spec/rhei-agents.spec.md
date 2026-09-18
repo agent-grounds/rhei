@@ -525,9 +525,23 @@ error: no agent configured for model 'impl-fast'.
 Set defaults.agent, the state's agent, models.impl-fast.default_agent, or pass --agent <AGENT> to rhei run.
 ```
 
+For an ordinary single target, Rhei first selects the lower-precedence
+identity from task `**Target:**` or `**Model:**`, state `target`, or the legacy
+state and settings fields. It then overlays a supplied `--agent` on only the
+agent segment and a supplied `--model` on only the model segment. The target's
+provider and optional mode remain unchanged, including when the mode is
+omitted. The effective agent supplies effort mapping and other agent-profile
+behavior.
+
+The composed selector goes through the same registry, mode, binding, timeout,
+and effort checks as an authored selector. An unknown run-level agent or model,
+or a preserved mode unsupported by the effective agent, is a run error that
+names the incompatible value before any invocation is scheduled or spawned.
+
 For a state that declares `all_targets`, this resolution is bypassed for the
 fields encoded directly in each selector: the agent id, optional mode, optional
-provider, and model name come from the selector itself. Validation must still
+provider, and model name come from the selector itself, even when `--agent` or
+`--model` is present. Validation must still
 verify that the referenced agent exists and that any referenced mode exists on
 that agent. For the legacy `all_models` form, agent resolution still runs
 independently for each model-specific execution of the state through the normal
@@ -620,6 +634,20 @@ states:
 Result for `agent-review`: model=`review-deep` (from state), agent=`codex`
 (from project defaults unless `review-deep.default_agent` or a CLI override
 supersedes it).
+
+An explicit single target composes the two CLI dimensions independently:
+
+| Run flags | Effective target for `state-agent[yolo]:state-provider:state-model` |
+|-----------|------------------------------------------------------------------------|
+| neither | `state-agent[yolo]:state-provider:state-model` |
+| `--agent override-agent` | `override-agent[yolo]:state-provider:state-model` |
+| `--model override-model` | `state-agent[yolo]:state-provider:override-model` |
+| both | `override-agent[yolo]:state-provider:override-model` |
+
+The same composition applies after selecting a task `**Target:**` or
+`**Model:**`. A selector without `[mode]` remains without a mode; substituting
+an agent does not select that agent's default mode. Provider and mode are never
+inferred from the run-level agent or model profile.
 
 ## 2. Known Agent Profiles
 

@@ -40,6 +40,15 @@ Flags are grouped by concern:
 | `--agent-mode <MODE>`   | Override the agent mode (named flag set) for this run                   |
 | `--model <MODEL>`       | Override the model for this run                                         |
 
+`--agent` and `--model` independently replace their named dimensions on
+ordinary single state and task targets. Dimensions not named on the command
+line retain their lower-precedence values, including an explicit target's
+provider and optional mode. The composed identity is validated before
+scheduling or spawn. `all_targets` is the exception: each fanout selector
+retains all four of its encoded identity dimensions. Legacy `all_models`
+continues to select each of its declared models while resolving its agent by
+the normal precedence rules. [§FS-rhei-agents.1.4](rhei-agents.spec.md#14-resolution-order)
+
 ### 2.3. Snapshots
 
 | Flag | Description |

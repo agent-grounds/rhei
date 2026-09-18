@@ -238,7 +238,7 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
                     reason.as_deref().expect("reason validated"), result.as_deref());
             }
             if reason.is_some() {
-                return Err(miette!("--reason is only valid with --force"));
+                return Err(diagnostic!("--reason is only valid with --force"));
             }
             transition_command(
                 target.path(),

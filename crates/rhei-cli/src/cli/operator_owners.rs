@@ -9,15 +9,15 @@ impl ForcedFile {
 
 /// Resolve only a regular immediate-parent manifest, never a caller-supplied parent path. §FS-rhei-recover.2
 fn forced_basin_manifest(root: &Path) -> MietteResult<PathBuf> {
-    let canonical = rhei_core::platform::canonical_path(root).map_err(|err| miette!("{err}"))?;
+    let canonical = rhei_core::platform::canonical_path(root).map_err(|err| diagnostic!("{err}"))?;
     if canonical != root || root.file_name().is_none_or(|name| name != "basin")
         || !fs::symlink_metadata(root).is_ok_and(|meta| meta.is_dir() && !meta.file_type().is_symlink())
         || fs::symlink_metadata(root.join("index.rhei.md")).is_ok() {
-        return Err(miette!("basin-project-metadata requires a canonical regular basin without an authored index"));
+        return Err(diagnostic!("basin-project-metadata requires a canonical regular basin without an authored index"));
     }
-    let parent = root.parent().ok_or_else(|| miette!("basin has no project owner"))?;
+    let parent = root.parent().ok_or_else(|| diagnostic!("basin has no project owner"))?;
     let manifest = forced_image_path(parent, "index.panta.md")?;
-    if !manifest.is_file() { return Err(miette!("basin project owner requires a regular index.panta.md")); }
+    if !manifest.is_file() { return Err(diagnostic!("basin project owner requires a regular index.panta.md")); }
     Ok(manifest)
 }
 
@@ -28,7 +28,7 @@ fn forced_file_path(root: &Path, file: &ForcedFile) -> MietteResult<PathBuf> {
         Some(ForcedOwner::BasinProjectMetadata) => {
             if file.path != "index.panta.md" || file.roles != ["checkpoint", "metadata"]
                 || file.before == ForcedImage::Absent || file.after == ForcedImage::Absent {
-                return Err(miette!("invalid basin-project-metadata image: expected complete index.panta.md metadata/checkpoint images"));
+                return Err(diagnostic!("invalid basin-project-metadata image: expected complete index.panta.md metadata/checkpoint images"));
             }
             forced_basin_manifest(root)
         }
@@ -37,7 +37,7 @@ fn forced_file_path(root: &Path, file: &ForcedFile) -> MietteResult<PathBuf> {
 
 /// Dependent project reads use the same filesystem-only owner discovery as ordinary access. §FS-rhei-recover.3
 fn forced_owner_roots(root: &Path, files: &[ForcedFile]) -> MietteResult<Vec<PathBuf>> {
-    let roots = rhei_core::root_access::input_roots(root).map_err(|err| miette!("{err}"))?;
+    let roots = rhei_core::root_access::input_roots(root).map_err(|err| diagnostic!("{err}"))?;
     for file in files { forced_file_path(root, file)?; }
     Ok(roots)
 }
@@ -47,11 +47,11 @@ fn forced_root_guards(roots: &[PathBuf]) -> MietteResult<Vec<rhei_core::root_acc
     let mut guards = Vec::new();
     for root in roots {
         let guard = match rhei_core::root_access::RootAccessGuard::try_exclusive(root)
-            .map_err(|err| miette!("{err}"))? {
+            .map_err(|err| diagnostic!("{err}"))? {
             Some(guard) => guard,
             None => {
                 forced_boundary("root-contended")?;
-                rhei_core::root_access::RootAccessGuard::exclusive(root).map_err(|err| miette!("{err}"))?
+                rhei_core::root_access::RootAccessGuard::exclusive(root).map_err(|err| diagnostic!("{err}"))?
             }
         };
         guards.push(guard);

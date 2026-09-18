@@ -10,9 +10,9 @@ impl ForcedDecision {
 fn forced_decision(root: &Path, marker: &ForcedMarker) -> MietteResult<ForcedDecision> {
     let path = forced_image_path(root, &marker.ledger.path)?;
     let bytes = ForcedImage::read(&path)?.bytes()?.unwrap_or_default();
-    let offset = usize::try_from(marker.ledger.offset).map_err(|err| miette!("invalid ledger offset: {err}"))?;
+    let offset = usize::try_from(marker.ledger.offset).map_err(|err| diagnostic!("invalid ledger offset: {err}"))?;
     if bytes.len() < offset || forced_digest(&bytes[..offset]) != marker.ledger.prefix_sha256 {
-        return Err(miette!("ledger prefix digest mismatch; restore evidence at {}", path.display()));
+        return Err(diagnostic!("ledger prefix digest mismatch; restore evidence at {}", path.display()));
     }
     let pair = format!("{}{}", marker.ledger.metadata_line, marker.ledger.movement_line);
     let tail = &bytes[offset..];
@@ -21,19 +21,19 @@ fn forced_decision(root: &Path, marker: &ForcedMarker) -> MietteResult<ForcedDec
     } else if pair.as_bytes().starts_with(tail) && std::str::from_utf8(tail).is_ok() {
         ForcedDecision::Rollback
     } else {
-        return Err(miette!("ambiguous ledger evidence (not the exact pair or a torn prefix); restore {}", path.display()));
+        return Err(diagnostic!("ambiguous ledger evidence (not the exact pair or a torn prefix); restore {}", path.display()));
     };
     // Parse the prefix to reject an earlier copy of this recovery id.
-    let prefix = std::str::from_utf8(&bytes[..offset]).map_err(|err| miette!("invalid ledger prefix: {err}"))?;
-    let history = rhei_core::transition_history::parse(prefix).map_err(|err| miette!("{err}"))?;
+    let prefix = std::str::from_utf8(&bytes[..offset]).map_err(|err| diagnostic!("invalid ledger prefix: {err}"))?;
+    let history = rhei_core::transition_history::parse(prefix).map_err(|err| diagnostic!("{err}"))?;
     if history.iter().any(|movement| movement.audit.as_ref().is_some_and(|audit| audit.recovery_id == marker.recovery_id)) {
-        return Err(miette!("duplicate recovery id in saved ledger prefix"));
+        return Err(diagnostic!("duplicate recovery id in saved ledger prefix"));
     }
     for file in &marker.files {
         let path = forced_file_path(root, file)?;
         let current = ForcedImage::read(&path)?;
         if current != file.before && current != file.after {
-            return Err(miette!("recovery image has a third value; restore evidence at {}", path.display()));
+            return Err(diagnostic!("recovery image has a third value; restore evidence at {}", path.display()));
         }
     }
     Ok(decision)
@@ -41,7 +41,7 @@ fn forced_decision(root: &Path, marker: &ForcedMarker) -> MietteResult<ForcedDec
 
 /// Marker errors always carry exactly one explicit recovery invocation. §FS-rhei-recover.4
 fn forced_recovery_error(root: &Path, error: miette::Report) -> miette::Report {
-    miette!("forced-recovery marker is corrupt or its evidence is ambiguous: {error}\nmarker: {}\nrhei recover {}",
+    diagnostic!("forced-recovery marker is corrupt or its evidence is ambiguous: {error}\nmarker: {}\nrhei recover {}",
         root.join(rhei_core::root_access::MARKER).display(), shell_quote(&root.display().to_string()))
 }
 
@@ -82,13 +82,13 @@ fn forced_replay(root: &Path, marker: &ForcedMarker, decision: ForcedDecision, a
     let _ledger = LockedTransitionLedger::lock(root)?;
     let marker_path = root.join(rhei_core::root_access::MARKER);
     let current = fs::read(&marker_path).map_err(|err| file_io_report(&marker_path, "confirmed marker vanished", err))?;
-    if current != preview { return Err(miette!("forced-recovery marker changed after confirmation; retry with fresh confirmation")); }
+    if current != preview { return Err(diagnostic!("forced-recovery marker changed after confirmation; retry with fresh confirmation")); }
     let locked_marker = ForcedMarker::parse(root, &current).map_err(|err| forced_recovery_error(root, err))?;
     if forced_owner_roots(root, &locked_marker.files)? != roots {
-        return Err(miette!("recovery owners changed after confirmation; retry with fresh confirmation"));
+        return Err(diagnostic!("recovery owners changed after confirmation; retry with fresh confirmation"));
     }
     let locked_decision = forced_decision(root, &locked_marker).map_err(|err| forced_recovery_error(root, err))?;
-    if locked_decision != decision { return Err(miette!("recovery decision changed after confirmation; retry with fresh confirmation")); }
+    if locked_decision != decision { return Err(diagnostic!("recovery decision changed after confirmation; retry with fresh confirmation")); }
     let path = forced_image_path(root, &marker.ledger.path)?;
     if path.exists() {
         forced_boundary("recovery-ledger-before")?;

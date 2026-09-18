@@ -28,7 +28,7 @@ impl LockedPlanFile {
     /// prior writer's last replacement or rollback.
     // §AR-agent-orchestrator-workflow.3.3.1 §FS-rhei-new.4
     fn open(path: &Path) -> MietteResult<Self> {
-        let root_guard = rhei_core::root_access::for_file(path).map_err(|err| miette!("{err}"))?;
+        let root_guard = rhei_core::root_access::for_file(path).map_err(|err| diagnostic!("{err}"))?;
         let lock_path = plan_lock_path(path)?;
         let writer_lock = fs::OpenOptions::new()
             .create(true)

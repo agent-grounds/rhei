@@ -1,5 +1,6 @@
 //! Typed composition provenance and its canonical v1 lock encoding.
 //! §FS-rhei-library.4.1 §AR-rhei-library.2–5
+use super::provenance_source::SourceRecord;
 use super::references::{tasks, Names};
 use super::*;
 use serde::Serialize;
@@ -14,6 +15,7 @@ struct MountRecord {
     chain: Vec<String>,
     encoded: String,
     source: String,
+    locator: SourceLocator,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -45,11 +47,11 @@ struct NodeTables {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ProvenanceStore {
-    sources: BTreeMap<String, SourceIdentity>,
+    sources: BTreeMap<String, SourceRecord>,
     mounts: BTreeMap<String, MountRecord>,
     declarations: BTreeMap<String, DeclarationRecord>,
     nodes: NodeTables,
-    routing_values: BTreeMap<String, Value>,
+    override_origins: Vec<Vec<Origin>>,
 }
 
 #[derive(Serialize)]
@@ -58,7 +60,7 @@ struct CompositionLock<'a> {
     mounts: &'a BTreeMap<String, MountRecord>,
     nodes: &'a NodeTables,
     schema_version: u8,
-    sources: &'a BTreeMap<String, SourceIdentity>,
+    sources: &'a BTreeMap<String, SourceRecord>,
 }
 
 impl ProvenanceStore {
@@ -69,7 +71,7 @@ impl ProvenanceStore {
         fragment: Option<&Fragment>,
     ) -> CompileResult<()> {
         let source_id = source.id()?;
-        insert_equal(&mut self.sources, source_id.clone(), source.clone(), "source")?;
+        self.merge_source(source_id.clone(), SourceRecord::from(source))?;
         let encoded = Qualifier::new(chain.to_vec()).prefix();
         let mount = if chain.is_empty() { "root".into() } else { encoded.clone() };
         insert_equal(
@@ -80,6 +82,7 @@ impl ProvenanceStore {
                 chain: chain.to_vec(),
                 encoded,
                 source: source_id.clone(),
+                locator: source.locator.clone(),
             },
             "mount",
         )?;
@@ -125,7 +128,7 @@ impl ProvenanceStore {
                 });
                 if let Ok(declaration) = self.declare(
                     "task",
-                    &slash(&file.path),
+                    &slash(&file.source_path),
                     Some(&task.id.to_string()),
                     rendered.clone(),
                     None,
@@ -170,23 +173,25 @@ impl ProvenanceStore {
                 )?;
                 add_origin(&mut self.nodes.routing, &key, direct(mount, &declaration));
             }
+            let rendered = policy
+                .overrides
+                .iter()
+                .map(|rule| serde_json::to_value(rule).map_err(|e| e.to_string()))
+                .collect::<CompileResult<Vec<_>>>()?;
+            let mut totals = BTreeMap::<String, usize>::new();
+            for rule in &rendered {
+                *totals.entry(digest_value(rule)?).or_default() += 1;
+            }
             let mut duplicate = BTreeMap::<String, usize>::new();
-            for rule in &policy.overrides {
-                let rendered = serde_json::to_value(rule).map_err(|e| e.to_string())?;
-                let rendered_digest = digest_value(&rendered)?;
-                let occurrence = duplicate.entry(rendered_digest.clone()).or_default();
+            for rule in rendered {
+                let digest = digest_value(&rule)?;
+                let occurrence = duplicate.entry(digest.clone()).or_default();
                 *occurrence += 1;
-                let declaration = self.declare(
-                    "routing",
-                    "states.yaml",
-                    None,
-                    rendered.clone(),
-                    Some(*occurrence),
-                    source,
-                )?;
-                let key = format!("overrides/sha256:{rendered_digest}~{occurrence}");
-                self.routing_values.insert(key.clone(), rendered);
-                add_origin(&mut self.nodes.routing, &key, direct(mount, &declaration));
+                // Declaration occurrences differ from final node ordinals. §FS-rhei-library.4.1
+                let occurrence = (totals[&digest] > 1).then_some(*occurrence);
+                let declaration =
+                    self.declare("routing", "states.yaml", None, rule, occurrence, source)?;
+                self.override_origins.push(vec![direct(mount, &declaration)]);
             }
         }
         Ok(())
@@ -224,25 +229,11 @@ impl ProvenanceStore {
         rename_nodes(&mut self.nodes.tasks, &names.tasks);
         rename_nodes(&mut self.nodes.profiles, &names.profiles);
         let routing = std::mem::take(&mut self.nodes.routing);
-        let mut values = std::mem::take(&mut self.routing_values);
         for (mut key, origins) in routing {
             if let Some(kind) = key.strip_prefix("by_type/") {
                 if let Some(qualified) = names.kinds.get(kind) {
                     key = format!("by_type/{qualified}");
                 }
-            } else if key.starts_with("overrides/") {
-                let mut rendered = values
-                    .remove(&key)
-                    .ok_or_else(|| format!("missing rendered routing provenance '{key}'"))?;
-                rewrite_routing_value(&mut rendered, names);
-                let occurrence = key.rsplit_once('~').map(|(_, value)| value).unwrap_or("1");
-                key = format!("overrides/sha256:{}~{occurrence}", digest_value(&rendered)?);
-                insert_equal(
-                    &mut self.routing_values,
-                    key.clone(),
-                    rendered,
-                    "routing provenance",
-                )?;
             }
             add_origins(&mut self.nodes.routing, key, origins);
         }
@@ -250,10 +241,12 @@ impl ProvenanceStore {
     }
 
     pub(crate) fn merge(&mut self, other: Self) -> CompileResult<()> {
-        merge_equal(&mut self.sources, other.sources, "source")?;
+        for (id, source) in other.sources {
+            self.merge_source(id, source)?;
+        }
         merge_equal(&mut self.mounts, other.mounts, "mount")?;
         merge_equal(&mut self.declarations, other.declarations, "declaration")?;
-        merge_equal(&mut self.routing_values, other.routing_values, "routing provenance")?;
+        self.override_origins.extend(other.override_origins);
         merge_nodes(&mut self.nodes.states, other.nodes.states);
         merge_nodes(&mut self.nodes.tasks, other.nodes.tasks);
         merge_nodes(&mut self.nodes.profiles, other.nodes.profiles);
@@ -261,7 +254,17 @@ impl ProvenanceStore {
         Ok(())
     }
 
-    pub(crate) fn finalize(&mut self, fragment: &Fragment, flow: &str) {
+    fn merge_source(&mut self, id: String, source: SourceRecord) -> CompileResult<()> {
+        if let Some(existing) = self.sources.get_mut(&id) {
+            existing.reconcile(source, &id)?;
+        } else {
+            self.sources.insert(id, source);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn finalize(&mut self, fragment: &Fragment, flow: &str) -> CompileResult<()> {
+        self.finalize_overrides(fragment.machine.node_policy.as_ref())?;
         let contributors = self
             .nodes
             .states
@@ -312,6 +315,7 @@ impl ProvenanceStore {
         for name in profiles {
             ensure_origins(&mut self.nodes.profiles, &name, &contributors);
         }
+        Ok(())
     }
 
     pub(crate) fn lock_bytes(&self) -> CompileResult<Vec<u8>> {
@@ -340,28 +344,6 @@ impl ProvenanceStore {
                 )
             })
             .collect()
-    }
-}
-
-fn rewrite_routing_value(value: &mut Value, names: &Names) {
-    let Some(rule) = value.as_object_mut() else { return };
-    let kind = rule
-        .get("match")
-        .and_then(Value::as_object)
-        .and_then(|match_| match_.get("type"))
-        .and_then(Value::as_str)
-        .and_then(|kind| names.kinds.get(kind))
-        .cloned();
-    if let Some(kind) = kind {
-        rule["match"]["type"] = Value::String(kind);
-    }
-    let profile = rule
-        .get("profile")
-        .and_then(Value::as_str)
-        .and_then(|profile| names.profiles.get(profile))
-        .cloned();
-    if let Some(profile) = profile {
-        rule["profile"] = Value::String(profile);
     }
 }
 
@@ -500,3 +482,5 @@ mod tests {
         );
     }
 }
+
+mod routing;

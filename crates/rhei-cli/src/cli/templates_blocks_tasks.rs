@@ -39,7 +39,7 @@
                     let text = files.remove(Path::new("plan.rhei.md")).ok_or_else(|| miette!(help = "add plan.rhei.md to the local block", "missing plan.rhei.md"))?;
                     let text = String::from_utf8(text.bytes).map_err(|e| miette!(help = "rewrite plan.rhei.md as UTF-8", "{}/plan.rhei.md: {e:?}", dir.display()))?;
                     let mut plan = rhei_core::parse(&text).map_err(|e| miette!(help = "fix the plan markdown syntax", "{}/plan.rhei.md: {e:?}", dir.display()))?;
-                    let tasks = vec![TaskFile { path: PathBuf::from("tasks/01-plan.md"), tasks: std::mem::take(&mut plan.tasks) }];
+                    let tasks = vec![TaskFile { source_path: PathBuf::from("plan.rhei.md"), path: PathBuf::from("tasks/01-plan.md"), tasks: std::mem::take(&mut plan.tasks) }];
                     (plan, tasks)
                 }
                 TemplateLayout::Workspace => {
@@ -51,7 +51,7 @@
                     for path in paths {
                         let text = String::from_utf8(files.remove(&path).unwrap().bytes).map_err(|e| miette!(help = "rewrite the task file as UTF-8", "{}: {e:?}", dir.join(&path).display()))?;
                         let nodes = rhei_core::parser::parse_workspace_tasks_with_structure(&text, &index.structure).map_err(|e| miette!(help = "fix the workspace task markdown syntax", "{}: {e:?}", dir.join(&path).display()))?;
-                        tasks.push(TaskFile { path, tasks: nodes });
+                        tasks.push(TaskFile { source_path: path.clone(), path, tasks: nodes });
                     }
                     (rhei_core::ast::Rhei { title: index.title, states: index.states, states_declared: index.states_declared, structure: index.structure, metadata: index.metadata, content_sections: index.content_sections, tasks: Vec::new() }, tasks)
                 }

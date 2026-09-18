@@ -33,6 +33,8 @@ impl From<Vec<u8>> for CompiledFile {
 
 #[derive(Debug, Clone)]
 pub struct TaskFile {
+    /// Authored path retained across output rebasing. §FS-rhei-library.4.1
+    pub source_path: PathBuf,
     pub path: PathBuf,
     pub tasks: Vec<Task>,
 }
@@ -87,7 +89,7 @@ impl Block {
             .as_ref()
             .map(|policy| policy.default.clone())
             .unwrap_or_else(|| "flow".into());
-        compiled.provenance.finalize(&compiled.fragment, &flow);
+        compiled.provenance.finalize(&compiled.fragment, &flow)?;
         Ok(compiled)
     }
 
@@ -449,6 +451,7 @@ impl CompiledBlock {
                 profiles.shift_remove(primary);
             }
         }
+        self.provenance.fold_override_profiles(policy, &self.primary_profiles)?;
         for profile in
             policy.by_type.values_mut().chain(policy.overrides.iter_mut().map(|r| &mut r.profile))
         {

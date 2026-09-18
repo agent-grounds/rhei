@@ -401,8 +401,12 @@ replay operation.
 the canonical source identity and effective source-tree digest. The digest
 inventory sorts slash-normalized, source-relative paths by UTF-8 bytes and
 frames each path, entry kind, and file bytes or symlink target by its byte
-length. It excludes directories, timestamps, permissions, traversal order,
-temporary extraction paths, and canonical host paths. The source record has a
+length. A symlink contributes both its authored target spelling and the
+effective file bytes read through it, under the link's source-relative path,
+even when the target is hidden or ignored. Entries sharing a path sort by
+entry kind. Resolved host paths are used only to verify tracking and containment,
+never as digest input. It excludes directories, timestamps, permissions,
+traversal order, temporary extraction paths, and canonical host paths. The source record has a
 `locator` describing the requested reference and winning discovery tier, plus
 a `revision` describing the strongest identity Rhei could establish. A
 relative, named, or repository-relative locator is portable. An explicitly
@@ -410,7 +414,12 @@ absolute or user-global locator is retained for diagnosis with
 `portable: false`; it is not content identity and is excluded from hashes.
 Every locator has `requested`, `tier`, and `portable`; `resolved` is present
 when Rhei can express the winning location without a temporary or canonical
-host path. Every revision has `kind`, `content`, `status`, and `replay`, plus
+host path. Equivalent source identities reconcile diagnostic locators in a
+duplicate-free `locators` array, sorted by `(requested,tier,portable,resolved)`
+(absent `resolved` sorts first); `locator` is its first member. Every mount also
+retains its own winning `locator`, so reconciliation loses no requested path or
+portability marking. Locator reconciliation does not relax revision or owned-node
+collision checks. Every revision has `kind`, `content`, `status`, and `replay`, plus
 the case-specific fields below. Content is `sha256:<lowercase-hex>` when bytes
 were available and `null` otherwise. A source id hashes the compact canonical
 JSON tuple `[kind,portable-locator,revision-marker,block-path,content]`;
@@ -426,7 +435,10 @@ Revision records use these honest cases:
 - clean Git records the commit, repository-relative block path, effective-tree
   digest, `kind: "git"`, `status: "clean"`, and `replay: "exact"` only when every source byte
   used by selection, rendering, or compilation is tracked at that commit and
-  no used file or symlink escapes that tree;
+  no used file or symlink escapes that tree. Symlink targets, including hidden
+  targets and intermediate links, must resolve within the source tree and their
+  consumed bytes must match the commit; tracking the visible link alone is
+  insufficient;
 - Git with changed tracked bytes, untracked used bytes, or both records HEAD
   only as context, the effective-tree digest, respectively `status: "dirty"`,
   `"untracked"`, or `"dirty-untracked"`, and `replay: "not-guaranteed"`;
@@ -436,6 +448,9 @@ Revision records use these honest cases:
 - when revision discovery is unavailable, fields that could not be learned
   are explicit `null`, available locator and content data are retained,
   `kind: "unavailable"`, `status: "unavailable"`, and replay is not guaranteed.
+  Missing or unexecutable Git is metadata unavailability, not a source error.
+  Known non-Git discovery respects Git's configured discovery ceiling; source
+  read and render failures remain errors.
 
 A content digest verifies bytes; it does not promise that those bytes can be
 retrieved. Exact replay is claimed only for immutable source content under the
@@ -453,12 +468,14 @@ nested mounts retain every segment.
 rendering and records `source`, slash-normalized source-relative `file`,
 `kind`, optional local name, rendered digest, and, where needed, occurrence.
 Its key is `decl:<kind>:sha256:<lowercase-hex>`. The digest input is the compact
-JSON tuple `[kind,file,local,rendered,occurrence]`: strings use JSON escaping,
+JSON tuple `[source,kind,file,local,rendered,occurrence]`, using the emitted
+source id and recorded canonical rendered digest: strings use JSON escaping,
 object keys in a rendered value are recursively sorted, arrays retain semantic
 order, and no insignificant whitespace is present. `occurrence` is `null`
 unless two otherwise identical unnamed declarations exist; those declarations
 receive one-based ordinals in authored order. Host paths, timestamps, and
-filesystem traversal order never participate.
+filesystem traversal order never participate. `file` names the authored file;
+single-file plan tasks retain `plan.rhei.md` even when emitted into `tasks/`.
 
 **Nodes.** `nodes` has tables `states`, `tasks`, `profiles`, and `routing`.
 Named-node keys are the final flat state, task, or profile ids after
@@ -467,7 +484,9 @@ qualification and compatibility lowering. Routing keys are `root`, `rhei`,
 `overrides/<canonical-rendered-digest>~<duplicate-ordinal>`. The override
 digest uses the declaration canonicalization above; its ordinal is one-based
 among byte-identical overrides in authored order, so unrelated array insertion
-does not change its identity.
+does not change its identity. These keys are computed from final emitted rules,
+after level-only expansion and primary-profile folding; each expanded rule keeps
+its contributing declaration origins.
 
 Every node value is a sorted, duplicate-free array of origins. An origin
 records a `mount`, `declaration`, and `via`; following the declaration's

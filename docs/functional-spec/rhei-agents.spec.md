@@ -1764,6 +1764,9 @@ transitions:
 
 The callback receives a `TransitionContext` with `triggeredBy: 'system'` and the timeout duration in `transitionData.timeout`.
 
+In serial and parallel runs, `on_leave` retains the timed-out agent's effective identity,
+including independent CLI overrides (§FS-rhei-agents.1.4, §FS-rhei-agents.1.5).
+
 ## 8. Log Capture
 
 All agent stdout and stderr are captured to log files in the `runtime/logs/` directory relative to the workspace or plan root.

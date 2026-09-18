@@ -111,7 +111,7 @@ fn fire_timeout_transition(
     task_id_str: &str,
     from_state: &str,
     timeout_secs: Option<u64>,
-    no_callbacks: bool,
+    opts: &RunOptions,
 ) -> TimeoutTransitionOutcome {
     let machine = machines.for_task_str(task_id_str);
     let Some(to_state) = find_timeout_transition(machine, from_state) else {
@@ -124,7 +124,7 @@ fn fire_timeout_transition(
         from_state,
         &to_state,
         timeout_secs,
-        no_callbacks,
+        opts,
     )
 }
 
@@ -136,7 +136,7 @@ fn fire_selected_timeout_transition(
     from_state: &str,
     to_state: &str,
     timeout_secs: Option<u64>,
-    no_callbacks: bool,
+    opts: &RunOptions,
 ) -> TimeoutTransitionOutcome {
     // The failing ticket's own machine and callback base fire the transition.
     // §DA-per-rhei-state-machines
@@ -168,7 +168,7 @@ fn fire_selected_timeout_transition(
         from_state,
         to_state,
         &timeout_label,
-        no_callbacks,
+        opts,
     ) {
         Ok(effective_to) => {
             diag_info!(

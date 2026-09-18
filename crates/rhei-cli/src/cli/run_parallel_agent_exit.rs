@@ -471,7 +471,7 @@ fn handle_parallel_agent_exit(
                 &state_name,
                 to_state,
                 timeout_secs,
-                opts.no_callbacks(),
+                opts,
             ) {
                 TimeoutTransitionOutcome::Fired => *progress.advanced_any = true,
                 // Did not move: the pool must not re-spawn

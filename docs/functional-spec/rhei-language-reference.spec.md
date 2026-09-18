@@ -39,6 +39,9 @@ The remaining three surfaces:
 - Execution references: agent, model, MCP server, skill, snapshot, and program
   references. Owned by [§FS-rhei-agents](rhei-agents.spec.md#fs-rhei-agents-rhei-agents-specification), [§FS-rhei-programs](rhei-programs.spec.md#fs-rhei-programs-rhei-program-states-specification), and
   [§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification).
+- Neural-work bounds: persistent project/task identities, state/default
+  `budget_threshold`, profile `transition_limit`, qualification, and `rhei
+  budget` commands. Owned by §FS-rhei-budgets.
 
 The plan and project markdown surface is the primary source of truth for project
 membership, task state, dependencies, hierarchy, assignees, and result links.
@@ -59,6 +62,8 @@ Use this order when learning or auditing the language:
    rules, callbacks, visits, polling, or artifact enforcement.
 6. Read [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification) when the authored source is a reusable template
    rather than a concrete plan workspace.
+7. Read §FS-rhei-budgets before authoring autonomous neural work or migrating
+   an existing autonomous plan.
 
 Command specs such as [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate), [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next), [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition),
 [§FS-rhei-complete](rhei-complete.spec.md#fs-rhei-complete-rhei-complete), and [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run) define command behavior over the language;
@@ -79,6 +84,8 @@ Language changes must preserve a single discoverable entry point:
   be linked from this page.
 - New execution references that appear in authored files must identify their
   owner spec from this page.
+- New neural launch paths and budget fields must enter through
+  §FS-rhei-budgets; no narrower feature may define an independent allowance.
 
 If a feature changes what a valid Rhei workflow can contain, this reference must
 be updated in the same change. The goal is not to centralize every rule here;

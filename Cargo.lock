@@ -1223,6 +1223,7 @@ dependencies = [
  "rhei-cli",
  "rhei-plan",
  "serde_json",
+ "sha2",
  "time",
  "url",
  "uuid",

@@ -9,6 +9,7 @@ the point they realize it.
 
 | ID | Subject |
 |---|---|
+| [§REQ-bounded-neural-work](bounded-neural-work.spec.md#req-bounded-neural-work-every-rhei-started-neural-unit-is-bounded-before-it-starts) | Finite, composable admission bounds for every Rhei-started neural unit |
 | [§REQ-cross-platform](cross-platform.md#req-cross-platform-one-tool-on-linux-macos-and-windows) | One tool on Linux, macOS, and Windows: parity, tested on all three, portable fixtures, paths as data |
 
 This index is navigational. Normative citations should target the specific

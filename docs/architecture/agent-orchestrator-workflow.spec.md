@@ -213,6 +213,12 @@ The validation pipeline ensures plan correctness before execution:
 
 ### 3.3. Orchestrator Engine
 
+The task scheduler cannot spawn provider-capable work directly. Every agent,
+model-capable program/callback, fanout arm, retry, poll, supervisor wake-up and
+nested execution crosses §AR-neural-admission, which durably reserves the
+composable bounds of §REQ-bounded-neural-work before returning a confined
+launch capability.
+
 The orchestrator manages workflow execution through state transitions:
 
 ```
@@ -254,6 +260,11 @@ The orchestrator manages workflow execution through state transitions:
 ```
 
 #### 3.3.1. Stable Writer Exclusion
+
+The Panta budget journal has its own stable sidecar outside `runtime/` and is
+the first lock in the global writer order; fanout and competing run processes
+use one serialized check-and-reserve transaction. The complete order and crash
+recovery are §AR-neural-admission.3.
 
 Every command that rewrites plan or metadata Markdown locks a persistent
 sidecar beside the destination before it reads the authoritative pathname. The
@@ -309,6 +320,12 @@ boundary, never between consent and destruction.
 [§FS-rhei-reset.4](../functional-spec/rhei-reset.spec.md#4-output)
 
 ### 3.4. Durable State and Git Boundary
+
+Persistent budget identities and the audited journal are Rhei-owned durable
+state outside `runtime/`. Git commits, reset, process restart, snapshots, and
+plan edits neither roll them back nor replenish them. Earned transitions and
+travel settlement share an idempotent receipt so crash recovery completes one
+decision rather than manufacturing another. §AR-neural-admission.6
 
 Rhei-owned durable state is the authored plan/workspace task state plus the
 result ledger under `runtime/results`. The ticket's own result file there is

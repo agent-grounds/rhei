@@ -239,6 +239,13 @@ validation rules are specified in the states spec node-policy section
 
 ## 5. Execution root and per-rhei runtime
 
+One additional root is project-wide: the persistent budget journal under the
+Panta root's `.agent-grounds/rhei/budgets/<project-uuid>/`, outside every rhei's
+`runtime/`. A bare rhei's implicit Panta uses that rhei's execution root. All
+member execution roots and narrowed runs resolve back to this single serialized
+ledger; accounting records remain per-rhei evidence and never become separate
+balances. §AR-neural-admission.3 §FS-rhei-budgets.3
+
 Each rhei keeps its own **execution root**, so artifact and relative-link
 resolution is **per rhei**, not per project. A rhei's execution
 root is defined exactly as a standalone plan's is today

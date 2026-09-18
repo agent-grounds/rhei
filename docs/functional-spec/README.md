@@ -26,6 +26,7 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-run-report](rhei-run-report.spec.md#fs-rhei-run-report-per-run-report) | Durable per-run Markdown report and dashboard affordance |
 | [§FS-rhei-run-tui](rhei-run-tui.spec.md#fs-rhei-run-tui-rhei-run-tui-and-run-event-journal) | `rhei run` TUI and transition journal |
 | [§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting) | Agent token/cost accounting and visualization |
+| [§FS-rhei-budgets](rhei-budgets.spec.md#fs-rhei-budgets-bounded-neural-work-and-budget-operations) | Persistent admission bounds, provider qualification, settlement, and budget commands |
 | [§FS-rhei-summary](rhei-summary.spec.md#fs-rhei-summary-rhei-summary) | `rhei summary`: a pull-request-ready Markdown account of a run |
 | [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next) | `rhei next` command behavior |
 | [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition) | `rhei transition` command behavior |

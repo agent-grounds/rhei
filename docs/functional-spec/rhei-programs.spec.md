@@ -10,6 +10,12 @@ A program state runs a command as a subprocess. The command receives context thr
 
 Program states participate in the same `rhei run` execution loop as agent states. They support the same artifact contracts, counted loops, timeout handling, log capture, and callback integration. The only difference is how the work is performed: a fixed command instead of a prompted agent.
 
+A program that can directly or transitively reach a model is neural work; the
+`program` label and deterministic-looking command are not proof otherwise.
+Rhei starts such a program only through §FS-rhei-budgets.4 with a qualified
+tuple and confined provider path. Programs proved non-neural keep the ordinary
+contract below and do not consume the monetary allowance.
+
 ## 1. Program Declaration
 
 ### 1.1. String Form

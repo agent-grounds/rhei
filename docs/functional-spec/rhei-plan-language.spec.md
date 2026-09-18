@@ -589,6 +589,14 @@ ESCAPED_BACKTICK = "\\`" ;
 NEWLINE         = ? line terminator (LF or CRLF) ? ;
 ```
 
+### 2.1. Budget identities in frontmatter
+
+The otherwise extensible YAML frontmatter reserves `budgetProjectId` and
+`metadata.tasks.<id>.budgetTicketId` for the persistent identities defined by
+§FS-rhei-budgets.2.3. `rhei budget init` and later task discovery write them;
+authors do not rotate or delete them. They are identities, not balances, and
+copying or renaming a plan cannot mint a fresh allowance.
+
 ## 3. Semantic Constraints
 
 Beyond the syntactic rules, the following semantic constraints must be validated:

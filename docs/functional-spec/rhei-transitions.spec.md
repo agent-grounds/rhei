@@ -345,6 +345,12 @@ Markdown-owned task fields are not duplicated in frontmatter. In particular,
 `**Assignee:**` remains a markdown field even when runtimes expose it through
 callback APIs.
 
+`budgetProjectId` and `metadata.tasks.<id>.budgetTicketId` are the reserved
+durable identities of §FS-rhei-budgets.2.3. Applied transitions additionally
+carry the idempotent receipt of §FS-rhei-budgets.3.3 in both the central
+transition ledger and the Panta budget journal; a display-id rename never
+changes their financial identity.
+
 ### 2.3. Counted Loop Metadata
 
 When a state declares `visits: <n>`, the engine tracks the current per-task loop count in:
@@ -955,6 +961,12 @@ variables. These are callback-only inputs: ordinary program-state subprocesses
 do not receive them. Additive JSON fields can break consumers that reject
 unknown properties; callback decoders must permit fields added by a compatible
 Rhei release.
+
+A callback whose implementation can reach a model is neural work regardless
+of its `cli`, `js`, `py`, or `java` label. Rhei starts it only through the
+shared admission and confinement contract of §FS-rhei-budgets.4; a callback
+classification or error/skip policy is not qualification. Deterministic
+callbacks remain outside the monetary promise.
 
 ### 4.8. Callback Mappings
 

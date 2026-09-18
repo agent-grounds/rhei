@@ -589,8 +589,8 @@ path = "docs/functional-spec/rhei-cost-accounting.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 850, unit = "lines" }
+max_accepted = { value = 1000, unit = "lines" }
 until = "A dedicated accounting-inspection reference owns section 8 and its inbound citations have migrated, bringing this reference below the 750-line soft budget."
 reason = """
-The accounting inspection surface in section 8 has no separate canonical declaration yet. Extracting it requires migrating its inbound section citations together; issue #253 fix round 1 is limited to four findings and preserves the accepted accounting contract points. This round adds only the descriptor-failure and scoped-preflight clarifications.
+The accounting inspection surface in section 8 has no separate canonical declaration yet. Extracting it requires migrating its inbound section citations together; issue #107 changes the enforcement seam while preserving those existing section identities, so it cannot perform that migration independently.
 """

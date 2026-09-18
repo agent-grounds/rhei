@@ -69,6 +69,11 @@ pass `--state-machine`.
    the same precedence and selector-bypass rules as execution, so it does not
    reject a shadowed settings fallback or speculate about a mode when no agent
    is effective. [§FS-rhei-agents.1.4.1](rhei-agents.spec.md#141-mode-resolution-order) [§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification)
+   For every reachable neural launch it also resolves persistent identities,
+   finite project and profile bounds, `budget_threshold`, ancestry, and the
+   exact qualification tuple. Missing/unlimited bounds or missing proof are
+   validation errors. This is a read-only admission check and writes no
+   identity or receipt. §FS-rhei-budgets.4
 4. Validate snapshot plan context and report orphaned snapshot diagnostics as
    warnings when a snapshot cache exists. [§FS-rhei-snapshot-operations](rhei-snapshot-operations.spec.md#fs-rhei-snapshot-operations-rhei-snapshot-operations-specification)
 5. Report every ticket that reached a successful terminal state while one of

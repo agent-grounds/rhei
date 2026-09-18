@@ -69,7 +69,7 @@ Examples:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `models` | string array | No | The complete set of model profile identifiers available to the machine |
-| `profiles` | map of name to `{initial, allowed}` | Yes | Named, reusable state profiles. Each profile declares the `initial` state and the `allowed` state subset for any node assigned to it. Referenced by `node_policy`. |
+| `profiles` | map of name to `{initial, allowed, transition_limit}` | Yes | Named, reusable state profiles. Each profile declares the `initial` state, the `allowed` state subset, and finite lifetime ticket travel for any node assigned to it. Referenced by `node_policy`. §FS-rhei-budgets.2.2 |
 | `node_policy` | object | Yes | Maps nodes to profiles. Must define `root` (the Panta project root) and `default`. Optionally defines `rhei` (the rhei tier), `by_type`, and `overrides`. See [Node Policy](#9-node-policy). |
 
 The `profiles` and `node_policy` blocks replace the earlier per-state
@@ -86,7 +86,7 @@ can start in different states within the same state machine.
 | `gating` | boolean | No | When `true`, autonomous commands (`rhei next`, `rhei complete`, engine-triggered transitions) must not transition out of this state. Only explicit human-initiated transitions are allowed. |
 | `concurrent` | boolean | No | When `true`, `rhei run` may work multiple ready tasks in this state simultaneously (up to `--parallel`). When `false` (the default), at most one ready task per pass is scheduled for this state and the rest are deferred to a later pass. This is a scheduling hint only — state entry, exit, and transition semantics are unchanged. Fanout invocations from a single task (`all_targets` / `all_models`) are not affected by this flag. |
 | `poll` | object | No | Marks this state as a time-triggered *polling* state. Contains `interval` (duration string, e.g. `5m`) and `max_attempts` (integer ≥ 1). On each attempt the state's `agent` or `program` runs once and the engine evaluates transitions normally; a self-loop (`from: X, to: X`) is interpreted as "not done yet, retry after `interval`". Between attempts the `--parallel` slot is released and the task is not ready again until the interval elapses. After `max_attempts` attempts the engine will not take a self-loop and instead selects a matching exhaustion transition (typically `condition: pollAttempts >= pollMaxAttempts`); if none matches, the task fails. May also carry `waiting_on` (a short label naming the person or role the poll waits for), which declares the wait as a *person* wait rather than machine backoff. Mutually exclusive with `visits`. See [Polling States](#2-polling-states) below and [Run Specification — Polling States](rhei-run.spec.md#51-polling-states). |
-| `visits` | integer | No | Maximum number of visits permitted for this state before the workflow must take a non-loop exit |
+| `visits` | integer | No | Maximum number of visits permitted for this state before the workflow must take a non-loop exit. It is an inner bound that never extends ticket travel or a project allowance. §REQ-bounded-neural-work.2 |
 | `execute_on` | enum | No | Marks this state as a *supervising* state: `child-terminal`, `child-transition`, `descendant-terminal`, or `descendant-transition`. A non-leaf task in it is woken at checkpoints of its subtree — the scope picks whose moves it hears (its direct children, or any descendant), the event picks which (a terminal entry, or every transition) — and holds the subtree between visits. Requires a self-loop transition as the release edge. See [Supervision Specification](rhei-supervision.spec.md). |
 | `target` | string | No | Inline execution target selector for one run of the state. Preferred over the legacy `model` + `agent` split for new workflows. A task may override this per work item with `**Model:**` or `**Target:**` unless `target_locked` is set; see [Plan Language — Task Execution Overrides](rhei-plan-language.spec.md#311-task-execution-overrides). |
 | `all_targets` | string array | No | Inline execution target selectors for fanout execution. The state runs once per listed selector. Preferred over `all_models` for new multi-target workflows. |
@@ -98,6 +98,7 @@ can start in different states within the same state machine.
 | `agent_mode` | string | No | Named flag set applied to the resolved agent for this state. Must match a key in the resolved agent's `modes` map. See [Agents Specification — Modes](rhei-agents.spec.md#22-modes). |
 | `agent_timeout` | string | No | Maximum time an agent may work in this state before being killed (e.g., `30m`, `1h`). See [Agents Specification — Timeout Handling](rhei-agents.spec.md#7-timeout-handling). |
 | `attempts` | integer | No | How many times **one visit** to this state may be spawned before `rhei run` halts the ticket. Distinct from `visits`, which bounds how many times the ticket may *enter* the state. Defaults to `2` — the invocation plus one informed retry. See [Agents Specification — Attempt Budget](rhei-agents.spec.md#323-attempt-budget). |
+| `budget_threshold` | object | For neural states | Positive `{currency, amount_micro}` live containment threshold. State value overrides `defaults.budget_threshold`; admission reserves threshold plus proven residual. §FS-rhei-budgets.2.1 |
 | `program` | string or object | No | The program command to execute in this state. String form runs via shell. Object form specifies `command`, `env`, `working_directory`, and `shell`. Mutually exclusive with `agent`. See [Program States Specification](rhei-programs.spec.md). |
 | `program_timeout` | string | No | Maximum time the program may run before being killed (e.g., `10m`, `1h`). Same duration format and timeout handling as `agent_timeout`. See [Program States Specification](rhei-programs.spec.md#4-timeout-handling). |
 | `inputs` | artifact array | No | Artifacts that must exist before the task can enter this state. Individual entries may be marked `optional: true` to skip the existence check. |
@@ -296,6 +297,10 @@ states:
 ### 2.2. Semantics
 
 - **Attempt counter.** `poll.max_attempts` replaces the `visits` cap for the state. The same `metadata.tasks.<id>.stateVisits.<state-name>` counter records attempts; the counter starts at `1` on first entry and increments on every self-loop re-entry, identical to the `visits` accounting in [Transitions Specification — Counted Loops](rhei-transitions.spec.md#43-counted-loops).
+- **Outer composition.** Every poll attempt still reserves an invocation and
+  provider exposure under §FS-rhei-budgets.5. Its internal self-loop is a wait,
+  so it releases reserved ticket travel; no poll or visit counter can extend a
+  spent outer allowance. §REQ-bounded-neural-work.2
 - **Retry signal.** Any self-loop transition (`from: X, to: X`) selected by the normal transition-matching rules is interpreted as "not done yet." The engine persists `metadata.tasks.<id>.pollNextAttemptAt.<state-name> = now() + interval`, releases the slot, and stops working this task for this pass. On later passes the task is excluded from the ready set until `pollNextAttemptAt` has elapsed.
 
   That attempt is recorded as a **wait** — neither a failure nor a completion —
@@ -1223,6 +1228,7 @@ profiles:
   <profile-name>:
     initial: <state-name>        # starting state for any node using this profile
     allowed: [<state-name>, ...] # states any such node may ever hold
+    transition_limit: <integer>  # finite lifetime transitions per ticket
 ```
 
 ### 8.2. Per-profile validation
@@ -1231,6 +1237,9 @@ profiles:
 - Every entry in `allowed` must be defined in `states`.
 - `initial` must appear in `allowed`.
 - `allowed` must contain at least one state marked `final: true`.
+- `transition_limit` must be an integer greater than zero. Omission is a
+  validation error for autonomous execution; there is no unlimited legacy
+  default. §FS-rhei-budgets.2.2
 - Every non-final state in `allowed` must have a path — using only
   transitions whose `to` is also in `allowed`, and counting an edge as
   [§FS-rhei-transitions.4.6](rhei-transitions.spec.md#46-wildcard-semantics)

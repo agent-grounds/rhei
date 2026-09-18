@@ -170,6 +170,7 @@ choosing one.
 | `agent_timeout` | string or null | No | Default autonomous agent timeout |
 | `program_timeout` | string or null | No | Default program timeout |
 | `attempts` | integer or null | No | Default number of spawns one state visit may have before the run halts. See [Attempt Budget](#323-attempt-budget). |
+| `budget_threshold` | object or null | No | Default positive `{currency, amount_micro}` containment threshold for neural states. State-level `budget_threshold` wins. §FS-rhei-budgets.2.1 |
 | `mcp_servers` | array | No | Default MCP server entries applied to every agent state. Entries are ids or inline definitions. See [MCP Servers](#114-mcp_servers). |
 | `skills` | array | No | Default skill entries applied to every agent state. Entries are ids or inline definitions. See [Skills](#115-skills). |
 
@@ -179,6 +180,10 @@ choosing one.
 and defaults reference agents by id — inline agent definitions are not
 permitted on a state or on `defaults.agent`. The registry is the only place an
 agent's `command`, flags, and modes are declared.
+
+It is not a qualification registry. An agent entry describes how to launch a
+transport but cannot prove or opt into a provider-spend bound; exact
+qualification is independently verified under §FS-rhei-budgets.6.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -528,6 +533,12 @@ warning to an error.
 A user-written entry for one of these ids in `settings.json` replaces the
 built-in entry wholesale (see [Merge Semantics](#13-merge-semantics)).
 
+A known id or matching command line is not a spend qualification. Every
+Rhei-started built-in or custom agent enters §FS-rhei-budgets.4. Only exact
+tuples present in the qualification registry may launch; the initial real
+qualification work and deliberately unqualified clients are listed in
+§FS-rhei-budgets.6.5.
+
 ### 2.1. Custom Agents
 
 When the built-in profiles don't fit, declare a new agent in the `agents`
@@ -818,6 +829,12 @@ Normative rules:
 - Gating states (`gating: true`) bypass completion authority: no subprocess is
   spawned and no automatic transition fires.
 
+The worker-authority exception covers only externally launched sessions. Every
+subprocess Rhei starts, including one framed as a custom worker or started by an
+embedded runtime, is orchestrator-owned for admission and ancestry and must
+pass §FS-rhei-budgets.4. A nested execution manages its own ticket state but
+inherits the same Panta ledger and ancestor envelope. §REQ-bounded-neural-work.1
+
 This separation keeps state transitions serialized through one orchestrator
 even when many agents run in parallel.
 
@@ -987,6 +1004,10 @@ agent that hangs without producing outputs is bounded by the timeout and
 routed to the state's timeout transition (or fails the task with a warning
 when no timeout transition is declared).
 
+Timeout is one conjunct of neural admission, never its monetary proof. The
+finite provider-spend reservation of §FS-rhei-budgets.6 is required before the
+same invocation starts. §REQ-bounded-neural-work.2
+
 #### 3.2.3. Attempt Budget
 
 One state **visit** — the span between two consecutive moves of the ticket
@@ -1048,6 +1069,11 @@ bound in `poll.max_attempts`; a second bound over the same spawns would end the
 loop earlier than the machine's author said it should. The re-spawn note of
 §3.2.1 still names a budget on a poll state — `poll.max_attempts` itself, not
 this exemption's internal encoding of "no budget applies here".
+
+Attempt refunds affect only this per-visit counter. Every confirmed or
+ambiguous neural start permanently consumes its Panta invocation unit and
+retains provider exposure until authoritative settlement; neither this refund
+nor a new visit credits the outer ledger. §FS-rhei-budgets.5
 
 ## 4. Environment Variables
 
@@ -1603,6 +1629,12 @@ place by each further attempt of the same invocation. It holds:
 | `log` | the transcript this spawn wrote |
 | `started`, `ended`, `duration`, `code` | when it ran, for how long, and how it exited |
 | `ending` | `exited`, `timed out`, or `interrupted` — why it stopped |
+
+For neural work the spawn record also carries the budget reservation id,
+qualification tuple/evidence hash, ancestor reservation, and the matching
+§FS-rhei-cost-accounting.3.7 attempt identity. The authoritative financial
+record remains §FS-rhei-budgets.3's journal; the spawn record is its diagnostic
+correlation and cannot release exposure.
 
 `task` and `state` are stored as fields and matched as fields. A reader looking
 for "a worker that ran in state `review`" must not match record *file names* by

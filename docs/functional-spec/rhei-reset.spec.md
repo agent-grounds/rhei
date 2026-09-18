@@ -180,6 +180,12 @@ Reset is destructive with respect to runtime state: it deletes results, exports,
 
 Because reset operates under a file lock, it is safe against concurrent `rhei next` / `rhei transition` / `rhei complete` calls: those calls either run before the reset acquires the lock or after it releases.
 
+Reset never removes or rewrites `budgetProjectId`, `budgetTicketId`, the
+`.agent-grounds/rhei/budgets/` journal or lock, consumed travel, settled spend,
+outstanding exposure, adjustments, breaches, or qualification history. A full
+or narrowed reset does not replenish any bound; reset and admission use the
+global lock order in §AR-neural-admission.3.
+
 ## 4. Output
 
 On success, reset reports how many tasks it cleared, **which tasks it moved and

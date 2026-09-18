@@ -25,9 +25,14 @@ For visual dashboard behavior see [Flow Visualization](rhei-viz.spec.md).
 
 - Guessing billing from transcript bytes, prompt text length, or local
   tokenizers when measured usage exists.
-- Enforcing budgets or stopping a run based on spend.
 - Writing cost rollups into task markdown.
 - Failing a task just because accounting is unsupported or extraction failed.
+
+Complete normalized usage and verified prices are consumed by the admission
+and settlement rules of §FS-rhei-budgets. Accounting remains observational for
+an invocation's earned outcome: it never retroactively fails a task or changes
+its selected edge. Before a later spawn, however, missing trustworthy evidence
+retains the full reservation and can refuse admission. §REQ-bounded-neural-work.4
 
 ## 1. Mental Model
 
@@ -342,6 +347,12 @@ A failed best-effort publication of `runtime/run.json` does not change the
 current run's in-memory identity or prevent agent execution. Both schedulers
 use that same identity for accounting even when no descriptor was published.
 
+The same attempt identity is carried in the pre-spawn budget reservation,
+spawn record, capture stream, final invocation record, settlement, and any
+transition receipt. A budget reservation id supplements rather than replaces
+`invocation_id`; identity conflicts retain exposure and refuse admission under
+§FS-rhei-budgets.7.
+
 A v1 id without those suffix components is a **legacy id**. Readers infer a
 legacy attempt identity from:
 
@@ -367,7 +378,8 @@ accounting for `claude-code`, `codex`, or `pi`. [§FS-rhei-snapshots](rhei-snaps
 
 For each agent invocation:
 
-1. Before spawn, Rhei creates the attempt identity under §3.7 and the
+1. Before spawn, Rhei creates the attempt identity under §3.7, qualifies and
+   durably reserves the full provider exposure under §FS-rhei-budgets.4, and the
    extractor declares any extra arguments, environment variables, or capture
    paths needed for structured usage. Rhei's built-in capture contract sets
    `RHEI_ACCOUNTING_USAGE_PATH` and
@@ -383,6 +395,8 @@ For each agent invocation:
 
 Extraction failures affect accounting coverage only. They do not change the
 agent exit code, completion condition, selected transition, or callbacks.
+For a contained admission they also fail containment closed and retain the
+full monetary reservation; future work that needs that capacity is refused.
 
 Built-in extractor requirements:
 
@@ -464,6 +478,10 @@ provider/model entries are rejected because pricing uses one exact match.
 Missing, unreadable, malformed, wrong-schema, and unsupported books fail the
 run with a diagnostic that names the supplied path. Selection never fetches a
 book over the network.
+
+This selection is not qualification. Caller metadata cannot certify a provider
+billing contract or reduce the maximum qualified price used for `FWC`; a tuple
+whose applicable provider price cannot be bounded remains unqualified.
 
 The document object and each entry object accept arbitrary additional JSON
 properties as metadata. Rhei preserves every additional property's JSON value
@@ -997,6 +1015,12 @@ for an attributed one.
 
 ## 9. Visualization
 
+Every accounting surface also shows the applicable budget ceilings, consumed,
+reserved and remaining invocation/spend/travel values, qualification tuple and
+grade, and precise halt or containment reason defined by §FS-rhei-budgets.10.
+Run spend and workspace accounting totals remain distinct from the persistent
+Panta allowance.
+
 The TUI header shows a compact run-level strip when accounting is available:
 
 ```text
@@ -1057,6 +1081,10 @@ Cube and Sankey modes may use subtree cost as heatmap color or ribbon width.
 
 ## 10. Dashboard Data
 
+The snapshot and invocation-detail payloads include the same budget snapshot
+and reservation identities as §FS-rhei-budgets.10; live updates upsert by
+receipt and invocation identity rather than adding repeated usage events.
+
 The frequently polled `/snapshot` payload carries compact rollups:
 
 ```ts
@@ -1090,6 +1118,12 @@ Invocation details are served from a separate loopback endpoint such as
 | Accounting identity conflict | Inspection retains the first valid record, reports the conflicting record and both paths, and continues read-only. Run preflight checks the complete in-scope root union, using the root selection and shared-root task filtering in [§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary), before per-root currency checks. A conflict within or across those roots refuses before mutation or spawn with an accounting-identity diagnostic naming both paths; it must not describe the conflict as a selected-currency failure. |
 | Unreadable accounting root | Name the root, read every other root in scope, and do not report `complete` (§6.2). With `--json`, a structured error naming the root, and its `roots` entry carries the count it could contribute. |
 | Concurrent writes | Write to a unique staging path, then atomically rename to `<invocation_file_id>.json`. Rollup files may be regenerated after pass writes complete. |
+
+Every row preserves the completed invocation's outcome. For future admissions,
+extractor, price, write, malformed-root, and identity failures keep the full
+outstanding exposure; they never turn unknown provider spend into zero or a
+fresh balance. Budget-journal corruption is stricter still: it refuses new
+admission Panta-wide until audited recovery. §FS-rhei-budgets.7
 
 ## Related Specifications
 

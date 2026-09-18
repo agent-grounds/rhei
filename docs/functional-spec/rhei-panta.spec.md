@@ -321,6 +321,13 @@ across rheis is bounded, and each spawned unit is attributed to its rhei in logs
 and accounting. The loop stops when no eligible ticket remains in scope or a
 gating state requires a human.
 
+Budget exhaustion, untrustworthy persistence, and missing qualification are
+explicit exceptions to drive-to-terminal behavior. Every member and later
+descendant shares the Panta-lifetime allowance of §FS-rhei-budgets; the bare
+rhei path uses the same rule through its implicit Panta. A halted ticket stays
+non-terminal and resumes ordinary scheduling only after the bound or evidence
+is valid again.
+
 Before spawning, `rhei run` reports the resolved scope and the rheis it will
 touch (§6). A bare rhei runs as the single rhei of its implicit Panta, so the
 project-wide loop is the only execution path.
@@ -399,6 +406,11 @@ roadmap.
   presentation work tracked on the roadmap (§4).
 
 ### 6.5. Cost and summary
+
+Selection narrows which rheis and tickets a command displays or works; it never
+narrows the Panta ledger charged by a neural admission. `--rhei`, a member path,
+and a resumed run therefore observe and reserve against the same lifetime
+allowance. §REQ-bounded-neural-work.3
 
 `rhei cost` and `rhei summary` read accounting artifacts. Every other command
 in §6.4 acts on tickets, and a ticket belongs to exactly one rhei; a record

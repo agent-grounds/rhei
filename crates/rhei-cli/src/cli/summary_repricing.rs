@@ -206,8 +206,8 @@ fn activity_from_liveness(liveness: Liveness) -> SelectedRunActivity {
     }
 }
 
-/// Read only the portable exact-id field. Contention is checked separately;
-/// ownership text left behind on a free lock is never active evidence.
+/// Trust an exact id only in a supported ownership record for this workspace.
+/// Contention is checked separately; text on a free lock is not active evidence.
 /// §FS-rhei-summary.1 §FS-rhei-summary.5
 fn run_lock_owner_id(root: &Path) -> Result<Option<String>, String> {
     let path = root.join(".rhei/run.lock");
@@ -216,10 +216,37 @@ fn run_lock_owner_id(root: &Path) -> Result<Option<String>, String> {
     if body.trim().is_empty() {
         return Ok(None);
     }
-    let value: serde_json::Value = serde_json::from_str(&body).map_err(|err| {
+    let owner: RunLockOwner = serde_json::from_str(&body).map_err(|err| {
         format!("{} is held but its run ownership record is invalid: {err}", path.display())
     })?;
-    Ok(value.get("id").and_then(serde_json::Value::as_str).map(str::to_string))
+    if owner.version != 1 {
+        return Err(format!(
+            "{} is held but its run ownership version {} is unsupported",
+            path.display(), owner.version
+        ));
+    }
+    if owner.id.trim().is_empty() || owner.pid == 0 {
+        return Err(format!(
+            "{} is held but its run ownership record has an invalid id or pid",
+            path.display()
+        ));
+    }
+    let workspace = fs::canonicalize(&owner.workspace).map_err(|err| {
+        format!(
+            "{} is held but its ownership workspace {} cannot be resolved: {err}",
+            path.display(), owner.workspace.display()
+        )
+    })?;
+    let root = fs::canonicalize(root).map_err(|err| {
+        format!("{} is held but its workspace cannot be resolved: {err}", path.display())
+    })?;
+    if !owner.workspace.is_absolute() || workspace != root {
+        return Err(format!(
+            "{} is held but its ownership workspace {} does not identify this lock's workspace",
+            path.display(), owner.workspace.display()
+        ));
+    }
+    Ok(Some(owner.id))
 }
 
 /// Find timestamped history reports that explicitly claim the exact run id.

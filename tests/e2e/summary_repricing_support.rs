@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use super::{unique_temp_dir, write_fixture_file, TestDir, STATE_MACHINE};
@@ -283,7 +284,61 @@ pub fn write_report(root: &Path, run_id: &str, started_at: &str, result: &str) -
     path
 }
 
+/// Hold a v1 run lock until the caller has finished invoking the summary CLI.
+/// The fields mirror `write_run_lock_owner`; Linux records the current process
+/// start identity as well. §FS-rhei-summary.1 §FS-rhei-summary.5
+pub fn hold_run_lock(root: &Path, run_id: &str) -> fs::File {
+    let root = fs::canonicalize(root).expect("canonical workspace");
+    let lock_dir = root.join(".rhei");
+    fs::create_dir_all(&lock_dir).expect("create lock directory");
+    let mut lock = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(lock_dir.join("run.lock"))
+        .expect("open run lock");
+    fs2::FileExt::try_lock_exclusive(&lock).expect("hold run lock");
+    let mut owner = serde_json::json!({
+        "version": 1,
+        "id": run_id,
+        "pid": std::process::id(),
+        "workspace": root
+    });
+    if let Some(ticks) = process_start_ticks() {
+        owner["process_start_ticks"] = ticks.into();
+    }
+    let mut body = serde_json::to_vec(&owner).expect("serialize lock owner");
+    body.push(b'\n');
+    lock.set_len(0).expect("clear lock owner");
+    lock.write_all(&body).expect("write lock owner");
+    lock.flush().expect("flush lock owner");
+    lock
+}
+
+#[cfg(target_os = "linux")]
+fn process_start_ticks() -> Option<u64> {
+    let stat = fs::read_to_string(format!("/proc/{}/stat", std::process::id()))
+        .expect("read fixture process identity");
+    Some(
+        stat.rsplit_once(") ")
+            .expect("process command")
+            .1
+            .split_whitespace()
+            .nth(19)
+            .expect("process start identity")
+            .parse()
+            .expect("process start ticks"),
+    )
+}
+
+#[cfg(not(target_os = "linux"))]
+fn process_start_ticks() -> Option<u64> {
+    None
+}
+
 pub fn write_running_descriptor(root: &Path, run_id: &str) {
+    let root = fs::canonicalize(root).expect("canonical workspace");
     let runtime = root.join("runtime");
     fs::create_dir_all(&runtime).expect("create runtime");
     let descriptor = serde_json::json!({

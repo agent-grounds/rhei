@@ -1315,6 +1315,7 @@ dependencies = [
 name = "rhei-e2e-tests"
 version = "0.5.1-dev"
 dependencies = [
+ "fs2",
  "jsonschema",
  "nix",
  "rhei-cli",

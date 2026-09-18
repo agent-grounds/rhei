@@ -157,7 +157,7 @@ fn headless_startup_run_locks(input: &Path) -> MietteResult<(BTreeSet<PathBuf>, 
     for root in &roots {
         let Some(lock) = try_acquire_run_lock(root)? else {
             // Lock-owner evidence is available without reading an in-doubt runtime descriptor.
-            let owner = fs::read_to_string(root.join(".rhei/run.lock"))
+            let owner = read_run_lock_owner(&root.join(".rhei/run.lock"))
                 .unwrap_or_else(|err| format!("owner record unreadable: {err}"));
             return Err(diagnostic!("a run is already live on {} and holds its .rhei/run.lock; recorded owner: {}",
                 root.display(), owner.trim()));

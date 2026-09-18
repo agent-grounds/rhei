@@ -268,6 +268,14 @@ impl LockedTransitionLedger {
     /// Remove selected ticket lines while the stable sidecar excludes every
     /// appender. The current data pathname is read only after acquisition.
     fn prune(&mut self, task_ids: &BTreeSet<String>) -> MietteResult<bool> {
+        // The sidecar remains the synchronization identity. Close an optional
+        // append handle before replacing the data pathname: Windows will not
+        // rename over a destination while this process still has it open.
+        if let Some(mut file) = self.file.take() {
+            file.flush().map_err(|err| {
+                file_io_report(&self.path, "failed to flush state transition log", err)
+            })?;
+        }
         if !self.path.is_file() {
             return Ok(false);
         }

@@ -107,9 +107,13 @@ fn operator_recovery_marker_blocks_readers_and_mutators() {
             rhei_core::platform::shell_quote(&canonical_root.display().to_string())
         );
         let run = run_cli(command, &fixture.force.plan, &fixture.force.machine, &args);
+        let diagnostic = serde_json::from_str::<serde_json::Value>(&run.stderr)
+            .ok()
+            .and_then(|value| value["error"]["message"].as_str().map(str::to_owned))
+            .unwrap_or_else(|| run.stderr.clone());
         if run.status.success()
-            || !run.stderr.contains("plan.1 human-gate -> implement")
-            || run.stderr.matches(&recovery).count() != 1
+            || !diagnostic.contains("plan.1 human-gate -> implement")
+            || diagnostic.matches(&recovery).count() != 1
             || artifact_snapshot(&fixture.force.dir, &fixture.force.plan) != before
         {
             violations.push(format!(

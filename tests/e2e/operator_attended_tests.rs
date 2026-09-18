@@ -210,6 +210,41 @@ fn operator_attended_eof_changes_nothing() {
     assert_artifacts_unchanged(&before);
 }
 
+/// Windows console EOF must refuse after the prompt without authorizing a hop. §FS-rhei-transition-cmd.6
+#[cfg(windows)]
+#[test]
+fn operator_attended_windows_console_eof_changes_nothing() {
+    let fixture = force_fixture("attended-windows-eof", GATE_PLAN, FORCE_MACHINE);
+    // Single-file plan snapshots include metadata/checkpoints as well as task bytes;
+    // the other snapshots cover result, both ledgers and recovery marker. §FS-rhei-recover.2
+    let before = artifact_snapshot(&fixture.dir, &fixture.plan);
+    let (success, transcript) = attended(
+        &fixture,
+        &[
+            "--state-machine",
+            fixture.machine.to_str().unwrap(),
+            "transition",
+            fixture.plan.to_str().unwrap(),
+            "--task",
+            "1",
+            "--from",
+            "human-gate",
+            "--to",
+            "implement",
+            "--force",
+            "--reason",
+            "repair route",
+        ],
+        // After the prompt barrier, ConPTY delivers Ctrl-Z to ReadConsoleW. Rust's
+        // console reader wakes on SUB and removes it, yielding a zero-byte read.
+        // No newline/answer, pipe EOF or timeout kill stands in for native EOF.
+        "\x1a",
+    );
+    assert!(!success, "{transcript}");
+    assert!(transcript.contains("operator confirmation did not match"), "{transcript}");
+    assert_artifacts_unchanged(&before);
+}
+
 /// Terminal result/link semantics are exercised through ConPTY as well as Unix. §FS-rhei-transition-cmd.6
 #[test]
 fn operator_attended_native_terminal_result_round_trip() {

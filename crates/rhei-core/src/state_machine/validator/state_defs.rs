@@ -50,6 +50,11 @@ pub struct StateDef {
     // §FS-rhei-supervision.1.1: `execute_on:` declares a supervisor.
     #[serde(default)]
     pub execute_on: Option<String>,
+    /// Whether repeated visits start cold or continue this state's immediately
+    /// preceding auto-emitted transcript. Omission retains the cold default.
+    // §FS-rhei-states.1.2 §FS-rhei-snapshots.4.7
+    #[serde(default)]
+    pub session: Option<StateSession>,
     /// Optional named snapshot emit/inherit declaration.
     ///
     /// The operational CLI and run override surface inspect this field to
@@ -252,6 +257,15 @@ pub struct StateSnapshotConfig {
     pub emit: Option<SnapshotEmitConfig>,
     #[serde(default)]
     pub inherit: Option<SnapshotInheritConfig>,
+}
+
+/// State-local transcript behavior for repeated self-loop visits.
+// §FS-rhei-states.1.2 §FS-rhei-snapshots.4.7
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum StateSession {
+    Cold,
+    Continue,
 }
 
 /// `snapshot.emit` declaration.

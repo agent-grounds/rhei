@@ -1,6 +1,57 @@
 impl StateMachine {
     fn validate_snapshot_configuration(&self) -> Result<(), StateMachineLoadError> {
         for (state_name, state) in &self.states {
+            if state.session.is_some() {
+                // An explicit value is an authored contract even when it says
+                // `cold`; omission is how an unrestricted ordinary state keeps
+                // the default. §FS-rhei-states.1.3 §FS-rhei-snapshots.11
+                if state.terminal {
+                    return Err(StateMachineLoadError::Invalid(format!(
+                        "state '{state_name}' is final and cannot declare 'session'"
+                    )));
+                }
+                if state.gating {
+                    return Err(StateMachineLoadError::Invalid(format!(
+                        "state '{state_name}' is gating and cannot declare 'session'"
+                    )));
+                }
+                if state.program.is_some() {
+                    return Err(StateMachineLoadError::Invalid(format!(
+                        "state '{state_name}' is a program state and cannot declare 'session'"
+                    )));
+                }
+                if state.poll.is_some() {
+                    return Err(StateMachineLoadError::Invalid(format!(
+                        "state '{state_name}' declares both 'poll' and 'session'; polling attempts run cold"
+                    )));
+                }
+                if !state.is_agent_bearing() {
+                    return Err(StateMachineLoadError::Invalid(format!(
+                        "state '{state_name}' declares 'session' but is not agent-bearing; give it an agent execution target"
+                    )));
+                }
+                let has_self_loop = self
+                    .transitions
+                    .iter()
+                    .any(|transition| transition.from.0 == *state_name && transition.to.0 == *state_name);
+                if !has_self_loop {
+                    return Err(StateMachineLoadError::Invalid(format!(
+                        "state '{state_name}' declares 'session' but has no self-loop transition"
+                    )));
+                }
+                if state.session == Some(StateSession::Continue)
+                    && state
+                        .snapshot
+                        .as_ref()
+                        .and_then(|snapshot| snapshot.inherit.as_ref())
+                        .is_some()
+                {
+                    return Err(StateMachineLoadError::Invalid(format!(
+                        "state '{state_name}' declares session: continue and snapshot.inherit; one invocation cannot select two preload sources"
+                    )));
+                }
+            }
+
             let Some(snapshot) = state.snapshot.as_ref() else {
                 continue;
             };

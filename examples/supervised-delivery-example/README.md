@@ -29,7 +29,6 @@ ci_commands:
 review_focus:
   - concurrency
   - error handling
-supervisor_session: false
 ```
 
 The same values are checked in at `instantiation-values.yaml`.
@@ -40,12 +39,9 @@ and consume the previous round's `findings` and `resolutions` exports. The
 non-empty `ci_commands` and `review_focus` lists exercise the other two
 conditional branches in `states.yaml`.
 
-The one branch this example does **not** cover is `supervisor_session: true`,
-which adds a `snapshot:` block to the supervising state. That block is only
-legal on a session-capable agent — of the built-in profiles, `pi` — so an
-example carrying it would not run with the `claude-code` targets every other
-example uses. It is covered by an end-to-end test instead
-(`tests/e2e/supervised_delivery_tests.rs`).
+The supervisor always declares `session: continue`. Its configured profile
+continues the preceding visit when native preload is supported and otherwise
+runs cold with a diagnostic; the workspace shape is identical on both machines.
 
 ## What it shows
 

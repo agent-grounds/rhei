@@ -272,14 +272,16 @@ fn validate_machine_settings_references_inner(
 
         if state.snapshot.as_ref().and_then(|snapshot| snapshot.emit.as_ref()).is_some()
             || state.snapshot.as_ref().and_then(|snapshot| snapshot.inherit.as_ref()).is_some()
+            || state.session.is_some()
         {
             // Settings-aware snapshot checks need the merged agent/model
             // registry, so they live in the CLI validation layer rather than
-            // §FS-rhei-snapshots.9.2 §FS-rhei-snapshots.11: Registry-aware checks.
+            // §FS-rhei-snapshots.4.7 §FS-rhei-snapshots.9.2
+            // §FS-rhei-snapshots.11: Registry-aware checks.
             match resolve_agent_invocations(machine, state_name, settings, &default_run_options()) {
                 Ok(invocations) if invocations.is_empty() => {
                     errors.push(format!(
-                        "state '{}' declares snapshot operations but no effective target tuple resolves (snapshot-requires-target)",
+                        "state '{}' declares snapshot/session operations but no effective target tuple resolves (snapshot-requires-target)",
                         state_name
                     ));
                 }
@@ -288,7 +290,7 @@ fn validate_machine_settings_references_inner(
                     for invocation in &invocations {
                         let Some(slug) = resolved_agent_target_slug(invocation) else {
                             errors.push(format!(
-                                "state '{}' declares snapshot operations but agent '{}' does not resolve provider and model (snapshot-requires-target)",
+                                "state '{}' declares snapshot/session operations but agent '{}' does not resolve provider and model (snapshot-requires-target)",
                                 state_name,
                                 invocation.agent.id()
                             ));
@@ -336,7 +338,7 @@ fn validate_machine_settings_references_inner(
                     }
                 }
                 Err(err) => errors.push(format!(
-                    "state '{}' declares snapshot operations but no effective target tuple resolves: {} (snapshot-requires-target)",
+                    "state '{}' declares snapshot/session operations but no effective target tuple resolves: {} (snapshot-requires-target)",
                     state_name, err
                 )),
             }

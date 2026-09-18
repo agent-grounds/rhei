@@ -39,7 +39,6 @@ are ceilings rather than a schedule.
 | `docs_rounds` | number | `1` | Ceiling on documentation rounds. |
 | `ci_commands` | array of string | `[]` | Commands that must be green before a fix, coverage, or docs step reports success. Empty means the agents discover the project's checks. |
 | `review_focus` | array of string | `[]` | Extra subsections every code review must answer. |
-| `supervisor_session` | boolean | `false` | Give the supervisor a snapshot session so each visit continues the last. Only with a session-capable target such as `pi`. |
 
 `review_rounds`, `coverage_rounds`, and `docs_rounds` are validated as positive
 integers; `0` is refused, because a phase with no rounds has no anchor for the
@@ -213,17 +212,15 @@ rhei run <workspace> --parallel 2
 correctly; the two reviews serialize and the supervisor spends one extra visit
 per round, which its visit budget already allows for.
 
-## The snapshot caveat
+## Session continuity
 
-A supervisor is at its best when each visit continues the previous transcript,
-which needs `snapshot:` — and of the built-in agent profiles only `pi` declares
-a snapshot session layout, through a `target:` that resolves both a provider
-and a model. `claude-code`, `codex`, `gemini`, `cursor`, and `kilocode` reject
-the block as a hard `unsupported-snapshot-session` validation error. So the
-block is emitted only when `supervisor_session=true`, and the default is
-`false`: with `claude-code` the supervisor runs **each visit cold**, carried by
-its checkpoints, its briefs, and the preparation note it wrote on visit 1. That
-is why this template writes so much down.
+The supervisor declares `session: continue` beside `execute_on`. After its
+first visit, a session-capable profile preloads the same state's immediately
+preceding auto snapshot; a profile without native preload support, or a missing
+or unusable exact source, logs the reason and runs cold. No per-machine template
+input or duplicate named snapshot is needed. Prompt memory remains
+unconditional, so checkpoints, briefs, previous visits, and the preparation
+note are present for warm and cold visits alike.
 
 ## Instantiate
 
@@ -232,7 +229,6 @@ rhei instantiate supervised-delivery docs/functional-spec/rhei-run.spec.md \
   --set title="Deliver detached runs" \
   --set review_rounds=2 \
   --set supervisor_target=pi:anthropic:claude-sonnet-4-5 \
-  --set supervisor_session=true \
   --output panta/deliver-detached-runs
 ```
 

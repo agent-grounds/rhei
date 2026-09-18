@@ -238,11 +238,10 @@ fn run_sequential_agent_invocation(
         run_info!("{note}");
     }
 
-    // Spec § Execution Loop step 3: if the state declares
-    // `snapshot.inherit:`, resolve and preload the source snapshot
-    // before spawning the agent. The actual preload is owned by
-    // impl-rhei-snapshots; this hook pins the call site so the
-    // orchestration ordering is encoded in code.
+    // Resolve authored inheritance, its task-level overlay, or state-local
+    // continuation immediately before spawn; prompt composition above stays
+    // unconditional.
+    // §FS-rhei-snapshots.4.4 §FS-rhei-snapshots.4.7
     let prior_snapshot_sources =
         eligible_prior_snapshot_sources(task, &loaded.rhei.tasks, machines);
     let snapshot_preload = preload_snapshot_inherit_before_spawn_with_prior_sources(

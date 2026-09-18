@@ -91,21 +91,12 @@ reports success:
 
 ## Session continuity
 
-{% if supervisor_session -%}
-`supervisor_session` is **true**, so the supervising state emits and inherits a
-snapshot named `supervisor` from itself: every visit continues the previous
-transcript. This requires `supervisor_target` to name a session-capable agent
-that resolves both a provider and a model — of the built-in profiles that is
-`pi` today.
-{%- else -%}
-`supervisor_session` is **false**, so the supervisor runs each visit cold. That
-is the supported shape for `claude-code`, `codex`, `gemini`, `cursor`, and
-`kilocode`, which reject a snapshot block outright. Nothing is lost that the
-workspace does not already carry: every visit is handed `## Checkpoints` —
-what moved and what it left behind — and the preparation note the supervisor
-wrote on its first visit. Set `supervisor_session=true` only with a
-session-capable target such as `pi`.
-{%- endif %}
+The supervising state declares `session: continue`. After visit 1, a profile
+with native snapshot preload continues the immediately preceding visit's
+transcript. An unsupported profile, or an unavailable or unusable exact source,
+logs the reason and runs that visit cold. In both cases the ordinary prompt
+still includes `## Checkpoints`, previous visits, the supervisor brief, and the
+preparation note.
 
 ## Where work happens
 

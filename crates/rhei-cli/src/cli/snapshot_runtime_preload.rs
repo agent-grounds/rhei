@@ -68,16 +68,15 @@ fn eligible_prior_snapshot_sources(
         .collect()
 }
 
-/// Orchestration hook for snapshot inheritance preload, invoked before
-/// spawning the agent subprocess for a state that declares
-/// `snapshot.inherit:`.
+/// Orchestration hook for snapshot preload, invoked before spawning an agent
+/// for a state that declares named `snapshot.inherit` or state-local
+/// `session: continue`.
 ///
 /// Per the run execution loop and snapshot preload contract, the orchestrator
-/// resolves the source snapshot (honoring `--from-snapshot`, `--override-inherit`,
-/// `--task`, and `--target` overrides), evaluates
-/// `compat:`, applies the agent's `ResumeStrategy` / `ForkStrategy`, and
-/// stages the session into the inheritor's generation directory before the
-/// subprocess starts.
+/// Named inheritance honors its explicit overrides and strictness. State-local
+/// continuation selects only the preceding visit's current auto snapshot and
+/// degrades cold. Both apply the agent's resume/fork strategy and stage the
+/// session before the subprocess starts.
 // §FS-rhei-run.3 §FS-rhei-snapshots.10.1: Preload before spawning.
 ///
 /// The actual preload is owned by the impl-rhei-snapshots task; this hook
@@ -136,8 +135,10 @@ fn preload_snapshot_inherit_before_spawn_with_prior_sources(
     let mut preload = SnapshotPreload::default();
     let effective_inherit = effective_snapshot_inherit(machine, task, current_state);
     let declares_inherit = effective_inherit.is_some();
+    let continues = machine.states.get(current_state).and_then(|state| state.session)
+        == Some(rhei_validator::StateSession::Continue);
 
-    let target_slug = if declares_inherit {
+    let target_slug = if declares_inherit || continues {
         Some(snapshot_target_slug_or_err(resolved)?)
     } else {
         resolved_agent_target_slug(resolved)
@@ -223,6 +224,22 @@ fn preload_snapshot_inherit_before_spawn_with_prior_sources(
                 }
             }
         }
+    }
+
+    if continues {
+        // State-local continuation is an implicit, optional source. It never
+        // broadens `--from-snapshot` or the named-inherit grammar.
+        // §FS-rhei-snapshots.4.7 §FS-rhei-snapshots.10.1
+        return preload_state_session_continuation(
+            preload,
+            roots.project,
+            task,
+            current_state,
+            resolved,
+            settings,
+            visit_count,
+            &target_slug,
+        );
     }
 
     let Some(inherit) = effective_inherit.as_ref() else {

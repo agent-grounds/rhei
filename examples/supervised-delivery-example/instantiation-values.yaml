@@ -17,4 +17,3 @@ ci_commands:
 review_focus:
   - concurrency
   - error handling
-supervisor_session: false

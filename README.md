@@ -65,6 +65,9 @@ Rhei is the only agent runtime that combines all of:
   unattended to the end with the parent's context out of the room. See
   [`examples/subtree-supervision/`](examples/subtree-supervision/) and
   [`docs/functional-spec/rhei-supervision.spec.md`](docs/functional-spec/rhei-supervision.spec.md).
+- **State-local session continuation.** A self-looping agent state may declare `session: continue` to preload only its immediately preceding visit's current auto snapshot; unusable or unsupported sources explain the cold fallback and still execute.
+  Newly instantiated `supervised-delivery` workspaces opt in automatically. Delete the removed `supervisor_session` key from old values files; existing instantiated workspaces are not rewritten.
+  The syntax requires a supporting release or installed pin because older binaries ignore it and run cold. Foundation-template rollout remains tracked by agent-grounds/agent-grounds#5 until release/pin and foundation-pin validation.
 - **Full validator.** `rhei validate` checks syntax, state validity, dependency
   integrity, hierarchy/id alignment, link integrity, terminal-tree coherence,
   artifact contracts, and execution references resolved from merged settings.

@@ -13,6 +13,17 @@
 
 ### Added
 
+- **Self-looping agent states can continue their immediately preceding visit
+  with `session: continue`.** The runtime selects the exact current `_state`
+  snapshot for the same task, state, prior visit, and target, reuses native
+  preload and lineage handling, and explains every cold fallback without
+  relaxing named snapshot contracts. Newly instantiated `supervised-delivery`
+  supervisors opt in automatically; delete the removed `supervisor_session`
+  key from old values files. Existing workspaces are not rewritten, and the new
+  syntax needs a supporting Rhei release or installed pin because older
+  binaries ignore it. Foundation-template rollout remains tracked in
+  agent-grounds/agent-grounds#5 after release/pin validation. (PR #293)
+
 - **Tasks can explicitly continue a declared predecessor's native session.**
   State machines accept `snapshot.inherit.from: prior`, while task
   `**Inherits:**` metadata and `rhei new --inherits` provide per-ticket opt-in,

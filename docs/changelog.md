@@ -113,6 +113,12 @@
   and ledger entry remain in the existing atomic claim transaction. Automatic
   selection still considers initial-state work only. (PR #288)
 
+- **Run-level `--agent` and `--model` overrides now compose with ordinary
+  explicit state and task targets instead of being silently ignored.** Each
+  flag replaces only its named identity dimension, preserving the target's
+  provider and optional mode; incompatible composed identities are refused
+  before spawn. Selector fanout keeps its authored identities. (PR #289)
+
 - **Plan rewrites now use their permanent sibling sidecar as the sole writer
   lock.** The replaceable plan pathname stays readable through callbacks and
   atomic replacement on Windows, while the sidecar remains held through

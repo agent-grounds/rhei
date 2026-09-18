@@ -10,11 +10,16 @@ fn private_wrapper(root: &Path, fields: &str) -> PathBuf {
     let manifest = fs::read_to_string(&path).unwrap();
     fs::write(path, manifest.split_once("expose:\n").unwrap().0).unwrap();
     let wrapper = root.join("wrapper");
-    fs::create_dir_all(&wrapper).unwrap();
+    fs::create_dir_all(wrapper.join("tasks")).unwrap();
     write_fixture_file(&wrapper, "template.yaml", &format!(
         "name: wrapper\nversion: 1\ndescription: Private settings boundary\nports:\n  entry: review.entry\n  exits: {{ done: review.done }}\nuse:\n  - {{ block: {}, as: review }}\n", fixture.leaf.display()
     ));
     write_fixture_file(&wrapper, "index.rhei.md", "# Rhei: Wrapper\n**States:** wrapper\n");
+    write_fixture_file(
+        &wrapper,
+        "tasks/01-observe.md",
+        "### Task observer: Observe\n**State:** observe\n\nObserve the settings boundary.\n",
+    );
     write_fixture_file(&wrapper, "states.yaml", &format!(
         "name: wrapper\nversion: 1\nstates:\n  observe:\n    description: Observer\n{fields}  finished:\n    final: true\ntransitions:\n  - {{ from: observe, to: finished }}\nprofiles:\n  primary: {{ initial: observe, allowed: [observe, finished] }}\nnode_policy: {{ root: primary, default: primary }}\n"
     ));

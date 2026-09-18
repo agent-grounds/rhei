@@ -125,3 +125,54 @@ fn operator_marker_blocks_run_discovery_and_intervention() {
         assert_eq!(fs::read(&entry).unwrap(), before);
     }
 }
+
+/// Real next/reset commands finish before force revalidates their state and claim effects. §FS-rhei-recover.4
+#[test]
+fn operator_force_revalidates_after_concurrent_claim_and_reset_commands() {
+    for reset in [false, true] {
+        let (dir, plan, machine) = operator_fixture();
+        let request = operator_request(&plan, &machine);
+        commit_confirmed_force(&request, prepare_forced_transition(&request).unwrap(), "test").unwrap();
+        let mut request = operator_request(&plan, &machine);
+        request.from = "work"; request.to = "gate";
+        let preview = prepare_forced_transition(&request).unwrap();
+        let (entered_tx, entered_rx) = mpsc::channel();
+        let (resume_tx, resume_rx) = mpsc::channel();
+        let command_plan = plan.clone(); let command_machine = machine.clone();
+        let command = std::thread::spawn(move || {
+            let pause = move || {
+                entered_tx.send(()).unwrap();
+                resume_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+            };
+            let result = if reset {
+                set_reset_after_preview_hook(move |_| pause());
+                reset_command(&command_plan, Some(&command_machine), &[], false, true)
+            } else {
+                set_claim_before_lock_hook(pause);
+                next_command(&command_plan, Some(&command_machine), Some("1"), true, true, false, &[])
+            };
+            result.map_err(|err| err.to_string())
+        });
+        entered_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+        let (waiting_tx, waiting_rx) = mpsc::channel();
+        let force = std::thread::spawn(move || {
+            FORCED_BOUNDARY.with(|hook| *hook.borrow_mut() = Some(Box::new(move |point| {
+                if point == "root-contended" { waiting_tx.send(()).unwrap(); }
+                Ok(())
+            })));
+            let mut request = operator_request(&plan, &machine);
+            request.from = "work"; request.to = "gate";
+            let result = commit_confirmed_force(&request, preview, "test");
+            clear_force_interrupt();
+            result.err().map(|err| err.to_string())
+        });
+        waiting_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert!(!dir.path().join(rhei_core::root_access::MARKER).exists());
+        resume_tx.send(()).unwrap();
+        command.join().unwrap().unwrap();
+        let error = force.join().unwrap().unwrap();
+        assert!(error.contains(if reset { "conflict:" } else { "assigned to" }), "{error}");
+        assert!(!dir.path().join(rhei_core::root_access::MARKER).exists());
+        assert_eq!(read_ledger(dir.path()).unwrap().len(), usize::from(!reset));
+    }
+}

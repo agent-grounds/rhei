@@ -9,6 +9,8 @@ fn viz_command(
     output: Option<&Path>,
     open: bool,
 ) -> MietteResult<()> {
+    // Keep the rendered output in the same guarded operation as its source reads. §FS-rhei-recover.4
+    let _root_guards = rhei_core::root_access::for_input(input).map_err(|err| miette!("{err}"))?;
     let key = input
         .file_stem()
         .and_then(|s| s.to_str())

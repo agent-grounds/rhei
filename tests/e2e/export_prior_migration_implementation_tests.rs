@@ -205,6 +205,14 @@ fn expected_help(target: &Path) -> String {
     format!("help: rhei migrate export-priors {}", shell_quote(&target.display().to_string()))
 }
 
+/// The target an omitted plan discovers is whatever the OS reports as the
+/// current directory, which on macOS resolves `/var`'s symlink to
+/// `/private/var`; canonicalize the same way so the expected line matches the
+/// rendered one instead of the fixture's pre-resolution spelling.
+fn discovered_target(plan: &Path) -> PathBuf {
+    rhei_core::platform::canonical_path(plan).unwrap_or_else(|_| plan.to_path_buf())
+}
+
 fn assert_complete_help_line(rendered: &str, target: &Path) {
     let expected = expected_help(target);
     assert!(
@@ -277,7 +285,7 @@ fn omitted_validate_watch_renders_copyable_migration_help() {
     };
     child.stop();
 
-    assert_complete_help_line(&rendered, &plan);
+    assert_complete_help_line(&rendered, &discovered_target(&plan));
     assert_authored_unchanged(&plan, &before);
 }
 
@@ -295,6 +303,6 @@ fn omitted_headless_startup_renders_copyable_migration_help() {
         .expect("headless command");
 
     assert!(!output.status.success(), "invalid headless run unexpectedly started");
-    assert_complete_help_line(&raw_stderr(&output), &plan);
+    assert_complete_help_line(&raw_stderr(&output), &discovered_target(&plan));
     assert_authored_unchanged(&plan, &before);
 }

@@ -283,7 +283,11 @@ mod migrate_export_prior_tests {
 
         let _live = try_acquire_run_lock(&consumer).unwrap().expect("member run lock");
         let error = migrate_export_priors_command(&consumer, false).expect_err("live run");
-        assert!(error.to_string().contains(&consumer.display().to_string()));
+        // The refusal names the canonicalized lock root, which on Windows can
+        // differ in text from a temp path spelled with an 8.3 short alias.
+        let canonical_consumer =
+            rhei_core::platform::canonical_path(&consumer).unwrap_or_else(|_| consumer.clone());
+        assert!(error.to_string().contains(&canonical_consumer.display().to_string()));
         assert!(!fs::read_to_string(consumer.join("tasks/consumer.md"))
             .unwrap()
             .contains("**Prior:**"));

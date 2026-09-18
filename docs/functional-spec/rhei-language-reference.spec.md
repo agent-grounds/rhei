@@ -111,7 +111,7 @@ while `**Inherits:**` opts a task into or out of snapshot inheritance
 ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-snapshot-inheritance-overrides)).
 The plan-language specification owns that markdown syntax; the snapshot
 specification owns its lineage, selection, compatibility, and fallback behavior
-([§FS-rhei-snapshots.4](rhei-snapshots.spec.md#4-state-machine-schema)).
+([§FS-rhei-snapshots.4](rhei-snapshots.spec.md#4-state-machine-yaml-grammar)).
 
 If a feature changes what a valid Rhei workflow can contain, this reference must
 be updated in the same change. The goal is not to centralize every rule here;

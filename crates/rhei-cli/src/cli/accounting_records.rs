@@ -180,3 +180,40 @@ fn published_invocation_json(record: &AccountingInvocationRecord) -> serde_json:
     }
     published
 }
+
+#[cfg(test)]
+fn write_invocation_record(
+    accounting_root: &Path,
+    record: &AccountingInvocationRecord,
+) -> MietteResult<PathBuf> {
+    write_invocation_record_value(accounting_root, record, serde_json::json!(record))
+}
+
+/// Add selected-profile provenance to new records without making the field
+/// mandatory when old v1 records are decoded. §FS-rhei-cost-accounting.3
+fn write_invocation_record_with_profile(
+    accounting_root: &Path,
+    record: &AccountingInvocationRecord,
+    model_profile: Option<&str>,
+) -> MietteResult<PathBuf> {
+    let mut value = serde_json::json!(record);
+    if let (Some(object), Some(model_profile)) = (value.as_object_mut(), model_profile) {
+        object.insert("model_profile".to_string(), serde_json::json!(model_profile));
+    }
+    write_invocation_record_value(accounting_root, record, value)
+}
+
+fn write_invocation_record_value(
+    accounting_root: &Path,
+    record: &AccountingInvocationRecord,
+    value: serde_json::Value,
+) -> MietteResult<PathBuf> {
+    // §FS-rhei-cost-accounting.2: File names use path-safe file ids.
+    let dir = accounting_root.join("invocations");
+    fs::create_dir_all(&dir)
+        .map_err(|err| file_io_report(&dir, "failed to create accounting invocation directory", err))?;
+    let file_id = invocation_file_id(record);
+    let path = dir.join(format!("{file_id}.json"));
+    write_json_atomic(&path, &value)?;
+    Ok(path)
+}

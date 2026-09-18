@@ -53,6 +53,7 @@
                 model: Some("gpt".to_string()),
                 default_agent: Some("codex".to_string()),
                 agents: BTreeMap::new(),
+                prices: None,
             },
         );
         let machine = static_mode_machine("  pending:\n    initial: true\n    description: x\n");
@@ -175,6 +176,7 @@
                 model: Some("baseline-model".to_string()),
                 default_agent: Some("codex".to_string()),
                 agents: BTreeMap::new(),
+                prices: None,
             },
         );
         let mut alternate_agents = BTreeMap::new();
@@ -193,6 +195,7 @@
                 model: Some("alternate-model".to_string()),
                 default_agent: Some("claude-code".to_string()),
                 agents: alternate_agents,
+                prices: None,
             },
         );
         settings

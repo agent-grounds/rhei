@@ -128,6 +128,56 @@ fn write_price_book(accounting_root: &Path, price_book: &PriceBook) -> MietteRes
     write_json_atomic(&path, price_book)
 }
 
+fn generated_price_book_archive_path(accounting_root: &Path, price_book: &PriceBook) -> PathBuf {
+    accounting_root.join("price-books").join(format!("{}.json", price_book.price_book_id))
+}
+
+/// Check immutable generated-book bytes in every root before the current
+/// snapshot in any root is changed. §FS-rhei-cost-accounting.5.1
+fn validate_generated_price_book_archive(
+    accounting_root: &Path,
+    price_book: &PriceBook,
+) -> MietteResult<()> {
+    let path = generated_price_book_archive_path(accounting_root, price_book);
+    let existing = match fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(err) => return Err(file_io_report(&path, "failed to read generated price-book archive", err)),
+    };
+    let expected = serde_json::to_vec_pretty(price_book).map_err(|err| {
+        miette!("failed to serialize generated price-book archive '{}': {err}", path.display())
+    })?;
+    if existing != expected {
+        return Err(miette!(
+            help = "preserve the existing archive under its content-derived id and repair the conflicting file before retrying",
+            "generated price-book archive '{}' already exists with different bytes",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+/// Publish the inspectable current snapshot and reuse or create its immutable
+/// generated archive. §FS-rhei-cost-accounting.5.1
+fn write_generated_price_book(accounting_root: &Path, price_book: &PriceBook) -> MietteResult<()> {
+    write_price_book(accounting_root, price_book)?;
+    let archive = generated_price_book_archive_path(accounting_root, price_book);
+    if !archive.exists() {
+        write_json_atomic(&archive, price_book)?;
+    }
+    Ok(())
+}
+
+/// Generated archives are trusted only when their declared id is the digest
+/// of their canonical semantic content. §FS-rhei-cost-accounting.5.2
+fn generated_archive_is_valid(path: &Path, price_book: &PriceBook) -> bool {
+    price_book.price_book_id.starts_with("profiles-sha256-")
+        && path.file_stem().and_then(OsStr::to_str) == Some(price_book.price_book_id.as_str())
+        && validate_price_book(path, price_book).is_ok()
+        && generated_price_book_id(price_book)
+            .is_ok_and(|generated| generated == price_book.price_book_id)
+}
+
 /// Refuse conflicts over the same root union and shared-root task scope that
 /// inspection reads, before currency checks or any accounting mutation.
 // §FS-rhei-panta.6.5 §FS-rhei-cost-accounting.11

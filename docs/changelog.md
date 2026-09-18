@@ -104,6 +104,13 @@
   Publication refuses a destination created during staging. Runs narrowed with
   `--rhei` keep their startup candidate set fixed. (PR #275)
 
+- **Model profiles can now declare their static accounting rates.** Selecting
+  a priced profile creates one deterministic effective book before execution,
+  persists current and immutable archived snapshots in every participating
+  root, and records the selected profile with each new invocation. Explicit
+  `--prices` books still take precedence, while unpriced profiles retain the
+  existing built-in fallback. (PR #291)
+
 - **Transition callbacks now receive a stable identity for each firing and an
   explicit pending ledger status.** Canonical JSON exposes `firingId` and
   `ledgerStatus`, and CLI callbacks receive equal environment values, so an

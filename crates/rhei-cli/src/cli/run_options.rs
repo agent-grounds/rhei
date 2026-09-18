@@ -34,7 +34,7 @@ struct StandaloneExecutionFlags {
     /// Maximum number of agents to run concurrently (0 = unlimited)
     #[arg(long, default_value_t = 1, add = ArgValueCompleter::new(complete_parallel))]
     parallel: usize,
-    /// Price measured usage with a local rhei.accounting.prices.v1 book
+    /// Override profile-derived and built-in pricing with a local price book
     #[arg(long, value_name = "PATH", add = ArgValueCompleter::new(complete_any_path))]
     prices: Option<PathBuf>,
     /// Narrow to the named rhei (repeatable; one id per flag). A rhei id

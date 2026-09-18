@@ -154,6 +154,25 @@ struct ModelProfile {
     /// Per-agent launch overrides for this model, keyed by agent id.
     #[serde(default)]
     agents: BTreeMap<String, ModelAgentBinding>,
+    /// Optional static accounting rates selected with this named profile.
+    /// §FS-rhei-agents.1.1.3
+    #[serde(default)]
+    prices: Option<ModelProfilePrices>,
+}
+
+/// One whole `models.<id>.prices` object. The known fields feed the standard
+/// price-book shape; every other permitted value remains entry metadata.
+/// §FS-rhei-agents.1.1.3
+#[derive(Debug, Deserialize, Clone, Eq, PartialEq)]
+struct ModelProfilePrices {
+    currency: String,
+    effective_at: String,
+    input_total_micro: u64,
+    input_cached_read_micro: u64,
+    input_cache_write_micro: u64,
+    output_total_micro: u64,
+    #[serde(default, flatten)]
+    extensions: BTreeMap<String, serde_json::Value>,
 }
 
 /// One `models.<id>.agents.<agent>` binding. Only `timeout` is consumed by
@@ -419,10 +438,75 @@ fn load_settings_document(path: &Path) -> MietteResult<SettingsDocument> {
             help = settings_help(),
             "failed to parse settings '{}': {err}", path.display()
         ))?;
+    validate_profile_prices_document(path, &raw)?;
     let typed: RheiSettings = serde_json::from_value(raw.clone())
         .map_err(|err| miette!(
             help = settings_help(),
             "failed to decode settings '{}': {err}", path.display()
         ))?;
     Ok(SettingsDocument { raw, typed, source_path: Some(path.to_path_buf()) })
+}
+
+/// Validate profile rates before typed decoding so every failure can name the
+/// complete author-facing settings path. §FS-rhei-agents.1.1.3
+fn validate_profile_prices_document(path: &Path, raw: &serde_json::Value) -> MietteResult<()> {
+    const REQUIRED_STRINGS: [&str; 2] = ["currency", "effective_at"];
+    const REQUIRED_RATES: [&str; 4] = [
+        "input_total_micro",
+        "input_cached_read_micro",
+        "input_cache_write_micro",
+        "output_total_micro",
+    ];
+    const RESERVED: [&str; 5] = ["provider", "model", "unit", "source", "model_profiles"];
+
+    let Some(models) = raw.get("models").and_then(serde_json::Value::as_object) else {
+        return Ok(());
+    };
+    for (id, profile) in models {
+        let Some(prices) = profile.get("prices") else { continue };
+        if prices.is_null() {
+            continue;
+        }
+        let Some(object) = prices.as_object() else {
+            return Err(invalid_profile_price(path, &format!("models.{id}.prices"), "must be an object or null"));
+        };
+        for field in REQUIRED_STRINGS {
+            let field_path = format!("models.{id}.prices.{field}");
+            if object
+                .get(field)
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .is_none_or(str::is_empty)
+            {
+                return Err(invalid_profile_price(path, &field_path, "must be a non-empty string"));
+            }
+        }
+        for field in REQUIRED_RATES {
+            let field_path = format!("models.{id}.prices.{field}");
+            if object.get(field).and_then(serde_json::Value::as_u64).is_none() {
+                return Err(invalid_profile_price(
+                    path,
+                    &field_path,
+                    "must be a non-negative integer no greater than u64::MAX",
+                ));
+            }
+        }
+        for field in RESERVED {
+            if object.contains_key(field) {
+                return Err(invalid_profile_price(
+                    path,
+                    &format!("models.{id}.prices.{field}"),
+                    "is reserved for generated price-book provenance",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn invalid_profile_price(path: &Path, field: &str, problem: &str) -> miette::Report {
+    miette!(
+        help = "provide currency, effective_at, and all four integer micro-currency rates; omit reserved generated-entry keys",
+        "invalid profile price in settings '{}': {field} {problem}", path.display()
+    )
 }

@@ -51,14 +51,14 @@ fn record_token_convention(record: &AccountingInvocationRecord) -> TokenConventi
 }
 
 /// The price books a reading can reach for a record whose money it has to
-/// recompute: the built-in book, and the `prices.json` sitting beside the
-/// records in the accounting root they were read from. Selection never fetches
-/// a book over the network (§FS-rhei-cost-accounting.5.1), so a book named by
-/// id alone and absent from disk is unreachable.
+/// recompute: the built-in book, the `prices.json` sitting beside the records,
+/// and valid content-addressed generated archives in that same accounting
+/// root. Selection never fetches a book over the network.
 // §FS-rhei-cost-accounting.5.2
 #[derive(Clone, Debug)]
 struct ReachablePriceBooks {
     beside_records: Option<PriceBook>,
+    generated_archives: BTreeMap<String, PriceBook>,
     builtin: PriceBook,
 }
 
@@ -70,27 +70,52 @@ impl ReachablePriceBooks {
         let beside_records = fs::read_to_string(accounting_root.join("prices.json"))
             .ok()
             .and_then(|text| serde_json::from_str::<PriceBook>(&text).ok());
-        Self { beside_records, builtin: builtin_price_book() }
+        let mut generated_archives = BTreeMap::new();
+        if let Ok(entries) = fs::read_dir(accounting_root.join("price-books")) {
+            for path in entries.filter_map(Result::ok).map(|entry| entry.path()) {
+                let Some(book) = fs::read_to_string(&path)
+                    .ok()
+                    .and_then(|text| serde_json::from_str::<PriceBook>(&text).ok())
+                else {
+                    continue;
+                };
+                if generated_archive_is_valid(&path, &book) {
+                    generated_archives.insert(book.price_book_id.clone(), book);
+                }
+            }
+        }
+        Self { beside_records, generated_archives, builtin: builtin_price_book() }
     }
 
     /// What is reachable while a run holds its own selected book: that book is
     /// the `prices.json` the run wrote beside the records it is writing.
     /// §FS-rhei-cost-accounting.5.1
     fn with_selected(price_book: &PriceBook) -> Self {
-        Self { beside_records: Some(price_book.clone()), builtin: builtin_price_book() }
+        Self {
+            beside_records: Some(price_book.clone()),
+            generated_archives: BTreeMap::new(),
+            builtin: builtin_price_book(),
+        }
     }
 
     /// Only the built-in book, where a reading has no accounting root behind
     /// it — which in practice is a test that builds an inspection by hand.
     #[cfg(test)]
     fn builtin_only() -> Self {
-        Self { beside_records: None, builtin: builtin_price_book() }
+        Self {
+            beside_records: None,
+            generated_archives: BTreeMap::new(),
+            builtin: builtin_price_book(),
+        }
     }
 
     /// The book a record names, when it is one of the reachable ones.
     fn named(&self, price_book_id: Option<&str>) -> Option<&PriceBook> {
         let id = price_book_id?;
         if let Some(book) = self.beside_records.as_ref().filter(|book| book.price_book_id == id) {
+            return Some(book);
+        }
+        if let Some(book) = self.generated_archives.get(id) {
             return Some(book);
         }
         (self.builtin.price_book_id == id).then_some(&self.builtin)

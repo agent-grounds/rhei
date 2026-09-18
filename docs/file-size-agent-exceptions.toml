@@ -537,10 +537,10 @@ path = "docs/functional-spec/rhei-templates.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 900, unit = "lines" }
+max_accepted = { value = 1000, unit = "lines" }
 until = "An approved split map gives the examples and user-facing command reference their own declarations, preserves the FS-rhei-templates section identities, and repoints every inbound citation."
 reason = """
-The missing boundary is between the normative template contract and its long worked examples and command reference. Moving those top-level sections requires new declarations and a migration of their live section citations; doing that beside a correction to FS-rhei-templates.1.2 would mix an unrelated specification restructure into the behavioral fix.
+The missing boundary is between the normative template contract and its long worked examples and command reference. Moving those top-level sections requires new declarations and a migration of their live section citations; doing that beside a focused extension of the block-composition references would mix an unrelated specification restructure into the behavioral fix.
 """
 
 [[exceptions]]

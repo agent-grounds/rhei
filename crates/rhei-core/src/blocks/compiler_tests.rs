@@ -254,6 +254,35 @@ fn missing_ports_nonterminal_exits_and_seam_guards_fail_without_panics() {
     }
 }
 
+/// The typed core preserves every closed exposure kind when decoding the
+/// manifest surface. §FS-rhei-library.1.2 §AR-rhei-library.2
+#[test]
+fn block_manifest_decodes_the_typed_exposure_table() {
+    let manifest: BlockManifest = serde_yaml::from_str(
+        r#"expose:
+  states: { ready: { local: internal-ready } }
+  tasks: { audit: { local: internal-audit } }
+  settings:
+    agents: { reviewer: { local: internal-agent } }
+    models: { careful: { local: internal-model } }
+    mcp_servers: { tracker: { local: internal-tracker } }
+    skills: { checklist: { local: internal-skill } }
+"#,
+    )
+    .expect("exposure manifest should decode");
+    let decoded = serde_yaml::to_value(manifest).expect("exposure manifest should encode");
+    assert_eq!(decoded["expose"]["states"]["ready"]["local"], "internal-ready");
+    assert_eq!(decoded["expose"]["tasks"]["audit"]["local"], "internal-audit");
+    for (registry, public, local) in [
+        ("agents", "reviewer", "internal-agent"),
+        ("models", "careful", "internal-model"),
+        ("mcp_servers", "tracker", "internal-tracker"),
+        ("skills", "checklist", "internal-skill"),
+    ] {
+        assert_eq!(decoded["expose"]["settings"][registry][public]["local"], local);
+    }
+}
+
 #[path = "reference_tests.rs"]
 mod reference_tests;
 

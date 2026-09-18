@@ -13,8 +13,8 @@ preserving the predictable output required by
 A block uses the existing template directory and `template.yaml`; there is no
 second manifest or discovery catalog. The existing `name`, `version`,
 `description`, and `inputs` fields retain their meanings. A manifest may also
-declare `ports`, `data`, `use`, `bind`, `seams`, `compatibility`, and the
-opt-in `select` declaration template below.
+declare `ports`, `data`, `expose`, `use`, `bind`, `seams`, `compatibility`, and
+the opt-in `select` declaration template below.
 
 `ports` declares the control surface:
 
@@ -61,9 +61,9 @@ endpoint is one of:
 Endpoint, port, and input names are separately unique within their mappings.
 An endpoint declaration exposes the named contract, not the state, task, path,
 or export behind it. A parent may cross a mount boundary only through a
-declared input, control port, or data endpoint. All other block-owned names and
-files remain private even though the compiled workspace necessarily contains
-their qualified forms.
+declared input, control port, data endpoint, or typed identity exposure under
+§1.2. All other block-owned names and files remain private even though the
+compiled workspace necessarily contains their qualified forms.
 
 A legacy template with none of the new fields remains valid and behaves as
 before. A block used by `use` or `--mount` must declare `ports`, including a
@@ -77,7 +77,7 @@ flow to be only composition rather than a placeholder task or machine.
 ### 1.1. Input-selected declarations
 
 `select` is an optional YAML block scalar containing a restricted MiniJinja
-template whose result is a mapping with only `ports`, `data`, and
+template whose result is a mapping with only `ports`, `data`, `expose`, and
 `compatibility`. It uses the same restricted environment as materialized files
 ([§FS-rhei-templates.5](rhei-templates.spec.md#5-instantiation-template-syntax)).
 
@@ -99,9 +99,10 @@ first. Resolve typed input values using the established precedence and binding
 rules. Render `select` once from those values, parse its result as the closed
 declaration schema, and render the local files with the same values. Check all
 selected declarations against the typed rendered fragments and expanded child
-interfaces before qualification, seams, or compatibility lowering. No runtime
-value participates in selection. The core receives ordinary typed declarations,
-never MiniJinja source.
+interfaces before qualification, seams, or compatibility lowering. A selected
+`expose` group may name only identities present in that selected mode. No
+runtime value participates in selection. The core receives ordinary typed
+declarations, never MiniJinja source.
 
 A group may be authored statically or selected, never both in one manifest;
 duplicate groups are errors, even if the static group is empty. An omitted
@@ -113,6 +114,72 @@ offending group/endpoint, the mount chain, and how to correct it. `inputs`,
 `use`, `bind`, `seams`, and every other manifest field remain static. The
 manifest itself is never rendered and legacy parsing is unchanged without
 `select`.
+
+### 1.2. Typed identity exposure
+
+`expose` is the closed, opt-in public identity surface of a block:
+
+```yaml
+expose:
+  states:
+    ready: { local: internal-ready }
+  tasks:
+    audit: { local: phase.audit }
+  settings:
+    agents: { reviewer: { local: review-agent } }
+    models: { careful: { local: reasoning-model } }
+    mcp_servers: { tracker: { local: tracker-server } }
+    skills: { checklist: { local: review-checklist } }
+```
+
+The only top-level kinds are `states`, `tasks`, and `settings`; the only
+settings registries are `agents`, `models`, `mcp_servers`, and `skills`. Each
+mapping key is a public name using the template identifier grammar. Each target
+has exactly one of these forms:
+
+- `{ local: <identity> }` names an identity owned by the declaring block's
+  rendered local fragment or owned settings registry.
+- `{ mount: <child-alias>, name: <public-name> }` names an exposure of one
+  immediate child in the same kind and, for settings, the same registry.
+
+The two forms cannot be combined and no additional target fields are valid.
+Within one kind or settings registry, public names and resolved targets are
+one-to-one. Duplicate public names, two names claiming one target, and a public
+name whose generated identity would collide with another owned identity are
+errors. Explicit kind and target forms prevent dotted task ids and equal names
+in separate settings registries from creating ownership ambiguity.
+
+A parent refers to an immediate mount's exposed identity as
+`<mount>.<public-name>`, for example state `review.ready`, task `review.audit`,
+agent `review.reviewer`, or model `review.careful`. State exposures are valid in
+every existing typed state-reference position: task state, transitions,
+profiles, snapshot selectors, and counted-state identities. The visit suffix
+remains attached to the resolved exposed state. Task exposures are valid in
+typed task-reference positions, including `Prior`. Settings exposures are
+valid only in reference positions belonging to their declared registry,
+including execution targets and per-state MCP-server and skill lists.
+
+Exposure grants identity access only. It does not expose defaults, secrets,
+arbitrary settings values, setting-owned files, paths, task exports, or a
+task's `Provides`/`Consumes` surface. Inputs, control ports, data endpoints,
+bindings, seams, and passes retain their existing meanings. A task exposure in
+`Prior` therefore creates a dependency but never authorizes reading one of the
+task's exports; that still requires a declared data endpoint and pass.
+
+The declaration is the complete author-owned public identity surface. Curated
+and direct mounts consume it without a caller-side selection step. Exposure is
+not transitive: a wrapper must explicitly re-expose an immediate child's
+public name with the `mount` form at every boundary. A reference may contain
+only its immediate mount and public name, so `outer.review.ready` cannot bypass
+an `outer` wrapper that omitted the re-exposure. Undeclared local identities,
+child private names, and generated qualified spellings remain inaccessible.
+
+Public names are stable interface identities. Mounted as `review`, exposed
+state `ready` lowers to the ordinary generated identity `m6_review__ready`.
+Changing the local or child target while retaining a compatible public key
+preserves both `review.ready` and the generated identity. Renaming or removing
+the key is an interface change. Blocks without `expose` retain exactly their
+existing privacy, generated names, output, and runtime behavior.
 
 ## 2. Mounts, bindings, and seams
 
@@ -222,6 +289,11 @@ target mounts own those data endpoints, so option order is immaterial. No
 matching seam or more than one matching seam is an error; use a curated block
 when two seams between the same mounts need distinct pass sets.
 
+Direct mounts consume each block's `expose` declaration automatically. They
+have no flag, values key, or other caller-side grammar for selecting exposed
+members. A direct and curated mount with the same alias produce the same public
+qualified identities and apply the same typed validation.
+
 `--list-inputs` prints the qualified union in mount order. `--dry-run` resolves,
 renders, compiles, and validates the complete graph in scratch without writing
 the requested output. `--execute` starts `rhei run` only after successful
@@ -249,6 +321,14 @@ for:
   reference to them; and
 - state artifact paths, task-export paths, program working directories, and
   other declared paths owned by the mounted block.
+
+Before ordinary qualification, the compiler resolves each typed exposure
+against the declaring block's local ownership tables or an immediate child's
+public table. It then substitutes the public key for the target's local suffix
+in both the exposed definition and every typed reference to it. Qualification
+uses that public suffix, so internal target names never leak into the exposed
+generated identity. Private definitions continue through the existing
+qualification path, and exposure neither merges nor coalesces identities.
 
 Text search and replacement is forbidden. A reference to a setting not shipped
 by the block remains external and unqualified; a reference to a block-shipped
@@ -377,6 +457,14 @@ settings references, artifact paths, output placement, and behavior while its
 review and fix portions become reusable blocks connected by a real artifact
 pass.
 
+Exposure resolution runs before this final root compatibility rename. A
+compatibility map may therefore target an immediate child's exposed public
+identity and map it to the wrapper's legacy identity. The compatibility name
+wins for final spelling. Existing compatibility manifests need no `expose`
+declaration, and exposure does not add a many-to-one case: §7.1's checked
+terminal equivalence remains the only coalescing operation and is validated
+before definitions are combined.
+
 ### 7.1. Equivalent terminal identities
 
 `compatibility.terminals` explicitly maps a stable state name to a list of at
@@ -448,14 +536,20 @@ next action. Small valid sets are listed and near misses are suggested.
 This applies to duplicate or invalid aliases, unknown blocks, cycles, missing
 ports, malformed or incomplete seam chains, unknown inputs/endpoints, duplicate
 bindings, kind mismatches, cross-task file passes, unresolved owned references,
-and incompatible identity maps. No partial output is accepted after one of
-these failures.
+and incompatible identity maps. It also applies to unknown exposure fields or
+public names, unresolved local or child targets, duplicate target claims,
+public/generated identity collisions, wrong-kind uses, ambiguous ownership,
+and references to undeclared private members. Exposure diagnostics identify
+the authored manifest path, full mount chain, member kind and offending
+reference, and include valid public alternatives and a corrective action when
+applicable. Every exposure declaration is validated after rendering and before
+qualification. No partial output is accepted after one of these failures.
 
 Catalog/discovery UX beyond existing template discovery, a replacement textual
-authoring language, richer provenance, additional exposure modes,
+authoring language, richer provenance, exposure of values, defaults, secrets,
+files, paths, profiles, task exports, or other identity kinds,
 conditional/gated seams, and arbitrary pass expressions are deliberately
-outside this contract. They are linked non-blocking follow-up work, and this
-feature remains deferred past release 0.5.0.
+outside this contract. They are linked non-blocking follow-up work.
 
 ## 9. Related specifications
 

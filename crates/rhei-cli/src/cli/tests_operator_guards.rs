@@ -49,6 +49,28 @@ fn operator_preflight_preserves_the_guard_matrix() {
     }
 }
 
+/// A declared edge keeps task-owned guards as well as its rule condition. §FS-rhei-transition-cmd.6
+#[test]
+fn operator_declared_edges_report_the_blocking_task_guard() {
+    for case in ["outputs", "inputs", "claim", "result"] {
+        let (dir, plan, machine) = operator_fixture();
+        let mut yaml = format!("{OPERATOR_MACHINE}  - {{from: gate, to: work}}\n");
+        let mut request = operator_request(&plan, &machine);
+        let expected = match case {
+            "outputs" => { yaml = yaml.replace("    gating: true", "    gating: true\n    outputs:\n      - {name: proof, path: runtime/proof.md}"); "Missing required output artifact" }
+            "inputs" => { yaml = yaml.replace("    visits: 3", "    visits: 3\n    inputs:\n      - {name: proof, path: runtime/proof.md}"); "Missing required input artifact" }
+            "claim" => { fs::write(&plan, format!("{}**Assignee:** worker\n", fs::read_to_string(&plan).unwrap())).unwrap(); "assigned to worker" }
+            _ => { request.to = "done"; request.result = None; "without a result" }
+        };
+        fs::write(&machine, yaml).unwrap();
+        let before = operator_snapshot(dir.path());
+        let error = prepare_forced_transition(&request).err().unwrap().to_string();
+        assert!(error.contains(expected), "{case}: {error}");
+        assert!(error.ends_with("--force does not bypass safeguards on declared edges"), "{error}");
+        assert_eq!(operator_snapshot(dir.path()), before);
+    }
+}
+
 /// Reserved cancellation waives source outputs; Prior is intentionally not a force guard. §FS-rhei-transition-cmd.6
 #[test]
 fn operator_preflight_preserves_cancellation_waiver_and_prior_omission() {

@@ -32,6 +32,7 @@ pub(crate) fn runs_command(
         return runs_history_command(json, &query);
     }
     let sweep = sweep_run_registry();
+    sweep.ensure_access()?;
     if json {
         let rendered = serde_json::to_string_pretty(&sweep.live).map_err(|err| {
             miette!(
@@ -95,6 +96,8 @@ fn report_undecided_runs(entries: &[UndecidedRun]) {
 /// Ask a run to stop. §FS-rhei-run-headless.7
 pub(crate) fn stop_command(reference: Option<&str>, kill: bool, wait: bool) -> MietteResult<()> {
     let descriptor = resolve_run(reference)?;
+    // Stop observes and signals a run only while its root is coherent. §FS-rhei-recover.4
+    let _root_guards = rhei_core::root_access::for_input(&descriptor.workspace).map_err(|err| miette!("{err}"))?;
     // Stopping something that has already stopped is not an error: the
     // operator's intent — "make sure this is not running" — is satisfied.
     //

@@ -54,9 +54,20 @@ pub(crate) struct RegistrySweep {
     /// Runs that are over but whose workspace still names them.
     pub(crate) ended: Vec<RunDescriptor>,
     pub(crate) undecided: Vec<UndecidedRun>,
+    /// Retain sorted root access through listing or reference resolution. §FS-rhei-panta.6.6
+    root_guards: Vec<rhei_core::root_access::RootAccessGuard>,
+    access_error: Option<String>,
 }
 
 impl RegistrySweep {
+    /// A pending root is a refusal, never an empty or partial listing. §FS-rhei-recover.4
+    fn ensure_access(&self) -> MietteResult<()> {
+        match &self.access_error {
+            Some(error) => Err(miette!("{error}")),
+            None => Ok(()),
+        }
+    }
+
     /// Every entry this pass could not call finished: the live runs first, then
     /// the ones whose liveness it could not decide.
     ///
@@ -103,6 +114,7 @@ enum Pruning {
     Keep,
 }
 
+/// Discover registry identities before reading any execution-root data. §FS-rhei-panta.6.6
 fn classify_run_registry(pruning: Pruning) -> RegistrySweep {
     let mut sweep = RegistrySweep::default();
     let Some(dir) = run_registry_dir() else {
@@ -111,6 +123,7 @@ fn classify_run_registry(pruning: Pruning) -> RegistrySweep {
     let Ok(entries) = fs::read_dir(&dir) else {
         return sweep;
     };
+    let mut descriptors = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
@@ -132,6 +145,32 @@ fn classify_run_registry(pruning: Pruning) -> RegistrySweep {
                 continue;
             }
         };
+        descriptors.push((path, descriptor));
+    }
+    classify_registry_roots(descriptors, sweep, pruning)
+}
+
+/// Multi-root registry reads retain one sorted guard set, including during pruning. §FS-rhei-recover.4
+fn classify_registry_roots(
+    descriptors: Vec<(PathBuf, RunDescriptor)>,
+    mut sweep: RegistrySweep,
+    pruning: Pruning,
+) -> RegistrySweep {
+    let roots = descriptors.iter().map(|(_, run)| run.workspace.clone()).filter(|root| {
+        !matches!(fs::metadata(root), Err(error) if error.kind() == std::io::ErrorKind::NotFound)
+    });
+    let roots = roots.map(|root| rhei_core::root_access::input_roots(&root))
+        .collect::<std::io::Result<Vec<_>>>()
+        .and_then(|groups| rhei_core::root_access::shared_roots(groups.into_iter().flatten()));
+    match roots {
+        Ok(guards) => sweep.root_guards = guards,
+        Err(error) => {
+            sweep.undecided.clear();
+            sweep.access_error = Some(error.to_string());
+            return sweep;
+        }
+    }
+    for (path, descriptor) in descriptors {
         match descriptor.liveness() {
             Liveness::Live => sweep.live.push(descriptor),
             Liveness::Ended => sweep.ended.push(descriptor),
@@ -202,6 +241,7 @@ pub(crate) fn resolve_run(reference: Option<&str>) -> MietteResult<RunDescriptor
     };
 
     let sweep = sweep_run_registry();
+    sweep.ensure_access()?;
     let current = sweep.not_known_to_have_ended();
     if let Some(exact) = current.iter().find(|run| run.id == reference) {
         return Ok((*exact).clone());
@@ -273,6 +313,8 @@ fn ambiguous_reference(
 /// The descriptor a plan path or workspace directory points at.
 fn descriptor_for_path(path: &Path) -> MietteResult<RunDescriptor> {
     let workspace = execution_workspace_root(&normalize_workspace_input(path));
+    // Retain exclusion while resolving the authoritative descriptor. §FS-rhei-recover.4
+    let _root_guards = rhei_core::root_access::for_input(&workspace).map_err(|err| miette!("{err}"))?;
     let descriptor_path = run_descriptor_path(&workspace);
     read_descriptor(&descriptor_path).ok_or_else(|| {
         miette!(

@@ -193,7 +193,7 @@ states:
     skills: [review.checklist]
     snapshot:
       inherit:
-        name: review
+        name: audit
         required: false
         select:
           state: {state_reference}

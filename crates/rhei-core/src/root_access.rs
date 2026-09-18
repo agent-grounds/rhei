@@ -39,21 +39,34 @@ impl Drop for Hold {
 
 /// A marker always outranks authored-input lenience. §FS-rhei-recover.4
 pub fn check_pending(root: &Path) -> io::Result<()> {
+    let mut inaccessible = None;
     for owner in pending_roots(root) {
-        check_marker(&owner)?;
+        if let Err(error) = check_marker(&owner) {
+            if error.kind() == io::ErrorKind::Other {
+                return Err(error);
+            }
+            inaccessible.get_or_insert(error);
+        }
     }
-    Ok(())
+    inaccessible.map_or(Ok(()), Err)
 }
 
 fn check_marker(root: &Path) -> io::Result<()> {
     let marker = root.join(MARKER);
+    // An unsearchable parent cannot establish marker presence or absence. §FS-rhei-run-headless.3
+    match fs::symlink_metadata(&marker) {
+        Ok(_) => (),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(io::Error::new(
+                error.kind(),
+                format!("cannot check recovery marker {}: {error}", marker.display()),
+            ))
+        }
+    }
+    // Once existence is established, even unreadable contents mean refusal. §FS-rhei-recover.4
     let bytes = match fs::read(&marker) {
         Ok(bytes) => bytes,
-        Err(err)
-            if err.kind() == io::ErrorKind::NotFound && fs::symlink_metadata(&marker).is_err() =>
-        {
-            return Ok(())
-        }
         Err(err) => {
             return Err(io::Error::other(format!(
             "forced recovery pending: ? ? -> ?; marker {} is unreadable: {err}\nrhei recover {}",

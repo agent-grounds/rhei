@@ -28,11 +28,8 @@ help = cwd_help(),
 "failed to read the current directory: {err}"))?,
     };
     let project = if here { host.clone() } else { host.join("panta") };
-    // Reinitialization writes the basin's shared manifest too. §FS-rhei-recover.4
-    let _root_guards = if project.is_dir() {
-        rhei_core::root_access::for_input(&project).map_err(|err| miette!("{err}"))?
-    } else { Vec::new() };
-
+    // Guard host effects even before the destination exists. §FS-rhei-init.2
+    let _root_guards = init_root_access(&host, &project).map_err(|err| miette!("{err}"))?;
 
     // §FS-rhei-init.2: a host that is itself a project refuses default mode
     // even under --force — a fresh `panta/` child nested inside it would lose
@@ -126,6 +123,11 @@ help = init_conflict_help(),
     let manifest = project.join("index.panta.md");
     fs::write(&manifest, contents)
         .map_err(|err| file_io_report(&manifest, "failed to write", err))?;
+
+    #[cfg(test)]
+    INIT_AFTER_MANIFEST.with(|hook| {
+        if let Some(hook) = hook.borrow_mut().take() { hook(); }
+    });
 
     // §FS-rhei-init.3: default mode ignores the project folder at the host and
     // self-contains the output rules inside it, so un-ignoring the plans later

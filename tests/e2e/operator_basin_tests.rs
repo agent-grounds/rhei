@@ -8,6 +8,7 @@ use super::*;
 #[test]
 fn operator_basin_attended_final_entry_preserves_manifest_and_siblings() {
     let dir = unique_temp_dir("operator-basin-attended");
+    fs::create_dir_all(dir.join("basin/runtime/results")).expect("basin fixture directories");
     let manifest = "# Panta: Recovery\n---\nowner: keep-me\nmetadata:\n  tasks:\n    basin.9:\n      stateVisits:\n        work: 2\n---\n\nProject prose stays byte-for-byte.\n";
     let plan = write_fixture_file(&dir, "index.panta.md", manifest);
     let machine = write_fixture_file(&dir, "states.yaml", "name: recovery\nversion: 1\nstates:\n  gate:\n    initial: true\n    gating: true\n  work:\n    visits: 3\n  supervising:\n    agent: pi\n    execute_on: descendant-terminal\n    visits: 3\n  done:\n    final: true\n  cancelled:\n    final: true\ntransitions:\n  - {from: gate, to: done}\n  - {from: work, to: cancelled}\n  - {from: supervising, to: supervising}\n  - {from: supervising, to: done}\n");

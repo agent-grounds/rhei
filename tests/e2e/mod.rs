@@ -49,6 +49,7 @@ mod export_prior_migration_tests;
 mod handoff_tests;
 mod headless_dead_supervisor_tests;
 mod headless_recovery_tests;
+mod headless_registry_access_tests;
 mod headless_stop_ownership_tests;
 mod headless_support;
 mod headless_tests;

@@ -92,6 +92,7 @@ include!("cli/system_transition_execution.rs");
 include!("cli/run_descriptor.rs");
 include!("cli/run_lock_ownership.rs");
 include!("cli/run_registry.rs");
+include!("cli/run_registry_access.rs");
 include!("cli/headless_launcher.rs");
 include!("cli/control_client.rs");
 include!("cli/run_options.rs");
@@ -145,6 +146,7 @@ include!("cli/snapshot_list_show.rs");
 include!("cli/snapshot_refs_gc.rs");
 include!("cli/snapshot_continue_lock.rs");
 include!("cli/init_command.rs");
+include!("cli/init_access.rs");
 include!("cli/new_options.rs");
 include!("cli/new_lock.rs");
 include!("cli/new_description.rs");
@@ -291,4 +293,6 @@ mod operator_recovery_tests {
     include!("cli/tests_operator_guards.rs");
     include!("cli/tests_operator_consumers.rs");
     include!("cli/tests_operator_exclusion.rs");
+    include!("cli/tests_operator_init.rs");
+    include!("cli/tests_operator_registry.rs");
 }

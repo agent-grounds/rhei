@@ -189,6 +189,18 @@ handshake; its child acquires the discovered run locks nonblocking before its
 first shared acquisition, so it cannot queue behind a force waiting for the
 parent's shared guards. It revalidates the discovered roots after loading.
 
+Init includes both its host and destination in the guarded operation, including
+host companion-file writes and creation of a previously absent destination
+(§FS-rhei-init.2). It discovers the affected existing owners and retains their
+sorted shared guards before any creation or other effect and through all writes.
+
+External run-registry reporting may retain an uncheckable root as unknown using
+only its registry entry (§FS-rhei-run-headless.3). Failure to inspect a root is
+neither proof of pending recovery nor permission to read that root: no dependent
+root reads, mutations, ended classification or pruning may follow. Unrelated
+accessible entries remain resolvable under their own guards. An established
+marker, including corrupt or unreadable contents, still causes strict refusal.
+
 When a marker is present, every entry point other than `rhei recover` refuses
 before returning plan, project, member, metadata, result, ledger, dashboard, or
 watch data and before any mutation. This includes lenient `rhei list`, project

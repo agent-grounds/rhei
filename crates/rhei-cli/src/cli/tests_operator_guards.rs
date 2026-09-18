@@ -29,7 +29,7 @@ fn operator_preflight_guard(case: &str) {
             "claim" => { body.push_str("**Assignee:** worker\n"); "assigned to worker" }
             "descendant-claim" => { body.push_str("\n#### Task 1.1: Child\n**State:** gate\n**Assignee:** worker\n"); "assigned to worker" }
             "descendants" => { body.push_str("\n#### Task 1.1: Child\n**State:** gate\n"); request.to = "cancelled"; "descendant tasks remain non-terminal" }
-            "visits" => { body = body.replace("# Rhei: Recovery\n", "# Rhei: Recovery\n---\nmetadata:\n  tasks:\n    '1':\n      stateVisits:\n        work: 3\n---\n"); "budget for state 'work' is exhausted" }
+            "visits" => { body = body.replace("# Rhei: Recovery\n", "# Rhei: Recovery\n---\nmetadata:\n  tasks:\n    1:\n      stateVisits:\n        work: 3\n---\n"); "budget for state 'work' is exhausted (3/3 visits)" }
             "ancestor" => { body = "# Rhei: Recovery\n\n## Tasks\n\n### Task 1: Parent\n**State:** done\n\n#### Task 1.1: Child\n**State:** done\n".into(); request.task = "1.1"; request.from = "done"; "terminal ancestor plan.1 must be reopened" }
             _ => {
                 yaml = yaml.replace("  work:\n", "  supervising:\n    agent: pi\n    execute_on: descendant-terminal\n    visits: 3\n  work:\n");

@@ -175,6 +175,17 @@ use:
 expose:
   states:
     approved: {{ mount: review, name: ready }}
+  tasks:
+    audit: {{ mount: review, name: audit }}
+  settings:
+    agents:
+      reviewer: {{ mount: review, name: reviewer }}
+    models:
+      careful: {{ mount: review, name: careful }}
+    mcp_servers:
+      tracker: {{ mount: review, name: tracker }}
+    skills:
+      checklist: {{ mount: review, name: checklist }}
 "#,
             fixture.leaf.display()
         ),

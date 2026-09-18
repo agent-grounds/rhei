@@ -528,7 +528,14 @@ shared root-access guard and hold the guard until every read or write derived
 from that load finishes. Project loads acquire every member/project guard in
 sorted canonical-root order. Direct member loading, omitted-target discovery,
 watch refreshes, and direct runtime readers use the same boundary; no path can
-avoid it by selecting one rhei or by tolerating a broken neighbour.
+avoid it by selecting one rhei or by tolerating a broken neighbour. Root
+identities are discovered before any shared acquisition or metadata parsing.
+Project/manifest and member access checks the reserved basin marker; basin
+access retains the parent project guard as well. Direct shared-manifest writers
+use this same complete sorted boundary, so an active writer finishes before
+force captures its manifest image and subsequent access refuses while marked.
+The manifest's qualified basin metadata ownership in §6 is unchanged; the
+versioned typed image in §FS-rhei-recover.2 represents it without relocation.
 
 A pending marker makes even lenient `rhei list` refuse that root. Lenience can
 skip malformed authored input, but an in-doubt transaction means the bytes it

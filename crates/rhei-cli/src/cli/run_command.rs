@@ -249,8 +249,8 @@ fn run_command(
     let lock_roots = run_lock_roots(&loaded, &workspace_root);
     let mut run_locks = if opts.dry_run() { Vec::new() } else if let Some((roots, locks)) = startup_locks {
         if !lock_roots.is_subset(&roots)
-            || rhei_core::root_access::input_roots(input).map_err(|err| miette!("{err}"))?.into_iter().collect::<BTreeSet<_>>() != roots {
-            return Err(miette!("execution roots changed while acquiring run locks; retry the run"));
+            || rhei_core::root_access::input_roots(input).map_err(|err| diagnostic!("{err}"))?.into_iter().collect::<BTreeSet<_>>() != roots {
+            return Err(diagnostic!("execution roots changed while acquiring run locks; retry the run"));
         }
         locks
     } else {
@@ -258,7 +258,7 @@ fn run_command(
         let locks = acquire_run_locks(&lock_roots, &opts)?;
         loaded = load_plan_for_run(input, &opts, state_machine_path)?;
         if run_lock_roots(&loaded, &workspace_root) != lock_roots {
-            return Err(miette!("execution roots changed while acquiring run locks; retry the run"));
+            return Err(diagnostic!("execution roots changed while acquiring run locks; retry the run"));
         }
         locks
     };

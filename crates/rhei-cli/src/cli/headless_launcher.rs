@@ -72,7 +72,7 @@ pub(crate) fn launch_headless_run(
 ) -> MietteResult<()> {
     // Hold the complete shared owner set before any parent launch effects. §FS-rhei-recover.4
     forced_boundary("launcher-before-guards")?;
-    let _guards = rhei_core::root_access::for_input(input).map_err(|err| miette!("{err}"))?;
+    let _guards = rhei_core::root_access::for_input(input).map_err(|err| diagnostic!("{err}"))?;
     forced_boundary("launcher-guarded")?;
     let workspace_root = execution_workspace_root(&normalize_workspace_input(input));
     // Held from here to the end of the handshake. §FS-rhei-run-headless.1.1
@@ -150,16 +150,16 @@ pub(crate) fn launch_headless_run(
 
 /// Avoid a parent/shared → child/shared → force/exclusive wait cycle on fair locks. §FS-rhei-recover.4
 fn headless_startup_run_locks(input: &Path) -> MietteResult<(BTreeSet<PathBuf>, Vec<HeldRunLock>)> {
-    let roots = rhei_core::root_access::input_roots(input).map_err(|err| miette!("{err}"))?
+    let roots = rhei_core::root_access::input_roots(input).map_err(|err| diagnostic!("{err}"))?
         .into_iter().collect::<BTreeSet<_>>();
-    for root in &roots { rhei_core::root_access::check_pending(root).map_err(|err| miette!("{err}"))?; }
+    for root in &roots { rhei_core::root_access::check_pending(root).map_err(|err| diagnostic!("{err}"))?; }
     let mut locks = Vec::new();
     for root in &roots {
         let Some(lock) = try_acquire_run_lock(root)? else {
             // Lock-owner evidence is available without reading an in-doubt runtime descriptor.
             let owner = fs::read_to_string(root.join(".rhei/run.lock"))
                 .unwrap_or_else(|err| format!("owner record unreadable: {err}"));
-            return Err(miette!("a run is already live on {} and holds its .rhei/run.lock; recorded owner: {}",
+            return Err(diagnostic!("a run is already live on {} and holds its .rhei/run.lock; recorded owner: {}",
                 root.display(), owner.trim()));
         };
         locks.push(lock);

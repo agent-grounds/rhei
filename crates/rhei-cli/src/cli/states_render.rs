@@ -919,7 +919,7 @@ fn load_plan_with(
     lenient: bool,
     run: Option<RunPlanInput<'_>>,
 ) -> MietteResult<LoadedPlan> {
-    let _guards = rhei_core::root_access::for_input(path).map_err(|err| miette!("{err}"))?;
+    let _guards = rhei_core::root_access::for_input(path).map_err(|err| diagnostic!("{err}"))?;
     if let Some(project_dir) = workspace::panta_project_dir(path) {
         let project = if lenient {
             workspace::load_panta_project_lenient(&project_dir)
@@ -1004,7 +1004,7 @@ fn load_project_with_member_for_validation(
 /// Load a plan for `rhei validate`, collecting recoverable parse errors where
 /// validation promises batch diagnostics.
 fn load_plan_for_validation(path: &Path) -> MietteResult<LoadedPlan> {
-    let _guards = rhei_core::root_access::for_input(path).map_err(|err| miette!("{err}"))?;
+    let _guards = rhei_core::root_access::for_input(path).map_err(|err| diagnostic!("{err}"))?;
     if let Some(project_dir) = workspace::panta_project_dir(path) {
         let project = workspace::load_panta_project(&project_dir)
             .map_err(|err| nested_parse_report(&err))?;
@@ -1092,7 +1092,7 @@ fn load_workspace_for_validation(ws_dir: &Path) -> MietteResult<LoadedPlan> {
     // than failing the whole project's load. §FS-rhei-plan-language.1.2
 
     let ws = rhei_core::workspace::Workspace {
-        root_guards: rhei_core::root_access::for_input(ws_dir).map_err(|err| miette!("{err}"))?,
+        root_guards: rhei_core::root_access::for_input(ws_dir).map_err(|err| diagnostic!("{err}"))?,
         rhei: rhei_core::ast::Rhei {
             title: index.title,
             states: index.states,

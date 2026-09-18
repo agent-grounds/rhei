@@ -40,7 +40,8 @@ fn operator_run_locks(roots: &[PathBuf], owner: &str) -> MietteResult<Vec<HeldRu
     for root in roots {
         let Some(mut lock) = try_acquire_run_lock(root)? else {
             let path = root.join(".rhei/run.lock");
-            let recorded = fs::read_to_string(&path).unwrap_or_else(|err| format!("owner record unreadable: {err}"));
+            let recorded = read_run_lock_owner(&path)
+                .unwrap_or_else(|err| format!("owner record unreadable: {err}"));
             return Err(diagnostic!("execution root {} has a held run lock; recorded owner: {}", root.display(), recorded.trim()));
         };
         let body = serde_json::json!({"operator": owner, "pid": std::process::id(), "operation": "forced-recovery"});

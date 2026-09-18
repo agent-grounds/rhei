@@ -7,6 +7,11 @@
   run refusals now name the copyable migration command; migration previews or
   writes only the required authored `Prior` diff, while newly authored plans
   remain subject to the same strict rule. (PR #294)
+- Let block authors expose selected state, task, agent, model, MCP-server, and
+  skill identities under stable public keys. Mounted parents can use only that
+  typed surface, wrappers must explicitly re-expose it at each boundary, and
+  blocks without exposure declarations keep their existing private identities.
+  (PR #295)
 
 - Compile block graphs over shared state and task types, retain compiled settings
   and support files without rendering twice, and restore extracted review/fix

@@ -5,7 +5,7 @@ use super::*;
 use serde_json::Value;
 
 /// Registry kinds are separate ownership domains. §FS-rhei-library.4
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct SettingNames {
     pub agents: BTreeMap<String, String>,
     pub models: BTreeMap<String, String>,

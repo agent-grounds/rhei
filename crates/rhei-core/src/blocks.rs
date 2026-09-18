@@ -77,6 +77,58 @@ pub struct InputBinding {
     pub to: String,
 }
 
+/// One explicitly owned identity behind a public exposure key.
+/// Exactly one target form is accepted by the compiler. §FS-rhei-library.1.2
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ExposureTarget {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mount: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+/// Registry-specific public settings identities. Equal public spellings in
+/// separate registries remain distinct. §FS-rhei-library.1.2
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SettingsExposure {
+    #[serde(default)]
+    pub agents: BTreeMap<String, ExposureTarget>,
+    #[serde(default)]
+    pub models: BTreeMap<String, ExposureTarget>,
+    #[serde(default)]
+    pub mcp_servers: BTreeMap<String, ExposureTarget>,
+    #[serde(default)]
+    pub skills: BTreeMap<String, ExposureTarget>,
+}
+
+/// Closed author-owned public identity table for one block boundary.
+/// §FS-rhei-library.1.2 §AR-rhei-library.2
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Exposure {
+    #[serde(default)]
+    pub states: BTreeMap<String, ExposureTarget>,
+    #[serde(default)]
+    pub tasks: BTreeMap<String, ExposureTarget>,
+    #[serde(default)]
+    pub settings: SettingsExposure,
+}
+
+impl Exposure {
+    pub fn is_empty(&self) -> bool {
+        self.states.is_empty()
+            && self.tasks.is_empty()
+            && self.settings.agents.is_empty()
+            && self.settings.models.is_empty()
+            && self.settings.mcp_servers.is_empty()
+            && self.settings.skills.is_empty()
+    }
+}
+
 /// Completion-only control edge, with optional runtime data wiring.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -148,6 +200,8 @@ pub struct BlockManifest {
     pub seams: Option<Vec<Seam>>,
     #[serde(default)]
     pub compatibility: CompatibilityMap,
+    #[serde(default)]
+    pub expose: Exposure,
 }
 
 impl BlockManifest {
@@ -159,6 +213,7 @@ impl BlockManifest {
             || !self.data.inputs.is_empty()
             || !self.data.outputs.is_empty()
             || !self.compatibility.is_empty()
+            || !self.expose.is_empty()
     }
 }
 
@@ -288,6 +343,7 @@ mod compatibility;
 mod compiler;
 mod data;
 mod emit;
+mod exposure;
 mod links;
 mod qualify;
 mod references;

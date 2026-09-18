@@ -220,8 +220,9 @@ fn run_command(
     mut opts: RunOptions,
 ) -> MietteResult<()> {
     // `--headless` re-executes this same command in a detached session and
-    // returns its id; everything below then runs in the *child*. Checked first
-    // so a launch takes no locks and starts no frontend of its own.
+    // returns its id; everything below then runs in the *child*. The parent
+    // retains shared access through its handshake; the child takes run locks
+    // nonblocking, so a competing force cannot deadlock parent and child.
 
     // §FS-rhei-run-headless.1
     if opts.headless() && !is_headless_child() {
@@ -237,11 +238,22 @@ fn run_command(
     install_interrupt_handlers();
     let input_buf = run_artifact_root(input);
     let input = input_buf.as_path();
+    // A headless parent retains shared access while awaiting this child. Take
+    // run locks before joining any shared-lock queue. §FS-rhei-recover.4
+    let startup_locks = if is_headless_child() && !opts.dry_run() {
+        Some(headless_startup_run_locks(input)?)
+    } else { None };
     let mut loaded = load_plan_for_run(input, &opts, state_machine_path)?;
     let workspace_root = run_execution_root(input);
     // §FS-rhei-recover.4: never wait for a run lock while retaining shared root access.
     let lock_roots = run_lock_roots(&loaded, &workspace_root);
-    let mut run_locks = if opts.dry_run() { Vec::new() } else {
+    let mut run_locks = if opts.dry_run() { Vec::new() } else if let Some((roots, locks)) = startup_locks {
+        if !lock_roots.is_subset(&roots)
+            || rhei_core::root_access::input_roots(input).map_err(|err| miette!("{err}"))?.into_iter().collect::<BTreeSet<_>>() != roots {
+            return Err(miette!("execution roots changed while acquiring run locks; retry the run"));
+        }
+        locks
+    } else {
         drop(loaded);
         let locks = acquire_run_locks(&lock_roots, &opts)?;
         loaded = load_plan_for_run(input, &opts, state_machine_path)?;

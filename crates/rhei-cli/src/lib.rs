@@ -81,6 +81,7 @@ include!("cli/operator_ceremony.rs");
 include!("cli/operator_force.rs");
 include!("cli/operator_force_prepare.rs");
 include!("cli/operator_marker.rs");
+include!("cli/operator_owners.rs");
 include!("cli/operator_transaction.rs");
 include!("cli/operator_recover.rs");
 include!("cli/claim_transaction.rs");
@@ -284,6 +285,9 @@ mod tests {
 mod operator_recovery_tests {
     use super::*;
     include!("cli/tests_operator_transaction.rs");
+    include!("cli/tests_operator_basin.rs");
+    include!("cli/tests_operator_basin_exclusion.rs");
+    include!("cli/tests_operator_launcher.rs");
     include!("cli/tests_operator_guards.rs");
     include!("cli/tests_operator_consumers.rs");
     include!("cli/tests_operator_exclusion.rs");

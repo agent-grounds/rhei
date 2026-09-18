@@ -579,18 +579,9 @@ function renderSurroundings(){
   // state history — task-specific durable history, capped to the last three
   frag.appendChild(el("h3",{text:"state history"}));
   const pc=el("div",{class:"chips"});
-  const prev=previousStates(n);
+  const prev=previousMovements(n);
   if(prev.length){
-    for(const s of prev){
-      const chip=el("span",{class:"chip flat"});
-      chip.appendChild(dot(stateColor(s)));
-      chip.appendChild(document.createTextNode(s));
-      // §FS-rhei-viz.4: exceptional history remains one chip with its reason.
-      const hop=(n.history||[]).slice().reverse().find(h=>h.from===s);
-      if(hop&&hop.forced_reason) chip.appendChild(el("span",{text:` — forced: ${hop.forced_reason}`}));
-      chip.addEventListener("click",()=>highlightState(s));
-      pc.appendChild(chip);
-    }
+    for(const hop of prev) pc.appendChild(historyChip(hop));
   } else {
     pc.appendChild(el("span",{class:"none",text:"— no state history recorded"}));
   }
@@ -814,12 +805,17 @@ function renderGateTransition(node, ms){
   box.appendChild(row);
   return box;
 }
-function previousStates(node){
-  return (node.history||[])
-    .map(h=>h&&h.from)
-    .filter(Boolean)
-    .reverse()
-    .slice(0,3);
+// §FS-rhei-viz.4: retain each movement's own reason and state identity.
+function previousMovements(node){
+  return (node.history||[]).filter(h=>h&&h.from).slice().reverse().slice(0,3);
+}
+function historyChip(hop){
+  const chip=el("span",{class:"chip flat"});
+  chip.appendChild(dot(stateColor(hop.from)));
+  chip.appendChild(document.createTextNode(hop.from));
+  if(hop.forced_reason) chip.appendChild(el("span",{text:` — forced: ${hop.forced_reason}`}));
+  chip.addEventListener("click",()=>highlightState(hop.from));
+  return chip;
 }
 // ANSI 16-color palette (dark terminal) used to render the agent's own coloring.
 const TERM_COLOR = {

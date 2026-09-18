@@ -14,9 +14,7 @@ fn operator_snapshot(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
 }
 
 /// Each refusal checks its own diagnostic and every affected file, including metadata. §FS-rhei-transition-cmd.6
-#[test]
-fn operator_preflight_preserves_the_guard_matrix() {
-    for case in ["stale", "unknown", "profile", "result", "outputs", "inputs", "claim", "descendant-claim", "descendants", "visits", "ancestor", "supervisor-claim"] {
+fn operator_preflight_guard(case: &str) {
         let (dir, plan, machine) = operator_fixture();
         let mut request = operator_request(&plan, &machine);
         let mut body = fs::read_to_string(&plan).unwrap();
@@ -24,7 +22,7 @@ fn operator_preflight_preserves_the_guard_matrix() {
         let expected = match case {
             "stale" => { request.from = "work"; "conflict:" }
             "unknown" => { request.to = "missing"; "not a valid state" }
-            "profile" => { yaml.push_str("profiles:\n  default:\n    initial: gate\n    allowed: [gate, done, cancelled]\nnode_policy:\n  root: default\n  default: default\n"); "not allowed by its resolved profile" }
+            "profile" => { yaml = yaml.replace("    initial: true\n", ""); yaml.push_str("profiles:\n  default:\n    initial: gate\n    allowed: [gate, done, cancelled]\nnode_policy:\n  root: default\n  default: default\n"); "not allowed by its resolved profile" }
             "result" => { request.to = "cancelled"; request.result = Some(" \t"); "requires a fresh non-empty --result" }
             "outputs" => { yaml = yaml.replace("    gating: true", "    gating: true\n    outputs:\n      - {name: proof, path: runtime/proof.md}"); "Missing required output artifact" }
             "inputs" => { yaml = yaml.replace("    visits: 3", "    visits: 3\n    inputs:\n      - {name: proof, path: runtime/proof.md}"); "Missing required input artifact" }
@@ -46,7 +44,22 @@ fn operator_preflight_preserves_the_guard_matrix() {
         let error = prepare_forced_transition(&request).err().expect(case);
         assert!(error.to_string().contains(expected), "{case}: {error}");
         assert_eq!(operator_snapshot(dir.path()), before, "{case}");
-    }
+}
+
+// Each guard runs independently, so one bad fixture cannot hide others. §FS-rhei-transition-cmd.6
+macro_rules! operator_guard_tests {
+    ($($name:ident => $case:literal),* $(,)?) => { $(
+        #[test]
+        fn $name() { operator_preflight_guard($case); }
+    )* };
+}
+operator_guard_tests! {
+    operator_guard_stale => "stale", operator_guard_unknown => "unknown",
+    operator_guard_profile => "profile", operator_guard_result => "result",
+    operator_guard_outputs => "outputs", operator_guard_inputs => "inputs",
+    operator_guard_claim => "claim", operator_guard_descendant_claim => "descendant-claim",
+    operator_guard_descendants => "descendants", operator_guard_visits => "visits",
+    operator_guard_ancestor => "ancestor", operator_guard_supervisor_claim => "supervisor-claim",
 }
 
 /// A declared edge keeps task-owned guards as well as its rule condition. §FS-rhei-transition-cmd.6
@@ -119,7 +132,7 @@ fn operator_workspace_images_preserve_checkpoint_and_result_once() {
     clear_force_interrupt();
     let marker = recorded_marker(&root);
     let decision = forced_decision(&root, &marker).unwrap();
-    forced_replay(&root, &marker, decision).unwrap();
+    forced_replay(&root, &marker, decision, "test").unwrap();
     for image in marker.files {
         assert_eq!(ForcedImage::read(&root.join(image.path)).unwrap(), if decision == ForcedDecision::Forward { image.after } else { image.before });
     }

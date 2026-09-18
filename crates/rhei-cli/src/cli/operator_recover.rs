@@ -30,7 +30,7 @@ fn forced_decision(root: &Path, marker: &ForcedMarker) -> MietteResult<ForcedDec
         return Err(miette!("duplicate recovery id in saved ledger prefix"));
     }
     for file in &marker.files {
-        let path = forced_image_path(root, &file.path)?;
+        let path = forced_file_path(root, file)?;
         let current = ForcedImage::read(&path)?;
         if current != file.before && current != file.after {
             return Err(miette!("recovery image has a third value; restore evidence at {}", path.display()));
@@ -64,29 +64,40 @@ fn recover_command(root: &Path) -> MietteResult<()> {
     let expected = format!("recover {} {} {} -> {} {}", marker.recovery_id, marker.hop.task_id,
         marker.hop.from, marker.hop.to, decision.word());
     let account = confirm_operator_hop(&expected, "recover")?;
-    let _run_locks = operator_run_locks(std::slice::from_ref(&root), &account)?;
-    let _root_guard = rhei_core::root_access::RootAccessGuard::exclusive(&root).map_err(|err| miette!("{err}"))?;
-    // Stable sidecars can lock absent before-images without creating those images.
-    let _file_locks = forced_lock_images(&root, &marker.files)?;
-    let _ledger = LockedTransitionLedger::lock(&root)?;
-    let current = fs::read(&marker_path).map_err(|err| file_io_report(&marker_path, "confirmed marker vanished", err))?;
-    if current != preview { return Err(miette!("forced-recovery marker changed after confirmation; retry with fresh confirmation")); }
-    let locked_decision = forced_decision(&root, &marker).map_err(|err| forced_recovery_error(&root, err))?;
-    if locked_decision != decision { return Err(miette!("recovery decision changed after confirmation; retry with fresh confirmation")); }
-    forced_replay(&root, &marker, decision)?;
+    forced_replay(&root, &marker, decision, &account)?;
     println!("{} {} {} -> {} rolled {}", marker.recovery_id, marker.hop.task_id,
         marker.hop.from, marker.hop.to, if decision == ForcedDecision::Forward { "forward" } else { "back" });
     Ok(())
 }
 
 /// Repeatable replay with the same fault boundaries as the initial writer. §FS-rhei-recover.3
-fn forced_replay(root: &Path, marker: &ForcedMarker, decision: ForcedDecision) -> MietteResult<()> {
+fn forced_replay(root: &Path, marker: &ForcedMarker, decision: ForcedDecision, account: &str) -> MietteResult<()> {
+    let preview = marker.bytes()?;
+    let roots = forced_owner_roots(root, &marker.files)?;
+    forced_boundary("recovery-confirmed-before-locks")?;
+    let _run_locks = operator_run_locks(&roots, account)?;
+    let _guards = forced_root_guards(&roots)?;
+    forced_marker_location(root)?;
+    let _file_locks = forced_lock_images(root, &marker.files)?;
+    let _ledger = LockedTransitionLedger::lock(root)?;
+    let marker_path = root.join(rhei_core::root_access::MARKER);
+    let current = fs::read(&marker_path).map_err(|err| file_io_report(&marker_path, "confirmed marker vanished", err))?;
+    if current != preview { return Err(miette!("forced-recovery marker changed after confirmation; retry with fresh confirmation")); }
+    let locked_marker = ForcedMarker::parse(root, &current).map_err(|err| forced_recovery_error(root, err))?;
+    if forced_owner_roots(root, &locked_marker.files)? != roots {
+        return Err(miette!("recovery owners changed after confirmation; retry with fresh confirmation"));
+    }
+    let locked_decision = forced_decision(root, &locked_marker).map_err(|err| forced_recovery_error(root, err))?;
+    if locked_decision != decision { return Err(miette!("recovery decision changed after confirmation; retry with fresh confirmation")); }
     let path = forced_image_path(root, &marker.ledger.path)?;
     if path.exists() {
+        forced_boundary("recovery-ledger-before")?;
         let ledger = fs::OpenOptions::new().write(true).open(&path)
             .map_err(|err| file_io_report(&path, "failed to open recovery ledger", err))?;
         if decision == ForcedDecision::Rollback {
+            forced_boundary("recovery-ledger-truncate-before")?;
             ledger.set_len(marker.ledger.offset).map_err(|err| file_io_report(&path, "failed to truncate torn force pair", err))?;
+            forced_boundary("recovery-ledger-truncate-after")?;
         }
         forced_boundary("recovery-ledger-sync-before")?;
         ledger.sync_all().map_err(|err| file_io_report(&path, "failed to sync recovery ledger", err))?;

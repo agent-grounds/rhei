@@ -127,14 +127,18 @@ fn operator_marker_blocks_run_discovery_and_intervention() {
 }
 
 /// Real next/reset commands finish before force revalidates their state and claim effects. §FS-rhei-recover.4
-#[test]
-fn operator_force_revalidates_after_concurrent_claim_and_reset_commands() {
-    for reset in [false, true] {
+fn operator_force_revalidates_after_command(reset: bool) {
         let (dir, plan, machine) = operator_fixture();
         let request = operator_request(&plan, &machine);
-        commit_confirmed_force(&request, prepare_forced_transition(&request).unwrap(), "test").unwrap();
+        if reset {
+            commit_confirmed_force(&request, prepare_forced_transition(&request).unwrap(), "test").unwrap();
+        } else {
+            // Explicit claiming uses an initial, non-gating task; R1-10 stays adjacent.
+            fs::write(&machine, OPERATOR_MACHINE.replace("    gating: true\n", "")).unwrap();
+        }
+        let (from, to) = if reset { ("work", "gate") } else { ("gate", "work") };
         let mut request = operator_request(&plan, &machine);
-        request.from = "work"; request.to = "gate";
+        request.from = from; request.to = to;
         let preview = prepare_forced_transition(&request).unwrap();
         let (entered_tx, entered_rx) = mpsc::channel();
         let (resume_tx, resume_rx) = mpsc::channel();
@@ -161,7 +165,7 @@ fn operator_force_revalidates_after_concurrent_claim_and_reset_commands() {
                 Ok(())
             })));
             let mut request = operator_request(&plan, &machine);
-            request.from = "work"; request.to = "gate";
+            request.from = from; request.to = to;
             let result = commit_confirmed_force(&request, preview, "test");
             clear_force_interrupt();
             result.err().map(|err| err.to_string())
@@ -173,6 +177,15 @@ fn operator_force_revalidates_after_concurrent_claim_and_reset_commands() {
         let error = force.join().unwrap().unwrap();
         assert!(error.contains(if reset { "conflict:" } else { "assigned to" }), "{error}");
         assert!(!dir.path().join(rhei_core::root_access::MARKER).exists());
-        assert_eq!(read_ledger(dir.path()).unwrap().len(), usize::from(!reset));
-    }
+        assert!(read_ledger(dir.path()).unwrap().is_empty());
+}
+
+#[test]
+fn operator_force_revalidates_after_concurrent_claim_command() {
+    operator_force_revalidates_after_command(false);
+}
+
+#[test]
+fn operator_force_revalidates_after_concurrent_reset_command() {
+    operator_force_revalidates_after_command(true);
 }

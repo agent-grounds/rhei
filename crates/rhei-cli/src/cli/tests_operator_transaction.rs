@@ -58,11 +58,11 @@ fn operator_writer_recovers_every_boundary_without_duplicate_effects() {
         let decision = forced_decision(dir.path(), &marker).unwrap();
         // Repeat each recovery with a second interruption after an image replacement.
         interrupt_force_at("image-0-after");
-        assert!(forced_replay(dir.path(), &marker, decision).is_err());
+        assert!(forced_replay(dir.path(), &marker, decision, "test").is_err());
         clear_force_interrupt();
         assert!(dir.path().join(rhei_core::root_access::MARKER).exists());
         assert_eq!(forced_decision(dir.path(), &marker).unwrap(), decision);
-        forced_replay(dir.path(), &marker, decision).unwrap();
+        forced_replay(dir.path(), &marker, decision, "test").unwrap();
         for file in &marker.files {
             let expected = if decision == ForcedDecision::Forward { &file.after } else { &file.before };
             assert_eq!(&ForcedImage::read(&dir.path().join(&file.path)).unwrap(), expected, "{point}: {}", file.path);

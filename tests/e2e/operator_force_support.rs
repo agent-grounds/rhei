@@ -111,7 +111,9 @@ fn run_in_terminal(mut command: Command, response: &str) -> TerminalRun {
     use std::os::fd::AsRawFd;
     use std::time::{Duration, Instant};
 
-    let pty = nix::pty::openpty(None, None).expect("open pseudo-terminal");
+    // Keep exact diagnostics independent of terminal wrapping. §FS-rhei-transition-cmd.6
+    let size = nix::pty::Winsize { ws_row: 40, ws_col: 240, ws_xpixel: 0, ws_ypixel: 0 };
+    let pty = nix::pty::openpty(Some(&size), None).expect("open pseudo-terminal");
     for fd in [pty.master.as_raw_fd(), pty.slave.as_raw_fd()] {
         nix::fcntl::fcntl(fd, nix::fcntl::FcntlArg::F_SETFD(nix::fcntl::FdFlag::FD_CLOEXEC))
             .expect("keep pseudo-terminal handles out of the child");

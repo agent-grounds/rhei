@@ -20,10 +20,11 @@ struct PreparedForce {
 
 /// Lock the same stable plan sidecars ordinary writers use, in sorted order. §FS-rhei-recover.3
 fn forced_lock_images(root: &Path, files: &[ForcedFile]) -> MietteResult<Vec<fs::File>> {
+    let mut paths = files.iter().filter(|file| !file.roles.iter().all(|role| role == "result"))
+        .map(|file| forced_file_path(root, file)).collect::<MietteResult<Vec<_>>>()?;
+    paths.sort(); paths.dedup();
     let mut locks = Vec::new();
-    for image in files {
-        if image.roles.iter().all(|role| role == "result") { continue; }
-        let path = forced_image_path(root, &image.path)?;
+    for path in paths {
         let lock_path = plan_lock_path(&path)?;
         let lock = fs::OpenOptions::new().create(true).read(true).write(true).truncate(false).open(&lock_path)
             .map_err(|err| file_io_report(&lock_path, "failed to open recovery writer lock", err))?;
@@ -48,24 +49,13 @@ fn commit_confirmed_force(request: &ForcedRequest<'_>, preview: PreparedForce, a
     let ForcedRequest { from, to, reason, result, .. } = *request;
     forced_boundary("confirmed-before-locks")?;
     let _run_locks = operator_run_locks(&preview.roots, account)?;
-    let mut _guards = Vec::new();
-    for root in &preview.roots {
-        let guard = match rhei_core::root_access::RootAccessGuard::try_exclusive(root)
-            .map_err(|err| miette!("{err}"))? {
-            Some(guard) => guard,
-            None => {
-                forced_boundary("root-contended")?;
-                rhei_core::root_access::RootAccessGuard::exclusive(root).map_err(|err| miette!("{err}"))?
-            }
-        };
-        _guards.push(guard);
-    }
+    let _guards = forced_root_guards(&preview.roots)?;
     for root in &preview.roots { rhei_core::root_access::check_pending(root).map_err(|err| miette!("{err}"))?; }
     let _file_locks = forced_lock_images(&preview.root, &preview.files)?;
     let _ledger = LockedTransitionLedger::lock(&preview.root)?;
     let prepared = prepare_forced_transition(request)?;
     if prepared.roots != preview.roots || prepared.root != preview.root || prepared.task_id != preview.task_id
-        || prepared.files.iter().map(|file| &file.path).collect::<Vec<_>>() != preview.files.iter().map(|file| &file.path).collect::<Vec<_>>() {
+        || prepared.files.iter().map(ForcedFile::key).collect::<Vec<_>>() != preview.files.iter().map(ForcedFile::key).collect::<Vec<_>>() {
         return Err(miette!("recovery scope changed after confirmation; retry with fresh confirmation"));
     }
     let id = uuid::Uuid::now_v7().to_string();
@@ -82,7 +72,7 @@ fn commit_confirmed_force(request: &ForcedRequest<'_>, preview: PreparedForce, a
     rhei_core::transition_history::parse(std::str::from_utf8(&prefix).map_err(|err| miette!("{err}"))?)
         .map_err(|err| miette!("{err}"))?;
     if !prefix.is_empty() && !prefix.ends_with(b"\n") { return Err(miette!("state ledger has an incomplete final row")); }
-    let marker = ForcedMarker { version: 1, recovery_id: id,
+    let marker = ForcedMarker { version: if prepared.files.iter().any(|file| file.owner.is_some()) { 2 } else { 1 }, recovery_id: id,
         hop: ForcedHop { task_id: prepared.task_id.clone(), from: from.into(), to: to.into() },
         files: prepared.files,
         ledger: ForcedLedger { path: "runtime/state-transitions.log".into(), offset: prefix.len() as u64,
@@ -102,13 +92,17 @@ fn commit_confirmed_force(request: &ForcedRequest<'_>, preview: PreparedForce, a
 fn forced_file(root: &Path, path: &Path, roles: &[&str], after: &[u8]) -> MietteResult<ForcedFile> {
     let path = if path.exists() { rhei_core::platform::canonical_path(path) }
         else { Ok(path.to_path_buf()) }.map_err(|err| file_io_report(path, "failed to resolve recovery file", err))?;
-    let relative = path.strip_prefix(root).map_err(|_| miette!(
-        "forced recovery cannot represent metadata outside execution root: {}; marker version 1 requires contained images", path.display()))?
-        .to_string_lossy().replace('\\', "/");
-    forced_image_path(root, &relative)?;
+    let (owner, relative) = match path.strip_prefix(root) {
+        Ok(relative) => (None, relative.to_string_lossy().replace('\\', "/")),
+        Err(_) if path == forced_basin_manifest(root)? =>
+            (Some(ForcedOwner::BasinProjectMetadata), "index.panta.md".to_string()),
+        Err(_) => return Err(miette!("recovery image is outside its permitted owner: {}", path.display())),
+    };
     let mut roles = roles.iter().map(|role| role.to_string()).collect::<Vec<_>>();
     roles.sort(); roles.dedup();
-    Ok(ForcedFile { path: relative, roles, before: ForcedImage::read(&path)?, after: ForcedImage::present(after) })
+    let file = ForcedFile { owner, path: relative, roles, before: ForcedImage::read(&path)?, after: ForcedImage::present(after) };
+    forced_file_path(root, &file)?;
+    Ok(file)
 }
 
 /// Completion/reopening changes only the task's result link, preserving history. §FS-rhei-plan-language.3.8

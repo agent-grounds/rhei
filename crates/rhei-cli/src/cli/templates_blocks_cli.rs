@@ -122,7 +122,7 @@
         for mount in &mounts {
             children.push((mount.alias.clone(), frontend.prepare(&mount.block, None, &inputs.for_alias(&mount.alias), &mount.alias)?));
         }
-        let block = Block { name: root_name.clone(), source: PathBuf::from("<command line>"), version: "1".into(), manifest: BlockManifest { mounts, seams, ..Default::default() }, local: None, children };
+        let block = Block { name: root_name.clone(), source: PathBuf::from("<command line>"), version: "1".into(), source_identity: SourceIdentity::unavailable("command-line composition"), manifest: BlockManifest { mounts, seams, ..Default::default() }, local: None, children };
         let compiled = block.compile().map_err(|e| miette!(help = "fix the block declarations, then retry", "block declarations (static or template.yaml select): {e}"))?;
         instantiate_compiled_workspace(
             compiled,

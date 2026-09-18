@@ -264,6 +264,9 @@ impl CompiledBlock {
             }
         }
         super::settings::rewrite(&mut self.fragment.settings, &names.settings, &names.paths)?;
+        // Node lookup keys follow the same checked typed rename as definitions;
+        // many-to-one terminal mappings union their origins. §FS-rhei-library.7.1
+        self.provenance.rewrite(names)?;
         Ok(())
     }
 }

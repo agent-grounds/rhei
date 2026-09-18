@@ -32,6 +32,7 @@ mod templates_blocks_tests {
                         name: "mounted".into(),
                         source: "<test>".into(),
                         version: "1".into(),
+                        source_identity: SourceIdentity::unavailable("test"),
                         manifest: BlockManifest::default(),
                         local: None,
                         children: vec![("outer".into(), block.clone())],
@@ -69,6 +70,24 @@ mod templates_blocks_tests {
         ]);
         write_compiled_files(dir.path(), files.clone()).unwrap();
         for (path, bytes) in files { assert_eq!(fs::read(dir.path().join(path)).unwrap(), bytes.bytes); }
+    }
+
+    /// A lock write error is a transaction error, not a reason to publish the
+    /// remaining workspace files. §FS-rhei-templates.6.1.2
+    #[test]
+    fn compiled_lock_write_failure_is_reported_with_partial_staging_intact() {
+        let dir = tempfile::tempdir().unwrap();
+        let files = BTreeMap::from([
+            (PathBuf::from(".agent-grounds/rhei"), b"collision".to_vec().into()),
+            (
+                PathBuf::from(".agent-grounds/rhei/composition.lock.json"),
+                b"{}\n".to_vec().into(),
+            ),
+        ]);
+        let error = write_compiled_files(dir.path(), files).unwrap_err();
+        assert!(error.to_string().contains("compiled directory"));
+        assert!(dir.path().join(".agent-grounds/rhei").is_file());
+        assert!(!dir.path().join("index.rhei.md").exists());
     }
 
     /// Unsupported guarded seams cannot silently become unconditional links.

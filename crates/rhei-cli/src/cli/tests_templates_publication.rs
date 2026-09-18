@@ -19,6 +19,11 @@ mod templates_publication_tests {
             r#"{"models":{"publication-fixture":{"provider":"fixture","model":"new"}}}"#,
         )
         .unwrap();
+        fs::write(
+            staged.join(".agent-grounds/rhei/composition.lock.json"),
+            "{\"schema_version\":1}\n",
+        )
+        .unwrap();
         fs::create_dir_all(project.join(settings_path).parent().unwrap()).unwrap();
         let previous = "{\"models\":{}}\n".to_string();
         fs::write(project.join(settings_path), &previous).unwrap();
@@ -54,6 +59,7 @@ mod templates_publication_tests {
             assert_eq!(staged.exists(), keep);
             if keep {
                 assert!(staged.join("index.rhei.md").is_file());
+                assert!(staged.join(".agent-grounds/rhei/composition.lock.json").is_file());
                 assert!(fs::read_to_string(staged.join(".agent-grounds/rhei/settings.json"))
                     .unwrap()
                     .contains("publication-fixture"));
@@ -96,6 +102,7 @@ mod templates_publication_tests {
         publish_staged_member(&staged, &output, Some(&settings), false).unwrap();
         assert!(!staged.exists());
         assert!(output.join("index.rhei.md").is_file());
+        assert!(output.join(".agent-grounds/rhei/composition.lock.json").is_file());
         assert!(!output.join(".agent-grounds/rhei/settings.json").exists());
         assert!(fs::read_to_string(dir.path().join(".agent-grounds/rhei/settings.json"))
             .unwrap()

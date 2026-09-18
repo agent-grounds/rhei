@@ -346,6 +346,8 @@ mod emit;
 mod exposure;
 mod exposure_schema;
 mod links;
+mod provenance;
+mod provenance_source;
 mod qualify;
 mod references;
 mod settings;
@@ -353,6 +355,7 @@ mod terminal_equivalence;
 pub use compiler::{
     Block, CompileResult, CompiledBlock, CompiledFile, Endpoint, Fragment, TaskFile,
 };
+pub use provenance_source::{SourceIdentity, SourceLocator, SourceRevision};
 
 #[cfg(test)]
 mod compiler_tests;

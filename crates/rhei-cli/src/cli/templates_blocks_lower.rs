@@ -1,6 +1,6 @@
     // Compiled bytes bypass template filtering and rendering. The shared final
     // transaction still places, hoists settings, validates and rolls back.
-    // §AR-rhei-library.3 §FS-rhei-library.4
+    // §AR-rhei-library.3 §FS-rhei-library.4.1 §FS-rhei-templates.6.1.2
     #[allow(clippy::too_many_arguments)]
     fn instantiate_compiled_workspace(
         compiled: CompiledBlock, root_name: &str, output: Option<&Path>,
@@ -25,8 +25,12 @@
         };
         let files = compiled.files().map_err(|e| miette!(help = "fix the composed block declarations, then retry", "{e}"))?;
         if let Err(error) = write_compiled_files(&target, files) {
-            if !dry_run { let _ = remove_path(&target, false); }
-            return Err(error);
+            if !dry_run && !keep_on_error { let _ = remove_path(&target, false); }
+            return if !dry_run && keep_on_error {
+                Err(error.wrap_err(format!("kept partial composed output at '{}' because --keep-on-error was passed", target.display())))
+            } else {
+                Err(error)
+            };
         }
         finish_template_instantiation(
             MaterializedTemplate { layout: TemplateLayout::Workspace, output_dir: target.clone() },

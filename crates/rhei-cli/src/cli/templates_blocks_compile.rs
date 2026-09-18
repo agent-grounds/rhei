@@ -38,6 +38,7 @@
             } else { reference.into() };
             let resolved = resolve_template_reference(&effective).map_err(|e| e.wrap_err(format!("block '{reference}' mounted as '{alias}'; check rhei templates")))?;
             let dir = fs::canonicalize(resolved.path()).map_err(|e| file_io_report(resolved.path(), "resolve block source", e))?;
+            let source_identity = composition_source_identity(reference, &resolved, &dir)?;
             let manifest_path = if resolved._extracted.is_some() { PathBuf::from(format!("built-in/{reference}/template.yaml")) } else { dir.join("template.yaml") };
             if self.stack.iter().any(|(path, _)| path == &manifest_path) {
                 let mut chain = self.stack.iter().map(|(p,a)| format!("{} as {a}", p.display())).collect::<Vec<_>>();
@@ -49,7 +50,7 @@
             self.stack.push((manifest_path.clone(), alias.into()));
             let chain = self.stack.iter().map(|(_,a)| a.as_str()).collect::<Vec<_>>().join(".");
             let result = self.prepare_inner(&dir, reference, &manifest, &values)
-                .map(|mut block| { block.source = manifest_path.clone(); block })
+                .map(|mut block| { block.source = manifest_path.clone(); block.source_identity = source_identity; block })
                 .map_err(|e| e.wrap_err(format!("{} [mount {chain}]", manifest_path.display())));
             self.stack.pop();
             result
@@ -159,6 +160,6 @@
             }
             // A mounting manifest may contribute its own plan and machine.
             let local = Some(self.render_fragment(dir, reference, values, !manifest.block.mounts.is_empty())?);
-            Ok(Block { name: manifest.name.clone(), source: dir.join("template.yaml"), version: manifest.version_string(), manifest: manifest.block.clone(), local, children })
+            Ok(Block { name: manifest.name.clone(), source: dir.join("template.yaml"), version: manifest.version_string(), source_identity: SourceIdentity::unavailable(reference), manifest: manifest.block.clone(), local, children })
         }
     }

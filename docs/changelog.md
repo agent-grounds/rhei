@@ -24,6 +24,13 @@
 
 ### Added
 
+- **Generated block compositions now carry durable per-node provenance.** A
+  canonical `.agent-grounds/rhei/composition.lock.json` traces every flattened
+  state, task, profile, and routing rule through its declaration and mount to
+  shipped, Git, local, or unavailable source metadata. Runtime commands keep
+  consuming the ordinary flat workspace, and exact replay is promised only
+  when the recorded source identity denotes immutable content. (PR #298)
+
 - **Attended operators can recover a missing state-machine edge with `transition
   --force --reason`.** Fresh confirmation, preserved transition safeguards and a
   durable exceptional audit pair make the correction recoverable with `rhei

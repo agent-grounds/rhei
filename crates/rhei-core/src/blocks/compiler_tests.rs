@@ -11,6 +11,7 @@ fn leaf(name: &str, states: &str, tasks: &str) -> Block {
         name: name.into(),
         source: PathBuf::from(format!("/{name}/template.yaml")),
         version: "1".into(),
+        source_identity: SourceIdentity::unavailable(name),
         manifest: BlockManifest {
             ports: Some(ControlPorts {
                 entry: "work".into(),
@@ -46,6 +47,7 @@ fn group(children: Vec<(&str, Block)>) -> Block {
         name: "flow".into(),
         source: "/flow/template.yaml".into(),
         version: "1".into(),
+        source_identity: SourceIdentity::unavailable("flow"),
         manifest: BlockManifest { mounts, ..Default::default() },
         local: None,
         children: children.into_iter().map(|(a, b)| (a.into(), b)).collect(),
@@ -72,6 +74,40 @@ fn recursive_expansion_preserves_every_alias_segment() {
     assert_eq!(m.profiles.as_ref().unwrap()["flow"].initial, "m5_outer__m1_a__work");
     assert!(m.states.values().all(|s| !s.initial));
     assert_eq!(compiled.origins.len(), 4);
+    let lock: serde_json::Value =
+        serde_json::from_slice(&compiled.provenance.lock_bytes().unwrap()).unwrap();
+    let origin = &lock["nodes"]["states"]["m5_outer__m1_a__work"][0];
+    assert_eq!(
+        lock["mounts"][origin["mount"].as_str().unwrap()]["chain"],
+        serde_json::json!(["outer", "a"]),
+        "qualification and merge must retain the declaring nested mount"
+    );
+}
+
+#[test]
+fn duplicate_routing_rules_receive_stable_one_based_ordinals() {
+    let mut block = simple("routes");
+    let machine = &mut block.local.as_mut().unwrap().machine;
+    machine.profiles =
+        Some(serde_yaml::from_str("lane: {initial: work, allowed: [work, done]}").unwrap());
+    machine.node_policy = Some(
+        serde_yaml::from_str(
+            "root: lane\ndefault: lane\noverrides:\n  - {match: {level: 1}, profile: lane}\n  - {match: {level: 1}, profile: lane}\n",
+        )
+        .unwrap(),
+    );
+    let compiled = group(vec![("route", block)]).compile().unwrap();
+    let lock: serde_json::Value =
+        serde_json::from_slice(&compiled.provenance.lock_bytes().unwrap()).unwrap();
+    let keys = lock["nodes"]["routing"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .filter(|key| key.starts_with("overrides/"))
+        .cloned()
+        .collect::<Vec<_>>();
+    assert!(keys.iter().any(|key| key.ends_with("~1")));
+    assert!(keys.iter().any(|key| key.ends_with("~2")));
 }
 
 #[test]

@@ -66,6 +66,10 @@ Rhei is the only agent runtime that combines all of:
   ready-to-execute workspace. Eleven templates ship inside the binary, so
   `rhei templates` is populated the moment `rhei` is installed. See
   [`docs/functional-spec/rhei-templates.spec.md`](docs/functional-spec/rhei-templates.spec.md).
+  Block compositions also write `.agent-grounds/rhei/composition.lock.json`,
+  tracing each flattened node to its declaration, mount, and source; digests
+  verify bytes, and exact replay needs an immutable source. See
+  [`docs/functional-spec/rhei-library.spec.md`](docs/functional-spec/rhei-library.spec.md).
 
 See [`docs/functional-spec/comparison.md`](docs/functional-spec/comparison.md) for a detailed comparison against
 beads, beans, opencode, Claude Code TodoWrite, Cline, Cursor, Roo, Devin, and

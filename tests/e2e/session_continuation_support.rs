@@ -1,3 +1,5 @@
+//! Shared fixtures for state-local continuation, governed by §FS-rhei-snapshots.4.7.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

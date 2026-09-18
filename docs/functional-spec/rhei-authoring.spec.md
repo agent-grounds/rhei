@@ -205,6 +205,36 @@ execution root. To upgrade an older plan, add the direct prior, correct any
 unmatched export name, and make the producer write non-whitespace content
 ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)).
 
+### 4.5. Continuing a Prior task's session
+
+When a successor genuinely needs most of a declared predecessor's native agent
+session, opt that task in explicitly:
+
+```markdown
+### Task review-1: Review independently
+**State:** review
+**Prior:** Task implement
+
+### Task fix-1: Apply that review
+**State:** fix
+**Prior:** Task review-1
+**Inherits:** reviewed from prior
+```
+
+The predecessor's state must emit the named snapshot (`reviewed` here), and the
+two invocations must have natively compatible agent session layouts. Only the
+declared Prior list is searched. If two priors emit indistinguishable matches,
+Rhei reports ambiguity; give them different snapshot names or states rather
+than relying on whichever ran last.
+
+Use `**Inherits:** none` when a task must remain independent even though its
+state has a default inheritance rule—for example, a review that should not
+start inside the implementer's reasoning. Omission preserves the state rule;
+`none` is the explicit cold opt-out. Inheritance is a continuity tool, not a
+guaranteed cost saving: a large inherited prefix is read again on every later
+turn. Durable facts still belong in `**Provides:**` / `**Consumes:**` and state
+artifacts. See §FS-rhei-plan-language.3.13 and §FS-rhei-snapshots.4.
+
 ## 5. Using a Custom State Machine
 
 To reuse one state machine across plans, declare it on the line directly

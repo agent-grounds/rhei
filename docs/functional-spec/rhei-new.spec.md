@@ -76,6 +76,7 @@ is an argument.
 | `--kind <KIND>`            | `task`             | Heading keyword, checked against `structure.nodeKinds` ([§FS-rhei-plan-language.3.7](rhei-plan-language.spec.md#37-node-kind-validity)) |
 | `--state <STATE>`          | the machine's initial | `**State:**`, checked against the owning rhei's machine (§3.2) |
 | `--prior <ID>`             | none               | `**Prior:**` entry; repeatable, and a comma-separated list is accepted |
+| `--inherits <RULE>`        | none               | `**Inherits:**`; accepts `none` or `'<name> from <self|ancestor|prior>'` ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-snapshot-inheritance-overrides)) |
 | `--provides <NAME>`        | none               | `**Provides:**` entry; repeatable ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)) |
 | `--consumes <ID:NAME>`     | none               | `**Consumes:**` entry; repeatable. Selects prompt injection, not filesystem visibility. Undeclared sibling exports remain readable; pair every producer with `--prior <ID>` or validation rejects the created ticket ([§FS-rhei-plan-language.3.12.1](rhei-plan-language.spec.md#3121-declaration-integrity)) |
 | `--excludes <ENTRY>`       | none               | `**Excludes:**` entry; repeatable. Each value is one `checkout=<path>`, `artifact=<path>`, or export reference ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)) |
@@ -94,6 +95,11 @@ does not invent a keyword the author did not ask for, and does not resolve the
 reference itself — an unresolvable prior is a validation error with a code
 frame ([§FS-rhei-validate.4.1](rhei-validate.spec.md#41-unresolved-prior-references)), which is a better report than anything the
 create path could produce.
+
+`--inherits` writes the normalized rule after `**Prior:**` and before the
+remaining optional metadata. It validates the complete value before creating
+or changing any file. Omitting the flag writes no field and therefore preserves
+state-level inheritance.
 
 ## 2. Creating a rhei
 

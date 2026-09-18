@@ -13,7 +13,7 @@ pub(super) fn run_snapshot_command(plan_path: &Path, machine_path: &Path, args: 
     CliRun::from(&output)
 }
 
-fn write_fake_snapshot_agent(dir: &Path) -> PathBuf {
+pub(super) fn write_fake_snapshot_agent(dir: &Path) -> PathBuf {
     write_python_agent(
         dir,
         "fake-snapshot-agent.py",

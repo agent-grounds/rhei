@@ -437,13 +437,14 @@ task_id_segment = NUMBER | IDENTIFIER ;
 (* ============================================== *)
 
 (* State field is mandatory and must appear first.
-   Prior, Assignee, and an optional execution override follow; the `complete`
-   command strips the assignee on completion. A task may declare at most one
+   Prior, an optional snapshot-inheritance override, Assignee, and an optional
+   execution override follow; the `complete` command strips the assignee on
+   completion. A task may declare at most one
    execution override — either `**Model:**` or `**Target:**`, never both. See
    section 3.11. *)
-(* The metadata block is closed: `**State:**`, `**Prior:**`, `**Provides:**`,
-   `**Consumes:**`, `**Excludes:**`, `**Assignee:**`, `**Model:**`, and `**Target:**` are the
-   only fields. A `**<name>:**` line
+(* The metadata block is closed: `**State:**`, `**Prior:**`, `**Inherits:**`,
+   `**Provides:**`, `**Consumes:**`, `**Excludes:**`, `**Assignee:**`,
+   `**Model:**`, and `**Target:**` are the only fields. A `**<name>:**` line
    with any other name, appearing in the block before a blank line has
    separated it from the heading, is a parse error naming the unknown field.
    Accepting it as content silently discards it, and the field authors most
@@ -451,8 +452,9 @@ task_id_segment = NUMBER | IDENTIFIER ;
    validates green and executes in the wrong order, with nothing to point at.
    Past a blank line the same line is ordinary bold text and is kept as task
    content. *)
-metadata        = state_field, [ prior_field ], [ provides_field ],
-                  [ consumes_field ], [ excludes_field ], [ assignee_field ],
+metadata        = state_field, [ prior_field ], [ inherits_field ],
+                  [ provides_field ], [ consumes_field ], [ excludes_field ],
+                  [ assignee_field ],
                   [ execution_override ] ;
 
 assignee_field  = "**Assignee:** ", title, NEWLINE ;
@@ -486,6 +488,13 @@ result_path     = "runtime/results/", task_id, ".md" ;
 state_field     = "**State:** ", state_value, NEWLINE ;
 
 prior_field     = "**Prior:** ", task_ref_list, NEWLINE ;
+
+inherits_field  = "**Inherits:** ", ( "none" | snapshot_name, " from ",
+                    inherit_axis ), NEWLINE ;
+
+inherit_axis    = "self" | "ancestor" | "prior" ;
+
+snapshot_name   = LETTER_LOWER, { LETTER_LOWER | DIGIT | "-" } ;
 
 task_ref_list   = task_ref, { ", ", task_ref } ;
 
@@ -595,6 +604,8 @@ NONZERO_DIGIT   = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
 IDENTIFIER      = LETTER, { LETTER | DIGIT | "-" | "_" } ;
 
 LETTER          = "a" | "b" | ... | "z" | "A" | "B" | ... | "Z" ;
+
+LETTER_LOWER    = "a" | "b" | ... | "z" ;
 
 ANY_CHAR        = ? any Unicode character ? ;
 
@@ -1396,6 +1407,46 @@ parse, validation, composition, and execution behavior. Program states,
 callbacks, `--no-agent`, and `rhei snapshot continue` do not launch a new agent
 under this contract and are unchanged.
 
+### 3.13. Task Snapshot Inheritance Overrides
+
+A task may override the name and lineage axis of the active state's
+`snapshot.inherit` rule, or explicitly disable that rule:
+
+```markdown
+### Task fix-1: Apply the review
+**State:** fix
+**Prior:** Task review-1
+**Inherits:** reviewed from prior
+
+### Task review-2: Review independently
+**State:** review
+**Prior:** Task fix-1
+**Inherits:** none
+```
+
+The value is either `none` or `<snapshot-name> from <axis>`, where `<axis>` is
+`self`, `ancestor`, or `prior` and the name obeys the snapshot-name grammar in
+§FS-rhei-snapshots.4.2. The field appears after `**Prior:**` when both are
+present and before `**Provides:**`, `**Consumes:**`, `**Assignee:**`,
+`**Model:**`, or `**Target:**`. It may appear at most once. An empty value, an
+unsupported axis, extra words, a duplicate, or a recognized metadata field in
+the wrong order is a parse error naming `**Inherits:**`.
+
+Omission leaves the state's inheritance rule unchanged. An authored
+`<name> from <axis>` replaces only `snapshot.inherit.name` and
+`snapshot.inherit.from`, retaining the state's `select`, `compat`, and
+`required` values. When the state has no rule, the task value supplies no
+selectors and uses the ordinary `compat: native` and `required: false`
+defaults. `none` removes the effective inheritance rule for that task; it does
+not disable named or automatic emission, artifacts, exports, or handoffs.
+
+Like `**Target:**` and `**Model:**`, the value follows the task through every
+autonomous state and counted visit and is re-read immediately before each
+spawn. It has no effect on human, final, gating, or program states, and it does
+not relax state restrictions such as the prohibition on polling inheritance.
+The effective rule and its runtime behavior are defined by
+§FS-rhei-snapshots.4.
+
 ## 4. Token Types
 
 This section is illustrative and non-normative. A complete implementation must
@@ -1415,6 +1466,7 @@ For lexer implementation, the following token types are a reasonable minimum:
 | `NodeHeader` | `^(###|####|#####|######) <kind> <id>: .*` | `#### Bug 1.2: Config` |
 | `MetadataState` | `\*\*State:\*\* .*` | `**State:** pending` |
 | `MetadataPrior` | `\*\*Prior:\*\* .*` | `**Prior:** Bug 1.2` |
+| `MetadataInherits` | `\*\*Inherits:\*\* .*` | `**Inherits:** reviewed from prior` |
 | `MetadataProvides` | `\*\*Provides:\*\* .*` | `**Provides:** api-contract` |
 | `MetadataConsumes` | `\*\*Consumes:\*\* .*` | `**Consumes:** 1:api-contract` |
 | `MetadataExcludes` | `\*\*Excludes:\*\* .*` | `**Excludes:** checkout=private.md` |
@@ -1451,6 +1503,7 @@ struct TaskNode {
     state: String,
     kind: String,
     prior: Vec<TaskId>,
+    inherits: Option<String>,       // normalized task snapshot override or "none"
     provides: Vec<String>,          // export names published (**Provides:**)
     consumes: Vec<ConsumedExport>,  // exports read from prior tasks (**Consumes:**)
     excludes: Vec<Exclusion>,       // authored read exclusions (**Excludes:**)

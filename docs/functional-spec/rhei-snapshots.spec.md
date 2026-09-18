@@ -166,7 +166,7 @@ states:
     snapshot:
       inherit:
         name: implementation
-        from: self                                # self | ancestor; default self
+        from: self                                # self | ancestor | prior; default self
         compat: native                            # native | none; default native
         required: false                           # false | true; default false
         select:
@@ -179,7 +179,7 @@ states:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | Yes | Snapshot name to look up. |
-| `from` | enum | No | Lineage axis. `self` walks the same task's prior state history. `ancestor` walks the plan ancestor chain. Default: `self`. |
+| `from` | enum | No | Lineage axis. `self` walks the same task's prior state history. `ancestor` walks the plan ancestor chain. `prior` inspects only tasks named by the inheriting task's declared `**Prior:**` edges. Default: `self`. |
 | `compat` | enum | No | Preload policy. `native` preloads only when the snapshot's agent identity and session layout match the inheritor. Mismatches run cold or fail according to `required`. `none` never preloads even on match. Default: `native`. |
 | `required` | boolean | No | When `false`, missing snapshots, incompatible snapshots, or unsupported agent session profiles are warnings and the agent runs cold. When `true`, those conditions are runtime errors before spawn. Default: `false`. |
 | `select` | object | No | Disambiguates among multiple matching snapshots or overrides the default visit/generation choice. |
@@ -214,6 +214,14 @@ Selector defaults and fanout requirements:
 `select.visit` defaults to `latest`; `select.generation` defaults to
 `current`. Integer selectors are 1-based and must be greater than or equal to
 `1`.
+
+The state rule is overlaid with task metadata before selection. Omitted
+`**Inherits:**` preserves the state rule. `<name> from <axis>` replaces only
+`name` and `from`, retaining the state's `select`, `compat`, and `required`; if
+the state has no rule, it supplies no selectors and defaults to native,
+optional inheritance. `**Inherits:** none` removes the effective rule for the
+task without changing emission or artifact behavior
+(§FS-rhei-plan-language.3.13).
 
 ### 4.3. Lineage Resolution
 
@@ -265,6 +273,27 @@ produce named snapshots. A later `select.visit: latest` may therefore resolve
 to an older successful visit rather than the immediately preceding attempt.
 Use `emit.on: always` when every iteration must be inheritable.
 
+For `from: prior`, obtain the source tasks from the current task's declared
+`**Prior:**` list in the merged project graph. A source qualifies only when it
+is terminal under its owning rhei's machine and its normalized terminal state
+is not `cancelled`. For each qualifying source independently:
+
+1. Keep orchestrator-produced snapshots whose name matches `inherit.name`.
+2. Apply `select.state` and then the target filter. `select.target: same` is
+   resolved from the inheriting invocation's effective target.
+3. Apply visit and generation selection *within that source*. Thus `latest`
+   visit means that source's latest visit, and `current` or `latest` generation
+   is evaluated under that source identity.
+
+After per-source reduction, zero candidates use the normal missing fallback;
+one resumes; more than one is `ambiguous-lineage`. Distinct sources remain
+distinct candidates even when one has a newer visit or generation than the
+other: there is no global-newest tie-break. The diagnostic names every
+competing project-qualified task id and snapshot reference. Multiple survivors
+within one source are equally ambiguous. The grammar adds neither
+`select.task` nor arbitrary task addressing; authors disambiguate reusable
+state-machine rules with existing snapshot names, states, and target selectors.
+
 ### 4.4. Inheritance Timing
 
 Snapshot inheritance happens immediately before the state invocation that
@@ -272,35 +301,47 @@ declares `snapshot.inherit:`:
 
 1. `rhei run` selects a ready task whose `Prior:` dependencies are terminal
    and whose required `inputs:` already exist. [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run)
-2. The orchestrator resolves the task's current state and execution target.
-3. If that state declares `snapshot.inherit:`, the orchestrator resolves and
-   preloads the source snapshot before spawning the agent.
+2. The orchestrator resolves the task's current state and effective execution
+   target in normal precedence order (CLI, task, state, settings), then re-reads
+   and overlays `**Inherits:**` for this spawn.
+3. If the resulting effective rule exists, the orchestrator resolves and
+   preloads the source snapshot before spawning the agent. `none` means no
+   effective rule and a cold spawn, not a failed lookup.
 4. The agent runs the state work.
 5. After the agent exits and the Completion Condition is evaluated, the same
    state may emit a new snapshot if it declares `snapshot.emit:`.
 
-Inheritance is therefore a property of the state being executed, not of the
-transition that led into that state and not of the next state after it. A state
-that declares both `inherit` and `emit` consumes first and emits after its own
-invocation.
+Inheritance is therefore a property of the state and task being executed, not
+of the transition that led into that state and not of the next state after it.
+The task overlay is re-read before every autonomous state and visit. Human,
+final, gating, and program states do not preload; polling restrictions remain
+unchanged. A state that declares both `inherit` and `emit` consumes first and
+emits after its own invocation.
 
 ### 4.5. Cross-Task Information Flow
 
 Snapshots are not an arbitrary task-to-task messaging mechanism. They preserve
-same-agent session lineage for `from: self` and parent-to-child branching via
-`from: ancestor`.
+same-agent session lineage for `from: self`, parent-to-child branching via
+`from: ancestor`, and an explicitly declared predecessor session via
+`from: prior`.
 
 When one task needs facts, decisions, summaries, diffs, or other durable
 content produced by another task, the producer should declare `outputs:` and
 the consumer should declare `inputs:` plus an ordinary `Prior:` dependency.
-That artifact path is the supported way to communicate across siblings,
-cousins, unrelated tasks, and different agents. The snapshot grammar
-therefore has no `from: task` or `from: prior` form in v1. [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) [§FS-rhei-plan-language](rhei-plan-language.spec.md#fs-rhei-plan-language-rhei-plan-language-specification)
+That artifact path remains the supported way to communicate durable facts
+across siblings, cousins, unrelated tasks, and different agents. `from: prior`
+transfers only native session lineage, reaches only declared Prior edges, and
+never makes an undeclared task addressable. The snapshot grammar has no
+`from: task` form. [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) [§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-snapshot-inheritance-overrides)
 
 ### 4.6. Fallback Behavior
 
-`required: false` has exactly one fallback: run the state cold. It does not
-try a second snapshot name, a farther ancestor, or another emitting state.
+`required: false` has exactly one fallback: run the state cold. This applies to
+zero candidates, missing or cancelled Prior sources, timed-out sources,
+incompatible snapshots, and unsupported session profiles. It does not try a
+second snapshot name, a farther ancestor, another emitting state, or an
+undeclared predecessor. `required: true` makes the same conditions errors
+before spawn at the resolver or preload boundary that discovers them.
 Authors who need a real fallback chain should model it explicitly as states
 and artifacts, so the plan records which branch was taken and why.
 
@@ -348,6 +389,15 @@ permissions, not transcript file format, so a snapshot produced under one
 mode is reusable by a sibling state running the same agent in a different
 mode. Operators who want stricter mode-matching can express it with
 `select.target`, which is slug-exact.
+
+Selection and compatibility are deliberately ordered. First resolve the
+inheriting invocation's effective agent, mode, provider, and model using CLI,
+task, state, and settings precedence. Then apply an explicit target selector
+(including `same`) and require a unique source. Only after uniqueness is known
+does `native_compatible` compare agent identity and session layout. A provider
+or model mismatch may make cache reuse uneconomic, but remains an advisory
+`cache_beneficial` diagnostic under the native rule; mode alone is not a
+transcript-format boundary.
 
 `compat: native` gates preload on `native_compatible`. `cache_beneficial` is
 advisory: it does not gate behavior but is logged at spawn time so the operator
@@ -1128,7 +1178,7 @@ fixed-location tracking rather than failing the spawn: this invocation loses
 emit/preload for that agent, not the run. The numbered steps below are
 specific to `snapshot.inherit:`.
 
-For each spawn of a state declaring `snapshot.inherit:`:
+For each spawn with an effective state/task inheritance rule:
 
 1. Resolve the snapshot reference per the lineage rules. If no match exists
    and `required: true`, fail with `missing-snapshot`. If no match exists and
@@ -1167,6 +1217,13 @@ For each spawn of a state declaring `snapshot.inherit:`:
    position is a property of the spawn rather than of any one agent: it is the
    same slot for `--session-dir <dir>`, `--fork <path>`, `--continue <id>`, and
    for a resume the agent spells as a positional subcommand.
+
+The sequential and parallel runners use this same preload contract. Snapshot
+resolution never changes scheduler readiness: a task with a pending or
+cancelled Prior remains ineligible even when inheritance is optional, and the
+optional cold fallback is reachable only after ordinary readiness has selected
+the task. Resolver-level tests may exercise cancelled-source filtering without
+weakening that scheduler boundary.
 
 ### 10.2. Emit on Exit
 
@@ -1298,7 +1355,8 @@ following rules. Violations are errors unless marked otherwise.
   errors.
 - `snapshot.emit.on`, when present, must be one of `success`, `failure`, or
   `always`.
-- `snapshot.inherit.from`, when present, must be `self` or `ancestor`.
+- `snapshot.inherit.from`, when present, must be `self`, `ancestor`, or
+  `prior`.
 - `snapshot.inherit.compat`, when present, must be `native` or `none`.
 - `snapshot.inherit.select.visit`, when present, must be `latest` or an
   integer greater than or equal to `1`.
@@ -1325,6 +1383,10 @@ following rules. Violations are errors unless marked otherwise.
   invocation remain allowed.
 - `snapshot.inherit.from: ancestor` on a root-task state is an error. There
   is no ancestor.
+- `snapshot.inherit.from: prior` requires plan-aware validation. For each task
+  to which the rule can apply, only its declared Prior edges are possible
+  sources; an undeclared task never satisfies static or runtime resolution.
+  Cross-rhei edges use the source task's owning state machine.
 - `snapshot.inherit.required`, when present, must be a boolean.
 - `snapshot.inherit.required: true` with `snapshot.inherit.compat: none` is
   an error because the state both requires and disables preload.
@@ -1336,7 +1398,8 @@ following rules. Violations are errors unless marked otherwise.
 - A `snapshot.inherit:` whose `from`/`name` combination resolves to no
   possible emitter under static analysis of the state machine is an error
   (unresolvable reference).
-- A `snapshot.inherit:` whose static resolution is ambiguous is an error.
+- An effective state/task inheritance rule whose static resolution is
+  ambiguous is an error.
   For `from: self`, ambiguity means the same task contains two states that
   could both be the source under the declared `name` and `emit.on` policy
   with no `select.state` to disambiguate. For `from: ancestor`, ambiguity is
@@ -1345,6 +1408,10 @@ following rules. Violations are errors unless marked otherwise.
   matching emitters errors here even if a farther ancestor has exactly one
   match, because the runtime walk stops at the nearest matching ancestor
   rather than falling through.
+  For `from: prior`, each declared source is filtered and reduced separately;
+  two surviving source tasks are ambiguous regardless of their relative visit
+  or generation numbers, and the diagnostic names their project-qualified
+  task ids and snapshot references.
 - A `snapshot.inherit:` whose static analysis shows the emitter's agent does
   not match the inheritor's agent is an error when `required: true`;
   otherwise it emits a warning ("preload will be skipped: snapshot agent does
@@ -1382,8 +1449,15 @@ following rules. Violations are errors unless marked otherwise.
 - Manifest validation requires `completion` to be `success`, `failure`, or
   `timeout` when `produced_by: orchestrator`, and only `success` or `failure`
   when `produced_by: operator`.
-- `snapshot.inherit:` may not depend on a snapshot in a different plan
-  workspace.
+- `**Inherits:**` obeys §FS-rhei-plan-language.3.13. A task value overlays only
+  state `name` and `from`; `none` removes the effective rule. The resulting
+  rule is validated against every autonomous state the task may enter,
+  including polling, fanout, target, required/compatibility, and source-shape
+  constraints. Re-reading metadata before each spawn makes later authored
+  changes effective without changing the state machine.
+- Snapshot inheritance may not search an unrelated plan workspace. A
+  `from: prior` edge may cross rheis only inside the same merged Panta project,
+  where project qualification identifies the source and its owning machine.
 
 Orphaned-snapshot detection runs at validation time when the cache directory
 exists: each manifest is compared against the current plan and state machine.

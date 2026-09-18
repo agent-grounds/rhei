@@ -62,8 +62,15 @@ rustix = { version = "1.1.4", features = ["process"] }
 [target.'cfg(any(target_os = "linux", target_os = "android", target_vendor = "apple", target_os = "redox"))'.dependencies]
 rustix = { version = "1.1.4", features = ["fs"] }
 
+# A mapped view can read immutable run-lock ownership while LockFileEx keeps
+# ordinary reads through other handles excluded. §REQ-cross-platform
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Storage_FileSystem"] }
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Storage_FileSystem",
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Memory",
+] }
 
 # Only the pty-based interruption e2e needs this, and only on Unix — Windows is
 # in the CI matrix and `nix` does not build there. §FS-rhei-run-tui.1.5.7

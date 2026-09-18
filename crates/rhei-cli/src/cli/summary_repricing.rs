@@ -211,7 +211,7 @@ fn activity_from_liveness(liveness: Liveness) -> SelectedRunActivity {
 /// §FS-rhei-summary.1 §FS-rhei-summary.5
 fn run_lock_owner_id(root: &Path) -> Result<Option<String>, String> {
     let path = root.join(".rhei/run.lock");
-    let body = fs::read_to_string(&path)
+    let body = read_run_lock_owner(&path)
         .map_err(|err| format!("{} is held but could not be read: {err}", path.display()))?;
     if body.trim().is_empty() {
         return Ok(None);

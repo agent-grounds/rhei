@@ -289,6 +289,9 @@ mod reference_tests;
 #[path = "exposure_ownership_tests.rs"]
 mod exposure_ownership_tests;
 
+#[path = "exposure_routing_tests.rs"]
+mod exposure_routing_tests;
+
 #[path = "links_tests.rs"]
 mod links_tests;
 

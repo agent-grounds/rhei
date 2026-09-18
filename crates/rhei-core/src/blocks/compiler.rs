@@ -362,7 +362,11 @@ impl CompiledBlock {
                 return Err(format!("private file collision at {}", path.display()));
             }
         }
-        self.primary.extend(other.primary);
+        // Exposure can put one state in both lanes. Drop only the first overlap
+        // per incoming identity so authored duplicates still fail validation.
+        // §FS-rhei-library.4
+        let mut overlap: BTreeSet<_> = self.primary.iter().cloned().collect();
+        self.primary.extend(other.primary.into_iter().filter(|state| !overlap.remove(state)));
         self.primary_profiles.extend(other.primary_profiles);
         self.stable_primary_profiles.extend(other.stable_primary_profiles);
         self.origins.extend(other.origins);

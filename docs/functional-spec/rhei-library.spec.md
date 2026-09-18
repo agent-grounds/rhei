@@ -335,6 +335,13 @@ uses that public suffix, so internal target names never leak into the exposed
 generated identity. Private definitions continue through the existing
 qualification path, and exposure neither merges nor coalesces identities.
 
+When a wrapper's primary lane refers to an exposed child state also present in
+the child's primary lane, combining those lanes retains one reference to that
+state at its first occurrence. The derived profile preserves the order of all
+distinct state identities. This normalization applies only to overlap between
+lanes; duplicate entries authored within a profile remain validation errors,
+and distinct state definitions remain distinct.
+
 Text search and replacement is forbidden. A reference to a setting not shipped
 by the block remains external and unqualified; a reference to a block-shipped
 setting is owned and qualified. Dangling references after this classification

@@ -56,7 +56,7 @@ fn operator_basin_captures_the_completed_manifest_writer() {
     assert!(!root.join(rhei_core::root_access::MARKER).exists());
     let mut temporary = tempfile::NamedTempFile::new_in(&project).unwrap();
     temporary.write_all(updated.as_bytes()).unwrap();
-    persist_locked(temporary, &manifest_path, Some(&writer)).unwrap();
+    persist_locked(temporary, &manifest_path).unwrap();
     drop(writer);
     assert!(worker.join().unwrap().unwrap().contains("interrupted after capture"));
     let marker = recorded_marker(&root);

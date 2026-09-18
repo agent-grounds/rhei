@@ -301,8 +301,9 @@ issue; the ids here are the intake ids.
   and predictability; composition is wired by `--mount`, `--seam`, `--pass`
   and `--set` or a block's `use` today, and #47 chose no language. Tracked as
   rhei.84.
-- Per-node provenance and richer lock metadata; generated output carries root
-  and block headers only. Tracked as rhei.85.
+- Completed in PR #298: per-node provenance and richer lock metadata now trace
+  each flattened node through its declaration and mount to an honest source
+  revision. Tracked as rhei.85.
 - Typed exposure of selected state, task, agent, model, MCP-server, and skill
   identities while keeping encapsulation the default. Delivered by #285 under
   §FS-rhei-library.1.2.

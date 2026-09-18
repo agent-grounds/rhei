@@ -44,6 +44,9 @@ pub struct Block {
     pub name: String,
     pub source: PathBuf,
     pub version: String,
+    /// Resolver-owned source identity enters the typed compiler boundary.
+    /// §FS-rhei-library.4.1 §AR-rhei-library.2
+    pub source_identity: SourceIdentity,
     pub manifest: BlockManifest,
     pub local: Option<Fragment>,
     pub children: Vec<(String, Block)>,
@@ -61,6 +64,7 @@ pub struct CompiledBlock {
     pub(crate) flow_name: Option<String>,
     pub(crate) stable_primary_profiles: BTreeSet<String>,
     pub origins: Vec<String>,
+    pub(crate) provenance: super::provenance::ProvenanceStore,
     pub(crate) source: PathBuf,
     pub(crate) chain: Vec<String>,
     pub(crate) public: super::exposure::PublicNames,
@@ -76,6 +80,14 @@ impl Block {
     pub fn compile(self) -> CompileResult<CompiledBlock> {
         let mut compiled = self.compile_at(&[], &mut Vec::new())?;
         compiled.derive_routing()?;
+        let flow = compiled
+            .fragment
+            .machine
+            .node_policy
+            .as_ref()
+            .map(|policy| policy.default.clone())
+            .unwrap_or_else(|| "flow".into());
+        compiled.provenance.finalize(&compiled.fragment, &flow);
         Ok(compiled)
     }
 
@@ -103,6 +115,7 @@ impl Block {
         chain: &[String],
         stack: &mut Vec<PathBuf>,
     ) -> CompileResult<CompiledBlock> {
+        let source_identity = self.source_identity.clone();
         let mut children = BTreeMap::new();
         let aliases = self.children.iter().map(|(a, _)| a.clone()).collect::<Vec<_>>();
         for (alias, block) in self.children {
@@ -131,6 +144,7 @@ impl Block {
         let mut result = CompiledBlock::empty(&self.name);
         result.source = self.source.clone();
         result.chain = chain.to_vec();
+        result.provenance.attach(&source_identity, chain, self.local.as_ref())?;
         let local_present = self.local.is_some();
         if let Some(local) = self.local {
             result.fragment = local;
@@ -303,6 +317,7 @@ impl CompiledBlock {
             flow_name: None,
             stable_primary_profiles: BTreeSet::new(),
             origins: vec![],
+            provenance: Default::default(),
             source: PathBuf::new(),
             chain: vec![],
             public: super::exposure::PublicNames::default(),
@@ -370,6 +385,7 @@ impl CompiledBlock {
         self.primary_profiles.extend(other.primary_profiles);
         self.stable_primary_profiles.extend(other.stable_primary_profiles);
         self.origins.extend(other.origins);
+        self.provenance.merge(other.provenance)?;
         Ok(())
     }
 

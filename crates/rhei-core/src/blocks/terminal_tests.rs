@@ -50,6 +50,13 @@ fn terminal_equivalence_preserves_root_mounted_and_one_target_references() {
         let completed = format!("{prefix}completed");
         let cancelled = format!("{prefix}cancelled");
         assert!(machine.states.contains_key(&completed));
+        let lock: serde_json::Value =
+            serde_json::from_slice(&compiled.provenance.lock_bytes().unwrap()).unwrap();
+        assert_eq!(
+            lock["nodes"]["states"][&completed].as_array().unwrap().len(),
+            2,
+            "checked terminal coalescing must union both declaration origins"
+        );
         assert!(machine.is_cancellation(&cancelled));
         assert!(!machine.states.contains_key(&format!("{prefix}m1_a__done")));
         assert!(!machine.states.contains_key(&format!("{prefix}m1_b__cancelled")));

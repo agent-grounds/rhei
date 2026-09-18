@@ -26,7 +26,7 @@ mod templates_selection_tests {
                 let block = BlockFrontend::new().unwrap().prepare(name, None, &supplied, name).unwrap();
                 for mounted in [false, true] {
                     let block = if mounted {
-                        Block { name: "outer-flow".into(), source: "<mode-test>".into(), version: "1".into(), manifest: BlockManifest::default(), local: None, children: vec![("outer".into(), block.clone())] }
+                        Block { name: "outer-flow".into(), source: "<mode-test>".into(), version: "1".into(), source_identity: SourceIdentity::unavailable("mode-test"), manifest: BlockManifest::default(), local: None, children: vec![("outer".into(), block.clone())] }
                     } else { block.clone() };
                     let compiled = block.compile().unwrap();
                     let output = tempfile::tempdir().unwrap();

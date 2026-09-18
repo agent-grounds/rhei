@@ -1,6 +1,6 @@
     // Typed CLI-side ownership and compiler records bridge manifest values to
     // one ordinary workspace. §AR-rhei-library.1–3
-    use rhei_core::blocks::{split_endpoint, Block, BlockManifest, CompiledBlock, CompiledFile, Fragment, Mount, Seam, TaskFile};
+    use rhei_core::blocks::{split_endpoint, Block, BlockManifest, CompiledBlock, CompiledFile, Fragment, Mount, Seam, SourceIdentity, SourceLocator, SourceRevision, TaskFile};
 
     /// Values already reduced through the direct-composition precedence
     /// chain, keyed by `<mount>.<input>`. §FS-rhei-library.3

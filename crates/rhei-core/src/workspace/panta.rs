@@ -389,8 +389,14 @@ pub fn implicit_panta_from_file_rhei(rhei: Rhei, file: &Path) -> parser::Result<
         Workspace {
             rhei,
             task_sources,
-            root_guards: crate::root_access::for_input(file)
-                .map_err(|err| ParseError::new(err.to_string(), None))?,
+            // The plan was already parsed in memory, so a synthetic source
+            // path that does not exist has no filesystem read to guard.
+            root_guards: if file.exists() {
+                crate::root_access::for_input(file)
+                    .map_err(|err| ParseError::new(err.to_string(), None))?
+            } else {
+                Vec::new()
+            },
         },
         file,
     )

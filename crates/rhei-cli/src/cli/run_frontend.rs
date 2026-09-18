@@ -364,17 +364,20 @@ fn load_plan_for_dashboard(
     plan_path: &Path,
     machines: &rhei_validator::MachineSet,
 ) -> Option<rhei_viz_model::VizModel> {
+    // §FS-rhei-recover.4: a watch refresh reports the interlock instead of hiding it as no graph.
+    let _guards = rhei_core::root_access::for_input(plan_path)
+        .map_err(|err| eprintln!("{err}")).ok()?;
     let loaded = load_plan(plan_path).ok()?;
     // Any directory input — workspace or Panta project — is its own execution
     // root; per-task roots route each ticket's history to its owning rhei,
     // which is where a project run writes its ledgers. §AR-rhei-panta.5
     let default_root = execution_workspace_root(plan_path);
-    Some(rhei_viz::build_set_with_history_roots(
+    rhei_viz::build_set_with_history_roots(
         &loaded.rhei,
         machines,
         &default_root,
         &loaded.task_roots,
-    ))
+    ).map_err(|err| eprintln!("{err}")).ok()
 }
 
 impl

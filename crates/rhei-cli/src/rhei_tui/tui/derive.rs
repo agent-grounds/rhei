@@ -74,7 +74,18 @@ pub(super) fn inspector_sections(state: &UiState, task_id: &str) -> Vec<Inspecto
         title: "state history".to_string(),
         items: previous_state_names(task)
             .into_iter()
-            .map(|state| Chip { label: state.clone(), action: ChipAction::MarkState(state) })
+            .map(|state| {
+                // §FS-rhei-viz.4: audit text belongs to the label, never the state identity.
+                let reason = task
+                    .history
+                    .iter()
+                    .rev()
+                    .find(|entry| entry.from == state)
+                    .and_then(|entry| entry.forced_reason.as_deref());
+                let label = reason
+                    .map_or_else(|| state.clone(), |reason| format!("{state} — forced: {reason}"));
+                Chip { label, action: ChipAction::MarkState(state) }
+            })
             .collect(),
     });
 

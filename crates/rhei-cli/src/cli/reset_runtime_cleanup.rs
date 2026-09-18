@@ -39,7 +39,9 @@ fn collect_reset_decision(
     input: &Path,
     scope: &RheiScope,
     machines: &rhei_validator::MachineSet,
-) -> ResetDecision {
+) -> MietteResult<ResetDecision> {
+    // §FS-rhei-reset.2.1: corrupt pairs refuse before any destructive rewrite.
+    for root in loaded.rhei_roots.values().collect::<BTreeSet<_>>() { read_ledger(root)?; }
     fn count_nodes(task: &rhei_core::ast::Task) -> usize {
         1 + task.children.iter().map(count_nodes).sum::<usize>()
     }
@@ -53,13 +55,13 @@ fn collect_reset_decision(
     let task_count = in_scope.len();
     let total_nodes: usize = in_scope.iter().map(|task| count_nodes(task)).sum();
 
-    ResetDecision {
+    Ok(ResetDecision {
         scope: scope.clone(),
         task_count,
         descendant_count: total_nodes.saturating_sub(task_count),
         authored: collect_authored_states(loaded, input, scope, machines),
         runtime_targets: reset_runtime_preview(loaded, input, scope),
-    }
+    })
 }
 
 /// Describe what a reset is about to destroy, and which tasks it would move.

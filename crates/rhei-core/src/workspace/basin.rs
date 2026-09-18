@@ -25,6 +25,8 @@ pub(super) fn load_basin_rhei(
     structure: &Structure,
     states: &str,
 ) -> parser::Result<Workspace> {
+    let _guards =
+        crate::root_access::for_input(dir).map_err(|err| ParseError::new(err.to_string(), None))?;
     let mut tasks = Vec::new();
     let mut task_sources = HashMap::new();
     for path in discover_basin_task_files(dir)? {
@@ -55,6 +57,8 @@ pub(super) fn load_basin_rhei(
         tasks.extend(parsed);
     }
     Ok(Workspace {
+        root_guards: crate::root_access::for_input(dir)
+            .map_err(|err| ParseError::new(err.to_string(), None))?,
         rhei: Rhei {
             title: "Basin".to_string(),
             states: states.to_string(),

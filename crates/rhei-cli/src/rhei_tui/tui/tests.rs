@@ -652,6 +652,7 @@ fn parked_model() -> VizModel {
             visit_count: None,
             prior: vec![],
             history: vec![crate::rhei_viz_model::StateHistoryEntry {
+                forced_reason: None,
                 from: "verify".into(),
                 to: "needs-human".into(),
             }],

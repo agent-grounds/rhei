@@ -14,6 +14,8 @@
 /// changes the identity held by writers or prevents a current-path read.
 // §FS-rhei-transition-cmd.3
 struct LockedPlanFile {
+    /// Retained across ordinary writes, including direct engine entry. §FS-rhei-recover.4
+    _root_guard: rhei_core::root_access::RootAccessGuard,
     writer_lock: Mutex<Option<fs::File>>,
     path: PathBuf,
 }
@@ -26,6 +28,7 @@ impl LockedPlanFile {
     /// prior writer's last replacement or rollback.
     // §AR-agent-orchestrator-workflow.3.3.1 §FS-rhei-new.4
     fn open(path: &Path) -> MietteResult<Self> {
+        let root_guard = rhei_core::root_access::for_file(path).map_err(|err| miette!("{err}"))?;
         let lock_path = plan_lock_path(path)?;
         let writer_lock = fs::OpenOptions::new()
             .create(true)
@@ -35,7 +38,11 @@ impl LockedPlanFile {
             .open(&lock_path)
             .map_err(|err| file_io_report(&lock_path, "failed to open plan lock file", err))?;
         lock_plan_writer(&writer_lock, &lock_path)?;
-        Ok(Self { writer_lock: Mutex::new(Some(writer_lock)), path: path.to_path_buf() })
+        Ok(Self {
+            _root_guard: root_guard,
+            writer_lock: Mutex::new(Some(writer_lock)),
+            path: path.to_path_buf(),
+        })
     }
 
     /// Read the authoritative current destination pathname under the sidecar.

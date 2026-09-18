@@ -329,6 +329,14 @@ fn distinct_legacy_attempts(
 /// are dropped, while ambiguous or contradictory records are reported.
 /// §FS-rhei-panta.6.5 §FS-rhei-cost-accounting.3.7
 fn read_cost_inspection_over(roots: &[AccountingRoot], scope: &RheiScope) -> CostInspection {
+    // §FS-rhei-recover.4: direct accounting readers share the same root boundary.
+    let execution_roots = roots.iter().filter_map(|root| root.path.parent()?.parent())
+        .filter(|root| root.exists()).map(Path::to_path_buf).collect::<Vec<_>>();
+    let _guards = match rhei_core::root_access::shared_roots(execution_roots) {
+        Ok(guards) => guards,
+        Err(err) => return CostInspection { summary: None, invocations: Vec::new(), roots: Vec::new(),
+            errors: vec![err.to_string()], identity_conflicts: Vec::new(), unreadable_root: true },
+    };
     let mut readings: Vec<AccountingRootReading> = Vec::new();
     let mut invocations: Vec<InspectedRecord> = Vec::new();
     let mut errors: Vec<String> = Vec::new();

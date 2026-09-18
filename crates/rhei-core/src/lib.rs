@@ -38,3 +38,5 @@ pub fn help_text() -> String {
     "Rhei - agent runtime for governed Markdown workflows\n\nUsage:\n  rhei [OPTIONS]\n\nFor now, use --help and --version."
         .to_string()
 }
+pub mod root_access;
+pub mod transition_history;

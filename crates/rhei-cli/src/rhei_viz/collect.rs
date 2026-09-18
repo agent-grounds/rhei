@@ -32,6 +32,8 @@ pub fn collect_plans(
     key: &str,
     machine_override: Option<&Path>,
 ) -> io::Result<Bundle> {
+    // §FS-rhei-panta.6.6: keep all root access through dependent history reads.
+    let _guards = rhei_core::root_access::for_input(path)?;
     let mut plans = Bundle::new();
 
     if path.is_file() {
@@ -72,7 +74,7 @@ pub fn collect_plans(
                 &machines,
                 path,
                 &task_roots,
-            ),
+            )?,
         );
         return Ok(plans);
     }
@@ -87,7 +89,7 @@ pub fn collect_plans(
             )
         })?;
         let machine = resolve_machine(path, machine_override, &loaded.rhei)?;
-        plans.insert(key.to_string(), build_with_history(&loaded.rhei, &machine, path));
+        plans.insert(key.to_string(), build_with_history(&loaded.rhei, &machine, path)?);
     }
 
     for plan_path in standalone_plan_files(path)? {
@@ -103,6 +105,7 @@ pub fn collect_plans(
 }
 
 fn load_plan_file(path: &Path, machine_override: Option<&Path>) -> io::Result<VizModel> {
+    let _guards = rhei_core::root_access::for_input(path)?;
     let text = fs::read_to_string(path)?;
     let rhei = parse(&text).map_err(|err| {
         io::Error::new(
@@ -121,7 +124,7 @@ fn load_plan_file(path: &Path, machine_override: Option<&Path>) -> io::Result<Vi
         .rhei;
     let machine = resolve_machine(path, machine_override, &rhei)?;
     let workspace_root = path.parent().unwrap_or_else(|| Path::new("."));
-    Ok(build_with_history(&rhei, &machine, workspace_root))
+    build_with_history(&rhei, &machine, workspace_root)
 }
 
 /// Resolve every machine a project's rheis run under: the manifest default via

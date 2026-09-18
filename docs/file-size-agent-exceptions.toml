@@ -22,7 +22,7 @@ path = "crates/rhei-cli/src/cli/run_agent_mode.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 1200, unit = "lines" }
+max_accepted = { value = 1000, unit = "lines" }
 until = "Pass selection — collecting a pass's agent, program, and callback work and applying the non-concurrent claim filter — has a part of its own, leaving this file the run's setup, its pass driver, and its end-of-run report."
 reason = """
 The execution bodies are parts of their own now; what is left is the run's own lifecycle. Pass selection has no boundary to move to: it reads the plan, the machines, and the settings and writes the three task lists the pass driver dispatches, and those lists are locals of the loop. Setup and the end-of-run report stay beside it because the report is written from the counters the loop advances.
@@ -96,6 +96,16 @@ max_accepted = { value = 1200, unit = "lines" }
 until = "Split by readiness, assignee, and transition behavior when new cases are added."
 reason = """
 `next` command E2E scenarios share command fixtures.
+"""
+[[exceptions]]
+path = "crates/rhei-cli/templates/changeset-review/states.yaml"
+match = "exact"
+rules = ["source"]
+kind = "deferred"
+max_accepted = { value = 600, unit = "lines" }
+until = "Split by template support if Rhei gains multi-file state machines."
+reason = """
+Template state machine must be copied as one instantiable workflow artifact.
 """
 [[exceptions]]
 path = "tests/e2e/run_tests.rs"
@@ -317,19 +327,7 @@ kind = "deferred"
 max_accepted = { value = 800, unit = "lines" }
 until = "Subcommand groups move to their own Subcommand enums that the root flattens, so each group's declarations travel with its command."
 reason = """
-The clap derive tree must name every subcommand in one enum. Its prior accepted
-growth added three commands; roster adds one inspection command, while the
-recorded grouped-subcommand split remains the boundary that retires this exception.
-"""
-[[exceptions]]
-path = "crates/rhei-cli/src/cli/cli_dispatch.rs"
-match = "exact"
-rules = ["source"]
-kind = "deferred"
-max_accepted = { value = 800, unit = "lines" }
-until = "Dispatch is split by the same subcommand groups the declaration tree grows, so each group's arms and its entry point travel together."
-reason = """
-Over budget before this change; the touch that surfaced it added three match arms. The dispatch match must name every subcommand in one place, and the process entry point and error rendering sit beside it.
+Over budget before this change; the touch that surfaced it added three subcommands. It is one clap derive tree, and a subcommand's declaration must sit inside the enum that clap parses.
 """
 [[exceptions]]
 path = "crates/rhei-cli/src/cli/completion_candidates.rs"
@@ -416,7 +414,7 @@ path = "docs/functional-spec/rhei-snapshots.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1300, unit = "lines" }
+max_accepted = { value = 1200, unit = "lines" }
 until = "§9 Agent Transport Integration and §4 State-Machine YAML Grammar are documents of their own, each with its own FS declaration, and every FS-rhei-snapshots.9.* and .4.* citation in the code and the specs has been repointed at them."
 reason = """
 The boundary this document needs does not exist yet. Its two largest sections are separable subjects — §9 is the agent-side transport contract (profile schema, built-in profiles, per-agent runtime behaviour) at 433 lines, §4 the authored YAML grammar at 181 — but neither can leave until it has an FS declaration of its own and every FS-rhei-snapshots.9.* and .4.* citation across the crates, the tests and the sibling specs has been repointed, which is a restructure with its own review rather than a section move. Lifting §9 alone would still leave about 780 lines, so the split that clears the budget is both sections, not one.
@@ -426,11 +424,11 @@ path = "docs/functional-spec/rhei-agents.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1600, unit = "lines" }
+max_accepted = { value = 1400, unit = "lines" }
 until = "The agent specification is split at its own top-level boundaries — the profile registry and built-in catalogue apart from prompt composition, and the run loop apart from timeouts and log capture — each half carrying its own declaration, with every `§FS-rhei-agents.<n>` citation repointed."
 issue = "agent-grounds/rhei#179"
 reason = """
-Three subjects share this declaration: what an agent profile is, what rhei composes when it spawns one, and what the run loop does around it. The split is real, is tracked by the linked issue, and is not this change's to make. This change extends only the existing resolution and partial-override points; splitting the document in the same commit would move every section citation alongside a behaviour contract, which is precisely what a spec-first commit must not hide.
+Three subjects share this declaration: what an agent profile is, what rhei composes when it spawns one, and what the run loop does around it. The split is real and is not this change's to make. What is edited here is one ticket's specification point — the claude-code prompt transport, the flag order that follows from it, and a dry-run illustration that stopped being true — and splitting the document in the same commit would move every section citation alongside a behaviour change, which is precisely what a spec-first commit must not hide.
 """
 [[exceptions]]
 path = "crates/rhei-cli/src/cli/agent_spawn.rs"
@@ -461,16 +459,6 @@ max_accepted = { value = 1200, unit = "lines" }
 until = "Artifact Contracts (section 3, with optional inputs, handoffs and terminal results) is a declaration of its own under docs/functional-spec/, cited from the state schema that requires it."
 reason = """
 The boundary that is missing is a document for artifact contracts. Section 3 is a self-contained subject - what a state must consume and produce, how handoffs inherit, what a terminal result owes - and it is cited from outside this file, so lifting it needs its own grund declaration and a re-point of every marker that reaches into section 3 today. The rest of the document is one subject: the state schema and the validation rules, profiles and node policy that are read against it, and splitting those apart would separate a field from the rule that constrains it.
-"""
-[[exceptions]]
-path = "crates/rhei-cli/src/rhei_viz/mod.rs"
-match = "exact"
-rules = ["source"]
-kind = "deferred"
-max_accepted = { value = 900, unit = "lines" }
-until = "State history — reading it from the transition ledger, the journal and the result files, and merging the three into one path — has a part of its own beside collect.rs."
-reason = """
-The module is the viz model's builder plus one group that could leave it whole: the history readers and their merge. They are not moved here because collect.rs is the only sibling part and it owns plan collection, not history; the history part has to be created before anything can move into it.
 """
 [[exceptions]]
 path = "crates/rhei-core/src/state_machine/validator/tests_plan_validation.rs"
@@ -523,24 +511,25 @@ reason = """
 Over budget before this change; the touch that surfaced it added one line, the report field on a constructed `UsageReported`. One test module covers state application, the `/snapshot` payload, and the served HTTP surface because all three are driven through the one DashboardState and DashboardSink fixture built in this file, and none of them can move out until that fixture does.
 """
 [[exceptions]]
-path = "README.md"
+path = "crates/rhei-cli/src/cli/settings_load_validate.rs"
 match = "exact"
-rules = ["entrypoint-doc"]
+rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 400, unit = "lines" }
-until = "A citable user-facing feature overview under docs/ owns the detailed feature list and README keeps only orientation and links."
+max_accepted = { value = 700, unit = "lines" }
+until = "crates/rhei-cli/src/cli/settings_validate_references.rs exists and carries the registry-reference validators with their hint builders"
+issue = "agent-grounds/rhei#197"
 reason = """
-No narrower document owns the multi-feature product overview yet, so README still carries both first-page orientation and the detailed feature list that successive behavioral fixes keep updating; extracting it is a dedicated information-architecture change, not part of any one fix.
+This file carries two responsibilities under one include: merging the settings documents into one registry (load_merged_settings and its JSON helpers), and validating a machine's and a plan's references against that registry (validate_machine_settings_references, validate_task_execution_override_settings_references, and the hint builders they print). The second half has no module of its own, so there is no destination to move it to; creating one is a structural change to the CLI's module layout, and it cannot ride inside a supervised diagnostic fix whose whole code change is eleven lines in two hint builders.
 """
 [[exceptions]]
 path = "docs/functional-spec/rhei-plan-language.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1300, unit = "lines" }
+max_accepted = { value = 1100, unit = "lines" }
 until = "A follow-up defines child declarations for the tutorial and data-model boundaries, maps every moved section to a stable ID, and migrates all inbound citations."
 reason = """
-The plan-language declaration has no approved split map for separating its tutorial, grammar, and data-model sections while preserving their live section IDs and inbound citations. A focused behaviour change must extend its owning point in place; this change extends FS-rhei-plan-language.3.11 rather than combining a citation migration with the precedence contract.
+The plan-language declaration has no approved split map for separating its tutorial, grammar, and data-model sections while preserving their live section IDs and inbound citations; this issue must extend the owning FS-rhei-plan-language.1.3 point in place.
 """
 
 [[exceptions]]
@@ -570,48 +559,8 @@ path = "docs/functional-spec/rhei-cost-accounting.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1000, unit = "lines" }
+max_accepted = { value = 850, unit = "lines" }
 until = "A dedicated accounting-inspection reference owns section 8 and its inbound citations have migrated, bringing this reference below the 750-line soft budget."
 reason = """
-The accounting inspection surface in section 8 has no separate canonical declaration yet. Extracting it requires migrating its inbound section citations together; issues #253 and #165 extend specific accepted accounting points while preserving their established ownership until that boundary exists.
-"""
-[[exceptions]]
-path = "crates/rhei-cli/src/cli/run_agent_sequential_completion.rs"
-match = "exact"
-rules = ["source"]
-kind = "deferred"
-max_accepted = { value = 600, unit = "lines" }
-until = "Serial and parallel agent completion share a completed-agent decision module, leaving each file only its execution-mode adapter."
-reason = """
-Serial and parallel agent completion still duplicate the same post-exit classification. The missing boundary is a shared completed-agent decision that owns resolved-artifact, snapshot, pending-sibling, and auto-advance verdicts; extracting that stateful decision is a reviewable refactor outside this bounded identity-context repair.
-"""
-[[exceptions]]
-path = "crates/rhei-cli/src/cli/run_parallel_agent_exit.rs"
-match = "exact"
-rules = ["source"]
-kind = "deferred"
-max_accepted = { value = 600, unit = "lines" }
-until = "Serial and parallel agent completion share a completed-agent decision module, leaving each file only its execution-mode adapter."
-reason = """
-Serial and parallel agent completion still duplicate the same post-exit classification. The missing boundary is a shared completed-agent decision that owns resolved-artifact, snapshot, pending-sibling, and auto-advance verdicts; extracting that stateful decision is a reviewable refactor outside this bounded identity-context repair.
-"""
-[[exceptions]]
-path = "docs/functional-spec/rhei-supervision.spec.md"
-match = "exact"
-rules = ["citable-spec"]
-kind = "structural"
-max_accepted = { value = 800, unit = "lines" }
-until = "indefinite"
-reason = """
-The corrected lines belong to existing supervision sections 1.1 and 6; extracting either would relocate stable section citations instead of preserving the directly relevant owner.
-"""
-[[exceptions]]
-path = "crates/rhei-core/src/parser/plan.rs"
-match = "exact"
-rules = ["source"]
-kind = "deferred"
-max_accepted = { value = 1100, unit = "lines" }
-until = "The parser introduces a metadata-block context/dispatcher that owns ordering and NodeBuilder mutation, allowing all task metadata handlers to move together."
-reason = """
-The line-oriented parser keeps task metadata ordering, code-fence state, content closure, and node-stack mutation in one loop; extracting one metadata field alone would duplicate that control flow rather than create a cohesive module.
+The accounting inspection surface in section 8 has no separate canonical declaration yet. Extracting it requires migrating its inbound section citations together; issue #253 fix round 1 is limited to four findings and preserves the accepted accounting contract points. This round adds only the descriptor-failure and scoped-preflight clarifications.
 """

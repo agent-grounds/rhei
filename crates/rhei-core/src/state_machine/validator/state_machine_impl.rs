@@ -27,6 +27,15 @@ impl StateMachine {
 
     fn validate(mut self) -> Result<Self, StateMachineLoadError> {
         self.validate_cancellation_and_sources()?;
+        // §FS-rhei-states.1.3: final exits are exclusively operator recovery.
+        for rule in &self.transitions {
+            if rule.from.0 != "*" && self.states.get(&rule.from.0).is_some_and(|state| state.terminal) {
+                return Err(StateMachineLoadError::Invalid(format!(
+                    "exact transition from final state '{}' is forbidden (§FS-rhei-states.1.3)",
+                    rule.from.0
+                )));
+            }
+        }
         self.validate_model_configuration()?;
         self.validate_prompt_templates()?;
         self.validate_program_configuration()?;

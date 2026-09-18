@@ -136,6 +136,8 @@ fn execute_transition_with_origin(
     claim: Option<&ClaimEligibilityContext<'_>>,
     run_options: Option<&RunOptions>,
 ) -> MietteResult<String> {
+    // §FS-rhei-recover.4: direct engine/callback entries retain root access too.
+    let _root_guard = rhei_core::root_access::RootAccessGuard::shared(files.artifact_root).map_err(|err| miette!("{err}"))?;
     let task_file = files.task_file;
     let metadata_file = files.metadata_file;
     let workspace_root = execution_workspace_root(&callback_paths.plan_path);
@@ -294,6 +296,7 @@ fn execute_transition_with_origin(
 
     // Now that we know the task really is in `from`, check whether the
     // declared transitions permit `from -> to`.
+    // §FS-rhei-transitions.4.6: wildcards never authorize departure from a final state.
     let matching_rule =
         machine.transitions().iter().find(|rule| rule.from.0 == from && rule.to.0 == to).or_else(
             || machine.transitions().iter().find(|rule| rule.from.0 == "*" && machine.transition_matches_source(rule, from) && rule.to.0 == to),

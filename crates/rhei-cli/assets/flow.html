@@ -585,6 +585,9 @@ function renderSurroundings(){
       const chip=el("span",{class:"chip flat"});
       chip.appendChild(dot(stateColor(s)));
       chip.appendChild(document.createTextNode(s));
+      // §FS-rhei-viz.4: exceptional history remains one chip with its reason.
+      const hop=(n.history||[]).slice().reverse().find(h=>h.from===s);
+      if(hop&&hop.forced_reason) chip.appendChild(el("span",{text:` — forced: ${hop.forced_reason}`}));
       chip.addEventListener("click",()=>highlightState(s));
       pc.appendChild(chip);
     }

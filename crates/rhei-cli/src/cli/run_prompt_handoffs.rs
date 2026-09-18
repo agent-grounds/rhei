@@ -16,30 +16,14 @@ fn last_recorded_source_state_for_current(
 ) -> MietteResult<Option<String>> {
     // §FS-rhei-states.3.2: transition.previous resolves from durable task
     // transition history, which lives in the central ledger. §FS-rhei-complete.3.1
-    let path = workspace_root.join("runtime").join("state-transitions.log");
-    if !path.exists() {
-        return Ok(None);
-    }
-    let content = fs::read_to_string(&path)
-        .map_err(|err| file_io_report(&path, "failed to read task transition history", err))?;
     let task_id_str = task_id.to_string();
     let mut found = None;
-    for line in content.lines() {
-        // `<task-id> <from>@<to>`
-        let Some((entry_task, transition)) = line.trim().split_once(' ') else {
-            continue;
-        };
-        if entry_task != task_id_str {
-            continue;
-        }
-        let Some((from, to)) = transition.split_once('@') else {
-            continue;
-        };
-        let from = normalized_state_name(from.trim(), machine);
-        let to = normalized_state_name(to.trim(), machine);
-        if machine.is_valid_state(&from) && to == current_state {
-            found = Some(from);
-        }
+    // §FS-rhei-complete.3.1: shared parsing rejects contradictory exceptional pairs.
+    for (entry_task, from, to) in read_ledger(workspace_root)? {
+        if entry_task != task_id_str { continue; }
+        let from = normalized_state_name(&from, machine);
+        let to = normalized_state_name(&to, machine);
+        if machine.is_valid_state(&from) && to == current_state { found = Some(from); }
     }
     Ok(found)
 }

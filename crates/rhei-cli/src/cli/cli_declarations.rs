@@ -299,8 +299,24 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Resolve an interrupted operator transition with fresh typed confirmation.
+    /// Agents must not invoke recovery; only an attended operator may resolve a marker.
+    // §FS-rhei-recover.1
+    Recover {
+        #[arg(value_name = "EXECUTION_ROOT", value_hint = clap::ValueHint::DirPath)]
+        execution_root: PathBuf,
+    },
     /// Atomically transition a task from one state to another (compare-and-swap)
     Transition {
+        /// Operator-only missing-edge recovery; requires an interactive terminal and typed hop.
+        /// This ceremony attributes an OS account; a same-account PTY cannot prove human identity.
+        // §FS-rhei-transition-cmd.6
+        #[arg(long)]
+        force: bool,
+        /// Fresh non-empty reason for this forced recovery (requires --force)
+        // §FS-rhei-transition-cmd.6
+        #[arg(long)]
+        reason: Option<String>,
         /// Path to a states YAML file (uses built-in default when omitted)
         #[arg(long, value_name = "PATH", add = ArgValueCompleter::new(complete_yaml_path))]
         state_machine: Option<PathBuf>,

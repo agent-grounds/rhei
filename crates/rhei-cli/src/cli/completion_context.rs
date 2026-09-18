@@ -56,7 +56,8 @@ fn first_command_positional(words: &[String], command: &str) -> Option<String> {
             }
             if matches!(
                 option,
-                "task"
+                "reason"
+                    | "task"
                     | "from"
                     | "to"
                     | "supervisor"

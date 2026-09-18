@@ -65,6 +65,9 @@ pub struct TaskRow {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StateHistoryEntry {
+    /// Exceptional audit reason for this one movement. §FS-rhei-viz.4
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub forced_reason: Option<String>,
     pub from: String,
     pub to: String,
 }

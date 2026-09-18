@@ -584,7 +584,10 @@ fn complete_transition_to_state(current: &OsStr) -> Vec<CompletionCandidate> {
             .and_then(|(plan, task)| current_task_state(&plan, &task).ok())
     });
     let mut targets = BTreeSet::new();
-    if let Some(from) = from {
+    // §FS-rhei-completions.7: missing-edge recovery offers every machine state.
+    if completion_words().iter().any(|word| word == "--force") {
+        targets.extend(machine.states.keys().cloned());
+    } else if let Some(from) = from {
         let normalized = normalized_state_name(&from, &machine);
         for rule in machine.transitions() {
             if machine.transition_matches_source(rule, &normalized) {

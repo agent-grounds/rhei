@@ -72,6 +72,9 @@ fn read_task_result(
     render_context: &RuntimeTemplateContext<'_>,
     task_id: &TaskId,
 ) -> MietteResult<Option<String>> {
+    // §FS-rhei-recover.4: even a result-only consumer retains root access.
+    let _guard = rhei_core::root_access::RootAccessGuard::shared(export_root_for_task(render_context, task_id))
+        .map_err(|err| miette!("{err}"))?;
     let Some(path) = resolved_result_path(render_context, task_id) else { return Ok(None) };
     if !prompt_source_allowed(render_context, &path) {
         return Ok(None);

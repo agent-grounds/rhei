@@ -145,12 +145,24 @@ fn record_run_lock_ownership(
 /// first: silent blocking is indistinguishable from a hang.
 // §FS-rhei-run.2.6 §FS-rhei-run-headless.1.1
 fn acquire_run_locks(
-    loaded: &LoadedPlan,
-    workspace_root: &Path,
+    roots: &BTreeSet<PathBuf>,
     opts: &RunOptions,
 ) -> MietteResult<Vec<HeldRunLock>> {
-    let roots = run_lock_roots(loaded, workspace_root);
-    acquire_run_locks_for_roots(roots.iter(), opts)
+    let mut locks = Vec::new();
+    for root in roots {
+        match try_acquire_run_lock(root)? {
+            Some(lock) => locks.push(lock),
+            None if is_headless_child() => return Err(run_lock_conflict(root)),
+            None => {
+                // §FS-rhei-recover.5: observe a real contended run lock in isolated tests.
+                #[cfg(test)]
+                forced_boundary("run-lock-contended")?;
+                announce_run_lock_wait(root, opts.json());
+                locks.push(wait_for_run_lock(root)?);
+            }
+        }
+    }
+    Ok(locks)
 }
 
 /// How often a queued run re-tries the lock it is waiting for.
@@ -225,22 +237,29 @@ fn run_command(
     install_interrupt_handlers();
     let input_buf = run_artifact_root(input);
     let input = input_buf.as_path();
-    let loaded = load_plan_for_run(input, &opts, state_machine_path)?;
+    let mut loaded = load_plan_for_run(input, &opts, state_machine_path)?;
+    let workspace_root = run_execution_root(input);
+    // §FS-rhei-recover.4: never wait for a run lock while retaining shared root access.
+    let lock_roots = run_lock_roots(&loaded, &workspace_root);
+    let mut run_locks = if opts.dry_run() { Vec::new() } else {
+        drop(loaded);
+        let locks = acquire_run_locks(&lock_roots, &opts)?;
+        loaded = load_plan_for_run(input, &opts, state_machine_path)?;
+        if run_lock_roots(&loaded, &workspace_root) != lock_roots {
+            return Err(miette!("execution roots changed while acquiring run locks; retry the run"));
+        }
+        locks
+    };
     let rhei_scope = resolve_rhei_scope(&loaded, opts.rhei_scope())?;
     report_panta_scope_narrowed(&loaded, "run", &rhei_scope);
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
-    let machines =
-        ExecutionMachines::build(&resolved, input, &loaded)?.with_state_machine_override(state_machine_path);
-    let workspace_root = run_execution_root(input);
+    let machines = ExecutionMachines::build(&resolved, input, &loaded)?
+        .with_state_machine_override(state_machine_path);
     let custom_price_book = opts.prices_path().map(Path::to_path_buf);
     if let Some(path) = custom_price_book.as_deref() {
         opts.select_price_book(load_price_book(path)?);
     }
     let settings = load_merged_settings(&workspace_root)?;
-    // §FS-rhei-run.2.6: one live run per rhei — lock every involved
-    // execution root, not just the run's own.
-    let mut run_locks =
-        if opts.dry_run() { Vec::new() } else { acquire_run_locks(&loaded, &workspace_root, &opts)? };
     // Stamped only now: a run that queued behind someone else's lock began
     // when it got the lock, not when it was typed, and `rhei runs` orders by
     // this. §FS-rhei-run.2.7

@@ -77,6 +77,12 @@ include!("cli/exclusion_requirements.rs");
 include!("cli/artifacts.rs");
 include!("cli/task_exports.rs");
 include!("cli/transition_checks.rs");
+include!("cli/operator_ceremony.rs");
+include!("cli/operator_force.rs");
+include!("cli/operator_force_prepare.rs");
+include!("cli/operator_marker.rs");
+include!("cli/operator_transaction.rs");
+include!("cli/operator_recover.rs");
 include!("cli/claim_transaction.rs");
 include!("cli/claim_revalidation.rs");
 include!("cli/system_transition_triggers.rs");
@@ -272,4 +278,13 @@ mod tests {
     include!("cli/tests_prompt_memory_caps.rs");
     include!("cli/tests_prompt_memory_results.rs");
     include!("cli/tests_prompt_memory_visits.rs");
+}
+
+#[cfg(test)]
+mod operator_recovery_tests {
+    use super::*;
+    include!("cli/tests_operator_transaction.rs");
+    include!("cli/tests_operator_guards.rs");
+    include!("cli/tests_operator_consumers.rs");
+    include!("cli/tests_operator_exclusion.rs");
 }

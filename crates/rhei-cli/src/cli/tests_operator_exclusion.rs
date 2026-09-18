@@ -1,0 +1,97 @@
+// Deterministic contention witnesses, without sleeps. §FS-rhei-recover.4 §FS-rhei-recover.5
+
+/// Both a loaded reader and a direct plan writer exclude marker publication. §FS-rhei-panta.6.6
+#[test]
+fn operator_force_waits_for_existing_readers_and_writers() {
+    for writer in [false, true] {
+        let (dir, plan, machine) = operator_fixture();
+        let read = (!writer).then(|| load_plan(&plan).unwrap());
+        let write = writer.then(|| LockedPlanFile::open(&plan).unwrap());
+        let (tx, rx) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            FORCED_BOUNDARY.with(|hook| *hook.borrow_mut() = Some(Box::new(move |point| {
+                if point == "root-contended" { tx.send(()).unwrap(); }
+                Ok(())
+            })));
+            let request = operator_request(&plan, &machine);
+            let result = commit_confirmed_force(&request, prepare_forced_transition(&request).unwrap(), "test");
+            clear_force_interrupt();
+            result.map_err(|err| err.to_string())
+        });
+        rx.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert!(!dir.path().join(rhei_core::root_access::MARKER).exists());
+        drop(read); drop(write);
+        worker.join().unwrap().unwrap();
+        assert_eq!(read_ledger(dir.path()).unwrap().len(), 1);
+    }
+}
+
+/// A reset holding its ordinary writer stack finishes before forced revalidation. §FS-rhei-recover.4
+#[test]
+fn operator_force_waits_for_an_active_reset() {
+    let (_dir, plan, machine) = operator_fixture();
+    let loaded = load_plan(&plan).unwrap();
+    let scope = resolve_rhei_scope(&loaded, &[]).unwrap();
+    let locks = ResetWriterLocks::acquire(&loaded, &plan, &scope).unwrap();
+    let (tx, rx) = mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        FORCED_BOUNDARY.with(|hook| *hook.borrow_mut() = Some(Box::new(move |point| {
+            if point == "root-contended" { tx.send(()).unwrap(); }
+            Ok(())
+        })));
+        let request = operator_request(&plan, &machine);
+        let result = commit_confirmed_force(&request, prepare_forced_transition(&request).unwrap(), "test");
+        clear_force_interrupt();
+        result.map_err(|err| err.to_string())
+    });
+    rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    drop(locks); drop(loaded);
+    worker.join().unwrap().unwrap();
+}
+
+/// A pending transaction blocks both initial run loading and watch refresh. §FS-rhei-recover.4
+#[test]
+fn operator_marker_blocks_run_startup_dashboard_and_accounting() {
+    let (dir, plan, machine) = operator_fixture();
+    let request = operator_request(&plan, &machine);
+    interrupt_force_at("marker-after");
+    assert!(commit_confirmed_force(&request, prepare_forced_transition(&request).unwrap(), "test").is_err());
+    clear_force_interrupt();
+    let error = load_plan_for_run(&plan, &default_run_options(), Some(&machine)).err().unwrap();
+    assert!(error.to_string().contains("plan.1 gate -> work"));
+    let machine = rhei_validator::StateMachine::from_yaml_file(&machine).unwrap();
+    let set = rhei_validator::MachineSet { default: machine, per_rhei: BTreeMap::new() };
+    assert!(load_plan_for_dashboard(&plan, &set).is_none());
+    let inspection = read_cost_inspection(&dir.path().join("runtime/accounting"));
+    assert!(inspection.invocations.is_empty());
+    assert!(inspection.errors.iter().any(|error| error.contains("plan.1 gate -> work")));
+}
+
+/// Waiting startup owns no shared root guard and rereads the marker after the run lock. §FS-rhei-recover.4
+#[test]
+fn operator_run_startup_wait_does_not_deadlock_recovery() {
+    let (dir, plan, machine) = operator_fixture();
+    let _run = operator_run_locks(&[dir.path().to_path_buf()], "operator").unwrap();
+    let (waiting_tx, waiting_rx) = mpsc::channel();
+    let (resume_tx, resume_rx) = mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        FORCED_BOUNDARY.with(|hook| *hook.borrow_mut() = Some(Box::new(move |point| {
+            if point == "run-lock-contended" {
+                waiting_tx.send(()).unwrap();
+                resume_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+            }
+            Ok(())
+        })));
+        let result = run_command(&plan, Some(&machine), default_run_options());
+        clear_force_interrupt();
+        result.err().map(|err| err.to_string())
+    });
+    waiting_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+    let exclusive = rhei_core::root_access::RootAccessGuard::try_exclusive(dir.path()).unwrap()
+        .expect("queued run released its initial shared guards");
+    fs::write(dir.path().join(rhei_core::root_access::MARKER),
+        r#"{"hop":{"task_id":"plan.1","from":"gate","to":"work"}}"#).unwrap();
+    drop(exclusive); drop(_run);
+    resume_tx.send(()).unwrap();
+    assert!(worker.join().unwrap().unwrap().contains("plan.1 gate -> work"));
+}

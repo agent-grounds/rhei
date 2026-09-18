@@ -35,6 +35,8 @@ pub const PANTA_INDEX_FILE: &str = "index.panta.md";
 /// the existing task execution pipeline. §AR-rhei-panta.2 §AR-rhei-panta.3
 #[derive(Debug)]
 pub struct PantaProject {
+    /// Retain every project/member lock through consumers. §FS-rhei-panta.6.6
+    pub root_guards: Vec<crate::root_access::RootAccessGuard>,
     pub rhei: Rhei,
     /// Maps project-qualified task ID (`auth.1`) → the file path that defines it.
     pub task_sources: HashMap<String, PathBuf>,
@@ -96,6 +98,8 @@ pub fn panta_project_dir(path: &Path) -> Option<PathBuf> {
 /// tree and the reserved `basin/` directory are skipped here and handled
 /// separately. Entries are returned in deterministic, `/`-normalized order.
 pub fn discover_rhei_entries(project_dir: &Path) -> parser::Result<Vec<PathBuf>> {
+    let _guards = crate::root_access::for_input(project_dir)
+        .map_err(|err| ParseError::new(err.to_string(), None))?;
     let mut entries = Vec::new();
     if !project_dir.is_dir() {
         return Ok(entries);
@@ -170,6 +174,8 @@ fn load_panta_project_with(
     lenient: bool,
     prospective: Option<(&str, &Path)>,
 ) -> parser::Result<PantaProject> {
+    let root_guards =
+        crate::root_access::for_input(dir).map_err(|err| ParseError::new(err.to_string(), None))?;
     let manifest_path = dir.join(PANTA_INDEX_FILE);
     let manifest_content = crate::source::read_to_string(&manifest_path).map_err(|e| {
         ParseError::new(format!("failed to read {}: {e}", manifest_path.display()), None)
@@ -335,6 +341,7 @@ fn load_panta_project_with(
     // An empty project — a manifest with no rheis yet — is a valid project;
     // `rhei init` creates exactly this state. §FS-rhei-panta.6
     Ok(PantaProject {
+        root_guards,
         rhei: Rhei {
             title: manifest.title,
             states: manifest.states,
@@ -378,7 +385,15 @@ pub fn implicit_panta_from_file_rhei(rhei: Rhei, file: &Path) -> parser::Result<
     for task in &rhei.tasks {
         collect_task_sources(task, file, &mut task_sources)?;
     }
-    wrap_rhei_as_implicit_panta(Workspace { rhei, task_sources }, file)
+    wrap_rhei_as_implicit_panta(
+        Workspace {
+            rhei,
+            task_sources,
+            root_guards: crate::root_access::for_input(file)
+                .map_err(|err| ParseError::new(err.to_string(), None))?,
+        },
+        file,
+    )
 }
 
 /// The rhei id the path `entry` names, with every rule that governs it: it is
@@ -429,6 +444,7 @@ pub fn wrap_rhei_as_implicit_panta(
     // declaration is the project's effective machine, so it needs no per-rhei
     // entry. §AR-rhei-panta.2
     Ok(PantaProject {
+        root_guards: loaded.root_guards,
         rhei,
         task_sources,
         task_roots,
@@ -458,6 +474,8 @@ pub fn rhei_plan_file(entry: &Path) -> Option<PathBuf> {
 }
 
 fn load_rhei_entry(path: &Path) -> parser::Result<Workspace> {
+    let _guards = crate::root_access::for_input(path)
+        .map_err(|err| ParseError::new(err.to_string(), None))?;
     if let Some(ws_dir) = workspace_dir(path) {
         load_workspace(&ws_dir)
     } else {
@@ -469,7 +487,12 @@ fn load_rhei_entry(path: &Path) -> parser::Result<Workspace> {
         for task in &rhei.tasks {
             collect_task_sources(task, path, &mut task_sources)?;
         }
-        Ok(Workspace { rhei, task_sources })
+        Ok(Workspace {
+            rhei,
+            task_sources,
+            root_guards: crate::root_access::for_input(path)
+                .map_err(|err| ParseError::new(err.to_string(), None))?,
+        })
     }
 }
 

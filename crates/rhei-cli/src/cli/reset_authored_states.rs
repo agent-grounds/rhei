@@ -57,19 +57,9 @@ fn ledger_first_departures(root: &Path) -> BTreeMap<String, String> {
     let Ok(raw) = fs::read_to_string(root.join("runtime").join("state-transitions.log")) else {
         return first;
     };
-    for line in raw.lines() {
-        let mut fields = line.split_whitespace();
-        let (Some(task_id), Some(movement)) = (fields.next(), fields.next()) else {
-            continue;
-        };
-        let Some((from, _to)) = movement.split_once('@') else {
-            continue;
-        };
-        if from.is_empty() {
-            continue;
-        }
-        // `or_insert`, never overwrite: later lines are later moves.
-        first.entry(task_id.to_string()).or_insert_with(|| from.to_string());
+    // §FS-rhei-reset.2.2: only movements establish authored state.
+    for movement in rhei_core::transition_history::parse(&raw).unwrap_or_default() {
+        first.entry(movement.task_id).or_insert(movement.from);
     }
     first
 }

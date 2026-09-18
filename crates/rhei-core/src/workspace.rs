@@ -43,6 +43,8 @@ pub const RHEI_INDEX_FILE: &str = "index.rhei.md";
 /// transitions).
 #[derive(Debug)]
 pub struct Workspace {
+    /// Held through all derived operations. §FS-rhei-panta.6.6
+    pub root_guards: Vec<crate::root_access::RootAccessGuard>,
     pub rhei: Rhei,
     /// Maps task ID (as string) → the file path that defines it.
     pub task_sources: HashMap<String, PathBuf>,
@@ -184,6 +186,8 @@ fn collect_task_roots(
 /// `.md` file inside the `tasks/` subdirectory. Reports duplicate task IDs
 /// across files and missing structure.
 pub fn load_workspace(dir: &Path) -> parser::Result<Workspace> {
+    let root_guards =
+        crate::root_access::for_input(dir).map_err(|err| ParseError::new(err.to_string(), None))?;
     let index_path = dir.join(RHEI_INDEX_FILE);
     let index_content = crate::source::read_to_string(&index_path).map_err(|e| {
         ParseError::new(format!("failed to read {}: {e}", index_path.display()), None)
@@ -218,6 +222,7 @@ pub fn load_workspace(dir: &Path) -> parser::Result<Workspace> {
     // warns instead. §FS-rhei-plan-language.1.2
 
     Ok(Workspace {
+        root_guards,
         rhei: Rhei {
             title: index.title,
             states: index.states,

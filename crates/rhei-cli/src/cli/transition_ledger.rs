@@ -274,6 +274,8 @@ impl LockedTransitionLedger {
         let raw = fs::read_to_string(&self.path).map_err(|err| {
             file_io_report(&self.path, "failed to read state transition log", err)
         })?;
+        // §FS-rhei-reset.2.1: validate adjacency before pruning both task-keyed rows.
+        rhei_core::transition_history::parse(&raw).map_err(|err| miette!("{err}"))?;
         let kept = raw
             .lines()
             .filter(|line| {

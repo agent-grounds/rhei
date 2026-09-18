@@ -278,7 +278,7 @@ fn reset_command(
         let resolved =
             resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
         let machines = resolved.validator_set();
-        let decision = collect_reset_decision(&loaded, input, &scope, &machines);
+        let decision = collect_reset_decision(&loaded, input, &scope, &machines)?;
         report_reset_preview(&decision);
         println!("\nDry run — nothing was changed.");
         return Ok(());
@@ -296,7 +296,7 @@ fn reset_command(
     reset_locks.verify_coverage(&loaded, input, &scope)?;
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
     let machines = resolved.validator_set();
-    let decision = collect_reset_decision(&loaded, input, &scope, &machines);
+    let decision = collect_reset_decision(&loaded, input, &scope, &machines)?;
 
     report_panta_scope_narrowed(&loaded, "reset", &decision.scope);
     // This preview, the mutation below, and the success summary all use the

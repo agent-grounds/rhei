@@ -21,6 +21,8 @@ pub fn set_reader(reader: Reader) {
 /// Read `path`, through the installed reader when there is one.
 // §FS-rhei-new.4
 pub fn read_to_string(path: &Path) -> std::io::Result<String> {
+    // §FS-rhei-recover.4: direct source readers also refuse a marked root.
+    let _guard = crate::root_access::for_file(path)?;
     match READER.get() {
         Some(reader) => reader(path),
         None => std::fs::read_to_string(path),

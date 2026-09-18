@@ -38,6 +38,8 @@ sha2 = "0.10"
 time = "=0.3.36"
 url = "=2.5.2"
 uuid = "=1.11.0"
+# Native Unix PTYs and Windows ConPTY exercise the same attended command. §FS-rhei-recover.5
+portable-pty = "=0.8.1"
 
 # Only the pty-based interruption e2e needs this, and only on Unix — Windows is
 # in the CI matrix and `nix` does not build there. §FS-rhei-run-tui.1.5.7

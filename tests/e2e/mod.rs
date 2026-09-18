@@ -76,6 +76,7 @@ mod next_explicit_passive_atomicity_tests;
 mod next_explicit_passive_claim_tests;
 mod next_node_kinds_tests;
 mod next_tests;
+mod operator_attended_tests;
 mod operator_force_support;
 mod operator_force_tests;
 mod operator_recovery_tests;

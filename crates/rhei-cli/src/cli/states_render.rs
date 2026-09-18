@@ -364,6 +364,8 @@ fn empty_rhei_warnings(loaded: &LoadedPlan) -> Vec<String> {
 }
 
 struct LoadedPlan {
+    /// Guard lifetime includes consumers of this graph. §FS-rhei-panta.6.6
+    _root_guards: Vec<rhei_core::root_access::RootAccessGuard>,
     rhei: rhei_core::ast::Rhei,
     kind: LoadedPlanKind,
     /// For directory workspaces: maps task ID string → source file path.
@@ -917,6 +919,7 @@ fn load_plan_with(
     lenient: bool,
     run: Option<RunPlanInput<'_>>,
 ) -> MietteResult<LoadedPlan> {
+    let _guards = rhei_core::root_access::for_input(path).map_err(|err| miette!("{err}"))?;
     if let Some(project_dir) = workspace::panta_project_dir(path) {
         let project = if lenient {
             workspace::load_panta_project_lenient(&project_dir)
@@ -954,6 +957,7 @@ fn implicit_loaded_plan(
     kind: LoadedPlanKind,
 ) -> LoadedPlan {
     LoadedPlan {
+        _root_guards: project.root_guards,
         rhei: project.rhei,
         kind,
         task_sources: project.task_sources,
@@ -970,6 +974,7 @@ fn implicit_loaded_plan(
 
 fn panta_loaded_plan(project: rhei_core::workspace::PantaProject) -> LoadedPlan {
     LoadedPlan {
+        _root_guards: project.root_guards,
         rhei: project.rhei,
         kind: LoadedPlanKind::PantaProject,
         task_sources: project.task_sources,
@@ -999,6 +1004,7 @@ fn load_project_with_member_for_validation(
 /// Load a plan for `rhei validate`, collecting recoverable parse errors where
 /// validation promises batch diagnostics.
 fn load_plan_for_validation(path: &Path) -> MietteResult<LoadedPlan> {
+    let _guards = rhei_core::root_access::for_input(path).map_err(|err| miette!("{err}"))?;
     if let Some(project_dir) = workspace::panta_project_dir(path) {
         let project = workspace::load_panta_project(&project_dir)
             .map_err(|err| nested_parse_report(&err))?;
@@ -1086,6 +1092,7 @@ fn load_workspace_for_validation(ws_dir: &Path) -> MietteResult<LoadedPlan> {
     // than failing the whole project's load. §FS-rhei-plan-language.1.2
 
     let ws = rhei_core::workspace::Workspace {
+        root_guards: rhei_core::root_access::for_input(ws_dir).map_err(|err| miette!("{err}"))?,
         rhei: rhei_core::ast::Rhei {
             title: index.title,
             states: index.states,

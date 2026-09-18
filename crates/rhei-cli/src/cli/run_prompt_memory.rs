@@ -413,26 +413,24 @@ fn task_history_summary(
 /// the memory sections need the order, not one lookup.
 // §FS-rhei-complete.3.1 §FS-rhei-memory.4.1
 fn read_ledger(root: &Path) -> MietteResult<Vec<(String, String, String)>> {
+    // §FS-rhei-recover.4: direct readers hold access through the read.
+    let _guard = rhei_core::root_access::RootAccessGuard::shared(root).map_err(|err| miette!("{err}"))?;
     let path = root.join("runtime").join("state-transitions.log");
     if !path.exists() {
         return Ok(Vec::new());
     }
     let content = fs::read_to_string(&path)
         .map_err(|err| file_io_report(&path, "failed to read the transition ledger", err))?;
+    rhei_core::transition_history::parse(&content).map_err(|err| miette!("{err}"))?;
     Ok(parse_ledger(&content))
 }
 
 /// Parse the timestamp-free `<task-id> <from>@<to>` ledger body.
 // §FS-rhei-complete.3.1
 fn parse_ledger(content: &str) -> Vec<(String, String, String)> {
-    content
-        .lines()
-        .filter_map(|line| {
-            let (task, transition) = line.trim().split_once(' ')?;
-            let (from, to) = transition.split_once('@')?;
-            Some((task.to_string(), from.trim().to_string(), to.trim().to_string()))
-        })
-        .collect()
+    // §FS-rhei-complete.3.1: one validated pair contributes one movement.
+    rhei_core::transition_history::parse(content).unwrap_or_default().into_iter()
+        .map(|movement| (movement.task_id, movement.from, movement.to)).collect()
 }
 
 /// Result files this prompt already pastes in full, by qualified id.

@@ -19,6 +19,11 @@
 
 ### Added
 
+- **Attended operators can recover a missing state-machine edge with `transition
+  --force --reason`.** Fresh confirmation, preserved transition safeguards and a
+  durable exceptional audit pair make the correction recoverable with `rhei
+  recover`; pending recovery blocks readers and writers. (PR #297)
+
 - **Self-looping agent states can continue their immediately preceding visit
   with `session: continue`.** The runtime selects the exact current `_state`
   snapshot for the same task, state, prior visit, and target, reuses native
@@ -141,6 +146,10 @@
   strict callback JSON decoders must permit additive fields. (PR #262)
 
 ### Fixed
+
+- **Exact transitions from final states now fail machine loading.** Terminal
+  exits require attended operator recovery; ordinary wildcard behavior is
+  unchanged. (PR #297)
 
 - **Explicit `rhei next --task` claims no longer reject ready non-initial work
   as a concurrent-writer conflict.** A ready passive state may advance one

@@ -8,6 +8,106 @@
 
 // §AR-source-file-size.3 §FS-rhei-plan-language.3
 
+/// One structured result from checking a `Consumes` producer relationship.
+///
+/// Validation and compatibility migration share this classification so the
+/// writer can repair only the exact condition the validator would otherwise
+/// reject. §FS-rhei-migrate.1.1
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportRelationship {
+    pub consumer: TaskId,
+    pub consumer_kind: String,
+    pub producer: TaskId,
+    pub producer_kind: Option<String>,
+    pub export: String,
+    pub kind: ExportRelationshipKind,
+}
+
+/// The mutually exclusive outcomes of export relationship analysis.
+/// §FS-rhei-migrate.1.1
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExportRelationshipKind {
+    ExistingDirectPrior,
+    MissingDirectPrior,
+    MissingProducer,
+    UndeclaredExport,
+    SelfConsumption,
+    AncestorConsumption,
+    ProposedCycle,
+}
+
+/// Classify every consumed export in source order without changing the graph.
+/// §FS-rhei-migrate.1.1
+pub fn classify_export_relationships(rhei: &Rhei) -> Vec<ExportRelationship> {
+    let index = build_task_index(rhei);
+    let mut relationships = Vec::new();
+
+    fn recurse(
+        task: &Task,
+        ancestors: &mut Vec<TaskId>,
+        index: &HashMap<TaskId, &Task>,
+        relationships: &mut Vec<ExportRelationship>,
+    ) {
+        relationships.extend(classify_export_relationships_for_task(task, ancestors, index));
+        ancestors.push(task.id.clone());
+        for child in &task.children {
+            recurse(child, ancestors, index, relationships);
+        }
+        ancestors.pop();
+    }
+
+    let mut ancestors = Vec::new();
+    for task in &rhei.tasks {
+        recurse(task, &mut ancestors, &index, &mut relationships);
+    }
+    mark_proposed_export_cycles(&index, &mut relationships);
+    relationships
+}
+
+fn mark_proposed_export_cycles(
+    index: &HashMap<TaskId, &Task>,
+    relationships: &mut [ExportRelationship],
+) {
+    let mut graph: HashMap<TaskId, Vec<TaskId>> = index
+        .iter()
+        .map(|(id, task)| (id.clone(), task.prior.clone()))
+        .collect();
+    for relationship in relationships.iter().filter(|relationship| {
+        relationship.kind == ExportRelationshipKind::MissingDirectPrior
+    }) {
+        let priors = graph.entry(relationship.consumer.clone()).or_default();
+        if !priors.contains(&relationship.producer) {
+            priors.push(relationship.producer.clone());
+        }
+    }
+
+    for relationship in relationships.iter_mut().filter(|relationship| {
+        relationship.kind == ExportRelationshipKind::MissingDirectPrior
+    }) {
+        let excluded = (&relationship.consumer, &relationship.producer);
+        let mut pending = vec![relationship.producer.clone()];
+        let mut seen = HashSet::new();
+        let mut cyclic = false;
+        while let Some(node) = pending.pop() {
+            if node == relationship.consumer {
+                cyclic = true;
+                break;
+            }
+            if !seen.insert(node.clone()) {
+                continue;
+            }
+            if let Some(priors) = graph.get(&node) {
+                pending.extend(priors.iter().filter(|prior| {
+                    !(&node == excluded.0 && *prior == excluded.1)
+                }).cloned());
+            }
+        }
+        if cyclic {
+            relationship.kind = ExportRelationshipKind::ProposedCycle;
+        }
+    }
+}
+
 fn validate_dependency_integrity(
     rhei: &Rhei,
     index: &HashMap<TaskId, &Task>,
@@ -88,26 +188,24 @@ fn validate_dependency_integrity(
             }
         }
 
-        // Check each declared handoff's producer, declaration, and direct edge.
-        // Suppress derivative checks when the producer is missing or forbidden.
-        // §FS-rhei-plan-language.3.12.1
-        for consumed in &task.consumes {
-            let producer = &consumed.task;
-            if producer == &task.id {
+        // Check each declared handoff through the same structured analysis the
+        // compatibility writer consumes. §FS-rhei-migrate.1.1
+        for relationship in classify_export_relationships_for_task(task, ancestors, index) {
+            let producer = &relationship.producer;
+            match relationship.kind {
+                ExportRelationshipKind::SelfConsumption => {
                 report.errors.push(format!(
                     "Task {} cannot consume its own export '{}'",
-                    task.id, consumed.name
+                    task.id, relationship.export
                 ));
-                continue;
-            }
-            if ancestors.iter().any(|ancestor| ancestor == producer) {
+                }
+                ExportRelationshipKind::AncestorConsumption => {
                 report.errors.push(format!(
                     "Task {} cannot consume export '{}' from ancestor Task {}",
-                    task.id, consumed.name, producer
+                    task.id, relationship.export, producer
                 ));
-                continue;
-            }
-            let Some(producing_task) = index.get(producer) else {
+                }
+                ExportRelationshipKind::MissingProducer => {
                 // The ordinary Prior diagnostic already names this producer.
                 // One authored bad reference gets one primary error.
                 // §FS-rhei-validate.4.3
@@ -119,13 +217,12 @@ fn validate_dependency_integrity(
                     }
                     report.errors.push(format!(
                         "Task {} consumes export '{}' from missing producer Task {}{}",
-                        task.id, consumed.name, producer, tail
+                        task.id, relationship.export, producer, tail
                     ));
                 }
-                continue;
-            };
-
-            if !producing_task.provides.iter().any(|name| name == &consumed.name) {
+                }
+                ExportRelationshipKind::UndeclaredExport => {
+                let producing_task = index[producer];
                 let mut available = producing_task.provides.clone();
                 available.sort();
                 let available = if available.is_empty() {
@@ -136,16 +233,21 @@ fn validate_dependency_integrity(
                 report.errors.push(format!(
                     "Task {} consumes export '{}' from Task {}, but that task does not declare it in **Provides:**. Available exports: {}",
                     task.id,
-                    consumed.name,
+                    relationship.export,
                     producer,
                     available
                 ));
-            }
-            if !task.prior.iter().any(|prior| prior == producer) {
+                }
+                ExportRelationshipKind::MissingDirectPrior => {
                 report.errors.push(format!(
                     "Task {} consumes export '{}' from Task {} and must list Task {} directly in **Prior:**",
-                    task.id, consumed.name, producer, producer
+                    task.id, relationship.export, producer, producer
                 ));
+                }
+                ExportRelationshipKind::ExistingDirectPrior => {}
+                ExportRelationshipKind::ProposedCycle => unreachable!(
+                    "per-task validation classifies before provisional cycle analysis"
+                ),
             }
         }
         ancestors.push(task.id.clone());
@@ -159,6 +261,46 @@ fn validate_dependency_integrity(
     for task in &rhei.tasks {
         recurse(task, &mut ancestors, index, &rhei_ids, &rhei.structure, report);
     }
+}
+
+fn classify_export_relationships_for_task(
+    task: &Task,
+    ancestors: &[TaskId],
+    index: &HashMap<TaskId, &Task>,
+) -> Vec<ExportRelationship> {
+    task.consumes
+        .iter()
+        .map(|consumed| {
+            let producer = &consumed.task;
+            let producing_task = index.get(producer).copied();
+            let kind = if producer == &task.id {
+                ExportRelationshipKind::SelfConsumption
+            } else if ancestors.iter().any(|ancestor| ancestor == producer) {
+                ExportRelationshipKind::AncestorConsumption
+            } else if producing_task.is_none() {
+                ExportRelationshipKind::MissingProducer
+            } else if !producing_task
+                .expect("checked above")
+                .provides
+                .iter()
+                .any(|name| name == &consumed.name)
+            {
+                ExportRelationshipKind::UndeclaredExport
+            } else if task.prior.iter().any(|prior| prior == producer) {
+                ExportRelationshipKind::ExistingDirectPrior
+            } else {
+                ExportRelationshipKind::MissingDirectPrior
+            };
+            ExportRelationship {
+                consumer: task.id.clone(),
+                consumer_kind: task.kind.clone(),
+                producer: producer.clone(),
+                producer_kind: producing_task.map(|producer| producer.kind.clone()),
+                export: consumed.name.clone(),
+                kind,
+            }
+        })
+        .collect()
 }
 
 /// Rhei ids of the merged project: the leading segment of every top-level id.

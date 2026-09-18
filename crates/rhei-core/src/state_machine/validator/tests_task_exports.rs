@@ -187,3 +187,82 @@
             "one coherence warning and the independent visibility advisory: {report:?}"
         );
     }
+
+    fn relationship_kinds(input: &str) -> Vec<ExportRelationshipKind> {
+        let rhei = crate::parse(input).expect("plan parses");
+        classify_export_relationships(&rhei)
+            .into_iter()
+            .map(|relationship| relationship.kind)
+            .collect()
+    }
+
+    /// Validation and migration distinguish every relationship outcome rather
+    /// than inferring repairability from diagnostic text. §FS-rhei-migrate.1.1
+    #[test]
+    fn task_export_relationships_have_a_shared_structured_classification() {
+        let input = r#"# Rhei: relationships
+
+## Tasks
+
+### Task 1: producer
+**State:** pending
+**Provides:** good
+
+#### Task 1.1: child
+**State:** pending
+**Consumes:** 1:good
+
+### Task 2: repairable
+**State:** pending
+**Consumes:** 1:good, 1:good
+
+### Task 3: existing
+**State:** pending
+**Prior:** Task 1
+**Consumes:** 1:good, 1:missing
+
+### Task 4: invalid
+**State:** pending
+**Consumes:** 4:own, 99:ghost
+"#;
+        assert_eq!(
+            relationship_kinds(input),
+            vec![
+                ExportRelationshipKind::AncestorConsumption,
+                ExportRelationshipKind::MissingDirectPrior,
+                ExportRelationshipKind::MissingDirectPrior,
+                ExportRelationshipKind::ExistingDirectPrior,
+                ExportRelationshipKind::UndeclaredExport,
+                ExportRelationshipKind::SelfConsumption,
+                ExportRelationshipKind::MissingProducer,
+            ]
+        );
+    }
+
+    /// A pair of individually resolvable handoffs is classified as unsafe
+    /// when their complete proposed dependency graph closes a cycle.
+    // §FS-rhei-migrate.1.1
+    #[test]
+    fn task_export_relationships_classify_a_proposed_cycle() {
+        let input = r#"# Rhei: cycle
+
+## Tasks
+
+### Task 1: one
+**State:** pending
+**Provides:** one
+**Consumes:** 2:two
+
+### Task 2: two
+**State:** pending
+**Provides:** two
+**Consumes:** 1:one
+"#;
+        assert_eq!(
+            relationship_kinds(input),
+            vec![
+                ExportRelationshipKind::ProposedCycle,
+                ExportRelationshipKind::ProposedCycle,
+            ]
+        );
+    }

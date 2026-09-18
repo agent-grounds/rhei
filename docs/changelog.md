@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add `rhei migrate export-priors` as the explicit recovery for plans laid
+  before consumed-export producers had to be direct dependencies. Validate and
+  run refusals now name the copyable migration command; migration previews or
+  writes only the required authored `Prior` diff, while newly authored plans
+  remain subject to the same strict rule. (PR #294)
+
 - Compile block graphs over shared state and task types, retain compiled settings
   and support files without rendering twice, and restore extracted review/fix
   stage instructions and artifact contracts. Keep the built-in bundles loadable,

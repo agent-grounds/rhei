@@ -133,6 +133,7 @@ mod migrate_export_prior_tests {
         )
         .expect("plan");
         let loaded = LoadedPlan {
+            _root_guards: Vec::new(),
             rhei,
             kind: LoadedPlanKind::SingleFile,
             task_sources: HashMap::new(),

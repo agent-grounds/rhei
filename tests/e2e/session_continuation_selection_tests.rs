@@ -108,7 +108,9 @@ if visit_two.exists():
     let output = format!("{}{}", run.stdout, run.stderr).to_lowercase();
     assert!(
         output.contains("running cold")
-            && (output.contains("missing") || output.contains("no snapshot")),
+            && (output.contains("missing")
+                || output.contains("no snapshot")
+                || output.contains("no current snapshot")),
         "missing N-1 must produce a reasoned fallback:\n{output}"
     );
 }
@@ -192,7 +194,10 @@ path.unlink()
             r#"root = pathlib.Path(env('RHEI_PLAN_PATH')).parent
 path = pathlib.Path(env('RHEI_PLAN_PATH'))
 raw = path.read_text()
-write(path, raw.replace('**State:** loop\n', '**State:** loop\n**Target:** fake:acme:model-b\n'))
+needle = '**State:** mutate\n'
+if needle not in raw:
+    raise RuntimeError('task is not at the target mutation boundary')
+write(path, raw.replace(needle, needle + '**Target:** fake:acme:model-b\n', 1))
 "#,
             "fake-acme-model-b",
         ),
@@ -201,6 +206,15 @@ write(path, raw.replace('**State:** loop\n', '**State:** loop\n**Target:** fake:
         let fixture = mutation_fixture(prefix, 2, mutation);
         let run = run_continuation(&fixture, &[]);
         assert_success(&run);
+        assert!(
+            fixture
+                .dir
+                .join(
+                    ".rhei/cache/snapshots/plan.1/_state/loop/1/fake-acme-model-a/g1/manifest.json"
+                )
+                .exists(),
+            "precondition: visit-1 target A snapshot must remain available"
+        );
         let log = continuation_log(&fixture);
         let visit_two = log.lines().find(|line| line.contains("visit=2 ")).expect("visit 2");
         assert!(
@@ -211,7 +225,9 @@ write(path, raw.replace('**State:** loop\n', '**State:** loop\n**Target:** fake:
         let output = format!("{}{}", run.stdout, run.stderr).to_lowercase();
         assert!(
             output.contains("running cold")
-                && (output.contains("missing") || output.contains("no snapshot")),
+                && (output.contains("missing")
+                    || output.contains("no snapshot")
+                    || output.contains("no current snapshot")),
             "fallback must explain the absent exact source:\n{output}"
         );
     }

@@ -43,57 +43,58 @@ transitions:
 /// The authored field is a checked contract even when its value is `cold`.
 /// Every shape below is otherwise accepted by today's machine grammar, so an
 /// unexpected success means `session` was ignored. §FS-rhei-states.1.3
+/// §FS-rhei-snapshots.11
 #[test]
 fn session_validation_rejects_invalid_values_and_illegal_state_shapes() {
     let (dir, plan) = validation_fixture("session-validation-illegal");
-    let cases = [
+    let cases: [(&str, &str, &str, &[&str]); 8] = [
         (
             "invalid-value",
             "    description: Bad enum\n    target: fake:acme:model-a\n    session: warm\n",
             "  - from: bad\n    to: bad\n  - from: bad\n    to: completed\n",
-            "cold or continue",
+            &["states.bad.session", "warm", "cold", "continue"],
         ),
         (
             "final",
             "    description: Final\n    final: true\n    session: cold\n",
             "  - from: bad\n    to: bad\n",
-            "final",
+            &["final"],
         ),
         (
             "gating",
             "    description: Gate\n    gating: true\n    target: fake:acme:model-a\n    session: cold\n",
             "  - from: bad\n    to: bad\n  - from: bad\n    to: completed\n",
-            "gating",
+            &["gating"],
         ),
         (
             "program",
             "    description: Program\n    program: \"true\"\n    session: cold\n",
             "  - from: bad\n    to: bad\n  - from: bad\n    to: completed\n",
-            "program",
+            &["program"],
         ),
         (
             "poll",
             "    description: Poll\n    target: fake:acme:model-a\n    session: cold\n    poll:\n      interval: 1s\n      max_attempts: 1\n",
             "  - from: bad\n    to: bad\n  - from: bad\n    to: completed\n    condition: pollAttempts >= pollMaxAttempts\n",
-            "poll",
+            &["poll"],
         ),
         (
             "no-self-loop",
             "    description: No loop\n    target: fake:acme:model-a\n    session: continue\n",
             "  - from: bad\n    to: completed\n",
-            "self-loop",
+            &["self-loop"],
         ),
         (
             "unresolved-target",
             "    description: No effective tuple\n    agent: fake\n    session: cold\n",
             "  - from: bad\n    to: bad\n  - from: bad\n    to: completed\n",
-            "target",
+            &["target"],
         ),
         (
             "no-agent",
             "    description: No agent executor\n    session: cold\n",
             "  - from: bad\n    to: bad\n  - from: bad\n    to: completed\n",
-            "agent",
+            &["agent"],
         ),
     ];
 
@@ -102,9 +103,10 @@ fn session_validation_rejects_invalid_values_and_illegal_state_shapes() {
     for (name, bad, transitions, expected) in cases {
         let run = validate_machine(&dir, &plan, name, &machine_with_bad_state(bad, transitions));
         let output = format!("{}{}", run.stdout, run.stderr);
+        let normalized = output.to_lowercase();
         if run.status.success() {
             unexpected.push(name);
-        } else if !output.to_lowercase().contains(expected) {
+        } else if !expected.iter().all(|part| normalized.contains(*part)) {
             wrong_diagnostic.push(format!("{name}: expected {expected:?}, got:\n{output}"));
         }
     }

@@ -238,10 +238,9 @@ fn run_sequential_agent_invocation(
         run_info!("{note}");
     }
 
-    // Resolve authored inheritance, its task-level overlay, or state-local
-    // continuation immediately before spawn; prompt composition above stays
-    // unconditional.
-    // §FS-rhei-snapshots.4.4 §FS-rhei-snapshots.4.7
+    // Resolve authored inheritance, its task overlay, or state-local
+    // continuation immediately before spawn; prompt composition stays
+    // unconditional. §FS-rhei-snapshots.4.4 §FS-rhei-snapshots.4.7
     let prior_snapshot_sources =
         eligible_prior_snapshot_sources(task, &loaded.rhei.tasks, machines);
     let snapshot_preload = preload_snapshot_inherit_before_spawn_with_prior_sources(

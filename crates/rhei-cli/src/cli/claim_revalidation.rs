@@ -9,6 +9,7 @@ struct ClaimEligibilityContext<'a> {
     input: &'a Path,
     machines: &'a ExecutionMachines,
     workspace_root: &'a Path,
+    selection: ClaimSelection,
 }
 
 /// Re-load the current project and ask the same ready-set implementation that
@@ -32,9 +33,14 @@ fn ensure_claimable_under_lock(
         workspace_root: context.workspace_root,
         task_roots: &loaded.task_roots,
     };
-    let still_claimable = find_claimable_tasks(&loaded.rhei, &context.machines.set, &roots)
-        .into_iter()
-        .any(|candidate| candidate.id == task.id);
+    let still_claimable = find_claimable_tasks_for_selection(
+        &loaded.rhei,
+        &context.machines.set,
+        &roots,
+        context.selection,
+    )
+    .into_iter()
+    .any(|candidate| candidate.id == task.id);
 
     let machine = context.machines.for_task(&task.id);
     let state = normalized_state_name(task.state.as_str(), machine);

@@ -43,10 +43,10 @@ help = ticket_id_required_help(),
     for target in &targets {
         let verb = if dry_run { "Would release" } else { "Released" };
         println!("{verb} Task {} (was assigned to {})", target.id, target.assignee);
-        // `next` only claims from the initial state, so a ticket released from
-        // a later one is unclaimed but not yet re-claimable. Say so rather than
-        // rolling the state back: the transition happened, its callbacks ran,
-        // and discarding that silently would lose the record of it.
+        // Automatic `next` only claims from the initial state. A ticket
+        // released later remains explicitly reclaimable, so name both that
+        // path and the deliberate state-reset alternative without moving it.
+        // §FS-rhei-release.3.1
         if let Some(initial) = target.initial_state.as_deref() {
             let machine = machines.for_task_str(&target.id);
             let state = normalized_state_name(&target.state, machine);
@@ -56,11 +56,18 @@ help = ticket_id_required_help(),
             let claimable_where_it_stands = execute_on_of(machine, &state).is_some();
             let target_exists = machine.states.contains_key(initial);
             if state != initial && !claimable_where_it_stands && target_exists {
+                let plan = shell_quote(&input.display().to_string());
                 println!(
-                    "  note: still in '{}'. `rhei next` claims from '{}', so move it back with \
-                     `rhei transition --task {} --from {} --to {}` if it should be picked up \
-                     again.",
-                    target.state, initial, target.id, target.state, initial
+                    "  note: still in '{}'. Automatic `rhei next` claims from '{}'; reclaim it \
+                     explicitly with `rhei next {} --task {}`, or move it back with \
+                     `rhei transition --task {} --from {} --to {}`.",
+                    target.state,
+                    initial,
+                    plan,
+                    target.id,
+                    target.id,
+                    target.state,
+                    initial
                 );
             }
         }

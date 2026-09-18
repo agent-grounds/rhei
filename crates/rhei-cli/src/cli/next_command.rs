@@ -22,8 +22,9 @@ fn parse_task_id(s: &str) -> TaskId {
     TaskId::from_segments(segments)
 }
 
-/// Execute the `next` subcommand: transition the next ready task to the next state,
-/// and print the task details with instructions.
+/// Execute the `next` subcommand: claim ready work, optionally advancing one
+/// passive-state edge, and print the task details with instructions.
+// §FS-rhei-next.3
 fn next_command(
     input: &Path,
     state_machine_path: Option<&Path>,
@@ -57,6 +58,11 @@ fn next_command(
     let resolved_filter = task_id_filter
         .map(|tid| resolve_cli_task_id(&loaded, tid, &scope))
         .transpose()?;
+    let claim_selection = if resolved_filter.is_some() {
+        ClaimSelection::Explicit
+    } else {
+        ClaimSelection::Automatic
+    };
     let (task_id_str, current_state_raw, current_state, task_workspace_root) = if let Some(tid) = resolved_filter.as_deref() {
         let target_id = parse_task_id(tid);
         let task = find_task_by_id(&loaded.rhei.tasks, &target_id)
@@ -176,31 +182,31 @@ fn next_command(
         }
         let machine = machines.for_task_str(tid);
         let state_name = normalized_state_name(task.state.as_str(), machine);
-        let is_initial = task_is_in_initial_state(task, &state_name, machine);
-        if is_initial {
-            let mut all_tasks = Vec::new();
-            collect_plan_tasks(&loaded.rhei.tasks, &mut all_tasks);
-            let state_map = plan_state_map(&all_tasks, &machines.set);
-            let all_priors_done = task.prior.iter().all(|dep_id| {
-                state_map
-                    .get(dep_id)
-                    .map(|s| dependency_is_satisfied(s, machines.set.for_task(dep_id)))
-                    .unwrap_or(false)
-            });
-            if !all_priors_done {
-                let detail = first_blocking_prior(task, &state_map, &machines.set, &scope)
-                    .map(|prior| format!("; waiting on {}", prior))
-                    .unwrap_or_default();
-                return Err(miette!(
-                    help = format!(
-                        "finish the prerequisite first, or see what is claimable now: rhei list {}",
-                        shell_quote(&input.display().to_string())
-                    ),
-                    "Task {} is blocked by incomplete prerequisites{}",
-                    tid,
-                    detail
-                ));
-            }
+        // Explicit selection bypasses only automatic initial-state narrowing;
+        // a task already mid-workflow still needs successful priors.
+        // §FS-rhei-next.3
+        let mut all_tasks = Vec::new();
+        collect_plan_tasks(&loaded.rhei.tasks, &mut all_tasks);
+        let state_map = plan_state_map(&all_tasks, &machines.set);
+        let all_priors_done = task.prior.iter().all(|dep_id| {
+            state_map
+                .get(dep_id)
+                .map(|s| dependency_is_satisfied(s, machines.set.for_task(dep_id)))
+                .unwrap_or(false)
+        });
+        if !all_priors_done {
+            let detail = first_blocking_prior(task, &state_map, &machines.set, &scope)
+                .map(|prior| format!("; waiting on {}", prior))
+                .unwrap_or_default();
+            return Err(miette!(
+                help = format!(
+                    "finish the prerequisite first, or see what is claimable now: rhei list {}",
+                    shell_quote(&input.display().to_string())
+                ),
+                "Task {} is blocked by incomplete prerequisites{}",
+                tid,
+                detail
+            ));
         }
         let state_def = machine
             .states
@@ -227,6 +233,29 @@ fn next_command(
             &settings,
             &format!("Task {} cannot be claimed in state {}.", tid, state_name),
         )?;
+        let roots = ReadySetRoots {
+            workspace_root: &workspace_root,
+            task_roots: &loaded.task_roots,
+        };
+        let explicitly_claimable = find_claimable_tasks_for_selection(
+            &loaded.rhei,
+            &machines.set,
+            &roots,
+            ClaimSelection::Explicit,
+        )
+        .into_iter()
+        .any(|candidate| candidate.id == task.id);
+        if !explicitly_claimable {
+            return Err(miette!(
+                help = format!(
+                    "inspect the task and current ready work with: rhei list {}",
+                    shell_quote(&input.display().to_string())
+                ),
+                "Task {} is not ready to be claimed in state '{}'",
+                tid,
+                state_name
+            ));
+        }
         (tid.to_string(), task.state.as_str().to_string(), state_name, task_workspace_root)
     } else {
         // §FS-rhei-panta.6.1: `--rhei` narrows candidates, not prior resolution.
@@ -305,20 +334,24 @@ fn next_command(
         .ok_or_else(|| {
             miette!(help = internal_error_help(), "state '{}' missing from loaded machine", current_state)
         })?;
-    // §FS-rhei-next.3: claim initial states in place when the next edge is terminal completion.
-    let auto_transition_initial = is_initial
-        && !state_declares_autonomous_execution(current_state_def)
-        && initial_state_has_non_terminal_forward_transition(selected_task, &loaded.rhei, machine)?;
+    // Automatic selection reaches this only from an initial state. Explicit
+    // selection may also advance one eligible non-initial passive state.
+    // §FS-rhei-next.3
+    let advance_passive_claim = (claim_selection == ClaimSelection::Explicit || is_initial)
+        && state_allows_passive_claim_advance(current_state_def)
+        && state_has_non_terminal_forward_transition(selected_task, &loaded.rhei, machine)?;
 
     let route = loaded.task_route(&task_id_str, input);
     let claim_eligibility = ClaimEligibilityContext {
         input,
         machines: &machines,
         workspace_root: &workspace_root,
+        selection: claim_selection,
     };
 
-    let final_state = if auto_transition_initial && !peek {
-        // Advance from a setup-only initial state (for example planning -> pending).
+    let final_state = if advance_passive_claim && !peek {
+        // Advance one passive-state edge (for example planning -> pending or
+        // an explicitly selected non-initial bridge -> work). §FS-rhei-next.3
         let target_id = parse_task_id(&task_id_str);
         let task = find_task_by_id(&loaded.rhei.tasks, &target_id)
             .ok_or_else(|| {
@@ -389,12 +422,12 @@ fn next_command(
     // Claim mode only: write `**Assignee:**` to the task file so a second
     // `rhei next` cannot re-claim the same task. Skipped in peek mode and
     // when the task already has an assignee set.
-    let mut claimed_as = if auto_transition_initial && !peek {
+    let mut claimed_as = if advance_passive_claim && !peek {
         task.assignee.clone()
     } else {
         None
     };
-    if !peek && !auto_transition_initial && task.assignee.is_none() {
+    if !peek && !advance_passive_claim && task.assignee.is_none() {
         let assignee = agent_id_str.as_deref().unwrap_or("manual");
         claimed_as = Some(assignee.to_string());
         write_task_assignee(

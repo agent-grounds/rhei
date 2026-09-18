@@ -411,6 +411,41 @@ fn format_held_tasks(held: &[&rhei_core::ast::Task]) -> String {
         .join(", ")
 }
 
+/// Whether `rhei next` chose a task automatically or by explicit `--task`.
+///
+/// The distinction survives until the locked re-read because explicit
+/// selection bypasses only the automatic initial-state narrowing.
+// §FS-rhei-next.3 §FS-rhei-next.3.1
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum ClaimSelection {
+    Automatic,
+    Explicit,
+}
+
+/// Find tasks that are ready to be claimed in the requested selection mode.
+///
+/// Both modes retain the complete ready set and ownership check. Automatic
+/// selection alone narrows that set to each task's initial state.
+// §FS-rhei-next.3
+fn find_claimable_tasks_for_selection<'a>(
+    rhei: &'a rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    roots: &ReadySetRoots<'_>,
+    selection: ClaimSelection,
+) -> Vec<&'a rhei_core::ast::Task> {
+    find_ready_tasks(rhei, machines, roots, &HashSet::new())
+        .into_iter()
+        .filter(|task| task.assignee.is_none())
+        .filter(|task| {
+            selection == ClaimSelection::Explicit || {
+                let machine = machines.for_task(&task.id);
+                let state = normalized_state_name(task.state.as_str(), machine);
+                task_is_in_initial_state(task, &state, machine)
+            }
+        })
+        .collect()
+}
+
 /// Find tasks that are ready to be claimed by `rhei next` in automatic mode.
 ///
 /// A task is claimable when every descendant of it is terminal, it is in the
@@ -422,15 +457,7 @@ fn find_claimable_tasks<'a>(
     machines: &rhei_validator::MachineSet,
     roots: &ReadySetRoots<'_>,
 ) -> Vec<&'a rhei_core::ast::Task> {
-    find_ready_tasks(rhei, machines, roots, &HashSet::new())
-        .into_iter()
-        .filter(|task| task.assignee.is_none())
-        .filter(|task| {
-            let machine = machines.for_task(&task.id);
-            let state = normalized_state_name(task.state.as_str(), machine);
-            task_is_in_initial_state(task, &state, machine)
-        })
-        .collect()
+    find_claimable_tasks_for_selection(rhei, machines, roots, ClaimSelection::Automatic)
 }
 
 fn task_is_in_initial_state(

@@ -107,6 +107,12 @@
 
 ### Fixed
 
+- **Explicit `rhei next --task` claims no longer reject ready non-initial work
+  as a concurrent-writer conflict.** A ready passive state may advance one
+  applicable non-terminal edge while state, ownership, metadata, callbacks,
+  and ledger entry remain in the existing atomic claim transaction. Automatic
+  selection still considers initial-state work only. (PR #288)
+
 - **Plan rewrites now use their permanent sibling sidecar as the sole writer
   lock.** The replaceable plan pathname stays readable through callbacks and
   atomic replacement on Windows, while the sidecar remains held through

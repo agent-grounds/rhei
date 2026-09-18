@@ -75,7 +75,7 @@ Execution:
   summary     Print a compact Markdown run summary for a pull request body
   report      Render readable Markdown reports from agent session logs
   snapshot    Inspect, prune, or continue from session snapshots
-  next        Transition the next ready task to the next state
+  next        Claim the next ready task, or explicitly claim a named task
   complete    Complete a task: transition to terminal state, write ledger/result,\n              link it from the task, and remove the assignee
   release     Drop a ticket's assignee so abandoned work can be claimed again
   reset       Return every task to the state it was authored in; for workspaces,\n              also remove runtime output
@@ -599,11 +599,11 @@ enum Commands {
         )]
         input_args: Vec<String>,
     },
-    /// Transition the next ready task to the next state
+    /// Claim the next ready task, or explicitly claim a named task
     ///
-    /// Finds the first task whose prerequisites are satisfied, transitions it
-    /// forward one step, and prints the task details with state-machine
-    /// instructions so an agent knows exactly what to do.
+    /// Automatic selection considers initial-state work. An explicit `--task`
+    /// may also claim ready non-initial work; a passive state can advance one
+    /// applicable non-terminal edge as part of the atomic claim.
     Next {
         /// Path to a states YAML file (uses built-in default when omitted)
         #[arg(long, value_name = "PATH", add = ArgValueCompleter::new(complete_yaml_path))]
@@ -612,7 +612,8 @@ enum Commands {
         /// enclosing project, workspace, or lone plan is used
         #[arg(value_name = "RHEI_PLAN", add = ArgValueCompleter::new(complete_rhei_plan_path))]
         input: Option<PathBuf>,
-        /// Target a specific task instead of auto-selecting
+        /// Claim a specific ready task, including non-initial work; a passive
+        /// state may advance one applicable non-terminal edge
         #[arg(long, add = ArgValueCompleter::new(complete_task_id))]
         task: Option<String>,
         /// Narrow to the named rhei (repeatable; one id per flag). A rhei id

@@ -11,7 +11,7 @@
 /// Insert a `**Assignee:** <value>` metadata line for a specific task.
 ///
 /// Locates the task node header, walks through its metadata block
-/// (`**State:**`, optional `**Prior:**`), and inserts the Assignee line at
+/// (`**State:**` through optional export fields), and inserts the Assignee line at
 /// the end of that block, matching the task grammar order. A duplicate
 /// insertion is treated as a claim conflict.
 // §FS-rhei-plan-language.2: Task metadata grammar order.
@@ -44,6 +44,7 @@ fn insert_task_assignee(raw: &str, task_id: &str, assignee: &str) -> MietteResul
             && in_target_task
             && (line.starts_with("**State:**")
                 || line.starts_with("**Prior:**")
+                || line.starts_with("**Inherits:**")
                 || line.starts_with("**Provides:**")
                 || line.starts_with("**Consumes:**")
                 || line.starts_with("**Excludes:**"))

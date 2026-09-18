@@ -348,12 +348,7 @@ fn snapshot_generation_protected_by_active_inherit(
         if is_terminal_state(&current_state, machine) {
             continue;
         }
-        let Some(state_def) = machine.states.get(&current_state) else {
-            continue;
-        };
-        let Some(inherit) =
-            state_def.snapshot.as_ref().and_then(|snapshot| snapshot.inherit.as_ref())
-        else {
+        let Some(inherit) = effective_snapshot_inherit(machine, task, &current_state) else {
             continue;
         };
         let active_task_id = task.id.to_string();
@@ -365,6 +360,23 @@ fn snapshot_generation_protected_by_active_inherit(
                     .any(|ancestor| ancestor == &record.task_id) =>
             {
                 continue;
+            }
+            "prior" => {
+                let eligible = task.prior.iter().any(|prior| {
+                    if prior.to_string() != record.task_id {
+                        return false;
+                    }
+                    let Some(source) = find_task_by_id(&ctx.loaded.rhei.tasks, prior) else {
+                        return false;
+                    };
+                    let source_machine = ctx.machines.for_task(&source.id);
+                    let source_state = normalized_state_name(&source.state, source_machine);
+                    is_terminal_state(&source_state, source_machine)
+                        && !rhei_validator::is_cancelled_state_name(&source_state)
+                });
+                if !eligible {
+                    continue;
+                }
             }
             "self" | "ancestor" => {}
             _ => continue,

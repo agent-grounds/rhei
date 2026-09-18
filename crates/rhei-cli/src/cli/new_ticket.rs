@@ -58,6 +58,7 @@ fn new_ticket_write(
         title: &options.title,
         state: &state,
         prior: &options.prior,
+        inherits: options.inherits.as_deref(),
         provides: &options.provides,
         consumes: &options.consumes,
         excludes: &options.excludes,

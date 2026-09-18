@@ -41,10 +41,10 @@ impl StateMachine {
                 validate_snapshot_name(state_name, "snapshot.inherit.name", &inherit.name)?;
                 if let Some(from_axis) = inherit.from_axis.as_deref() {
                     match from_axis {
-                        "self" | "ancestor" => {}
+                        "self" | "ancestor" | "prior" => {}
                         _ => {
                             return Err(StateMachineLoadError::Invalid(format!(
-                                "state '{state_name}' has unsupported snapshot.inherit.from '{from_axis}' (expected self or ancestor)"
+                                "state '{state_name}' has unsupported snapshot.inherit.from '{from_axis}' (expected self, ancestor, or prior)"
                             )));
                         }
                     }
@@ -86,11 +86,13 @@ impl StateMachine {
                 }
 
                 if let Some(select) = inherit.select.as_ref() {
-                    if let Some(selected_state) = select.state.as_deref() {
-                        if !self.states.contains_key(selected_state) {
-                            return Err(StateMachineLoadError::Invalid(format!(
-                                "state '{state_name}' has snapshot.inherit.select.state '{selected_state}' but no such state is defined"
-                            )));
+                    if inherit.from_axis.as_deref() != Some("prior") {
+                        if let Some(selected_state) = select.state.as_deref() {
+                            if !self.states.contains_key(selected_state) {
+                                return Err(StateMachineLoadError::Invalid(format!(
+                                    "state '{state_name}' has snapshot.inherit.select.state '{selected_state}' but no such state is defined"
+                                )));
+                            }
                         }
                     }
                     if let Some(target) = select.target.as_deref() {
@@ -128,6 +130,14 @@ impl StateMachine {
                     }
                 }
 
+                // A Prior source may belong to another rhei and machine, so
+                // emitter existence, fanout shape, and static agent identity
+                // are validated with the merged plan graph instead.
+                // §FS-rhei-snapshots.11 §FS-rhei-panta.6.1
+                if inherit.from_axis.as_deref() == Some("prior") {
+                    continue;
+                }
+
                 let selected_state =
                     inherit.select.as_ref().and_then(|select| select.state.as_deref());
                 let select_target =
@@ -145,7 +155,12 @@ impl StateMachine {
                     })
                     .collect();
 
-                if possible_emitters.is_empty() {
+                // A task overlay may replace the snapshot name while retaining
+                // this explicit source-state selector. Defer that combination
+                // to plan-aware effective-rule validation; a wholly
+                // unconstrained missing name remains a machine error.
+                // §FS-rhei-snapshots.4.2 §FS-rhei-snapshots.11
+                if possible_emitters.is_empty() && selected_state.is_none() {
                     return Err(StateMachineLoadError::Invalid(format!(
                         "state '{state_name}' has unresolvable snapshot.inherit reference '{}' (no possible snapshot.emit source matches)",
                         inherit.name

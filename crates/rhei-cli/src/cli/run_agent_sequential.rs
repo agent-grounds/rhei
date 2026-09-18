@@ -243,7 +243,9 @@ fn run_sequential_agent_invocation(
     // before spawning the agent. The actual preload is owned by
     // impl-rhei-snapshots; this hook pins the call site so the
     // orchestration ordering is encoded in code.
-    let snapshot_preload = preload_snapshot_inherit_before_spawn(
+    let prior_snapshot_sources =
+        eligible_prior_snapshot_sources(task, &loaded.rhei.tasks, machines);
+    let snapshot_preload = preload_snapshot_inherit_before_spawn_with_prior_sources(
         input,
         SnapshotPreloadRoots { project: workspace_root, execution: &task_workspace_root },
         &checkout_root.path,
@@ -255,6 +257,7 @@ fn run_sequential_agent_invocation(
         visit_count,
         snapshot_override_selection,
         opts,
+        &prior_snapshot_sources,
     )?;
 
     let started_at = TuiInstant::now();

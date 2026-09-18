@@ -389,6 +389,7 @@ transitions:
             state: "pending".to_string(),
             prior: Vec::new(),
             prior_kinds: Vec::new(),
+            inherits: None,
             provides: Vec::new(),
             consumes: Vec::new(),
             excludes: Vec::new(),

@@ -172,6 +172,7 @@ include!("cli/next_diagnostics.rs");
 include!("cli/ready_auto_advance.rs");
 include!("cli/snapshot_runtime_emit.rs");
 include!("cli/snapshot_runtime_preload.rs");
+include!("cli/snapshot_runtime_override.rs");
 include!("cli/task_metadata_lines.rs");
 include!("cli/next_command.rs");
 include!("cli/reset_authored_states.rs");

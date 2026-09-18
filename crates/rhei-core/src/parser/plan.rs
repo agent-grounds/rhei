@@ -1,6 +1,6 @@
 use crate::ast::{
     ConsumedExport, ContentSection, Metadata, Rhei, Structure, Task, TaskExclusion,
-    MAX_ALLOWED_LEVELS,
+    TaskSnapshotInherit, MAX_ALLOWED_LEVELS,
 };
 use crate::text::parse_task_id;
 use regex::Regex;
@@ -26,6 +26,10 @@ pub fn parse(input: &str) -> Result<Rhei> {
     let re_prior_ref =
         Regex::new(&format!(r#"^(?:([A-Za-z][A-Za-z0-9_-]*)\s+)?({task_id_pattern})$"#)).unwrap();
     let re_prior_like = Regex::new(r#"^\*\*Prior\b.*$"#).unwrap();
+    let re_inherits =
+        Regex::new(r#"^\*\*Inherits:\*\*\s*(none|([a-z][a-z0-9-]*) from (self|ancestor|prior))$"#)
+            .unwrap();
+    let re_inherits_like = Regex::new(r#"^\*\*Inherits\b.*$"#).unwrap();
     // Export names key a file on disk, so they are restricted to what is safe
     // in a path segment. §FS-rhei-plan-language.3.12
     let export_name_pattern = r#"[A-Za-z0-9][A-Za-z0-9._-]*"#;
@@ -207,6 +211,7 @@ pub fn parse(input: &str) -> Result<Rhei> {
 
             if re_state_like.is_match(line)
                 || re_prior_like.is_match(line)
+                || re_inherits_like.is_match(line)
                 || re_provides_like.is_match(line)
                 || re_consumes_like.is_match(line)
                 || re_excludes_like.is_match(line)
@@ -351,6 +356,7 @@ pub fn parse(input: &str) -> Result<Rhei> {
                 state: None,
                 prior: Vec::new(),
                 prior_kinds: Vec::new(),
+                inherits: None,
                 provides: Vec::new(),
                 consumes: Vec::new(),
                 excludes: Vec::new(),
@@ -425,6 +431,12 @@ pub fn parse(input: &str) -> Result<Rhei> {
                     Some(line_number),
                 ));
             }
+            if top.inherits.is_some() {
+                return Err(ParseError::new(
+                    format!("**Inherits:** must appear after **Prior:** for Task {}", top.id),
+                    Some(line_number),
+                ));
+            }
             if !top.provides.is_empty() || !top.consumes.is_empty() || !top.excludes.is_empty() {
                 return Err(ParseError::new(
                     format!("**Prior:** must appear before export metadata for Task {}", top.id),
@@ -476,6 +488,78 @@ pub fn parse(input: &str) -> Result<Rhei> {
             if node_stack.last().is_some() {
                 return Err(ParseError::new(
                     "Malformed metadata field: expected '**Prior:** Task <id>'",
+                    Some(line_number),
+                ));
+            }
+            return Err(ParseError::new(
+                "Metadata field appears outside a task",
+                Some(line_number),
+            ));
+        }
+
+        // **Inherits:** metadata. Normalize the closed value grammar here so
+        // renderers and runtime consumers share one representation.
+        // §FS-rhei-plan-language.3.13
+        if let Some(caps) = re_inherits.captures(line) {
+            let Some(top) = node_stack.last_mut() else {
+                return Err(ParseError::new(
+                    "Metadata field appears outside a task",
+                    Some(line_number),
+                ));
+            };
+            if top.metadata_closed {
+                return Err(ParseError::new(
+                    "Metadata fields must appear immediately after the task heading before task content",
+                    Some(line_number),
+                ));
+            }
+            if top.state.is_none() {
+                return Err(ParseError::new(
+                    format!("**State:** must appear before **Inherits:** for Task {}", top.id),
+                    Some(line_number),
+                ));
+            }
+            if top.inherits.is_some() {
+                return Err(ParseError::new(
+                    format!("Task {} declares **Inherits:** more than once", top.id),
+                    Some(line_number),
+                ));
+            }
+            if !top.provides.is_empty()
+                || !top.consumes.is_empty()
+                || top.assignee.is_some()
+                || top.model.is_some()
+                || top.target.is_some()
+            {
+                return Err(ParseError::new(
+                    format!(
+                        "**Inherits:** must appear before **Provides:** and later metadata for Task {}",
+                        top.id
+                    ),
+                    Some(line_number),
+                ));
+            }
+            if caps.get(2).is_some_and(|name| name.as_str().len() > 64) {
+                return Err(ParseError::new(
+                    "Malformed **Inherits:** metadata: snapshot names are at most 64 characters",
+                    Some(line_number),
+                ));
+            }
+            top.inherits = if caps.get(1).is_some_and(|value| value.as_str() == "none") {
+                Some(TaskSnapshotInherit::Disabled)
+            } else {
+                Some(TaskSnapshotInherit::Rule {
+                    name: caps.get(2).expect("rule name capture").as_str().to_string(),
+                    from_axis: caps.get(3).expect("rule axis capture").as_str().to_string(),
+                })
+            };
+            continue;
+        }
+
+        if re_inherits_like.is_match(line) {
+            if node_stack.last().is_some() {
+                return Err(ParseError::new(
+                    "Malformed **Inherits:** metadata: expected `none` or `<snapshot-name> from <self|ancestor|prior>`",
                     Some(line_number),
                 ));
             }
@@ -880,8 +964,9 @@ pub fn parse(input: &str) -> Result<Rhei> {
                     return Err(ParseError::new(
                         format!(
                             "Unknown metadata field '**{field}:**' for Task {}. Task metadata \
-                             is one of **State:**, **Prior:**, **Provides:**, **Consumes:**, \
-                             **Excludes:**, **Assignee:**, **Model:**, **Target:**. Leave a blank line before \
+                             is one of **State:**, **Prior:**, **Inherits:**, **Provides:**, \
+                             **Consumes:**, **Excludes:**, **Assignee:**, **Model:**, \
+                             **Target:**. Leave a blank line before \
                              this line to keep it as task content.",
                             top.id
                         ),

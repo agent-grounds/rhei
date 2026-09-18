@@ -48,7 +48,7 @@ fn render_rhei_file(header: &RheiHeader<'_>, with_tasks_section: bool) -> String
 }
 
 /// Every metadata field a new ticket can carry, in plan-language order.
-// §FS-rhei-plan-language.2: metadata = state, prior, provides, consumes, excludes,
+// §FS-rhei-plan-language.2: metadata = state, prior, inherits, provides, consumes, excludes,
 // assignee, execution override.
 struct TicketFields<'a> {
     kind: &'a str,
@@ -56,6 +56,7 @@ struct TicketFields<'a> {
     title: &'a str,
     state: &'a str,
     prior: &'a [String],
+    inherits: Option<&'a str>,
     provides: &'a [String],
     consumes: &'a [String],
     excludes: &'a [String],
@@ -77,8 +78,17 @@ fn render_ticket(fields: &TicketFields<'_>) -> String {
         fields.title.trim(),
         fields.state
     );
+    if !fields.prior.is_empty() {
+        let joined = fields.prior.iter().map(|value| value.trim()).collect::<Vec<_>>().join(", ");
+        out.push_str(&format!("**Prior:** {joined}\n"));
+    }
+    if let Some(inherits) = fields.inherits {
+        // The parser performs the closed-grammar validation during the
+        // create transaction; this renderer owns canonical placement.
+        // §FS-rhei-new.1.3 §FS-rhei-plan-language.3.13
+        out.push_str(&format!("**Inherits:** {}\n", inherits.trim()));
+    }
     for (label, values) in [
-        ("Prior", fields.prior),
         ("Provides", fields.provides),
         ("Consumes", fields.consumes),
         ("Excludes", fields.excludes),

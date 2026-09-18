@@ -208,6 +208,7 @@ fn refill_parallel_worker_pool(
     workspace_root: &Path,
     runtime_dir: &Path,
     run_id: &str,
+    snapshot_override_selection: Option<&SnapshotOverrideRunSelection>,
     sink: &Arc<dyn rhei_tui::EventSink>,
     intervene: Option<&Arc<RunInterveneSink>>,
     free_slots: &mut BTreeSet<rhei_tui::Slot>,
@@ -324,19 +325,8 @@ fn refill_parallel_worker_pool(
         sink.emit(rhei_tui::RunEvent::TasksDeferred { pass, tasks: agent_deferred });
     }
 
-    let refill_candidates = agent_items
-        .iter()
-        .map(|item| {
-            (
-                item.task_id_str.clone(),
-                item.current_state_raw.clone(),
-                item.current_state.clone(),
-                item.resolved.clone(),
-            )
-        })
-        .collect::<Vec<_>>();
-    let snapshot_override_selection =
-        select_snapshot_override_run_invocation(input, machines, opts, &refill_candidates)?;
+    // Refills share the run's binding, including whether preload consumed it.
+    // §FS-rhei-snapshot-operations.2
     let agent_outcome = schedule_agent_work_items(
         agent_items,
         task_capacity,
@@ -349,7 +339,7 @@ fn refill_parallel_worker_pool(
         workspace_root,
         runtime_dir,
         run_id,
-        snapshot_override_selection.as_ref(),
+        snapshot_override_selection,
         sink,
         intervene,
         free_slots,

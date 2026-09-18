@@ -83,9 +83,8 @@ fn run_agent_worker_pool(
     };
     let initial_items = batch
         .iter()
-        .map(|(task_id_str, current_state_raw, current_state, resolved)| AgentWorkItem {
+        .map(|(task_id_str, _current_state_raw, current_state, resolved)| AgentWorkItem {
             task_id_str: task_id_str.clone(),
-            current_state_raw: current_state_raw.clone(),
             current_state: current_state.clone(),
             resolved: resolved.clone(),
         })
@@ -167,6 +166,7 @@ fn run_agent_worker_pool(
                     workspace_root,
                     runtime_dir,
                     run_id,
+                    snapshot_override_selection,
                     sink,
                     intervene,
                     &mut free_slots,
@@ -356,6 +356,7 @@ fn run_agent_worker_pool(
             workspace_root,
             runtime_dir,
             run_id,
+            snapshot_override_selection,
             sink,
             intervene,
             &mut free_slots,

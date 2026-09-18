@@ -132,6 +132,7 @@ fn run_agent_mode(
     let mut programs_spawned = 0u32;
     let mut callback_transitions_made = 0u32;
     let mut pass = 0u32;
+    let mut snapshot_override = SnapshotOverrideRun::default();
     // One-time notice so the gate-wait below does not spam the journal each tick.
     let mut awaiting_gate_announced = false;
     // Re-check persisted deadlines and task states in short slices without
@@ -789,9 +790,8 @@ fn run_agent_mode(
                 batch.push(entry.clone());
             }
         }
-        let batch_size = batch.len();
         let snapshot_override_selection =
-            select_snapshot_override_run_invocation(input, machines, opts, &agent_tasks)?;
+            snapshot_override.select(input, machines, opts, &agent_tasks)?;
 
         if opts.dry_run() {
             if run_programs_in_worker_pool {
@@ -864,7 +864,7 @@ fn run_agent_mode(
         }
 
         // Spawn agents (sequential or parallel).
-        if batch_size == 1 && (program_tasks.is_empty() || !run_programs_in_worker_pool) {
+        if batch.len() == 1 && (program_tasks.is_empty() || !run_programs_in_worker_pool) {
             // Sequential: spawn one agent at a time. Every way out of this
             // ticket's turn lands on the shared pass tail below, so one ticket
             // giving up never skips the decision about the pass. §FS-rhei-run.3
@@ -884,7 +884,7 @@ fn run_agent_mode(
                 &workspace_root,
                 &runtime_dir,
                 &run_id,
-                snapshot_override_selection.as_ref(),
+                snapshot_override_selection,
                 &sink,
                 intervene.as_ref(),
                 &mut progress,
@@ -910,7 +910,7 @@ fn run_agent_mode(
                 &workspace_root,
                 &runtime_dir,
                 &run_id,
-                snapshot_override_selection.as_ref(),
+                snapshot_override_selection,
                 &sink,
                 intervene.as_ref(),
                 &mut progress,

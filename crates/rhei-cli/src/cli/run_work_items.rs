@@ -30,12 +30,39 @@ struct AgentPassProgress<'a> {
 struct SnapshotOverrideRunSelection {
     task_id: String,
     target_slug: String,
+    /// Preload consumes the override on the scheduler thread, before spawning
+    /// a worker; the binding survives later passes and refills.
+    /// §FS-rhei-snapshot-operations.2
+    consumed: std::cell::Cell<bool>,
+}
+
+/// Bind once per run, retaining the chosen invocation even after preload
+/// consumes it; later passes must not select another override recipient.
+/// §FS-rhei-snapshot-operations.2
+#[derive(Default)]
+struct SnapshotOverrideRun {
+    selection: Option<SnapshotOverrideRunSelection>,
+}
+
+impl SnapshotOverrideRun {
+    fn select(
+        &mut self,
+        input: &Path,
+        machines: &ExecutionMachines,
+        opts: &RunOptions,
+        invocations: &[(String, String, String, ResolvedAgent)],
+    ) -> MietteResult<Option<&SnapshotOverrideRunSelection>> {
+        if self.selection.is_none() {
+            self.selection =
+                select_snapshot_override_run_invocation(input, machines, opts, invocations)?;
+        }
+        Ok(self.selection.as_ref())
+    }
 }
 
 #[derive(Clone)]
 struct AgentWorkItem {
     task_id_str: String,
-    current_state_raw: String,
     current_state: String,
     resolved: ResolvedAgent,
 }
@@ -190,6 +217,7 @@ fn select_snapshot_override_run_invocation(
         candidates.push(SnapshotOverrideRunSelection {
             task_id: task_id.clone(),
             target_slug,
+            consumed: std::cell::Cell::new(false),
         });
     }
 
@@ -394,7 +422,6 @@ fn collect_ready_agent_work_items(
         for resolved in pending {
             agent_tasks.push(AgentWorkItem {
                 task_id_str: task_id_str.clone(),
-                current_state_raw: current_state_raw.clone(),
                 current_state: current_state.clone(),
                 resolved,
             });

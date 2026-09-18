@@ -414,7 +414,7 @@ fn snapshot_prior_missing_source_is_optional_cold_but_required_pre_spawn_failure
 ## Tasks
 
 ### Task source: Source
-**State:** source
+**State:** completed
 
 ### Task optional: Optional consumer
 **State:** optional
@@ -429,10 +429,10 @@ version: 1
 states:
   source:
     initial: true
-    description: Emits another name
+    description: Can emit but has never run
     target: fake:acme:model-a
     snapshot:
-      emit: { name: other, on: always }
+      emit: { name: implementation, on: always }
   optional:
     description: Runs cold
     target: fake:acme:model-a

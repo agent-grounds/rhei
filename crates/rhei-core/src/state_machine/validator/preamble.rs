@@ -385,7 +385,7 @@ pub struct ExecutionTarget {
     /// runtime provenance, not part of the selector's serialized identity.
     /// §FS-rhei-agents.1.4
     #[serde(skip)]
-    pub(crate) model_profile: Option<String>,
+    pub model_profile: Option<String>,
 }
 
 impl ExecutionTarget {

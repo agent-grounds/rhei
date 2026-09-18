@@ -51,7 +51,9 @@ The human operator has full authority over the plan. They can:
 - Transition tasks out of `human-review`.
 - Cancel tasks at any point.
 - Edit the plan structure (add tasks, change dependencies) — usually by re-invoking the plan writer.
-- Override any state, including terminal states, when explicitly needed.
+- Override any state, including terminal states, when explicitly needed,
+  through the attended `rhei transition --force --reason` and explicit
+  `rhei recover` contracts (§FS-rhei-transition-cmd.6, §FS-rhei-recover).
 
 The human is the only role that can unblock `human-review` gates. This is by design: certain decisions (ship/no-ship, scope changes, external approvals) require human judgment.
 
@@ -60,7 +62,10 @@ The human is the only role that can unblock `human-review` gates. This is by des
 The state machine is the single coordination protocol between all roles. It defines:
 
 1. **What states exist** and what each one means (via `description` and `instructions` fields).
-2. **What transitions are legal** — any transition not declared is forbidden.
+2. **What transitions are legal** — any transition not declared is forbidden
+   to ordinary callers. A human operator may use only the narrow, attended
+   missing-edge recovery of §FS-rhei-transition-cmd.6; it does not make the
+   edge part of the machine or bypass a declared edge's safeguards.
 3. **Who acts in each state** — the `instructions` field tells the current role what to do and when to hand off.
 
 This means agents do not need to communicate with each other directly. They communicate through artifacts and the authoritative plan state managed by the orchestrator: one agent writes outputs for its state, `rhei run` advances the task, and the next agent reads the resulting state and artifacts.
@@ -97,7 +102,8 @@ The commands that coordinate through the state machine:
 | `rhei init`        | Sets up a Panta project in a gitignored `panta/` folder (or in place with `--here`): manifest, ignore rules, agent-discovery note ([§FS-rhei-init](rhei-init.spec.md#fs-rhei-init-rhei-init)) |
 | `rhei run`         | Drives the full plan forward under orchestrator authority (`--rhei <id>` narrows a project-scoped run) |
 | `rhei next`        | Claims the next ready task for a manual worker; `--task` may advance one eligible passive edge, while `--peek` is read-only and `--rhei <id>` narrows scope |
-| `rhei transition`  | Atomically changes a task's state via compare-and-swap; `--result` carries the message a `final: true` target requires ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)) |
+| `rhei transition`  | Atomically changes a task's state via compare-and-swap; `--result` carries the message a `final: true` target requires, and the attended `--force --reason` form repairs a missing edge ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result), §FS-rhei-transition-cmd.6) |
+| `rhei recover`     | Explicitly rolls back or forward an interrupted forced transition; every other command refuses the marked execution root (§FS-rhei-recover) |
 | `rhei complete`    | Terminal transition invoked by a manual worker: the inferred one-hop terminal target plus the shared transition carrying a literal `--result` or UTF-8 `--result-file` message |
 | `rhei reset`       | Returns each task to the state it was authored in ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)), removes `runtime/`; narrowed with `--rhei <id>` it removes only the in-scope tickets' keyed output ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)) |
 | `rhei snapshot`    | Lists, shows, prunes, or continues from session snapshots captured by `rhei run` |

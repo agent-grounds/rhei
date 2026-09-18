@@ -1,6 +1,11 @@
 # FS-rhei-transition-cmd: `rhei transition`
 
-Atomically advance a task's state using compare-and-swap semantics. `rhei transition` is the coordination primitive for manual workers and concurrent agents: only the caller whose expected `--from` matches the task's actual current state wins the race, and every transition is validated against the active state machine before any write.
+Atomically advance a task's state using compare-and-swap semantics. `rhei
+transition` is the coordination primitive for manual workers and concurrent
+agents: only the caller whose expected `--from` matches the task's actual
+current state wins the race. Ordinary transitions are validated against the
+active state machine before any write; §6 defines the one attended operator
+exception for a missing edge.
 
 ## 1. Usage
 
@@ -8,6 +13,8 @@ Atomically advance a task's state using compare-and-swap semantics. `rhei transi
 rhei transition <TICKET_ID> --from <STATE> --to <STATE>
 rhei transition <TICKET_ID> --from <STATE> --to <STATE> --result <MESSAGE>
 rhei transition <RHEI_PLAN> --task <TASK_ID> --from <STATE> --to <STATE>
+rhei transition <RHEI_PLAN> --task <TASK_ID> --from <STATE> --to <STATE> \
+  --force --reason <WHY>
 ```
 
 The positional slot is a *ticket or plan*, on the shared rule every
@@ -25,6 +32,8 @@ The ticket must be named one way or the other.
 | `--result <MSG>` | Only when `--to` is a `final: true` state and the ticket has no result yet | | Result message appended to `runtime/results/<task-id>.md`. See §3.2. |
 | `--supervisor <TASK_ID>` | No |  | The move's nearest in-scope supervising ancestor. Suppresses the checkpoint the move would otherwise deliver to it. |
 | `--no-callbacks` | No       | false   | Skip execution of `on_leave` / `on_enter` callbacks registered on the edge  |
+| `--force`        | No       | false   | Attended operator recovery across an edge the active machine does not declare (§6) |
+| `--reason <WHY>` | With `--force` | | Fresh non-whitespace explanation recorded in the exceptional audit row |
 
 `--result` is accepted on any transition, not only terminal ones: a message
 passed on a non-terminal hop is appended to the same result file and creates it
@@ -66,6 +75,12 @@ dispatch-and-claim holds or in-flight suppression.
 
 State values passed to `--from` and `--to` follow the state-value rendering rules in the [main spec](rhei-plan-language.spec.md#32-state-validity): bare for names that match `IDENTIFIER`, backtick-wrapped otherwise.
 
+`--reason` without `--force` is refused. `--force` with `--supervisor` is
+refused because an operator recovery must deliver its ordinary supervision
+checkpoint. `--force --no-callbacks` is refused with `a forced recovery runs no
+callbacks; drop --no-callbacks`: the force path has no edge callbacks, so an
+accepted no-op flag would conceal rather than select behavior.
+
 ### 2.1. Ticket Targets
 
 The ticket target — positional or `--task` — accepts either the
@@ -81,6 +96,14 @@ names the scope. The rewrite is routed to the file of the rhei that owns the
 ticket, under that rhei's own rhei-local heading ([§FS-rhei-panta.6.1](rhei-panta.spec.md#61-readiness-and-rhei-next)).
 
 ## 3. Behavior
+
+Without `--force`, the numbered sequence below is unchanged. With `--force`,
+the command performs flag validation, load, task/target existence, profile
+legality, and declared-versus-missing edge classification as read-only
+preflight before step 3; a stable refusal therefore never prompts. It then
+collects the §6 confirmation, acquires the run locks and root guards followed
+by the step-3 file locks, and resumes at step 4. Under those locks it re-reads
+compare-and-swap and every mutable guard before computing any effect.
 
 1. Load the state machine and plan (single-file or directory workspace). Validate.
 2. Locate the task by id. Fail if it does not exist.
@@ -102,7 +125,12 @@ ticket, under that rhei's own rhei-local heading ([§FS-rhei-panta.6.1](rhei-pan
    edge and condition evaluation, callbacks and redirects, artifact checks,
    transition-metadata preparation, and every state, result, ledger, or
    checkpoint effect. `--no-callbacks` does not bypass it.
-6. Validate that a declared transition exists from `--from` to `--to` in the active state machine. Reject if the edge is unlisted. Then evaluate the edge's `condition:`, if it declares one, and reject when it is unmet, naming which transitions from `--from` *are* currently applicable.
+6. Validate that a declared transition exists from `--from` to `--to` in the
+   active state machine. Without `--force`, reject if the edge is unlisted.
+   With `--force`, classify the edge and route only a genuinely missing edge to
+   §6; a declared edge never enters the exceptional path. Then evaluate the
+   selected edge's `condition:`, if it declares one, and reject when it is
+   unmet, naming which transitions from `--from` *are* currently applicable.
 7. Apply the descendants-first guard (§3.1). Reject before any callback runs
    when `--to` is a `final: true` state and the task still has a non-terminal
    descendant. The guard runs after the edge is confirmed declared and
@@ -218,8 +246,10 @@ ahead of its subtree is finished by finishing or cancelling the subtree first �
 
 A transition into a `final: true` state is refused unless the ticket has a
 non-empty `runtime/results/<task-id>.md` or the caller carried a message on the
-move. The obligation belongs to the state, not to the command: it is specified
-once in [§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result) and enforced here, on the same shared path as
+move. A forced entry is stricter: that invocation must carry its own fresh,
+non-whitespace `--result`; an old result file does not satisfy it. The
+obligation belongs to the state, not to the command: it is specified once in
+[§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result) and enforced here, on the same shared path as
 compare-and-swap, the descendants-first guard (§3.1), and `inputs:` /
 `outputs:` resolution.
 
@@ -282,6 +312,110 @@ With `--no-callbacks`:
 ```text
 Task <ID> transitioned: '<from>' -> '<to>' (callbacks skipped)
 ```
+
+## 6. Operator-forced missing-edge recovery
+
+`--force` is available only on an explicit `rhei transition` invocation by a
+human operator. It is not expressible in YAML, a callback, `rhei run`, an
+environment variable, configuration, persistent grant, or `--yes`; agents are
+forbidden to invoke it. Stdin must be a terminal. After every stable preflight
+passes, the command prints the exact qualified task id and canonical base-state
+hop and requires the operator to type back
+`force <task-id> <from> -> <to>`. Mismatch, EOF, or a non-terminal caller
+refuses. The confirmation is valid for that invocation only; a refusal, race,
+or retry requires another invocation and confirmation.
+
+This ceremony is an explicitness and account-attribution boundary, not proof
+that a human read it: a same-account agent can drive a pseudo-terminal. Sites
+MAY add a separate-principal verifier before the prompt, but none ships and one
+is never required. Approval of this command does not authorize an agent to use
+it, including to leave a `human-review` or other gating state.
+
+An edge is **declared** when the valid, resolved active machine contains either
+an exact rule or an ordinarily matching wildcard for the canonical base source
+state. Exact rules take precedence. A condition, exit-code route, visit budget,
+or other safeguard can make a declared edge unavailable but cannot make it
+missing. A declared and available edge refuses `--force` and tells the operator
+to drop it. A declared but blocked edge gives its ordinary diagnostic followed
+by `--force does not bypass safeguards on declared edges`. An unknown target,
+a target excluded by the resolved profile, or an invalid machine is never
+forceable. Exact rules from final source states are invalid under
+§FS-rhei-states.1.3, so every exit from a final state in a valid machine is a
+missing edge and requires this path.
+
+For a genuinely missing edge, every task- or state-owned rule on the ordinary
+shared path remains in force: compare-and-swap, source `outputs:` with the
+existing cancellation waiver, target `inputs:`, descendants-first final entry,
+fresh forced-final result (§3.2), target/profile legality, the task and
+ancestor claim checks below, visit-budget refusal and ordinary visit suffix and
+counter update, ordinary `**Prior:**` omission, terminal finalization, and
+supervision checkpoint delivery. A forced move from a gating state is allowed.
+When a target is terminal, descendants close first. When a source is terminal,
+every terminal ancestor must already have been reopened, so the hop cannot
+leave a non-terminal descendant beneath a terminal ancestor.
+
+The absent edge carries no `condition:`, callback, redirect, retry policy, or
+firing identity. The force path runs no `on_leave` or `on_enter`, allocates no
+callback firing id, and its effective destination is literally `--to`.
+`--result` on a non-final hop keeps its ordinary append meaning but never
+substitutes for the mandatory fresh `--reason`. Leaving a terminal state
+removes the task body's result link and preserves the append-only result file;
+re-entering a final state appends the required fresh result and restores one
+link.
+
+After confirmation, the command acquires each affected execution root's run
+lock non-blocking and refuses with its recorded owner when held. It then takes
+the exclusive root-access guards of §FS-rhei-recover.4 and the stable metadata,
+task, and ledger locks. It refuses while a claim exists on the task, any
+descendant, or the nearest in-scope supervising ancestor; claim release is a
+separate operator action. Under the locks it re-reads `--from` and revalidates
+every mutable guard. A stale source gets the ordinary compare-and-swap error.
+Every refusal is non-zero and precedes all effects: plan and metadata bytes,
+result, both ledgers, visits, checkpoints, result link, and assignee remain
+unchanged.
+
+### 6.1. Durable transaction and audit pair
+
+Once the locked revalidation accepts, the command computes complete before and
+after images for the task/metadata/checkpoint/result files and the exact audit
+pair, publishes the versioned marker of §FS-rhei-recover.2 durably, then
+installs after-images. The marker records absence distinctly and covers the
+state and assignee rewrite, visits and suffix, supervision checkpoint, result
+append, and result-link addition or removal. It also records the original
+ledger byte offset and prefix digest. No effect precedes durable marker
+publication.
+
+Under the central ledger lock, the command appends these two adjacent lines as
+one logical record:
+
+```text
+<task-id> !force-v1 <base64url(canonical-json)>
+<task-id> <from>@<to>
+```
+
+The second line is byte-identical to an ordinary movement row. The unpadded
+base64url payload is canonical UTF-8 JSON with lexicographically sorted keys,
+no insignificant whitespace, decimal integers, and these fields:
+`confirmation` (`typed-hop-v1`), `from`, `os_user`, `reason`, `recovery_id`,
+`schema_version` (`1`), `task_id`, `timestamp` (RFC 3339 UTC), and `to`.
+Forced final entry also has `result_sha256`, the lower-case hexadecimal SHA-256
+of the exact UTF-8 `--result` argument before result-file formatting. No
+credential, terminal bytes, or permit is recorded.
+
+The command syncs the adjacent pair as one append. That durable, exact pair is
+the commit point. It then ensures every after-image is durable and durably
+removes the marker. An interruption at any boundary leaves the marker for the
+operator-only `rhei recover` path; no ordinary loader resolves it. Recovery
+uses the recovery id to make replay idempotent, so there is exactly one pair,
+result entry, checkpoint, and visit update. §FS-rhei-recover
+
+Pair-aware readers validate duplicated task/from/to values and adjacency, skip
+unknown `!` metadata rows safely, and expose one movement per valid pair.
+Narrowed reset removes both task-keyed lines together and authored-state
+reconstruction reads movement rows only. A metadata row without its exact next
+movement, or a movement that contradicts its metadata, is corrupt history and
+is never presented as a forced hop. `runtime/transitions.log` receives no row:
+a manual recovery owns no run slot. §FS-rhei-complete.3.1
 
 ## Relationship to Other Commands
 

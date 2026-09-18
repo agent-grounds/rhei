@@ -342,6 +342,24 @@ sidecars remain and are reused, but Rhei does not detect or support concurrent
 mixed-version writing. In particular, the presence of a sidecar does not prove
 that every writer follows this protocol.
 
+The forced-transition coordinator adds a root-level exclusion layer because a
+process-crash transaction spans plan/metadata, result, checkpoint, and ledger
+files: ordinary callback rollback cannot make that set atomic. Every access
+takes a shared guard keyed by canonical execution root in rhei's platform state
+directory and holds it through its derived reads/writes; force and explicit
+recovery take it exclusively. Readers check the durable marker on both sides
+of acquisition, closing the race between a load and marker publication without
+requiring write permission inside the project. Multi-root operations acquire
+all run locks first, then all root guards, each set sorted by canonical root;
+stable metadata, task, and ledger locks follow in their existing order.
+§FS-rhei-transition-cmd.6.1 §FS-rhei-recover.4
+
+The versioned marker contains complete before/after file images and the exact
+ledger pair. It is published and directory-synced before any effect; the
+synced adjacent audit pair is the commit witness. Only `rhei recover` may
+restore the before-images before that witness or install after-images after it.
+No ordinary loader performs recovery. §FS-rhei-recover
+
 ### 3.4. Durable State and Git Boundary
 
 Rhei-owned durable state is the authored plan/workspace task state plus the

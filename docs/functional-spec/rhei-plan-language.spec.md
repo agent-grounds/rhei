@@ -1029,8 +1029,11 @@ A result block is optional syntax, but it has a lifecycle invariant:
   reached by commands other than `rhei complete` and by imported plans.
 - `rhei complete` must create or preserve exactly one valid result block for a
   successful non-cancelled terminal completion.
-- `rhei transition` may append audit entries to the result file, but it never
-  adds a result block to the task body.
+- Every successful terminal entry, including `rhei transition` and an
+  operator-forced entry, performs the shared terminal finalization and leaves
+  exactly one valid result block (§FS-rhei-complete.3). A forced exit from a
+  terminal state removes that block while preserving the append-only result
+  file; a later final re-entry appends its fresh result and restores one block.
 - `rhei reset` removes result blocks along with other runtime completion
   artifacts.
 

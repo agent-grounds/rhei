@@ -32,6 +32,7 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-summary](rhei-summary.spec.md#fs-rhei-summary-rhei-summary) | `rhei summary`: a pull-request-ready Markdown account of a run |
 | [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next) | `rhei next` command behavior |
 | [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition) | `rhei transition` command behavior |
+| [§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover) | Explicit recovery of an interrupted operator-forced transition |
 | [§FS-rhei-complete](rhei-complete.spec.md#fs-rhei-complete-rhei-complete) | `rhei complete` command behavior |
 | [§FS-rhei-release](rhei-release.spec.md#fs-rhei-release-rhei-release) | `rhei release` command behavior |
 | [§FS-rhei-reset](rhei-reset.spec.md#fs-rhei-reset-rhei-reset) | `rhei reset` command behavior |

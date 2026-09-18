@@ -74,8 +74,11 @@ Use this order when learning or auditing the language:
    several blocks directly.
 
 Command specs such as [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate), [§FS-rhei-migrate](rhei-migrate.spec.md#fs-rhei-migrate-rhei-migrate), [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next), [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition),
-[§FS-rhei-complete](rhei-complete.spec.md#fs-rhei-complete-rhei-complete), and [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run) define command behavior over the language;
-they are not the primary grammar reference.
+Command specs such as [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate), [§FS-rhei-migrate](rhei-migrate.spec.md#fs-rhei-migrate-rhei-migrate), [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next), [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition),
+[§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover), [§FS-rhei-complete](rhei-complete.spec.md#fs-rhei-complete-rhei-complete), and [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run) define command behavior over the language;
+they are not the primary grammar reference. Read §FS-rhei-recover with
+§FS-rhei-transition-cmd.6 when auditing operator recovery or an execution root
+blocked by `.rhei/forced-recovery.json`.
 
 ## 3. Ownership Rules
 

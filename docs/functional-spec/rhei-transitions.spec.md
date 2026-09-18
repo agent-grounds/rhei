@@ -17,7 +17,9 @@ State transitions will be defined declaratively in YAML and executed through pla
 3. Provide a consistent API across CLI, JavaScript, Python, and Java
 
 ### Requirements
-- State transitions must be explicitly declared - unlisted transitions are forbidden
+- State transitions must be explicitly declared; unlisted transitions are
+  forbidden to ordinary callers. The only exception is the attended,
+  operator-only missing-edge recovery in §FS-rhei-transition-cmd.6.
 - Transitions trigger callbacks/functions that receive context about the task
 - Callbacks can reject transitions by returning an error (for conditional logic)
 - Failed transitions should be reportable and recoverable
@@ -874,7 +876,10 @@ contract instead of a convention in free-form instructions.
 The special value `"*"` in the `from` field matches any state with these rules:
 - Matches any state **except** final states (states with `final: true`)
 - Specific transitions take precedence over wildcard transitions
-- A transition from a final state is always forbidden, even with wildcards
+- A declared transition from a final state is always forbidden, even with
+  wildcards. A valid machine cannot declare an exact final-source rule
+  (§FS-rhei-states.1.3); leaving a final state is therefore possible only as an
+  operator-forced missing-edge recovery (§FS-rhei-transition-cmd.6).
 
 Optional `sources: [work, review]` restricts a `from: "*"` rule to exactly the
 listed declared state names. An absent set means all states; an empty set

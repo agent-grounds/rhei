@@ -264,6 +264,10 @@ does not silently drift from the current CLI surface.
 | `transition` | `--result` | No fixed candidates; shell should preserve free text |
 | `transition` | `--supervisor` | No fixed candidates; shell should preserve the supervising task's id |
 | `transition` | `--no-callbacks` | Static flag completion |
+| `transition` | `--force` | Static flag completion |
+| `transition` | `--reason` | No fixed candidates; shell should preserve free text |
+| `transition --force` | `--to` | Valid profile target states missing both an exact and ordinarily matching wildcard edge from `--from` |
+| `recover` | `EXECUTION_ROOT` | Directory path completion |
 | `reset` | `RHEI_PLAN` | Rhei plan/workspace path completion |
 | `install-skills` | `--agent` | `claude-code`, `cursor`, `windsurf`, `copilot`, `kilocode`, `pi`, `codex`, `antigravity`, `all` |
 | `install-skills` | `--local`, `--link`, `--uninstall`, `--dry-run` | Static flag completion |

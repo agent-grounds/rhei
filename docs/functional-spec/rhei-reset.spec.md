@@ -100,6 +100,11 @@ subdirectory rhei:
 - the ticket's lines in `runtime/state-transitions.log`, so a reset ticket's
   recorded history cannot claim a completion its plan no longer holds
 
+A forced transition's `!force-v1` metadata row and immediately adjacent
+movement row are one task-keyed record (§FS-rhei-complete.3.1). Narrowed reset
+validates the pair and removes both rows together; it never leaves exceptional
+metadata orphaned or prunes only the movement.
+
 Artifact paths that still carry unresolved placeholders after `{task_id}` is
 substituted (`{state}`, `{visit_count}`, `{model}`, …) are matched by the
 literal prefix up to the first remaining placeholder, so `auth.1` never matches
@@ -135,10 +140,12 @@ per-task, so reset recovers it per-task.
 
 The record it recovers from is the central transition ledger,
 `runtime/state-transitions.log` — the one place every verb that moves a ticket
-appends to ([§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector)). Each line is `<task-id> <from>@<to>`, in the order
-the moves happened, so the **first `from` recorded for a task is the state that
-task started in**. Reset reads the ledger before it deletes it, and for each
-in-scope task:
+appends to ([§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector)). Ordinary movement rows are
+`<task-id> <from>@<to>`; forced metadata rows are paired as specified by
+§FS-rhei-complete.3.1. Authored-state reconstruction ignores metadata rows and
+reads each validated pair's movement exactly once, so the **first `from`
+recorded for a task is the state that task started in**. Reset reads the ledger
+before it deletes it, and for each in-scope task:
 
 - **The task has ledger lines.** Its authored state is the first `from`. Reset
   rewrites `**State:**` back to it.
@@ -194,6 +201,13 @@ reset persistence boundary, never between consent and destruction. A cancelled
 or refused reset releases without mutation. Persistent plan and ledger
 sidecars, and the directories required to preserve their pathname identities,
 survive scoped pruning and full runtime cleanup.
+
+Reset first obeys the root-access interlock of §FS-rhei-recover.4. A pending
+forced-recovery marker refuses both preview and mutation and prints the one
+recovery invocation; reset never repairs or deletes it. With no marker, reset
+holds shared root guards and its ordinary stable file locks, so concurrent
+`rhei next`, `rhei transition`, `rhei complete`, and forced writers run wholly
+before or after its decision snapshot.
 
 ## 4. Output
 

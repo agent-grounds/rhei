@@ -1321,6 +1321,7 @@ dependencies = [
  "rhei-plan",
  "serde_json",
  "serde_yaml",
+ "sha2",
  "time",
  "url",
  "uuid",

@@ -9,7 +9,11 @@ file inventoried below before shipping PR #303, after retaining the artifacts.
 
 The `Issue 301 macOS evidence` workflow is limited to PR #303 on
 `fix/issue-301`. Job key `paired-watch-trace` has display name
-`issue-301 full-suite macOS evidence`. It runs this protocol once:
+`issue-301 full-suite macOS evidence`. The first preparation run
+(`35428542945`, attempt 1, head `d868c7f97c319790cde3a1893d5a2df56171fc0a`)
+spent zero slots because its checkout lacked the historical object. Supervisor
+checkpoint 11 authorizes exactly one continuation after verifying and retaining
+that run's exact artifact. The continuation runs this unchanged protocol once:
 
 1. Full suite on unchanged historical `b0e3f86ad7ef37e75732beaa0adfa9f154b60a5b`.
 2. Full suite on unchanged current baseline `c841d36fe5f650ba3352c89724df59a2509e8f0a`.
@@ -42,20 +46,29 @@ A job killed before a final result is explicitly incomplete.
 is not refunded. Command records are written before spawn and after completion.
 The workflow serializes runs without canceling an active collector. The
 collector rejects attempts other than 1 and queries earlier workflow runs for
-this branch. The first commit introducing `round-2-full-suite-v1` identifies
-this approved round: an earlier run whose head contains that commit blocks
-further collection, even if that run failed during setup. The comparison uses
-GitHub commit ancestry, so unavailable local old heads cannot reset the budget.
-Missing run/ancestry access is inconclusive. No one may change the protocol
-marker or rerun collection to obtain fresh slots without a supervisor decision.
-Inspect the first run's ledger; this deliberately conservative guard may consume
-the opportunity before any test. There is no automatic recovery or retry.
+this branch. The first commit introducing `round-2-full-suite-v1` must remain
+the original diagnostic head. Collection proceeds only when the sole earlier
+protocol run is the predecessor named above and its completed run API record
+and unexpired, digest-verified artifact prove the exact missing-object failure
+and an empty four-slot ledger. The predecessor artifact and authorization proof are retained
+under `authorized-continuation/`. A later head sees both protocol runs and is
+refused, so this exception cannot grant a second continuation. Missing,
+unreadable, expired or inconsistent run/artifact evidence is inconclusive.
+There is no general setup-failure exemption, automatic recovery or retry.
 
 **Source, environment and path fidelity**
 
 Source archives, explicit build targets and diagnostic artifacts live under
 `~/ag/tmp`. One target directory reuses dependencies sequentially; Cargo and the
 existing harness freshness build validate binaries against each source copy.
+Before any suite spends a slot, the collector directly fetches both exact
+approved commits, resolves their commit and tree identities, and rejects any
+identity other than historical
+tree `cc582280de5b0521df4570d2a12537c61dbb05a1` or current tree
+`fd8c4cf1eccc54685dff8fd80ff3e75e9957d963`. Acquisition commands, raw streams
+and `source-identity.json` remain under `source-acquisition/`. Each preparation
+resolves the identity again immediately before archiving it. The present PR
+head, main or an archive of unverified provenance cannot substitute.
 Every source directory records and enforces Rust/Cargo 1.82.0 and the same host.
 Dependency preparation remains `cargo fetch --locked --target <recorded-host>`;
 subsequent builds use the offline cache. Each revision retains its own lockfile,

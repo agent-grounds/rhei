@@ -12,9 +12,42 @@ TEST_FILE = "tests/e2e/export_prior_migration_implementation_tests.rs"
 SOURCE_FILES = ["Cargo.lock", TEST_FILE, "crates/rhei-cli/src/lib.rs", "crates/rhei-cli/src/cli/states_render.rs"]
 
 
-def prepare(checkout, scratch, output, name, revision, host=None, instrumented=False):
+def verify_revision(checkout, output, revision, expected_tree):
+    """Resolve the approved commit and tree without accepting a substitute (§AR-ci-release.1)."""
+    commit = required(
+        output, "resolved-commit",
+        ["git", "rev-parse", "--verify", revision + "^{commit}"], checkout,
+    )
+    tree = required(
+        output, "resolved-tree",
+        ["git", "rev-parse", "--verify", revision + "^{tree}"], checkout,
+    )
+    identity = {
+        "requested_revision": revision,
+        "resolved_commit": commit,
+        "resolved_tree": tree,
+        "expected_tree": expected_tree,
+        "verified": commit == revision and tree == expected_tree,
+    }
+    write_json(output / "source-identity.json", identity)
+    if not identity["verified"]:
+        raise RuntimeError("acquired source does not match the approved commit and tree identity")
+
+
+def acquire(checkout, output, revision, expected_tree):
+    """Fetch and verify an exact approved source before any suite spends a slot (§AR-ci-release.1)."""
+    output.mkdir()
+    required(
+        output, "acquire-revision",
+        ["git", "fetch", "--no-tags", "--force", "origin", revision], checkout, 300,
+    )
+    verify_revision(checkout, output, revision, expected_tree)
+
+
+def prepare(checkout, scratch, output, name, revision, expected_tree, host=None, instrumented=False):
     """Keep revision/lockfile provenance, applying probes only to copies (§AR-ci-release.1)."""
     output.mkdir()
+    verify_revision(checkout, output, revision, expected_tree)
     archive = scratch / (name + ".tar")
     required(output, "archive", ["git", "archive", revision, "-o", archive], checkout)
     source = scratch / name

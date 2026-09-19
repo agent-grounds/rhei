@@ -8,6 +8,8 @@ use std::time::{Duration, Instant};
 pub(super) const LIMIT_SIGNAL: &str =
     "You've hit your session limit · resets 10:20pm (Europe/Zurich)";
 
+const PROVIDER_WAIT_PATIENCE: Duration = Duration::from_secs(30);
+
 pub(super) struct RunningChild(pub(super) Option<Child>);
 
 impl RunningChild {
@@ -73,6 +75,79 @@ pub(super) fn markdown_text(path: &Path) -> String {
     let mut text = String::new();
     visit(path, &mut text);
     text
+}
+
+fn try_markdown_text(path: &Path) -> Result<String, String> {
+    fn visit(path: &Path, text: &mut String) -> Result<(), String> {
+        let entries = fs::read_dir(path)
+            .map_err(|error| format!("read workspace '{}': {error}", path.display()))?;
+        for entry in entries {
+            let entry = entry
+                .map_err(|error| format!("read workspace entry '{}': {error}", path.display()))?;
+            let path = entry.path();
+            let file_type = entry.file_type().map_err(|error| {
+                format!("inspect workspace entry '{}': {error}", path.display())
+            })?;
+            if file_type.is_dir() {
+                if path.file_name().and_then(|name| name.to_str()) != Some("runtime") {
+                    visit(&path, text)?;
+                }
+            } else if path.extension().and_then(|extension| extension.to_str()) == Some("md") {
+                text.push_str(
+                    &fs::read_to_string(&path)
+                        .map_err(|error| format!("read markdown '{}': {error}", path.display()))?,
+                );
+            }
+        }
+        Ok(())
+    }
+
+    let mut text = String::new();
+    visit(path, &mut text)?;
+    Ok(text)
+}
+
+/// Observe every durable, state-qualified provider wait while the run remains
+/// live. Transient Markdown locks consume the same finite test deadline rather
+/// than starting a new per-file clock. §FS-rhei-run.3.3
+pub(super) fn wait_for_provider_waits(
+    path: &Path,
+    run: &mut RunningChild,
+    expected: usize,
+) -> String {
+    let deadline = Instant::now() + PROVIDER_WAIT_PATIENCE;
+    let mut most_observed = 0;
+
+    loop {
+        let (observation, read_error) = match try_markdown_text(path) {
+            Ok(text) => {
+                let observed = text.matches("nextAttemptAt:").count();
+                most_observed = most_observed.max(observed);
+                (Some((observed, text)), None)
+            }
+            Err(error) => (None, Some(error)),
+        };
+
+        if let Some(status) = run.child().try_wait().expect("inspect run status") {
+            panic!(
+                "recognized provider limits followed the ordinary failure path: the {expected}-worker run exited {status} instead of parking"
+            );
+        }
+        if let Some((_, text)) = observation.filter(|(observed, _)| *observed == expected) {
+            return text;
+        }
+
+        if Instant::now() >= deadline {
+            let read_detail = read_error
+                .as_deref()
+                .map(|error| format!("; last Markdown read error: {error}"))
+                .unwrap_or_default();
+            panic!(
+                "the run stayed live but persisted only {most_observed} of {expected} provider waits within {PROVIDER_WAIT_PATIENCE:?}{read_detail}"
+            );
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
 }
 
 pub(super) fn expire_provider_deadlines(path: &Path) {

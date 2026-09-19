@@ -165,6 +165,11 @@
   runners no longer fail otherwise-correct behavior on fixed observation
   clocks, while genuine stalls retain bounded diagnostics. (PR #302)
 
+- **Watch migration-help E2E coverage now validates each complete failed pass
+  independently.** Ordered output and controlled input changes permit multiple
+  legitimate revalidation passes while still rejecting duplicate, missing,
+  wrapped, or wrong-target recovery commands within any pass. (PR #303)
+
 - **Exact transitions from final states now fail machine loading.** Terminal
   exits require attended operator recovery; ordinary wildcard behavior is
   unchanged. (PR #297)

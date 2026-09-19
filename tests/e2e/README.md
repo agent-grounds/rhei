@@ -64,6 +64,14 @@ lives on one side of a newline the message wrote itself.
 `diagnostic_wrap_tests` runs the two shipped diagnostics that meet this and
 records it as a limit rather than a promise.
 
+Watch validation scenarios that need to compare passes capture stdout and
+stderr into one ordered file outside every registered watch root. They make
+controlled input edits, wait for the existing watch and revalidation banners
+to close complete reports, and assert migration help independently in every
+failed pass. Each pass must contain exactly one complete physical command for
+the discovered target; aggregate command counts cannot substitute for this
+per-pass check. [§FS-rhei-validate.5](../../docs/functional-spec/rhei-validate.spec.md#5-watch-mode)
+
 ## Rust
 
 `cargo test --workspace --all-targets` builds and runs these; `cargo test -p

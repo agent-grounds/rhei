@@ -245,8 +245,9 @@ fn explicit_validate_and_run_dry_run_render_copyable_migration_help() {
     }
 }
 
-/// Omitted discovery feeds the complete discovered target through watch's
-/// initial pass exactly once without mutation. §FS-rhei-validate.5
+/// Omitted discovery preserves one complete command per failed watch pass as
+/// controlled input edits revalidate and then repair the plan, with ordered
+/// output captured outside the watch root. §FS-rhei-validate.5
 /// §FS-rhei-migrate.5 §FS-rhei-errors.1.2
 #[test]
 fn omitted_validate_watch_renders_copyable_migration_help() {

@@ -211,6 +211,11 @@ read-only, and scope behavior defined here. The claim intent is exclusive to
 and `run` retain their existing persistence, callback, recovery, and output
 contracts, sharing only serialized ledger appends.
 
+Conformance tests for an advancing claim observe the provisional state-write
+boundary, sidecar contention and subsequent acquisition, and the committed
+state and claim-before-transition ledger order. Those observations use finite,
+portable test patience; they do not establish a command-latency guarantee.
+
 ### 3.2. Output (claim mode)
 
 The first line reports the claim, because taking the claim is what the command

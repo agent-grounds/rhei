@@ -48,16 +48,15 @@ pub(super) fn complete_watch_passes(rendered: &str) -> Option<Vec<&str>> {
     Some(passes)
 }
 
-/// Assertion seam for watch migration help.
-///
-/// The framing contract is already fixed, but this intentionally delegates to
-/// the old aggregate assertion. Implementation may change only this delegation
-/// to assert each failed pass separately.
+/// Require one complete migration command in every complete failed watch pass.
+/// §FS-rhei-validate.5
 pub(super) fn assert_watch_migration_help(rendered: &str, target: &Path) {
-    let _passes = complete_watch_passes(rendered).unwrap_or_else(|| {
+    let passes = complete_watch_passes(rendered).unwrap_or_else(|| {
         panic!("watch output did not contain complete banner-framed passes:\n{rendered}")
     });
-    assert_complete_help_line(rendered, target);
+    for pass in &passes[..passes.len() - 1] {
+        assert_complete_help_line(pass, target);
+    }
 }
 
 #[cfg(test)]

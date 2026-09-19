@@ -1,0 +1,39 @@
+--- a/tests/e2e/export_prior_migration_implementation_tests.rs
++++ b/tests/e2e/export_prior_migration_implementation_tests.rs
+@@ -166,6 +166,10 @@
+ **Consumes:** 1:handoff
+ "#;
+
++// Disposable snapshot retention for §FS-rhei-validate.5.
++#[path = "issue_301_fixture.rs"]
++mod issue_301_fixture;
++
+ struct ChildGuard(Option<Child>);
+
+ impl ChildGuard {
+@@ -271,13 +275,17 @@
+     let directory = plan.parent().expect("plan directory");
+     let stderr_path = directory.join("watch-stderr.txt");
+     let stderr_file = fs::File::create(&stderr_path).expect("watch stderr");
++    let mut evidence = issue_301_fixture::Evidence::new(&plan, &stderr_path);
+     let child = rhei_command(isolated_home_for(&plan))
++        .env("ISSUE_301_TRACE_DIR", &evidence.output)
++        .env("ISSUE_301_STDERR", &stderr_path)
+         .current_dir(directory)
+         .args(["validate", "--watch"])
+         .stdout(Stdio::null())
+         .stderr(Stdio::from(stderr_file))
+         .spawn()
+         .expect("watch command");
++    evidence.child(child.id());
+     let mut child = ChildGuard(Some(child));
+
+     let deadline = Instant::now() + Duration::from_secs(10);
+@@ -293,6 +301,7 @@
+         thread::sleep(Duration::from_millis(25));
+     };
+     child.stop();
++    evidence.finish(&rendered);
+
+     assert_complete_help_line(&rendered, &discovered_target(&plan));
+     assert_authored_unchanged(&plan, &before);

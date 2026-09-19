@@ -47,7 +47,7 @@
  fn register_watch_roots(
      watcher: &mut RecommendedWatcher,
      roots: &[WatchRoot],
-@@ -1350,25 +1355,35 @@
+@@ -1350,31 +1355,53 @@
          watcher.watch(&root.path, root.mode).map_err(|err| {
              miette!(help = watch_help(), "failed to watch '{}': {err}", root.path.display())
          })?;
@@ -74,15 +74,37 @@
      rx: &mpsc::Receiver<notify::Result<Event>>,
      targets: &[WatchTarget],
  ) -> bool {
-     match rx.recv_timeout(Duration::from_millis(250)) {
+-    match rx.recv_timeout(Duration::from_millis(250)) {
 -        Ok(Ok(event)) => should_revalidate(&event, targets),
++    let started = std::time::Instant::now();
++    let relevant = match rx.recv_timeout(Duration::from_millis(250)) {
 +        Ok(Ok(event)) => {
 +            let accepted = should_revalidate(&event, targets);
 +            issue_301_trace::event("debounce", &event, accepted);
 +            accepted
-+        },
++        }
          Ok(Err(err)) => {
 +            issue_301_trace::record(serde_json::json!({"type": "watch_error", "error": err.to_string()}));
              eprintln!("watch error: {err}");
              false
          }
+-        Err(RecvTimeoutError::Timeout) => false,
+-        Err(RecvTimeoutError::Disconnected) => false,
+-    }
++        Err(RecvTimeoutError::Timeout) => {
++            issue_301_trace::record(serde_json::json!({"type": "debounce_end", "reason": "Timeout"}));
++            false
++        }
++        Err(RecvTimeoutError::Disconnected) => {
++            issue_301_trace::record(serde_json::json!({"type": "debounce_end", "reason": "Disconnected"}));
++            false
++        }
++    };
++    issue_301_trace::record(serde_json::json!({
++        "type": "debounce_wait", "relevant": relevant,
++        "elapsed_ns": started.elapsed().as_nanos().to_string(),
++    }));
++    relevant
+ }
+
+ fn should_revalidate(event: &Event, targets: &[WatchTarget]) -> bool {

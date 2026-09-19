@@ -1,105 +1,68 @@
 #!/usr/bin/env python3
-"""Prepare hosted evidence for §FS-rhei-validate.5, without changing the contract."""
+"""Prepare bounded full-suite evidence for §FS-rhei-validate.5; never claim a fix."""
 
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
 from pathlib import Path
 import platform
-import re
 import shutil
-import signal
-import subprocess
 import sys
-import tarfile
 import tempfile
 import traceback
 
-from cases import run_case
+from cases import HERE, SOURCE_FILES, outside_capture, prepare
 from evidence import analyze_case, verdict
+from execution import ENV_KEYS, TEST, claim_budget, command, named_outcome, record_toolchain, required, write_json
 
+PROTOCOL = "round-2-full-suite-v1"
+HISTORICAL = "b0e3f86ad7ef37e75732beaa0adfa9f154b60a5b"
 BASELINE = "c841d36fe5f650ba3352c89724df59a2509e8f0a"
-TEST = "export_prior_migration_implementation_tests::omitted_validate_watch_renders_copyable_migration_help"
-ATTEMPTS = 12
-HERE = Path(__file__).resolve().parent
 
 
-def write_json(path, value):
-    """Retain observations as evidence for §FS-rhei-validate.5."""
-    path.write_text(json.dumps(value, indent=2) + "\n")
-
-
-def command(output, name, args, cwd, timeout=900):
-    """Keep exact commands, raw streams and statuses (§AR-ci-release.1)."""
-    record = {
-        "argv": [str(arg) for arg in args], "cwd": str(cwd),
-        "started_utc": datetime.now(timezone.utc).isoformat(), "timeout_seconds": timeout,
-        "environment": {key: os.environ.get(key) for key in [
-            "PATH", "TMPDIR", "CARGO_TARGET_DIR", "CARGO_TERM_COLOR", "RUSTUP_TOOLCHAIN",
-        ]},
-    }
-    write_json(output / (name + ".command.json"), record)
-    with (output / (name + ".stdout")).open("wb") as stdout, (output / (name + ".stderr")).open("wb") as stderr:
-        process = subprocess.Popen(record["argv"], cwd=cwd, stdout=stdout, stderr=stderr, start_new_session=True)
-        try:
-            record["exit_status"] = process.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
-            record["exit_status"] = process.wait()
-            record["timed_out"] = True
-    record["finished_utc"] = datetime.now(timezone.utc).isoformat()
-    write_json(output / (name + ".command.json"), record)
-    return record["exit_status"]
-
-
-def required(output, name, args, cwd, timeout=900):
-    """Separate setup failures from test outcomes (§AR-ci-release.1)."""
-    status = command(output, name, args, cwd, timeout)
-    if status:
-        raise RuntimeError(f"{name} exited {status}; inspect its raw streams")
-    return (output / (name + ".stdout")).read_text().strip()
-
-
-def archive(output, checkout, scratch, name):
-    """Build only the pinned uncorrected source (§FS-rhei-validate.5)."""
-    path = scratch / (name + ".tar")
-    required(output, name + "-archive", ["git", "archive", BASELINE, "-o", path], checkout)
-    source = scratch / name
-    source.mkdir()
-    with tarfile.open(path) as bundle:
-        bundle.extractall(source, filter="data")
-    return source
-
-
-def record_toolchain(output, prefix, cwd):
-    """Record and enforce the observation toolchain (§AR-ci-release.1)."""
-    rustc = required(output, prefix + "-rustc", ["rustc", "-Vv"], cwd)
-    cargo = required(output, prefix + "-cargo", ["cargo", "-V"], cwd)
-    required(output, prefix + "-toolchain", ["rustup", "show", "active-toolchain"], cwd)
-    host = re.search(r"(?m)^host: (\S+)$", rustc)
-    if not host:
-        raise RuntimeError(f"cannot determine {prefix} host target from rustc -Vv")
-    if not re.search(r"(?m)^release: 1\.82\.0$", rustc) or not cargo.startswith("cargo 1.82.0 "):
-        raise RuntimeError(f"{prefix} must use Rust and Cargo 1.82.0")
-    return host.group(1)
+def suite(source, target, output, ledger, artifact, name, revision, measured=False):
+    """Spend a slot before launch; a crash never refunds it (§AR-ci-release.1)."""
+    if len(ledger["slots"]) >= 4:
+        raise RuntimeError("full-suite execution budget exhausted")
+    hashes = {path: hashlib.sha256((source / path).read_bytes()).hexdigest() for path in SOURCE_FILES}
+    write_json(output / "prepared-source-sha256.json", hashes)
+    slot = {"slot": len(ledger["slots"]) + 1, "name": name, "revision": revision,
+            "state": "spent_before_launch", "output": str(output)}
+    ledger["slots"].append(slot)
+    write_json(artifact / "execution-budget.json", ledger)
+    env = os.environ.copy()
+    env.update(CARGO_TARGET_DIR=str(target), CARGO_NET_OFFLINE="true", CARGO_TERM_COLOR="never")
+    if measured:
+        measurement = output / "measurement"
+        measurement.mkdir()
+        env["ISSUE_301_CASE_OUTPUT"] = str(measurement)
+    args = ["cargo", "test", "--workspace", "--all-targets", "--locked", "--no-fail-fast",
+            "--offline", "--target-dir", target]
+    record = command(output, "suite", args, source, timeout=2700, env=env)
+    outcome = named_outcome(output, record)
+    after = {path: hashlib.sha256((source / path).read_bytes()).hexdigest() for path in SOURCE_FILES}
+    write_json(output / "after-source-sha256.json", after)
+    if hashes != after:
+        outcome["infrastructure_failure"] = True
+        outcome["source_mutated"] = True
+    outcome.update(name=name, revision=revision, slot=slot["slot"])
+    slot.update(state="finished", outcome=outcome)
+    write_json(output / "outcome.json", outcome)
+    write_json(artifact / "execution-budget.json", ledger)
+    return outcome
 
 
 def collect(checkout, output):
-    """Run the bounded unchanged baseline and disposable traces (§FS-rhei-validate.5)."""
-    scratch_parent = Path.home() / "ag/tmp"
-    scratch_parent.mkdir(parents=True, exist_ok=True)
-    scratch = Path(tempfile.mkdtemp(prefix="issue-301-source-", dir=scratch_parent)).resolve()
-    temp = scratch / "temp"
-    temp.mkdir()
-    os.environ["TMPDIR"] = str(temp)
-    os.environ["CARGO_TERM_COLOR"] = "never"
+    """Run historical/current once, opening the pair only on current 2 != 1 (§FS-rhei-validate.5)."""
+    parent = Path.home() / "ag/tmp"
+    parent.mkdir(parents=True, exist_ok=True)
+    if not output.is_relative_to(parent.resolve()):
+        raise RuntimeError("diagnostic artifacts must be under ~/ag/tmp")
     environment = {
-        "baseline_revision": BASELINE, "diagnostic_revision": os.environ.get("ISSUE_301_HEAD"),
-        "os": platform.platform(), "python": sys.version, "scratch": str(scratch),
-        "baseline_attempt_bound": ATTEMPTS, "paired_attempt_bound": ATTEMPTS,
-        "test": TEST, "run_url": f"{os.environ.get('GITHUB_SERVER_URL')}/{os.environ.get('GITHUB_REPOSITORY')}"
-        f"/actions/runs/{os.environ.get('GITHUB_RUN_ID')}/attempts/{os.environ.get('GITHUB_RUN_ATTEMPT')}",
+        "protocol": PROTOCOL, "historical_revision": HISTORICAL, "baseline_revision": BASELINE,
+        "diagnostic_revision": os.environ.get("ISSUE_301_HEAD"), "os": platform.platform(),
+        "python": sys.version, "native_temp_dir": tempfile.gettempdir(),
+        "inherited_environment": {key: os.environ.get(key) for key in ENV_KEYS}, "test": TEST,
         "hosted": {key: os.environ.get(key) for key in [
             "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GITHUB_JOB", "GITHUB_WORKFLOW", "GITHUB_SHA",
             "RUNNER_OS", "RUNNER_ARCH", "ImageOS", "ImageVersion",
@@ -107,112 +70,111 @@ def collect(checkout, output):
     }
     write_json(output / "environment.json", environment)
     if platform.system() != "Darwin":
-        raise RuntimeError("this evidence job requires macOS")
+        raise RuntimeError("hosted evidence requires macOS")
+    # Never relocate TMPDIR. Unexpected collection/test overrides make this setup inconclusive. §AR-ci-release.1
+    for key in ["RUST_TEST_THREADS", "RUST_TEST_NOCAPTURE", "RHEI_KEEP_TEST_DIRS",
+                "ISSUE_301_CASE_OUTPUT", "ISSUE_301_TRACE_DIR", "ISSUE_301_STDERR"]:
+        if key in os.environ:
+            raise RuntimeError(f"unexpected inherited override: {key}")
+    if Path(tempfile.gettempdir()).resolve().is_relative_to(parent.resolve()):
+        raise RuntimeError("native test temp directory was redirected into scratch")
     head = required(output, "diagnostic-revision", ["git", "rev-parse", "HEAD"], checkout)
     if head != environment["diagnostic_revision"]:
-        raise RuntimeError("checkout does not match the declared diagnostic revision")
-    required(output, "baseline-revision", ["git", "cat-file", "-e", BASELINE + "^{commit}"], checkout)
-    for name, args in [("os", ["sw_vers"]), ("kernel", ["uname", "-a"]),
-                       ("rustc", ["rustc", "-Vv"]), ("cargo", ["cargo", "-V"]),
-                       ("toolchain", ["rustup", "show", "active-toolchain"])]:
-        required(output, name, args, checkout)
-    source = archive(output, checkout, scratch, "baseline")
-    instrumented = archive(output, checkout, scratch, "instrumented")
-    host = record_toolchain(output, "baseline", source)
-    environment["cargo_fetch_target"] = host
-    environment["observation_toolchain"] = "1.82.0"
-    write_json(output / "environment.json", environment)
-    hashes = {}
-    for path in ["Cargo.lock", "tests/e2e/export_prior_migration_implementation_tests.rs",
-                 "crates/rhei-cli/src/lib.rs", "crates/rhei-cli/src/cli/states_render.rs"]:
-        hashes[path] = hashlib.sha256((source / path).read_bytes()).hexdigest()
-    write_json(output / "baseline-source-sha256.json", hashes)
-    # Fetch only the observed host graph: an unrestricted fetch selects non-host
-    # packages whose manifests Cargo 1.82 cannot parse. §AR-ci-release.1
-    required(output, "fetch", ["cargo", "fetch", "--locked", "--target", host], source)
-    target = scratch / "baseline-target"
-    required(output, "baseline-cli-build", ["cargo", "build", "--offline", "--locked", "--package", "rhei-cli",
-                                          "--bin", "rhei", "--target-dir", target], source)
-    args = ["cargo", "test", "--offline", "--locked", "--package", "rhei-e2e-tests", "--test", "e2e",
-            "--target-dir", target]
-    required(output, "baseline-build", args + ["--no-run"], source)
-    baselines = []
-    for attempt in range(1, ATTEMPTS + 1):
-        name = f"baseline-{attempt:02d}"
-        status = command(output, name, args + [TEST, "--", "--exact", "--nocapture", "--test-threads=1"], source, 180)
-        raw = (output / (name + ".stdout")).read_text() + (output / (name + ".stderr")).read_text()
-        outcome = "other_failure"
-        if status == 0 and "1 passed; 0 failed" in raw and TEST in raw:
-            outcome = "pass"
-        elif (status == 101 and "the recovery command should be rendered exactly once" in raw
-              and re.search(r"left:\s*2\s+right:\s*1", raw) and "1 failed" in raw):
-            outcome = "reported_assertion_failure"
-        baselines.append({"attempt": attempt, "exit_status": status, "outcome": outcome})
-        write_json(output / "baseline-outcomes.json", baselines)
-    required(output, "diagnostic-init", ["git", "init", "-q"], instrumented)
-    required(output, "apply-trace", ["git", "apply", HERE / "watch-trace.patch"], instrumented)
-    shutil.copyfile(HERE / "trace.rs", instrumented / "crates/rhei-cli/src/cli/issue_301_trace.rs")
-    for name in ["watch-trace.patch", "trace.rs"]:
-        shutil.copyfile(HERE / name, output / name)
-    instrumented_host = record_toolchain(output, "instrumented", instrumented)
-    if instrumented_host != host:
-        raise RuntimeError(f"instrumented host {instrumented_host} differs from baseline host {host}")
-    trace_target = scratch / "trace-target"
-    required(output, "trace-build", ["cargo", "build", "--offline", "--locked", "--package", "rhei-cli",
-                                   "--bin", "rhei", "--target-dir", trace_target], instrumented)
-    pairs = []
-    for attempt in range(1, ATTEMPTS + 1):
-        pair = {"attempt": attempt}
-        order = ["in-root", "outside-root"] if attempt % 2 else ["outside-root", "in-root"]
-        pair["order"] = order
-        for slot, mode in zip(["a", "b"], order):
-            case_output = output / f"pair-{attempt:02d}" / mode
-            case_root = scratch / "cases" / f"pair-{attempt:02d}" / slot
-            metadata = run_case(trace_target / "debug/rhei", source, case_root, case_output, mode)
-            pair[mode] = analyze_case(case_output, metadata)
-        pairs.append(pair)
-        write_json(output / "paired-outcomes.json", pairs)
-    code, outcome, supporting = verdict(baselines, pairs)
-    # Actual numeric job IDs come from the attempt-specific Actions endpoint.
-    # Missing identity is an access gap, not a negative reproduction. §AR-ci-release.1
+        raise RuntimeError("checkout does not match declared diagnostic revision")
     jobs = json.loads((output / "jobs.json").read_text())
-    job = next((job for job in jobs["jobs"] if job["name"] == "issue-301 paired macOS trace"), None)
+    job = next((row for row in jobs["jobs"] if row["name"] == "issue-301 full-suite macOS evidence"), None)
     if not job:
-        raise RuntimeError("hosted numeric job identity unavailable; inspect jobs-api artifacts")
+        raise RuntimeError("hosted numeric job identity unavailable")
+    environment.update(job_id=job["id"], job_url=job["html_url"])
+    write_json(output / "environment.json", environment)
+    if (output / "execution-budget.json").exists():
+        raise RuntimeError("this artifact already owns an execution ledger; refusing restart")
+    ledger = claim_budget(checkout, output, PROTOCOL)
+    scratch = Path(tempfile.mkdtemp(prefix="issue-301-source-", dir=parent)).resolve()
+    environment["scratch"] = str(scratch)
+    write_json(output / "environment.json", environment)
+    for name, args in [("os", ["sw_vers"]), ("kernel", ["uname", "-a"]), ("space", ["df", "-h", scratch])]:
+        required(output, name, args, checkout)
+    collector = output / "collector"
+    collector.mkdir()
+    shutil.copyfile(checkout / ".github/workflows/issue-301-macos-evidence.yml", collector / "workflow.yml")
+    for path in HERE.iterdir():
+        if path.is_file():
+            shutil.copyfile(path, collector / path.name)
+    # A shared target reuses dependency builds, while Cargo fingerprints each source copy. §AR-ci-release.1
+    target = scratch / "target"
+    baselines, pair = [], {}
+    host = None
+    for name, revision in [("historical", HISTORICAL), ("current", BASELINE)]:
+        case_output = output / name
+        source, host = prepare(checkout, scratch, case_output, name, revision, host)
+        row = suite(source, target, case_output, ledger, output, name, revision)
+        baselines.append(row)
+        write_json(output / "baseline-outcomes.json", baselines)
+        if row["infrastructure_failure"]:
+            return finish(output, environment, ledger, baselines, pair)
+    eligible = baselines[1]["outcome"] == "reported_assertion_failure"
+    write_json(output / "pair-condition.json", {
+        "eligible": eligible, "current_named_outcome": baselines[1],
+        "reason": "Only the current named test's exact recovery-command 2 != 1 assertion opens slots 3 and 4.",
+    })
+    if eligible:
+        case_output = output / "in-root"
+        source, host = prepare(checkout, scratch, case_output, "instrumented", BASELINE, host, True)
+        for mode in ["in-root", "outside-root"]:
+            case_output = output / mode
+            if mode == "outside-root":
+                case_output.mkdir()
+                outside_capture(source, case_output)
+                if record_toolchain(case_output, source) != host:
+                    raise RuntimeError("outside-root source toolchain changed")
+            row = suite(source, target, case_output, ledger, output, mode, BASELINE, True)
+            case = analyze_case(case_output, mode)
+            case["suite"] = row
+            if row["infrastructure_failure"]:
+                case["problems"].append("suite build/access/timeout failure")
+            pair[mode] = case
+            write_json(output / "paired-outcomes.json", pair)
+            if row["infrastructure_failure"] or case["problems"] or case["contrary"]:
+                break
+    return finish(output, environment, ledger, baselines, pair)
+
+
+def finish(output, environment, ledger, baselines, pair):
+    """Keep all suite statuses independent of this diagnostic verdict (§AR-ci-release.1)."""
+    code, outcome = verdict(baselines, pair)
     result = {
-        "exit_status": code, "outcome": outcome, "baseline_revision": BASELINE, "diagnostic_revision": head,
-        "job_id": job["id"], "job_url": job["html_url"], "run_url": environment["run_url"],
-        "baselines": baselines, "paired_attempts_with_location_difference": supporting,
-        "shipping_verdict": "not evaluated; supervisor acceptance required",
+        "exit_status": code, "outcome": outcome, "environment": environment,
+        "spent_slots": len(ledger["slots"]), "slot_bound": 4, "baselines": baselines,
+        "pair": pair, "shipping_verdict": "not evaluated; supervisor and revised contract required",
     }
     write_json(output / "result.json", result)
-    lines = [f"Diagnostic outcome: {outcome} (exit {code}).", f"Baseline: {BASELINE}",
-             f"Diagnostic: {head}", f"Job: {job['html_url']}",
-             "The original E2E uses its unchanged timing; paired probes add a separate 1 s observation window."]
-    lines += [f"Baseline {row['attempt']:02d}: {row['outcome']} (exit {row['exit_status']})" for row in baselines]
-    for pair in pairs:
-        for mode in ["in-root", "outside-root"]:
-            case = pair[mode]
-            lines.append(f"Pair {pair['attempt']:02d} {mode}: {len(case['passes'])} complete passes; "
-                         f"poll assertion={case['poll_snapshot']['exact_assertion']}; "
-                         f"problems={case['setup_or_measurement_problems']}; contrary={case['contrary_evidence']}")
-            for item in case["passes"][1:]:
-                lines.append(f"  Pass {item['pass']} admitted by {json.dumps(item['admitting_event'])}")
-    lines.append("Diagnostic completion is not a shipping verdict. Review raw per-pass stderr and event traces.")
+    lines = [f"Diagnostic outcome: {outcome} (exit {code}).",
+             f"Job: {environment['job_url']}", f"Protocol: {PROTOCOL}; spent slots: {len(ledger['slots'])}/4.",
+             "No retries, timing extension, product fix or shipping verdict."]
+    for slot in ledger["slots"]:
+        row = slot["outcome"]
+        lines.append(f"Slot {slot['slot']} {slot['name']}: named test={row['outcome']}; suite exit={row['exit_status']}.")
+    for mode, case in pair.items():
+        lines.append(f"{mode}: complete passes={len(case['passes'])}; problems={case['problems']}; contrary={case['contrary']}.")
+    lines.append("Inspect raw suite streams, snapshot/pass bytes, admissions, overhead and incomplete intervals.")
     (output / "summary.txt").write_text("\n".join(lines) + "\n")
     return code
 
 
 def main():
-    """Leave a readable artifact on setup failure (§AR-ci-release.1)."""
+    """Preserve partial observations on setup failure without retrying (§AR-ci-release.1)."""
     checkout, output = [Path(arg).resolve() for arg in sys.argv[1:]]
     output.mkdir(parents=True, exist_ok=True)
     try:
         return collect(checkout, output)
     except Exception as error:
         (output / "setup-error.txt").write_text(traceback.format_exc())
-        write_json(output / "result.json", {"exit_status": 2, "outcome": "setup_or_measurement_failure", "error": str(error)})
-        (output / "summary.txt").write_text(f"Setup/measurement failure (exit 2): {error}\nNo shipping verdict. Raw partial evidence retained.\n")
+        write_json(output / "result.json", {
+            "exit_status": 2, "outcome": "setup_or_measurement_failure", "error": str(error),
+            "partial_evidence": "Read execution-budget.json, individual outcome.json and raw streams; nothing was retried.",
+        })
+        (output / "summary.txt").write_text(f"Inconclusive setup/measurement failure (exit 2): {error}\nRaw partial evidence retained; no shipping verdict.\n")
         return 2
 
 

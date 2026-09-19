@@ -85,6 +85,7 @@ fn claim_commit_excludes_and_orders_an_ordinary_transition() {
     let (release_tx, release_rx) = mpsc::channel();
     let claimant = std::thread::spawn(move || {
         set_claim_after_state_write_hook(move || {
+            std::thread::sleep(Duration::from_secs(3));
             provisional_tx.send(()).expect("provisional state signal");
             release_rx.recv_timeout(Duration::from_secs(2)).expect("release claim");
         });

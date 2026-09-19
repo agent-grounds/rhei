@@ -700,6 +700,11 @@ ends the run under §FS-rhei-run.3.2 without losing the wait; a later run uses
 the persisted deadline. Headless launch still returns its run id immediately,
 and attach reads the same provider and deadline from the run event stream.
 
+Conformance tests for concurrent provider-limit parking observe every durable,
+state-qualified wait while the run remains live, then verify uncharged records
+and eventual resumption under a portable controlled delay. Finite test patience
+does not establish a provider-parking latency guarantee.
+
 ## 4. Dry Run
 
 With `--dry-run`, `rhei run` performs the same scan and selection logic but prints each planned transition instead of executing subprocesses or callbacks. Output format:

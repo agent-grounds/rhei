@@ -42,6 +42,7 @@ if not marker.exists():
     deadline = time.time() + 5
     while len(list(starts.glob('*.txt'))) < 8 and time.time() < deadline:
         time.sleep(0.01)
+    time.sleep(11)
     print({LIMIT_SIGNAL:?}, file=sys.stderr, flush=True)
     raise SystemExit(1)
 result('## Result\n\nResumed after the provider wait.\n')
@@ -59,7 +60,7 @@ write(root / 'runtime' / 'provider-limit-resumed' / (local + '.txt'), 'resumed\n
     "codex": {{
       "command": {},
       "stdin_prompt": true,
-      "timeout": "10s",
+      "timeout": "20s",
       "modes": {{ "yolo": [] }}
     }}
   }}

@@ -162,23 +162,7 @@ fn eight_parallel_codex_limits_park_and_resume_without_spending_attempts() {
     let mut run = RunningChild(Some(command.spawn().expect("spawn rhei run")));
 
     wait_for("all eight controlled agents to start", || count_files(&starts) == 8);
-    let persistence_deadline = Instant::now() + Duration::from_secs(10);
-    loop {
-        if markdown_text(&workspace).matches("nextAttemptAt:").count() == 8 {
-            break;
-        }
-        if let Some(status) = run.child().try_wait().expect("inspect run status") {
-            panic!(
-                "recognized provider limits followed the ordinary failure path: the eight-worker run exited {status} instead of parking"
-            );
-        }
-        assert!(
-            Instant::now() < persistence_deadline,
-            "the run stayed live but did not persist all eight provider waits"
-        );
-        thread::sleep(Duration::from_millis(25));
-    }
-    let parked = markdown_text(&workspace);
+    let parked = wait_for_provider_waits(&workspace, &mut run, 8);
     assert_eq!(parked.matches("providerLimits:").count(), 8, "{parked}");
     assert_all_tasks_in_state(&workspace, &machine, "working");
 

@@ -153,6 +153,11 @@
 
 ### Fixed
 
+- **Windows claim and provider-parking regressions now wait for witnessed
+  synchronization events and all eight durable provider waits.** Slow required
+  runners no longer fail otherwise-correct behavior on fixed observation
+  clocks, while genuine stalls retain bounded diagnostics. (PR #302)
+
 - **Exact transitions from final states now fail machine loading.** Terminal
   exits require attended operator recovery; ordinary wildcard behavior is
   unchanged. (PR #297)

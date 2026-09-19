@@ -38,6 +38,10 @@ transitions:
     to: completed
 "#;
 
+// Positive claim-boundary observations have finite, portable test patience;
+// this is not a command-latency promise. §FS-rhei-next.3.1
+const TEST_PATIENCE: Duration = Duration::from_secs(30);
+
 fn claim_writer_fixture() -> (tempfile::TempDir, PathBuf, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
     let plan = dir.path().join("plan.rhei.md");
@@ -83,13 +87,14 @@ fn claim_commit_excludes_and_orders_an_ordinary_transition() {
     let claimant_machine = machine.clone();
     let (provisional_tx, provisional_rx) = mpsc::channel();
     let (release_tx, release_rx) = mpsc::channel();
+    let (claimant_done_tx, claimant_done_rx) = mpsc::channel();
     let claimant = std::thread::spawn(move || {
+        set_claim_before_lock_hook(|| std::thread::sleep(Duration::from_secs(3)));
         set_claim_after_state_write_hook(move || {
-            std::thread::sleep(Duration::from_secs(3));
             provisional_tx.send(()).expect("provisional state signal");
-            release_rx.recv_timeout(Duration::from_secs(2)).expect("release claim");
+            release_rx.recv_timeout(TEST_PATIENCE).expect("release claim");
         });
-        next_command(
+        let result = next_command(
             &claimant_plan,
             Some(&claimant_machine),
             None,
@@ -98,10 +103,12 @@ fn claim_commit_excludes_and_orders_an_ordinary_transition() {
             false,
             &[],
         )
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string());
+        claimant_done_tx.send(()).expect("claimant completion");
+        result
     });
 
-    provisional_rx.recv_timeout(Duration::from_secs(2)).expect("provisional claim state");
+    provisional_rx.recv_timeout(TEST_PATIENCE).expect("provisional claim state");
     let provisional = fs::read_to_string(&plan).expect("provisional plan");
     assert!(provisional.contains("**State:** pending"));
     assert!(provisional.contains("stateVisits:\n        pending: 1"));
@@ -112,7 +119,7 @@ fn claim_commit_excludes_and_orders_an_ordinary_transition() {
     let transition =
         spawn_waiting_transition(plan.clone(), machine.clone(), lock_tx, done_tx);
     assert_eq!(
-        lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition lock attempt"),
+        lock_rx.recv_timeout(TEST_PATIENCE).expect("transition lock attempt"),
         PlanLockEvent::Contended,
         "the ordinary transition must encounter the claim's stable writer lock"
     );
@@ -123,11 +130,12 @@ fn claim_commit_excludes_and_orders_an_ordinary_transition() {
 
     release_tx.send(()).expect("release claimant");
     assert_eq!(
-        lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition lock acquisition"),
+        lock_rx.recv_timeout(TEST_PATIENCE).expect("transition lock acquisition"),
         PlanLockEvent::Acquired
     );
+    claimant_done_rx.recv_timeout(TEST_PATIENCE).expect("claimant completion");
+    done_rx.recv_timeout(TEST_PATIENCE).expect("transition completion");
     claimant.join().expect("claimant thread").expect("claim succeeds");
-    done_rx.recv_timeout(Duration::from_secs(2)).expect("transition completion");
     transition.join().expect("transition thread").expect("transition succeeds");
 
     let final_plan = fs::read_to_string(&plan).expect("final plan");

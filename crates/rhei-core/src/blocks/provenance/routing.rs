@@ -1,4 +1,4 @@
-//! Keep override contributors aligned with typed lowering until final emission.
+//! Keep routing contributors aligned with typed lowering until final emission.
 //! §FS-rhei-library.4.1 §AR-rhei-library.4
 use super::*;
 use crate::state_machine::{NodePolicy, NodePolicyOverride};
@@ -23,19 +23,33 @@ impl ProvenanceStore {
         Ok(())
     }
 
-    pub(crate) fn fold_override_profiles(
+    pub(crate) fn fold_primary_profiles(
         &mut self,
         policy: &NodePolicy,
         primary: &BTreeSet<String>,
     ) -> CompileResult<()> {
         self.check_override_count(policy.overrides.len())?;
+        // The outer lane derives from all primary profiles. §FS-rhei-library.4.1
+        let contributors = primary
+            .iter()
+            .flat_map(|profile| self.nodes.profiles.get(profile).into_iter().flatten().cloned())
+            .collect::<Vec<_>>();
+        let fold = |origins: &mut Vec<Origin>| {
+            origins.extend(contributors.iter().cloned());
+            *origins = synthesized(std::mem::take(origins), "folded-primary-routing");
+        };
+        for (kind, profile) in &policy.by_type {
+            if primary.contains(profile) {
+                let key = format!("by_type/{kind}");
+                let origins = self.nodes.routing.get_mut(&key).ok_or_else(|| {
+                    format!("routing provenance missing for '{key}' during primary-profile folding")
+                })?;
+                fold(origins);
+            }
+        }
         for (rule, origins) in policy.overrides.iter().zip(&mut self.override_origins) {
             if primary.contains(&rule.profile) {
-                // The outer lane derives from all primary profiles. §FS-rhei-library.4.1
-                for profile in primary {
-                    origins.extend(self.nodes.profiles.get(profile).into_iter().flatten().cloned());
-                }
-                *origins = synthesized(std::mem::take(origins), "folded-primary-routing");
+                fold(origins);
             }
         }
         Ok(())

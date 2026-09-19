@@ -451,7 +451,7 @@ impl CompiledBlock {
                 profiles.shift_remove(primary);
             }
         }
-        self.provenance.fold_override_profiles(policy, &self.primary_profiles)?;
+        self.provenance.fold_primary_profiles(policy, &self.primary_profiles)?;
         for profile in
             policy.by_type.values_mut().chain(policy.overrides.iter_mut().map(|r| &mut r.profile))
         {

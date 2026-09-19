@@ -33,6 +33,13 @@ fn identical_absolute_sources_reconcile_locators_without_losing_mounts() {
     let b = dir.join("copy/a");
     write_provenance_block(&a, false);
     write_provenance_block(&b, false);
+    for file in ["template.yaml", "states.yaml", "index.rhei.md", "tasks/work.md"] {
+        assert_eq!(
+            fs::read(a.join(file)).unwrap(),
+            fs::read(b.join(file)).unwrap(),
+            "paired source bytes must match: {file}"
+        );
+    }
     let mounts = [mount_arg("a", &a), mount_arg("b", &b)];
     let mut locks = Vec::new();
     for (name, order) in [("forward", [0, 1]), ("reverse", [1, 0])] {

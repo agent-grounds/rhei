@@ -15,21 +15,31 @@ fn seeded_reentry(name: &str) -> (TestDir, std::path::PathBuf, std::path::PathBu
     fixture
 }
 
-#[test]
-fn sequential_parallel_and_dry_run_require_current_visit_proof() {
-    for (label, extra) in [("sequential", Vec::new()), ("parallel", vec!["--parallel", "2"])] {
-        let (dir, plan, machine) = seeded_reentry(&format!("agent-old-record-{label}"));
-        write_spawn_record(&dir, None, 0, "exited", Some(0));
-        let mut args = vec!["--no-tui", "--no-callbacks"];
-        args.extend(extra);
-        assert_success(&run_cli("run", &plan, &machine, &args));
-        assert_eq!(
-            spawn_lines(&dir),
-            ["work"],
-            "{label} scheduling must not reuse an older visit's successful record"
-        );
-    }
+fn assert_old_record_spawns(label: &str, extra: &[&str]) {
+    let (dir, plan, machine) = seeded_reentry(&format!("agent-old-record-{label}"));
+    write_spawn_record(&dir, None, 0, "exited", Some(0));
+    let mut args = vec!["--no-tui", "--no-callbacks"];
+    args.extend_from_slice(extra);
+    assert_success(&run_cli("run", &plan, &machine, &args));
+    assert_eq!(
+        spawn_lines(&dir),
+        ["work"],
+        "{label} scheduling must not reuse an older visit's successful record"
+    );
+}
 
+#[test]
+fn sequential_scheduling_requires_current_visit_proof() {
+    assert_old_record_spawns("sequential", &[]);
+}
+
+#[test]
+fn parallel_scheduling_requires_current_visit_proof() {
+    assert_old_record_spawns("parallel", &["--parallel", "2"]);
+}
+
+#[test]
+fn dry_run_predicts_the_fresh_spawn_required_by_execution() {
     let (dir, plan, machine) = seeded_reentry("agent-old-record-dry-run");
     write_spawn_record(&dir, None, 0, "exited", Some(0));
     let dry = run_cli("run", &plan, &machine, &["--dry-run", "--no-tui", "--no-callbacks"]);
@@ -45,6 +55,7 @@ fn sequential_parallel_and_dry_run_require_current_visit_proof() {
 
 #[test]
 fn unsuccessful_current_visit_records_do_not_complete_an_invocation() {
+    let mut wrongly_reused = Vec::new();
     for (label, ending, code) in [
         ("failed", "exited", Some(3)),
         ("interrupted", "interrupted", None),
@@ -54,12 +65,15 @@ fn unsuccessful_current_visit_records_do_not_complete_an_invocation() {
         let (dir, plan, machine) = seeded_reentry(&format!("agent-record-{label}"));
         write_spawn_record(&dir, None, 1, ending, code);
         assert_success(&run_cli("run", &plan, &machine, &["--no-tui", "--no-callbacks"]));
-        assert_eq!(
-            spawn_lines(&dir),
-            ["work"],
-            "a {label} record is history, not successful current-visit proof"
-        );
+        if spawn_lines(&dir).is_empty() {
+            wrongly_reused.push(label);
+        }
     }
+    assert!(
+        wrongly_reused.is_empty(),
+        "failed, interrupted, provider-limited, and timed-out records are history, not \
+         successful current-visit proof; wrongly reused={wrongly_reused:?}"
+    );
 }
 
 #[test]

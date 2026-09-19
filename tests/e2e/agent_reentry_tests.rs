@@ -96,6 +96,11 @@ else:
         "the automatic work -> review -> work loop requires a worker in both visits; \
          observed spawns={observed:?}\ntransition ledger:\n{transitions}"
     );
+    assert_eq!(
+        fs::read_to_string(dir.join("runtime/results/plan.1.md")).expect("terminal result"),
+        "work visit 2 completed\n",
+        "the required terminal result must come from the successful current visit"
+    );
 }
 
 #[test]

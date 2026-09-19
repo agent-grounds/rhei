@@ -1,0 +1,67 @@
+name: Issue 301 macOS evidence
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  actions: read
+
+# Temporary evidence for §FS-rhei-validate.5; remove before shipping PR #303.
+# The required CI workflow and its full platform matrix remain independent.
+jobs:
+  paired-watch-trace:
+    name: issue-301 paired macOS trace
+    if: github.event.pull_request.number == 303 && github.head_ref == 'fix/issue-301'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Initialize evidence and hosted identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          mkdir -p "$HOME/ag/tmp"
+          evidence_dir=$(mktemp -d "$HOME/ag/tmp/issue-301-evidence.XXXXXX")
+          echo "ISSUE_301_EVIDENCE=$evidence_dir" >> "$GITHUB_ENV"
+          echo 'Setup incomplete; no reproduction verdict is available.' > "$evidence_dir/summary.txt"
+          printf 'repository=%s\nrun=%s\nattempt=%s\njob_key=%s\nos=%s\narch=%s\n' \
+            "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" \
+            "$GITHUB_JOB" "$RUNNER_OS" "$RUNNER_ARCH" > "$evidence_dir/hosted-identity.txt"
+          set +e
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" \
+            > "$evidence_dir/jobs.json" 2> "$evidence_dir/jobs-api.stderr"
+          echo "$?" > "$evidence_dir/jobs-api.exit"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.82.0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Collect bounded baseline and paired evidence
+        timeout-minutes: 35
+        env:
+          ISSUE_301_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: python scripts/issue-301-macos/run.py "$GITHUB_WORKSPACE" "$ISSUE_301_EVIDENCE"
+
+      - name: Publish diagnostic summary
+        if: always()
+        shell: bash
+        run: cat "$ISSUE_301_EVIDENCE/summary.txt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain raw evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: issue-301-macos-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.ISSUE_301_EVIDENCE }}
+          if-no-files-found: error
+          retention-days: 30

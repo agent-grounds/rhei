@@ -8,7 +8,8 @@ pub(super) const LOCK_PATH: &str = ".agent-grounds/rhei/composition.lock.json";
 
 pub(super) fn write_provenance_block(path: &Path, single: bool) {
     fs::create_dir_all(path).unwrap();
-    fs::write(path.join("template.yaml"), "name: provenance-block\nversion: 1\ndescription: Provenance fixture\nports:\n  entry: work\n  exits: {done: done}\n").unwrap();
+    let name = path.file_name().and_then(|name| name.to_str()).expect("fixture directory name");
+    fs::write(path.join("template.yaml"), format!("name: {name}\nversion: 1\ndescription: Provenance fixture\nports:\n  entry: work\n  exits: {{done: done}}\n")).unwrap();
     fs::write(path.join("states.yaml"), "name: provenance-block\nversion: 1\nstates:\n  work: {description: Work}\n  done: {description: Done, final: true}\ntransitions:\n  - {from: work, to: done}\nprofiles:\n  primary: {initial: work, allowed: [work, done]}\nnode_policy:\n  root: primary\n  default: primary\n").unwrap();
     let index = "# Rhei: Provenance fixture\n**States:** provenance-block\n";
     let task = "### Task job: Work\n**State:** work\n\nDo the work.\n";

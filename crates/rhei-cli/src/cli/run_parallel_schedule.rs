@@ -254,6 +254,7 @@ fn refill_parallel_worker_pool(
         settings,
         opts,
         workspace_root,
+        runtime_dir,
         &active_task_ids,
         &active_nonconcurrent_states,
     )?;

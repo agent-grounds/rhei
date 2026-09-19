@@ -324,8 +324,16 @@ fn handle_sequential_agent_completion(
                         .states
                         .get(state_before)
                         .map(|state_def| {
+                            let agent_runtime_dir = if machines
+                                .uses_member_local_runtime(task_id_str)
+                            {
+                                task_workspace_root.join("runtime")
+                            } else {
+                                workspace_root.join("runtime")
+                            };
                             task_has_pending_agent_invocations(
                                 &task_workspace_root,
+                                &agent_runtime_dir,
                                 task,
                                 state_before,
                                 task.state.as_str(),

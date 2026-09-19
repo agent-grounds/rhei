@@ -288,8 +288,16 @@ fn handle_parallel_agent_exit(
                     .and_then(|task| {
                         machine.states.get(state_name.as_str()).map(
                             |state_def| {
+                                let agent_runtime_dir = if machines
+                                    .uses_member_local_runtime(&task_id_str)
+                                {
+                                    task_root.join("runtime")
+                                } else {
+                                    workspace_root.join("runtime")
+                                };
                                 task_has_pending_agent_invocations(
                                     &task_root,
+                                    &agent_runtime_dir,
                                     task,
                                     &state_name,
                                     task.state.as_str(),

@@ -412,9 +412,19 @@ fn run_agent_mode(
                 // The whole completion condition decides this, not the
                 // declared outputs alone: an invocation that wrote its outputs
                 // but not the result has not finished. §FS-rhei-agents.3.2
+                let task_root = loaded.task_root(&task_id_str, &workspace_root);
+                let agent_runtime_dir = if live
+                    .machines
+                    .uses_member_local_runtime(&task_id_str)
+                {
+                    task_root.join("runtime")
+                } else {
+                    runtime_dir.clone()
+                };
                 let pending = agent_invocations_to_spawn(
                     &loaded,
                     &workspace_root,
+                    &agent_runtime_dir,
                     task,
                     machine,
                     &current_state,

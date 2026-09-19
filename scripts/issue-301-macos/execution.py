@@ -1,12 +1,15 @@
 """Bounded process/provenance records for temporary §AR-ci-release.1 evidence."""
 
 from datetime import datetime, timezone
+import hashlib
 import json
 import os
 import re
 import signal
+import shutil
 import subprocess
 import time
+import zipfile
 
 SETUP_SECONDS = 1800
 SETUP_SPENT = 0.0
@@ -18,6 +21,14 @@ ENV_KEYS = [
     "RUSTFLAGS", "CARGO_BUILD_JOBS", "RHEI_KEEP_TEST_DIRS", "FORCE_COLOR", "CLICOLOR_FORCE",
     "ISSUE_301_CASE_OUTPUT", "ISSUE_301_TRACE_DIR", "ISSUE_301_STDERR",
 ]
+
+AUTHORIZED_PREDECESSOR = {
+    "run_id": "35428542945",
+    "attempt": "1",
+    "head_sha": "d868c7f97c319790cde3a1893d5a2df56171fc0a",
+    "artifact": "issue-301-macos-35428542945-1",
+    "historical_revision": "b0e3f86ad7ef37e75732beaa0adfa9f154b60a5b",
+}
 
 
 def write_json(path, value):
@@ -70,6 +81,23 @@ def required(output, name, args, cwd, timeout=120):
     return (output / (name + ".stdout")).read_text().strip()
 
 
+def required_binary(output, name, args, cwd, timeout=300):
+    """Retain an API response byte-for-byte within the setup allowance (§AR-ci-release.1)."""
+    global SETUP_SPENT
+    remaining = SETUP_SECONDS - SETUP_SPENT
+    if remaining <= 0:
+        raise RuntimeError("aggregate 30-minute setup budget exhausted")
+    started = time.monotonic()
+    try:
+        record = command(output, name, args, cwd, min(timeout, remaining))
+    finally:
+        SETUP_SPENT += time.monotonic() - started
+        write_json(output / "setup-budget.json", {"limit_seconds": SETUP_SECONDS, "spent_seconds": SETUP_SPENT})
+    if record["exit_status"]:
+        raise RuntimeError(f"{name} exited {record['exit_status']}; inspect raw streams")
+    return output / (name + ".stdout")
+
+
 def record_toolchain(output, cwd):
     """Enforce the pinned compiler in each actual source directory (§AR-ci-release.1)."""
     rustc = required(output, "rustc", ["rustc", "-Vv"], cwd)
@@ -111,14 +139,112 @@ def named_outcome(output, record):
     }
 
 
+def _json(path):
+    return json.loads(path.read_text())
+
+
+def _extract_artifact(bundle, destination):
+    """Preserve the predecessor artifact without trusting archive paths (§AR-ci-release.1)."""
+    destination.mkdir()
+    root = destination.resolve()
+    with zipfile.ZipFile(bundle) as archive:
+        for member in archive.infolist():
+            target = (destination / member.filename).resolve()
+            if not target.is_relative_to(root):
+                raise RuntimeError("predecessor artifact contains an unsafe path")
+            if member.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with archive.open(member) as source, target.open("wb") as sink:
+                shutil.copyfileobj(source, sink)
+
+
+def _verify_predecessor(output, checkout, repo, run):
+    """Prove the sole authorized continuation is the recorded zero-slot setup failure (§AR-ci-release.1)."""
+    expected = AUTHORIZED_PREDECESSOR
+    if (str(run["id"]), str(run.get("run_attempt")), run["head_sha"]) != (
+        expected["run_id"], expected["attempt"], expected["head_sha"]
+    ):
+        raise RuntimeError("earlier protocol run is not the supervisor-authorized predecessor")
+    run_record = json.loads(required(output, "authorized-predecessor-run", [
+        "gh", "api", f"repos/{repo}/actions/runs/{expected['run_id']}",
+    ], checkout))
+    if (
+        str(run_record["id"]), str(run_record["run_attempt"]), run_record["head_sha"],
+        run_record["status"], run_record["conclusion"],
+    ) != (
+        expected["run_id"], expected["attempt"], expected["head_sha"], "completed", "failure",
+    ):
+        raise RuntimeError("authorized predecessor run identity or outcome changed")
+    artifacts = json.loads(required(output, "authorized-predecessor-artifacts", [
+        "gh", "api", f"repos/{repo}/actions/runs/{expected['run_id']}/artifacts?per_page=100",
+    ], checkout))["artifacts"]
+    matches = [artifact for artifact in artifacts if artifact["name"] == expected["artifact"]]
+    if len(matches) != 1 or matches[0]["expired"]:
+        raise RuntimeError("authorized predecessor artifact is missing, ambiguous, or expired")
+    artifact = matches[0]
+    if str(artifact["workflow_run"]["id"]) != expected["run_id"] or artifact["workflow_run"]["head_sha"] != expected["head_sha"]:
+        raise RuntimeError("authorized predecessor artifact provenance does not match")
+    bundle = required_binary(output, "authorized-predecessor-artifact", [
+        "gh", "api", f"repos/{repo}/actions/artifacts/{artifact['id']}/zip",
+    ], checkout)
+    digest = "sha256:" + hashlib.sha256(bundle.read_bytes()).hexdigest()
+    if artifact.get("digest") != digest:
+        raise RuntimeError("authorized predecessor artifact digest does not match its API record")
+    retained = output / "authorized-continuation" / "predecessor-artifact"
+    retained.parent.mkdir()
+    _extract_artifact(bundle, retained)
+
+    ledger = _json(retained / "execution-budget.json")
+    result = _json(retained / "result.json")
+    environment = _json(retained / "environment.json")
+    archive = _json(retained / "historical/archive.command.json")
+    archive_stderr = (retained / "historical/archive.stderr").read_text().strip()
+    setup_error = (retained / "setup-error.txt").read_text()
+    identity = dict(line.split("=", 1) for line in (retained / "hosted-identity.txt").read_text().splitlines())
+    historical = expected["historical_revision"]
+    if ledger != {
+        "protocol": "round-2-full-suite-v1", "introduction_commit": expected["head_sha"],
+        "run_id": expected["run_id"], "attempt": expected["attempt"], "bound": 4,
+        "seconds_per_suite": 2700, "slots": [], "earlier_protocol_runs": [],
+    }:
+        raise RuntimeError("authorized predecessor ledger does not prove zero spent slots")
+    if result.get("exit_status") != 2 or result.get("outcome") != "setup_or_measurement_failure" or result.get("error") != "archive exited 128; inspect raw streams":
+        raise RuntimeError("authorized predecessor result is not the recorded setup failure")
+    if environment.get("diagnostic_revision") != expected["head_sha"] or environment.get("hosted", {}).get("GITHUB_RUN_ID") != expected["run_id"] or environment.get("hosted", {}).get("GITHUB_RUN_ATTEMPT") != expected["attempt"]:
+        raise RuntimeError("authorized predecessor artifact has inconsistent hosted identity")
+    if archive.get("argv", [])[:3] != ["git", "archive", historical] or archive.get("exit_status") != 128 or archive.get("state") != "finished" or archive.get("timed_out"):
+        raise RuntimeError("authorized predecessor archive record is not the approved source failure")
+    if archive_stderr != f"fatal: not a tree object: {historical}" or "RuntimeError: archive exited 128; inspect raw streams" not in setup_error:
+        raise RuntimeError("authorized predecessor raw failure does not match the recorded missing object")
+    if identity.get("run") != expected["run_id"] or identity.get("attempt") != expected["attempt"]:
+        raise RuntimeError("authorized predecessor hosted identity file is inconsistent")
+    proof = {
+        "authorization": "supervisor checkpoint 11: one continuation after zero-slot setup failure",
+        "predecessor": expected,
+        "run_url": run_record["html_url"],
+        "artifact_id": artifact["id"],
+        "artifact_digest": digest,
+        "verified": {
+            "completed_failure": True, "exact_diagnostic_head": True, "protocol_introduction": True,
+            "zero_spent_slots": True, "missing_historical_object_before_suites": True,
+        },
+    }
+    write_json(output / "authorized-continuation" / "proof.json", proof)
+    return proof
+
+
 def claim_budget(checkout, output, protocol):
-    """Refuse reruns and later heads of this approved experiment (§AR-ci-release.1)."""
+    """Refuse every restart except the one proved supervisor-authorized continuation (§AR-ci-release.1)."""
     if os.environ.get("GITHUB_RUN_ATTEMPT") != "1":
         raise RuntimeError("the approved experiment does not authorize workflow reruns")
     intro = required(output, "protocol-introduction", [
         "git", "log", "--reverse", "--format=%H", "-S", f'PROTOCOL = "{protocol}"',
         "--", "scripts/issue-301-macos/run.py",
     ], checkout).splitlines()[0]
+    if intro != AUTHORIZED_PREDECESSOR["head_sha"]:
+        raise RuntimeError("protocol introduction is not the approved original identity")
     repo = os.environ["GITHUB_REPOSITORY"]
     raw = required(output, "prior-runs", [
         "gh", "api", "--paginate", "--slurp",
@@ -135,13 +261,16 @@ def claim_budget(checkout, output, protocol):
                 "gh", "api", f"repos/{repo}/compare/{intro}...{sha}",
             ], checkout))
             if comparison["status"] in ("ahead", "identical"):
-                previous.append({"id": run["id"], "sha": sha, "url": run["html_url"]})
+                previous.append(run)
+    if len(previous) != 1:
+        raise RuntimeError("expected exactly the one supervisor-authorized predecessor protocol run")
+    proof = _verify_predecessor(output, checkout, repo, previous[0])
+    prior = [{"id": row["id"], "attempt": row["run_attempt"], "sha": row["head_sha"], "url": row["html_url"]} for row in previous]
     ledger = {
         "protocol": protocol, "introduction_commit": intro,
         "run_id": os.environ["GITHUB_RUN_ID"], "attempt": os.environ["GITHUB_RUN_ATTEMPT"],
-        "bound": 4, "seconds_per_suite": 2700, "slots": [], "earlier_protocol_runs": previous,
+        "bound": 4, "seconds_per_suite": 2700, "slots": [], "earlier_protocol_runs": prior,
+        "authorized_continuation": proof,
     }
     write_json(output / "execution-budget.json", ledger)
-    if previous:
-        raise RuntimeError("earlier round-2 workflow exists; inspect its spent slots, do not restart the budget")
     return ledger

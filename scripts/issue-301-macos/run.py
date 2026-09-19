@@ -11,13 +11,15 @@ import sys
 import tempfile
 import traceback
 
-from cases import HERE, SOURCE_FILES, outside_capture, prepare
+from cases import HERE, SOURCE_FILES, acquire, outside_capture, prepare
 from evidence import analyze_case, verdict
 from execution import ENV_KEYS, TEST, claim_budget, command, named_outcome, record_toolchain, required, write_json
 
 PROTOCOL = "round-2-full-suite-v1"
 HISTORICAL = "b0e3f86ad7ef37e75732beaa0adfa9f154b60a5b"
 BASELINE = "c841d36fe5f650ba3352c89724df59a2509e8f0a"
+HISTORICAL_TREE = "cc582280de5b0521df4570d2a12537c61dbb05a1"
+BASELINE_TREE = "fd8c4cf1eccc54685dff8fd80ff3e75e9957d963"
 
 
 def suite(source, target, output, ledger, artifact, name, revision, measured=False):
@@ -59,7 +61,11 @@ def collect(checkout, output):
     if not output.is_relative_to(parent.resolve()):
         raise RuntimeError("diagnostic artifacts must be under ~/ag/tmp")
     environment = {
-        "protocol": PROTOCOL, "historical_revision": HISTORICAL, "baseline_revision": BASELINE,
+        "protocol": PROTOCOL,
+        "historical_revision": HISTORICAL,
+        "historical_tree": HISTORICAL_TREE,
+        "baseline_revision": BASELINE,
+        "baseline_tree": BASELINE_TREE,
         "diagnostic_revision": os.environ.get("ISSUE_301_HEAD"), "os": platform.platform(),
         "python": sys.version, "native_temp_dir": tempfile.gettempdir(),
         "inherited_environment": {key: os.environ.get(key) for key in ENV_KEYS}, "test": TEST,
@@ -95,6 +101,10 @@ def collect(checkout, output):
     write_json(output / "environment.json", environment)
     for name, args in [("os", ["sw_vers"]), ("kernel", ["uname", "-a"]), ("space", ["df", "-h", scratch])]:
         required(output, name, args, checkout)
+    acquisition = output / "source-acquisition"
+    acquisition.mkdir()
+    acquire(checkout, acquisition / "historical", HISTORICAL, HISTORICAL_TREE)
+    acquire(checkout, acquisition / "current", BASELINE, BASELINE_TREE)
     collector = output / "collector"
     collector.mkdir()
     shutil.copyfile(checkout / ".github/workflows/issue-301-macos-evidence.yml", collector / "workflow.yml")
@@ -105,9 +115,11 @@ def collect(checkout, output):
     target = scratch / "target"
     baselines, pair = [], {}
     host = None
-    for name, revision in [("historical", HISTORICAL), ("current", BASELINE)]:
+    for name, revision, tree in [
+        ("historical", HISTORICAL, HISTORICAL_TREE), ("current", BASELINE, BASELINE_TREE),
+    ]:
         case_output = output / name
-        source, host = prepare(checkout, scratch, case_output, name, revision, host)
+        source, host = prepare(checkout, scratch, case_output, name, revision, tree, host)
         row = suite(source, target, case_output, ledger, output, name, revision)
         baselines.append(row)
         write_json(output / "baseline-outcomes.json", baselines)
@@ -120,7 +132,9 @@ def collect(checkout, output):
     })
     if eligible:
         case_output = output / "in-root"
-        source, host = prepare(checkout, scratch, case_output, "instrumented", BASELINE, host, True)
+        source, host = prepare(
+            checkout, scratch, case_output, "instrumented", BASELINE, BASELINE_TREE, host, True,
+        )
         for mode in ["in-root", "outside-root"]:
             case_output = output / mode
             if mode == "outside-root":

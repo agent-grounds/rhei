@@ -160,6 +160,11 @@
 
 ### Fixed
 
+- **Re-entered agent states now run each invocation again before advancing.**
+  Manual and automatic loop-backs no longer reuse an earlier visit's static
+  outputs or required result, while deliberately pre-seeded first visits and
+  successful same-visit restarts retain their existing reuse behavior. (PR #304)
+
 - **Windows claim and provider-parking regressions now wait for witnessed
   synchronization events and all eight durable provider waits.** Slow required
   runners no longer fail otherwise-correct behavior on fixed observation

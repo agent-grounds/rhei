@@ -310,6 +310,7 @@ fn collect_ready_agent_work_items(
     settings: &RheiSettings,
     opts: &RunOptions,
     workspace_root: &Path,
+    runtime_dir: &Path,
     active_task_ids: &HashSet<String>,
     active_nonconcurrent_states: &HashSet<String>,
 ) -> MietteResult<(Vec<AgentWorkItem>, Vec<String>)> {
@@ -370,9 +371,16 @@ fn collect_ready_agent_work_items(
         // The rule the pass driver and the post-exit check apply: a refill
         // re-spawns an invocation whose completion condition is unmet, and skips
         // only one that is genuinely finished. §FS-rhei-agents.3.2
+        let task_root = loaded.task_root(&task_id_str, workspace_root);
+        let agent_runtime_dir = if machines.uses_member_local_runtime(&task_id_str) {
+            task_root.join("runtime")
+        } else {
+            runtime_dir.to_path_buf()
+        };
         let pending = agent_invocations_to_spawn(
             loaded,
             workspace_root,
+            &agent_runtime_dir,
             task,
             machine,
             &current_state,

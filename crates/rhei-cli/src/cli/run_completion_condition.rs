@@ -19,12 +19,15 @@
 /// roots, because both resolve against the same place and a run-level root
 /// passed here would look in the wrong directory for a Panta project member.
 /// §FS-rhei-agents.3.2 condition (2)
+/// `runtime_dir` is where this invocation's spawn record and the transition
+/// ledger used by its run live. §FS-rhei-agents.8.4
 /// `finishes_ticket` is a property of the *edge* the exit would select, not of
 /// the state, which is why it is settled once here rather than re-derived per
 /// invocation.
 // §FS-rhei-agents.3.2 §FS-rhei-states.3.3 §FS-rhei-panta.6.2
 struct InvocationCompletion<'a> {
     artifact_root: &'a Path,
+    runtime_dir: &'a Path,
     task: &'a rhei_core::ast::Task,
     state_name: &'a str,
     current_state_raw: &'a str,
@@ -33,19 +36,46 @@ struct InvocationCompletion<'a> {
     state_def: &'a rhei_validator::StateDef,
     finishes_ticket: bool,
     visit_count: u64,
+    moves: u64,
 }
 
 impl InvocationCompletion<'_> {
-    /// Whether this invocation still owes the ticket something: a declared
-    /// `outputs:` artifact of *its* identity is missing, or — when the edge this
-    /// exit would select finishes the ticket — its own result is.
+    /// Whether an existing artifact belongs to work eligible for this visit.
     ///
-    /// Exit code is deliberately not part of it. Before a spawn there is no exit
-    /// to read, and after one the caller has the status in hand; what this
-    /// answers is the artifact half of the condition, which is the half that is
-    /// the same question at both moments.
+    /// With no record and no recorded move, an upgraded workspace retains the
+    /// legacy first-visit interpretation. Once either source supplies history,
+    /// only this invocation's successful current-visit record can answer.
+    // §FS-rhei-agents.3.2 §FS-rhei-agents.8.4 §FS-rhei-transitions.4.3
+    fn work_is_eligible_for_visit(&self, resolved: &ResolvedAgent) -> bool {
+        let task_id = self.task.id.to_string();
+        let suffix = resolved_agent_log_suffix(resolved, Some(self.visit_count));
+        let record = read_spawn_record(&spawn_record_path(
+            self.runtime_dir,
+            &task_id,
+            self.state_name,
+            suffix.as_deref(),
+        ));
+        match record {
+            Some(record) => {
+                record.proves_successful_work(&task_id, self.state_name, self.moves)
+            }
+            None => self.moves == 0,
+        }
+    }
+
+    /// Whether this invocation still owes the ticket something: successful
+    /// work eligible for this visit, a declared `outputs:` artifact of *its*
+    /// identity, or — when the edge this exit would select finishes the ticket
+    /// — its own result.
+    ///
+    /// The current caller's exit is still held by its post-exit path. Reading a
+    /// persisted exit here answers only whether on-disk work can be reused
+    /// rather than spawned again, at both moments this condition is asked.
     // §FS-rhei-agents.3.2 §FS-rhei-states.3.3
     fn invocation_is_pending(&self, resolved: &ResolvedAgent) -> bool {
+        if !self.state_def.outputs.is_empty() && !self.work_is_eligible_for_visit(resolved) {
+            return true;
+        }
         if !state_outputs_exist_for_resolved_invocation(
             self.artifact_root,
             self.task,
@@ -90,6 +120,7 @@ impl InvocationCompletion<'_> {
 #[allow(clippy::too_many_arguments)]
 fn task_has_pending_agent_invocations(
     artifact_root: &Path,
+    runtime_dir: &Path,
     task: &rhei_core::ast::Task,
     state_name: &str,
     current_state_raw: &str,
@@ -109,6 +140,7 @@ fn task_has_pending_agent_invocations(
     )?;
     let completion = InvocationCompletion {
         artifact_root,
+        runtime_dir,
         task,
         state_name,
         current_state_raw,
@@ -123,6 +155,7 @@ fn task_has_pending_agent_invocations(
             current_state_raw,
             machine,
         ),
+        moves: ticket_move_count(artifact_root, runtime_dir, &task.id.to_string()),
     };
     Ok(invocations.iter().any(|resolved| completion.invocation_is_pending(resolved)))
 }
@@ -141,9 +174,11 @@ fn task_has_pending_agent_invocations(
 /// passed through, so a result written earlier would excuse a state that has not
 /// run at all.
 // §FS-rhei-agents.3.2 §FS-rhei-run.3
+#[allow(clippy::too_many_arguments)]
 fn agent_invocations_to_spawn(
     loaded: &LoadedPlan,
     workspace_root: &Path,
+    runtime_dir: &Path,
     task: &rhei_core::ast::Task,
     machine: &rhei_validator::StateMachine,
     state_name: &str,
@@ -158,6 +193,7 @@ fn agent_invocations_to_spawn(
     let artifact_root = loaded.task_root(&task.id.to_string(), workspace_root);
     let completion = InvocationCompletion {
         artifact_root: &artifact_root,
+        runtime_dir,
         task,
         state_name,
         current_state_raw,
@@ -173,6 +209,7 @@ fn agent_invocations_to_spawn(
             current_state_raw,
             machine,
         ),
+        moves: ticket_move_count(&artifact_root, runtime_dir, &task.id.to_string()),
     };
     invocations
         .into_iter()

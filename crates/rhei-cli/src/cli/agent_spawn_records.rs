@@ -70,6 +70,21 @@ fn default_attempt_charged() -> bool {
 const WITHHELD_ENDING: &str = "withheld";
 
 impl SpawnRecord {
+    /// Whether this invocation successfully finished work in `moves`, the
+    /// ticket's current visit.
+    ///
+    /// `withheld` is the engine's durable spelling of an `exited`/`0` record
+    /// whose already-satisfied release edge was withheld; it remains successful
+    /// work when the ticket has not moved. §FS-rhei-supervision.3.6
+    // §FS-rhei-agents.3.2 §FS-rhei-agents.8.4
+    fn proves_successful_work(&self, task_id: &str, state_name: &str, moves: u64) -> bool {
+        self.task == task_id
+            && self.state == state_name
+            && self.moves == moves
+            && (self.ending == "exited" || self.ending == WITHHELD_ENDING)
+            && self.code == Some(0)
+    }
+
     /// How the previous attempt ended, as the retry note and the retried
     /// prompt both say it.
     ///
@@ -162,7 +177,7 @@ fn read_spawn_record(path: &Path) -> Option<SpawnRecord> {
 ///
 /// A missing or unreadable ledger reads as zero, which makes a fresh ticket's
 /// first visit look exactly like what it is.
-// §FS-rhei-viz.4 §FS-rhei-panta.6.2
+// §FS-rhei-agents.8.4 §FS-rhei-viz.4 §FS-rhei-panta.6.2
 fn ticket_move_count(task_root: &Path, runtime_dir: &Path, task_id: &str) -> u64 {
     let owning = task_root.join("runtime").join("state-transitions.log");
     let running = runtime_dir.join("state-transitions.log");

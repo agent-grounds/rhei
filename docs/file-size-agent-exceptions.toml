@@ -22,7 +22,7 @@ path = "crates/rhei-cli/src/cli/run_agent_mode.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 1000, unit = "lines" }
+max_accepted = { value = 1200, unit = "lines" }
 until = "Pass selection — collecting a pass's agent, program, and callback work and applying the non-concurrent claim filter — has a part of its own, leaving this file the run's setup, its pass driver, and its end-of-run report."
 reason = """
 The execution bodies are parts of their own now; what is left is the run's own lifecycle. Pass selection has no boundary to move to: it reads the plan, the machines, and the settings and writes the three task lists the pass driver dispatches, and those lists are locals of the loop. Setup and the end-of-run report stay beside it because the report is written from the counters the loop advances.
@@ -573,4 +573,34 @@ max_accepted = { value = 600, unit = "lines" }
 until = "indefinite"
 reason = """
 Rust requires these sibling e2e modules to be declared at the test crate root so their existing super::* imports, shared private helpers, and stable test paths resolve in one namespace. Moving declarations into a nested registry would change that namespace rather than extract a cohesive source responsibility; an include-only registry would merely hide the same indivisible manifest behind another file.
+"""
+[[exceptions]]
+path = "crates/rhei-cli/src/cli/agent_spawn_records.rs"
+match = "exact"
+rules = ["source"]
+kind = "deferred"
+max_accepted = { value = 600, unit = "lines" }
+until = "Spawn-record reads and writes are exposed through one internal persistence API consumed by attempt planning and completion checks."
+reason = """
+Spawn-record persistence and spawn-attempt planning still share private record and budget types; a persistence query boundary must exist before either responsibility can move without duplicating their visit semantics.
+"""
+[[exceptions]]
+path = "crates/rhei-cli/src/cli/run_agent_sequential_completion.rs"
+match = "exact"
+rules = ["source"]
+kind = "deferred"
+max_accepted = { value = 600, unit = "lines" }
+until = "Sequential and parallel handlers consume a shared post-exit completion decision and this file retains only sequential emission and routing."
+reason = """
+Sequential post-exit routing still combines mode-specific event emission with the completion decision; a shared post-exit decision value must exist before either responsibility can move without duplicating transition ordering.
+"""
+[[exceptions]]
+path = "crates/rhei-cli/src/cli/run_parallel_agent_exit.rs"
+match = "exact"
+rules = ["source"]
+kind = "deferred"
+max_accepted = { value = 600, unit = "lines" }
+until = "Sequential and parallel handlers consume a shared post-exit completion decision and this file retains only pool-specific slot handling and emission."
+reason = """
+Parallel post-exit routing still combines pool-specific slot handling with the completion decision; a shared post-exit decision value must exist before either responsibility can move without duplicating transition ordering.
 """

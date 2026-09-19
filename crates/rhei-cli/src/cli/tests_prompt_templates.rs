@@ -206,3 +206,27 @@ transitions:
             "creating prompt_templates/ revalidates and re-plans"
         );
     }
+
+    /// A sibling output capture is inside a registered directory but is not a
+    /// logical watch target and cannot begin a new pass. §FS-rhei-validate.5
+    #[test]
+    fn validate_watch_rejects_sibling_capture_path() {
+        let (_guard, dir) = canonical_tempdir();
+        let plan = dir.join("plan.rhei.md");
+        let states = dir.join("states.yaml");
+        let capture = dir.join("watch-stderr.txt");
+        fs::write(&plan, "# Rhei: Watch\n").expect("plan");
+        fs::write(&states, "name: watch\nversion: 1\nstates: {}\ntransitions: []\n")
+            .expect("states");
+        fs::write(&capture, "diagnostic output\n").expect("capture");
+        let watched = canonical_watched_paths(&plan, &states);
+        let event = Event {
+            kind: EventKind::Modify(notify::event::ModifyKind::Data(
+                notify::event::DataChange::Content,
+            )),
+            paths: vec![capture],
+            attrs: Default::default(),
+        };
+
+        assert!(!should_revalidate(&event, &watched));
+    }

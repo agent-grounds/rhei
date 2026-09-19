@@ -262,7 +262,8 @@ fn explicit_validate_and_run_dry_run_render_copyable_migration_help() {
 }
 
 /// Omitted discovery feeds the complete discovered target through watch's
-/// initial pass without mutation. §FS-rhei-migrate.5 §FS-rhei-errors.1.2
+/// initial pass exactly once without mutation. §FS-rhei-validate.5
+/// §FS-rhei-migrate.5 §FS-rhei-errors.1.2
 #[test]
 fn omitted_validate_watch_renders_copyable_migration_help() {
     let (_root, plan) = diagnostic_case("migration-diagnostic-watch");

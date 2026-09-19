@@ -10,7 +10,7 @@
             let source = dir.join("states.yaml");
             let mut machine = if rendered.join("states.yaml").is_file() {
                 let text = fs::read_to_string(rendered.join("states.yaml")).map_err(|e| file_io_report(&source, "read rendered state fragment", e))?;
-                rhei_validator::StateMachine::parse_fragment(&text).map_err(|e| miette!(help = "fix the YAML in the authored states.yaml fragment", "{}: {e}; fix the authored state fragment", source.display()))?
+                rhei_validator::StateMachine::parse_fragment(&text).map_err(|e| miette!(help = "fix the authored state fragment in states.yaml", "{}: {e}; fix the authored state fragment", source.display()))?
             } else if has_plan && !has_children {
                 return Err(miette!(help = "add states.yaml beside the local plan, or mount a child block", "{}: a local mounted plan must supply its states.yaml fragment", source.display()));
             } else {

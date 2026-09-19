@@ -35,7 +35,7 @@
         inventory: &mut CompositionInventory,
     ) -> MietteResult<()> {
         for entry in fs::read_dir(dir).map_err(|err| file_io_report(dir, "read source inventory", err))? {
-            let path = entry.map_err(|err| miette!("read source inventory entry: {err}"))?.path();
+            let path = entry.map_err(|err| miette!(help = "check that the source block directory is readable", "read source inventory entry: {err}"))?.path();
             if path.file_name().and_then(|name| name.to_str()).is_some_and(|name| name.starts_with('.')) {
                 continue;
             }
@@ -101,7 +101,7 @@
                 return Ok(resolved);
             }
         }
-        Err(miette!("too many source symlinks resolving {}", path.display()))
+        Err(miette!(help = "remove the symlink cycle from the source block", "too many source symlinks resolving {}", path.display()))
     }
 
     #[cfg(test)]

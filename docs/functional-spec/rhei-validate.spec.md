@@ -206,8 +206,11 @@ validation when the plan file or resolved states file changes.
 
 Watch mode reports each pass independently. Each successful pass reports the
 `**Consumes:**` warning once when that pass's graph contains a consumer; file
-events do not repeat it outside a validation pass. A failed pass does not
-terminate the watcher; file watcher initialization errors do.
+events do not repeat it outside a validation pass. When a failed pass reports
+the export-prior recovery action, it emits the complete actionable migration
+command exactly once. A later pass caused by a genuine watched-input change
+may emit that command once for that pass. A failed pass does not terminate the
+watcher; file watcher initialization errors do.
 
 ## 6. Output
 

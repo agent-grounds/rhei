@@ -1,5 +1,8 @@
 //! Implementation-owned boundary coverage for export-prior migration.
 
+#[path = "watch_migration_assertions.rs"]
+mod watch_migration_assertions;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
@@ -8,6 +11,7 @@ use std::time::{Duration, Instant};
 
 use super::terminal_result_tests::write_mock_agent_settings;
 use super::*;
+use watch_migration_assertions::{assert_complete_help_line, assert_watch_migration_help};
 
 const MACHINE: &str = r#"name: migration-boundaries
 version: 1
@@ -201,10 +205,6 @@ fn diagnostic_case(prefix: &str) -> (TestDir, PathBuf) {
     (root, plan)
 }
 
-fn expected_help(target: &Path) -> String {
-    format!("help: rhei migrate export-priors {}", shell_quote(&target.display().to_string()))
-}
-
 /// The target an omitted plan discovers is whatever the OS reports as the
 /// current directory. `getcwd` resolves symlinks on Unix, so macOS rewrites
 /// `/var` to `/private/var`; `GetCurrentDirectoryW` on Windows does neither
@@ -219,22 +219,6 @@ fn discovered_target(plan: &Path) -> PathBuf {
 #[cfg(windows)]
 fn discovered_target(plan: &Path) -> PathBuf {
     plan.to_path_buf()
-}
-
-fn assert_complete_help_line(rendered: &str, target: &Path) {
-    let expected = expected_help(target);
-    assert!(
-        rendered.lines().any(|line| {
-            line.find("help: rhei migrate export-priors ")
-                .is_some_and(|start| line[start..] == expected)
-        }),
-        "expected one complete physical help line {expected:?}; got:\n{rendered}"
-    );
-    assert_eq!(
-        rendered.matches("rhei migrate export-priors").count(),
-        1,
-        "the recovery command should be rendered exactly once:\n{rendered}"
-    );
 }
 
 fn assert_authored_unchanged(plan: &Path, before: &[u8]) {
@@ -266,36 +250,83 @@ fn explicit_validate_and_run_dry_run_render_copyable_migration_help() {
 /// §FS-rhei-migrate.5 §FS-rhei-errors.1.2
 #[test]
 fn omitted_validate_watch_renders_copyable_migration_help() {
-    let (_root, plan) = diagnostic_case("migration-diagnostic-watch");
-    let before = fs::read(&plan).expect("plan before watch");
+    let (root, plan) = diagnostic_case("migration-diagnostic-watch");
     let directory = plan.parent().expect("plan directory");
-    let stderr_path = directory.join("watch-stderr.txt");
-    let stderr_file = fs::File::create(&stderr_path).expect("watch stderr");
+    let states = directory.join("states.yaml");
+    let initial_plan = fs::read(&plan).expect("plan before watch");
+    let initial_states = fs::read(&states).expect("states before watch");
+    let renamed_plan = DIAGNOSTIC_PLAN.replace("Task 2: Consumer", "Task changed: Consumer");
+    let repaired_plan = renamed_plan.replace("**Consumes:**", "**Prior:** 1\n**Consumes:**");
+    let capture_path = root.join("ordered-watch-output.txt");
+    let capture = fs::File::create(&capture_path).expect("ordered watch output");
     let child = rhei_command(isolated_home_for(&plan))
         .current_dir(directory)
         .args(["validate", "--watch"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::from(stderr_file))
+        .stdout(Stdio::from(capture.try_clone().expect("clone ordered output")))
+        .stderr(Stdio::from(capture))
         .spawn()
         .expect("watch command");
     let mut child = ChildGuard(Some(child));
 
     let deadline = Instant::now() + Duration::from_secs(10);
-    let rendered = loop {
-        let rendered = raw_stderr_from_file(&stderr_path);
-        if rendered.contains("rhei migrate export-priors") {
+    let initial = loop {
+        let rendered = raw_stderr_from_file(&capture_path);
+        if rendered.contains("Task plan.2 consumes export 'handoff'")
+            && rendered.contains("fix the errors above, then re-check with: rhei validate <plan>")
+        {
             break rendered;
         }
-        assert!(Instant::now() < deadline, "watch did not render migration help:\n{rendered}");
+        assert!(Instant::now() < deadline, "initial watch report did not complete:\n{rendered}");
         if let Some(status) = child.child().try_wait().expect("inspect watch") {
             panic!("watch exited early with {status}:\n{rendered}");
         }
         thread::sleep(Duration::from_millis(25));
     };
+    assert!(initial.starts_with("Watch mode started for '"), "missing watch-start banner");
+    assert_eq!(fs::read(&plan).expect("initial plan after refusal"), initial_plan);
+    assert_eq!(fs::read(&states).expect("initial states after refusal"), initial_states);
+
+    fs::write(&plan, &renamed_plan).expect("rename consumer while retaining missing prior");
+    let renamed = loop {
+        let rendered = raw_stderr_from_file(&capture_path);
+        if rendered.matches("--- change detected, revalidating ---").count() >= 1
+            && rendered.contains("Task plan.changed consumes export 'handoff'")
+            && rendered
+                .matches("fix the errors above, then re-check with: rhei validate <plan>")
+                .count()
+                >= 2
+        {
+            break rendered;
+        }
+        assert!(Instant::now() < deadline, "renamed-consumer report did not complete:\n{rendered}");
+        if let Some(status) = child.child().try_wait().expect("inspect watch") {
+            panic!("watch exited before renamed report with {status}:\n{rendered}");
+        }
+        thread::sleep(Duration::from_millis(25));
+    };
+    assert!(renamed.contains("Task plan.changed consumes export 'handoff'"));
+    assert_eq!(fs::read(&plan).expect("renamed plan after refusal"), renamed_plan.as_bytes());
+    assert_eq!(fs::read(&states).expect("states after rename"), initial_states);
+
+    fs::write(&plan, &repaired_plan).expect("repair consumer prior");
+    let rendered = loop {
+        let rendered = raw_stderr_from_file(&capture_path);
+        if rendered.matches("--- change detected, revalidating ---").count() >= 2
+            && rendered.contains("Validation succeeded")
+        {
+            break rendered;
+        }
+        assert!(Instant::now() < deadline, "repaired watch report did not complete:\n{rendered}");
+        if let Some(status) = child.child().try_wait().expect("inspect watch") {
+            panic!("watch exited before repaired report with {status}:\n{rendered}");
+        }
+        thread::sleep(Duration::from_millis(25));
+    };
     child.stop();
 
-    assert_complete_help_line(&rendered, &discovered_target(&plan));
-    assert_authored_unchanged(&plan, &before);
+    assert_eq!(fs::read(&plan).expect("repaired plan after success"), repaired_plan.as_bytes());
+    assert_eq!(fs::read(&states).expect("states after repair"), initial_states);
+    assert_watch_migration_help(&rendered, &discovered_target(&plan));
 }
 
 /// The detached startup path preserves the omitted discovered target when it

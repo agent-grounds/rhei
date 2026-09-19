@@ -1144,13 +1144,27 @@ excuse a sibling that wrote nothing.
 
 The same condition is also what lets `rhei run` decide *not* to spawn. Before a
 pass spawns an invocation of a state that declares `outputs:`, it asks whether
-that invocation's work is already on disk, and it skips the spawn only when
-conditions (2) **and** (3) both hold for that invocation — the declared
-artifacts, and, on a terminal edge, its own result. There is one completion
+that invocation's work is eligible for the current **visit** as well as already
+on disk. A visit is the span during which the ticket's transition-ledger move
+count does not change. The initial visit may reuse deliberately pre-populated
+work without a spawn when neither transition history nor an older spawn record
+establishes an earlier entry. After re-entry, however, each invocation is
+eligible only when its own spawn record (§8.4) proves a successful exit in the
+current visit. A restart or a withheld edge that has not moved the ticket stays
+in the same visit and may reuse that successful proof.
+
+The pass therefore skips an invocation only when visit eligibility and
+conditions (2) **and** (3) all hold for that invocation — successful
+current-visit proof when re-entry requires it, the declared artifacts, and, on
+a terminal edge, its own result. An older-visit record, or a current-visit
+record that failed, was interrupted, timed out, or was provider-limited, cannot
+supply successful proof. The artifact and result checks remain independent of
+that proof: one fan-out identity cannot answer for a sibling, a visit-templated
+path resolves for the current visit as before, and a successful record cannot
+excuse a missing artifact or required result. There is one completion
 condition, asked at two moments; a scheduling test that looked only at the
-declared outputs would read an invocation that *failed* the condition on one
-pass as having nothing left to do on the next, and the ticket would advance on
-the strength of artifacts that never answered for it.
+declared outputs would read an invocation that belongs to an earlier visit as
+having nothing left to do, and the ticket would advance on stale work.
 
 A state that declares no `outputs:` is never skipped this way. It has no
 artifact of its own that could stand as proof its work was done, and
@@ -1936,6 +1950,15 @@ A provider-limited record keeps the subprocess's real non-zero `code`, uses
 `ending: provider_limited`, and sets `attempt_charged: false`. Its log, timing,
 resolved worker identity, and any usage the worker reported remain ordinary
 auditable spawn evidence.
+
+For the pre-spawn completion check (§3.2), a record proves successful work for
+one invocation only when its `task`, canonical `state`, and invocation-specific
+filename identify that invocation, its `moves` equals the ticket's current
+transition-ledger move count, its `ending` is `exited`, and its `code` is `0`.
+Older visits and records ending in failure, timeout, interruption, or provider
+limiting remain useful history but are not successful current-visit proof. The
+existing per-invocation filename keeps fan-out identities independent; this
+rule adds no persisted field or format.
 
 `task` and `state` are stored as fields and matched as fields. A reader looking
 for "a worker that ran in state `review`" must not match record *file names* by

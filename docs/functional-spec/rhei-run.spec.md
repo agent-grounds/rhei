@@ -254,6 +254,13 @@ headless, and JSONL surfaces; no new output record family is introduced.
    while every supervising ancestor has released them.
 3. Up to `--parallel` tasks from the ready set are executed concurrently, subject to the [concurrent-state rule](#5-parallel-execution): at most one ready task per non-concurrent state is scheduled per pass. For each task:
    - Resolve the state's target: either an agent subprocess (`agent` or resolved target selector) or a program (`program`).
+   - For an agent state with declared outputs, apply the visit-aware pre-spawn
+     completion check of [§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition)
+     independently to every resolved invocation. Sequential, parallel, and
+     dry-run scheduling use the same decision: initial work may be pre-seeded,
+     successful work may be reused while the move count is unchanged, and a
+     re-entered invocation without successful proof at the current move count
+     is spawned even when its old artifacts still exist.
    - If the state declares `snapshot.inherit:`, resolve and preload the source snapshot before spawning the agent. Polling states reject `snapshot.inherit` in v1. See [Snapshots Specification](rhei-snapshots.spec.md).
    - Compose the agent prompt ([Agents Specification — Prompt Composition](rhei-agents.spec.md#3-prompt-composition)). A prompt that cannot be composed — a `required: true` handoff with no content, an unreadable prior result, or any missing or blank consumed export ([§FS-rhei-agents.3.3](rhei-agents.spec.md#33-consumed-export-preflight)) — fails **that task**, not the pass: `rhei run` reports the task and the reason, then applies the same rule as any other task failure, continuing to the next task under `--continue-on-error` and aborting with a non-zero exit code without it. Sibling tasks already spawned in the pass are unaffected. The refused task remains in its existing state and is retryable after the prompt input is repaired.
    - Spawn the subprocess with the state's resolved instructions, remaining

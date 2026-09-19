@@ -758,6 +758,11 @@ Rules:
 - `visits` applies to every entry into that state, including the initial entry and later loop-back re-entries.
 - Starting in a counted state records `metadata.tasks.<id>.stateVisits.<state-name> = 1`.
 - Each later loop-back re-entry increments `metadata.tasks.<id>.stateVisits.<state-name>` by `1`.
+- Every completed move into an agent state starts a fresh visit for orchestrated
+  completion, including manual and automatic loop-backs and states without a
+  `visits:` field or suffixed authored state. The transition-ledger move count,
+  rather than the optional displayed visit suffix, distinguishes that entry
+  from a restart which has not moved the ticket (§FS-rhei-agents.3.2).
 - The task's active `**State:**` value mirrors that count by writing `<state>-<n>` for visits greater than `1`; visit `1` stays as the bare state name.
 - When evaluating transitions from a counted-loop state, runtimes should expose:
   - `visitCount`: the current value of `metadata.tasks.<id>.stateVisits.<state-name>`
@@ -866,7 +871,11 @@ State artifact contracts (see [States Specification — Artifact Contracts](rhei
    completion condition and applies the command-specific success and failure
    ordering defined in the main plan-language spec.
 4. In v1, enforcement is file-existence only. Content validation is out of
-   scope.
+   scope. Orchestrated pre-spawn completion additionally requires the
+   current-visit eligibility defined by §FS-rhei-agents.3.2: an artifact left
+   by an earlier visit remains on disk and available to the next worker, but
+   its existence alone cannot authorize advancement after re-entry. Rhei does
+   not delete it or compare timestamps, hashes, or bytes.
 
 This makes artifact production and consumption part of the state-machine
 contract instead of a convention in free-form instructions.

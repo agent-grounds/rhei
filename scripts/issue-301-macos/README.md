@@ -24,11 +24,22 @@ retained. `jobs.json` comes from the attempt-specific Actions jobs endpoint;
 `jobs-api.exit` and `jobs-api.stderr` preserve access failures.
 
 Fresh sources, test temporary directories and explicit Cargo targets live
-under `~/ag/tmp`. `cargo fetch --locked` populates an empty runner cache
-online before any offline build. No shared cache or earlier CI job is needed.
-The workflow allows 45 minutes, collection allows 35, setup/build commands
-allow 15 each, and each baseline execution allows 3 minutes. An interrupted
-job with no final `result.json` is incomplete, never a reproduction verdict.
+under `~/ag/tmp`. Rust and Cargo 1.82.0 are checked and recorded from both the
+baseline and instrumented source directories. The host triple parsed from the
+baseline's `rustc -Vv` scopes the online cache preparation:
+
+```text
+cargo fetch --locked --target <recorded-host-triple>
+```
+
+This keeps the pinned lockfile while excluding locked dependencies for
+unobserved targets whose manifests require a newer Cargo. Every build and test
+continues to use Rust/Cargo 1.82.0 and runs offline; no second toolchain, shared
+cache, or earlier CI job is used. Exact toolchain and fetch command records are
+retained. The workflow allows 45 minutes, collection allows 35, setup/build
+commands allow 15 each, and each baseline execution allows 3 minutes. An
+interrupted job with no final `result.json` is incomplete, never a reproduction
+verdict.
 
 **Bound and observations**
 

@@ -72,6 +72,19 @@ def archive(output, checkout, scratch, name):
     return source
 
 
+def record_toolchain(output, prefix, cwd):
+    """Record and enforce the observation toolchain (§AR-ci-release.1)."""
+    rustc = required(output, prefix + "-rustc", ["rustc", "-Vv"], cwd)
+    cargo = required(output, prefix + "-cargo", ["cargo", "-V"], cwd)
+    required(output, prefix + "-toolchain", ["rustup", "show", "active-toolchain"], cwd)
+    host = re.search(r"(?m)^host: (\S+)$", rustc)
+    if not host:
+        raise RuntimeError(f"cannot determine {prefix} host target from rustc -Vv")
+    if not re.search(r"(?m)^release: 1\.82\.0$", rustc) or not cargo.startswith("cargo 1.82.0 "):
+        raise RuntimeError(f"{prefix} must use Rust and Cargo 1.82.0")
+    return host.group(1)
+
+
 def collect(checkout, output):
     """Run the bounded unchanged baseline and disposable traces (§FS-rhei-validate.5)."""
     scratch_parent = Path.home() / "ag/tmp"
@@ -105,14 +118,18 @@ def collect(checkout, output):
         required(output, name, args, checkout)
     source = archive(output, checkout, scratch, "baseline")
     instrumented = archive(output, checkout, scratch, "instrumented")
+    host = record_toolchain(output, "baseline", source)
+    environment["cargo_fetch_target"] = host
+    environment["observation_toolchain"] = "1.82.0"
+    write_json(output / "environment.json", environment)
     hashes = {}
     for path in ["Cargo.lock", "tests/e2e/export_prior_migration_implementation_tests.rs",
                  "crates/rhei-cli/src/lib.rs", "crates/rhei-cli/src/cli/states_render.rs"]:
         hashes[path] = hashlib.sha256((source / path).read_bytes()).hexdigest()
     write_json(output / "baseline-source-sha256.json", hashes)
-    # Populate an empty hosted cache online, then make builds explicit and offline.
-    # This does not depend on another workflow's cache. §AR-ci-release.1
-    required(output, "fetch", ["cargo", "fetch", "--locked"], source)
+    # Fetch only the observed host graph: an unrestricted fetch selects non-host
+    # packages whose manifests Cargo 1.82 cannot parse. §AR-ci-release.1
+    required(output, "fetch", ["cargo", "fetch", "--locked", "--target", host], source)
     target = scratch / "baseline-target"
     required(output, "baseline-cli-build", ["cargo", "build", "--offline", "--locked", "--package", "rhei-cli",
                                           "--bin", "rhei", "--target-dir", target], source)
@@ -137,6 +154,9 @@ def collect(checkout, output):
     shutil.copyfile(HERE / "trace.rs", instrumented / "crates/rhei-cli/src/cli/issue_301_trace.rs")
     for name in ["watch-trace.patch", "trace.rs"]:
         shutil.copyfile(HERE / name, output / name)
+    instrumented_host = record_toolchain(output, "instrumented", instrumented)
+    if instrumented_host != host:
+        raise RuntimeError(f"instrumented host {instrumented_host} differs from baseline host {host}")
     trace_target = scratch / "trace-target"
     required(output, "trace-build", ["cargo", "build", "--offline", "--locked", "--package", "rhei-cli",
                                    "--bin", "rhei", "--target-dir", trace_target], instrumented)

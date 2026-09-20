@@ -833,41 +833,36 @@ fn run_agent_mode(
                     let _ = resolved;
                 }
             }
-            for (task_id_str, current_state_raw, current_state, resolved) in &batch {
+            for (task_id_str, current_state_raw, _, resolved) in &batch {
                 let loaded = load_plan(input)?;
                 let target_id = parse_task_id(task_id_str);
                 let machine = machines.for_task_str(task_id_str);
                 if let Some(task) = find_task_by_id(&loaded.rhei.tasks, &target_id) {
-                    if let Some(to_state) = find_next_transition(task, &loaded.rhei, machine)? {
-                        let task_root = loaded.task_root(task_id_str, &workspace_root);
-                        let checkout = resolve_agent_checkout_root(&task_root, task_id_str)?;
-                        let callbacks = machines.callbacks_for_str(task_id_str);
-                        let exclusions = loaded_task_exclusions(
-                            &loaded,
-                            task,
-                            &task_root,
-                            &checkout.path,
-                            &callbacks.plan_path,
-                            machine,
-                            callbacks.state_machine_path.as_deref(),
-                            settings,
-                            opts,
+                    let task_root = loaded.task_root(task_id_str, &workspace_root);
+                    let checkout = resolve_agent_checkout_root(&task_root, task_id_str)?;
+                    let callbacks = machines.callbacks_for_str(task_id_str);
+                    let exclusions = loaded_task_exclusions(
+                        &loaded,
+                        task,
+                        &task_root,
+                        &checkout.path,
+                        &callbacks.plan_path,
+                        machine,
+                        callbacks.state_machine_path.as_deref(),
+                        settings,
+                        opts,
+                    )
+                    .map_err(exclusion_report)?;
+                    run_info!(
+                        "{}",
+                        format_dry_run_agent_spawn(
+                            task_id_str,
+                            current_state_raw,
+                            resolved,
+                            &exclusions,
                         )
-                        .map_err(exclusion_report)?;
-                        run_info!(
-                            "{}",
-                            format_dry_run_agent_transition(
-                                task_id_str,
-                                current_state_raw,
-                                &to_state,
-                                resolved,
-                                machine,
-                                &exclusions,
-                            )
-                        );
-                    }
+                    );
                 }
-                let _ = current_state;
             }
             sink.emit(RunEvent::PassEnded { pass, progressed: false });
             break;

@@ -113,6 +113,84 @@ fn a_first_visit_may_reuse_a_deliberately_preseeded_output() {
     assert_task_state(&plan, &machine, "1", "verifying");
 }
 
+// §FS-rhei-agents.3.2: first entry remains reusable after unrelated task moves.
+#[test]
+fn a_first_entry_after_another_state_reuses_the_seed_without_spawning() {
+    let machine_text = BASIC_MACHINE
+        .replace(
+            "  work:\n    initial: true\n",
+            "  prepare:\n    initial: true\n    description: Stage inputs\n    gating: true\n  work:\n",
+        )
+        .replace(
+            "transitions:\n",
+            "transitions:\n  - { from: prepare, to: work, description: Start work }\n",
+        );
+    for parallel in ["1", "2"] {
+        let (dir, plan, machine) = setup(
+            &format!("agent-first-entry-after-prepare-{parallel}"),
+            &machine_text,
+            COUNTING_AGENT,
+        );
+        fs::write(&plan, PLAN.replace("**State:** work", "**State:** prepare"))
+            .expect("start in prepare");
+        seed_output(&dir, "runtime/digest.md");
+        assert_success(&run_transition(&plan, &machine, "1", "prepare", "work"));
+        assert_eq!(ledger(&dir), "plan.1 prepare@work\n");
+
+        assert_success(&run_cli(
+            "run",
+            &plan,
+            &machine,
+            &["--parallel", parallel, "--no-tui", "--no-callbacks"],
+        ));
+        assert!(spawn_lines(&dir).is_empty(), "a first entry must reuse its preseed");
+        assert_eq!(
+            fs::read_to_string(dir.join("runtime/digest.md")).expect("seeded digest"),
+            "seeded before this visit\n",
+            "a first entry must leave deliberately seeded work intact"
+        );
+        assert_task_state(&plan, &machine, "1", "verifying");
+        assert_eq!(ledger(&dir), "plan.1 prepare@work\nplan.1 work@verifying\n");
+    }
+}
+
+// §FS-rhei-agents.3.2: recorded state history requires fresh work even without a spawn record.
+#[test]
+fn a_reentry_without_a_spawn_record_still_requires_fresh_work() {
+    for (label, counted, parallel) in
+        [("sequential", false, "1"), ("parallel", false, "2"), ("counted", true, "1")]
+    {
+        let machine_text = if counted {
+            BASIC_MACHINE.replace("    agent: mock\n", "    visits: 2\n    agent: mock\n")
+        } else {
+            BASIC_MACHINE.to_string()
+        };
+        let (dir, plan, machine) =
+            setup(&format!("agent-reentry-without-record-{label}"), &machine_text, COUNTING_AGENT);
+        seed_output(&dir, "runtime/digest.md");
+        let args = ["--parallel", parallel, "--no-tui", "--no-callbacks"];
+        assert_success(&run_cli("run", &plan, &machine, &args));
+        assert!(spawn_lines(&dir).is_empty(), "the first visit reuses its seed");
+        assert!(
+            !dir.join("runtime/spawns").exists()
+                || fs::read_dir(dir.join("runtime/spawns"))
+                    .expect("spawn records")
+                    .next()
+                    .is_none(),
+            "preseeded work leaves no spawn record"
+        );
+        assert_success(&run_transition(&plan, &machine, "1", "verifying", "work"));
+        assert_success(&run_cli("run", &plan, &machine, &args));
+
+        assert_eq!(spawn_lines(&dir), ["work"], "{label}: history alone establishes re-entry");
+        assert_eq!(
+            fs::read_to_string(dir.join("runtime/digest.md")).expect("fresh digest"),
+            "written by current invocation\n"
+        );
+        assert_task_state(&plan, &machine, "1", "verifying");
+    }
+}
+
 #[test]
 fn a_visit_templated_output_still_resolves_for_each_counted_visit() {
     let machine_text = BASIC_MACHINE

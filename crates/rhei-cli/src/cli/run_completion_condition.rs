@@ -42,9 +42,10 @@ struct InvocationCompletion<'a> {
 impl InvocationCompletion<'_> {
     /// Whether an existing artifact belongs to work eligible for this visit.
     ///
-    /// With no record and no recorded move, an upgraded workspace retains the
-    /// legacy first-visit interpretation. Once either source supplies history,
-    /// only this invocation's successful current-visit record can answer.
+    /// With neither a record nor evidence of a prior visit to this state, an upgraded
+    /// workspace retains the legacy first-visit interpretation. Moves through
+    /// other states do not establish re-entry. Otherwise only this invocation's
+    /// successful current-visit record can answer.
     // §FS-rhei-agents.3.2 §FS-rhei-agents.8.4 §FS-rhei-transitions.4.3
     fn work_is_eligible_for_visit(&self, resolved: &ResolvedAgent) -> bool {
         let task_id = self.task.id.to_string();
@@ -59,8 +60,37 @@ impl InvocationCompletion<'_> {
             Some(record) => {
                 record.proves_successful_work(&task_id, self.state_name, self.moves)
             }
-            None => self.moves == 0,
+            None => !self.has_prior_state_visit(),
         }
+    }
+
+    /// A departure proves a prior visit, including a visit that began before
+    /// the ledger. Two arrivals also prove re-entry in a partial history.
+    /// A lone arrival can be the first visit, even after other task moves.
+    // §FS-rhei-agents.3.2
+    fn has_prior_state_visit(&self) -> bool {
+        let owning = self.artifact_root.join("runtime/state-transitions.log");
+        let running = self.runtime_dir.join("state-transitions.log");
+        let task_id = self.task.id.to_string();
+        let mut entries = 0;
+        for path in std::iter::once(&owning).chain((running != owning).then_some(&running)) {
+            let Ok(raw) = fs::read_to_string(path) else { continue };
+            for (id, from, to) in parse_ledger(&raw) {
+                if id != task_id {
+                    continue;
+                }
+                if normalized_state_name(&from, self.machine) == self.state_name {
+                    return true;
+                }
+                if normalized_state_name(&to, self.machine) == self.state_name {
+                    entries += 1;
+                    if entries > 1 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Whether this invocation still owes the ticket something: successful

@@ -15,6 +15,9 @@ readme = "../../README.md"
 # §AR-rhei-viz-flow.2), so they must travel with the published package.
 include = ["src/**/*", "templates/**/*", "skills/**/*", "assets/**/*", "schemas/**/*"]
 
+[features]
+budget-fixtures = ["rhei-core/budget-fixtures"]
+
 [dependencies]
 rhei-core = { package = "rhei-plan", path = "../rhei-core", version = "=0.5.1-dev" }
 # Absorbed from the former rhei-cli-tui crate.

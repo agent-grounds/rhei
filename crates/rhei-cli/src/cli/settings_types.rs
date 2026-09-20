@@ -196,6 +196,10 @@ struct ModelAgentBinding {
 /// distinguish "unset" (inherit) from "empty" (explicitly clear inherited).
 #[derive(Debug, Default, Deserialize, Clone)]
 struct SettingsDefaults {
+    /// Finite live threshold; qualification supplies the additional residual.
+    /// §FS-rhei-budgets.2.1
+    #[serde(default)]
+    budget_threshold: Option<rhei_core::budget::Money>,
     /// §FS-rhei-agents.1.1.1: Default model profile id.
     #[serde(default)]
     model: Option<String>,

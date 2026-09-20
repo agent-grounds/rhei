@@ -116,10 +116,21 @@ inspection remains available.
 | Claude Code and other/custom clients | Independently verified exact tuple | Unqualified | Unqualified | Unqualified |
 
 No restricted real launch is permitted yet. The implementation has a durable
-request barrier, but no HTTP provider adapter, confined process capability, or
-complete transport evidence bundle. Both initial clients and every required
-OS remain delivery blockers; a refusal-only release does not satisfy
+request barrier and, on Linux, a confinement backend that takes credential,
+egress and complete-process-tree containment from the kernel's user, network,
+pid, ipc and uts namespaces. It has no HTTP provider adapter reaching that
+broker from inside the namespace, no macOS or Windows backend, and no complete
+transport evidence bundle. Both initial clients and every required OS remain
+delivery blockers; a refusal-only release does not satisfy
 [§FS-rhei-budgets.12](functional-spec/rhei-budgets.spec.md#12-migration-compatibility-and-delivery-proof).
+
+The Linux containment cases prove each claim by breaching it, so they need the
+launcher they confine with: install `bubblewrap` before running the suite on
+Linux, and expect them to fail loudly on a kernel that refuses unprivileged
+user namespaces rather than pass quietly without proving anything. Ubuntu 24.04
+denies those namespaces through AppArmor by default, which is the mechanism
+being confined with; `sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`
+is what the Linux CI job does about it.
 
 Environment declarations, custom command names, client streaming usage, and
 test fixture JSON cannot qualify production work. The eventual restricted

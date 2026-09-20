@@ -97,6 +97,7 @@ struct ParallelAgentCompletion {
     /// Where this spawn recorded itself, so a withheld release edge can give
     /// back the attempt it was charged. §FS-rhei-agents.3.2.3
     spawn_record: PathBuf,
+    budget_lease: BudgetLease,
     result: MietteResult<AgentSpawnOutcome>,
     accounting_recorded: bool,
     accounting_warning: Option<String>,
@@ -129,6 +130,7 @@ struct ParallelAgentExit {
     /// Where this spawn recorded itself, so a withheld release edge can give
     /// back the attempt it was charged. §FS-rhei-agents.3.2.3
     spawn_record: PathBuf,
+    budget_lease: BudgetLease,
     accounting_recorded: bool,
     outcome: AgentSpawnOutcome,
 }

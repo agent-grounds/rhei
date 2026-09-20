@@ -150,6 +150,7 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
     // subcommands that read one; the subcommand copy wins when both appear.
     let before_subcommand = cli.state_machine;
     match cli.command {
+        Commands::Budget { command } => budget_command(command),
         Commands::Init { dir, here, title, no_agents, force } => {
             init_command(dir.as_deref(), title.as_deref(), no_agents, force, here)
         }

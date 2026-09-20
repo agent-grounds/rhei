@@ -50,6 +50,13 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
         map.insert(key.to_string(), value);
     };
     match event {
+        RunEvent::Budget { event } => {
+            return serde_json::to_value(event)
+                .expect("budget event serializes")
+                .as_object()
+                .expect("budget event is an object")
+                .clone();
+        }
         RunEvent::RunStarted { run_id, workspace, parallel, total_tasks } => {
             put("event", json!("run_started"));
             put("schema", json!(SCHEMA_VERSION));
@@ -313,6 +320,10 @@ fn decode_event(kind: &str, v: &Value, wall_clock: SystemTime) -> Option<RunEven
     let path = |key: &str| PathBuf::from(text(key));
 
     Some(match kind {
+        "budget_snapshot" | "budget_reserved" | "budget_settled" | "budget_released"
+        | "budget_breach" | "budget_halt" | "budget_started" | "budget_contained" => {
+            RunEvent::Budget { event: Box::new(serde_json::from_value(v.clone()).ok()?) }
+        }
         "run_started" => RunEvent::RunStarted {
             run_id: text("run_id"),
             workspace: path("workspace"),

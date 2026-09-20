@@ -260,6 +260,34 @@ fn run_sequential_agent_invocation(
 
     let started_at = TuiInstant::now();
     let started_wall = SystemTime::now();
+
+
+    // Reservation is the last scheduler action before capability transfer.
+    // The fixture driver supplies deterministic authority; release builds
+    // reach this same seam only after registry qualification. §AR-neural-admission.1
+    let budget_lease = match budget_admit_agent(
+        input,
+        &loaded,
+        machine,
+        settings,
+        opts,
+        task,
+        current_state,
+        resolved,
+        &plan,
+        runtime_dir,
+        &task_workspace_root,
+        run_id,
+        visit_count,
+        sink,
+    ) {
+        Ok(lease) => lease,
+        Err(_) => {
+            progress.stalled_tasks.insert(task_id_str.clone());
+            return Ok(());
+        }
+    };
+
     sink.emit(RunEvent::SlotAssigned {
         slot: 0,
         task: task_id_str.clone(),
@@ -305,7 +333,17 @@ fn run_sequential_agent_invocation(
             resolved.model.as_deref(),
         )
         .as_deref(),
-    );
+    Some(&budget_lease),
+);
+    let capture = spawn_result
+        .as_ref()
+        .ok()
+        .and_then(|outcome| outcome.usage_capture_path.as_deref());
+    if let Err(error) = budget_lease.settle_if_captured(capture, sink) {
+        // Missing finality retains exposure and never changes the earned result.
+        // §FS-rhei-budgets.7
+        run_warn!("budget settlement retained exposure: {error}");
+    }
     let duration_ms = started_at.elapsed().as_millis() as u64;
     let finished_wall = SystemTime::now();
     let (outcome, exit_code) = slot_outcome(&spawn_result);
@@ -377,6 +415,7 @@ fn run_sequential_agent_invocation(
             run_warn!("  warning: failed to record accounting: {}", err);
         }
     }
+    let _budget_edge = BudgetEdgeGuard::enter(task_id_str, &budget_lease);
     handle_sequential_agent_completion(
         input,
         machines,
@@ -391,7 +430,7 @@ fn run_sequential_agent_invocation(
             started_at: started_wall,
             task,
             release,
-            task_workspace_root,
+            task_workspace_root: task_workspace_root.clone(),
             resolved,
             log,
             snapshot_preload,
@@ -404,5 +443,11 @@ fn run_sequential_agent_invocation(
             result: spawn_result,
         },
         progress,
-    )
+    )?;
+    let refreshed = load_plan(input)?;
+    let state = find_task_by_id(&refreshed.rhei.tasks, &target_id)
+        .map(|task| task.state.as_str())
+        .unwrap_or(current_state);
+    budget_lease.finish_travel(&task_workspace_root, runtime_dir, task_id_str, state, sink)?;
+    Ok(())
 }

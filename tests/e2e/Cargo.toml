@@ -12,7 +12,6 @@ rust-version.workspace = true
 repository.workspace = true
 publish = false
 description = "User scenarios: black-box proof of the rhei spec."
-
 # The tests are the files of this directory: it is the home, not a crate with
 # a `tests/` subtree of its own.
 autotests = false
@@ -27,8 +26,9 @@ path = "fixtures/effort_fixture.rs"
 
 [dev-dependencies]
 fs2 = "0.4.3"
+# Parser access must not unify the isolated fixture feature. §AR-neural-admission.8
+rhei-cli = { path = "../../crates/rhei-cli", default-features = false }
 rhei-core = { package = "rhei-plan", path = "../../crates/rhei-core" }
-rhei-cli = { path = "../../crates/rhei-cli" }
 jsonschema = { version = "0.18.3", default-features = false }
 serde_json = "1"
 serde_yaml = "0.9"
@@ -46,4 +46,4 @@ portable-pty = "=0.8.1"
 [target.'cfg(unix)'.dev-dependencies]
 # `fs` is what gates `nix::fcntl`, which the hung-up-terminal e2e needs to keep
 # the pty out of the child it spawns. §FS-rhei-run.3.2
-nix = { version = "0.29", features = ["term", "fs"] }
+nix = { version = "0.29", features = ["term", "fs", "signal", "process"] }

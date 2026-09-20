@@ -14,6 +14,7 @@
                 agent_timeout: Some("45m".to_string()),
                 program_timeout: None,
                 attempts: None,
+                budget_threshold: None,
                 mcp_servers: None,
                 skills: None,
             },
@@ -526,7 +527,8 @@
             None,
             &spawn_plan_for_test(&log_path),
             None,
-        )
+        None,
+)
         .expect("agent runs");
 
         let log = fs::read_to_string(&log_path).expect("read log");

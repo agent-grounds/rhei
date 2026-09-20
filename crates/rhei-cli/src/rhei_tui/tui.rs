@@ -19,8 +19,10 @@ use ratatui::Terminal;
 use crate::rhei_tui::dashboard::{GateTransitionSink, InterveneSink, PlanLoader};
 use crate::rhei_tui::event::{EventSink, MessageLevel, RunEvent};
 
+mod cost;
 mod derive;
 mod input;
+mod inspector;
 mod render;
 mod state;
 mod text;

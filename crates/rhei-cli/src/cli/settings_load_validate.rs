@@ -358,6 +358,12 @@ fn load_merged_roster(
         }
     }
     let defaults = SettingsDefaults {
+        // §FS-rhei-budgets.2.1: state, project defaults, global defaults.
+        budget_threshold: if json_nested_field_present(project_raw, "defaults", "budget_threshold") {
+            project.defaults.budget_threshold
+        } else {
+            global.defaults.budget_threshold
+        },
         model: if json_nested_field_present(project_raw, "defaults", "model") {
             project.defaults.model
         } else {

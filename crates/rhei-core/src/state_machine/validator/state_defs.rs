@@ -1,6 +1,10 @@
 /// One entry from the `states` map in a YAML states file.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StateDef {
+    /// The live threshold is smaller than the complete reserved charge.
+    /// §FS-rhei-budgets.2.1
+    #[serde(default)]
+    pub budget_threshold: Option<crate::budget::Money>,
     /// Optional descriptive text; the current schema intentionally keeps this permissive.
     pub description: Option<String>,
     /// Optional reusable prompt-template reference with state-specific values.
@@ -402,6 +406,10 @@ fn statically_resolved_snapshot_agent(state: &StateDef) -> Option<String> {
 /// §FS-rhei-states.8: Named reusable `{initial, allowed}` state policy.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Profile {
+    /// Required before autonomous neural work; legacy authored documents
+    /// remain readable for inspection and migration. §FS-rhei-budgets.2.2
+    #[serde(default)]
+    pub transition_limit: Option<u64>,
     /// Initial state that nodes bound to this profile start in.
     pub initial: String,
     /// Complete set of state names that nodes bound to this profile may hold.

@@ -1337,6 +1337,27 @@ function suppSlots(body){
   body.appendChild(renderAccountingGrid(IX.plan.accounting||null));
 }
 function suppCost(body){
+  // §FS-rhei-budgets.10: lifetime reservations stay separate from run accounting.
+  const budget=IX.plan.budget;
+  if(budget){
+    body.appendChild(el("h3",{text:"Panta lifetime budget"}));
+    body.appendChild(el("p",{text:budget.project_id+" · "+budget.ledger_health+" history"}));
+    const table=el("table"), header=el("tr");
+    ["bound","ceiling","consumed","reserved","remaining"].forEach(t=>header.appendChild(el("th",{text:t})));
+    table.appendChild(header);
+    const row=(name,limit,used,held,left)=>{
+      const r=el("tr"); [name,limit,used,held,left].forEach(v=>r.appendChild(el("td",{text:String(v??"unknown")}))); table.appendChild(r);
+    };
+    row("invocations",budget.allowance.invocations,budget.consumed.invocations,budget.reserved.invocations,budget.remaining.invocations);
+    row("micro-"+budget.allowance.spend.currency,budget.allowance.spend.amount_micro,budget.consumed.spend.amount_micro,budget.reserved.spend.amount_micro,budget.remaining.spend.amount_micro);
+    Object.entries(budget.travel||{}).forEach(([ticket,t])=>row("travel "+ticket,(budget.travel_limits||{})[ticket],t.consumed,t.reserved,(budget.travel_remaining||{})[ticket]));
+    body.appendChild(table);
+    Object.entries(budget.reservations||{}).forEach(([id,r])=>{
+      const detail=el("details"); detail.appendChild(el("summary",{text:id+" · "+r.containment_state}));
+      detail.appendChild(el("pre",{text:JSON.stringify(r,null,2)})); body.appendChild(detail);
+    });
+    if(budget.breached) body.appendChild(el("p",{text:"Budget breach retained; requalification required."}));
+  }
   const a=IX.plan.accounting;
   if(a){ body.appendChild(el("h3",{text:"run total"}));
     const g=el("div",{class:"acct-grid"});

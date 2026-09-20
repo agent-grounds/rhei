@@ -27,6 +27,7 @@ impl StateMachine {
 
     fn validate(mut self) -> Result<Self, StateMachineLoadError> {
         self.validate_cancellation_and_sources()?;
+        self.validate_budget_configuration()?;
         self.validate_model_configuration()?;
         self.validate_prompt_templates()?;
         self.validate_program_configuration()?;

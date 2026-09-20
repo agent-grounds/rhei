@@ -277,6 +277,9 @@ fn run_command(
     // this. §FS-rhei-run.2.7
     let identity = RunIdentity::new();
     record_run_lock_ownership(&mut run_locks, &identity)?;
+    // Own the report/event paths before reporting any admission refusal.
+    // No callback or worker has started. §FS-rhei-budgets.10
+    report_budget_preflight(input, &loaded, &machines, &settings, &rhei_scope, &opts, &identity)?;
     // §FS-rhei-run.3.1: detect subprocess commits that leave run-owned state dirty.
     let git_consistency = RunGitConsistencyGuard::capture(&workspace_root, input, !opts.dry_run());
 

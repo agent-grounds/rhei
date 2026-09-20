@@ -39,9 +39,11 @@ fn handle_parallel_agent_exit(
         retry_outlook,
         subtree_before,
         spawn_record,
+        budget_lease,
         accounting_recorded,
         outcome,
     } = exit;
+    let _budget_edge = BudgetEdgeGuard::enter(&task_id_str, &budget_lease);
     let AgentSpawnOutcome { status, timed_out, timeout_secs, provider_limit, .. } = outcome;
     // The completed ticket's own machine drives its post-exit
     // handling; callbacks resolve inside each helper from the
@@ -542,5 +544,16 @@ fn handle_parallel_agent_exit(
         }
     }
 
+    let final_plan = load_plan(input)?;
+    let final_state = find_task_by_id(&final_plan.rhei.tasks, &target_id)
+        .map(|task| task.state.as_str())
+        .unwrap_or(&state_name);
+    budget_lease.finish_travel(
+        &task_root,
+        &workspace_root.join("runtime"),
+        &task_id_str,
+        final_state,
+        sink,
+    )?;
     Ok(())
 }

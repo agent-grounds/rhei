@@ -254,15 +254,25 @@ impl LockedTransitionLedger {
                 "ledger append injection after partial write: {message}"
             ));
         }
-        writeln!(file, "{} {}@{}", task_id, from, to).map_err(|err| {
+        let receipt_suffix = budget_edge_suffix(task_id);
+        writeln!(file, "{} {}@{}{}", task_id, from, to, receipt_suffix).map_err(|err| {
             miette!(
                 help = transition_log_help(),
                 "failed to write state transition log entry: {err}"
             )
         })?;
-        file.flush().map_err(|err| {
-            file_io_report(&self.path, "failed to flush state transition log", err)
-        })
+        file.flush().and_then(|()| file.sync_all()).map_err(|err| {
+            file_io_report(&self.path, "failed to sync state transition log", err)
+        })?;
+        // Isolated driver fault: prove recovery after the central side is durable.
+        // §AR-neural-admission.8 §FS-rhei-budgets.7
+        #[cfg(feature = "budget-fixtures")]
+        if budget_fixture_active() && !receipt_suffix.is_empty()
+            && std::env::var_os("RHEI_FIXTURE_CRASH_AFTER_CENTRAL").is_some()
+        {
+            std::process::exit(95);
+        }
+        Ok(())
     }
 
     /// Remove selected ticket lines while the stable sidecar excludes every

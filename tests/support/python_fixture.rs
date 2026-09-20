@@ -56,6 +56,26 @@ import re
 import sys
 import time
 
+# Only the isolated budget driver supplies this synthetic endpoint. Ordinary
+# fixture execution and the release binary never enable it.
+def fixture_provider_call():
+    if not os.environ.get('RHEI_FIXTURE_BROKER_URL'):
+        return
+    import json
+    import urllib.request
+    _budget_body = json.dumps({
+        'model': os.environ['RHEI_FIXTURE_MODEL'], 'input': 'deterministic fixture',
+        'max_output_tokens': 1000, 'stream': False, 'store': False,
+        'background': False, 'service_tier': 'default',
+    }).encode('utf-8')
+    _budget_request = urllib.request.Request(os.environ['RHEI_FIXTURE_BROKER_URL'],
+        data=_budget_body, headers={
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + os.environ['RHEI_FIXTURE_BROKER_TOKEN'],
+        })
+    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(_budget_request, timeout=3) as _response:
+        assert json.load(_response)['status'] == 'completed'
+
 # Rhei speaks UTF-8 with one `\n` per line on every platform, and Python does
 # not: on Windows it decodes stdin in the host's code page — a prompt carrying
 # an em dash comes back as lone surrogates that will not re-encode — and

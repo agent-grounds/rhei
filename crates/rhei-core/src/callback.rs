@@ -105,6 +105,8 @@ impl CallbackResult {
 /// Error returned when a callback cannot be executed.
 #[derive(Debug)]
 pub enum CallbackError {
+    /// A callback had no qualified admission capability. §FS-rhei-budgets.9
+    BudgetRefused(String),
     /// The callback identifier has no recognized platform prefix.
     UnknownPlatform(String),
     /// The callback command could not be started.
@@ -116,6 +118,7 @@ pub enum CallbackError {
 impl std::fmt::Display for CallbackError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            CallbackError::BudgetRefused(reason) => write!(f, "budget admission halted: {reason}"),
             CallbackError::UnknownPlatform(id) => {
                 write!(f, "unknown callback platform in '{id}' (expected prefix like 'cli:')")
             }
@@ -215,6 +218,11 @@ impl CallbackExecutor for ShellCallbackExecutor {
             cmd.env("RHEI_TRANSITION_LEDGER_STATUS", ledger_status.as_str());
         }
 
+        // Shell callbacks are neural-capable, including through embedded
+        // callers. A raw shell has no qualified launch capability.
+        // §AR-neural-admission.1 §FS-rhei-budgets.4
+        crate::budget::refuse_unqualified_spawn()
+            .map_err(|e| CallbackError::BudgetRefused(e.to_string()))?;
         let mut child =
             cmd.spawn().map_err(|e| CallbackError::SpawnFailed(command.to_string(), e))?;
 

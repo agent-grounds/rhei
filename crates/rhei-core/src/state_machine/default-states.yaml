@@ -27,6 +27,8 @@ transitions:
 # Named, reusable state policies. Referenced from `node_policy` below.
 profiles:
   default-rhei:
+    # Lifetime applied edges, preserved across runs and resets. §FS-rhei-budgets.2.2
+    transition_limit: 100
     # Built-in profile used by both the root and every task node in the
     # default configuration. Covers the simple pending/completed flow.
     initial: pending

@@ -80,6 +80,7 @@ pub struct SummarySink {
 
 #[derive(Default)]
 struct SummaryState {
+    budget_events: Vec<rhei_core::budget::BudgetEvent>,
     /// Driver of each in-flight slot, keyed by slot index, set on `SlotAssigned`.
     inflight: HashMap<u16, &'static str>,
     /// Finalized per-task activity, keyed by task id.
@@ -155,6 +156,7 @@ impl rhei_tui::EventSink for SummarySink {
             Err(_) => return,
         };
         match event {
+            rhei_tui::RunEvent::Budget { event } => state.budget_events.push(*event),
             // `agent` is `Some` for agent-backed work, `None` for programs.
             rhei_tui::RunEvent::SlotAssigned { slot, task, agent, .. } => {
                 let driver = if agent.is_some() { "agent" } else { "program" };
@@ -671,6 +673,7 @@ struct TaskAccountingRow {
 
 /// The fully resolved run report, ready to render to the console or to Markdown.
 pub struct RunSummaryReport {
+    budget_events: Vec<rhei_core::budget::BudgetEvent>,
     title: String,
     result: String,
     duration: Option<std::time::Duration>,
@@ -860,8 +863,9 @@ impl RunSummaryReport {
         );
         let invocations = build_invocations(ledger, &stats.workspace_root);
 
-        Self {
+        let mut report = Self {
             title: rhei.title.clone(),
+            budget_events: summary.budget_events(),
             result,
             duration: stats.duration,
             state_counts,
@@ -887,7 +891,9 @@ impl RunSummaryReport {
             task_accounting,
             report_path: None,
             history_path: None,
-        }
+        };
+        report.apply_budget_halts();
+        report
     }
 
     /// Render the rich, colored summary for an interactive terminal.
@@ -1037,6 +1043,7 @@ impl RunSummaryReport {
         out.push_str(&format!("| could not advance | {could_not_advance} |\n"));
         out.push('\n');
         out.push_str(&self.accounting.render_markdown());
+        out.push_str(&self.budget_markdown());
         if self.agents_spawned == 0 && self.programs_spawned == 0 {
             out.push_str(
                 "> No agent or program ran this run. Any task that advanced did so through \

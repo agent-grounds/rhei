@@ -23,6 +23,7 @@ pub(super) struct DashboardState {
     pub(super) recent: Vec<JournalLine>,
     pub(super) links: Vec<DashboardLink>,
     pub(super) accounting: Option<AccountingRunSummary>,
+    pub(super) budget: Option<rhei_core::budget::Snapshot>,
     #[serde(skip)]
     pub(super) invocations: Vec<DashboardUsageRecord>,
     pub(super) finished: bool,
@@ -52,6 +53,7 @@ impl DashboardState {
             recent: Vec::new(),
             links: Vec::new(),
             accounting: None,
+            budget: None,
             invocations: Vec::new(),
             finished: false,
             summary: None,
@@ -64,6 +66,12 @@ impl DashboardState {
         let now = now_ms();
         self.updated_at_ms = now;
         match event {
+            RunEvent::Budget { event } => {
+                if let Some(snapshot) = event.snapshot() {
+                    self.budget = Some(snapshot.clone());
+                }
+                self.push_recent("info", event.message());
+            }
             RunEvent::RunStarted { workspace, parallel, total_tasks, .. } => {
                 self.workspace = workspace.display().to_string();
                 self.parallel = (*parallel).max(1);

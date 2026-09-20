@@ -9,6 +9,7 @@ members = [
     "xtask",
 ]
 
+exclude = ["tests/fixtures/budget-driver"]
 resolver = "2"
 
 [workspace.package]

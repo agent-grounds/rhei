@@ -1239,6 +1239,12 @@ fn validation_pass_for_loaded(
     report
         .errors
         .extend(validate_plan_settings_references(&loaded.rhei, &machines, &settings));
+    // The same read-only allowance checks back validation and dry-run.
+    // §FS-rhei-budgets.4 §FS-rhei-validate.4
+    let scope = resolve_rhei_scope(&loaded, &[])?;
+    if let Err(error) = budget_preflight(input, &loaded, &machines, &settings, &scope, &mut Vec::new(), true) {
+        report.errors.push(error.to_string());
+    }
     report.errors.extend(validate_snapshot_plan_context(&loaded, &resolved));
     report.warnings.extend(snapshot_orphan_validation_warnings(
         &workspace_root,

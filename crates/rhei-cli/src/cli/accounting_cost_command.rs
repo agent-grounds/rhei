@@ -24,13 +24,16 @@ fn cost_command(options: CostCommandOptions<'_>) -> MietteResult<()> {
     let roots = accounting_roots(&loaded, &execution_workspace_root(&input_buf), &scope);
     let inspection = read_cost_inspection_over(&roots, &scope);
     let selected = selection.apply(inspection.scoped(), inspection.unreadable_root);
+    let budget = budget_inspection(&input_buf);
 
     if options.json {
-        let payload = cost_json_payload(&loaded.rhei, &inspection, &selection, &selected, options);
+        let mut payload = cost_json_payload(&loaded.rhei, &inspection, &selection, &selected, options);
+        payload["budget"] = budget;
         println!("{}", serde_json::to_string_pretty(&payload).expect("cost json serializes"));
         return Ok(());
     }
 
+    print!("{}", budget_inspection_text(&budget));
     for error in &inspection.errors {
         eprintln!("warning: {error}");
     }

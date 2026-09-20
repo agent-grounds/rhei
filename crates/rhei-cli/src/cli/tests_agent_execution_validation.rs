@@ -39,7 +39,8 @@
             None,
             &spawn_plan_for_test(&log_path),
             None,
-        )
+        None,
+)
         .expect("fake agent runs");
 
         assert!(status.status.success());
@@ -214,7 +215,8 @@ for line in sys.stdin:
             Some(&intervene),
             &spawn_plan_for_test(&log_path),
             None,
-        )
+        None,
+)
         .expect("fake stdin agent runs");
 
         assert!(status.status.success());
@@ -287,7 +289,8 @@ for line in sys.stdin:
             None,
             &spawn_plan_for_test(&log_path),
             None,
-        )
+        None,
+)
         .expect("timeout returns process status");
 
         assert!(!status.status.success());
@@ -351,7 +354,8 @@ for line in sys.stdin:
             None,
             &spawn_plan_for_test(&log_path),
             None,
-        )
+        None,
+)
         .expect("agent should complete without waiting for inherited pipe EOF");
 
         assert!(status.status.success());

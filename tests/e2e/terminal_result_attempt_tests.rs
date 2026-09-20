@@ -17,12 +17,15 @@ use super::operator_force_support::ForceFixture;
 use super::terminal_result_tests::write_mock_agent_settings;
 use super::*;
 
+include!("attempt_budget_support.rs");
+
 /// Publishes the state's declared output, counts the spawn, and exits 0 without
 /// touching `RHEI_RESULT_PATH` — the shape of issue #105.
 const OUTPUT_WITHOUT_RESULT_AGENT: &str = r#"root = pathlib.Path(env('RHEI_ROOT'))
 counter = root / ('attempts-' + env('RHEI_TASK_ID') + '.txt')
 n = int(counter.read_text().strip()) + 1 if counter.exists() else 1
 write(counter, str(n))
+fixture_provider_call()
 write(root / 'artifacts' / ('report-' + env('RHEI_TASK_ID') + '.md'), 'the report\n')
 sys.stdout.write('ATTEMPT-{} OF-VISIT-{}\n'.format(env('RHEI_ATTEMPT'), env('RHEI_VISIT_COUNT')))
 "#;
@@ -33,6 +36,7 @@ const FINISHING_AGENT: &str = r#"root = pathlib.Path(env('RHEI_ROOT'))
 counter = root / ('spawns-' + env('RHEI_STATE') + '.txt')
 n = int(counter.read_text().strip()) + 1 if counter.exists() else 1
 write(counter, str(n))
+fixture_provider_call()
 result('done in ' + env('RHEI_STATE') + '\n')
 sys.stdout.write('RAN-{}-{}\n'.format(env('RHEI_STATE'), env('RHEI_ATTEMPT')))
 "#;
@@ -75,6 +79,7 @@ fn setup(name: &str, plan: &str, machine: &str, agent_body: &str) -> (TestDir, P
     let machine_path = write_fixture_file(&dir, "states.yaml", machine);
     let agent = write_python_agent(&dir, "mock-agent.py", agent_body);
     write_mock_agent_settings(&dir, &agent);
+    migrate_attempt_case(&dir, &plan_path, &machine_path);
     (dir, plan_path, machine_path)
 }
 
@@ -121,7 +126,7 @@ fn a_visit_is_spawned_at_most_its_attempt_budget_across_separate_runs() {
     assert_task_state(&plan_path, &machine_path, "1", "implement");
     assert_eq!(
         log_names(&dir),
-        vec!["task-plan.1-implement-attempt2.log", "task-plan.1-implement.log"],
+        vec!["task-plan.1-implement-fixture-attempt2.log", "task-plan.1-implement-fixture.log"],
         "and two transcripts, not one per run"
     );
 }
@@ -396,7 +401,7 @@ fn re_entering_a_state_is_a_new_visit_with_a_fresh_attempt_budget() {
     );
     assert_eq!(
         log_names(&fixture.dir),
-        vec!["task-plan.1-a.log", "task-plan.1-b.log"],
+        vec!["task-plan.1-a-fixture.log", "task-plan.1-b-fixture.log"],
         "each visit writes the plain name; `-attempt` is for retries within one visit"
     );
 }
@@ -504,10 +509,11 @@ transitions:
     )
     .expect("write settings");
 
+    migrate_attempt_case(&dir, &plan_path, &machine_path);
     let failed = run_cli("run", &plan_path, &machine_path, &["--no-tui", "--no-callbacks"]);
     assert!(!failed.status.success(), "the agent command does not exist");
     assert!(
-        dir.join("runtime/logs/task-plan.1-implement.log").exists(),
+        dir.join("runtime/logs/task-plan.1-implement-fixture.log").exists(),
         "the header was written before the spawn was attempted, which is the trap"
     );
 

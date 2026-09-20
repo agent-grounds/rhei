@@ -347,6 +347,10 @@ fn summarize_coverage(
 // §FS-rhei-run-tui.1.1: Run event surface.
 #[derive(Debug, Clone)]
 pub enum RunEvent {
+    /// Shared durable budget facts and admission refusals. §FS-rhei-budgets.10
+    Budget {
+        event: Box<rhei_core::budget::BudgetEvent>,
+    },
     RunStarted {
         /// The id this run is named by everywhere — the report, the descriptor,
         /// and `rhei attach <id>`. Carried on the event so the record stream is

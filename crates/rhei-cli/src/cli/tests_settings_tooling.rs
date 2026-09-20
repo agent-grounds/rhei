@@ -1127,7 +1127,8 @@ transitions:
             None,
             &spawn_plan_for_test(&log_path),
             None,
-        )
+        None,
+)
         .expect("agent runs");
         let log = fs::read_to_string(log_path).expect("read log");
         assert!(log.contains("\nmcp_servers: optional-mcp?\n"), "{log}");

@@ -210,7 +210,8 @@ spawns.mkdir(parents=True, exist_ok=True)
             None,
             &spawn_plan_for_test(&log_path),
             None,
-        )
+        None,
+)
         .expect("timeout returns process status");
 
         assert!(status.timed_out);

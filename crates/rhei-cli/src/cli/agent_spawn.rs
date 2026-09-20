@@ -198,6 +198,7 @@ fn spawn_and_wait_agent(
     // path key the same invocation; the prompt already carries its result path.
     // §FS-rhei-states.3.3
     _result_identity: Option<&str>,
+    budget_lease: Option<&BudgetLease>,
 ) -> MietteResult<AgentSpawnOutcome> {
     // Ensure log directory exists.
     if let Some(parent) = log_path.parent() {
@@ -331,7 +332,9 @@ fn spawn_and_wait_agent(
     // The agent leads its own process group, so its MCP servers and shell tools
     // are terminated with it, and it never inherits the operator's terminal.
     // §FS-rhei-run.3.2
-    let spawned = Supervised::spawn(&mut cmd, &format!("{task_id}@{state_name}"));
+    let capability = budget_lease.map(BudgetLease::prepare_process).transpose()?;
+    if let Some(capability) = &capability { capability.configure(&mut cmd)?; }
+    let spawned = Supervised::spawn_with_budget(&mut cmd, &format!("{task_id}@{state_name}"), capability.as_ref());
     let mut supervised = match spawned {
         Ok(supervised) => supervised,
         // Interrupted between the scheduler's check and the spawn. Nothing

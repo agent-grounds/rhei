@@ -307,6 +307,9 @@ fn run_on_cli_stack() {
 /// shapes.
 fn command_wants_json(command: &Commands) -> bool {
     match command {
+        Commands::Budget { command: BudgetCommand::Show { format, .. } } => {
+            matches!(format, SnapshotListFormat::Json)
+        }
         Commands::Next { json, .. } => *json,
         Commands::States { json, .. } => *json,
         Commands::Roster { json, .. } => *json,

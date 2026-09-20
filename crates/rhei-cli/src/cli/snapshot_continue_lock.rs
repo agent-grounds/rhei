@@ -365,6 +365,10 @@ fn spawn_snapshot_continue_agent(
     cmd.stdin(std::process::Stdio::inherit())
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit());
+    // Rhei owns this process too: interactive delivery is not an exemption
+    // from provider-spend qualification. §FS-rhei-budgets.4
+    rhei_core::budget::refuse_unqualified_spawn()
+        .map_err(|error| miette!(help = "qualify the transport this session would launch, or deliver the message without rhei", "budget admission halted: {error}"))?;
     let status = cmd
         .status()
         .map_err(|err| miette!(

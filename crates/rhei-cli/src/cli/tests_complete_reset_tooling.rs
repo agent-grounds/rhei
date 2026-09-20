@@ -874,6 +874,7 @@ transitions:
                 agent_timeout: None,
                 program_timeout: None,
                 attempts: None,
+                budget_threshold: None,
                 mcp_servers: defaults_mcp,
                 skills: None,
             },

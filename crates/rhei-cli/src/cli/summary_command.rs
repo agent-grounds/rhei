@@ -83,6 +83,11 @@ fn summary_command(
             alternate.as_ref().map(|(_, book)| book),
         )
     );
+    // Every bound stays visible on the reading surfaces. §FS-rhei-budgets.10
+    let budget = budget_inspection(&input_buf);
+    if !budget.is_null() {
+        println!("\n{}", budget_inspection_text(&budget));
+    }
     Ok(())
 }
 

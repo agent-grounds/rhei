@@ -286,17 +286,7 @@ fn spawn_parallel_agent_work_item(
     let from_state = task.state.as_str().to_string();
     let started_at = std::time::Instant::now();
     let started_wall = std::time::SystemTime::now();
-    sink.emit(rhei_tui::RunEvent::SlotAssigned {
-        slot,
-        task: item.task_id_str.clone(),
-        from: from_state.clone(),
-        to: item.current_state.clone(),
-        agent: Some(item.resolved.agent.id().to_string()),
-        template_context: Some(agent_template_context(&item.resolved)),
-        log_path: log.clone(),
-        started_at,
-        wall_clock: started_wall,
-    });
+
 
     // Each fan-out identity receives its own freshly resolved adapter paths.
     // §FS-rhei-agents.5.2.2
@@ -306,7 +296,7 @@ fn spawn_parallel_agent_work_item(
     let intervene_for_thread = intervene.cloned();
     let log_for_thread = log.clone();
     let log_for_result = log.clone();
-    let from_for_thread = from_state;
+    let from_for_thread = from_state.clone();
     let to_for_thread = item.current_state.clone();
     let tid_for_event = item.task_id_str.clone();
     let runtime_dir_for_thread = agent_runtime_dir;
@@ -340,6 +330,44 @@ fn spawn_parallel_agent_work_item(
     // and no other — owns the group it leads. §FS-rhei-run.3.2
     let run_owner = current_run_owner();
 
+    // The shared admission seam runs on the scheduler thread before the
+    // worker receives process capability. Fanout arms are reserved together;
+    // competing tasks serialize on the project journal. §FS-rhei-budgets.5
+    let budget_lease = match budget_admit_agent(
+        input,
+        &loaded,
+        machine,
+        settings,
+        opts,
+        task,
+        &item.current_state,
+        &item.resolved,
+        &plan_for_thread,
+        runtime_dir,
+        workspace_root,
+        run_id,
+        visit_count,
+        sink,
+    ) {
+        Ok(lease) => lease,
+        Err(_) => {
+            return Ok(ParallelAgentSpawnOutcome::Skipped);
+        }
+    };
+    sink.emit(rhei_tui::RunEvent::SlotAssigned {
+        slot,
+        task: item.task_id_str.clone(),
+        from: from_state.clone(),
+        to: item.current_state.clone(),
+        agent: Some(item.resolved.agent.id().to_string()),
+        template_context: Some(agent_template_context(&item.resolved)),
+        log_path: log.clone(),
+        started_at,
+        wall_clock: started_wall,
+    });
+
+    let budget_lease_for_thread = budget_lease.clone();
+
     let handle = std::thread::spawn(move || {
         inherit_run_owner(run_owner);
         let thread_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -367,7 +395,8 @@ fn spawn_parallel_agent_work_item(
                 // §FS-rhei-agents.8.4
                 &plan_for_thread,
                 result_identity.as_deref(),
-            );
+            Some(&budget_lease_for_thread),
+);
             let duration_ms = started_at.elapsed().as_millis() as u64;
             let (outcome, exit_code) = slot_outcome(&result);
             let finished_wall = std::time::SystemTime::now();
@@ -403,6 +432,10 @@ fn spawn_parallel_agent_work_item(
             );
             let usage_capture_path =
                 result.as_ref().ok().and_then(|outcome| outcome.usage_capture_path.as_ref());
+            let budget_warning = budget_lease_for_thread
+                .settle_if_captured(usage_capture_path.map(PathBuf::as_path), &sink_for_thread)
+                .err()
+                .map(|error| error.to_string());
             let accounting_result = record_agent_accounting_attempt(
                 AgentAccountingInvocation {
                     workspace_root: &workspace_root_for_thread,
@@ -427,11 +460,17 @@ fn spawn_parallel_agent_work_item(
                     .as_ref()
                     .expect("agent spawn plans carry accounting identity"),
             );
-            let (accounting_recorded, accounting_warning) = match accounting_result {
+            let (accounting_recorded, mut accounting_warning) = match accounting_result {
                 Ok(Some(_)) => (true, None),
                 Ok(None) => (false, None),
                 Err(err) => (false, Some(err.to_string())),
             };
+            if let Some(warning) = budget_warning {
+                accounting_warning = Some(match accounting_warning {
+                    Some(existing) => format!("{existing}; budget settlement: {warning}"),
+                    None => format!("budget settlement: {warning}"),
+                });
+            }
             ParallelAgentThreadMessage::Completed(ParallelAgentCompletion {
                 task_id_str: tid,
                 state_name: sname,
@@ -444,6 +483,7 @@ fn spawn_parallel_agent_work_item(
                 retry_outlook: outlook_for_result,
                 subtree_before,
                 spawn_record,
+                budget_lease: budget_lease_for_thread,
                 result,
                 accounting_recorded,
                 accounting_warning,

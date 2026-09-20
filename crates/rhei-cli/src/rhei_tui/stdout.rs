@@ -29,7 +29,9 @@ impl Default for StdoutSink {
 
 impl EventSink for StdoutSink {
     fn emit(&self, event: RunEvent) {
-        if let RunEvent::Message { level, text } = event {
+        if let RunEvent::Budget { event } = event {
+            println!("{}", event.message());
+        } else if let RunEvent::Message { level, text } = event {
             match level {
                 MessageLevel::Info => println!("{text}"),
                 MessageLevel::Warn | MessageLevel::Error => eprintln!("{text}"),

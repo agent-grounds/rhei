@@ -38,6 +38,20 @@ jobs:
         with:
           python-version: "3.x"
 
+      # Credential, egress and process-tree confinement is proved by breaching
+      # it, so the Linux runner needs the launcher those cases confine with.
+      # A runner without it cannot prove containment, and the cases say so
+      # rather than passing quietly. §FS-rhei-budgets.6.4
+      - name: Install bubblewrap
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y bubblewrap
+          # Ubuntu 24.04 denies unprivileged user namespaces through AppArmor,
+          # which is the very mechanism the containment cases confine with.
+          # Kernels without the knob need no relaxing, so a missing key is not
+          # a failure.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
       - name: Cache cargo registry and target
         uses: actions/cache@v5
         continue-on-error: true

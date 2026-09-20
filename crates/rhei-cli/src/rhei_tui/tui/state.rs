@@ -216,6 +216,7 @@ pub(super) struct UiState {
     pub(super) slots: Vec<SlotState>,
     pub(super) invocations: Vec<UsageRecord>,
     pub(super) accounting: Option<AccountingRunSummary>,
+    pub(super) budget: Option<rhei_core::budget::Snapshot>,
     pub(super) deferred: HashSet<String>,
     pub(super) pass: u32,
     pub(super) journal: VecDeque<JournalEntry>,
@@ -273,6 +274,7 @@ impl UiState {
             slots: vec![SlotState::default(); parallel as usize],
             invocations: Vec::new(),
             accounting: None,
+            budget: None,
             deferred: HashSet::new(),
             pass: 0,
             journal: VecDeque::with_capacity(JOURNAL_BUFFER),
@@ -434,6 +436,12 @@ impl UiState {
 
     pub(super) fn apply(&mut self, event: &RunEvent) {
         match event {
+            RunEvent::Budget { event } => {
+                if let Some(snapshot) = event.snapshot() {
+                    self.budget = Some(snapshot.clone());
+                }
+                self.push_journal(MessageLevel::Info, event.message());
+            }
             RunEvent::RunStarted { workspace, parallel, total_tasks, .. } => {
                 self.workspace = workspace.clone();
                 self.parallel = (*parallel).max(1);

@@ -1,0 +1,16 @@
+[package]
+name = "rhei-budget-fixture-driver"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Separate resolution prevents fixture features from unifying into ordinary
+# workspace builds. §AR-neural-admission.8
+[workspace]
+
+[dependencies]
+rhei-cli = { path = "../../../crates/rhei-cli", features = ["budget-fixtures"] }
+
+[[bin]]
+name = "rhei-budget-fixture-driver"
+path = "main.rs"

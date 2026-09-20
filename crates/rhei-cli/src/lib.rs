@@ -14,10 +14,23 @@ pub mod rhei_viz_model;
 
 // §AR-source-file-size: The CLI is split into bounded include parts.
 include!("cli/path_guards.rs");
+include!("cli/cli_imports.rs");
 include!("cli/cli_declarations.rs");
 include!("cli/complete_result_input.rs");
 include!("cli/cli_dispatch.rs");
 include!("cli/command_target_dispatch.rs");
+include!("cli/budget_commands.rs");
+include!("cli/budget_identity.rs");
+include!("cli/budget_initialization.rs");
+include!("cli/budget_ticket_identities.rs");
+include!("cli/budget_audit.rs");
+include!("cli/budget_preflight.rs");
+include!("cli/budget_visibility.rs");
+include!("cli/budget_run_report.rs");
+include!("cli/budget_fixture_runtime.rs");
+include!("cli/budget_halt.rs");
+include!("cli/budget_process.rs");
+include!("cli/budget_edges.rs");
 include!("cli/completion_candidates.rs");
 include!("cli/completion_context.rs");
 include!("cli/list_command.rs");
@@ -216,6 +229,15 @@ include!("cli/attach_command.rs");
 include!("cli/runs_command.rs");
 include!("cli/runs_history.rs");
 include!("cli/diagnostics.rs");
+
+/// Entry point for the separately compiled deterministic budget driver.
+/// The ordinary binaries cannot name this function without opting into the
+/// test-only feature at compile time. §AR-neural-admission.8
+#[cfg(feature = "budget-fixtures")]
+pub fn run_budget_fixture() {
+    BUDGET_FIXTURE_ACTIVE.store(true, std::sync::atomic::Ordering::SeqCst);
+    run();
+}
 
 #[cfg(test)]
 mod tests {

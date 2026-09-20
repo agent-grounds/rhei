@@ -380,7 +380,8 @@ print(json.dumps({
         None,
         &spawn_plan_for_test(&log_path),
         None,
-    )
+    None,
+)
     .expect("fake Claude agent runs");
     assert!(outcome.status.success());
     let log = std::fs::read_to_string(&log_path).expect("read Claude log");
@@ -491,7 +492,8 @@ print(json.dumps({
         None,
         &spawn_plan_for_test(&log_path),
         None,
-    )
+    None,
+)
     .expect("fake Claude agent runs");
     assert!(outcome.status.success());
 

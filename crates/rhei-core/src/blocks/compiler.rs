@@ -464,7 +464,11 @@ impl CompiledBlock {
         }
         profiles.insert(
             flow.clone(),
-            Profile { initial: self.entry.clone(), allowed: self.primary.clone() },
+            Profile {
+                initial: self.entry.clone(),
+                allowed: self.primary.clone(),
+                transition_limit: None,
+            },
         );
         policy.root = flow.clone();
         policy.default = flow;

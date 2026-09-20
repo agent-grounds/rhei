@@ -817,6 +817,16 @@ impl Supervised {
     /// already ruled out.
     // §FS-rhei-run.3.2
     fn spawn(cmd: &mut std::process::Command, label: &str) -> std::io::Result<Self> {
+        // A raw agent/program/redactor command carries no confinement proof.
+        // §AR-neural-admission.1 §FS-rhei-budgets.6.4
+        Self::spawn_with_budget(cmd, label, None)
+    }
+
+    fn spawn_with_budget(cmd: &mut std::process::Command, label: &str, capability: Option<&BudgetProcessCapability>) -> std::io::Result<Self> {
+        match capability {
+            Some(capability) => capability.authorize()?,
+            None => rhei_core::budget::refuse_unqualified_spawn()?,
+        }
         // The one place work actually starts, and so the only place the rule
         // holds with no window in front of it: the scheduler's own check is a
         // whole item's work earlier. §FS-rhei-run.3.2
@@ -874,6 +884,7 @@ impl Supervised {
         }
 
         let child = cmd.spawn()?;
+        if let Some(capability) = capability { capability.attach(child.id()); }
         #[cfg(unix)]
         let pgid = child.id() as i32;
         #[cfg(unix)]

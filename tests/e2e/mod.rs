@@ -36,6 +36,11 @@ mod block_provenance_support;
 mod block_provenance_symlink_tests;
 mod block_provenance_tests;
 mod block_terminal_compatibility_tests;
+mod budget_admission_tests;
+mod budget_containment_tests;
+mod budget_operator_tests;
+mod budget_persistence_tests;
+mod budget_test_support;
 mod complete_result_input_tests;
 mod completions_tests;
 mod consumes_advisory_tests;
@@ -199,7 +204,7 @@ pub fn python_callback_yaml(code: &str) -> String {
     serde_json::to_string(&format!("cli:{} -c \"{code}\"", python_command()))
         .expect("callback should serialize")
 }
-pub use binaries::rhei_binary;
+pub use binaries::{budget_fixture_binary, rhei_binary};
 pub use test_dir::TestDir;
 
 /// The product's own quoting, so a test builds an expected command line the way

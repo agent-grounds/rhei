@@ -129,6 +129,41 @@ pub fn rhei_binary() -> PathBuf {
         .clone()
 }
 
+/// Separately compiled bounded-runtime fixture. It is a target of the
+/// independent fixture workspace; its features cannot unify with a release build.
+/// §AR-neural-admission.8
+pub fn budget_fixture_binary() -> PathBuf {
+    static FIXTURE_BINARY: OnceLock<PathBuf> = OnceLock::new();
+    FIXTURE_BINARY
+        .get_or_init(|| {
+            let profile = profile_dir();
+            let target_dir =
+                profile.parent().expect("profile has target directory").join("budget-fixture");
+            let binary = target_dir
+                .join(profile.file_name().expect("profile name"))
+                .join(format!("rhei-budget-fixture-driver{}", std::env::consts::EXE_SUFFIX));
+            let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
+            let mut command = Command::new(cargo);
+            command
+                .args([
+                    "build",
+                    "--manifest-path",
+                    "tests/fixtures/budget-driver/Cargo.toml",
+                    "--locked",
+                    "--target-dir",
+                ])
+                .arg(target_dir)
+                .current_dir(repo_root());
+            if profile.file_name().and_then(|name| name.to_str()) == Some("release") {
+                command.arg("--release");
+            }
+            assert!(command.status().expect("build budget fixture driver").success());
+            assert!(binary.is_file(), "no budget fixture driver at {}", binary.display());
+            binary
+        })
+        .clone()
+}
+
 #[cfg(test)]
 mod tests {
     use std::ffi::{OsStr, OsString};

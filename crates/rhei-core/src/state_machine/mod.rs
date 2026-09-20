@@ -18,6 +18,7 @@ include!("validator/agent_effort.rs");
 include!("validator/state_defs.rs");
 include!("validator/metrics_decl.rs");
 include!("validator/state_machine_impl.rs");
+include!("validator/state_machine_budgets.rs");
 include!("validator/state_machine_prompt_templates.rs");
 include!("validator/state_machine_snapshots.rs");
 include!("validator/state_machine_runtime_validation.rs");

@@ -714,11 +714,31 @@ does not establish a provider-parking latency guarantee.
 
 ## 4. Dry Run
 
-With `--dry-run`, `rhei run` performs the same scan and selection logic but prints each planned transition instead of executing subprocesses or callbacks. Output format:
+With `--dry-run`, `rhei run` performs the same scan and selection logic but
+prints the work and transitions it predicts instead of executing subprocesses
+or callbacks. A pending agent invocation is reported first:
+
+```text
+Would spawn: agent '<agent>' for Task <ID> [<state>] [target=<target>]
+```
+
+When the current graph also selects an applicable post-work edge, the dry run
+additionally reports its transition:
 
 ```text
 would transition: Task <ID>  <from> -> <to>
 ```
+
+The spawn line means the pending work must run before that edge can fire; the
+edge projection never makes the work reusable or skippable. Both lines carry
+the same target label for a fan-out invocation, and a supervising self-loop is
+labelled `(release)`. When the graph presently selects no edge, the invocation
+still produces its spawn line and no transition is invented.
+
+An invocation whose work is reusable for the current visit produces no spawn
+line. It remains on the callback-only path, which reports its selected
+transition or the existing `withheld:` outcome when an empty supervising visit
+cannot release its descendants.
 
 No file lock is acquired, no markdown is rewritten, and no runtime artifacts are created.
 

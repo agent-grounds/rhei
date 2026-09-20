@@ -862,6 +862,21 @@ fn run_agent_mode(
                             &exclusions,
                         )
                     );
+                    // Pending work stays visible even when the graph can also
+                    // project its post-work edge. §FS-rhei-run.4
+                    if let Some(to_state) = find_next_transition(task, &loaded.rhei, machine)? {
+                        run_info!(
+                            "{}",
+                            format_dry_run_agent_transition(
+                                task_id_str,
+                                current_state_raw,
+                                &to_state,
+                                resolved,
+                                machine,
+                                &exclusions,
+                            )
+                        );
+                    }
                 }
             }
             sink.emit(RunEvent::PassEnded { pass, progressed: false });

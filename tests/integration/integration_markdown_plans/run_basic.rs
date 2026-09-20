@@ -351,6 +351,20 @@ transitions:
     assert!(
         result
             .stdout
+            .contains("Would spawn: agent 'codex' for Task plan.1 [review] [target=codex-yolo-openai-gpt-5.5]"),
+        "should label the first fanout spawn; got:\n{}",
+        result.stdout
+    );
+    assert!(
+        result
+            .stdout
+            .contains("Would spawn: agent 'codex' for Task plan.1 [review] [target=codex-yolo-openai-gpt-5.4]"),
+        "should label the second fanout spawn; got:\n{}",
+        result.stdout
+    );
+    assert!(
+        result
+            .stdout
             .contains("would transition: Task plan.1  review -> completed [target=codex-yolo-openai-gpt-5.5]"),
         "should label the first fanout target; got:\n{}",
         result.stdout

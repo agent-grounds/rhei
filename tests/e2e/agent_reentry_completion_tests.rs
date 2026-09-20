@@ -50,6 +50,44 @@ fn dry_run_predicts_the_fresh_spawn_required_by_execution() {
         dry.stdout,
         dry.stderr
     );
+    assert!(
+        dry.stdout.contains("would transition: Task plan.1  work -> verifying"),
+        "dry run must also project the selectable post-work edge; got:\n{}{}",
+        dry.stdout,
+        dry.stderr
+    );
+    assert!(spawn_lines(&dir).is_empty(), "dry run executes no worker");
+}
+
+#[test]
+fn dry_run_predicts_a_pending_spawn_when_no_edge_is_selectable() {
+    let machine = r#"name: agent-reentry-no-edge
+version: 1
+states:
+  work:
+    initial: true
+    description: Produce the digest
+    agent: mock
+    agent_timeout: 10s
+    outputs:
+      - name: digest
+        path: runtime/digest.md
+  completed:
+    description: Done
+    final: true
+transitions:
+  - { from: work, to: completed, condition: visitCount > 1 }
+"#;
+    let (dir, plan, machine) = setup("agent-dry-run-no-edge", machine, COUNTING_AGENT);
+
+    let dry = run_cli("run", &plan, &machine, &["--dry-run", "--no-tui", "--no-callbacks"]);
+    assert_success(&dry);
+    assert!(dry.stdout.contains("Would spawn:"), "pending work must be shown:\n{}", dry.stdout);
+    assert!(
+        !dry.stdout.contains("would transition: Task plan.1"),
+        "dry run must not invent a post-work edge:\n{}",
+        dry.stdout
+    );
     assert!(spawn_lines(&dir).is_empty(), "dry run executes no worker");
 }
 

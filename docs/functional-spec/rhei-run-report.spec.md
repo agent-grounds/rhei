@@ -711,6 +711,10 @@ The execution engine must retain enough per-run facts to render the report:
 - every halted task with the most concrete blocker known to the scheduler;
 - the run's own accounting rollup and the workspace lifetime total, told apart,
   along with which of the two sources produced the strip (§2.1).
+- the starting and ending Panta budget snapshots, every reservation,
+  settlement, release, containment and breach relevant to the run, ticket
+  travel, qualification evidence, precise halt reasons, and links to budget
+  and accounting receipts. §FS-rhei-budgets.10
 
 These facts already overlap heavily with the run event surface and transition
 journal, but the report should not be reconstructed only from

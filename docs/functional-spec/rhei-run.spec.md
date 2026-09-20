@@ -167,6 +167,14 @@ the identity belongs to the run, not to `--headless`.
 
 `rhei run` runs passes until no further forward progress is possible:
 
+Every neural unit selected by this loop enters the shared admission transaction
+of §FS-rhei-budgets.4 before any subprocess or provider request starts. A
+refusal starts no arm and leaves the ticket unchanged. Already admitted work
+keeps its finite containment, normal completion condition, result, and reserved
+edge. The run continues independently admissible work, then exits non-zero and
+names every budget-halted non-terminal ticket. No exhausted bound fires an
+error edge, invents a result, or silently advances. §REQ-bounded-neural-work.5
+
 Mode selection: `rhei run` uses orchestrated subprocess execution whenever any reachable non-terminal, non-gating state declares autonomous work via `program`, `agent`, `target`, `all_targets`, `model`, or `all_models`. Callback-only advancement is entered only when no such state exists, or when the caller explicitly disables spawning with `--no-agent` and/or `--no-program`. If a state declares model/target-driven work but no agent transport resolves, `rhei run` fails with a missing-agent configuration error; it does not silently fall back to callback-only transitions for that state.
 
 For mode selection only, a spawn-enabled program poll that satisfies every
@@ -520,6 +528,12 @@ early-termination path and three reasons to take it: the invocation's own
 deadline, an operator interrupt, and the supervisor's death. Timeout and
 shutdown are two triggers of the same routine.
 
+A qualified containment stop uses that owned teardown routine but is neither
+an operator interruption, an ordinary timeout, nor outer-budget exhaustion. It
+retains the admitted reservation and records its containment reason; reaping a
+local process group does not prove that provider billing stopped.
+§FS-rhei-budgets.6 §FS-rhei-budgets.9
+
 **What this covers.** Every subprocess `rhei run` starts itself to do a
 ticket's work: agents, programs, and the snapshot redactor
 ([§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification)). Three are deliberately outside it: a subprocess a
@@ -748,6 +762,10 @@ stdout remains pure JSONL. The warnings do not change the predicted exit status,
 and neither dry-run form creates a run descriptor, journal, event log, report,
 or any other runtime file.
 
+Dry-run performs the same budget, ancestry, and qualification resolution and
+reports the reservation or refusal it predicts, but it never locks for write,
+appends a receipt, or debits capacity. §FS-rhei-budgets.4
+
 A dry run **reports** the manual-only condition of §3 instead of aborting on
 the first task that hits it:
 
@@ -785,6 +803,12 @@ and do not by themselves fail it.
 ## 5. Parallel Execution
 
 With `--parallel N`, up to `N` subprocesses run concurrently. The orchestrator:
+
+- reserves all selected work through the one serialized Panta ledger before
+  assigning a slot; competing run processes cannot claim the same remaining
+  unit;
+- admits one task's fanout atomically — every arm's invocation and `FWC` plus
+  the task's single travel unit, or no arm starts. §FS-rhei-budgets.5
 
 - Assigns each spawn a slot index.
 - Writes one line to `runtime/transitions.log` per `SlotAssigned` and one per

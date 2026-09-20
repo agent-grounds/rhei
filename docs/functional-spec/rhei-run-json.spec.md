@@ -77,6 +77,10 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `tasks_deferred` | Ready tasks yielded a same-state slot | `pass`, `tasks` |
 | `task_outputs_missing` | A worker exited `0` without its required artifacts | `task`, `state`, `entries` |
 | `usage_reported` | A turn was measured, and again once the accounting record was durably written | `task`, `invocation_id`, `slot`, `report` (`streamed`/`final`), `usage` |
+| `budget_snapshot` | Run start/end and every allowance change | project identity, ceilings, consumed, reserved, remaining, currency, ledger health |
+| `budget_reserved` / `budget_settled` / `budget_released` | A budget receipt is durably committed | task/attempt/reservation/receipt identities and exact unit deltas |
+| `budget_started` / `budget_contained` | Start ambiguity/confirmation or a containment action is durably recorded | reservation receipt, qualification, containment reason and ending snapshot |
+| `budget_halt` / `budget_breach` | Admission refuses or actual charge exceeds its reservation | stable reason, affected bound or qualification, retained exposure and recovery action |
 | `message` | Engine diagnostics | `level` (`info`/`warn`/`error`), `text` |
 | `link` | The run produced a URL or file link | `label`, `url` |
 | `agent_output` | A live agent output line (§2.3) | `slot`, `task`, `stream`, `line` |

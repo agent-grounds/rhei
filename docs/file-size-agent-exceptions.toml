@@ -491,16 +491,6 @@ reason = """
 The validator's rules are already split into parts by block; its tests are not, so this file grows with every one of them. The split follows the parts that exist, but sample_machine and its neighbours here are shared across blocks and have no home yet; giving them one is the step before any case can move.
 """
 [[exceptions]]
-path = "crates/rhei-cli/src/cli/tests_complete_reset_tooling.rs"
-match = "exact"
-rules = ["source"]
-kind = "deferred"
-max_accepted = { value = 900, unit = "lines" }
-until = "The MCP and skills resolution cases below the divider at line 849 are an include-part of their own beside this one, with the machine and settings builders they need."
-reason = """
-Over budget before this change, which added no line to it. The file already carries its own seam - a divider separating the complete/reset plan-rewriting cases from the tooling resolution cases - but the second half cannot move until machine_with_tooling and settings_with move with it, and settings_with builds a RheiSettings the complete/reset half also reads. Naming that shared builder and giving it a home is the step before either half can leave.
-"""
-[[exceptions]]
 path = "crates/rhei-cli/src/rhei_tui/dashboard/tests.rs"
 match = "exact"
 rules = ["source"]
@@ -559,10 +549,10 @@ path = "docs/functional-spec/rhei-cost-accounting.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 850, unit = "lines" }
+max_accepted = { value = 1000, unit = "lines" }
 until = "A dedicated accounting-inspection reference owns section 8 and its inbound citations have migrated, bringing this reference below the 750-line soft budget."
 reason = """
-The accounting inspection surface in section 8 has no separate canonical declaration yet. Extracting it requires migrating its inbound section citations together; issue #253 fix round 1 is limited to four findings and preserves the accepted accounting contract points. This round adds only the descriptor-failure and scoped-preflight clarifications.
+The accounting inspection surface in section 8 has no separate canonical declaration yet. Extracting it requires migrating its inbound section citations together; issue #107 changes the enforcement seam while preserving those existing section identities, so it cannot perform that migration independently.
 """
 [[exceptions]]
 path = "tests/e2e/mod.rs"

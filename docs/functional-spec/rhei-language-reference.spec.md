@@ -48,6 +48,9 @@ The remaining three surfaces:
 - Execution references: agent, model, MCP server, skill, snapshot, and program
   references. Owned by [§FS-rhei-agents](rhei-agents.spec.md#fs-rhei-agents-rhei-agents-specification), [§FS-rhei-programs](rhei-programs.spec.md#fs-rhei-programs-rhei-program-states-specification), and
   [§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification).
+- Neural-work bounds: persistent project/task identities, state/default
+  `budget_threshold`, profile `transition_limit`, qualification, and `rhei
+  budget` commands. Owned by §FS-rhei-budgets.
 
 The plan and project markdown surface is the primary source of truth for project
 membership, task state, dependencies, hierarchy, assignees, and result links.
@@ -74,6 +77,8 @@ Use this order when learning or auditing the language:
 7. Read [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks)
    when one template mounts reusable blocks or `rhei instantiate` composes
    several blocks directly.
+8. Read §FS-rhei-budgets before authoring autonomous neural work or migrating
+   an existing autonomous plan.
 
 Command specs such as [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate), [§FS-rhei-migrate](rhei-migrate.spec.md#fs-rhei-migrate-rhei-migrate), [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next), [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition),
 Command specs such as [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate), [§FS-rhei-migrate](rhei-migrate.spec.md#fs-rhei-migrate-rhei-migrate), [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next), [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition),
@@ -109,6 +114,8 @@ Language changes must preserve a single discoverable entry point:
   [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification).
 - New execution references that appear in authored files must identify their
   owner spec from this page.
+- New neural launch paths and budget fields must enter through
+  §FS-rhei-budgets; no narrower feature may define an independent allowance.
 
 Task metadata may also control execution without changing the state machine:
 `**Target:**` and `**Model:**` select an execution identity

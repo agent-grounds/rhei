@@ -143,26 +143,27 @@ The primary reference documents are:
 
 ## First 10 minutes
 
-After installing from Cargo or running from this checkout, start with a
-mock-backed example that does not require external agent credentials:
+This development branch is implementing mandatory neural-work admission: no
+real transport is qualified yet, so autonomous subprocess launches refuse. The
+[budget operations guide](docs/budget-operations.md) has the qualification and
+migration status. Start by inspecting a workflow without launching its agents:
 
 ```bash
-cargo xtask examples validate agent-discussion
-cargo xtask examples run agent-discussion
+cargo run -p rhei-cli -- render examples/agent-discussion --format json
+cargo run -p rhei-cli -- viz examples/ui-test-canonical-example --output rhei-ui-test.html
 ```
 
-That validates a real workspace, runs deterministic mock agents in a temporary
-copy, and leaves runtime logs and artifacts in the copied workspace. To inspect
-the larger dashboard fixture without executing subprocesses:
+For a new project, initialize and inspect its persistent allowance first:
 
 ```bash
-cargo run -p rhei-cli -- run examples/ui-test-canonical-example --dry-run
-cargo run -p rhei-cli -- viz examples/ui-test-canonical-example --output /tmp/rhei-ui-test.html
+rhei budget init ./panta --invocations 50 --spend-micro 20000000 --currency USD --reason "Initial project allowance"
+rhei budget show ./panta --format json
 ```
 
-Use [`examples/README.md`](examples/README.md) as the cookbook once the basic
-loop is clear. It maps common jobs such as code review, snapshots, multi-agent
-analysis, and dashboard testing to concrete examples.
+Initialization does not qualify an agent or authorize an unbounded launch. See
+[`examples/README.md`](examples/README.md) for workflow shapes and [budget
+operations](docs/budget-operations.md) for thresholds, travel, history, and the
+unresolved rollout prerequisites.
 
 ## Install
 

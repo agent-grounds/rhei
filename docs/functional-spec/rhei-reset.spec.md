@@ -209,6 +209,12 @@ holds shared root guards and its ordinary stable file locks, so concurrent
 `rhei next`, `rhei transition`, `rhei complete`, and forced writers run wholly
 before or after its decision snapshot.
 
+Reset never removes or rewrites `budgetProjectId`, `budgetTicketId`, the
+`.agent-grounds/rhei/budgets/` journal or lock, consumed travel, settled spend,
+outstanding exposure, adjustments, breaches, or qualification history. A full
+or narrowed reset does not replenish any bound; reset and admission use the
+global lock order in §AR-neural-admission.3.
+
 ## 4. Output
 
 On success, reset reports how many tasks it cleared, **which tasks it moved and

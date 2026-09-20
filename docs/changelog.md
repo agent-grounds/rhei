@@ -24,6 +24,38 @@
 
 ### Added
 
+- **Begin persistent neural-work admission.** Add integer invocation/spend
+  ledgers, audited initialization, adjustment and witnessed recovery, bound fields, and a durable
+  request barrier. Unqualified autonomous launches now refuse before work
+  starts. External committed-history witnesses reject copied or truncated
+  histories; initialization can resume interrupted metadata writes. Cost and
+  summary include lifetime balances. Identical copies retain all live source
+  bindings; typed budget events preserve preflight refusals in run reports.
+  Offline signed-bundle verification does not enable unproved tuples. Shared
+  sequential/parallel scheduling now reserves and reports bounded work through
+  a separate fixture workspace. First admission retains journal ownership;
+  scheduler refusals retain typed halt reasons and allow independent tickets.
+  The fixture path uses authenticated HTTP forwarding and matched synthetic
+  provider captures. Financial proofs retain their project/qualification/account
+  scope and match every durable request; fanout shares one travel receipt.
+  Retry fixtures retain their profile-owned start and ordinary parser dependency.
+  Linux qualification acquisition has a concrete isolated-image backend with
+  finite capture, grant replay refusal and signed finality/review collection.
+  Signed settlement inboxes feed completion and resumed admission; breached
+  tuples acquire an external fence shared across projects.
+  A Linux confinement backend now takes credential, egress and
+  complete-process-tree containment from the kernel's user, network, pid, ipc
+  and uts namespaces, and a host without them refuses rather than running
+  beside them. Nested and embedded admission authenticates its ancestry token
+  against this project's own journal and fits inside the descendant envelope
+  that ancestor's qualification proved, refusing an absent, finished,
+  envelope-less, overdrawn or longer-lived descendant.
+  macOS and Windows confinement, pinned-client forwarding across the confined
+  boundary, complete earned-edge recovery, owned program/callback/snapshot
+  lifecycles, real transport qualification and independently authoritative
+  three-platform evidence remain rollout blockers; this development change is
+  incomplete and its refusal is not yet a delivered feature.
+  (PR #296)
 - **Generated block compositions now carry durable per-node provenance.** A
   canonical `.agent-grounds/rhei/composition.lock.json` traces every flattened
   state, task, profile, and routing rule through its declaration and mount to

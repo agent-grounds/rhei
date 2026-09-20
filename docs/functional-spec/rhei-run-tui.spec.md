@@ -34,6 +34,13 @@ Slot-oriented events (see below) mean the renderer updates exactly one slot per 
 
 ### 1.1. Event Surface
 
+The event surface also carries the budget lifecycle of §FS-rhei-budgets.10:
+`BudgetSnapshot`, `BudgetReserved`, `BudgetSettled`, `BudgetReleased`,
+`BudgetHalt`, and `BudgetBreach`. Each event names its project, ticket,
+attempt, reservation/receipt identities, exact invocation/travel/money values,
+qualification, and stable reason code. Frontends upsert them by receipt id and
+show consumed, reserved and remaining capacity live.
+
 ```rust
 // crates/rhei-cli/src/rhei_tui/event.rs
 pub type Slot = u16;

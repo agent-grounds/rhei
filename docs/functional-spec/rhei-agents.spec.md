@@ -1146,9 +1146,15 @@ The same condition is also what lets `rhei run` decide *not* to spawn. Before a
 pass spawns an invocation of a state that declares `outputs:`, it asks whether
 that invocation's work is eligible for the current **visit** as well as already
 on disk. A visit is the span during which the ticket's transition-ledger move
-count does not change. The initial visit may reuse deliberately pre-populated
-work without a spawn when neither transition history nor an older spawn record
-establishes an earlier entry. After re-entry, however, each invocation is
+count does not change. The first visit to a canonical state may reuse deliberately
+pre-populated work without a spawn when neither transition history nor an older
+spawn record establishes an earlier visit to that state. Moves through other
+states, including the first move into this state, do not alone establish
+re-entry. A recorded departure from this state (including a self-loop), or
+multiple recorded entries into it, does establish an earlier visit even when
+its spawn record is absent. Counted state suffixes refer to the same canonical
+state. When neither usable history source establishes an earlier visit, the
+legacy first-visit interpretation remains available. After re-entry, each invocation is
 eligible only when its own spawn record (§8.4) proves a successful exit in the
 current visit. A restart or a withheld edge that has not moved the ticket stays
 in the same visit and may reuse that successful proof.
@@ -1943,7 +1949,7 @@ place by each further attempt of the same invocation. It holds:
 | `kind`, `worker` | `agent` or `program`, and the resolved agent id or command |
 | `log` | the transcript this spawn wrote |
 | `started`, `ended`, `duration`, `code` | when it ran, for how long, and how it exited |
-| `ending` | `exited`, `timed out`, `interrupted`, or `provider_limited` — why it stopped |
+| `ending` | `exited`, `timed out`, `interrupted`, `provider_limited`, or `withheld` — why it stopped or remained in its state |
 | `attempt_charged` | whether this invocation consumed the state visit's `attempts:` budget |
 
 A provider-limited record keeps the subprocess's real non-zero `code`, uses
@@ -1951,10 +1957,19 @@ A provider-limited record keeps the subprocess's real non-zero `code`, uses
 resolved worker identity, and any usage the worker reported remain ordinary
 auditable spawn evidence.
 
+The engine changes a successful `exited` record to `ending: withheld` only when
+the subprocess exited with code `0`, the invocation met its completion condition,
+and the engine withheld its release edge without moving the ticket
+(§FS-rhei-supervision.3.6). The record retains code `0` and the same visit and
+invocation identity. This ending cannot turn an unsuccessful invocation into
+successful work.
+
 For the pre-spawn completion check (§3.2), a record proves successful work for
 one invocation only when its `task`, canonical `state`, and invocation-specific
 filename identify that invocation, its `moves` equals the ticket's current
-transition-ledger move count, its `ending` is `exited`, and its `code` is `0`.
+transition-ledger move count, its `ending` is `exited` or `withheld`, and its
+`code` is `0`. A withheld record supplies proof only for that same visit and
+invocation; it cannot excuse work after a later move.
 Older visits and records ending in failure, timeout, interruption, or provider
 limiting remain useful history but are not successful current-visit proof. The
 existing per-invocation filename keeps fan-out identities independent; this

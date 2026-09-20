@@ -264,15 +264,17 @@ fn format_snapshot_override_candidates(candidates: &[SnapshotOverrideRunSelectio
         .join("\n")
 }
 
-fn format_dry_run_agent_transition(
+// §FS-rhei-run.3: pending invocations predict a spawn, not their eventual edge.
+fn format_dry_run_agent_spawn(
     task_id: &str,
-    from: &str,
-    to: &str,
+    state: &str,
     resolved: &ResolvedAgent,
-    machine: &rhei_validator::StateMachine,
     exclusions: &ResolvedExclusions,
 ) -> String {
-    let base = format_dry_run_transition(task_id, from, to, machine);
+    let base = format!(
+        "Would spawn: agent '{}' for Task {task_id} [{state}]",
+        resolved.agent.id()
+    );
     let target = match resolved_agent_target_slug(resolved) {
         Some(target_slug) => format!("{base} [target={target_slug}]"),
         None => base,

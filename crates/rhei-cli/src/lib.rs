@@ -201,6 +201,8 @@ include!("cli/complete_reset_rewrites.rs");
 include!("cli/file_locks.rs");
 include!("cli/migrate_export_priors.rs");
 include!("cli/session_report_parse.rs");
+include!("cli/session_report_parse_claude.rs");
+include!("cli/session_report_parse_codex.rs");
 include!("cli/session_report_render.rs");
 include!("cli/metrics_ledger.rs");
 include!("cli/report_command.rs");
@@ -243,6 +245,7 @@ mod tests {
     include!("cli/tests_agent_prompt_transport.rs");
     include!("cli/tests_spawn_records.rs");
     include!("cli/tests_session_reports.rs");
+    include!("cli/tests_session_report_streams.rs");
     include!("cli/tests_program_exit_routes.rs");
     include!("cli/tests_agent_execution_validation.rs");
     include!("cli/tests_effective_static_mode_validation.rs");

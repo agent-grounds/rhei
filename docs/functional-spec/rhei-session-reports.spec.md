@@ -101,10 +101,64 @@ The report never invents, softens, or omits what the log records:
 
 The log body is the agent CLI's native event stream, so rendering is
 per-extractor, mirroring how accounting already reads these streams
-([§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)). The first supported extractor is the Pi session
-stream. Claude and Codex stream renderers are additive follow-ups behind the
-same extractor boundary; a log whose stream has no renderer yet is reported as
+([§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)). The supported extractors are the Pi session
+stream, the Claude Code `stream-json` stream, and the Codex `--json` thread
+stream. A log whose JSON event stream matches none of them is reported as
 unsupported, not rendered wrongly.
+
+### 6.1 Stream Detection
+
+The extractor is chosen from the stream first — marker event types that are
+disjoint across the three streams: Pi's `session`/`agent_start`, Claude
+Code's `system` init event, and Codex's `thread.`/`turn.`/`item.` events.
+Each body is folded through the detected stream's collectors alone, so one
+stream's generic event names never leak into another's report. A body that
+is mostly JSON events but carries no marker is read as the agent the log
+header records; when even that reading collects nothing, the log is reported
+as unsupported, never rendered as a confidently empty report. A body that is
+mostly prose is plain output ([§6.4](#64-logs-without-an-event-stream)), even
+when it quotes the odd JSON line.
+
+### 6.2 Claude Code Stream
+
+Assistant messages contribute thinking, text, and `tool_use` events; `user`
+events carry the matched `tool_result` payloads, errors marked. The token
+usage of the last assistant message that reports any becomes the report's
+usage; a `result` envelope kept as JSON supersedes it with the session
+totals. Two capture facts shape the rendering:
+
+- The final `result` envelope is logged as its extracted result text, not as
+  JSON ([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow)), so the final message is the last
+  assistant text event of the stream. An envelope a capture kept as JSON
+  adds its text only when the transcript does not already end with it — a
+  conclusion that lives only in the envelope is never dropped.
+- The stream does not echo the delivered prompt unless a `user` event
+  carries plain text without tool results — text riding along a tool result
+  is injected context, not the prompt. A session without an echoed prompt
+  renders the explicit no-prompt marker rather than an inferred one.
+
+### 6.3 Codex Stream
+
+Completed thread items contribute the events: `agent_message` as text,
+`reasoning` as thinking, and `command_execution`, `file_change`,
+`mcp_tool_call`, and `web_search` as tool calls. A Codex item carries its own
+execution result, so the call and its output arrive as one event; `file_change`
+items name the changed paths and the change kind but no content, and the
+files-produced section says exactly that — written paths only, a deletion
+stays in the actions timeline. `turn.completed` usage becomes the report's
+usage, last turn wins. Started and updated item events are deltas and are
+skipped; the stream does not echo the delivered prompt.
+
+### 6.4 Logs Without an Event Stream
+
+A body with no event stream is not an unknown stream: it is the agent's
+plain output, exactly as captured — an ordinary Claude Code session whose
+result was logged as text, or a historical log written before structured
+output. Such a body renders verbatim as a "Session output" section, truncated
+like a tool output ([§3](#3-truncation)), instead of an empty report. Body
+text that quotes rhei's own log markers stays body text: the exit footer is
+the log's last well-formed footer block, and output a still-running
+descendant appended after it is body again, in log order.
 
 ## 7. Non-Goals
 

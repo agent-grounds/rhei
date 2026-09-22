@@ -57,7 +57,7 @@ mod session_reports {
         body
     }
 
-    fn workspace_with_log(log_name: &str, content: &str) -> (tempfile::TempDir, PathBuf) {
+    pub(super) fn workspace_with_log(log_name: &str, content: &str) -> (tempfile::TempDir, PathBuf) {
         let dir = tempfile::tempdir().expect("tmpdir");
         let logs = dir.path().join("runtime").join("logs");
         fs::create_dir_all(&logs).expect("logs dir");
@@ -101,18 +101,29 @@ mod session_reports {
         assert!(text.contains("session ended without an exit record"));
     }
 
-    /// A non-Pi event stream renders header and notice, never a wrong body.
+    /// An event stream none of the extractors read renders header and
+    /// notice, never a wrong body.
     // §FS-rhei-session-reports.6
     #[test]
     fn an_unsupported_stream_is_named_not_guessed() {
+        let mut content = String::from("=== rhei agent log v1 ===\ntask: plan.1\n===\n");
+        content.push_str("{\"type\":\"telemetry.span\",\"span_id\":\"x\"}\n");
+        let (dir, log) = workspace_with_log("task-plan.1-cover.log", &content);
+        let report =
+            render_session_report(&log, &dir.path().join("runtime"), false).expect("rendered");
+        let text = fs::read_to_string(&report).expect("report");
+        assert!(text.contains("not one this renderer reads"));
+        assert!(!text.contains("## Agent actions"));
+        assert!(!text.contains("## Session output"));
+
+        // A bare result envelope with no agent recorded is just as unknown.
         let mut content = String::from("=== rhei agent log v1 ===\ntask: plan.1\n===\n");
         content.push_str("{\"type\":\"result\",\"session_id\":\"x\"}\n");
         let (dir, log) = workspace_with_log("task-plan.1-cover.log", &content);
         let report =
             render_session_report(&log, &dir.path().join("runtime"), false).expect("rendered");
         let text = fs::read_to_string(&report).expect("report");
-        assert!(text.contains("not a Pi session stream"));
-        assert!(!text.contains("## Agent actions"));
+        assert!(text.contains("not one this renderer reads"));
     }
 
     /// Oversized tool output is cut at the rendering limit with a pointer to

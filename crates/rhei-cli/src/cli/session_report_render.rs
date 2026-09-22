@@ -36,6 +36,15 @@ fn render_session_report(
         return write_session_report(runtime_dir, &stem, &out);
     }
 
+    // A body with no event stream is the agent's plain output as captured;
+    // it renders verbatim, not as an empty report.
+    // §FS-rhei-session-reports.6.4
+    if let Some(output) = &transcript.plain_output {
+        out.push_str("## Session output\n\n");
+        out.push_str(&fenced(&truncate_output(output, full, None)));
+        return write_session_report(runtime_dir, &stem, &out);
+    }
+
     out.push_str("## Prompt\n\n<details><summary>full prompt</summary>\n\n");
     out.push_str(&fenced(transcript.prompt.as_deref().unwrap_or("(no prompt recorded)")));
     out.push_str("\n</details>\n\n## Agent actions\n\n");
@@ -126,25 +135,56 @@ fn render_tool_call(
     out.push_str("---\n\n");
 }
 
-/// Track paths written through editing tools, in first-write order.
+/// Track paths written through editing tools, in first-write order. Tool
+/// names arrive as each CLI spells them (`write`, `Write`, `MultiEdit`), so
+/// recording compares and stores the lowercase spelling.
 fn note_written_file(
     files: &mut Vec<(String, Vec<(String, serde_json::Value)>)>,
     name: &str,
     arguments: &serde_json::Value,
 ) {
     const WRITING_TOOLS: &[&str] = &["write", "create", "edit", "multiedit"];
-    if !WRITING_TOOLS.contains(&name) {
+    let name = name.to_ascii_lowercase();
+    // A Codex file-change item names the changed paths and the change kind,
+    // and carries no content. A deletion is not a produced file: it stays in
+    // the actions timeline only. §FS-rhei-session-reports.6.3
+    if name == "file_change" {
+        for change in
+            arguments.get("changes").and_then(|c| c.as_array()).into_iter().flatten()
+        {
+            let Some(path) = change.get("path").and_then(|p| p.as_str()) else { continue };
+            let kind = change.get("kind").and_then(|k| k.as_str()).unwrap_or("change");
+            if kind == "delete" {
+                continue;
+            }
+            written_file_entry(files, path).push((kind.to_string(), serde_json::Value::Null));
+        }
         return;
     }
-    let Some(path) = arguments.get("path").and_then(|p| p.as_str()) else { return };
-    let entry = match files.iter_mut().find(|(known, _)| known == path) {
-        Some(entry) => entry,
+    if !WRITING_TOOLS.contains(&name.as_str()) {
+        return;
+    }
+    let Some(path) = arguments
+        .get("path")
+        .or_else(|| arguments.get("file_path"))
+        .and_then(|p| p.as_str())
+    else {
+        return;
+    };
+    written_file_entry(files, path).push((name, arguments.clone()));
+}
+
+fn written_file_entry<'a>(
+    files: &'a mut Vec<(String, Vec<(String, serde_json::Value)>)>,
+    path: &str,
+) -> &'a mut Vec<(String, serde_json::Value)> {
+    match files.iter().position(|(known, _)| known == path) {
+        Some(index) => &mut files[index].1,
         None => {
             files.push((path.to_string(), Vec::new()));
-            files.last_mut().expect("just pushed")
+            &mut files.last_mut().expect("just pushed").1
         }
-    };
-    entry.1.push((name.to_string(), arguments.clone()));
+    }
 }
 
 /// The files-produced section: what this session wrote, from its tool-call
@@ -174,31 +214,44 @@ fn render_files_produced(out: &mut String, files: &[(String, Vec<(String, serde_
                 continue;
             }
         }
+        let pairs: Vec<(&str, &str)> =
+            operations.iter().flat_map(|(_, arguments)| edit_pairs(arguments)).collect();
+        // Operations without recorded content — a Codex file change — list
+        // the path and kind alone. §FS-rhei-session-reports.6.3
+        if pairs.is_empty() {
+            continue;
+        }
         out.push_str("<details><summary>edits</summary>\n\n");
-        for (_, arguments) in operations {
-            for edit in arguments
-                .get("edits")
-                .and_then(|edits| edits.as_array())
-                .into_iter()
-                .flatten()
-            {
-                let old = edit
-                    .get("oldText")
-                    .or_else(|| edit.get("old_string"))
-                    .and_then(|t| t.as_str())
-                    .unwrap_or("");
-                let new = edit
-                    .get("newText")
-                    .or_else(|| edit.get("new_string"))
-                    .and_then(|t| t.as_str())
-                    .unwrap_or("");
-                out.push_str("Replace:\n");
-                out.push_str(&fenced(old));
-                out.push_str("With:\n");
-                out.push_str(&fenced(new));
-            }
+        for (old, new) in pairs {
+            out.push_str("Replace:\n");
+            out.push_str(&fenced(old));
+            out.push_str("With:\n");
+            out.push_str(&fenced(new));
         }
         out.push_str("\n</details>\n\n");
+    }
+}
+
+/// The old/new pairs one editing call records: a MultiEdit-style `edits`
+/// list, or the single pair the arguments carry directly.
+fn edit_pairs(arguments: &serde_json::Value) -> Vec<(&str, &str)> {
+    fn one_pair(edit: &serde_json::Value) -> Option<(&str, &str)> {
+        let old = edit
+            .get("oldText")
+            .or_else(|| edit.get("old_string"))
+            .and_then(|t| t.as_str());
+        let new = edit
+            .get("newText")
+            .or_else(|| edit.get("new_string"))
+            .and_then(|t| t.as_str());
+        if old.is_none() && new.is_none() {
+            return None;
+        }
+        Some((old.unwrap_or(""), new.unwrap_or("")))
+    }
+    match arguments.get("edits").and_then(|edits| edits.as_array()) {
+        Some(edits) => edits.iter().filter_map(one_pair).collect(),
+        None => one_pair(arguments).into_iter().collect(),
     }
 }
 

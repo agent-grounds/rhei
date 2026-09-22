@@ -604,3 +604,23 @@ until = "Sequential and parallel handlers consume a shared post-exit completion 
 reason = """
 Parallel post-exit routing still combines pool-specific slot handling with the completion decision; a shared post-exit decision value must exist before either responsibility can move without duplicating transition ordering.
 """
+[[exceptions]]
+path = "docs/functional-spec/rhei-run.spec.md"
+match = "exact"
+rules = ["citable-spec"]
+kind = "deferred"
+max_accepted = { value = 800, unit = "lines" }
+until = "a dedicated spec-decomposition change introduces stable child declarations and migrates every affected FS-rhei-run citation"
+reason = """
+The execution loop is still one normative declaration with heavily cited numbered sections; a child-declaration boundary and atomic citation-migration plan must exist before it can be split safely.
+"""
+[[exceptions]]
+path = "docs/functional-spec/rhei-supervision.spec.md"
+match = "exact"
+rules = ["citable-spec"]
+kind = "deferred"
+max_accepted = { value = 800, unit = "lines" }
+until = "a dedicated spec-decomposition change introduces stable child declarations and migrates every affected FS-rhei-supervision citation"
+reason = """
+The supervision lifecycle is still one normative declaration with dense numbered-section cross-references; a child-declaration boundary and atomic citation-migration plan must exist before it can be split safely.
+"""

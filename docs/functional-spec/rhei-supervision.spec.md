@@ -572,6 +572,14 @@ terminal edge for a parent. The descendants-first guard still decides whether
 that edge may be taken ([§FS-rhei-transition-cmd.3.1](rhei-transition-cmd.spec.md#31-descendants-first-on-terminal-entry)) — `openDescendants` is
 how a machine agrees with the guard, never a way around it.
 
+That post-visit reread enters scheduling only after the complete graph passes
+the live checkpoint validation of
+[§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop). This applies when a
+supervisor appends a descendant inside an existing member as well as when a new
+member appears. A malformed descendant remains authored for explicit repair
+but stops the run before it enters a ready set or executes; a valid appended
+descendant still counts here and may execute in the same invocation.
+
 The canonical supervisor edges are:
 
 ```yaml

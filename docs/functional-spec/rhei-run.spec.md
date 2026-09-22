@@ -187,15 +187,24 @@ Every reload made for scheduling is also a live-member admission checkpoint.
 The run performs one after processing each completed worker, before choosing
 the next sequential task or refilling a parallel slot, and once immediately
 before its normal no-work or gate stopping decision. At a checkpoint the run
-strictly reloads the complete project and compares its discovered member ids
-with the initialized set. A membership delta becomes eligible only after all
-of the following succeed as one admission: merged settings reload; member
-machine and callback-base resolution; complete graph and execution-reference
-validation; acquisition of every new execution-root lock; and initialization
-of the member's execution and accounting roots. Whole-run state-machine,
-agent, and model overrides apply normally. An incompatible member fails
-admission instead of inheriting an already initialized member's machine or
-runtime paths.
+strictly reloads the complete project and applies the same complete-graph
+semantic and execution-reference validation as startup before any ready-set
+scan, parallel refill, or normal stopping decision. This validation runs even
+when the discovered member ids are unchanged, so a task appended inside an
+initialized member cannot enter the ready set under text that a fresh run
+would refuse. An invalid reload stops scheduling through the existing
+validation diagnostic and migration help, without rewriting the plan;
+validation warnings retain the initial report's once-per-run presentation.
+
+Only after that validation does the run compare discovered member ids with the
+initialized set. The membership delta controls initialization, not whether
+validation runs. A delta becomes eligible only after all of the following
+succeed as one admission: merged settings reload; member machine and
+callback-base resolution; acquisition of every new execution-root lock; and
+initialization of the member's execution and accounting roots. Whole-run
+state-machine, agent, and model overrides apply normally. An incompatible
+member fails admission instead of inheriting an already initialized member's
+machine or runtime paths.
 
 Admission does not introduce a directory watcher or an unbounded idle wait. A
 member visible in the final checkpoint snapshot is considered before stopping;

@@ -72,6 +72,7 @@ mod installed_state_machine_guidance_tests;
 mod instantiate_output_default_tests;
 mod laid_output_root_tests;
 mod list_ready_tests;
+mod live_checkpoint_validation_tests;
 mod live_member_admission_tests;
 mod live_member_lock_tests;
 mod live_member_program_tests;

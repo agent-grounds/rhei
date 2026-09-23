@@ -83,6 +83,16 @@
   per-session strips; measuring program states receive `RHEI_ITERATION`.
   (PR #283)
 
+- **Claude Code and Codex sessions now render readable reports too.** Session
+  reports read the Claude Code `stream-json` and Codex `--json` streams beside
+  Pi's, and a log with no event stream renders verbatim as session output
+  instead of an empty report. Claude Code launches now request `stream-json`
+  output so their logs carry every tool call; the live display shows the
+  assistant's text rather than raw JSON. Report paths read relative to the
+  session's root, metric trajectories name sessions by visit (`cover #2`), and
+  the agent prompt warns that headings in a task body break the plan.
+  (PR #311)
+
 - **Tasks can declare explicit read exclusions for blind work.** `**Excludes:**`
   accepts checkout paths, runtime files or directories, and declared exports;
   validation rejects malformed, escaping, duplicate, unresolved, or

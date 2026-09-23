@@ -160,6 +160,13 @@
 
 ### Fixed
 
+- **Live runs now validate every scheduling reread before appended work can
+  execute.** Tasks added inside an existing Panta member can no longer bypass
+  startup declaration and execution-reference checks merely because the
+  member set stayed unchanged; malformed appends stop through the existing
+  diagnostic and explicit migration help, while valid appends still run in
+  the same invocation. (PR #308)
+
 - **Re-entered agent states now run each invocation again before advancing.**
   Manual and automatic loop-backs no longer reuse an earlier visit's static
   outputs or required result, while deliberately pre-seeded first visits and

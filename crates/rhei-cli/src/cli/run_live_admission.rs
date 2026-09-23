@@ -34,10 +34,11 @@ impl LiveRunContext {
         }
     }
 
-    /// Strictly reload the project and completely initialize newly visible
-    /// members before returning their tasks to a ready-set scan. Explicit
-    /// `--rhei` scope is still applied by the caller, after this full-project
-    /// validation and lock step. §FS-rhei-run.2.5 §FS-rhei-run.3
+    /// Strictly reload and validate the complete project before returning it
+    /// to a ready-set scan, even when no new member appeared. Newly visible
+    /// members are then completely initialized. Explicit `--rhei` scope is
+    /// still applied by the caller after this full-project checkpoint.
+    /// §FS-rhei-run.2.5 §FS-rhei-run.3 §FS-rhei-supervision.4.1
     fn checkpoint(
         &mut self,
         input: &Path,
@@ -48,12 +49,10 @@ impl LiveRunContext {
         let loaded = load_plan(input)?;
         let current: BTreeSet<String> = loaded.rhei_ids.iter().cloned().collect();
         let admitted: Vec<String> = current.difference(&self.initialized_rheis).cloned().collect();
-        if admitted.is_empty() {
-            return Ok((loaded, admitted));
-        }
 
         // Resolve and validate the entire prospective graph before any of its
-        // tasks can enter a ready set. §AR-rhei-panta.2 §AR-rhei-panta.4
+        // tasks can enter a ready set, regardless of whether membership
+        // changed. §AR-rhei-panta.2 §AR-rhei-panta.4 §FS-rhei-run.3
         let resolved = resolve_state_machines_for_loaded_plan(
             input,
             &loaded,
@@ -75,6 +74,13 @@ impl LiveRunContext {
                 &report.help,
             ));
         }
+
+        // Validation belongs to every scheduling checkpoint; member setup and
+        // warning presentation belong only to admission. §FS-rhei-run.3
+        if admitted.is_empty() {
+            return Ok((loaded, admitted));
+        }
+
         report.warnings.dedup();
         for warning in &report.warnings {
             eprintln!("warning: {warning}");

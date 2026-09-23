@@ -30,7 +30,10 @@ metrics also gets a run-level metrics summary; that artifact belongs to
 
 Reports use relative links — to the source log, to sibling session reports, and
 to artifacts — so they stay useful after the workspace is committed, moved, or
-pasted into an issue.
+pasted into an issue. For the same reason a path the agent spelled absolutely
+is shown relative to the directory the session worked in, as the log header
+records it (the worktree when there was one, the checkout otherwise); a path
+outside that directory is shown as written.
 
 ## 2. Markdown UI
 
@@ -121,6 +124,8 @@ when it quotes the odd JSON line.
 
 ### 6.2 Claude Code Stream
 
+Every Claude Code launch requests the `stream-json` event stream
+([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow)), so its session log carries this stream.
 Assistant messages contribute thinking, text, and `tool_use` events; `user`
 events carry the matched `tool_result` payloads, errors marked. The token
 usage of the last assistant message that reports any becomes the report's

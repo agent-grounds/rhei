@@ -703,7 +703,7 @@ historically the agent's default.
 
 | Agent ID | Binary | Prompt Delivery | Model Flag | MCP Wiring | Skill Wiring | `yolo` Mode Flags |
 |----------|--------|-----------------|------------|------------|--------------|-------------------|
-| `claude-code` | `claude` | stdin, under a bare `-p`, with typed `--output-format json`; with `intervene_stdin`, stream-json stdin/output | `--model <m>` | `--mcp-config <path>` | `--skill <id>` | `--permission-mode bypassPermissions` |
+| `claude-code` | `claude` | stdin, under a bare `-p`, with `--output-format stream-json --verbose`; with `intervene_stdin`, stream-json stdin as well | `--model <m>` | `--mcp-config <path>` | `--skill <id>` | `--permission-mode bypassPermissions` |
 | `codex` | `codex exec` | `--` (stdin) | `--model <m>` | `--mcp <spec>` (per server) | unsupported | `--sandbox danger-full-access --skip-git-repo-check -c approval_policy="never"` |
 | `gemini` | `gemini` | `--prompt <prompt>` | `--model <m>` | unsupported | unsupported | `--approval-mode yolo` |
 | `cursor` | `cursor-agent` | `--print <prompt>` | `--model <m>` | unsupported | unsupported | `--force` |

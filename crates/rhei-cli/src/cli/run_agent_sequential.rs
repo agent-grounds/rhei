@@ -317,6 +317,7 @@ fn run_sequential_agent_invocation(
         &agent_runtime_dir,
         task_id_str,
         current_state,
+        visit_count,
         &plan,
         &log,
         spawn_result.as_ref().ok(),

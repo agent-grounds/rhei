@@ -295,6 +295,7 @@ Two fixed sub-sections follow the existing authority text and transition list.
 What you write is what the next agent and the human see.
 - `runtime/results/<task-id>.md`: the first line is the one-line summary every later Plan History shows; detail below it.
 - You may append progress paragraphs to your own task body — files touched, commands run, decisions made — and append child tasks under your own task. Do not edit `**State:**` lines or any other task's body.
+- Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` stops the plan from parsing for the whole run.
 ```
 
 `Reading the rhei` is the map that makes §1.1 true across rheis: it names

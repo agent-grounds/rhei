@@ -68,9 +68,12 @@ fn render_session_report(
         }
     }
 
-    render_files_produced(&mut out, &files);
+    render_files_produced(&mut out, &files, session_root(&transcript));
+    // The last usage the stream reported: one message's or turn's for most
+    // streams, the session total only where a result envelope carried it.
+    // §FS-rhei-session-reports.6.2
     if let Some(usage) = &transcript.usage {
-        out.push_str(&format!("**Final usage**: `{usage}`\n"));
+        out.push_str(&format!("**Last reported usage**: `{usage}`\n"));
     }
     write_session_report(runtime_dir, &stem, &out)
 }
@@ -122,7 +125,11 @@ fn render_tool_call(
     name: &str,
     arguments: &serde_json::Value,
 ) {
-    out.push_str(&format!("**{name}** `{}`\n\n", tool_argument_summary(arguments)));
+    let summary = tool_argument_summary(arguments);
+    out.push_str(&format!(
+        "**{name}** `{}`\n\n",
+        relative_to_root(&summary, session_root(transcript))
+    ));
     match transcript.results.get(id) {
         Some(result) => {
             let error_mark = if result.is_error { " (error)" } else { "" };
@@ -189,7 +196,11 @@ fn written_file_entry<'a>(
 
 /// The files-produced section: what this session wrote, from its tool-call
 /// arguments — never from the current filesystem. §FS-rhei-session-reports.2
-fn render_files_produced(out: &mut String, files: &[(String, Vec<(String, serde_json::Value)>)]) {
+fn render_files_produced(
+    out: &mut String,
+    files: &[(String, Vec<(String, serde_json::Value)>)],
+    root: Option<&str>,
+) {
     if files.is_empty() {
         return;
     }
@@ -198,7 +209,8 @@ fn render_files_produced(out: &mut String, files: &[(String, Vec<(String, serde_
         let sequence: Vec<&str> =
             operations.iter().map(|(name, _)| name.as_str()).collect();
         out.push_str(&format!(
-            "### `{path}`\n\n{} operation(s): {}\n\n",
+            "### `{}`\n\n{} operation(s): {}\n\n",
+            relative_to_root(path, root),
             operations.len(),
             sequence.join(", ")
         ));
@@ -252,6 +264,28 @@ fn edit_pairs(arguments: &serde_json::Value) -> Vec<(&str, &str)> {
     match arguments.get("edits").and_then(|edits| edits.as_array()) {
         Some(edits) => edits.iter().filter_map(one_pair).collect(),
         None => one_pair(arguments).into_iter().collect(),
+    }
+}
+
+/// The directory the session worked in, as the log header records it: the
+/// worktree when the session had one, the checkout otherwise.
+fn session_root(transcript: &SessionTranscript) -> Option<&str> {
+    let header = |key: &str| {
+        transcript.header.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+    };
+    header("worktree_root").or_else(|| header("checkout_root"))
+}
+
+/// A path the agent spelled absolutely, shown relative to the session's own
+/// root so a report stays readable and portable; anything else is unchanged.
+/// §FS-rhei-session-reports.1
+fn relative_to_root(path: &str, root: Option<&str>) -> String {
+    let Some(root) = root.map(|root| root.trim_end_matches('/')).filter(|r| !r.is_empty()) else {
+        return path.to_string();
+    };
+    match path.strip_prefix(root).and_then(|rest| rest.strip_prefix('/')) {
+        Some(relative) if !relative.is_empty() => relative.to_string(),
+        _ => path.to_string(),
     }
 }
 
@@ -319,7 +353,7 @@ fn render_metrics_strip(out: &mut String, runtime_dir: &Path, log_path: &Path) {
                 .sessions
                 .iter()
                 .filter(|session| session.log != log_reference)
-                .map(|session| format!("{} (visit {})", session.state, session.moves))
+                .map(metric_session_label)
                 .collect();
             let shared = if shared.is_empty() { "—".to_string() } else { shared.join(", ") };
             rows.push_str(&format!(
@@ -336,6 +370,17 @@ fn render_metrics_strip(out: &mut String, runtime_dir: &Path, log_path: &Path) {
         out.push_str("|---|---|---|---|---|---|\n");
         out.push_str(&rows);
         out.push('\n');
+    }
+}
+
+/// A session as the metric surfaces name it: by its visit identity, the
+/// number its log name carries (`cover #2`), never by the iteration it is
+/// bound to. A record written before visits were recorded names the ledger
+/// move instead, and says so. §FS-rhei-metrics.4
+fn metric_session_label(session: &MetricSessionRef) -> String {
+    match session.visit {
+        Some(visit) => format!("{} #{visit}", session.state),
+        None => format!("{} (move {})", session.state, session.moves),
     }
 }
 
@@ -421,8 +466,8 @@ fn render_metrics_summary(runtime_dir: &Path) -> MietteResult<()> {
                             .into_owned();
                         let emphasis = if session.driver { "**" } else { "" };
                         format!(
-                            "{emphasis}[{} (visit {})](./{stem}.md){emphasis}",
-                            session.state, session.moves
+                            "{emphasis}[{}](./{stem}.md){emphasis}",
+                            metric_session_label(session)
                         )
                     })
                     .collect::<Vec<_>>()

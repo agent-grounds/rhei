@@ -379,6 +379,7 @@ fn spawn_parallel_agent_work_item(
                 &runtime_dir_for_thread,
                 &tid,
                 &sname,
+                visit_for_result,
                 &plan_for_thread,
                 &log_for_thread,
                 result.as_ref().ok(),

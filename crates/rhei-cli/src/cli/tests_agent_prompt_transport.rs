@@ -92,9 +92,11 @@ mod agent_prompt_transport_tests {
             "a stdin_prompt profile ends at the separator: {argv:?}"
         );
         assert_eq!(
-            argv.windows(2).filter(|pair| *pair == ["--output-format", "json"]).count(),
+            argv.windows(3)
+                .filter(|span| *span == ["--output-format", "stream-json", "--verbose"])
+                .count(),
             1,
-            "typed usage JSON is still requested exactly once: {argv:?}"
+            "the stream-json event stream is still requested exactly once: {argv:?}"
         );
     }
 

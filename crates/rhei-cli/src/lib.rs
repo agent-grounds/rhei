@@ -135,6 +135,7 @@ include!("cli/accounting_session.rs");
 include!("cli/accounting_selection.rs");
 include!("cli/accounting_roots.rs");
 include!("cli/accounting.rs");
+include!("cli/accounting_claude_display.rs");
 include!("cli/accounting_cost_command.rs");
 include!("cli/accounting_presentation.rs");
 include!("cli/run_lock_owner_read.rs");

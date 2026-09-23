@@ -257,13 +257,14 @@ mod metric_recording {
         .expect("measurement");
     }
 
-    fn note_session(root: &Path, state: &str, moves: u64) {
+    fn note_session(root: &Path, state: &str, visit: u64, moves: u64) {
         let runtime = root.join("runtime");
         let log = runtime.join("logs").join(format!("task-plan.1-{state}.log"));
         note_metric_pending_session(
             &runtime,
             "plan.1",
             state,
+            visit,
             moves,
             1,
             &log,
@@ -294,7 +295,7 @@ mod metric_recording {
         assert!(records[0].sessions.is_empty());
 
         // One driver session, then a successful measurement: iteration 1.
-        note_session(root, "cover", 1);
+        note_session(root, "cover", 1, 1);
         write_measurement(root, 1, 76.37, 543);
         confirm_metric_iterations(root, &machine, "plan.1", "measure");
         let records = read_metric_records(&record_path);
@@ -304,12 +305,12 @@ mod metric_recording {
         assert_eq!(records[1].sessions[0].state, "cover");
 
         // A failed measurement: no report-2.json, so nothing advances.
-        note_session(root, "cover", 2);
+        note_session(root, "cover", 2, 3);
         confirm_metric_iterations(root, &machine, "plan.1", "measure");
         assert_eq!(read_metric_records(&record_path).len(), 2);
 
         // The repair session joins the same window as the cover it repairs.
-        note_session(root, "fix", 2);
+        note_session(root, "fix", 1, 4);
         write_measurement(root, 2, 94.66, 673);
         confirm_metric_iterations(root, &machine, "plan.1", "measure");
         let records = read_metric_records(&record_path);
@@ -330,6 +331,12 @@ mod metric_recording {
         assert!(summary.contains("| 0 | (baseline) | 3.23% (23/801) | — |"));
         assert!(summary.contains("▲ +73.14%"));
         assert!(summary.contains("94.66% (673/801)"));
+        // Sessions keep their visit identity, never the ledger move count
+        // or the iteration they are bound to. §FS-rhei-metrics.4
+        assert!(summary.contains("**[cover #1](./task-plan.1-cover.md)**"));
+        assert!(summary.contains("**[cover #2](./task-plan.1-cover.md)**"));
+        assert!(summary.contains("[fix #1](./task-plan.1-fix.md)"));
+        assert!(!summary.contains("(visit "));
     }
 
     /// Another task's sessions never enter this task's windows.
@@ -344,6 +351,7 @@ mod metric_recording {
             &runtime,
             "plan.2",
             "cover",
+            1,
             1,
             1,
             &runtime.join("logs").join("task-plan.2-cover.log"),

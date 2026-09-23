@@ -1,6 +1,7 @@
 // The per-stream session-report contract: how each extractor's log reads
-// back, and how the parser tells streams, plain output, and unknown streams
-// apart without ever rendering a body wrongly.
+// back, how the parser tells streams, plain output, and unknown streams
+// apart without ever rendering a body wrongly, and what the live display
+// shows of the Claude stream the report reads.
 //
 // Its own part because stream detection and the Claude Code and Codex
 // collectors are their own surface beside the base report contract.
@@ -348,5 +349,83 @@ mod session_report_streams {
         assert!(text.contains("Wrote `runtime/summary.md` with the requested sections."));
         assert!(!text.contains("## Prompt"));
         assert!(!text.contains("no prompt recorded"));
+    }
+}
+
+mod claude_stream_display {
+    use super::super::*;
+
+    /// The live surfaces show a Claude stream the way they show Pi's: the
+    /// session start and the assistant's text; tool traffic, thinking, and
+    /// notices stay in the log for the report, never as raw JSON on screen.
+    // §FS-rhei-session-reports.6.2 §FS-rhei-cost-accounting.4
+    #[test]
+    fn a_claude_stream_displays_text_and_hides_events() {
+        let show = |event: serde_json::Value| {
+            display_output_line(AgentUsageExtractor::Claude, &event.to_string())
+        };
+        assert!(matches!(
+            show(serde_json::json!({"type": "system", "subtype": "init", "session_id": "s-7"})),
+            AgentOutputLine::Replace(text) if text == "claude-code session started: s-7"
+        ));
+        assert!(matches!(
+            show(serde_json::json!({"type": "assistant", "message": {"role": "assistant",
+                "content": [{"type": "text", "text": "Covering slugify next."}]}})),
+            AgentOutputLine::Replace(text) if text == "Covering slugify next."
+        ));
+        for hidden in [
+            serde_json::json!({"type": "assistant", "message": {"role": "assistant",
+                "content": [{"type": "tool_use", "id": "t1", "name": "Bash",
+                             "input": {"command": "ls"}}]}}),
+            serde_json::json!({"type": "assistant", "message": {"role": "assistant",
+                "content": [{"type": "thinking", "thinking": "plan"}]}}),
+            serde_json::json!({"type": "user", "message": {"role": "user",
+                "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "src"}]}}),
+            serde_json::json!({"type": "rate_limit_event", "rate_limit_info": {}}),
+        ] {
+            assert!(matches!(show(hidden), AgentOutputLine::Suppress));
+        }
+        assert!(matches!(
+            display_output_line(AgentUsageExtractor::Claude, "plain stderr-ish text"),
+            AgentOutputLine::Passthrough
+        ));
+    }
+}
+
+mod session_report_paths {
+    use super::super::*;
+    use super::session_reports::workspace_with_log;
+
+    /// Paths the agent spelled absolutely read relative to the session's
+    /// working root; a path outside it stays as written.
+    // §FS-rhei-session-reports.1
+    #[test]
+    fn absolute_paths_read_relative_to_the_session_root() {
+        let mut content = String::from("=== rhei agent log v1 ===\n");
+        content.push_str("agent: claude-code\ntask: plan.13\nstate: cover\n");
+        content.push_str("checkout_root: /work/repo\n===\n");
+        for event in [
+            serde_json::json!({"type": "system", "subtype": "init", "session_id": "c-13"}),
+            serde_json::json!({"type": "assistant", "message": {"role": "assistant",
+                "content": [
+                    {"type": "tool_use", "id": "t1", "name": "Read",
+                     "input": {"file_path": "/work/repo/src/lib.rs"}},
+                    {"type": "tool_use", "id": "t2", "name": "Write",
+                     "input": {"file_path": "/work/repo/test/a.test.mjs", "content": "x"}},
+                    {"type": "tool_use", "id": "t3", "name": "Read",
+                     "input": {"file_path": "/etc/hosts"}},
+                ]}}),
+        ] {
+            content.push_str(&event.to_string());
+            content.push('\n');
+        }
+        let (dir, log) = workspace_with_log("task-plan.13-cover.log", &content);
+        let report = render_session_report(&log, &dir.path().join("runtime"), false)
+            .expect("rendered");
+        let text = fs::read_to_string(&report).expect("report");
+        assert!(text.contains("**Read** `src/lib.rs`"));
+        assert!(text.contains("### `test/a.test.mjs`"));
+        assert!(text.contains("**Read** `/etc/hosts`"));
+        assert!(!text.contains("/work/repo/src/lib.rs"));
     }
 }

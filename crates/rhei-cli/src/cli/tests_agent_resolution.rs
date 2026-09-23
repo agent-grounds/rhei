@@ -304,8 +304,8 @@
     }
 
     #[test]
-    fn ordinary_builtin_claude_requests_typed_json_without_intervention_flags() {
-        // §FS-rhei-cost-accounting.4: ordinary Claude launches must emit typed usage JSON.
+    fn ordinary_builtin_claude_requests_stream_json_without_intervention_input() {
+        // §FS-rhei-cost-accounting.4: ordinary Claude launches emit the stream-json event stream.
         let profile = built_in_agents().remove("claude-code").expect("claude-code");
         let resolved = ResolvedAgent {
             agent: AgentConfig::from("claude-code"),
@@ -337,10 +337,13 @@
         let args: Vec<String> =
             command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect();
 
+        // §FS-rhei-cost-accounting.4: the stream the session report renders.
         assert_eq!(
-            args.windows(2).filter(|pair| *pair == ["--output-format", "json"]).count(),
+            args.windows(3)
+                .filter(|span| *span == ["--output-format", "stream-json", "--verbose"])
+                .count(),
             1,
-            "ordinary Claude command must request JSON exactly once: {args:?}"
+            "ordinary Claude command must request stream-json exactly once: {args:?}"
         );
         assert!(
             args.windows(2).any(|pair| pair == ["-p", "--model"]),
@@ -348,7 +351,6 @@
         );
         assert!(!args.iter().any(|arg| arg == "do work"), "prompt leaked into argv: {args:?}");
         assert!(!args.iter().any(|arg| arg == "--input-format"), "stream input leaked: {args:?}");
-        assert!(!args.iter().any(|arg| arg == "--verbose"), "stream verbose leaked: {args:?}");
     }
 
     #[test]

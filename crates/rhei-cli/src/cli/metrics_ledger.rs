@@ -15,6 +15,11 @@
 struct MetricPendingSession {
     task: String,
     state: String,
+    /// The visit whose log this is: the number the log name carries, 1 for a
+    /// state without counted visits. Absent from notes written before it was
+    /// recorded. §FS-rhei-agents.8.1 §FS-rhei-metrics.4
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    visit: Option<u64>,
     moves: u64,
     attempt: u64,
     log: String,
@@ -27,6 +32,10 @@ struct MetricPendingSession {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct MetricSessionRef {
     state: String,
+    /// The session's visit identity, as its log name carries it.
+    /// §FS-rhei-metrics.4
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    visit: Option<u64>,
     moves: u64,
     attempt: u64,
     driver: bool,
@@ -97,6 +106,7 @@ fn note_metric_pending_session(
     runtime_dir: &Path,
     task_id: &str,
     state: &str,
+    visit: u64,
     moves: u64,
     attempt: u64,
     log_path: &Path,
@@ -106,6 +116,7 @@ fn note_metric_pending_session(
     let note = MetricPendingSession {
         task: task_id.to_string(),
         state: state.to_string(),
+        visit: Some(visit),
         moves,
         attempt,
         log: session_log_reference(runtime_dir, log_path),
@@ -129,11 +140,13 @@ fn note_metric_pending_session(
 /// After one agent session ended: render its report, and note it for metrics
 /// attribution when the machine declares any. Best-effort epilogues — the log
 /// is the record. §FS-rhei-session-reports.4 §FS-rhei-metrics.2
+#[allow(clippy::too_many_arguments)]
 fn finish_agent_session_artifacts(
     metrics_declared: bool,
     runtime_dir: &Path,
     task_id: &str,
     state: &str,
+    visit: u64,
     plan: &SpawnPlan,
     log_path: &Path,
     outcome: Option<&AgentSpawnOutcome>,
@@ -160,6 +173,7 @@ fn finish_agent_session_artifacts(
         runtime_dir,
         task_id,
         state,
+        visit,
         plan.moves,
         plan.attempt,
         log_path,
@@ -251,6 +265,7 @@ fn confirm_one_metric(
         .filter(|session| !metric.measured_by.iter().any(|state| state == &session.state))
         .map(|session| MetricSessionRef {
             state: session.state.clone(),
+            visit: session.visit,
             moves: session.moves,
             attempt: session.attempt,
             driver: metric.drivers.iter().any(|state| state == &session.state),

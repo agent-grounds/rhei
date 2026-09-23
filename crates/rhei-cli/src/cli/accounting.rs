@@ -665,11 +665,11 @@ fn usage_capture_for_spawn(
 
 fn configure_agent_accounting_args(cmd: &mut std::process::Command, resolved: &ResolvedAgent) {
     match agent_usage_extractor(resolved.agent.id()) {
-        // §FS-rhei-cost-accounting.4: Ordinary Claude output is a typed JSON result.
+        // §FS-rhei-cost-accounting.4: stream-json, so the log carries every event a report renders.
         Some(AgentUsageExtractor::Claude)
             if agent_stdin_format(resolved) != AgentStdinFormat::ClaudeCodeStreamJson =>
         {
-            cmd.args(["--output-format", "json"]);
+            cmd.args(["--output-format", "stream-json", "--verbose"]);
         }
         Some(AgentUsageExtractor::Codex) => {
             cmd.arg("--json");
@@ -813,9 +813,8 @@ fn display_output_line(extractor: AgentUsageExtractor, line: &str) -> AgentOutpu
     match extractor {
         AgentUsageExtractor::Claude => match parse_claude_result_line(line) {
             ClaudeResultLine::Result(ClaudeResult { text, .. }) => AgentOutputLine::Replace(text),
-            ClaudeResultLine::Unrelated | ClaudeResultLine::Malformed => {
-                AgentOutputLine::Passthrough
-            }
+            ClaudeResultLine::Unrelated => display_claude_stream_line(line),
+            ClaudeResultLine::Malformed => AgentOutputLine::Passthrough,
         },
         AgentUsageExtractor::Codex => display_codex_json_line(line)
             .map(AgentOutputLine::Replace)

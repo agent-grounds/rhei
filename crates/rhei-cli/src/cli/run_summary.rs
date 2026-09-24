@@ -432,6 +432,9 @@ impl Drop for RunReportGuard<'_> {
                 // The fallback fires while the run is failing, so there is no
                 // captured reading to use: ask the token now. §FS-rhei-run.3.2
                 interrupted: interrupted_by_signal(),
+                // A run tearing down never reached a stopping decision, and an
+                // idle return is one. §FS-rhei-run.3
+                stop: None,
             },
         );
     }
@@ -634,6 +637,11 @@ pub struct RunStats {
     /// on the TUI's finished screen — has a result of its own to report.
     // §FS-rhei-run.3.2
     pub interrupted: bool,
+    /// How a run that selected `--until-idle` stopped, `None` for every run
+    /// that did not. It is what moves the waiting tickets out of Attention and
+    /// what gives the header its idle phrase, so both stay selected-only.
+    // §FS-rhei-run-report.3.1
+    pub stop: Option<rhei_tui::RunStop>,
 }
 
 /// One rendered Transition Ledger row. §FS-rhei-run-report.4
@@ -804,6 +812,22 @@ impl RunSummaryReport {
             &mut counts,
         );
 
+        // An idle return is a run with nothing for anyone to act on: every
+        // ticket it left behind is waiting on somebody else's turn, and a
+        // non-empty Attention would say the opposite. Both groups are filled
+        // from one classification, so this moves rows rather than
+        // reclassifying them, and only a selected run reaches it at all.
+
+        // §FS-rhei-run-report.3.1: Attention is empty on every idle return.
+        let idle = stats
+            .stop
+            .as_ref()
+            .filter(|stop| stop.reason == rhei_tui::StopReason::Idle)
+            .cloned();
+        if idle.is_some() {
+            waiting.append(&mut attention);
+        }
+
         // Terminal-at-start: same terminal state at run start as now, so no work
         // was attempted. The row keeps its state count but flips to the calm `·`
         // marker so it reads apart from work that just ran. §FS-rhei-run-report.3.2
@@ -842,7 +866,14 @@ impl RunSummaryReport {
         } else {
             // Why the loop ended, as the caller read it when it ended (see
             // `result_phrase`). §FS-rhei-run.3.2 §FS-rhei-run-report.3.1
-            result_phrase(&attention, &rows, no_work, advanced_without_work, stats.interrupted)
+            result_phrase(
+                &attention,
+                &rows,
+                no_work,
+                advanced_without_work,
+                stats.interrupted,
+                idle.as_ref(),
+            )
         };
         let work = format_work(stats.agents_spawned, stats.programs_spawned, stats.callback_only);
         let accounting = summary.accounting();
@@ -1464,6 +1495,10 @@ fn result_phrase(
     // beside a parameter shadowing it, and made "ask the token here" — the one
     // thing the paragraph above forbids — a one-character edit that compiles.
     cut_short_by_signal: bool,
+    // The idle stop, when this run selected `--until-idle` and reached one. It
+    // ranks below both readings above it: an interrupt is a run the operator
+    // stopped, and one actionable ticket defeats idle. §FS-rhei-run-report.3.1
+    idle: Option<&rhei_tui::RunStop>,
 ) -> String {
     let all_terminal_success =
         rows.iter().all(|r| matches!(r.marker, Marker::Done | Marker::TerminalAtStart));
@@ -1473,6 +1508,10 @@ fn result_phrase(
         // Gated and blocked tasks both halt the run for a human; the report and
         // tree carry the per-task distinction. §FS-rhei-run-report.6
         "stopped for human attention".to_string()
+    } else if let Some((kind, stop)) =
+        idle.and_then(|stop| stop.idle_blocker.map(|kind| (kind, stop)))
+    {
+        kind.result_phrase(stop.next_attempt_at.as_deref())
     } else if all_terminal_success && no_work && advanced_without_work {
         // A run that advanced tasks while spawning nothing must not read like a
         // fast successful run — name the absence of work. §FS-rhei-run-report.3.3

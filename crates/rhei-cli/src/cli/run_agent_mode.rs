@@ -226,28 +226,32 @@ fn run_agent_mode(
                     interruptible_sleep(Duration::from_millis(500));
                     continue;
                 }
-                if let Some(deadline) = earliest_pending_agent_deadline(
-                    &loaded.rhei,
-                    &machines.set,
-                    settings,
-                    opts,
-                    &rhei_scope,
-                )
-                {
-                    let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
-                    if awaiting_deadline_announced != Some(deadline) {
-                        run_info!(
-                            "No ready tasks; sleeping {}s until the next scheduled attempt.",
-                            sleep_secs
+                // Selected, the checkpoint above is the last one there is:
+                // the run returns instead of sleeping, and every other reason
+                // to take another pass is untouched. §FS-rhei-run.5.1
+                if !opts.until_idle() {
+                    if let Some(deadline) = earliest_pending_agent_deadline(
+                        &loaded.rhei,
+                        &machines.set,
+                        settings,
+                        opts,
+                        &rhei_scope,
+                    ) {
+                        let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
+                        if awaiting_deadline_announced != Some(deadline) {
+                            run_info!(
+                                "No ready tasks; sleeping {}s until the next scheduled attempt.",
+                                sleep_secs
+                            );
+                            awaiting_deadline_announced = Some(deadline);
+                        }
+                        // A poll deadline is minutes away; the token must not
+                        // wait it out. §FS-rhei-run.3.2
+                        interruptible_sleep(
+                            Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),
                         );
-                        awaiting_deadline_announced = Some(deadline);
+                        continue;
                     }
-                    // A poll deadline is minutes away; the token must not wait
-                    // it out. §FS-rhei-run.3.2
-                    interruptible_sleep(
-                        Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),
-                    );
-                    continue;
                 }
             }
             // Nothing schedulable on the first pass: without this the loop
@@ -709,27 +713,30 @@ fn run_agent_mode(
                     sink.emit(RunEvent::PassEnded { pass, progressed: false });
                     continue;
                 }
-                if let Some(deadline) = earliest_pending_agent_deadline(
-                    &loaded.rhei,
-                    &machines.set,
-                    settings,
-                    opts,
-                    &rhei_scope,
-                ) {
-                    let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
-                    if awaiting_deadline_announced != Some(deadline) {
-                        run_info!(
-                            "No ready tasks; sleeping {}s until the next scheduled attempt.",
-                            sleep_secs
+                // §FS-rhei-run.5.1: the sleep is the continuous mode's.
+                if !opts.until_idle() {
+                    if let Some(deadline) = earliest_pending_agent_deadline(
+                        &loaded.rhei,
+                        &machines.set,
+                        settings,
+                        opts,
+                        &rhei_scope,
+                    ) {
+                        let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
+                        if awaiting_deadline_announced != Some(deadline) {
+                            run_info!(
+                                "No ready tasks; sleeping {}s until the next scheduled attempt.",
+                                sleep_secs
+                            );
+                            awaiting_deadline_announced = Some(deadline);
+                        }
+                        stalled_tasks.clear();
+                        progress_since_stall_reset = false;
+                        interruptible_sleep(
+                            Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),
                         );
-                        awaiting_deadline_announced = Some(deadline);
+                        continue;
                     }
-                    stalled_tasks.clear();
-                    progress_since_stall_reset = false;
-                    interruptible_sleep(
-                        Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),
-                    );
-                    continue;
                 }
                 run_info!("No program, agent, or callback-only tasks could advance.");
                 sink.emit(RunEvent::PassEnded { pass, progressed: false });
@@ -968,27 +975,30 @@ fn run_agent_mode(
             continue;
         }
         let loaded = load_plan(input)?;
-        if let Some(deadline) = earliest_pending_agent_deadline(
-            &loaded.rhei,
-            &live.machines.set,
-            &live.settings,
-            opts,
-            &rhei_scope,
-        ) {
-            let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
-            if awaiting_deadline_announced != Some(deadline) {
-                run_info!(
-                    "No ready tasks; sleeping {}s until the next scheduled attempt.",
-                    sleep_secs
+        // §FS-rhei-run.5.1: the sleep is the continuous mode's.
+        if !opts.until_idle() {
+            if let Some(deadline) = earliest_pending_agent_deadline(
+                &loaded.rhei,
+                &live.machines.set,
+                &live.settings,
+                opts,
+                &rhei_scope,
+            ) {
+                let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
+                if awaiting_deadline_announced != Some(deadline) {
+                    run_info!(
+                        "No ready tasks; sleeping {}s until the next scheduled attempt.",
+                        sleep_secs
+                    );
+                    awaiting_deadline_announced = Some(deadline);
+                }
+                stalled_tasks.clear();
+                progress_since_stall_reset = false;
+                interruptible_sleep(
+                    Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),
                 );
-                awaiting_deadline_announced = Some(deadline);
+                continue;
             }
-            stalled_tasks.clear();
-            progress_since_stall_reset = false;
-            interruptible_sleep(
-                Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),
-            );
-            continue;
         }
         break;
     }
@@ -1007,6 +1017,23 @@ fn run_agent_mode(
         );
     }
 
+    // The stopping decision, read once against the plan as the loop left it:
+    // the exit code, the console line, the durable report and `run_finished`
+    // are all rendered from this one answer.
+
+    // §FS-rhei-run.4: a preview predicts it only when its own scan found
+    // nothing schedulable, which is `pass` never leaving zero.
+    let stopped = opts.until_idle().then(|| load_plan(input)).transpose()?;
+    let idle = stopped
+        .as_ref()
+        .filter(|_| !interrupted_run && (!opts.dry_run() || pass == 0))
+        .and_then(|loaded| {
+            idle_return(&loaded.rhei, &live.machines.set, &live.settings, opts, &rhei_scope)
+        });
+    if idle.is_some() {
+        request_idle_exit();
+    }
+
     // Print summary.
     let (terminal_count, total_tasks) = if opts.dry_run() {
         // Spec §Dry-Run Output: final line reads "Dry run complete - no
@@ -1014,6 +1041,10 @@ fn run_agent_mode(
         // but the wording matches the agent-spec example so existing
         // tooling that greps for this exact phrase keeps working.
         run_info!("\nDry run complete - no agents were spawned.");
+        if let Some((idle, loaded)) = idle.as_ref().zip(stopped.as_ref()) {
+            let terminal = terminal_task_count(&loaded.rhei, &live.machines.set);
+            run_info!("{}", idle_console_line(idle, terminal, total_task_count(&loaded.rhei)));
+        }
         if !manual_only_dry_run.is_empty() {
             return Err(manual_only_dry_run_error(&manual_only_dry_run));
         }
@@ -1023,6 +1054,16 @@ fn run_agent_mode(
             return Err(dry_run_halt_error());
         }
         (0usize, 0usize)
+    } else if let Some((idle, loaded)) = idle.as_ref().zip(stopped.as_ref()) {
+        // Idle is its own outcome, so it replaces the `Run complete:` line
+        // rather than qualifying it. §FS-rhei-run-report.3.1
+        let terminal_count = terminal_task_count(&loaded.rhei, &live.machines.set);
+        let total_tasks = total_task_count(&loaded.rhei);
+        run_info!("{}", idle_console_line(idle, terminal_count, total_tasks));
+        for line in final_state_lines(&loaded.rhei) {
+            run_info!("{}", line);
+        }
+        (terminal_count, total_tasks)
     } else if agents_spawned == 0 && programs_spawned == 0 {
         if callback_transitions_made == 0 {
             let loaded = load_plan(input)?;
@@ -1092,6 +1133,20 @@ fn run_agent_mode(
         (terminal_count, total_tasks)
     };
 
+    // One payload for every outcome a selected run can reach, so the split it
+    // asked for is reported whether or not it landed on the new half.
+    // §FS-rhei-run-json.2.1
+    let stop = stopped.as_ref().and_then(|loaded| {
+        run_stop_payload(
+            &loaded.rhei,
+            &live.machines.set,
+            opts,
+            &rhei_scope,
+            idle.as_ref(),
+            interrupted_run,
+        )
+    });
+
     let accounting = if opts.dry_run() {
         None
     } else {
@@ -1118,6 +1173,7 @@ fn run_agent_mode(
             // headline; the workspace lifetime total rides beside it.
             accounting: accounting.as_ref().map(|rollup| rollup.run.clone()),
             workspace_accounting: accounting.and_then(|rollup| rollup.workspace).map(Box::new),
+            stop: stop.clone(),
         },
     });
     // The loop reached the point where it writes a report, so the finished
@@ -1155,6 +1211,7 @@ fn run_agent_mode(
             initial_states,
             dry_run: opts.dry_run(),
             interrupted: interrupted_run,
+            stop,
         },
     );
     report_guard.disarm();

@@ -24,6 +24,17 @@
 
 ### Added
 
+- **`rhei run --until-idle` does the available work and then hands the process
+  back.** Where a continuous run would sleep for a human gate, a future poll
+  deadline or a recognized provider limit, a selected run performs the same
+  final admission checkpoint and returns instead: it exits `3`, names the
+  dominant kind of wait, and reports the earliest instant a next invocation
+  could find work on the console, in the durable report and in
+  `run_finished.summary.stop`. A timer can drive a plan without holding a
+  process. The option implies line output and is refused beside `--tui` or
+  `--headless`; a run that does not select it keeps every exit code and every
+  byte of output it had. (PR #316)
+
 - **Generated block compositions now carry durable per-node provenance.** A
   canonical `.agent-grounds/rhei/composition.lock.json` traces every flattened
   state, task, profile, and routing rule through its declaration and mount to

@@ -523,22 +523,10 @@ fn state_outputs_exist_for_resolved_invocation(
 
 fn default_run_options() -> RunOptions {
     RunOptions {
-        standalone: StandaloneExecutionFlags {
-            json: false,
-            json_agent_output: false,
-            headless: false,
-            rhei: Vec::new(),
-            dry_run: false,
-            no_callbacks: false,
-            continue_on_error: false,
-            parallel: 1,
-            prices: None,
-            tui: false,
-            no_tui: false,
-            dashboard: false,
-            no_dashboard: false,
-        },
-        agent: AgentExecutionFlags { no_agent: false, agent: None, agent_mode: None, model: None },
+        // Every other flag's default is its type's; `parallel` alone is not,
+        // because `0` means unlimited and clap's own default is `1`.
+        standalone: StandaloneExecutionFlags { parallel: 1, ..Default::default() },
+        agent: AgentExecutionFlags::default(),
         program: ProgramExecutionFlags::default(),
         snapshot: SnapshotExecutionFlags::default(),
         price_book: builtin_price_book(),

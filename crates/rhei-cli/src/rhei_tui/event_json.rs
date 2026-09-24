@@ -21,6 +21,7 @@ use crate::rhei_tui::event::{
     AccountingRunSummary, AgentStream, MessageLevel, RunEvent, RunSummary, TaskOutcome,
     UsageReport, UsageSummary,
 };
+use crate::rhei_tui::run_stop::RunStop;
 
 /// Wire version of the record contract. Moves only when a documented field is
 /// removed or changes meaning; adding records or fields does not move it.
@@ -236,7 +237,7 @@ fn stream_name(stream: AgentStream) -> &'static str {
 }
 
 fn summary_value(summary: &RunSummary) -> Value {
-    json!({
+    let mut value = json!({
         "agents_spawned": summary.agents_spawned,
         "programs_spawned": summary.programs_spawned,
         "terminal_tasks": summary.terminal_tasks,
@@ -253,7 +254,13 @@ fn summary_value(summary: &RunSummary) -> Value {
             .as_ref()
             .and_then(|a| serde_json::to_value(a).ok())
             .unwrap_or(Value::Null),
-    })
+    });
+    // Inserted rather than written above, so the key is *absent* — not null —
+    // on a run that did not select the option. §FS-rhei-run-json.2.1
+    if let Some(stop) = summary.stop.as_ref() {
+        value["stop"] = stop.to_value();
+    }
+    value
 }
 
 // ---------------------------------------------------------------------------
@@ -443,6 +450,7 @@ fn decode_summary(value: Option<&Value>) -> RunSummary {
             .cloned()
             .and_then(|a| serde_json::from_value::<AccountingRunSummary>(a).ok())
             .map(Box::new),
+        stop: value.get("stop").and_then(RunStop::from_value),
     }
 }
 

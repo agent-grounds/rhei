@@ -274,7 +274,7 @@ path = "crates/rhei-cli/src/cli/run_summary.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 1700, unit = "lines" }
+max_accepted = { value = 1800, unit = "lines" }
 until = "The run report has a model type the Markdown writer and the TTY renderer both consume, so each renderer can move to its own module."
 reason = """
 Over budget before this change; the touch that surfaced it added six lines. The report model, its Markdown writer, and its TTY renderer are three surfaces behind one struct, and nothing separates the model from either renderer today.
@@ -623,4 +623,14 @@ max_accepted = { value = 800, unit = "lines" }
 until = "a dedicated spec-decomposition change introduces stable child declarations and migrates every affected FS-rhei-supervision citation"
 reason = """
 The supervision lifecycle is still one normative declaration with dense numbered-section cross-references; a child-declaration boundary and atomic citation-migration plan must exist before it can be split safely.
+"""
+[[exceptions]]
+path = "crates/rhei-cli/src/cli/tests_run_summary.rs"
+match = "exact"
+rules = ["source"]
+kind = "deferred"
+max_accepted = { value = 600, unit = "lines" }
+until = "The run report has a model type the Markdown writer and the TTY renderer both consume, so the tests for each renderer move beside it."
+reason = """
+Over budget the moment a test is added: the file was 493 lines before this one. It mirrors run_summary.rs, whose own entry names the same missing boundary — the report model, its Markdown writer and its TTY renderer are three surfaces behind one struct, and a test cannot move out of this file until the surface it covers has a module of its own.
 """

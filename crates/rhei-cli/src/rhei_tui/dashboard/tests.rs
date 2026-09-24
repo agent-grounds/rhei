@@ -819,6 +819,7 @@ fn frozen_dashboard_writes_self_contained_final_artifact() {
             total_tasks: 1,
             accounting: None,
             workspace_accounting: None,
+            stop: None,
         },
     });
 

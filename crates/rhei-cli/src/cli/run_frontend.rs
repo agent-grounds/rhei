@@ -155,6 +155,7 @@ fn start_run_frontend(
     shutdown: &RunShutdown,
     identity: &RunIdentity,
 ) -> ActiveRunFrontend {
+    announce_line_output_for_until_idle(opts);
     if opts.dry_run() {
         return ActiveRunFrontend {
             sink: dry_run_sink(workspace_root, opts),

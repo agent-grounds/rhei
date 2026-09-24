@@ -503,21 +503,33 @@ pub fn assert_all_tasks_in_state(plan_path: &Path, machine_path: &Path, expected
     }
 }
 
-/// Assert a single task has the expected state, verified via CLI.
-/// `task_id` can be a number (e.g. "1") or a name (e.g. "setup").
+/// The task answering to `task_id`, searched this level first and then into
+/// each subtree: the render nests subtasks under `children` rather than
+/// flattening them into `tasks`, so a dotted local id such as "1.1" is
+/// otherwise unfindable. Taking this level first means every lookup that
+/// resolves today resolves exactly as it did.
+fn find_task<'a>(tasks: &'a [serde_json::Value], task_id: &str) -> Option<&'a serde_json::Value> {
+    // JSON id has shape { "path": "...", "segments": [...] }, with the path
+    // qualified by the implicit Panta rhei id (e.g. "plan.1"). Match either the
+    // exact path or the local id after the rhei qualifier - the cut is at the
+    // first dot, so a top-level local carries none and a nested one keeps its
+    // own ("1.1"), and neither can answer for the other.
+    let matches = |t: &serde_json::Value| {
+        t["id"]["path"].as_str().is_some_and(|path| {
+            path == task_id || path.split_once('.').is_some_and(|(_, local)| local == task_id)
+        })
+    };
+    tasks.iter().find(|t| matches(t)).or_else(|| {
+        tasks.iter().find_map(|t| t["children"].as_array().and_then(|c| find_task(c, task_id)))
+    })
+}
+
+/// Assert a single task has the expected state, verified via CLI. `task_id` is
+/// a number ("1"), a name ("setup"), or a subtask's dotted local id ("1.1").
 pub fn assert_task_state(plan_path: &Path, machine_path: &Path, task_id: &str, expected: &str) {
     let json = render_json(plan_path, machine_path);
     let tasks = json["tasks"].as_array().expect("tasks array");
-    let task = tasks
-        .iter()
-        .find(|t| {
-            // JSON id now has shape { "path": "...", "segments": [...] }, with the
-            // path qualified by the implicit Panta rhei id (e.g. "plan.1"). Match
-            // either the exact path or the local id after the rhei qualifier.
-            t["id"]["path"].as_str().is_some_and(|path| {
-                path == task_id || path.split_once('.').is_some_and(|(_, local)| local == task_id)
-            })
-        })
+    let task = find_task(tasks, task_id)
         .unwrap_or_else(|| panic!("Task {} not found in rendered JSON", task_id));
     let state = task["state"].as_str().expect("state field");
     assert_eq!(state, expected, "Task {} should be '{}', got '{}'", task_id, expected, state);

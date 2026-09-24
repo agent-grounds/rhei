@@ -54,7 +54,7 @@ fn validate_reports_the_consumes_advisory_once_after_success() {
     assert_success(&result);
     assert_eq!(
         result.stdout,
-        format!("Validation succeeded\n{ADVISORY}\n"),
+        format!("Validation succeeded\n{VALIDATED_BOUNDS}{ADVISORY}\n"),
         "the exact graph-level advisory must follow successful validation"
     );
     assert!(result.stderr.is_empty(), "validation writes its success report to stdout");
@@ -67,7 +67,7 @@ fn validate_without_consumes_preserves_the_existing_success_output() {
     let (_dir, plan, machine) = setup_single_file("validate-without-consumes", LINEAR_PLAN);
     let result = run_cli("validate", &plan, &machine, &[]);
     assert_success(&result);
-    assert_eq!(result.stdout, "Validation succeeded\n");
+    assert_eq!(result.stdout, format!("Validation succeeded\n{VALIDATED_BOUNDS}"));
     assert!(result.stderr.is_empty());
 }
 
@@ -79,7 +79,10 @@ fn consumes_change_preserves_existing_validation_warning_wording_and_frequency()
         setup_single_file("validate-existing-warning", EXISTING_WARNING_PLAN);
     let result = run_cli("validate", &plan, &machine, &[]);
     assert_success(&result);
-    assert_eq!(result.stdout, format!("Validation succeeded\n{EXISTING_PRIOR_WARNING}\n"));
+    assert_eq!(
+        result.stdout,
+        format!("Validation succeeded\n{VALIDATED_BOUNDS}{EXISTING_PRIOR_WARNING}\n")
+    );
 }
 
 /// Existing validation warnings take the same event path as the new advisory;

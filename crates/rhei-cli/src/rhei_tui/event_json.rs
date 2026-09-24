@@ -18,8 +18,8 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use serde_json::{json, Map, Value};
 
 use crate::rhei_tui::event::{
-    AccountingRunSummary, AgentStream, MessageLevel, RunEvent, RunSummary, TaskOutcome,
-    UsageReport, UsageSummary,
+    AccountingRunSummary, AgentStream, BoundReport, MessageLevel, RunEvent, RunSummary,
+    TaskOutcome, UsageReport, UsageSummary,
 };
 use crate::rhei_tui::run_stop::RunStop;
 
@@ -147,8 +147,56 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
             put("event", json!("run_finished"));
             put("summary", summary_value(summary));
         }
+        // These two do not move the schema version: a reader that does not
+        // know them skips them like any other unrecognized `event`.
+        // §FS-rhei-run-json.2.1 §FS-rhei-run-json.2.2
+        RunEvent::BudgetSnapshot { bounds } => {
+            put("event", json!("budget_snapshot"));
+            put("bounds", Value::Array(bounds.iter().map(bound_value).collect()));
+        }
+        RunEvent::BudgetHalt { task, reason_code, bound, renews_at, remedy } => {
+            put("event", json!("budget_halt"));
+            put("task", json!(task));
+            put("reason_code", json!(reason_code));
+            let Value::Object(fields) = bound_value(bound) else { unreachable!("object") };
+            for (key, value) in fields {
+                put(&key, value);
+            }
+            put("renews_at", json!(renews_at));
+            put("remedy", json!(remedy));
+        }
     }
     map
+}
+
+/// One count dimension's fields, shared by the snapshot record and the halt so
+/// the two cannot drift apart. §FS-rhei-run-json.2.1
+fn bound_value(bound: &BoundReport) -> Value {
+    json!({
+        "dimension": bound.dimension,
+        "effective": bound.effective,
+        "value_source": bound.value_source,
+        "limiting_source": bound.limiting_source,
+        "consumed": bound.consumed,
+        "outstanding": bound.outstanding,
+        "remaining": bound.remaining,
+        "mode": bound.mode,
+        "window": bound.window,
+    })
+}
+
+fn bound_report(v: &Value) -> Option<BoundReport> {
+    Some(BoundReport {
+        dimension: v.get("dimension")?.as_str()?.to_owned(),
+        effective: v.get("effective").and_then(Value::as_u64).unwrap_or_default(),
+        value_source: v.get("value_source").and_then(Value::as_str).unwrap_or("").to_owned(),
+        limiting_source: v.get("limiting_source").and_then(Value::as_str).map(str::to_owned),
+        consumed: v.get("consumed").and_then(Value::as_u64).unwrap_or_default(),
+        outstanding: v.get("outstanding").and_then(Value::as_u64).unwrap_or_default(),
+        remaining: v.get("remaining").and_then(Value::as_u64).unwrap_or_default(),
+        mode: v.get("mode").and_then(Value::as_str).unwrap_or("").to_owned(),
+        window: v.get("window").and_then(Value::as_str).map(str::to_owned),
+    })
 }
 
 /// Encode one event as a complete record: envelope plus payload.
@@ -378,6 +426,20 @@ fn decode_event(kind: &str, v: &Value, wall_clock: SystemTime) -> Option<RunEven
                 _ => UsageReport::Final,
             },
             usage: serde_json::from_value::<UsageSummary>(v.get("usage")?.clone()).ok()?,
+        },
+        "budget_snapshot" => RunEvent::BudgetSnapshot {
+            bounds: v
+                .get("bounds")
+                .and_then(Value::as_array)
+                .map(|bounds| bounds.iter().filter_map(bound_report).collect())
+                .unwrap_or_default(),
+        },
+        "budget_halt" => RunEvent::BudgetHalt {
+            task: text("task"),
+            reason_code: text("reason_code"),
+            bound: bound_report(v)?,
+            renews_at: v.get("renews_at").and_then(Value::as_str).map(str::to_owned),
+            remedy: text("remedy"),
         },
         "message" => RunEvent::Message {
             level: match v.get("level").and_then(Value::as_str).unwrap_or("info") {

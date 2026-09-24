@@ -456,6 +456,73 @@ pub enum RunEvent {
         state: String,
         entries: Vec<String>,
     },
+    /// Where both count bounds stand.
+    ///
+    /// Emitted once before the first scheduling event, so the bounds are on
+    /// screen *before* any capacity is spent, and again as receipts are written
+    /// rather than only at exhaustion. A bound nobody can see until it stops
+    /// something is not visible.
+    // §FS-rhei-budgets.9 §FS-rhei-run-tui.1.1
+    BudgetSnapshot {
+        bounds: Vec<BoundReport>,
+    },
+    /// One admission a bound refused.
+    ///
+    /// The human-readable halt still arrives as an `error`-level
+    /// [`RunEvent::Message`], so a frontend that renders neither record still
+    /// says why the run stopped; this carries the same facts in a form a reader
+    /// can route on. §FS-rhei-budgets.8 §FS-rhei-run-json.2.1
+    BudgetHalt {
+        task: String,
+        reason_code: String,
+        bound: BoundReport,
+        /// The instant the window renews, present exactly when the window
+        /// contract is what limited. §FS-rhei-budgets.8
+        renews_at: Option<String>,
+        /// The single remedy that raises the limiter that actually stopped the
+        /// work — never an inner value the machine ceiling would clamp.
+        remedy: String,
+    },
+}
+
+/// One count dimension as every surface reports it: what it is, what bounds it,
+/// who set that bound, who lowered it, and where it stands.
+///
+/// The two sources stay apart because they answer different questions: "the
+/// machine set this" and "the machine lowered this" send a reader to different
+/// files. §FS-rhei-budgets.2.3 §FS-rhei-budgets.9
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BoundReport {
+    pub dimension: String,
+    pub effective: u64,
+    pub value_source: String,
+    /// `Some("machine")` exactly when a higher request was clamped.
+    pub limiting_source: Option<String>,
+    pub consumed: u64,
+    pub outstanding: u64,
+    pub remaining: u64,
+    /// `per ticket identity`, `window`, or `lifetime`.
+    pub mode: String,
+    /// The UTC day key, under the window contract only.
+    pub window: Option<String>,
+}
+
+/// One dimension on a terminal surface: the bound with its provenance, and
+/// where it stands. §FS-rhei-budgets.9
+pub fn bound_journal_line(bound: &BoundReport) -> String {
+    let source = match &bound.limiting_source {
+        Some(limiter) => format!("{} limited by {limiter}", bound.value_source),
+        None => bound.value_source.clone(),
+    };
+    format!(
+        "{}: {} consumed + {} outstanding / {} ({source}); {} remaining [{}]",
+        bound.dimension,
+        bound.consumed,
+        bound.outstanding,
+        bound.effective,
+        bound.remaining,
+        bound.window.as_deref().unwrap_or(&bound.mode)
+    )
 }
 
 /// Sink that consumes `RunEvent`s. Implementations must be cheap to clone and

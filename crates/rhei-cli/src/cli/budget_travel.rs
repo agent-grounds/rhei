@@ -142,3 +142,95 @@ fn budget_charge_applied_edge(
         )),
     }
 }
+
+/// Where both counts stand, as the surfaces that show them want it.
+///
+/// The travel line is per ticket, so it is reported for the ticket being
+/// admitted rather than for the project: a run that showed one ticket's travel
+/// as the project's would be reporting a number that is true of nothing.
+/// §FS-rhei-budgets.9
+fn budget_reports(
+    journal: &Journal,
+    ticket: &str,
+    bounds: &CountBounds,
+) -> Result<Vec<rhei_tui::BoundReport>, BudgetError> {
+    let snapshot = journal.snapshot()?;
+    let invocation_bound = snapshot.invocation_bound(bounds.per_day.effective);
+    let travel = snapshot.travel_for(ticket);
+    Ok(vec![
+        rhei_tui::BoundReport {
+            dimension: Dimension::Invocations.label().into(),
+            effective: invocation_bound,
+            value_source: bounds.per_day.source.as_str().into(),
+            limiting_source: bounds.per_day.requested.map(|_| "machine".into()),
+            consumed: snapshot.invocations.consumed,
+            outstanding: snapshot.invocations.reserved,
+            remaining: snapshot.invocations.remaining(invocation_bound)?,
+            mode: snapshot.contract.name().into(),
+            window: matches!(snapshot.contract, Contract::Window).then(|| snapshot.day.clone()),
+        },
+        rhei_tui::BoundReport {
+            dimension: Dimension::Travel.label().into(),
+            effective: bounds.travel.effective,
+            value_source: bounds.travel.source.as_str().into(),
+            limiting_source: bounds.travel.requested.map(|_| "machine".into()),
+            consumed: travel.consumed,
+            outstanding: travel.reserved,
+            remaining: travel.remaining(bounds.travel.effective)?,
+            mode: "per ticket identity".into(),
+            window: None,
+        },
+    ])
+}
+
+/// The refused admission as a record, carrying the same facts the halt text
+/// prints so a reader can route on them without parsing prose.
+/// §FS-rhei-run-json.2.1
+fn budget_halt_event(
+    refusal: &BudgetError,
+    bounds: &CountBounds,
+    journal: &Journal,
+    task_id_str: &str,
+) -> Option<rhei_tui::RunEvent> {
+    let spent = refusal.exhaustion.as_deref()?;
+    let (bound, renews_at) = match spent.dimension {
+        Dimension::Travel => (&bounds.travel, None),
+        Dimension::Invocations => (
+            &bounds.per_day,
+            match spent.contract {
+                Contract::Window => journal.renewal_instant().ok().flatten(),
+                Contract::Lifetime { .. } => None,
+            },
+        ),
+    };
+    Some(rhei_tui::RunEvent::BudgetHalt {
+        task: task_id_str.to_string(),
+        reason_code: refusal.reason_code.clone(),
+        bound: rhei_tui::BoundReport {
+            dimension: spent.dimension.label().into(),
+            effective: spent.bound,
+            value_source: bound.source.as_str().into(),
+            limiting_source: bound.requested.map(|_| "machine".into()),
+            consumed: spent.counter.consumed,
+            outstanding: spent.counter.reserved,
+            remaining: spent.counter.remaining(spent.bound).unwrap_or(0),
+            mode: match spent.dimension {
+                Dimension::Travel => "per ticket identity".into(),
+                Dimension::Invocations => spent.contract.name().into(),
+            },
+            window: matches!(
+                (spent.dimension, &spent.contract),
+                (Dimension::Invocations, Contract::Window)
+            )
+            .then(|| spent.day.clone()),
+        },
+        // Never an inner value the machine ceiling would clamp: telling an
+        // operator to raise a field that cannot take effect sends them to the
+        // wrong file. §FS-rhei-budgets.8
+        remedy: match &renews_at {
+            Some(instant) => format!("wait: the window renews at {instant}"),
+            None => bound.remedy(),
+        },
+        renews_at,
+    })
+}

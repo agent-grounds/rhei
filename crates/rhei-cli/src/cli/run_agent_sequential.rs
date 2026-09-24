@@ -177,9 +177,17 @@ fn run_sequential_agent_invocation(
         task,
         task_id_str,
     )? {
-        BudgetAdmission::Admitted | BudgetAdmission::NotAccounted => {}
-        BudgetAdmission::Refused { halt } => {
+        // Both counts on screen before any of this visit's capacity is spent.
+        // §FS-rhei-budgets.9
+        BudgetAdmission::Admitted { bounds } => {
+            sink.emit(RunEvent::BudgetSnapshot { bounds });
+        }
+        BudgetAdmission::NotAccounted => {}
+        BudgetAdmission::Refused { halt, event } => {
             run_error!("{halt}");
+            if let Some(event) = event {
+                sink.emit(*event);
+            }
             progress.stalled_tasks.insert(task_id_str.clone());
             return Ok(());
         }

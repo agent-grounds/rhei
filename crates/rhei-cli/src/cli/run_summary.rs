@@ -101,6 +101,16 @@ struct SummaryState {
     /// Which of the strip's two sources produced what it is about to show.
     // §FS-rhei-run-report.2.1
     source: AccountingSource,
+    /// The first and the latest bound snapshot of the run, keyed by dimension.
+    ///
+    /// Both, because the record answers "what was this bounded by" and "what
+    /// did it spend" — one number cannot do both. §FS-rhei-run-report.3.1
+    bounds_first: BTreeMap<String, rhei_tui::BoundReport>,
+    bounds_last: BTreeMap<String, rhei_tui::BoundReport>,
+    /// Every dimension that refused an admission this run, so the record says
+    /// what stopped it without the reader reconstructing it from rows.
+    /// §FS-rhei-budgets.8
+    bound_halts: Vec<(String, rhei_tui::BoundReport, Option<String>, String)>,
 }
 
 impl SummarySink {
@@ -119,6 +129,20 @@ impl SummarySink {
     /// lock, for the same best-effort reason as [`snapshot`](Self::snapshot).
     fn ledger(&self) -> Vec<LedgerRecord> {
         self.inner.lock().map(|state| state.ledger.clone()).unwrap_or_default()
+    }
+
+    /// The run's bounds: where each count stood when the run started, where it
+    /// stood when it ended, and every dimension that refused an admission.
+    /// §FS-rhei-run-report.3.1
+    fn bounds(&self) -> BoundsSection {
+        self.inner
+            .lock()
+            .map(|state| BoundsSection {
+                first: state.bounds_first.clone(),
+                last: state.bounds_last.clone(),
+                halts: state.bound_halts.clone(),
+            })
+            .unwrap_or_default()
     }
 
     /// Run-level accounting, preferring the finalized `RunFinished` rollup and
@@ -155,6 +179,19 @@ impl rhei_tui::EventSink for SummarySink {
             Err(_) => return,
         };
         match event {
+            // §FS-rhei-run-report.3.1 §FS-rhei-budgets.9
+            rhei_tui::RunEvent::BudgetSnapshot { bounds } => {
+                for bound in bounds {
+                    state
+                        .bounds_first
+                        .entry(bound.dimension.clone())
+                        .or_insert_with(|| bound.clone());
+                    state.bounds_last.insert(bound.dimension.clone(), bound);
+                }
+            }
+            rhei_tui::RunEvent::BudgetHalt { task, bound, renews_at, remedy, .. } => {
+                state.bound_halts.push((task, bound, renews_at, remedy));
+            }
             // `agent` is `Some` for agent-backed work, `None` for programs.
             rhei_tui::RunEvent::SlotAssigned { slot, task, agent, .. } => {
                 let driver = if agent.is_some() { "agent" } else { "program" };
@@ -711,6 +748,78 @@ pub struct RunSummaryReport {
     /// Relative paths to the written report files, filled by [`write_to_runtime`].
     report_path: Option<String>,
     history_path: Option<String>,
+    /// What the run was bounded by, and what it spent. §FS-rhei-run-report.3.1
+    bounds: BoundsSection,
+}
+
+/// Each count dimension at the start and at the end of the run, and the halts.
+///
+/// Both ends, because the record answers "what was this bounded by" and "what
+/// did it spend": one number cannot do both, and a reader who has only the
+/// second cannot tell a run that finished from one that nearly did not.
+/// §FS-rhei-run-report.3.1 §FS-rhei-budgets.9
+#[derive(Clone, Default)]
+struct BoundsSection {
+    first: BTreeMap<String, rhei_tui::BoundReport>,
+    last: BTreeMap<String, rhei_tui::BoundReport>,
+    halts: Vec<(String, rhei_tui::BoundReport, Option<String>, String)>,
+}
+
+impl BoundsSection {
+    fn is_empty(&self) -> bool {
+        self.last.is_empty()
+    }
+
+    /// `80 (built_in)`, or the clamped form naming requester and limiter.
+    /// §FS-rhei-budgets.2.3
+    fn provenance(bound: &rhei_tui::BoundReport) -> String {
+        match &bound.limiting_source {
+            Some(limiter) => format!(
+                "{} (requested by the {}, limited by {limiter} settings)",
+                bound.effective, bound.value_source
+            ),
+            None => format!("{} ({})", bound.effective, bound.value_source),
+        }
+    }
+
+    fn render_markdown(&self) -> String {
+        if self.is_empty() {
+            return String::new();
+        }
+        let mut out = String::from("## Bounds\n\n");
+        out.push_str(
+            "| Dimension | Bound | Mode | Consumed at start | Consumed at end | Remaining |\n\
+             | --- | --- | --- | ---: | ---: | ---: |\n",
+        );
+        for (dimension, bound) in &self.last {
+            let started = self.first.get(dimension).map(|b| b.consumed).unwrap_or(bound.consumed);
+            out.push_str(&format!(
+                "| {} | {} | {} | {started} | {} | {} |\n",
+                md_cell(dimension),
+                md_cell(&Self::provenance(bound)),
+                md_cell(bound.window.as_deref().unwrap_or(&bound.mode)),
+                bound.consumed,
+                bound.remaining,
+            ));
+        }
+        out.push('\n');
+        for (task, bound, renews_at, remedy) in &self.halts {
+            out.push_str(&format!(
+                "- `{}` was stopped by its {} bound of {}; {}\n",
+                task,
+                bound.dimension,
+                Self::provenance(bound),
+                match renews_at {
+                    Some(at) => format!("it renews at {at}"),
+                    None => remedy.clone(),
+                }
+            ));
+        }
+        if !self.halts.is_empty() {
+            out.push('\n');
+        }
+        out
+    }
 }
 
 // ANSI codes; emitted only when color is enabled.
@@ -894,6 +1003,7 @@ impl RunSummaryReport {
         Self {
             title: rhei.title.clone(),
             result,
+            bounds: summary.bounds(),
             duration: stats.duration,
             state_counts,
             total_tasks,
@@ -1091,6 +1201,11 @@ impl RunSummaryReport {
             }
             out.push('\n');
         }
+
+        // 3a. Bounds — what the run was bounded by and what it spent, so the
+        // record answers "what stopped it" without reconstructing it from rows.
+        // §FS-rhei-run-report.3.1
+        out.push_str(&self.bounds.render_markdown());
 
         // 3b. Waiting — held tickets, kept out of Attention so the rows a
         // person must act on stay undiluted. §FS-rhei-supervision.3.4

@@ -163,6 +163,27 @@ fn run_sequential_agent_invocation(
         progress.stalled_tasks.insert(task_id_str.clone());
         return Ok(());
     }
+    // The fourth bound over this same spawn, and the only one that asks about
+    // the ticket's whole life and the project's whole day. It is checked here,
+    // before anything is composed or staged, so that a spawn the account cannot
+    // pay for costs nothing to decline — and a refusal takes the same stall
+    // step 5 gives any other. §FS-rhei-run.3.4 §FS-rhei-budgets.6.1
+    match budget_admit_spawn(
+        input,
+        &loaded,
+        workspace_root,
+        machine,
+        settings,
+        task,
+        task_id_str,
+    )? {
+        BudgetAdmission::Admitted | BudgetAdmission::NotAccounted => {}
+        BudgetAdmission::Refused { halt } => {
+            run_error!("{halt}");
+            progress.stalled_tasks.insert(task_id_str.clone());
+            return Ok(());
+        }
+    }
     let checkout_root = resolve_agent_checkout_root(&task_workspace_root, task_id_str)?;
     // A sequential pass runs one invocation at a time, so nothing else of this
     // run is in flight. §FS-rhei-memory.4.3
@@ -213,6 +234,9 @@ fn run_sequential_agent_invocation(
                 return Err(err);
             }
             progress.unpromptable_tasks.insert(task_id_str.clone());
+            // Nothing was spawned, so the units this visit reserved go back.
+            // §FS-rhei-budgets.6.2
+            budget_settle_visit(workspace_root, task_id_str);
             return Ok(());
         }
     };
@@ -275,6 +299,9 @@ fn run_sequential_agent_invocation(
     // Re-resolved policy is materialized into adapter flags only for a profile
     // that explicitly declares the capability. §FS-rhei-agents.5.2.1
     let spawn_resolved = agent_with_exclusion_adapter(resolved, &exclusions);
+    // Ambiguity is recorded *before* the capability is transferred: a crash
+    // from here on can never refund the invocation. §FS-rhei-budgets.6.2
+    budget_record_start(workspace_root, task_id_str, false);
     let spawn_result = spawn_and_wait_agent(
         &spawn_resolved,
         opts.price_book(),
@@ -306,6 +333,10 @@ fn run_sequential_agent_invocation(
         )
         .as_deref(),
     );
+    // The process returned, so the start that was ambiguous is now confirmed.
+    // Confirmation refines the record; it never refunds it.
+    // §FS-rhei-budgets.6.2
+    budget_record_start(workspace_root, task_id_str, true);
     let duration_ms = started_at.elapsed().as_millis() as u64;
     let finished_wall = SystemTime::now();
     let (outcome, exit_code) = slot_outcome(&spawn_result);
@@ -378,7 +409,7 @@ fn run_sequential_agent_invocation(
             run_warn!("  warning: failed to record accounting: {}", err);
         }
     }
-    handle_sequential_agent_completion(
+    let completion = handle_sequential_agent_completion(
         input,
         machines,
         settings,
@@ -405,5 +436,10 @@ fn run_sequential_agent_invocation(
             result: spawn_result,
         },
         progress,
-    )
+    );
+    // After the completion has had its chance to apply an edge: a travel unit
+    // still held is one no edge was applied against, and it goes back.
+    // §FS-rhei-budgets.4.1
+    budget_settle_visit(workspace_root, task_id_str);
+    completion
 }

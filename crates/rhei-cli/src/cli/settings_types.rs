@@ -53,6 +53,18 @@ struct RheiSettings {
     // §FS-rhei-agents.1.1.1: Nested settings defaults.
     #[serde(default)]
     defaults: SettingsDefaults,
+    /// What the **machine-global** settings file alone said about the three
+    /// count bounds, retained through the merge because that tier is the
+    /// ceiling and not merely the fallback: a project or a plan may lower it,
+    /// and may not raise it. §FS-rhei-budgets.2
+    #[serde(skip)]
+    machine_bounds: CountBoundTier,
+    /// What the **project** settings file alone said about them, retained for
+    /// the same reason from the other side: the merged value cannot say
+    /// whether the project set it or merely inherited it, and the two send a
+    /// reader to different files. §FS-rhei-budgets.2.3
+    #[serde(skip)]
+    project_bounds: CountBoundTier,
     /// Registry of agent transport profiles keyed by agent id.
     #[serde(default)]
     agents: BTreeMap<String, CustomAgentProfile>,
@@ -218,10 +230,46 @@ struct SettingsDefaults {
     // §FS-rhei-agents.3.2.3: the resolution chain this is the second level of.
     #[serde(default)]
     attempts: Option<u32>,
+    /// Applied transitions one ticket may make over the lifetime of its
+    /// identity. §FS-rhei-budgets.2.1
+    #[serde(default)]
+    transition_limit: Option<u64>,
+    /// Neural starts a project may be admitted per UTC day under the window
+    /// contract. §FS-rhei-budgets.2.1
+    #[serde(default)]
+    invocations_per_day: Option<u64>,
+    /// The ceiling on an explicit lifetime invocation allowance. It is a
+    /// ceiling, not an allowance: nothing consumes it and no project receives
+    /// it. §FS-rhei-budgets.2.1
+    #[serde(default)]
+    invocation_lifetime_max: Option<u64>,
     #[serde(default)]
     mcp_servers: Option<Vec<StateMcpEntry>>,
     #[serde(default)]
     skills: Option<Vec<StateSkillEntry>>,
+}
+
+/// The three count bounds as one settings tier read them.
+///
+/// Carried separately from the merged `defaults` because the machine tier is
+/// not only a fallback for these three: it is also the **ceiling**, so the
+/// value it set has to survive being overridden by a more specific tier.
+/// §FS-rhei-budgets.2
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct CountBoundTier {
+    transition_limit: Option<u64>,
+    invocations_per_day: Option<u64>,
+    invocation_lifetime_max: Option<u64>,
+}
+
+impl CountBoundTier {
+    fn of(defaults: &SettingsDefaults) -> Self {
+        Self {
+            transition_limit: defaults.transition_limit,
+            invocations_per_day: defaults.invocations_per_day,
+            invocation_lifetime_max: defaults.invocation_lifetime_max,
+        }
+    }
 }
 
 /// Built-in agent registry.

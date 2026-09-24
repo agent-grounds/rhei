@@ -728,6 +728,39 @@ fn execute_transition_with_origin(
         ));
     }
 
+    // The edge is charged before the state that records it is written, so a
+    // ticket at its bound is refused rather than moved and then told. A crash
+    // between the two over-counts by one, which is the conservative direction.
+    // §FS-rhei-budgets.4.1 §FS-rhei-budgets.1
+    match budget_charge_applied_edge(
+        &TransitionCharge {
+            workspace_root: &workspace_root,
+            machine,
+            settings: &settings,
+            task: Some(&task_info.task),
+            metadata_key: &metadata_key,
+            metadata_file,
+            // The project-qualified id, which is what the run loop admitted
+            // this visit under and what the ledger line names. The local id
+            // next door names the ticket inside its own file and would find no
+            // claim to convert. §FS-rhei-panta.6
+            task_id_str: files.artifact_id,
+            from,
+            to,
+        },
+        updated_metadata.as_ref().or(metadata_for_checks),
+    ) {
+        Ok(None) => {}
+        Ok(minted) => updated_metadata = minted,
+        Err(err) => {
+            if let Some(task_handle) = &task_handle {
+                task_handle.release();
+            }
+            metadata_handle.release();
+            return Err(err);
+        }
+    }
+
     let rendered_to_state = format_task_state_value(to, to_visit_count, machine);
     // §FS-rhei-supervision.3.4: the release self-loop ends the visit, so it
     // ends the claim the visit was taken under.

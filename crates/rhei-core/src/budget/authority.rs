@@ -45,8 +45,8 @@ impl Authority {
             return Err(BudgetError::corrupt("budget authority directory must be absolute"));
         }
         let root = std::fs::canonicalize(root)?;
-        // Resolve existing ancestors before creating anything, including a
-        // symlink pointing back into the project it is meant to outlive.
+        // Resolve existing ancestors before creating anything, so a symlink
+        // pointing back at the account is seen for what it is.
         // §FS-rhei-budgets.5.3
         let mut ancestor = base;
         while !ancestor.exists() {
@@ -55,8 +55,16 @@ impl Authority {
         }
         let resolved = std::fs::canonicalize(ancestor)?
             .join(base.strip_prefix(ancestor).map_err(BudgetError::corrupt)?);
-        if resolved.starts_with(&root) {
-            return Err(BudgetError::corrupt("budget authority must live outside the project"));
+        // What a witness must not be is the *journal*. Where an operator's
+        // state directory happens to sit is theirs to decide, and refusing a
+        // machine whose `$XDG_STATE_HOME` is under some project would refuse
+        // work that runs today; a witness that had become the ledger it
+        // witnesses would be a chain verifying against itself.
+        // §FS-rhei-budgets.5.3 §REQ-bounded-neural-work.2
+        if resolved.starts_with(root.join(super::account::ACCOUNT_DIR)) {
+            return Err(BudgetError::corrupt(
+                "the budget authority cannot live inside the account it witnesses",
+            ));
         }
         // The directory is created whatever the caller came for, because an
         // **adopted** journal has to be able to write a witness this machine

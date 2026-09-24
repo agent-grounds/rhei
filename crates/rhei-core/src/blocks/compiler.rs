@@ -464,7 +464,13 @@ impl CompiledBlock {
         }
         profiles.insert(
             flow.clone(),
-            Profile { initial: self.entry.clone(), allowed: self.primary.clone() },
+            // A derived profile declares no travel bound of its own, so every
+            // node of it resolves the settings chain. §FS-rhei-budgets.2.2
+            Profile {
+                initial: self.entry.clone(),
+                allowed: self.primary.clone(),
+                transition_limit: None,
+            },
         );
         policy.root = flow.clone();
         policy.default = flow;

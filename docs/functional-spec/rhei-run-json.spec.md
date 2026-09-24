@@ -96,6 +96,32 @@ the journal.
 `failed` outcome. The stream remains open while the ordinary run loop waits;
 `run_finished` is emitted only when that loop later finishes or halts.
 
+`run_finished.summary` gains one object, **`stop`**, present exactly when
+`--until-idle` ([§FS-rhei-run.2.1](rhei-run.spec.md#21-standalone)) is selected — an unselected run's stream stays
+byte-identical — and within it every field is present, with null where it does
+not apply:
+
+```json
+{"event":"run_finished","summary":{"…":"…","stop":{
+   "reason":"idle","idle_blocker":"poll",
+   "next_attempt_at":"2026-09-24T14:30:00Z","exit_code":3}}}
+```
+
+`reason` is the closed set `complete | idle | attention | failed |
+interrupted`. `idle_blocker` is the closed set `gate | poll | provider_limit |
+mixed`, present and null when `reason` is not `idle`. `next_attempt_at` is an
+RFC 3339 UTC instant, the same spelling and format as the `next_attempt_at` on
+`slot_released`, and is present and null when no task contributes one
+([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)) — never omitted and never a synthesized placeholder.
+`exit_code` is the integer the process exits with (§5). The values are
+snake_case because the stream's sibling enumeration, `outcome`, already is, and
+they are one object rather than four loose keys because `summary` is a counts
+rollup and four more keys would read as more counts. This is an addition under
+§2.2, so `schema` does not move, and no new record kind is introduced —
+including for the informational stderr notice a line frontend may print when
+the option suppresses a TUI that detection would have chosen, which never
+reaches this stream.
+
 `usage_reported.report` is `streamed` for a running total observed
 mid-invocation and `final` for the one report that follows the durable record;
 exactly one `final` record exists per invocation that reaches a record
@@ -181,11 +207,33 @@ warnings use the same `message` records and startup ordering as a real run.
 
 ## 5. Exit Codes
 
-`--json` does not change them. `rhei run --json` exits exactly as
-`rhei run` does: `0` on a plan whose tasks are all terminal, non-zero when
-progress halts, `128 + signal` when a signal ended it ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)). The
-stream and the exit code are two answers to different questions and a consumer
-should read both.
+`--json` does not change them. `rhei run --json` exits exactly as `rhei run`
+does:
+
+| Code | When |
+|------|------|
+| `0` | Every in-scope task is terminal — **or** the run halted with work remaining that is only deliberately waiting ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)), which without `--until-idle` is the same `0` |
+| `1` | Work remains that needs a person or a repair, or the run itself errored |
+| `2` | A usage refusal, including `--until-idle` alongside `--tui` or `--headless` ([§FS-rhei-run-tui.1.4](rhei-run-tui.spec.md#14-frontend-selection)) |
+| `3` | **Idle** — produced only when `--until-idle` is selected (§2.1) |
+| `101` | A panic |
+| `128 + n` | A signal ended it ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) |
+
+`3` is allocated once, identically on every supported platform, and nothing
+else in `3..=99` is allocated anywhere in the CLI. It is the one thing about
+this option that cannot be changed after release without breaking every caller
+keyed on it.
+
+The first row is the correction this table exists to make. "Non-zero when
+progress halts" was never true of a run that halted with only gate-blocked work
+left: such a run exits `0`, the same code as a finished plan, because a gate is
+the plan working as authored. Without the option that collapse stands
+unchanged; the option splits it for the caller who asked for the split, and
+reclassifies nothing for anyone else.
+
+The stream and the exit code are two answers to different questions and a
+consumer should read both — with one caution for a new caller: a script that
+passes `--until-idle` and reads "non-zero means trouble" will misread `3`.
 
 ## Related Specifications
 

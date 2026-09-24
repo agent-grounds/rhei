@@ -368,4 +368,97 @@ transitions:
             Some(now + 180)
         );
     }
+
+    /// The provider-limit term of the plan-wide deliberate-wait judgment.
+    ///
+    /// The judgment and the deadline scan diverged over provider limits: the
+    /// scan knew about them and the judgment did not. In the continuous mode
+    /// nobody noticed, because the run simply slept. Under `--until-idle` the
+    /// split produces a concretely wrong answer — the one wait the report
+    /// calls calm, reported as attention and exited in the failure category.
+    /// A task parked by a recognized provider limit is a deliberate wait.
+    /// §FS-rhei-run-report.3.1 §FS-rhei-run.3.3
+    #[test]
+    fn a_provider_limit_only_wait_is_a_deliberate_wait() {
+        let mut rhei = rhei_core::parse(
+            "# Rhei: Limits\n\n## Tasks\n\n### Task 1: Parked\n**State:** working\n",
+        )
+        .expect("parse plan");
+        let now = current_unix_secs();
+        let limit = ProviderLimit {
+            identity: ProviderIdentity { agent: "codex".into(), provider: "openai".into() },
+            signal: "signal".into(),
+            observed_at: deadline(now),
+            next_attempt_at: deadline(now + 1800),
+        };
+        let (metadata, _) =
+            set_provider_limit_metadata(None, &parse_task_id("1"), "working", &limit);
+        rhei.metadata = Some(metadata);
+        let machines = rhei_validator::MachineSet::single(provider_machine(false));
+
+        assert!(
+            remaining_work_is_only_gating_or_poll_blocked(&rhei, &machines, &None),
+            "a parked task resumes when its deadline elapses, with nothing for an \
+             operator to repair"
+        );
+    }
+
+    /// The only-blocker filter on the reported next attempt.
+    ///
+    /// A deadline is a schedule hint until something says whether its expiry
+    /// can actually make the task runnable. Task 2's poll is real and still
+    /// ahead, but task 1's gate is what holds it: expiry alone changes
+    /// nothing, so the deadline contributes no next attempt and a timer woken
+    /// for it would find the same gate.
+    /// §FS-rhei-run.5.1
+    #[test]
+    fn a_deadline_behind_a_gated_prior_contributes_no_next_attempt() {
+        let mut rhei = rhei_core::parse(
+            "# Rhei: Limits\n\n## Tasks\n\n### Task 1: Gate\n**State:** review\n\n\
+             ### Task 2: Behind the gate\n**State:** working\n**Prior:** Task 1\n",
+        )
+        .expect("parse plan");
+        let now = current_unix_secs();
+        rhei.metadata =
+            Some(set_poll_next_attempt_metadata(None, &parse_task_id("2"), "working", now + 600, 1));
+        let machine = rhei_validator::StateMachine::from_yaml_str(
+            r#"name: gated-provider
+version: 1
+states:
+  review:
+    initial: true
+    gating: true
+  working:
+    target: codex:openai:gpt-5.6-sol
+    poll:
+      interval: 1m
+      max_attempts: 3
+  completed:
+    final: true
+transitions:
+  - from: review
+    to: completed
+  - from: working
+    to: working
+    condition: pollAttempts < pollMaxAttempts
+  - from: working
+    to: completed
+"#,
+        )
+        .expect("gated provider state machine");
+        let machines = rhei_validator::MachineSet::single(machine);
+        let settings = RheiSettings { agents: built_in_agents(), ..RheiSettings::default() };
+
+        assert_eq!(
+            earliest_pending_agent_deadline(
+                &rhei,
+                &machines,
+                &settings,
+                &default_run_options(),
+                &None,
+            ),
+            None,
+            "expiry cannot release a task its prior's gate still holds"
+        );
+    }
 }

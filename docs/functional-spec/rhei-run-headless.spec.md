@@ -41,8 +41,17 @@ The child is an ordinary `rhei run`: it acquires the same run locks
 and writes the same run report. It is *not* a service, keeps no cross-run
 state, and exits when its plan is done.
 
-`--headless` conflicts with `--tui` (there is no terminal to own) and with
-`--dry-run` (a preview has nothing to detach from).
+`--headless` conflicts with `--tui` (there is no terminal to own), with
+`--dry-run` (a preview has nothing to detach from), and with `--until-idle`
+([§FS-rhei-run.2.1](rhei-run.spec.md#21-standalone)). The last is not a frontend disagreement: the launcher's
+exit code answers "did the run start?", not "did the run finish idle?", so a
+detached selected run would hand its caller `0` and a run id whatever became of
+it, and the one status the option exists to deliver could never reach the
+timer. Like the other two it is declared on the flags and refused at startup
+with status `2`, before any lock, descriptor, journal or event log is written
+and before any ticket moves. It is also what preserves §1.2 by construction: a
+detached run can never carry the option, so the promise that a detached run
+waits at a human gate needs no exception.
 
 `--json` alongside `--headless` describes **the launcher's** output: it prints
 the new run's descriptor (§2) as one JSON object instead of the human block,

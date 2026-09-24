@@ -276,12 +276,24 @@ At the entry of `run_plan`, the frontend is decided once:
 | Condition                                         | Frontend   |
 |--------------------------------------------------|------------|
 | `--json`, regardless of TTY detection             | JsonSink   |
+| `--until-idle`, regardless of TTY detection       | StdoutSink |
 | `--no-tui`, or `stdout` is not a TTY              | StdoutSink |
 | `--tui`, regardless of TTY detection              | TuiSink    |
 | Default: `stdout.is_terminal()` is true            | TuiSink    |
 
 `--json` is decided first and conflicts with `--tui`: a stream that a program
 parses cannot also be a screen a person reads.
+
+`--until-idle` ([§FS-rhei-run.2.1](rhei-run.spec.md#21-standalone)) follows the same settled pattern one row below:
+it overrides TTY auto-detection and conflicts with an explicit `--tui`. A
+finished TUI run parks on its final surface until the operator presses `q`
+(§1.5.7), so the run loop returns and the process does not — an option whose
+whole point is returning cannot use that frontend. The conflict is declared on
+the flags, so it is refused at startup with status `2` and a diagnostic naming
+`--no-tui`, before any lock, descriptor, journal or event log is written; a
+merely *detected* TTY is overridden and never refused, because nobody should be
+refused for a flag they never typed. The option's own effect resolves here and
+nowhere else, so "the frontend is decided once" still reads true.
 
 Auto-detection uses `std::io::IsTerminal`. The `--tui` override exists for edge cases where detection is wrong (nested shells, certain tmux configurations). The `--no-tui` override is for scripted demos and debugging.
 
@@ -444,9 +456,17 @@ glyphs and labels, not color alone ([§FS-rhei-viz-ux.3.3](rhei-viz-ux.spec.md#3
 Interactive TUI runs stay live for a pending human gate only when gates, or work
 blocked by those gates or future poll deadlines, are the remaining blockers. The
 operator can resolve the gate in the UI or stop with `Ctrl+C`. Non-interactive
-runs do not wait. After `RunFinished`, live actions are disabled but the final
-surface remains navigable until `q`; non-TTY and `--no-tui` output remains
-line-oriented (§1.4, §3).
+runs do not wait **for a human gate** — they still sleep to a future poll or
+provider-limit deadline ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)), which is a different wait and is
+not scoped by this sentence. After `RunFinished`, live actions are disabled but
+the final surface remains navigable until `q`; non-TTY and `--no-tui` output
+remains line-oriented (§1.4, §3).
+
+`--until-idle` ([§FS-rhei-run.2.1](rhei-run.spec.md#21-standalone)) is independent of the frontend: on every
+frontend it supports — plain stdout, a non-TTY stdout, explicit `--no-tui`,
+`--json`, `--dry-run`, and callback-only runs — it neither waits for a human
+gate nor sleeps for a deadline, so a timer's behaviour does not depend on
+whether cron handed it a TTY.
 
 The navigable final surface belongs to a run that ended on its own terms. **A
 run that ended any other way — the operator interrupted it ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)),

@@ -180,6 +180,24 @@ the summary prints five stacked groups:
    to inspect logs or to cancel the task: nothing about the ticket failed, the
    run was stopped, and re-running it is the whole recovery. The console prints
    no `Run complete:` line for such a run.
+
+   A run returning **idle** under `--until-idle` ([§FS-rhei-run.2.1](rhei-run.spec.md#21-standalone)) reads as
+   its own outcome too. The result vocabulary gains `idle — waiting on a
+   person`, `idle — retry at <instant>`, `idle — waiting on a provider limit`
+   and `idle — mixed waits`, ranked **below `interrupted` and below
+   attention**: an interrupt outranks it, and one in-scope ticket whose
+   classified blocker is actionable defeats it however many tickets wait
+   beside it ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 9). The console result line on such a run is
+   script-distinguishable from an ordinary halt and **never contains `Run
+   complete:`**; it carries the stop reason, the dominant blocker kind from the
+   same closed vocabulary the stream uses ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)), and the
+   earliest next attempt, spelling the absence of one in words rather than
+   omitting it. The waiting tickets appear in the existing `## Waiting`
+   section, and `## Attention` is **empty on every idle return** — a non-empty
+   Attention means the run was not idle. The two are defined from one
+   classification, so that invariant is free, and one classification drives
+   every surface: the exit code, this line, the durable report's header, and
+   `run_finished` say the same thing about the same run.
 2. **Counts** - two dense lines: final task states, then run activity (agents,
    programs, reused-output, callback-only, terminal-at-start, could-not-advance).
    The states line is preceded by a static state-distribution bar whose segments
@@ -313,8 +331,13 @@ the summary prints five stacked groups:
 
    The run's exit status and `--dry-run`'s are one judgment, not two readings
    of this classification: a run ends non-zero when work remains that is
-   waiting on neither a human gate, a poll backoff, nor a `**Prior:**` that is
-   itself waiting on one of those ([§FS-rhei-run.4](rhei-run.spec.md#4-dry-run)). Deriving the prediction
+   waiting on neither a human gate, a poll backoff, a recognized provider limit
+   ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)), nor a `**Prior:**` that is itself waiting on one of
+   those ([§FS-rhei-run.4](rhei-run.spec.md#4-dry-run)). The provider-limit term is the fourth, and it belongs
+   with the other three: the prose above already places a parked task in
+   **Waiting**, "never **Attention**", so a judgment that omitted it read the
+   same ticket two ways — calm on one surface and a reason to exit non-zero on
+   another. Deriving the prediction
    from the per-ticket causes instead made `--dry-run` exit non-zero on plans
    the run itself exits zero on — a ticket whose prior chain ends in a gate is
    blocked by that gate, however its own line reads.

@@ -255,6 +255,17 @@ fn nested_parent_reservation() -> Option<String> {
     std::env::var(PARENT_RESERVATION_ENV).ok().filter(|value| !value.is_empty())
 }
 
+/// The reservation a spawn's own descendants may be placed under: the arm this
+/// visit was admitted on.
+///
+/// A descriptor rather than a capability — the ledger decides whether the name
+/// buys anything, and a child that cannot be placed under a live ancestor of
+/// this very project refuses rather than opening a balance of its own.
+/// §FS-rhei-budgets.7 §AR-neural-admission.6
+fn budget_ancestry_token(task_id_str: &str) -> Option<String> {
+    with_claims(|claims| claims.get(task_id_str).and_then(|claim| claim.arms.first().cloned()))
+}
+
 /// Record that the subprocess is being created.
 ///
 /// Appended *immediately before* the spawn call with `confirmed: false`, and

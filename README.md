@@ -165,6 +165,18 @@ Use [`examples/README.md`](examples/README.md) as the cookbook once the basic
 loop is clear. It maps common jobs such as code review, snapshots, multi-agent
 analysis, and dashboard testing to concrete examples.
 
+## What bounds a run
+
+Every plan is bounded before it starts and nothing has to be declared for it to
+be: a ticket may make at most **80 applied moves** over the life of its
+identity, and a project at most **200 agent starts per UTC day**. Raise either
+for the whole machine with `defaults.transition_limit` or
+`defaults.invocations_per_day` in `~/.config/rhei/settings.json`; a project or a
+plan may ask for less, and asking for more is reported rather than refused.
+`rhei budget show <plan-or-project>` says where a project stands, and
+[Bounded ticket travel and project invocations](docs/functional-spec/rhei-budgets.spec.md)
+is the reference.
+
 ## Install
 
 ### Cargo

@@ -383,6 +383,20 @@ reservation an ancestor already holds.
 Ancestry is the one door through which anything a program does is counted
 ([§REQ-bounded-neural-work.6](../requirements/bounded-neural-work.spec.md#6-the-residual-gap)).
 
+### 7.1. How the descriptor reaches a nested run
+
+`RHEI_BUDGET_PARENT_RESERVATION` is set in the environment of every agent Rhei
+starts, naming the reservation that invocation was admitted on. A `rhei run`
+started inside that agent reads it and places its own admissions under that
+ancestor.
+
+It carries no credential, because there is nothing to credential: a descendant
+charges the same account through the same locks, and the ledger is what decides
+whether the name it was given buys anything ([§AR-neural-admission.6](../architecture/neural-admission.spec.md#6-ancestry)). A value
+naming a reservation this project's journal does not hold, or one that is not
+outstanding, is `ancestor_unavailable` before any spawn — which is why forging
+it buys nothing rather than buying a fresh balance.
+
 ## 8. Exhaustion
 
 A refused admission starts no arm, applies no edge, writes no task result, and

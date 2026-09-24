@@ -461,4 +461,61 @@ transitions:
             "expiry cannot release a task its prior's gate still holds"
         );
     }
+
+    /// The `**Assignee:**` rung of the plan-wide judgment, both ways round.
+    ///
+    /// §FS-rhei-run.3 step 9 states the pair: gated *and* claimed classifies as
+    /// gated and is idle-compatible, because releasing the claim moves nothing
+    /// while the gate holds; polled and claimed classifies as claimed and is
+    /// not, because a claim really does stop a poll from reaching its next
+    /// attempt. The judgment had no such rung, so the polled half read as a
+    /// deliberate wait while the same run's ledger row read `claimed by alice`.
+    /// §FS-rhei-run-report.3.1
+    #[test]
+    fn a_claim_outranks_a_poll_and_a_gate_outranks_a_claim() {
+        let machine = rhei_validator::StateMachine::from_yaml_str(
+            r#"name: claimed-poll
+version: 1
+states:
+  review: { initial: true, gating: true }
+  working:
+    target: codex:openai:gpt-5.6-sol
+    poll: { interval: 1m, max_attempts: 3 }
+  completed: { final: true }
+transitions:
+  - { from: review, to: completed }
+  - { from: working, to: working, condition: pollAttempts < pollMaxAttempts }
+  - { from: working, to: completed }
+"#,
+        )
+        .expect("claimed poll state machine");
+        let machines = rhei_validator::MachineSet::single(machine);
+
+        let mut polled = rhei_core::parse(
+            "# Rhei: Claims\n\n## Tasks\n\n### Task 1: Retries later\n**State:** working\n\
+             **Assignee:** alice\n",
+        )
+        .expect("parse the polled plan");
+        polled.metadata = Some(set_poll_next_attempt_metadata(
+            None,
+            &parse_task_id("1"),
+            "working",
+            current_unix_secs() + 600,
+            1,
+        ));
+        assert!(
+            !remaining_work_is_only_gating_or_poll_blocked(&polled, &machines, &None),
+            "a claim really does stop a poll from reaching its next attempt"
+        );
+
+        let gated = rhei_core::parse(
+            "# Rhei: Claims\n\n## Tasks\n\n### Task 1: Waiting on a reviewer\n**State:** review\n\
+             **Assignee:** alice\n",
+        )
+        .expect("parse the gated plan");
+        assert!(
+            remaining_work_is_only_gating_or_poll_blocked(&gated, &machines, &None),
+            "releasing the claim moves nothing while the gate holds"
+        );
+    }
 }

@@ -157,15 +157,56 @@ fn a_finished_plan_exits_zero_with_the_option_and_without_it() {
         "nothing is waiting, so there is no idle stop to report; got:\n{}",
         with.stdout
     );
-    let states = |text: &str| {
-        text.lines()
-            .find(|line| line.starts_with("Final states:"))
-            .unwrap_or_else(|| panic!("the line-oriented summary is preserved; got:\n{text}"))
-            .to_string()
+    // The byte-compatibility promise itself, which is what this case is for:
+    // the two halves run in workspaces of their own, so the one thing that may
+    // legitimately differ is each workspace's unique directory name — and
+    // normalising *that* normalises every spelling of every path under it,
+    // including macOS's `/private/var` reading of the same directory.
+    let scrub = |plan: &IdlePlan, text: &str| {
+        let workspace =
+            plan.root().file_name().and_then(|name| name.to_str()).expect("a workspace name");
+        text.replace(workspace, "<workspace>")
     };
     assert_eq!(
-        states(&with.stdout),
-        states(&without.stdout),
+        scrub(&selected, &with.stdout),
+        scrub(&unselected, &without.stdout),
         "the option changes nothing about a plan it has nothing to wait for"
+    );
+}
+
+/// (21) A claim on the *polled* ticket, which is the hole case (8) leaves: put
+/// the assignee on work with no clock of its own and the answer is right by
+/// accident, because the claim is the only reading there is. Move it onto the
+/// poll and the two readings of one ticket diverge — the run's own ledger row
+/// says `blocked … claimed by alice` while the stop would say `waiting on
+/// poll; next attempt none`, a line that contradicts itself.
+///
+/// §FS-rhei-run.3 step 9 settles it in as many words: "a task that is both
+/// polled and claimed classifies as claimed and is not [idle-compatible],
+/// because a claim really does stop a poll from reaching its next attempt".
+/// So the run exits `1`, and the remedy it names is the claim's.
+// §FS-rhei-run.3 §FS-rhei-run-report.3.1
+#[test]
+fn a_claim_on_the_polled_ticket_defeats_idle() {
+    let plan = IdlePlan::new(
+        "until-idle-claim-on-the-poll",
+        &format!(
+            "---\nmetadata:\n  tasks:\n    1:\n      pollNextAttemptAt:\n        \
+             poll: {FUTURE_POLL}\n---\n\n## Tasks\n\n\
+             ### Task 1: Retries later, and claimed\n**State:** poll\n**Assignee:** alice\n"
+        ),
+    );
+
+    let result = plan.run(&["--until-idle", "--no-dashboard"]);
+
+    assert_exit(&result, 1, "a claim stops a poll from reaching its next attempt");
+    let combined = format!("{}{}", result.stdout, result.stderr);
+    assert!(
+        !combined.contains("Run idle:"),
+        "a claimed poll is not a deliberate wait; got:\n{combined}"
+    );
+    assert!(
+        combined.contains("rhei release"),
+        "and the remedy is the claim's, not the clock's; got:\n{combined}"
     );
 }

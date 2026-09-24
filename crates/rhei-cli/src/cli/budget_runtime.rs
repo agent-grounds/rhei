@@ -104,14 +104,41 @@ fn open_project_account(project_root: &Path, reason: &str) -> MietteResult<Optio
     Ok(Some(journal))
 }
 
-/// The ticket's persistent identity, minted and written into the plan's
-/// metadata the first time it is needed.
+/// A ticket's budget identity, resolved under the owning rhei's metadata lock.
 ///
-/// It is written under the owning rhei's metadata lock, which is why the lock
-/// order puts metadata *above* the account: assigning an identity that does not
-/// exist yet takes that lock, and an ordinary admission takes neither.
-/// §AR-neural-admission.3
-fn ticket_budget_uuid(input: &Path, loaded: &LoadedPlan, task_id_str: &str) -> MietteResult<String> {
+/// The identity follows *spending*, never attempting: a ticket that has never
+/// been bound has spent nothing, so an admission weighed against a not-yet-
+/// written identity is exact, and a run refused at that admission leaves the
+/// authored plan byte-identical. §FS-rhei-budgets.6.1 §FS-rhei-budgets.8
+struct TicketIdentity {
+    uuid: String,
+    /// The write a freshly minted identity owes the plan, withheld until the
+    /// same transaction has spent something on the ticket. `None` when the plan
+    /// already carried an identity, which is nothing left to write.
+    pending: Option<PendingIdentity>,
+}
+
+/// A minted identity, the metadata it will be folded into, and the lock that
+/// has been held since it was read.
+struct PendingIdentity {
+    lock: LockedPlanFile,
+    metadata_file: PathBuf,
+    raw: String,
+    on_disk: Option<Metadata>,
+    metadata_id: TaskId,
+}
+
+/// Read the ticket's identity, minting one it does not have without writing it.
+///
+/// The metadata lock is taken here and held by the returned value until the
+/// admission it is for has decided, which is why the lock order puts metadata
+/// *above* the account: it is acquired first and may be held while the journal
+/// lock is taken, never the other way around. §AR-neural-admission.3
+fn ticket_budget_identity(
+    input: &Path,
+    loaded: &LoadedPlan,
+    task_id_str: &str,
+) -> MietteResult<TicketIdentity> {
     let route = loaded.task_route(task_id_str, input);
     let metadata_id = parse_task_id(&route.metadata_id);
     let lock = LockedPlanFile::open(&route.metadata_file)?;
@@ -121,17 +148,31 @@ fn ticket_budget_uuid(input: &Path, loaded: &LoadedPlan, task_id_str: &str) -> M
         .and_then(|task| task.get(yaml_key(BUDGET_TICKET_KEY)))
         .and_then(YamlValue::as_str)
     {
-        return Ok(existing.to_string());
+        return Ok(TicketIdentity { uuid: existing.to_string(), pending: None });
     }
-    let minted = uuid::Uuid::new_v4().to_string();
-    let mut root = on_disk.unwrap_or_default();
-    let metadata_section = ensure_mapping(&mut root, yaml_key("metadata"));
-    let tasks = ensure_mapping(metadata_section, yaml_key("tasks"));
-    let task_entry = ensure_mapping(tasks, task_id_yaml_key(&metadata_id));
-    task_entry.insert(yaml_key(BUDGET_TICKET_KEY), YamlValue::String(minted.clone()));
-    let rewritten = rewrite_frontmatter(&raw, &root)?;
-    write_file_atomic_locked(&route.metadata_file, &rewritten, Some(&lock))?;
-    Ok(minted)
+    let pending =
+        PendingIdentity { lock, metadata_file: route.metadata_file, raw, on_disk, metadata_id };
+    Ok(TicketIdentity { uuid: uuid::Uuid::new_v4().to_string(), pending: Some(pending) })
+}
+
+impl TicketIdentity {
+    /// Write a minted identity into the plan, under the lock still held from
+    /// the read.
+    ///
+    /// Called only once the transaction that resolved it has spent something on
+    /// this ticket. A ticket that already had one writes nothing; one whose
+    /// admission refused is dropped instead, releasing the lock with the plan
+    /// untouched. §FS-rhei-budgets.6.1
+    fn commit(self) -> MietteResult<()> {
+        let Some(pending) = self.pending else { return Ok(()) };
+        let mut root = pending.on_disk.unwrap_or_default();
+        let metadata_section = ensure_mapping(&mut root, yaml_key("metadata"));
+        let tasks = ensure_mapping(metadata_section, yaml_key("tasks"));
+        let task_entry = ensure_mapping(tasks, task_id_yaml_key(&pending.metadata_id));
+        task_entry.insert(yaml_key(BUDGET_TICKET_KEY), YamlValue::String(self.uuid));
+        let rewritten = rewrite_frontmatter(&pending.raw, &root)?;
+        write_file_atomic_locked(&pending.metadata_file, &rewritten, Some(&pending.lock))
+    }
 }
 
 /// Whether the run that owns a reservation is gone, which is the proof of
@@ -171,10 +212,10 @@ fn budget_admit_spawn(
 ) -> MietteResult<BudgetAdmission> {
     let project_root = budget_project_root(workspace_root);
     let bounds = resolve_count_bounds(settings, node_transition_limit(machine, Some(task)));
-    // The identity is assigned under the metadata lock, before the account is
-    // opened: metadata sits above the account in the lock order.
-    // §AR-neural-admission.3
-    let ticket_uuid = ticket_budget_uuid(input, loaded, task_id_str)?;
+    // Read under the metadata lock, which is held across the reserve below: a
+    // minted identity is written only where the reserve spent something, so a
+    // refusal writes nothing. §AR-neural-admission.3 §FS-rhei-budgets.6.1
+    let identity = ticket_budget_identity(input, loaded, task_id_str)?;
     let route = loaded.task_route(task_id_str, input);
     let Some(mut journal) = open_project_account(&project_root, "admit a neural start")? else {
         return Ok(BudgetAdmission::NotAccounted);
@@ -182,7 +223,7 @@ fn budget_admit_spawn(
     let account = budget_result(Account::locate(&project_root))?.ok_or_else(|| {
         miette!(help = budget_inspect_help(), "the account just established has no identity")
     })?;
-    let ticket = account.ticket_identity(&ticket_uuid);
+    let ticket = account.ticket_identity(&identity.uuid);
     let audit = budget_audit("admit a neural start")?;
     // A fanout arrives as several work items, so the ticket's one travel unit
     // goes to the first arm of a visit and later arms take an invocation unit
@@ -218,6 +259,8 @@ fn budget_admit_spawn(
     })();
     match admitted {
         Ok(group) => {
+            // The reserve spent, so the ticket has earned its durable identity.
+            identity.commit()?;
             let bounds = budget_reports(&journal, &ticket, &bounds).unwrap_or_default();
             with_claims(|claims| {
                 let claim = claims.entry(task_id_str.to_string()).or_insert_with(|| HeldClaim {

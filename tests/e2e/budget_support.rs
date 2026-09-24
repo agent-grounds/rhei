@@ -84,7 +84,17 @@ pub(super) const PLAN: &str = r#"# Rhei: Bounded work
 **State:** work
 "#;
 
-/// A fake agent that records the spawn and writes both loop artifacts.
+/// A fake agent that records the spawn and writes the artifact of the state it
+/// is in — its own, and only its own.
+///
+/// Writing the sibling's too would hand the ticket its first arrival at that
+/// state for free: with no spawn record for the visit and no prior visit to the
+/// state, `InvocationCompletion::work_is_eligible_for_visit` reads the artifact
+/// already on disk as this visit's own work and walks the edge with no
+/// subprocess. One free edge per run, so a bound of `n` would yield `n - 1`
+/// spawns. From the second visit onwards `has_prior_state_visit()` closes that
+/// door by itself, which is why clearing the sibling is not needed.
+/// §FS-rhei-states.3.3
 ///
 /// It writes **no** result: the loop never reaches a terminal state, and a
 /// ticket that was stopped rather than finished must have no account of itself
@@ -100,8 +110,7 @@ seen = len(log.read_text(encoding='utf-8').splitlines()) if log.exists() else 0
 append(log, '{}\n'.format(env('RHEI_STATE')))
 if seen >= 25:
     raise SystemExit(17)
-write(root / 'runtime' / 'work.md', 'work\n')
-write(root / 'runtime' / 'review.md', 'review\n')
+write(root / 'runtime' / '{}.md'.format(env('RHEI_STATE')), '{}\n'.format(env('RHEI_STATE')))
 "#;
 
 /// The same agent for a plan that does reach a terminal state, so it owes the
@@ -240,4 +249,78 @@ pub(super) fn assert_halt_mentions(result: &CliRun, expected: &str) {
         result.stdout,
         result.stderr
     );
+}
+
+/// Assert a command left the plan as it was, but for the ticket's budget
+/// identity.
+///
+/// The identity follows **spending**, never attempting: an admission that
+/// appended a reservation against the project's account earns the ticket its
+/// durable `budgetTicketId`, and one that spent nothing writes nothing at all.
+/// So a visit that spawned leaves that one key behind even where it changed
+/// nothing else, and the assertion that a hold rewrote nothing is about
+/// everything else — the state, the visit count, the supervision block, the
+/// body of the document.
+///
+/// Compared by frontmatter *value* with the key removed rather than
+/// byte-for-byte, because writing any metadata re-emits the whole frontmatter
+/// and normalizes its YAML style. §FS-rhei-budgets.6.1
+pub(super) fn assert_plan_but_for_the_budget_identity(actual: &str, before: &str, why: &str) {
+    assert_eq!(plan_body(actual), plan_body(before), "{why}");
+    assert_eq!(
+        plan_metadata_without_identity(actual),
+        plan_metadata_without_identity(before),
+        "{why}"
+    );
+}
+
+/// The document with its frontmatter block excised, which no budget write ever
+/// touches — and which reads the same whether or not the plan has one.
+fn plan_body(plan: &str) -> String {
+    match frontmatter_span(plan) {
+        Some((open, _, end)) => format!("{}{}", &plan[..open], &plan[end..]),
+        None => plan.to_string(),
+    }
+}
+
+/// The frontmatter as a value, with every ticket's `budgetTicketId` removed.
+fn plan_metadata_without_identity(plan: &str) -> serde_yaml::Value {
+    let Some((_, start, end)) = frontmatter_span(plan) else { return serde_yaml::Value::Null };
+    let body = &plan[start..end.saturating_sub(5)];
+    let mut value: serde_yaml::Value = serde_yaml::from_str(body).expect("plan frontmatter");
+    if let Some(tasks) = value
+        .get_mut("metadata")
+        .and_then(|metadata| metadata.get_mut("tasks"))
+        .and_then(serde_yaml::Value::as_mapping_mut)
+    {
+        for (_, task) in tasks.iter_mut() {
+            if let Some(task) = task.as_mapping_mut() {
+                task.remove(serde_yaml::Value::from("budgetTicketId"));
+            }
+            // A ticket whose only metadata was the identity is a ticket the
+            // plan never carried an entry for.
+            if task.as_mapping().is_some_and(serde_yaml::Mapping::is_empty) {
+                *task = serde_yaml::Value::Null;
+            }
+        }
+        tasks.retain(|_, task| !task.is_null());
+        if tasks.is_empty() {
+            value.as_mapping_mut().expect("frontmatter mapping").remove("metadata");
+        }
+    }
+    // A frontmatter block holding nothing else is the plan that had none: the
+    // identity is what put it there.
+    if value.as_mapping().is_some_and(serde_yaml::Mapping::is_empty) {
+        return serde_yaml::Value::Null;
+    }
+    value
+}
+
+/// Where the opening `---` line begins, where the body begins, and where the
+/// closing `---\n` line ends.
+fn frontmatter_span(plan: &str) -> Option<(usize, usize, usize)> {
+    let open = plan.find("\n---\n")?;
+    let start = open + 5;
+    let close = start + plan[start..].find("\n---\n")?;
+    Some((open, start, close + 5))
 }

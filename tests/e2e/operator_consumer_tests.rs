@@ -136,7 +136,14 @@ fn operator_cli_consumers_refuse_a_mismatching_pair() {
             format!("{}{}", run.stdout, run.stderr).contains("force"),
             "missing corruption diagnostic"
         );
-        assert_eq!(fs::read(&fixture.plan).unwrap(), plan_before);
+        // `run` composes the inherited handoff only after the spawn is admitted,
+        // so the corrupt pair is found with a reservation appended and the
+        // identity earned; the other two spend nothing. §FS-rhei-budgets.6.1
+        super::budget_support::assert_plan_but_for_the_budget_identity(
+            &String::from_utf8_lossy(&fs::read(&fixture.plan).unwrap()),
+            &String::from_utf8_lossy(&plan_before),
+            command,
+        );
         assert_eq!(fs::read_to_string(&path).unwrap(), corrupt);
         assert!(!fixture.dir.join("runtime/consumer-prompt.md").exists());
     }

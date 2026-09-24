@@ -414,7 +414,13 @@ pub struct Profile {
     /// thought about it. A value above the machine's ceiling is not a
     /// validation error — the node gets the machine's value and the run reports
     /// both. §FS-rhei-budgets.2.2 §FS-rhei-states.8.1
-    #[serde(default)]
+    ///
+    /// Presence is the declaration, so the field is omitted rather than
+    /// serialized as `null`: a profile that declares no bound renders
+    /// byte-for-byte what it did, and the composition lock written before this
+    /// field existed still agrees with the digest the compiler now takes over
+    /// the rendered profile. §FS-rhei-library.4.1
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transition_limit: Option<u64>,
 }
 

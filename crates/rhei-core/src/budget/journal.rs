@@ -125,12 +125,14 @@ impl Journal {
             super::authority::durable_directories(&dir)?;
         }
         let path = dir.join("journal.jsonl");
+        let lock_path = dir.join("journal.jsonl.lock");
         let lock = OpenOptions::new()
             .create(create)
             .truncate(false)
             .read(true)
             .write(true)
-            .open(dir.join("journal.jsonl.lock"))?;
+            .open(&lock_path)
+            .map_err(|error| BudgetError::unreachable(&lock_path, &error))?;
         lock.lock_exclusive()?;
         let mut ledger = Self {
             authority,
@@ -287,7 +289,9 @@ impl Journal {
         }
         self.writable = false;
         self.authority.append(&line)?;
-        let mut file = options.open(&self.path)?;
+        let mut file = options
+            .open(&self.path)
+            .map_err(|error| BudgetError::unreachable(&self.path, &error))?;
         file.write_all(&line)?;
         file.sync_all()?;
         self.state = next;
@@ -336,7 +340,9 @@ pub(crate) fn digest(bytes: &[u8]) -> String {
 /// holds a receipt cannot vanish under a crash. §FS-rhei-budgets.5.1
 pub(crate) fn sync_directory(path: &Path) -> Result<()> {
     #[cfg(unix)]
-    File::open(path)?.sync_all()?;
+    File::open(path)
+        .and_then(|dir| dir.sync_all())
+        .map_err(|error| BudgetError::unreachable(path, &error))?;
     #[cfg(not(unix))]
     let _ = path;
     Ok(())

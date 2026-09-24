@@ -122,10 +122,13 @@ structure:
         combined.contains("waits on brief"),
         "and names the file the child is waiting for; got:\n{combined}"
     );
-    assert_eq!(
-        fs::read_to_string(&plan_path).expect("read plan"),
-        before,
-        "a held visit rewrites nothing"
+    // But for the ticket's budget identity: the visit spawned, so its admission
+    // reserved a unit against the project and the ticket earned one.
+    // §FS-rhei-budgets.6.1
+    super::budget_support::assert_plan_but_for_the_budget_identity(
+        &fs::read_to_string(&plan_path).expect("read plan"),
+        &before,
+        "a held visit rewrites nothing",
     );
     assert_eq!(spawn_log(&dir), vec!["plan.1 supervising 1".to_string()]);
 }
@@ -218,10 +221,13 @@ structure:
         !combined.contains("rerun to pick it up"),
         "and the run never falls back to the advice that cannot help; got:\n{combined}"
     );
-    assert_eq!(
-        fs::read_to_string(&plan_path).expect("read plan"),
-        before,
-        "a held visit rewrites nothing"
+    // But for the ticket's budget identity: the visit spawned, so its admission
+    // reserved a unit against the project and the ticket earned one.
+    // §FS-rhei-budgets.6.1
+    super::budget_support::assert_plan_but_for_the_budget_identity(
+        &fs::read_to_string(&plan_path).expect("read plan"),
+        &before,
+        "a held visit rewrites nothing",
     );
     assert_eq!(spawn_log(&dir), vec!["plan.1 supervising 1".to_string()]);
 }

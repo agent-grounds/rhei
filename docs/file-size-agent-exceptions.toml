@@ -324,10 +324,10 @@ path = "crates/rhei-cli/src/cli/cli_declarations.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 800, unit = "lines" }
+max_accepted = { value = 900, unit = "lines" }
 until = "Subcommand groups move to their own Subcommand enums that the root flattens, so each group's declarations travel with its command."
 reason = """
-Over budget before this change; the touch that surfaced it added three subcommands. It is one clap derive tree, and a subcommand's declaration must sit inside the enum that clap parses.
+Over budget before this change, and 72 lines past the accepted ceiling at the commit before this one; the touch that surfaced it added one line, listing `budget` in the hand-maintained top-level help so that `rhei --help` names a command the README tells operators to run. It is one clap derive tree, and a subcommand's declaration must sit inside the enum that clap parses, so the help template cannot move without the declarations it describes.
 """
 [[exceptions]]
 path = "crates/rhei-cli/src/cli/completion_candidates.rs"

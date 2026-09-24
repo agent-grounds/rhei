@@ -68,6 +68,7 @@ Inspection:
   list        List tasks in a plan with optional filters
   schema      Print or list published accounting JSON Schemas
   viz         Render a self-contained HTML flow visualization of a plan or workspace
+  budget      Inspect or set the project's invocation allowance
 
 Templates:
   templates   List available templates

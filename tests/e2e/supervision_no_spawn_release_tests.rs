@@ -130,10 +130,13 @@ fn an_advance_that_spawns_nothing_still_answers_the_release_test() {
         !second_out.contains("'supervising' \u{2192} 'supervising'"),
         "so the release self-loop never fires; got:\n{second_out}"
     );
-    assert_eq!(
-        fs::read_to_string(&plan_path).expect("read plan"),
-        before,
-        "and two held runs rewrite nothing: no spent visit, no `phase: released`"
+    // But for the ticket's budget identity, which run 1's spawn earned by
+    // reserving a unit against the project; run 2 spawned nothing and so wrote
+    // nothing of its own. §FS-rhei-budgets.6.1
+    super::budget_support::assert_plan_but_for_the_budget_identity(
+        &fs::read_to_string(&plan_path).expect("read plan"),
+        &before,
+        "and two held runs rewrite nothing: no spent visit, no `phase: released`",
     );
     assert_eq!(
         spawn_log(&dir),

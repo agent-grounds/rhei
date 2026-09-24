@@ -14,11 +14,19 @@ fn env_lock() -> &'static Mutex<()> {
     LOCK.get_or_init(|| Mutex::new(()))
 }
 
+/// One witness home for the whole process, because the witness base is resolved
+/// once per process: a second directory would be set in the environment and
+/// never read. The cases stay apart by account uuid instead, which is what keys
+/// a witness anyway. §FS-rhei-budgets.5.3
+fn witness_home() -> &'static Path {
+    static HOME: OnceLock<tempfile::TempDir> = OnceLock::new();
+    HOME.get_or_init(|| tempfile::tempdir().expect("witness home")).path()
+}
+
 /// A project root, its witness directory, and the environment that points one
 /// at the other. Dropping it restores whatever the process had before.
 pub(super) struct Case {
     _guard: MutexGuard<'static, ()>,
-    _home: tempfile::TempDir,
     project: tempfile::TempDir,
     previous_state_home: Option<std::ffi::OsString>,
     previous_clock: Option<std::ffi::OsString>,
@@ -34,24 +42,15 @@ impl Case {
 
     pub fn at(now: &str) -> Self {
         let guard = env_lock().lock().unwrap_or_else(|poison| poison.into_inner());
-        let home = tempfile::tempdir().expect("witness home");
         let project = tempfile::tempdir().expect("project root");
         let previous_state_home = std::env::var_os("XDG_STATE_HOME");
         let previous_clock = std::env::var_os(CLOCK_ENV);
-        std::env::set_var("XDG_STATE_HOME", home.path());
+        std::env::set_var("XDG_STATE_HOME", witness_home());
         std::env::set_var(CLOCK_ENV, now);
         let source = project.path().join("plan.rhei.md");
         std::fs::write(&source, "# Rhei: Case\n").expect("write ticket source");
         let (account, _) = Account::establish(project.path(), &audit()).expect("establish");
-        Self {
-            _guard: guard,
-            _home: home,
-            project,
-            previous_state_home,
-            previous_clock,
-            account,
-            source,
-        }
+        Self { _guard: guard, project, previous_state_home, previous_clock, account, source }
     }
 
     pub fn root(&self) -> &Path {
@@ -85,11 +84,7 @@ impl Case {
     }
 
     pub fn witness_path(&self) -> PathBuf {
-        self._home
-            .path()
-            .join("rhei/budget-authority")
-            .join(self.account.uuid())
-            .join("history.jsonl")
+        witness_home().join("rhei/budget-authority").join(self.account.uuid()).join("history.jsonl")
     }
 }
 

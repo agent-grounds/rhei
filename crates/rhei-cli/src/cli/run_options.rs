@@ -41,6 +41,10 @@ struct StandaloneExecutionFlags {
     /// is its file stem or directory name; default is the whole project
     #[arg(long = "rhei", value_name = "RHEI_ID", add = ArgValueCompleter::new(complete_rhei_id))]
     rhei: Vec<String>,
+    /// Run the available work, then return when every open task is waiting on
+    /// a person or a future deadline (implies --no-tui). Exits 3
+    #[arg(long, conflicts_with_all = ["tui", "headless"])]
+    until_idle: bool,
     /// Force TUI mode even when stdout is not detected as a TTY
     #[arg(long, conflicts_with = "no_tui")]
     tui: bool,
@@ -179,11 +183,29 @@ impl RunOptions {
         self.standalone.json
     }
 
+    /// Whether this invocation asks to return at idle rather than sleep for a
+    /// gate or a future deadline. §FS-rhei-run.2.1
+    fn until_idle(&self) -> bool {
+        self.standalone.until_idle
+    }
+
+    /// Whether the caller named a surface itself, rather than leaving the
+    /// frontend to detection. What it answers is who needs telling that
+    /// `--until-idle` chose one for them. §FS-rhei-run-tui.1.4
+    fn explicit_frontend(&self) -> bool {
+        self.standalone.tui || self.standalone.no_tui
+    }
+
     fn frontend_kind(&self) -> rhei_tui::FrontendKind {
         // Decided before TTY detection: a stream a program parses is never also
         // a screen. §FS-rhei-run-json.1
         if self.standalone.json {
             rhei_tui::FrontendKind::Json { agent_output: self.standalone.json_agent_output }
+        } else if self.standalone.until_idle {
+            // One row below `--json`: a finished TUI run parks on its final
+            // surface until `q`, so an option whose whole point is returning
+            // cannot use it. §FS-rhei-run-tui.1.4
+            rhei_tui::FrontendKind::Stdout
         } else if self.standalone.tui {
             rhei_tui::FrontendKind::Tui
         } else if self.standalone.no_tui {
@@ -225,7 +247,10 @@ impl RunOptions {
     /// plain non-interactive run has nobody at all.
     // §FS-rhei-run-headless.1.2 §FS-rhei-run-tui.1.5.7
     fn waits_for_human_gates(&self, frontend_is_tui: bool) -> bool {
-        frontend_is_tui || is_headless_child()
+        // Belt and braces, since the option refuses both surfaces a human
+        // arrives at — but this is the sentence the gate wait is written from.
+        // §FS-rhei-run-tui.1.5.7
+        !self.standalone.until_idle && (frontend_is_tui || is_headless_child())
     }
 
     fn no_agent(&self) -> bool {

@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::rhei_tui::event::{RunSummary, Slot};
+use crate::rhei_tui::run_stop::{IdleBlocker, RunStop, StopReason};
 use std::time::Duration;
 
 fn at() -> SystemTime {
@@ -319,4 +320,59 @@ fn a_record_with_no_sequence_number_still_decodes() {
     let decoded = decode(&record.to_string()).expect("decode");
     assert_eq!(decoded.seq, None);
     assert_eq!(decoded.ts, at());
+}
+
+/// The `stop` payload survives a round trip, and adding it moves nothing.
+///
+/// Two claims in one test because they are two halves of the same promise:
+/// `run_finished.summary` gains an object whose every field is present — with
+/// null where it does not apply — and `schema` stays `1` because an addition
+/// is an addition. The unselected half is the other half of it: a run that did
+/// not ask for the option emits no `stop` key at all, not a null one, so its
+/// stream is byte-identical to the one this build's predecessor wrote.
+/// §FS-rhei-run-json.2.1 §FS-rhei-run-json.2.2
+#[test]
+fn the_stop_payload_round_trips_without_moving_the_schema() {
+    let stop = RunStop {
+        reason: StopReason::Idle,
+        idle_blocker: Some(IdleBlocker::Poll),
+        next_attempt_at: Some("2030-01-01T00:00:00Z".to_string()),
+        exit_code: 3,
+    };
+    let finished = RunEvent::RunFinished {
+        summary: RunSummary {
+            total_tasks: 5,
+            terminal_tasks: 2,
+            stop: Some(stop.clone()),
+            ..RunSummary::default()
+        },
+    };
+
+    let record = encode(Some(1), &finished, at(), None);
+    let payload = &record["summary"]["stop"];
+    assert_eq!(payload["reason"], "idle");
+    assert_eq!(payload["idle_blocker"], "poll");
+    assert_eq!(payload["next_attempt_at"], "2030-01-01T00:00:00Z");
+    assert_eq!(payload["exit_code"], 3);
+
+    let decoded = decode(&record.to_string()).expect("decode");
+    let RunEvent::RunFinished { summary } = decoded.event else {
+        panic!("run_finished decodes as itself");
+    };
+    assert_eq!(summary.stop, Some(stop), "every field survives the round trip");
+
+    let started = encode(Some(0), &every_variant()[0], at(), None);
+    assert_eq!(started["schema"], 1, "an additive payload does not move `schema`");
+
+    let unselected = encode(
+        Some(2),
+        &RunEvent::RunFinished { summary: RunSummary { total_tasks: 5, ..RunSummary::default() } },
+        at(),
+        None,
+    );
+    assert!(
+        unselected["summary"].get("stop").is_none(),
+        "an unselected run's stream carries no stop key at all; got:\n{}",
+        unselected["summary"]
+    );
 }

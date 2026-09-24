@@ -168,6 +168,7 @@ include!("cli/run_parallel_spawn.rs");
 include!("cli/run_parallel_program_spawn.rs");
 include!("cli/run_parallel_schedule.rs");
 include!("cli/run_parallel_program_completion.rs");
+include!("cli/run_until_idle.rs");
 include!("cli/run_agent_mode.rs");
 include!("cli/run_program_sequential.rs");
 include!("cli/run_agent_sequential.rs");

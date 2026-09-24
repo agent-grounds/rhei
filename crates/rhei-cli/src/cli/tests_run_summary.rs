@@ -45,6 +45,7 @@
             initial_states: HashMap::new(),
             dry_run: false,
             interrupted: false,
+            stop: None,
         }
     }
 
@@ -541,4 +542,84 @@ transitions:
         // The spawned agent row and the synthesized callback advance both appear.
         assert!(md.contains("| 1 | build | review | agent |"), "{md}");
         assert!(md.contains("| 1 | review | completed | callback-only |"), "{md}");
+    }
+
+    fn idle_stop(blocker: rhei_tui::IdleBlocker, next: Option<&str>) -> rhei_tui::RunStop {
+        rhei_tui::RunStop {
+            reason: rhei_tui::StopReason::Idle,
+            idle_blocker: Some(blocker),
+            next_attempt_at: next.map(str::to_string),
+            exit_code: 3,
+        }
+    }
+
+    fn gate_row() -> TaskRow {
+        TaskRow {
+            depth: 0,
+            id: "1".to_string(),
+            state: "review".to_string(),
+            marker: Marker::Gate,
+            detail: None,
+        }
+    }
+
+    fn attention_row() -> AttentionRow {
+        AttentionRow {
+            id: "2".to_string(),
+            state: "build".to_string(),
+            reason: "stalled".to_string(),
+            next: "inspect the logs".to_string(),
+            is_gate: false,
+            waits_on_person: false,
+            provider_limited: false,
+        }
+    }
+
+    /// The idle branch of the run's one-line outcome, and where it ranks.
+    ///
+    /// Each wait gets its own phrase, because "idle" alone tells an operator
+    /// nothing about whether to come back or to go and do something. The rank
+    /// is the half that matters more: one ticket whose blocker is actionable
+    /// defeats idle however many tickets wait beside it, and an interrupt
+    /// defeats both — so a real problem can never hide under a waiting result.
+    /// §FS-rhei-run-report.3.1 §FS-rhei-run.3
+    #[test]
+    fn the_idle_result_phrase_names_its_wait_and_ranks_below_attention() {
+        let rows = vec![gate_row()];
+        let phrase = |stop: &rhei_tui::RunStop| {
+            result_phrase(&[], &rows, true, false, false, Some(stop))
+        };
+        assert_eq!(
+            phrase(&idle_stop(rhei_tui::IdleBlocker::Gate, None)),
+            "idle \u{2014} waiting on a person"
+        );
+        assert_eq!(
+            phrase(&idle_stop(rhei_tui::IdleBlocker::Poll, Some("2030-01-01T00:00:00Z"))),
+            "idle \u{2014} retry at 2030-01-01T00:00:00Z"
+        );
+        assert_eq!(
+            phrase(&idle_stop(rhei_tui::IdleBlocker::ProviderLimit, None)),
+            "idle \u{2014} waiting on a provider limit"
+        );
+        assert_eq!(
+            phrase(&idle_stop(rhei_tui::IdleBlocker::Mixed, None)),
+            "idle \u{2014} mixed waits"
+        );
+
+        let idle = idle_stop(rhei_tui::IdleBlocker::Gate, None);
+        assert_eq!(
+            result_phrase(&[attention_row()], &rows, true, false, false, Some(&idle)),
+            "stopped for human attention",
+            "one actionable ticket defeats idle however many wait beside it"
+        );
+        assert_eq!(
+            result_phrase(&[], &rows, true, false, true, Some(&idle)),
+            "interrupted \u{2014} re-run to continue",
+            "and an interrupt defeats both"
+        );
+        assert_eq!(
+            result_phrase(&[], &rows, true, false, false, None),
+            "finished",
+            "an unselected run reaches none of this"
+        );
     }

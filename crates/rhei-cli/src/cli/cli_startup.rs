@@ -29,6 +29,23 @@ fn install_diagnostic_handler() {
     }));
 }
 
+/// Whether a parse failure is the one refusal that has a better answer than
+/// "these two cannot be used together": `--until-idle` beside an explicit
+/// `--tui`.
+///
+/// Matched on the rendered refusal rather than on the argument ids, because
+/// clap exposes the pair it refused only in the message. `--headless` is
+/// excluded by name: that pair is refused for a different reason and `--no-tui`
+/// is no answer to it.
+// §FS-rhei-run-tui.1.4
+fn refuses_until_idle_beside_tui(err: &clap::Error) -> bool {
+    if err.kind() != ErrorKind::ArgumentConflict {
+        return false;
+    }
+    let rendered = err.render().to_string();
+    rendered.contains("--until-idle") && !rendered.contains("--headless")
+}
+
 /// True when `rhei` was invoked with no arguments at all.
 ///
 /// Distinguishes the orientation case from a subcommand-level usage error;
@@ -41,6 +58,32 @@ fn is_bare_invocation() -> bool {
 /// closed early: `128 + SIGPIPE`, the same value the shell reports for
 /// `yes | head`.
 const EXIT_BROKEN_PIPE: i32 = 141;
+
+/// The run did the available work and returned because everything left is
+/// deliberately waiting. Produced only when `--until-idle` is selected, and
+/// allocated once here beside the other statuses this CLI owns: nothing else
+/// in `3..=99` is allocated anywhere in it, and this is the one thing about
+/// the option that cannot be changed after release without breaking every
+/// caller keyed on it.
+// §FS-rhei-run-json.5
+const EXIT_IDLE: i32 = 3;
+
+/// Whether the run that just finished returned idle.
+///
+/// The exit code is knowable only on the way out — after every guard has run
+/// and the report is written — and a run that returned idle returns `Ok`,
+/// because nothing about it failed. So it is recorded here and read on the
+/// exit path, the same shape the interruption status already uses.
+// §FS-rhei-run.3 §FS-rhei-run-json.5
+static IDLE_RETURN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn request_idle_exit() {
+    IDLE_RETURN.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+fn idle_exit_code() -> Option<i32> {
+    IDLE_RETURN.load(std::sync::atomic::Ordering::SeqCst).then_some(EXIT_IDLE)
+}
 
 /// Leave quietly when there is no longer anywhere to print, instead of
 /// surfacing an internal error.
@@ -270,6 +313,17 @@ fn run_on_cli_stack() {
             println!();
             return;
         }
+        // Declared on the flags, so it fires before any lock, descriptor,
+        // journal or event log exists. What clap cannot say is the alternative
+        // that works. §FS-rhei-run-tui.1.4
+        Err(err) if refuses_until_idle_beside_tui(&err) => {
+            let _ = err.print();
+            eprintln!(
+                "  tip: --until-idle implies line output; pass --no-tui, or drop --tui and let \
+                 it choose."
+            );
+            std::process::exit(err.exit_code());
+        }
         Err(err) => err.exit(),
     };
 
@@ -292,6 +346,12 @@ fn run_on_cli_stack() {
     // written: `128 + signal` is what a shell reports for a process the signal
     // killed, and `rhei run` was asked to stop by one. §FS-rhei-run.3.2
     if let Some(code) = interrupt_exit_code() {
+        finalize_run_descriptor(code);
+        std::process::exit(code);
+    }
+    // Below the signal, because an interrupt outranks every other outcome, and
+    // above the plain success it is a split of. §FS-rhei-run.3
+    if let Some(code) = idle_exit_code() {
         finalize_run_descriptor(code);
         std::process::exit(code);
     }

@@ -9,6 +9,7 @@ mod event_log;
 mod frontend;
 mod journal;
 mod json;
+mod run_stop;
 mod stdout;
 mod tui;
 
@@ -25,5 +26,6 @@ pub use event_log::{event_log_path, EventLogReader, EventLogSink};
 pub use frontend::{select_frontend, Frontend, FrontendKind};
 pub use journal::JournalSink;
 pub use json::JsonSink;
+pub use run_stop::{IdleBlocker, RunStop, StopReason};
 pub use stdout::StdoutSink;
 pub use tui::{StopRequested, TuiContext, TuiSink};

@@ -63,6 +63,11 @@ pub struct RunSummary {
     /// other event on the channel.
     // §FS-rhei-cost-accounting.6
     pub workspace_accounting: Option<Box<AccountingRunSummary>>,
+    /// Why the run stopped, present exactly when `--until-idle` was selected.
+    /// An unselected run leaves it `None` and its stream is byte-identical to
+    /// the one it emitted before this field existed.
+    // §FS-rhei-run-json.2.1
+    pub stop: Option<crate::rhei_tui::run_stop::RunStop>,
 }
 
 /// Severity of an engine log message.

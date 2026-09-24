@@ -176,16 +176,21 @@ fn run_callback_mode(
                     interruptible_sleep(Duration::from_millis(500));
                     continue;
                 }
-                if let Some(deadline) =
-                    earliest_pending_poll_deadline(&loaded.rhei, &machines.set, &rhei_scope)
-                {
-                    let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
-                    run_info!(
-                        "No ready tasks; sleeping {}s until the next poll attempt.",
-                        sleep_secs
-                    );
-                    interruptible_sleep(Duration::from_secs(sleep_secs));
-                    continue;
+                // Selected, the checkpoint just above is the last one there
+                // is: the run returns here instead of sleeping.
+                // §FS-rhei-run.3 §FS-rhei-run.5.1
+                if !opts.until_idle() {
+                    if let Some(deadline) =
+                        earliest_pending_poll_deadline(&loaded.rhei, &machines.set, &rhei_scope)
+                    {
+                        let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
+                        run_info!(
+                            "No ready tasks; sleeping {}s until the next poll attempt.",
+                            sleep_secs
+                        );
+                        interruptible_sleep(Duration::from_secs(sleep_secs));
+                        continue;
+                    }
                 }
             }
             // Nothing schedulable and nothing advanced: without this the loop
@@ -378,8 +383,39 @@ fn run_callback_mode(
     // finished screen — did not cut this loop short. §FS-rhei-run.3.2
     let interrupted_run = interrupted_by_signal();
 
+    // The stopping decision, read once and shared by every surface of this
+    // run; a preview predicts it only when its own scan found nothing
+    // schedulable. §FS-rhei-run.3 §FS-rhei-run.4
+    let stopped = opts.until_idle().then(|| load_plan(input)).transpose()?;
+    let idle = stopped
+        .as_ref()
+        .filter(|_| !interrupted_run && (!opts.dry_run() || pass == 0))
+        .and_then(|loaded| {
+            idle_return(&loaded.rhei, &live.machines.set, &live.settings, opts, &rhei_scope)
+        });
+    if idle.is_some() {
+        request_idle_exit();
+    }
+    // One payload for every outcome a selected run can reach, so the split it
+    // asked for is reported whether or not it landed on the new half.
+    // §FS-rhei-run-json.2.1
+    let stop = stopped.as_ref().and_then(|loaded| {
+        run_stop_payload(
+            &loaded.rhei,
+            &live.machines.set,
+            opts,
+            &rhei_scope,
+            idle.as_ref(),
+            interrupted_run,
+        )
+    });
+
     let (terminal_count, total_tasks) = if opts.dry_run() {
         run_info!("\nDry run complete \u{2014} no changes were made.");
+        if let Some((idle, loaded)) = idle.as_ref().zip(stopped.as_ref()) {
+            let terminal = terminal_task_count(&loaded.rhei, &live.machines.set);
+            run_info!("{}", idle_console_line(idle, terminal, total_task_count(&loaded.rhei)));
+        }
         if !manual_only_dry_run.is_empty() {
             return Err(manual_only_dry_run_error(&manual_only_dry_run));
         }
@@ -389,6 +425,16 @@ fn run_callback_mode(
             return Err(dry_run_halt_error());
         }
         (0usize, 0usize)
+    } else if let Some((idle, loaded)) = idle.as_ref().zip(stopped.as_ref()) {
+        // Idle is its own outcome, so it replaces the `Run complete:` line
+        // rather than qualifying it. §FS-rhei-run-report.3.1
+        let terminal_count = terminal_task_count(&loaded.rhei, &live.machines.set);
+        let total_tasks = total_task_count(&loaded.rhei);
+        run_info!("{}", idle_console_line(idle, terminal_count, total_tasks));
+        for line in final_state_lines(&loaded.rhei) {
+            run_info!("{}", line);
+        }
+        (terminal_count, total_tasks)
     } else if transitions_made == 0 {
         let loaded = load_plan(input)?;
         run_info!(
@@ -433,6 +479,7 @@ fn run_callback_mode(
             total_tasks,
             accounting: None,
             workspace_accounting: None,
+            stop: stop.clone(),
         },
     });
     frontend.write_frozen_dashboard();
@@ -467,6 +514,7 @@ fn run_callback_mode(
             initial_states,
             dry_run: opts.dry_run(),
             interrupted: interrupted_run,
+            stop,
         },
     );
     report_guard.disarm();

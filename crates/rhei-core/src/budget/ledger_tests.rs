@@ -38,8 +38,10 @@ fn a_witness_without_a_journal_refuses_and_names_both_paths() {
     assert_eq!(refused.reason_code, "untrustworthy_ledger");
     let journal = case.journal_path().display().to_string();
     let witness = case.witness_path().display().to_string();
-    assert!(refused.message.contains(&journal), "names the journal: {}", refused.message);
-    assert!(refused.message.contains(&witness), "names the witness: {}", refused.message);
+    // Both spellings quoted, not just the one the product printed: when these
+    // two disagree the difference is the whole finding. §REQ-cross-platform.5
+    assert!(refused.message.contains(&journal), "names the journal {journal}: {}", refused.message);
+    assert!(refused.message.contains(&witness), "names the witness {witness}: {}", refused.message);
     assert!(refused.message.contains("copying the witness back"), "{}", refused.message);
 }
 
@@ -145,4 +147,34 @@ fn a_chain_whose_hashes_do_not_link_refuses() {
     let refused = case.account.open(false).expect_err("a broken link is refused");
 
     assert_eq!(refused.reason_code, "untrustworthy_ledger");
+}
+
+/// The guard of §FS-rhei-budgets.5.3 compares two resolved paths, so both have
+/// to be resolved the same way: a witness *inside* the account is refused, and
+/// one beside it is not. Resolving one of the two with a raw `canonicalize` and
+/// the other plainly makes this comparison stop matching on Windows, which
+/// silently admits the self-witnessing ledger the guard exists to refuse — so
+/// the refusal is pinned rather than reasoned about.
+/// §FS-rhei-budgets.5.3 §REQ-cross-platform.5
+#[test]
+fn a_witness_inside_the_account_is_refused_and_one_beside_it_is_not() {
+    let case = Case::new();
+    let uuid = case.account.uuid();
+
+    let inside = case.root().join(ACCOUNT_DIR).join("witness");
+    // `err()` rather than `expect_err`: a held lock is not `Debug`.
+    let refused = super::authority::Authority::lock_at(case.root(), &inside, uuid)
+        .err()
+        .expect("a chain verifying against itself verifies nothing");
+
+    assert!(
+        refused.message.contains("cannot live inside the account it witnesses"),
+        "{}",
+        refused.message
+    );
+
+    let beside = case.root().join("witness");
+    if let Err(error) = super::authority::Authority::lock_at(case.root(), &beside, uuid) {
+        panic!("a witness beside the account is one an operator may keep: {}", error.message);
+    }
 }

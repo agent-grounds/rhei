@@ -242,7 +242,7 @@ write(pathlib.Path(session_dir) / 'session.jsonl', '{"provider":"openai","model"
 /// account lives in — so the cheapest wrong implementation is one that reads a
 /// balance back out of a cache the project also writes. The table of
 /// §FS-rhei-budgets.11 says a snapshot creates none, and until now nothing
-/// pinned that row: the other three seams it names each have a case above.
+/// pinned that row: the other four seams it names each have a case above.
 // §FS-rhei-budgets.11 §REQ-bounded-neural-work.4
 #[test]
 fn snapshotting_a_spent_project_creates_no_capacity() {

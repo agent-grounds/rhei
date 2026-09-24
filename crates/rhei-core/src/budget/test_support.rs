@@ -18,9 +18,21 @@ fn env_lock() -> &'static Mutex<()> {
 /// once per process: a second directory would be set in the environment and
 /// never read. The cases stay apart by account uuid instead, which is what keys
 /// a witness anyway. §FS-rhei-budgets.5.3
+///
+/// In the canonical spelling, because this path is compared against one a
+/// refusal printed and `tempfile` hands back whatever the host's `TMP` says:
+/// on a Windows runner that is the 8.3 `RUNNER~1` form, which `canonicalize`
+/// expands. Pre-resolving it here is what `tests_prompt_templates`'
+/// `canonical_tempdir` does for the same reason. §REQ-cross-platform.5
 fn witness_home() -> &'static Path {
-    static HOME: OnceLock<tempfile::TempDir> = OnceLock::new();
-    HOME.get_or_init(|| tempfile::tempdir().expect("witness home")).path()
+    static HOME: OnceLock<(tempfile::TempDir, PathBuf)> = OnceLock::new();
+    let (_dir, resolved) = HOME.get_or_init(|| {
+        let dir = tempfile::tempdir().expect("witness home");
+        let resolved =
+            crate::platform::canonical_path(dir.path()).expect("resolve the witness home");
+        (dir, resolved)
+    });
+    resolved
 }
 
 /// A project root, its witness directory, and the environment that points one

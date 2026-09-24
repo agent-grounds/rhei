@@ -609,7 +609,7 @@ path = "docs/functional-spec/rhei-run.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 800, unit = "lines" }
+max_accepted = { value = 900, unit = "lines" }
 until = "a dedicated spec-decomposition change introduces stable child declarations and migrates every affected FS-rhei-run citation"
 reason = """
 The execution loop is still one normative declaration with heavily cited numbered sections; a child-declaration boundary and atomic citation-migration plan must exist before it can be split safely.

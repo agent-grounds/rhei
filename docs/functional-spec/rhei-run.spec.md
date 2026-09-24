@@ -24,6 +24,7 @@ Flags are grouped by concern:
 | `--parallel <N>`         | 1       | Maximum number of agents or programs to run concurrently (0 = unlimited)   |
 | `--prices <PATH>`        | profile or built-in | Override profile-derived and built-in pricing with a validated local price book and copy it into the run's accounting roots. Without the flag, selected profiles with authored rates produce a generated snapshot before execution; otherwise built-in pricing is unchanged. See [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection). |
 | `--rhei <RHEI_ID>`       | all     | Narrow this run to the named rheis (repeatable). See §2.5.                  |
+| `--until-idle`           | false   | Run the available work, then return when every open task is waiting on a person or a future deadline, instead of sleeping for it. Exits `3` and reports the earliest next attempt. Implies plain output; conflicts with `--tui` and `--headless`. See §3 step 9 and §5.1. |
 | `--tui`                  | auto    | Force TUI mode even when stdout is not detected as a TTY                   |
 | `--no-tui`               | auto    | Force plain stdout output even when stdout is a TTY                        |
 | `--json`                 | false   | Emit the run as a JSONL event stream on stdout. See [Run JSON Stream](rhei-run-json.spec.md) |
@@ -408,6 +409,49 @@ headless, and JSONL surfaces; no new output record family is introduced.
    [Complete Command — Result File](rhei-complete.spec.md#3-result-file).
 9. Repeat until no pass makes progress. Exit `0` when the plan reaches a state where every task is terminal. Exit non-zero when progress halts with non-terminal tasks remaining and no further advancement is possible.
 
+   **With `--until-idle`, this step has a third outcome.** Where a continuous
+   run with nothing ready would consult the earliest effective deadline and
+   sleep (§5.1), a selected run performs the same final live-member admission
+   checkpoint and **returns idle** instead: nothing is ready, nothing is in
+   flight, and every in-scope non-terminal task is *idle-compatible*. It exits
+   `3`, names the dominant kind of wait, and reports the earliest instant at
+   which a next invocation could find work
+   ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout), [§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)). Nothing else changes: the
+   option drains rather than making one scan — newly ready dependents and
+   already-due retries run, parallel slots refill, and an in-flight worker is
+   never abandoned, because a sleep site is unreachable while one is running —
+   and the pass loop, the readiness rules, the admission checkpoint, and §3.2's
+   three reasons for ending early are untouched. A run that does not select the
+   option keeps every exit code and every byte of output it has today.
+
+   A non-terminal task is **idle-compatible** exactly when the single blocker
+   the plan-wide classification of [§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout) selects for it
+   resumes by a mechanism the plan already declares — a deadline that elapses
+   on its own, or a decision the contract is already waiting on a person to
+   make — with nothing for an operator to repair in the plan, the workspace, or
+   the environment. For the two structural entries at the head of that order,
+   an open descendant subtree and an unsatisfied `**Prior:**`, the predicate
+   follows the classified blocker at the other end. So a task that is both
+   gated and claimed classifies as gated and *is* idle-compatible, because
+   releasing the claim moves nothing while the gate holds; a task that is both
+   polled and claimed classifies as claimed and is not, because a claim really
+   does stop a poll from reaching its next attempt. Naming a new blocker kind
+   means giving it a rank in that same order, because that is where its
+   idle-compatibility is decided. Idle is a property of the whole in-scope
+   plan: one in-scope task whose classified blocker is actionable defeats it
+   however many tasks wait beside it, so a real problem never hides under a
+   waiting result, and an interrupt ([§FS-rhei-run.3.2](#32-interruption-and-process-ownership)) defeats both.
+   `--continue-on-error` governs how far independent work drains inside a pass
+   and never this precedence.
+
+   The stopping boundary is the final admission checkpoint, read against one
+   captured `now`. A deadline at or before that instant makes its task ready,
+   so the run takes another pass instead of stopping; a deadline after it is
+   reported even if it elapses before the caller reads the report. The reported
+   instant is a lower bound on when a next invocation could find work, never an
+   assertion about when the process stopped: *do not call before this; calling
+   after is always safe.*
+
    This is the **pass loop's** bound, and it is not the attempt budget of step
    5. The two answer different questions and neither substitutes for the other:
    the budget bounds how many times one visit to a state may be spawned, across
@@ -791,6 +835,17 @@ read as "nothing to do". The dry run exits non-zero whenever the remaining
 tickets need a human; gating states awaiting a decision are a deliberate pause
 and do not by themselves fail it.
 
+With `--until-idle`, a dry run predicts the idle outcome the same way: **when
+its own scan finds nothing schedulable**, it reports the category, the exit
+code, the stop reason and the instant a real selected run would report, through
+the no-work classification block above and, under `--json`, through
+`run_finished` ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)) — no new console line, no dry-run-only
+line, and no new record kind. When the scan finds schedulable work it lists
+that work and predicts **nothing** about the eventual stop, because the
+deadlines that work would create do not exist yet. A dry run still creates no
+descriptor, report, journal or event log, and a dry run without the option
+keeps its existing contract.
+
 ## 5. Parallel Execution
 
 With `--parallel N`, up to `N` subprocesses run concurrently. The orchestrator:
@@ -831,9 +886,30 @@ If, at the end of a pass, every remaining non-terminal task is either in a gatin
 Provider-limit waits join this same deadline scan. For one task, eligibility is
 the later of its applicable poll deadline and provider-limit deadline. The run
 sleeps until the earliest such effective eligibility deadline among all
-waiting tasks, bounded below by 1 s, and does not emit `run_finished` merely
-because all remaining work is provider-limited. Poll attempt counters,
-self-loop selection, and exhaustion are unchanged.
+waiting tasks, bounded below by 1 s, and **in the continuous mode** does not
+emit `run_finished` merely because all remaining work is provider-limited —
+under `--until-idle` that is precisely when it does (§3 step 9). Poll attempt
+counters, self-loop selection, and exhaustion are unchanged.
+
+**The sleep is the continuous mode's.** With `--until-idle`, each site that
+would sleep here returns idle instead, and the deadline scan becomes the
+reported **earliest effective next attempt** rather than a sleep duration.
+Composition is unchanged and must not diverge from it — the *later* of a task's
+applicable poll and provider-limit deadlines, then the *earliest* such instant
+across waiting tasks, published as an RFC 3339 UTC instant. One filter is added
+for the reported value, and it is the whole difference between a schedule hint
+and a published contract: a task contributes only when its deadline **alone**
+makes it eligible for *this* invocation, under the `--rhei` scope it was given
+and with no change to the command line. A future poll behind a gated
+`**Prior:**` contributes nothing though it is still idle-compatible, and a
+deadline on work outside the candidate scope contributes nothing either,
+because expiry cannot make that prior a candidate and the scoped caller would
+be woken for work this command cannot run. When no task contributes, the value
+is **present and null** — never omitted and never a synthesized far-future
+placeholder: null says this plan has no timed retry, absent says this build did
+not tell you, and only the first is a fact about the plan. The text and report
+surfaces say instead that no timed retry is available, and the stop reason
+names the wait.
 
 Once `stateVisits.<state-name>` reaches `poll.max_attempts`, the engine refuses to select a self-loop transition and picks the first matching non-self-loop instead. If no non-self-loop transition matches, the run halts that task with a "polling exhausted with no matching non-self-loop transition" error — `--continue-on-error` applies as with any other task failure. A non-self-loop exit at any attempt clears both `pollNextAttemptAt.<state-name>` and `stateVisits.<state-name>`.
 

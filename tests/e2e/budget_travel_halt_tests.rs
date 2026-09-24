@@ -100,3 +100,60 @@ fn reset_and_rerun_converges_on_the_travel_bound_instead_of_escaping_it() {
     );
     assert_halt_mentions(&after, "ticket travel");
 }
+
+/// A ticket whose identity write was lost adopts the binding the ledger already
+/// holds instead of being minted a second one.
+///
+/// The two writes of an admission are not one transaction: the reservation is
+/// appended to the journal and the uuid is written to the plan afterwards, so
+/// ENOSPC, a read-only mount, an OOM kill or power loss between them leaves
+/// travel charged against a uuid the plan does not carry. Minting on the next
+/// admission would hand the ticket a whole second `transition_limit` — the same
+/// "every fresh run starts the count again" this bound exists to close.
+// §FS-rhei-budgets.5.2 §FS-rhei-budgets.6.1
+#[test]
+fn a_lost_identity_write_converges_on_the_travel_bound_instead_of_doubling_it() {
+    let (dir, plan, machine) = setup("budget-travel-orphan", PING_PONG_MACHINE, FOUR_MOVES);
+
+    run_plan(&plan, &machine, None);
+    assert_spawn_count(&dir, 4, "the first run spends the ticket's whole travel bound");
+
+    strip_budget_identity(&plan);
+    let after = run_plan(&plan, &machine, None);
+
+    // `runtime/` survives, so the log still holds the first run's four spawns:
+    // eight is the doubling this pins against, four is convergence.
+    assert_spawn_count(&dir, 4, "the ledger's own binding is adopted, so nothing is bought back");
+    assert!(
+        !after.status.success(),
+        "a ticket that has spent its travel is halted again, whatever its plan still names"
+    );
+    assert_halt_mentions(&after, "ticket travel");
+}
+
+/// The same at the other writer. `budget_charge_applied_edge` appends its
+/// `identity` and `transition` receipts and only then hands the metadata back
+/// for the caller to write, so a lost write there leaves a travel unit
+/// *consumed* — nothing releases one — for an edge that was never applied. A
+/// manual move after that must meet the bound it already spent.
+// §FS-rhei-budgets.4.1 §FS-rhei-budgets.5.2
+#[test]
+fn a_manual_edge_after_a_lost_identity_write_meets_the_bound_it_already_spent() {
+    let (dir, plan, machine) = setup("budget-travel-orphan-edge", PING_PONG_MACHINE, FOUR_MOVES);
+
+    run_plan(&plan, &machine, None);
+    assert_spawn_count(&dir, 4, "the first run spends the ticket's whole travel bound");
+
+    strip_budget_identity(&plan);
+    let moved = run_at(
+        "transition",
+        &plan,
+        &machine,
+        None,
+        &["--task", "1", "--from", "work", "--to", "review", "--no-callbacks"],
+    );
+
+    assert!(!moved.status.success(), "a manual edge cannot be the door back to a fresh counter");
+    assert_halt_mentions(&moved, "ticket travel");
+    assert_task_state(&plan, &machine, "1", "work");
+}

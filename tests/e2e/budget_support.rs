@@ -324,3 +324,22 @@ fn frontmatter_span(plan: &str) -> Option<(usize, usize, usize)> {
     let close = start + plan[start..].find("\n---\n")?;
     Some((open, start, close + 5))
 }
+
+/// Remove the ticket's `budgetTicketId`, leaving the plan as a lost identity
+/// write leaves it: the journal holds the receipts and the document no longer
+/// names the uuid they were spent against. A hand-edit that deletes the key
+/// reaches the same state, and gets the same answer. §FS-rhei-budgets.5.2
+pub(super) fn strip_budget_identity(plan: &Path) {
+    let before = fs::read_to_string(plan).expect("read the plan");
+    let mut after = String::with_capacity(before.len());
+    for line in before.lines().filter(|line| !line.trim_start().starts_with("budgetTicketId:")) {
+        after.push_str(line);
+        after.push('\n');
+    }
+    assert_eq!(
+        before.lines().count(),
+        after.lines().count() + 1,
+        "the plan should carry exactly one budget identity to remove:\n{before}"
+    );
+    fs::write(plan, after).expect("write the plan without its budget identity");
+}

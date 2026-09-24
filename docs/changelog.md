@@ -13,7 +13,10 @@
   new field and no machine needs a new file. When a bound is spent the ticket
   stops exactly where it stands with its artifacts intact, the run carries on
   with other work, and it exits non-zero naming the bound, the numbers, and the
-  one thing that would raise it. (PR #315)
+  one thing that would raise it. A ticket's identity is resolved from the
+  project's own ledger where its plan does not carry one, so a lost or
+  hand-deleted `budgetTicketId` recovers the travel it already spent instead of
+  buying a second bound. (PR #315)
 
 - Add `rhei migrate export-priors` as the explicit recovery for plans laid
   before consumed-export producers had to be direct dependencies. Validate and

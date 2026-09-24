@@ -111,7 +111,11 @@ fn open_project_account(project_root: &Path, reason: &str) -> MietteResult<Optio
 /// written identity is exact, and a run refused at that admission leaves the
 /// authored plan byte-identical. §FS-rhei-budgets.6.1 §FS-rhei-budgets.8
 struct TicketIdentity {
-    uuid: String,
+    /// The uuid the plan itself carried, or `None` until the admission settles
+    /// one against the replayed ledger. Reading is not settling: the ledger
+    /// cannot be consulted before the journal is open, and the journal sits
+    /// below metadata in the lock order. §AR-neural-admission.3
+    uuid: Option<String>,
     /// The write a freshly minted identity owes the plan, withheld until the
     /// same transaction has spent something on the ticket. `None` when the plan
     /// already carried an identity, which is nothing left to write.
@@ -128,7 +132,7 @@ struct PendingIdentity {
     metadata_id: TaskId,
 }
 
-/// Read the ticket's identity, minting one it does not have without writing it.
+/// Read the ticket's identity, reporting its absence rather than inventing one.
 ///
 /// The metadata lock is taken here and held by the returned value until the
 /// admission it is for has decided, which is why the lock order puts metadata
@@ -148,15 +152,36 @@ fn ticket_budget_identity(
         .and_then(|task| task.get(yaml_key(BUDGET_TICKET_KEY)))
         .and_then(YamlValue::as_str)
     {
-        return Ok(TicketIdentity { uuid: existing.to_string(), pending: None });
+        return Ok(TicketIdentity { uuid: Some(existing.to_string()), pending: None });
     }
     let pending =
         PendingIdentity { lock, metadata_file: route.metadata_file, raw, on_disk, metadata_id };
-    Ok(TicketIdentity { uuid: uuid::Uuid::new_v4().to_string(), pending: Some(pending) })
+    Ok(TicketIdentity { uuid: None, pending: Some(pending) })
 }
 
 impl TicketIdentity {
-    /// Write a minted identity into the plan, under the lock still held from
+    /// Settle which uuid this admission weighs: the plan's own, else the one the
+    /// replayed ledger already binds to this source path and display id, else a
+    /// fresh mint.
+    ///
+    /// Minting is the last resort rather than the first move, because a ticket
+    /// whose plan write was lost after its receipts were appended has already
+    /// spent against a uuid the plan no longer names, and minting a second one
+    /// would hand it a second travel bound. §FS-rhei-budgets.6.1
+    fn settle(&mut self, journal: &Journal, display: &str) -> MietteResult<String> {
+        if let Some(uuid) = &self.uuid {
+            return Ok(uuid.clone());
+        }
+        let adopted = match self.pending.as_ref() {
+            Some(pending) => budget_result(journal.bound_ticket(display, &pending.metadata_file))?,
+            None => None,
+        };
+        let settled = adopted.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        self.uuid = Some(settled.clone());
+        Ok(settled)
+    }
+
+    /// Write a settled identity into the plan, under the lock still held from
     /// the read.
     ///
     /// Called only once the transaction that resolved it has spent something on
@@ -165,11 +190,13 @@ impl TicketIdentity {
     /// untouched. §FS-rhei-budgets.6.1
     fn commit(self) -> MietteResult<()> {
         let Some(pending) = self.pending else { return Ok(()) };
+        // Nothing was settled, so nothing was weighed and nothing spent.
+        let Some(uuid) = self.uuid else { return Ok(()) };
         let mut root = pending.on_disk.unwrap_or_default();
         let metadata_section = ensure_mapping(&mut root, yaml_key("metadata"));
         let tasks = ensure_mapping(metadata_section, yaml_key("tasks"));
         let task_entry = ensure_mapping(tasks, task_id_yaml_key(&pending.metadata_id));
-        task_entry.insert(yaml_key(BUDGET_TICKET_KEY), YamlValue::String(self.uuid));
+        task_entry.insert(yaml_key(BUDGET_TICKET_KEY), YamlValue::String(uuid));
         let rewritten = rewrite_frontmatter(&pending.raw, &root)?;
         write_file_atomic_locked(&pending.metadata_file, &rewritten, Some(&pending.lock))
     }
@@ -177,7 +204,12 @@ impl TicketIdentity {
 
 /// Whether the run that owns a reservation is gone, which is the proof of
 /// non-start: its execution-root lock can be acquired, so nothing holds it.
-/// §FS-rhei-budgets.6.2
+///
+/// Called from inside the held account, which reaches back up the lock order of
+/// §AR-neural-admission.3 and is permitted there for one reason: this is a
+/// `try_lock_exclusive` and never waits, so it can close no cycle. A blocking
+/// acquisition here would be the violation.
+/// §FS-rhei-budgets.6.2 §AR-neural-admission.3
 fn run_is_gone(execution_root: &str) -> bool {
     let lock_path = Path::new(execution_root).join(".rhei/run.lock");
     let Ok(file) = fs::OpenOptions::new().read(true).write(true).open(&lock_path) else {
@@ -213,9 +245,9 @@ fn budget_admit_spawn(
     let project_root = budget_project_root(workspace_root);
     let bounds = resolve_count_bounds(settings, node_transition_limit(machine, Some(task)));
     // Read under the metadata lock, which is held across the reserve below: a
-    // minted identity is written only where the reserve spent something, so a
+    // settled identity is written only where the reserve spent something, so a
     // refusal writes nothing. §AR-neural-admission.3 §FS-rhei-budgets.6.1
-    let identity = ticket_budget_identity(input, loaded, task_id_str)?;
+    let mut identity = ticket_budget_identity(input, loaded, task_id_str)?;
     let route = loaded.task_route(task_id_str, input);
     let Some(mut journal) = open_project_account(&project_root, "admit a neural start")? else {
         return Ok(BudgetAdmission::NotAccounted);
@@ -223,7 +255,9 @@ fn budget_admit_spawn(
     let account = budget_result(Account::locate(&project_root))?.ok_or_else(|| {
         miette!(help = budget_inspect_help(), "the account just established has no identity")
     })?;
-    let ticket = account.ticket_identity(&identity.uuid);
+    // Settled against the replayed ledger rather than at the read, so a plan
+    // that lost its key adopts the history it already spent. §FS-rhei-budgets.6.1
+    let ticket = account.ticket_identity(&identity.settle(&journal, task_id_str)?);
     let audit = budget_audit("admit a neural start")?;
     // A fanout arrives as several work items, so the ticket's one travel unit
     // goes to the first arm of a visit and later arms take an invocation unit

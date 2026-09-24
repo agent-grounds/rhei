@@ -291,6 +291,18 @@ live sources are tolerated only while their bytes agree. That is what makes a
 copied or moved ticket keep its travel, and what makes two documents claiming
 one identity with different content a conflict rather than a fork.
 
+The binding is also what a ticket carrying no identity is resolved *from*. A
+ticket whose document names no identity is not therefore a new ticket: the
+ledger is asked for a binding on this source path and display id first, and one
+is minted only where there is none. That closes the one door left open by the
+fact that a receipt and the document naming it are two writes rather than one —
+a document whose write was lost after its receipts were durable would otherwise
+be handed a second identity, and with it a second travel bound. Deleting
+`budgetTicketId` by hand is the same case and gets the same answer: the history
+comes back. The display id is part of the key, because one document holds every
+ticket of a rhei and a binding matched on the path alone would hand one ticket's
+travel to its sibling.
+
 ### 5.3. The witness
 
 A byte-identical copy of the committed receipts lives at
@@ -343,10 +355,15 @@ what it claims.
 Immediately before every neural spawn, one boundary performs one ordered,
 serialized transaction:
 
-1. resolve the project, the ticket identity, the ancestor reservation where
-   there is one, and every bound in force with its provenance ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from));
-2. lock and verify the account, replay it, and derive the current consumed and
-   outstanding amounts for the active contract ([§FS-rhei-budgets.3](rhei-budgets.spec.md#3-the-invocation-contracts));
+1. resolve the project, the ancestor reservation where there is one, and every
+   bound in force with its provenance ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)), and **read** the ticket's
+   identity from its document — reporting its absence rather than inventing one,
+   because nothing may be minted before the ledger has been asked;
+2. lock and verify the account, replay it, derive the current consumed and
+   outstanding amounts for the active contract ([§FS-rhei-budgets.3](rhei-budgets.spec.md#3-the-invocation-contracts)), and
+   **settle** the ticket identity against what was replayed: the document's own,
+   else the binding the ledger already holds for it ([§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal)), else a
+   fresh one;
 3. check one travel unit for the ticket and one invocation unit per arm against
    the effective bounds and against every ancestor envelope;
 4. append and durably sync one reservation carrying every unit, or refuse and
@@ -356,6 +373,12 @@ serialized transaction:
 One account held exclusively is what serializes competing processes, parallel
 arms, and nested runtimes. Two racing `rhei run` processes cannot both take the
 last unit.
+
+A settled identity is written into the document only by step 4 succeeding, under
+the document lock step 1 took and has held since. So the identity follows
+**spending**: an admission that refused leaves the authored document
+byte-identical, and a lost write is a recoverable state rather than a fresh
+history, because step 2 will find the binding again.
 
 ### 6.2. Reserve, then settle
 

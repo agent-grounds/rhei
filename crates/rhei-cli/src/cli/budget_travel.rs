@@ -45,29 +45,37 @@ fn budget_halt_text(refusal: &BudgetError, bounds: &CountBounds, journal: &Journ
 }
 
 /// The ticket's budget identity, taken from the plan metadata the caller is
-/// already holding, and minted into a copy of it when the ticket has none.
+/// already holding, and settled into a copy of it when the ticket has none.
 ///
 /// The transition path already holds this ticket's metadata lock, so the
 /// identity is folded into the update it is about to write rather than taken
 /// through a second lock — which is the same lock, and would be a deadlock.
 /// §AR-neural-admission.3
+///
+/// Where the plan carries no key the ledger is asked before anything is minted,
+/// because this writer appends its receipts and only then hands the metadata
+/// back: an edge whose plan write is lost has already consumed a travel unit,
+/// and a fresh uuid would give the ticket a second counter to spend it from.
+/// §FS-rhei-budgets.6.1
 fn budget_ticket_id_in_metadata(
+    journal: &Journal,
+    charge: &TransitionCharge<'_>,
     metadata: Option<&Metadata>,
-    metadata_key: &TaskId,
-) -> (Option<Metadata>, String) {
-    if let Some(existing) = task_metadata_map(metadata, metadata_key)
+) -> MietteResult<(Option<Metadata>, String)> {
+    if let Some(existing) = task_metadata_map(metadata, charge.metadata_key)
         .and_then(|task| task.get(yaml_key(BUDGET_TICKET_KEY)))
         .and_then(YamlValue::as_str)
     {
-        return (None, existing.to_string());
+        return Ok((None, existing.to_string()));
     }
-    let minted = uuid::Uuid::new_v4().to_string();
+    let settled = budget_result(journal.bound_ticket(charge.task_id_str, charge.metadata_file))?
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     let mut root = metadata.cloned().unwrap_or_default();
     let metadata_section = ensure_mapping(&mut root, yaml_key("metadata"));
     let tasks = ensure_mapping(metadata_section, yaml_key("tasks"));
-    let task_entry = ensure_mapping(tasks, task_id_yaml_key(metadata_key));
-    task_entry.insert(yaml_key(BUDGET_TICKET_KEY), YamlValue::String(minted.clone()));
-    (Some(root), minted)
+    let task_entry = ensure_mapping(tasks, task_id_yaml_key(charge.metadata_key));
+    task_entry.insert(yaml_key(BUDGET_TICKET_KEY), YamlValue::String(settled.clone()));
+    Ok((Some(root), settled))
 }
 
 /// What one applied edge needs to be charged, gathered where the transition
@@ -108,8 +116,6 @@ fn budget_charge_applied_edge(
     let Some(account) = budget_result(Account::locate(&project_root))? else {
         return Ok(None);
     };
-    let (minted, ticket_uuid) = budget_ticket_id_in_metadata(metadata, charge.metadata_key);
-    let ticket = account.ticket_identity(&ticket_uuid);
     let bounds =
         resolve_count_bounds(charge.settings, node_transition_limit(charge.machine, charge.task));
     // The unit admission is holding for this very edge, where the move came
@@ -118,7 +124,12 @@ fn budget_charge_applied_edge(
     let held =
         with_claims(|claims| claims.get_mut(charge.task_id_str).and_then(|c| c.travel.take()));
     let audit = budget_audit("apply an edge")?;
+    // The journal is opened before the identity is settled, because settling
+    // reads the replayed ledger. The lock order is unchanged: the caller's
+    // metadata lock is above this one either way. §AR-neural-admission.3
     let mut journal = budget_result(account.open(true))?;
+    let (settled, ticket_uuid) = budget_ticket_id_in_metadata(&journal, charge, metadata)?;
+    let ticket = account.ticket_identity(&ticket_uuid);
     let charged = (|| -> Result<(), BudgetError> {
         journal.bind_ticket(&ticket, charge.task_id_str, charge.metadata_file, &audit)?;
         journal.charge_travel(
@@ -134,7 +145,7 @@ fn budget_charge_applied_edge(
         )
     })();
     match charged {
-        Ok(()) => Ok(minted),
+        Ok(()) => Ok(settled),
         Err(refusal) => Err(miette!(
             help = budget_inspect_help(),
             "{}",

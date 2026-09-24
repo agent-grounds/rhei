@@ -284,3 +284,84 @@ fn a_claimless_supervisor_over_a_gated_child_is_still_idle() {
     assert_idle_line(&with, "gate", "none");
     assert_exit(&without, 0, "and the unselected run's exit is unchanged");
 }
+
+/// (24) The rung `fix-1` added, pinned in the direction it changed: a plan held
+/// entirely behind a gate-parked supervisor is a deliberate wait. The supervisor
+/// left its supervising state for a human gate, which keeps the block
+/// (§FS-rhei-supervision.3.1 rule 4), so there is no next visit to release the
+/// subtree and "the supervisor releases it on its next visit" stops being true
+/// — what holds the child is the gate at the other end of the hold.
+///
+/// This is the case that bites: delete the `awaiting_human` short-circuit from
+/// either walk and the held child falls through to its own rungs, where `work`
+/// names no wait at all, so the selected run exits `1` instead of `3` and the
+/// unselected one exits `1` instead of `0`. Round 2 established that nothing in
+/// the suite moved when both short-circuits were removed; this is that gap.
+// §FS-rhei-run.3 §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.1
+#[test]
+fn a_plan_held_behind_a_gate_parked_supervisor_is_idle() {
+    let body = "---\nmetadata:\n  tasks:\n    1:\n      supervision:\n        \
+                phase: held\n---\n\n## Tasks\n\n\
+                ### Task 1: A supervisor parked at a gate, still holding its subtree\n\
+                **State:** gate\n\n\
+                #### Task 1.1: Held, with work it could otherwise do\n**State:** work\n";
+    let selected = IdlePlan::new("until-idle-gate-parked-supervisor-selected", body);
+    let unselected = IdlePlan::new("until-idle-gate-parked-supervisor-unselected", body);
+
+    let with = selected.run(&["--until-idle", "--no-dashboard"]);
+    let without = unselected.run(&["--no-tui", "--no-dashboard"]);
+
+    assert_exit(
+        &with,
+        EXIT_IDLE,
+        "the gate at the other end of the hold is what the plan waits on",
+    );
+    assert_idle_line(&with, "gate", "none");
+    assert_exit(&without, 0, "and an unselected run ends quietly rather than halting");
+    assert!(
+        selected.records().is_empty(),
+        "nothing beneath a held supervisor is dispatched, so the child never ran"
+    );
+    assert_task_state(&selected.plan, &selected.machine, "1.1", "work");
+}
+
+/// (25) The other half of the same rung: a hold whose supervisor is still owed
+/// a visit is *not* a deliberate wait, because the visit it ends at is one the
+/// run itself still owes. `fix-1` left that reading alone deliberately, and
+/// this keeps it that way — make the hold rung unconditional and the plan
+/// becomes idle.
+///
+/// Read what it pins honestly. The exit is over-determined: the supervisor here
+/// is claimed, which is also what keeps it from being dispatched, and case (22)
+/// already makes a claimed supervisor non-idle on its own. So this case pins the
+/// child's reading through the report rather than through the exit code — it is
+/// classified as held with a visit still coming, not as waiting on a person —
+/// and the exit is the outer invariant that must hold with it.
+// §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.4
+#[test]
+fn a_hold_whose_supervisor_is_still_owed_a_visit_keeps_its_exit() {
+    let body = "## Tasks\n\n### Task 1: A supervisor a worker still holds\n\
+                **State:** supervising\n**Assignee:** alice\n\n\
+                #### Task 1.1: Held, with work it could otherwise do\n**State:** work\n";
+    let selected = IdlePlan::new("until-idle-visit-owed-hold-selected", body);
+    let unselected = IdlePlan::new("until-idle-visit-owed-hold-unselected", body);
+
+    let with = selected.run(&["--until-idle", "--no-dashboard"]);
+    let without = unselected.run(&["--no-tui", "--no-dashboard"]);
+
+    assert_exit(&with, 1, "a hold that ends at a visit the run still owes is not a wait");
+    assert_exit(&without, 1, "and the unselected run's exit is unchanged");
+    let combined = format!("{}{}", with.stdout, with.stderr);
+    assert!(
+        !combined.contains("Run idle:"),
+        "nothing here is waiting on a person; got:\n{combined}"
+    );
+    assert!(
+        combined.contains("the supervisor releases it on its next visit"),
+        "the child is held with a visit still coming, not parked at a gate; got:\n{combined}"
+    );
+    assert!(
+        !combined.contains("still holds this subtree"),
+        "which is the gate-parked reading, and this supervisor is not at a gate; got:\n{combined}"
+    );
+}

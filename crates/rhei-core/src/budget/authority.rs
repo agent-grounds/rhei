@@ -36,8 +36,12 @@ impl Authority {
         if !base.is_absolute() {
             return Err(BudgetError::corrupt("budget authority directory must be absolute"));
         }
-        let root =
-            std::fs::canonicalize(root).map_err(|error| BudgetError::unreachable(root, &error))?;
+        // The plain spelling, as `account::canonical` already resolves the same
+        // root with: a verbatim path is a second spelling of one location, and
+        // two spellings of the project root inside one module make the guard
+        // below stop matching. §REQ-cross-platform.5
+        let root = crate::platform::canonical_path(root)
+            .map_err(|error| BudgetError::unreachable(root, &error))?;
         // Resolve existing ancestors before creating anything, so a symlink
         // pointing back at the account is seen for what it is.
         // §FS-rhei-budgets.5.3
@@ -185,10 +189,16 @@ pub(super) fn authority_base() -> Result<PathBuf> {
 /// same case as one that was never there, so this climbs again rather than
 /// reporting a path that is merely absent — a state directory Rhei is about to
 /// create is not a damaged account. §FS-rhei-budgets.5.3 §FS-rhei-budgets.5.4
+///
+/// The resolved prefix is the plain spelling, because this path is printed in
+/// the refusal of §FS-rhei-budgets.5.4 and joined against: a verbatim base
+/// rewrites the separators of every component pushed onto it, so the witness
+/// was reported in a spelling no other line of a run uses.
+/// §REQ-cross-platform.5
 fn resolve_existing(base: &Path) -> Result<PathBuf> {
     let mut ancestor = base;
     loop {
-        match std::fs::canonicalize(ancestor) {
+        match crate::platform::canonical_path(ancestor) {
             Ok(resolved) => {
                 let rest = base.strip_prefix(ancestor).map_err(BudgetError::corrupt)?;
                 return Ok(resolved.join(rest));

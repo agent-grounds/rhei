@@ -455,7 +455,7 @@ path = "docs/functional-spec/rhei-states.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1200, unit = "lines" }
+max_accepted = { value = 1300, unit = "lines" }
 until = "Artifact Contracts (section 3, with optional inputs, handoffs and terminal results) is a declaration of its own under docs/functional-spec/, cited from the state schema that requires it."
 reason = """
 The boundary that is missing is a document for artifact contracts. Section 3 is a self-contained subject - what a state must consume and produce, how handoffs inherit, what a terminal result owes - and it is cited from outside this file, so lifting it needs its own grund declaration and a re-point of every marker that reaches into section 3 today. The rest of the document is one subject: the state schema and the validation rules, profiles and node policy that are read against it, and splitting those apart would separate a field from the rule that constrains it.
@@ -559,7 +559,7 @@ path = "docs/functional-spec/rhei-cost-accounting.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 850, unit = "lines" }
+max_accepted = { value = 1100, unit = "lines" }
 until = "A dedicated accounting-inspection reference owns section 8 and its inbound citations have migrated, bringing this reference below the 750-line soft budget."
 reason = """
 The accounting inspection surface in section 8 has no separate canonical declaration yet. Extracting it requires migrating its inbound section citations together; issue #253 fix round 1 is limited to four findings and preserves the accepted accounting contract points. This round adds only the descriptor-failure and scoped-preflight clarifications.

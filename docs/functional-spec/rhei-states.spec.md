@@ -1279,6 +1279,7 @@ profiles:
   <profile-name>:
     initial: <state-name>        # starting state for any node using this profile
     allowed: [<state-name>, ...] # states any such node may ever hold
+    transition_limit: <int>      # optional: applied transitions a node of this profile may make
 ```
 
 ### 8.2. Per-profile validation
@@ -1296,6 +1297,12 @@ profiles:
   of [Validation Rules](#13-validation-rules) again at profile scope, so a
   profile whose only way out of an allowed state is a wildcard edge to a final
   state is rejected even when the full graph is sound.
+- `transition_limit`, when present, must be a positive integer. It is
+  **optional**: a profile that omits it resolves the settings chain, so every
+  node of every profile is bounded whether or not the machine's author thought
+  about it ([§FS-rhei-budgets.2.2](rhei-budgets.spec.md#22-transition_limit-on-a-profile)). A declared value above the machine's
+  ceiling is **not** a validation error — the node gets the machine's value and
+  the run reports both.
 
 ### Example
 

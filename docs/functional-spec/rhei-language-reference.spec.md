@@ -107,6 +107,13 @@ Language changes must preserve a single discoverable entry point:
   [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks);
   additions to `template.yaml` or `rhei instantiate` must also update
   [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification).
+- The count bounds a plan or a machine may author — `transition_limit` on a
+  `profiles` entry, and the `defaults.transition_limit`,
+  `defaults.invocations_per_day`, and `defaults.invocation_lifetime_max`
+  settings keys — together with the `rhei budget` commands that read and adjust
+  them, are owned by [§FS-rhei-budgets](rhei-budgets.spec.md#fs-rhei-budgets-bounded-ticket-travel-and-project-invocations). The `profiles` block that carries
+  the field is owned by [§FS-rhei-states.8](rhei-states.spec.md#8-profiles) and the `defaults` block by
+  [§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults); neither owns what the values bound.
 - New execution references that appear in authored files must identify their
   owner spec from this page.
 

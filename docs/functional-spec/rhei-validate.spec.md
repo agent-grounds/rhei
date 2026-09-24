@@ -95,7 +95,19 @@ pass `--state-machine`.
    The warning is advisory: it does not change plan validity, export
    resolution, readiness, or the filesystem a worker can read
    (§FS-rhei-plan-language.3.12).
-7. Exit non-zero when any validation error remains. Warnings do not make the
+7. Report each count bound in force as a **warning**, one line per dimension,
+   with its effective value, its value source, and — when the machine clamped a
+   higher request — the machine as the limiting source
+   ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued)). Every plan has all three bounds in force, so
+   every successful validation reports all three; a machine that has configured
+   nothing reports `built_in` three times. Asking for more than the machine
+   allows is **never** an error here — the report says the plan asked and the
+   machine limited, and validation still succeeds
+   ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)).
+
+   Validation resolves and reports these bounds; it never locks, appends, or
+   debits the account ([§FS-rhei-budgets.6.3](rhei-budgets.spec.md#63-what-never-debits)).
+8. Exit non-zero when any validation error remains. Warnings do not make the
    command fail.
 
 `rhei validate` does not acquire task locks, run callbacks, spawn agents,
@@ -228,10 +240,32 @@ warning: <diagnostic>
 ```
 
 For a graph with `**Consumes:**`, successful output is the success line followed
-by the exact advisory from §4 with the normal `warning: ` prefix. A graph
-without `**Consumes:**` retains the existing `Validation succeeded\n` output
-byte for byte. Existing warnings retain their wording and occur once at their
-existing trigger frequency.
+by the exact advisory from [§FS-rhei-validate.4](#4-behavior) with the normal `warning: ` prefix.
+Existing warnings retain their wording and occur once at their existing trigger
+frequency.
+
+Successful output always carries the three count-bound lines of §4 step 7, in
+dimension order, after the success line and before any conditional warning:
+
+```text
+Validation succeeded
+warning: transition_limit: 80 (built_in)
+warning: invocations_per_day: 200 (built_in)
+warning: invocation_lifetime_max: 6000 (built_in)
+```
+
+A clamped bound names both sources on its own line:
+
+```text
+warning: transition_limit: 100 (requested 500 by the plan, limited by machine settings)
+```
+
+These lines are unconditional, because every plan has all three bounds in force
+and a bound nobody can see before it is spent is not visible
+([§REQ-bounded-neural-work.5](../requirements/bounded-neural-work.spec.md#5-exhaustion-is-a-halt-where-the-ticket-stands)). They therefore replace the earlier promise
+that a graph without `**Consumes:**` emits `Validation succeeded\n` byte for
+byte: that sentence described the `**Consumes:**` advisory's blast radius and
+cannot survive a report that every plan gets.
 
 On a semantic validation failure, the diagnostic names the resolved
 state-machine sources that the validation pass used. When the pass used one

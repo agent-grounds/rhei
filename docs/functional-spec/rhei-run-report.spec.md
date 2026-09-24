@@ -248,6 +248,22 @@ the summary prints five stacked groups:
    person-waiting poll is a poll, and it already counted as deliberate waiting
    there while its backoff window was open.
 
+   A ticket halted by a spent count bound ([§FS-rhei-run.3.4](rhei-run.spec.md#34-bound-admission)) belongs in
+   **Attention**, not in Waiting: nothing resumes it by itself, and the remedy
+   is an operator's. Its blocker names the dimension and the effective bound
+   with its source, and its next action is the one remedy that raises the
+   limiter that stopped it — never an inner value the machine ceiling would
+   clamp ([§FS-rhei-budgets.8](rhei-budgets.spec.md#8-exhaustion)). A window-limited ticket is the one exception
+   that resumes itself, and its row says when: the renewal instant is the
+   blocker's deadline and `renews automatically` is the next action.
+
+   The durable report additionally records, in a `## Bounds` section after
+   `## Attention`, each count dimension's effective bound with its value source
+   and limiting source, and the consumed, outstanding and remaining amounts at
+   the start and at the end of the run. A run that halted on a bound names that
+   bound there as well as in Attention, so the record answers "what stopped it"
+   without the reader reconstructing it from rows.
+
    A task parked by a recognized provider limit (§FS-rhei-run.3.3) also
    belongs in **Waiting**, never **Attention**. Its row names `provider openai`,
    the reporting task, and the UTC `nextAttemptAt`, with automatic resumption as

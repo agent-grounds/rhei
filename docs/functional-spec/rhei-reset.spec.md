@@ -1,6 +1,14 @@
 # FS-rhei-reset: `rhei reset`
 
-Return every task in a plan to the state it was **authored** in and remove runtime output. This is the inverse of a forward run: it restores the plan to a clean, pre-execution state so the same plan can be re-executed from scratch.
+Return every task in a plan to the state it was **authored** in and remove runtime output. This is the inverse of a forward run for *authored state*: it restores the plan to a clean, pre-execution state so the same plan can be re-executed.
+
+It is **not** the inverse of a forward run for *capacity*. Reset returns no
+ticket travel and no project invocations: both are bounded over the lifetime of
+an identity rather than over one execution, and an inverse that returned them
+would make `rhei reset` the way to buy more ([§FS-rhei-budgets.4](rhei-budgets.spec.md#4-what-spends-a-count)).
+Reset-and-rerun therefore converges on the travel bound instead of escaping it.
+That is stated here, in the lead, because "re-executed from scratch" is what a
+reader takes away from this page and it is no longer true of everything.
 
 ## 1. Usage
 
@@ -72,6 +80,15 @@ Reset does **not**:
 - Modify the `# Rhei:` title, content sections, `**Prior:**` lines, or task descriptions.
 - Remove user-authored files outside of `runtime/`.
 - Alter the state machine or template source of the plan.
+- Touch the project's budget account. It lives at
+  `.agent-grounds/rhei/budgets/`, which is outside `runtime/` and outside every
+  deletion step 3 and step 4 enumerate ([§FS-rhei-budgets.5.1](rhei-budgets.spec.md#51-where-it-lives)).
+- Delete the ticket's `metadata.tasks.<id>.budgetTicketId`. Step 3 deletes
+  `stateVisits`, `providerLimits`, and the `supervision` block by name; the
+  budget identity is deliberately **not** in that list, because removing it
+  would hand the ticket a fresh travel history. It is also why a
+  `metadata.tasks.<id>` entry holding only that key is **not** removed as empty:
+  it is a record of something.
 
 Reset is project-wide by default. Because it destroys runtime state across
 every in-scope rhei, it reports its resolved scope and the affected rheis
@@ -99,6 +116,11 @@ subdirectory rhei:
   `runtime/accounting/tasks/<ticket-id>.json`
 - the ticket's lines in `runtime/state-transitions.log`, so a reset ticket's
   recorded history cannot claim a completion its plan no longer holds
+
+A narrowed reset removes **no budget receipts**, for the same reason: the
+account is per project, a receipt is not keyed by a ticket id, and a narrowing
+that could drop a ticket's travel would make `--rhei` the faucet
+([§FS-rhei-budgets.11](rhei-budgets.spec.md#11-what-does-not-change)).
 
 A forced transition's `!force-v1` metadata row and immediately adjacent
 movement row are one task-keyed record (§FS-rhei-complete.3.1). Narrowed reset

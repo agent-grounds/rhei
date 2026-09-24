@@ -80,6 +80,8 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `message` | Engine diagnostics | `level` (`info`/`warn`/`error`), `text` |
 | `link` | The run produced a URL or file link | `label`, `url` |
 | `agent_output` | A live agent output line (§2.3) | `slot`, `task`, `stream`, `line` |
+| `budget_snapshot` | Once before scheduling, and again after each receipt is durable | `bounds` (one entry per dimension: `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`) |
+| `budget_halt` | An admission was refused | `task`, `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `renews_at`, `remedy`, `reason_code` |
 | `run_finished` | Once, when the run loop ends (§2.4) | `summary` |
 
 `outcome` is one of `completed`, `failed`, `waiting`, `provider_limited`,
@@ -121,6 +123,16 @@ rollup and four more keys would read as more counts. This is an addition under
 including for the informational stderr notice a line frontend may print when
 the option suppresses a TUI that detection would have chosen, which never
 reaches this stream.
+
+`budget_snapshot` carries the bounds in force before any capacity is spent, so
+a reader that sees only the head of the stream still knows what the run is
+bounded by ([§FS-rhei-budgets.9](rhei-budgets.spec.md#9-visibility)). `budget_halt.remedy` is the single remedy
+that raises the limiter that actually stopped the work, and
+`budget_halt.renews_at` is present exactly when the window contract limited.
+`reason_code` is stable and machine-readable; the human text of the same halt is
+a `message` record at `error` level. Adding these records does not move the
+schema version ([§FS-rhei-run-json.2.2](#22-schema-version)): a reader that does not know them skips
+them like any other unrecognized `event`.
 
 `usage_reported.report` is `streamed` for a running total observed
 mid-invocation and `final` for the one report that follows the durable record;

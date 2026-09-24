@@ -295,6 +295,14 @@ snapshots, and the unified visualization. Distinct subtrees
 them from colliding, exactly as a standalone plan coexists its results and
 accounting in one `runtime/`.
 
+One durable thing is deliberately **not** per rhei and not under `runtime/`: the
+project's budget account, at `.agent-grounds/rhei/budgets/`
+([§FS-rhei-budgets.5.1](../functional-spec/rhei-budgets.spec.md#51-where-it-lives)). It is one account for the whole project, shared by
+every member rhei and every member added later. Per-rhei placement would let a
+project add a rhei to buy capacity, and placement under an execution root would
+let `rhei reset` return it; the rule above is about artifact and link
+resolution, which the account has neither of.
+
 Live admission extends the run's routing tables before eligibility: the new
 member receives its own execution root, result/log/snapshot paths, accounting
 root, and execution-root lock, while the project descriptor and event journal

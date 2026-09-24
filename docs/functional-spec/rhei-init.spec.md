@@ -113,7 +113,14 @@ entry) does not start committing runtime state:
 ```gitignore
 runtime/
 .rhei/cache/
+.agent-grounds/rhei/budgets/
 ```
+
+The budget account is machine state rather than authored content
+([§FS-rhei-budgets.5.1](rhei-budgets.spec.md#51-where-it-lives)), so it is seeded here alongside the other generated
+output. A project that commits it anyway still works: a clone that arrives on a
+machine with no witness for it is *adopted*, carrying its consumed counts with
+it ([§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted)).
 
 With `--here` only the generated-output entries are seeded, into the host's
 `.gitignore` — adopted plans are assumed to be content worth versioning.

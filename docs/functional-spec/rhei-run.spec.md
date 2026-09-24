@@ -79,8 +79,11 @@ and project-wide locking, but never become candidates in that run.
 
 - An id that names no rhei in the project is an error listing the available
   rhei ids.
-- Narrowing selects **candidate** tickets only; it never narrows where their
-  priors resolve. A candidate may still be blocked by a prior in a rhei outside
+- Narrowing selects **candidate** tickets only. It narrows neither where their
+  priors resolve nor the project's one invocation account: one account, one
+  balance, whatever the selection ([§FS-rhei-budgets.1](rhei-budgets.spec.md#1-the-two-counts)). A narrowing that
+  opened a second balance would make `--rhei` the faucet.
+  A candidate may still be blocked by a prior in a rhei outside
   the scope, and the no-work diagnostic names that prior as out of scope
   ([§FS-rhei-panta.6.1](rhei-panta.spec.md#61-readiness-and-rhei-next)).
 - Before spawning, `rhei run` reports its resolved scope and the rheis it will
@@ -769,6 +772,41 @@ Conformance tests for concurrent provider-limit parking observe every durable,
 state-qualified wait while the run remains live, then verify uncharged records
 and eventual resumption under a portable controlled delay. Finite test patience
 does not establish a provider-parking latency guarantee.
+
+### 3.4. Bound Admission
+
+Every spawn in step 3 passes one admission checkpoint first, at the existing
+pre-spawn point and before the subprocess is created
+([§FS-rhei-budgets.6.1](rhei-budgets.spec.md#61-the-transaction)). It checks one travel unit for the ticket and one
+invocation unit per arm against the bounds in force, reserves them durably, and
+only then lets the spawn proceed. Every spawn path enters here: retries, poll
+attempts, fanout arms, supervisor wake-ups, appended members, concurrent
+passes, and nested runs. `--continue-on-error` does not waive it.
+
+A **refused** admission takes the stall path of step 5 and adds nothing to it.
+No transition fires, no task result is written, no terminal outcome is invented,
+and the ticket stays exactly where it is with its earned artifacts intact. The
+pass stops working that ticket and continues with the others; the run exits
+non-zero under step 9 once a pass makes no progress, naming every ticket it
+stopped and why.
+
+The halt names the dimension, the effective bound with its value source and —
+when the machine clamped it — its limiting source, the consumed, outstanding
+and remaining amounts, the accounting mode, and exactly the one remedy that
+raises the limiter that actually stopped the work ([§FS-rhei-budgets.8](rhei-budgets.spec.md#8-exhaustion)). It
+never names an inner value the ceiling would clamp.
+
+This is a **fourth** distinct bound over the same spawns, and it answers a
+question none of the other three asks ([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-four-levels)): the
+timeout bounds one round, `attempts:` bounds one visit, the pass loop of step 9
+bounds *this* run, and admission bounds the ticket's whole life and the
+project's whole day. A run that ends because the pass loop made no progress and
+a run that ends because a bound is spent are reported as the different things
+they are.
+
+`rhei run --dry-run` ([§FS-rhei-run.4](#4-dry-run)) runs this checkpoint read-only: it reports
+each bound with its value, source, and what the predicted pass would cost, and
+debits nothing.
 
 ## 4. Dry Run
 

@@ -109,8 +109,8 @@ fn spawn_parallel_agent_work_item(
         return Ok(ParallelAgentSpawnOutcome::Skipped);
     }
     // The same bound at the same point: a worker pool that skipped it would
-    // be the exception that makes the count untrue.
-    // §FS-rhei-run.3.4 §FS-rhei-budgets.6.1
+    // be the exception that makes the count untrue. One arm at a time, which is
+    // the stated residual. §FS-rhei-run.3.4 §FS-rhei-budgets.6.1 §FS-rhei-budgets.4.2
     match budget_admit_spawn(
         input,
         &loaded,

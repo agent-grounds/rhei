@@ -28,15 +28,7 @@ impl Authority {
     /// `$HOME/.local/state` (or `%USERPROFILE%` on Windows).
     /// §FS-rhei-budgets.5.3
     pub(crate) fn lock(root: &Path, uuid: &str) -> Result<Self> {
-        let base = std::env::var_os("XDG_STATE_HOME")
-            .map(PathBuf::from)
-            .or_else(|| {
-                std::env::var_os("HOME")
-                    .or_else(|| std::env::var_os("USERPROFILE"))
-                    .map(|home| PathBuf::from(home).join(".local/state"))
-            })
-            .ok_or_else(|| BudgetError::corrupt("no external budget authority directory"))?;
-        Self::lock_at(root, &base, uuid)
+        Self::lock_at(root, &authority_base()?, uuid)
     }
 
     pub(crate) fn lock_at(root: &Path, base: &Path, uuid: &str) -> Result<Self> {
@@ -44,17 +36,12 @@ impl Authority {
         if !base.is_absolute() {
             return Err(BudgetError::corrupt("budget authority directory must be absolute"));
         }
-        let root = std::fs::canonicalize(root)?;
+        let root =
+            std::fs::canonicalize(root).map_err(|error| BudgetError::unreachable(root, &error))?;
         // Resolve existing ancestors before creating anything, so a symlink
         // pointing back at the account is seen for what it is.
         // §FS-rhei-budgets.5.3
-        let mut ancestor = base;
-        while !ancestor.exists() {
-            ancestor =
-                ancestor.parent().ok_or_else(|| BudgetError::corrupt("invalid authority path"))?;
-        }
-        let resolved = std::fs::canonicalize(ancestor)?
-            .join(base.strip_prefix(ancestor).map_err(BudgetError::corrupt)?);
+        let resolved = resolve_existing(base)?;
         // What a witness must not be is the *journal*: a chain verifying
         // against itself verifies nothing. Where an operator's state directory
         // sits is otherwise theirs. §FS-rhei-budgets.5.3 §REQ-bounded-neural-work.2
@@ -68,18 +55,20 @@ impl Authority {
         // directory is not capacity. §FS-rhei-budgets.5.4
         let dir = resolved.join("rhei/budget-authority").join(uuid);
         durable_directories(&dir)?;
+        let lock_path = dir.join("history.lock");
         let lock = OpenOptions::new()
             .create(true)
             .truncate(false)
             .read(true)
             .write(true)
-            .open(dir.join("history.lock"))?;
+            .open(&lock_path)
+            .map_err(|error| BudgetError::unreachable(&lock_path, &error))?;
         lock.lock_exclusive()?;
         let path = dir.join("history.jsonl");
         let bytes = match std::fs::read(&path) {
             Ok(bytes) => bytes,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-            Err(e) => return Err(e.into()),
+            Err(e) => return Err(BudgetError::unreachable(&path, &e)),
         };
         Ok(Self { _lock: lock, path, bytes, adopted: false })
     }
@@ -159,6 +148,60 @@ impl Authority {
     }
 }
 
+/// Where this process keeps its witnesses, resolved from the environment once.
+///
+/// Once, because the witness location is a property of the run rather than of
+/// the moment a spawn is admitted: a process that re-read the environment could
+/// write two different witnesses for one account, and one whose environment is
+/// rewritten underneath it — a test harness moving `HOME` in another thread —
+/// would decide where an unrelated account's witness lives. §FS-rhei-budgets.5.3
+/// Only a resolution that succeeded is remembered: an environment with neither
+/// variable set is a condition of the moment, and caching it would refuse every
+/// later admission of the process on the strength of one.
+pub(super) fn authority_base() -> Result<PathBuf> {
+    static BASE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+    if let Some(base) = BASE.get() {
+        return Ok(base.clone());
+    }
+    let resolved = std::env::var_os("XDG_STATE_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .or_else(|| std::env::var_os("USERPROFILE"))
+                .map(|home| PathBuf::from(home).join(".local/state"))
+        })
+        .ok_or_else(|| {
+            BudgetError::new(
+                "unreachable_budget_path",
+                "no external budget authority directory: set XDG_STATE_HOME or HOME",
+            )
+        })?;
+    Ok(BASE.get_or_init(|| resolved).clone())
+}
+
+/// Resolve the longest existing prefix of `base` and re-attach the rest.
+///
+/// A prefix that goes away between being tested for and being resolved is the
+/// same case as one that was never there, so this climbs again rather than
+/// reporting a path that is merely absent — a state directory Rhei is about to
+/// create is not a damaged account. §FS-rhei-budgets.5.3 §FS-rhei-budgets.5.4
+fn resolve_existing(base: &Path) -> Result<PathBuf> {
+    let mut ancestor = base;
+    loop {
+        match std::fs::canonicalize(ancestor) {
+            Ok(resolved) => {
+                let rest = base.strip_prefix(ancestor).map_err(BudgetError::corrupt)?;
+                return Ok(resolved.join(rest));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                ancestor =
+                    ancestor.parent().ok_or_else(|| BudgetError::unreachable(base, &error))?;
+            }
+            Err(error) => return Err(BudgetError::unreachable(ancestor, &error)),
+        }
+    }
+}
+
 /// Persist newly created ancestors as well as the leaf: a directory entry that
 /// is not synced is a directory that can vanish under a crash.
 /// §FS-rhei-budgets.5.1
@@ -171,7 +214,7 @@ pub(crate) fn durable_directories(path: &Path) -> Result<()> {
     match std::fs::create_dir(path) {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists && path.is_dir() => {}
-        Err(e) => return Err(e.into()),
+        Err(e) => return Err(BudgetError::unreachable(path, &e)),
     }
     sync_directory(path)?;
     sync_directory(parent)

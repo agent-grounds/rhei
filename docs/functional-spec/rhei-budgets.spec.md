@@ -224,9 +224,19 @@ refused admission.
 ### 4.2. Invocations
 
 One unit per **admitted neural start**: every first spawn, every retry, every
-neural poll attempt, and every arm of a fanout. A fanout is all-or-none — either
-every arm reserves its unit and the ticket reserves its travel unit, or no arm
-starts.
+neural poll attempt, and every arm of a fanout.
+
+**Residual: the run loop admits a fanout's arms individually.** The account
+supports the grouped, all-or-none form — either every arm reserves its unit and
+the ticket reserves its travel unit, or no arm starts — and that is what an
+account-level reservation of several arms does. The run loop does not yet use
+it: it admits one resolved invocation at a time, so a fanout that cannot afford
+every arm **starts the arms it can afford and refuses the rest**. The ticket
+then waits on its own state for the arms that did not start. Nothing is leaked
+and the visit is resumable: the first arm reserves the ticket's one travel unit,
+later arms take an invocation unit alone, an edge that was never applied
+releases the travel unit, and the next run that has capacity starts only the
+missing arms before the ticket advances.
 
 A retry costs **zero travel and one invocation**. A fresh visit refreshes
 `attempts:` and never the project account.
@@ -283,16 +293,23 @@ one identity with different content a conflict rather than a fork.
 
 ### 5.3. The witness
 
-A byte-identical copy of the committed receipts lives outside the project, at
+A byte-identical copy of the committed receipts lives at
 `$XDG_STATE_HOME/rhei/budget-authority/<uuid>/history.jsonl`, falling back to
 `$HOME/.local/state` (or `%USERPROFILE%\.local\state`). It is keyed by the
 project uuid and records every canonical root it has seen, so an absent project
 directory is still recognized.
 
+Where that directory is, is the operator's. The one place the witness may **not**
+be is inside the account it witnesses — a chain verifying against itself
+verifies nothing — and that is what Rhei refuses. It does not require the state
+directory to be outside the project.
+
 The witness is not a second spendable balance. It exists so that an accidentally
 lost tail is distinguishable from a fresh project: deleting the journal cannot
 recreate capacity. Deleting the journal **and** the witness is the stated
-residual of this design.
+residual of this design. Where an operator's state directory happens to sit
+under a project root, that residual narrows to one key: both copies are in the
+one tree, so removing the tree removes both.
 
 ### 5.4. Absent, damaged, adopted
 

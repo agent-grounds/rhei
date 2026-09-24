@@ -82,7 +82,7 @@ impl Account {
 }
 
 fn canonical(root: &Path) -> Result<PathBuf> {
-    crate::platform::canonical_path(root).map_err(BudgetError::from)
+    crate::platform::canonical_path(root).map_err(|error| BudgetError::unreachable(root, &error))
 }
 
 /// The single uuid-named directory under this root's `budgets/`, if any.
@@ -119,16 +119,11 @@ fn local_uuid(root: &Path) -> Result<Option<String>> {
 
 /// The witness index: every canonical root the witness directory has seen,
 /// with the account uuid it belongs to. §FS-rhei-budgets.5.3
+/// The same base the witness itself uses, resolved once for the process: an
+/// index written beside one state directory and read beside another would
+/// forget a root the witness remembers. §FS-rhei-budgets.5.3
 fn roots_index_path() -> Result<PathBuf> {
-    let base = std::env::var_os("XDG_STATE_HOME")
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME")
-                .or_else(|| std::env::var_os("USERPROFILE"))
-                .map(|home| PathBuf::from(home).join(".local/state"))
-        })
-        .ok_or_else(|| BudgetError::corrupt("no external budget authority directory"))?;
-    Ok(base.join("rhei/budget-authority/roots.json"))
+    Ok(super::authority::authority_base()?.join("rhei/budget-authority/roots.json"))
 }
 
 fn witnessed_roots() -> Result<BTreeMap<PathBuf, String>> {
@@ -136,7 +131,7 @@ fn witnessed_roots() -> Result<BTreeMap<PathBuf, String>> {
     match std::fs::read(&path) {
         Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(BTreeMap::new()),
-        Err(error) => Err(error.into()),
+        Err(error) => Err(BudgetError::unreachable(&path, &error)),
     }
 }
 
@@ -146,7 +141,8 @@ fn record_root(root: &Path, uuid: &str) -> Result<()> {
     let mut index = witnessed_roots()?;
     index.insert(root.to_path_buf(), uuid.to_string());
     let pending = path.with_extension(format!("{}.pending", uuid::Uuid::new_v4()));
-    std::fs::write(&pending, serde_json::to_vec_pretty(&index)?)?;
-    std::fs::rename(&pending, &path)?;
+    std::fs::write(&pending, serde_json::to_vec_pretty(&index)?)
+        .map_err(|error| BudgetError::unreachable(&pending, &error))?;
+    std::fs::rename(&pending, &path).map_err(|error| BudgetError::unreachable(&path, &error))?;
     Ok(())
 }

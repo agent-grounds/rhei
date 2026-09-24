@@ -196,6 +196,21 @@ impl BudgetError {
         Self::new("untrustworthy_ledger", format!("budget journal is untrustworthy: {message}"))
     }
 
+    /// A path this module needed and could not reach, which says nothing about
+    /// whether the account is sound.
+    ///
+    /// Separate from [`Self::corrupt`] because the two send an operator to
+    /// different places: `untrustworthy_ledger` means a chain failed to verify
+    /// and the witness is how it is restored, while this one means the file or
+    /// directory was not there — and so it names it, rather than blaming a
+    /// ledger that is fine. §FS-rhei-budgets.5.4
+    pub(crate) fn unreachable(path: &std::path::Path, error: &std::io::Error) -> Self {
+        Self::new(
+            "unreachable_budget_path",
+            format!("cannot reach the budget path {}: {error}", path.display()),
+        )
+    }
+
     /// Whether this refusal is a spent bound rather than a broken account.
     pub fn is_exhaustion(&self) -> bool {
         self.exhaustion.is_some()
@@ -210,9 +225,16 @@ impl std::fmt::Display for BudgetError {
 
 impl std::error::Error for BudgetError {}
 
+/// An io failure carries no path, so it cannot claim a particular ledger is
+/// damaged: it reports that the account could not be read or written, and the
+/// sites that do know the path say which one with
+/// [`BudgetError::unreachable`]. §FS-rhei-budgets.5.4
 impl From<std::io::Error> for BudgetError {
     fn from(error: std::io::Error) -> Self {
-        Self::corrupt(error)
+        Self::new(
+            "unreachable_budget_path",
+            format!("the project's budget account could not be read or written: {error}"),
+        )
     }
 }
 

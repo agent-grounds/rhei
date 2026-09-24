@@ -163,9 +163,9 @@ fn run_sequential_agent_invocation(
         progress.stalled_tasks.insert(task_id_str.clone());
         return Ok(());
     }
-    // The fourth bound over this spawn, checked before anything is composed
-    // or staged so a spawn the account cannot pay for costs nothing to
-    // decline. §FS-rhei-run.3.4 §FS-rhei-budgets.6.1
+    // The fourth bound over this spawn, checked before anything is composed or
+    // staged, so one it cannot pay for costs nothing to decline; per resolved
+    // invocation, which is the residual. §FS-rhei-run.3.4 §FS-rhei-budgets.6.1 §FS-rhei-budgets.4.2
     match budget_admit_spawn(
         input,
         &loaded,

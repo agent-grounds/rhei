@@ -258,10 +258,13 @@ metadata:
     let result = run_cli("run", &plan_path, &machine_path, &["--no-callbacks", "--no-tui"]);
     let combined = format!("{}{}", result.stdout, result.stderr);
     assert!(combined.contains("the visit released nothing"), "the visit is held; got:\n{combined}");
-    assert_eq!(
-        fs::read_to_string(&plan_path).expect("read plan"),
-        before,
-        "no transition fired, so the checkpoint and the visit count both stand"
+    // But for the ticket's budget identity: the visit spawned, so its admission
+    // reserved a unit against the project and the ticket earned one.
+    // §FS-rhei-budgets.6.1
+    super::budget_support::assert_plan_but_for_the_budget_identity(
+        &fs::read_to_string(&plan_path).expect("read plan"),
+        &before,
+        "no transition fired, so the checkpoint and the visit count both stand",
     );
 }
 

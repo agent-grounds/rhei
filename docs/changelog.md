@@ -33,12 +33,18 @@
   `run_finished.summary.stop`. A timer can drive a plan without holding a
   process. The option implies line output and is refused beside `--tui` or
   `--headless`. One judgment of "is this ticket deliberately waiting" answers
-  for both modes, so two readings it had wrong are corrected for the continuous
-  run as well: a ticket that is both polled and claimed is now classified by the
-  claim, so the run says `rhei release` instead of calling it a timed retry, and
-  a ticket held by a supervisor parked at a human gate is now classified by that
+  for both modes, so five readings it had wrong are corrected for the continuous
+  run as well. A ticket that is both polled and claimed is now classified by the
+  claim, so the run says `rhei release` instead of calling it a timed retry. A
+  ticket held by a supervisor parked at a human gate is now classified by that
   gate, so a plan waiting on nothing else ends as quietly as any other gated
-  one. (PR #316)
+  one. A supervisor is classified by its own gate and its own `**Assignee:**`
+  before its subtree, because it is ready while that subtree is open, so a
+  claimed supervisor now halts naming `rhei release` where it used to end
+  quietly on whatever waited beneath it. A plan whose only remaining work is a
+  recognized provider limit now ends quietly instead of halting. And a
+  continuous run no longer sleeps for a deadline whose expiry could release
+  nothing: it reaches the same halt without the wait. (PR #316)
 
 - **Generated block compositions now carry durable per-node provenance.** A
   canonical `.agent-grounds/rhei/composition.lock.json` traces every flattened

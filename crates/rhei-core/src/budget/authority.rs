@@ -31,15 +31,17 @@ impl Authority {
         Self::lock_at(root, &authority_base()?, uuid)
     }
 
+    /// Both paths are resolved to the plain spelling, and they have to be
+    /// resolved the same way: a verbatim path is a second spelling of one
+    /// location, so resolving the root one way and the witness base the other
+    /// leaves the guard below comparing two spellings that never match — which
+    /// admits the self-witnessing ledger it exists to refuse. `account::canonical`
+    /// already resolves this same root plainly. §REQ-cross-platform.5
     pub(crate) fn lock_at(root: &Path, base: &Path, uuid: &str) -> Result<Self> {
         super::types::uuid(uuid)?;
         if !base.is_absolute() {
             return Err(BudgetError::corrupt("budget authority directory must be absolute"));
         }
-        // The plain spelling, as `account::canonical` already resolves the same
-        // root with: a verbatim path is a second spelling of one location, and
-        // two spellings of the project root inside one module make the guard
-        // below stop matching. §REQ-cross-platform.5
         let root = crate::platform::canonical_path(root)
             .map_err(|error| BudgetError::unreachable(root, &error))?;
         // Resolve existing ancestors before creating anything, so a symlink

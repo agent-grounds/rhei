@@ -23,8 +23,23 @@ mod replay;
 mod types;
 mod window;
 
+#[cfg(test)]
+mod adjust_tests;
+#[cfg(test)]
+mod ancestry_tests;
+#[cfg(test)]
+mod ledger_tests;
+#[cfg(test)]
+mod nonstart_tests;
+#[cfg(test)]
+mod test_support;
+#[cfg(test)]
+mod travel_tests;
+#[cfg(test)]
+mod window_tests;
+
 pub use account::{Account, ACCOUNT_DIR};
-pub use admission::{AdmissionRequest, Arm, EffectiveBounds, ReservationGroup};
+pub use admission::{AdmissionRequest, AppliedEdge, Arm, EffectiveBounds, ReservationGroup};
 pub use bounds::{halt_text, Bound, BoundSource, Remedy};
 pub use events::{BudgetEvent, BudgetLine};
 pub use journal::{Audit, Journal, Receipt};

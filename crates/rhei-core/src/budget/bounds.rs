@@ -149,10 +149,9 @@ pub fn halt_text(spent: &Exhaustion, bound: &Bound, remedy: &Remedy) -> String {
             format!("error: ticket '{}' has spent its travel bound", spent.subject)
         }
         Dimension::Invocations => match spent.contract {
-            Contract::Window => format!(
-                "error: project '{}' has spent today's invocation capacity",
-                spent.subject
-            ),
+            Contract::Window => {
+                format!("error: project '{}' has spent today's invocation capacity", spent.subject)
+            }
             Contract::Lifetime { .. } => {
                 format!("error: project '{}' has spent its invocation allowance", spent.subject)
             }

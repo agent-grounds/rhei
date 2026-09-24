@@ -27,7 +27,7 @@ impl Authority {
     /// `$XDG_STATE_HOME/rhei/budget-authority/<uuid>/`, falling back to
     /// `$HOME/.local/state` (or `%USERPROFILE%` on Windows).
     /// §FS-rhei-budgets.5.3
-    pub(crate) fn lock(root: &Path, uuid: &str, create: bool) -> Result<Self> {
+    pub(crate) fn lock(root: &Path, uuid: &str) -> Result<Self> {
         let base = std::env::var_os("XDG_STATE_HOME")
             .map(PathBuf::from)
             .or_else(|| {
@@ -36,10 +36,10 @@ impl Authority {
                     .map(|home| PathBuf::from(home).join(".local/state"))
             })
             .ok_or_else(|| BudgetError::corrupt("no external budget authority directory"))?;
-        Self::lock_at(root, &base, uuid, create)
+        Self::lock_at(root, &base, uuid)
     }
 
-    pub(crate) fn lock_at(root: &Path, base: &Path, uuid: &str, create: bool) -> Result<Self> {
+    pub(crate) fn lock_at(root: &Path, base: &Path, uuid: &str) -> Result<Self> {
         super::types::uuid(uuid)?;
         if !base.is_absolute() {
             return Err(BudgetError::corrupt("budget authority directory must be absolute"));
@@ -58,12 +58,14 @@ impl Authority {
         if resolved.starts_with(&root) {
             return Err(BudgetError::corrupt("budget authority must live outside the project"));
         }
+        // The directory is created whatever the caller came for, because an
+        // **adopted** journal has to be able to write a witness this machine
+        // has never had. An empty directory is not capacity; its contents are.
+        // §FS-rhei-budgets.5.4
         let dir = resolved.join("rhei/budget-authority").join(uuid);
-        if create {
-            durable_directories(&dir)?;
-        }
+        durable_directories(&dir)?;
         let lock = OpenOptions::new()
-            .create(create)
+            .create(true)
             .truncate(false)
             .read(true)
             .write(true)
@@ -132,7 +134,7 @@ impl Authority {
         if self.bytes.is_empty() {
             return self.write_initial(line);
         }
-        let mut file = OpenOptions::new().append(true).write(true).open(&self.path)?;
+        let mut file = OpenOptions::new().append(true).open(&self.path)?;
         file.write_all(line)?;
         file.sync_all()?;
         sync_directory(self.path.parent().expect("authority has a parent"))?;

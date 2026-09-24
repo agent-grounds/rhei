@@ -78,6 +78,19 @@ pub struct Journal {
     pub(crate) day: String,
 }
 
+/// The path and the identity, never the chain: a debug print of a ledger is
+/// for saying *which* ledger, and the receipts are read through `receipts`.
+impl std::fmt::Debug for Journal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Journal")
+            .field("project_id", &self.project_id)
+            .field("path", &self.path)
+            .field("receipts", &self.receipts.len())
+            .field("day", &self.day)
+            .finish()
+    }
+}
+
 impl Journal {
     /// Open an account that already exists. Never initializes or repairs one.
     /// §FS-rhei-budgets.5.4
@@ -93,8 +106,12 @@ impl Journal {
         audit.validate()?;
         let mut ledger = Self::locked(root, project_uuid, true, true)?;
         if ledger.state.contract.is_none() {
-            ledger.append("initialize", json!({"contract": Contract::Window.to_json(),
-                "audit": audit}), audit)?;
+            ledger.append(
+                "initialize",
+                json!({"contract": Contract::Window.to_json(),
+                "audit": audit}),
+                audit,
+            )?;
             sync_directory(ledger.path.parent().expect("journal has a parent"))?;
         }
         Ok(ledger)
@@ -102,7 +119,7 @@ impl Journal {
 
     fn locked(root: &Path, project_uuid: &str, writable: bool, create: bool) -> Result<Self> {
         uuid(project_uuid)?;
-        let authority = super::authority::Authority::lock(root, project_uuid, create)?;
+        let authority = super::authority::Authority::lock(root, project_uuid)?;
         let dir = root.join(".agent-grounds/rhei/budgets").join(project_uuid);
         if create {
             super::authority::durable_directories(&dir)?;
@@ -324,19 +341,3 @@ pub(crate) fn sync_directory(path: &Path) -> Result<()> {
     let _ = path;
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "ledger_tests.rs"]
-mod ledger_tests;
-
-#[cfg(test)]
-#[path = "travel_tests.rs"]
-mod travel_tests;
-
-#[cfg(test)]
-#[path = "ancestry_tests.rs"]
-mod ancestry_tests;
-
-#[cfg(test)]
-#[path = "nonstart_tests.rs"]
-mod nonstart_tests;

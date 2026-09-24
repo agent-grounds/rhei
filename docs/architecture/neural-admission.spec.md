@@ -63,11 +63,18 @@ metadata sidecars (sorted)
 
 An ordinary admission needs only the last two. Assigning a ticket identity that
 does not exist yet additionally takes that ticket's metadata lock, which is why
-metadata sits above rather than below. Releasing an unstarted reservation
-([§FS-rhei-budgets.6.2](../functional-spec/rhei-budgets.spec.md#62-reserve-then-settle)) acquires the dead run's execution-root lock, and it does
-so *before* the authority and journal locks like any other caller — the proof of
-non-start is a lock acquisition, so it may not be attempted while holding the
-account.
+metadata sits above rather than below.
+
+Releasing an unstarted reservation ([§FS-rhei-budgets.6.2](../functional-spec/rhei-budgets.spec.md#62-reserve-then-settle)) is the one step that
+reaches *back up* this order: it acquires the dead run's execution-root lock
+while holding the authority and the journal. That is permitted, and it is
+permitted for one reason only — the proof of non-start is a **non-blocking
+try-acquisition**. It either succeeds at once or reports that something holds the
+lock, so it can close no cycle, and the ordinary direction (a live run holding
+its own execution-root lock and then blocking on the journal) stays exactly as
+declared. The alternative would be scanning reservations without holding the
+account, which races a concurrent reserve — a worse trade for a tidier order. A
+release step that ever *waited* on a lock below it would be the violation.
 
 One fanout group is one journal transaction: every arm is validated, every unit
 is reserved, the receipts are synced once, and only then do the launches

@@ -34,6 +34,39 @@ impl Journal {
         Ok(paths)
     }
 
+    /// The ticket uuid the ledger already binds to this source path and display
+    /// id, if it has one.
+    ///
+    /// This is what a caller asks before minting. A ticket whose plan write was
+    /// lost after its receipts were appended still has its binding here, so it
+    /// adopts the identity it already spent against instead of being handed a
+    /// fresh one — and with it a second travel bound. Stripping
+    /// `budgetTicketId` from a plan by hand therefore restores that history
+    /// rather than resetting it, which is the same answer [§FS-rhei-budgets.5.2](../../../../docs/functional-spec/rhei-budgets.spec.md)
+    /// gives a copied or moved ticket.
+    ///
+    /// The display id is part of the key rather than decoration: one metadata
+    /// file holds every task of a rhei, so a binding matched on the path alone
+    /// would hand one ticket's travel to its sibling.
+    pub fn bound_ticket(&self, display: &str, source: &Path) -> Result<Option<String>> {
+        let source = match std::fs::canonicalize(source) {
+            Ok(source) => source,
+            // Nothing can be bound to a path that is not there.
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error.into()),
+        };
+        let prefix = format!("ticket:{}:", self.project_id.trim_start_matches("panta:"));
+        for (ticket, binding) in &self.state.identities {
+            if binding["display_id"] != display || !sources(binding)?.contains(&source) {
+                continue;
+            }
+            if let Some(id) = ticket.strip_prefix(&prefix) {
+                return Ok(Some(id.to_string()));
+            }
+        }
+        Ok(None)
+    }
+
     /// Validate every identity, including ones absent from the selected root.
     /// §FS-rhei-budgets.5.2
     pub fn validate_identity_sources(&self) -> Result<()> {

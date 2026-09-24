@@ -406,6 +406,16 @@ pub struct Profile {
     pub initial: String,
     /// Complete set of state names that nodes bound to this profile may hold.
     pub allowed: Vec<String>,
+    /// Applied transitions a node of this profile may make over the lifetime of
+    /// its identity.
+    ///
+    /// Optional: a profile that omits it resolves the settings chain, so every
+    /// node of every profile is bounded whether or not the machine's author
+    /// thought about it. A value above the machine's ceiling is not a
+    /// validation error — the node gets the machine's value and the run reports
+    /// both. §FS-rhei-budgets.2.2 §FS-rhei-states.8.1
+    #[serde(default)]
+    pub transition_limit: Option<u64>,
 }
 
 /// Node-policy resolution: maps node type/level selectors to named profiles.

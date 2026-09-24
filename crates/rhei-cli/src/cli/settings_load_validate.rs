@@ -338,6 +338,9 @@ fn load_merged_roster(
             "agent_timeout",
             "program_timeout",
             "attempts",
+            "transition_limit",
+            "invocations_per_day",
+            "invocation_lifetime_max",
             "mcp_servers",
             "skills",
         ],
@@ -350,6 +353,9 @@ fn load_merged_roster(
         "agent_timeout",
         "program_timeout",
         "attempts",
+        "transition_limit",
+        "invocations_per_day",
+        "invocation_lifetime_max",
         "mcp_servers",
         "skills",
     ] {
@@ -357,6 +363,12 @@ fn load_merged_roster(
             provenance.defaults.insert(field.to_string(), RosterOrigin::Project);
         }
     }
+    // Read before the merge consumes `global.defaults`: this tier is the
+    // ceiling for the three count bounds, so being overridden by a more
+    // specific value must not be the same as being forgotten.
+    // §FS-rhei-budgets.2
+    let machine_bounds = CountBoundTier::of(&global.defaults);
+    let project_bounds = CountBoundTier::of(&project.defaults);
     let defaults = SettingsDefaults {
         model: if json_nested_field_present(project_raw, "defaults", "model") {
             project.defaults.model
@@ -387,6 +399,30 @@ fn load_merged_roster(
             project.defaults.attempts
         } else {
             global.defaults.attempts
+        },
+        transition_limit: if json_nested_field_present(project_raw, "defaults", "transition_limit")
+        {
+            project.defaults.transition_limit
+        } else {
+            global.defaults.transition_limit
+        },
+        invocations_per_day: if json_nested_field_present(
+            project_raw,
+            "defaults",
+            "invocations_per_day",
+        ) {
+            project.defaults.invocations_per_day
+        } else {
+            global.defaults.invocations_per_day
+        },
+        invocation_lifetime_max: if json_nested_field_present(
+            project_raw,
+            "defaults",
+            "invocation_lifetime_max",
+        ) {
+            project.defaults.invocation_lifetime_max
+        } else {
+            global.defaults.invocation_lifetime_max
         },
         mcp_servers: if json_nested_field_present(project_raw, "defaults", "mcp_servers") {
             project.defaults.mcp_servers
@@ -420,6 +456,8 @@ fn load_merged_roster(
             global.program_timeout
         },
         defaults,
+        machine_bounds,
+        project_bounds,
         agents,
         models,
         mcp_servers,

@@ -1148,8 +1148,34 @@ fn validate_command(input: &Path, state_machine: Option<&Path>, watch: bool) -> 
 /// Parse a plan, load the selected states, and print validation results.
 fn run_validation_once(input: &Path, state_machine: Option<&Path>) -> MietteResult<()> {
     let warnings = validation_warnings_or_error(input, state_machine)?;
-    print_validation_report(&warnings);
+    // Every plan has all three bounds in force, so every successful validation
+    // reports all three — before any conditional warning, because a bound
+    // nobody can see before it is spent is not visible. They resolve and
+    // report only: nothing here locks, appends, or debits.
+    // §FS-rhei-validate.4 §FS-rhei-budgets.6.3
+    let mut reported = validated_bound_lines(input, state_machine);
+    reported.extend(warnings);
+    print_validation_report(&reported);
     Ok(())
+}
+
+/// The three count-bound lines, in dimension order.
+///
+/// Resolution failures are silent here on purpose: validation has already
+/// succeeded, and a settings file this pass could not re-read is a diagnostic
+/// the pass itself owes rather than one to invent in the report.
+/// §FS-rhei-validate.4
+fn validated_bound_lines(input: &Path, state_machine: Option<&Path>) -> Vec<String> {
+    let workspace_root = execution_workspace_root(input);
+    let Ok(settings) = load_merged_settings(&workspace_root) else { return Vec::new() };
+    let declared = load_plan_for_validation(input)
+        .ok()
+        .and_then(|loaded| {
+            resolve_state_machines_for_loaded_plan(input, &loaded, state_machine).ok()
+        })
+        .map(|resolved| resolved.validator_set().default)
+        .and_then(|machine| node_transition_limit(&machine, None));
+    plan_count_bounds_with(&settings, declared).report_lines()
 }
 
 /// One whole validation pass, before anything decides what to do with it.

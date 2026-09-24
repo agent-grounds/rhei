@@ -11,6 +11,9 @@
 
 pub mod ast;
 pub mod blocks;
+/// The one serialized account beneath every neural start.
+/// §AR-neural-admission
+pub mod budget;
 pub mod callback;
 pub mod lexer;
 pub mod parser;

@@ -108,9 +108,8 @@ fn spawn_parallel_agent_work_item(
         );
         return Ok(ParallelAgentSpawnOutcome::Skipped);
     }
-    // The same fourth bound the sequential path checks, at the same point and
-    // for the same reason: every spawn path enters here, and a worker pool that
-    // skipped it would be the exception that makes the count untrue.
+    // The same bound at the same point: a worker pool that skipped it would
+    // be the exception that makes the count untrue.
     // §FS-rhei-run.3.4 §FS-rhei-budgets.6.1
     match budget_admit_spawn(
         input,

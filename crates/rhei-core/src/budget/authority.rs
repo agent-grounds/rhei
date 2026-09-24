@@ -55,21 +55,17 @@ impl Authority {
         }
         let resolved = std::fs::canonicalize(ancestor)?
             .join(base.strip_prefix(ancestor).map_err(BudgetError::corrupt)?);
-        // What a witness must not be is the *journal*. Where an operator's
-        // state directory happens to sit is theirs to decide, and refusing a
-        // machine whose `$XDG_STATE_HOME` is under some project would refuse
-        // work that runs today; a witness that had become the ledger it
-        // witnesses would be a chain verifying against itself.
-        // §FS-rhei-budgets.5.3 §REQ-bounded-neural-work.2
+        // What a witness must not be is the *journal*: a chain verifying
+        // against itself verifies nothing. Where an operator's state directory
+        // sits is otherwise theirs. §FS-rhei-budgets.5.3 §REQ-bounded-neural-work.2
         if resolved.starts_with(root.join(super::account::ACCOUNT_DIR)) {
             return Err(BudgetError::corrupt(
                 "the budget authority cannot live inside the account it witnesses",
             ));
         }
-        // The directory is created whatever the caller came for, because an
-        // **adopted** journal has to be able to write a witness this machine
-        // has never had. An empty directory is not capacity; its contents are.
-        // §FS-rhei-budgets.5.4
+        // Created whatever the caller came for: an adopted journal must be
+        // able to write a witness this machine never had, and an empty
+        // directory is not capacity. §FS-rhei-budgets.5.4
         let dir = resolved.join("rhei/budget-authority").join(uuid);
         durable_directories(&dir)?;
         let lock = OpenOptions::new()

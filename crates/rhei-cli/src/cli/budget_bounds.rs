@@ -55,10 +55,9 @@ fn resolve_count_bounds(settings: &RheiSettings, profile_limit: Option<u64>) -> 
             machine.transition_limit,
             requested(profile_limit, project.transition_limit),
         ),
-        // Neither of these is declarable on a plan: how many processes a
-        // project may start in a day is the machine's business and the
-        // project's, and a plan that could raise it would be raising the cap of
-        // whichever machine ran it. §FS-rhei-budgets.2.1
+        // Neither is declarable on a plan: a plan that could raise the day's
+        // starts would be raising the cap of whichever machine ran it.
+        // §FS-rhei-budgets.2.1
         per_day: Bound::resolve(
             "invocations_per_day",
             built_in::INVOCATIONS_PER_DAY,
@@ -95,11 +94,9 @@ fn node_transition_limit(
 /// case reports the built-in three, and a plan whose machine declares a profile
 /// limit reports that one. §FS-rhei-validate.4
 fn plan_count_bounds_with(settings: &RheiSettings, declared: Option<u64>) -> CountBounds {
-    // A plan with several profiles has several travel bounds; validation
-    // reports the one the plan's root node resolves, which is the number that
-    // answers "what bounds this plan" for every node that declares nothing. A
-    // node that declares its own is reported by the run that admits it, where
-    // the node is known. §FS-rhei-budgets.2.2
+    // Several profiles mean several travel bounds; validation reports the
+    // root node's, which is what bounds every node declaring nothing. A node
+    // with its own is reported by the run. §FS-rhei-budgets.2.2
     resolve_count_bounds(settings, declared)
 }
 
@@ -121,4 +118,21 @@ fn budget_project_root(workspace_root: &Path) -> PathBuf {
             _ => return workspace_root.to_path_buf(),
         }
     }
+}
+
+/// The three count-bound lines `rhei validate` reports, in dimension order.
+///
+/// Resolution failures are silent here on purpose: validation has already
+/// succeeded, and a settings file this pass could not re-read is a diagnostic
+/// the pass itself owes rather than one to invent in the report.
+/// §FS-rhei-validate.4
+fn validated_bound_lines(input: &Path, state_machine: Option<&Path>) -> Vec<String> {
+    let workspace_root = execution_workspace_root(input);
+    let Ok(settings) = load_merged_settings(&workspace_root) else { return Vec::new() };
+    let declared = load_plan_for_validation(input)
+        .ok()
+        .and_then(|loaded| resolve_state_machines_for_loaded_plan(input, &loaded, state_machine).ok())
+        .map(|resolved| resolved.validator_set().default)
+        .and_then(|machine| node_transition_limit(&machine, None));
+    plan_count_bounds_with(&settings, declared).report_lines()
 }

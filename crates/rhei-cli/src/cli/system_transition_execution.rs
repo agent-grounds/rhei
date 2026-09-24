@@ -728,9 +728,8 @@ fn execute_transition_with_origin(
         ));
     }
 
-    // The edge is charged before the state that records it is written, so a
-    // ticket at its bound is refused rather than moved and then told. A crash
-    // between the two over-counts by one, which is the conservative direction.
+    // Charged before the state that records it is written, so a ticket at its
+    // bound is refused rather than moved and then told.
     // §FS-rhei-budgets.4.1 §FS-rhei-budgets.1
     match budget_charge_applied_edge(
         &TransitionCharge {
@@ -740,10 +739,9 @@ fn execute_transition_with_origin(
             task: Some(&task_info.task),
             metadata_key: &metadata_key,
             metadata_file,
-            // The project-qualified id, which is what the run loop admitted
-            // this visit under and what the ledger line names. The local id
-            // next door names the ticket inside its own file and would find no
-            // claim to convert. §FS-rhei-panta.6
+            // The project-qualified id the run loop admitted this visit
+            // under; the local id next door would find no claim to convert.
+            // §FS-rhei-panta.6
             task_id_str: files.artifact_id,
             from,
             to,

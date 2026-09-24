@@ -326,11 +326,9 @@ fn spawn_and_wait_agent(
             cmd.env("RHEI_SNAPSHOT_PARENT_REF", parent_ref.to_string());
         }
     }
-    // The ancestry descriptor this invocation's own descendants draw on. It
-    // carries no credential, because there is nothing to credential: a nested
-    // `rhei run` charges the same account through the same locks, and the
-    // ledger is what decides whether the name it was given buys anything.
-    // §FS-rhei-budgets.7 §AR-neural-admission.6
+    // The ancestry descriptor this invocation's descendants draw on. No
+    // credential: a descendant charges the same account through the same
+    // locks. §FS-rhei-budgets.7 §AR-neural-admission.6
     if let Some(reservation) = budget_ancestry_token(task_id) {
         cmd.env(PARENT_RESERVATION_ENV, reservation);
     }

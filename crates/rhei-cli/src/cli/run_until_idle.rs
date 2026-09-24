@@ -38,12 +38,18 @@ fn merge_blockers(left: Option<rhei_tui::IdleBlocker>, right: Option<rhei_tui::I
 
 /// Which kind of wait the plan-wide classification selects for each ticket.
 ///
-/// It walks the order §FS-rhei-run-report.3.1 publishes, the same order the
-/// deliberate-wait judgment walks, because that is where a blocker's
-/// idle-compatibility is decided. For the two structural entries at the head
-/// of that order — an open descendant subtree and an unsatisfied `**Prior:**`
-/// — it follows the classified blocker at the other end, so a ticket held
-/// behind a gate reports the gate rather than a wait of its own.
+/// It walks the order §FS-rhei-run-report.3.1 publishes — a supervisor's hold,
+/// an open descendant subtree, a gate, a live `**Assignee:**`, an unsatisfied
+/// `**Prior:**`, a provider limit, then the ticket's own poll — because that is
+/// where a blocker's idle-compatibility is decided, and here the order is
+/// load-bearing: this walk answers *which* wait, and a ticket with two of them
+/// must be named by the one that outranks. The deliberate-wait judgment answers
+/// a different question — *is* this deliberate — and that is a disjunction over
+/// the same rungs, so its order does not affect its answer and it does not walk
+/// this one. For the structural entries — a supervisor's hold, an open
+/// descendant subtree and an unsatisfied `**Prior:**` — this walk follows the
+/// classified blocker at the other end, so a ticket held behind a gate reports
+/// the gate rather than a wait of its own.
 // §FS-rhei-run.3 §FS-rhei-run-report.3.1
 struct IdleBlockerScan<'a> {
     rhei: &'a rhei_core::ast::Rhei,
@@ -81,6 +87,14 @@ impl<'a> IdleBlockerScan<'a> {
     }
 
     fn compute(&mut self, task: &'a rhei_core::ast::Task) -> Option<rhei_tui::IdleBlocker> {
+        // The head of the order: a held ticket reports the blocker at the
+        // other end of the hold, and a gate-parked supervisor's is its gate.
+        // §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.4
+        if held_by_supervisor(task, self.rhei, self.machines)
+            .is_some_and(|hold| hold.awaiting_human)
+        {
+            return Some(rhei_tui::IdleBlocker::Gate);
+        }
         // A parent is blocked by exactly whatever blocks its open descendants.
         // §FS-rhei-plan-language.3
         let open = open_descendant_tasks(task, self.machines);
@@ -94,6 +108,12 @@ impl<'a> IdleBlockerScan<'a> {
         let state = normalized_state_name(task.state.as_str(), machine);
         if machine.states.get(&state).map(|def| def.gating && !def.terminal).unwrap_or(false) {
             return Some(rhei_tui::IdleBlocker::Gate);
+        }
+        // Behind the gate, ahead of the prior: a claim names no idle-compatible
+        // wait, and the clock under it would read `waiting on poll; next
+        // attempt none`. §FS-rhei-run.3 §FS-rhei-run-report.3.1
+        if task.assignee.is_some() {
+            return None;
         }
         // Ahead of this ticket's own clock, because that is where the halt
         // classification puts it: a poll behind an unsatisfied prior is held

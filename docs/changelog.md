@@ -32,8 +32,13 @@
   could find work on the console, in the durable report and in
   `run_finished.summary.stop`. A timer can drive a plan without holding a
   process. The option implies line output and is refused beside `--tui` or
-  `--headless`; a run that does not select it keeps every exit code and every
-  byte of output it had. (PR #316)
+  `--headless`. One judgment of "is this ticket deliberately waiting" answers
+  for both modes, so two readings it had wrong are corrected for the continuous
+  run as well: a ticket that is both polled and claimed is now classified by the
+  claim, so the run says `rhei release` instead of calling it a timed retry, and
+  a ticket held by a supervisor parked at a human gate is now classified by that
+  gate, so a plan waiting on nothing else ends as quietly as any other gated
+  one. (PR #316)
 
 - **Generated block compositions now carry durable per-node provenance.** A
   canonical `.agent-grounds/rhei/composition.lock.json` traces every flattened

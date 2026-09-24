@@ -299,8 +299,17 @@ fn should_wait_for_human_gate(
 /// One "is this ticket deliberately waiting?" judgment over a whole plan.
 ///
 /// A ticket is deliberately waiting rather than stuck when it is held open by
-/// its own subtree, parked in a gating state, inside a poll backoff window, or
-/// waiting on a `**Prior:**` that is itself deliberately waiting.
+/// its own subtree, parked in a gating state, inside a poll backoff window,
+/// parked by a recognized provider limit, or waiting on a `**Prior:**` that is
+/// itself deliberately waiting.
+///
+/// Two rungs of §FS-rhei-run-report.3.1's order answer the other way and so
+/// must be walked before the clocks they outrank: a live `**Assignee:**`,
+/// which is not deliberate at all, and a supervisor's hold, which answers with
+/// the blocker at the other end. Everything after them is a disjunction, so
+/// their order among themselves does not change this answer — unlike
+/// `IdleBlockerScan`, which asks *which* wait and is order-dependent
+/// throughout.
 ///
 /// One judgment, reached two ways — the top-level scan applies it to every
 /// in-scope ticket, and the prior walk applies it to every ticket it reaches.
@@ -361,6 +370,14 @@ impl<'a> DeliberateWaitJudgment<'a> {
     }
 
     fn compute(&mut self, task: &'a rhei_core::ast::Task) -> bool {
+        // A held ticket answers with the blocker at the other end of the hold,
+        // and a supervisor parked at a gate has no next visit to release it on.
+        // §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.1
+        if held_by_supervisor(task, self.rhei, self.machines)
+            .is_some_and(|hold| hold.awaiting_human)
+        {
+            return true;
+        }
         // A parent is not workable until its subtree closes, so it is blocked
         // by exactly whatever blocks its open descendants, each judged by this
         // same walk. §FS-rhei-plan-language.3
@@ -374,6 +391,12 @@ impl<'a> DeliberateWaitJudgment<'a> {
         // the same reading `has_pending_human_gate` uses.
         if machine.states.get(&state).map(|def| def.gating && !def.terminal).unwrap_or(false) {
             return true;
+        }
+        // Behind the gate — gated *and* claimed is gated, because releasing the
+        // claim moves nothing while the gate holds — and ahead of the clocks and
+        // the prior, which a claim stops from ever coming back. §FS-rhei-run.3
+        if task.assignee.is_some() {
+            return false;
         }
         if poll_next_attempt_at(self.rhei.metadata.as_ref(), &task.id, &state)
             .is_some_and(|deadline| deadline > current_unix_secs())

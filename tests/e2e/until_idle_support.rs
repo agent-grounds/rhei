@@ -156,6 +156,12 @@ impl IdlePlan {
     }
 
     /// Any other `rhei` subcommand against this plan's isolated `HOME`.
+    ///
+    /// Gated exactly as its one caller is: the detached control case
+    /// (`until_idle_frontend_tests`, case 14) is `#[cfg(unix)]`, so on Windows
+    /// this method is dead and `-D warnings` would fail the whole `e2e`
+    /// target — all of it, not the twenty cases this set adds.
+    #[cfg(unix)]
     pub fn rhei(&self, args: &[&str]) -> CliRun {
         let mut command = rhei_command(&self.home);
         command.args(args);

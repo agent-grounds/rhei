@@ -108,6 +108,25 @@ fn spawn_parallel_agent_work_item(
         );
         return Ok(ParallelAgentSpawnOutcome::Skipped);
     }
+    // The same fourth bound the sequential path checks, at the same point and
+    // for the same reason: every spawn path enters here, and a worker pool that
+    // skipped it would be the exception that makes the count untrue.
+    // §FS-rhei-run.3.4 §FS-rhei-budgets.6.1
+    match budget_admit_spawn(
+        input,
+        &loaded,
+        workspace_root,
+        machine,
+        settings,
+        task,
+        &item.task_id_str,
+    )? {
+        BudgetAdmission::Admitted | BudgetAdmission::NotAccounted => {}
+        BudgetAdmission::Refused { halt } => {
+            emit_run_message(sink, rhei_tui::MessageLevel::Error, halt);
+            return Ok(ParallelAgentSpawnOutcome::Skipped);
+        }
+    }
     // Bound while both roots still have their own names: the rebind below
     // shadows the project root, and the two differ only in a Panta project.
     // §FS-rhei-snapshots.7
@@ -340,6 +359,10 @@ fn spawn_parallel_agent_work_item(
     // and no other — owns the group it leads. §FS-rhei-run.3.2
     let run_owner = current_run_owner();
 
+    // Ambiguity is recorded *before* the worker is handed the spawn, on this
+    // thread, so a crash between here and the process can never refund the
+    // invocation. §FS-rhei-budgets.6.2
+    budget_record_start(workspace_root, &item.task_id_str, false);
     let handle = std::thread::spawn(move || {
         inherit_run_owner(run_owner);
         let thread_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

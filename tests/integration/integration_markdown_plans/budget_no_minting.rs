@@ -17,15 +17,32 @@
 /// built-in ceilings, so the project tier is honored rather than clamped.
 // §FS-rhei-budgets.2 §FS-rhei-agents.1.1
 fn budget_project(prefix: &str, moves: u64, starts: u64) -> (TestDir, PathBuf, PathBuf) {
+    budget_project_with_agent(prefix, moves, starts, "", r#""stdin_prompt": true"#, "agent: mock")
+}
+
+/// [`budget_project`], with the agent's own shape left to the caller: `prologue`
+/// runs before the looping body, `profile` is the agent-profile JSON that
+/// decides how the run reaches it, and `selector` is the line each working
+/// state names its agent with.
+fn budget_project_with_agent(
+    prefix: &str,
+    moves: u64,
+    starts: u64,
+    prologue: &str,
+    profile: &str,
+    selector: &str,
+) -> (TestDir, PathBuf, PathBuf) {
     let dir = unique_temp_dir(prefix);
     let agent = write_python_agent(
         &dir,
         "looping-agent.py",
-        r#"root = pathlib.Path(env('RHEI_ROOT'))
-append(root / 'runtime' / 'spawns.log', '{}\n'.format(env('RHEI_STATE')))
+        &format!(
+            r#"{prologue}root = pathlib.Path(env('RHEI_ROOT'))
+append(root / 'runtime' / 'spawns.log', '{{}}\n'.format(env('RHEI_STATE')))
 write(root / 'runtime' / 'work.md', 'work\n')
 write(root / 'runtime' / 'review.md', 'review\n')
-"#,
+"#
+        ),
     );
     let settings = dir.join(".agent-grounds").join("rhei");
     fs::create_dir_all(&settings).expect("project settings directory");
@@ -39,7 +56,7 @@ write(root / 'runtime' / 'review.md', 'review\n')
     "transition_limit": {moves},
     "invocations_per_day": {starts}
   }},
-  "agents": {{ "mock": {{ "command": {}, "stdin_prompt": true, "timeout": "30s" }} }}
+  "agents": {{ "mock": {{ "command": {}, {profile}, "timeout": "30s" }} }}
 }}"#,
             fixture_command(&agent)
         ),
@@ -48,20 +65,21 @@ write(root / 'runtime' / 'review.md', 'review\n')
     let machine = write_fixture_file(
         &dir,
         "states.yaml",
-        r#"name: budget-no-minting
+        &format!(
+            r#"name: budget-no-minting
 version: 1
 states:
   work:
     initial: true
     description: A round of work
-    agent: mock
+    {selector}
     agent_timeout: 30s
     outputs:
       - name: work
         path: runtime/work.md
   review:
     description: Another round
-    agent: mock
+    {selector}
     agent_timeout: 30s
     outputs:
       - name: review
@@ -70,11 +88,12 @@ states:
     description: Stop
     final: true
 transitions:
-  - { from: work, to: review, description: Round done }
-  - { from: review, to: work, description: Another round }
-  - { from: work, to: cancelled, description: Stop }
-  - { from: review, to: cancelled, description: Stop }
-"#,
+  - {{ from: work, to: review, description: Round done }}
+  - {{ from: review, to: work, description: Another round }}
+  - {{ from: work, to: cancelled, description: Stop }}
+  - {{ from: review, to: cancelled, description: Stop }}
+"#
+        ),
     );
     let plan = write_fixture_file(
         &dir,
@@ -188,5 +207,64 @@ fn appending_a_ticket_to_a_spent_project_creates_no_capacity() {
         "and it is the project's day that says so\nstdout:\n{}\nstderr:\n{}",
         appended.stdout,
         appended.stderr
+    );
+}
+
+/// A project whose agent resolves a provider and a model, which is what makes
+/// `rhei run` snapshot a state exit at all: an agent that resolves neither is
+/// skipped by auto-emission, and a fixture that is skipped pins nothing.
+// §FS-rhei-snapshots.3.1 §FS-rhei-agents.1.1
+fn snapshotting_budget_project(
+    prefix: &str,
+    moves: u64,
+    starts: u64,
+) -> (TestDir, PathBuf, PathBuf) {
+    budget_project_with_agent(
+        prefix,
+        moves,
+        starts,
+        r#"session_dir = ''
+args = sys.argv[1:]
+while args:
+    if args.pop(0) == '--session-dir' and args:
+        session_dir = args.pop(0)
+if not session_dir:
+    sys.exit('the agent was spawned without --session-dir')
+write(pathlib.Path(session_dir) / 'session.jsonl', '{"provider":"openai","model":"model"}\n')
+"#,
+        r#""session": { "session_dir_flag": "--session-dir", "layout": { "kind": "FlatById", "ext": "jsonl" } }"#,
+        "target: mock:openai:model",
+    )
+}
+
+/// A snapshot stages a session, not capacity. The run caches one at every
+/// agent-state exit it can, under `.rhei/cache/` in the same project root the
+/// account lives in — so the cheapest wrong implementation is one that reads a
+/// balance back out of a cache the project also writes. The table of
+/// §FS-rhei-budgets.11 says a snapshot creates none, and until now nothing
+/// pinned that row: the other three seams it names each have a case above.
+// §FS-rhei-budgets.11 §REQ-bounded-neural-work.4
+#[test]
+fn snapshotting_a_spent_project_creates_no_capacity() {
+    let (dir, plan, machine) = snapshotting_budget_project("budget-snapshot", 2, 50);
+
+    run_run_command(&plan, &machine, &["--no-callbacks"]);
+    assert_eq!(applied_moves(&dir), 2, "the first run spends the project's two travel units");
+    // The precondition, asserted rather than assumed: without it this case
+    // would pass on a run that snapshotted nothing at all.
+    assert!(
+        !collect_run_agent_snapshot_manifests(&dir).is_empty(),
+        "the run cached a snapshot, so the seam under test was actually reached"
+    );
+
+    let again = run_run_command(&plan, &machine, &["--no-callbacks"]);
+
+    assert_eq!(applied_moves(&dir), 2, "the cached session buys no further move");
+    assert!(!again.status.success(), "and the rerun is halted rather than quietly idle");
+    assert!(
+        format!("{}{}", again.stdout, again.stderr).contains("ticket travel"),
+        "the halt names the dimension that stopped it\nstdout:\n{}\nstderr:\n{}",
+        again.stdout,
+        again.stderr
     );
 }

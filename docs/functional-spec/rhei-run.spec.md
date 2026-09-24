@@ -429,9 +429,14 @@ headless, and JSONL surfaces; no new output record family is introduced.
    resumes by a mechanism the plan already declares — a deadline that elapses
    on its own, or a decision the contract is already waiting on a person to
    make — with nothing for an operator to repair in the plan, the workspace, or
-   the environment. For the two structural entries at the head of that order,
-   an open descendant subtree and an unsatisfied `**Prior:**`, the predicate
-   follows the classified blocker at the other end. So a task that is both
+   the environment. For the three structural entries at the head of that order,
+   a supervisor's hold, an open descendant subtree and an unsatisfied
+   `**Prior:**`, the predicate follows the classified blocker at the other end —
+   and the open-subtree entry carries the exception that point publishes with
+   it: a supervising task is classified by its own gate and its own
+   `**Assignee:**` before its subtree, because it is ready while that subtree is
+   open, so a claimed supervisor over a waiting child is **not**
+   idle-compatible however calm the wait beneath it is. So a task that is both
    gated and claimed classifies as gated and *is* idle-compatible, because
    releasing the claim moves nothing while the gate holds; a task that is both
    polled and claimed classifies as claimed and is not, because a claim really

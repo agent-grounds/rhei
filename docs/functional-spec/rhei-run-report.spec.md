@@ -256,8 +256,11 @@ the summary prints five stacked groups:
    retry keeps the existing higher-priority classification.
 
    The blocker and next action come from a **plan-wide classification** of why
-   each non-terminal task node is not moving, in this order: an open descendant
-   subtree; a gating state awaiting a decision; a live `**Assignee:**`; an
+   each non-terminal task node is not moving, in this order: a supervisor's
+   hold, which answers with the blocker at the other end of that hold rather
+   than with a wait of its own; an open descendant subtree, except over a
+   supervising ticket, which reads its own rungs first (below); a gating state
+   awaiting a decision; a live `**Assignee:**`; an
    unsatisfied `**Prior:**`; a poll state that declares it waits on a person; a
    worker interrupted mid-flight by an *operator's*
    shutdown ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) — a run that tore its own workers down while
@@ -320,6 +323,20 @@ the summary prints five stacked groups:
    gating, `blocked`, or `failed` keeps its Attention row: those are things to
    act on whatever its children are doing, even though the open subtree
    outranks them in the classification order above.
+
+   The open-subtree rung has one exception, and it is the whole of what a
+   supervising state changes here. A ticket in a supervising state is ready
+   *while* its subtree is open ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule) rule 1), so it is
+   classified by its own gating state and its own `**Assignee:**` **before** its
+   descendants, and answers through the subtree only when neither of those
+   rungs answers. An ordinary parent is never dispatched while its subtree is
+   open ([§FS-rhei-plan-language.3](rhei-plan-language.spec.md#3-semantic-constraints)), so a claim on it stops nothing that the
+   open subtree was not stopping already and the subtree is the truthful
+   reading; a supervisor's claim is the only thing stopping it, and releasing
+   the claim is the only thing that starts it again. The two readings would
+   otherwise contradict each other on the plan shape a supervisor is for: the
+   ledger would call the supervisor `blocked … claimed by <name>` while the
+   run's stop called the whole plan a wait on its subtree's clock.
 
    A **gating** parent that still carries a `held` supervision block
    ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule)) is classified ahead of the open-subtree reading,

@@ -56,7 +56,12 @@ impl BudgetEvent {
 impl Journal {
     /// A snapshot projection for the run's live surfaces, given the bounds the
     /// caller resolved. §FS-rhei-budgets.9
-    pub fn lines(&self, ticket: Option<&str>, per_day: u64, travel_bound: u64) -> Result<Vec<BudgetLine>> {
+    pub fn lines(
+        &self,
+        ticket: Option<&str>,
+        per_day: u64,
+        travel_bound: u64,
+    ) -> Result<Vec<BudgetLine>> {
         let snapshot = self.snapshot()?;
         let invocation_bound = snapshot.invocation_bound(per_day);
         let mut lines = vec![BudgetLine {

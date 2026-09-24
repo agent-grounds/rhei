@@ -94,10 +94,10 @@ impl Contract {
         match value.get("mode").and_then(serde_json::Value::as_str) {
             Some("window") => Ok(Self::Window),
             Some("lifetime") => {
-                let allowance = value
-                    .get("invocations")
-                    .and_then(serde_json::Value::as_u64)
-                    .ok_or_else(|| BudgetError::corrupt("lifetime contract without an allowance"))?;
+                let allowance =
+                    value.get("invocations").and_then(serde_json::Value::as_u64).ok_or_else(
+                        || BudgetError::corrupt("lifetime contract without an allowance"),
+                    )?;
                 if allowance == 0 {
                     return Err(BudgetError::corrupt("a lifetime allowance must be positive"));
                 }
@@ -167,8 +167,12 @@ pub struct Exhaustion {
 pub struct BudgetError {
     pub reason_code: String,
     pub message: String,
-    /// Present exactly when a bound is what refused. §FS-rhei-budgets.8
-    pub exhaustion: Option<Exhaustion>,
+    /// Present exactly when a bound is what refused.
+    ///
+    /// Boxed because every refusal in this module travels in a `Result` and
+    /// most of them carry none: an unboxed variant would make the ordinary
+    /// `Ok` path pay for the rare one. §FS-rhei-budgets.8
+    pub exhaustion: Option<Box<Exhaustion>>,
 }
 
 impl BudgetError {
@@ -177,7 +181,11 @@ impl BudgetError {
     }
 
     pub(crate) fn exhausted(code: &str, message: impl Into<String>, spent: Exhaustion) -> Self {
-        Self { reason_code: code.into(), message: message.into(), exhaustion: Some(spent) }
+        Self {
+            reason_code: code.into(),
+            message: message.into(),
+            exhaustion: Some(Box::new(spent)),
+        }
     }
 
     pub(crate) fn bounds(message: impl Into<String>) -> Self {

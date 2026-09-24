@@ -21,10 +21,7 @@ impl Journal {
     /// Whether this ticket identity is durably installed and may be reserved
     /// against. §FS-rhei-budgets.6.1
     pub fn identity_installed(&self, ticket: &str) -> bool {
-        self.state
-            .identities
-            .get(ticket)
-            .is_some_and(|binding| binding["status"] == "installed")
+        self.state.identities.get(ticket).is_some_and(|binding| binding["status"] == "installed")
     }
 
     /// Every registered copy's path, not just the latest root. The driver locks

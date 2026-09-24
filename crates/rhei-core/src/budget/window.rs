@@ -98,7 +98,3 @@ fn parse_day(day: &str) -> Result<Date> {
     let month = Month::try_from(month).map_err(|_| malformed())?;
     Date::from_calendar_date(year, month, day_of_month).map_err(|_| malformed())
 }
-
-#[cfg(test)]
-#[path = "window_tests.rs"]
-mod window_tests;

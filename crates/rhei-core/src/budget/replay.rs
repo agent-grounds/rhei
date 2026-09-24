@@ -5,8 +5,8 @@
 //! renewal event and therefore has nothing to forge, replay twice, or lose.
 //! §AR-neural-admission.5 §FS-rhei-budgets.3.3
 
-use super::types::{add, BudgetError, Contract, Counter, Snapshot};
 use super::journal::Receipt;
+use super::types::{add, BudgetError, Contract, Counter, Snapshot};
 use super::Result;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};

@@ -47,6 +47,22 @@ pub struct AdmissionRequest<'a> {
     pub travel: bool,
 }
 
+/// One applied edge, as the shared transition path describes it.
+///
+/// A struct rather than six positional arguments because `from` and `to` are
+/// both `&str` and both name a state: swapped, they would compile and lie.
+/// §FS-rhei-budgets.4.1
+pub struct AppliedEdge<'a> {
+    pub ticket: &'a str,
+    pub display_id: &'a str,
+    pub from: &'a str,
+    pub to: &'a str,
+    /// The travel unit admission already holds for this edge, where the move
+    /// came from a spawn this run admitted.
+    pub reservation: Option<&'a str>,
+    pub transition_limit: u64,
+}
+
 /// A durable group: one travel unit for the ticket and one invocation unit per
 /// arm, all-or-none. §FS-rhei-budgets.4.2
 #[derive(Clone, Debug)]
@@ -60,11 +76,7 @@ impl Journal {
     /// Inspection and mutation use the same checks; `preview` cannot debit, so
     /// `rhei validate` and `--dry-run` reach exactly this code.
     /// §FS-rhei-budgets.6.3
-    pub fn preview(
-        &self,
-        request: &AdmissionRequest<'_>,
-        bounds: EffectiveBounds,
-    ) -> Result<()> {
+    pub fn preview(&self, request: &AdmissionRequest<'_>, bounds: EffectiveBounds) -> Result<()> {
         self.validate_identity_sources()?;
         if !self.identity_installed(request.ticket_identity) {
             return Err(BudgetError::new(
@@ -200,7 +212,12 @@ impl Journal {
     /// Record ambiguity *before* capability transfer. A crash after this point
     /// can never refund the invocation; confirmation only refines it.
     /// §FS-rhei-budgets.6.2
-    pub fn record_start(&mut self, reservation: &str, confirmed: bool, audit: &Audit) -> Result<()> {
+    pub fn record_start(
+        &mut self,
+        reservation: &str,
+        confirmed: bool,
+        audit: &Audit,
+    ) -> Result<()> {
         self.append(
             "start",
             json!({"reservation_id": reservation,
@@ -234,16 +251,8 @@ impl Journal {
     /// transition`, or a callback redirect — and is checked against the bound
     /// here, because nothing checked it earlier. A manual path that moved for
     /// free would be the bypass. §FS-rhei-budgets.4.1
-    pub fn charge_travel(
-        &mut self,
-        ticket: &str,
-        display_id: &str,
-        from: &str,
-        to: &str,
-        reservation: Option<&str>,
-        transition_limit: u64,
-        audit: &Audit,
-    ) -> Result<()> {
+    pub fn charge_travel(&mut self, edge: &AppliedEdge<'_>, audit: &Audit) -> Result<()> {
+        let AppliedEdge { ticket, display_id, from, to, reservation, transition_limit } = *edge;
         if reservation.is_none() {
             let snapshot = self.snapshot()?;
             let travel = snapshot.travel_for(ticket);
@@ -337,9 +346,7 @@ impl Journal {
             .reservations
             .iter()
             .filter(|(_, r)| !r.started && !r.released)
-            .filter(|(_, r)| {
-                r.payload["execution_root"].as_str().is_some_and(is_run_gone)
-            })
+            .filter(|(_, r)| r.payload["execution_root"].as_str().is_some_and(is_run_gone))
             .map(|(id, _)| id.clone())
             .collect();
         for id in &abandoned {

@@ -184,17 +184,14 @@ fn budget_admit_spawn(
     })?;
     let ticket = account.ticket_identity(&ticket_uuid);
     let audit = budget_audit("admit a neural start")?;
-    // A fanout reaches this checkpoint as several work items rather than as
-    // one group, so the ticket's single travel unit goes to whichever arm of a
-    // visit arrives first and every later arm of the same visit takes an
-    // invocation unit alone. One applied edge, however many arms.
-    // §FS-rhei-budgets.4.2
+    // A fanout arrives as several work items, so the ticket's one travel unit
+    // goes to the first arm of a visit and later arms take an invocation unit
+    // alone. One applied edge, however many arms. §FS-rhei-budgets.4.2
     let travel = with_claims(|claims| !claims.contains_key(task_id_str));
     let attempts = [format!("attempt:{}", uuid::Uuid::new_v4())];
-    // A descendant envelope of one lets a nested `rhei run` this invocation
-    // starts draw a single admission through the ancestry path, which is the
-    // one door through which anything a program does is counted.
-    // §FS-rhei-budgets.7
+    // An envelope of one lets a nested `rhei run` draw a single admission
+    // through the ancestry path, which is the one door anything a program
+    // does is counted through. §FS-rhei-budgets.7
     let arms: Vec<Arm<'_>> = attempts
         .iter()
         .map(|attempt| Arm { attempt_identity: attempt, descendant_envelope: 1 })

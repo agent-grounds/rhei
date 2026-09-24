@@ -364,8 +364,7 @@ fn load_merged_roster(
         }
     }
     // Read before the merge consumes `global.defaults`: this tier is the
-    // ceiling for the three count bounds, so being overridden by a more
-    // specific value must not be the same as being forgotten.
+    // ceiling, so being overridden must not be the same as being forgotten.
     // §FS-rhei-budgets.2
     let machine_bounds = CountBoundTier::of(&global.defaults);
     let project_bounds = CountBoundTier::of(&project.defaults);

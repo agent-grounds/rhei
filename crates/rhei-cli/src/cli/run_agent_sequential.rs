@@ -163,11 +163,9 @@ fn run_sequential_agent_invocation(
         progress.stalled_tasks.insert(task_id_str.clone());
         return Ok(());
     }
-    // The fourth bound over this same spawn, and the only one that asks about
-    // the ticket's whole life and the project's whole day. It is checked here,
-    // before anything is composed or staged, so that a spawn the account cannot
-    // pay for costs nothing to decline — and a refusal takes the same stall
-    // step 5 gives any other. §FS-rhei-run.3.4 §FS-rhei-budgets.6.1
+    // The fourth bound over this spawn, checked before anything is composed
+    // or staged so a spawn the account cannot pay for costs nothing to
+    // decline. §FS-rhei-run.3.4 §FS-rhei-budgets.6.1
     match budget_admit_spawn(
         input,
         &loaded,

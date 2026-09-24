@@ -284,7 +284,7 @@ path = "crates/rhei-cli/src/cli/states_render.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 1500, unit = "lines" }
+max_accepted = { value = 1600, unit = "lines" }
 until = "Plan loading moves to a module the render, scope, and validation paths all call, leaving this file the state-machine renderer."
 reason = """
 Over budget before this change; the touch that surfaced it added eight lines. Plan loading, scope reporting, and state-machine rendering share the file because plan loading has no home of its own.

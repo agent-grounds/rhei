@@ -600,6 +600,30 @@ impl UiState {
             // warning arrives separately as a `Message`, so rendering it here
             // would print the same stall twice. §FS-rhei-run-report.3.1
             RunEvent::TaskOutputsMissing { .. } => {}
+            // Both land in the Journal, where the bounds are readable while
+            // they are being spent rather than only once one stops something.
+            // §FS-rhei-run-tui.1.1 §FS-rhei-budgets.9
+            RunEvent::BudgetSnapshot { bounds } => {
+                for bound in bounds {
+                    self.push_journal(
+                        MessageLevel::Info,
+                        crate::rhei_tui::event::bound_journal_line(bound),
+                    );
+                }
+            }
+            RunEvent::BudgetHalt { task, bound, renews_at, remedy, .. } => {
+                self.push_journal(
+                    MessageLevel::Error,
+                    format!(
+                        "{task} halted on {} — {}",
+                        bound.dimension,
+                        renews_at
+                            .as_ref()
+                            .map(|at| format!("renews at {at}"))
+                            .unwrap_or_else(|| remedy.clone())
+                    ),
+                );
+            }
         }
     }
 

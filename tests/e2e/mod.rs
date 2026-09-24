@@ -592,6 +592,22 @@ pub fn assert_refuses_time_text(result: &CliRun, flag: &str, text: &str) {
     assert_stderr_contains(result, &format!("could not read '{text}' as a time for {flag}"));
 }
 
+/// The bounds report every successful validation carries, after the success
+/// line and before any conditional warning.
+///
+/// Every plan has all three count bounds in force, so every successful
+/// validation reports all three; an isolated home has configured none, so all
+/// three read `built_in`. This replaced the older promise that a graph without
+/// `**Consumes:**` emitted `Validation succeeded\n` byte for byte — that
+/// sentence described the advisory's blast radius and cannot survive a report
+/// every plan gets.
+// §FS-rhei-validate.4 §FS-rhei-validate.6 §FS-rhei-budgets.2.3
+pub const VALIDATED_BOUNDS: &str = concat!(
+    "warning: transition_limit: 80 (built_in)\n",
+    "warning: invocations_per_day: 200 (built_in)\n",
+    "warning: invocation_lifetime_max: 6000 (built_in)\n",
+);
+
 pub fn assert_success(result: &CliRun) {
     assert!(
         result.status.success(),

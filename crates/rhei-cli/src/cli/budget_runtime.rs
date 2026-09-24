@@ -25,11 +25,17 @@ const PARENT_RESERVATION_ENV: &str = "RHEI_BUDGET_PARENT_RESERVATION";
 
 /// What an admission decided, in the three shapes the caller acts on.
 enum BudgetAdmission {
-    /// Every unit is reserved and the spawn may proceed.
-    Admitted,
+    /// Every unit is reserved and the spawn may proceed. The report is where
+    /// both counts now stand, for the surfaces that show it while it is spent
+    /// rather than only at exhaustion. §FS-rhei-budgets.9
+    Admitted { bounds: Vec<rhei_tui::BoundReport> },
     /// A bound, or an account that cannot be trusted, refused the spawn. The
-    /// text is the whole halt of §FS-rhei-budgets.8, ready to print.
-    Refused { halt: String },
+    /// text is the whole halt of §FS-rhei-budgets.8, ready to print, and the
+    /// record carries the same facts in a form a reader can route on.
+    ///
+    /// Boxed because a refusal is the rare arm and a `RunEvent` is wide: the
+    /// ordinary admitted path should not pay for it.
+    Refused { halt: String, event: Option<Box<rhei_tui::RunEvent>> },
     /// This target has no project directory to account against. Nothing is
     /// bounded and nothing is charged, which is the same answer the engine gave
     /// before this checkpoint existed.
@@ -215,6 +221,7 @@ fn budget_admit_spawn(
     })();
     match admitted {
         Ok(group) => {
+            let bounds = budget_reports(&journal, &ticket, &bounds).unwrap_or_default();
             with_claims(|claims| {
                 let claim = claims.entry(task_id_str.to_string()).or_insert_with(|| HeldClaim {
                     travel: None,
@@ -226,11 +233,12 @@ fn budget_admit_spawn(
                 }
                 claim.arms.extend(group.reservation_ids.clone());
             });
-            Ok(BudgetAdmission::Admitted)
+            Ok(BudgetAdmission::Admitted { bounds })
         }
-        Err(refusal) => {
-            Ok(BudgetAdmission::Refused { halt: budget_halt_text(&refusal, &bounds, &journal) })
-        }
+        Err(refusal) => Ok(BudgetAdmission::Refused {
+            halt: budget_halt_text(&refusal, &bounds, &journal),
+            event: budget_halt_event(&refusal, &bounds, &journal, task_id_str).map(Box::new),
+        }),
     }
 }
 

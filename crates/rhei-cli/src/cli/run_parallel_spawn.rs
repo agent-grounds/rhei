@@ -121,9 +121,16 @@ fn spawn_parallel_agent_work_item(
         task,
         &item.task_id_str,
     )? {
-        BudgetAdmission::Admitted | BudgetAdmission::NotAccounted => {}
-        BudgetAdmission::Refused { halt } => {
+        // §FS-rhei-budgets.9
+        BudgetAdmission::Admitted { bounds } => {
+            sink.emit(rhei_tui::RunEvent::BudgetSnapshot { bounds });
+        }
+        BudgetAdmission::NotAccounted => {}
+        BudgetAdmission::Refused { halt, event } => {
             emit_run_message(sink, rhei_tui::MessageLevel::Error, halt);
+            if let Some(event) = event {
+                sink.emit(*event);
+            }
             return Ok(ParallelAgentSpawnOutcome::Skipped);
         }
     }

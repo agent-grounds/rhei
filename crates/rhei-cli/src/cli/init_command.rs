@@ -134,14 +134,14 @@ help = init_conflict_help(),
     // never commits runtime state. Track host writes to name them. §FS-rhei-init.5
     let mut host_changes: Vec<String> = Vec::new();
     if here {
-        if seed_gitignore(&host, &["runtime/", ".rhei/cache/"])? {
+        if seed_gitignore(&host, &["runtime/", ".rhei/cache/", ".agent-grounds/rhei/budgets/"])? {
             host_changes.push(".gitignore".to_string());
         }
     } else {
         if seed_gitignore(&host, &["panta/"])? {
             host_changes.push(".gitignore".to_string());
         }
-        seed_gitignore(&project, &["runtime/", ".rhei/cache/"])?;
+        seed_gitignore(&project, &["runtime/", ".rhei/cache/", ".agent-grounds/rhei/budgets/"])?;
     }
     if !no_agents {
         let (changed, path) = write_agents_note(&host, here)?;

@@ -191,12 +191,14 @@ fn the_default_instantiation_validates_clean_and_holds_every_child() {
     assert_success(&validated);
     assert_eq!(
         validated.stdout,
-        concat!(
-            "Validation succeeded\n",
-            "warning: **Consumes:** declares export data-flow for prompt injection, not filesystem visibility. ",
-            "Workers can read undeclared sibling exports under runtime/exports/. For a blind round, schedule ",
-            "participants concurrently and brief them not to inspect sibling exports; neither measure enforces ",
-            "blindness once an export exists.\n",
+        format!(
+            "Validation succeeded\n{VALIDATED_BOUNDS}{}",
+            concat!(
+                "warning: **Consumes:** declares export data-flow for prompt injection, not filesystem visibility. ",
+                "Workers can read undeclared sibling exports under runtime/exports/. For a blind round, schedule ",
+                "participants concurrently and brief them not to inspect sibling exports; neither measure enforces ",
+                "blindness once an export exists.\n",
+            )
         ),
         "validation must emit only the exact Consumes advisory after success"
     );

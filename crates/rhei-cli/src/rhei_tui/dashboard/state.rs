@@ -262,6 +262,15 @@ impl DashboardState {
             // warning arrives separately as a `Message`, so rendering it here
             // would show the same stall twice. §FS-rhei-run-report.3.1
             RunEvent::TaskOutputsMissing { .. } => {}
+            // §FS-rhei-run-tui.1.1 §FS-rhei-budgets.9
+            RunEvent::BudgetSnapshot { bounds } => {
+                for bound in bounds {
+                    self.push_recent("info", crate::rhei_tui::event::bound_journal_line(bound));
+                }
+            }
+            RunEvent::BudgetHalt { task, bound, .. } => {
+                self.push_recent("error", format!("{task} halted on {}", bound.dimension));
+            }
         }
     }
 

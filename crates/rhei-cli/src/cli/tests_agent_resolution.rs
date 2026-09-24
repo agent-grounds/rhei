@@ -16,12 +16,14 @@
                 attempts: None,
                 mcp_servers: None,
                 skills: None,
+                ..Default::default()
             },
             agents: built_in_agents(),
             models: BTreeMap::new(),
             mcp_servers: BTreeMap::new(),
             skills: BTreeMap::new(),
             snapshots: None,
+            ..Default::default()
         };
 
         let resolved =
@@ -46,6 +48,7 @@
             mcp_servers: BTreeMap::new(),
             skills: BTreeMap::new(),
             snapshots: None,
+            ..Default::default()
         }
     }
 

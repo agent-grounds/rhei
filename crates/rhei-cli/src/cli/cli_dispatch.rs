@@ -155,6 +155,7 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
         }
         Commands::New { options } => new_command(&options),
         command @ Commands::Migrate { .. } => dispatch_target_command(command, before_subcommand),
+        Commands::Budget { command } => budget_command(command),
         command @ Commands::Validate { .. } => dispatch_target_command(command, before_subcommand),
         Commands::Render { input, format, pretty, no_color, no_metadata, no_content, state_machine } => {
             let target = resolve_plan_target(input)?;

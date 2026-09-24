@@ -876,12 +876,14 @@ transitions:
                 attempts: None,
                 mcp_servers: defaults_mcp,
                 skills: None,
+                ..Default::default()
             },
             agents: built_in_agents(),
             models: BTreeMap::new(),
             mcp_servers: registry,
             skills: BTreeMap::new(),
             snapshots: None,
+            ..Default::default()
         }
     }
 

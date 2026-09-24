@@ -184,7 +184,7 @@ fn budget_admit_spawn(
     // invocation unit alone. One applied edge, however many arms.
     // §FS-rhei-budgets.4.2
     let travel = with_claims(|claims| !claims.contains_key(task_id_str));
-    let attempts = vec![format!("attempt:{}", uuid::Uuid::new_v4())];
+    let attempts = [format!("attempt:{}", uuid::Uuid::new_v4())];
     // A descendant envelope of one lets a nested `rhei run` this invocation
     // starts draw a single admission through the ancestry path, which is the
     // one door through which anything a program does is counted.

@@ -104,6 +104,7 @@ include!("cli/settings_load_validate.rs");
 include!("cli/budget_bounds.rs");
 include!("cli/budget_runtime.rs");
 include!("cli/budget_travel.rs");
+include!("cli/budget_command.rs");
 include!("cli/roster_command.rs");
 include!("cli/tooling_resolution.rs");
 include!("cli/agent_effort.rs");

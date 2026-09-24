@@ -311,6 +311,14 @@ fn should_wait_for_human_gate(
 /// `IdleBlockerScan`, which asks *which* wait and is order-dependent
 /// throughout.
 ///
+/// One rung is read out of the published order's turn, and §FS-rhei-run-report.3.1
+/// says so: a supervising ticket is classified by its own gate and its own
+/// `**Assignee:**` before its subtree, because a supervisor is ready *while*
+/// that subtree is open (§FS-rhei-supervision.3.1 rule 1) and its claim is
+/// therefore the only thing stopping it. An ordinary parent is never dispatched
+/// while its subtree is open, so its own claim is moot and it keeps answering
+/// through the subtree.
+///
 /// One judgment, reached two ways — the top-level scan applies it to every
 /// in-scope ticket, and the prior walk applies it to every ticket it reaches.
 /// Judging a prior by its own state alone was the first bug: a dependent whose
@@ -378,6 +386,23 @@ impl<'a> DeliberateWaitJudgment<'a> {
         {
             return true;
         }
+        let machine = self.machines.for_task(&task.id);
+        let state = normalized_state_name(task.state.as_str(), machine);
+        // A terminal gate is a decision already taken, not one still pending —
+        // the same reading `has_pending_human_gate` uses.
+        let own_gate_pending =
+            machine.states.get(&state).map(|def| def.gating && !def.terminal).unwrap_or(false);
+        // A supervisor is ready *while* its subtree is open, so its own gate
+        // and claim are read ahead of the subtree, as `classify_halt` reads
+        // them. §FS-rhei-supervision.3.1 §FS-rhei-run-report.3.1
+        if task_is_supervising(task, machine) {
+            if own_gate_pending {
+                return true;
+            }
+            if task.assignee.is_some() {
+                return false;
+            }
+        }
         // A parent is not workable until its subtree closes, so it is blocked
         // by exactly whatever blocks its open descendants, each judged by this
         // same walk. §FS-rhei-plan-language.3
@@ -385,11 +410,7 @@ impl<'a> DeliberateWaitJudgment<'a> {
         if !open.is_empty() {
             return open.iter().copied().all(|child| self.judge(child).unwrap_or(true));
         }
-        let machine = self.machines.for_task(&task.id);
-        let state = normalized_state_name(task.state.as_str(), machine);
-        // A terminal gate is a decision already taken, not one still pending —
-        // the same reading `has_pending_human_gate` uses.
-        if machine.states.get(&state).map(|def| def.gating && !def.terminal).unwrap_or(false) {
+        if own_gate_pending {
             return true;
         }
         // Behind the gate — gated *and* claimed is gated, because releasing the

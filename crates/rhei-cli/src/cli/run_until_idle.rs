@@ -46,10 +46,18 @@ fn merge_blockers(left: Option<rhei_tui::IdleBlocker>, right: Option<rhei_tui::I
 /// must be named by the one that outranks. The deliberate-wait judgment answers
 /// a different question — *is* this deliberate — and that is a disjunction over
 /// the same rungs, so its order does not affect its answer and it does not walk
-/// this one. For the structural entries — a supervisor's hold, an open
+/// this one. For the three structural entries — a supervisor's hold, an open
 /// descendant subtree and an unsatisfied `**Prior:**` — this walk follows the
 /// classified blocker at the other end, so a ticket held behind a gate reports
 /// the gate rather than a wait of its own.
+///
+/// The descendant rung carries the one exception the same point publishes: a
+/// supervising ticket is classified by its own gate and its own `**Assignee:**`
+/// before its subtree, because a supervisor is ready *while* that subtree is
+/// open (§FS-rhei-supervision.3.1 rule 1), so its claim is the only thing
+/// stopping it and `rhei release` the only thing that starts it again. An
+/// ordinary parent is never dispatched while its subtree is open, so its own
+/// claim is moot and it answers through the subtree as before.
 // §FS-rhei-run.3 §FS-rhei-run-report.3.1
 struct IdleBlockerScan<'a> {
     rhei: &'a rhei_core::ast::Rhei,
@@ -89,11 +97,26 @@ impl<'a> IdleBlockerScan<'a> {
     fn compute(&mut self, task: &'a rhei_core::ast::Task) -> Option<rhei_tui::IdleBlocker> {
         // The head of the order: a held ticket reports the blocker at the
         // other end of the hold, and a gate-parked supervisor's is its gate.
-        // §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.4
+        // §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.1
         if held_by_supervisor(task, self.rhei, self.machines)
             .is_some_and(|hold| hold.awaiting_human)
         {
             return Some(rhei_tui::IdleBlocker::Gate);
+        }
+        let machine = self.machines.for_task(&task.id);
+        let state = normalized_state_name(task.state.as_str(), machine);
+        let own_gate_pending =
+            machine.states.get(&state).map(|def| def.gating && !def.terminal).unwrap_or(false);
+        // A supervisor is ready *while* its subtree is open, so its own gate
+        // and claim are read ahead of the subtree, as `classify_halt` reads
+        // them. §FS-rhei-supervision.3.1 §FS-rhei-run-report.3.1
+        if task_is_supervising(task, machine) {
+            if own_gate_pending {
+                return Some(rhei_tui::IdleBlocker::Gate);
+            }
+            if task.assignee.is_some() {
+                return None;
+            }
         }
         // A parent is blocked by exactly whatever blocks its open descendants.
         // §FS-rhei-plan-language.3
@@ -104,9 +127,7 @@ impl<'a> IdleBlockerScan<'a> {
                 .copied()
                 .fold(None, |seen, child| merge_blockers(seen, self.classify(child)));
         }
-        let machine = self.machines.for_task(&task.id);
-        let state = normalized_state_name(task.state.as_str(), machine);
-        if machine.states.get(&state).map(|def| def.gating && !def.terminal).unwrap_or(false) {
+        if own_gate_pending {
             return Some(rhei_tui::IdleBlocker::Gate);
         }
         // Behind the gate, ahead of the prior: a claim names no idle-compatible

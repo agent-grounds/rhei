@@ -37,8 +37,8 @@ pub(super) fn instant(epoch: u64) -> String {
 
 /// One machine for the whole set, so a case differs from its neighbours only
 /// in the plan it is given: work that finishes at once, a human gate, a timed
-/// retry, agent work a provider limit can park, and a worker that exits `0`
-/// without the artifact it owes.
+/// retry, agent work a provider limit can park, a worker that exits `0` without
+/// the artifact it owes, and a supervisor to hold a subtree with.
 pub(super) fn idle_machine(dir: &Path) -> String {
     let work =
         fixture_command(&write_python_agent(dir, "work.py", "result('## Result\\n\\nDone.\\n')\n"));
@@ -60,6 +60,11 @@ states:
   gate:
     description: Waiting on a human decision
     gating: true
+  supervising:
+    description: Supervises the subtree beneath it
+    execute_on: child-terminal
+    target: codex:openai:alpha
+    visits: 12
   poll:
     description: A timed retry
     program:
@@ -96,6 +101,11 @@ transitions:
     exit_code: 0
   - from: gate
     to: done
+  - from: supervising
+    to: supervising
+  - from: supervising
+    to: done
+    condition: openDescendants < 1
   - from: poll
     to: poll
     condition: pollAttempts < pollMaxAttempts

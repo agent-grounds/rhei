@@ -210,3 +210,77 @@ fn a_claim_on_the_polled_ticket_defeats_idle() {
         "and the remedy is the claim's, not the clock's; got:\n{combined}"
     );
 }
+
+/// (22) A claim on a *supervising* parent, which is the hole case (21) leaves
+/// one level up: the ticket carries a live `**Assignee:**` and an open subtree
+/// at the same time, and every other rung of the order reads the subtree first.
+/// A supervisor is ready *while* that subtree is open
+/// (§FS-rhei-supervision.3.1 rule 1), so its claim is the only thing stopping
+/// it and `rhei release` the only thing that starts it again — and the two
+/// readings of one run diverged on exactly that: the ledger row said
+/// `blocked … claimed by alice` while the stop said `waiting on gate`.
+///
+/// `classify_halt` never made the mistake — it skips its descendant rung for a
+/// supervising ticket and selects `Claimed` — so §FS-rhei-run.3 step 9, which
+/// decides idle-compatibility by the blocker the classification *selects*, was
+/// already settled against the walks. The run exits `1`, and the remedy it
+/// names is the claim's. This is the shape every grounded-ticket plan has while
+/// a worker holds a supervisor's visit.
+// §FS-rhei-run.3 §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.1
+#[test]
+fn a_claim_on_a_supervising_parent_defeats_idle() {
+    let plan = IdlePlan::new(
+        "until-idle-claim-on-the-supervisor",
+        "## Tasks\n\n### Task 1: A supervisor a worker still holds\n\
+         **State:** supervising\n**Assignee:** alice\n\n\
+         #### Task 1.1: Waiting on a reviewer\n**State:** gate\n",
+    );
+
+    let result = plan.run(&["--until-idle", "--no-dashboard"]);
+
+    assert_exit(&result, 1, "a supervisor's claim is the only thing stopping it");
+    let combined = format!("{}{}", result.stdout, result.stderr);
+    assert!(
+        !combined.contains("Run idle:"),
+        "a claimed supervisor is not a deliberate wait, whatever waits beneath it; got:\n{combined}"
+    );
+    assert!(
+        combined.contains("rhei release"),
+        "and the remedy is the claim's, not the gate's; got:\n{combined}"
+    );
+    assert_task_state(&plan.plan, &plan.machine, "1", "supervising");
+    assert_task_state(&plan.plan, &plan.machine, "1.1", "gate");
+}
+
+/// (23) The control for the reading that must **not** move, and it passes
+/// before case (22)'s fix as well as after: a *claimless* supervisor that has
+/// released a subtree waiting on a person is still idle. Do not read a passing
+/// control as a pin — its job is to refuse the wrong fix, not to prove the
+/// right one.
+///
+/// The wrong fix is the tempting one: give the walks `classify_halt`'s
+/// `!task_is_supervising` exclusion wholesale, so a supervising ticket is never
+/// classified by its subtree at all. Follow that past the descendant rung here
+/// and there is nothing left to answer — no gate, no claim, no prior, no
+/// clock — so the plan stops being idle and the run exits `1` where it exits
+/// `3` today. That is this whole ticket defeated in the opposite direction, on
+/// the plan shape it exists for. The narrow reading is the one that holds: read
+/// a supervising ticket's own gate and claim first, and keep the subtree as the
+/// fallback.
+// §FS-rhei-run.3 §FS-rhei-run-report.3.1 §FS-rhei-supervision.3.1
+#[test]
+fn a_claimless_supervisor_over_a_gated_child_is_still_idle() {
+    let body = "---\nmetadata:\n  tasks:\n    1:\n      supervision:\n        \
+                phase: released\n---\n\n## Tasks\n\n\
+                ### Task 1: A supervisor that released its subtree\n**State:** supervising\n\n\
+                #### Task 1.1: Waiting on a reviewer\n**State:** gate\n";
+    let selected = IdlePlan::new("until-idle-claimless-supervisor-selected", body);
+    let unselected = IdlePlan::new("until-idle-claimless-supervisor-unselected", body);
+
+    let with = selected.run(&["--until-idle", "--no-dashboard"]);
+    let without = unselected.run(&["--no-tui", "--no-dashboard"]);
+
+    assert_exit(&with, EXIT_IDLE, "a supervisor with no claim is stopped by nothing of its own");
+    assert_idle_line(&with, "gate", "none");
+    assert_exit(&without, 0, "and the unselected run's exit is unchanged");
+}

@@ -10,6 +10,7 @@ the point they realize it.
 | ID | Subject |
 |---|---|
 | [§REQ-cross-platform](cross-platform.md#req-cross-platform-one-tool-on-linux-macos-and-windows) | One tool on Linux, macOS, and Windows: parity, tested on all three, portable fixtures, paths as data |
+| [§REQ-bounded-neural-work](bounded-neural-work.spec.md#req-bounded-neural-work-every-unit-of-neural-work-is-bounded-before-it-starts) | Every unit of neural work is bounded before it starts: the four levels, bounded by default, and where the default numbers came from |
 
 This index is navigational. Normative citations should target the specific
 declaration ID rather than this file.

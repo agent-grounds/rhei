@@ -173,6 +173,9 @@ choosing one.
 | `agent_timeout` | string or null | No | Default autonomous agent timeout |
 | `program_timeout` | string or null | No | Default program timeout |
 | `attempts` | integer or null | No | Default number of spawns one state visit may have before the run halts. See [Attempt Budget](#323-attempt-budget). |
+| `transition_limit` | integer or null | No | Applied transitions one ticket may make over the lifetime of its identity. Built-in `80`. [§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys) |
+| `invocations_per_day` | integer or null | No | Neural starts a project may be admitted per UTC day under the window contract. Built-in `200`. [§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys) |
+| `invocation_lifetime_max` | integer or null | No | Ceiling on an explicit lifetime invocation allowance; clamps `rhei budget init` and every `adjust`. Built-in `6000`. [§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys) |
 | `mcp_servers` | array | No | Default MCP server entries applied to every agent state. Entries are ids or inline definitions. See [MCP Servers](#114-mcp_servers). |
 | `skills` | array | No | Default skill entries applied to every agent state. Entries are ids or inline definitions. See [Skills](#115-skills). |
 
@@ -1342,6 +1345,15 @@ not halt one ticket but leave the workspace recoverable only by `rhei reset`.
 A budget below `1` is raised to `1`: every visit gets at least the invocation
 that makes it a visit.
 
+This budget is the **second** of the four levels a unit of neural work is
+bounded at, and it bounds one visit only ([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-four-levels)).
+Entering the state again is a new visit and brings a fresh `attempts:` budget;
+it never brings fresh project capacity. Every neural retry this budget permits
+is charged one invocation against the project's one account
+([§FS-rhei-budgets.4.2](rhei-budgets.spec.md#42-invocations)), and the four non-spend exceptions above stay local to
+this counter: an attempt given back is an attempt, never an invocation, and
+nothing downstream of an admitted start refunds one.
+
 A **poll state** ([§FS-rhei-states.2](rhei-states.spec.md#2-polling-states)) is exempt from the budget. Re-spawning
 without moving is what a poll state is for, and it already declares its own
 bound in `poll.max_attempts`; a second bound over the same spawns would end the
@@ -1725,6 +1737,12 @@ must resolve to a finite value at some level of the chain; missing timeouts on
 orchestrator-driven states are a validation error. Under `worker` authority
 the resolution is optional and the engine does not impose a timeout on manual
 work.
+
+A finite timeout here is the **first** of the four levels a unit of neural work
+is bounded at, and it bounds one orchestrated round only: it says nothing about
+how many rounds there may be ([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-four-levels)). This chain is not
+clamped by the machine ceiling of [§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from), which is enumerated to
+the two count dimensions and reaches nothing about time.
 
 ### 7.2. Duration Format
 

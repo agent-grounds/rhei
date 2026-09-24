@@ -243,6 +243,19 @@ journal model, the JSON frontend and durable event log retain warning message
 records, and the plain/headless frontend writes them to stderr. Reusing this
 event path preserves the wording and frequency of existing validation warnings.
 
+`BudgetSnapshot` carries the count bounds in force — for each dimension the
+effective bound, its value source, the machine as limiting source where it
+clamped, and the consumed, outstanding and remaining amounts. It is emitted once
+after `RunStarted` and before the first scheduling event, so the bounds are on
+screen *before* any capacity is spent, and again after each receipt is durable
+rather than only at exhaustion. `BudgetHalt` carries the same fields for one
+refused admission plus the task, the accounting mode with its window day key,
+the renewal instant where the window limited, and the one remedy that raises the
+limiter ([§FS-rhei-budgets.9](rhei-budgets.spec.md#9-visibility)). Terminal frontends render both in the Journal
+view and keep the latest snapshot in the shared chrome; a halt is additionally
+an `error`-level `Message` so a frontend that renders neither record still says
+why the run stopped.
+
 `RunFinished` is emitted once with aggregate counts for spawned agents, spawned programs, terminal tasks, total tasks, and accounting totals when available.
 
 `Tee` is a composite sink implementing `EventSink` by forwarding each event to a fixed list of inner sinks.

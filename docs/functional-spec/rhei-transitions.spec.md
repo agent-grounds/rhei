@@ -365,6 +365,12 @@ The `-1` suffix is never written; first visit is implicit. The suffixed form is
 valid only when the base state declares `visits`, and the suffix must not
 exceed that state's declared visit budget.
 
+`stateVisits` is **not** the ticket's travel count. It records entries into one
+state and is cleared by `rhei reset`; travel counts every applied edge of the
+ticket over the lifetime of its identity and survives reset
+([§FS-rhei-budgets.4.1](rhei-budgets.spec.md#41-travel)). Neither is derived from the other, and neither is
+refunded when the other is.
+
 ### 2.4. Metadata Access in Callbacks
 
 When a transition callback is invoked, the metadata is merged into `task.metadata`:
@@ -771,6 +777,11 @@ Rules:
 - When a state also declares `all_models`, visit accounting is scoped to each model-specific execution of that state.
 - When a state also declares `all_targets`, visit accounting is scoped to each target-specific execution of that state.
 - A transition whose `from` equals its `to` on a state that does **not** declare `poll:` is a loop-back re-entry like any other: it increments `stateVisits.<state-name>`, is bounded by `visits`, and emits and inherits snapshots per visit. On a supervising state it is the release edge ([§FS-rhei-supervision.4.2](rhei-supervision.spec.md#42-self-loops-on-agent-states)).
+- An applied self-loop spends one of the ticket's travel units, like any other
+  applied edge; a **poll wait** spends none, because no edge is applied
+  ([§FS-rhei-budgets.4.1](rhei-budgets.spec.md#41-travel)). `visits` is the **adjacent** state-entry bound of
+  [§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-four-levels) and neither substitutes for the ticket's travel
+  bound nor is charged by it.
 - On a state that declares [`poll:`](rhei-states.spec.md#2-polling-states), the same `stateVisits` entry records poll attempts. Transitions from that state may use `pollAttempts` (alias for `visitCount`) and `pollMaxAttempts` (alias for `poll.max_attempts`) for clarity; both names are only defined on transitions whose `from` state declares `poll:`. A self-loop transition from a poll state is interpreted by `rhei run` as "retry after `poll.interval`" and releases the `--parallel` slot between attempts; once `pollAttempts >= pollMaxAttempts`, the engine refuses self-loops and picks the first matching non-self-loop transition instead.
 
 Example:

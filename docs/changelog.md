@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Bound a ticket's travel and a project's invocations by default. Every ticket
+  may make at most 80 applied moves over the lifetime of its identity, and every
+  project may be admitted at most 200 agent starts per UTC day; both numbers are
+  built-in defaults measured from real run records, both are visible with their
+  source before the first agent starts, and both are raised by one machine
+  settings key or lowered by a project, a plan, or a profile. A machine's value
+  is a ceiling: a plan that asks for more still validates, gets the machine's
+  number, and is told so. Nothing that ran before is refused — no plan needs a
+  new field and no machine needs a new file. When a bound is spent the ticket
+  stops exactly where it stands with its artifacts intact, the run carries on
+  with other work, and it exits non-zero naming the bound, the numbers, and the
+  one thing that would raise it. (PR #N)
+
 - Add `rhei migrate export-priors` as the explicit recovery for plans laid
   before consumed-export producers had to be direct dependencies. Validate and
   run refusals now name the copyable migration command; migration previews or

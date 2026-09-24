@@ -25,7 +25,14 @@ For visual dashboard behavior see [Flow Visualization](rhei-viz.spec.md).
 
 - Guessing billing from transcript bytes, prompt text length, or local
   tokenizers when measured usage exists.
-- Enforcing budgets or stopping a run based on spend.
+- Enforcing budgets or stopping a run based on **spend**. Count enforcement is
+  different and is not a non-goal: the durable invocation record of
+  [§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal) is a named consumer of what is recorded here, for
+  visibility, rollups, and reconciliation surfaces. The direction is one-way.
+  Admission decides on the count ledger and never on an accounting record, and
+  no accounting record can authorize, refund, or reverse a count — an extraction
+  that fails, a price that is missing, or a transport that reports no usage
+  leaves both counts exactly as they were.
 - Writing cost rollups into task markdown.
 - Failing a task just because accounting is unsupported or extraction failed.
 

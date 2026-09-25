@@ -90,7 +90,10 @@
   output so their logs carry every tool call; the live display shows the
   assistant's text rather than raw JSON. Report paths read relative to the
   session's root, metric trajectories name sessions by visit (`cover #2`), and
-  the agent prompt warns that headings in a task body break the plan.
+  the agent prompt warns that headings in a task body break the plan. Every
+  agent spawn now records the prompt it was given under `runtime/prompts/`, so
+  each report opens with the exact prompt, and tool calls render as numbered
+  steps whose inputs and outputs are labelled with their step.
   (PR #311)
 
 - **Tasks can declare explicit read exclusions for blind work.** `**Excludes:**`

@@ -1923,7 +1923,7 @@ missing line means the state declared no entries of that kind.
 
 ### 8.3. Log Directory
 
-`runtime/logs/` is created automatically by `rhei run` if it does not exist. `rhei reset` removes the entire `runtime/` directory, including logs.
+`runtime/logs/` is created automatically by `rhei run` if it does not exist. Each agent log's prompt record sits beside it, as `runtime/prompts/<log stem>.md` ([§FS-rhei-session-reports.1.1](rhei-session-reports.spec.md#11-prompt-record)). `rhei reset` removes the entire `runtime/` directory, including logs.
 
 ### 8.4. Spawn Records
 

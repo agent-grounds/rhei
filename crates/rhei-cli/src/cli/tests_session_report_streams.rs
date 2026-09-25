@@ -120,7 +120,7 @@ mod session_report_streams {
             .expect("rendered");
         let text = fs::read_to_string(&report).expect("report");
         assert!(text.contains("(no prompt recorded)"));
-        assert!(text.contains("**Bash** `ls`"));
+        assert!(text.contains("### Step 1 · Bash — ok\n\n**Command:** `ls`"));
     }
 
     /// A kept result envelope adds its text when the transcript does not
@@ -263,12 +263,15 @@ mod session_report_streams {
         assert!(text.contains("# plan.2 — fix"));
         assert!(text.contains("# Task plan.2\nfix the bug"));
         assert!(text.contains("inspect the failing test"));
-        assert!(text.contains("**Bash** `cargo test`"));
-        assert!(text.contains("output (error)"));
+        assert!(text.contains("### Step 1 · Bash — error\n\n**Command:** `cargo test`"));
+        assert!(text.contains("<b>Output of step 1</b> · 1 line"));
         assert!(text.contains("1 test failed"));
         // A search identifies itself by its pattern, not the directory.
-        assert!(text.contains("**Grep** `off_by_one`"));
-        assert!(text.contains("### `src/lib.rs`"));
+        assert!(text.contains("### Step 3 · Grep — ok\n\n**Pattern:** `off_by_one`"));
+        assert!(text.contains("### `src/lib.rs` — edited in step 2"));
+        assert!(text.contains("Step 2 replaced:"));
+        // The agent's words are set apart from tool traffic.
+        assert!(text.contains("> **Agent**\n>\n> Fixed the off-by-one."));
         assert!(text.contains("a + 2"));
         assert!(text.contains("a + 1"));
         assert!(text.contains("Fixed the off-by-one."));
@@ -316,16 +319,14 @@ mod session_report_streams {
             .expect("rendered");
         let text = fs::read_to_string(&report).expect("report");
         assert!(text.contains("look at the parser first"));
-        assert!(text.contains("**command** `cargo build`"));
+        assert!(text.contains("### Step 1 · command — error\n\n**Command:** `cargo build`"));
         assert!(text.contains("error[E0308]: mismatched types"));
-        assert!(text.contains("output (error)"));
         // The started delta of the same command never renders a second call.
-        assert_eq!(text.matches("**command**").count(), 1);
+        assert_eq!(text.matches("· command —").count(), 1);
         // The action line names the touched paths; the deletion stays there
         // and never lands under files produced.
-        assert!(text.contains("**file_change** `src/parse.rs, src/dead.rs`"));
-        assert!(text.contains("### `src/parse.rs`"));
-        assert!(text.contains("1 operation(s): update"));
+        assert!(text.contains("### Step 2 · file_change — ok\n\n**Files:** `src/parse.rs, src/dead.rs`"));
+        assert!(text.contains("### `src/parse.rs` — updated in step 2"));
         assert!(!text.contains("### `src/dead.rs`"));
         assert!(!text.contains("Replace:"));
         assert!(text.contains("Build fixed."));
@@ -423,9 +424,44 @@ mod session_report_paths {
         let report = render_session_report(&log, &dir.path().join("runtime"), false)
             .expect("rendered");
         let text = fs::read_to_string(&report).expect("report");
-        assert!(text.contains("**Read** `src/lib.rs`"));
-        assert!(text.contains("### `test/a.test.mjs`"));
-        assert!(text.contains("**Read** `/etc/hosts`"));
+        assert!(text.contains("### Step 1 · Read — no result recorded\n\n**File:** `src/lib.rs`"));
+        assert!(text.contains("### `test/a.test.mjs` — written in step 2"));
+        assert!(text.contains("**File:** `/etc/hosts`"));
         assert!(!text.contains("/work/repo/src/lib.rs"));
+    }
+
+    /// The prompt record wins over a stream's own echo, and a plain-output
+    /// report shows its recorded prompt too. §FS-rhei-session-reports.1.1
+    #[test]
+    fn a_recorded_prompt_is_the_report_prompt() {
+        let mut stream = String::from("=== rhei agent log v1 ===\nagent: pi\ntask: plan.14\n===\n");
+        for event in [
+            serde_json::json!({"type": "session", "id": "s-14"}),
+            serde_json::json!({"type": "message_end", "message": {"role": "user",
+                "content": [{"type": "text", "text": "echoed prompt"}]}}),
+        ] {
+            stream.push_str(&event.to_string());
+            stream.push('\n');
+        }
+        let (dir, log) = workspace_with_log("task-plan.14-cover.log", &stream);
+        fs::create_dir_all(dir.path().join("runtime/prompts")).expect("prompts dir");
+        fs::write(session_prompt_record_path(&log), "recorded prompt").expect("record");
+        let text = fs::read_to_string(
+            render_session_report(&log, &dir.path().join("runtime"), false).expect("rendered"),
+        )
+        .expect("report");
+        assert!(text.contains("recorded prompt"));
+        assert!(!text.contains("echoed prompt"));
+
+        let plain = "=== rhei agent log v1 ===\nagent: claude-code\ntask: plan.15\n===\n\nDone.\n";
+        let (dir, log) = workspace_with_log("task-plan.15-present.log", plain);
+        assert!(session_prompt_record_path(&log).ends_with("runtime/prompts/task-plan.15-present.md"));
+        write_session_prompt_record(&log, "the delivered prompt");
+        let text = fs::read_to_string(
+            render_session_report(&log, &dir.path().join("runtime"), false).expect("rendered"),
+        )
+        .expect("report");
+        assert!(text.contains("## Prompt") && text.contains("the delivered prompt"));
+        assert!(text.contains("## Session output"));
     }
 }

@@ -1,6 +1,6 @@
-// One readable Markdown report per agent session log, and the run-level
-// metrics summary: pure formatting over the transcript the parser read and
-// the iteration records the ledger appended.
+// One readable Markdown report per agent session log: pure formatting over
+// the transcript the parser read, with the metrics strip and summary next
+// door.
 //
 // Its own part because rendering is a derived, regenerable view — it never
 // invents, softens, or reorders what the log and the records say, and failing
@@ -17,6 +17,15 @@ fn session_reports_dir(runtime_dir: &Path) -> PathBuf {
     runtime_dir.join("reports")
 }
 
+/// One editing step on one path, as the files recap names it.
+// §FS-rhei-session-reports.2
+struct FileOperation {
+    /// The lowercase tool name, or a Codex change kind.
+    kind: String,
+    arguments: serde_json::Value,
+    step: usize,
+}
+
 /// Render one session log to `runtime/reports/<log stem>.md`.
 // §FS-rhei-session-reports.1
 fn render_session_report(
@@ -26,12 +35,17 @@ fn render_session_report(
 ) -> MietteResult<PathBuf> {
     let transcript = parse_session_log(log_path)?;
     let stem = log_path.file_stem().unwrap_or_default().to_string_lossy();
+    // The prompt this spawn was given, never a rebuild; a log written before
+    // records existed falls back to its stream's echo. §FS-rhei-session-reports.1.1
+    let recorded_prompt = read_session_prompt_record(log_path);
+    let prompt = recorded_prompt.as_deref().or(transcript.prompt.as_deref());
     let mut out = String::new();
 
     render_report_header(&mut out, &transcript, log_path, runtime_dir, &stem);
     render_metrics_strip(&mut out, runtime_dir, log_path);
 
     if let Some(notice) = &transcript.unsupported_stream {
+        render_prompt(&mut out, prompt, false);
         out.push_str(&format!("> {notice}\n"));
         return write_session_report(runtime_dir, &stem, &out);
     }
@@ -40,42 +54,66 @@ fn render_session_report(
     // it renders verbatim, not as an empty report.
     // §FS-rhei-session-reports.6.4
     if let Some(output) = &transcript.plain_output {
+        render_prompt(&mut out, prompt, false);
         out.push_str("## Session output\n\n");
         out.push_str(&fenced(&truncate_output(output, full, None)));
         return write_session_report(runtime_dir, &stem, &out);
     }
 
-    out.push_str("## Prompt\n\n<details><summary>full prompt</summary>\n\n");
-    out.push_str(&fenced(transcript.prompt.as_deref().unwrap_or("(no prompt recorded)")));
-    out.push_str("\n</details>\n\n## Agent actions\n\n");
-
-    let mut files: Vec<(String, Vec<(String, serde_json::Value)>)> = Vec::new();
+    render_prompt(&mut out, prompt, true);
+    out.push_str("## Agent actions\n\n");
+    let root = session_root(&transcript);
+    let mut files: Vec<(String, Vec<FileOperation>)> = Vec::new();
+    let mut step = 0usize;
     for event in &transcript.events {
         match event {
             SessionEvent::Thinking(text) => {
-                out.push_str("<details><summary><i>thinking</i></summary>\n\n");
+                out.push_str("<details><summary><i>Agent thinking</i></summary>\n\n");
                 out.push_str(&fenced(&truncate_output(text, full, None)));
                 out.push_str("\n</details>\n\n");
             }
-            SessionEvent::Text(text) => {
-                out.push_str(text);
-                out.push_str("\n\n");
-            }
+            SessionEvent::Text(text) => out.push_str(&quote_agent_text(text)),
             SessionEvent::ToolCall { id, name, arguments } => {
-                render_tool_call(&mut out, &transcript, full, id, name, arguments);
-                note_written_file(&mut files, name, arguments);
+                step += 1;
+                render_tool_step(&mut out, &transcript, full, step, id, name, arguments);
+                note_written_file(&mut files, name, arguments, step);
             }
         }
     }
 
-    render_files_produced(&mut out, &files, session_root(&transcript));
+    render_files_changed(&mut out, &files, root);
     // The last usage the stream reported: one message's or turn's for most
     // streams, the session total only where a result envelope carried it.
     // §FS-rhei-session-reports.6.2
     if let Some(usage) = &transcript.usage {
-        out.push_str(&format!("**Last reported usage**: `{usage}`\n"));
+        out.push_str(&format!("## Outcome\n\n**Last reported usage**: `{usage}`\n"));
     }
     write_session_report(runtime_dir, &stem, &out)
+}
+
+/// The prompt section. An event-stream report always has one, saying so when
+/// no prompt was recorded; a report of plain output or of an unsupported
+/// stream shows it only when there is one. §FS-rhei-session-reports.2
+fn render_prompt(out: &mut String, prompt: Option<&str>, always: bool) {
+    let Some(prompt) = prompt.or(always.then_some("(no prompt recorded)")) else { return };
+    out.push_str("## Prompt\n\n<details><summary>full prompt</summary>\n\n");
+    out.push_str(&fenced(prompt));
+    out.push_str("\n</details>\n\n");
+}
+
+/// The agent's own words, set apart from tool traffic as a labelled quote.
+/// §FS-rhei-session-reports.2
+fn quote_agent_text(text: &str) -> String {
+    let mut out = String::from("> **Agent**\n>\n");
+    for line in text.trim_end().lines() {
+        if line.is_empty() {
+            out.push_str(">\n");
+        } else {
+            out.push_str(&format!("> {line}\n"));
+        }
+    }
+    out.push('\n');
+    out
 }
 
 fn render_report_header(
@@ -117,44 +155,64 @@ fn render_report_header(
     ));
 }
 
-fn render_tool_call(
+/// One tool call as a numbered step: which tool and how it ended, the
+/// argument that identifies it, labelled, and its output, labelled with the
+/// same step number so no output can be read as another call's.
+/// §FS-rhei-session-reports.2
+fn render_tool_step(
     out: &mut String,
     transcript: &SessionTranscript,
     full: bool,
+    step: usize,
     id: &str,
     name: &str,
     arguments: &serde_json::Value,
 ) {
-    let summary = tool_argument_summary(arguments);
-    out.push_str(&format!(
-        "**{name}** `{}`\n\n",
-        relative_to_root(&summary, session_root(transcript))
-    ));
-    match transcript.results.get(id) {
-        Some(result) => {
-            let error_mark = if result.is_error { " (error)" } else { "" };
-            out.push_str(&format!("<details><summary>output{error_mark}</summary>\n\n"));
-            out.push_str(&fenced(&truncate_output(&result.text, full, Some(result.log_line))));
-            out.push_str("\n</details>\n\n");
-        }
-        None => out.push_str("(no execution result recorded)\n\n"),
+    let result = transcript.results.get(id);
+    let status = match result {
+        Some(result) if result.is_error => "error",
+        Some(_) => "ok",
+        None => "no result recorded",
+    };
+    out.push_str(&format!("### Step {step} · {name} — {status}\n\n"));
+    let (label, value) = tool_argument_identity(arguments);
+    let value = relative_to_root(&value, session_root(transcript));
+    if value.is_empty() {
+        out.push_str(&format!("**{label}:** (none)\n\n"));
+    } else if value.contains('\n') || value.contains('`') {
+        out.push_str(&format!("**{label}:**\n\n"));
+        out.push_str(&fenced(&value));
+        out.push('\n');
+    } else {
+        out.push_str(&format!("**{label}:** `{value}`\n\n"));
     }
-    out.push_str("---\n\n");
+    let Some(result) = result else { return };
+    let size = match result.text.lines().count() {
+        0 => "empty".to_string(),
+        1 => "1 line".to_string(),
+        lines => format!("{lines} lines"),
+    };
+    out.push_str(&format!(
+        "<details><summary><b>Output of step {step}</b> · {size}</summary>\n\n"
+    ));
+    out.push_str(&fenced(&truncate_output(&result.text, full, Some(result.log_line))));
+    out.push_str("\n</details>\n\n");
 }
 
-/// Track paths written through editing tools, in first-write order. Tool
-/// names arrive as each CLI spells them (`write`, `Write`, `MultiEdit`), so
-/// recording compares and stores the lowercase spelling.
+/// Track paths written through editing tools, in first-write order, with the
+/// step that wrote them. Tool names arrive as each CLI spells them (`write`,
+/// `Write`, `MultiEdit`), so recording compares the lowercase spelling.
 fn note_written_file(
-    files: &mut Vec<(String, Vec<(String, serde_json::Value)>)>,
+    files: &mut Vec<(String, Vec<FileOperation>)>,
     name: &str,
     arguments: &serde_json::Value,
+    step: usize,
 ) {
     const WRITING_TOOLS: &[&str] = &["write", "create", "edit", "multiedit"];
     let name = name.to_ascii_lowercase();
     // A Codex file-change item names the changed paths and the change kind,
-    // and carries no content. A deletion is not a produced file: it stays in
-    // the actions timeline only. §FS-rhei-session-reports.6.3
+    // and carries no content. A deletion is not a changed file to recap: it
+    // stays in the actions timeline only. §FS-rhei-session-reports.6.3
     if name == "file_change" {
         for change in
             arguments.get("changes").and_then(|c| c.as_array()).into_iter().flatten()
@@ -164,7 +222,11 @@ fn note_written_file(
             if kind == "delete" {
                 continue;
             }
-            written_file_entry(files, path).push((kind.to_string(), serde_json::Value::Null));
+            written_file_entry(files, path).push(FileOperation {
+                kind: kind.to_string(),
+                arguments: serde_json::Value::Null,
+                step,
+            });
         }
         return;
     }
@@ -178,13 +240,17 @@ fn note_written_file(
     else {
         return;
     };
-    written_file_entry(files, path).push((name, arguments.clone()));
+    written_file_entry(files, path).push(FileOperation {
+        kind: name,
+        arguments: arguments.clone(),
+        step,
+    });
 }
 
 fn written_file_entry<'a>(
-    files: &'a mut Vec<(String, Vec<(String, serde_json::Value)>)>,
+    files: &'a mut Vec<(String, Vec<FileOperation>)>,
     path: &str,
-) -> &'a mut Vec<(String, serde_json::Value)> {
+) -> &'a mut Vec<FileOperation> {
     match files.iter().position(|(known, _)| known == path) {
         Some(index) => &mut files[index].1,
         None => {
@@ -194,50 +260,87 @@ fn written_file_entry<'a>(
     }
 }
 
-/// The files-produced section: what this session wrote, from its tool-call
-/// arguments — never from the current filesystem. §FS-rhei-session-reports.2
-fn render_files_produced(
+/// How the recap names what a step did to a file: `written in step 5`,
+/// `written in step 2, edited in steps 4, 6`.
+fn file_operation_summary(operations: &[FileOperation]) -> String {
+    let mut groups: Vec<(&str, Vec<usize>)> = Vec::new();
+    for operation in operations {
+        let verb = match operation.kind.as_str() {
+            "write" => "written",
+            "create" => "created",
+            "edit" | "multiedit" => "edited",
+            "add" => "added",
+            "update" => "updated",
+            other => other,
+        };
+        match groups.last_mut() {
+            Some((last, steps)) if *last == verb => steps.push(operation.step),
+            _ => groups.push((verb, vec![operation.step])),
+        }
+    }
+    groups
+        .iter()
+        .map(|(verb, steps)| {
+            let noun = if steps.len() == 1 { "step" } else { "steps" };
+            let list: Vec<String> = steps.iter().map(ToString::to_string).collect();
+            format!("{verb} in {noun} {}", list.join(", "))
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// The files-changed recap: what this session wrote, from its tool-call
+/// arguments — never from the current filesystem — each file naming the
+/// steps above that wrote it. §FS-rhei-session-reports.2
+fn render_files_changed(
     out: &mut String,
-    files: &[(String, Vec<(String, serde_json::Value)>)],
+    files: &[(String, Vec<FileOperation>)],
     root: Option<&str>,
 ) {
     if files.is_empty() {
         return;
     }
-    out.push_str("## Files produced\n\n");
+    out.push_str("## Files changed by this session\n\n");
+    out.push_str("_A recap of the editing steps above, grouped by file._\n\n");
     for (path, operations) in files {
-        let sequence: Vec<&str> =
-            operations.iter().map(|(name, _)| name.as_str()).collect();
         out.push_str(&format!(
-            "### `{}`\n\n{} operation(s): {}\n\n",
+            "### `{}` — {}\n\n",
             relative_to_root(path, root),
-            operations.len(),
-            sequence.join(", ")
+            file_operation_summary(operations)
         ));
         let last_write = operations
             .iter()
             .rev()
-            .find(|(name, _)| name == "write" || name == "create");
-        if let Some((_, arguments)) = last_write {
-            if let Some(content) = arguments.get("content").and_then(|c| c.as_str()) {
-                out.push_str("<details><summary>final written content</summary>\n\n");
+            .find(|operation| operation.kind == "write" || operation.kind == "create");
+        if let Some(operation) = last_write {
+            if let Some(content) = operation.arguments.get("content").and_then(|c| c.as_str()) {
+                out.push_str(&format!(
+                    "<details><summary>content written in step {}</summary>\n\n",
+                    operation.step
+                ));
                 out.push_str(&fenced(content));
                 out.push_str("\n</details>\n\n");
                 continue;
             }
         }
-        let pairs: Vec<(&str, &str)> =
-            operations.iter().flat_map(|(_, arguments)| edit_pairs(arguments)).collect();
+        let pairs: Vec<(usize, &str, &str)> = operations
+            .iter()
+            .flat_map(|operation| {
+                edit_pairs(&operation.arguments)
+                    .into_iter()
+                    .map(move |(old, new)| (operation.step, old, new))
+            })
+            .collect();
         // Operations without recorded content — a Codex file change — list
-        // the path and kind alone. §FS-rhei-session-reports.6.3
+        // the path and the steps alone. §FS-rhei-session-reports.6.3
         if pairs.is_empty() {
             continue;
         }
         out.push_str("<details><summary>edits</summary>\n\n");
-        for (old, new) in pairs {
-            out.push_str("Replace:\n");
+        for (step, old, new) in pairs {
+            out.push_str(&format!("Step {step} replaced:\n"));
             out.push_str(&fenced(old));
-            out.push_str("With:\n");
+            out.push_str("with:\n");
             out.push_str(&fenced(new));
         }
         out.push_str("\n</details>\n\n");
@@ -320,176 +423,4 @@ fn truncate_output(text: &str, full: bool, log_line: Option<usize>) -> String {
         None => " — full text in the log".to_string(),
     };
     format!("{}\n… [{} bytes truncated{source}]", &text[..cut], text.len() - cut)
-}
-
-/// The metrics strip: this session's place in a recorded iteration, when the
-/// ledger has one. Reads records only. §FS-rhei-metrics.4
-fn render_metrics_strip(out: &mut String, runtime_dir: &Path, log_path: &Path) {
-    let log_reference = session_log_reference(runtime_dir, log_path);
-    let metrics_dir = metrics_runtime_dir(runtime_dir);
-    let Ok(entries) = fs::read_dir(&metrics_dir) else { return };
-    let mut rows = String::new();
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("jsonl")
-            || path.file_name().and_then(|n| n.to_str()) == Some("pending-sessions.jsonl")
-        {
-            continue;
-        }
-        let records = read_metric_records(&path);
-        for (index, record) in records.iter().enumerate() {
-            if !record.sessions.iter().any(|session| session.log == log_reference) {
-                continue;
-            }
-            let previous = index.checked_sub(1).and_then(|i| records.get(i));
-            let label = record
-                .label
-                .clone()
-                .or_else(|| {
-                    path.file_stem().map(|stem| stem.to_string_lossy().into_owned())
-                })
-                .unwrap_or_default();
-            let shared: Vec<String> = record
-                .sessions
-                .iter()
-                .filter(|session| session.log != log_reference)
-                .map(metric_session_label)
-                .collect();
-            let shared = if shared.is_empty() { "—".to_string() } else { shared.join(", ") };
-            rows.push_str(&format!(
-                "| {label} | {} | {} | {} | {shared} | `{}` |\n",
-                previous.map_or("—".to_string(), format_metric_value),
-                format_metric_value(record),
-                format_metric_delta(previous, record),
-                record.artifact
-            ));
-        }
-    }
-    if !rows.is_empty() {
-        out.push_str("| Metric | Before | After | Δ | Shared with | Read from |\n");
-        out.push_str("|---|---|---|---|---|---|\n");
-        out.push_str(&rows);
-        out.push('\n');
-    }
-}
-
-/// A session as the metric surfaces name it: by its visit identity, the
-/// number its log name carries (`cover #2`), never by the iteration it is
-/// bound to. A record written before visits were recorded names the ledger
-/// move instead, and says so. §FS-rhei-metrics.4
-fn metric_session_label(session: &MetricSessionRef) -> String {
-    match session.visit {
-        Some(visit) => format!("{} #{visit}", session.state),
-        None => format!("{} (move {})", session.state, session.moves),
-    }
-}
-
-fn format_metric_value(record: &MetricIterationRecord) -> String {
-    let unit = record.unit.as_deref().unwrap_or("");
-    let value = match &record.value {
-        serde_json::Value::String(text) => text.clone(),
-        other => other.to_string(),
-    };
-    match &record.detail {
-        Some(detail) => format!("{value}{unit} ({detail})"),
-        None => format!("{value}{unit}"),
-    }
-}
-
-fn format_metric_delta(
-    previous: Option<&MetricIterationRecord>,
-    current: &MetricIterationRecord,
-) -> String {
-    let (Some(previous), Some(before), Some(after)) =
-        (previous, previous.and_then(|p| p.value.as_f64()), current.value.as_f64())
-    else {
-        return "—".to_string();
-    };
-    let _ = previous;
-    let delta = ((after - before) * 10_000.0).round() / 10_000.0;
-    let unit = current.unit.as_deref().unwrap_or("");
-    if delta == 0.0 {
-        return "= 0".to_string();
-    }
-    let improving = match current.goal.as_deref() {
-        Some("decrease") => delta < 0.0,
-        _ => delta > 0.0,
-    };
-    let arrow = if improving { "▲" } else { "▼" };
-    let sign = if delta > 0.0 { "+" } else { "" };
-    format!("{arrow} {sign}{delta}{unit}")
-}
-
-/// Regenerate `runtime/reports/metrics-summary.md` from the iteration records
-/// alone; the records carry their own presentation facts. §FS-rhei-metrics.4
-fn render_metrics_summary(runtime_dir: &Path) -> MietteResult<()> {
-    let metrics_dir = metrics_runtime_dir(runtime_dir);
-    let Ok(entries) = fs::read_dir(&metrics_dir) else { return Ok(()) };
-    let mut names: Vec<PathBuf> = entries
-        .flatten()
-        .map(|entry| entry.path())
-        .filter(|path| {
-            path.extension().and_then(|e| e.to_str()) == Some("jsonl")
-                && path.file_name().and_then(|n| n.to_str())
-                    != Some("pending-sessions.jsonl")
-        })
-        .collect();
-    names.sort();
-    let mut out = String::from("# Metrics\n\n");
-    let mut any = false;
-    for path in names {
-        let records = read_metric_records(&path);
-        let Some(first) = records.first() else { continue };
-        any = true;
-        let key = path.file_stem().unwrap_or_default().to_string_lossy().into_owned();
-        let label = first.label.clone().unwrap_or_else(|| key.clone());
-        out.push_str(&format!("## {label} — `{}`\n\n", first.task));
-        out.push_str(&format!("Measured by: `{}`", first.measure_state));
-        if let Some(goal) = &first.goal {
-            out.push_str(&format!(" · goal: {goal}"));
-        }
-        out.push_str("\n\n| Pass | Sessions in window | Value | Δ | Read from |\n");
-        out.push_str("|---|---|---|---|---|\n");
-        for (index, record) in records.iter().enumerate() {
-            let previous = index.checked_sub(1).and_then(|i| records.get(i));
-            let who = if record.sessions.is_empty() {
-                if record.iteration == 0 { "(baseline)".to_string() } else { "(none)".to_string() }
-            } else {
-                record
-                    .sessions
-                    .iter()
-                    .map(|session| {
-                        let stem = Path::new(&session.log)
-                            .file_stem()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .into_owned();
-                        let emphasis = if session.driver { "**" } else { "" };
-                        format!(
-                            "{emphasis}[{}](./{stem}.md){emphasis}",
-                            metric_session_label(session)
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            };
-            out.push_str(&format!(
-                "| {} | {who} | {} | {} | `{}` |\n",
-                record.iteration,
-                format_metric_value(record),
-                format_metric_delta(previous, record),
-                record.artifact
-            ));
-        }
-        out.push('\n');
-    }
-    if !any {
-        return Ok(());
-    }
-    let dir = session_reports_dir(runtime_dir);
-    fs::create_dir_all(&dir)
-        .map_err(|err| miette!(help = session_report_help(), "failed to create '{}': {err}", dir.display()))?;
-    let path = dir.join("metrics-summary.md");
-    fs::write(&path, &out)
-        .map_err(|err| miette!(help = session_report_help(), "failed to write '{}': {err}", path.display()))
 }

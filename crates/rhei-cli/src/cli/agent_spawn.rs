@@ -271,6 +271,10 @@ fn spawn_and_wait_agent(
         "failed to write log header '{}': {e}", log_path.display()
     ))?;
 
+    // What the report shows as the prompt: this spawn's, never a rebuild.
+    // §FS-rhei-session-reports.1.1
+    write_session_prompt_record(log_path, prompt);
+
     // Emit spawn-time warnings for tooling the agent profile cannot wire.
     // §FS-rhei-agents.1.1.5 §FS-rhei-agents.6: Spawn-time tooling warnings.
     for warning in collect_unsupported_tooling_warnings(resolved, tooling) {

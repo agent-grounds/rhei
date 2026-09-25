@@ -35,6 +35,25 @@ is shown relative to the directory the session worked in, as the log header
 records it (the worktree when there was one, the checkout otherwise); a path
 outside that directory is shown as written.
 
+### 1.1 Prompt Record
+
+The prompt is the one input a reviewer cannot reconstruct, and agent streams
+do not reliably carry it: Claude Code and Codex never echo a prompt delivered
+on stdin. Rebuilding it at render time is not an option either — the prompt
+builder reads the task body, prior results, previous visits, and plan history,
+all of which later sessions change, so a rebuilt prompt would show the agent
+text it never saw.
+
+So when `rhei run` opens an agent session's log, it also writes the prompt it
+composed for that spawn, verbatim, as `runtime/prompts/<log stem>.md`. It
+shares the log's stem, attempt suffix included, so each log has exactly one
+prompt record; it lives beside `runtime/logs/` rather than in it, so that
+directory keeps holding transcripts and nothing else. It is written before the
+subprocess starts, a failed write warns and never fails the spawn, and a
+ticket's records are swept with its logs ([§FS-rhei-agents.8.3](rhei-agents.spec.md#83-log-directory)). The record
+is runtime capture like the log itself, and the only capture this feature
+adds.
+
 ## 2. Markdown UI
 
 Each report renders, in order:
@@ -46,23 +65,29 @@ Each report renders, in order:
    session belongs to a recorded iteration: before/after value, delta, the
    sessions sharing the window, and the artifact the value was read from.
    Content and rules are owned by [§FS-rhei-metrics.4](rhei-metrics.spec.md#4-presentation).
-3. **Prompt** — the first user message of the stream, verbatim and complete,
-   inside a collapsed block. The prompt is never truncated.
-4. **Agent actions** — the session's assistant events in stream order:
+3. **Prompt** — the prompt record (§1.1), verbatim and complete, inside a
+   collapsed block; it is never truncated. A log without a record — one
+   written before records existed — falls back to the first user message of
+   its stream, and otherwise says "(no prompt recorded)".
+4. **Agent actions** — the session's assistant events in stream order, laid
+   out so that which output belongs to which call is never in doubt:
+   - the agent's own text as a quote labelled **Agent**;
    - thinking blocks, collapsed;
-   - text blocks, inline;
-   - tool calls as `**{tool}** {argument summary}` with the matched execution
-     result in a collapsed output block, errors marked. The argument summary
-     prefers the argument that identifies the call (command, path, pattern,
-     URL) over dumping the full argument object.
-5. **Files produced** — every path the session wrote through its editing tools,
-   grouped by path, with the operation sequence and the content: full final
-   content for whole-file writes, old/new pairs for edits. This section is
-   derived from tool-call arguments in the log, never from the current
-   filesystem — it shows what the session did, not what later sessions left
-   behind.
-6. **Outcome** — the final assistant message, the reported token usage, and the
-   stop reason.
+   - every tool call as a numbered step, `### Step {n} · {tool} — {status}`,
+     where the status is `ok`, `error`, or `no result recorded`. Under it, the
+     identifying argument is labelled by what it is — **Command**, **File**,
+     **Pattern**, **Query**, **URL** — rather than dumping the full argument
+     object; a multi-line argument is fenced. The matched execution result
+     follows in a collapsed block labelled **Output of step {n}** with its
+     line count.
+5. **Files changed by this session** — a recap of the editing steps above,
+   grouped by path, each naming the steps that wrote it (`written in step 5`,
+   `edited in steps 3, 7`), with the content: full final content for
+   whole-file writes, old/new pairs for edits. This section is derived from
+   tool-call arguments in the log, never from the current filesystem — it
+   shows what the session did, not what later sessions left behind.
+6. **Outcome** — the reported token usage. The final assistant message is the
+   last **Agent** quote of the actions, not repeated here.
 
 ## 3. Truncation
 
@@ -137,10 +162,10 @@ totals. Two capture facts shape the rendering:
   assistant text event of the stream. An envelope a capture kept as JSON
   adds its text only when the transcript does not already end with it — a
   conclusion that lives only in the envelope is never dropped.
-- The stream does not echo the delivered prompt unless a `user` event
-  carries plain text without tool results — text riding along a tool result
-  is injected context, not the prompt. A session without an echoed prompt
-  renders the explicit no-prompt marker rather than an inferred one.
+- The stream does not echo the delivered prompt, so the report's prompt is
+  the prompt record (§1.1). For a log without one, a `user` event carrying
+  plain text without tool results stands in; text riding along a tool result
+  is injected context, never the prompt.
 
 ### 6.3 Codex Stream
 
@@ -170,5 +195,6 @@ descendant appended after it is body again, in log order.
 - No HTML or dashboard surface; the report is plain Markdown.
 - Not a replacement for [§FS-rhei-run-report](rhei-run-report.spec.md#fs-rhei-run-report-per-run-report) or [§FS-rhei-summary](rhei-summary.spec.md#fs-rhei-summary-rhei-summary); those
   aggregate across sessions.
-- No new capture: the renderer adds no fields to the log format and depends on
-  none beyond what [§FS-rhei-agents.8.2](rhei-agents.spec.md#82-log-format) already specifies.
+- No capture beyond the prompt record (§1.1): the renderer adds no fields to
+  the log format and depends on none beyond what [§FS-rhei-agents.8.2](rhei-agents.spec.md#82-log-format) already
+  specifies.

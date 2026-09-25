@@ -403,30 +403,34 @@ fn collect_tool_result(
     );
 }
 
-/// The argument that identifies a tool call, preferred over dumping the
-/// whole argument object. A search's pattern outranks the directory it
-/// searched. §FS-rhei-session-reports.2
-fn tool_argument_summary(arguments: &serde_json::Value) -> String {
-    const IDENTIFYING_KEYS: &[&str] =
-        &["command", "pattern", "query", "url", "path", "file_path"];
-    if let Some(object) = arguments.as_object() {
-        for key in IDENTIFYING_KEYS {
-            if let Some(value) = object.get(*key).and_then(|v| v.as_str()) {
-                return value.to_string();
-            }
+/// The argument that identifies a tool call, labelled by what it is and
+/// preferred over dumping the whole argument object. A search's pattern
+/// outranks the directory it searched. §FS-rhei-session-reports.2
+fn tool_argument_identity(arguments: &serde_json::Value) -> (&'static str, String) {
+    const IDENTIFYING_KEYS: &[(&str, &str)] = &[
+        ("command", "Command"),
+        ("pattern", "Pattern"),
+        ("query", "Query"),
+        ("url", "URL"),
+        ("file_path", "File"),
+        ("path", "Path"),
+    ];
+    let Some(object) = arguments.as_object() else { return ("Arguments", String::new()) };
+    for (key, label) in IDENTIFYING_KEYS {
+        if let Some(value) = object.get(*key).and_then(|v| v.as_str()) {
+            return (label, value.to_string());
         }
-        // A Codex file change identifies itself by the paths it touched.
-        // §FS-rhei-session-reports.6.3
-        if let Some(changes) = object.get("changes").and_then(|c| c.as_array()) {
-            let paths: Vec<&str> = changes
-                .iter()
-                .filter_map(|change| change.get("path").and_then(|p| p.as_str()))
-                .collect();
-            if !paths.is_empty() {
-                return paths.join(", ");
-            }
-        }
-        return object.keys().map(|k| format!("{k}=…")).collect::<Vec<_>>().join(", ");
     }
-    String::new()
+    // A Codex file change identifies itself by the paths it touched.
+    // §FS-rhei-session-reports.6.3
+    if let Some(changes) = object.get("changes").and_then(|c| c.as_array()) {
+        let paths: Vec<&str> = changes
+            .iter()
+            .filter_map(|change| change.get("path").and_then(|p| p.as_str()))
+            .collect();
+        if !paths.is_empty() {
+            return ("Files", paths.join(", "));
+        }
+    }
+    ("Arguments", object.keys().map(|k| format!("{k}=…")).collect::<Vec<_>>().join(", "))
 }

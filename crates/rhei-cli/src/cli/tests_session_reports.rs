@@ -79,10 +79,12 @@ mod session_reports {
         assert!(text.contains("# plan.1 — cover"));
         assert!(text.contains("**Duration**: 2m · **Exit**: 0"));
         assert!(text.contains("# Task plan.1\ncover the API"));
-        assert!(text.contains("**read** `suite/build.gradle`"));
+        assert!(text.contains("### Step 1 · read — ok\n\n**Path:** `suite/build.gradle`"));
+        assert!(text.contains("<b>Output of step 1</b> · 1 line"));
         assert!(text.contains("plugins { }"));
-        assert!(text.contains("## Files produced"));
-        assert!(text.contains("### `suite/Test.java`"));
+        assert!(text.contains("## Files changed by this session"));
+        assert!(text.contains("### `suite/Test.java` — written in step 2"));
+        assert!(text.contains("content written in step 2"));
         assert!(text.contains("class Test {}"));
         assert!(text.contains("Covered the API."));
         assert!(text.contains("totalTokens"));

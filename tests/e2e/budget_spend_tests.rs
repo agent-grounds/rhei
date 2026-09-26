@@ -381,3 +381,80 @@ fn a_second_currency_in_one_project_is_refused_before_any_agent_starts() {
         spawns(&dir)
     );
 }
+
+/// A price book denominated in something other than the dollar this binary was
+/// written in, so the account it establishes is too. §FS-rhei-cost-accounting.5
+const EUR_PRICES: &str = r#"{
+  "schema": "rhei.accounting.prices.v1",
+  "price_book_id": "fixture-eur-2026-09-01",
+  "currency": "EUR",
+  "entries": [{
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-6",
+    "effective_at": "2026-09-01T00:00:00Z",
+    "unit": "1m_tokens",
+    "input_total_micro": 3000000,
+    "input_cached_read_micro": 300000,
+    "input_cache_write_micro": 3750000,
+    "output_total_micro": 15000000
+  }]
+}"#;
+
+/// A `claude-code` spawn that reports no usage at all.
+///
+/// The extractor is chosen by the agent id, so a record *is* written — and with
+/// no token measured in it, its pricing status is `not-applicable`: nothing
+/// measured, nothing priced, and **no currency named**, which is the arm the
+/// case below is about. §FS-rhei-cost-accounting.5
+const SILENT_FINISHING_AGENT: &str = r#"root = pathlib.Path(env('RHEI_ROOT'))
+append(root / 'runtime' / 'spawn-count.log', '{}\n'.format(env('RHEI_STATE')))
+result('done\n')
+"#;
+
+/// An amount with no currency of its own is settled in the account's, not in a
+/// guess.
+///
+/// One account holds exactly one currency (§FS-rhei-budgets.5.5), so a settle
+/// that stamped `USD` on a record that named none would be a foreign receipt to
+/// a ledger denominated in anything else: refused, and refused *silently*,
+/// because a visit that ends may not fail a run over a unit nobody spent. What
+/// would be left is the reserve standing as `unsettled` — and the mark is the
+/// whole point of keeping three of them. `unsettled` sends an operator after a
+/// run that went away; this day wants a price for the model it ran.
+// §FS-rhei-budgets.5.5 §FS-rhei-budgets.6.2
+#[test]
+fn a_record_that_names_no_currency_is_settled_in_the_accounts_own() {
+    let (dir, plan, machine) = setup_spend(
+        "budget-spend-eur",
+        &spend_finishing(PRICED_TARGET),
+        SILENT_FINISHING_AGENT,
+        "claude-code",
+        PRICED_MODEL,
+        "",
+    );
+    let prices = write_fixture_file(&dir, "eur-prices.json", EUR_PRICES);
+    let prices_arg = prices.to_string_lossy().into_owned();
+
+    assert_success(&run_at(
+        "run",
+        &plan,
+        &machine,
+        Some(SPEND_DAY),
+        &["--no-tui", "--no-callbacks", "--prices", &prices_arg],
+    ));
+    let shown = budget_show(&plan, Some(SPEND_DAY));
+
+    assert_success(&shown);
+    assert!(
+        shown.stdout.contains("project spend: 20.00 EUR consumed + 0.00 EUR outstanding"),
+        "the worst case is charged to the day in the account's own currency \
+         rather than left outstanding by a receipt the ledger refused; got:\n{}",
+        shown.stdout
+    );
+    assert!(
+        shown.stdout.contains("estimated:   1 unpriced (charged at 20.00 EUR each)"),
+        "and it carries the mark that says what to do about it, not the one \
+         that says a run disappeared; got:\n{}",
+        shown.stdout
+    );
+}

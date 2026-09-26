@@ -69,7 +69,12 @@ struct HeldClaim {
 #[derive(Clone, Debug)]
 struct Measurement {
     amount_micro: u64,
-    currency: String,
+    /// What the accounting record said it was denominated in, and `None` where
+    /// the record said nothing — a pricing status of `not-applicable` carries
+    /// no currency. Guessing one here would put a foreign receipt to an
+    /// account that holds exactly one currency, which the ledger refuses; the
+    /// settle falls back to the account's own instead. §FS-rhei-budgets.5.5
+    currency: Option<String>,
     basis: SpendBasis,
 }
 
@@ -401,19 +406,14 @@ fn budget_record_spend(task_id_str: &str, usage: Option<&rhei_tui::UsageSummary>
     let Some(usage) = usage else { return };
     // A record whose pricing is `unpriced` or `not-applicable` carries no
     // amount, and a day that read `$0.00` for it would read healthy hardest
-    // for the models nobody has written a price for yet.
-    let measurement = match usage.cost_micro.or(usage.priced_cost_micro) {
-        Some(amount_micro) => Measurement {
-            amount_micro,
-            currency: usage.currency.clone().unwrap_or_else(|| "USD".into()),
-            basis: SpendBasis::Measured,
-        },
-        None => Measurement {
-            amount_micro: built_in::SPEND_RESERVE,
-            currency: usage.currency.clone().unwrap_or_else(|| "USD".into()),
-            basis: SpendBasis::Unpriced,
-        },
+    // for the models nobody has written a price for yet. The currency is
+    // carried as the record gave it, `None` included: a `not-applicable`
+    // record names none, and the settle knows the account's own.
+    let (amount_micro, basis) = match usage.cost_micro.or(usage.priced_cost_micro) {
+        Some(amount_micro) => (amount_micro, SpendBasis::Measured),
+        None => (built_in::SPEND_RESERVE, SpendBasis::Unpriced),
     };
+    let measurement = Measurement { amount_micro, currency: usage.currency.clone(), basis };
     with_claims(|claims| {
         if let Some(claim) = claims.get_mut(task_id_str) {
             claim.measured.push(measurement);
@@ -440,9 +440,9 @@ fn budget_settle_visit(workspace_root: &Path, task_id_str: &str) {
     let Ok(Some(account)) = Account::locate(&project_root) else { return };
     let Ok(mut journal) = account.open(true) else { return };
     if claim.started {
-        // The account's own, so an arm with nothing to settle is charged in
-        // the currency its reserve was taken in rather than in a guess.
-        // §FS-rhei-budgets.5.5
+        // The account's own: an arm with no currency — nothing to settle, or a
+        // record whose pricing named none — is charged in the one its reserve
+        // was taken in rather than in a guess. §FS-rhei-budgets.5.5
         let held = journal.snapshot().ok().and_then(|snapshot| snapshot.currency);
         let fallback = held.as_deref().unwrap_or("USD");
         // Money first, because the travel release below may return early and
@@ -454,7 +454,7 @@ fn budget_settle_visit(workspace_root: &Path, task_id_str: &str) {
                 m.amount_micro
             });
             let basis = measured.map_or(SpendBasis::Unmeasurable, |m| m.basis);
-            let currency = measured.map_or(fallback, |m| m.currency.as_str());
+            let currency = measured.and_then(|m| m.currency.as_deref()).unwrap_or(fallback);
             let _ = journal.settle_spend(arm, amount, currency, basis, &audit);
         }
         if let Some(travel) = claim.travel {

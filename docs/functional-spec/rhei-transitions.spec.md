@@ -780,7 +780,7 @@ Rules:
 - An applied self-loop spends one of the ticket's travel units, like any other
   applied edge; a **poll wait** spends none, because no edge is applied
   ([§FS-rhei-budgets.4.1](rhei-budgets.spec.md#41-travel)). `visits` is the **adjacent** state-entry bound of
-  [§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-four-levels) and neither substitutes for the ticket's travel
+  [§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-five-levels) and neither substitutes for the ticket's travel
   bound nor is charged by it.
 - On a state that declares [`poll:`](rhei-states.spec.md#2-polling-states), the same `stateVisits` entry records poll attempts. Transitions from that state may use `pollAttempts` (alias for `visitCount`) and `pollMaxAttempts` (alias for `poll.max_attempts`) for clarity; both names are only defined on transitions whose `from` state declares `poll:`. A self-loop transition from a poll state is interpreted by `rhei run` as "retry after `poll.interval`" and releases the `--parallel` slot between attempts; once `pollAttempts >= pollMaxAttempts`, the engine refuses self-loops and picks the first matching non-self-loop transition instead.
 

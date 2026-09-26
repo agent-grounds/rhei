@@ -38,6 +38,7 @@ mod block_provenance_tests;
 mod block_terminal_compatibility_tests;
 mod budget_ceiling_tests;
 mod budget_declaration_free_tests;
+mod budget_spend_tests;
 mod budget_support;
 mod budget_travel_halt_tests;
 mod budget_window_tests;

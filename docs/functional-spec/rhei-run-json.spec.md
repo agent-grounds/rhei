@@ -80,8 +80,8 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `message` | Engine diagnostics | `level` (`info`/`warn`/`error`), `text` |
 | `link` | The run produced a URL or file link | `label`, `url` |
 | `agent_output` | A live agent output line (§2.3) | `slot`, `task`, `stream`, `line` |
-| `budget_snapshot` | Once before scheduling, and again after each receipt is durable | `bounds` (one entry per dimension: `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`) |
-| `budget_halt` | An admission was refused | `task`, `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `renews_at`, `remedy`, `reason_code` |
+| `budget_snapshot` | Once before scheduling, and again after each receipt is durable | `bounds` (one entry per dimension: `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, and `currency` on the spend entry) |
+| `budget_halt` | An admission was refused | `task`, `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `renews_at`, `remedy`, `reason_code`, and on a spend halt `currency`, `unpriced`, `unmeasurable`, `unsettled` |
 | `run_finished` | Once, when the run loop ends (§2.4) | `summary` |
 
 `outcome` is one of `completed`, `failed`, `waiting`, `provider_limited`,
@@ -126,9 +126,16 @@ reaches this stream.
 
 `budget_snapshot` carries the bounds in force before any capacity is spent, so
 a reader that sees only the head of the stream still knows what the run is
-bounded by ([§FS-rhei-budgets.9](rhei-budgets.spec.md#9-visibility)). `budget_halt.remedy` is the single remedy
-that raises the limiter that actually stopped the work, and
-`budget_halt.renews_at` is present exactly when the window contract limited.
+bounded by ([§FS-rhei-budgets.9](rhei-budgets.spec.md#9-visibility)). There is one entry per dimension, spend
+among them; on that entry the amounts are integer micro-units of `currency`
+rather than counts, so a reader never has to parse a rendered `$`
+(§FS-rhei-budgets.5.5). `budget_halt.remedy` is the single remedy that raises
+the limiter that actually stopped the work, and `budget_halt.renews_at` is
+present exactly when the window contract limited — which, for a spend halt, is
+always (§FS-rhei-budgets.3.4). The three mark counts are present on a spend
+halt and are `0` where nothing was charged at the fallback, because a reader
+distinguishing "none" from "not reported" should not have to infer it from an
+absent key (§FS-rhei-budgets.6.2).
 `reason_code` is stable and machine-readable; the human text of the same halt is
 a `message` record at `error` level. Adding these records does not move the
 schema version ([§FS-rhei-run-json.2.2](#22-schema-version)): a reader that does not know them skips

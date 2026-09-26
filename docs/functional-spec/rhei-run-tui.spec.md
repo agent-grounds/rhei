@@ -243,15 +243,18 @@ journal model, the JSON frontend and durable event log retain warning message
 records, and the plain/headless frontend writes them to stderr. Reusing this
 event path preserves the wording and frequency of existing validation warnings.
 
-`BudgetSnapshot` carries the count bounds in force — for each dimension the
+`BudgetSnapshot` carries every bound in force — for each dimension the
 effective bound, its value source, the machine as limiting source where it
-clamped, and the consumed, outstanding and remaining amounts. It is emitted once
-after `RunStarted` and before the first scheduling event, so the bounds are on
-screen *before* any capacity is spent, and again after each receipt is durable
-rather than only at exhaustion. `BudgetHalt` carries the same fields for one
-refused admission plus the task, the accounting mode with its window day key,
-the renewal instant where the window limited, and the one remedy that raises the
-limiter ([§FS-rhei-budgets.9](rhei-budgets.spec.md#9-visibility)). Terminal frontends render both in the Journal
+clamped, and the consumed, outstanding and remaining amounts. The spend
+dimension is one of them, and it carries the account's currency so a frontend
+renders `$25.00` or `25.00 EUR` rather than a bare number whose unit the reader
+has to guess (§FS-rhei-budgets.5.5). It is emitted once after `RunStarted` and
+before the first scheduling event, so the bounds are on screen *before* any
+capacity is spent, and again after each receipt is durable rather than only at
+exhaustion. `BudgetHalt` carries the same fields for one refused admission plus
+the task, the accounting mode with its window day key, the renewal instant
+where the window limited, the one remedy that raises the limiter, and on a
+spend halt the three fallback marks ([§FS-rhei-budgets.9](rhei-budgets.spec.md#9-visibility)). Terminal frontends render both in the Journal
 view and keep the latest snapshot in the shared chrome; a halt is additionally
 an `error`-level `Message` so a frontend that renders neither record still says
 why the run stopped.

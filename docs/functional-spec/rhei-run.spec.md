@@ -81,7 +81,7 @@ and project-wide locking, but never become candidates in that run.
   rhei ids.
 - Narrowing selects **candidate** tickets only. It narrows neither where their
   priors resolve nor the project's one invocation account: one account, one
-  balance, whatever the selection ([§FS-rhei-budgets.1](rhei-budgets.spec.md#1-the-two-counts)). A narrowing that
+  balance, whatever the selection ([§FS-rhei-budgets.1](rhei-budgets.spec.md#1-the-two-counts-and-the-days-spend)). A narrowing that
   opened a second balance would make `--rhei` the faucet.
   A candidate may still be blocked by a prior in a rhei outside
   the scope, and the no-work diagnostic names that prior as out of scope
@@ -797,7 +797,7 @@ raises the limiter that actually stopped the work ([§FS-rhei-budgets.8](rhei-bu
 never names an inner value the ceiling would clamp.
 
 This is a **fourth** distinct bound over the same spawns, and it answers a
-question none of the other three asks ([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-four-levels)): the
+question none of the other three asks ([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-five-levels)): the
 timeout bounds one round, `attempts:` bounds one visit, the pass loop of step 9
 bounds *this* run, and admission bounds the ticket's whole life and the
 project's whole day. A run that ends because the pass loop made no progress and

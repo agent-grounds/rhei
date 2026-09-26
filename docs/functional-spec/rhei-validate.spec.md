@@ -95,15 +95,16 @@ pass `--state-machine`.
    The warning is advisory: it does not change plan validity, export
    resolution, readiness, or the filesystem a worker can read
    (§FS-rhei-plan-language.3.12).
-7. Report each count bound in force as a **warning**, one line per dimension,
-   with its effective value, its value source, and — when the machine clamped a
+7. Report each bound in force as a **warning**, one line per dimension, with
+   its effective value, its value source, and — when the machine clamped a
    higher request — the machine as the limiting source
-   ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued)). Every plan has all three bounds in force, so
-   every successful validation reports all three; a machine that has configured
-   nothing reports `built_in` three times. Asking for more than the machine
-   allows is **never** an error here — the report says the plan asked and the
-   machine limited, and validation still succeeds
-   ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)).
+   ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued)). Every plan has all four bounds in force, so
+   every successful validation reports all four; a machine that has configured
+   nothing reports `built_in` four times. The spend bound is reported like the
+   three counts, as the bare number its settings key takes
+   (§FS-rhei-budgets.2.1). Asking for more than the machine allows is **never**
+   an error here — the report says the plan asked and the machine limited, and
+   validation still succeeds ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)).
 
    Validation resolves and reports these bounds; it never locks, appends, or
    debits the account ([§FS-rhei-budgets.6.3](rhei-budgets.spec.md#63-what-never-debits)).

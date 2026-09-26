@@ -1,18 +1,23 @@
-# FS-rhei-budgets: Bounded ticket travel and project invocations
+# FS-rhei-budgets: Bounded ticket travel, project invocations, and a day's spend
 
-Every ticket may make a finite number of moves, and every project may be
-admitted a finite number of neural starts. Both bounds are in force on every
-plan and every machine without anyone declaring anything, both are visible with
-their value and their source before the first agent starts, and both stop the
-work they bound where it stands rather than inventing an outcome for it. This
-is the user-visible realization of [§REQ-bounded-neural-work](../requirements/bounded-neural-work.spec.md#req-bounded-neural-work-every-unit-of-neural-work-is-bounded-before-it-starts); [§AR-neural-admission](../architecture/neural-admission.spec.md#ar-neural-admission-one-serialized-account-beneath-every-neural-start)
+Every ticket may make a finite number of moves, every project may be admitted a
+finite number of neural starts, and every project may be charged a finite
+amount of measured spend in a day. All three bounds are in force on every plan
+and every machine without anyone declaring anything, all three are visible with
+their value and their source before the first agent starts, and all three stop
+the work they bound where it stands rather than inventing an outcome for it.
+This is the user-visible realization of [§REQ-bounded-neural-work](../requirements/bounded-neural-work.spec.md#req-bounded-neural-work-every-unit-of-neural-work-is-bounded-before-it-starts); [§AR-neural-admission](../architecture/neural-admission.spec.md#ar-neural-admission-one-serialized-account-beneath-every-neural-start)
 owns the runtime boundary beneath it.
 
-Provider-billed spend is not bounded here. That is a separate obligation on
-`agent-grounds/rhei#107`, and nothing in this specification qualifies a
-transport, brokers a request, confines a process, or settles money.
+The spend bounded here is **measured** spend, read from the cost accounting
+record a completed invocation already produces §FS-rhei-cost-accounting.
+Nothing in this specification qualifies a transport, brokers a request,
+confines a process, or settles money: spend as a provider bills it is the
+stricter grade and remains an obligation on `agent-grounds/rhei#107`. What is
+added here is a ceiling over what this engine's own records say was spent
+§REQ-bounded-neural-work.6.
 
-## 1. The two counts
+## 1. The two counts and the day's spend
 
 **Travel** is the number of applied transitions one ticket may make over the
 lifetime of its identity. It is a property of the ticket, it is persisted with
@@ -23,12 +28,20 @@ property of the **project** — one durable account shared by every rhei of the
 project, every member added later, every concurrent `rhei run`, and every nested
 runtime. A bare rhei is the single rhei of its implicit project ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
 
-Both are integer counts. Neither is a duration and neither is an amount of
-money. Neither is `visits:`, `attempts:`, or a poll counter: those bound a state
-entry, and they may refresh or increment without touching either count
-([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-four-levels)).
+**Spend** is the measured cost a project may be charged during one UTC day.
+Like invocations it is a property of the **project**, and the same one durable
+account holds it. Unlike either count it is an amount of money: admission
+tallies no unit of it, and its value comes from the accounting record the
+invocation produced §FS-rhei-cost-accounting.
 
-At every durable boundary, for each count:
+Travel and invocations are integer counts. Neither is a duration and neither is
+an amount of money. Neither is `visits:`, `attempts:`, or a poll counter: those
+bound a state entry, and they may refresh or increment without touching either
+count ([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-five-levels)). Spend is the amount, held in integer
+micro-units of the account's currency so that the arithmetic below stays exact
+and no rounding accumulates §FS-rhei-cost-accounting.5.
+
+At every durable boundary, for each of the three:
 
 ```text
 consumed + outstanding <= effective bound
@@ -51,7 +64,7 @@ effective bound = min(resolved value, machine value)
 
 Where machine-global settings configure no value for a dimension, the built-in
 default **is** the machine value and therefore the ceiling. There is no
-unconfigured state in which a count dimension is unbounded
+unconfigured state in which any of the three dimensions is unbounded
 ([§REQ-bounded-neural-work.2](../requirements/bounded-neural-work.spec.md#2-bounded-by-default-refusing-nothing-that-runs-today)).
 
 Requesting more than the machine allows is **never a validation refusal**. The
@@ -60,13 +73,18 @@ reports the bound says so. Refusing it would make a template invalid on the
 machine that did not write it; honoring it would let a template raise the cap of
 the machine that pays for it.
 
-The clamp is enumerated to exactly these two count dimensions. `agent_timeout`,
-`attempts:`, `visits:`, `poll.max_attempts`, and every other setting keep their
-existing resolution and are not clamped by anything here.
+The clamp is enumerated to exactly the two count dimensions and the spend
+dimension. `agent_timeout`, `attempts:`, `visits:`, `poll.max_attempts`, and
+every other setting keep their existing resolution and are not clamped by
+anything here.
+
+The first term of the chain above is not open to every dimension:
+`spend_per_day` resolves on the **machine and project tiers only**
+§FS-rhei-budgets.2.1.
 
 ### 2.1. The settings keys
 
-Three keys in the `defaults` block of global or project settings
+Four keys in the `defaults` block of global or project settings
 ([§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults)):
 
 | Key | Type | Built-in | Bounds |
@@ -74,17 +92,34 @@ Three keys in the `defaults` block of global or project settings
 | `transition_limit` | positive integer | `80` | applied transitions per ticket identity |
 | `invocations_per_day` | positive integer | `200` | admitted neural starts per project per UTC day, in the window contract |
 | `invocation_lifetime_max` | positive integer | `6000` | the ceiling on an explicit lifetime allowance |
+| `spend_per_day` | positive number | `400.00` | measured spend per project per UTC day |
 
-The three built-in values are measured rather than chosen, and the measurement —
+The four built-in values are measured rather than chosen, and the measurement —
 the definition of a healthy history, the observed maxima, the multiplier, and
 what the evidence could not see — is recorded in [§REQ-bounded-neural-work.7](../requirements/bounded-neural-work.spec.md#7-the-defaults-are-measured-not-chosen) so
-that a re-measurement can supersede them honestly.
+that a re-measurement can supersede them honestly. The spend number was
+measured over a different corpus under a restated definition of healthy, which
+§REQ-bounded-neural-work.7.5 states separately for exactly that reason.
 
 `invocation_lifetime_max` is a ceiling, not an allowance: nothing consumes it
 and no project receives it. It clamps `rhei budget init` and every `adjust`.
 
-A value that is zero, negative, fractional, or the word `unlimited` is a
-settings error naming the key.
+`spend_per_day` is a **bare number** carrying no symbol and no currency code:
+`400`, `25.00` and `9.5` are all accepted, to at most six decimal places, which
+is the micro-unit the amount is held in. The currency is the account's own and
+is fixed by §FS-rhei-budgets.5.5, not by this key, because a machine setting
+that named a currency could disagree with the records it is charged from and
+nothing would say which of the two was wrong.
+
+`spend_per_day` is the one key of the four a plan or a profile may **not**
+declare; it resolves on the machine and project tiers only. A plan that could
+raise a day's spend would be raising the cap of whichever machine paid for it,
+which is the same reason `invocations_per_day` is not plan-declarable.
+
+For the three counts, a value that is zero, negative, fractional, or the word
+`unlimited` is a settings error naming the key. For `spend_per_day` a
+fractional value is the point of the key, so the error is the narrower one:
+zero, a negative, the word `unlimited`, or more than six decimal places.
 
 ### 2.2. `transition_limit` on a profile
 
@@ -204,6 +239,27 @@ the authority the system clock has and no more**: the highest-day-key guard of
 [§FS-rhei-budgets.3.3](rhei-budgets.spec.md#33-the-window-is-a-key-not-a-refill) applies to it unchanged, so it can open a new day and can never un-spend a
 recorded one.
 
+### 3.4. The spend window
+
+Spend is bounded per **UTC calendar day**, always. It is not a third invocation
+contract and it does not follow the one the account holds: an account moved to
+the lifetime contract by `rhei budget init` still has its spend bounded by the
+day, because §FS-rhei-budgets.10 grants no spend allowance for a lifetime
+contract to bound.
+
+The day key is the one [§FS-rhei-budgets.3.3](rhei-budgets.spec.md#33-the-window-is-a-key-not-a-refill) already defines, read through the one
+clock seam of [§FS-rhei-budgets.3.3.1](rhei-budgets.spec.md#331-reading-the-clock-from-the-environment), and it is a key rather than a refill for
+the same reasons. A day's spend capacity is never written, granted, or reset;
+every amount is stamped with the UTC day it was charged in, and the remainder
+is derived by replay:
+
+```text
+remaining = spend_per_day - consumed(today) - outstanding(today)
+```
+
+The highest-day-key guard of [§FS-rhei-budgets.3.3](rhei-budgets.spec.md#33-the-window-is-a-key-not-a-refill) applies unchanged, so a clock
+moved backwards keeps charging the day already recorded and mints no money.
+
 ## 4. What spends a count
 
 ### 4.1. Travel
@@ -282,9 +338,28 @@ the UTC instant, the actor, the receipt `kind`, the `window` day key where one
 applies, and the kind's payload.
 
 The `kind` vocabulary is closed: `initialize`, `identity`, `reserve`, `start`,
-`release`, `transition`, and `adjust`. Replaying a receipt id with identical
-content is idempotent; replaying it with different content is corruption. An
-unknown kind is retained and makes this build read-only until it understands it.
+`release`, `transition`, `adjust`, and `spend`. Replaying a receipt id with
+identical content is idempotent; replaying it with different content is
+corruption. An unknown kind is retained and makes this build read-only until it
+understands it.
+
+A `reserve` receipt for a neural start additionally carries the worst case
+reserved against the day, `spend_reserve_micro`, and the account's
+`spend_currency`. They ride the existing kind because one transaction decides
+them at one instant, and a build that predates them ignores payload keys it
+does not know, so an account that has only ever reserved still reads on an
+older build.
+
+A `spend` receipt is the settle, and it has to be a kind of its own because
+every other kind is appended *before* a measured cost can exist. It names the
+`reservation_id` it settles, the `amount_micro` charged, the `currency`, and a
+`basis` of `measured`, `unpriced`, or `unmeasurable` §FS-rhei-budgets.6.2. At
+most one `spend` receipt may name a reservation: a second naming the same
+reservation with different content is corruption, and one naming a reservation
+the chain does not hold is corruption. A build that does not know the kind
+reads the account **read-only** rather than refusing it, which is what the
+closed-vocabulary rule above already promises and what a downgrade across this
+version is owed.
 
 A ticket's identity is bound by **source path and content hash**, so several
 live sources are tolerated only while their bytes agree. That is what makes a
@@ -348,6 +423,26 @@ today, which [§REQ-bounded-neural-work.2](../requirements/bounded-neural-work.s
 accidentally lost tail, not a hand-edited ledger**, and that is the whole of
 what it claims.
 
+### 5.5. One currency per account
+
+A project account is denominated in exactly **one** currency, fixed by the
+first receipt it holds that carries an amount. That is a `reserve`, so the
+currency comes from the composed price book, which is validated before any
+agent starts. An account that has never carried an amount has no currency yet
+and takes the next one it is shown.
+
+A run whose composed price book names a currency other than the one the account
+already holds is **refused before any agent starts**, naming both currencies
+and the account. Nothing is converted: an exchange rate is a fact about a day
+that this ledger does not hold, and adding two currencies would make every
+number above this line wrong without saying so.
+
+This is the same answer §FS-rhei-cost-accounting.5.1 already gives for a second
+currency arriving in one accounting root, taken at a different boundary and for
+a different reason — that check protects a rollup, this one protects a bound —
+which is why the rule is stated here, where the account that holds the currency
+is specified, rather than in the accounting specification.
+
 ## 6. Admission
 
 ### 6.1. The transaction
@@ -364,10 +459,13 @@ serialized transaction:
    **settle** the ticket identity against what was replayed: the document's own,
    else the binding the ledger already holds for it ([§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal)), else a
    fresh one;
-3. check one travel unit for the ticket and one invocation unit per arm against
-   the effective bounds and against every ancestor envelope;
-4. append and durably sync one reservation carrying every unit, or refuse and
-   append nothing;
+3. check one travel unit for the ticket, one invocation unit per arm, and the
+   worst case each arm may spend (§FS-rhei-budgets.6.2) against the effective
+   bounds and against every ancestor envelope — in that order, so that a spawn
+   standing at two bounds at once is refused on the count and reports the text
+   it already reported (§FS-rhei-budgets.8);
+4. append and durably sync one reservation carrying every unit and every
+   reserved amount, or refuse and append nothing;
 5. only then create the subprocess.
 
 One account held exclusively is what serializes competing processes, parallel
@@ -382,9 +480,10 @@ history, because step 2 will find the binding again.
 
 ### 6.2. Reserve, then settle
 
-A reservation becomes **consumed** once a start is recorded, confirmed or
-ambiguous, and is never settled downward. `record_start` is appended immediately
-before the spawn call and refined after it returns.
+**For the two counts, the settle is monotone.** A reservation becomes
+**consumed** once a start is recorded, confirmed or ambiguous, and is never
+settled downward. `record_start` is appended immediately before the spawn call
+and refined after it returns.
 
 There is exactly **one lawful release** of a reserved invocation unit: engine-
 side proof that no process could have started. That proof is the **absence of a
@@ -400,6 +499,50 @@ admission that already holds the account exclusively.
 No event downstream of an admitted start, and no accounting or observational
 record, can authorize, refund, or reverse a consumed invocation unit or an
 applied travel unit ([§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)).
+
+**For spend, the settle revises.** Money is not a count
+([§REQ-bounded-neural-work.4](../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)), and the monotone rule above is scoped to the two
+counts in writing because a spend amount is *expected* to change exactly once.
+What is reserved before a request is a worst case; what the day carries
+afterwards is what the request cost. A settle that lowers it is an estimate
+being corrected, not capacity being created, and it is the only write that may
+lower an amount.
+
+The worst case reserved for every neural start is a flat **20.00** in the
+account's currency. It is not derived per model, because no agent profile
+declares a token or a context limit to derive one from; it is the largest
+single invocation this workspace has recorded, rounded up, and it carries no
+margin of its own §REQ-bounded-neural-work.7.5. Its size bounds the *in-flight*
+exposure rather than the day's total, because a settled reservation gives it
+back.
+
+A settle has four outcomes, and only the first revises:
+
+| what the invocation produced | what the day carries | mark |
+|---|---|---|
+| an accounting record priced with an amount | the measured amount | — |
+| a record whose pricing is `unpriced` or `not-applicable` | the reserve | `unpriced` |
+| no accounting record at all | the reserve | `unmeasurable` |
+| a settle that could not be written | the reserve, left outstanding | `unsettled` |
+
+The third row decides where the fallback has to be charged. Usage extraction is
+not supported for every agent §FS-rhei-cost-accounting.3.2, so for that class
+no record is ever written and a settle never runs at all. The worst case is
+therefore charged at the **reserve**, which always runs because admission
+always runs. **No invocation is ever charged nothing.** A dimension that read
+zero for every transport it cannot price would be silently absent for exactly
+the transports no other bound watches.
+
+The fourth row is best-effort preserved and never fails the run. An unsettled
+amount is not stored as a mark but *derived*: a reservation carrying a spend
+reserve, with no `spend` receipt, whose owning run is gone — the same test the
+release step above already performs, on the same account under the same lock.
+It stays outstanding, so a wrong day reads high rather than silently low, and
+every surface of §FS-rhei-budgets.9 says how many there are.
+
+A `spend` receipt settles money and nothing else. It releases no travel unit
+and no invocation unit and changes neither count in either direction, so every
+paragraph above this one is as true after a settle as before it.
 
 ### 6.3. What never debits
 
@@ -447,7 +590,7 @@ pass makes no progress, naming every halted ticket.
 
 The halt names, in one place:
 
-- the **dimension** — ticket travel, or project invocations;
+- the **dimension** — ticket travel, project invocations, or project spend;
 - the **effective bound** and its **value source**, plus the machine as the
   **limiting source** when the value was clamped ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued));
 - **consumed**, **outstanding**, and **remaining**;
@@ -493,6 +636,41 @@ error: project 'panta' has spent today's invocation capacity
        renews at:   2026-09-25T00:00:00Z
 ```
 
+A spend halt has the same six rows and the same labels. Its remedy is the
+renewal instant, because spend is bounded by a window §FS-rhei-budgets.3.4 and
+the rule above does not change for being about money — which costs the halt the
+chance to mention `defaults.spend_per_day`, and is the accepted price of one
+halt reading the same on every surface:
+
+```text
+error: project 'panta' has spent today's measured budget
+       dimension:   project spend
+       bound:       $25.00 (machine)
+       consumed:    $6.22  outstanding: $20.00  remaining: $0.00
+       mode:        window (2026-09-26Z)
+       renews at:   2026-09-27T00:00:00Z
+```
+
+Two things in that shape are particular to spend. `outstanding:` carries the
+worst case of the request that was just refused, added to whatever the day
+already held outstanding, because consumed alone never reaches a spend
+ceiling — what reaches it is consumed plus the next reserve, and a halt whose
+arithmetic the reader cannot do has not said what stopped the work. And every
+amount is written in the account's currency §FS-rhei-budgets.5.5: `$` before
+the number for USD, the code after it otherwise, as in `25.00 EUR`.
+
+A spend halt carries **one optional row**, present only where some part of the
+day was charged at the fallback rather than measured, so a fully measured halt
+has exactly the six rows above:
+
+```text
+       estimated:   2 unpriced, 1 unmeasurable, 1 unsettled (charged at $20.00 each)
+```
+
+It sits between `consumed:` and `mode:`, because it qualifies the numbers above
+it. A mark with no members is left out of the list rather than printed as a
+zero.
+
 ## 9. Visibility
 
 Every bound in force is visible with its value and its source **before** capacity
@@ -506,13 +684,24 @@ is spent, on every surface that already shows autonomous work:
   exhaustion ([§FS-rhei-run-tui.1.1](rhei-run-tui.spec.md#11-event-surface)).
 - **`rhei run --json`** carries the same facts as records with stable reason
   codes ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)).
-- **the run report** records the starting and ending snapshot of both counts,
-  every reservation the run made, and the exact halt reason
+- **the run report** records the starting and ending snapshot of all three
+  dimensions, every reservation the run made, and the exact halt reason
   ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)).
 
-Where cost accounting also exists for a run, the two are reported side by side
-and neither is described as the other: accounting is observational, and where
-its extraction fails the counts are unaffected.
+Every surface that carries the spend dimension carries the account's currency
+with it, and says how much of the day was charged at the fallback rather than
+measured, by the three marks of §FS-rhei-budgets.6.2.
+
+Where cost accounting also exists for a run, the two are still reported side by
+side and neither is described as the other. Accounting only measures, prices
+and rolls up: it resolves no ceiling and refuses no spawn, and **where its
+extraction fails the counts are unaffected**. That sentence is the whole of the
+distinction and it is unchanged. What is new is that one dimension of the
+budget is now *charged* from those records rather than only displayed beside
+them, and it is the dimension whose unit is money rather than a count. Where
+extraction fails, that dimension is charged the worst case rather than nothing
+§FS-rhei-budgets.6.2 — which is a fact about the bound, not a change to what
+accounting measured.
 
 ## 10. `rhei budget`
 
@@ -530,10 +719,24 @@ the given allowance, clamped by `defaults.invocation_lifetime_max`. It is
 optional: a project that never runs it is bounded by the window contract and is
 never refused for not having run it.
 
-`show` is read-only and reports, for both counts, the effective bound, its value
-source and limiting source, consumed, outstanding, remaining, the contract in
-force, the window day key where one applies, the account's health, and the
-project identity.
+`show` is read-only and reports, for each of the three dimensions, the
+effective bound, its value source and limiting source, consumed, outstanding,
+remaining, the contract in force, the window day key where one applies, the
+account's health, and the project identity. For spend it reports the amounts in
+the account's currency and additionally how much of the day was charged at the
+fallback rather than measured, by the three marks of §FS-rhei-budgets.6.2.
+
+The marks go on their own line beneath the spend line, in the words the halt
+uses, and the line is absent where the whole day was measured:
+
+```text
+project spend: $20.00 consumed + $0.00 outstanding / $400.00; $380.00 remaining (window (2026-09-26Z))
+  estimated:   1 unpriced (charged at $20.00 each)
+```
+
+`init` and `adjust` take no spend argument and gain none. There is no spend
+allowance to grant: spend is bounded by a window always §FS-rhei-budgets.3.4,
+and a window is renewed by the passage of time rather than by an audited grant.
 
 `adjust` changes the allowance and never consumption. Every adjustment is
 audited: it records the actor, the UTC instant, the old and new values, the
@@ -562,10 +765,12 @@ performs no mutation.
 | `rhei run --dry-run` | reports the bounds and what the pass would cost, and spends nothing |
 | detached and concurrent runs | the same account, serialized by the same lock ([§FS-rhei-run-headless](rhei-run-headless.spec.md#fs-rhei-run-headless-detached-runs)) |
 | snapshots, appended work, live member admission | a new member joins the run and the one account; joining creates no capacity |
-| cost accounting | untouched and still observational ([§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)) |
+| cost accounting | unchanged in how it measures, prices and rolls up. What is new is that one record it already wrote is now read by the spend dimension ([§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)) |
+| a plan with no spend field | there is no spend field to omit: `spend_per_day` is not plan-declarable, and every plan runs under the machine's value or the built-in (§FS-rhei-budgets.2.1) |
+| `rhei budget init` / `adjust` | neither gains a spend argument, because there is no spend allowance to grant (§FS-rhei-budgets.10) |
 | git | the account is machine state and is gitignored; a project that commits it anyway is *adopted* on the next machine ([§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted)) |
 
-Four things do change for someone, and they are the point rather than a side
+Six things do change for someone, and they are the point rather than a side
 effect:
 
 1. A project that starts more than 200 agent processes in a UTC day now stops.
@@ -574,6 +779,14 @@ effect:
 3. `rhei transition` by hand now spends one travel unit. Silence becomes a count.
 4. A **damaged** account is an error where there was previously no account at
    all. A **missing** one is not: absence is lawful and silent.
+5. A project charged more than $400.00 of measured spend in a UTC day now
+   stops, and an invocation Rhei cannot price or cannot measure is charged
+   20.00 rather than nothing. The busiest project-day in this workspace's whole
+   archive was $96.37, so the ceiling is not what a working project meets — but
+   more than twenty unmeasurable invocations in one day is, and that is the
+   sharpest edge in the bound rather than an oversight §FS-rhei-budgets.6.2.
+6. A project whose price book names a currency the account does not hold is
+   refused before any agent starts, where it ran before §FS-rhei-budgets.5.5.
 
 And one thing stops being true: `rhei reset` no longer returns a ticket to a
 state from which it can consume without limit.

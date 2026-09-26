@@ -343,3 +343,179 @@ pub(super) fn strip_budget_identity(plan: &Path) {
     );
     fs::write(plan, after).expect("write the plan without its budget identity");
 }
+
+/// The instant every spend scenario runs at, so a halt's window key and its
+/// renewal instant are facts about the fixture rather than about the day the
+/// suite was run. §FS-rhei-budgets.3.3.1
+pub(super) const SPEND_DAY: &str = "2026-09-26T12:00:00Z";
+pub(super) const SPEND_DAY_KEY: &str = "window (2026-09-26Z)";
+pub(super) const SPEND_RENEWAL: &str = "2026-09-27T00:00:00Z";
+
+/// What one invocation of [`PRICED_AGENT`] costs under the built-in price book.
+///
+/// 100,000 uncached input tokens at $3.00/1M and 180,000 output tokens at
+/// $15.00/1M is $0.30 + $2.70 exactly. The numbers are chosen to land on a
+/// round figure so that a halt's arithmetic is readable in the assertion
+/// rather than only in a comment. §FS-rhei-cost-accounting.5
+pub(super) const PRICED_INVOCATION: &str = "$3.00";
+
+/// The flat worst case every neural start reserves against the day.
+/// §FS-rhei-budgets.6.2
+pub(super) const SPEND_RESERVE: &str = "$20.00";
+
+/// A ping-pong that only a spent bound ends, spawning a priced `claude-code`
+/// rather than a bare `mock`.
+///
+/// The agent id is spelled `claude-code` because the accounting extractor is
+/// chosen by it, so a profile under that name is how a fixture earns a real
+/// invocation record without a real Claude Code on the machine. The model is
+/// `anthropic:claude-sonnet-4-6` because it is the built-in price book's one
+/// entry, so the record prices rather than reading `unpriced`.
+/// §FS-rhei-cost-accounting.4
+pub(super) fn spend_ping_pong(target: &str) -> String {
+    format!(
+        r#"name: budget-spend-ping-pong
+version: 1
+states:
+  work:
+    initial: true
+    description: Do a round of work
+    target: {target}
+    agent_timeout: 60s
+    outputs:
+      - name: work
+        path: runtime/work.md
+  review:
+    description: Send it back for another round
+    target: {target}
+    agent_timeout: 60s
+    outputs:
+      - name: review
+        path: runtime/review.md
+  cancelled:
+    description: Stop
+    final: true
+transitions:
+  - {{ from: work, to: review, description: Round done }}
+  - {{ from: review, to: work, description: Another round }}
+  - {{ from: work, to: cancelled, description: Stop }}
+  - {{ from: review, to: cancelled, description: Stop }}
+"#
+    )
+}
+
+/// One agent state and one move into a terminal state, so exactly one priced
+/// invocation is recorded and the run exits zero.
+pub(super) fn spend_finishing(target: &str) -> String {
+    format!(
+        r#"name: budget-spend-finishing
+version: 1
+states:
+  work:
+    initial: true
+    description: Do the work once
+    target: {target}
+    agent_timeout: 60s
+  completed:
+    description: Done
+    final: true
+transitions:
+  - {{ from: work, to: completed, description: Work done }}
+"#
+    )
+}
+
+/// [`RECORDING_AGENT`] that also reports usage through the capture contract,
+/// so the invocation it stands for lands a priced accounting record.
+/// §FS-rhei-cost-accounting.4
+pub(super) const PRICED_AGENT: &str = r#"root = pathlib.Path(env('RHEI_ROOT'))
+log = root / 'runtime' / 'spawn-count.log'
+seen = len(log.read_text(encoding='utf-8').splitlines()) if log.exists() else 0
+append(log, '{}\n'.format(env('RHEI_STATE')))
+if seen >= 25:
+    raise SystemExit(17)
+capture = env('RHEI_ACCOUNTING_USAGE_PATH')
+if capture:
+    append(
+        capture,
+        '{"schema": "rhei.accounting.usage.v1", "usage": '
+        '{"total_tokens": 280000, "input_tokens": 100000, "output_tokens": 180000}}\n',
+    )
+write(root / 'runtime' / '{}.md'.format(env('RHEI_STATE')), '{}\n'.format(env('RHEI_STATE')))
+"#;
+
+/// [`PRICED_AGENT`] for a plan that reaches a terminal state, so it owes the
+/// ticket's own account. §FS-rhei-states.3.3
+pub(super) const PRICED_FINISHING_AGENT: &str = r#"root = pathlib.Path(env('RHEI_ROOT'))
+append(root / 'runtime' / 'spawn-count.log', '{}\n'.format(env('RHEI_STATE')))
+capture = env('RHEI_ACCOUNTING_USAGE_PATH')
+if capture:
+    append(
+        capture,
+        '{"schema": "rhei.accounting.usage.v1", "usage": '
+        '{"total_tokens": 280000, "input_tokens": 100000, "output_tokens": 180000}}\n',
+    )
+result('done\n')
+"#;
+
+/// A workspace whose machine settings name `agent_id` as the agent behind
+/// `model_id`, with `extra` folded into the `defaults` block.
+///
+/// Both halves of the spend scenarios live in the *machine* file rather than
+/// the project's, because a spend ceiling is a machine value and a project
+/// file resolves one tier lower — it could never be the thing that clamps.
+/// §FS-rhei-agents.1.1.1
+pub(super) fn setup_spend(
+    prefix: &str,
+    machine: &str,
+    agent_body: &str,
+    agent_id: &str,
+    model_id: &str,
+    extra: &str,
+) -> (TestDir, PathBuf, PathBuf) {
+    let dir = unique_temp_dir(prefix);
+    let plan = write_fixture_file(&dir, "plan.rhei.md", PLAN);
+    let machine_path = write_fixture_file(&dir, "states.yaml", machine);
+    let agent = write_python_agent(&dir, "priced-agent.py", agent_body);
+    let command = fixture_command(&agent);
+    write_machine_settings(
+        &dir,
+        &format!(
+            r#"{{
+  "defaults": {{ "agent_timeout": "60s"{extra} }},
+  "agents": {{
+    "{agent_id}": {{
+      "command": {command},
+      "timeout": "60s",
+      "stdin_prompt": true,
+      "intervene_stdin": false,
+      "modes": {{ "yolo": [] }}
+    }}
+  }},
+  "models": {{
+    "{model_id}": {{
+      "provider": "anthropic",
+      "model": "{model_id}",
+      "default_agent": "{agent_id}"
+    }}
+  }}
+}}"#
+        ),
+    );
+    (dir, plan, machine_path)
+}
+
+/// `rhei budget show <PLAN>`, at the fixture's instant so the window key a
+/// snapshot reports is a fact about the fixture rather than about today.
+///
+/// It cannot go through [`run_at`], which puts the plan straight after the
+/// subcommand: `budget` takes its own subcommand there first.
+pub(super) fn budget_show(plan: &Path, now: Option<&str>) -> CliRun {
+    let root = plan.parent().expect("plan has a parent");
+    let mut cmd: Command = rhei_command(home_for(root));
+    cmd.arg("budget").arg("show").arg(plan);
+    if let Some(instant) = now {
+        cmd.env("RHEI_BUDGET_NOW", instant);
+    }
+    CliRun::from(&cmd.output().expect("rhei budget show should run"))
+}

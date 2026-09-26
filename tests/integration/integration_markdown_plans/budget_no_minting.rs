@@ -268,3 +268,169 @@ fn snapshotting_a_spent_project_creates_no_capacity() {
         again.stderr
     );
 }
+
+/// A project whose agent is priced, so a completed invocation lands a real
+/// accounting record and the spend reserve taken for it has something measured
+/// to be revised down to.
+///
+/// The agent id is `claude-code` because the accounting extractor is chosen by
+/// it, and the model is the built-in price book's one entry, so the record
+/// prices rather than reading `unpriced`. §FS-rhei-cost-accounting.4
+///
+/// It writes the artifact of the state it is in and **only** that one, unlike
+/// the fixture above. Writing the sibling's too would satisfy that state's
+/// completion condition before it was ever entered, and the engine would walk
+/// the first edge with no subprocess at all — one free edge per run, so a
+/// travel bound of two would buy one spawn rather than two, and a case about
+/// what two settles do to the counts would be a case about one.
+/// §FS-rhei-states.3.3
+fn priced_budget_project(prefix: &str, moves: u64, spend: &str) -> (TestDir, PathBuf, PathBuf) {
+    let dir = unique_temp_dir(prefix);
+    let agent = write_python_agent(
+        &dir,
+        "priced-agent.py",
+        r#"root = pathlib.Path(env('RHEI_ROOT'))
+append(root / 'runtime' / 'spawns.log', '{}\n'.format(env('RHEI_STATE')))
+capture = env('RHEI_ACCOUNTING_USAGE_PATH')
+if capture:
+    append(
+        capture,
+        '{"schema": "rhei.accounting.usage.v1", "usage": '
+        '{"total_tokens": 280000, "input_tokens": 100000, "output_tokens": 180000}}\n',
+    )
+write(root / 'runtime' / '{}.md'.format(env('RHEI_STATE')), '{}\n'.format(env('RHEI_STATE')))
+"#,
+    );
+    let settings = dir.join(".agent-grounds").join("rhei");
+    fs::create_dir_all(&settings).expect("project settings directory");
+    fs::write(
+        settings.join("settings.json"),
+        format!(
+            r#"{{
+  "defaults": {{
+    "agent_timeout": "60s",
+    "transition_limit": {moves},
+    "spend_per_day": {spend}
+  }},
+  "agents": {{
+    "claude-code": {{
+      "command": {},
+      "timeout": "60s",
+      "stdin_prompt": true,
+      "intervene_stdin": false,
+      "modes": {{ "yolo": [] }}
+    }}
+  }},
+  "models": {{
+    "claude-sonnet-4-6": {{
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6",
+      "default_agent": "claude-code"
+    }}
+  }}
+}}"#,
+            fixture_command(&agent)
+        ),
+    )
+    .expect("project settings");
+    let machine = write_fixture_file(
+        &dir,
+        "states.yaml",
+        r#"name: budget-no-minting-priced
+version: 1
+states:
+  work:
+    initial: true
+    description: A round of work
+    target: claude-code[yolo]:anthropic:claude-sonnet-4-6
+    agent_timeout: 60s
+    outputs:
+      - name: work
+        path: runtime/work.md
+  review:
+    description: Another round
+    target: claude-code[yolo]:anthropic:claude-sonnet-4-6
+    agent_timeout: 60s
+    outputs:
+      - name: review
+        path: runtime/review.md
+  cancelled:
+    description: Stop
+    final: true
+transitions:
+  - { from: work, to: review, description: Round done }
+  - { from: review, to: work, description: Another round }
+  - { from: work, to: cancelled, description: Stop }
+  - { from: review, to: cancelled, description: Stop }
+"#,
+    );
+    let plan = write_fixture_file(
+        &dir,
+        "plan.rhei.md",
+        "# Rhei: No minting\n\n## Tasks\n\n### Task 1: Work\n**State:** work\n",
+    );
+    (dir, plan, machine)
+}
+
+/// The one case in this file that is about the rule being *weakened* rather
+/// than about a seam that could refill a count.
+///
+/// The five cases above pin "nothing creates capacity" against the two counts,
+/// and none of them touches money — so all five would keep passing even if a
+/// spend settle quietly released the invocation unit it was settling against.
+/// That is the hole the spend dimension opens: its settle is the first write in
+/// the ledger allowed to lower a number, and §REQ-bounded-neural-work.4's
+/// monotone rule is scoped to the counts in writing precisely so it can.
+/// Scoped is not the same as suspended.
+///
+/// So: two priced invocations reserve $20.00 each and settle to $3.00 each, and
+/// afterwards both counts read exactly what two admitted starts and two applied
+/// edges owe — not one less, and not one more. The travel halt still arrives on
+/// the third admission with the text it has always had, which is the same fact
+/// stated from the other side.
+// §REQ-bounded-neural-work.4 §FS-rhei-budgets.6.2 §AR-neural-admission.5
+#[test]
+fn a_revising_spend_settle_releases_no_travel_and_no_invocation_unit() {
+    let (dir, plan, machine) = priced_budget_project("budget-spend-settle", 2, "400.00");
+
+    let halted = run_run_command(&plan, &machine, &["--no-callbacks"]);
+
+    assert_eq!(spawn_count(&dir), 2, "the travel bound of two allows two starts");
+    assert_eq!(applied_moves(&dir), 2, "and exactly two applied edges");
+    assert!(!halted.status.success(), "the third admission is refused on travel");
+    assert!(
+        format!("{}{}", halted.stdout, halted.stderr).contains("ticket travel"),
+        "a settled spend amount does not change which bound stopped the \
+         work\nstdout:\n{}\nstderr:\n{}",
+        halted.stdout,
+        halted.stderr
+    );
+
+    let shown = run_budget_show(&plan);
+    assert!(
+        shown.contains("project spend: $6.00 consumed + $0.00 outstanding"),
+        "the premise: two $20.00 reserves were revised down to the $3.00 each \
+         actually cost, and nothing is left outstanding; got:\n{shown}"
+    );
+    assert!(
+        shown.contains("project invocations: 2 consumed + 0 outstanding"),
+        "and the revision released no invocation unit: two starts were \
+         admitted and two remain consumed; got:\n{shown}"
+    );
+}
+
+/// `rhei budget show <PLAN>`, whose stdout is where a released count would
+/// become visible as a number rather than as one more spawn in a later run.
+fn run_budget_show(plan: &Path) -> String {
+    let output = rhei_command()
+        .arg("budget")
+        .arg("show")
+        .arg(plan)
+        .output()
+        .expect("rhei budget show should run");
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    )
+}

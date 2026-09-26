@@ -1346,7 +1346,7 @@ A budget below `1` is raised to `1`: every visit gets at least the invocation
 that makes it a visit.
 
 This budget is the **second** of the four levels a unit of neural work is
-bounded at, and it bounds one visit only ([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-four-levels)).
+bounded at, and it bounds one visit only ([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-five-levels)).
 Entering the state again is a new visit and brings a fresh `attempts:` budget;
 it never brings fresh project capacity. Every neural retry this budget permits
 is charged one invocation against the project's one account
@@ -1740,7 +1740,7 @@ work.
 
 A finite timeout here is the **first** of the four levels a unit of neural work
 is bounded at, and it bounds one orchestrated round only: it says nothing about
-how many rounds there may be ([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-four-levels)). This chain is not
+how many rounds there may be ([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-five-levels)). This chain is not
 clamped by the machine ceiling of [§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from), which is enumerated to
 the two count dimensions and reaches nothing about time.
 

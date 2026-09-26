@@ -14,9 +14,9 @@ That is the failure this requirement removes.
 
 The bounds hold identically on every supported platform. [§REQ-cross-platform](cross-platform.md#req-cross-platform-one-tool-on-linux-macos-and-windows)
 
-## 1. The four levels
+## 1. The five levels
 
-Bounding one unit of neural work is four separate questions, and no level
+Bounding one unit of neural work is five separate questions, and no level
 substitutes for another:
 
 | Level | Bounds | Realized by |
@@ -25,11 +25,15 @@ substitutes for another:
 | 2. One visit | how many times a single state entry may be spawned | `attempts:` [§FS-rhei-agents.3.2.3](../functional-spec/rhei-agents.spec.md#323-attempt-budget) |
 | 3. One ticket | how many moves a ticket may make in its whole life | `transition_limit` [§FS-rhei-budgets.2](../functional-spec/rhei-budgets.spec.md#2-where-a-bound-comes-from) |
 | 4. One project | how many neural starts a project may be admitted | the invocation contract [§FS-rhei-budgets.3](../functional-spec/rhei-budgets.spec.md#3-the-invocation-contracts) |
+| 5. One project-day | how much measured spend a project may be charged | `spend_per_day` §FS-rhei-budgets.3.4 |
 
-Levels 1 and 2 are the ground as it stood before this requirement. Levels 3
-and 4 are what it adds, and both are **counts** — not time, and not money.
+Levels 1 and 2 are the ground as it stood before this requirement. Levels 3, 4
+and 5 are what it adds. Levels 3 and 4 are **counts** — not time, and not
+money. Level 5 is money, and it is the one level whose unit is not a count: it
+is charged from what an accounting record measured rather than from anything
+admission tallies for itself.
 
-Two adjacent state-entry bounds are neither of these four and are not changed
+Two adjacent state-entry bounds are neither of these five and are not changed
 by this requirement: `visits:` bounds how many times a ticket may *enter* one
 state ([§FS-rhei-transitions.4.3](../functional-spec/rhei-transitions.spec.md#43-counted-loops)), and the run loop's pass bound ends a run that
 makes no progress ([§FS-rhei-run.3](../functional-spec/rhei-run.spec.md#3-execution-loop)). A level-3 or level-4 count is independent
@@ -61,7 +65,7 @@ clamped. Asking for more than the machine allows is never a validation refusal �
 otherwise a template written on one machine would either be invalid on another
 or would raise the cap of the machine that pays for it. [§FS-rhei-budgets.2](../functional-spec/rhei-budgets.spec.md#2-where-a-bound-comes-from)
 
-## 3. The two counts
+## 3. Two counts and an amount
 
 **Ticket travel** is the number of applied transitions a ticket may make over
 the lifetime of its identity. Exactly one unit is consumed per applied edge,
@@ -92,6 +96,21 @@ long-lived project and ask an operator to top it up — a block by another route
 which [§REQ-bounded-neural-work.2](bounded-neural-work.spec.md#2-bounded-by-default-refusing-nothing-that-runs-today) forbids. A window is a rate: it stops a project that is spinning and
 never meets a project that is working.
 
+**Project spend** is the measured cost a project may be charged in one UTC day.
+It is not a third count. No unit of it is tallied at admission; its amount
+comes from the cost accounting record a completed invocation already produces
+§FS-rhei-cost-accounting, and the project-day is its whole unit. It holds no
+lifetime contract, for the reason the paragraph above gives: a lifetime total
+of money stops every healthy long-lived project in the end, and money renews on
+the same window an invocation count does.
+
+Before each admitted start a worst case for the next request is reserved
+against the day, and once the invocation's measured cost is known the reserve
+is replaced by that amount. An invocation whose cost cannot be measured is
+charged the worst case and never nothing, because a dimension that reads zero
+for every transport it cannot price is a bound that is silently absent exactly
+where it is least watched. §FS-rhei-budgets.6.2
+
 ## 4. Nothing creates capacity
 
 Neither count is ever created by an operation that is not one of its two lawful
@@ -105,6 +124,23 @@ window, and an audited `init` or `adjust` under the machine's ceiling. Fresh
 travel has exactly one: a genuinely new ticket identity. A ticket that is
 copied, moved, or re-instantiated keeps its history, so reset-and-rerun
 converges on the travel bound rather than escaping it.
+
+Everything above is about the **counts**, and the scope is deliberate rather
+than incidental. A travel or invocation unit, once consumed, is consumed, and
+nothing downstream of the start it paid for gives it back
+[§FS-rhei-budgets.6.2](../functional-spec/rhei-budgets.spec.md#62-reserve-then-settle). **Money is not a count.** A day's spend is an amount
+measured after the fact, so the number the ledger holds for one invocation is
+expected to change exactly once — from the worst case reserved before the
+request to what the request actually cost — and that revision may be downward.
+Reading it as minting would be reading an estimate being corrected as capacity
+being created.
+
+Fresh spend capacity therefore has exactly one lawful source, the passage of
+the window, and a spend reservation has exactly two lawful writes: the worst
+case appended at admission, and the one settle that replaces it with the
+measured amount or leaves it standing where nothing could be measured. A settle
+touches no travel unit and no invocation unit in either direction, which is
+what keeps the paragraphs above it true after one has been written.
 
 ## 5. Exhaustion is a halt where the ticket stands
 
@@ -138,10 +174,23 @@ ancestry path, charges it, and must additionally fit the ancestor's reservation
 envelope and deadline. It opens no balance of its own, and it can neither
 outlive nor outspend its ancestor. [§FS-rhei-budgets.7](../functional-spec/rhei-budgets.spec.md#7-nested-runs)
 
-Provider-billed spend is a fifth bound, and it is not here. It needs a request
-broker, credential, egress and process-tree confinement, and the qualification
-of a real transport, none of which a count needs. It stays on
-`agent-grounds/rhei#107`.
+Provider-billed spend is the fifth bound and it **is** here, in the one grade
+the evidence this engine already holds can carry: **measured** spend, charged
+from the cost accounting record §FS-rhei-cost-accounting writes for a completed
+invocation. That is the owner's ruling of 2026-09-25 on
+`agent-grounds/rhei#107`. What stays on that issue is the stricter grade —
+spend as the provider bills it, which needs a request broker, credential,
+egress and process-tree confinement, and the qualification of a real transport,
+none of which a count needs. The stricter grade is a later obligation and not a
+precondition for this one.
+
+The measured grade carries a residual of its own, stated here rather than
+discovered later. A reserve is a worst case, not a promise: an invocation whose
+actual cost exceeds what was reserved for it overshoots the ceiling by the
+difference, and the day then carries the actual. At most one invocation can be
+in that position at a time, because the next admission reads the settled
+amount, and how far it can reach is bounded by `agent_timeout` and by the two
+counts rather than by anything on the money side.
 
 ## 7. The defaults are measured, not chosen
 
@@ -201,7 +250,7 @@ rather than a total. A project that spins reaches 200 in a day and stops.
 
 ### 7.4. What the measurement could not see
 
-Three gaps, stated rather than papered over, because they bound how much the
+Four gaps, stated rather than papered over, because they bound how much the
 numbers above are worth:
 
 1. **Retries are undercounted.** Two retries of the same visit overwrite one
@@ -211,12 +260,81 @@ numbers above are worth:
    invocation records against 436 agent spawns, because usage extraction is not
    supported for every transport. That is itself the argument for admission
    reading a count ledger of its own rather than accounting records
-   ([§FS-rhei-cost-accounting](../functional-spec/rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)).
+   ([§FS-rhei-cost-accounting](../functional-spec/rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)). The spend bound of level 5 neither softens that argument nor
+   is an exception to it: the counts are still derived by counting
+   reservations, and no accounting record moves one. Re-measured when the spend
+   default was taken, the sparsity had grown worse — 165 records, only 80 of
+   them carrying an amount. That is precisely why the spend dimension charges an
+   unpriced or unmeasurable invocation its reserve rather than nothing. A money
+   bound that read zero wherever extraction is unsupported would be absent for
+   exactly the transports no other bound watches.
 3. **There is no explicit-mode history at all**, because the mode did not exist
    when the measurement was taken. `invocation_lifetime_max` is therefore
    reasoned from the lifetime totals of window-mode projects — about 43 × the
    largest observed (138) — which makes it the weakest of the three numbers and
    the first that should be re-measured once explicit accounts have a history.
+4. **None of it measured money.** The three numbers above are counts, taken
+   over spawn records and transition logs, and they say nothing about what a
+   project spends. The spend default of level 5 rests on a different corpus, a
+   smaller one, and a restated definition of healthy, which is why
+   §REQ-bounded-neural-work.7.5 states it separately rather than adding a row
+   to §REQ-bounded-neural-work.7.2's table.
+
+### 7.5. The spend default, and the four things it could not see
+
+`defaults.spend_per_day` is **400.00** in the account's currency, and it is
+measured rather than chosen — but over a different corpus and under a restated
+definition of healthy, so it is stated here rather than added to
+§REQ-bounded-neural-work.7.2's table as though it came from the same evidence.
+
+The corpus is every `rhei.accounting.invocation.v1` record this workspace holds
+under `~/ag/*/panta/`, with the synthetic
+`tests/e2e/fixtures/accounting-archive/*.json` excluded for the reason
+§REQ-bounded-neural-work.7 already gives. The unit is the **project-day**,
+because that is what the bound bounds.
+
+| dimension | n | median | max |
+|---|---|---|---|
+| measured spend per project per UTC day | 8 | $10.94 | $96.37 |
+| measured cost of one invocation | 80 | $1.69 | $17.71 |
+
+`defaults.spend_per_day` is 4 × $96.37, rounded to a legible number:
+**400.00**. The multiplier and the reason for it are
+§REQ-bounded-neural-work.7.3's, unchanged.
+
+The **fallback reserve is 20.00**, the largest single invocation rounded up,
+and it deliberately carries **no multiplier**. The ×4 of
+§REQ-bounded-neural-work.7.3 is a margin on a *bound*; a reserve is an estimate
+of one request, and the margin is already carried by the ceiling that estimate
+is checked against. Multiplying here would charge the margin twice, and it
+would charge it hardest against the invocations that cannot be measured at
+all — the ones already paying the worst case
+[§FS-rhei-budgets.6.2](../functional-spec/rhei-budgets.spec.md#62-reserve-then-settle).
+
+Four things this measurement could not see. §REQ-bounded-neural-work.7.1 is
+explicit that a measurement which does not say what it measured supersedes
+nothing, so these are stated as plainly as the number itself:
+
+1. **n = 8.** Eight project-days, against the 21 behind
+   `defaults.invocations_per_day`. It is the smallest corpus any default here
+   rests on.
+2. **Healthy had to be restated.** §REQ-bounded-neural-work.7.1 defines a
+   healthy sample as a ticket history ending in a terminal state, and an
+   accounting record is not a ticket history — it belongs to one invocation.
+   Here healthy is *every invocation record whose run is not the run that
+   halted*. That is a weaker filter and a different one; it is not
+   §REQ-bounded-neural-work.7.1's definition applied to a new corpus, and a
+   re-measurement that wants to supersede this number has to say which of the
+   two it used.
+3. **Only 80 of 165 records carry an amount.** The rest were written by a
+   transport whose usage could not be extracted or for a model the price book
+   does not price. Both maxima above are therefore a lower bound on a lower
+   bound.
+4. **The failure this requirement is named after is not in the corpus.**
+   `agent-grounds/rhei#232` at $75.58 is not among these records at all. The
+   largest project-day the corpus does hold is $96.37, and that is what the ×4
+   was taken over. A default measured from a corpus missing the very case it
+   was written for is the first of the four numbers that should be re-measured.
 
 A later measurement that repeats [§REQ-bounded-neural-work.7.1](bounded-neural-work.spec.md#71-healthy-defined-first)'s healthy definition over a wider corpus
 supersedes these numbers. One that does not say what it measured does not.

@@ -4,12 +4,17 @@ The scheduler does not construct a neural subprocess directly. It submits a
 resolved launch to the neural-admission component, which either returns an owned
 reservation or a typed refusal. That one boundary sits beneath every scheduler,
 embedded runtime, retry, poll attempt, fanout arm, and nested run, which is what
-makes the counts of [§FS-rhei-budgets](../functional-spec/rhei-budgets.spec.md#fs-rhei-budgets-bounded-ticket-travel-and-project-invocations) true of *every* start rather than of the
+makes the counts of [§FS-rhei-budgets](../functional-spec/rhei-budgets.spec.md#fs-rhei-budgets-bounded-ticket-travel-project-invocations-and-a-days-spend) true of *every* start rather than of the
 ones someone remembered to route through it. It realizes [§REQ-bounded-neural-work](../requirements/bounded-neural-work.spec.md#req-bounded-neural-work-every-unit-of-neural-work-is-bounded-before-it-starts).
 
-This component counts. It does not price, broker, confine, or qualify anything:
-those belong to the provider-spend obligation on `agent-grounds/rhei#107`, and
-importing them here would make a count depend on evidence a count does not need.
+This component counts, and it reads one amount it did not produce. It still
+does not price, broker, confine, or qualify anything: pricing belongs to cost
+accounting [§FS-rhei-cost-accounting](../functional-spec/rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting), and brokering, confinement and qualification
+belong to the provider-spend obligation on `agent-grounds/rhei#107`. The reason
+is unchanged for the counts — importing that evidence here would make a count
+depend on evidence a count does not need — and it is why the spend dimension of
+§FS-rhei-budgets.1 consumes a record written elsewhere rather than measuring
+anything of its own.
 
 ## 1. The boundary
 
@@ -19,10 +24,13 @@ Refused  { reason_code, bound_snapshot }
 ```
 
 The request carries the project identity, the ticket identity, the attempt
-identity, the resolved launch tuple, the fanout group, and the ancestry token
-where the run is nested. `travel_units` is `1` for the first arm of a group and
-`0` for every later one, which is the fanout rule of [§FS-rhei-budgets.4.1](../functional-spec/rhei-budgets.spec.md#41-travel)
-expressed as arithmetic rather than as a special case.
+identity, the resolved launch tuple, the fanout group, the worst case each arm
+may spend, and the ancestry token where the run is nested. `travel_units` is
+`1` for the first arm of a group and `0` for every later one, which is the
+fanout rule of [§FS-rhei-budgets.4.1](../functional-spec/rhei-budgets.spec.md#41-travel) expressed as arithmetic rather than as a
+special case. A returned reservation names the amount it reserved as well as
+its units, because the settle that later revises that amount has to have
+something to name §FS-rhei-budgets.6.2.
 
 A source-level dependency rule keeps subprocess creation below this module, so
 that adding a new spawn path cannot accidentally omit admission.
@@ -104,7 +112,11 @@ account.
 No balance is stored. `consumed` and `outstanding` are derived by replaying the
 chain under the active contract: for the lifetime contract, over every
 reservation; for the window contract, over the reservations stamped with the
-current day key.
+current day key. The day's spend is derived in the same pass and from the same
+receipts — a reservation's `spend` receipt where it has one, its reserved worst
+case where it has none — so an amount is no more stored here than a count is,
+and lowering `spend_per_day` rewrites nothing for the reason lowering a count
+ceiling does not §FS-rhei-budgets.3.4.
 
 This is why a window needs no renewal event, and therefore has nothing to forge,
 replay twice, or lose ([§FS-rhei-budgets.3.3](../functional-spec/rhei-budgets.spec.md#33-the-window-is-a-key-not-a-refill)). It is also why lowering a ceiling

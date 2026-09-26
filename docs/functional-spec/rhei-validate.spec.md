@@ -98,9 +98,12 @@ pass `--state-machine`.
 7. Report each bound in force as a **warning**, one line per dimension, with
    its effective value, its value source, and — when the machine clamped a
    higher request — the machine as the limiting source
-   ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued)). Every plan has all four bounds in force, so
-   every successful validation reports all four; a machine that has configured
-   nothing reports `built_in` four times. The spend bound is reported like the
+   ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued)). Every plan resolves all four settings
+   keys — the three bounds in force plus the `invocation_lifetime_max` ceiling
+   nothing consumes — so every successful validation reports all four lines; a
+   machine that has configured nothing reports `built_in` four times. What is
+   counted here is the lines reported, not the dimensions in force
+   ([§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys)). The spend bound is reported like the
    three counts, as the bare number its settings key takes
    (§FS-rhei-budgets.2.1). Asking for more than the machine allows is **never**
    an error here — the report says the plan asked and the machine limited, and
@@ -262,8 +265,8 @@ A clamped bound names both sources on its own line:
 warning: transition_limit: 100 (requested 500 by the plan, limited by machine settings)
 ```
 
-These lines are unconditional, because every plan has all three bounds in force
-and a bound nobody can see before it is spent is not visible
+These lines are unconditional, because every plan resolves all four of those
+settings keys and a bound nobody can see before it is spent is not visible
 ([§REQ-bounded-neural-work.5](../requirements/bounded-neural-work.spec.md#5-exhaustion-is-a-halt-where-the-ticket-stands)). They therefore replace the earlier promise
 that a graph without `**Consumes:**` emits `Validation succeeded\n` byte for
 byte: that sentence described the `**Consumes:**` advisory's blast radius and

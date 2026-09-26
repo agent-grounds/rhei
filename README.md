@@ -174,9 +174,9 @@ identity, a project at most **200 agent starts per UTC day**, and at most
 invocation already produces. Raise any of them for the whole machine with
 `defaults.transition_limit`, `defaults.invocations_per_day` or
 `defaults.spend_per_day` in `~/.config/rhei/settings.json`; a project may ask
-for less of any, a plan of the two counts, and more is reported rather than
-refused. `rhei budget show <plan-or-project>` says where a project stands, and
-[Bounded ticket travel, project invocations, and a day's spend](docs/functional-spec/rhei-budgets.spec.md)
+for less of any, a plan only of a ticket's travel, and more is reported rather
+than refused. `rhei budget show <plan-or-project>` says where a project stands,
+and [Bounded ticket travel, project invocations, and a day's spend](docs/functional-spec/rhei-budgets.spec.md)
 is the reference.
 
 ## Install

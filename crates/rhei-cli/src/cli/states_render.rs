@@ -1148,7 +1148,7 @@ fn validate_command(input: &Path, state_machine: Option<&Path>, watch: bool) -> 
 /// Parse a plan, load the selected states, and print validation results.
 fn run_validation_once(input: &Path, state_machine: Option<&Path>) -> MietteResult<()> {
     let warnings = validation_warnings_or_error(input, state_machine)?;
-    // All three, before any conditional warning: a bound nobody sees before
+    // All four, before any conditional warning: a bound nobody sees before
     // it is spent is not visible. Resolved and reported only — nothing here
     // locks, appends, or debits. §FS-rhei-validate.4 §FS-rhei-budgets.6.3
     let mut reported = validated_bound_lines(input, state_machine);

@@ -9,13 +9,16 @@
 use super::budget_support::*;
 use super::*;
 
-/// Every plan has all three bounds in force, so every successful validation
-/// reports all three. A machine that has configured nothing reports `built_in`
-/// three times — which is the honest answer, and is why there is no
-/// unconfigured state in which a count dimension is unbounded.
+/// Every plan resolves all four settings keys, so every successful validation
+/// reports all four lines. A machine that has configured nothing reports
+/// `built_in` four times — which is the honest answer, and is why there is no
+/// unconfigured state in which a count dimension is unbounded. The three count
+/// lines are asserted here; the spend line is pinned byte for byte by
+/// `VALIDATED_BOUNDS` and by
+/// `a_plan_that_declares_nothing_runs_under_the_built_in_spend_ceiling`.
 // §FS-rhei-validate.4 §FS-rhei-budgets.2.1
 #[test]
-fn validate_reports_all_three_bounds_with_their_built_in_source() {
+fn validate_reports_all_four_bounds_with_their_built_in_source() {
     let (_dir, plan, machine) = setup_with_agent(
         "budget-declaration-free-validate",
         FINISHING_MACHINE,

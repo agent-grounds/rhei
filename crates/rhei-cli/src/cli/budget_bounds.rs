@@ -109,7 +109,7 @@ fn node_transition_limit(
 }
 
 /// The bounds a plan reports before anything is spent: the declaration-free
-/// case reports the built-in three, and a plan whose machine declares a profile
+/// case reports the built-in four, and a plan whose machine declares a profile
 /// limit reports that one. §FS-rhei-validate.4
 fn plan_count_bounds_with(settings: &RheiSettings, declared: Option<u64>) -> CountBounds {
     // Several profiles mean several travel bounds; validation reports the
@@ -138,7 +138,7 @@ fn budget_project_root(workspace_root: &Path) -> PathBuf {
     }
 }
 
-/// The three count-bound lines `rhei validate` reports, in dimension order.
+/// The four bound lines `rhei validate` reports, in dimension order.
 ///
 /// Resolution failures are silent here on purpose: validation has already
 /// succeeded, and a settings file this pass could not re-read is a diagnostic

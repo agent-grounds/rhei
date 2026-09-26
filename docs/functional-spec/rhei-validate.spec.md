@@ -245,7 +245,7 @@ by the exact advisory from [§FS-rhei-validate.4](#4-behavior) with the normal `
 Existing warnings retain their wording and occur once at their existing trigger
 frequency.
 
-Successful output always carries the three count-bound lines of §4 step 7, in
+Successful output always carries the four bound lines of §4 step 7, in
 dimension order, after the success line and before any conditional warning:
 
 ```text
@@ -253,6 +253,7 @@ Validation succeeded
 warning: transition_limit: 80 (built_in)
 warning: invocations_per_day: 200 (built_in)
 warning: invocation_lifetime_max: 6000 (built_in)
+warning: spend_per_day: 400.00 (built_in)
 ```
 
 A clamped bound names both sources on its own line:

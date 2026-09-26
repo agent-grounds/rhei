@@ -169,13 +169,13 @@ analysis, and dashboard testing to concrete examples.
 
 Every plan is bounded before it starts and nothing has to be declared for it to
 be: a ticket may make at most **80 applied moves** over the life of its
-identity, a project at most **200 agent starts per UTC day**, and a project at
-most **$400.00 of measured spend per UTC day**, charged from the cost
-accounting an invocation already produces. Raise any of them for the whole
-machine with `defaults.transition_limit`, `defaults.invocations_per_day` or
-`defaults.spend_per_day` in `~/.config/rhei/settings.json`; a project or a plan
-may ask for less, and asking for more is reported rather than refused.
-`rhei budget show <plan-or-project>` says where a project stands, and
+identity, a project at most **200 agent starts per UTC day**, and at most
+**$400.00 of measured spend per UTC day**, charged from the cost accounting an
+invocation already produces. Raise any of them for the whole machine with
+`defaults.transition_limit`, `defaults.invocations_per_day` or
+`defaults.spend_per_day` in `~/.config/rhei/settings.json`; a project may ask
+for less of any, a plan of the two counts, and more is reported rather than
+refused. `rhei budget show <plan-or-project>` says where a project stands, and
 [Bounded ticket travel, project invocations, and a day's spend](docs/functional-spec/rhei-budgets.spec.md)
 is the reference.
 

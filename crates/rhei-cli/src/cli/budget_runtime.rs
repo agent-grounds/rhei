@@ -440,14 +440,21 @@ fn budget_settle_visit(workspace_root: &Path, task_id_str: &str) {
     let Ok(Some(account)) = Account::locate(&project_root) else { return };
     let Ok(mut journal) = account.open(true) else { return };
     if claim.started {
+        // The account's own, so an arm with nothing to settle is charged in
+        // the currency its reserve was taken in rather than in a guess.
+        // §FS-rhei-budgets.5.5
+        let held = journal.snapshot().ok().and_then(|snapshot| snapshot.currency);
+        let fallback = held.as_deref().unwrap_or("USD");
         // Money first, because the travel release below may return early and
         // the amount is owed either way. A dropped settle leaves the reserve
         // outstanding and is surfaced as `unsettled`. §FS-rhei-budgets.6.2
         for (index, arm) in claim.arms.iter().enumerate() {
             let measured = claim.measured.get(index);
-            let amount = measured.map_or(built_in::SPEND_RESERVE, |m| m.amount_micro);
+            let amount = measured.map_or(built_in::SPEND_RESERVE, |m| {
+                m.amount_micro
+            });
             let basis = measured.map_or(SpendBasis::Unmeasurable, |m| m.basis);
-            let currency = measured.map_or("USD", |m| m.currency.as_str());
+            let currency = measured.map_or(fallback, |m| m.currency.as_str());
             let _ = journal.settle_spend(arm, amount, currency, basis, &audit);
         }
         if let Some(travel) = claim.travel {

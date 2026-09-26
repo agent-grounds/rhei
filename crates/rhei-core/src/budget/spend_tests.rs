@@ -388,6 +388,11 @@ fn an_unknown_receipt_kind_is_retained_and_makes_the_account_read_only() {
     assert!(!journal.writable(), "and it may not be appended to");
     let snapshot = journal.snapshot().expect("it still reports");
     assert_eq!(snapshot.spend.reserved, RESERVE, "from the receipts it does understand");
+    // The read is done with, and the authority's lock is one exclusive `flock`
+    // per open: holding this journal across the open below would wait on
+    // itself. §FS-rhei-budgets.5.3
+    drop(journal);
+
     let refused = case
         .account
         .open(true)

@@ -146,6 +146,12 @@ impl Journal {
             day: String::new(),
         };
         ledger.load()?;
+        // A kind this build does not understand is not a broken account: it is
+        // a newer one. It reports, and it may not append.
+        // §FS-rhei-budgets.5.2
+        if !ledger.state.unknown_kinds.is_empty() {
+            ledger.writable = false;
+        }
         ledger.day = super::window::effective_day(
             &super::window::day_key(super::window::now()?),
             ledger.state.highest_day.as_deref(),
@@ -209,6 +215,13 @@ impl Journal {
         self.authority.adopted()
     }
 
+    /// Whether this transaction may append at all. A caller that asked for a
+    /// writable account and got a read-only one is reading a chain newer than
+    /// itself. §FS-rhei-budgets.5.2
+    pub fn writable(&self) -> bool {
+        self.writable
+    }
+
     pub fn receipts(&self) -> &[Receipt] {
         &self.receipts
     }
@@ -259,6 +272,12 @@ impl Journal {
         window: Option<String>,
     ) -> Result<()> {
         if !self.writable {
+            if let Some(unknown) = self.state.unknown_kinds.iter().next() {
+                return Err(BudgetError::corrupt(format!(
+                    "this account holds a '{unknown}' receipt this build does not understand; \
+                     it can be read but not appended to until the build is upgraded"
+                )));
+            }
             return Err(BudgetError::corrupt("read-only budget transaction cannot append"));
         }
         audit.validate()?;

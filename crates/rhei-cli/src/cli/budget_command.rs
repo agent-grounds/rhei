@@ -1,4 +1,5 @@
-// `rhei budget init`, `show`, and `adjust`, over the invocation dimension only.
+// `rhei budget init`, `show`, and `adjust` — the first and last over the
+// invocation dimension only, because there is no spend allowance to grant.
 //
 // Its own part because these three are a thin layer over the ledger and the
 // resolution next door: they decide nothing a run does not already decide, and
@@ -95,7 +96,13 @@ fn budget_show_command(
     };
     let journal = budget_result(account.open(false))?;
     let snapshot = budget_result(journal.snapshot())?;
-    let lines = budget_result(journal.lines(None, bounds.per_day.effective, 0))?;
+    let lines = budget_result(journal.lines(
+        None,
+        bounds.per_day.effective,
+        0,
+        bounds.spend.effective,
+        &run_is_gone,
+    ))?;
     // `--rhei` narrows display only. There is one account and one balance
     // whatever the selection, and a narrowing that showed a second would be
     // describing capacity that does not exist. §FS-rhei-budgets.10
@@ -113,8 +120,12 @@ fn budget_show_command(
                     "transition_limit": budget_bound_json(&bounds.travel),
                     "invocations_per_day": budget_bound_json(&bounds.per_day),
                     "invocation_lifetime_max": budget_bound_json(&bounds.lifetime_max),
+                    "spend_per_day": budget_bound_json(&bounds.spend),
                 },
                 "invocations": budget_line_json(&lines[0]),
+                // In micro-units of the account's currency, so a reader never
+                // has to parse a rendered `$`. §FS-rhei-budgets.10
+                "spend": budget_spend_json(&lines[1], snapshot.currency.as_deref()),
                 "lifetime_invocations": {
                     "consumed": snapshot.lifetime_invocations.consumed,
                     "outstanding": snapshot.lifetime_invocations.reserved,
@@ -127,15 +138,13 @@ fn budget_show_command(
             println!("Project: {} ({})", project_root.display(), snapshot.project_id);
             println!("Account: {} [{}]", account.directory().display(), snapshot.health);
             for line in &lines {
-                println!(
-                    "{}: {} consumed + {} outstanding / {}; {} remaining ({})",
-                    line.dimension,
-                    line.consumed,
-                    line.outstanding,
-                    line.bound,
-                    line.remaining,
-                    line.mode
-                );
+                println!("{}", line.render());
+                // The marks go beneath the line they qualify, in the words the
+                // halt uses, and are absent where the whole day was measured.
+                // §FS-rhei-budgets.10
+                if let Some(marks) = line.marks_line() {
+                    println!("{marks}");
+                }
             }
             println!(
                 "lifetime invocations: {} consumed + {} outstanding",
@@ -158,6 +167,22 @@ fn budget_bound_json(bound: &Bound) -> serde_json::Value {
         "source": bound.source.as_str(),
         "requested": bound.requested,
         "limited_by": bound.requested.map(|_| "machine"),
+    })
+}
+
+/// The spend dimension, with its currency and how much of the day was
+/// estimated rather than measured. §FS-rhei-budgets.10 §FS-rhei-budgets.6.2
+fn budget_spend_json(line: &BudgetLine, currency: Option<&str>) -> serde_json::Value {
+    serde_json::json!({
+        "bound": line.bound,
+        "consumed": line.consumed,
+        "outstanding": line.outstanding,
+        "remaining": line.remaining,
+        "mode": line.mode,
+        "currency": currency,
+        "unpriced": line.marks.unpriced,
+        "unmeasurable": line.marks.unmeasurable,
+        "unsettled": line.marks.unsettled,
     })
 }
 

@@ -7,7 +7,7 @@
 //! §FS-rhei-budgets.6 §AR-neural-admission.1
 
 use super::journal::{Audit, Journal};
-use super::types::{add, BudgetError, Contract, Dimension, Exhaustion};
+use super::types::{add, BudgetError, Contract, Dimension, Exhaustion, SpendBasis};
 use super::Result;
 use serde_json::json;
 
@@ -29,6 +29,9 @@ pub struct Arm<'a> {
 pub struct EffectiveBounds {
     pub transition_limit: u64,
     pub invocations_per_day: u64,
+    /// Measured spend the project may be charged this UTC day, in micro-units
+    /// of its account's currency. §FS-rhei-budgets.3.4
+    pub spend_per_day: u64,
 }
 
 pub struct AdmissionRequest<'a> {
@@ -45,6 +48,13 @@ pub struct AdmissionRequest<'a> {
     /// Whether this admission holds a travel unit for the edge the visit is
     /// expected to apply. A spawn that cannot move the ticket holds none.
     pub travel: bool,
+    /// The worst case each arm may spend, reserved against the day and
+    /// replaced by the settle that says what it cost. §FS-rhei-budgets.6.2
+    pub spend_reserve_micro: u64,
+    /// The currency the composed price book will report this spend in, which
+    /// is what fixes an account's own on its first amount.
+    /// §FS-rhei-budgets.5.5
+    pub spend_currency: &'a str,
 }
 
 /// One applied edge, as the shared transition path describes it.
@@ -89,6 +99,24 @@ impl Journal {
         }
         let ancestor = self.authenticate_ancestor(request)?;
         let snapshot = self.snapshot()?;
+        // Before any bound, because this is not a bound: an account
+        // denominated in one currency cannot be charged in another, and
+        // nothing here converts. §FS-rhei-budgets.5.5
+        if request.spend_reserve_micro > 0 {
+            if let Some(held) = snapshot.currency.as_deref() {
+                if held != request.spend_currency {
+                    return Err(BudgetError::new(
+                        "currency_conflict",
+                        format!(
+                            "project '{}' keeps its account in {held} and this run prices in \
+                             {}; nothing here converts one to the other, so the run is refused \
+                             before any agent starts",
+                            request.project_label, request.spend_currency
+                        ),
+                    ));
+                }
+            }
+        }
         let contract = snapshot.contract.clone();
         let invocation_bound = snapshot.invocation_bound(bounds.invocations_per_day);
         let count = u64::try_from(request.arms.len())
@@ -116,6 +144,7 @@ impl Journal {
                         bound: bounds.transition_limit,
                         contract: contract.clone(),
                         day: snapshot.day.clone(),
+                        currency: None,
                     },
                 ));
             }
@@ -138,6 +167,45 @@ impl Journal {
                     bound: invocation_bound,
                     contract,
                     day: snapshot.day.clone(),
+                    currency: None,
+                },
+            ));
+        }
+        // Third and last, so that a spawn standing at two bounds at once is
+        // refused on the count and reports the text it already reported.
+        // §FS-rhei-budgets.6.1
+        let reserving = request.spend_reserve_micro.checked_mul(count).ok_or_else(|| {
+            BudgetError::corrupt("the worst case for this fanout overflows the ledger")
+        })?;
+        if add(snapshot.spend.exposure()?, reserving)? > bounds.spend_per_day {
+            let mut counter = snapshot.spend;
+            // What reaches a spend ceiling is consumed plus the *next*
+            // reserve, so the refused request's own worst case is in the
+            // number a reader adds up. §FS-rhei-budgets.8
+            counter.reserved = add(counter.reserved, reserving)?;
+            return Err(BudgetError::exhausted(
+                "spend_exhausted",
+                format!(
+                    "project '{}' has spent today's measured budget ({} consumed + {} \
+                     outstanding / {})",
+                    request.project_label,
+                    crate::money::format_micro(counter.consumed, snapshot.currency.as_deref()),
+                    crate::money::format_micro(counter.reserved, snapshot.currency.as_deref()),
+                    crate::money::format_micro(bounds.spend_per_day, snapshot.currency.as_deref()),
+                ),
+                Exhaustion {
+                    dimension: Dimension::Spend,
+                    subject: request.project_label.into(),
+                    counter,
+                    bound: bounds.spend_per_day,
+                    contract: snapshot.contract.clone(),
+                    day: snapshot.day.clone(),
+                    currency: Some(
+                        snapshot
+                            .currency
+                            .clone()
+                            .unwrap_or_else(|| request.spend_currency.to_string()),
+                    ),
                 },
             ));
         }
@@ -183,7 +251,7 @@ impl Journal {
             // The fanout rule of §FS-rhei-budgets.4.1 as arithmetic rather than
             // as a special case: one applied edge, however many arms.
             let travel_units = u64::from(request.travel && index == 0);
-            reservations.push(json!({
+            let mut arm_payload = json!({
                 "reservation_id": id,
                 "attempt_identity": arm.attempt_identity,
                 "ticket_identity": request.ticket_identity,
@@ -194,7 +262,15 @@ impl Journal {
                 "invocation_units": 1,
                 "travel_units": travel_units,
                 "window": window,
-            }));
+            });
+            // Riding the existing kind, because one transaction decides both
+            // at one instant and a build that predates them ignores payload
+            // keys it does not know. §FS-rhei-budgets.5.2
+            if request.spend_reserve_micro > 0 {
+                arm_payload["spend_reserve_micro"] = request.spend_reserve_micro.into();
+                arm_payload["spend_currency"] = request.spend_currency.into();
+            }
+            reservations.push(arm_payload);
             ids.push(id);
         }
         self.append_in_window(
@@ -207,6 +283,34 @@ impl Journal {
             travel_reservation_id: request.travel.then(|| ids[0].clone()),
             reservation_ids: ids,
         })
+    }
+
+    /// Replace one reservation's reserved worst case with what the
+    /// invocation actually cost.
+    ///
+    /// The only write in this ledger allowed to lower a number, and it lowers
+    /// exactly one: it releases no travel unit and no invocation unit, so
+    /// every count is what it was. A basis other than `measured` charges the
+    /// reserve, because an amount nobody could measure is not an amount of
+    /// nothing. §FS-rhei-budgets.6.2 §REQ-bounded-neural-work.4
+    pub fn settle_spend(
+        &mut self,
+        reservation: &str,
+        amount_micro: u64,
+        currency: &str,
+        basis: SpendBasis,
+        audit: &Audit,
+    ) -> Result<()> {
+        self.append(
+            "spend",
+            json!({
+                "reservation_id": reservation,
+                "amount_micro": amount_micro,
+                "currency": currency,
+                "basis": basis.as_str(),
+            }),
+            audit,
+        )
     }
 
     /// Record ambiguity *before* capability transfer. A crash after this point
@@ -271,6 +375,7 @@ impl Journal {
                         bound: transition_limit,
                         contract: snapshot.contract,
                         day: snapshot.day,
+                        currency: None,
                     },
                 ));
             }

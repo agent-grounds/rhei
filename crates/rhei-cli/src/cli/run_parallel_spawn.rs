@@ -119,6 +119,7 @@ fn spawn_parallel_agent_work_item(
         settings,
         task,
         &item.task_id_str,
+        &opts.price_book().currency,
     )? {
         // §FS-rhei-budgets.9
         BudgetAdmission::Admitted { bounds } => {
@@ -333,6 +334,7 @@ fn spawn_parallel_agent_work_item(
     let log_for_result = log.clone();
     let from_for_thread = from_state;
     let to_for_thread = item.current_state.clone();
+    let tid_for_spend = item.task_id_str.clone();
     let tid_for_event = item.task_id_str.clone();
     let runtime_dir_for_thread = agent_runtime_dir;
     // Read before the plan moves into the worker: only here are the plan and
@@ -458,7 +460,13 @@ fn spawn_parallel_agent_work_item(
                     .expect("agent spawn plans carry accounting identity"),
             );
             let (accounting_recorded, accounting_warning) = match accounting_result {
-                Ok(Some(_)) => (true, None),
+                // On the worker's thread, where the record becomes durable;
+                // the claim map is global, so the settle still finds it.
+                // §FS-rhei-budgets.6.2
+                Ok(Some(usage)) => {
+                    budget_record_spend(&tid_for_spend, Some(&usage));
+                    (true, None)
+                }
                 Ok(None) => (false, None),
                 Err(err) => (false, Some(err.to_string())),
             };

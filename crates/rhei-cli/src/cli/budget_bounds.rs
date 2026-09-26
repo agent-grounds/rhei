@@ -1,5 +1,5 @@
-// Resolving the three count bounds, and finding the project an account belongs
-// to.
+// Resolving the four bounds in force, and finding the project an account
+// belongs to.
 //
 // Its own part because resolution is a *settings* question and admission is a
 // *ledger* one: this file knows the tiers and the ceiling, and the module next
@@ -11,26 +11,35 @@
 
 use rhei_core::budget::{built_in, Bound, BoundSource};
 
-/// The three bounds in force, each with the value and the provenance every
+/// The four bounds in force, each with the value and the provenance every
 /// surface prints. §FS-rhei-budgets.2.3
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct CountBounds {
     travel: Bound,
     per_day: Bound,
     lifetime_max: Bound,
+    /// The one whose number is money rather than a count, reported like the
+    /// other three as the bare number its key takes. §FS-rhei-budgets.2.1
+    spend: Bound,
 }
 
 impl CountBounds {
     /// The lines `rhei validate` reports and the run's bounds section renders,
     /// in dimension order. §FS-rhei-validate.4
     fn report_lines(&self) -> Vec<String> {
-        vec![self.travel.report_line(), self.per_day.report_line(), self.lifetime_max.report_line()]
+        vec![
+            self.travel.report_line(),
+            self.per_day.report_line(),
+            self.lifetime_max.report_line(),
+            self.spend.report_line(),
+        ]
     }
 
     fn effective(&self) -> rhei_core::budget::EffectiveBounds {
         rhei_core::budget::EffectiveBounds {
             transition_limit: self.travel.effective,
             invocations_per_day: self.per_day.effective,
+            spend_per_day: self.spend.effective,
         }
     }
 }
@@ -69,6 +78,15 @@ fn resolve_count_bounds(settings: &RheiSettings, profile_limit: Option<u64>) -> 
             built_in::INVOCATION_LIFETIME_MAX,
             machine.invocation_lifetime_max,
             requested(None, project.invocation_lifetime_max),
+        ),
+        // Machine and project tiers only: a plan that could raise a day's
+        // spend would be raising the cap of whichever machine paid for it.
+        // §FS-rhei-budgets.2.1
+        spend: Bound::resolve_money(
+            "spend_per_day",
+            built_in::SPEND_PER_DAY,
+            machine.spend_per_day,
+            requested(None, project.spend_per_day),
         ),
     }
 }

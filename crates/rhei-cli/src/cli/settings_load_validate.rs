@@ -341,6 +341,7 @@ fn load_merged_roster(
             "transition_limit",
             "invocations_per_day",
             "invocation_lifetime_max",
+            "spend_per_day",
             "mcp_servers",
             "skills",
         ],
@@ -356,6 +357,7 @@ fn load_merged_roster(
         "transition_limit",
         "invocations_per_day",
         "invocation_lifetime_max",
+        "spend_per_day",
         "mcp_servers",
         "skills",
     ] {
@@ -422,6 +424,11 @@ fn load_merged_roster(
             project.defaults.invocation_lifetime_max
         } else {
             global.defaults.invocation_lifetime_max
+        },
+        spend_per_day: if json_nested_field_present(project_raw, "defaults", "spend_per_day") {
+            project.defaults.spend_per_day
+        } else {
+            global.defaults.spend_per_day
         },
         mcp_servers: if json_nested_field_present(project_raw, "defaults", "mcp_servers") {
             project.defaults.mcp_servers

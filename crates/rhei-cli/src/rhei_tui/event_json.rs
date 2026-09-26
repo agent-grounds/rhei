@@ -182,6 +182,12 @@ fn bound_value(bound: &BoundReport) -> Value {
         "remaining": bound.remaining,
         "mode": bound.mode,
         "window": bound.window,
+        // Present exactly on the dimension whose amounts are money, so a
+        // reader never has to parse a rendered `$`. §FS-rhei-run-json.2.1
+        "currency": bound.currency,
+        "unpriced": bound.marks.map(|marks| marks.unpriced),
+        "unmeasurable": bound.marks.map(|marks| marks.unmeasurable),
+        "unsettled": bound.marks.map(|marks| marks.unsettled),
     })
 }
 
@@ -196,6 +202,14 @@ fn bound_report(v: &Value) -> Option<BoundReport> {
         remaining: v.get("remaining").and_then(Value::as_u64).unwrap_or_default(),
         mode: v.get("mode").and_then(Value::as_str).unwrap_or("").to_owned(),
         window: v.get("window").and_then(Value::as_str).map(str::to_owned),
+        currency: v.get("currency").and_then(Value::as_str).map(str::to_owned),
+        marks: v.get("unpriced").and_then(Value::as_u64).map(|unpriced| {
+            rhei_core::budget::SpendMarks {
+                unpriced,
+                unmeasurable: v.get("unmeasurable").and_then(Value::as_u64).unwrap_or_default(),
+                unsettled: v.get("unsettled").and_then(Value::as_u64).unwrap_or_default(),
+            }
+        }),
     })
 }
 

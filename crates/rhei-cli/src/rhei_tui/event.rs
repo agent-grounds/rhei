@@ -505,6 +505,14 @@ pub struct BoundReport {
     pub mode: String,
     /// The UTC day key, under the window contract only.
     pub window: Option<String>,
+    /// The account's currency, present exactly on the dimension whose
+    /// amounts are money in micro-units rather than counts.
+    /// §FS-rhei-budgets.5.5 §FS-rhei-run-tui.1.1
+    pub currency: Option<String>,
+    /// How much of this dimension was charged at the worst case rather than
+    /// measured, present on the spend dimension and zeroed rather than absent
+    /// where nothing was. §FS-rhei-budgets.6.2
+    pub marks: Option<rhei_core::budget::SpendMarks>,
 }
 
 /// One dimension on a terminal surface: the bound with its provenance, and
@@ -514,13 +522,20 @@ pub fn bound_journal_line(bound: &BoundReport) -> String {
         Some(limiter) => format!("{} limited by {limiter}", bound.value_source),
         None => bound.value_source.clone(),
     };
+    // Money carries its currency; a count is written as itself.
+    // §FS-rhei-run-tui.1.1
+    let write = |value: u64| match &bound.currency {
+        Some(currency) => rhei_core::money::format_micro(value, Some(currency)),
+        None if bound.marks.is_some() => rhei_core::money::format_micro(value, None),
+        None => value.to_string(),
+    };
     format!(
         "{}: {} consumed + {} outstanding / {} ({source}); {} remaining [{}]",
         bound.dimension,
-        bound.consumed,
-        bound.outstanding,
-        bound.effective,
-        bound.remaining,
+        write(bound.consumed),
+        write(bound.outstanding),
+        write(bound.effective),
+        write(bound.remaining),
         bound.window.as_deref().unwrap_or(&bound.mode)
     )
 }

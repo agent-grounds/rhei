@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Bound a project's measured spend by default. Every project may be charged at
+  most $400.00 of provider cost per UTC day, a built-in measured from the
+  accounting archive the same way the two counts were, raised for a machine
+  with `defaults.spend_per_day` or lowered by a project. The amount is charged
+  from the cost accounting record an invocation already produces: each spawn
+  reserves a flat $20.00 worst case before the request, and the settle replaces
+  it with what the request actually cost, so the day carries the measured
+  amount rather than the estimate. An invocation nobody could price, and one
+  that produced no accounting record at all, are charged that worst case rather
+  than nothing, and every surface says how much of the day was estimated rather
+  than measured. Nothing needs declaring: a plan with no spend field runs under
+  the built-in, and `spend_per_day` is not a plan or profile field at all. When
+  the day is spent the ticket stops exactly where it stands with its artifacts
+  intact, and the halt names the dimension, the numbers in the account's
+  currency, and the instant the day renews. `rhei validate`, `rhei budget show`,
+  the run report, the TUI and `--json` all carry the third dimension. (PR #322)
+
 - Bound a ticket's travel and a project's invocations by default. Every ticket
   may make at most 80 applied moves over the lifetime of its identity, and every
   project may be admitted at most 200 agent starts per UTC day; both numbers are

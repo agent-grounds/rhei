@@ -1,8 +1,9 @@
 //! The identities every admission is expressed in, the counters a replay
 //! derives, and the refusal codes a caller routes on.
 //!
-//! Nothing here prices, brokers, or qualifies anything: the two quantities this
-//! module knows how to add up are both integer counts.
+//! Nothing here prices, brokers, or qualifies anything. Two of the three
+//! quantities this module adds up are integer counts; the third is an amount
+//! of money in integer micro-units, read from a record written elsewhere.
 //! §FS-rhei-budgets.1 §AR-neural-admission.2
 
 use super::Result;
@@ -31,12 +32,16 @@ impl Counter {
     }
 }
 
-/// Which of the two counts a number is about. They are reported by different
-/// names because they stop different things. §FS-rhei-budgets.1
+/// Which of the three bounds a number is about. They are reported by
+/// different names because they stop different things, and only two of them
+/// are counts. §FS-rhei-budgets.1
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dimension {
     Travel,
     Invocations,
+    /// The day's measured spend, in micro-units of the account's currency.
+    /// §FS-rhei-budgets.3.4
+    Spend,
 }
 
 impl Dimension {
@@ -46,6 +51,7 @@ impl Dimension {
         match self {
             Self::Travel => "ticket travel",
             Self::Invocations => "project invocations",
+            Self::Spend => "project spend",
         }
     }
 
@@ -54,6 +60,92 @@ impl Dimension {
         match self {
             Self::Travel => "transition_limit",
             Self::Invocations => "invocations_per_day",
+            Self::Spend => "spend_per_day",
+        }
+    }
+
+    /// Whether this dimension's numbers are money rather than a count, which
+    /// is what decides how every surface writes them. §FS-rhei-budgets.1
+    pub fn is_money(self) -> bool {
+        matches!(self, Self::Spend)
+    }
+}
+
+/// How much of a day's spend was charged at the worst case rather than
+/// measured, told apart by *why*.
+///
+/// Three marks rather than one number, because the three send a reader
+/// somewhere different: `unpriced` wants a price-book entry, `unmeasurable`
+/// wants an accounting extractor for the agent, and `unsettled` is a run that
+/// went away before it could say what it spent. A day with none of them was
+/// measured outright and says nothing at all. §FS-rhei-budgets.6.2
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SpendMarks {
+    pub unpriced: u64,
+    pub unmeasurable: u64,
+    pub unsettled: u64,
+}
+
+impl SpendMarks {
+    pub fn any(&self) -> bool {
+        self.unpriced > 0 || self.unmeasurable > 0 || self.unsettled > 0
+    }
+
+    /// `2 unpriced, 1 unsettled` — a mark with no members is left out rather
+    /// than printed as a zero. `None` where the whole day was measured.
+    /// §FS-rhei-budgets.8 §FS-rhei-budgets.10
+    pub fn phrase(&self) -> Option<String> {
+        let members = [
+            (self.unpriced, "unpriced"),
+            (self.unmeasurable, "unmeasurable"),
+            (self.unsettled, "unsettled"),
+        ];
+        let written: Vec<String> = members
+            .iter()
+            .filter(|(count, _)| *count > 0)
+            .map(|(count, name)| format!("{count} {name}"))
+            .collect();
+        (!written.is_empty()).then(|| written.join(", "))
+    }
+
+    /// The whole row, in the words §FS-rhei-budgets.8 fixes, given the worst
+    /// case each marked invocation was charged.
+    pub fn row(&self, reserve: u64, currency: Option<&str>) -> Option<String> {
+        let written = self.phrase()?;
+        Some(format!(
+            "{written} (charged at {} each)",
+            crate::money::format_micro(reserve, currency)
+        ))
+    }
+}
+
+/// What a settle said about one invocation's cost, and why.
+///
+/// `Measured` is the only one that revises the reserve; the other two leave it
+/// standing as the charge, because an amount nobody could measure is not an
+/// amount of nothing. §FS-rhei-budgets.6.2
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpendBasis {
+    Measured,
+    Unpriced,
+    Unmeasurable,
+}
+
+impl SpendBasis {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Measured => "measured",
+            Self::Unpriced => "unpriced",
+            Self::Unmeasurable => "unmeasurable",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "measured" => Some(Self::Measured),
+            "unpriced" => Some(Self::Unpriced),
+            "unmeasurable" => Some(Self::Unmeasurable),
+            _ => None,
         }
     }
 }
@@ -127,6 +219,22 @@ pub struct Snapshot {
     pub lifetime_invocations: Counter,
     /// Applied and held travel, per ticket identity. §FS-rhei-budgets.4.1
     pub travel: BTreeMap<String, Counter>,
+    /// The day's measured spend in micro-units: settled amounts consumed,
+    /// unsettled reserves outstanding. Always the **day**, whichever
+    /// invocation contract the account holds. §FS-rhei-budgets.3.4
+    pub spend: Counter,
+    /// The account's currency, absent until the first receipt carrying an
+    /// amount fixed it. §FS-rhei-budgets.5.5
+    pub currency: Option<String>,
+    /// How much of the day was charged at the worst case rather than
+    /// measured. `unsettled` is not in here: it needs the owning run's lock
+    /// to tell a dead reserve from one in flight, which is a question the
+    /// chain alone cannot answer. §FS-rhei-budgets.6.2
+    pub spend_marks: SpendMarks,
+    /// The execution roots of started reservations still holding a spend
+    /// reserve, from which a caller that can take those locks derives the
+    /// `unsettled` mark. §FS-rhei-budgets.6.2
+    pub spend_unsettled_roots: Vec<String>,
     pub reservations: BTreeMap<String, serde_json::Value>,
     pub health: &'static str,
 }
@@ -145,6 +253,14 @@ impl Snapshot {
             Contract::Lifetime { allowance } => *allowance,
         }
     }
+
+    /// The three marks, with `unsettled` resolved by the same "is the owning
+    /// run gone" proof the release step performs: a started reserve whose run
+    /// is still live is in flight, not unsettled. §FS-rhei-budgets.6.2
+    pub fn marks(&self, is_run_gone: &dyn Fn(&str) -> bool) -> SpendMarks {
+        let unsettled = self.spend_unsettled_roots.iter().filter(|root| is_run_gone(root)).count();
+        SpendMarks { unsettled: unsettled as u64, ..self.spend_marks }
+    }
 }
 
 /// What a refused admission knows about the bound that stopped it, so the
@@ -159,6 +275,9 @@ pub struct Exhaustion {
     pub bound: u64,
     pub contract: Contract,
     pub day: String,
+    /// The account's currency, present exactly when the refused dimension's
+    /// numbers are money. §FS-rhei-budgets.5.5
+    pub currency: Option<String>,
 }
 
 /// Stable refusal code plus a concrete, human-readable reason.

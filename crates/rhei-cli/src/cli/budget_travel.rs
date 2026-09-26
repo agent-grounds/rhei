@@ -9,7 +9,7 @@
 
 // §AR-source-file-size.3 §FS-rhei-budgets.4.1 §FS-rhei-budgets.8
 
-use rhei_core::budget::{halt_text, AppliedEdge, Contract, Dimension, Remedy};
+use rhei_core::budget::{halt_text, AppliedEdge, Contract, Dimension, Remedy, SpendMarks};
 
 /// Render a refusal as the halt of §FS-rhei-budgets.8, or as itself when what
 /// refused was the account rather than a bound.
@@ -24,13 +24,16 @@ fn budget_halt_text(refusal: &BudgetError, bounds: &CountBounds, journal: &Journ
     let Some(spent) = refusal.exhaustion.as_deref() else {
         return format!("error: {}", refusal.message);
     };
+    let none = SpendMarks::default();
     match spent.dimension {
-        Dimension::Travel => halt_text(spent, &bounds.travel, &Remedy::Raise),
+        Dimension::Travel => halt_text(spent, &bounds.travel, &Remedy::Raise, &none),
         Dimension::Invocations => match &spent.contract {
             // A window renews on its own, so the instant *is* the remedy.
             Contract::Window => match journal.renewal_instant() {
-                Ok(Some(instant)) => halt_text(spent, &bounds.per_day, &Remedy::Renews(instant)),
-                _ => halt_text(spent, &bounds.per_day, &Remedy::Raise),
+                Ok(Some(instant)) => {
+                    halt_text(spent, &bounds.per_day, &Remedy::Renews(instant), &none)
+                }
+                _ => halt_text(spent, &bounds.per_day, &Remedy::Raise, &none),
             },
             // An explicit allowance is the ledger's own number rather than a
             // settings value, so it is reported as one and raised by the
@@ -39,9 +42,39 @@ fn budget_halt_text(refusal: &BudgetError, bounds: &CountBounds, journal: &Journ
                 spent,
                 &Bound::resolve("invocation_allowance", *allowance, None, None),
                 &Remedy::Adjust,
+                &none,
             ),
         },
+        // Spend is window-bounded whichever contract the account holds, so
+        // its one remedy is the renewal instant rather than the settings key.
+        // §FS-rhei-budgets.3.4 §FS-rhei-budgets.8
+        Dimension::Spend => {
+            let marks = budget_spend_marks(journal);
+            let remedy = match journal.renewal_instant() {
+                Ok(Some(instant)) => Remedy::Renews(instant),
+                // A lifetime account still bounds spend by the day, so the
+                // instant is derived from the day key rather than skipped.
+                _ => match rhei_core::budget::renewal_instant(&spent.day) {
+                    Ok(instant) => Remedy::Renews(instant),
+                    Err(_) => Remedy::Raise,
+                },
+            };
+            halt_text(spent, &bounds.spend, &remedy, &marks)
+        }
     }
+}
+
+/// How much of the day was charged at the worst case rather than measured.
+///
+/// `unsettled` is the one that cannot come from the chain alone: a started
+/// reserve with no settle is either in flight or abandoned, and only the
+/// owning run's execution-root lock tells the two apart — the same proof the
+/// release step performs. §FS-rhei-budgets.6.2
+fn budget_spend_marks(journal: &Journal) -> SpendMarks {
+    journal
+        .snapshot()
+        .map(|snapshot| snapshot.marks(&run_is_gone))
+        .unwrap_or_default()
 }
 
 /// The ticket's budget identity, taken from the plan metadata the caller is
@@ -168,6 +201,7 @@ fn budget_reports(
     let snapshot = journal.snapshot()?;
     let invocation_bound = snapshot.invocation_bound(bounds.per_day.effective);
     let travel = snapshot.travel_for(ticket);
+    let marks = snapshot.marks(&run_is_gone);
     Ok(vec![
         rhei_tui::BoundReport {
             dimension: Dimension::Invocations.label().into(),
@@ -179,6 +213,24 @@ fn budget_reports(
             remaining: snapshot.invocations.remaining(invocation_bound)?,
             mode: snapshot.contract.name().into(),
             window: matches!(snapshot.contract, Contract::Window).then(|| snapshot.day.clone()),
+            currency: None,
+            marks: None,
+        },
+        // Amounts in micro-units and the currency beside them, so a frontend
+        // renders `$25.00` rather than a bare number whose unit the reader has
+        // to guess. §FS-rhei-run-tui.1.1 §FS-rhei-run-json.2.1
+        rhei_tui::BoundReport {
+            dimension: Dimension::Spend.label().into(),
+            effective: bounds.spend.effective,
+            value_source: bounds.spend.source.as_str().into(),
+            limiting_source: bounds.spend.requested.map(|_| "machine".into()),
+            consumed: snapshot.spend.consumed,
+            outstanding: snapshot.spend.reserved,
+            remaining: snapshot.spend.remaining(bounds.spend.effective)?,
+            mode: "window".into(),
+            window: Some(snapshot.day.clone()),
+            currency: snapshot.currency.clone(),
+            marks: Some(marks),
         },
         rhei_tui::BoundReport {
             dimension: Dimension::Travel.label().into(),
@@ -190,6 +242,8 @@ fn budget_reports(
             remaining: travel.remaining(bounds.travel.effective)?,
             mode: "per ticket identity".into(),
             window: None,
+            currency: None,
+            marks: None,
         },
     ])
 }
@@ -213,6 +267,11 @@ fn budget_halt_event(
                 Contract::Lifetime { .. } => None,
             },
         ),
+        // Always window-limited, whichever contract the account holds.
+        // §FS-rhei-budgets.3.4
+        Dimension::Spend => {
+            (&bounds.spend, rhei_core::budget::renewal_instant(&spent.day).ok())
+        }
     };
     Some(rhei_tui::RunEvent::BudgetHalt {
         task: task_id_str.to_string(),
@@ -228,12 +287,22 @@ fn budget_halt_event(
             mode: match spent.dimension {
                 Dimension::Travel => "per ticket identity".into(),
                 Dimension::Invocations => spent.contract.name().into(),
+                Dimension::Spend => "window".into(),
             },
-            window: matches!(
-                (spent.dimension, &spent.contract),
-                (Dimension::Invocations, Contract::Window)
-            )
-            .then(|| spent.day.clone()),
+            window: match spent.dimension {
+                Dimension::Travel => None,
+                Dimension::Invocations => matches!(spent.contract, Contract::Window)
+                    .then(|| spent.day.clone()),
+                Dimension::Spend => Some(spent.day.clone()),
+            },
+            currency: spent.currency.clone(),
+            // Present and zeroed on a spend halt rather than absent, so a
+            // reader never has to tell "none" from "not reported".
+            // §FS-rhei-run-json.2.1
+            marks: spent
+                .dimension
+                .is_money()
+                .then(|| budget_spend_marks(journal)),
         },
         // Never an inner value the machine ceiling would clamp: telling an
         // operator to raise a field that cannot take effect sends them to the

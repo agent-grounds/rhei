@@ -596,9 +596,9 @@ pub fn assert_refuses_time_text(result: &CliRun, flag: &str, text: &str) {
 /// The bounds report every successful validation carries, after the success
 /// line and before any conditional warning.
 ///
-/// Every plan has all three count bounds in force, so every successful
-/// validation reports all three; an isolated home has configured none, so all
-/// three read `built_in`. This replaced the older promise that a graph without
+/// Every plan has all four bounds in force, so every successful validation
+/// reports all four; an isolated home has configured none, so all four read
+/// `built_in`. This replaced the older promise that a graph without
 /// `**Consumes:**` emitted `Validation succeeded\n` byte for byte — that
 /// sentence described the advisory's blast radius and cannot survive a report
 /// every plan gets.
@@ -607,6 +607,7 @@ pub const VALIDATED_BOUNDS: &str = concat!(
     "warning: transition_limit: 80 (built_in)\n",
     "warning: invocations_per_day: 200 (built_in)\n",
     "warning: invocation_lifetime_max: 6000 (built_in)\n",
+    "warning: spend_per_day: 400.00 (built_in)\n",
 );
 
 pub fn assert_success(result: &CliRun) {

@@ -336,9 +336,9 @@ fn cli_validate_output_is_byte_for_byte_pinned() {
 
     let succeeded = run_validate_in_dir(&dir);
     assert_eq!(succeeded.status.code(), Some(0));
-    // Every plan has all three count bounds in force, and a successful
-    // validation reports each with its value and its source before anything
-    // can be spent. §FS-rhei-validate.4 §FS-rhei-validate.6
+    // Every plan has all four bounds in force, and a successful validation
+    // reports each with its value and its source before anything can be
+    // spent. §FS-rhei-validate.4 §FS-rhei-validate.6
     assert_eq!(
         succeeded.stdout,
         concat!(
@@ -346,6 +346,7 @@ fn cli_validate_output_is_byte_for_byte_pinned() {
             "warning: transition_limit: 80 (built_in)\n",
             "warning: invocations_per_day: 200 (built_in)\n",
             "warning: invocation_lifetime_max: 6000 (built_in)\n",
+            "warning: spend_per_day: 400.00 (built_in)\n",
         )
     );
     assert_eq!(succeeded.stderr, "");

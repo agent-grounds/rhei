@@ -243,23 +243,50 @@ struct SettingsDefaults {
     /// it. §FS-rhei-budgets.2.1
     #[serde(default)]
     invocation_lifetime_max: Option<u64>,
+    /// Measured spend a project may be charged per UTC day, written as a bare
+    /// number and held here in micro-units. The one key of the four a plan or
+    /// a profile may not declare. §FS-rhei-budgets.2.1
+    #[serde(default, deserialize_with = "spend_per_day_micro")]
+    spend_per_day: Option<u64>,
     #[serde(default)]
     mcp_servers: Option<Vec<StateMcpEntry>>,
     #[serde(default)]
     skills: Option<Vec<StateSkillEntry>>,
 }
 
-/// The three count bounds as one settings tier read them.
+/// A bare number in the `defaults` block, in micro-units.
+///
+/// Its own reader rather than a plain `Option<u64>` because this key is the
+/// first of the four that is not an integer, and because the refusal has to
+/// name the key: a settings file has several numbers in it and serde's own
+/// message would say only that one of them was the wrong shape.
+/// §FS-rhei-budgets.2.1
+fn spend_per_day_micro<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = Option::<serde_json::Value>::deserialize(deserializer)?;
+    match raw {
+        None => Ok(None),
+        Some(serde_json::Value::Null) => Ok(None),
+        Some(value) => rhei_core::money::parse_settings_amount("spend_per_day", &value)
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+    }
+}
+
+/// The four bounds as one settings tier read them.
 ///
 /// Carried separately from the merged `defaults` because the machine tier is
-/// not only a fallback for these three: it is also the **ceiling**, so the
-/// value it set has to survive being overridden by a more specific tier.
+/// not only a fallback for these: it is also the **ceiling**, so the value it
+/// set has to survive being overridden by a more specific tier.
 /// §FS-rhei-budgets.2
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 struct CountBoundTier {
     transition_limit: Option<u64>,
     invocations_per_day: Option<u64>,
     invocation_lifetime_max: Option<u64>,
+    spend_per_day: Option<u64>,
 }
 
 impl CountBoundTier {
@@ -268,6 +295,7 @@ impl CountBoundTier {
             transition_limit: defaults.transition_limit,
             invocations_per_day: defaults.invocations_per_day,
             invocation_lifetime_max: defaults.invocation_lifetime_max,
+            spend_per_day: defaults.spend_per_day,
         }
     }
 }

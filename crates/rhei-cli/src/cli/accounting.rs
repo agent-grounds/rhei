@@ -1541,26 +1541,18 @@ fn is_descendant_id(candidate: &str, ancestor: &str) -> bool {
 
 fn format_summary_cost(summary: &rhei_tui::AccountingRunSummary) -> String {
     match summary.cost_micro.or(summary.priced_cost_micro) {
-        Some(value) => format_cost_micro(value, summary.currency.as_deref()),
+        Some(value) => rhei_core::money::format_micro(value, summary.currency.as_deref()),
         None => "unpriced".to_string(),
     }
 }
 
 fn format_usage_cost(usage: &rhei_tui::UsageSummary) -> String {
     match usage.cost_micro.or(usage.priced_cost_micro) {
-        Some(value) => format_cost_micro(value, usage.currency.as_deref()),
+        Some(value) => rhei_core::money::format_micro(value, usage.currency.as_deref()),
         None => "unpriced".to_string(),
     }
 }
 
-fn format_cost_micro(value: u64, currency: Option<&str>) -> String {
-    let units = value / 1_000_000;
-    let cents = (value % 1_000_000) / 10_000;
-    match currency {
-        Some("USD") | None => format!("${units}.{cents:02}"),
-        Some(currency) => format!("{units}.{cents:02} {currency}"),
-    }
-}
 
 fn format_dimension_value(summary: &rhei_tui::DimensionSummary) -> String {
     let Some(value) = summary.value else {

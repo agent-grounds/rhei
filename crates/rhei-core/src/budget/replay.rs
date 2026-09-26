@@ -6,7 +6,7 @@
 //! §AR-neural-admission.5 §FS-rhei-budgets.3.3
 
 use super::journal::Receipt;
-use super::types::{add, BudgetError, Contract, Counter, Snapshot};
+use super::types::{add, BudgetError, Contract, Counter, Snapshot, SpendBasis, SpendMarks};
 use super::Result;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -24,6 +24,14 @@ pub(crate) struct Reservation {
     /// A travel unit held but not yet applied to an edge.
     pub travel_held: bool,
     pub transition: Option<String>,
+    /// The worst case this admission reserved against the day, in micro-units.
+    /// Zero on a reservation written before the spend dimension existed, which
+    /// is what makes such an account read unchanged. §FS-rhei-budgets.6.2
+    pub spend_reserve: u64,
+    /// The settle that replaced the reserve, with the receipt it came from so
+    /// a replay of the same bytes is idempotent and a different one is
+    /// corruption. §FS-rhei-budgets.5.2
+    pub spend: Option<(u64, SpendBasis, Value)>,
 }
 
 /// Recomputed from the entire verified chain; no mutable balance cache.
@@ -40,6 +48,14 @@ pub(crate) struct State {
     /// The highest day key the chain has ever recorded, which is the floor a
     /// clock moved backwards cannot get under. §FS-rhei-budgets.3.3
     pub highest_day: Option<String>,
+    /// The account's one currency, fixed by the first receipt that carried an
+    /// amount. §FS-rhei-budgets.5.5
+    pub currency: Option<String>,
+    /// Receipt kinds this build does not understand. One of them makes the
+    /// account **read-only** rather than untrustworthy: it verified, it is
+    /// simply newer than this binary, and a downgrade is owed the reading it
+    /// was promised. §FS-rhei-budgets.5.2
+    pub unknown_kinds: BTreeSet<String>,
     pub audit: Vec<Value>,
 }
 
@@ -130,13 +146,63 @@ impl State {
                 self.contract = Some(next);
                 self.audit.push(p.clone());
             }
+            // Money, and nothing else: it releases no travel unit and no
+            // invocation unit, so both counts are what they were.
+            // §FS-rhei-budgets.6.2 §REQ-bounded-neural-work.4
+            "spend" => self.apply_spend(p)?,
+            // Retained rather than refused: a build that predates a kind has
+            // verified the chain and may read it, but not append to it.
+            // §FS-rhei-budgets.5.2
             kind => {
-                return Err(BudgetError::corrupt(format!(
-                    "unsupported receipt kind '{kind}'; this build cannot mutate it"
-                )))
+                self.unknown_kinds.insert(kind.to_string());
             }
         }
         Ok(())
+    }
+
+    /// The one write in this ledger allowed to lower a number.
+    ///
+    /// It revises a reservation's reserved worst case to what the invocation
+    /// actually cost — up or down — and touches neither count in either
+    /// direction. At most one may name a reservation: a second with different
+    /// content is corruption, and one naming a reservation the chain does not
+    /// hold is corruption. §FS-rhei-budgets.5.2 §FS-rhei-budgets.6.2
+    fn apply_spend(&mut self, p: &Value) -> Result<()> {
+        let currency = string(p, "currency")?.to_string();
+        let basis = SpendBasis::parse(string(p, "basis")?)
+            .ok_or_else(|| BudgetError::corrupt("spend receipt names an unknown basis"))?;
+        let amount = number(p, "amount_micro")?;
+        self.fix_currency(&currency)?;
+        let reservation = self.reservation(p)?;
+        if let Some((_, _, previous)) = &reservation.spend {
+            return if previous == p {
+                Ok(())
+            } else {
+                Err(BudgetError::corrupt("conflicting spend settle for one reservation"))
+            };
+        }
+        if reservation.released {
+            return Err(BudgetError::corrupt("a released reservation spent nothing"));
+        }
+        reservation.spend = Some((amount, basis, p.clone()));
+        Ok(())
+    }
+
+    /// One currency per account, fixed by the first receipt carrying an
+    /// amount. A second is corruption here, because admission refuses it
+    /// before any receipt is written: a chain that holds two was not written
+    /// by this engine. §FS-rhei-budgets.5.5
+    fn fix_currency(&mut self, currency: &str) -> Result<()> {
+        match &self.currency {
+            Some(held) if held != currency => Err(BudgetError::corrupt(format!(
+                "the account is denominated in {held} and a receipt carries {currency}"
+            ))),
+            Some(_) => Ok(()),
+            None => {
+                self.currency = Some(currency.to_string());
+                Ok(())
+            }
+        }
     }
 
     /// An applied edge. With a reservation it converts that reservation's held
@@ -192,6 +258,14 @@ impl State {
             return Err(BudgetError::corrupt("invalid or duplicate reservation"));
         }
         let window = string(p, "window")?.to_string();
+        // Absent on a reservation written before the spend dimension existed,
+        // which is what lets an older account read unchanged: it reserved
+        // nothing against a day nobody was charging. §FS-rhei-budgets.5.2
+        let spend_reserve = p.get("spend_reserve_micro").and_then(Value::as_u64).unwrap_or(0);
+        if spend_reserve > 0 {
+            let currency = string(p, "spend_currency")?.to_string();
+            self.fix_currency(&currency)?;
+        }
         self.reservations.insert(
             id.into(),
             Reservation {
@@ -202,9 +276,55 @@ impl State {
                 released: false,
                 travel_held: number(p, "travel_units")? == 1,
                 transition: None,
+                spend_reserve,
+                spend: None,
             },
         );
         Ok(())
+    }
+
+    /// The day's spend, derived in the same pass and from the same receipts as
+    /// the counts: a reservation's settle where it has one, its reserved worst
+    /// case where it has none.
+    ///
+    /// No amount is stored, exactly as no count is, which is why lowering
+    /// `spend_per_day` rewrites nothing. A released reservation contributes
+    /// nothing at all: the one lawful release is proof that no process could
+    /// have started, so there was no request to pay for.
+    /// §FS-rhei-budgets.3.4 §AR-neural-admission.5
+    fn spend(&self, day: &str) -> Result<(Counter, SpendMarks, Vec<String>)> {
+        let mut counter = Counter::default();
+        let mut marks = SpendMarks::default();
+        let mut unsettled = Vec::new();
+        for r in self.reservations.values() {
+            if r.released || r.spend_reserve == 0 || r.window != day {
+                continue;
+            }
+            match &r.spend {
+                Some((amount, basis, _)) => {
+                    counter.consumed = add(counter.consumed, *amount)?;
+                    match basis {
+                        SpendBasis::Measured => {}
+                        SpendBasis::Unpriced => marks.unpriced = add(marks.unpriced, 1)?,
+                        SpendBasis::Unmeasurable => {
+                            marks.unmeasurable = add(marks.unmeasurable, 1)?
+                        }
+                    }
+                }
+                None => {
+                    counter.reserved = add(counter.reserved, r.spend_reserve)?;
+                    // Only a *started* reservation can be unsettled: one that
+                    // never started is released whole by the step above this
+                    // one, money and all. §FS-rhei-budgets.6.2
+                    if r.started {
+                        if let Some(root) = r.payload["execution_root"].as_str() {
+                            unsettled.push(root.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        Ok((counter, marks, unsettled))
     }
 
     /// Replay re-derives ancestry from the chain itself: a receipt naming a
@@ -292,6 +412,7 @@ impl State {
         for (ticket, applied) in &self.travel {
             travel.entry(ticket.clone()).or_default().consumed = *applied;
         }
+        let (spend, spend_marks, spend_unsettled_roots) = self.spend(day)?;
         let mut reservations = BTreeMap::new();
         for (id, r) in &self.reservations {
             let mut row = r.payload.clone();
@@ -311,6 +432,10 @@ impl State {
             invocations,
             lifetime_invocations: self.lifetime_counter()?,
             travel,
+            spend,
+            currency: self.currency.clone(),
+            spend_marks,
+            spend_unsettled_roots,
             reservations,
             health: "verified",
         })

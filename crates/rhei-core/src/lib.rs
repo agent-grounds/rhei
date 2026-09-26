@@ -16,6 +16,9 @@ pub mod blocks;
 pub mod budget;
 pub mod callback;
 pub mod lexer;
+/// One rendering of an amount of money, and one reading of one.
+/// §FS-rhei-cost-accounting.5
+pub mod money;
 pub mod parser;
 pub mod platform;
 pub mod source;

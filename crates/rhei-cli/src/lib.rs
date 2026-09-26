@@ -185,6 +185,7 @@ include!("cli/run_failure_transitions.rs");
 include!("cli/run_pass_remaining_work.rs");
 include!("cli/run_summary_usage.rs");
 include!("cli/run_summary_accounting.rs");
+include!("cli/run_summary_bounds.rs");
 include!("cli/run_summary.rs");
 include!("cli/ready_transition.rs");
 include!("cli/ready_run_views.rs");
@@ -267,6 +268,7 @@ mod tests {
     include!("cli/tests_summary.rs");
     include!("cli/tests_summary_repricing.rs");
     include!("cli/tests_settings_tooling.rs");
+    include!("cli/tests_budget_spend.rs");
     include!("cli/tests_roster.rs");
     include!("cli/tests_snapshots_gc.rs");
     include!("cli/tests_snapshot_pointer.rs");

@@ -9,7 +9,7 @@
 
 // §AR-source-file-size.3 §FS-rhei-budgets.6 §AR-neural-admission.7
 
-use rhei_core::budget::{Account, AdmissionRequest, Arm, Audit, BudgetError, Journal};
+use rhei_core::budget::{Account, AdmissionRequest, Arm, Audit, BudgetError, Journal, SpendBasis};
 
 /// Where a ticket's budget identity is persisted.
 ///
@@ -55,6 +55,22 @@ struct HeldClaim {
     /// engine's own knowledge that it never spawned *is* the proof of
     /// non-start; after one has, nothing refunds it. §FS-rhei-budgets.6.2
     started: bool,
+    /// What this claim's invocations turned out to cost, one per accounting
+    /// record that landed, in the order they landed.
+    ///
+    /// An arm with none is charged the reserve as `unmeasurable`, which is
+    /// what makes an agent with no accounting extractor visible rather than
+    /// free — that class writes no record at all, so a settle-side fallback
+    /// would never run for it. §FS-rhei-budgets.6.2
+    measured: Vec<Measurement>,
+}
+
+/// One invocation's cost as the settle will write it. §FS-rhei-budgets.6.2
+#[derive(Clone, Debug)]
+struct Measurement {
+    amount_micro: u64,
+    currency: String,
+    basis: SpendBasis,
 }
 
 fn held_claims() -> &'static std::sync::Mutex<BTreeMap<String, HeldClaim>> {
@@ -229,9 +245,14 @@ fn run_is_gone(execution_root: &str) -> bool {
 /// before a spawn.
 ///
 /// Resolve the bounds, lock and replay the account, check one travel unit for
-/// the ticket and one invocation unit per arm, append one reservation carrying
-/// every unit — or refuse and append nothing. Only then may the caller create
-/// the subprocess. §FS-rhei-budgets.6.1 §FS-rhei-run.3.4
+/// the ticket, one invocation unit per arm and the worst case each arm may
+/// spend, append one reservation carrying every unit and every reserved
+/// amount — or refuse and append nothing. Only then may the caller create the
+/// subprocess.
+///
+/// `currency` is the composed price book's, which fixes an account's own on
+/// its first amount and is refused where the account already holds another.
+/// §FS-rhei-budgets.6.1 §FS-rhei-budgets.5.5 §FS-rhei-run.3.4
 #[allow(clippy::too_many_arguments)]
 fn budget_admit_spawn(
     input: &Path,
@@ -241,6 +262,7 @@ fn budget_admit_spawn(
     settings: &RheiSettings,
     task: &rhei_core::ast::Task,
     task_id_str: &str,
+    currency: &str,
 ) -> MietteResult<BudgetAdmission> {
     let project_root = budget_project_root(workspace_root);
     let bounds = resolve_count_bounds(settings, node_transition_limit(machine, Some(task)));
@@ -288,6 +310,8 @@ fn budget_admit_spawn(
             arms: &arms,
             parent_reservation: parent.as_deref(),
             travel,
+            spend_reserve_micro: built_in::SPEND_RESERVE,
+            spend_currency: currency,
         };
         journal.reserve(&request, bounds.effective(), &audit)
     })();
@@ -301,6 +325,7 @@ fn budget_admit_spawn(
                     travel: None,
                     arms: Vec::new(),
                     started: false,
+                    measured: Vec::new(),
                 });
                 if claim.travel.is_none() {
                     claim.travel = group.travel_reservation_id.clone();
@@ -363,18 +388,50 @@ fn budget_record_start(workspace_root: &Path, task_id_str: &str, confirmed: bool
     }
 }
 
+/// Hand the settle what this invocation actually cost.
+///
+/// Called where the accounting record is already durable, on whichever thread
+/// wrote it: the claim map is process-global and keyed by ticket, so the
+/// sequential and the parallel path reach it the same way. `None` is the
+/// class with no accounting extractor at all — no record is ever written for
+/// it — and it is deliberately *not* recorded here, so the settle charges it
+/// the reserve as `unmeasurable` rather than as nothing.
+/// §FS-rhei-budgets.6.2 §FS-rhei-cost-accounting.3.2
+fn budget_record_spend(task_id_str: &str, usage: Option<&rhei_tui::UsageSummary>) {
+    let Some(usage) = usage else { return };
+    // A record whose pricing is `unpriced` or `not-applicable` carries no
+    // amount, and a day that read `$0.00` for it would read healthy hardest
+    // for the models nobody has written a price for yet.
+    let measurement = match usage.cost_micro.or(usage.priced_cost_micro) {
+        Some(amount_micro) => Measurement {
+            amount_micro,
+            currency: usage.currency.clone().unwrap_or_else(|| "USD".into()),
+            basis: SpendBasis::Measured,
+        },
+        None => Measurement {
+            amount_micro: built_in::SPEND_RESERVE,
+            currency: usage.currency.clone().unwrap_or_else(|| "USD".into()),
+            basis: SpendBasis::Unpriced,
+        },
+    };
+    with_claims(|claims| {
+        if let Some(claim) = claims.get_mut(task_id_str) {
+            claim.measured.push(measurement);
+        }
+    });
+}
+
 /// End the visit this claim paid for.
 ///
 /// A travel unit still held is one no edge was applied against — a poll wait, a
 /// completion that selected nothing, a stall — and it goes back. An invocation
 /// unit goes back only when no start was ever recorded, which is this engine
 /// knowing it never created the subprocess; once a start exists the unit is
-/// consumed, ambiguous or not. §FS-rhei-budgets.4.1 §FS-rhei-budgets.6.2
+/// consumed, ambiguous or not. And once a start exists, every arm owes the
+/// day an amount: what the record said, or the worst case that was reserved
+/// for it. §FS-rhei-budgets.4.1 §FS-rhei-budgets.6.2
 fn budget_settle_visit(workspace_root: &Path, task_id_str: &str) {
     let Some(claim) = with_claims(|claims| claims.remove(task_id_str)) else { return };
-    if claim.travel.is_none() && claim.started {
-        return;
-    }
     // Best effort by design: a visit that ends while the account cannot be
     // opened leaves the unit outstanding, which is the conservative direction.
     // Failing the run over a unit nobody spent would be the other one.
@@ -383,11 +440,23 @@ fn budget_settle_visit(workspace_root: &Path, task_id_str: &str) {
     let Ok(Some(account)) = Account::locate(&project_root) else { return };
     let Ok(mut journal) = account.open(true) else { return };
     if claim.started {
+        // Money first, because the travel release below may return early and
+        // the amount is owed either way. A dropped settle leaves the reserve
+        // outstanding and is surfaced as `unsettled`. §FS-rhei-budgets.6.2
+        for (index, arm) in claim.arms.iter().enumerate() {
+            let measured = claim.measured.get(index);
+            let amount = measured.map_or(built_in::SPEND_RESERVE, |m| m.amount_micro);
+            let basis = measured.map_or(SpendBasis::Unmeasurable, |m| m.basis);
+            let currency = measured.map_or("USD", |m| m.currency.as_str());
+            let _ = journal.settle_spend(arm, amount, currency, basis, &audit);
+        }
         if let Some(travel) = claim.travel {
             let _ = journal.release_travel(&travel, &audit);
         }
         return;
     }
+    // Nothing started, so the whole reservation goes back — its invocation
+    // unit, its travel unit, and the worst case it reserved against the day.
     for arm in &claim.arms {
         let _ = journal.release_unstarted(arm, &audit);
     }

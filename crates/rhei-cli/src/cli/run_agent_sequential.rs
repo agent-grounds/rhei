@@ -174,6 +174,7 @@ fn run_sequential_agent_invocation(
         settings,
         task,
         task_id_str,
+        &opts.price_book().currency,
     )? {
         // Both counts on screen before any of this visit's capacity is spent.
         // §FS-rhei-budgets.9
@@ -404,7 +405,11 @@ fn run_sequential_agent_invocation(
             .as_ref()
             .expect("agent spawn plans carry accounting identity"),
     ) {
-        Ok(Some(_)) => {
+        // The day is charged from this record. An agent with no extractor
+        // reaches `Ok(None)`, so the settle charges it the reserve instead.
+        // §FS-rhei-budgets.6.2
+        Ok(Some(usage)) => {
+            budget_record_spend(task_id_str, Some(&usage));
             if let Err(err) = regenerate_accounting_indexes(workspace_root, &loaded.rhei)
             {
                 run_warn!("  warning: failed to update accounting rollups: {}", err);

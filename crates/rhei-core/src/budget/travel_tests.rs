@@ -262,6 +262,8 @@ fn two_transactions_racing_for_one_unit_admit_exactly_one() {
                         arms: &arms,
                         parent_reservation: None,
                         travel: false,
+                        spend_reserve_micro: built_in::SPEND_RESERVE,
+                        spend_currency: "USD",
                     };
                     journal.reserve(&request, bounds(80, 1), &audit()).is_ok()
                 })

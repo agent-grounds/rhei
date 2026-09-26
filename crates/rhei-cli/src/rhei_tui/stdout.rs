@@ -61,17 +61,8 @@ fn accounting_line(task: &str, report: UsageReport, usage: &UsageSummary) -> Opt
     Some(format!(
         "accounting: task {task} {} {}",
         usage.agent,
-        format_cost_micro(cost, usage.currency.as_deref())
+        rhei_core::money::format_micro(cost, usage.currency.as_deref())
     ))
-}
-
-fn format_cost_micro(value: u64, currency: Option<&str>) -> String {
-    let units = value / 1_000_000;
-    let cents = (value % 1_000_000) / 10_000;
-    match currency {
-        Some("USD") | None => format!("${units}.{cents:02}"),
-        Some(currency) => format!("{units}.{cents:02} {currency}"),
-    }
 }
 
 #[cfg(test)]

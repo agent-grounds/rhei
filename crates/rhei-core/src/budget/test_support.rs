@@ -126,7 +126,11 @@ pub(super) fn audit() -> Audit {
 /// The bounds a case runs under unless it says otherwise: generous enough that
 /// only the bound a test is about ever fires.
 pub(super) fn bounds(transition_limit: u64, invocations_per_day: u64) -> EffectiveBounds {
-    EffectiveBounds { transition_limit, invocations_per_day }
+    EffectiveBounds {
+        transition_limit,
+        invocations_per_day,
+        spend_per_day: built_in::SPEND_PER_DAY,
+    }
 }
 
 pub(super) fn arm(attempt: &str) -> [Arm<'_>; 1] {
@@ -147,5 +151,7 @@ pub(super) fn request<'a>(
         arms,
         parent_reservation: None,
         travel,
+        spend_reserve_micro: built_in::SPEND_RESERVE,
+        spend_currency: "USD",
     }
 }

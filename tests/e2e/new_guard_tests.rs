@@ -424,6 +424,57 @@ fn an_unusable_title_is_refused_as_an_argument() {
     assert_eq!(fs::read_to_string(dir.join("auth.rhei.md")).expect("rhei file"), before);
 }
 
+/// §FS-rhei-new.3.4.1: a `--description` value beginning with `-` is refused by
+/// argument parsing, and the refusal names the spellings that keep it instead of
+/// the `--` advice, which cannot attach a value to an option and fails again
+/// when it is followed.
+#[test]
+fn a_hyphen_leading_description_value_names_the_spellings_that_work() {
+    let dir = project_with_rhei("new-desc-hyphen");
+    let before = fs::read_to_string(dir.join("auth.rhei.md")).expect("rhei file");
+
+    let refused =
+        new_run(&["new", "t", "--under", "auth", "--description", "- Context: x.\n- y."], &dir);
+    let said = flattened_output(&refused);
+    // The value stays refused: accepting it would take a following flag for the
+    // body too, so `--description --dry-run` would write `--dry-run` and exit 0.
+    assert_eq!(refused.status.code(), Some(2), "got:\n{said}");
+    assert_eq!(
+        fs::read_to_string(dir.join("auth.rhei.md")).expect("rhei file"),
+        before,
+        "a refused argument writes nothing"
+    );
+    assert!(said.contains("--description="), "must name the attached form, got:\n{said}");
+    assert!(said.contains("--description-file -"), "must name standard input, got:\n{said}");
+    // Replaced in its own slot, not accompanied: two tips of which the first is
+    // wrong leave the caller choosing between them.
+    assert!(!said.contains("-- - "), "the `--` advice must be gone, got:\n{said}");
+
+    // A path is the same refusal in its own words: a bare `-` there already
+    // means standard input, so piping is no answer to it.
+    let path = new_run(&["new", "t", "--under", "auth", "--description-file", "-x/body.md"], &dir);
+    let path_said = flattened_output(&path);
+    assert_eq!(path.status.code(), Some(2), "got:\n{path_said}");
+    assert!(path_said.contains("--description-file="), "got:\n{path_said}");
+    assert!(!path_said.contains("-- -x"), "the `--` advice must be gone, got:\n{path_said}");
+    assert_eq!(fs::read_to_string(dir.join("auth.rhei.md")).expect("rhei file"), before);
+}
+
+/// §FS-rhei-new.3.4.1: a hyphen-leading `TITLE` renders byte-identically to a
+/// refused `--description` value, so only the command line tells them apart — and
+/// it is a different mistake with a different answer. A regression guard: this
+/// holds before the change and must still hold after it.
+#[test]
+fn a_hyphen_leading_title_keeps_the_refusal_it_prints_today() {
+    let dir = project_with_rhei("new-title-hyphen");
+    let refused = new_run(&["new", "- leading", "--under", "auth"], &dir);
+    let said = flattened_output(&refused);
+    assert_eq!(refused.status.code(), Some(2), "got:\n{said}");
+    assert!(said.contains("unexpected argument '- ' found"), "got:\n{said}");
+    assert!(said.contains("use '-- - '"), "the title keeps its own advice, got:\n{said}");
+    assert!(!said.contains("--description"), "a title is not an option value, got:\n{said}");
+}
+
 /// §FS-rhei-new.5.2: a `**Prior:**` into a rhei the lenient load skipped can be
 /// checked by nothing, so it is refused rather than written and then blamed on
 /// whoever repairs the sibling.

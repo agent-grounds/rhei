@@ -350,6 +350,53 @@ the refusal says so. Demoting or escaping the author's line automatically would
 mean a create that edits its input behind the author's back, and a description
 carrying someone's issue body has to come out the way they wrote it.
 
+Everything above is about text that *arrived*. A value the argument parser
+refused never reaches any of these checks, and §3.4.1 says what happens to it.
+
+#### 3.4.1. A value the argument parser refused
+
+`--description` and `--description-file` are ordinary options, so a value
+beginning with `-` is taken for another flag and refused during argument
+parsing — before the command is built, before every check above, and with
+nothing written. That refusal stays: `rhei new "t" --under auth --description
+'- Context: x.'` exits with the argument parser's status and creates nothing.
+Accepting such a value would mean accepting a *following flag* as one too, so
+`--description --dry-run` would write `--dry-run` into the body and exit 0
+instead of previewing the create.
+
+What must not stay is advice the caller cannot follow. The argument parser's own
+tip for this shape — pass the value after a bare `--` — is written for a
+positional: `--` ends option parsing, so it can never attach a value to an
+option, and following it is refused a second time. The refusal therefore
+**replaces** that tip with rhei's own, in the same place rather than beside it,
+because two tips of which the first is wrong leave the caller choosing between
+them. What rhei's says is the spelling that keeps the value: the attached
+`--description=<text>` form, or `--description-file -` for a body read from
+standard input. For a hyphen-leading *path* it is the attached
+`--description-file=<path>` form, since a bare `-` there already means standard
+input. Both are runnable as printed and neither echoes the caller's own text
+back (§FS-rhei-errors.2), so the message needs no per-platform quoting and is
+the same everywhere (§REQ-cross-platform). The caller recovers from the failure
+they are standing in rather than from an instruction they were supposed to have
+read first (§FS-rhei-errors.6), and the value is answered for where it was
+supplied (§FS-rhei-errors.3).
+
+The new tip is keyed to the *option*, not to the message: a hyphen-leading
+`TITLE` renders byte-identically today — the parser reports `-` plus the
+offending second character, and a bullet's second character is a space either
+way — yet it is a different mistake with a different answer. So `rhei new
+"- leading"` keeps exactly the refusal it prints now and mentions no option.
+What tells the two apart is the command line itself: an option's name
+immediately followed by a token that begins with `-` and is neither `-` nor
+`--`, looked for only before the first bare `--`. A value of exactly `-` is the
+spelling the tip recommends and never matches it; a command line carrying both
+mistakes gets the option's tip, which names the option and is true of it.
+
+`--description` and `--description-file` are the only options this covers.
+Every other option taking free prose keeps what it prints today; the table of
+options and their advice is one row per option so that adding one later is a
+row rather than a redesign.
+
 ### 3.5. The basin needs a project
 
 `--under basin` requires a Panta project, exactly as creating a rhei does

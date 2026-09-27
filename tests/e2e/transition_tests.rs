@@ -513,3 +513,88 @@ transitions:
         "A transition into the reserved `cancelled` state skips this check.",
     );
 }
+
+/// A refusal has to be readable, and today's is not when several rules share the
+/// refused pair: it refuses the move to `completed` and lists `completed` among
+/// the transitions currently applicable, in the same sentence. Both halves are
+/// true of *different* rules for the pair, and the message says neither.
+///
+/// `rhei transition` names a state pair and carries no rule identity, so the
+/// first declared rule governs and the later one is never reached
+/// (§FS-rhei-transitions.4.4). The refusal must say that: the target just
+/// refused is not somewhere the caller could go instead, and the reason names
+/// the leading edge as what governs.
+// §FS-rhei-transition-cmd.3
+#[test]
+fn transition_refusing_a_shared_pair_names_the_leading_edge_and_drops_the_target() {
+    let machine = r#"name: shared-pair-refusal
+version: 1
+states:
+  draft:
+    initial: true
+    description: Draft
+  fix:
+    description: Fix findings
+    visits: 2
+  completed:
+    final: true
+    description: Done
+transitions:
+  - from: draft
+    to: fix
+  - from: fix
+    to: completed
+    condition: visitCount >= visits
+  - from: fix
+    to: completed
+  - from: fix
+    to: fix
+    condition: visitCount < visits
+"#;
+    let dir = unique_temp_dir("trans-shared-pair-refusal");
+    let plan_path = write_fixture_file(
+        &dir,
+        "plan.rhei.md",
+        "# Rhei: Shared pair\n\n## Tasks\n\n### Task 1: Fix findings\n**State:** fix\n",
+    );
+    let machine_path = write_fixture_file(&dir, "states.yaml", machine);
+
+    let result = run_transition(&plan_path, &machine_path, "1", "fix", "completed");
+    assert!(!result.status.success(), "the leading edge's condition is unmet on visit 1");
+    let said = flattened_diagnostic(&result);
+    assert!(
+        said.contains("transition from 'fix' to 'completed' is not currently applicable"),
+        "the refusal still names the move it refused; got:\n{said}"
+    );
+    assert!(
+        !applicable_targets(&said).iter().any(|target| target == "completed"),
+        "the list is where a move could go instead, so it cannot repeat the \
+         refused target; got:\n{said}"
+    );
+    assert!(
+        said.contains("first declared"),
+        "and the reason names the leading edge as what governs the pair; got:\n{said}"
+    );
+    assert_task_state(&plan_path, &machine_path, "1", "fix");
+}
+
+/// A miette diagnostic wraps its message across lines behind a `│` gutter, so an
+/// assertion about a sentence has to read the sentence rather than the layout.
+// §FS-rhei-errors.2
+fn flattened_diagnostic(result: &CliRun) -> String {
+    let stripped: String =
+        result.stderr.chars().map(|c| if "×│╰─▲^".contains(c) { ' ' } else { c }).collect();
+    stripped.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// The targets a refusal offered instead, read out of its flattened message.
+fn applicable_targets(said: &str) -> Vec<String> {
+    let Some((_, rest)) = said.split_once("Currently applicable transitions from ") else {
+        return Vec::new();
+    };
+    let Some((_, list)) = rest.split_once(": ") else {
+        return Vec::new();
+    };
+    let list = list.split('.').next().unwrap_or_default();
+    list.split(',').map(|target| target.trim().to_string()).filter(|t| !t.is_empty()).collect()
+}

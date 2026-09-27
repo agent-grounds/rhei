@@ -446,6 +446,17 @@ impl ExitCodeMatch {
 struct ProgramExitRoute {
     to: String,
     matched: ExitCodeMatch,
+    /// Which rule of `machine.transitions()` was chosen, by index.
+    ///
+    /// The `(from, to)` pair does not identify a rule: several rules may
+    /// declare the same pair and differ only in their `exit_code:`, their
+    /// `condition:`, or their callbacks. So the pair cannot be re-resolved
+    /// afterwards to recover what fired — the selection has to say.
+    /// §FS-rhei-programs.3.2 §FS-rhei-transitions.4.4
+    // Read by the contract's selection tests. Nothing on the run path carries
+    // it to the apply step yet, which is what the fix is for.
+    #[allow(dead_code)]
+    selected_rule: usize,
 }
 
 fn find_program_exit_transition(
@@ -475,8 +486,9 @@ fn find_program_exit_transition(
     let ordered_match = machine
         .transitions()
         .iter()
-        .filter(|rule| rule.from.0 == current_state)
-        .filter(|rule| {
+        .enumerate()
+        .filter(|(_, rule)| rule.from.0 == current_state)
+        .filter(|(_, rule)| {
             if exit_code == 0 {
                 rule.exit_code.is_none() || transition_matches_exit_code(rule, exit_code)
             } else if rule.exit_code.is_none() {
@@ -486,7 +498,7 @@ fn find_program_exit_transition(
             }
         });
 
-    for rule in ordered_match {
+    for (selected_rule, rule) in ordered_match {
         if applicable_exact_match_exists && transition_is_nonzero_exit_code(rule) {
             continue;
         }
@@ -499,7 +511,11 @@ fn find_program_exit_transition(
             } else {
                 ExitCodeMatch::of(rule)
             };
-            return Ok(Some(ProgramExitRoute { to: rule.to.0.clone(), matched }));
+            return Ok(Some(ProgramExitRoute {
+                to: rule.to.0.clone(),
+                matched,
+                selected_rule,
+            }));
         }
     }
 

@@ -292,3 +292,203 @@ fn a_routed_exit_that_owes_the_result_is_reported_with_its_own_exit_code() {
         "and never an exit that did not happen; got:\n{report}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The rule the exit code selected is the rule that fires
+//
+// A `(from, to)` pair may carry several rules, so the pair does not identify
+// one: a poll state's condition-only exhaustion edge and an exit-coded edge to
+// the same target are the ordinary shape. These pin that the algorithm's choice
+// is what fires - the move, and the callbacks with it - whichever order the two
+// rules are declared in.
+// ---------------------------------------------------------------------------
+
+const POLL_PLAN: &str = r#"# Rhei: Routing exit behind a leading edge
+
+## Tasks
+
+### Task 1: The poll whose program exits 4 on its first attempt
+**State:** waiting
+"#;
+
+/// The exhaustion edge §FS-rhei-run.5.1 prescribes: condition-only, declaring
+/// no `exit_code:`, so the exit-code algorithm never collects it.
+const EXHAUSTION_EDGE: &str = "  - from: waiting\n    to: gate\n    \
+     condition: pollAttempts >= pollMaxAttempts\n    \
+     description: The wait ran out; a person takes it from here\n";
+
+/// The edge exit 4 names. It carries no `condition:` of its own.
+const EXIT_FOUR_EDGE: &str = "  - from: waiting\n    to: gate\n    exit_code: 4\n    \
+     description: The program refused to go on; a person decides\n";
+
+/// The ticket's machine: a poll state whose program exits 4 on its first
+/// attempt, two edges to the `gating: true` state a person waits in, and the
+/// self-loop a poll state keeps for "nothing yet".
+fn poll_route_machine(command: &str, edges: &str) -> String {
+    format!(
+        r#"name: poll-exit-route
+version: 1
+states:
+  waiting:
+    initial: true
+    description: Poll a program that exits 4 on its first attempt
+    program:
+      command: {command}
+    program_timeout: 10s
+    poll:
+      interval: 1s
+      max_attempts: 3
+  gate:
+    gating: true
+    description: A person decides what happens next
+  done:
+    final: true
+    description: Done
+transitions:
+{edges}
+  - from: waiting
+    to: waiting
+    exit_code: 75
+    description: Nothing yet; wait out poll.interval and look again
+  - from: gate
+    to: done
+    description: The person is finished with it
+"#
+    )
+}
+
+fn set_up_poll(prefix: &str, edges: &str) -> (TestDir, std::path::PathBuf, std::path::PathBuf) {
+    let dir = unique_temp_dir(prefix);
+    let program = write_python_agent(&dir, "refuse.py", "sys.exit(4)\n");
+    let plan_path = write_fixture_file(&dir, "plan.rhei.md", POLL_PLAN);
+    let machine_path = write_fixture_file(
+        &dir,
+        "states.yaml",
+        &poll_route_machine(&fixture_command(&program), edges),
+    );
+    (dir, plan_path, machine_path)
+}
+
+/// The ticket verbatim. The poll budget has two attempts left, so the leading
+/// edge's `condition:` is false — and that edge is not a candidate for exit 4 in
+/// the first place. Exit 4 selects the edge that names it, so the ticket reaches
+/// the gate it was written to reach and the run finishes.
+// §FS-rhei-programs.3.2 §FS-rhei-transitions.3.5
+#[test]
+fn an_exit_code_fires_its_own_edge_declared_after_a_conditional_one() {
+    let (_dir, plan_path, machine_path) =
+        set_up_poll("exit-route-conditional-first", &format!("{EXHAUSTION_EDGE}{EXIT_FOUR_EDGE}"));
+
+    let result = run_cli("run", &plan_path, &machine_path, &["--no-tui", "--no-callbacks"]);
+    assert_success(&result);
+    assert_task_state(&plan_path, &machine_path, "1", "gate");
+}
+
+/// The same two rules in the other order, and nothing else. It is what stops a
+/// fix that works in only one declaration order: two machines declaring the same
+/// edges must route the same exit code the same way.
+// §FS-rhei-programs.3.2 §FS-rhei-transitions.4.4
+#[test]
+fn the_same_two_edges_declared_the_other_way_round_route_the_same_exit() {
+    let (_dir, plan_path, machine_path) =
+        set_up_poll("exit-route-exit-code-first", &format!("{EXIT_FOUR_EDGE}{EXHAUSTION_EDGE}"));
+
+    let result = run_cli("run", &plan_path, &machine_path, &["--no-tui", "--no-callbacks"]);
+    assert_success(&result);
+    assert_task_state(&plan_path, &machine_path, "1", "gate");
+}
+
+/// The quiet face of the same defect, and the one an operator cannot see: the
+/// leading edge's `condition:` is **met**, so the target is right either way and
+/// nothing refuses anything — but the callbacks that run are the leading edge's
+/// rather than the ones on the edge exit 4 selected. The marker file is what
+/// makes *which rule fired* observable, and it is the whole assertion here.
+///
+/// It also rules out the cheaper fix of taking the first *applicable* rule for
+/// the pair: here the first applicable rule is the leading one, so that fix
+/// leaves the marker reading `leading` exactly as today does.
+// §FS-rhei-programs.3.2 §FS-rhei-transitions.3.5 §FS-rhei-transitions.4.4
+#[test]
+fn the_callbacks_that_run_belong_to_the_edge_the_exit_code_selected() {
+    let dir = unique_temp_dir("exit-route-which-rule-fired");
+    let program = write_python_agent(&dir, "refuse.py", "sys.exit(4)\n");
+    let marker = dir.join("fired.txt");
+    let machine_path = write_fixture_file(
+        &dir,
+        "states.yaml",
+        &format!(
+            r#"name: quiet-exit-route
+version: 1
+states:
+  route:
+    initial: true
+    description: Route on the exit code
+    program:
+      command: {command}
+    program_timeout: 10s
+  gate:
+    gating: true
+    description: A person decides what happens next
+  done:
+    final: true
+    description: Done
+transitions:
+  - from: route
+    to: gate
+    condition: visitCount < 2
+    on_enter: {leading}
+    description: The leading edge for the pair, whose condition is met
+  - from: route
+    to: gate
+    exit_code: 4
+    on_enter: {selected}
+    description: The edge exit 4 names
+  - from: gate
+    to: done
+    description: The person is finished with it
+"#,
+            command = fixture_command(&program),
+            leading = marker_callback(&marker, "leading"),
+            selected = marker_callback(&marker, "selected"),
+        ),
+    );
+    let plan_path = write_fixture_file(
+        &dir,
+        "plan.rhei.md",
+        "# Rhei: Which rule fired\n\n## Tasks\n\n### Task 1: Route on exit 4\n**State:** route\n",
+    );
+
+    let result = run_cli("run", &plan_path, &machine_path, &["--no-tui"]);
+    assert_success(&result);
+    // The state is right under the defect too, which is why it cannot be the
+    // assertion: both edges go to `gate`.
+    assert_task_state(&plan_path, &machine_path, "1", "gate");
+
+    let fired = fs::read_to_string(&marker).unwrap_or_default();
+    assert_eq!(
+        fired.trim(),
+        "selected",
+        "the `on_enter` of the edge exit 4 selected is what must run, not the \
+         leading edge's; got:\n{fired}"
+    );
+}
+
+/// A `cli:` callback that appends one name to `marker`, so the marker reads back
+/// as the rule that fired. The path is spelled as character codes because a
+/// temporary directory on Windows is full of backslashes and neither a YAML
+/// scalar nor a Python literal would hand them through unchanged.
+// §FS-rhei-programs.1.1 §REQ-cross-platform.4
+fn marker_callback(marker: &Path, name: &str) -> String {
+    let path_chars = marker
+        .display()
+        .to_string()
+        .chars()
+        .map(|character| u32::from(character).to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    python_callback_yaml(&format!(
+        "import json,pathlib,sys;p=pathlib.Path(''.join(map(chr,[{path_chars}])));\
+         h=p.open('a',encoding='utf-8',newline='');h.write('{name}\\n');h.close();\
+         sys.stdout.write(json.dumps({{'success': True}}))"
+    ))
+}

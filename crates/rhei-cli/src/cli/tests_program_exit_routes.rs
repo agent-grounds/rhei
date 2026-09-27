@@ -122,6 +122,24 @@ transitions:
         assert_eq!(selected_is_declared_route(&both, 3), Some(false));
     }
 
+    /// The ticket's pair, read at the selection boundary. The leading rule
+    /// declares no `exit_code:` at all, so step 1 never collects it; the rule
+    /// the exit code chose is the second one declared for the pair. Which of
+    /// the two it was has to leave the function, because `(route, checked)`
+    /// names both of them. §FS-rhei-programs.3.2 §FS-rhei-transitions.4.4
+    #[test]
+    fn a_selection_behind_a_leading_conditional_rule_carries_the_rule_it_chose() {
+        let leading = "  - from: route\n    to: checked\n    condition: visitCount >= 1\n";
+        let both = format!("{leading}{EXACT}");
+        let route = selected_route(&both, 3).expect("the exit-coded edge is selected");
+        assert_eq!(route.to, "checked");
+        assert_eq!(
+            route.selected_rule, 1,
+            "the exit code chose the second rule declared for the pair; the first \
+             is not a candidate at all"
+        );
+    }
+
     /// The shape every poll fixture has: one `poll:` state whose self-loop and
     /// whose exhaustion edge declare the *same* exact code, so which of them
     /// fires is decided by the attempt budget and never by the exit.
@@ -186,6 +204,10 @@ transitions:
                 .expect("the exhaustion edge is selected");
         assert_eq!(route.to, "exhausted");
         assert!(!route.matched.is_declared_route());
+        // Carrying the rule's identity does not move which rule a spent budget
+        // picks: it is the exhaustion edge, the second rule declared here.
+        // §FS-rhei-run.5.1
+        assert_eq!(route.selected_rule, 1);
     }
 
     /// The budget is not spent, so the self-loop is still open and the attempt
@@ -199,4 +221,7 @@ transitions:
                 .expect("selection should not error")
                 .expect("the self-loop is selected");
         assert_eq!(route.to, "waiting");
+        // The self-loop is the first rule declared, and an unspent budget
+        // leaves that unchanged too. §FS-rhei-run.5.1
+        assert_eq!(route.selected_rule, 0);
     }

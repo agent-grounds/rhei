@@ -131,6 +131,14 @@ compare-and-swap and every mutable guard before computing any effect.
    §6; a declared edge never enters the exceptional path. Then evaluate the
    selected edge's `condition:`, if it declares one, and reject when it is
    unmet, naming which transitions from `--from` *are* currently applicable.
+   *Selected* means the **first declared** edge from `--from` to `--to`: this
+   command names a state pair and carries no rule identity, so where several
+   rules share the pair the leading one governs and the rest are not reached
+   ([§FS-rhei-transitions.4.4](rhei-transitions.spec.md#44-transition-definition)).
+   The applicable list is what a move could reach *instead*, so it never repeats
+   the target just refused; where a later rule for that same pair is applicable,
+   the refusal says that the leading edge is what governs, so the reason and the
+   list cannot read as contradicting each other.
 7. Apply the descendants-first guard (§3.1). Reject before any callback runs
    when `--to` is a `final: true` state and the task still has a non-terminal
    descendant. The guard runs after the edge is confirmed declared and

@@ -163,14 +163,27 @@ When a program exits and has not already advanced the task (via `rhei transition
 1. Collect all transitions from the current state that declare an `exit_code` field.
 2. Evaluate specific matches first: integer and integer-array conditions are checked against the actual exit code.
 3. If no specific match and the exit code is non-zero, evaluate `"nonzero"` transitions.
-4. If exactly one transition matches, fire it (with its `on_leave`/`on_enter` callbacks).
-5. If multiple transitions match at the same specificity level, also evaluate `condition` fields to disambiguate. If still ambiguous after conditions, it is a validation error.
+4. If exactly one transition matches, fire that rule (with *its* `on_leave`/`on_enter` callbacks).
+5. If multiple transitions match at the same specificity level, also evaluate `condition` fields to disambiguate. A `condition:` is a tiebreaker *between* the rules that matched the exit code, never a second gate applied afterwards to the rule that won. If still ambiguous after conditions, it is a validation error.
 6. If no transition matches and exit code is `0`, log a warning: `warning: program exited 0 but task {id} did not advance from '{state}'`.
 7. If no transition matches and exit code is non-zero, log an error and apply the `--continue-on-error` policy.
 
 On a `poll:` state whose attempt budget is spent, step 1 does not govern the
 exhaustion edge: the engine selects the first matching non-self-loop
 transition regardless of `exit_code` (§FS-rhei-run.5.1).
+
+**The rule these steps selected is the rule that fires.** Steps 1–5 choose a
+transition *rule*, not merely a target state, and the engine fires that rule
+with that rule's own `on_leave` and `on_enter`. It does not re-resolve the edge
+from the rule's `from` and `to` after selecting it. Where one `(from, to)` pair
+carries several rules, which of them the algorithm picked is the whole answer
+([§FS-rhei-transitions.4.4](rhei-transitions.spec.md#44-transition-definition)),
+so the order the rules are declared in does not decide the outcome. A rule step
+1 never collected as a candidate — one declaring no `exit_code:` at all — never
+gates the move either: its `condition:` is not consulted, and it cannot refuse a
+transition the exit code selected. Two machines that declare the same rules for
+one pair in different orders therefore route the same exit code the same way,
+and to the same callbacks.
 
 **An exit that fired an exact match is a declared route, not a failure.** A
 step-2 match — an integer or an integer-array condition — is the program naming

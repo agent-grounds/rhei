@@ -481,8 +481,11 @@ When a program state's subprocess exits and has not already advanced the task (v
 2. Match the actual exit code against specific integers and arrays first.
 3. If no specific match and exit code is non-zero, try `"nonzero"` transitions.
 4. If multiple transitions match, evaluate `condition` fields to disambiguate.
-5. The matching transition fires with `triggeredBy: 'system'`.
-6. The transition's `on_leave` and `on_enter` callbacks execute normally.
+5. The transition steps 2–4 selected fires with `triggeredBy: 'system'` — that
+   rule, not merely its target state. The engine does not resolve the edge again
+   from `from` and `to`, so a different rule declared for the same pair neither
+   fires nor refuses this move (§FS-rhei-transitions.4.4).
+6. That rule's own `on_leave` and `on_enter` callbacks execute normally.
 
 ```yaml
 states:
@@ -860,6 +863,32 @@ transitions:
 | `skill_unavailable` | boolean or string array | No | Same shape as `mcp_unavailable`, for skills. |
 | `max_retries` | integer | No | Maximum automatic retry attempts |
 | `retry_delay` | string | No | Delay between retries (e.g., `30s`, `5m`) |
+
+**Several rules may share one `(from, to)` pair.** Nothing forbids two
+transitions with the same source and target: they differ in their `exit_code:`,
+their `condition:`, or their callbacks, and a poll state normally has this shape
+— a condition-only exhaustion edge to the state a person waits in
+([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)) beside an
+exit-coded edge to the same place. Which rule of the pair fires depends on what
+the trigger named, and that is a property of the trigger rather than of the
+declaration order:
+
+- A trigger that **selects a rule** fires the rule it selected, with that rule's
+  own `on_leave` and `on_enter`. The program exit-code trigger
+  (§FS-rhei-transitions.3.5) is one: its
+  algorithm evaluates each candidate's `condition:` while choosing, so the rule
+  it chose is the rule applied, and a rule it never collected as a candidate
+  cannot refuse the move
+  ([§FS-rhei-programs.3.2](rhei-programs.spec.md#32-evaluation-order)).
+  Declaration order does not decide the outcome.
+- A caller that **names only a state pair** takes the **first declared** rule for
+  the pair, and that rule's `condition:` governs. `rhei transition --from/--to`
+  ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)),
+  `rhei complete`, and an `on_leave` callback's `nextState` redirect are all of
+  this kind: they carry no rule identity, so the later rules for the pair are
+  never reached and their callbacks do not run. A move refused this way is
+  refused because of the leading rule, whatever a later rule for the pair
+  declares.
 
 ### 4.5. Artifact Enforcement
 

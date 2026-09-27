@@ -38,6 +38,7 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-release](rhei-release.spec.md#fs-rhei-release-rhei-release) | `rhei release` command behavior |
 | [§FS-rhei-reset](rhei-reset.spec.md#fs-rhei-reset-rhei-reset) | `rhei reset` command behavior |
 | [§FS-rhei-list](rhei-list.spec.md#fs-rhei-list-rhei-list) | `rhei list` command behavior |
+| [§FS-rhei-show](rhei-show.spec.md#fs-rhei-show-rhei-show) | `rhei show` command behavior |
 | [§FS-rhei-viz](rhei-viz.spec.md#fs-rhei-viz-flow-visualization) | Flow visualization: the primary plan/machine visualization surface |
 | [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification) | Rhei template format and instantiation behavior |
 | [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks) | Composable block manifests, qualification, seams, routing, and data passes |

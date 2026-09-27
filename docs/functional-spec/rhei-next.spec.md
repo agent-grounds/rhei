@@ -318,6 +318,12 @@ Peek mode still resolves required `inputs` for the first otherwise-claimable
 task. If any are missing, `--peek` fails with the same missing-artifact error as
 claim mode.
 
+A ticket outside the ready set is still refused — the gate is about claiming,
+and reading is not claiming — but the refusal's help line names the verb that
+prints the body, `rhei show <ticket>`, rather than `rhei list`, which prints no
+body at all ([§FS-rhei-show](rhei-show.spec.md#fs-rhei-show-rhei-show),
+[§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help)).
+
 ### 4.1. Output (peek mode)
 
 Peek prints what claim mode prints, minus the claim: the same heading, the same

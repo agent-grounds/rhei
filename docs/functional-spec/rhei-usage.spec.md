@@ -113,6 +113,7 @@ Commands for authoring, inspecting, and running a workflow:
 | `rhei reset`       | Returns each task to the state it was authored in ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)), removes `runtime/`; narrowed with `--rhei <id>` it removes only the in-scope tickets' keyed output ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)) |
 | `rhei snapshot`    | Lists, shows, prunes, or continues from session snapshots captured by `rhei run` |
 | `rhei roster`      | Inspects the effective agents, models, bindings, defaults, sources, and merge provenance for a project ([§FS-rhei-agents.1.1.7](rhei-agents.spec.md#117-inspecting-the-effective-roster)) |
+| `rhei show`       | Prints one task's heading and body by id, and nothing else; `--json` for the machine form ([§FS-rhei-show](rhei-show.spec.md#fs-rhei-show-rhei-show)) |
 
 `rhei run` and the manual-worker flow (`next` / `transition` / `complete`) are mutually exclusive per execution — they never overlap on the same task because `rhei run` holds transition responsibility for the states it drives. The typical manual-worker loop is `next` (claim) → work → `transition` (advance as needed) → `complete` (finish, record result, release).
 

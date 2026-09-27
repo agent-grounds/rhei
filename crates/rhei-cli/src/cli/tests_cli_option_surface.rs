@@ -34,3 +34,26 @@ fn transition_help_documents_the_supervisor_option() {
          checkpoint this move would deliver to the named supervisor — got: {description}"
     );
 }
+
+/// `rhei show` is a documented verb with a documented machine form: the listing
+/// names the subcommand, its `--json` flag, and its `--task` alternative, because
+/// every error this command raises tells a reader to type it. §FS-rhei-show.1
+#[test]
+fn show_help_documents_the_ticket_target_and_the_machine_form() {
+    let mut command = cli_command();
+    let show = command.find_subcommand_mut("show").expect("`show` subcommand");
+
+    let help = show.render_help().to_string();
+    for flag in ["--json", "--task"] {
+        assert!(help.contains(flag), "`rhei show --help` should list `{flag}`:\n{help}");
+    }
+
+    let description = show
+        .get_about()
+        .expect("`show` carries an about line")
+        .to_string();
+    assert!(
+        description.contains("body"),
+        "`show` should be described by what it prints — one task's body — got: {description}"
+    );
+}

@@ -1303,3 +1303,44 @@ transitions:
         "result file should not be written on failure"
     );
 }
+
+/// The ready-set refusal has to name a command that actually shows the body it
+/// is refusing to show. `rhei list` prints none, which §FS-rhei-errors.1.2 calls
+/// the wrong help line, and `rhei show` is the verb that does.
+/// §FS-rhei-next.4 §FS-rhei-show
+#[test]
+fn next_refusal_help_names_the_verb_that_prints_the_body() {
+    let plan = r#"# Rhei: Refusal Help
+
+## Tasks
+
+### Task 1: The claimable one
+**State:** draft
+
+### Task 2: The finished one
+**State:** completed
+
+Body nobody can reach through a claim.
+"#;
+
+    let dir = unique_temp_dir("next-refusal-help-show");
+    let plan_path = write_fixture_file(&dir, "plan.rhei.md", plan);
+    let machine_path = write_fixture_file(&dir, "states.yaml", STATE_MACHINE);
+
+    let result = run_cli("next", &plan_path, &machine_path, &["--task", "plan.2", "--peek"]);
+    assert!(!result.status.success(), "a terminal ticket is still refused:\n{}", result.stdout);
+
+    let said = &result.stderr;
+    assert!(
+        said.contains("Task plan.2 is not ready to be claimed in state 'completed'"),
+        "the gate itself is unchanged; got:\n{said}"
+    );
+    assert!(
+        said.contains("rhei show plan.2"),
+        "the help should name the verb that prints this task's body; got:\n{said}"
+    );
+    assert!(
+        !said.contains("inspect the task and current ready work with: rhei list"),
+        "the old help line sent the reader to the one place the body is not; got:\n{said}"
+    );
+}

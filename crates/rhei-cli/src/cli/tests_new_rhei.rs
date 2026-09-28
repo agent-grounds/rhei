@@ -140,3 +140,115 @@ mod new_rhei_destination_tests {
         );
     }
 }
+
+/// Unit coverage for the tip that replaces the argument parser's `--` advice on
+/// a hyphen-leading option value.
+/// §FS-rhei-new.3.4.1
+mod new_description_hyphen_value_tests {
+    use super::super::*;
+
+    fn matched(argv: &[&str]) -> Option<&'static str> {
+        hyphen_value_option(argv.iter().copied()).map(|option| option.name)
+    }
+
+    fn tip_for(name: &str) -> &'static str {
+        HYPHEN_VALUE_OPTIONS
+            .iter()
+            .find(|option| option.name == name)
+            .expect("a covered option")
+            .tip
+    }
+
+    /// One row per covered option, each matched by its own hyphen-leading value.
+    #[test]
+    fn each_covered_option_matches_its_own_hyphen_leading_value() {
+        assert_eq!(
+            matched(&["rhei", "new", "t", "--under", "auth", "--description", "- Context: x."]),
+            Some("--description")
+        );
+        assert_eq!(
+            matched(&["rhei", "new", "t", "--description-file", "-x/body.md"]),
+            Some("--description-file")
+        );
+    }
+
+    /// The tips name the spellings that keep the value, and neither carries a
+    /// `-- ` run of its own — the parser's advice must not come back in rhei's
+    /// words.
+    #[test]
+    fn each_tip_names_the_spelling_that_keeps_the_value() {
+        let description = tip_for("--description");
+        assert!(description.contains("--description="), "got: {description}");
+        assert!(description.contains("--description-file -"), "got: {description}");
+
+        let file = tip_for("--description-file");
+        assert!(file.contains("--description-file="), "got: {file}");
+
+        for option in &HYPHEN_VALUE_OPTIONS {
+            assert!(!option.tip.contains("-- "), "got: {}", option.tip);
+        }
+    }
+
+    /// A hyphen-leading `TITLE` is a different mistake with a different answer,
+    /// and it is the command line that tells the two apart.
+    #[test]
+    fn a_hyphen_leading_title_matches_no_option() {
+        assert_eq!(matched(&["rhei", "new", "- leading", "--under", "auth"]), None);
+    }
+
+    /// `-` is the spelling the tip recommends, so it must never raise it.
+    #[test]
+    fn a_value_of_exactly_one_hyphen_matches_nothing() {
+        assert_eq!(matched(&["rhei", "new", "t", "--description-file", "-"]), None);
+        assert_eq!(matched(&["rhei", "new", "t", "--description", "-"]), None);
+    }
+
+    #[test]
+    fn an_option_with_nothing_after_it_matches_nothing() {
+        assert_eq!(matched(&["rhei", "new", "t", "--description"]), None);
+    }
+
+    /// After a bare `--` every token is a value, so nothing there was taken for
+    /// another flag.
+    #[test]
+    fn an_occurrence_after_a_bare_double_dash_matches_nothing() {
+        assert_eq!(matched(&["rhei", "new", "t", "--", "--description", "- x"]), None);
+    }
+
+    #[test]
+    fn the_tip_takes_the_slot_the_parsers_own_tip_stood_in() {
+        let rendered = "\
+error: unexpected argument '- ' found
+
+  tip: to pass '- ' as a value, use '-- - '
+
+Usage: rhei new [OPTIONS] <TITLE>
+
+For more information, try '--help'.
+";
+        assert_eq!(
+            parser_tip_replaced(rendered, "attach it as --description=<text>."),
+            "\
+error: unexpected argument '- ' found
+
+  tip: attach it as --description=<text>.
+
+Usage: rhei new [OPTIONS] <TITLE>
+
+For more information, try '--help'.
+"
+        );
+    }
+
+    /// The parser offers its `--` advice only where the command takes
+    /// positionals, so a rendering without it still has to carry rhei's.
+    #[test]
+    fn a_refusal_carrying_no_tip_gets_one_above_the_usage_line() {
+        let rendered = "error: unexpected argument '-x' found\n\nUsage: rhei new [OPTIONS]\n";
+        assert_eq!(
+            parser_tip_replaced(rendered, "attach it as --description-file=<path>."),
+            "error: unexpected argument '-x' found\n\n  tip: attach it as \
+             --description-file=<path>.\n\nUsage: rhei new [OPTIONS]\n"
+        );
+    }
+}

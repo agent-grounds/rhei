@@ -77,6 +77,20 @@
   or a plan with `--task`, resolving the way `rhei complete`'s does, and
   `rhei next`'s ready-set refusal now points at `rhei show <ticket>` rather than
   at `rhei list`, which prints no body at all. (PR #327)
+- Say which spelling keeps a `rhei new` description that begins with `-`. A
+  bullet list is the ordinary shape of a ticket body, and `--description
+  '- Context: x.'` is taken for another flag and refused during argument
+  parsing. The value stays refused and nothing is written — accepting it would
+  accept a following flag as the body too — but the parser's advice to pass it
+  after a bare `--` is written for a positional and fails again when it is
+  followed, so the refusal now replaces that advice in its own slot with the
+  spelling that works: `--description=<text>`, or `--description-file -` for a
+  body read from standard input. A hyphen-leading path to `--description-file`
+  gets the attached `--description-file=<path>` form, since a bare `-` there
+  already means standard input. A hyphen-leading `TITLE` renders identically to
+  a refused option value, so the two are told apart by the command line rather
+  than by the message, and a title keeps exactly the refusal it printed before.
+  (PR #326)
 
 - Bound a project's measured spend by default. Every project may be charged at
   most $400.00 of provider cost per UTC day, a built-in measured from the

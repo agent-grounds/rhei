@@ -4,7 +4,7 @@
 // a flag, a file, or standard input, and refusing text the plan language would
 // read as structure rather than as prose.
 
-// §FS-rhei-new.1.1 §FS-rhei-new.3.4
+// §FS-rhei-new.1.1 §FS-rhei-new.3.4 §FS-rhei-new.3.4.1
 
 /// The metadata markers the plan language recognizes at the start of a line.
 ///
@@ -169,4 +169,130 @@ fn structural_description_line(line: &str) -> Option<&'static str> {
         .iter()
         .any(|marker| line.starts_with(marker))
         .then_some("a metadata field of the node it lands in")
+}
+
+// ---------------------------------------------------------------------------
+// A value the argument parser refused, before any of the checks above
+// ---------------------------------------------------------------------------
+
+/// An option whose hyphen-leading value the argument parser takes for another
+/// flag, together with the spelling that keeps it.
+///
+/// One row per option so that covering another one later is a row here rather
+/// than a redesign. The tip is runnable as printed and echoes none of the
+/// caller's own text, so it needs no per-platform quoting.
+// §FS-rhei-new.3.4.1 §FS-rhei-errors.2 §REQ-cross-platform
+struct HyphenValueOption {
+    /// The long spelling, exactly as it appears on the command line.
+    name: &'static str,
+    /// What to say in place of the parser's `--` advice.
+    tip: &'static str,
+}
+
+/// `--description` and `--description-file` are the only options this covers;
+/// every other option taking free prose keeps what it prints today.
+// §FS-rhei-new.3.4.1
+const HYPHEN_VALUE_OPTIONS: [HyphenValueOption; 2] = [
+    HyphenValueOption {
+        name: "--description",
+        tip: "a description beginning with '-' is taken for another flag: attach it as \
+              --description=<text>, or read the body from standard input with \
+              --description-file -.",
+    },
+    HyphenValueOption {
+        name: "--description-file",
+        tip: "a path beginning with '-' is taken for another flag: attach it as \
+              --description-file=<path>. A bare - there already means standard input, so \
+              piping is no answer to a path.",
+    },
+];
+
+/// The option this command line supplied a hyphen-leading value to, if any.
+///
+/// Read from the command line rather than from the refusal, because a
+/// hyphen-leading `TITLE` renders byte-identically — the parser reports `-` plus
+/// the offending second character, and a bullet's second character is a space
+/// either way — yet it is a different mistake with a different answer. A value
+/// of exactly `-` is the spelling the tip recommends and never raises it, `--`
+/// ends option parsing rather than supplying a value, and nothing after the
+/// first bare `--` was taken for a flag at all.
+// §FS-rhei-new.3.4.1
+fn hyphen_value_option<I, S>(argv: I) -> Option<&'static HyphenValueOption>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let mut pending: Option<&'static HyphenValueOption> = None;
+    for raw in argv {
+        let token = raw.as_ref().to_string_lossy();
+        if token == "--" {
+            return None;
+        }
+        if let Some(option) = pending {
+            if token.starts_with('-') && token != "-" {
+                return Some(option);
+            }
+        }
+        pending = HYPHEN_VALUE_OPTIONS.iter().find(|option| option.name == token);
+    }
+    None
+}
+
+/// The refusal to print in place of the argument parser's own, when the parser
+/// took a hyphen-leading value for a flag on an option rhei has better advice
+/// for. `None` leaves the parser's refusal exactly as it stands.
+///
+/// The value stays refused and nothing is written: accepting it would mean
+/// accepting a *following flag* as a value too, so `--description --dry-run`
+/// would write `--dry-run` into the body and exit 0 instead of previewing.
+/// Rendered plain, because a `clap::Error` does not expose the colour choice it
+/// would have printed with, and this refusal exists to be copied out of.
+// §FS-rhei-new.3.4.1
+fn hyphen_value_refusal<I, S>(err: &clap::Error, argv: I) -> Option<String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    if err.kind() != ErrorKind::UnknownArgument {
+        return None;
+    }
+    let option = hyphen_value_option(argv)?;
+    Some(parser_tip_replaced(&err.render().to_string(), option.tip))
+}
+
+/// Put `tip` where the argument parser's own tip stands.
+///
+/// In that slot rather than beside it: the parser's advice for this shape is to
+/// pass the value after a bare `--`, which is written for a positional and can
+/// never attach a value to an option, so two tips of which the first is wrong
+/// leave the caller choosing between them. Every tip the parser offered goes,
+/// and rhei's is the only one left. A rendering carrying no tip at all gets it
+/// above the usage line, which is where a tip belongs.
+// §FS-rhei-new.3.4.1 §FS-rhei-errors.6
+fn parser_tip_replaced(rendered: &str, tip: &str) -> String {
+    let ours = format!("  tip: {tip}");
+    let mut refusal: Vec<String> = Vec::new();
+    let mut placed = false;
+    for line in rendered.lines() {
+        if line.trim_start().starts_with("tip:") {
+            if !placed {
+                refusal.push(ours.clone());
+                placed = true;
+            }
+            continue;
+        }
+        if !placed && line.starts_with("Usage:") {
+            refusal.push(ours.clone());
+            refusal.push(String::new());
+            placed = true;
+        }
+        refusal.push(line.to_string());
+    }
+    if !placed {
+        refusal.push(String::new());
+        refusal.push(ours);
+    }
+    let mut refusal = refusal.join("\n");
+    refusal.push('\n');
+    refusal
 }

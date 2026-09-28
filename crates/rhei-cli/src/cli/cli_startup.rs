@@ -324,7 +324,16 @@ fn run_on_cli_stack() {
             );
             std::process::exit(err.exit_code());
         }
-        Err(err) => err.exit(),
+        // Also before any lock, descriptor, journal or event log exists, and
+        // last because it is a better refusal rather than a different one: what
+        // clap cannot say is which spelling keeps the value. §FS-rhei-new.3.4.1
+        Err(err) => match hyphen_value_refusal(&err, std::env::args_os()) {
+            Some(refusal) => {
+                eprint!("{refusal}");
+                std::process::exit(err.exit_code());
+            }
+            None => err.exit(),
+        },
     };
 
     let json_mode = command_wants_json(&cli.command);

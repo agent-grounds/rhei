@@ -103,6 +103,7 @@ mod operator_consumer_tests;
 mod operator_force_support;
 mod operator_force_tests;
 mod operator_recovery_tests;
+mod operator_unwritable_state_home_tests;
 mod parallel_target_override_tests;
 mod poll_resume_program_tests;
 mod poll_wait_outcome_tests;

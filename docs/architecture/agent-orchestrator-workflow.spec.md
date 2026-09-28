@@ -359,7 +359,9 @@ process-crash transaction spans plan/metadata, result, checkpoint, and ledger
 files: ordinary callback rollback cannot make that set atomic. Every access
 takes a shared guard keyed by canonical execution root in rhei's platform state
 directory and holds it through its derived reads/writes; force and explicit
-recovery take it exclusively. Readers check the durable marker on both sides
+recovery take it exclusively. Where the account's state directory cannot hold
+the lock, shared access proceeds unguarded with the marker checks intact
+(§FS-rhei-recover.4.1). Readers check the durable marker on both sides
 of acquisition, closing the race between a load and marker publication without
 requiring write permission inside the project. Multi-root operations acquire
 all run locks first, then all root guards, each set sorted by canonical root;

@@ -3,66 +3,6 @@ use std::fs;
 use super::operator_force_support::*;
 use super::*;
 
-const RECOVERY_ID: &str = "018f0000-0000-7000-8000-000000000001";
-const EMPTY_SHA256: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-
-#[cfg_attr(windows, allow(dead_code))]
-struct RecoveryFixture {
-    force: ForceFixture,
-    before_plan: String,
-    after_plan: String,
-    pair: String,
-}
-
-fn recovery_fixture(prefix: &str) -> RecoveryFixture {
-    let force = force_fixture(prefix, GATE_PLAN, FORCE_MACHINE);
-    let before_plan = fs::read_to_string(&force.plan).expect("before plan");
-    let after_plan = before_plan.replace("**State:** human-gate", "**State:** implement");
-    let payload = serde_json::json!({
-        "confirmation": "typed-hop-v1",
-        "from": "human-gate",
-        "os_user": "fixture-user",
-        "reason": "repair route",
-        "recovery_id": RECOVERY_ID,
-        "schema_version": 1,
-        "task_id": "plan.1",
-        "timestamp": "2026-09-18T12:00:00Z",
-        "to": "implement"
-    });
-    let payload = serde_json::to_string(&payload).expect("audit JSON");
-    let metadata_line = format!("plan.1 !force-v1 {}\n", encode_base64url(payload.as_bytes()));
-    let movement_line = "plan.1 human-gate@implement\n";
-    let pair = format!("{metadata_line}{movement_line}");
-    let marker = serde_json::json!({
-        "files": [{
-            "after": {"bytes": encode_base64url(after_plan.as_bytes()), "kind": "present"},
-            "before": {"bytes": encode_base64url(before_plan.as_bytes()), "kind": "present"},
-            "path": "plan.rhei.md",
-            "roles": ["metadata", "task"]
-        }],
-        "hop": {"from": "human-gate", "task_id": "plan.1", "to": "implement"},
-        "ledger": {
-            "metadata_line": metadata_line,
-            "movement_line": movement_line,
-            "offset": 0,
-            "path": "runtime/state-transitions.log",
-            "prefix_sha256": EMPTY_SHA256
-        },
-        "recovery_id": RECOVERY_ID,
-        "version": 1
-    });
-    fs::create_dir_all(force.dir.join(".rhei")).expect("marker directory");
-    let mut marker = serde_json::to_string(&marker).expect("marker JSON");
-    marker.push('\n');
-    fs::write(force.dir.join(".rhei/forced-recovery.json"), marker).expect("recovery marker");
-    RecoveryFixture { force, before_plan, after_plan, pair }
-}
-
-#[cfg_attr(windows, allow(dead_code))]
-fn recovery_confirmation(decision: &str) -> String {
-    format!("recover {RECOVERY_ID} plan.1 human-gate -> implement {decision}")
-}
-
 /// Absence is an idempotent success and never prompts. §FS-rhei-recover.1
 #[test]
 fn operator_recovery_with_no_marker_is_a_noop() {

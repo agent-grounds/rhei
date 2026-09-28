@@ -217,6 +217,34 @@ and release of the shared guard are the only added behavior and existing
 command bytes and effects remain unchanged. Older binaries cannot enforce this
 interlock and must not access an in-doubt root.
 
+### 4.1. When the account cannot hold a lock
+
+The marker check above needs nothing from the account: it reads
+`<root>/.rhei/forced-recovery.json` inside the root. Creating the lock does
+need the account's state directory, which rhei has no way to guarantee is
+writable (§DA-detached-runs). Where the lock for a root cannot be located,
+created, or opened, a **shared** acquisition proceeds without it. The marker is
+still checked before and after, an established marker still refuses, and the
+command's bytes and effects are otherwise unchanged. What is given up is mutual
+exclusion between rhei processes on that root, on that machine only: a failure
+to create a lock is not a failure to inspect the root, and carries none of the
+consequences that failure carries.
+
+Exclusive acquisition never degrades. The force and recovery coordinators exist
+to publish, inspect, and resolve a marker, and doing that without exclusion is
+worse than refusing: they fail, and the refusal names the lock path it could
+not create, the execution root it was for, the underlying error, and
+`XDG_STATE_HOME` as the lever (§FS-rhei-errors.1.5). The same subjects are
+named when a shared acquisition degrades, as one warning on stderr per
+canonical root per process; stdout and the exit status are unchanged.
+
+A hold is uniformly guarded or uniformly unguarded. A root already held is
+reused without re-probing the lock, so every nested load under one operation
+gets the same hold; a root held unguarded does not read as guarded, and an
+exclusive acquisition over it refuses as it would over any active shared hold.
+Once the last hold on a root is released, the next acquisition tries the lock
+again.
+
 ## 5. Portability and interruption
 
 Confirmation, canonical paths, user attribution, file and directory syncing,

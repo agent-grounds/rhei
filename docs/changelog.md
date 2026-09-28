@@ -90,7 +90,9 @@
   already means standard input. A hyphen-leading `TITLE` renders identically to
   a refused option value, so the two are told apart by the command line rather
   than by the message, and a title keeps exactly the refusal it printed before.
-  (PR #326)
+  The new tip is printed only where the option's own value is the token the
+  parser refused: an unknown flag elsewhere on the line, and a command that
+  declares no such option at all, keep the parser's own message. (PR #326)
 
 - Bound a project's measured spend by default. Every project may be charged at
   most $400.00 of provider cost per UTC day, a built-in measured from the

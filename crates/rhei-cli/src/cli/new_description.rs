@@ -207,6 +207,19 @@ const HYPHEN_VALUE_OPTIONS: [HyphenValueOption; 2] = [
     },
 ];
 
+/// A covered option the command line supplied a hyphen-leading value to, and
+/// where in the command line that value stands.
+///
+/// The position is what lets the refusal be checked against the value: the
+/// token the parser named is compared with every *other* token, so a value that
+/// is itself a plausible flag does not suppress its own tip.
+// §FS-rhei-new.3.4.1
+struct HyphenValueMatch {
+    option: &'static HyphenValueOption,
+    /// Index of the hyphen-leading value in the command line as given.
+    at: usize,
+}
+
 /// The option this command line supplied a hyphen-leading value to, if any.
 ///
 /// Read from the command line rather than from the refusal, because a
@@ -217,20 +230,20 @@ const HYPHEN_VALUE_OPTIONS: [HyphenValueOption; 2] = [
 /// ends option parsing rather than supplying a value, and nothing after the
 /// first bare `--` was taken for a flag at all.
 // §FS-rhei-new.3.4.1
-fn hyphen_value_option<I, S>(argv: I) -> Option<&'static HyphenValueOption>
+fn hyphen_value_option<I, S>(argv: I) -> Option<HyphenValueMatch>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
     let mut pending: Option<&'static HyphenValueOption> = None;
-    for raw in argv {
+    for (at, raw) in argv.into_iter().enumerate() {
         let token = raw.as_ref().to_string_lossy();
         if token == "--" {
             return None;
         }
         if let Some(option) = pending {
             if token.starts_with('-') && token != "-" {
-                return Some(option);
+                return Some(HyphenValueMatch { option, at });
             }
         }
         pending = HYPHEN_VALUE_OPTIONS.iter().find(|option| option.name == token);
@@ -238,9 +251,40 @@ where
     None
 }
 
+/// Whether the token the parser refused is the value `found` rather than a flag
+/// the command line wrote in its own right.
+///
+/// The adjacency alone says only that a hyphen-leading value was *supplied*; it
+/// does not say the parser tripped over it. An unknown flag earlier on the line
+/// is refused first, and on a command that declares no such option it is the
+/// option's own name that is refused — in both cases the parser's advice is
+/// about the token it named and rhei has nothing better to say. A value the
+/// parser mangled into a flag is never the token it named: it reports `-` plus
+/// the offending second character, so `- Context: x.` comes back as `- ` and
+/// `-x/body.md` as `-x`, neither of which the command line contains. A refusal
+/// naming no token keeps the parser's message, which is the safe direction.
+// §FS-rhei-new.3.4.1
+fn refusal_is_about_the_value(
+    err: &clap::Error,
+    argv: &[std::ffi::OsString],
+    found: &HyphenValueMatch,
+) -> bool {
+    let Some(clap::error::ContextValue::String(refused)) =
+        err.get(clap::error::ContextKind::InvalidArg)
+    else {
+        return false;
+    };
+    !argv
+        .iter()
+        .enumerate()
+        .any(|(at, token)| at != found.at && token.as_os_str() == OsStr::new(refused.as_str()))
+}
+
 /// The refusal to print in place of the argument parser's own, when the parser
 /// took a hyphen-leading value for a flag on an option rhei has better advice
-/// for. `None` leaves the parser's refusal exactly as it stands.
+/// for. `None` leaves the parser's refusal exactly as it stands — including
+/// every refusal that is about some other token, which
+/// `refusal_is_about_the_value` is what establishes.
 ///
 /// The value stays refused and nothing is written: accepting it would mean
 /// accepting a *following flag* as a value too, so `--description --dry-run`
@@ -256,8 +300,12 @@ where
     if err.kind() != ErrorKind::UnknownArgument {
         return None;
     }
-    let option = hyphen_value_option(argv)?;
-    Some(parser_tip_replaced(&err.render().to_string(), option.tip))
+    let argv: Vec<std::ffi::OsString> = argv.into_iter().map(|raw| raw.as_ref().to_os_string()).collect();
+    let found = hyphen_value_option(&argv)?;
+    if !refusal_is_about_the_value(err, &argv, &found) {
+        return None;
+    }
+    Some(parser_tip_replaced(&err.render().to_string(), found.option.tip))
 }
 
 /// Put `tip` where the argument parser's own tip stands.
@@ -265,27 +313,44 @@ where
 /// In that slot rather than beside it: the parser's advice for this shape is to
 /// pass the value after a bare `--`, which is written for a positional and can
 /// never attach a value to an option, so two tips of which the first is wrong
-/// leave the caller choosing between them. Every tip the parser offered goes,
-/// and rhei's is the only one left. A rendering carrying no tip at all gets it
+/// leave the caller choosing between them. The tip the parser offered goes, and
+/// rhei's is the only one left. A rendering carrying no tip at all gets it
 /// above the usage line, which is where a tip belongs.
+///
+/// The parser's tip is its own paragraph — set off by a blank line and ending
+/// at the next one — and that, rather than the `tip:` prefix alone, is what
+/// identifies it. The parser echoes the argument it refused back into the error
+/// sentence, so a value carrying a line of its own that begins with `tip:`
+/// would otherwise be dropped out of the middle of the message, leaving it no
+/// longer saying what was refused.
 // §FS-rhei-new.3.4.1 §FS-rhei-errors.6
 fn parser_tip_replaced(rendered: &str, tip: &str) -> String {
     let ours = format!("  tip: {tip}");
     let mut refusal: Vec<String> = Vec::new();
     let mut placed = false;
+    let mut dropping = false;
+    let mut after_blank = false;
     for line in rendered.lines() {
-        if line.trim_start().starts_with("tip:") {
-            if !placed {
-                refusal.push(ours.clone());
-                placed = true;
+        let blank = line.trim().is_empty();
+        if dropping {
+            // The rest of the parser's tip paragraph, up to the blank line that
+            // closes it — the tip may run over several lines when it quotes a
+            // value that has newlines in it.
+            if !blank {
+                continue;
             }
+            dropping = false;
+        } else if !placed && after_blank && line.trim_start().starts_with("tip:") {
+            refusal.push(ours.clone());
+            placed = true;
+            dropping = true;
             continue;
-        }
-        if !placed && line.starts_with("Usage:") {
+        } else if !placed && line.starts_with("Usage:") {
             refusal.push(ours.clone());
             refusal.push(String::new());
             placed = true;
         }
+        after_blank = blank;
         refusal.push(line.to_string());
     }
     if !placed {

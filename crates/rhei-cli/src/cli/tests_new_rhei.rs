@@ -148,7 +148,7 @@ mod new_description_hyphen_value_tests {
     use super::super::*;
 
     fn matched(argv: &[&str]) -> Option<&'static str> {
-        hyphen_value_option(argv.iter().copied()).map(|option| option.name)
+        hyphen_value_option(argv.iter().copied()).map(|found| found.option.name)
     }
 
     fn tip_for(name: &str) -> &'static str {
@@ -249,6 +249,107 @@ For more information, try '--help'.
             parser_tip_replaced(rendered, "attach it as --description-file=<path>."),
             "error: unexpected argument '-x' found\n\n  tip: attach it as \
              --description-file=<path>.\n\nUsage: rhei new [OPTIONS]\n"
+        );
+    }
+
+    /// The refusal the parser really raises for `argv`, put through the tip
+    /// substitution: `None` means the parser's own message stands. Parsed
+    /// rather than hand-rolled, because which token the parser refuses first is
+    /// the whole question here.
+    fn refusal_for(argv: &[&str]) -> Option<String> {
+        match Cli::try_parse_from(argv) {
+            Ok(_) => panic!("expected a refusal for {argv:?}"),
+            Err(err) => hyphen_value_refusal(&err, argv.iter().copied()),
+        }
+    }
+
+    /// The command lines the ticket reports: the value is what the parser
+    /// refused, so rhei's tip takes the slot.
+    #[test]
+    fn a_refusal_about_the_value_gets_the_options_tip() {
+        let bullets =
+            refusal_for(&["rhei", "new", "t", "--under", "auth", "--description", "- Context: x."])
+                .expect("a substituted refusal");
+        assert!(bullets.contains("--description=<text>"), "got: {bullets}");
+        assert!(!bullets.contains("-- - "), "got: {bullets}");
+
+        let path = refusal_for(&["rhei", "new", "t", "--description-file", "-x/body.md"])
+            .expect("a substituted refusal");
+        assert!(path.contains("--description-file=<path>"), "got: {path}");
+    }
+
+    /// A value that is itself flag-shaped is still the value: the token the
+    /// parser named may stand where the value stands and nowhere else.
+    #[test]
+    fn a_value_that_looks_like_a_flag_does_not_suppress_its_own_tip() {
+        let refusal = refusal_for(&["rhei", "new", "t", "--description", "-x"])
+            .expect("a substituted refusal");
+        assert!(refusal.contains("--description=<text>"), "got: {refusal}");
+    }
+
+    /// An unknown flag earlier on the line is refused first, and the parser's
+    /// advice about it is the advice the caller needs.
+    #[test]
+    fn a_refusal_about_another_flag_keeps_the_parsers_message() {
+        assert_eq!(
+            refusal_for(&["rhei", "new", "t", "--under", "auth", "--bogus", "--description", "-x"]),
+            None
+        );
+        assert_eq!(refusal_for(&["rhei", "new", "t", "-x", "--description", "-xyz"]), None);
+    }
+
+    /// On a command that declares no such option it is the option's own name
+    /// the parser refuses, so there is no value to advise about — and advice
+    /// about one would be refused a second time when it was followed.
+    #[test]
+    fn a_command_without_the_option_keeps_the_parsers_message() {
+        assert_eq!(refusal_for(&["rhei", "list", "--description", "-x"]), None);
+        assert_eq!(refusal_for(&["rhei", "intervene", "--description", "-x"]), None);
+    }
+
+    /// A hyphen-leading `TITLE` is refused before the value is reached, and its
+    /// refusal is the parser's own.
+    #[test]
+    fn a_hyphen_leading_title_alone_keeps_the_parsers_message() {
+        assert_eq!(refusal_for(&["rhei", "new", "- leading", "--under", "auth"]), None);
+    }
+
+    /// Both mistakes at once gets the option's tip, which names the option and
+    /// is true of it: the token the parser named, `- `, is no token of the
+    /// command line.
+    #[test]
+    fn both_mistakes_at_once_get_the_options_tip() {
+        let refusal =
+            refusal_for(&["rhei", "new", "- leading", "--under", "auth", "--description", "-x"])
+                .expect("a substituted refusal");
+        assert!(refusal.contains("--description=<text>"), "got: {refusal}");
+    }
+
+    /// A `tip:` line inside the sentence the parser echoed back is part of what
+    /// was refused, not the parser's advice, and dropping it would leave the
+    /// message no longer saying what was refused.
+    #[test]
+    fn a_tip_line_inside_the_error_sentence_is_kept() {
+        let rendered = "\
+error: unexpected argument '--bo
+tip: eaten' found
+
+  tip: to pass '--bo
+tip: eaten' as a value, use '-- --bo
+tip: eaten'
+
+Usage: rhei new [OPTIONS] <TITLE>
+";
+        assert_eq!(
+            parser_tip_replaced(rendered, "attach it as --description=<text>."),
+            "\
+error: unexpected argument '--bo
+tip: eaten' found
+
+  tip: attach it as --description=<text>.
+
+Usage: rhei new [OPTIONS] <TITLE>
+"
         );
     }
 }

@@ -392,6 +392,20 @@ immediately followed by a token that begins with `-` and is neither `-` nor
 spelling the tip recommends and never matches it; a command line carrying both
 mistakes gets the option's tip, which names the option and is true of it.
 
+That adjacency is a necessary condition rather than the whole test: the tip is
+printed only where the parser's refusal is about that value. The parser names
+the token it refused, and a value it mangled into a flag is never that token as
+the command line wrote it — `- Context: x.` is reported as `- `, and
+`-x/body.md` as `-x`. So when the named token stands in the command line in its
+own right, at any other position than the value that was found, the refusal is
+about something else and the parser's own message is left alone: `rhei new "t"
+--under auth --bogus --description -x` is refused for `--bogus` and keeps the
+parser's advice about it, and `rhei list --description -x`, on a command that
+declares no such option at all, is refused for `--description` and keeps its
+own — which is what makes the new tip impossible on a command that has no such
+value to give advice about. A refusal that names no token keeps the parser's
+message too.
+
 `--description` and `--description-file` are the only options this covers.
 Every other option taking free prose keeps what it prints today; the table of
 options and their advice is one row per option so that adding one later is a

@@ -250,11 +250,11 @@ fn next_command(
         // decision. §FS-rhei-supervision.3.4
         let supervisor_preview = peek && task_is_supervising(task, machine);
         if !explicitly_claimable && !supervisor_preview {
+            // The gate is about claiming and stands; the help names the verb
+            // that prints this ticket's body, which `rhei list` does not.
+            // §FS-rhei-next.4 §FS-rhei-show
             return Err(miette!(
-                help = format!(
-                    "inspect the task and current ready work with: rhei list {}",
-                    shell_quote(&input.display().to_string())
-                ),
+                help = format!("read this ticket's body with: rhei show {}", tid),
                 "Task {} is not ready to be claimed in state '{}'",
                 tid,
                 state_name

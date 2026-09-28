@@ -217,6 +217,14 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             json,
             )
         }
+        Commands::Show { input, task, json } => {
+            // The shared ticket split, never `resolve_plan_target`'s plan-only
+            // path: it answers an id-shaped argument with "this argument takes a
+            // plan or project, not a ticket id". §FS-rhei-show.5
+            let (input, task) = split_show_ticket_target(input, task)?;
+            let target = resolve_plan_target(input)?;
+            show_command(target.path(), &target.scope_with(&[]), &task, json)
+        }
         Commands::Recover { execution_root } => recover_command(&execution_root),
         Commands::Transition {
             force,

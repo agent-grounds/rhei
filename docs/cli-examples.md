@@ -42,6 +42,21 @@ cargo run -p rhei-cli -- roster examples/release-automation.rhei.md --json
 Both views use the execution settings merge; see
 [Agents and models](functional-spec/rhei-agents.spec.md#11-global-and-project-settings).
 
+Read one ticket's body, whatever state it is in:
+
+```bash
+cargo run -p rhei-cli -- show release-automation.1
+```
+
+The same body for a script, as one object with `id`, `title`, and `content`:
+
+```bash
+cargo run -p rhei-cli -- show release-automation.1 --json
+```
+
+Both resolve the plan from the working directory; name it explicitly with
+`show <plan> --task <ticket-id>`. See [§FS-rhei-show](functional-spec/rhei-show.spec.md#fs-rhei-show-rhei-show).
+
 Render a plan as GitHub-style markdown without metadata or subtask body text:
 
 ```bash

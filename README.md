@@ -124,6 +124,8 @@ The runtime currently supports:
 - validating task metadata, dependencies, state machines, and artifact
   contracts against [`docs/functional-spec/states.yaml`](docs/functional-spec/states.yaml)
 - selecting ready work deterministically with `rhei next`
+- reading one ticket's body by id with `rhei show`, in any state and without
+  rendering the plan around it
 - atomically advancing work with `rhei transition`, `rhei complete`, and
   `rhei reset`
 - orchestrating agents and deterministic programs with `rhei run`

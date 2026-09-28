@@ -56,6 +56,32 @@ help = ticket_id_required_help(),
     }
 }
 
+/// Split `rhei show`'s positional, where the ticket is mandatory.
+///
+/// Routed through the shared split rather than the plan-only resolver: an
+/// id-shaped positional is the ticket here, and reporting it as a missing path
+/// would deny the one invocation this verb exists for.
+// §FS-rhei-show.5: `rhei show probe.7` is never a bad plan path.
+fn split_show_ticket_target(
+    input: Option<PathBuf>,
+    task: Option<String>,
+) -> MietteResult<(Option<PathBuf>, String)> {
+    match split_ticket_target(input, task)? {
+        (plan, Some(task)) => Ok((plan, task)),
+        (Some(plan), None) => Err(miette!(
+            help = ticket_id_required_help(),
+            "'{}' is a plan path; name the ticket too: `rhei show <ticket-id>` \
+             (or `rhei show {} --task <ticket-id>`)",
+            plan.display(),
+            plan.display(),
+        )),
+        (None, None) => Err(miette!(
+            help = ticket_id_required_help(),
+            "name the ticket to show: `rhei show <ticket-id>` (or `--task <ticket-id>`)"
+        )),
+    }
+}
+
 /// Split `rhei transition`'s positional, where the ticket is mandatory.
 /// §FS-rhei-transition-cmd.1
 fn split_transition_ticket_target(

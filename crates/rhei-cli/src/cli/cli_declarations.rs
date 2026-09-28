@@ -66,6 +66,7 @@ Inspection:
   states      Print the states and allowed transitions for the configured state machine
   roster      Print the effective agent, model, and defaults registry
   list        List tasks in a plan with optional filters
+  show        Print one task's heading and its body as stored, by ticket id
   schema      Print or list published accounting JSON Schemas
   viz         Render a self-contained HTML flow visualization of a plan or workspace
   budget      Inspect or set the project's invocation allowance
@@ -313,6 +314,23 @@ enum Commands {
         #[arg(long, default_value_t = 0, add = ArgValueCompleter::new(complete_limit))]
         limit: usize,
         /// Emit output as JSON for machine consumption
+        #[arg(long)]
+        json: bool,
+    },
+    /// Print one task's heading and its body as stored, by ticket id
+    // §FS-rhei-show.1: the read that carries a body and no document around it.
+    Show {
+        /// Ticket id to show (`auth.1`, `3`), or path to the markdown plan
+        /// file (.rhei.md). An id-shaped argument that names no existing path
+        /// is the ticket, with the plan inferred from the working directory;
+        /// a positional that names only a plan needs `--task`
+        #[arg(value_name = "TICKET_OR_PLAN", add = ArgValueCompleter::new(complete_rhei_plan_path))]
+        input: Option<PathBuf>,
+        /// Task identifier (number or name); alternative to naming the ticket
+        /// positionally
+        #[arg(long, add = ArgValueCompleter::new(complete_task_id))]
+        task: Option<String>,
+        /// Emit one JSON object carrying the id, title, and body
         #[arg(long)]
         json: bool,
     },

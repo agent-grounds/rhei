@@ -634,3 +634,23 @@ until = "The run report has a model type the Markdown writer and the TTY rendere
 reason = """
 Over budget the moment a test is added: the file was 493 lines before this one. It mirrors run_summary.rs, whose own entry names the same missing boundary — the report model, its Markdown writer and its TTY renderer are three surfaces behind one struct, and a test cannot move out of this file until the surface it covers has a module of its own.
 """
+[[exceptions]]
+path = "crates/rhei-cli/src/cli/next_command.rs"
+match = "exact"
+rules = ["source"]
+kind = "deferred"
+max_accepted = { value = 600, unit = "lines" }
+until = "The explicit-target resolution and its ready-set admission are a next_target module of their own, leaving next_command the claim transaction."
+reason = """
+Over budget before this change, which added no line to it: the ready-set refusal's help line is the same nine lines it was, now naming rhei show instead of rhei list. next_command is one function that resolves an explicit or implicit target, decides admission against the ready set, and then runs the claim transaction; the printing already left for next_output.rs and the diagnostics for next_diagnostics.rs, so what is left has no seam until the target-and-admission half is named. It reads the plan, the machine set, the workspace roots and the settings before it decides anything, and every one of those is also what the claim needs.
+"""
+[[exceptions]]
+path = "README.md"
+match = "exact"
+rules = ["entrypoint-doc"]
+kind = "deferred"
+max_accepted = { value = 300, unit = "lines" }
+until = "The Agent runtime capability list is replaced by a link to the command surface table, which already names every verb once."
+reason = """
+Two lines over the accepted shape before this change, and this touch added two more: a bullet for rhei show beside the rhei next one, because the list is what tells a reader which verbs exist. The boundary that is missing is that this list is a second hand-maintained copy of the command surface the functional spec already carries per verb, so every new verb is written twice and the README grows by the same bullet twice. Nothing here can shorten until the list is a link to that table and the orientation above it is what stays; deleting the bullet instead would leave the README naming rhei next and not the verb that reads what rhei next refuses.
+"""

@@ -21,6 +21,7 @@ include!("cli/command_target_dispatch.rs");
 include!("cli/completion_candidates.rs");
 include!("cli/completion_context.rs");
 include!("cli/list_command.rs");
+include!("cli/show_command.rs");
 include!("cli/error_guidance.rs");
 include!("cli/plan_input_guidance.rs");
 include!("cli/help_strings.rs");
@@ -236,6 +237,7 @@ mod tests {
     include!("cli/tests_error_guidance.rs");
     include!("cli/tests_prompt_templates.rs");
     include!("cli/tests_complete_reset_tooling.rs");
+    include!("cli/tests_show_target.rs");
     include!("cli/tests_cancellation_roles.rs");
     include!("cli/tests_complete_result_input.rs");
     include!("cli/tests_member_execution_context.rs");

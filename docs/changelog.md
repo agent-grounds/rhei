@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Add `rhei show <ticket>`, the read that prints one task's body without the
+  document around it. It prints one `## Task <id>: <title>` heading, a blank
+  line, and the body as stored — an appended lifecycle record included — and
+  nothing else; `--json` emits one object with exactly `id`, `title`, and
+  `content`. Any ticket resolves in any state, because reading is not claiming:
+  the ticket nobody may claim was the one read rhei had no verb for, and
+  reaching it meant rendering the whole plan. The positional takes a ticket id
+  or a plan with `--task`, resolving the way `rhei complete`'s does, and
+  `rhei next`'s ready-set refusal now points at `rhei show <ticket>` rather than
+  at `rhei list`, which prints no body at all. (PR #327)
+
 - Bound a project's measured spend by default. Every project may be charged at
   most $400.00 of provider cost per UTC day, a built-in measured from the
   accounting archive the same way the two counts were, raised for a machine

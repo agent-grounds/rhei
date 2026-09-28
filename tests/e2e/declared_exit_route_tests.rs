@@ -379,8 +379,8 @@ fn an_exit_code_fires_its_own_edge_declared_after_a_conditional_one() {
     let (_dir, plan_path, machine_path) =
         set_up_poll("exit-route-conditional-first", &format!("{EXHAUSTION_EDGE}{EXIT_FOUR_EDGE}"));
 
-    let result = run_cli("run", &plan_path, &machine_path, &["--no-tui", "--no-callbacks"]);
-    assert_success(&result);
+    let args = ["--no-tui", "--no-callbacks"];
+    assert_success(&run_cli("run", &plan_path, &machine_path, &args));
     assert_task_state(&plan_path, &machine_path, "1", "gate");
 }
 
@@ -393,8 +393,8 @@ fn the_same_two_edges_declared_the_other_way_round_route_the_same_exit() {
     let (_dir, plan_path, machine_path) =
         set_up_poll("exit-route-exit-code-first", &format!("{EXIT_FOUR_EDGE}{EXHAUSTION_EDGE}"));
 
-    let result = run_cli("run", &plan_path, &machine_path, &["--no-tui", "--no-callbacks"]);
-    assert_success(&result);
+    let args = ["--no-tui", "--no-callbacks"];
+    assert_success(&run_cli("run", &plan_path, &machine_path, &args));
     assert_task_state(&plan_path, &machine_path, "1", "gate");
 }
 
@@ -491,4 +491,58 @@ fn marker_callback(marker: &Path, name: &str) -> String {
          h=p.open('a',encoding='utf-8',newline='');h.write('{name}\\n');h.close();\
          sys.stdout.write(json.dumps({{'success': True}}))"
     ))
+}
+
+/// The ticket's shape with an agent in the poll state: one attempt, so the
+/// failing attempt spends the budget, and a leading rule for the same pair whose
+/// `condition:` is never met. Both are condition-only because load refuses an
+/// `exit_code:` edge from a state with no `program:`.
+const AGENT_POLL_MACHINE: &str = r#"name: agent-poll-route
+version: 1
+states:
+  waiting:
+    initial: true
+    description: Poll an agent that refuses on its only attempt
+    agent: mock
+    agent_timeout: 30s
+    poll: { interval: 0s, max_attempts: 1 }
+  gate: { gating: true, description: A person decides what happens next }
+  done: { final: true, description: Done }
+transitions:
+  - { from: waiting, to: gate, condition: visitCount >= 99,
+      description: A rule the selection cannot choose, declared first }
+  - { from: waiting, to: gate, condition: pollAttempts >= pollMaxAttempts,
+      description: The wait ran out; a person takes it from here }
+  - { from: waiting, to: waiting, condition: pollAttempts < pollMaxAttempts,
+      description: Nothing yet; wait out poll.interval and look again }
+  - { from: gate, to: done, description: The person is finished with it }
+"#;
+
+/// The same defect on the other path: a poll-exhausted **agent** reaches the
+/// apply step through the same selection a program does, so a run that resolved
+/// the pair again is refused by the leading rule and leaves the ticket in
+/// `waiting`, with the person it was routing to never asked.
+// §FS-rhei-programs.3.2 §FS-rhei-run.5.1 §FS-rhei-transitions.4.4
+#[test]
+fn a_poll_exhausted_agent_fires_the_edge_its_exhaustion_selected() {
+    let dir = unique_temp_dir("exit-route-agent-poll");
+    let command = fixture_command(&write_python_agent(&dir, "refuse.py", "sys.exit(1)\n"));
+    let settings_dir = dir.join(".agent-grounds/rhei");
+    fs::create_dir_all(&settings_dir).expect("create settings dir");
+    let settings = format!(
+        r#"{{ "defaults": {{ "agent": "mock", "agent_timeout": "30s" }},
+  "agents": {{ "mock": {{ "command": {command}, "timeout": "30s" }} }} }}"#
+    );
+    fs::write(settings_dir.join("settings.json"), settings).expect("write settings");
+    let plan_path = write_fixture_file(
+        &dir,
+        "plan.rhei.md",
+        "# Rhei: Agent poll exhaustion\n\n## Tasks\n\n\
+         ### Task 1: The poll whose agent refuses on its only attempt\n**State:** waiting\n",
+    );
+    let machine_path = write_fixture_file(&dir, "states.yaml", AGENT_POLL_MACHINE);
+
+    let args = ["--no-tui", "--no-callbacks"];
+    assert_success(&run_cli("run", &plan_path, &machine_path, &args));
+    assert_task_state(&plan_path, &machine_path, "1", "gate");
 }

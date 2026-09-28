@@ -2,18 +2,19 @@
 
 ## Unreleased
 
-- Fire the edge a program's exit code selected, whichever order the edges for
-  that pair are declared in, and run that edge's callbacks. A `(from, to)` pair
-  does not name a rule, so where a state declared two edges to one target — the
+- Fire the edge an exit code selected — a program's, and an agent's whose poll
+  budget ran out — whichever order the edges for that pair are declared in, and
+  run that edge's callbacks. A `(from, to)` pair does not name a rule, so where a
+  state declared two edges to one target — the
   ordinary shape of a poll state, a condition-only exhaustion edge beside an
   exit-coded one — the engine resolved the pair again after choosing and applied
   whichever rule came first in `states.yaml`. A conditional edge declared ahead
   of an exit-coded one made the target unreachable by exit code and halted the
   run, and where the leading edge's condition was met it quietly ran the wrong
   `on_enter`. `rhei transition`, `rhei complete`, and an `on_leave` `nextState`
-  redirect are unchanged: each names only a state pair, so the first declared
-  rule for it still governs, and a refusal now says so rather than listing the
-  target it just refused as somewhere to go instead. (PR #328)
+  redirect are unchanged: each names only a state pair, so the pair's first
+  declared exact rule still governs, and a refusal now says so rather than
+  listing the target it just refused as somewhere to go instead. (PR #328)
 
 - Add `rhei show <ticket>`, the read that prints one task's body without the
   document around it. It prints one `## Task <id>: <title>` heading, a blank

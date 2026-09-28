@@ -203,22 +203,30 @@ fn handle_sequential_agent_completion(
             } else {
                 SnapshotCompletion::Failure
             };
-            let failure_selected_to_state = if timed_out {
-                find_timeout_transition(machine, current_state)
+            // The target and, where a selection chose it, the rule it chose: a
+            // timeout computes a target and selects nothing, while an exhausted
+            // poll is selected by the algorithm that evaluates each candidate's
+            // `condition:`, so the pair cannot be resolved again afterwards.
+            // §FS-rhei-transitions.4.4
+            let (failure_selected_to_state, failure_selected_rule) = if timed_out {
+                (find_timeout_transition(machine, current_state), None)
             } else if !status.success() {
                 // Load refuses an `exit_code:` edge from a state with no `program:`,
                 // so an agent reaches this only by a poll exhaustion edge, whose
                 // classification the caller never reads. §FS-rhei-run.5.1
-                find_program_exit_transition(
+                let route = find_program_exit_transition(
                     machine,
                     loaded.rhei.metadata.as_ref(),
                     task,
                     current_state,
                     status.code().unwrap_or(-1),
-                )?
-                .map(|route| route.to)
+                )?;
+                (
+                    route.as_ref().map(|route| route.to.clone()),
+                    route.map(|route| route.selected_rule),
+                )
             } else {
-                None
+                (None, None)
             };
             if !status.success() {
                 if let Err(err) = emit_snapshots_after_agent_exit(
@@ -526,6 +534,7 @@ fn handle_sequential_agent_completion(
                         state_before,
                         to_state,
                         code,
+                        failure_selected_rule,
                         opts.no_callbacks(),
                     ) {
                         TimeoutTransitionOutcome::Fired => *progress.advanced_any = true,

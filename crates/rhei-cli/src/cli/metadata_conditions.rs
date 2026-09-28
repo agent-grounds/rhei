@@ -380,8 +380,10 @@ fn applicable_alternatives(
 /// clause rather than the list.
 ///
 /// `resolved_by_pair` is why the clause is conditional. A caller that named only
-/// a state pair was refused by the first declared rule for it, and the machine
-/// having a later applicable one is the surprise worth explaining; a caller that
+/// a state pair was refused by the pair's governing rule — its first declared
+/// exact one, or a wildcard-source rule only where the pair declares no exact
+/// rule at all — and the machine having another applicable rule for the pair is
+/// the surprise worth explaining; a caller that
 /// selected a rule was refused by the rule it selected, where declaration order
 /// decided nothing and the clause would be a lie.
 // §FS-rhei-transition-cmd.3 §FS-rhei-transitions.4.4
@@ -405,8 +407,9 @@ fn describe_refused_alternatives(
 
     let governs = if resolved_by_pair && pair_has_an_applicable_rule {
         format!(
-            "A move that names only a state pair takes the first declared '{from}' -> \
-             '{refused_to}' edge, so that edge is the one refused here; '{from}' declares \
+            "A move that names only a state pair takes the pair's first declared exact \
+             '{from}' -> '{refused_to}' edge, and a wildcard-source edge only where the pair \
+             declares no exact one, so that edge is the one refused here; '{from}' declares \
              another rule for the pair that is currently applicable, and naming a state pair \
              does not reach it. "
         )

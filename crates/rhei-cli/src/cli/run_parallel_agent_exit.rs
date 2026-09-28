@@ -99,6 +99,10 @@ fn handle_parallel_agent_exit(
     let mut missing_required_outputs = Vec::new();
     let mut snapshot_completion_for_emit = None;
     let mut failure_selected_to_state = None;
+    // Which rule the selection chose, where a selection ran at all: an exhausted
+    // poll's edge is picked by evaluating candidates' conditions, and the
+    // `(from, to)` pair cannot recover it. §FS-rhei-transitions.4.4
+    let mut failure_selected_rule = None;
     // Hoisted out of the block below so the pending-invocation
     // check can ask the same question about the same edge.
     // §FS-rhei-agents.3.2
@@ -163,22 +167,25 @@ fn handle_parallel_agent_exit(
         } else {
             SnapshotCompletion::Failure
         };
-        failure_selected_to_state = if timed_out {
-            find_timeout_transition(machine, &state_name)
+        (failure_selected_to_state, failure_selected_rule) = if timed_out {
+            (find_timeout_transition(machine, &state_name), None)
         } else if !status.success() {
             // Load refuses an `exit_code:` edge from a state with no `program:`,
             // so an agent reaches this only by a poll exhaustion edge, whose
             // classification the caller never reads. §FS-rhei-run.5.1
-            find_program_exit_transition(
+            let route = find_program_exit_transition(
                 machine,
                 reloaded.rhei.metadata.as_ref(),
                 task_for_snapshot,
                 &state_name,
                 status.code().unwrap_or(-1),
-            )?
-            .map(|route| route.to)
+            )?;
+            (
+                route.as_ref().map(|route| route.to.clone()),
+                route.map(|route| route.selected_rule),
+            )
         } else {
-            None
+            (None, None)
         };
         if !status.success() {
             if let Err(err) = emit_snapshots_after_agent_exit(
@@ -524,6 +531,7 @@ fn handle_parallel_agent_exit(
                 &state_name,
                 to_state,
                 code,
+                failure_selected_rule,
                 opts.no_callbacks(),
             ) {
                 TimeoutTransitionOutcome::Fired => *progress.advanced_any = true,

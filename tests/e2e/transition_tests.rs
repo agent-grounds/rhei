@@ -520,10 +520,10 @@ transitions:
 /// true of *different* rules for the pair, and the message says neither.
 ///
 /// `rhei transition` names a state pair and carries no rule identity, so the
-/// first declared rule governs and the later one is never reached
+/// pair's first declared exact rule governs and the other is never reached
 /// (§FS-rhei-transitions.4.4). The refusal must say that: the target just
 /// refused is not somewhere the caller could go instead, and the reason names
-/// the leading edge as what governs.
+/// the governing edge.
 // §FS-rhei-transition-cmd.3
 #[test]
 fn transition_refusing_a_shared_pair_names_the_leading_edge_and_drops_the_target() {

@@ -880,15 +880,23 @@ declaration order:
   it chose is the rule applied, and a rule it never collected as a candidate
   cannot refuse the move
   ([§FS-rhei-programs.3.2](rhei-programs.spec.md#32-evaluation-order)).
-  Declaration order does not decide the outcome.
-- A caller that **names only a state pair** takes the **first declared** rule for
-  the pair, and that rule's `condition:` governs. `rhei transition --from/--to`
+  Declaration order does not decide the outcome. A spent poll budget is the same
+  algorithm choosing the non-self-loop edge
+  ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)), so it selects a rule
+  too — whether the poll state runs a program or an agent, and whichever of the
+  pair's rules the choice landed on.
+- A caller that **names only a state pair** takes the **first declared exact**
+  rule for the pair — and a wildcard-source rule to that target only where the
+  pair declares no exact rule at all (§4.6) — and that rule's `condition:`
+  governs. `rhei transition --from/--to`
   ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)),
   `rhei complete`, and an `on_leave` callback's `nextState` redirect are all of
-  this kind: they carry no rule identity, so the later rules for the pair are
-  never reached and their callbacks do not run. A move refused this way is
-  refused because of the leading rule, whatever a later rule for the pair
-  declares.
+  this kind: they carry no rule identity, so the pair's other rules are never
+  reached and their callbacks do not run. A move refused this way is refused
+  because of the governing rule, whatever another rule for the pair declares —
+  and declaration order decides only among the pair's exact rules, so an
+  applicable wildcard rule to the same target is not what refused it, wherever
+  it was declared.
 
 ### 4.5. Artifact Enforcement
 

@@ -299,11 +299,10 @@ profile's own id when it declares none. That is the usage extractor and the
 launch arguments it requires, and whether an invocation record is written at all
 ([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow),
 [§FS-rhei-cost-accounting.3.2](rhei-cost-accounting.spec.md#32-extraction-status)),
-the stream-json stdin transport below, which session-report stream a log is
-([§FS-rhei-session-reports.6.2](rhei-session-reports.spec.md#62-claude-code-stream)),
-and provider-refusal recognition (§FS-rhei-agents.2). A profile that declares no `family`
-resolves to itself, so every built-in and every existing custom profile takes
-the arm it takes today.
+the stream-json stdin transport below, and which session-report stream a log is
+([§FS-rhei-session-reports.6.2](rhei-session-reports.spec.md#62-claude-code-stream)).
+A profile that declares no `family` resolves to itself, so every built-in and
+every existing custom profile takes the arm it takes today.
 
 Everything that *names* the agent stays the profile's own id: `RHEI_AGENT`, the
 log header's `agent:` line, spawn records (§FS-rhei-agents.8.4), target slugs, the invocation

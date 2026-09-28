@@ -1,7 +1,9 @@
 //! What a declared family gives a wrapped agent besides a token count: the
 //! launch arguments its extractor requires, a log that says which family wrote
-//! it, a rendered session report, the prohibition on reading Claude usage out
-//! of log text, and provider-refusal recognition.
+//! it, a rendered session report, and the prohibition on reading Claude usage
+//! out of log text. A wrapped profile also parks on a recognized refusal, which
+//! it owes to its resolved provider rather than to its family
+//! ([§FS-rhei-agents.2.3](../../docs/functional-spec/rhei-agents.spec.md#23-recognized-provider-refusals)).
 //!
 //! One of these is not an under-delivery if it is left keyed on the id. The
 //! log-fallback guard is the sentence
@@ -9,7 +11,7 @@
 //! closes with a flat prohibition, so a wrapped Claude Code that falls through
 //! to the log scraper is forbidden behaviour rather than a missing feature.
 // §FS-rhei-agents.1.1.2 §FS-rhei-agents.8.2 §FS-rhei-cost-accounting.4
-// §FS-rhei-session-reports.6.2 §FS-rhei-agents.2
+// §FS-rhei-session-reports.6.2 §FS-rhei-agents.2.3
 
 use std::fs;
 
@@ -163,34 +165,14 @@ raise SystemExit(1)
     fixture
 }
 
-/// Recognition is keyed on the family, so a wrapped Codex parks on the refusal
-/// its built-in id parks on instead of charging it as a failed attempt.
-// §FS-rhei-agents.2 §FS-rhei-agents.1.1.2
+/// A wrapped profile parks end to end: recognition is keyed on the resolved
+/// provider, so a refusal under a declared family is a calm wait rather than a
+/// failed attempt, under whatever id the operator gave the entry.
+// §FS-rhei-agents.2.3 §FS-rhei-agents.1.1.2
 #[test]
 fn the_codex_family_parks_on_a_recognized_refusal() {
     let fixture = limit_fixture("family-limit-openai", "codex", "openai");
     let mut run = fixture.start(&[]);
     fixture.parked(&mut run);
     assert_all_tasks_in_state(&fixture.root, &fixture.machine, "working");
-}
-
-/// And only there: recognition still requires the provider, so the same family
-/// under `anthropic` is an ordinary failure. This change does not quietly
-/// widen the recognized set.
-// §FS-rhei-agents.2
-#[test]
-fn the_codex_family_under_another_provider_is_an_ordinary_failure() {
-    let fixture = limit_fixture("family-limit-anthropic", "codex", "anthropic");
-    let mut run = fixture.start(&[]);
-    let status = fixture.finish(&mut run);
-    assert!(
-        !status.success(),
-        "a refusal rhei does not recognize fails the run: {}",
-        fixture.output()
-    );
-    assert!(
-        !markdown_text(&fixture.root).contains("providerLimits:"),
-        "and parks nothing:\n{}",
-        markdown_text(&fixture.root)
-    );
 }

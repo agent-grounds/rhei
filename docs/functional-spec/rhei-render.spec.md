@@ -66,6 +66,62 @@ When JSON format is selected, command errors are rendered as a single JSON
 object on stderr so machine consumers do not need to parse two diagnostic
 shapes.
 
+The top-level `frontmatter` field carries the plan's **whole parsed frontmatter
+document** — `metadata` with its `tasks` map, and whatever else the document
+declared beside it — with the `metadata.tasks` keys re-keyed from the rhei-local
+ids the file authored to the project-qualified ids every other surface names
+([§FS-rhei-transitions.2.2](rhei-transitions.spec.md#22-metadata-storage-example),
+[§AR-rhei-panta.3](../architecture/rhei-panta.spec.md#3-identity-and-id-namespacing)).
+The key is `null` for a plan that declared no frontmatter.
+
+It is deliberately **unfiltered**, which is where it parts from `rhei list
+--json`. `list` answers a query about tickets and publishes the author's layer
+alone, so the keys rhei writes are held back from it
+([§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes),
+[§FS-rhei-list.4.2](rhei-list.spec.md#42-json---json)). `render` exports the
+document, and a document with its counters removed is not the document: the whole
+point of this format is that what comes out could be read back. So a task's
+`stateVisits`, its `supervision` block and every other registered key appear
+here, and a consumer reading them is reading rhei's runtime bookkeeping, which is
+not a stable contract for anything but this export.
+
+#### 3.1.1. YAML values in JSON
+
+Frontmatter is YAML and this output is JSON, so one conversion is defined here
+and used by every JSON surface that publishes frontmatter — this field and the
+`metadata` field of `rhei list --json`
+([§FS-rhei-list.4.2](rhei-list.spec.md#42-json---json)) — so that the two can
+never disagree about what a stored value looks like.
+
+- A **mapping key** becomes its YAML text as a JSON string: `12:` is emitted as
+  `"12"`, `true:` as `"true"`. JSON has only string keys, and the author's
+  spelling is the one thing every reader can agree on.
+- A **tagged value** becomes a one-key object naming the tag: `!custom hello`
+  is emitted as `{"!custom": "hello"}`.
+- Everything else converts as its JSON counterpart: mappings to objects,
+  sequences to arrays, strings, finite numbers, booleans and null to themselves.
+
+Two YAML shapes have no JSON image at all, and each is an **error** rather than a
+silent substitution:
+
+- a key that is not a scalar — a sequence or a mapping used as a key, which JSON
+  cannot name;
+- a float that is not finite — `.inf`, `-.inf`, `.nan`, which JSON has no number
+  for.
+
+The error names the plan, the project-qualified task id whose metadata holds the
+value, and the key: a scalar key is named in quotes, and a non-scalar key is
+reported by the shape that was used as one, because it has no name to give. Every
+such value in the document is reported in one run
+([§FS-rhei-errors.1.1](rhei-errors.spec.md#11-message)), the command exits
+non-zero, and no document is emitted. Both cases used to pass silently — a
+non-scalar key dropped the entire `frontmatter` value to `null`, and a non-finite
+float became `null` — which is the loss this error replaces.
+
+Making either shape a `rhei validate` error instead was considered and
+**deliberately deferred**: it would refuse plans that validate today, which is a
+compatibility question of its own and larger than the surface it would protect.
+
 Each rendered task has an optional string field `inherits`. When authored, its
 normalized value is either `"none"` or `"<name> from <axis>"`, matching
 §FS-rhei-plan-language.3.14. The key is absent, not `null` or an empty string,

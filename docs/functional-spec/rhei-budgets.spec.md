@@ -374,7 +374,9 @@ fact that a receipt and the document naming it are two writes rather than one â€
 a document whose write was lost after its receipts were durable would otherwise
 be handed a second identity, and with it a second travel bound. Deleting
 `budgetTicketId` by hand is the same case and gets the same answer: the history
-comes back. The display id is part of the key, because one document holds every
+comes back. The key is rhei's own and registered as one
+([Â§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes)), which
+is also what keeps it out of the author metadata a query publishes. The display id is part of the key, because one document holds every
 ticket of a rhei and a binding matched on the path alone would hand one ticket's
 travel to its sibling.
 

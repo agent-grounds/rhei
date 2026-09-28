@@ -373,7 +373,9 @@ metadata:
   and by `rhei reset` together with `stateVisits`, which also drops
   a `metadata.tasks.<id>` entry left empty by the two ([§FS-rhei-reset](rhei-reset.spec.md#fs-rhei-reset-rhei-reset)).
 
-Nothing here is authored by hand in normal workflows. The block exists so
+Nothing here is authored by hand in normal workflows: `supervision` is rhei's own
+key, registered as one
+([§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes)). The block exists so
 that a run stopped between a checkpoint and the supervisor's visit resumes
 exactly where it was, and so that a manual worker (§3.4) sees the same state
 `rhei run` would.

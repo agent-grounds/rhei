@@ -304,9 +304,19 @@ rather than frontmatter.
 - In TypeScript/JavaScript: Access via `task.metadata.dependsOn` (camelCase)
 - In Python: Access via `task.metadata.depends_on` (snake_case, idiomatic Python)
 - In Java: Access via `task.getMetadata().getDependsOn()` (camelCase getters)
-- In CLI JSON: Access via `task.metadata.dependsOn` (camelCase, raw JSON)
+- In CLI JSON: Access via `task.metadata.dependsOn` (camelCase, raw JSON) — per
+  task on `rhei list --json`, which carries the author's own keys for each listed
+  ticket ([§FS-rhei-list.4.2](rhei-list.spec.md#42-json---json)), and for the
+  whole document on `rhei render --format json`
+  ([§FS-rhei-render.3.1](rhei-render.spec.md#31-json))
 
 Each platform's SDK exposes the shared data model using its idiomatic naming convention. The bindings handle translation between platform-idiomatic names and the canonical camelCase JSON form.
+
+The camelCase in the CLI row is the **authoring convention** this document
+recommends, not a normalization rhei performs. Frontmatter is stored as the
+author wrote it and no surface renames a key: a plan that writes `depends_on`
+reaches a CLI caller as `depends_on`. Only the bindings translate, and they
+translate between their own idiom and the key on disk.
 
 ### 2.2. Metadata Storage Example
 
@@ -338,6 +348,11 @@ The YAML frontmatter between `---` markers contains:
 - `metadata.tasks.<id>` - Custom metadata for each task, keyed by task ID
 - Any key-value pairs needed by callbacks or conditions (e.g., `retryCount`, `priority`)
 - `metadata.tasks.<id>.stateVisits.<state-name>` - Runtime-maintained counted-loop counters for states that declare a `visits` limit
+
+`stateVisits` is one of five keys rhei maintains in this same flat map, and it is
+not a special case: the whole set, and what a surface may do with it, is
+[§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes). An
+author reads that register to know which names are not theirs.
 
 These on-disk `<id>` keys stay rhei-local (matching the task headings in the
 same file); the merged project graph re-keys them to project-qualified ticket
@@ -400,6 +415,54 @@ For counted loops, runtimes should additionally expose:
 - `ctx.task.metadata.stateVisits` for the persisted per-state counters
 - `ctx.task.metadata.visitCount` as the active state's current loop count
 - `ctx.state.visits` as the active state's configured loop budget
+
+### 2.5. Keys rhei writes
+
+`metadata.tasks.<id>` is one flat map, and
+[§FS-rhei-transitions.2.2](rhei-transitions.spec.md#22-metadata-storage-example)
+puts an author's `priority` and the runtime's `stateVisits` side by side in it
+with nothing in the shape to tell them apart. This register is what tells them apart. It is the whole set of keys
+**rhei itself** writes into a task's map:
+
+| Key | What it holds | Specified at | Cleared by `rhei reset` |
+|---|---|---|---|
+| `stateVisits` | entry counters per state, for a counted loop or a poll's attempts | [§FS-rhei-transitions.2.3](rhei-transitions.spec.md#23-counted-loop-metadata) | yes |
+| `pollNextAttemptAt` | the instant a polling state may be attempted again, per state | [§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics) | no |
+| `providerLimits` | a parked provider-limit wait, per state | [§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking) | yes |
+| `supervision` | a supervising task's phase and its undelivered checkpoints | [§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata) | yes |
+| `budgetTicketId` | the ticket's budget identity | [§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal) | no |
+
+Two rules attach to the register, and they are why it is one declaration rather
+than a sentence repeated at each of the five points above.
+
+- **A key in the register is never published as author metadata.** A surface
+  that offers a caller "this task's metadata" as a stable contract offers what
+  the author wrote, so it emits the task's stored map minus these keys —
+  including when that leaves nothing to emit. `rhei list --json` is the surface
+  this binds ([§FS-rhei-list.4.2](rhei-list.spec.md#42-json---json)). A surface
+  that publishes the *stored* map whole is not bound by it and says so at its own
+  point: the callback view does
+  ([§FS-rhei-transitions.2.4](rhei-transitions.spec.md#24-metadata-access-in-callbacks)),
+  and so does `rhei render --format json`
+  ([§FS-rhei-render.3.1](rhei-render.spec.md#31-json)).
+- **A point that introduces a new runtime key adds a row here.** The register is
+  where the set lives; the row's third column is the point that specifies the key
+  and owns its meaning. Without that rule the first runtime key added after this
+  register was written would be published as author metadata by omission —
+  silently, on a read-only command, which is the one place a mistake becomes a
+  contract.
+
+`rhei reset` deletes exactly the rows marked cleared
+([§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior)). Two survive it:
+`budgetTicketId`, deliberately and for the reason argued there, and
+`pollNextAttemptAt`, which is one state's own scheduling and is cleared by that
+state's exit instead ([§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics)).
+
+The register reserves nothing. A plan may author a key it names and still
+validate; the key keeps its runtime meaning, stays out of the author view, and
+raises no diagnostic. Turning a collision into a `rhei validate` error is a
+change of its own and deliberately not taken here: it would refuse plans that
+validate today.
 
 ---
 

@@ -2,8 +2,11 @@
 
 Read-only listing of tasks in a plan, with filters for state, assignee, kind,
 dependency, hierarchy, free-text, and readiness. Modeled after `bd list` from
-beads, restricted to fields Rhei stores in markdown (no priority, labels, or
-timestamps).
+beads, restricted to what Rhei stores in the plan — the markdown task fields and
+the frontmatter an author wrote beside them — and never to anything Rhei does not
+store at all. There are no labels and no timestamps because no plan holds one; a
+`priority` reaches the listing where a plan authored one as task metadata
+([§FS-rhei-transitions.2](rhei-transitions.spec.md#2-rhei-file-metadata-format)).
 
 ## 1. Usage
 
@@ -215,12 +218,65 @@ Fields are stable: `id`, `kind`, `title`, `state` (raw, as authored), `assignee`
 `depth` (1-based depth within the owning rhei — a top-level ticket is `1`; the
 Panta qualification segment does not count).
 
-One additive field, `waiting_on`, is present **only** on a ticket whose current
-state is a person-waiting poll, carrying that state's `poll.waiting_on` label
+Two additive fields follow one rule between them: **presence is the
+declaration**. Each is emitted only on a ticket it means something for, and
+omitted rather than `null` everywhere else, so a plan that uses neither emits
+exactly the object it emitted before. Their shape is as stable as the eight
+fields above; what varies is whether a ticket carries them at all.
+
+`waiting_on` is present **only** on a ticket whose current state is a
+person-waiting poll, carrying that state's `poll.waiting_on` label
 ([§FS-rhei-states.2.5](rhei-states.spec.md#25-waiting-on-a-person)). It is omitted rather than `null` elsewhere, for the
 same reason it is omitted on the state machine itself: its presence is the
 declaration, and a plan that uses no such state emits exactly the object it
 emitted before.
+
+`metadata` is the ticket's **persisted author metadata** — the
+`metadata.tasks.<id>` map the plan's frontmatter holds for it
+([§FS-rhei-transitions.2](rhei-transitions.spec.md#2-rhei-file-metadata-format)),
+keyed by the qualified id this listing prints, with every key spelled as the
+author wrote it. Rhei renames nothing and nests nothing: the object is the stored
+map, and the values are converted to JSON by the one conversion both JSON
+surfaces share ([§FS-rhei-render.3.1](rhei-render.spec.md#31-json)).
+
+What it carries is the author's layer and only that. The keys rhei writes into
+the same map are registered once
+([§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes)) and
+every one of them is filtered out here, because a read-only query is where a
+field becomes a contract and rhei's loop accounting is not one. A key the
+register names keeps its runtime meaning even on a plan that authored it, so it
+is filtered out there too.
+
+The field is therefore absent in three cases that a caller need not distinguish:
+a plan with no frontmatter at all, a task with no entry in `metadata.tasks`, and
+a task whose stored entry holds **only** registered keys. The last is the common
+one on a plan that has been running — a supervising ticket whose map is
+`stateVisits` and `supervision` emits no `metadata` key, not an empty object —
+and it is the reason the rule is stated as absence rather than as emptiness. A
+caller that wants the stored map whole, counters and all, asks `rhei render
+--format json` ([§FS-rhei-render.3.1](rhei-render.spec.md#31-json)).
+
+A ticket that carries both fields carries them independently — a
+person-waiting poll with author metadata emits each for its own reason:
+
+```json
+{
+  "id": "release.2",
+  "kind": "task",
+  "title": "Bootstrap environments",
+  "state": "draft",
+  "assignee": null,
+  "prior": ["release.1"],
+  "parent": null,
+  "depth": 1,
+  "metadata": { "context": "/checkouts/widget", "priority": "high" }
+}
+```
+
+No filter selects on `metadata`. The field is emitted on whatever survives the
+filters this command already has; `--contains` matches title and body and not
+metadata. Filtering on an author's field is a question of its own and is not
+answered here.
 
 ## Relationship to Other Commands
 

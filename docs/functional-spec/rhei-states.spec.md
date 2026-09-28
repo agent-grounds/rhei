@@ -349,6 +349,10 @@ states:
   has not gone anywhere. The attempts are in the journal instead, one
   `start@`/`end@` pair each.
 - **Exit.** Any non-self-loop transition exits the state normally and clears both `pollNextAttemptAt.<state-name>` and `stateVisits.<state-name>` for that state.
+  Both keys are rhei's own, registered with the rest of what the runtime writes
+  into a task's metadata map
+  ([§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes)), so no
+  surface publishes either as something a plan's author wrote.
 - **Exhaustion.** When `stateVisits.<state-name> >= poll.max_attempts`, the engine will *not* execute a self-loop transition even if one matches. Instead it re-evaluates transitions and picks the first matching non-self-loop. That edge is an ordinary **move**: it is applied, it appends its ledger line, and the attempt that selected it keeps the outcome its own exit earns rather than reading as a wait — the waiting is over, which is what exhaustion means. The recommended pattern is an explicit exhaustion transition:
   ```yaml
   - from: ci-wait

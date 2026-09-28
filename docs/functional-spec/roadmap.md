@@ -139,9 +139,17 @@ old notes are historical; this roadmap owns the remaining backlog.
   envelope with a stable `kind` and optional `path` taxonomy before downstream
   integrations depend on it. [§FS-rhei-render](rhei-render.spec.md#fs-rhei-render-rhei-render) [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next)
 - Clean up small human-output ambiguities: show agent and model as distinct
-  fields, reword built-in validation source labels, clarify live template
-  variables versus prose in state instructions, and decide whether rendered
-  JSON should keep or flatten `metadata.metadata`. [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next) [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate) [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) [§FS-rhei-render](rhei-render.spec.md#fs-rhei-render-rhei-render)
+  fields, reword built-in validation source labels, and clarify live template
+  variables versus prose in state instructions. [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next) [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate) [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) [§FS-rhei-render](rhei-render.spec.md#fs-rhei-render-rhei-render)
+- Resolved: rendered JSON **keeps** `metadata.metadata` rather than flattening
+  it. `frontmatter` carries the whole parsed frontmatter document, where
+  `metadata` is one declaration beside the others a document may hold —
+  `structure` is already one — so flattening it would collide with a sibling key
+  rather than shorten a path
+  ([§FS-rhei-render.3.1](rhei-render.spec.md#31-json)). A caller that wants one
+  task's authored fields without the nesting asks `rhei list --json`, whose
+  `metadata` field is that task's map and nothing else
+  ([§FS-rhei-list.4.2](rhei-list.spec.md#42-json---json)).
 
 ## Planned: A Dry Run That Prints the Composed Prompt
 

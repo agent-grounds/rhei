@@ -83,10 +83,11 @@ Reset does **not**:
 - Touch the project's budget account. It lives at
   `.agent-grounds/rhei/budgets/`, which is outside `runtime/` and outside every
   deletion step 3 and step 4 enumerate ([§FS-rhei-budgets.5.1](rhei-budgets.spec.md#51-where-it-lives)).
-- Delete the ticket's `metadata.tasks.<id>.budgetTicketId`. Step 3 deletes
-  `stateVisits`, `providerLimits`, and the `supervision` block by name; the
-  budget identity is deliberately **not** in that list, because removing it
-  would hand the ticket a fresh travel history. It is also why a
+- Delete the ticket's `metadata.tasks.<id>.budgetTicketId`. Which of rhei's own
+  metadata keys reset deletes is the register's `Cleared by rhei reset` column
+  ([§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes)), not a
+  second list kept here; the budget identity is deliberately **not** among them,
+  because removing it would hand the ticket a fresh travel history. It is also why a
   `metadata.tasks.<id>` entry holding only that key is **not** removed as empty:
   it is a record of something.
 

@@ -452,10 +452,12 @@ struct ProgramExitRoute {
     /// declare the same pair and differ only in their `exit_code:`, their
     /// `condition:`, or their callbacks. So the pair cannot be re-resolved
     /// afterwards to recover what fired — the selection has to say.
+    ///
+    /// It indexes the `transitions()` of the machine the selection was run
+    /// against, so it means nothing apart from that machine: the caller hands
+    /// the two to the apply step in one call, and the apply step accepts the
+    /// index only for a rule that still declares the pair it is moving along.
     /// §FS-rhei-programs.3.2 §FS-rhei-transitions.4.4
-    // Read by the contract's selection tests. Nothing on the run path carries
-    // it to the apply step yet, which is what the fix is for.
-    #[allow(dead_code)]
     selected_rule: usize,
 }
 

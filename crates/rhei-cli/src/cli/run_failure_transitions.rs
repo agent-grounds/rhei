@@ -218,6 +218,10 @@ fn fire_agent_exit_transition(
         // ended — a timeout, an agent's failure, a spent poll budget — so none
         // of them is a declared route. §FS-rhei-programs.3.2
         ExitCodeMatch::None,
+        // And none of them selected a rule either: each names a target the
+        // engine computed, so the pair resolves as it always has.
+        // §FS-rhei-transitions.4.4
+        None,
         no_callbacks,
     ) {
         Ok(effective_to) => {

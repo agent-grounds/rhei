@@ -34,6 +34,16 @@ struct TransitionOrigin {
     /// transition process and is matched against the current plan tree.
     // §FS-rhei-supervision.2.1
     supervisor: Option<TaskId>,
+    /// Which rule the caller's own selection chose, by index into the
+    /// `transitions()` of the machine passed in the same call.
+    ///
+    /// A trigger that selects a rule — the program exit-code route — is the only
+    /// caller that has this to say, and saying it is the whole difference
+    /// between firing the edge the exit code named and firing whichever rule for
+    /// the pair happens to be declared first. `None` is a caller that named only
+    /// a state pair, and the apply step resolves it as it always has.
+    // §FS-rhei-transitions.4.4 §FS-rhei-programs.3.2
+    selected_rule: Option<usize>,
     /// The engine's own account of the move, recorded *only* when the effective
     /// target turns out to be `final: true` and nothing else answered for the
     /// ticket.
@@ -237,6 +247,9 @@ fn execute_system_timeout_transition(
             result_message: Some(message),
             supervisor: None,
             terminal_result_fallback: None,
+            // The engine computed this target itself; there is no rule it
+            // selected to carry. §FS-rhei-transitions.4.4
+            selected_rule: None,
         },
         None,
         Some(opts),
@@ -286,6 +299,9 @@ fn execute_system_tooling_transition(
             result_message: Some(message),
             supervisor: None,
             terminal_result_fallback: None,
+            // The engine computed this target itself; there is no rule it
+            // selected to carry. §FS-rhei-transitions.4.4
+            selected_rule: None,
         },
         None,
         None,
@@ -302,6 +318,10 @@ fn execute_system_program_exit_transition(
     to: &str,
     exit_code: i32,
     matched: ExitCodeMatch,
+    // Which rule of `machine`'s own `transitions()` the exit code selected; it
+    // arrives beside the machine it indexes. An engine-chosen target passes
+    // `None`. §FS-rhei-transitions.4.4
+    selected_rule: Option<usize>,
     no_callbacks: bool,
 ) -> MietteResult<String> {
     let mut data = serde_json::Map::new();
@@ -331,6 +351,9 @@ fn execute_system_program_exit_transition(
             result_message: message,
             supervisor: None,
             terminal_result_fallback: None,
+            // The rule the exit code chose is the rule that must fire, and only
+            // this trigger knows which it was. §FS-rhei-programs.3.2
+            selected_rule,
         },
         None,
         None,

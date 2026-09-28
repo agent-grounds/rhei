@@ -370,6 +370,61 @@ fn applicable_alternatives(
     out
 }
 
+/// The sentences a refusal ends with: which edge governed the pair, where the
+/// move could go instead.
+///
+/// The target just refused is never among the alternatives — a reader offered the
+/// state they were denied in the same breath learns nothing from it. It can only
+/// appear there because some *other* rule declares the same pair and is
+/// applicable, and the answer to that is which rule governed, which is the
+/// clause rather than the list.
+///
+/// `resolved_by_pair` is why the clause is conditional. A caller that named only
+/// a state pair was refused by the first declared rule for it, and the machine
+/// having a later applicable one is the surprise worth explaining; a caller that
+/// selected a rule was refused by the rule it selected, where declaration order
+/// decided nothing and the clause would be a lie.
+// §FS-rhei-transition-cmd.3 §FS-rhei-transitions.4.4
+#[allow(clippy::too_many_arguments)]
+fn describe_refused_alternatives(
+    machine: &rhei_validator::StateMachine,
+    metadata: Option<&Metadata>,
+    task_id: &TaskId,
+    task: Option<&rhei_core::ast::Task>,
+    from: &str,
+    current_state_raw: &str,
+    refused_to: &str,
+    resolved_by_pair: bool,
+) -> String {
+    let mut alternatives =
+        applicable_alternatives(machine, metadata, task_id, task, from, current_state_raw);
+    // The refused rule is inapplicable — that is why this is being written — so
+    // its own target reaching the list is another rule for the pair saying so.
+    let pair_has_an_applicable_rule = alternatives.iter().any(|target| target == refused_to);
+    alternatives.retain(|target| target != refused_to);
+
+    let governs = if resolved_by_pair && pair_has_an_applicable_rule {
+        format!(
+            "A move that names only a state pair takes the first declared '{from}' -> \
+             '{refused_to}' edge, so that edge is the one refused here; '{from}' declares \
+             another rule for the pair that is currently applicable, and naming a state pair \
+             does not reach it. "
+        )
+    } else {
+        String::new()
+    };
+    let reachable = if !alternatives.is_empty() {
+        format!("Currently applicable transitions from '{from}': {}.", alternatives.join(", "))
+    } else if governs.is_empty() {
+        "No other transitions from this state are currently applicable.".to_string()
+    } else {
+        // Saying "no other transitions are applicable" here would contradict the
+        // clause above, which just said one is.
+        format!("No other state is reachable from '{from}' right now.")
+    };
+    format!("{governs}{reachable}")
+}
+
 #[allow(clippy::too_many_arguments)]
 fn transition_rule_is_applicable(
     rule: &rhei_core::ast::TransitionRule,

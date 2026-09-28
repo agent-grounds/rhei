@@ -123,6 +123,35 @@ fn ensure_task_profile_allows_state(
     ))
 }
 
+/// The rule the caller's own selection chose, where it carried one and the
+/// loaded machine still agrees that rule declares the move being applied.
+///
+/// A `(from, to)` pair does not name a rule — a poll state normally declares two
+/// rules for one pair — so a trigger that evaluated the rules itself has to say
+/// which one it chose. Without that, the move is resolved by its pair again and
+/// whichever rule was declared first for it both fires and gates, which is the
+/// defect in agent-grounds/rhei#312.
+///
+/// The index means something only alongside the machine it was computed over,
+/// and that is how it travels: a `StateMachine` is immutable once loaded —
+/// `transitions()` hands out a slice of an owned `Vec` and nothing in the
+/// workspace mutates it — and the exit-code trigger passes the selection's own
+/// machine and its index into one call. The pair check holds a future caller to
+/// that rather than trusting it: an index computed over some other machine
+/// either falls outside the slice or names a rule declaring a different move,
+/// and either way the resolution degrades to the pair lookup instead of firing
+/// an edge nobody selected.
+// §FS-rhei-programs.3.2 §FS-rhei-transitions.4.4
+fn rule_the_caller_selected<'machine>(
+    machine: &'machine rhei_validator::StateMachine,
+    selected_rule: Option<usize>,
+    from: &str,
+    to: &str,
+) -> Option<&'machine rhei_core::ast::TransitionRule> {
+    let rule = machine.transitions().get(selected_rule?)?;
+    (machine.transition_matches_source(rule, from) && rule.to.0 == to).then_some(rule)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn execute_transition_with_origin(
     files: TransitionFiles<'_>,
@@ -296,11 +325,16 @@ fn execute_transition_with_origin(
 
     // Now that we know the task really is in `from`, check whether the
     // declared transitions permit `from -> to`.
+    let selected = rule_the_caller_selected(machine, origin.selected_rule, from, to);
+    // A state pair names no rule, so this is the one resolution declaration
+    // order decides — which is what the refusal has to say. §FS-rhei-transitions.4.4
+    let resolved_by_pair = selected.is_none();
     // §FS-rhei-transitions.4.6: wildcards never authorize departure from a final state.
-    let matching_rule =
+    let matching_rule = selected.or_else(|| {
         machine.transitions().iter().find(|rule| rule.from.0 == from && rule.to.0 == to).or_else(
             || machine.transitions().iter().find(|rule| rule.from.0 == "*" && machine.transition_matches_source(rule, from) && rule.to.0 == to),
-        );
+        )
+    });
     let Some(matching_rule) = matching_rule else {
         if let Some(task_handle) = &task_handle {
             task_handle.release();
@@ -344,23 +378,16 @@ fn execute_transition_with_origin(
             from,
             &current_state_raw,
         );
-        let alternatives = applicable_alternatives(
+        let suffix = describe_refused_alternatives(
             machine,
             metadata_for_checks,
             &metadata_key,
             Some(&task_info.task),
             from,
             &current_state_raw,
+            to,
+            resolved_by_pair,
         );
-        let suffix = if alternatives.is_empty() {
-            "No other transitions from this state are currently applicable.".to_string()
-        } else {
-            format!(
-                "Currently applicable transitions from '{}': {}.",
-                from,
-                alternatives.join(", ")
-            )
-        };
         return Err(miette!(
             help = "the edge exists but its condition is unmet. Inspect the machine with: rhei states",
             "transition from '{}' to '{}' is not currently applicable: {}. {}",
@@ -501,6 +528,10 @@ fn execute_transition_with_origin(
     // Resolve redirects before committing state: validate the redirect is a
     // declared transition from the current state. A redirect to the same
     // target is a no-op.
+
+    // A redirect names a state and no rule, so its pair is resolved here even for
+    // a caller that selected one: that selection was about the replaced edge.
+    // §FS-rhei-transitions.4.4
     let (effective_to, effective_rule) = if let Some(redirect) = redirect_next_state.as_deref() {
         if redirect == to {
             (to.to_string(), matching_rule)

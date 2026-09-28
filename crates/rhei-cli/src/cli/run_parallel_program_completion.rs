@@ -211,6 +211,9 @@ fn handle_parallel_program_completion(
                     to_state,
                     exit_code,
                     exit_route.matched,
+                    // The rule this very selection chose, over this very
+                    // machine. §FS-rhei-programs.3.2
+                    Some(exit_route.selected_rule),
                     opts.no_callbacks(),
                 )?;
                 emit_run_message(

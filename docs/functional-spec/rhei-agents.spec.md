@@ -877,7 +877,7 @@ what the wrapper changes (§1.1.2):
   "agents": {
     "cld": {
       "family": "claude-code",
-      "command": ["sh", "-lc", "CLAUDE_CONFIG_DIR="$HOME/.claude1" exec claude "$@"", "cld"]
+      "command": ["sh", "-lc", "CLAUDE_CONFIG_DIR=\"$HOME/.claude1\" exec claude \"$@\"", "cld"]
     }
   }
 }
@@ -2012,7 +2012,7 @@ Each log file contains:
 
 ```
 === rhei agent log v1 ===
-agent: claude-code
+agent: cld
 family: claude-code
 model: impl-fast
 provider: anthropic

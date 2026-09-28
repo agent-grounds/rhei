@@ -284,8 +284,10 @@ each:
    entry for the same task are **merged** key by key: the index may hold
    `priority` for a task while the task's own file holds `context`, and both
    reach the merged map. The *same* key in both places is a validation error
-   naming both files and the key. The workspace therefore keeps exactly one
-   authoritative value for every `metadata.tasks.<id>.<key>` — the guarantee
+   naming both files and the key. A `metadata.tasks` key names a task by its id
+   in string form whatever YAML scalar spells it, so `1.2` and `"1.2"` are one
+   task with one entry rather than two. The workspace therefore keeps exactly
+   one authoritative value for every `metadata.tasks.<id>.<key>` — the guarantee
    holds per key rather than per file, and no reader has to learn a precedence
    rule to predict which value wins.
 4. **Authored, never written.** No Rhei command reads the block for its own

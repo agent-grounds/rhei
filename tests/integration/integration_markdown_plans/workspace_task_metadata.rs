@@ -1,7 +1,6 @@
-// The loader and the diagnostics behind a workspace task file's own metadata
-// block (agent-grounds/rhei#318): where the merged map comes from, what the five
-// refusals say, and the line number a parse error in the task body still
-// reports. §AR-rhei-panta.2 §FS-rhei-plan-language.1.4 §FS-rhei-validate.4.4
+// The loader and the diagnostics behind a workspace task file's own metadata block
+// (agent-grounds/rhei#318): where the merged map comes from, what the six refusals say, and the line
+// a parse error in the task body still reports. §AR-rhei-panta.2 §FS-rhei-plan-language.1.4 §FS-rhei-validate.4.4
 
 /// The workspace directory is named `wp` here too, so an assertion reads in the
 /// ids the specification writes.
@@ -234,5 +233,141 @@ fn malformed_yaml_in_the_block_is_refused_with_the_task_files_line() {
     assert!(
         reported.contains("01-first.md"),
         "the refusal should name the task file; got:\n{reported}"
+    );
+}
+
+/// Every `metadata.tasks` entry the loader produced, keyed as the merged map
+/// keys it, so a test can assert that one task has exactly one entry however
+/// the two files spell its id. §FS-rhei-plan-language.1.4
+fn loaded_task_entries(ws: &Path) -> Vec<(String, YamlValue)> {
+    let loaded = workspace::load_workspace(ws).expect("workspace should load");
+    let Some(metadata) = loaded.rhei.metadata else {
+        return Vec::new();
+    };
+    let Some(tasks) = metadata
+        .get(YamlValue::String("metadata".into()))
+        .and_then(YamlValue::as_mapping)
+        .and_then(|section| section.get(YamlValue::String("tasks".into())))
+        .and_then(YamlValue::as_mapping)
+    else {
+        return Vec::new();
+    };
+    tasks
+        .iter()
+        .map(|(key, value)| match key {
+            YamlValue::String(id) => (id.clone(), value.clone()),
+            other => (serde_yaml::to_string(other).unwrap_or_default().trim().to_string(), value.clone()),
+        })
+        .collect()
+}
+
+const NESTED_INDEX: &str = "# Rhei: Workspace\n\n---\nstructure:\n  maxLevels: 2\nmetadata:\n  tasks:\n    \"1.2\":\n      stateVisits:\n        pending: 4\n---\n";
+
+const NESTED_TASKS: &str = "---\nmetadata:\n  tasks:\n    1.2:\n      context: oracle-labs\n---\n\n\
+                            ### Task 1: parent\n**State:** pending\n\n\
+                            #### Task 1.2: child\n**State:** pending\n";
+
+/// 15 · A task id is one task however the two files spell it. The runtime writes
+/// a multi-segment id into the index as a string while a bare `1.2:` authored in
+/// a task file is a YAML float, so a merge that compared the raw keys filed one
+/// task twice and let the later entry replace the index's — the runtime's own
+/// `stateVisits` included. §FS-rhei-plan-language.1.4
+#[test]
+fn a_task_id_spelled_as_a_number_and_as_a_string_is_one_entry() {
+    let (_dir, ws) =
+        metadata_workspace("wtm-number-id", NESTED_INDEX, &[("01-first.md", NESTED_TASKS)]);
+
+    let entries = loaded_task_entries(&ws);
+    assert_eq!(
+        entries.len(),
+        1,
+        "`1.2` and `\"1.2\"` name one task, so the merged map holds one entry; got:\n{entries:?}"
+    );
+    let (id, entry) = &entries[0];
+    assert_eq!(id, "1.2");
+    let entry = entry.as_mapping().expect("the merged entry is a mapping");
+    assert!(
+        entry.contains_key(YamlValue::String("context".into()))
+            && entry.contains_key(YamlValue::String("stateVisits".into())),
+        "both files' keys must survive the merge; got:\n{entry:?}"
+    );
+}
+
+/// 15 · The same rule with the spellings swapped, and on a single-segment id,
+/// which `task_id_yaml_key` keeps numeric in the index: a numeric index key and
+/// a quoted task-file key are still one task. §FS-rhei-plan-language.1.4
+#[test]
+fn a_single_segment_numeric_id_merges_in_either_direction() {
+    for (index_key, file_key) in [("\"3\"", "3"), ("3", "\"3\"")] {
+        let index = format!(
+            "# Rhei: Workspace\n\n---\nmetadata:\n  tasks:\n    {index_key}:\n      \
+             stateVisits:\n        pending: 4\n---\n"
+        );
+        let task_file = format!(
+            "---\nmetadata:\n  tasks:\n    {file_key}:\n      context: oracle-labs\n---\n\n\
+             ### Task 3: an item\n**State:** pending\n"
+        );
+        let (_dir, ws) = metadata_workspace(
+            "wtm-number-id-either",
+            &index,
+            &[("01-first.md", task_file.as_str())],
+        );
+
+        let entries = loaded_task_entries(&ws);
+        assert_eq!(
+            entries.len(),
+            1,
+            "index `{index_key}` and task file `{file_key}` name one task; got:\n{entries:?}"
+        );
+        let entry = entries[0].1.as_mapping().expect("the merged entry is a mapping");
+        assert!(
+            entry.contains_key(YamlValue::String("context".into()))
+                && entry.contains_key(YamlValue::String("stateVisits".into())),
+            "index `{index_key}` and task file `{file_key}` must merge; got:\n{entry:?}"
+        );
+    }
+}
+
+/// 16 · The overlap refusal reads the two spellings as one task too, so a key
+/// set in both places is named rather than silently resolved by whichever entry
+/// the map kept last. §FS-rhei-validate.4.4
+#[test]
+fn an_overlapping_key_is_refused_across_the_two_spellings() {
+    let (dir, ws) = metadata_workspace(
+        "wtm-number-id-overlap",
+        NESTED_INDEX,
+        &[("01-first.md", &NESTED_TASKS.replace("context: oracle-labs", "stateVisits:\n        pending: 9"))],
+    );
+
+    let reported = validate_fails(&dir, &ws);
+    assert!(
+        reported.contains("stateVisits")
+            && reported.contains("index.rhei.md")
+            && reported.contains("01-first.md")
+            && reported.contains("`1.2`"),
+        "the overlap must name both files, the key and the id as authored; got:\n{reported}"
+    );
+}
+
+/// 17 · A key under `metadata` other than `tasks` — `taks` for `tasks` — is the
+/// same mistake as a stray top-level key and is named the same way, because it
+/// is otherwise the one block still accepted and then discarded.
+/// §FS-rhei-validate.4.4
+#[test]
+fn a_key_under_metadata_other_than_tasks_is_refused() {
+    let (dir, ws) = metadata_workspace(
+        "wtm-metadata-typo",
+        "# Rhei: Workspace\n",
+        &[(
+            "01-first.md",
+            "---\nmetadata:\n  taks:\n    first:\n      context: oracle-labs\n---\n\n\
+             ### Task first: first item\n**State:** pending\n",
+        )],
+    );
+
+    let reported = validate_fails(&dir, &ws);
+    assert!(
+        reported.contains("`metadata.taks`") && reported.contains("`tasks`"),
+        "the refusal must name the key at the depth it was written; got:\n{reported}"
     );
 }

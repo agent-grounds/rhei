@@ -232,7 +232,7 @@ errors.
 | # | What is wrong | Class | What the message names |
 |---|---------------|-------|------------------------|
 | 1 | `structure` as a top-level key | parse | that `structure` is a plan-wide setting and belongs in `index.rhei.md`, which carries it for every task file (§FS-rhei-authoring.3.3) |
-| 2 | any other top-level key | parse | the key, and that a task file's frontmatter carries only `metadata.tasks.<id>` for the tasks it defines |
+| 2 | any other top-level key, or a key under `metadata` other than `tasks` | parse | the key at the depth it was written, and that a task file's frontmatter carries only `metadata.tasks.<id>` for the tasks it defines |
 | 3 | `metadata.tasks.<id>` for an id this file does not define | parse | the id, and both places the entry may go — the file that defines that task, or `index.rhei.md` |
 | 4 | malformed YAML inside the block | parse | the task file's own line |
 | 5 | the same key set for one task in both `index.rhei.md` and a task file | load | **both** files and the key, and that a task file's metadata and the index's entry for one task are disjoint by key, so the fix is to keep that key in one of them |
@@ -240,7 +240,10 @@ errors.
 
 Rows 1 and 2 are one check with two messages: `structure` is a top-level key
 like any other and earns its own wording only because it is the one plan-wide
-key an author plausibly writes into the wrong file. Row 3 is file-local by
+key an author plausibly writes into the wrong file. Row 2 reaches one level
+down as well — `metadata.taks` is the same mistake as a stray top-level key and
+is named the same way, because a key under `metadata` that is not `tasks` would
+otherwise be the one thing still accepted and discarded. Row 3 is file-local by
 necessity — a parser reading one file does not know which file defines the id
 that entry names.
 

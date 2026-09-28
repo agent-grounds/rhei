@@ -417,11 +417,25 @@ fn defined_ids(tasks: &[Task]) -> Vec<String> {
 
 /// A `metadata.tasks` key as a task id: the ids a numbered ticket authors are
 /// YAML numbers, and `3` names the same ticket as `"3"`.
-fn metadata_task_id(key: &serde_yaml::Value) -> Option<String> {
+///
+/// The one rule for what a `metadata.tasks` key identifies, so the parser's
+/// check and the merge cannot come to disagree about it — a task with two keys
+/// in the merged map is a task whose entries silently replace one another.
+/// §FS-rhei-plan-language.1.4
+pub(crate) fn metadata_task_id(key: &serde_yaml::Value) -> Option<String> {
     match key {
         serde_yaml::Value::String(id) => Some(id.clone()),
         serde_yaml::Value::Number(number) => Some(number.to_string()),
         _ => None,
+    }
+}
+
+/// A frontmatter key as a message names it: the key itself, without YAML's
+/// quoting, at whatever depth the block spells it.
+fn metadata_key_name(key: &serde_yaml::Value) -> String {
+    match key {
+        serde_yaml::Value::String(name) => name.clone(),
+        other => serde_yaml::to_string(other).unwrap_or_default().trim().to_string(),
     }
 }
 
@@ -439,17 +453,33 @@ fn check_task_metadata_block(
     let mut errors = Vec::new();
 
     for (key, value) in metadata {
-        let name = match key {
-            serde_yaml::Value::String(name) => name.clone(),
-            other => serde_yaml::to_string(other).unwrap_or_default().trim().to_string(),
-        };
+        let name = metadata_key_name(key);
         if name == "metadata" {
-            if !matches!(value, serde_yaml::Value::Mapping(_)) {
-                errors.push(ParseError::new(
+            match value {
+                // A key under `metadata` other than `tasks` — `taks` for
+                // `tasks` — is the same mistake one level down, and is named
+                // rather than dropped. §FS-rhei-validate.4.4
+                serde_yaml::Value::Mapping(section) => {
+                    errors.extend(section.keys().filter_map(|key| {
+                        let nested = metadata_key_name(key);
+                        (nested != "tasks").then(|| {
+                            ParseError::new(
+                                format!(
+                                    "`metadata.{nested}` is not allowed in a workspace task \
+                                     file's frontmatter: the one permitted key under \
+                                     `metadata` is `tasks`, carrying `metadata.tasks.<id>` \
+                                     entries for the tasks this file defines."
+                                ),
+                                top_level_key_line(block, &name).or(Some(block.open_line)),
+                            )
+                        })
+                    }));
+                }
+                _ => errors.push(ParseError::new(
                     "`metadata` in a workspace task file's frontmatter must be a mapping \
                      carrying `tasks.<id>` entries for the tasks this file defines.",
                     top_level_key_line(block, &name).or(Some(block.open_line)),
-                ));
+                )),
             }
             continue;
         }

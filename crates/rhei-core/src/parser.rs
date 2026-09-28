@@ -16,6 +16,7 @@ mod workspace;
 
 pub use plan::parse;
 pub use recovery::parse_collect;
+pub(crate) use workspace::metadata_task_id;
 pub use workspace::{
     parse_basin_ticket_file, parse_basin_ticket_file_collect, parse_panta_manifest,
     parse_workspace_index, parse_workspace_task_file, parse_workspace_task_file_collect,

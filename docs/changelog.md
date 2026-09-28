@@ -16,10 +16,12 @@
   reset` leaves an authored block byte-identical. What the block may not do is
   now refused by name instead of accepted and silently discarded: a top-level
   key other than `metadata`, an entry for a task another file defines,
-  malformed YAML, the same key as the index, a block in a `basin/` ticket file
-  (the basin's metadata document is the project manifest), and a block in a
-  mounted block's task file, which composition would have to rewrite ids
-  inside. (PR #331)
+  malformed YAML, the same key as the index, a key under `metadata` other than
+  `tasks`, a block in a `basin/` ticket file (the basin's metadata document is
+  the project manifest), and a block in a mounted block's task file, which
+  composition would have to rewrite ids inside. `rhei list` now skips a basin it
+  cannot load and warns naming the ticket file, rather than failing the whole
+  project as it did for any basin ticket error before. (PR #331)
 
 - Read a fenced code block in a plan the way the language defines one, so a plan
   may quote the plan format. The structural scan used to decide what was code by

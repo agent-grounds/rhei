@@ -237,13 +237,11 @@ pub(super) fn qualify_task_metadata(metadata: Option<Metadata>, rhei_id: &str) -
     if let Some(tasks) = frontmatter_tasks(&metadata) {
         let mut qualified = Metadata::new();
         for (key, value) in tasks {
-            let local = match &key {
-                serde_yaml::Value::String(s) => s.clone(),
-                serde_yaml::Value::Number(n) => n.to_string(),
-                _ => {
-                    qualified.insert(key, value);
-                    continue;
-                }
+            // Same rule as the merge and the parser's check, so a key qualifies
+            // under the id they read it as. §FS-rhei-plan-language.1.4
+            let Some(local) = crate::parser::metadata_task_id(&key) else {
+                qualified.insert(key, value);
+                continue;
             };
             qualified.insert(serde_yaml::Value::String(format!("{rhei_id}.{local}")), value);
         }

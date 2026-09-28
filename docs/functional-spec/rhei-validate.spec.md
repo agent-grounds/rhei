@@ -233,7 +233,7 @@ errors.
 |---|---------------|-------|------------------------|
 | 1 | `structure` as a top-level key | parse | that `structure` is a plan-wide setting and belongs in `index.rhei.md`, which carries it for every task file (§FS-rhei-authoring.3.3) |
 | 2 | any other top-level key, or a key under `metadata` other than `tasks` | parse | the key at the depth it was written, and that a task file's frontmatter carries only `metadata.tasks.<id>` for the tasks it defines |
-| 3 | `metadata.tasks.<id>` for an id this file does not define | parse | the id, and both places the entry may go — the file that defines that task, or `index.rhei.md` |
+| 3 | a `metadata.tasks` key that does not stand for exactly one task this file defines: an id it does not define, or one id spelled twice | parse | the id, and for a foreign id both places the entry may go — the file that defines that task, or `index.rhei.md`; for a repeated id, that two spellings of it are one task |
 | 4 | malformed YAML inside the block | parse | the task file's own line |
 | 5 | the same key set for one task in both `index.rhei.md` and a task file | load | **both** files and the key, and that a task file's metadata and the index's entry for one task are disjoint by key, so the fix is to keep that key in one of them |
 | 6 | a frontmatter block in a `basin/` ticket file | load | the file, and `index.panta.md` as where basin ticket metadata lives (§FS-rhei-panta.2) |
@@ -245,7 +245,10 @@ down as well — `metadata.taks` is the same mistake as a stray top-level key an
 is named the same way, because a key under `metadata` that is not `tasks` would
 otherwise be the one thing still accepted and discarded. Row 3 is file-local by
 necessity — a parser reading one file does not know which file defines the id
-that entry names.
+that entry names — and it reads each key by the text the file spells rather
+than by the scalar that text resolves to, so `1.10` names task `1.10` and a key
+no id can be read out of at all, such as `true`, names no task rather than
+being stepped past (§FS-rhei-plan-language.1.4).
 
 Both classes fail the load, so `validate`, `render`, `next`, `run`,
 `transition`, `complete` and `reset` all refuse and report; a partial graph

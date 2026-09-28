@@ -415,12 +415,18 @@ fn defined_ids(tasks: &[Task]) -> Vec<String> {
     ids
 }
 
-/// A `metadata.tasks` key as a task id: the ids a numbered ticket authors are
-/// YAML numbers, and `3` names the same ticket as `"3"`.
+/// A `metadata.tasks` key as a task id, for a key whose authored text is no
+/// longer in hand: the ids a numbered ticket authors are YAML numbers, and `3`
+/// names the same ticket as `"3"`.
 ///
 /// The one rule for what a `metadata.tasks` key identifies, so the parser's
 /// check and the merge cannot come to disagree about it — a task with two keys
 /// in the merged map is a task whose entries silently replace one another.
+///
+/// A parsed number cannot always say how it was written, so this is a fallback
+/// rather than the rule: a task file's keys are re-read from their own text by
+/// [`normalize_task_metadata_ids`] before anything asks what they name, and
+/// what reaches here is `index.rhei.md`'s own keys, which the runtime writes.
 /// §FS-rhei-plan-language.1.4
 pub(crate) fn metadata_task_id(key: &serde_yaml::Value) -> Option<String> {
     match key {
@@ -428,6 +434,117 @@ pub(crate) fn metadata_task_id(key: &serde_yaml::Value) -> Option<String> {
         serde_yaml::Value::Number(number) => Some(number.to_string()),
         _ => None,
     }
+}
+
+/// A task file's `metadata.tasks` keys as the text the file spells them with,
+/// in the order the block writes them.
+///
+/// YAML resolves a plain scalar key before the mapping is built, and what it
+/// resolves to cannot always say how it was written: `1.10` and `1.1` are one
+/// `f64`, so an id recovered from the parsed number names task `1.1` whatever
+/// the author wrote, and `true:` resolves to a scalar no id can be read out of
+/// at all. Deserializing the same block with `String` keys asks the parser for
+/// each key's own text instead, which is exact for every scalar a key can be.
+///
+/// `None` where the block is not shaped like one carrying entries — a key that
+/// is not a scalar, a `metadata` that is not a mapping — and then the keys stay
+/// as they were read and the checks below name what is wrong with them.
+/// §FS-rhei-plan-language.1.4
+fn spelled_task_metadata_ids(lines: &[String]) -> Option<Vec<String>> {
+    #[derive(serde::Deserialize)]
+    struct Block {
+        metadata: Option<Section>,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct Section {
+        tasks: Option<SpelledIds>,
+    }
+
+    /// Every key of the `tasks` mapping, duplicates kept: two spellings of one
+    /// id are two keys here and one entry in the parsed mapping, and the count
+    /// is what says so.
+    struct SpelledIds(Vec<String>);
+
+    impl<'de> serde::Deserialize<'de> for SpelledIds {
+        fn deserialize<D: serde::Deserializer<'de>>(
+            deserializer: D,
+        ) -> std::result::Result<Self, D::Error> {
+            struct Keys;
+
+            impl<'de> serde::de::Visitor<'de> for Keys {
+                type Value = SpelledIds;
+
+                fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    f.write_str("a mapping of task id to that task's metadata")
+                }
+
+                fn visit_map<A: serde::de::MapAccess<'de>>(
+                    self,
+                    mut map: A,
+                ) -> std::result::Result<SpelledIds, A::Error> {
+                    let mut ids = Vec::new();
+                    while let Some(id) = map.next_key::<String>()? {
+                        map.next_value::<serde::de::IgnoredAny>()?;
+                        ids.push(id);
+                    }
+                    Ok(SpelledIds(ids))
+                }
+            }
+
+            deserializer.deserialize_map(Keys)
+        }
+    }
+
+    serde_yaml::from_str::<Block>(&lines.join("\n")).ok()?.metadata?.tasks.map(|ids| ids.0)
+}
+
+/// Re-key a task file's `metadata.tasks` entries under the ids the file spells,
+/// so the merge, the check below and the project qualification all read the
+/// task the author named rather than the one its scalar rounds to.
+///
+/// Returns the error of §FS-rhei-validate.4.4 row 3 where two of the file's own
+/// keys spell one id: one task with two entries is one entry silently
+/// discarded, which is the outcome that table exists to rule out. The re-keying
+/// still happens, because the load is refused either way and every later check
+/// reads better ids for it. §FS-rhei-plan-language.1.4
+fn normalize_task_metadata_ids(
+    metadata: &mut Metadata,
+    block: &LeadingFrontmatter,
+) -> Option<ParseError> {
+    let metadata_key = serde_yaml::Value::String("metadata".to_string());
+    let tasks_key = serde_yaml::Value::String("tasks".to_string());
+    let Some(serde_yaml::Value::Mapping(mut section)) = metadata.get(&metadata_key).cloned() else {
+        return None;
+    };
+    let Some(serde_yaml::Value::Mapping(entries)) = section.get(&tasks_key).cloned() else {
+        return None;
+    };
+    let spelled = spelled_task_metadata_ids(&block.lines)?;
+    if spelled.len() != entries.len() {
+        return None;
+    }
+
+    let mut error = None;
+    let mut renamed = Metadata::new();
+    for (id, (_, value)) in spelled.into_iter().zip(entries) {
+        let key = serde_yaml::Value::String(id.clone());
+        if renamed.contains_key(&key) && error.is_none() {
+            error = Some(ParseError::new(
+                format!(
+                    "`metadata.tasks` carries two entries for task `{id}` in this file. A key \
+                     names the task its own text spells, so two spellings of `{id}` are one task \
+                     rather than two: keep one entry for it."
+                ),
+                top_level_key_line(block, "metadata").or(Some(block.open_line)),
+            ));
+        }
+        renamed.insert(key, value);
+    }
+
+    section.insert(tasks_key, serde_yaml::Value::Mapping(renamed));
+    metadata.insert(metadata_key, serde_yaml::Value::Mapping(section));
+    error
 }
 
 /// A frontmatter key as a message names it: the key itself, without YAML's
@@ -526,9 +643,10 @@ fn check_task_metadata_block(
 
     let defined = defined_ids(tasks);
     for key in entries.keys() {
-        let Some(id) = metadata_task_id(key) else {
-            continue;
-        };
+        // A key no id can be read out of — `true:`, a mapping — names no task
+        // either, and stepping past it is how a block is accepted and then
+        // discarded. §FS-rhei-validate.4.4
+        let id = metadata_task_id(key).unwrap_or_else(|| metadata_key_name(key));
         if defined.iter().any(|defined| *defined == id) {
             continue;
         }
@@ -555,7 +673,7 @@ fn parse_task_file(
             return Err(basin_frontmatter_error(block));
         }
     }
-    let metadata = match &leading {
+    let mut metadata = match &leading {
         Some(block) => {
             Some(parse_frontmatter(&block.lines, block.start_line, "workspace task file")?)
         }
@@ -574,7 +692,10 @@ fn parse_task_file(
         }
     };
 
-    if let (Some(metadata), Some(block)) = (metadata.as_ref(), leading.as_ref()) {
+    if let (Some(metadata), Some(block)) = (metadata.as_mut(), leading.as_ref()) {
+        if let Some(error) = normalize_task_metadata_ids(metadata, block) {
+            return Err(error);
+        }
         if let Some(error) =
             check_task_metadata_block(metadata, block, Some(&tasks)).into_iter().next()
         {
@@ -600,7 +721,7 @@ fn parse_task_file_collect(
     }
 
     let mut errors = Vec::new();
-    let metadata = match &leading {
+    let mut metadata = match &leading {
         Some(block) => {
             match parse_frontmatter(&block.lines, block.start_line, "workspace task file") {
                 Ok(metadata) => Some(metadata),
@@ -624,7 +745,8 @@ fn parse_task_file_collect(
     errors.append(&mut body_errors);
     let tasks = maybe_rhei.map(|rhei| rhei.tasks);
 
-    if let (Some(metadata), Some(block)) = (metadata.as_ref(), leading.as_ref()) {
+    if let (Some(metadata), Some(block)) = (metadata.as_mut(), leading.as_ref()) {
+        errors.extend(normalize_task_metadata_ids(metadata, block));
         errors.extend(check_task_metadata_block(metadata, block, tasks.as_deref()));
     }
     (tasks.map(|tasks| WorkspaceTaskFile { tasks, metadata }), errors)

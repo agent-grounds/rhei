@@ -10,12 +10,15 @@
   task are merged and **disjoint by key** — the index may hold `priority` while
   the task's own file holds `context`, and both reach `{meta.<key>}`, callback
   task metadata and `rhei render`; the same key in both places is a validation
-  error naming both files and the key. Nothing new is written: `stateVisits`,
+  error naming both files and the key. A key in a task file names the task its
+  own text spells, so `1.2` and `"1.2"` are one task while `1.10` is task
+  `1.10` rather than the `1.1` its float form rounds to. Nothing new is written: `stateVisits`,
   `pollNextAttemptAt`, `providerLimits`, `budgetTicketId` and the supervision
   block still go to `index.rhei.md` whatever a task file carries, and `rhei
   reset` leaves an authored block byte-identical. What the block may not do is
   now refused by name instead of accepted and silently discarded: a top-level
-  key other than `metadata`, an entry for a task another file defines,
+  key other than `metadata`, an entry for a task another file defines, two of
+  one file's keys spelling one id,
   malformed YAML, the same key as the index, a key under `metadata` other than
   `tasks`, a block in a `basin/` ticket file (the basin's metadata document is
   the project manifest), and a block in a mounted block's task file, which

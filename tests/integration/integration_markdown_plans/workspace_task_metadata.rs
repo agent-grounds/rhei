@@ -371,3 +371,105 @@ fn a_key_under_metadata_other_than_tasks_is_refused() {
         "the refusal must name the key at the depth it was written; got:\n{reported}"
     );
 }
+
+/// 18 · A key names the task its own text spells, not the one the scalar it
+/// parses as rounds to: `1.10` is task `1.10`, whose index entry it merges
+/// with, and not the `1.1` that a parsed float would deliver it to — a sibling
+/// that exists whenever a parent has ten children.
+/// §FS-rhei-plan-language.1.4
+#[test]
+fn an_id_whose_float_form_rounds_names_the_task_it_spells() {
+    let mut body = String::from("### Task 1: parent\n**State:** pending\n\n");
+    for n in 1..=10 {
+        body.push_str(&format!("#### Task 1.{n}: child {n}\n**State:** pending\n\n"));
+    }
+    let (_dir, ws) = metadata_workspace(
+        "wtm-rounding-id",
+        "# Rhei: Workspace\n\n---\nstructure:\n  maxLevels: 2\nmetadata:\n  tasks:\n    \
+         \"1.10\":\n      stateVisits:\n        pending: 4\n---\n",
+        &[(
+            "01-first.md",
+            &format!("---\nmetadata:\n  tasks:\n    1.10:\n      context: oracle-labs\n---\n\n{body}"),
+        )],
+    );
+
+    let entries = loaded_task_entries(&ws);
+    assert_eq!(
+        entries.len(),
+        1,
+        "the file's `1.10` and the index's `\"1.10\"` are one task; got:\n{entries:?}"
+    );
+    let (id, entry) = &entries[0];
+    assert_eq!(id, "1.10", "the entry belongs to the task the key spells");
+    let entry = entry.as_mapping().expect("the merged entry is a mapping");
+    assert!(
+        entry.contains_key(YamlValue::String("context".into()))
+            && entry.contains_key(YamlValue::String("stateVisits".into())),
+        "and it carries both files' keys; got:\n{entry:?}"
+    );
+    assert!(
+        loaded_task_metadata(&ws, "1.1").is_none(),
+        "the sibling the float form rounds to must get nothing"
+    );
+}
+
+/// 19 · A key no id can be read out of names no task, so it is refused rather
+/// than stepped past and discarded — and where the file does define a task by
+/// that name, the entry is that task's. §FS-rhei-validate.4.4
+#[test]
+fn a_key_that_reads_as_no_id_is_refused_and_a_real_one_is_not() {
+    let block = "---\nmetadata:\n  tasks:\n    true:\n      context: oracle-labs\n---\n\n";
+    let (dir, ws) = metadata_workspace(
+        "wtm-unreadable-id",
+        "# Rhei: Workspace\n",
+        &[("01-first.md", &format!("{block}### Task first: first item\n**State:** pending\n"))],
+    );
+    let reported = validate_fails(&dir, &ws);
+    assert!(
+        reported.contains("`metadata.tasks.true`") && reported.contains("names no task"),
+        "the key must be named rather than passed over; got:\n{reported}"
+    );
+
+    let (_dir, ws) = metadata_workspace(
+        "wtm-unreadable-id-real",
+        "# Rhei: Workspace\n",
+        &[("01-first.md", &format!("{block}### Task true: an item\n**State:** pending\n"))],
+    );
+    let entry = loaded_task_metadata(&ws, "true").expect("the task named `true` has the entry");
+    assert_eq!(
+        entry.get(YamlValue::String("context".into())).and_then(YamlValue::as_str),
+        Some("oracle-labs"),
+        "a task really named `true` keeps its own entry"
+    );
+}
+
+/// 20 · One file spelling one id twice is one task written twice, so it is
+/// refused where it is written — naming that file and the id, rather than
+/// sending the reader to an `index.rhei.md` the entries never came from.
+/// §FS-rhei-validate.4.4
+#[test]
+fn one_file_spelling_one_id_twice_is_refused_naming_that_file() {
+    for second in ["context: b", "priority: high"] {
+        let (dir, ws) = metadata_workspace(
+            "wtm-one-id-twice",
+            "# Rhei: Workspace\n",
+            &[(
+                "01-first.md",
+                &format!(
+                    "---\nmetadata:\n  tasks:\n    3:\n      context: a\n    \"3\":\n      \
+                     {second}\n---\n\n### Task 3: three\n**State:** pending\n"
+                ),
+            )],
+        );
+
+        let reported = validate_fails(&dir, &ws);
+        assert!(
+            reported.contains("two entries for task `3`") && reported.contains("01-first.md"),
+            "the refusal must name the file that spells the id twice; got:\n{reported}"
+        );
+        assert!(
+            !reported.contains("index.rhei.md"),
+            "and must not send the reader to a file the entries never came from; got:\n{reported}"
+        );
+    }
+}

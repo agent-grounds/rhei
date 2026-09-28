@@ -745,28 +745,6 @@ None of the six built-in profiles declares `deny_read`; each therefore provides
 composition-only exclusion. A mode name, model, permission flag, or writable
 root never implies read denial.
 
-The `codex` adapter recognizes one provider refusal in addition to its normal
-process result. Recognition requires all of the following:
-
-- the resolved agent id is exactly `codex` and its resolved provider is exactly
-  `openai`;
-- the invocation exited non-zero and was neither timed out nor interrupted;
-- after stripping terminal-control decoration and trimming surrounding
-  whitespace from each captured stdout and stderr line, exactly one line is
-  `You've hit your session limit · resets <h>:<mm><am|pm> (<zone>)`, where
-  `<h>` is `1` through `12`, `<mm>` is two digits from `00` through `59`, the
-  meridiem is lowercase, and `<zone>` is an installed IANA time-zone name whose
-  local time is valid and unambiguous. Terminal decoration means ANSI escape
-  sequences; removing it must not otherwise rewrite the line.
-
-Matching is case-sensitive and does not search inside prose. An exit of `0`, a
-different transport, absent or malformed reset information, an absent or
-invalid zone, a nonexistent or ambiguous local time, or a second matching line
-is an ordinary process result. Timeout and interruption classification happen
-before this recognition, so their output can never turn them into a provider
-limit. The recognized result is the provider-limited ending specified in
-§FS-rhei-run.3.3.
-
 ### 2.1. Custom Agents
 
 When the built-in profiles don't fit, declare a new agent in the `agents`
@@ -857,6 +835,47 @@ An agent entry may declare zero, one, or many modes. When no modes are
 declared, no mode flags are appended and `agent_mode` must not be set for
 states that use this agent. See
 [Mode Resolution Order](#141-mode-resolution-order) for how a mode is selected.
+
+### 2.3. Recognized Provider Refusals
+
+Rhei recognizes one provider refusal in addition to a normal process result.
+Recognition requires all of the following:
+
+- the resolved provider is one of `openai` or `anthropic`, matched exactly and
+  case-sensitively. **The resolved agent registry id is not tested**;
+- the invocation exited non-zero and was neither timed out nor interrupted;
+- after stripping terminal-control decoration and trimming surrounding
+  whitespace from each captured stdout and stderr line, exactly one line is
+  `You've hit your session limit · resets <h>:<mm><am|pm> (<zone>)`, where
+  `<h>` is `1` through `12`, `<mm>` is two digits from `00` through `59`, the
+  meridiem is lowercase, and `<zone>` is an installed IANA time-zone name whose
+  local time is valid and unambiguous. Terminal decoration means ANSI escape
+  sequences; removing it must not otherwise rewrite the line.
+
+The match does not search inside prose. An exit of `0`, absent or malformed
+reset information, an absent or invalid zone, a nonexistent or ambiguous local
+time, or a second matching line is an ordinary process result. Timeout and
+interruption are classified first, so their output can never turn them into a
+provider limit (§FS-rhei-agents.7.3, §FS-rhei-run.3.2). The recognized result is
+the provider-limited ending of §FS-rhei-run.3.3, whose durable record carries
+the resolved agent registry id alongside the provider.
+
+**The provider set is closed**: `openai` and `anthropic` are the whole of it,
+and a provider joins it by a change to this specification rather than to a
+project's configuration. The set is what carries the claim being made — that
+this line names a reset instant worth sleeping on. A registry id cannot carry
+that claim, because an entry may be named anything and wrap anything
+(§FS-rhei-agents.2.1); an entry named `cld1` resolving `anthropic` is therefore
+recognized, and one named `codex` resolving `acme` is not.
+
+Two cases stay ordinary process results whatever the invocation printed. A
+resolved provider **outside the set**, including one differing only in case: a
+profile written `"provider": "Anthropic"` does not park. And a state that
+resolves an agent but **no provider at all** — a bare `agent:` with no model
+profile and no `<provider>` in its target (§FS-rhei-agents.1.4). Recognition
+keys on the resolved provider, so there is nothing to match and no execution
+identity to key a wait on, and the invocation is routed as the agent failure it
+appears to be. Program states resolve no agent and never park.
 
 ## 3. Prompt Composition
 

@@ -711,8 +711,8 @@ that goes away *after* the run has ended finds the report already on disk
 
 ### 3.3. Provider-Limit Parking
 
-A recognized Codex/OpenAI provider limit (§FS-rhei-agents.2) parks the
-invocation instead of routing its non-zero exit as an agent failure. The task
+A recognized provider limit (§FS-rhei-agents.2.3) parks the invocation
+instead of routing its non-zero exit as an agent failure. The task
 keeps its authored state, no transition or callback fires, no snapshot is
 emitted, and the invocation does not spend the state visit's `attempts:`
 budget. Its log, spawn record, and any reported usage remain available.
@@ -745,10 +745,22 @@ metadata:
           nextAttemptAt: "2026-09-16T20:21:00Z"
 ```
 
+The `agent` field is the resolved agent registry id, recorded verbatim. It says
+which invocation observed the limit and it keys the suppression below; it is
+not a recognition condition, and a record naming any other entry reads exactly
+the same way (§FS-rhei-agents.2.3).
+
 The execution identity is the pair of resolved agent registry id and resolved
-provider. Model, mode, and task are deliberately not part of it: the supported
-signal describes the Codex/OpenAI provider session, while the current
-transport exposes no reliable account identifier. Only the reporting task's
+provider. Model, mode, and task are deliberately not part of it: the signal
+describes a provider session, not one model and not one ticket. The agent
+registry id stays in because no transport exposes an account identifier, and
+the registry id is the narrowest thing Rhei can observe that tracks one — a
+site running two accounts against one provider runs them under two registry
+entries, with different binaries, configuration homes, and credentials. Keying
+on the pair therefore under-suppresses rather than over-suppresses: two entries
+on one account each spend at most one refusal per limit window learning the
+same limit. That is the better of the two errors, because over-suppression
+parks work the provider would have accepted. Only the reporting task's
 record is persisted, but every active record suppresses not-yet-started work
 with that identity. Already-running work and work with any other identity
 continue. If several active records share an identity, suppression lasts until

@@ -144,7 +144,7 @@ transitions:
 
 /// Eight simultaneous reset-bearing Codex refusals remain parked, auditable,
 /// uncharged, and resumable instead of ending the run as eight failures.
-/// §FS-rhei-agents.2 §FS-rhei-agents.3.2.3 §FS-rhei-agents.5.2.2
+/// §FS-rhei-agents.2.3 §FS-rhei-agents.3.2.3 §FS-rhei-agents.5.2.2
 /// §FS-rhei-agents.8.4 §FS-rhei-run.3.3 §FS-rhei-run.5.1
 #[test]
 fn eight_parallel_codex_limits_park_and_resume_without_spending_attempts() {

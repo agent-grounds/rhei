@@ -111,6 +111,7 @@ mod provider_limit_cleanup_tests;
 mod provider_limit_compatibility_tests;
 mod provider_limit_parking_tests;
 mod provider_limit_poll_tests;
+mod provider_limit_recognition_tests;
 mod provider_limit_scheduling_tests;
 mod provider_limit_support;
 mod registry_location_tests;

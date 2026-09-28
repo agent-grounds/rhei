@@ -5,8 +5,10 @@ enum AgentStdinFormat {
     ClaudeCodeStreamJson,
 }
 
+// §FS-rhei-agents.1.1.2: the transport follows the resolved family, so a
+// wrapped Claude Code holding stdin open speaks the same dialect as the built-in.
 fn agent_stdin_format(resolved: &ResolvedAgent) -> AgentStdinFormat {
-    if resolved.agent.id() == "claude-code" && resolved.profile.intervene_stdin {
+    if resolved.family() == "claude-code" && resolved.profile.intervene_stdin {
         AgentStdinFormat::ClaudeCodeStreamJson
     } else {
         AgentStdinFormat::PlainLine

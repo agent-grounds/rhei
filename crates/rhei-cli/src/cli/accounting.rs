@@ -169,8 +169,9 @@ fn record_agent_accounting_attempt(
     invocation: AgentAccountingInvocation<'_>,
     identity: &AccountingAttemptIdentity,
 ) -> MietteResult<Option<rhei_tui::UsageSummary>> {
-    // §FS-rhei-cost-accounting.3.2: Built-ins must not silently omit records.
-    if !agent_has_accounting_extractor(invocation.resolved.agent.id()) {
+    // §FS-rhei-cost-accounting.3.2: the claude-code, codex and pi families
+    // must not silently omit records, an id declaring one of them included.
+    if !agent_has_accounting_extractor(invocation.resolved.family()) {
         return Ok(None);
     }
 
@@ -182,7 +183,7 @@ fn record_agent_accounting_attempt(
     let extraction = extract_usage_with_diagnostics(
         invocation.usage_capture_path,
         invocation.log_path,
-        invocation.resolved.agent.id(),
+        invocation.resolved.family(),
     );
     let (tokens, extraction_status) = match extraction.status {
         ExtractedUsageStatus::Measured(usage) => (tokens_from_usage(usage), "measured"),
@@ -215,6 +216,9 @@ fn record_agent_accounting_attempt(
         visit: invocation.visit,
         target_slug,
         agent: invocation.resolved.agent.id().to_string(),
+        // §FS-rhei-cost-accounting.3: provenance beside `agent`, never in
+        // place of it — `agent` is always the profile's own id.
+        agent_family: Some(invocation.resolved.family().to_string()),
         provider,
         model,
         started_at: format_iso8601_utc(invocation.started_at),
@@ -531,13 +535,15 @@ fn dimension_summary(dimension: &AccountingTokenDimension) -> rhei_tui::Dimensio
     rhei_tui::DimensionSummary { value: None, status, measured_count: 0, missing_count: 1 }
 }
 
-fn agent_has_accounting_extractor(agent: &str) -> bool {
-    // §FS-rhei-cost-accounting.4: v1 supports claude-code, codex, and pi.
-    agent_usage_extractor(agent).is_some()
+fn agent_has_accounting_extractor(family: &str) -> bool {
+    // §FS-rhei-cost-accounting.4: v1 supports the claude-code, codex, and pi families.
+    agent_usage_extractor(family).is_some()
 }
 
-fn agent_usage_extractor(agent: &str) -> Option<AgentUsageExtractor> {
-    match agent {
+/// The extractor a resolved family binds, which for a built-in profile is the
+/// one its own id has always bound. §FS-rhei-cost-accounting.4
+fn agent_usage_extractor(family: &str) -> Option<AgentUsageExtractor> {
+    match family {
         "codex" => Some(AgentUsageExtractor::Codex),
         "pi" => Some(AgentUsageExtractor::Pi),
         "claude-code" => Some(AgentUsageExtractor::Claude),
@@ -551,7 +557,7 @@ fn accounting_capture_path_for_spawn(
     state_name: &str,
     resolved: &ResolvedAgent,
 ) -> Option<PathBuf> {
-    if !agent_has_accounting_extractor(resolved.agent.id()) {
+    if !agent_has_accounting_extractor(resolved.family()) {
         return None;
     }
     let target = resolved_agent_target_slug(resolved).unwrap_or_else(|| resolved.agent.id().to_string());
@@ -617,10 +623,10 @@ fn usage_capture_for_attempt(
     slot: rhei_tui::Slot,
     price_book: &PriceBook,
 ) -> Option<AgentUsageCapture> {
-    let extractor = agent_usage_extractor(resolved.agent.id())?;
+    let extractor = agent_usage_extractor(resolved.family())?;
     Some(AgentUsageCapture {
         extractor,
-        replace_usage_capture: resolved.agent.id() == "claude-code"
+        replace_usage_capture: resolved.family() == "claude-code"
             && agent_stdin_format(resolved) == AgentStdinFormat::ClaudeCodeStreamJson,
         path: capture_path?.to_path_buf(),
         // §FS-rhei-cost-accounting.3.7: streamed usage keeps the identity
@@ -664,7 +670,7 @@ fn usage_capture_for_spawn(
 }
 
 fn configure_agent_accounting_args(cmd: &mut std::process::Command, resolved: &ResolvedAgent) {
-    match agent_usage_extractor(resolved.agent.id()) {
+    match agent_usage_extractor(resolved.family()) {
         // §FS-rhei-cost-accounting.4: stream-json, so the log carries every event a report renders.
         Some(AgentUsageExtractor::Claude)
             if agent_stdin_format(resolved) != AgentStdinFormat::ClaudeCodeStreamJson =>
@@ -1148,22 +1154,22 @@ fn append_extractor_failure_event_value(
 fn extract_usage(
     capture_path: Option<&Path>,
     log_path: Option<&Path>,
-    agent: &str,
+    family: &str,
 ) -> ExtractedUsageStatus {
-    extract_usage_with_diagnostics(capture_path, log_path, agent).status
+    extract_usage_with_diagnostics(capture_path, log_path, family).status
 }
 
 fn extract_usage_with_diagnostics(
     capture_path: Option<&Path>,
     log_path: Option<&Path>,
-    agent: &str,
+    family: &str,
 ) -> ExtractedUsageResult {
     let captured = extract_usage_from_capture_with_diagnostics(capture_path);
     match &captured.status {
         ExtractedUsageStatus::NoUsageEmitted => {
             // §FS-rhei-cost-accounting.4: Claude usage comes only from its
-            // typed result envelope, never from human-readable log text.
-            if agent == "claude-code" {
+            // typed result envelope, never from log text — for the whole family.
+            if family == "claude-code" {
                 captured
             } else {
                 ExtractedUsageResult {

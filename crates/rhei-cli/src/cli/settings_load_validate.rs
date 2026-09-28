@@ -229,21 +229,22 @@ fn load_merged_roster(
         ..Default::default()
     };
     for (id, profile) in global.agents {
-        agent_fields.insert(
-            id.clone(),
-            raw_object_keys(json_child(json_child(global_raw, "agents"), &id)),
-        );
+        let raw = json_child(json_child(global_raw, "agents"), &id);
+        warn_unknown_agent_profile_keys(&id, raw);
+        agent_fields.insert(id.clone(), raw_object_keys(raw));
         provenance.agents.insert(id.clone(), RosterOrigin::Global);
         agents.insert(id, profile);
     }
     for (id, profile) in project.agents {
-        agent_fields.insert(
-            id.clone(),
-            raw_object_keys(json_child(json_child(project_raw, "agents"), &id)),
-        );
+        let raw = json_child(json_child(project_raw, "agents"), &id);
+        warn_unknown_agent_profile_keys(&id, raw);
+        agent_fields.insert(id.clone(), raw_object_keys(raw));
         provenance.agents.insert(id.clone(), RosterOrigin::Project);
         agents.insert(id, profile);
     }
+    // One fallback, once, so everything downstream receives a complete profile
+    // and no use site resolves a family a second time. §FS-rhei-agents.1.3
+    apply_agent_family_inheritance(&mut agents, &mut agent_fields);
     validate_agent_effort_profiles(&agents)?;
 
     // Registries merge by id: start with global, override by project.

@@ -23,6 +23,15 @@ struct AccountingInvocationRecord {
     #[serde(skip_serializing_if = "Option::is_none")]
     target_slug: Option<String>,
     agent: String,
+    /// The built-in family the profile that ran belongs to.
+    ///
+    /// Provenance beside `agent` and never in place of it: `agent` is always
+    /// the profile's own id. Optional, and the schema string does not move
+    /// with it — a record written before the field existed still parses, and
+    /// no reader inside Rhei consumes it.
+    // §FS-rhei-cost-accounting.3
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    agent_family: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     provider: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

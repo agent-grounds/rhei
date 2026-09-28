@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- Let an `agents.<id>` profile name the built-in family it belongs to. A wrapper
+  around a coding agent — a second account, a proxy, a `nix run`, a sandbox — is
+  an entry under an id of its own, and every capability rhei selects per
+  built-in agent used to be keyed on that id, so a wrapped Claude Code ran and
+  was never measured: no `runtime/accounting/`, nothing for `rhei summary` to
+  count, and a session log nothing had asked to structure. Write
+  `"family": "claude-code"` and the profile is that built-in with its own fields
+  laid over it: it inherits every field it does not write, and rhei reads the
+  resolved family for the usage extractor and the launch arguments that
+  extractor requires, for whether a record is written at all, for the
+  stream-json stdin transport, and for which session-report stream the log is.
+  The record gains optional `agent_family` beside `agent`, which is still always
+  the profile's own id, and the agent log gains a `family:` line when the two
+  differ. `rhei roster` reports such a profile resolved; a family that is not a
+  built-in is a settings error naming the six that are, and a key that is not a
+  field is now a warning rather than silence. A profile that declares no family
+  is unchanged in every respect. (PR #335)
+
 - Park a session limit for any provider Rhei recognizes, not only
   `codex`/`openai`. Recognition now keys on the resolved provider in a closed
   set — `openai` and `anthropic` — and the agent entry's name no longer decides

@@ -27,6 +27,7 @@
     "visit": { "type": "integer", "minimum": 0 },
     "target_slug": { "type": "string" },
     "agent": { "type": "string" },
+    "agent_family": { "type": "string" },
     "provider": { "type": "string" },
     "model": { "type": "string" },
     "started_at": { "type": "string" },

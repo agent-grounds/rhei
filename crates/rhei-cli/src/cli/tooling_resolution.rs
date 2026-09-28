@@ -276,6 +276,15 @@ struct ResolvedAgent {
 }
 
 impl ResolvedAgent {
+    /// The built-in this invocation behaves as: the profile's declared
+    /// `family`, or its own id when it declares none, so a built-in agent is
+    /// its own family. Every behavioral branch that used to read the id reads
+    /// this; everything that *names* the agent keeps reading `agent`.
+    /// §FS-rhei-agents.1.1.2
+    fn family(&self) -> &str {
+        resolved_agent_family(&self.profile, self.agent.id())
+    }
+
     /// The selected named profile, kept distinct from a literal target. For a
     /// named model over a target, `model` is the profile id while the target
     /// carries the final concrete model. §FS-rhei-agents.1.4

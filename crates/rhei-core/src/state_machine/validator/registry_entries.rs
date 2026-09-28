@@ -43,7 +43,16 @@ impl From<&str> for AgentConfig {
 /// value.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, Serialize)]
 pub struct CustomAgentProfile {
-    /// Base command and fixed arguments.
+    /// The id of the built-in agent this profile belongs to. Every field the
+    /// entry does not write is taken from that built-in, and every behavior
+    /// Rhei selects per built-in agent is selected on the resolved family —
+    /// the declared value, or the profile's own id when it declares none.
+    // §FS-rhei-agents.1.1.2: A profile may name the built-in family it belongs to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub family: Option<String>,
+    /// Base command and fixed arguments. Required unless `family` supplies it.
+    // §FS-rhei-agents.1.1.2: `command` is required only when `family` is absent.
+    #[serde(default)]
     pub command: Vec<String>,
     /// Flag to pass the prompt (e.g., `"--prompt"`, `"-p"`). Omit if using stdin.
     #[serde(default)]

@@ -109,6 +109,17 @@ fn validate_intrinsic_settings(settings: &RheiSettings) -> Vec<String> {
     // `mcp_flag` and `mcp_config_flag` are mutually exclusive per
     // §FS-rhei-agents.1.1.2: Validate agent transport profile settings.
     for (id, profile) in &settings.agents {
+        // A family that is not a built-in inherits nothing, so the profile the
+        // operator meant to write does not exist. §FS-rhei-agents.1.1.2
+        if let Some(family) = profile.family.as_deref() {
+            if !BUILT_IN_AGENT_FAMILIES.contains(&family) {
+                errors.push(format!(
+                    "agent '{id}' declares family '{family}', which is not a built-in agent; \
+                     known families are {}",
+                    known_agent_families()
+                ));
+            }
+        }
         if profile.command.is_empty() {
             errors.push(format!(
                 "agent '{}' has an empty 'command'; the `command` field is required",

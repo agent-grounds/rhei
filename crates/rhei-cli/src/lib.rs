@@ -101,6 +101,7 @@ include!("cli/control_client.rs");
 include!("cli/run_options.rs");
 include!("cli/run_frontend.rs");
 include!("cli/settings_types.rs");
+include!("cli/agent_family.rs");
 include!("cli/settings_load_validate.rs");
 include!("cli/budget_bounds.rs");
 include!("cli/budget_runtime.rs");
@@ -252,6 +253,7 @@ mod tests {
     include!("cli/tests_cli_target_overrides.rs");
     include!("cli/tests_provider_limits.rs");
     include!("cli/tests_agent_prompt_transport.rs");
+    include!("cli/tests_agent_family.rs");
     include!("cli/tests_spawn_records.rs");
     include!("cli/tests_session_reports.rs");
     include!("cli/tests_session_report_streams.rs");

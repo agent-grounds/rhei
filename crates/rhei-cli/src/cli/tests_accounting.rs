@@ -8,6 +8,8 @@ fn accounting_test_record() -> AccountingInvocationRecord {
         visit: 1,
         target_slug: None,
         agent: "codex".to_string(),
+        // A record written before the field existed. §FS-rhei-cost-accounting.3
+        agent_family: None,
         provider: Some("openai".to_string()),
         model: Some("gpt-test".to_string()),
         started_at: "2026-05-20T10:00:00Z".to_string(),

@@ -195,4 +195,38 @@ mod agent_prompt_transport_tests {
             "the stream-json command line gains the separator and nothing else: {argv:?}"
         );
     }
+
+    /// The stream-json stdin transport follows the resolved family, so a
+    /// wrapped Claude Code that holds stdin open is handed intervention
+    /// messages in the dialect it is already speaking on the way out. There is
+    /// no end-to-end case for this on purpose: an `intervene_stdin` profile
+    /// holds the child's stdin open, and the suite's fixture prelude blocks on
+    /// `sys.stdin.read()` until EOF. §FS-rhei-agents.1.1.2
+    #[test]
+    fn a_wrapped_claude_code_gets_the_stream_json_stdin_transport() {
+        let mut wrapped = builtin("claude-code");
+        wrapped.family = Some("claude-code".to_string());
+        wrapped.command = vec!["wrapper".to_string()];
+        wrapped.intervene_stdin = true;
+        assert_eq!(
+            agent_stdin_format(&resolved(wrapped.clone(), "cld", None)),
+            AgentStdinFormat::ClaudeCodeStreamJson,
+            "the family decides the transport, not the id the operator chose"
+        );
+
+        // The compatibility floor on both sides: no family is still the id,
+        // and a family that is not Claude Code is still a plain line.
+        let mut bare = wrapped.clone();
+        bare.family = None;
+        assert_eq!(
+            agent_stdin_format(&resolved(bare, "cld", None)),
+            AgentStdinFormat::PlainLine
+        );
+        let mut codex = wrapped;
+        codex.family = Some("codex".to_string());
+        assert_eq!(
+            agent_stdin_format(&resolved(codex, "cld", None)),
+            AgentStdinFormat::PlainLine
+        );
+    }
 }

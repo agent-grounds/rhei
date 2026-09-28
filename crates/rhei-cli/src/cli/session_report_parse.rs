@@ -254,8 +254,13 @@ fn detect_stream(framed: &FramedLog<'_>) -> StreamDetection {
     if json_objects == 0 || json_objects.saturating_mul(2) <= nonblank {
         return StreamDetection::PlainOutput;
     }
-    let agent = framed.header.iter().find(|(key, _)| key == "agent").map(|(_, v)| v.as_str());
-    match agent {
+    // A log is read without the registry that produced it, so `family:` is
+    // what carries the reading; `agent:` is the fallback, which is every log
+    // written before families existed. §FS-rhei-session-reports.6.2
+    let header = |key: &str| {
+        framed.header.iter().find(|(name, _)| name == key).map(|(_, value)| value.as_str())
+    };
+    match header("family").or_else(|| header("agent")) {
         Some("pi") => StreamDetection::HeaderFallback(SessionStream::Pi),
         Some("claude-code") => StreamDetection::HeaderFallback(SessionStream::Claude),
         Some("codex") => StreamDetection::HeaderFallback(SessionStream::Codex),

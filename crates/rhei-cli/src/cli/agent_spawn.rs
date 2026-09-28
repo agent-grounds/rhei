@@ -224,6 +224,11 @@ fn spawn_and_wait_agent(
     with_agent_log(&log_file, |f| {
         writeln!(f, "=== rhei agent log v1 ===")?;
         writeln!(f, "agent: {}", resolved.agent.id())?;
+        // §FS-rhei-agents.8.2: written only when it differs, so its absence
+        // means the profile declared none and every older log reads as it did.
+        if resolved.family() != resolved.agent.id() {
+            writeln!(f, "family: {}", resolved.family())?;
+        }
         if let Some(mode) = &resolved.mode {
             writeln!(f, "mode: {mode}")?;
         }

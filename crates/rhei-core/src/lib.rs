@@ -16,6 +16,10 @@ pub mod blocks;
 pub mod budget;
 pub mod callback;
 pub mod lexer;
+/// The keys rhei writes into a task's metadata, and the one conversion every
+/// JSON surface that publishes frontmatter uses.
+/// §FS-rhei-transitions.2.5 §FS-rhei-render.3.1.1
+pub mod metadata;
 /// One rendering of an amount of money, and one reading of one.
 /// §FS-rhei-cost-accounting.5
 pub mod money;

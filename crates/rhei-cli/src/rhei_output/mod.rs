@@ -37,8 +37,14 @@ pub use json::{
 pub use progress::{to_progress_report, ProgressReportOutput};
 
 /// Plan output generator trait for structured outputs.
+///
+/// Fallible because frontmatter is YAML and this output is JSON: a value with no
+/// JSON image is named rather than dropped. §FS-rhei-render.3.1.1
 pub trait PlanOutputGenerator {
-    fn generate_rhei(&self, rhei: &rhei_core::ast::Rhei) -> serde_json::Value;
+    fn generate_rhei(
+        &self,
+        rhei: &rhei_core::ast::Rhei,
+    ) -> Result<serde_json::Value, Vec<rhei_core::metadata::UnrepresentableValue>>;
 }
 
 #[cfg(test)]

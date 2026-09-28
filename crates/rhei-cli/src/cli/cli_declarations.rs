@@ -29,6 +29,9 @@ use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watche
 use regex::Regex;
 use rhei_core::ast::{Metadata, TaskId};
 use rhei_core::callback::{CallbackContext, CallbackExecutor, ShellCallbackExecutor};
+use rhei_core::metadata::{
+    author_task_metadata, frontmatter_to_json, keys_cleared_by_reset, UnrepresentableValue,
+};
 use rhei_core::workspace;
 use rhei_validator::{
     parse_execution_target, AgentConfig, CustomAgentProfile, ExecutionTarget, McpServerProfile,

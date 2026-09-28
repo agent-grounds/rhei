@@ -213,7 +213,7 @@ mod provider_limits {
             &limit("2026-09-16T20:00:00Z"),
         );
         assert_eq!(effective.next_attempt_at, "2026-09-16T20:21:00Z");
-        let cleared = clear_runtime_provider_limits(Some(&metadata)).unwrap();
+        let cleared = clear_runtime_task_metadata(Some(&metadata)).unwrap();
         assert!(provider_limit_for_task_state(Some(&cleared), &task, "working").is_none());
     }
 

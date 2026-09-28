@@ -88,7 +88,7 @@ fn valid_plan_parses_validates_and_renders_across_crates() {
     assert_eq!(rhei.tasks[1].id, TaskId::number(2));
     assert_eq!(rhei.tasks[2].prior.len(), 2);
 
-    let json = to_json_value(&rhei);
+    let json = to_json_value(&rhei).expect("every frontmatter value has a JSON image");
     assert_eq!(json["title"].as_str(), Some("Release Automation Rollout"));
     assert_eq!(json["tasks"].as_array().map(Vec::len), Some(3));
 

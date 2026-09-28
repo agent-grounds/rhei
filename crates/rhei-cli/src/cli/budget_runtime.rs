@@ -13,11 +13,11 @@ use rhei_core::budget::{Account, AdmissionRequest, Arm, Audit, BudgetError, Jour
 
 /// Where a ticket's budget identity is persisted.
 ///
-/// `rhei reset` deletes `stateVisits`, `providerLimits` and the supervision
-/// block by name; this key is deliberately not in that list, because removing
-/// it would hand the ticket a fresh travel history.
-/// §FS-rhei-reset.2 §FS-rhei-budgets.4.1
-const BUDGET_TICKET_KEY: &str = "budgetTicketId";
+/// Which of rhei's own keys `rhei reset` deletes is the register's own column
+/// (§FS-rhei-transitions.2.5); this key is deliberately not among them, because
+/// removing it would hand the ticket a fresh travel history.
+/// §FS-rhei-reset.2 §FS-rhei-budgets.5.2
+const BUDGET_TICKET_KEY: &str = rhei_core::metadata::BUDGET_TICKET_ID_KEY;
 
 /// The ancestry token a nested `rhei run` inherits from the invocation that
 /// started it. §FS-rhei-budgets.7

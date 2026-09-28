@@ -24,6 +24,7 @@ fn render_command(
         .map(|resolved| terminal_ticket_ids(&rhei, &resolved.validator_set()))
         .unwrap_or_default();
     let rendered = render_rhei(
+        input,
         &rhei,
         terminal_ids,
         loaded.is_panta_project(),
@@ -33,8 +34,7 @@ fn render_command(
         no_color,
         no_metadata,
         no_content,
-    )
-    .map_err(|err| miette!(help = internal_error_help(), "{err}"))?;
+    )?;
     println!("{rendered}");
     Ok(())
 }
@@ -113,8 +113,13 @@ fn narrow_rhei_to_scope(
 }
 
 /// Render a parsed rhei into the requested output representation.
+///
+/// Fallible only on the JSON format, and only because frontmatter is YAML: a
+/// value JSON has no image for is named against the plan rather than dropped
+/// from the document. §FS-rhei-render.3.1.1
 #[allow(clippy::too_many_arguments)]
 fn render_rhei(
+    input: &Path,
     rhei: &rhei_core::ast::Rhei,
     terminal_ids: BTreeSet<String>,
     is_project: bool,
@@ -124,15 +129,19 @@ fn render_rhei(
     no_color: bool,
     no_metadata: bool,
     no_content: bool,
-) -> Result<String> {
+) -> MietteResult<String> {
     match format {
         RenderFormat::Json => {
-            if pretty {
-                Ok(rhei_output::to_json_string_pretty_with_rheis(rhei, rhei_machines))
+            let value = rhei_output::to_json_value_with_rheis(rhei, rhei_machines)
+                .map_err(|found| unrepresentable_frontmatter_error(input, &found))?;
+            let rendered = if pretty {
+                serde_json::to_string_pretty(&value)
             } else {
-                let value = rhei_output::to_json_value_with_rheis(rhei, rhei_machines);
-                serde_json::to_string(&value).context("failed to serialize JSON output")
-            }
+                serde_json::to_string(&value)
+            };
+            rendered.map_err(|err| {
+                miette!(help = internal_error_help(), "failed to serialize JSON output: {err}")
+            })
         }
         RenderFormat::Github => Ok(rhei_output::GithubIssuesOutput {
             include_content: !no_content,

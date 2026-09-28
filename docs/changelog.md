@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Carry each task's authored frontmatter metadata on `rhei list --json`, so a
+  caller reads one custom field off the query surface instead of re-deriving
+  rhei's id keying. The `metadata` object is the task's `metadata.tasks.<id>`
+  map, keyed by the qualified id the listing prints and spelled exactly as the
+  author wrote it, and it is omitted rather than empty where there is nothing to
+  publish. What rhei writes into the same map stays out of it: the keys rhei
+  writes are now named once in a register the specification carries, which is
+  also what `rhei reset` reads to decide what it deletes. `rhei render --format
+  json`'s top-level `frontmatter` key is documented for the first time — the
+  whole parsed document, deliberately unfiltered — and a YAML value JSON cannot
+  hold is now named on both surfaces, every one of them in one run, where a
+  non-scalar key used to drop the entire document and a non-finite float used to
+  become `null`. (PR #330)
+
 ## 2. [0.5.1] - 2026-09-28
 
 - Let an `agents.<id>` profile name the built-in family it belongs to. A wrapper

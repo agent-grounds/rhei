@@ -24,6 +24,31 @@ fn yaml_value_to_u64(value: &YamlValue) -> Option<u64> {
     }
 }
 
+/// Name every frontmatter value JSON has no image for, in one report.
+///
+/// Both JSON surfaces raise it from the same conversion, so a plan that fails on
+/// `render --format json` fails identically on `list --json`: the check is over
+/// the document, not over the rows a query asked for.
+// §FS-rhei-render.3.1.1 §FS-rhei-errors.1.1
+fn unrepresentable_frontmatter_error(input: &Path, found: &[UnrepresentableValue]) -> Report {
+    let mut message = format!(
+        "frontmatter of '{}' holds {} value{} JSON cannot represent",
+        input.display(),
+        found.len(),
+        if found.len() == 1 { "" } else { "s" }
+    );
+    for value in found {
+        message.push_str("\n  ");
+        message.push_str(&value.describe());
+    }
+    miette!(
+        help = "edit the plan's frontmatter: give every mapping key a scalar name, and replace \
+                each non-finite float with a finite number — or quote it ('.inf') to store it as \
+                text.",
+        "{message}"
+    )
+}
+
 fn task_metadata_map<'a>(
     metadata: Option<&'a Metadata>,
     task_id: &TaskId,

@@ -150,6 +150,25 @@ fn list_command(
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
     let machines = resolved.validator_set();
 
+    // The `metadata` field's source, converted once for the whole document by
+    // the conversion `render --format json` uses, so neither a stored value nor
+    // a value JSON cannot hold can read differently on the two surfaces.
+
+    // A fault in the plan is not a fault in the query, so it is reported whether
+    // or not the filters kept the ticket that holds it.
+    // §FS-rhei-list.4.2 §FS-rhei-render.3.1.1
+    let frontmatter = if as_json {
+        loaded
+            .rhei
+            .metadata
+            .as_ref()
+            .map(frontmatter_to_json)
+            .transpose()
+            .map_err(|found| unrepresentable_frontmatter_error(input, &found))?
+    } else {
+        None
+    };
+
     // Flatten the task tree into (task, parent_id) pairs, preserving source order.
     let mut flat: Vec<(&rhei_core::ast::Task, Option<TaskId>)> = Vec::new();
     fn walk<'a>(
@@ -381,6 +400,15 @@ fn list_command(
                 // §FS-rhei-list.4.2
                 if let Some(label) = task_waiting_on_person(task, &machines) {
                     entry["waiting_on"] = serde_json::Value::String(label.to_string());
+                }
+                // The author's layer of the same map, under the id printed
+                // above: the keys rhei writes are held back, and a map holding
+                // only those emits no field at all. §FS-rhei-list.4.2
+                if let Some(author) = frontmatter
+                    .as_ref()
+                    .and_then(|document| author_task_metadata(document, &task.id.to_string()))
+                {
+                    entry["metadata"] = author;
                 }
                 entry
             })

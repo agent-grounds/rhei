@@ -12,7 +12,7 @@ fn json_output_minimal_smoke() {
 "#;
 
     let rhei = parse(input).expect("parse ok");
-    let v = to_json_value(&rhei);
+    let v = to_json_value(&rhei).expect("every frontmatter value has a JSON image");
 
     assert_eq!(v["title"].as_str().unwrap(), "Minimal");
     assert!(v["content_sections"].is_array());
@@ -49,7 +49,7 @@ Do B line
 "#;
 
     let rhei = parse(input).expect("parse ok");
-    let v = to_json_value(&rhei);
+    let v = to_json_value(&rhei).expect("every frontmatter value has a JSON image");
 
     let tasks = v["tasks"].as_array().unwrap();
 
@@ -84,7 +84,7 @@ fn json_output_omits_assignee_when_absent() {
 "#;
 
     let rhei = parse(input).expect("parse ok");
-    let v = to_json_value(&rhei);
+    let v = to_json_value(&rhei).expect("every frontmatter value has a JSON image");
     let tasks = v["tasks"].as_array().unwrap();
     assert!(tasks[0].as_object().unwrap().get("assignee").is_none());
 }
@@ -101,7 +101,7 @@ fn json_output_includes_assignee_when_present() {
 "#;
 
     let rhei = parse(input).expect("parse ok");
-    let v = to_json_value(&rhei);
+    let v = to_json_value(&rhei).expect("every frontmatter value has a JSON image");
     let tasks = v["tasks"].as_array().unwrap();
     assert_eq!(tasks[0]["assignee"].as_str(), Some("alice"));
 }
@@ -132,7 +132,7 @@ fn json_output_escaped_state_space() {
 "#;
 
     let rhei = parse(input).expect("parse ok");
-    let v = to_json_value(&rhei);
+    let v = to_json_value(&rhei).expect("every frontmatter value has a JSON image");
     let tasks = v["tasks"].as_array().unwrap();
     assert_eq!(tasks[0]["state"].as_str(), Some("in progress"));
 }

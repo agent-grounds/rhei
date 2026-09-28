@@ -10,7 +10,9 @@ use chrono::{DateTime, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Seconds
 use chrono::{TimeDelta, TimeZone, Utc};
 use chrono_tz::Tz;
 
-const PROVIDER_LIMITS_KEY: &str = "providerLimits";
+/// The `metadata.tasks.<id>.providerLimits` key, named by the register of the
+/// keys rhei writes. §FS-rhei-transitions.2.5 §FS-rhei-run.3.3
+const PROVIDER_LIMITS_KEY: &str = rhei_core::metadata::PROVIDER_LIMITS_KEY;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ProviderIdentity {
@@ -235,24 +237,6 @@ fn clear_provider_limit_state_metadata(
         .is_some_and(YamlMapping::is_empty)
     {
         task.remove(yaml_key(PROVIDER_LIMITS_KEY));
-    }
-    Some(drop_empty_task_metadata(root))
-}
-
-/// Reset owns all runtime wait state, including provider deadlines.
-/// §FS-rhei-reset.2 §FS-rhei-run.3.3
-fn clear_runtime_provider_limits(existing: Option<&Metadata>) -> Option<Metadata> {
-    let mut root = existing.cloned()?;
-    let Some(YamlValue::Mapping(metadata)) = root.get_mut(yaml_key("metadata")) else {
-        return Some(root);
-    };
-    let Some(YamlValue::Mapping(tasks)) = metadata.get_mut(yaml_key("tasks")) else {
-        return Some(root);
-    };
-    for value in tasks.values_mut() {
-        if let YamlValue::Mapping(task) = value {
-            task.remove(yaml_key(PROVIDER_LIMITS_KEY));
-        }
     }
     Some(drop_empty_task_metadata(root))
 }

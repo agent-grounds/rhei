@@ -608,6 +608,7 @@ transitions:
         .expect("parse should succeed");
 
         let rendered = render_rhei(
+            Path::new("smoke.rhei.md"),
             &rhei,
             BTreeSet::new(),
             false,

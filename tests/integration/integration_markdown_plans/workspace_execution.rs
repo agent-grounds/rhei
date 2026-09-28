@@ -150,7 +150,7 @@ fn assignee_field_round_trips_through_parse_and_json() {
     let task2 = rhei.tasks.iter().find(|t| t.id == TaskId::number(2)).expect("task 2");
     assert_eq!(task2.assignee, None);
 
-    let json = to_json_value(&rhei);
+    let json = to_json_value(&rhei).expect("every frontmatter value has a JSON image");
     let tasks = json["tasks"].as_array().expect("tasks array");
     let t1 = tasks.iter().find(|t| t["id"]["path"].as_str() == Some("1")).expect("task 1 json");
     assert_eq!(t1["assignee"].as_str(), Some("alice"));

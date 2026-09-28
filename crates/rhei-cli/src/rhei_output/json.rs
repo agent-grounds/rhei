@@ -1,8 +1,13 @@
 use serde_json::{json, Map, Value};
 
 use rhei_core::ast::{Rhei, Task, TaskId, TaskIdSegment};
+use rhei_core::metadata::{frontmatter_to_json, UnrepresentableValue};
 
 use crate::rhei_output::PlanOutputGenerator;
+
+/// Every frontmatter value this document cannot carry, or the document.
+/// §FS-rhei-render.3.1.1
+type JsonResult<T> = Result<T, Vec<UnrepresentableValue>>;
 
 /// The state machine one rhei of a merged project runs under.
 ///
@@ -31,13 +36,13 @@ pub struct JsonOutput {
 }
 
 impl PlanOutputGenerator for JsonOutput {
-    fn generate_rhei(&self, rhei: &rhei_core::ast::Rhei) -> serde_json::Value {
+    fn generate_rhei(&self, rhei: &rhei_core::ast::Rhei) -> JsonResult<serde_json::Value> {
         rhei_json(rhei, &self.rheis)
     }
 }
 
 /// Convert a parsed Rhei into a serde_json::Value.
-pub fn to_json_value(rhei: &rhei_core::ast::Rhei) -> serde_json::Value {
+pub fn to_json_value(rhei: &rhei_core::ast::Rhei) -> JsonResult<serde_json::Value> {
     JsonOutput::default().generate_rhei(rhei)
 }
 
@@ -46,12 +51,12 @@ pub fn to_json_value(rhei: &rhei_core::ast::Rhei) -> serde_json::Value {
 pub fn to_json_value_with_rheis(
     rhei: &rhei_core::ast::Rhei,
     rheis: Vec<RheiMachine>,
-) -> serde_json::Value {
+) -> JsonResult<serde_json::Value> {
     JsonOutput { pretty: false, rheis }.generate_rhei(rhei)
 }
 
 /// Convert a parsed Rhei into a pretty-printed JSON string.
-pub fn to_json_string_pretty(rhei: &rhei_core::ast::Rhei) -> String {
+pub fn to_json_string_pretty(rhei: &rhei_core::ast::Rhei) -> JsonResult<String> {
     to_json_string_pretty_with_rheis(rhei, Vec::new())
 }
 
@@ -59,9 +64,9 @@ pub fn to_json_string_pretty(rhei: &rhei_core::ast::Rhei) -> String {
 pub fn to_json_string_pretty_with_rheis(
     rhei: &rhei_core::ast::Rhei,
     rheis: Vec<RheiMachine>,
-) -> String {
-    let v = to_json_value_with_rheis(rhei, rheis);
-    serde_json::to_string_pretty(&v).expect("pretty JSON serialization")
+) -> JsonResult<String> {
+    let v = to_json_value_with_rheis(rhei, rheis)?;
+    Ok(serde_json::to_string_pretty(&v).expect("pretty JSON serialization"))
 }
 
 // -----------------------------------------------------------------------------
@@ -136,7 +141,7 @@ fn task_json(t: &Task) -> Value {
     Value::Object(obj)
 }
 
-fn rhei_json(rhei: &Rhei, rheis: &[RheiMachine]) -> Value {
+fn rhei_json(rhei: &Rhei, rheis: &[RheiMachine]) -> JsonResult<Value> {
     let content_sections = rhei
         .content_sections
         .iter()
@@ -180,14 +185,17 @@ fn rhei_json(rhei: &Rhei, rheis: &[RheiMachine]) -> Value {
             "node_kinds": rhei.structure.node_kinds,
         }),
     );
+    // The whole parsed frontmatter document, deliberately unfiltered: `render`
+    // exports the document, and a document with its counters removed is not the
+    // document. `null` where the plan declared none. §FS-rhei-render.3.1
     obj.insert(
         "frontmatter".to_string(),
-        rhei.metadata
-            .as_ref()
-            .and_then(|metadata| serde_json::to_value(metadata).ok())
-            .unwrap_or(Value::Null),
+        match rhei.metadata.as_ref() {
+            Some(metadata) => frontmatter_to_json(metadata)?,
+            None => Value::Null,
+        },
     );
     obj.insert("content_sections".to_string(), Value::Array(content_sections));
     obj.insert("tasks".to_string(), Value::Array(tasks));
-    Value::Object(obj)
+    Ok(Value::Object(obj))
 }

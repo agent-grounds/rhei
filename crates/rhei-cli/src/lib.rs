@@ -283,6 +283,7 @@ mod tests {
     include!("cli/tests_snapshot_nested_locator.rs");
     include!("cli/tests_supervised.rs");
     include!("cli/tests_subtree_supervision.rs");
+    include!("cli/tests_subtree_supervision_delivery.rs");
     include!("cli/tests_subtree_supervision_scope.rs");
     include!("cli/tests_subtree_supervision_owner.rs");
     include!("cli/tests_subtree_supervision_barrier.rs");

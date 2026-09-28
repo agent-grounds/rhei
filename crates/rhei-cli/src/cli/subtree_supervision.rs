@@ -8,8 +8,9 @@
 
 // §AR-source-file-size.3 §FS-rhei-supervision
 
-/// The `metadata.tasks.<id>.supervision` key. §FS-rhei-supervision.3.3
-const SUPERVISION_KEY: &str = "supervision";
+/// The `metadata.tasks.<id>.supervision` key, named by the register of the
+/// keys rhei writes. §FS-rhei-transitions.2.5 §FS-rhei-supervision.3.3
+const SUPERVISION_KEY: &str = rhei_core::metadata::SUPERVISION_KEY;
 
 /// Where a supervisor stands between visits.
 ///
@@ -238,17 +239,19 @@ fn clear_supervision_for_task(existing: Option<&Metadata>, task_id: &TaskId) -> 
     Some(root)
 }
 
-/// The runtime task metadata `rhei reset` clears: the visit counters, and the
-/// supervision blocks that are meaningless without them.
+/// The runtime task metadata `rhei reset` clears — every key the register marks
+/// `Cleared by rhei reset`, and not a second list kept here, so a runtime key
+/// added later is cleared by adding its row.
 ///
 /// A task whose whole entry was runtime state loses the entry too. `tasks: {1:
 /// {}}` in a reset plan is a record of nothing, and the next reader has to
 /// decide whether it means anything.
-// §FS-rhei-supervision.3.3 §FS-rhei-reset
+// §FS-rhei-transitions.2.5 §FS-rhei-reset.2 §FS-rhei-supervision.3.3
 fn clear_runtime_task_metadata(existing: Option<&Metadata>) -> Option<Metadata> {
-    let without_visits = clear_runtime_state_visits(existing)?;
-    let without_limits = clear_runtime_provider_limits(Some(&without_visits))?;
-    let cleared = clear_runtime_supervision(Some(&without_limits))?;
+    let mut cleared = existing.cloned()?;
+    for key in keys_cleared_by_reset() {
+        cleared = clear_rhei_written_key(Some(&cleared), key)?;
+    }
     Some(drop_empty_task_metadata(cleared))
 }
 
@@ -270,20 +273,3 @@ fn drop_empty_task_metadata(mut root: Metadata) -> Metadata {
     root
 }
 
-/// Drop every task's supervision block, beside the `stateVisits` reset.
-// §FS-rhei-supervision.3.3 §FS-rhei-reset
-fn clear_runtime_supervision(existing: Option<&Metadata>) -> Option<Metadata> {
-    let mut root = existing.cloned()?;
-    let Some(YamlValue::Mapping(metadata_section)) = root.get_mut(yaml_key("metadata")) else {
-        return Some(root);
-    };
-    let Some(YamlValue::Mapping(tasks)) = metadata_section.get_mut(yaml_key("tasks")) else {
-        return Some(root);
-    };
-    for value in tasks.values_mut() {
-        if let YamlValue::Mapping(task_map) = value {
-            task_map.remove(yaml_key(SUPERVISION_KEY));
-        }
-    }
-    Some(root)
-}

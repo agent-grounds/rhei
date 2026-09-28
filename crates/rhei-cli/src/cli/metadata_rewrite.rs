@@ -1,3 +1,8 @@
+/// The two `metadata.tasks.<id>` keys this file writes, named by the register of
+/// the keys rhei writes. §FS-rhei-transitions.2.5
+const STATE_VISITS_KEY: &str = rhei_core::metadata::STATE_VISITS_KEY;
+const POLL_NEXT_ATTEMPT_AT_KEY: &str = rhei_core::metadata::POLL_NEXT_ATTEMPT_AT_KEY;
+
 fn render_frontmatter_yaml(metadata: &Metadata) -> MietteResult<String> {
     let mut rendered = serde_yaml::to_string(metadata)
         .map_err(|err| miette!(
@@ -108,7 +113,7 @@ fn ensure_current_state_visit_count(
     let metadata_section = ensure_mapping(&mut root, yaml_key("metadata"));
     let tasks = ensure_mapping(metadata_section, yaml_key("tasks"));
     let task_entry = ensure_mapping(tasks, task_id_yaml_key(task_id));
-    let state_visits = ensure_mapping(task_entry, yaml_key("stateVisits"));
+    let state_visits = ensure_mapping(task_entry, yaml_key(STATE_VISITS_KEY));
     state_visits.insert(yaml_key(current_state), yaml_u64(current));
     Some(root)
 }
@@ -127,7 +132,7 @@ fn update_metadata_for_transition(
     let metadata_section = ensure_mapping(&mut root, yaml_key("metadata"));
     let tasks = ensure_mapping(metadata_section, yaml_key("tasks"));
     let task_entry = ensure_mapping(tasks, task_id_yaml_key(task_id));
-    let state_visits = ensure_mapping(task_entry, yaml_key("stateVisits"));
+    let state_visits = ensure_mapping(task_entry, yaml_key(STATE_VISITS_KEY));
     let state_key = yaml_key(to_state);
     let next =
         state_visits.get(&state_key).and_then(yaml_value_to_u64).map(|n| n.max(1) + 1).unwrap_or(1);
@@ -135,7 +140,13 @@ fn update_metadata_for_transition(
     Some(root)
 }
 
-fn clear_runtime_state_visits(existing: Option<&Metadata>) -> Option<Metadata> {
+/// Drop one of rhei's own keys from every task's metadata entry.
+///
+/// Which keys a caller passes is the register's business, not this function's:
+/// `rhei reset` reads them off the `Cleared by rhei reset` column so that a
+/// runtime key added later is cleared by adding its row.
+// §FS-rhei-transitions.2.5 §FS-rhei-reset.2
+fn clear_rhei_written_key(existing: Option<&Metadata>, key: &str) -> Option<Metadata> {
     let mut root = existing.cloned()?;
     let Some(YamlValue::Mapping(metadata_section)) = root.get_mut(yaml_key("metadata")) else {
         return Some(root);
@@ -146,7 +157,7 @@ fn clear_runtime_state_visits(existing: Option<&Metadata>) -> Option<Metadata> {
 
     for value in tasks.values_mut() {
         if let YamlValue::Mapping(task_map) = value {
-            task_map.remove(yaml_key("stateVisits"));
+            task_map.remove(yaml_key(key));
         }
     }
 
@@ -164,9 +175,9 @@ fn set_poll_next_attempt_metadata(
     let metadata_section = ensure_mapping(&mut root, yaml_key("metadata"));
     let tasks = ensure_mapping(metadata_section, yaml_key("tasks"));
     let task_entry = ensure_mapping(tasks, task_id_yaml_key(task_id));
-    let poll_next = ensure_mapping(task_entry, yaml_key("pollNextAttemptAt"));
+    let poll_next = ensure_mapping(task_entry, yaml_key(POLL_NEXT_ATTEMPT_AT_KEY));
     poll_next.insert(yaml_key(state_name), yaml_u64(next_attempt_at));
-    let state_visits = ensure_mapping(task_entry, yaml_key("stateVisits"));
+    let state_visits = ensure_mapping(task_entry, yaml_key(STATE_VISITS_KEY));
     state_visits.insert(yaml_key(state_name), yaml_u64(next_attempt_count.max(1)));
     root
 }
@@ -186,25 +197,25 @@ fn clear_poll_state_metadata(
     let Some(YamlValue::Mapping(task_entry)) = tasks.get_mut(task_id_yaml_key(task_id)) else {
         return Some(root);
     };
-    if let Some(YamlValue::Mapping(poll_next)) = task_entry.get_mut(yaml_key("pollNextAttemptAt")) {
+    if let Some(YamlValue::Mapping(poll_next)) = task_entry.get_mut(yaml_key(POLL_NEXT_ATTEMPT_AT_KEY)) {
         poll_next.remove(yaml_key(state_name));
     }
     if task_entry
-        .get(yaml_key("pollNextAttemptAt"))
+        .get(yaml_key(POLL_NEXT_ATTEMPT_AT_KEY))
         .and_then(YamlValue::as_mapping)
         .is_some_and(YamlMapping::is_empty)
     {
-        task_entry.remove(yaml_key("pollNextAttemptAt"));
+        task_entry.remove(yaml_key(POLL_NEXT_ATTEMPT_AT_KEY));
     }
-    if let Some(YamlValue::Mapping(state_visits)) = task_entry.get_mut(yaml_key("stateVisits")) {
+    if let Some(YamlValue::Mapping(state_visits)) = task_entry.get_mut(yaml_key(STATE_VISITS_KEY)) {
         state_visits.remove(yaml_key(state_name));
     }
     if task_entry
-        .get(yaml_key("stateVisits"))
+        .get(yaml_key(STATE_VISITS_KEY))
         .and_then(YamlValue::as_mapping)
         .is_some_and(YamlMapping::is_empty)
     {
-        task_entry.remove(yaml_key("stateVisits"));
+        task_entry.remove(yaml_key(STATE_VISITS_KEY));
     }
     Some(root)
 }

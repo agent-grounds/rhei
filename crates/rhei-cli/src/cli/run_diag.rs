@@ -26,6 +26,11 @@ struct RunDiagGuard;
 impl RunDiagGuard {
     fn install(sink: std::sync::Arc<dyn rhei_tui::EventSink>) -> Self {
         *RUN_DIAG_SINK.write().expect("run diag sink lock poisoned") = Some(sink);
+        // A degraded root guard warns from `rhei-core`, which is under the same
+        // hazard as every leaf helper here. §FS-rhei-recover.4.1
+        rhei_core::root_access::set_warning_sink(Some(Box::new(|text| {
+            emit_run_diag(rhei_tui::MessageLevel::Warn, text.to_owned())
+        })));
         RunDiagGuard
     }
 }
@@ -33,6 +38,7 @@ impl RunDiagGuard {
 impl Drop for RunDiagGuard {
     fn drop(&mut self) {
         *RUN_DIAG_SINK.write().expect("run diag sink lock poisoned") = None;
+        rhei_core::root_access::set_warning_sink(None);
     }
 }
 

@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Read a plan where the account's state directory is not writable. A root guard
+  keeps its lock outside the project, in the account's state directory, so that
+  reading a read-only project needs no file inside it; where that directory
+  cannot hold the lock either, every read-only command — `rhei validate`,
+  `list`, `render`, `next`, the viz and dashboard readers — refused before it
+  read the first byte of the plan. A shared acquisition now proceeds without the
+  lock, giving up only mutual exclusion between rhei processes on that root and
+  saying so in one `warning:` line on stderr per root; stdout and the exit
+  status are unchanged. The recovery-marker interlock is untouched: a root that
+  holds `.rhei/forced-recovery.json` is refused exactly as before, on the same
+  machine. Exclusive acquisition never degrades, so `rhei recover` and a forced
+  `rhei transition` still refuse there — but the refusal, and the warning, now
+  name the lock path, the execution root, the underlying error and
+  `XDG_STATE_HOME` as the lever, instead of a bare `Permission denied (os error
+  13)` that read like a defect in the plan being validated. Nothing changes on a
+  machine whose state directory is writable. (PR #329)
+
 - Fire the edge an exit code selected — a program's, and an agent's whose poll
   budget ran out — whichever order the edges for that pair are declared in, and
   run that edge's callbacks. A `(from, to)` pair does not name a rule, so where a

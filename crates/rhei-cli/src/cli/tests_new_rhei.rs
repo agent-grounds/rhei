@@ -227,7 +227,7 @@ Usage: rhei new [OPTIONS] <TITLE>
 For more information, try '--help'.
 ";
         assert_eq!(
-            parser_tip_replaced(rendered, "attach it as --description=<text>."),
+            parser_tip_replaced(rendered, "attach it as --description=<text>.", "- "),
             "\
 error: unexpected argument '- ' found
 
@@ -246,7 +246,7 @@ For more information, try '--help'.
     fn a_refusal_carrying_no_tip_gets_one_above_the_usage_line() {
         let rendered = "error: unexpected argument '-x' found\n\nUsage: rhei new [OPTIONS]\n";
         assert_eq!(
-            parser_tip_replaced(rendered, "attach it as --description-file=<path>."),
+            parser_tip_replaced(rendered, "attach it as --description-file=<path>.", "-x"),
             "error: unexpected argument '-x' found\n\n  tip: attach it as \
              --description-file=<path>.\n\nUsage: rhei new [OPTIONS]\n"
         );
@@ -314,15 +314,125 @@ For more information, try '--help'.
         assert_eq!(refusal_for(&["rhei", "new", "- leading", "--under", "auth"]), None);
     }
 
-    /// Both mistakes at once gets the option's tip, which names the option and
-    /// is true of it: the token the parser named, `- `, is no token of the
-    /// command line.
+    /// Both mistakes at once is settled by which of them the parser reached.
+    ///
+    /// This test used to assert the opposite — that the option's tip is printed
+    /// whenever both mistakes are on the line — on the reasoning that the token
+    /// the parser named, `- `, is no token of the command line. That reasoning
+    /// was the plan's extrapolation and it does not hold: the parser names a
+    /// token rather than quoting it, so the title `- leading` is *also* named
+    /// `- `. The rule is now the parser's own order. Where the two are
+    /// distinguishable the title was refused and keeps its own message; where
+    /// they are indistinguishable the earlier token wins, which is the title
+    /// again.
     #[test]
-    fn both_mistakes_at_once_get_the_options_tip() {
-        let refusal =
-            refusal_for(&["rhei", "new", "- leading", "--under", "auth", "--description", "-x"])
-                .expect("a substituted refusal");
+    fn both_mistakes_at_once_are_settled_by_which_was_refused() {
+        assert_eq!(
+            refusal_for(&["rhei", "new", "- leading", "--under", "auth", "--description", "-x"]),
+            None
+        );
+        assert_eq!(
+            refusal_for(&[
+                "rhei",
+                "new",
+                "- leading",
+                "--under",
+                "auth",
+                "--description",
+                "- Context: x.",
+            ]),
+            None
+        );
+    }
+
+    /// The parser names a long option truncated at its first `=` and a token
+    /// beginning with a single `-` as `-` plus its first character, so the
+    /// comparison is against that name and not against the token. Cut on a
+    /// `char`: a multibyte first character must not panic.
+    #[test]
+    fn the_parsers_name_for_a_token_is_not_the_token() {
+        assert_eq!(parser_name_for("--kindd=task"), "--kindd");
+        assert_eq!(parser_name_for("--bogus"), "--bogus");
+        assert_eq!(parser_name_for("-xy"), "-x");
+        assert_eq!(parser_name_for("-éxy"), "-é");
+        assert_eq!(parser_name_for("- Context: x."), "- ");
+        assert_eq!(parser_name_for("-"), "-");
+        assert_eq!(parser_name_for("t"), "t");
+    }
+
+    /// The spellings the parser does not name verbatim: a doubled letter in a
+    /// long option and a cluster of unknown short flags are refusals about
+    /// *that* token, and taking the parser's advice away from them would take
+    /// away the only advice that fixes the line.
+    #[test]
+    fn a_refusal_the_parser_did_not_name_verbatim_keeps_the_parsers_message() {
+        assert_eq!(
+            refusal_for(&[
+                "rhei",
+                "new",
+                "t",
+                "--under",
+                "auth",
+                "--kindd=task",
+                "--description",
+                "- Context: x.",
+            ]),
+            None
+        );
+        assert_eq!(refusal_for(&["rhei", "list", "--bogus=1", "--description", "-z"]), None);
+        assert_eq!(refusal_for(&["rhei", "list", "-xy", "--description", "-z"]), None);
+        assert_eq!(refusal_for(&["rhei", "intervene", "-xy", "--description", "-z"]), None);
+    }
+
+    /// A multibyte cluster reaches the same comparison, and the answer is the
+    /// parser's message rather than a panic.
+    #[test]
+    fn a_multibyte_first_character_is_cut_on_a_char_boundary() {
+        assert_eq!(refusal_for(&["rhei", "list", "-éxy", "--description", "-z"]), None);
+        let refusal = refusal_for(&["rhei", "new", "t", "--under", "auth", "--description", "-éxy"])
+            .expect("a substituted refusal");
         assert!(refusal.contains("--description=<text>"), "got: {refusal}");
+    }
+
+    /// An earlier token the parser would name the same way is the one it
+    /// refused, so the value's tip is withheld: the name alone cannot tell
+    /// `rhei list -x --description -x` apart, but the order can.
+    #[test]
+    fn an_earlier_token_with_the_same_name_keeps_the_parsers_message() {
+        assert_eq!(refusal_for(&["rhei", "list", "-x", "--description", "-x"]), None);
+    }
+
+    /// Both options at once is an error the caller must fix either way, but the
+    /// value that was refused is still the one answered for: the match is
+    /// positional and by name rather than "this token appears nowhere else".
+    #[test]
+    fn a_value_repeated_later_on_the_line_keeps_its_tip() {
+        let refusal = refusal_for(&[
+            "rhei",
+            "new",
+            "t",
+            "--under",
+            "auth",
+            "--description",
+            "-x",
+            "--description-file",
+            "-x",
+        ])
+        .expect("a substituted refusal");
+        assert!(refusal.contains("--description=<text>"), "got: {refusal}");
+    }
+
+    /// The parser quotes the refused token inside its tip, so a token carrying a
+    /// blank line makes a tip several paragraphs long. All of it goes: half a
+    /// tip left behind is the `-- ` advice this refusal exists to remove,
+    /// standing without the `tip:` label that says it is advice.
+    #[test]
+    fn a_refused_token_carrying_a_blank_line_takes_its_whole_tip_with_it() {
+        let argv = ["rhei", "new", "t", "--under", "auth", "--description", "--bo\n\nq"];
+        let refusal = refusal_for(&argv).expect("a substituted refusal");
+        assert!(refusal.contains("--description=<text>"), "got: {refusal}");
+        assert!(!refusal.contains("as a value, use"), "got: {refusal}");
+        assert!(!refusal.contains("-- --bo"), "got: {refusal}");
     }
 
     /// A `tip:` line inside the sentence the parser echoed back is part of what
@@ -341,7 +451,7 @@ tip: eaten'
 Usage: rhei new [OPTIONS] <TITLE>
 ";
         assert_eq!(
-            parser_tip_replaced(rendered, "attach it as --description=<text>."),
+            parser_tip_replaced(rendered, "attach it as --description=<text>.", "--bo\ntip: eaten"),
             "\
 error: unexpected argument '--bo
 tip: eaten' found

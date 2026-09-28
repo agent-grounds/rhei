@@ -210,9 +210,10 @@ const HYPHEN_VALUE_OPTIONS: [HyphenValueOption; 2] = [
 /// A covered option the command line supplied a hyphen-leading value to, and
 /// where in the command line that value stands.
 ///
-/// The position is what lets the refusal be checked against the value: the
-/// token the parser named is compared with every *other* token, so a value that
-/// is itself a plausible flag does not suppress its own tip.
+/// The position is what lets the refusal be checked against the value: the name
+/// the parser would give this token is compared with the token it actually
+/// refused, and every *earlier* token is checked for that same name, because
+/// the parser stops at the first token it cannot take.
 // §FS-rhei-new.3.4.1
 struct HyphenValueMatch {
     option: &'static HyphenValueOption,
@@ -251,33 +252,63 @@ where
     None
 }
 
-/// Whether the token the parser refused is the value `found` rather than a flag
-/// the command line wrote in its own right.
+/// What the argument parser calls `token` when it refuses it.
+///
+/// Not the token as the command line wrote it: a long option is named truncated
+/// at its first `=`, so `--kindd=task` comes back as `--kindd`, and a token
+/// beginning with a single `-` is named `-` plus its first character, so `-xy`
+/// comes back as `-x` and `- Context: x.` as `- `. Everything else is named as
+/// written. Cut on a `char`, not a byte: `-éxy` is named `-é`.
+// §FS-rhei-new.3.4.1
+fn parser_name_for(token: &str) -> &str {
+    if token.starts_with("--") {
+        return match token.find('=') {
+            Some(at) => &token[..at],
+            None => token,
+        };
+    }
+    match token.strip_prefix('-').and_then(|rest| rest.chars().next()) {
+        Some(first) => &token[.."-".len() + first.len_utf8()],
+        None => token,
+    }
+}
+
+/// The token the parser refused, when it is the value `found` rather than a
+/// flag the command line wrote in its own right.
 ///
 /// The adjacency alone says only that a hyphen-leading value was *supplied*; it
-/// does not say the parser tripped over it. An unknown flag earlier on the line
-/// is refused first, and on a command that declares no such option it is the
-/// option's own name that is refused — in both cases the parser's advice is
-/// about the token it named and rhei has nothing better to say. A value the
-/// parser mangled into a flag is never the token it named: it reports `-` plus
-/// the offending second character, so `- Context: x.` comes back as `- ` and
-/// `-x/body.md` as `-x`, neither of which the command line contains. A refusal
-/// naming no token keeps the parser's message, which is the safe direction.
+/// does not say the parser tripped over it. So two things are asked of the name
+/// the parser printed, and both are asked of the *name* rather than of the
+/// token, because those differ: a value the parser mangled into a flag is
+/// reported as whatever `parser_name_for` says, and so is every other token.
+///
+/// First the name must be the one this value would carry — an unknown flag
+/// anywhere on the line has a name of its own, and on a command that declares
+/// no such option it is the option's own name that is refused, which begins
+/// `--` and so is never a value's name. Then no *earlier* token may carry the
+/// same name, since the parser reads left to right and stops at the first token
+/// it cannot take: `rhei list -x --description -x` is refused for the first
+/// `-x`. A refusal naming no token keeps the parser's message, which is the
+/// safe direction.
 // §FS-rhei-new.3.4.1
-fn refusal_is_about_the_value(
+fn value_the_parser_refused(
     err: &clap::Error,
     argv: &[std::ffi::OsString],
     found: &HyphenValueMatch,
-) -> bool {
+) -> Option<String> {
     let Some(clap::error::ContextValue::String(refused)) =
         err.get(clap::error::ContextKind::InvalidArg)
     else {
-        return false;
+        return None;
     };
-    !argv
+    let value = argv.get(found.at)?.to_string_lossy();
+    if parser_name_for(&value) != refused {
+        return None;
+    }
+    let earlier = argv[..found.at]
         .iter()
-        .enumerate()
-        .any(|(at, token)| at != found.at && token.as_os_str() == OsStr::new(refused.as_str()))
+        .any(|token| parser_name_for(&token.to_string_lossy()) == refused);
+    (!earlier).then(|| refused.clone())
 }
 
 /// The refusal to print in place of the argument parser's own, when the parser
@@ -302,13 +333,12 @@ where
     }
     let argv: Vec<std::ffi::OsString> = argv.into_iter().map(|raw| raw.as_ref().to_os_string()).collect();
     let found = hyphen_value_option(&argv)?;
-    if !refusal_is_about_the_value(err, &argv, &found) {
-        return None;
-    }
-    Some(parser_tip_replaced(&err.render().to_string(), found.option.tip))
+    let refused = value_the_parser_refused(err, &argv, &found)?;
+    Some(parser_tip_replaced(&err.render().to_string(), found.option.tip, &refused))
 }
 
-/// Put `tip` where the argument parser's own tip stands.
+/// Put `tip` where the argument parser's own tip stands, given the token the
+/// parser said it refused.
 ///
 /// In that slot rather than beside it: the parser's advice for this shape is to
 /// pass the value after a bare `--`, which is written for a positional and can
@@ -324,40 +354,76 @@ where
 /// would otherwise be dropped out of the middle of the message, leaving it no
 /// longer saying what was refused.
 // §FS-rhei-new.3.4.1 §FS-rhei-errors.6
-fn parser_tip_replaced(rendered: &str, tip: &str) -> String {
+fn parser_tip_replaced(rendered: &str, tip: &str, refused: &str) -> String {
     let ours = format!("  tip: {tip}");
-    let mut refusal: Vec<String> = Vec::new();
-    let mut placed = false;
-    let mut dropping = false;
-    let mut after_blank = false;
-    for line in rendered.lines() {
-        let blank = line.trim().is_empty();
-        if dropping {
-            // The rest of the parser's tip paragraph, up to the blank line that
-            // closes it — the tip may run over several lines when it quotes a
-            // value that has newlines in it.
-            if !blank {
-                continue;
-            }
-            dropping = false;
-        } else if !placed && after_blank && line.trim_start().starts_with("tip:") {
-            refusal.push(ours.clone());
-            placed = true;
-            dropping = true;
-            continue;
-        } else if !placed && line.starts_with("Usage:") {
-            refusal.push(ours.clone());
-            refusal.push(String::new());
-            placed = true;
-        }
-        after_blank = blank;
-        refusal.push(line.to_string());
+    let mut refusal = if let Some(start) = parser_tip_start(rendered) {
+        let end = parser_tip_end(rendered, start, refused);
+        format!("{}{ours}{}", &rendered[..start], &rendered[end..])
+    } else if let Some(usage) = usage_line_start(rendered) {
+        format!("{}{ours}\n\n{}", &rendered[..usage], &rendered[usage..])
+    } else {
+        format!("{}\n\n{ours}", rendered.trim_end_matches('\n'))
+    };
+    if !refusal.ends_with('\n') {
+        refusal.push('\n');
     }
-    if !placed {
-        refusal.push(String::new());
-        refusal.push(ours);
-    }
-    let mut refusal = refusal.join("\n");
-    refusal.push('\n');
     refusal
+}
+
+/// Each line of `text` with the offset it starts at.
+fn lines_with_offsets(text: &str) -> impl Iterator<Item = (usize, &str)> {
+    let mut at = 0;
+    text.split('\n').map(move |line| {
+        let start = at;
+        at += line.len() + "\n".len();
+        (start, line)
+    })
+}
+
+/// Where the parser's own tip paragraph begins, or `None` when it offered none
+/// — a rendering for a command taking no positionals carries no tip, and a
+/// future parser may word its own differently.
+// §FS-rhei-new.3.4.1
+fn parser_tip_start(rendered: &str) -> Option<usize> {
+    let mut after_blank = false;
+    for (start, line) in lines_with_offsets(rendered) {
+        if after_blank && line.trim_start().starts_with("tip:") {
+            return Some(start);
+        }
+        after_blank = line.trim().is_empty();
+    }
+    None
+}
+
+/// Where that paragraph ends, given the token the parser refused.
+///
+/// The paragraph ends at a blank line, but the parser quotes the refused token
+/// inside it — twice — so a token carrying a blank line of its own would end the
+/// paragraph early and leave the rest of the parser's advice standing with its
+/// `tip:` label gone. Every occurrence of the token is therefore stepped over
+/// whole, and only a blank line outside one closes the paragraph.
+// §FS-rhei-new.3.4.1
+fn parser_tip_end(rendered: &str, start: usize, refused: &str) -> usize {
+    let mut at = start;
+    while at < rendered.len() {
+        let rest = &rendered[at..];
+        if !refused.is_empty() && rest.starts_with(refused) {
+            at += refused.len();
+            continue;
+        }
+        if rest.starts_with("\n\n") {
+            return at;
+        }
+        at += rest.chars().next().map_or(1, char::len_utf8);
+    }
+    rendered.len()
+}
+
+/// Where the usage line begins, which is where a tip goes when the parser
+/// offered no slot of its own.
+// §FS-rhei-new.3.4.1
+fn usage_line_start(rendered: &str) -> Option<usize> {
+    lines_with_offsets(rendered)
+        .find(|(_, line)| line.starts_with("Usage:"))
+        .map(|(start, _)| start)
 }

@@ -90,9 +90,14 @@
   already means standard input. A hyphen-leading `TITLE` renders identically to
   a refused option value, so the two are told apart by the command line rather
   than by the message, and a title keeps exactly the refusal it printed before.
-  The new tip is printed only where the option's own value is the token the
-  parser refused: an unknown flag elsewhere on the line, and a command that
-  declares no such option at all, keep the parser's own message. (PR #326)
+  The new tip is printed only where the option's own value is what the parser
+  refused, judged by the name the parser gives a token rather than by the token
+  itself — a long option truncated at its first `=`, a short cluster cut to its
+  first character — and only where no earlier token carries that same name, since
+  the parser stops at the first token it cannot take. So a doubled letter in
+  `--kindd=task`, an unknown short cluster, an unknown flag elsewhere on the
+  line, and a command that declares no such option at all all keep the parser's
+  own message, spelling suggestions and all. (PR #326)
 
 - Bound a project's measured spend by default. Every project may be charged at
   most $400.00 of provider cost per UTC day, a built-in measured from the

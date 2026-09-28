@@ -370,7 +370,11 @@ positional: `--` ends option parsing, so it can never attach a value to an
 option, and following it is refused a second time. The refusal therefore
 **replaces** that tip with rhei's own, in the same place rather than beside it,
 because two tips of which the first is wrong leave the caller choosing between
-them. What rhei's says is the spelling that keeps the value: the attached
+them. That tip goes whole: the parser quotes the token it refused inside it, so
+a refused value carrying blank lines makes a tip that runs over several
+paragraphs, and leaving any of it standing would leave the `--` advice behind
+without the `tip:` label that marks it as advice. What rhei's says is the
+spelling that keeps the value: the attached
 `--description=<text>` form, or `--description-file -` for a body read from
 standard input. For a hyphen-leading *path* it is the attached
 `--description-file=<path>` form, since a bare `-` there already means standard
@@ -389,22 +393,40 @@ way — yet it is a different mistake with a different answer. So `rhei new
 What tells the two apart is the command line itself: an option's name
 immediately followed by a token that begins with `-` and is neither `-` nor
 `--`, looked for only before the first bare `--`. A value of exactly `-` is the
-spelling the tip recommends and never matches it; a command line carrying both
-mistakes gets the option's tip, which names the option and is true of it.
+spelling the tip recommends and never matches it.
 
-That adjacency is a necessary condition rather than the whole test: the tip is
-printed only where the parser's refusal is about that value. The parser names
-the token it refused, and a value it mangled into a flag is never that token as
-the command line wrote it — `- Context: x.` is reported as `- `, and
-`-x/body.md` as `-x`. So when the named token stands in the command line in its
-own right, at any other position than the value that was found, the refusal is
-about something else and the parser's own message is left alone: `rhei new "t"
---under auth --bogus --description -x` is refused for `--bogus` and keeps the
-parser's advice about it, and `rhei list --description -x`, on a command that
-declares no such option at all, is refused for `--description` and keeps its
-own — which is what makes the new tip impossible on a command that has no such
-value to give advice about. A refusal that names no token keeps the parser's
-message too.
+That adjacency is a necessary condition rather than the whole test: the new
+advice appears only where an *option's value* was what the parser refused. Both
+halves of that test are read from the name the parser gives the token it
+refused, which is not the token as the command line wrote it: a long option is
+named truncated at its first `=`, so `--kindd=task` comes back as `--kindd`, and
+a token beginning with a single `-` is named `-` plus its first character, so
+`-xy` comes back as `-x` and `- Context: x.` as `- `.
+
+First, the parser must have named the value that was found. `rhei new "t"
+--under auth --kindd=task --description '- Context: x.'` is refused for
+`--kindd`, which is not what `- Context: x.` would be named, so the parser keeps
+its own message — including the spelling suggestion that is the only thing on
+that line which fixes it. `rhei new "t" --under auth --bogus --description -x`
+keeps the parser's advice about `--bogus` the same way. And on a command
+declaring no such option it is the option's *name* that is refused, which is
+named as written and so is never the name of a value beginning with `-`: `rhei
+list --description -x` keeps the parser's message, which is what makes the new
+tip impossible on a command that has no such value to give advice about.
+
+Second, no token *before* the value may carry that same name. The parser reads
+the command line from left to right and stops at the first token it cannot take,
+so an earlier token named the same way is the one that was refused: `rhei list
+-x --description -x` is refused for the first `-x` and keeps the parser's advice
+about it. That is also what settles a command line carrying both mistakes. Where
+the two are distinguishable, the refusal is answered for whichever of them the
+parser reached — `rhei new "- leading" --under auth --description -x` is refused
+for the title, whose name `- ` is not `-x`'s, so the title keeps the message it
+prints on its own. Where they are *indistinguishable* — `rhei new "- leading"
+--under auth --description '- Context: x.'`, in which title and value are both
+named `- ` — the earlier token wins, because that is the one the parser reached
+first, and the title's message stands there too. A refusal that names no token
+keeps the parser's message as well.
 
 `--description` and `--description-file` are the only options this covers.
 Every other option taking free prose keeps what it prints today; the table of

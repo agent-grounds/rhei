@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Park a session limit for any provider Rhei recognizes, not only
+  `codex`/`openai`. Recognition now keys on the resolved provider in a closed
+  set — `openai` and `anthropic` — and the agent entry's name no longer decides
+  it: an entry a machine calls `cld1` resolving `anthropic` parks on the same
+  terms as the built-in `codex` entry on `openai`, so its refusal writes a
+  `providerLimits` record with a `nextAttemptAt`, costs the visit none of its
+  `attempts:` budget, and resumes at the reset without a person. Before this,
+  the identical reset-bearing line from a Claude Code invocation was an ordinary
+  failure: two of them spent a state visit's whole budget and the ticket halted
+  until someone forced a transition. Nothing needs declaring — the set is closed
+  and a provider joins it by a change to the specification rather than to a
+  project's configuration — and a state that resolves an agent but no provider
+  still does not park. (PR #334)
+
 - Read a plan where the account's state directory is not writable. A root guard
   keeps its lock outside the project, in the account's state directory, so that
   reading a read-only project needs no file inside it; where that directory

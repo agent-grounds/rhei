@@ -4,7 +4,7 @@
 // thing in sequential and parallel completion, and every scheduler surface
 // must read the same durable record.
 
-// §FS-rhei-agents.2 §FS-rhei-run.3.3 §FS-rhei-run.5.1
+// §FS-rhei-agents.2.3 §FS-rhei-run.3.3 §FS-rhei-run.5.1
 
 use chrono::{DateTime, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, SecondsFormat};
 use chrono::{TimeDelta, TimeZone, Utc};
@@ -44,7 +44,7 @@ fn resolved_provider_identity(resolved: &ResolvedAgent) -> Option<ProviderIdenti
 }
 
 /// Strip ANSI CSI/OSC decoration without changing any other text. The caller
-/// trims surrounding whitespace only after this operation. §FS-rhei-agents.2
+/// trims surrounding whitespace only after this operation. §FS-rhei-agents.2.3
 fn strip_terminal_decoration(line: &str) -> std::borrow::Cow<'_, str> {
     static ANSI: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     ANSI.get_or_init(|| {
@@ -53,6 +53,12 @@ fn strip_terminal_decoration(line: &str) -> std::borrow::Cow<'_, str> {
     })
     .replace_all(line, "")
 }
+
+/// The closed set of providers whose session-limit line names a reset instant
+/// worth sleeping on. A provider joins it by a change to the specification, not
+/// by a project's configuration, and the agent registry id is never tested.
+/// §FS-rhei-agents.2.3
+const RECOGNIZED_PROVIDERS: [&str; 2] = ["openai", "anthropic"];
 
 fn provider_signal_regex() -> &'static Regex {
     static SIGNAL: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
@@ -84,9 +90,9 @@ fn unique_safe_boundary(
     }
 }
 
-/// Recognize the one supported Codex/OpenAI reset signal and turn its named
-/// local minute into the first safe UTC instant after that minute.
-/// §FS-rhei-agents.2 §FS-rhei-run.3.3
+/// Recognize the reset signal of a provider in `RECOGNIZED_PROVIDERS` and turn
+/// its named local minute into the first safe UTC instant after that minute.
+/// §FS-rhei-agents.2.3 §FS-rhei-run.3.3
 fn classify_provider_limit(
     resolved: &ResolvedAgent,
     status: std::process::ExitStatus,
@@ -95,9 +101,10 @@ fn classify_provider_limit(
     captured_lines: &[String],
     observed: std::time::SystemTime,
 ) -> Option<ProviderLimit> {
+    // The identity is recorded whole, but only its provider half is a
+    // recognition condition. §FS-rhei-agents.2.3
     let identity = resolved_provider_identity(resolved)?;
-    if identity.agent != "codex"
-        || identity.provider != "openai"
+    if !RECOGNIZED_PROVIDERS.contains(&identity.provider.as_str())
         || status.success()
         || timed_out
         || interrupted

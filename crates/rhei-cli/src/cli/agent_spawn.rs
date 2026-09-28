@@ -19,7 +19,7 @@ struct AgentSpawnOutcome {
     usage_capture_path: Option<PathBuf>,
     cli_session: Option<AccountingCliSession>,
     /// A strict provider refusal recognized after output drain and before the
-    /// generic non-zero completion paths run. §FS-rhei-agents.2
+    /// generic non-zero completion paths run. §FS-rhei-agents.2.3
     provider_limit: Option<ProviderLimit>,
 }
 
@@ -66,7 +66,7 @@ fn agent_stream_label(stream: rhei_tui::AgentStream) -> &'static str {
 }
 
 /// Keep the thread's independently owned inputs explicit, as in `spawn_and_wait_agent`.
-/// Raw capture is separate from usage parsing and display for provider recognition. §FS-rhei-agents.2
+/// Raw capture is separate from usage parsing and display for provider recognition. §FS-rhei-agents.2.3
 #[allow(clippy::too_many_arguments)]
 fn spawn_agent_output_reader<R>(
     reader: R,

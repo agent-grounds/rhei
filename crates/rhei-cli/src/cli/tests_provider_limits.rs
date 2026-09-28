@@ -28,7 +28,7 @@ mod provider_limits {
 
     /// Strict matching accepts either captured stream after decoration removal
     /// and rejects duplicates and transport/exit precedence violations.
-    /// §FS-rhei-agents.2
+    /// §FS-rhei-agents.2.3
     #[test]
     fn codex_provider_limit_classifier_is_strict() {
         let resolved = codex_openai();
@@ -65,9 +65,12 @@ mod provider_limits {
             observed,
         )
         .is_none());
+        // The second provider of the closed set is recognized on the same
+        // terms, and the registry id it ran as is recorded rather than tested.
+        // §FS-rhei-agents.2.3
         let mut anthropic = resolved.clone();
         anthropic.model_provider = Some("anthropic".to_string());
-        assert!(classify_provider_limit(
+        let recognized = classify_provider_limit(
             &anthropic,
             status(1),
             false,
@@ -75,7 +78,9 @@ mod provider_limits {
             &[signal.to_string()],
             observed,
         )
-        .is_none());
+        .expect("a provider in the closed set is recognized");
+        assert_eq!(recognized.identity.provider, "anthropic");
+        assert_eq!(recognized.identity.agent, "codex", "the registry id is recorded, not tested");
         for lookalike in [
             "You've hit your session limit - resets 10:20pm (Europe/Zurich)",
             "You've hit your session limit · resets 10:20PM (Europe/Zurich)",
@@ -121,6 +126,55 @@ mod provider_limits {
         .is_none());
     }
 
+    /// Recognition keys on the resolved provider, in a closed set, and never on
+    /// the agent registry id: an entry the user named may park, a provider
+    /// outside the set never does, and a state resolving no provider has no
+    /// execution identity to key a wait on. §FS-rhei-agents.2.3
+    #[test]
+    fn provider_limit_recognition_keys_on_the_closed_provider_set() {
+        let observed = std::time::UNIX_EPOCH + Duration::from_secs(1_789_579_200);
+        let signal = "You've hit your session limit · resets 10:20pm (Europe/Zurich)";
+        let classify = |resolved: &ResolvedAgent, timed_out, interrupted| {
+            classify_provider_limit(
+                resolved,
+                status(1),
+                timed_out,
+                interrupted,
+                &[signal.to_string()],
+                observed,
+            )
+        };
+        let entry = |agent: &str, provider: Option<&str>| {
+            let mut resolved = codex_openai();
+            resolved.agent = agent.into();
+            resolved.model_provider = provider.map(str::to_string);
+            resolved
+        };
+
+        // A provider outside the set stays an ordinary process result whatever
+        // the entry is named, and the set is matched case-sensitively.
+        assert!(classify(&entry("codex", Some("acme")), false, false).is_none());
+        assert!(classify(&entry("codex", Some("Anthropic")), false, false).is_none());
+
+        // Neither direction of the agent registry id decides anything.
+        let user_named = classify(&entry("cld1", Some("openai")), false, false)
+            .expect("a user-named entry on openai is recognized");
+        assert_eq!(user_named.identity.agent, "cld1");
+        let codex_elsewhere = classify(&entry("codex", Some("anthropic")), false, false)
+            .expect("the built-in codex entry on anthropic is recognized");
+        assert_eq!(codex_elsewhere.identity.provider, "anthropic");
+
+        // A state that resolves an agent but no provider has no execution
+        // identity, so there is nothing to key a wait on.
+        assert!(classify(&entry("cld1", None), false, false).is_none());
+
+        // Timeout and interruption are still classified first.
+        let anthropic = entry("cld1", Some("anthropic"));
+        assert!(classify(&anthropic, false, false).is_some());
+        assert!(classify(&anthropic, true, false).is_none());
+        assert!(classify(&anthropic, false, true).is_none());
+    }
+
     /// Deadline resolution uses the next local date only after today's safe
     /// boundary and never guesses through DST gaps or overlaps. §FS-rhei-run.3.3
     #[test]
@@ -164,7 +218,7 @@ mod provider_limits {
     }
 
     /// Both OSC terminators preserve a hyperlink's visible standalone signal;
-    /// decoration removal must not relax standalone matching. §FS-rhei-agents.2
+    /// decoration removal must not relax standalone matching. §FS-rhei-agents.2.3
     #[test]
     fn provider_limit_osc_links_preserve_visible_text() {
         let resolved = codex_openai();

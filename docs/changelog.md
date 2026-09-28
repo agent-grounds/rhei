@@ -20,7 +20,7 @@
   only by a bare run of the same character at least as long, and running to the end
   of the file when nothing closes it. Two consequences are worth knowing: a bare
   `~~~` line now opens a fence where it used to open nothing, and a run carrying an
-  info string never closes one. (PR #N)
+  info string never closes one. (PR #337)
 
 - Carry each task's authored frontmatter metadata on `rhei list --json`, so a
   caller reads one custom field off the query surface instead of re-deriving

@@ -5,6 +5,7 @@
 //! metadata tokens.
 
 use crate::ast::{ConsumedExport, TaskId, TaskSnapshotInherit};
+use crate::fence::FenceTracker;
 use crate::text::parse_task_id;
 use crate::tokens::Token;
 use regex::Regex;
@@ -25,7 +26,9 @@ pub struct Tokenizer<'a> {
     re_model: Regex,
     re_target: Regex,
 
-    in_code_block: bool,
+    /// The fenced block the scan is inside, if any: inside one every line is
+    /// text, whatever it looks like. §FS-rhei-plan-language.2.1
+    fence: FenceTracker,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -87,7 +90,7 @@ impl<'a> Tokenizer<'a> {
             re_assignee,
             re_model,
             re_target,
-            in_code_block: false,
+            fence: FenceTracker::default(),
         }
     }
 
@@ -97,11 +100,6 @@ impl<'a> Tokenizer<'a> {
             return input[1..input.len() - 1].to_string();
         }
         input.to_string()
-    }
-
-    fn is_fence(line: &str) -> bool {
-        let trimmed = line.trim_start();
-        trimmed.starts_with("```")
     }
 }
 
@@ -117,8 +115,10 @@ impl<'a> Iterator for Tokenizer<'a> {
         for raw in self.lines.by_ref() {
             let line = raw.trim();
 
-            if Self::is_fence(raw) {
-                self.in_code_block = !self.in_code_block;
+            // A fence line, and every line of the block it opens, is text, so
+            // a plan quoting the plan format tokenizes as a quotation.
+            // §FS-rhei-plan-language.2.1
+            if self.fence.read(raw) {
                 return Some(Token::TextContent);
             }
 
@@ -126,7 +126,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 continue;
             }
 
-            if self.in_code_block {
+            if self.fence.is_open() {
                 return Some(Token::TextContent);
             }
 

@@ -1,4 +1,5 @@
 use crate::ast::{ContentSection, Metadata, Structure, Task};
+use crate::fence::FenceTracker;
 use regex::Regex;
 
 use super::{parse, parse_collect, parse_frontmatter, parse_structure, ParseError, Result};
@@ -77,7 +78,7 @@ fn parse_manifest(input: &str, header_name: &str, frontmatter_kind: &str) -> Res
     let mut frontmatter_lines: Vec<String> = Vec::new();
     let mut header_seen = false;
     let mut content: Vec<ContentSection> = Vec::new();
-    let mut in_code_block = false;
+    let mut fence = FenceTracker::default();
 
     for (idx, raw) in input.lines().enumerate() {
         let line_number = idx + 1;
@@ -99,19 +100,9 @@ fn parse_manifest(input: &str, header_name: &str, frontmatter_kind: &str) -> Res
             continue;
         }
 
-        let trimmed_start = raw.trim_start();
-        if trimmed_start.starts_with("```") {
-            in_code_block = !in_code_block;
-            if let Some(ContentSection { content: ref mut c, .. }) = content.last_mut() {
-                if !c.is_empty() {
-                    c.push('\n');
-                }
-                c.push_str(raw);
-            }
-            continue;
-        }
-
-        if in_code_block {
+        // The index reads a fence by the language's one rule, so an index may
+        // quote the plan format it documents. §FS-rhei-plan-language.2.1
+        if fence.read(raw) || fence.is_open() {
             if let Some(ContentSection { content: ref mut c, .. }) = content.last_mut() {
                 if !c.is_empty() {
                     c.push('\n');

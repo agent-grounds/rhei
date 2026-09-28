@@ -1,25 +1,13 @@
-/// The fence character and its run length, when a line is a code fence.
+/// The language's one reading of a fence, re-exported where the validator's
+/// callers already look for it: a run of at least three backticks or tildes,
+/// closed only by a bare run of the same character at least as long.
 ///
-/// CommonMark: a fence is a run of at least three backticks or tildes; the
-/// opening one may carry an info string, the closing one may not, and the
-/// closing run must be at least as long as the opening one.
-///
-/// Crate-visible because the prompt composer reads result files by the same
-/// rule: a heading inside a fence is a quotation there too.
-// §FS-rhei-plan-language.3.6
-pub fn code_fence_run(line: &str) -> Option<(char, usize, bool)> {
-    let trimmed = line.trim_start();
-    let marker = trimmed.chars().next()?;
-    if marker != '`' && marker != '~' {
-        return None;
-    }
-    let run = trimmed.chars().take_while(|character| *character == marker).count();
-    if run < 3 {
-        return None;
-    }
-    let bare = trimmed[run..].trim().is_empty();
-    Some((marker, run, bare))
-}
+/// The definition itself lives in [`crate::fence`], because the structural
+/// scan and the prompt composer read a plan by the same rule — a heading
+/// inside a fence is a quotation to every one of them.
+// §FS-rhei-plan-language.2.1
+pub use crate::fence::code_fence_run;
+use crate::fence::FenceTracker;
 
 /// One line with its inline code spans removed.
 ///
@@ -72,20 +60,11 @@ fn strip_inline_code_spans(line: &str) -> String {
 // §FS-rhei-plan-language.3.6
 fn markdown_prose(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
-    let mut fence: Option<(char, usize)> = None;
+    let mut fence = FenceTracker::default();
     for line in text.lines() {
-        match fence {
-            Some((marker, open)) => {
-                if let Some((character, run, bare)) = code_fence_run(line) {
-                    if character == marker && run >= open && bare {
-                        fence = None;
-                    }
-                }
-            }
-            None => match code_fence_run(line) {
-                Some((marker, run, _)) => fence = Some((marker, run)),
-                None => out.push_str(&strip_inline_code_spans(line)),
-            },
+        // A fence line, and every line of the block it opens, is code.
+        if !fence.read(line) && !fence.is_open() {
+            out.push_str(&strip_inline_code_spans(line));
         }
         out.push('\n');
     }
@@ -217,17 +196,19 @@ fn validate_result_blocks(rhei: &Rhei, machines: &MachineSet, report: &mut Valid
         .expect("valid result block regex");
 
     for_each_node(rhei, |task| {
-        let mut in_code_block = false;
+        let mut fence = FenceTracker::default();
         let mut valid_blocks = Vec::new();
         let label = format!("{} {}", title_case_kind(&task.kind), task.id);
 
         for line in task.content.lines() {
-            let trimmed = line.trim_start();
-            if trimmed.starts_with("```") {
-                in_code_block = !in_code_block;
+            // A task body may show what a finished task's result line looks
+            // like; quoted in a fence it claims nothing.
+            // §FS-rhei-plan-language.2.1
+            if fence.read(line) || fence.is_open() {
                 continue;
             }
-            if in_code_block || !trimmed.starts_with("> **Result:**") {
+            let trimmed = line.trim_start();
+            if !trimmed.starts_with("> **Result:**") {
                 continue;
             }
 

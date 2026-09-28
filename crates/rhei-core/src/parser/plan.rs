@@ -2,6 +2,7 @@ use crate::ast::{
     ConsumedExport, ContentSection, Metadata, Rhei, Structure, Task, TaskExclusion,
     TaskSnapshotInherit, MAX_ALLOWED_LEVELS,
 };
+use crate::fence::FenceTracker;
 use crate::text::parse_task_id;
 use regex::Regex;
 
@@ -52,7 +53,7 @@ pub fn parse(input: &str) -> Result<Rhei> {
     let re_h2_heading = Regex::new(r#"^##\s+\S.*$"#).unwrap();
     let re_section_header = Regex::new(r#"^##\s+(.+)$"#).unwrap();
 
-    let mut in_code_block = false;
+    let mut fence = FenceTracker::default();
     let mut in_tasks_section = false;
     let mut tasks_section_line: Option<usize> = None;
     let mut pre_tasks_h2_seen = false;
@@ -97,11 +98,12 @@ pub fn parse(input: &str) -> Result<Rhei> {
             continue;
         }
 
-        let trimmed_start = raw.trim_start();
-        let is_fence = trimmed_start.starts_with("```");
+        // One definition of a fence governs which `##` lines are chapters and
+        // which `### <kind> <id>:` lines are nodes: nothing inside one is a
+        // production of the grammar. §FS-rhei-plan-language.2.1
+        let is_fence = fence.read(raw);
+        let in_code_block = fence.is_open();
         if is_fence {
-            in_code_block = !in_code_block;
-
             if in_tasks_section {
                 if let Some(top) = node_stack.last_mut() {
                     top.metadata_closed = true;

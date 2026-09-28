@@ -15,6 +15,9 @@ pub mod blocks;
 /// §AR-neural-admission
 pub mod budget;
 pub mod callback;
+/// The language's one reading of a fenced code block.
+/// §FS-rhei-plan-language.2.1
+pub mod fence;
 pub mod lexer;
 /// The keys rhei writes into a task's metadata, and the one conversion every
 /// JSON surface that publishes frontmatter uses.

@@ -526,14 +526,7 @@ transitions:
 #[test]
 fn a_poll_exhausted_agent_fires_the_edge_its_exhaustion_selected() {
     let dir = unique_temp_dir("exit-route-agent-poll");
-    let command = fixture_command(&write_python_agent(&dir, "refuse.py", "sys.exit(1)\n"));
-    let settings_dir = dir.join(".agent-grounds/rhei");
-    fs::create_dir_all(&settings_dir).expect("create settings dir");
-    let settings = format!(
-        r#"{{ "defaults": {{ "agent": "mock", "agent_timeout": "30s" }},
-  "agents": {{ "mock": {{ "command": {command}, "timeout": "30s" }} }} }}"#
-    );
-    fs::write(settings_dir.join("settings.json"), settings).expect("write settings");
+    write_refusing_mock_agent(&dir, &dir);
     let plan_path = write_fixture_file(
         &dir,
         "plan.rhei.md",
@@ -545,4 +538,83 @@ fn a_poll_exhausted_agent_fires_the_edge_its_exhaustion_selected() {
     let args = ["--no-tui", "--no-callbacks"];
     assert_success(&run_cli("run", &plan_path, &machine_path, &args));
     assert_task_state(&plan_path, &machine_path, "1", "gate");
+}
+
+/// `mock` resolved to a script that refuses. The settings home is resolved from
+/// the plan's own directory, so `settings_root` is the temporary directory for a
+/// single-file plan and the workspace itself for a directory one. Both agent
+/// paths stand their fixture up through this, so the two differ in the scheduler
+/// that applies the selection and in nothing else.
+// §FS-rhei-agents.3
+fn write_refusing_mock_agent(dir: &Path, settings_root: &Path) {
+    let command = fixture_command(&write_python_agent(dir, "refuse.py", "sys.exit(1)\n"));
+    let settings_dir = settings_root.join(".agent-grounds/rhei");
+    fs::create_dir_all(&settings_dir).expect("create settings dir");
+    let settings = format!(
+        r#"{{ "defaults": {{ "agent": "mock", "agent_timeout": "30s" }},
+  "agents": {{ "mock": {{ "command": {command}, "timeout": "30s" }} }} }}"#
+    );
+    fs::write(settings_dir.join("settings.json"), settings).expect("write settings");
+}
+
+/// The agent machine with the poll state marked `concurrent: true`, so one pass
+/// holds both tickets in `waiting` and the worker pool is what applies the
+/// selection. It is built out of the sequential fixture rather than written
+/// again, because the flag is the only difference the parallel case is about.
+fn concurrent_agent_poll_machine() -> String {
+    AGENT_POLL_MACHINE.replace("    initial: true\n", "    initial: true\n    concurrent: true\n")
+}
+
+/// The fourth and last path the selection is applied on, and the one a hand-run
+/// proved and nothing pinned: the agent worker pool. The two program paths are
+/// asserted on separately above for the same reason — the pool is separate code,
+/// so an exhausted poll budget's rule has to reach the apply step there too, or
+/// a ticket routed to a person is left in `waiting` under `--parallel` alone.
+///
+/// The `(parallel)` markers are asserted because reaching the pool is a property
+/// of the fixture: tickets sharing one plan file are forced back to sequential
+/// execution, so each ticket has a file of its own and `waiting` is
+/// `concurrent: true`. Without that assertion a fixture that drifted back would
+/// keep passing while testing the sequential path twice over.
+// §FS-rhei-run.5.1 §FS-rhei-transitions.4.4 §FS-rhei-run.3
+#[test]
+fn the_worker_pool_fires_the_edge_an_agents_exhaustion_selected() {
+    let tasks = [
+        ("01-waiting.md", "### Task 1: The poll whose agent refuses\n**State:** waiting\n"),
+        ("02-waiting.md", "### Task 2: The poll whose agent refuses as well\n**State:** waiting\n"),
+    ];
+    let (dir, workspace, machine_path) = create_workspace(
+        "exit-route-agent-poll-parallel",
+        "# Rhei: Agent poll exhaustion in the pool\n",
+        &tasks,
+    );
+    write_refusing_mock_agent(&dir, &workspace);
+    fs::write(&machine_path, concurrent_agent_poll_machine())
+        .expect("state machine should be written");
+
+    let result = run_cli(
+        "run",
+        &workspace,
+        &machine_path,
+        &["--no-tui", "--no-callbacks", "--parallel", "2"],
+    );
+    assert_success(&result);
+
+    let spawns = result
+        .stdout
+        .lines()
+        .filter_map(|line| line.strip_prefix("Spawning agent 'mock' for Task "))
+        .collect::<Vec<_>>();
+    assert_eq!(spawns.len(), 2, "one spawn per ticket; got:\n{}", result.stdout);
+    for spawn in &spawns {
+        assert!(
+            spawn.ends_with("(parallel)"),
+            "the pool is what this test is for, so a run that fell back to the \
+             sequential loop fails it; got:\n{spawn}"
+        );
+    }
+
+    for task in ["1", "2"] {
+        assert_task_state(&workspace, &machine_path, task, "gate");
+    }
 }

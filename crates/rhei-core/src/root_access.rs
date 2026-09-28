@@ -74,8 +74,9 @@ impl GuardFailure {
     }
 
     /// Exclusive acquisition never degrades, and its refusal names its subject.
-    /// The break before the root keeps every subject on a line short enough that
-    /// diagnostic wrapping cannot come between two words of one.
+    /// The breaks give the lock, the root and the lever a line each to open, so
+    /// a rendered diagnostic reads as three subjects rather than one paragraph;
+    /// they do not bound how the renderer wraps a line that is still too long.
     /// §FS-rhei-recover.4.1 §FS-rhei-errors.1.5
     fn refusal(&self) -> io::Error {
         io::Error::new(

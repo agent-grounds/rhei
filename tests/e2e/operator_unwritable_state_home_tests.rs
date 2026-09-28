@@ -224,7 +224,10 @@ fn recover_refuses_and_names_the_lock_it_could_not_create() {
     let refused = run_recover_in_terminal(&root, &recovery_confirmation("rollback"));
     unseal(&state);
 
-    let transcript = refused.transcript.replace('\r', "");
+    // A subject long enough to wrap straddles a break this assertion would not
+    // see, so undo the renderer's layout first: what it reads is the message,
+    // not this machine's `$TMPDIR`. §FS-rhei-errors.2
+    let transcript = rendered_stderr::undo_soft_wrap(&refused.transcript.replace('\r', ""));
     assert!(
         !refused.status.success(),
         "recover must not resolve a marker without exclusion\ntranscript:\n{transcript}"

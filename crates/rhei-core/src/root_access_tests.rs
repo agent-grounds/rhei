@@ -288,6 +288,19 @@ fn operator_exclusive_refusal_names_the_lock_the_root_and_the_lever() {
     assert!(probe.is_err(), "a nonblocking probe returns the failure, never Ok(None)");
 }
 
+/// The two overrides the warning case installs, put back from a drop: every
+/// assertion between them can panic, and a warning sink left behind is
+/// process-wide, so it would swallow the rest of the binary's warnings into a
+/// vector nobody reads. §FS-rhei-recover.4.1
+struct Overrides;
+
+impl Drop for Overrides {
+    fn drop(&mut self) {
+        lock_base(None);
+        set_warning_sink(None);
+    }
+}
+
 /// One line per canonical root per process, and none at all where the account
 /// holds the lock. §FS-rhei-recover.4.1
 #[test]
@@ -300,6 +313,7 @@ fn operator_degradation_warns_once_per_root() {
 
     let captured = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
     let sink = Arc::clone(&captured);
+    let _overrides = Overrides;
     set_warning_sink(Some(Box::new(move |text| {
         sink.lock().unwrap().push(text.to_owned());
     })));
@@ -309,8 +323,6 @@ fn operator_degradation_warns_once_per_root() {
     }
     lock_base(Some(&writable));
     drop(RootAccessGuard::shared(&quiet).expect("guarded hold"));
-    lock_base(None);
-    set_warning_sink(None);
 
     // Other cases share the sink while it is installed, so count by root.
     let lines = captured.lock().unwrap().clone();

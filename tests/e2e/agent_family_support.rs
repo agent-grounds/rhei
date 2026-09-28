@@ -216,9 +216,16 @@ result('## Result\n\nWrapped Claude finished.\n')
 
 /// A fake Claude Code that emits no envelope but leaves usage-shaped text in
 /// its log — the one thing the Claude row forbids reading.
+///
+/// The prose goes to stderr rather than stdout on purpose. Only the stdout
+/// reader is handed the usage capture, so prose written there would be capture
+/// content the Claude parser rejects, and the run would end `extractor-failed`
+/// before the log scraper is ever the question. On stderr the text reaches the
+/// agent log — which is what a scraper would read — while the capture stays
+/// empty, so `no-usage-emitted` is the answer under test.
 /// §FS-rhei-cost-accounting.4
-pub const CLAUDE_LOG_TEXT_ONLY_AGENT: &str = r#"print('tokens used', flush=True)
-print('12,345', flush=True)
+pub const CLAUDE_LOG_TEXT_ONLY_AGENT: &str = r#"print('tokens used', file=sys.stderr, flush=True)
+print('12,345', file=sys.stderr, flush=True)
 result('## Result\n\nNo envelope, only prose.\n')
 "#;
 

@@ -153,3 +153,43 @@ fn an_unknown_family_is_refused_and_names_the_known_ones() {
         assert_stderr_contains(&validate, known);
     }
 }
+
+/// A key that is not a field loads and does nothing, so an operator is told
+/// rather than refused — on stderr, leaving `--json` stdout a reader can still
+/// parse. `autonomous_args` is the ticket's own case: a `models.<id>.agents`
+/// binding field written on an `agents.<id>` profile, read and discarded in
+/// silence until now.
+// §FS-rhei-agents.1.1.2
+#[test]
+fn an_unknown_profile_key_is_warned_about_and_the_json_still_parses() {
+    let workspace = wrapped_workspace(
+        "family-unknown-key",
+        CODEX_DIALECT_AGENT,
+        serde_json::json!({
+            "family": "codex",
+            "autonomous_args": ["--print", "--output-format", "stream-json"],
+        }),
+        "openai",
+        "gpt-contract",
+    );
+    let roster = run_cli("roster", &workspace.plan, &workspace.machine, &["--json"]);
+    assert_success(&roster);
+    assert_stderr_contains(
+        &roster,
+        "warning: agents.cld declares 'autonomous_args', which is not a field of an agent \
+         profile and is ignored.",
+    );
+    // The diagnostic names what may be written instead of only what may not.
+    assert_stderr_contains(&roster, "The fields are family, command,");
+
+    // Nothing of the warning reached stdout, so the machine-readable answer is
+    // still an answer. §FS-rhei-agents.1.1.7
+    assert!(
+        !roster.stdout.contains("warning:"),
+        "the warning belongs on stderr:\n{}",
+        roster.stdout
+    );
+    let parsed: serde_json::Value =
+        serde_json::from_str(&roster.stdout).expect("roster JSON still parses");
+    assert_eq!(parsed["agents"][WRAPPED_AGENT]["family"], "codex");
+}

@@ -114,6 +114,14 @@ fn the_claude_family_never_reads_usage_from_log_text() {
     let run = run_cli("run", &workspace.plan, &workspace.machine, &["--no-tui", "--no-callbacks"]);
     assert_success(&run);
 
+    // There was something to scrape. A guard that passed because the log was
+    // empty would pin nothing. §FS-rhei-cost-accounting.4
+    let log = workspace.agent_log();
+    assert!(
+        log.contains("tokens used") && log.contains("12,345"),
+        "the usage-shaped prose reached the log a scraper would read:\n{log}"
+    );
+
     let record = one_record(&workspace);
     assert_eq!(record["agent_family"], "claude-code");
     assert_eq!(

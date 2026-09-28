@@ -203,7 +203,12 @@ mod agent_family {
             "extraction_status": "measured",
             "scope": "aggregate-agent-process",
             "token_convention": TOKEN_CONVENTION_INCLUDES_CACHE,
-            "tokens": {},
+            // The whole dimension tree, from the type rather than restated: an
+            // unmeasured record still carries `input` and `output`, and a
+            // fixture that left them out would fail before the field under
+            // test was ever read.
+            "tokens": serde_json::to_value(AccountingTokens::default())
+                .expect("the unmeasured token tree serializes"),
             "pricing": { "status": "unpriced" },
         });
         let without: AccountingInvocationRecord =
@@ -220,5 +225,68 @@ mod agent_family {
         assert_eq!(with.agent, "cld", "the family never displaces the profile's own id");
         // Stated wins over anything the family might have implied.
         assert_eq!(record_token_convention(&with), TokenConvention::ExcludesCache);
+    }
+    /// A profile carrying every field, so nothing is skipped on the way out.
+    ///
+    /// The destructuring is the point of the helper: a field added to
+    /// `CustomAgentProfile` stops this compiling until it is named here, which
+    /// the serialized comparison below cannot see on its own, several fields
+    /// being skipped when absent. §FS-rhei-agents.1.1.2
+    fn fully_populated_profile() -> CustomAgentProfile {
+        let profile: CustomAgentProfile = serde_json::from_value(serde_json::json!({
+            "family": "codex",
+            "command": ["agent"],
+            "prompt_flag": "--prompt",
+            "model_flag": "--model",
+            "stdin_prompt": true,
+            "intervene_stdin": true,
+            "timeout": "30m",
+            "mcp_flag": "--mcp",
+            "mcp_config_flag": "--mcp-config",
+            "skill_flag": "--skill",
+            "deny_read": { "path_flag": "--deny" },
+            "modes": { "yolo": ["--yolo"] },
+            "effort": { "values": { "high": "high" }, "args": ["--effort"] },
+            "session": { "resume": true },
+        }))
+        .expect("a profile carrying every field decodes");
+        let CustomAgentProfile {
+            family: _,
+            command: _,
+            prompt_flag: _,
+            model_flag: _,
+            stdin_prompt: _,
+            intervene_stdin: _,
+            timeout: _,
+            mcp_flag: _,
+            mcp_config_flag: _,
+            skill_flag: _,
+            deny_read: _,
+            modes: _,
+            effort: _,
+            session: _,
+        } = &profile;
+        profile
+    }
+
+    /// The unknown-key warning is only as good as the list it accuses from: a
+    /// field the list has forgotten is a valid key an operator is told to
+    /// remove. §FS-rhei-agents.1.1.2
+    #[test]
+    fn the_unknown_key_warning_knows_every_field_a_profile_has() {
+        let serialized = serde_json::to_value(fully_populated_profile())
+            .expect("a profile serializes")
+            .as_object()
+            .expect("a profile is a JSON object")
+            .keys()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let listed =
+            AGENT_PROFILE_FIELDS.iter().map(|field| (*field).to_string()).collect::<BTreeSet<_>>();
+        assert_eq!(
+            serialized, listed,
+            "AGENT_PROFILE_FIELDS is what the warning offers instead of the key it refused; \
+             it must be every field of CustomAgentProfile and nothing else"
+        );
     }
 }

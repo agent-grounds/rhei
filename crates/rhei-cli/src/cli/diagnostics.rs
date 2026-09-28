@@ -515,17 +515,33 @@ fn collect_parse_errors(path: &Path, source: &str) -> Vec<rhei_core::parser::Par
         return rhei_core::parser::parse_collect(source).1;
     }
 
-    // A workspace task file or a basin ticket file parses as bare task nodes,
-    // against the structure of the document that owns it.
-    let Some(structure) = owning_structure(path) else {
-        return Vec::new();
-    };
-    rhei_core::parser::parse_workspace_tasks_collect_with_structure(source, &structure).1
+    // A bare task file parses against the structure of the document that owns
+    // it, and the two roles admit different frontmatter, so which production
+    // applies is part of the role. §FS-rhei-plan-language.2
+    match owning_role(path) {
+        Some(BareTaskFileRole::WorkspaceTask(structure)) => {
+            rhei_core::parser::parse_workspace_task_file_collect(source, Some(&structure)).1
+        }
+        Some(BareTaskFileRole::BasinTicket(structure)) => {
+            rhei_core::parser::parse_basin_ticket_file_collect(source, Some(&structure)).1
+        }
+        None => Vec::new(),
+    }
 }
 
-/// Structure governing a bare task file: its Directory Workspace index, or the
-/// project manifest when the file is a basin ticket. §FS-rhei-panta.2
-fn owning_structure(path: &Path) -> Option<rhei_core::ast::Structure> {
+/// What a bare task file is, and the structure governing it: a `tasks/` file of
+/// a Directory Workspace, which may open with a metadata-only frontmatter
+/// block, or a basin ticket under the project manifest, which admits none.
+/// §FS-rhei-panta.2 §FS-rhei-plan-language.2
+enum BareTaskFileRole {
+    WorkspaceTask(rhei_core::ast::Structure),
+    BasinTicket(rhei_core::ast::Structure),
+}
+
+/// Walk up from a bare task file to the document that owns it. The nearer
+/// document wins, so a `tasks/` file inside a project member is a workspace
+/// task file rather than a basin ticket.
+fn owning_role(path: &Path) -> Option<BareTaskFileRole> {
     let parent = path.parent()?;
     // `tasks/` files may nest, so walk up to the workspace root.
     let mut dir = parent;
@@ -533,12 +549,14 @@ fn owning_structure(path: &Path) -> Option<rhei_core::ast::Structure> {
         let index = dir.join("index.rhei.md");
         if index.is_file() {
             let raw = std::fs::read_to_string(&index).ok()?;
-            return Some(rhei_core::parser::parse_workspace_index(&raw).ok()?.structure);
+            let structure = rhei_core::parser::parse_workspace_index(&raw).ok()?.structure;
+            return Some(BareTaskFileRole::WorkspaceTask(structure));
         }
         let manifest = dir.join(rhei_core::workspace::PANTA_INDEX_FILE);
         if manifest.is_file() {
             let raw = std::fs::read_to_string(&manifest).ok()?;
-            return Some(rhei_core::parser::parse_panta_manifest(&raw).ok()?.structure);
+            let structure = rhei_core::parser::parse_panta_manifest(&raw).ok()?.structure;
+            return Some(BareTaskFileRole::BasinTicket(structure));
         }
         dir = dir.parent()?;
     }

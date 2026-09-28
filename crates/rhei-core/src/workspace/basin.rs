@@ -6,7 +6,11 @@
 //! difference from an ordinary Directory Workspace rhei, and the reason it is
 //! loaded by its own function rather than by [`super::load_workspace`]: any
 //! `*.md` under it is a task file, `index.rhei.md` is a mistake worth naming,
-//! and `basin` is a reserved id whether or not the directory exists.
+//! frontmatter of any kind is a mistake worth naming, and `basin` is a reserved
+//! id whether or not the directory exists. That last one is why its tickets
+//! parse as `basin_task_file` rather than `workspace_task_file`: with no
+//! metadata document of its own, the basin has nowhere for an authored
+//! `metadata.tasks.<id>` block to belong. §FS-rhei-plan-language.2
 
 // §FS-rhei-panta.2 §AR-rhei-panta.1
 
@@ -49,7 +53,7 @@ pub(super) fn load_basin_rhei(
         let content = crate::source::read_to_string(&path).map_err(|e| {
             ParseError::new(format!("failed to read {}: {e}", path.display()), None)
         })?;
-        let parsed = parser::parse_workspace_tasks_with_structure(&content, structure)
+        let parsed = parser::parse_basin_ticket_file(&content, Some(structure))
             .map_err(|e| nested_parse_error(e, &path))?;
         for task in &parsed {
             collect_task_sources(task, &path, &mut task_sources)?;

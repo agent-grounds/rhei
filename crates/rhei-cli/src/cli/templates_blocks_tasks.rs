@@ -50,8 +50,14 @@
                     let mut tasks = Vec::new();
                     for path in paths {
                         let text = String::from_utf8(files.remove(&path).unwrap().bytes).map_err(|e| miette!(help = "rewrite the task file as UTF-8", "{}: {e:?}", dir.join(&path).display()))?;
-                        let nodes = rhei_core::parser::parse_workspace_tasks_with_structure(&text, &index.structure).map_err(|e| miette!(help = "fix the workspace task markdown syntax", "{}: {e:?}", dir.join(&path).display()))?;
-                        tasks.push(TaskFile { source_path: path.clone(), path, tasks: nodes });
+                        let parsed = rhei_core::parser::parse_workspace_task_file(&text, Some(&index.structure)).map_err(|e| miette!(help = "fix the workspace task markdown syntax", "{}: {e:?}", dir.join(&path).display()))?;
+                        // Composition rewrites task ids, so an authored entry
+                        // would have to be rewritten with them: the compiler
+                        // refuses rather than carry it. §FS-rhei-library.4
+                        if parsed.metadata.is_some() {
+                            return Err(miette!(help = "move the entries into the block's index.rhei.md, which composition qualifies with the mount", "{}: a mounted block's task file carries no metadata frontmatter block — composition rewrites task ids, so an authored `metadata.tasks.<id>` entry would have to be rewritten with them. Put block metadata in the block's index.rhei.md", dir.join(&path).display()));
+                        }
+                        tasks.push(TaskFile { source_path: path.clone(), path, tasks: parsed.tasks });
                     }
                     (rhei_core::ast::Rhei { title: index.title, states: index.states, states_declared: index.states_declared, structure: index.structure, metadata: index.metadata, content_sections: index.content_sections, tasks: Vec::new() }, tasks)
                 }

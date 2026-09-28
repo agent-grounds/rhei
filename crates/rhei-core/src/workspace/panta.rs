@@ -169,6 +169,16 @@ pub fn load_panta_project_lenient(dir: &Path) -> parser::Result<PantaProject> {
     load_panta_project_with(dir, true, None)
 }
 
+/// Where a basin load failed, for the one-line skip message a lenient load
+/// records: the ticket file the error names, with its line when it has one.
+fn basin_failure_location(err: &ParseError, basin_dir: &Path) -> String {
+    let named = err.file.as_deref().unwrap_or(basin_dir);
+    match err.line {
+        Some(line) => format!("{}:{line}", named.display()),
+        None => named.display().to_string(),
+    }
+}
+
 fn load_panta_project_with(
     dir: &Path,
     lenient: bool,
@@ -267,14 +277,30 @@ fn load_panta_project_with(
         if seen_ids.insert(BASIN_RHEI_ID.to_string(), basin_dir.clone()).is_some() {
             return Err(ParseError::new("duplicate synthetic basin rhei id", None));
         }
-        let loaded = load_basin_rhei(&basin_dir, &manifest.structure, &manifest.states)?;
-        rheis.push((
-            BASIN_RHEI_ID.to_string(),
-            loaded.rhei,
-            loaded.task_sources,
-            basin_dir.clone(),
-            basin_dir,
-        ));
+        // An unparseable basin ticket keeps the basin out of the graph as a
+        // malformed rhei keeps that rhei out, so a lenient load skips it the
+        // same way. §FS-rhei-panta.6 §FS-rhei-validate.4.4
+        match load_basin_rhei(&basin_dir, &manifest.structure, &manifest.states) {
+            Ok(loaded) => rheis.push((
+                BASIN_RHEI_ID.to_string(),
+                loaded.rhei,
+                loaded.task_sources,
+                basin_dir.clone(),
+                basin_dir,
+            )),
+            Err(err) if lenient => {
+                seen_ids.remove(BASIN_RHEI_ID);
+                unloadable.push(format!(
+                    "rhei '{BASIN_RHEI_ID}' could not be loaded ({}): {}",
+                    // The basin is a directory with no plan document of its
+                    // own, so the entry names no file: the ticket the error
+                    // came from is the only useful place to send a reader.
+                    basin_failure_location(&err, &basin_dir),
+                    err.message
+                ));
+            }
+            Err(err) => return Err(err),
+        }
     }
 
     let rhei_ids: Vec<String> = rheis.iter().map(|(id, ..)| id.clone()).collect();

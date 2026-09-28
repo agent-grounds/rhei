@@ -1045,6 +1045,7 @@ fn load_workspace_for_validation(ws_dir: &Path) -> MietteResult<LoadedPlan> {
     let mut task_sources = HashMap::new();
     let mut parse_error_groups = Vec::new();
     let mut duplicate_task_error: Option<String> = None;
+    let mut authored_metadata: Vec<rhei_core::workspace::AuthoredTaskMetadata> = Vec::new();
 
     if tasks_dir.is_dir() {
         let task_files = workspace::discover_task_files(&tasks_dir)
@@ -1052,19 +1053,21 @@ fn load_workspace_for_validation(ws_dir: &Path) -> MietteResult<LoadedPlan> {
 
         for path in task_files {
             let raw = read_input_file(&path)?;
-            let (maybe_tasks, errors) =
-                rhei_core::parser::parse_workspace_tasks_collect_with_structure(
-                    &raw,
-                    &index.structure,
-                );
+            // A task file's own metadata block is checked in this same
+            // collecting pass, so its diagnostics arrive with every other
+            // recoverable parse error. §FS-rhei-validate.4 §FS-rhei-validate.4.4
+            let (maybe_file, errors) = rhei_core::parser::parse_workspace_task_file_collect(
+                &raw,
+                Some(&index.structure),
+            );
             if !errors.is_empty() {
                 parse_error_groups.push(ParseErrorGroup { path, input: raw, errors });
                 continue;
             }
-            let Some(tasks) = maybe_tasks else {
+            let Some(parsed) = maybe_file else {
                 continue;
             };
-            for task in &tasks {
+            for task in &parsed.tasks {
                 if duplicate_task_error.is_none() {
                     if let Err(err) =
                         collect_workspace_task_sources(task, &path, &mut task_sources)
@@ -1073,7 +1076,13 @@ fn load_workspace_for_validation(ws_dir: &Path) -> MietteResult<LoadedPlan> {
                     }
                 }
             }
-            all_tasks.extend(tasks);
+            if let Some(metadata) = parsed.metadata {
+                authored_metadata.push(rhei_core::workspace::AuthoredTaskMetadata {
+                    path: path.clone(),
+                    metadata,
+                });
+            }
+            all_tasks.extend(parsed.tasks);
         }
     }
 
@@ -1088,6 +1097,24 @@ fn load_workspace_for_validation(ws_dir: &Path) -> MietteResult<LoadedPlan> {
         ));
     }
 
+    // The one merge, shared with `rhei_core::workspace::load_workspace`, so the
+    // overlap a task file has with the index is refused by every command alike.
+    // §FS-rhei-plan-language.1.4 §FS-rhei-validate.4.4
+    let metadata = rhei_core::workspace::merge_authored_task_metadata(
+        index.metadata,
+        &index_path,
+        &authored_metadata,
+    )
+    .map_err(|err| {
+        miette!(
+            help = "a task file's metadata and the index's entry for the same task are disjoint \
+                    by key: delete the key from one of the two files, then re-check with: rhei \
+                    validate <workspace>",
+            "{}",
+            err.message
+        )
+    })?;
+
     // An empty workspace is a valid, empty rhei; `rhei validate` warns rather
     // than failing the whole project's load. §FS-rhei-plan-language.1.2
 
@@ -1098,7 +1125,7 @@ fn load_workspace_for_validation(ws_dir: &Path) -> MietteResult<LoadedPlan> {
             states: index.states,
             states_declared: index.states_declared,
             structure: index.structure,
-            metadata: index.metadata,
+            metadata,
             content_sections: index.content_sections,
             tasks: all_tasks,
         },

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- Let a workspace task file carry its own metadata. A file under `tasks/` may
+  now open with a metadata-only frontmatter block holding
+  `metadata.tasks.<id>` entries for the tasks it defines, so a task's custom
+  field lives beside that task's `**State:**` rather than in the one file every
+  other run also writes. The block and `index.rhei.md`'s entry for the same
+  task are merged and **disjoint by key** — the index may hold `priority` while
+  the task's own file holds `context`, and both reach `{meta.<key>}`, callback
+  task metadata and `rhei render`; the same key in both places is a validation
+  error naming both files and the key. Nothing new is written: `stateVisits`,
+  `pollNextAttemptAt`, `providerLimits`, `budgetTicketId` and the supervision
+  block still go to `index.rhei.md` whatever a task file carries, and `rhei
+  reset` leaves an authored block byte-identical. What the block may not do is
+  now refused by name instead of accepted and silently discarded: a top-level
+  key other than `metadata`, an entry for a task another file defines,
+  malformed YAML, the same key as the index, a block in a `basin/` ticket file
+  (the basin's metadata document is the project manifest), and a block in a
+  mounted block's task file, which composition would have to rewrite ids
+  inside. (PR #331)
+
 - Read a fenced code block in a plan the way the language defines one, so a plan
   may quote the plan format. The structural scan used to decide what was code by
   flipping a flag on any line starting with three backticks: it kept no run

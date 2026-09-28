@@ -17,9 +17,11 @@ mod workspace;
 pub use plan::parse;
 pub use recovery::parse_collect;
 pub use workspace::{
-    parse_panta_manifest, parse_workspace_index, parse_workspace_tasks,
-    parse_workspace_tasks_collect, parse_workspace_tasks_collect_with_structure,
-    parse_workspace_tasks_with_structure, PantaManifest, WorkspaceIndex,
+    parse_basin_ticket_file, parse_basin_ticket_file_collect, parse_panta_manifest,
+    parse_workspace_index, parse_workspace_task_file, parse_workspace_task_file_collect,
+    parse_workspace_tasks, parse_workspace_tasks_collect,
+    parse_workspace_tasks_collect_with_structure, parse_workspace_tasks_with_structure,
+    PantaManifest, WorkspaceIndex, WorkspaceTaskFile,
 };
 
 use crate::ast::{Metadata, Structure, DEFAULT_MAX_LEVELS, DEFAULT_NODE_KIND, MAX_ALLOWED_LEVELS};

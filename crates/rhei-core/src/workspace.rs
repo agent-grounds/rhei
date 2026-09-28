@@ -13,12 +13,18 @@
 //! lives in [`panta`]. What the merge does to a rhei's ids, its metadata, and
 //! its structure — and what a rhei id is allowed to be — lives in [`qualify`];
 //! the one rhei a project synthesizes rather than discovers lives in [`basin`].
+//!
+//! A workspace rhei's metadata is read from more files than it is written to: a
+//! task file may open with its own authored `metadata.tasks.<id>` block, and
+//! folding those into the index is [`task_metadata`]. Only `index.rhei.md` is
+//! ever written. §FS-rhei-plan-language.1.4 §AR-rhei-panta.2
 
 // §AR-rhei-panta
 
 mod basin;
 mod panta;
 mod qualify;
+mod task_metadata;
 
 pub use basin::BASIN_RHEI_ID;
 pub use panta::{
@@ -27,6 +33,7 @@ pub use panta::{
     panta_project_dir, rhei_id_for_path, rhei_plan_file, wrap_rhei_as_implicit_panta, PantaProject,
     PANTA_INDEX_FILE,
 };
+pub use task_metadata::{merge_authored_task_metadata, AuthoredTaskMetadata};
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -185,6 +192,10 @@ fn collect_task_roots(
 /// Reads `index.rhei.md` for plan metadata, then discovers and parses every
 /// `.md` file inside the `tasks/` subdirectory. Reports duplicate task IDs
 /// across files and missing structure.
+///
+/// The rhei's metadata is the index's, with the authored
+/// `metadata.tasks.<id>` block each task file may open with merged into it
+/// under rhei-local ids. §FS-rhei-plan-language.1.4
 pub fn load_workspace(dir: &Path) -> parser::Result<Workspace> {
     let root_guards =
         crate::root_access::for_input(dir).map_err(|err| ParseError::new(err.to_string(), None))?;
@@ -199,6 +210,7 @@ pub fn load_workspace(dir: &Path) -> parser::Result<Workspace> {
     let tasks_dir = dir.join("tasks");
     let mut all_tasks: Vec<Task> = Vec::new();
     let mut task_sources: HashMap<String, PathBuf> = HashMap::new();
+    let mut authored_metadata: Vec<AuthoredTaskMetadata> = Vec::new();
 
     if tasks_dir.is_dir() {
         for path in discover_task_files(&tasks_dir)? {
@@ -206,20 +218,29 @@ pub fn load_workspace(dir: &Path) -> parser::Result<Workspace> {
                 ParseError::new(format!("failed to read {}: {e}", path.display()), None)
             })?;
 
-            let tasks = parser::parse_workspace_tasks_with_structure(&content, &index.structure)
+            let parsed = parser::parse_workspace_task_file(&content, Some(&index.structure))
                 .map_err(|e| nested_parse_error(e, &path))?;
 
-            for task in &tasks {
+            for task in &parsed.tasks {
                 collect_task_sources(task, &path, &mut task_sources)?;
             }
 
-            all_tasks.extend(tasks);
+            // The block a task file opened with is read, never written: the
+            // merge is what makes it reachable through `{meta.<key>}` and
+            // `rhei render`. §FS-rhei-plan-language.1.4
+            if let Some(metadata) = parsed.metadata {
+                authored_metadata.push(AuthoredTaskMetadata { path: path.clone(), metadata });
+            }
+
+            all_tasks.extend(parsed.tasks);
         }
     }
 
     // No task files is a valid, empty rhei. Failing here let one freshly
     // created directory break loading for every sibling rhei; `rhei validate`
     // warns instead. §FS-rhei-plan-language.1.2
+
+    let metadata = merge_authored_task_metadata(index.metadata, &index_path, &authored_metadata)?;
 
     Ok(Workspace {
         root_guards,
@@ -228,7 +249,7 @@ pub fn load_workspace(dir: &Path) -> parser::Result<Workspace> {
             states: index.states,
             states_declared: index.states_declared,
             structure: index.structure,
-            metadata: index.metadata,
+            metadata,
             content_sections: index.content_sections,
             tasks: all_tasks,
         },

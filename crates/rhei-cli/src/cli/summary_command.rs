@@ -29,6 +29,69 @@ struct SummaryOptions {
     prices: Option<PathBuf>,
 }
 
+/// Resolve the machine that gives a summary's task tally its meaning.
+///
+/// A Panta may contain self-declaring rheis, so its merged task graph is not
+/// necessarily governed by the manifest's default machine. A summary can
+/// name one workflow only; when its task scope resolves to several distinct
+/// machines, refuse to combine their terminal definitions and ask the caller
+/// to narrow the scope instead. §FS-rhei-summary.2.1 §DA-per-rhei-state-machines
+fn resolve_summary_machine(
+    input: &Path,
+    loaded: &LoadedPlan,
+    state_machine_path: Option<&Path>,
+    scope: &RheiScope,
+) -> MietteResult<ResolvedStateMachine> {
+    // An explicit override retains the existing whole-scope behavior. A
+    // non-Panta plan has one effective machine by construction.
+    if state_machine_path.is_some() || !loaded.is_panta_project() {
+        return resolve_state_machine_for_loaded_plan(input, loaded, state_machine_path);
+    }
+
+    let machines = resolve_state_machines_for_loaded_plan(input, loaded, None)?;
+    let tasks = narrow_to_rhei_scope(flatten_tasks(&loaded.rhei), scope);
+    let mut candidates: BTreeMap<String, ResolvedStateMachine> = BTreeMap::new();
+
+    for task in tasks {
+        let task_id = task.id.to_string();
+        let resolved = machines.for_task_str(&task_id);
+        candidates.entry(resolved.machine.fingerprint()).or_insert_with(|| resolved.clone());
+    }
+
+    // An empty member has no task from which to infer a machine, but a
+    // `--rhei` selection still has an authored declaration to honor. The
+    // project-wide empty summary falls back to the project default.
+    if candidates.is_empty() {
+        let selected = scope
+            .as_ref()
+            .map(|ids| ids.iter().cloned().collect::<Vec<_>>())
+            .unwrap_or_else(|| loaded.rhei_ids.clone());
+        for rhei_id in selected {
+            let resolved = machines.per_rhei.get(&rhei_id).unwrap_or(&machines.default);
+            candidates.entry(resolved.machine.fingerprint()).or_insert_with(|| resolved.clone());
+        }
+    }
+
+    if candidates.is_empty() {
+        candidates.insert(machines.default.machine.fingerprint(), machines.default);
+    }
+
+    match candidates.len() {
+        1 => Ok(candidates.into_values().next().expect("one summary machine")),
+        _ => {
+            let names = candidates
+                .values()
+                .map(|resolved| resolved.machine.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            Err(miette!(
+                help = "narrow the summary with `--rhei <ID>` so it covers one state machine",
+                "summary scope spans multiple state machines: {names}"
+            ))
+        }
+    }
+}
+
 fn summary_command(
     input: &Path,
     scope: &[String],
@@ -50,7 +113,7 @@ fn summary_command(
     // §FS-rhei-panta.6.5: scope is one thing for both reading commands, so
     // `--rhei` is refused and resolved here exactly as `rhei cost` does it.
     let scope = resolve_rhei_scope(&loaded, scope)?;
-    let resolved = resolve_state_machine_for_loaded_plan(&input_buf, &loaded, state_machine)?;
+    let resolved = resolve_summary_machine(&input_buf, &loaded, state_machine, &scope)?;
     let run_root = execution_workspace_root(&input_buf);
     let roots = accounting_roots(&loaded, &run_root, &scope);
     let inspection = read_cost_inspection_over(&roots, &scope);

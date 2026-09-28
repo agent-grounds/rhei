@@ -71,6 +71,10 @@ distinct models, and the task tally:
   appended, so a mid-run summary says it is one. One sentence must not describe
   two scopes: `rhei summary <member>` counting the member's invocations beside
   the whole project's tasks reads as a summary of neither.
+- For a Panta project, each in-scope task is classified by the state machine of
+  the rhei that owns it. If the scope contains tasks from more than one
+  distinct machine, the command refuses rather than combining incompatible
+  terminal definitions; use `--rhei <ID>` to produce one summary per machine.
 - With explicit `--run`/`--prices`, the sentence names the exact run id and its
   invocation and model counts. Its task tally covers only task ids represented
   by that run's selected invocation records, using the states recorded by

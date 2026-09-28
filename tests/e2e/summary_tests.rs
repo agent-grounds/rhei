@@ -330,3 +330,59 @@ fn summary_of_a_workspace_with_no_accounting_still_prints_the_lead_line() {
         result.stdout
     );
 }
+
+#[test]
+fn summary_uses_a_members_machine_when_the_project_has_no_default() {
+    // §FS-rhei-summary.2.1 §DA-per-rhei-state-machines: a project-wide
+    // summary must classify a member's tasks under that member's machine.
+    let dir = unique_temp_dir("summary-member-machine");
+    fs::write(dir.join("index.panta.md"), "# Panta: Member machine\n")
+        .expect("panta manifest should be written");
+    let member = dir.join("flow");
+    fs::create_dir_all(member.join("tasks")).expect("member tasks directory should be created");
+    fs::write(member.join("index.rhei.md"), "# Rhei: Flow\n**States:** grounded-ticket\n")
+        .expect("member index should be written");
+    fs::write(
+        member.join("states.yaml"),
+        r#"name: grounded-ticket
+version: 1
+states:
+  pending:
+    description: Task not yet started
+    initial: true
+  completed:
+    description: Task finished successfully
+    final: true
+  cancelled:
+    description: Task intentionally cancelled
+    final: true
+transitions:
+  - from: pending
+    to: completed
+  - from: pending
+    to: cancelled
+"#,
+    )
+    .expect("member machine should be written");
+    for (name, task) in [
+        ("completed.md", "### Task 1: Completed\n**State:** completed\n"),
+        ("cancelled.md", "### Task 2: Cancelled\n**State:** cancelled\n"),
+        ("pending.md", "### Task 3: Pending\n**State:** pending\n"),
+    ] {
+        fs::write(member.join("tasks").join(name), task).expect("task should be written");
+    }
+
+    let output = rhei_command(dir.join(".home"))
+        .arg("summary")
+        .arg(&dir)
+        .output()
+        .expect("summary should run");
+    let result = CliRun::from(&output);
+    assert_success(&result);
+    assert_eq!(
+        result.stdout.lines().next(),
+        Some("`grounded-ticket` workflow: 0 agent invocations across 0 models; 1 task completed, 1 cancelled, 1 in progress."),
+        "got:\n{}",
+        result.stdout
+    );
+}

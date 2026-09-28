@@ -385,6 +385,14 @@ the alias chain. Markdown uses the equivalent HTML comment. Headers never
 contain a temporary extraction path or canonical host path and point readers
 to `.agent-grounds/rhei/composition.lock.json` for machine-readable detail.
 
+A mounted block's task file may **not** open with the metadata-only frontmatter
+block a plain workspace task file may carry (§FS-rhei-plan-language.1.4).
+Composition rewrites task ids, so an authored `metadata.tasks.<id>` entry in a
+block task file would have to be rewritten alongside them; the compiler refuses
+it instead, naming the file and the block's own `index.rhei.md` as where block
+metadata goes. Carrying such a block through qualification is a contract of its
+own and is deliberately outside this one (§8).
+
 ### 4.1. Composition lock and per-node provenance
 
 Every curated composition with `use` and every direct `--mount` composition

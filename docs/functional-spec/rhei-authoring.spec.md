@@ -111,7 +111,11 @@ that exceed the declared depth or use a heading kind not listed in
 In a directory workspace, the `structure` block is declared once in
 `index.rhei.md` and applies to every markdown task file under `tasks/`.
 Task files do not redeclare structure locally; loaders and validators parse
-them using the workspace index structure.
+them using the workspace index structure. A task file's own frontmatter is
+metadata-only and carries nothing plan-wide: `structure` written there is a
+validation error naming `index.rhei.md` as where it belongs
+(§FS-rhei-plan-language.1.4, §FS-rhei-validate.4.4). What a task file's
+frontmatter *may* carry is §4.6.
 
 ## 4. Metadata
 
@@ -250,6 +254,60 @@ start inside the implementer's reasoning. Omission preserves the state rule;
 guaranteed cost saving: a large inherited prefix is read again on every later
 turn. Durable facts still belong in `**Provides:**` / `**Consumes:**` and state
 artifacts. See §FS-rhei-plan-language.3.14 and §FS-rhei-snapshots.4.
+
+### 4.6. A task's own metadata, in a directory workspace
+
+Custom per-task metadata lives under `metadata.tasks.<id>` in YAML frontmatter
+(§FS-rhei-transitions.2.2), and in a directory workspace a task file may open
+with a metadata-only block of its own so that a task's custom field sits beside
+that task's `**State:**` rather than in a file every other run also writes
+(§FS-rhei-plan-language.1.4).
+
+Two tasks in two files, each needing one field — which context it belongs to:
+
+```markdown
+<!-- tasks/01-first.md -->
+---
+metadata:
+  tasks:
+    first:
+      context: oracle-labs
+---
+
+### Task first: first item
+**State:** pending
+```
+
+```markdown
+<!-- tasks/02-second.md -->
+---
+metadata:
+  tasks:
+    second:
+      context: personal
+---
+
+### Task second: second item
+**State:** pending
+```
+
+`index.rhei.md` needs no metadata at all, and `{meta.context}` resolves per
+task exactly as it would had both fields been written there
+(§FS-rhei-states.4.1). Four things the block may not do, each of them a named
+diagnostic rather than a silent drop (§FS-rhei-validate.4.4):
+
+- carry any top-level key but `metadata` — `structure` included (§3.3);
+- carry `metadata.tasks.<id>` for a task some *other* file defines;
+- set a key that `index.rhei.md` already sets for the same task. The two are
+  disjoint by key: the index may hold `priority` for `first` while
+  `tasks/01-first.md` holds `context`, and both arrive merged; `context` in
+  both is the error;
+- be the place runtime bookkeeping lands. `stateVisits` and the other keys the
+  runtime owns go to `index.rhei.md` whatever a task file carries, and nothing
+  Rhei runs — `rhei reset` included — rewrites an authored block.
+
+Under `basin/` there is no such block: an unfiled ticket's metadata belongs to
+the project manifest (§FS-rhei-panta.2).
 
 ## 5. Using a Custom State Machine
 

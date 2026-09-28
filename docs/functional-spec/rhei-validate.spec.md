@@ -58,6 +58,9 @@ pass `--state-machine`.
    file validation collect every recoverable parse error before returning so
    users can fix related issues in one pass. Workspace index parse errors remain
    fail-fast because later task-file diagnostics may depend on index structure.
+   A workspace task file's metadata-only frontmatter block
+   (§FS-rhei-plan-language.1.4) is checked in this same pass; its diagnostics
+   are §4.4.
 2. Resolve the state machine and validate plan semantics, including state
    values, task ids, dependencies, node policy, terminal and gating states,
    counted-loop syntax, artifact contracts, and task read exclusions.
@@ -213,6 +216,46 @@ consumer warning in §4 remains the sole coherence warning when a direct
 producer is non-terminal; export validation does not add a second warning for
 the same ordering contradiction. The graph-level `**Consumes:**` visibility
 advisory in §4 remains present independently of export-integrity diagnostics.
+
+### 4.4. Workspace task-file metadata diagnostics
+
+A workspace task file may open with a metadata-only frontmatter block
+(§FS-rhei-plan-language.1.4). Six things can be wrong with one, and each is
+reported by name rather than passed over: before that format was specified the
+block was accepted and then discarded, which is the one outcome none of these
+messages may return to. The first four are detectable inside a single file and
+are therefore **parse** errors, carrying the task file's own line and a code
+frame, collected with every other recoverable parse error of step 1. The last
+two are detectable only at the merge and at the load, and are therefore **load**
+errors.
+
+| # | What is wrong | Class | What the message names |
+|---|---------------|-------|------------------------|
+| 1 | `structure` as a top-level key | parse | that `structure` is a plan-wide setting and belongs in `index.rhei.md`, which carries it for every task file (§FS-rhei-authoring.3.3) |
+| 2 | any other top-level key | parse | the key, and that a task file's frontmatter carries only `metadata.tasks.<id>` for the tasks it defines |
+| 3 | `metadata.tasks.<id>` for an id this file does not define | parse | the id, and both places the entry may go — the file that defines that task, or `index.rhei.md` |
+| 4 | malformed YAML inside the block | parse | the task file's own line |
+| 5 | the same key set for one task in both `index.rhei.md` and a task file | load | **both** files and the key, and that a task file's metadata and the index's entry for one task are disjoint by key, so the fix is to keep that key in one of them |
+| 6 | a frontmatter block in a `basin/` ticket file | load | the file, and `index.panta.md` as where basin ticket metadata lives (§FS-rhei-panta.2) |
+
+Rows 1 and 2 are one check with two messages: `structure` is a top-level key
+like any other and earns its own wording only because it is the one plan-wide
+key an author plausibly writes into the wrong file. Row 3 is file-local by
+necessity — a parser reading one file does not know which file defines the id
+that entry names.
+
+Both classes fail the load, so `validate`, `render`, `next`, `run`,
+`transition`, `complete` and `reset` all refuse and report; a partial graph
+cannot decide readiness (§FS-rhei-panta.6). `rhei list` remains the one
+exception it already is — it skips what it cannot load, warns naming the file
+and the error, and lists every other rhei — so a mistake here stops a run, and
+the answer to "what can I still see" is the answer a malformed heading already
+gets.
+
+A parse error in the **task body** of a file that carries a block still reports
+that file's own line number, with or without `structure` declared in the index.
+The block changes what the loader reads before the body; it must not change
+where the loader says a problem is.
 
 ## 5. Watch Mode
 

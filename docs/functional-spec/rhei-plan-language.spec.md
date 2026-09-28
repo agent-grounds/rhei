@@ -165,8 +165,11 @@ A Directory Workspace consists of:
 1. **`index.rhei.md`**: The root configuration. Contains the `Rhei Title`, `States Declaration`, and any `Content Sections`. It does **not** contain a `## Tasks` section.
 2. **`tasks/` directory**: A folder containing workspace task `.md` files.
 3. **Workspace Task Files**: Files within `tasks/` that contain one or more
-   node definitions (starting directly with `### <kind> <id>:`). They do not
-   require the `# Rhei:` header.
+   node definitions (`### <kind> <id>:`), optionally preceded by a
+   metadata-only frontmatter block carrying the authored
+   `metadata.tasks.<id>` entries of the tasks that file defines (§1.4). They do
+   not require the `# Rhei:` header, and `index.rhei.md` remains the
+   workspace's only *writable* metadata document.
 
 Task-file discovery is recursive and deterministic. Implementations must load
 non-hidden files matching `tasks/**/*.md`, where neither the file name nor any
@@ -255,14 +258,61 @@ State-machine resolution is normative for all commands:
 
 ### 1.4. Directory Workspace Metadata
 
-YAML frontmatter for a Directory Workspace belongs in `index.rhei.md`. Workspace
-task files start directly with task definitions and must not introduce
-independent frontmatter blocks, so the workspace has exactly one authoritative
-`metadata.tasks.<id>` map.
+A Directory Workspace has two places YAML frontmatter may appear, and only one
+of them is writable. `index.rhei.md` carries the workspace's plan-wide
+frontmatter and is the only file into which a Rhei command ever writes
+`metadata.tasks.<id>`. A workspace task file under `tasks/` may additionally
+**open** with a metadata-only frontmatter block, carrying authored
+`metadata.tasks.<id>` entries for the tasks that file defines, so a task's
+custom field lives in the same file as its `**State:**`, `**Prior:**` and
+`**Assignee:**` and two agents on two sparse checkouts of one plan each write
+exactly one file (§1.2, §FS-rhei-authoring.4).
 
-Runtime-managed metadata that is defined in the transitions specification, such
-as `metadata.tasks.<id>.stateVisits.<state-name>`, is therefore read from and
-written to the frontmatter in `index.rhei.md`, keyed by the global task id.
+Four rules govern that block. Each one is a diagnostic rather than a
+convention, and §FS-rhei-validate.4 gives the message and the error class of
+each:
+
+1. **Metadata only.** Its one permitted top-level key is `metadata`. A
+   plan-wide setting such as `structure` is declared once in `index.rhei.md`
+   and applies to every task file (§FS-rhei-authoring.3.3); so is every other
+   top-level key. A task file sets nothing that reaches beyond the tasks it
+   defines.
+2. **Its own tasks only.** Every `metadata.tasks.<id>` entry names an id that
+   file defines, spelled as the task's own heading spells it. An entry for any
+   other id belongs in the file that defines that task, or in `index.rhei.md`.
+3. **Disjoint by key from the index.** The index's entry and a task file's
+   entry for the same task are **merged** key by key: the index may hold
+   `priority` for a task while the task's own file holds `context`, and both
+   reach the merged map. The *same* key in both places is a validation error
+   naming both files and the key. The workspace therefore keeps exactly one
+   authoritative value for every `metadata.tasks.<id>.<key>` — the guarantee
+   holds per key rather than per file, and no reader has to learn a precedence
+   rule to predict which value wins.
+4. **Authored, never written.** No Rhei command reads the block for its own
+   bookkeeping or rewrites it. The runtime leaves it exactly as it found it,
+   `rhei reset` included (§FS-rhei-reset.2), and the merged map it feeds is
+   reachable through the surfaces that already exist — `{meta.<key>}`
+   (§FS-rhei-states.4.1), callback task metadata (§FS-rhei-transitions.2.2),
+   and `rhei render` (§FS-rhei-render.3.1). No read surface is added.
+
+A metadata block under `basin/` is refused instead of admitted: a basin ticket
+file has no metadata document of its own, because the basin's manifest is the
+project's, so basin ticket metadata lives in `index.panta.md` under
+project-qualified ids (§FS-rhei-panta.2, §AR-rhei-panta.2). That is a load
+error naming the file.
+
+**Runtime-managed metadata is read from and written to `index.rhei.md`, and
+nowhere else.** The runtime's keys are named here rather than inferred, because
+writing a counter back into whichever file it was read from would move the
+shared-write hotspot instead of closing it:
+`metadata.tasks.<id>.stateVisits.<state-name>` (§FS-rhei-transitions.2.3),
+`metadata.tasks.<id>.pollNextAttemptAt.<state-name>`,
+`metadata.tasks.<id>.providerLimits`, `metadata.tasks.<id>.budgetTicketId`
+(§FS-rhei-budgets.5.1), and the task's `supervision` block
+(§FS-rhei-supervision.3.3). Each is keyed by the task id as the workspace's own
+files spell it — the rhei-local id, which the load re-keys to the
+project-qualified id (§AR-rhei-panta.2) — and each goes to the index whether or
+not that task's file carries a block of its own.
 
 Persistence ownership is normative:
 
@@ -285,12 +335,12 @@ Persistence ownership is normative:
   view over the markdown `**Assignee:**` line rather than a separately
   persisted frontmatter field.
 
-This keeps task descriptions, `**Assignee:**` changes, and `> **Result:**`
-blocks localized to task files, which preserves most of the concurrency benefit
-of the workspace format. However, features that persist data through
-frontmatter-backed task metadata still serialize through `index.rhei.md`, so
-metadata-heavy workflows reintroduce a narrow shared-write hotspot until a
-workspace-local metadata format is specified.
+This keeps task descriptions, `**Assignee:**` changes, `> **Result:**` blocks
+and a task's authored metadata all localized to task files, so a
+metadata-heavy workflow no longer serializes its per-task fields through
+`index.rhei.md`. The shared-write hotspot that remains is the runtime's own,
+named above, and it is the narrowest one the format can have: every key the
+runtime writes, it also owns.
 
 ### 1.5. Panta Project
 
@@ -361,7 +411,21 @@ workspace_index = rhei_header, { blank_line },
                   [ frontmatter, { blank_line } ],
                   { content_section } ;
 
-workspace_task_file = [ { blank_line } ], task_level_1, { task_level_1 } ;
+workspace_task_file = [ { blank_line } ],
+                      [ task_metadata_frontmatter, { blank_line } ],
+                      task_level_1, { task_level_1 } ;
+
+(* A workspace task file's frontmatter is metadata-only: the single top-level
+   key `metadata`, carrying `tasks.<id>` entries for the ids this file defines.
+   Plan-wide settings such as `structure` belong in `index.rhei.md`
+   (section 1.4). *)
+task_metadata_frontmatter = "---", NEWLINE, { yaml_line }, "---", NEWLINE ;
+
+(* Entries under `basin/` have no metadata document of their own: the basin's
+   manifest is the project's, so basin ticket metadata lives in
+   `index.panta.md` under project-qualified ids. They parse as this narrower
+   production, which admits no frontmatter at all. *)
+basin_task_file = [ { blank_line } ], task_level_1, { task_level_1 } ;
 
 
 (* ============================================== *)
@@ -374,7 +438,7 @@ workspace_task_file = [ { blank_line } ], task_level_1, { task_level_1 } ;
    panta_manifest. Each rhei entry in the project directory is a Single-File Plan
    (rhei_document) or a Directory Workspace (a workspace_index plus
    workspace_task_file files). Entries under the optional `basin/` directory
-   parse as workspace_task_file and are loaded as the synthetic `basin` rhei. *)
+   parse as basin_task_file and are loaded as the synthetic `basin` rhei. *)
 
 panta_manifest  = panta_header, { blank_line },
                   [ states_field, { blank_line } ],

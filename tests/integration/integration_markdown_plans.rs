@@ -19,6 +19,7 @@ include!("integration_markdown_plans/reset.rs");
 include!("integration_markdown_plans/reset_unrecorded.rs");
 include!("integration_markdown_plans/workspace_validation.rs");
 include!("integration_markdown_plans/workspace_validation_diagnostics.rs");
+include!("integration_markdown_plans/workspace_task_metadata.rs");
 include!("integration_markdown_plans/workspace_validation_project.rs");
 include!("integration_markdown_plans/workspace_validation_project_machine.rs");
 include!("integration_markdown_plans/workspace_validation_reports.rs");

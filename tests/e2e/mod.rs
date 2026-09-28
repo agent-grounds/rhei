@@ -190,6 +190,7 @@ mod validate_retry_cache_tests;
 mod validation_source_tests;
 mod waiting_on_person_tests;
 mod worker_capture_precondition_tests;
+mod workspace_task_metadata_tests;
 
 /// The plan and machine text most of them start from.
 mod shared_fixtures;

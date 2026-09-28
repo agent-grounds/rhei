@@ -80,6 +80,19 @@ visit counters and poll timers resolve against the merged graph's qualified
 ticket ids; writes route back through the source map to the owning rhei file
 under the rhei-local key.
 
+The read side of that contract is wider than the write side. A Directory
+Workspace rhei's on-disk entries may come from two places — its `index.rhei.md`
+and the metadata-only frontmatter block a `tasks/` file may open with
+(§FS-rhei-plan-language.1.4) — and the load merges them, per rhei, under
+rhei-local ids before the re-keying above. Only the index's are **writable**:
+every writer of `metadata.tasks.<id>` locates its target by the `# Rhei:` or
+`# Panta:` header of a metadata document, which no task file carries, and
+re-reads and re-parses that document rather than serializing the merged graph.
+So the runtime's keys stay in the index by construction, and the source map
+keeps keying by node rather than by metadata key. A `basin/` ticket file admits
+no such block at all: the basin's metadata document is the project manifest
+(§FS-rhei-panta.2).
+
 Every load path yields a Panta-rooted graph. A bare rhei loaded directly — a
 `.rhei.md` file or a Directory Workspace with no enclosing `index.panta.md` — is
 treated as the single rhei of an **implicit Panta**: the loader synthesizes the

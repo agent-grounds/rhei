@@ -20,8 +20,8 @@ its role, and the spec that owns its grammar and behavior:
 | `index.panta.md` | Panta project manifest: title, optional default `**States:**`, content; no authored nodes | [§FS-rhei-panta.1](rhei-panta.spec.md#1-what-panta-is), [§FS-rhei-plan-language.1.5](rhei-plan-language.spec.md#15-panta-project) |
 | rhei entry (in the project dir) | One rhei per entry — a `*.rhei.md` or a Directory Workspace — discovered at project scope | [§FS-rhei-panta.1](rhei-panta.spec.md#1-what-panta-is), [§FS-rhei-plan-language.1.5](rhei-plan-language.spec.md#15-panta-project) |
 | `*.rhei.md` | Single-File Plan: a rhei with its `## Tasks` inline | [§FS-rhei-plan-language.1.1](rhei-plan-language.spec.md#11-single-file-plan-1-agent-or-low-concurrency) |
-| `index.rhei.md` + `tasks/**/*.md` | Directory Workspace rhei: manifest plus merged workspace task files | [§FS-rhei-plan-language.1.2](rhei-plan-language.spec.md#12-directory-workspace-agent-teams-high-concurrency) |
-| `basin/` task files (optional) | Unfiled tickets loaded as the reserved synthetic `basin` rhei | [§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis), [§FS-rhei-plan-language.1.5](rhei-plan-language.spec.md#15-panta-project) |
+| `index.rhei.md` + `tasks/**/*.md` | Directory Workspace rhei: manifest plus merged workspace task files. The index carries the workspace's plan-wide frontmatter and is its only writable metadata document; a task file may open with a metadata-only block for the tasks it defines | [§FS-rhei-plan-language.1.2](rhei-plan-language.spec.md#12-directory-workspace-agent-teams-high-concurrency), §FS-rhei-plan-language.1.4 |
+| `basin/` task files (optional) | Unfiled tickets loaded as the reserved synthetic `basin` rhei. Nodes only — no frontmatter of any kind, because the basin's metadata document is the project manifest | [§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis), [§FS-rhei-plan-language.1.5](rhei-plan-language.spec.md#15-panta-project) |
 
 A bare rhei — a lone `*.rhei.md` or workspace with no enclosing
 `index.panta.md` — loads as a one-rhei project. Load order, id namespacing,

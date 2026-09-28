@@ -104,8 +104,9 @@ else: no `state`, `kind`, `assignee`, `prior`, `parent`, or `depth`. Those are
 that must agree about a ticket's state is one too many. Three fields is a set
 that can grow; a fourth added now could not be taken back.
 
-Nothing is written to stderr on success, so `rhei show <id> --json | jq -r
-.content` is the body and nothing else.
+The object is alone on stdout — a rhei that would not load is a warning on
+stderr ([§FS-rhei-show](rhei-show.spec.md#fs-rhei-show-rhei-show)) — so `rhei show <id> --json | jq -r .content` is the
+body and nothing else.
 
 ## 5. Errors
 

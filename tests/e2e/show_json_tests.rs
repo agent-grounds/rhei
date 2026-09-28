@@ -74,3 +74,30 @@ fn show_json_carries_an_empty_content_for_an_empty_body() {
     assert_eq!(keys(&payload), BTreeSet::from(["content", "id", "title"]));
     assert_eq!(payload["content"], "");
 }
+
+/// A failing `show --json` is §FS-rhei-errors.5's single-line object on stderr,
+/// not miette prose: the verb whose whole point is that a script can read it
+/// must not hand that script two shapes. §FS-rhei-errors.5
+#[test]
+fn show_json_reports_a_missing_ticket_as_a_json_error() {
+    let (dir, _plan) = show_fixture("show-json-error");
+    let home = dir.join(".home");
+
+    let result = run_show(&home, &dir, &["probe.99", "--json"]);
+
+    assert!(!result.status.success(), "an unknown ticket should fail: {}", result.stdout);
+    assert_eq!(result.stdout, "", "nothing but the object may reach stdout");
+    let payload: Value = serde_json::from_str(result.stderr.trim()).unwrap_or_else(|error| {
+        panic!("stderr should be one JSON object: {error}\nstderr:\n{}", result.stderr)
+    });
+    assert!(
+        payload["error"]["message"].as_str().is_some_and(|message| message.contains("probe.99")),
+        "got:\n{}",
+        result.stderr
+    );
+    assert!(
+        payload["error"]["help"].as_str().is_some_and(|help| help.contains("rhei list")),
+        "expected the help to travel with the JSON error; got:\n{}",
+        result.stderr
+    );
+}

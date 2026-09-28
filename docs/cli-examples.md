@@ -45,17 +45,19 @@ Both views use the execution settings merge; see
 Read one ticket's body, whatever state it is in:
 
 ```bash
-cargo run -p rhei-cli -- show release-automation.1
+cargo run -p rhei-cli -- show examples/release-automation.rhei.md --task 1
 ```
 
 The same body for a script, as one object with `id`, `title`, and `content`:
 
 ```bash
-cargo run -p rhei-cli -- show release-automation.1 --json
+cargo run -p rhei-cli -- show examples/release-automation.rhei.md --task 1 --json
 ```
 
-Both resolve the plan from the working directory; name it explicitly with
-`show <plan> --task <ticket-id>`. See [§FS-rhei-show](functional-spec/rhei-show.spec.md#fs-rhei-show-rhei-show).
+Both name the plan because this page is run from the repository root. The
+everyday shape is shorter: from inside a project the positional may be the bare
+ticket id, so `rhei show release-automation.1` prints the same body. See
+[§FS-rhei-show](functional-spec/rhei-show.spec.md#fs-rhei-show-rhei-show).
 
 Render a plan as GitHub-style markdown without metadata or subtask body text:
 

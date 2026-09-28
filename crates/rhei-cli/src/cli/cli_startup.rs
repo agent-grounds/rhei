@@ -374,6 +374,9 @@ fn command_wants_json(command: &Commands) -> bool {
         Commands::Snapshot { command: SnapshotCommand::List { format, .. }, .. } => {
             matches!(format, SnapshotListFormat::Json)
         }
+        // `show --json` exists so a script reads three keys every time, so its
+        // failures are the machine shape too. §FS-rhei-errors.5
+        Commands::Show { json, .. } => *json,
         Commands::Templates { json, .. } => *json,
         Commands::Cost { json, .. } => *json,
         Commands::Runs { json, .. } => *json,

@@ -1,10 +1,8 @@
-    // How `rhei show` reads its positional, before any plan is loaded. Four
-    // ways is the whole surface, and the one that matters is the first: an
-    // id-shaped argument is the ticket, because `rhei show probe.7` is the
-    // invocation the verb exists for.
-    // §FS-rhei-show.5
-
-    /// The four-way resolution, and the two refusals that have to name a form
+    /// How `rhei show` reads its positional, before any plan is loaded.
+    ///
+    /// Four ways is the whole surface, and the one that matters is the first: an
+    /// id-shaped argument is the ticket, because `rhei show probe.7` is the
+    /// invocation the verb exists for. The two refusals have to name a form
     /// which works when pasted. §FS-rhei-show.5
     #[test]
     fn show_positional_splits_between_ticket_and_plan() {

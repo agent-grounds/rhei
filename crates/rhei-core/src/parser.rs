@@ -165,6 +165,8 @@ fn unescape_state(input: &str) -> String {
 }
 
 #[cfg(test)]
+mod fence_tests;
+#[cfg(test)]
 mod plan_snapshot_prior_tests;
 #[cfg(test)]
 mod plan_tests;

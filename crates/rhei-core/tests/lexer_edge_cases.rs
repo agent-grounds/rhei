@@ -174,3 +174,46 @@ fn state_metadata_backtick_escaping() {
 
     assert_eq!(tokens, expected);
 }
+
+/// §FS-rhei-plan-language.2.1: the tokenizer reads a fence by the language's one
+/// rule — `~~~` opens a block, and a run shorter than the open does not close
+/// one — so a plan that quotes the plan format tokenizes as text.
+#[test]
+fn tilde_and_nested_fences_are_not_tokenized_as_structure() {
+    let input = r#"# Rhei: Example
+
+## Tasks
+
+### Task 1: Title
+**State:** pending
+
+~~~markdown
+## Tasks
+### Task 999: Quoted in a tilde fence
+**State:** quoted
+~~~
+
+````markdown
+```console
+$ rhei validate plan.rhei.md
+### Task 998: Quoted past a run too short to close
+**State:** quoted
+````
+"#;
+
+    let tokens: Vec<Token> = tokenize(input).collect();
+
+    let structural: Vec<&Token> =
+        tokens.iter().filter(|token| !matches!(token, Token::TextContent)).collect();
+
+    assert_eq!(
+        structural,
+        vec![
+            &Token::RheiHeader,
+            &Token::TasksSection,
+            &Token::NodeHeader { level: 3, kind: TASK_KIND.to_string(), id: TaskId::number(1) },
+            &Token::MetadataState { state: "pending".to_string() },
+        ],
+        "only the authored task is structure; got {tokens:?}"
+    );
+}

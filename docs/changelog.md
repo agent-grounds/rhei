@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- Read a fenced code block in a plan the way the language defines one, so a plan
+  may quote the plan format. The structural scan used to decide what was code by
+  flipping a flag on any line starting with three backticks: it kept no run
+  length and did not know `~~~` at all, so a `~~~markdown` fence quoting
+  `## Tasks` authored a real chapter, and a ``` ```console ``` line *closed* a
+  four-backtick fence and let the headings after it author chapters too. Either
+  way the plan's own `## Tasks` landed mid-document and the plan was refused with
+  "Tasks section must be the final '##' chapter" — and because one unparseable
+  plan fails the project load, `rhei validate <store>` and every `rhei run` over
+  that store went down with it, however healthy the plans beside it were. Whether
+  a plan was refused at all turned on how many inner fence lines a paste happened
+  to carry, which made the failure look like a property of the text rather than of
+  the reader. A fence is now one thing everywhere — the structural scan, the
+  tokenizer, the link checker and the result-block scan read the same rule
+  (§FS-rhei-plan-language.2.1): a run of three or more backticks or tildes, closed
+  only by a bare run of the same character at least as long, and running to the end
+  of the file when nothing closes it. Two consequences are worth knowing: a bare
+  `~~~` line now opens a fence where it used to open nothing, and a run carrying an
+  info string never closes one. (PR #N)
+
 - Carry each task's authored frontmatter metadata on `rhei list --json`, so a
   caller reads one custom field off the query surface instead of re-deriving
   rhei's id keying. The `metadata` object is the task's `metadata.tasks.<id>`

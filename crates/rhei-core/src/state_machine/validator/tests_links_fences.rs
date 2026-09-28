@@ -114,3 +114,45 @@
 
         assert_eq!(links, vec![("a link".to_string(), "a.md".to_string())]);
     }
+
+    /// §FS-rhei-plan-language.2.1: the result-block scan reads a fence by the
+    /// same rule as the link checker, so a task body may show what a finished
+    /// task's result line looks like without claiming to have one.
+    #[test]
+    fn a_result_block_quoted_in_a_tilde_fence_is_not_a_result_block() {
+        let input = "# Rhei: Result demo\n\n## Tasks\n\n\
+                     ### Task 1: Do it\n**State:** pending\n\n\
+                     How a finished task records its result:\n\n\
+                     ~~~markdown\n\
+                     > **Result:** [1](runtime/results/1.md)\n\
+                     ~~~\n";
+        let rhei = parse(input).expect("parse ok");
+        let report = Validator::new(sample_machine()).validate(&rhei);
+
+        assert!(
+            !report.has_errors(),
+            "a quoted result line must not be read as one: {:?}",
+            report.errors
+        );
+    }
+
+    /// §FS-rhei-plan-language.2.1: and a run too short to close the fence it
+    /// sits in does not let the line after it out either.
+    #[test]
+    fn a_result_block_past_a_short_run_inside_a_fence_is_not_one() {
+        let input = "# Rhei: Result demo\n\n## Tasks\n\n\
+                     ### Task 1: Do it\n**State:** pending\n\n\
+                     ````markdown\n\
+                     ```console\n\
+                     $ rhei complete 1\n\
+                     > **Result:** [1](runtime/results/1.md)\n\
+                     ````\n";
+        let rhei = parse(input).expect("parse ok");
+        let report = Validator::new(sample_machine()).validate(&rhei);
+
+        assert!(
+            !report.has_errors(),
+            "a quoted result line must not be read as one: {:?}",
+            report.errors
+        );
+    }

@@ -580,12 +580,31 @@ section_title   = { ANY_CHAR - NEWLINE }+ - "Tasks" ;
    prefix is reserved for the dedicated result_block production so the grammar
    can distinguish result metadata from freeform prose. *)
 task_markdown_block = ( blank_line
+                      | fenced_code_block
                       | task_body_line, NEWLINE ) ;
 
 (* A markdown_block is any non-structural content line for use in sections.
    Blank lines are markdown_blocks. *)
 markdown_block  = ( blank_line
+                  | fenced_code_block
                   | non_structural_line, NEWLINE ) ;
+
+(* A fenced code block is content, never structure: no production of this
+   grammar is recognized between its opening fence and its close, so a plan may
+   quote the plan format. What opens and closes one is defined in section 2.1.
+   The close is optional because an unclosed fence runs to the end of the text
+   that opened it. *)
+fenced_code_block = fence_open, NEWLINE,
+                    { fenced_line, NEWLINE },
+                    [ fence_close, NEWLINE ] ;
+
+fence_open      = ? a run of three or more "`" or of three or more "~",
+                    optionally followed by an info string ? ;
+
+fence_close     = ? a run of this block's fence character, at least as long as
+                    its fence_open run, followed by nothing but whitespace ? ;
+
+fenced_line     = ? any line that is not this block's fence_close ? ;
 
 task_body_line  = ? any line that does not match a header production above
                    and does not begin with "> **Result:** " ? ;
@@ -615,6 +634,77 @@ ESCAPED_BACKTICK = "\\`" ;
 
 NEWLINE         = ? line terminator (LF or CRLF) ? ;
 ```
+
+### 2.1. Fenced Code Blocks
+
+A **fenced code block** opens on a line whose first non-whitespace character
+begins a run of three or more backticks or three or more tildes, optionally
+followed by an info string. It closes on the first later line that is a run of
+the *same* character, *at least as long* as the opening run, followed by nothing
+but whitespace. Nothing else closes it: a run of the other character, a shorter
+run, and a run carrying an info string are ordinary lines of the block. A fence
+that is never closed runs to the end of the text that opened it.
+
+Between an opening fence and its close **no production of this grammar is
+recognized**. A `## `, `### <kind> <id>: `, `**State:**`, `---`, or
+`> **Result:** ` line there is content — a quotation of the plan format rather
+than an instance of it. This is what lets a plan document the plan language: a
+content section or task body that shows how to write a task quotes `## Tasks`
+and `### Task` lines that were never meant to author anything.
+
+This is the language's only definition of a fence, and every reader of a plan
+resolves it the same way — the structural scan that decides which `## ` lines
+are chapters and which `### <kind> <id>: ` lines are task nodes, the link
+checker that decides which links are references ([§FS-rhei-plan-language.3.6](rhei-plan-language.spec.md#36-link-integrity)),
+and the result-block scan of section 3.8 alike. A plan must never be read by two
+different fence rules, because the same line would then be structure to one
+reader and content to another.
+
+Two consequences are normative, and an implementation is held to them:
+
+- **`~~~` is a fence.** A tilde run of three or more opens a block exactly as a
+  backtick run does. Tildes are how a plan quotes markdown that itself contains
+  backtick fences, so a reader that does not see them cannot read a plan that
+  quotes the format. A bare `~~~` line therefore opens a fence, and an unclosed
+  one runs to the end of the file.
+- **Nesting is the rule, not parity.** An implementation must record the opening
+  fence's character and run length and close only on a bare run that matches, so
+  a longer fence may contain shorter ones. A reader that instead flips a flag on
+  every fence-looking line closes a four-backtick block on the first
+  three-backtick line inside it: the `## ` lines after that point become
+  chapters, the plan's own `## Tasks` becomes code, and whether the plan is
+  accepted at all turns on how many inner fence lines it happens to contain.
+  That is not a property of the format, and text pasted into a plan — a forge
+  comment, an issue body, a transcript, a truncated quotation — can carry any
+  number of them.
+
+The frontmatter delimiter is not a fence and is not governed by this section: it
+is `frontmatter` above, opened and closed by a line that is exactly `---`.
+
+`````markdown
+# Rhei: A plan that quotes a plan
+
+## Notes
+
+~~~markdown
+## Tasks                          ← content: the tilde run above opened a fence
+### Task demo-1: an illustration  ← content: not a task node
+~~~
+
+A transcript someone pasted, in a fence one backtick longer than it contains:
+
+````markdown
+```console
+$ rhei validate plan.rhei.md
+## Terms                          ← content: the run above is three backticks,
+                                    too short to close a four-backtick fence
+````
+
+## Tasks
+
+### Task real-1: the only task
+**State:** pending
+`````
 
 ## 3. Semantic Constraints
 
@@ -934,12 +1024,13 @@ containing `index.rhei.md`, even when the link appears in a nested file under
 
 External URLs (`http://`, `https://`, `mailto:`), and fragment-only anchors (`#section`) are not checked. When a link contains a fragment (`file.md#section`), only the file portion is verified.
 
-A link inside a fenced code block — a run of three or more backticks or
-tildes, closed by a run of the same character at least as long — or inside an
-inline code span is an illustration of the format, not a reference to a file,
-and is not checked. A plan that documents how to write a task quotes links that
-were never meant to resolve, in a content section as in a task body. A fence
-that is never closed runs to the end of the text that opened it.
+A link inside a fenced code block ([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)) or inside an inline
+code span is an illustration of the format, not a reference to a file, and is
+not checked. A plan that documents how to write a task quotes links that were
+never meant to resolve, in a content section as in a task body. The fence rule
+here is the one the structural scan reads, not a second one: a `~~~` run opens a
+block, only a bare run of the opening character at least as long closes it, and
+an unclosed fence runs to the end of the text that opened it.
 
 For Directory Workspaces, implementations must not resolve `./` or `../`
 against the physical path of the task file that contains the link. This keeps
@@ -1461,7 +1552,11 @@ The effective rule and its runtime behavior are defined by
 
 This section is illustrative and non-normative. A complete implementation must
 support every normative grammar production above, including YAML frontmatter,
-`**Assignee:**`, and `> **Result:**` blocks.
+`**Assignee:**`, and `> **Result:**` blocks. `CodeFence` is listed first because
+it decides whether any of the others is a token at all: inside a fenced code
+block ([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)) every line is `Text`. A lexer that reduces
+`CodeFence` to a boolean flip loses the fence character and run length the
+closing rule needs.
 
 For lexer implementation, the following token types are a reasonable minimum:
 
@@ -1469,6 +1564,7 @@ For lexer implementation, the following token types are a reasonable minimum:
 |-------|---------|---------|
 | `RheiHeader` | `# Rhei: .*` | `# Rhei: My Project` |
 | `MetadataStates` | `\*\*States:\*\* .*` | `**States:** rhei` |
+| `CodeFence` | A line whose first non-whitespace run is three or more backticks or three or more tildes; the token carries that character, the run length, and whether the rest of the line is blank | a backtick run with the info string `console`; a bare `~~~` |
 | `FrontmatterFence` | `^---\s*$` | `---` |
 | `FrontmatterYamlLine` | Any line inside frontmatter that is not `---` | `metadata:` |
 | `TasksSection` | `^## Tasks\s*$` | `## Tasks` |

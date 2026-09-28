@@ -68,6 +68,7 @@ mod exclusions_tests;
 mod exclusions_validation_tests;
 mod export_prior_migration_implementation_tests;
 mod export_prior_migration_tests;
+mod fence_structure_tests;
 mod handoff_tests;
 mod headless_dead_supervisor_tests;
 mod headless_recovery_tests;

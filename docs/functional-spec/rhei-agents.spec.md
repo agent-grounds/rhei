@@ -301,12 +301,12 @@ launch arguments it requires, and whether an invocation record is written at all
 [§FS-rhei-cost-accounting.3.2](rhei-cost-accounting.spec.md#32-extraction-status)),
 the stream-json stdin transport below, which session-report stream a log is
 ([§FS-rhei-session-reports.6.2](rhei-session-reports.spec.md#62-claude-code-stream)),
-and provider-refusal recognition (§2). A profile that declares no `family`
+and provider-refusal recognition (§FS-rhei-agents.2). A profile that declares no `family`
 resolves to itself, so every built-in and every existing custom profile takes
 the arm it takes today.
 
 Everything that *names* the agent stays the profile's own id: `RHEI_AGENT`, the
-log header's `agent:` line, spawn records (§8.4), target slugs, the invocation
+log header's `agent:` line, spawn records (§FS-rhei-agents.8.4), target slugs, the invocation
 record's `invocation_id` and `agent`, `rhei cost --by agent`, snapshot lock
 selectors, and every diagnostic. A family is what a profile is, not what it is
 called. `models.<id>.agents.<agent-id>` bindings are keyed on the profile's own
@@ -506,7 +506,7 @@ Every provenance leaf is one of the source keys `built_in`, `global`, or
 `project`:
 
 - `provenance.agents.<id>` is one origin for the whole agent profile: the
-  source that declared the entry. A profile that declares `family` (§1.1.2) is
+  source that declared the entry. A profile that declares `family` (§FS-rhei-agents.1.1.2) is
   reported **resolved** — its written and its inherited fields together, with
   `family` among them — under that same single origin, because the entry is
   still what a layer replaced. Family inheritance adds no provenance leaf, so
@@ -569,7 +569,7 @@ settings compose over the result:
 - `agents` merge by agent id. A user entry with the same id as a built-in or a
   global entry **replaces that entry wholesale** — there is no field-level
   merge within a single agent entry. To tweak just one mode of a built-in
-  agent, redeclare the whole entry, or declare `family` (§1.1.2) and write only
+  agent, redeclare the whole entry, or declare `family` (§FS-rhei-agents.1.1.2) and write only
   the fields that differ. Family inheritance is one fallback applied once after
   this merge has produced the effective registry, over the set of keys each
   entry actually wrote, so everything downstream — execution, `rhei roster`,
@@ -814,7 +814,7 @@ warning to an error.
 
 A user-written entry for one of these ids in `settings.json` replaces the
 built-in entry wholesale (see [Merge Semantics](#13-merge-semantics)).
-`family` (§1.1.2) is the partial counterpart to that rule and the two are read
+`family` (§FS-rhei-agents.1.1.2) is the partial counterpart to that rule and the two are read
 together: an entry that reuses a built-in id and writes no `family` still
 replaces it wholesale, while an entry that writes `family` replaces only the
 fields it writes. That includes an entry whose id is the same built-in it names
@@ -870,7 +870,7 @@ states:
 
 When the agent is one of the built-ins behind a wrapper rather than a new
 agent, declare the family instead of restating the transport, and write only
-what the wrapper changes (§1.1.2):
+what the wrapper changes (§FS-rhei-agents.1.1.2):
 
 ```json
 {
@@ -2052,7 +2052,7 @@ A program log (`=== rhei program log v1 ===`) carries the same two lines with
 reader — and a script — can tell an agent that finished from one the engine
 stopped without inferring it from the exit code.
 
-`family:` is the resolved family of the profile that ran (§1.1.2), and is
+`family:` is the resolved family of the profile that ran (§FS-rhei-agents.1.1.2), and is
 written **only when it differs from `agent:`** — its absence means the profile
 declared no family and is its own, which is why every log written before
 families existed reads exactly as it did. It is the line a reader of an

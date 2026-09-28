@@ -425,7 +425,7 @@ and to every profile that declares it as its family. Rhei appends the row's
 required launch arguments itself, from the resolved extractor, so a profile that
 declares a family is launched with them whether or not the operator wrote
 anything; a wrapper that discards the arguments it is handed emits no structured
-usage and its record reads `no-usage-emitted` (§3.2).
+usage and its record reads `no-usage-emitted` (§FS-rhei-cost-accounting.3.2).
 
 | Family | Requirement |
 | --- | --- |

@@ -409,9 +409,9 @@ fn describe_refused_alternatives(
         format!(
             "A move that names only a state pair takes the pair's first declared exact \
              '{from}' -> '{refused_to}' edge, and a wildcard-source edge only where the pair \
-             declares no exact one, so that edge is the one refused here; '{from}' declares \
-             another rule for the pair that is currently applicable, and naming a state pair \
-             does not reach it. "
+             declares no exact one, so that edge is the one refused here; another rule \
+             for the pair is currently applicable, and naming a state pair does not reach \
+             it. "
         )
     } else {
         String::new()

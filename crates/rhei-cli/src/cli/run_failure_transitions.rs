@@ -195,9 +195,9 @@ fn fire_agent_exit_transition(
     from_state: &str,
     to_state: &str,
     exit_code: i32,
-    // Which rule the caller's selection chose, where one ran: an exhausted poll
-    // budget picks its edge by evaluating conditions, so the pair cannot recover
-    // it afterwards. §FS-rhei-transitions.4.4
+    // Which rule the caller's selection chose: an exhausted poll budget picks
+    // its edge by evaluating conditions, so the pair cannot recover it
+    // afterwards. §FS-rhei-transitions.4.4
     selected_rule: Option<usize>,
     no_callbacks: bool,
 ) -> TimeoutTransitionOutcome {
@@ -222,9 +222,9 @@ fn fire_agent_exit_transition(
         // ended — a timeout, an agent's failure, a spent poll budget — so none
         // of them is a declared route. §FS-rhei-programs.3.2
         ExitCodeMatch::None,
-        // A spent poll budget did select a rule, and that is the one that must
-        // fire; a timeout and an unavailable tool compute their target and select
-        // nothing, so they pass `None`. §FS-rhei-transitions.4.4
+        // Every caller here is an agent exit whose selection chose a rule, so one
+        // always arrives; the `Option` is for the callers that name only a state
+        // pair and have none. §FS-rhei-transitions.4.4
         selected_rule,
         no_callbacks,
     ) {

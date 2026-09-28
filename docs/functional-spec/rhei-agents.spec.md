@@ -188,7 +188,8 @@ agent's `command`, flags, and modes are declared.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `command` | string array | Yes | Base command and fixed arguments |
+| `family` | string | No | The id of a built-in agent (see [Known Agent Profiles](#2-known-agent-profiles)) this profile belongs to. Every field the entry does not write is taken from that built-in, and every behavior Rhei selects per built-in agent is selected for this profile too. Omit to declare a profile that stands on its own. |
+| `command` | string array | Yes, unless `family` | Base command and fixed arguments |
 | `prompt_flag` | string | No | Flag that carries the prompt (e.g., `--prompt`, `-p`) — or, with `stdin_prompt`, the flag that puts the agent in non-interactive mode, emitted with no value. Omit when the agent needs neither. |
 | `model_flag` | string | No | Flag to pass the concrete provider model name. Omit if the agent doesn't support model selection. |
 | `stdin_prompt` | boolean | No | When `true`, the prompt is piped to stdin instead of being passed as the `prompt_flag` value, `prompt_flag` is still emitted if present, a `--` is appended last, and stdin is closed unless `intervene_stdin` is also true. Default: `false`. |
@@ -256,6 +257,69 @@ Built-in agent ids (see [Known Agent Profiles](#2-known-agent-profiles)) are
 preloaded as the default agents registry. A user entry with the same id in
 global or project settings replaces the built-in entry wholesale — `command`,
 flags, and `modes` are taken from the user entry without field-level merging.
+
+**`family` — the built-in a profile belongs to.** A profile that writes `family`
+is the built-in of that name with the entry's own fields laid over it. The value
+must be one of the six built-in ids; any other value is a settings error,
+reported where an empty `command` and contradictory MCP flags are reported and
+naming the ids that are families. Wrapping an agent — for a second account, a
+proxy, a `nix run`, a sandbox — is then two lines rather than a restatement of
+its transport:
+
+```json
+// .agent-grounds/rhei/settings.json — Claude Code under a second account
+{
+  "agents": {
+    "cld": {
+      "family": "claude-code",
+      "command": ["sh", "-lc", "CLAUDE_CONFIG_DIR=\"$HOME/.claude1\" exec claude \"$@\"", "cld"]
+    }
+  }
+}
+```
+
+Inheritance is per field and is decided by **what the entry wrote**, never by
+what a field parsed to:
+
+- A field the entry writes wins; a field it omits is the family's. A written
+  `"stdin_prompt": false` therefore overrides an inherited `true` rather than
+  being indistinguishable from silence.
+- `command` is required only when `family` is absent. `{"family": "gemini"}` is
+  a complete profile: Gemini under another id.
+- `modes`, `effort`, `session`, and `deny_read` are replaced **whole**, never
+  merged key by key — the same rule a same-id entry already follows. A profile
+  writing one mode has exactly that mode, and a written `"modes": {}` has none.
+- A key that is not a field of the table above is a warning naming the key and
+  the known fields, not a refusal: such a key loads today and does nothing, and
+  refusing it would reject files that load now.
+
+**A built-in agent is its own family.** Every behavior Rhei selects per built-in
+agent is selected on the *resolved family* — the declared `family`, or the
+profile's own id when it declares none. That is the usage extractor and the
+launch arguments it requires, and whether an invocation record is written at all
+([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow),
+[§FS-rhei-cost-accounting.3.2](rhei-cost-accounting.spec.md#32-extraction-status)),
+the stream-json stdin transport below, which session-report stream a log is
+([§FS-rhei-session-reports.6.2](rhei-session-reports.spec.md#62-claude-code-stream)),
+and provider-refusal recognition (§2). A profile that declares no `family`
+resolves to itself, so every built-in and every existing custom profile takes
+the arm it takes today.
+
+Everything that *names* the agent stays the profile's own id: `RHEI_AGENT`, the
+log header's `agent:` line, spawn records (§8.4), target slugs, the invocation
+record's `invocation_id` and `agent`, `rhei cost --by agent`, snapshot lock
+selectors, and every diagnostic. A family is what a profile is, not what it is
+called. `models.<id>.agents.<agent-id>` bindings are keyed on the profile's own
+id and never fall back to the family: two profiles of one family are two
+accounts or two wrappers, and a binding is the operator's decision about one of
+them.
+
+**The inherited value to look at twice is `session`.** A wrapper usually exists
+because the agent's configuration home has moved, and a `session` block names a
+transcript store on disk. An inherited block therefore points snapshot resume at
+the family's store rather than the wrapper's, so a profile whose command moves
+that home restates `session` instead of inheriting it. `claude-code` declares no
+`session` block, so a wrapped Claude Code inherits none; `codex` and `pi` do.
 
 **Enabling live intervention.** No built-in agent enables `intervene_stdin`: the
 known coding agents read their prompt and then run autonomously without consuming
@@ -441,8 +505,13 @@ stderr warning.
 Every provenance leaf is one of the source keys `built_in`, `global`, or
 `project`:
 
-- `provenance.agents.<id>` is one origin for the whole agent profile because an
-  agent entry is replaced wholesale.
+- `provenance.agents.<id>` is one origin for the whole agent profile: the
+  source that declared the entry. A profile that declares `family` (§1.1.2) is
+  reported **resolved** — its written and its inherited fields together, with
+  `family` among them — under that same single origin, because the entry is
+  still what a layer replaced. Family inheritance adds no provenance leaf, so
+  the `schema_version` field list above does not move, and `rhei roster` is
+  where an operator reads what a family supplied.
 - `provenance.models.<id>.<field>` records the origin of each supplied
   `provider`, `model`, and `default_agent` field.
 - `provenance.models.<id>.agents.<agent-id>.<field>` records the origin of each
@@ -500,7 +569,11 @@ settings compose over the result:
 - `agents` merge by agent id. A user entry with the same id as a built-in or a
   global entry **replaces that entry wholesale** — there is no field-level
   merge within a single agent entry. To tweak just one mode of a built-in
-  agent, redeclare the whole entry.
+  agent, redeclare the whole entry, or declare `family` (§1.1.2) and write only
+  the fields that differ. Family inheritance is one fallback applied once after
+  this merge has produced the effective registry, over the set of keys each
+  entry actually wrote, so everything downstream — execution, `rhei roster`,
+  validation, the dry run — receives a profile that is already complete.
 - `models` merge by model id.
 - `models.<id>.agents` merge by agent id.
 - `models.<id>.prices` is one optional object: absence inherits it, an authored
@@ -741,6 +814,16 @@ warning to an error.
 
 A user-written entry for one of these ids in `settings.json` replaces the
 built-in entry wholesale (see [Merge Semantics](#13-merge-semantics)).
+`family` (§1.1.2) is the partial counterpart to that rule and the two are read
+together: an entry that reuses a built-in id and writes no `family` still
+replaces it wholesale, while an entry that writes `family` replaces only the
+fields it writes. That includes an entry whose id is the same built-in it names
+as its family — `"claude-code": {"family": "claude-code", …}` means "inherit
+from the built-in I am replacing", and `family` wins because the operator wrote
+it. A family whose built-in has no usage extractor — `gemini`, `cursor`,
+`kilocode` — is a legal family: such a profile inherits transport and modes,
+inherits no extractor, and stays unmeasured exactly as that built-in's own runs
+are.
 None of the six built-in profiles declares `deny_read`; each therefore provides
 composition-only exclusion. A mode name, model, permission flag, or writable
 root never implies read denial.
@@ -781,6 +864,21 @@ states:
   "defaults": {
     "agent": "my-agent",
     "agent_mode": "safe"
+  }
+}
+```
+
+When the agent is one of the built-ins behind a wrapper rather than a new
+agent, declare the family instead of restating the transport, and write only
+what the wrapper changes (§1.1.2):
+
+```json
+{
+  "agents": {
+    "cld": {
+      "family": "claude-code",
+      "command": ["sh", "-lc", "CLAUDE_CONFIG_DIR="$HOME/.claude1" exec claude "$@"", "cld"]
+    }
   }
 }
 ```
@@ -1915,6 +2013,7 @@ Each log file contains:
 ```
 === rhei agent log v1 ===
 agent: claude-code
+family: claude-code
 model: impl-fast
 provider: anthropic
 model_name: claude-sonnet-4-6
@@ -1952,6 +2051,15 @@ A program log (`=== rhei program log v1 ===`) carries the same two lines with
 `program` in place of `agent`. Neither flag appears on a normal exit, so a
 reader — and a script — can tell an agent that finished from one the engine
 stopped without inferring it from the exit code.
+
+`family:` is the resolved family of the profile that ran (§1.1.2), and is
+written **only when it differs from `agent:`** — its absence means the profile
+declared no family and is its own, which is why every log written before
+families existed reads exactly as it did. It is the line a reader of an
+artifact resolves the family from, since a log is read without the registry
+that produced it. Adding it does not move the `v1` log format version: a line
+whose absence means something is the shape `mcp_servers:` and `skills:` already
+have.
 
 Each entry in `mcp_servers:` and `skills:` is the resolved id; an entry
 suffixed with `?` was declared `optional: true` and failed its availability

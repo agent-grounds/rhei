@@ -69,6 +69,43 @@ mod session_report_streams {
         assert!(!text.contains("## Agent actions"));
     }
 
+    /// A markerless stream from a *wrapped* agent falls back to the family the
+    /// header records, not to the profile's own id: a log is read without the
+    /// registry that produced it, so `family:` is what carries the reading.
+    // §FS-rhei-session-reports.6.2 §FS-rhei-agents.8.2
+    #[test]
+    fn a_markerless_stream_falls_back_to_the_recorded_family() {
+        let mut content = String::from("=== rhei agent log v1 ===\n");
+        content.push_str("agent: cld\nfamily: claude-code\ntask: plan.9\nstate: build\n===\n");
+        content.push_str("{\"type\":\"assistant\",\"message\":{\"content\":");
+        content.push_str("[{\"type\":\"text\",\"text\":\"The wrapper spoke Claude.\"}]}}\n");
+        content.push_str("\n=== exit ===\ncode: 0\nduration: 1s\n===\n");
+        let (dir, log) = workspace_with_log("task-plan.9-build.log", &content);
+        let report = render_session_report(&log, &dir.path().join("runtime"), false)
+            .expect("rendered");
+        let text = fs::read_to_string(&report).expect("report");
+        assert!(text.contains("The wrapper spoke Claude."), "{text}");
+        assert!(!text.contains("not one this renderer reads"), "{text}");
+    }
+
+    /// A log written before families existed carries no `family:` line, so the
+    /// reading still comes from `agent:` and detects exactly as it did.
+    // §FS-rhei-session-reports.6.2
+    #[test]
+    fn a_log_without_a_family_line_still_falls_back_to_its_agent() {
+        let mut content = String::from("=== rhei agent log v1 ===\n");
+        content.push_str("agent: claude-code\ntask: plan.10\nstate: build\n===\n");
+        content.push_str("{\"type\":\"assistant\",\"message\":{\"content\":");
+        content.push_str("[{\"type\":\"text\",\"text\":\"Historical stream.\"}]}}\n");
+        content.push_str("\n=== exit ===\ncode: 0\nduration: 1s\n===\n");
+        let (dir, log) = workspace_with_log("task-plan.10-build.log", &content);
+        let report = render_session_report(&log, &dir.path().join("runtime"), false)
+            .expect("rendered");
+        let text = fs::read_to_string(&report).expect("report");
+        assert!(text.contains("Historical stream."), "{text}");
+        assert!(!text.contains("not one this renderer reads"), "{text}");
+    }
+
     /// One stream's generic event names never leak into another's report:
     /// a Pi session with a stray top-level error event stays a Pi report.
     // §FS-rhei-session-reports.6.1

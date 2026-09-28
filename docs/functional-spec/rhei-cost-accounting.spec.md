@@ -107,6 +107,7 @@ Each supported agent spawn writes one JSON object:
   "visit": 1,
   "target_slug": "claude-code-anthropic-sonnet",
   "agent": "claude-code",
+  "agent_family": "claude-code",
   "provider": "anthropic",
   "model": "claude-sonnet-4-6",
   "model_profile": "review-sonnet",
@@ -141,6 +142,16 @@ Each supported agent spawn writes one JSON object:
   }
 }
 ```
+
+`agent_family` is optional provenance naming the resolved family of the profile
+that ran ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)) — the
+built-in whose extractor, launch arguments, and transport the invocation used.
+It sits **beside** `agent` and never in place of it: `agent` is always the
+profile's own id. Rhei writes it whenever the resolved family is known, which is
+for every recorded invocation, including the built-ins, whose family is their own
+id. Older `rhei.accounting.invocation.v1` records without this field remain valid
+and are read unchanged, and no reader inside Rhei consumes it: like
+`model_profile`, it is provenance for a reader.
 
 `model_profile` is optional provenance naming the selected settings profile.
 Rhei writes it for a named profile selected through CLI, state, defaults,
@@ -217,8 +228,9 @@ Measured zero is `"value": 0`; it is not the same as unavailable.
 
 ### 3.2. Extraction Status
 
-Every `claude-code`, `codex`, and `pi` invocation writes a record even when
-tokens cannot be measured.
+Every invocation whose resolved family
+([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)) is `claude-code`,
+`codex`, or `pi` writes a record even when tokens cannot be measured.
 
 | `extraction_status` | Meaning |
 | --- | --- |
@@ -233,8 +245,10 @@ attach extraction diagnostics to the other four statuses, whose meanings and
 precedence remain unchanged.
 
 Unsupported custom agents may omit records only when the resolved agent profile
-has no accounting extractor. Built-in `claude-code`, `codex`, and `pi` must not
-silently omit records.
+has no accounting extractor — which, now that a profile may declare its family,
+is a custom agent that declared no family rather than every custom agent. The
+`claude-code`, `codex`, and `pi` **families** must not silently omit records: a
+profile declaring one of them is held to this exactly as the built-in id is.
 
 ### 3.3. Measurement Scope
 
@@ -404,11 +418,18 @@ For each agent invocation:
 Extraction failures affect accounting coverage only. They do not change the
 agent exit code, completion condition, selected transition, or callbacks.
 
-Built-in extractor requirements:
+Built-in extractor requirements. The table is keyed on the invocation's
+**resolved family** ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)),
+which for a built-in profile is its own id, so each row applies to the built-in
+and to every profile that declares it as its family. Rhei appends the row's
+required launch arguments itself, from the resolved extractor, so a profile that
+declares a family is launched with them whether or not the operator wrote
+anything; a wrapper that discards the arguments it is handed emits no structured
+usage and its record reads `no-usage-emitted` (§3.2).
 
-| Agent | Requirement |
+| Family | Requirement |
 | --- | --- |
-| `claude-code` | For an ordinary one-shot launch, request Claude Code's `stream-json` event output (`--output-format stream-json --verbose`), so the session log carries every assistant event a session report renders ([§FS-rhei-session-reports.6.2](rhei-session-reports.spec.md#62-claude-code-stream)); usage is read from the stream's final result event alone. Accept only a result envelope with `type: "result"`, a textual `result`, and a complete typed `usage` or `modelUsage` object containing input, cache-read, cache-write, and output token fields; normalize those dimensions. The envelope's `result` text is the human-readable agent output. When `intervene_stdin` also selects stream-json input, retain that transport; the same result-envelope usage extraction applies to its final result event. |
+| `claude-code` | Usage is read from the result envelope alone and never from human-readable log text, for the whole family. For an ordinary one-shot launch, request Claude Code's `stream-json` event output (`--output-format stream-json --verbose`), so the session log carries every assistant event a session report renders ([§FS-rhei-session-reports.6.2](rhei-session-reports.spec.md#62-claude-code-stream)); usage is read from the stream's final result event alone. Accept only a result envelope with `type: "result"`, a textual `result`, and a complete typed `usage` or `modelUsage` object containing input, cache-read, cache-write, and output token fields; normalize those dimensions. The envelope's `result` text is the human-readable agent output. When `intervene_stdin` also selects stream-json input, retain that transport; the same result-envelope usage extraction applies to its final result event. |
 | `codex` | Run `codex exec --json`; extract `turn.completed.usage` from JSONL stdout and normalize it into `runtime/accounting/captures/*.jsonl`. Do not depend on Codex snapshot support. |
 | `pi` | Run `pi --mode json`; extract each assistant `message_end.message.usage` event and normalize it into `runtime/accounting/captures/*.jsonl`. Ignore the duplicate message usage carried by `turn_end` and `agent_end`. Do not depend on Pi snapshot session data. |
 
@@ -442,7 +463,9 @@ record.
 Diagnostics come only from structured parsing. Rhei must not guess from nearby
 human-readable text, quote the rejected output, or parse arbitrary agent
 stdout/stderr JSON as billing telemetry; it only accepts structured capture
-events that identify the accounting schema.
+events that identify the accounting schema. This prohibition is untouched by
+families and is what licenses one: a family is **declared** by the operator, and
+Rhei never infers it from a profile's `command` or its arguments.
 
 ## 5. Pricing
 
@@ -1011,8 +1034,8 @@ Published v1 schemas permit additive evolution: fields may be added within v1,
 and consumers must tolerate unknown fields at every object extension point. A
 removal, rename, type change, or semantic change to an existing field requires
 a new schema id. Fields documented as optional, including `duration_ms`,
-`cli_session`, `run_id`, and `token_convention`, remain optional so artifacts
-from older Rhei versions still validate.
+`cli_session`, `run_id`, `agent_family`, and `token_convention`, remain optional
+so artifacts from older Rhei versions still validate.
 
 Within those same v1 ids, the usage schema defines the optional string
 `diagnostic` on its `extractor-failed` variant. The invocation schema and the

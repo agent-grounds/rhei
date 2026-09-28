@@ -116,16 +116,24 @@ disjoint across the three streams: Pi's `session`/`agent_start`, Claude
 Code's `system` init event, and Codex's `thread.`/`turn.`/`item.` events.
 Each body is folded through the detected stream's collectors alone, so one
 stream's generic event names never leak into another's report. A body that
-is mostly JSON events but carries no marker is read as the agent the log
-header records; when even that reading collects nothing, the log is reported
+is mostly JSON events but carries no marker is read as the family the log
+header records (§6.2); when even that reading collects nothing, the log is reported
 as unsupported, never rendered as a confidently empty report. A body that is
 mostly prose is plain output ([§6.4](#64-logs-without-an-event-stream)), even
 when it quotes the odd JSON line.
 
 ### 6.2 Claude Code Stream
 
-Every Claude Code launch requests the `stream-json` event stream
+Every launch of the `claude-code` family requests the `stream-json` event stream
 ([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow)), so its session log carries this stream.
+A wrapped Claude Code that declares `family: claude-code`
+([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)) is launched the same
+way and its log is this stream too, so header-fallback detection (§6.1) reads the
+**family** — the log header's `family:` line, and its `agent:` line when there is
+none ([§FS-rhei-agents.8.2](rhei-agents.spec.md#82-log-format)). Which families
+are recognized is unchanged, so a log written before families existed detects
+exactly as it did.
+
 Assistant messages contribute thinking, text, and `tool_use` events; `user`
 events carry the matched `tool_result` payloads, errors marked. The token
 usage of the last assistant message that reports any becomes the report's

@@ -887,7 +887,8 @@ declaration order:
   pair's rules the choice landed on.
 - A caller that **names only a state pair** takes the **first declared exact**
   rule for the pair — and a wildcard-source rule to that target only where the
-  pair declares no exact rule at all (§4.6) — and that rule's `condition:`
+  pair declares no exact rule at all
+  ([§FS-rhei-transitions.4.6](#46-wildcard-semantics)) — and that rule's `condition:`
   governs. `rhei transition --from/--to`
   ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)),
   `rhei complete`, and an `on_leave` callback's `nextState` redirect are all of

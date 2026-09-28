@@ -203,11 +203,9 @@ fn handle_sequential_agent_completion(
             } else {
                 SnapshotCompletion::Failure
             };
-            // The target and, where a selection chose it, the rule it chose: a
-            // timeout computes a target and selects nothing, while an exhausted
-            // poll is selected by the algorithm that evaluates each candidate's
-            // `condition:`, so the pair cannot be resolved again afterwards.
-            // §FS-rhei-transitions.4.4
+            // The target and, where a selection chose it, the rule: a timeout
+            // computes a target and selects nothing, an exhausted poll's edge is
+            // chosen by evaluating conditions. §FS-rhei-transitions.4.4
             let (failure_selected_to_state, failure_selected_rule) = if timed_out {
                 (find_timeout_transition(machine, current_state), None)
             } else if !status.success() {

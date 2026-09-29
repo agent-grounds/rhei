@@ -114,9 +114,12 @@ fn dir_names_differ_between_two_runs_of_one_harness() {
 }
 
 /// The public helper, not the rule underneath it: whatever it mixes in, calls
-/// that follow one another still come back distinct. This is the one test that
-/// holds [`unique_dir_name`] to advancing the sequence it reads, which the rule
-/// above cannot see.
+/// that follow one another still come back distinct.
+///
+/// What it holds is the name as a whole, and only against the clock this machine
+/// happens to give it: where a reading moves between the two calls the names
+/// differ whatever else the wrapper read, so this passes with an ingredient
+/// missing. Which of the three reads is carrying the name is held below.
 #[test]
 fn dir_names_differ_across_back_to_back_calls() {
     const CALLS: usize = 64;
@@ -124,6 +127,68 @@ fn dir_names_differ_across_back_to_back_calls() {
         (0..CALLS).map(|_| unique_dir_name("rhei-integ-back-to-back")).collect();
 
     assert_eq!(names.len(), CALLS, "back-to-back calls got {} name(s)", names.len());
+}
+
+/// The last three `-` fields of a name — what the clock read, which process
+/// asked, and how many names that process had asked for already — counted from
+/// the end, because the stem carries hyphens of its own.
+fn discriminator_of(name: &str) -> (u128, u32, u64) {
+    let mut fields = name.rsplit('-');
+    let mut field = |what: &str| {
+        fields.next().unwrap_or_else(|| panic!("{name} should carry a {what} field")).to_owned()
+    };
+    let sequence = field("sequence");
+    let process = field("process");
+    let clock_nanos = field("clock");
+
+    (
+        clock_nanos.parse().expect("the clock field should be a number of nanoseconds"),
+        process.parse().expect("the process field should be a process id"),
+        sequence.parse().expect("the sequence field should be a count"),
+    )
+}
+
+/// The three reads the wrapper makes, which the rule above cannot see.
+///
+/// Every test above hands [`name_from`] its ingredients, so all three stay green
+/// with [`unique_dir_name`] reading a constant in place of the clock, of this
+/// process, or of its own counter. This is where those reads are held, from the
+/// fields of the name the wrapper returns.
+///
+/// The sequence must have advanced between two calls that follow one another,
+/// which is what a name-against-name test cannot show on its own: where the
+/// clock moves between the two calls the names differ with the counter frozen
+/// §REQ-cross-platform.6 — green on a fine clock and red on a coarse one, the
+/// failure agent-grounds/rhei#340 reports. The process field must name this
+/// process, which no comparison among one process's names reaches. The clock
+/// reading is held only to being of this minute: what it must not be is a
+/// constant, and a tighter window would be a bet on the runner's scheduler
+/// rather than a statement about the name.
+#[test]
+fn dir_names_read_the_clock_this_process_and_an_advancing_sequence() {
+    let first = unique_dir_name("rhei-integ-attempt-cross-root");
+    let second = unique_dir_name("rhei-integ-attempt-cross-root");
+    let now_nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time should be after unix epoch")
+        .as_nanos();
+
+    let (first_clock, first_process, first_sequence) = discriminator_of(&first);
+    let (_, second_process, second_sequence) = discriminator_of(&second);
+
+    assert_eq!(
+        (first_process, second_process),
+        (std::process::id(), std::process::id()),
+        "the helper should name this process, got {first} and {second}"
+    );
+    assert!(
+        second_sequence > first_sequence,
+        "the helper should advance the sequence it reads, got {first} and {second}"
+    );
+    assert!(
+        now_nanos.abs_diff(first_clock) < 60_000_000_000,
+        "the helper should read the clock, got {first} against {now_nanos}"
+    );
 }
 
 /// The discriminator may be anything; the stem is what a person reads in a

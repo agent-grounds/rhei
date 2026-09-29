@@ -37,6 +37,13 @@ The suite's mock agents, programs, and callbacks are Python scripts, which is
 what lets one command run on all three platforms, so each `test` job installs a
 Python alongside the Rust toolchain.
 
+That Python is also what runs the repository's gate scripts, so the `test` job
+runs their own tests as a fifth command. The changelog gate of
+[§FS-rhei-distribution.6](../functional-spec/rhei-distribution.spec.md#6-local-gates) runs on contributors' machines
+rather than only in CI, which makes it a behaviour the cross-platform
+requirement covers: proving it on Linux alone would leave the two platforms it
+also refuses pushes on unproven ([§REQ-cross-platform.3](../requirements/cross-platform.md#3-tested-not-assumed)).
+
 Subprocess-driving E2E and integration harnesses must ask Cargo to verify and,
 when needed, rebuild the `rhei-cli` binary from the current checkout before the
 first subprocess use in each harness process. A pre-existing profile binary is
@@ -61,7 +68,10 @@ only the path sends a reader hunting in a checkout that built correctly.
 files with the cargo hooks skipped — `test` has just run them on three
 platforms, and running the suite a second time on one of them bought nothing —
 so the remaining hook contract (fissile, lychee, attribution boilerplate) is
-enforced remotely, and on pull requests the changelog entry check. The gate
+enforced remotely, and on pull requests the changelog entry check, which is
+passed the pull request's base commit alongside its number so that it compares
+the section against what the pull request actually added
+([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-what-the-pull-request-check-requires)). The gate
 binaries (`grund`, `lychee`, `fissile`) are installed from source only on a
 cache miss: they live under a root of their own keyed by their pinned versions,
 so a version bump rebuilds exactly that tool and nothing else.
@@ -71,10 +81,21 @@ look the green run up by workflow name.
 
 ## 2. Local Hooks
 
-The pre-commit hooks run `grund`, formatting, clippy, build, tests, changelog
-checks, link checks, and attribution boilerplate checks before a commit. The
-pre-push hook reruns tests and checks that an open pull request has a matching
-`docs/changelog.md` `Unreleased` entry.
+The pre-commit hooks run `grund`, formatting, clippy, build, tests, the gate
+scripts' tests, link checks, and attribution boilerplate checks before a
+commit. The pre-push hook reruns tests and checks `docs/changelog.md` against
+the branch's base, whether or not a pull request is open
+([§FS-rhei-distribution.6](../functional-spec/rhei-distribution.spec.md#6-local-gates)); a pull request the hook can
+resolve supplies a number to check, and its absence is not a reason to skip.
+
+The changelog hook stays at the pre-push stage alone, and that placement is
+load-bearing rather than incidental. CI's repository-gates job runs
+`pre-commit run --all-files`, which runs the pre-commit stage, so a changelog
+hook registered there would fire the same check twice inside one CI run with
+different arguments — two gates disagreeing about one file, which is what
+[§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-what-the-pull-request-check-requires) exists
+to stop. Both halves of the check, local and remote, therefore run one
+implementation over one definition of a bullet.
 
 ## 3. Release Workflows
 
@@ -88,6 +109,15 @@ Patch and minor release helper workflows follow the same model as the release
 workflow: they require a green `CI` run on `main`, create a version bump commit,
 dry-run the release workflow from the candidate branch, then fast-forward
 `main` and dispatch the publishing release.
+
+Both helpers stamp the changelog's pull request numbers
+([§FS-rhei-distribution.5.2](../functional-spec/rhei-distribution.spec.md#52-what-the-release-stamps)) in the same step
+that bumps the versions, and before the section is promoted: the numbers are
+resolved from the commits the bullets were written in, so they have to be read
+where their authors left them. The stamped changelog rides the version bump
+commit, so no bot commit and no branch-protection bypass is added. Resolving a
+commit to its pull request is a forge read, which is the one permission the
+stamping adds to these workflows.
 
 ## 4. PGO Boundary
 

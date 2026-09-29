@@ -56,9 +56,11 @@ first removes the tree the other is still reading. The failure surfaces as a
 wrong assertion or a missing file somewhere else entirely, never as a complaint
 about the name.
 
-The supported platforms §REQ-cross-platform.1 do not agree on how finely a wall
+The supported platforms [§REQ-cross-platform.1](cross-platform.md#1-supported-platforms) do not agree on how finely a wall
 clock reads, and none of them promises a reading that has moved since the last
 one. A name that leans on the clock alone therefore holds where it was written
 and gives way where it is gated. That is a defect of the harness rather than a
-property of the platform §REQ-cross-platform.2, and it is the one way the
-three-platform gate §REQ-cross-platform.3 reports a failure that is not there.
+property of the platform [§REQ-cross-platform.2](cross-platform.md#2-parity). What the three-platform gate
+[§REQ-cross-platform.3](cross-platform.md#3-tested-not-assumed) reports is real — the harness is broken on every platform,
+including the one it is green on — and it surfaces on the platform whose clock
+reads the more coarsely, where the name ran out of resolution first.

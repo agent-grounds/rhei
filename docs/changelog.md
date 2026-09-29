@@ -25,9 +25,13 @@
   single-file plan — and it surfaced only where the clock reads coarsely, so a
   suite green on Linux went red on macOS. The name now carries a per-call
   sequence and the process id beside the clock reading, the rule the CLI already
-  uses for the artifacts it publishes, and a unit test beside the harness holds
-  it with the clock frozen, so a name that leans on the clock alone cannot pass
-  on one platform and fail on the next. (PR #344)
+  uses for the artifacts it publishes. The rule is a function that reads none of
+  the three for itself, so the unit tests beside the harness hold two of them
+  still and vary the third, once for each: dropping the clock reading, the
+  process id or the sequence from the name fails a named test, rather than
+  passing on whichever ingredient the platform happened to move. A name that
+  leans on any one of them alone therefore cannot pass on one platform and fail
+  on the next. (PR #344)
 
 - Let a workspace task file carry its own metadata. A file under `tasks/` may
   now open with a metadata-only frontmatter block holding

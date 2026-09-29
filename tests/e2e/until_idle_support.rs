@@ -263,9 +263,12 @@ const PATIENCE: Duration = Duration::from_secs(90);
 /// child that filled a pipe nobody was draining would block, and the guard
 /// would report a hang that was the harness's own.
 pub(super) fn bounded(mut command: Command, what: &str, scratch: &Path) -> CliRun {
-    // §REQ-cross-platform.6: a name of this run's own, not of the clock's tick.
-    let out_path = scratch.join(unique_dir_name::unique_dir_name("run-out"));
-    let err_path = out_path.with_extension("err");
+    // §REQ-cross-platform.6: a name of this run's own, not of the clock's tick. It
+    // names directories elsewhere; here it names two files, built from the one name
+    // rather than by `with_extension`, which would need a discriminator free of dots.
+    let name = unique_dir_name::unique_dir_name("run-out");
+    let out_path = scratch.join(&name);
+    let err_path = scratch.join(format!("{name}.err"));
     let out = fs::File::create(&out_path).expect("run stdout file");
     let err = fs::File::create(&err_path).expect("run stderr file");
     let mut child = command

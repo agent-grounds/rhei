@@ -236,7 +236,6 @@ pub use rhei_core::platform::shell_quote;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -268,11 +267,12 @@ pub fn unique_temp_dir(prefix: &str) -> TestDir {
 }
 
 pub fn unique_scratchpad_dir(prefix: &str) -> TestDir {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time should be after unix epoch")
-        .as_nanos();
-    TestDir::create(repo_root().join("scratchpad").join(format!("rhei-integ-{prefix}-{nanos}")))
+    // §REQ-cross-platform.6
+    TestDir::create(
+        repo_root()
+            .join("scratchpad")
+            .join(unique_dir_name::unique_dir_name(&format!("rhei-integ-{prefix}"))),
+    )
 }
 
 /// Compare existing paths by filesystem identity rather than spelling. macOS

@@ -28,8 +28,20 @@ pub fn unique_dir_name(stem: &str) -> String {
 /// uniqueness — it is the resolution of whatever clock the platform gave the
 /// runner, which is the whole of the difference between a suite that is green
 /// where it was written and red where it is gated §REQ-cross-platform.6.
-fn name_from(stem: &str, clock_nanos: u128, _process: u32) -> String {
-    format!("{stem}-{clock_nanos}")
+///
+/// So the name carries three ingredients and leans on none of them alone
+/// §REQ-cross-platform.6. The sequence counts this process's calls, and is what
+/// makes two names distinct when the clock has not moved between them; the
+/// process tells two runners apart, because each counts its own calls from zero
+/// and `cargo test` runs the harnesses side by side; the clock reading tells
+/// this run of a harness from the last one, whose files may still be on disk.
+/// This is the rule the CLI already spells for the artifacts it publishes —
+/// `invocation_file_id` and `unique_staging_path` in
+/// `crates/rhei-cli/src/cli/accounting.rs`.
+fn name_from(stem: &str, clock_nanos: u128, process: u32) -> String {
+    static SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let sequence = SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    format!("{stem}-{clock_nanos}-{process}-{sequence}")
 }
 
 /// The clock reading a test gets belongs to the runner, not to the test: one

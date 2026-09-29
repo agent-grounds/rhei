@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use rhei_core::ast::TaskId;
 use rhei_core::parse;
@@ -14,6 +13,7 @@ use serde_yaml::Value as YamlValue;
 // The same guard and fixture helpers the e2e harness uses; `include!` rather
 // than `mod`, because this harness is one flat module assembled by `include!`.
 include!("../../support/test_dir.rs");
+include!("../../support/unique_dir_name.rs");
 include!("../../support/python_fixture.rs");
 
 #[allow(dead_code)]
@@ -59,11 +59,8 @@ fn rhei_command() -> Command {
 }
 
 fn unique_temp_dir(prefix: &str) -> TestDir {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time should be after unix epoch")
-        .as_nanos();
-    TestDir::create(std::env::temp_dir().join(format!("rhei-{prefix}-{nanos}")))
+    // §REQ-cross-platform.6
+    TestDir::create(std::env::temp_dir().join(unique_dir_name(&format!("rhei-{prefix}"))))
 }
 
 fn write_fixture_file(dir: &Path, name: &str, contents: &str) -> PathBuf {

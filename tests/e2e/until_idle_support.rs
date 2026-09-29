@@ -263,7 +263,8 @@ const PATIENCE: Duration = Duration::from_secs(90);
 /// child that filled a pipe nobody was draining would block, and the guard
 /// would report a hang that was the harness's own.
 pub(super) fn bounded(mut command: Command, what: &str, scratch: &Path) -> CliRun {
-    let out_path = scratch.join(format!("run-out-{}", unique_suffix()));
+    // §REQ-cross-platform.6: a name of this run's own, not of the clock's tick.
+    let out_path = scratch.join(unique_dir_name::unique_dir_name("run-out"));
     let err_path = out_path.with_extension("err");
     let out = fs::File::create(&out_path).expect("run stdout file");
     let err = fs::File::create(&err_path).expect("run stderr file");
@@ -294,13 +295,6 @@ pub(super) fn bounded(mut command: Command, what: &str, scratch: &Path) -> CliRu
         stdout: fs::read_to_string(&out_path).unwrap_or_default(),
         stderr: rendered_stderr::undo_soft_wrap(&fs::read_to_string(&err_path).unwrap_or_default()),
     }
-}
-
-fn unique_suffix() -> u128 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("system time should be after unix epoch")
-        .as_nanos()
 }
 
 /// The exit status, named, so a failure says which code arrived.

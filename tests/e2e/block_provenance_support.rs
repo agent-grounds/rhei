@@ -2,7 +2,6 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub(super) const LOCK_PATH: &str = ".agent-grounds/rhei/composition.lock.json";
 
@@ -26,11 +25,10 @@ pub(super) fn provenance_test_dir(prefix: &str) -> super::TestDir {
     let root = std::env::var_os("RHEI_TEST_SCRATCH_ROOT")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(std::env::temp_dir);
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time should be after unix epoch")
-        .as_nanos();
-    super::TestDir::create(root.join(format!("rhei-issue-284-{prefix}-{nanos}")))
+    // §REQ-cross-platform.6
+    super::TestDir::create(
+        root.join(super::unique_dir_name::unique_dir_name(&format!("rhei-issue-284-{prefix}"))),
+    )
 }
 
 pub(super) fn read_lock(output: &Path) -> serde_json::Value {

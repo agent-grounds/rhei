@@ -48,8 +48,21 @@ _STRIPPED = (
 
 
 def clean_env(**overrides: str | None) -> dict[str, str]:
-    """The ambient environment with everything that could answer for us removed."""
-    env = {key: value for key, value in os.environ.items() if key not in _STRIPPED}
+    """The ambient environment with everything that could answer for us removed.
+
+    Every `GIT_*` variable goes, not only the ones listed above. Git exports
+    `GIT_DIR` into the subprocesses of a hook it invokes, and these tests run as a
+    `pre-commit` hook, so a `GIT_DIR` left in place aims `TempRepo`'s own `git
+    init`, `checkout -b` and `commit` at the repository being committed to rather
+    than at the temporary directory - real branches written, real `HEAD` moved.
+    The scripts under test strip the same variables for their own calls
+    (`check_changelog_pr_entry._no_git_env`); the harness has to do it too.
+    """
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in _STRIPPED and not key.startswith("GIT_")
+    }
     env["GIT_CONFIG_GLOBAL"] = os.devnull
     env["GIT_CONFIG_SYSTEM"] = os.devnull
     env["GIT_AUTHOR_NAME"] = env["GIT_COMMITTER_NAME"] = "Changelog Test"
@@ -77,6 +90,11 @@ class TempRepo:
     def __init__(self, path: Path, branch: str = "main") -> None:
         self.path = path
         (self.path / "docs").mkdir(parents=True, exist_ok=True)
+        # Checked before `init`, because a leaked `GIT_DIR` would aim it at a real
+        # repository, and the loss is a moved `HEAD` rather than a failed test.
+        leaked = sorted(key for key in clean_env() if key.startswith("GIT_DIR"))
+        if leaked:
+            raise AssertionError(f"clean_env still carries {leaked}; git would write somewhere real")
         self.git("init", "-b", branch)
 
     def git(self, *args: str) -> str:
@@ -148,19 +166,17 @@ sys.exit(1)
 '''
 
 
-def _install(directory: Path, name: str, python_source: str | None, forward: str | None) -> None:
-    """Put `name` in `directory` so a subprocess finds it by that bare name.
+def _install(directory: Path, name: str, python_source: str) -> None:
+    """Put a stub `name` in `directory` so a subprocess finds it by that bare name.
 
     Windows resolves a bare name through `PATHEXT`, so the stub is written under
     every extension a launcher might look for as well as under the bare name.
+    Only a tool with no real binary behind it is installed this way: a launcher is
+    a shell, and a shell re-parses what it forwards (§REQ-cross-platform.4).
     """
-    if python_source is not None:
-        impl = directory / f"_{name}_stub.py"
-        impl.write_text(python_source, encoding="utf-8")
-        target = f'"{sys.executable}" "{impl}"'
-    else:
-        assert forward is not None
-        target = f'"{forward}"'
+    impl = directory / f"_{name}_stub.py"
+    impl.write_text(python_source, encoding="utf-8")
+    target = f'"{sys.executable}" "{impl}"'
 
     posix = directory / name
     posix.write_text(f'#!/bin/sh\nexec {target} "$@"\n', encoding="utf-8")
@@ -170,22 +186,37 @@ def _install(directory: Path, name: str, python_source: str | None, forward: str
             (directory / (name + extension)).write_text(f"@{target} %*\n", encoding="utf-8")
 
 
-def make_bin(directory: Path, pulls: dict[str, list[int]] | None = None, gh: bool = True) -> Path:
-    """A directory to put first on `PATH`: a stub `gh`, and a real `git` behind it.
+def make_bin(directory: Path, pulls: dict[str, list[int]] | None = None) -> Path:
+    """A directory to put first on `PATH`, holding a stub `gh` and nothing else.
 
-    With `gh=False` the directory is the *whole* `PATH`, which is how "no `gh`
-    installed" is reached without depending on where the real one lives.
+    `git` is deliberately not in it. The directory goes *in front of* the ambient
+    `PATH`, so the real `git` is already reachable, and a forwarding wrapper would
+    only put a shell between the script and the tool (§REQ-cross-platform.4).
     """
     directory.mkdir(parents=True, exist_ok=True)
-    if gh:
-        _install(directory, "gh", _GH_STUB, None)
-    real_git = shutil.which("git")
-    if real_git is None:
-        raise unittest.SkipTest("git is not on PATH")
-    _install(directory, "git", None, real_git)
+    _install(directory, "gh", _GH_STUB)
     if pulls is not None:
         (directory / "pulls.json").write_text(json.dumps(pulls), encoding="utf-8")
     return directory
+
+
+def path_with_no_gh() -> str:
+    """The ambient `PATH` with every directory that offers a `gh` taken out.
+
+    How "no `gh` installed" is reached without saying where the real one lives and
+    without building a `PATH` of our own around a wrapper
+    (§REQ-cross-platform.4). Where `gh` shares a directory with `git` - which is
+    what a distribution's `/usr/bin` does - this takes `git` with it, and that is
+    sound rather than tolerated: the stamper reports an unreachable `gh` before it
+    spawns anything, so the path under test never asks for `git`. Do not put a
+    `git` back for it.
+    """
+    kept = [
+        entry
+        for entry in os.environ.get("PATH", "").split(os.pathsep)
+        if entry and shutil.which("gh", path=entry) is None
+    ]
+    return os.pathsep.join(kept)
 
 
 def pulls_file(directory: Path) -> Path:

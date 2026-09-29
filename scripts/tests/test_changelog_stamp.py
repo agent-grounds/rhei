@@ -15,7 +15,7 @@ from scripts.tests.changelog_test_support import (
     STAMPER,
     ScriptTestCase,
     changelog,
-    make_bin,
+    path_with_no_gh,
 )
 
 class ChangelogStampTests(ScriptTestCase):
@@ -85,10 +85,9 @@ class ChangelogStampTests(ScriptTestCase):
 
     def test_it_warns_and_writes_nothing_with_no_gh_on_path(self):
         repo, _ = self.repo_with(["- The change this branch made."])
-        bare = make_bin(self.tmp / "bin-without-gh", gh=False)
 
         before = repo.read_changelog()
-        result = self.stamp(repo, path=str(bare))
+        result = self.stamp(repo, path=path_with_no_gh())
         self.assertEqual(result.returncode, 0, self.report(result))
         self.assertEqual(repo.read_changelog(), before)
         self.assertIn("gh", self.output(result), "the warning names the cause")

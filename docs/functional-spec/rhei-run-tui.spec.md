@@ -596,6 +596,15 @@ line is present after the run releases the slot. This is the run-journal side
 of the callback visibility contract in
 [§FS-rhei-transitions.1.2](rhei-transitions.spec.md#12-firing-identity-and-callback-time-visibility).
 
+A parked invocation selects no transition, so that paragraph does not reach it,
+but its `end@<state>` line is last in the same way: the durable `nextAttemptAt:`
+wait written into the task's Markdown and the retained spawn record
+([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)) are both
+observable before the release is emitted. An observer that has seen the wait or
+the record must therefore not assume the `end@<state> … outcome=provider_limited`
+line is already in the journal, and must wait for the line itself before reading
+it.
+
 ### 1.8. Failure Modes
 
 - **Panic in the execution engine** — a panic hook registered by `TuiSink` calls `ratatui::restore()` before re-raising, so the terminal is never left in raw mode.

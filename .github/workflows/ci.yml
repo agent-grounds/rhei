@@ -63,6 +63,12 @@ jobs:
         timeout-minutes: 45
         run: cargo test --workspace --all-targets --locked --no-fail-fast
 
+      # The changelog gate refuses pushes on contributors' machines, Windows
+      # included, so proving it on Linux alone would leave two of the three
+      # platforms it runs on unproven. §REQ-cross-platform.3
+      - name: gate script tests
+        run: python -m unittest discover -s scripts/tests -t .
+
   lint:
     name: repository gates (grund, fissile, lychee, changelog, attribution)
     runs-on: ubuntu-latest
@@ -130,4 +136,7 @@ jobs:
 
       - name: changelog PR entry
         if: github.event_name == 'pull_request'
-        run: python scripts/check_changelog_pr_entry.py --pr-number "${{ github.event.pull_request.number }}"
+        run: |
+          python scripts/check_changelog_pr_entry.py \
+            --pr-number "${{ github.event.pull_request.number }}" \
+            --base-ref "${{ github.event.pull_request.base.sha }}"

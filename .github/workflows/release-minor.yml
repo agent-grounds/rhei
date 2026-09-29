@@ -6,6 +6,9 @@ on:
 permissions:
   contents: write
   actions: write
+  # Resolving a changelog bullet's commit to its pull request is a forge read.
+  # §AR-ci-release.3
+  pull-requests: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -79,6 +82,9 @@ jobs:
           next="${{ steps.versions.outputs.next }}"
           python3 scripts/set-release-version.py "$next"
           cargo update --workspace
+          # Before the promotion, so the numbers are resolved from the
+          # commits the bullets were written in. §FS-rhei-distribution.5.2
+          python3 scripts/prepare_changelog_release.py stamp
           python3 scripts/prepare_changelog_release.py prepare "$next"
           # Fail here rather than three minutes into the dry run: this is the
           # same check `release.yml` opens with, and it is cheap.

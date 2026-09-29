@@ -51,6 +51,16 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit, pre-push]
+      - id: gate-script-tests
+        name: gate script tests
+        entry: python -m unittest discover -s scripts/tests -t .
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      # Stays at the pre-push stage alone: at pre-commit it would also fire
+      # inside CI's `pre-commit run --all-files`, with different arguments.
+      # §AR-ci-release.2
       - id: changelog-pr-entry
         name: changelog PR entry
         entry: python scripts/check_changelog_pr_entry.py --local-pr

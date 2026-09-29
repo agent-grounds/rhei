@@ -80,7 +80,13 @@ jobs:
       FISSILE_VERSION: 0.8.3
       TOOLS_ROOT: ${{ github.workspace }}/.ci-tools
     steps:
+      # The whole history, because the changelog step below is passed the pull
+      # request's base commit and a depth-1 clone does not hold it: the check
+      # refuses a base it cannot reach, so a shallow clone here would fail the
+      # job rather than let the gate pass everything. §AR-ci-release.1
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Install current stable Rust for tooling
         uses: dtolnay/rust-toolchain@stable

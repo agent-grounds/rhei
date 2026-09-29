@@ -116,11 +116,29 @@ tip, because a release promotion that lands on the base after the branch point
 would otherwise read as the branch putting the promoted bullets back under
 `Unreleased`, and a branch that added nothing would pass.
 
+The base is named by the caller where the caller knows it, and looked for
+otherwise. A caller that names one is making a claim about its own checkout, so
+a named base the checkout cannot resolve is a refusal naming the ref, never a
+check that carries on without it: a clone too shallow to hold the base would
+otherwise gate nothing at all, and the advice a missing base earns a
+contributor - fetch the base branch - cannot be taken by the workflow that
+named it.
+
+Where no base is named, the branch's base is looked for among the push remote's
+`main`, `origin/main`, `upstream/main` and `main`, and of those that resolve the
+one whose merge base with the head is the most recent is the base. Taking the
+first that merely resolves would let a default branch left behind decide it -
+a fork's `origin/main` never synced while the branch itself merged upstream in -
+and every bullet that merge brought along would then read as the pull request's
+own, which is the two gates disagreeing about one file again.
+
 Where a number is known, a bullet the pull request added or changed may not
 carry a different pull request's number, and the placeholder is not a number.
-Bullets from earlier pull requests keep their own numbers and are not examined.
-A number that cannot be resolved is not an error, which is the ordinary case
-before the pull request exists.
+The number a bullet carries is its trailing token and only that, so a number
+written in a bullet's prose - a revert naming the pull request it reverses - is
+not a number that bullet carries. Bullets from earlier pull requests keep their
+own numbers and are not examined. A number that cannot be resolved is not an
+error, which is the ordinary case before the pull request exists.
 
 The refusal names the missing bullet and says that no number is needed, because
 for a contributor meeting the rule for the first time that message is the only
@@ -160,7 +178,9 @@ becoming a pull request; that skip is local and CI does not honour it, so the
 pull request is still checked. Where the branch's base resolves to no ref at
 all the hook degrades to requiring the section to hold a bullet and says which
 refs it tried, because a refusal a contributor cannot act on is worse than the
-CI failure it is preventing.
+CI failure it is preventing. That degrade is the hook's, because the hook is the
+side that has to find the base; a caller that named one is refused instead
+(§5.1).
 
 ## 7. Supported Platforms
 

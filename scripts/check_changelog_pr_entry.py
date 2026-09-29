@@ -9,7 +9,8 @@ R1  `Unreleased` must hold at least one bullet the same section does not already
     hold at the merge base of the branch's base and head. It needs no pull
     request number, which is why the hook can run before one exists.
 R2  Where a number is known, a bullet R1 counted may not carry a different
-    pull request's number. The placeholder is not a number.
+    pull request's number - the trailing token of the bullet, so a number in its
+    prose is not one it carries. The placeholder is not a number either.
 
 §FS-rhei-distribution.5.1
 """
@@ -27,6 +28,7 @@ from pathlib import Path
 from typing import Sequence
 
 from changelog_bullets import Bullet, ChangelogFormatError, bullets, bullets_in
+from tool_lookup import tool
 
 ZERO_REF_RE = re.compile(r"^0+$")
 
@@ -53,15 +55,21 @@ def check_changelog_pr_entry(
     head_ref = to_ref or "HEAD"
     head_lines = _head_lines(changelog, git, to_ref)
 
-    base_label = base_ref or _resolve_base(git)
-    if base_label is None:
-        _check_without_a_base(head_lines, git)
-        return
+    if base_ref is not None:
+        # A named base is the caller's claim about its own checkout: refusing one
+        # it cannot reach beats degrading to a check that passes any section with
+        # a bullet, advising a fetch no runner takes. §FS-rhei-distribution.5.1
+        base_label = base_ref
+        merge_base = git.merge_base(base_ref, head_ref)
+        if merge_base is None:
+            raise ChangelogPrError(_unresolvable_base_message(base_ref))
+    else:
+        resolved = _resolve_base(git, head_ref)
+        if resolved is None:
+            _check_without_a_base(head_lines, git)
+            return
+        base_label, merge_base = resolved
 
-    merge_base = git.merge_base(base_label, head_ref)
-    if merge_base is None:
-        _check_without_a_base(head_lines, git, tried=[base_label])
-        return
     if merge_base == git.commit(head_ref):
         # `git push origin main` after a fast-forward: the head adds nothing to
         # the base, so there is nothing for a bullet to describe. §FS-rhei-distribution.5.1
@@ -95,27 +103,39 @@ def _added_bullets(head_lines: Sequence[str], base_text: str | None) -> list[Bul
 
 
 def _check_the_number(added: Sequence[Bullet], pr_number: int) -> None:
-    """A bullet this pull request added may not name another one. R2"""
+    """A bullet this pull request added may not carry another one's number. R2"""
     for bullet in added:
-        wrong = sorted(number for number in bullet.numbers if number != pr_number)
-        if wrong:
-            named = ", ".join(f"PR #{number}" for number in wrong)
-            raise ChangelogPrError(
-                f"docs/changelog.md ## Unreleased: a bullet added by this pull request "
-                f"names {named}, not PR #{pr_number}; remove the number or correct it - "
-                f"leaving it out is fine, the release fills it in."
-            )
+        # The trailing token, not every number in the bullet: a number in a
+        # bullet's prose - a revert naming what it reverses - is not the number
+        # the bullet carries, and asking for it back would be wrong advice.
+        token = bullet.token
+        if token is None or not token.isdigit() or int(token) == pr_number:
+            continue
+        raise ChangelogPrError(
+            f"docs/changelog.md ## Unreleased: a bullet added by this pull request "
+            f"carries PR #{token}, not PR #{pr_number}; remove the number or correct it - "
+            f"leaving it out is fine, the release fills it in."
+        )
 
 
-def _check_without_a_base(head_lines: Sequence[str], git: _Git, tried: Sequence[str] | None = None) -> None:
-    """No base to compare against: require a bullet, and say so.
+def _unresolvable_base_message(base_ref: str) -> str:
+    return (
+        f"docs/changelog.md: the base {base_ref} was named but is not in this checkout, "
+        f"so there is nothing to compare ## Unreleased against\n"
+        f"  fetch the base commit - a checkout of depth 1 does not hold it - and run this again"
+    )
+
+
+def _check_without_a_base(head_lines: Sequence[str], git: _Git) -> None:
+    """No candidate resolved: require a bullet, and say which refs were tried.
 
     A refusal a contributor cannot act on is worse than the CI failure it is
     preventing, so this degrades rather than refuses. R2 is not applied: it is
     scoped to the bullets R1 counted, and without a base there is no such set.
+    This is the hook's path alone - a caller that named a base is refused.
     §FS-rhei-distribution.6
     """
-    names = list(tried) if tried else git.base_candidates()
+    names = git.base_candidates()
     remote = names[0].split("/")[0] if "/" in names[0] else "origin"
     print(
         f"warning: docs/changelog.md: no base to compare against (tried {', '.join(names)}); "
@@ -158,11 +178,30 @@ def _head_lines(changelog: Path, git: _Git, to_ref: str | None) -> list[str]:
         raise ChangelogPrError(f"missing changelog: {changelog}") from exc
 
 
-def _resolve_base(git: _Git) -> str | None:
+def _resolve_base(git: _Git, head_ref: str) -> tuple[str, str] | None:
+    """The branch's base and the merge base to compare against, or nothing.
+
+    Of the candidates that resolve, the one whose merge base with the head is the
+    most recent. Taking the first that merely resolves lets a stale `origin/main`
+    - a fork's default branch never synced, while the branch itself merged
+    upstream in - decide the base, and every bullet that merge brought along then
+    reads as this pull request's own. §FS-rhei-distribution.5.1
+    """
+    found: list[tuple[str, str]] = []
     for candidate in git.base_candidates():
-        if git.commit(candidate) is not None:
-            return candidate
-    return None
+        if git.commit(candidate) is None:
+            continue
+        merge_base = git.merge_base(candidate, head_ref)
+        if merge_base is not None:
+            found.append((candidate, merge_base))
+    if not found:
+        return None
+
+    best = found[0]
+    for other in found[1:]:
+        if other[1] != best[1] and git.is_ancestor(best[1], other[1]):
+            best = other
+    return best
 
 
 class _Git:
@@ -178,12 +217,17 @@ class _Git:
         """The branch's base, in the order the hook and CI agree on."""
         remote = os.environ.get("PRE_COMMIT_REMOTE_NAME")
         names = [f"{remote}/main"] if remote else []
-        names += ["origin/main", "main"]
+        # `upstream/main` is where a fork's contributor has the real base, which
+        # is the case their `origin/main` is most likely to be behind.
+        names += ["origin/main", "upstream/main", "main"]
         return list(dict.fromkeys(names))
 
     def commit(self, ref: str) -> str | None:
         result = self._run("rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}")
         return result.stdout.strip() or None if result.returncode == 0 else None
+
+    def is_ancestor(self, earlier: str, later: str) -> bool:
+        return self._run("merge-base", "--is-ancestor", earlier, later).returncode == 0
 
     def merge_base(self, base: str, head: str) -> str | None:
         result = self._run("merge-base", base, head)
@@ -211,12 +255,16 @@ class _Git:
             return None
 
     def _run(self, *args: str) -> subprocess.CompletedProcess[str]:
+        absent = subprocess.CompletedProcess(args, 1, "", "git is not on PATH")
+        git = tool("git")
+        if git is None:
+            return absent
         try:
             return subprocess.run(
-                ["git", *args], cwd=str(self.cwd), check=False, capture_output=True, text=True
+                [git, *args], cwd=str(self.cwd), check=False, capture_output=True, text=True
             )
         except FileNotFoundError:
-            return subprocess.CompletedProcess(args, 1, "", "git is not on PATH")
+            return absent
 
 
 def pr_number_from_event(event_path: Path) -> int | None:
@@ -241,9 +289,12 @@ def pr_number_from_event(event_path: Path) -> int | None:
 
 
 def pr_number_from_current_branch() -> int | None:
+    gh = tool("gh")
+    if gh is None:
+        return None
     try:
         result = subprocess.run(
-            ["gh", "pr", "view", "--json", "number", "--jq", ".number"],
+            [gh, "pr", "view", "--json", "number", "--jq", ".number"],
             check=False,
             capture_output=True,
             text=True,

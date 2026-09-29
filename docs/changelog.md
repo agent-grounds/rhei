@@ -50,7 +50,12 @@ pull request number: the release stamps `(PR #N)` onto it. See
   bullet it cannot resolve as written with a warning, and never failing a release
   over one. Both halves of the check and the stamper read one definition of a
   bullet, in `scripts/changelog_bullets.py`, because two gates disagreeing about
-  `docs/changelog.md` was the defect. A new `CONTRIBUTING.md` and pull request
+  `docs/changelog.md` was the defect. Where the base is not named, it is the
+  candidate — the push remote's `main`, `origin/main`, `upstream/main`, `main` —
+  whose merge base with the branch is the most recent, so a fork's unsynced
+  `origin/main` no longer makes the bullets a merge brought along read as the
+  branch's own; where it is named, a base the checkout does not hold is refused
+  by name instead of quietly checked less. A new `CONTRIBUTING.md` and pull request
   template say the rule up front, and `SKIP=changelog-pr-entry git push` is the
   documented way to push a branch that is not becoming a pull request.
 

@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import datetime as _datetime
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +19,7 @@ from typing import Sequence
 
 import changelog_bullets
 from changelog_bullets import Bullet
+from tool_lookup import tool
 
 
 VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
@@ -105,7 +105,7 @@ def stamp_pull_requests(changelog: Path) -> None:
 
     if not unstamped:
         return
-    if shutil.which("gh") is None:
+    if tool("gh") is None:
         _warn("`gh` is not on PATH, so no pull request could be resolved; nothing stamped")
         return
 
@@ -187,9 +187,15 @@ class _Forge:
         return {int(token) for token in result.stdout.split() if token.isdigit()}
 
     def _run(self, *args: str) -> subprocess.CompletedProcess[str] | None:
+        # The resolved path rather than the bare name: on Windows a bare name
+        # reaches only a `.exe`, so a `gh` shim would read as a forge that could
+        # not be asked. §REQ-cross-platform.3
+        executable = tool(args[0])
+        if executable is None:
+            return None
         try:
             return subprocess.run(
-                list(args), cwd=str(self.cwd), check=False, capture_output=True, text=True
+                [executable, *args[1:]], cwd=str(self.cwd), check=False, capture_output=True, text=True
             )
         except FileNotFoundError:
             return None

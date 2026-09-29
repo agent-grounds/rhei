@@ -16,6 +16,7 @@ from scripts.tests.changelog_test_support import (
     GATE,
     ScriptTestCase,
     changelog,
+    checkout_fetch_depth,
     hook_stages,
 )
 
@@ -136,6 +137,59 @@ class ChangelogGateTests(ScriptTestCase):
         self.assertEqual(local.returncode, 1, self.report(local))
         self.assertIn("no new or changed bullet", local.stderr)
 
+    def test_a_stale_origin_main_does_not_decide_the_base(self):
+        """A fork's default branch left behind must not make merged-in bullets ours.
+
+        The ordinary way a contributor brings a branch up to date is to merge
+        upstream in without first syncing their fork's `main`. Reading the base
+        off whichever candidate resolves first then counts the bullets that merge
+        brought along as this branch's own, and R2 refuses them for carrying
+        somebody else's number - a state CI accepts on the identical tree.
+        """
+        theirs = "- Somebody else's newer change, merged in from upstream. (PR #338)"
+        repo, branch_point = self.branch_off([EARLIER])
+        repo.git("update-ref", "refs/remotes/origin/main", branch_point)
+
+        repo.git("checkout", "-b", "as-upstream-has-it")
+        repo.write_changelog(changelog([EARLIER, theirs]))
+        upstream = repo.commit("upstream main gains somebody else's bullet")
+        repo.git("update-ref", "refs/remotes/upstream/main", upstream)
+
+        repo.git("checkout", "fix/the-thing")
+        repo.git("branch", "-D", "as-upstream-has-it")
+        repo.touch_source("src.txt")
+        repo.commit("the change itself")
+        repo.git("merge", "--no-edit", "-m", "merge upstream main", upstream)
+        repo.write_changelog(changelog([EARLIER, theirs, "- The change this branch makes."]))
+        repo.commit("my own bullet")
+
+        local = self.pre_push(repo, GH_STUB_PR="339")
+        self.assertEqual(local.returncode, 0, self.report(local))
+        self.assertNotIn("PR #338", self.output(local), "that bullet is not this branch's")
+        remote = self.ci(repo, 339, upstream)
+        self.assertEqual(remote.returncode, 0, self.report(remote))
+
+    def test_a_named_base_the_checkout_does_not_hold_is_refused(self):
+        """A shallow clone must fail loudly rather than degrade to passing everything.
+
+        The degrade of §FS-rhei-distribution.6 is for a base the hook could not
+        find. A base the caller named is its own claim about its checkout, and CI
+        passing one it cannot reach is how a green gate comes to check nothing.
+        """
+        repo, _ = self.branch_off([EARLIER])
+        repo.touch_source("src.txt")
+        repo.commit("a change with no changelog bullet")
+        absent = "4e1410270d3dca4b2908f2e3963ff495fcd8dfb9"
+
+        remote = self.ci(repo, 339, absent)
+        self.assertNotEqual(remote.returncode, 0, self.report(remote))
+        self.assertIn(absent, remote.stderr, "it must name the ref it was given")
+        self.assertNotIn(
+            "checking only that",
+            self.output(remote),
+            "a named base that is missing is not a reason to check less",
+        )
+
     # --- the number, where a number is known ---------------------------------
 
     def test_a_new_bullet_carrying_another_pull_requests_number_is_refused(self):
@@ -147,6 +201,21 @@ class ChangelogGateTests(ScriptTestCase):
         self.assertEqual(remote.returncode, 1, self.report(remote))
         self.assertIn("PR #338", remote.stderr)
         self.assertIn("not PR #339", remote.stderr)
+
+    def test_a_number_in_a_bullets_prose_is_not_the_number_it_carries(self):
+        """A revert may name what it reverses: the number checked is the trailing token."""
+        repo, base = self.branch_off([EARLIER])
+        repo.write_changelog(
+            changelog(
+                [EARLIER, "- Revert the behaviour introduced in PR #338, which broke nested runs."]
+            )
+        )
+        repo.commit("a bullet whose prose names another pull request")
+
+        local = self.pre_push(repo, GH_STUB_PR="339")
+        self.assertEqual(local.returncode, 0, self.report(local))
+        remote = self.ci(repo, 339, base)
+        self.assertEqual(remote.returncode, 0, self.report(remote))
 
     def test_a_written_number_is_accepted_where_no_number_is_knowable(self):
         """Passes today, and must keep passing: the hook has no oracle for a number."""
@@ -209,6 +278,14 @@ class ChangelogGateTests(ScriptTestCase):
         one file, which is the defect (§AR-ci-release.2).
         """
         self.assertEqual(hook_stages("changelog-pr-entry"), ["pre-push"])
+
+    def test_the_lint_jobs_checkout_holds_the_whole_history(self):
+        """CI's half is passed a base commit, so its clone has to hold one.
+
+        `actions/checkout` takes one commit by default, which leaves the base of
+        every pull request outside the clone (§AR-ci-release.1).
+        """
+        self.assertEqual(checkout_fetch_depth("lint"), "0")
 
 
 if __name__ == "__main__":

@@ -71,7 +71,11 @@ so the remaining hook contract (fissile, lychee, attribution boilerplate) is
 enforced remotely, and on pull requests the changelog entry check, which is
 passed the pull request's base commit alongside its number so that it compares
 the section against what the pull request actually added
-([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-what-the-pull-request-check-requires)). The gate
+([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-what-the-pull-request-check-requires)). Passing that
+commit obliges the job to hold it, so this checkout fetches the full history
+rather than the single commit a checkout takes by default: a base the clone does
+not hold is a base the check refuses on, and before it refused, a gate that
+could not see what the pull request added passed everything. The gate
 binaries (`grund`, `lychee`, `fissile`) are installed from source only on a
 cache miss: they live under a root of their own keyed by their pinned versions,
 so a version bump rebuilds exactly that tool and nothing else.

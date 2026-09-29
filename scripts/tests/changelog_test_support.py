@@ -27,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 GATE = REPO_ROOT / "scripts" / "check_changelog_pr_entry.py"
 STAMPER = REPO_ROOT / "scripts" / "prepare_changelog_release.py"
 PRE_COMMIT_CONFIG = REPO_ROOT / ".pre-commit-config.yaml"
+CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 WINDOWS = os.name == "nt"
 
@@ -259,3 +260,33 @@ def hook_stages(hook_id: str) -> list[str]:
         if found:
             return [item.strip() for item in found.group("items").split(",") if item.strip()]
     return []
+
+
+def checkout_fetch_depth(job: str) -> str | None:
+    """The `fetch-depth:` of a CI job's `actions/checkout`, read without PyYAML.
+
+    Same reason as `hook_stages`: the `lint` job installs `pre-commit` and
+    nothing else (§AR-ci-release.1).
+    """
+    lines = CI_WORKFLOW.read_text(encoding="utf-8").splitlines()
+    start = None
+    for index, line in enumerate(lines):
+        if re.match(rf"^  {re.escape(job)}:\s*$", line):
+            start = index
+            break
+    if start is None:
+        raise AssertionError(f"no job {job!r} in {CI_WORKFLOW}")
+
+    end = next((index for index in range(start + 1, len(lines)) if re.match(r"^  \S", lines[index])), len(lines))
+    within = lines[start:end]
+    for index, line in enumerate(within):
+        if "actions/checkout" not in line:
+            continue
+        for following in within[index + 1 :]:
+            if re.match(r"^\s*-\s", following):
+                return None
+            found = re.match(r"^\s*fetch-depth:\s*(?P<depth>\S+)\s*$", following)
+            if found:
+                return found.group("depth")
+        return None
+    raise AssertionError(f"job {job!r} has no actions/checkout step")

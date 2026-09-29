@@ -33,14 +33,6 @@ _TRAILING_TOKEN_RE = re.compile(
     r"|(?:PR|pull request)\s*#\s*(?P<bare>[0-9]+|TBD))\s*$"
 )
 
-# Every way this changelog has ever named a pull request, so that a number
-# written in any of them is checked rather than only the canonical form.
-_NUMBER_RES = (
-    re.compile(r"(?i)\bPR\s*#\s*(?P<number>[0-9]+)\b"),
-    re.compile(r"(?i)\bpull request\s*#\s*(?P<number>[0-9]+)\b"),
-    re.compile(r"/pull/(?P<number>[0-9]+)(?:\b|[/#?)])"),
-)
-
 _PLACEHOLDER_PARENTHESISED_RE = re.compile(r"(?i)\(\s*(?:PR|pull request)\s*#\s*TBD\s*\)")
 _PLACEHOLDER_BARE_RE = re.compile(r"(?i)\b(?:PR|pull request)\s*#\s*TBD\b")
 
@@ -78,14 +70,6 @@ class Bullet:
         if match is None:
             return None
         return match.group("parenthesised") or match.group("bare")
-
-    @property
-    def numbers(self) -> frozenset[int]:
-        """Every pull request number the bullet names, wherever it names it."""
-        raw = self.raw
-        return frozenset(
-            int(match.group("number")) for pattern in _NUMBER_RES for match in pattern.finditer(raw)
-        )
 
     @property
     def is_stamped(self) -> bool:

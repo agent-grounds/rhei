@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Wait for the run journal's own line before reading it. The eight-way
+  provider-limit parking regression read `runtime/transitions.log` once, the
+  instant the durable `nextAttemptAt:` waits became visible, and asserted that
+  all eight `end@working … outcome=provider_limited` lines were already in it.
+  They need not be: a parked invocation's wait and its retained spawn record are
+  both observable before the release carrying its journal line is emitted, a
+  window of a few milliseconds here and wide enough on a loaded required runner
+  to fail the test having seen seven of eight. The observation now polls for the
+  eighth line on the same patience and grid as the wait beside it, and names a
+  run that died rather than reporting it as a wait that timed out.
+  §FS-rhei-run-tui.1.7 states that ordering, which the engine already had, so an
+  observer knows the line is owed. (PR #343)
+
 - Let a workspace task file carry its own metadata. A file under `tasks/` may
   now open with a metadata-only frontmatter block holding
   `metadata.tasks.<id>` entries for the tasks it defines, so a task's custom

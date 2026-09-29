@@ -163,10 +163,9 @@ fn eight_parallel_codex_limits_park_and_resume_without_spending_attempts() {
 
     wait_for("all eight controlled agents to start", || count_files(&starts) == 8);
     let parked = wait_for_provider_waits(&workspace, &mut run, 8);
-    // The journal is read the instant the durable waits are visible, because
-    // that is when its `end@` lines are still owed. §FS-rhei-run-tui.1.7
-    let journal =
-        fs::read_to_string(workspace.join("runtime/transitions.log")).expect("read run journal");
+    // The journal is observed the instant the durable waits are visible, so it
+    // waits for the `end@` lines those waits still owe. §FS-rhei-run-tui.1.7
+    let journal = wait_for_parked_journal_lines(&workspace, &mut run, 8);
     assert_eq!(journal.matches("outcome=provider_limited").count(), 8, "{journal}");
     assert!(journal.contains("provider=openai"), "{journal}");
     assert_eq!(parked.matches("providerLimits:").count(), 8, "{parked}");

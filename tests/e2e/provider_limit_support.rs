@@ -150,6 +150,60 @@ pub(super) fn wait_for_provider_waits(
     }
 }
 
+/// Observe the run journal only once it holds every parked invocation's
+/// `end@<state> … outcome=provider_limited` line. A parked invocation's durable
+/// wait and its retained spawn record are both observable before the release
+/// carrying that line is emitted, so an observer that has seen either must wait
+/// for the line itself rather than read the journal once. §FS-rhei-run-tui.1.7
+pub(super) fn wait_for_parked_journal_lines(
+    path: &Path,
+    run: &mut RunningChild,
+    expected: usize,
+) -> String {
+    const OUTCOME: &str = "outcome=provider_limited";
+
+    let journal = path.join("runtime/transitions.log");
+    let deadline = Instant::now() + PROVIDER_WAIT_PATIENCE;
+    let mut most_observed = 0;
+
+    loop {
+        // The exit is inspected before the read, not after it: a journal read
+        // that follows an observed exit already holds everything the run will
+        // ever write, so a complete journal is never reported as a dead run.
+        let exited = run.child().try_wait().expect("inspect run status");
+        let (observation, read_error) = match fs::read_to_string(&journal) {
+            Ok(text) => {
+                let observed = text.matches(OUTCOME).count();
+                most_observed = most_observed.max(observed);
+                (Some((observed, text)), None)
+            }
+            Err(error) => {
+                (None, Some(format!("read run journal '{}': {error}", journal.display())))
+            }
+        };
+
+        if let Some((_, text)) = observation.filter(|(observed, _)| *observed >= expected) {
+            return text;
+        }
+
+        let read_detail = read_error
+            .as_deref()
+            .map(|error| format!("; last journal read error: {error}"))
+            .unwrap_or_default();
+        if let Some(status) = exited {
+            panic!(
+                "the run exited {status} having written only {most_observed} of {expected} `{OUTCOME}` journal lines{read_detail}"
+            );
+        }
+        if Instant::now() >= deadline {
+            panic!(
+                "the run stayed live but wrote only {most_observed} of {expected} `{OUTCOME}` journal lines within {PROVIDER_WAIT_PATIENCE:?}{read_detail}"
+            );
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+}
+
 pub(super) fn expire_provider_deadlines(path: &Path) {
     for entry in fs::read_dir(path).expect("read workspace") {
         let path = entry.expect("workspace entry").path();

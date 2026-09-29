@@ -301,17 +301,23 @@ completion and reset commands. Run examples from the repository root.
 
 ## Development hooks
 
-Install the pre-commit hook to run grounding checks before each commit:
+Install the hooks to run the repository's gates before each commit and push:
 
 ```bash
-pre-commit install
+pre-commit install --install-hooks
 ```
 
-The checked-in hook runs:
+The checked-in hooks run:
 
 ```bash
-grund check .
+grund check .                                        # grounding
+fissile check --staged                               # file size budgets
+python -m unittest discover -s scripts/tests -t .    # the gate scripts' tests
+python scripts/check_changelog_pr_entry.py --local-pr  # changelog, on push
 ```
+
+The changelog check asks for a bullet under `## Unreleased`, not for a pull
+request number — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Library usage
 

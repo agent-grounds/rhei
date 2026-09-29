@@ -27,6 +27,10 @@ cargo build --workspace --all-targets
 cargo test --workspace --all-targets --no-fail-fast
 ```
 
+Every change also adds a bullet under `## Unreleased` in `docs/changelog.md`
+without a pull request number — the release stamps it, and the pre-push hook
+refuses a push that adds no bullet (see `CONTRIBUTING.md`).
+
 
 <!-- BEGIN GRUND MANAGED BLOCK -->
 ## Grounding with grund (v10)

@@ -1,5 +1,9 @@
 # Changelog
 
+*Every pull request adds a bullet under `## Unreleased`. Do not write the
+pull request number: the release stamps `(PR #N)` onto it. See
+[CONTRIBUTING.md](../CONTRIBUTING.md).*
+
 ## Unreleased
 
 - Wait for the run journal's own line before reading it. The eight-way
@@ -32,6 +36,23 @@
   passing on whichever ingredient the platform happened to move. A name that
   leans on any one of them alone therefore cannot pass on one platform and fail
   on the next. (PR #344)
+
+- Ask a contributor for a changelog bullet, not for a pull request number they
+  cannot know yet. The `## Unreleased` check now requires at least one bullet
+  that the section does not already hold at the branch's merge base with its
+  base, and checks a written number only where a number is known and only on the
+  bullets the branch itself added — so the pre-push hook runs it whether or not a
+  pull request exists, and a first push learns the rule on the contributor's own
+  machine instead of from a red CI run. Rewrapping a bullet somebody else wrote
+  is not a bullet of your own, and neither is writing your number onto one. The
+  release then stamps `(PR #N)` onto each bullet it can resolve to exactly one
+  pull request, replacing a `(PR #TBD)` placeholder where it stands, leaving a
+  bullet it cannot resolve as written with a warning, and never failing a release
+  over one. Both halves of the check and the stamper read one definition of a
+  bullet, in `scripts/changelog_bullets.py`, because two gates disagreeing about
+  `docs/changelog.md` was the defect. A new `CONTRIBUTING.md` and pull request
+  template say the rule up front, and `SKIP=changelog-pr-entry git push` is the
+  documented way to push a branch that is not becoming a pull request.
 
 - Let a workspace task file carry its own metadata. A file under `tasks/` may
   now open with a metadata-only frontmatter block holding

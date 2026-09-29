@@ -307,7 +307,10 @@ Install the hooks to run the repository's gates before each commit and push:
 pre-commit install --install-hooks
 ```
 
-The checked-in hooks run:
+That installs the whole `.pre-commit-config.yaml`, the Rust suite included, so
+`cargo fmt`, `cargo clippy`, `cargo build` and `cargo test` run before a commit
+and `cargo test` again before a push. The cheap ones, which is where a refusal
+usually comes from, are:
 
 ```bash
 grund check .                                        # grounding
@@ -315,6 +318,10 @@ fissile check --staged                               # file size budgets
 python -m unittest discover -s scripts/tests -t .    # the gate scripts' tests
 python scripts/check_changelog_pr_entry.py --local-pr  # changelog, on push
 ```
+
+The rest — `grund config validate`, `lychee`, and the two checks for
+AI-attribution boilerplate — are in
+[`.pre-commit-config.yaml`](.pre-commit-config.yaml), which is the list itself.
 
 The changelog check asks for a bullet under `## Unreleased`, not for a pull
 request number — see [CONTRIBUTING.md](CONTRIBUTING.md).

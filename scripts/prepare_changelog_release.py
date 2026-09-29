@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
-"""Prepare and read changelog release sections. §FS-rhei-distribution.5"""
+"""Prepare and read changelog release sections. §FS-rhei-distribution.5
+
+`stamp` writes the pull request numbers the contributors did not know onto the
+bullets they left, and runs before `prepare` promotes the section, because the
+numbers are resolved from the commits the bullets were written in
+(§FS-rhei-distribution.5.2).
+"""
 
 from __future__ import annotations
 
 import argparse
 import datetime as _datetime
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Sequence
+
+import changelog_bullets
+from changelog_bullets import Bullet
 
 
 VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
@@ -17,6 +28,8 @@ RELEASE_RE = re.compile(
     r"^## (?P<number>[0-9]+)\. \[(?P<version>[0-9]+\.[0-9]+\.[0-9]+)\] - (?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2})\s*$"
 )
 OLDER_RE = re.compile(r"^## (?P<number>[0-9]+)\. Older releases\s*$")
+BLAME_HEADER_RE = re.compile(r"^(?P<sha>[0-9a-f]{40,64}) [0-9]+ [0-9]+")
+UNCOMMITTED_RE = re.compile(r"^0+$")
 
 
 class ChangelogError(Exception):
@@ -74,6 +87,116 @@ def prepare_release(changelog: Path, version: str, release_date: str) -> None:
         *older_body,
     ]
     _write_lines(changelog, new_lines)
+
+
+def stamp_pull_requests(changelog: Path) -> None:
+    """Write `PR #<n>` onto every Unreleased bullet that resolves to one.
+
+    It is allowed to achieve nothing. A bullet it cannot resolve to exactly one
+    pull request is left as written and reported, and so is a forge it cannot
+    reach at all: a release that could not be cut over a changelog annotation
+    would cost more than the missing annotation does. §FS-rhei-distribution.5.2
+    """
+    lines = _read_lines(changelog)
+    try:
+        unstamped = [bullet for bullet in changelog_bullets.bullets(lines) if not bullet.is_stamped]
+    except changelog_bullets.ChangelogFormatError as exc:
+        raise ChangelogError(str(exc)) from exc
+
+    if not unstamped:
+        return
+    if shutil.which("gh") is None:
+        _warn("`gh` is not on PATH, so no pull request could be resolved; nothing stamped")
+        return
+
+    forge = _Forge(changelog)
+    stamped = False
+    for bullet in unstamped:
+        number, reason = forge.pull_request_for(bullet)
+        if number is None:
+            _warn(
+                f"docs/changelog.md ## Unreleased: bullet at line {bullet.first + 1} "
+                f"left unstamped ({reason})"
+            )
+            continue
+        # Stamping never changes a bullet's line count, so the ranges the
+        # remaining bullets carry stay valid as this writes through them.
+        lines[bullet.first : bullet.last + 1] = bullet.stamped(number)
+        stamped = True
+
+    if stamped:
+        _write_lines(changelog, lines)
+
+
+class _Forge:
+    """Which pull request a bullet's lines were written in, asked of git and gh."""
+
+    def __init__(self, changelog: Path) -> None:
+        resolved = changelog.resolve()
+        self.cwd = resolved.parent if resolved.parent.is_dir() else Path.cwd()
+        self.name = resolved.name
+        self._cache: dict[str, set[int] | None] = {}
+
+    def pull_request_for(self, bullet: Bullet) -> tuple[int | None, str]:
+        shas = self._blame(bullet.first + 1, bullet.last + 1)
+        if shas is None:
+            return None, "git blame could not read its lines"
+        if not shas:
+            return None, "it has no committed lines to resolve"
+        if any(UNCOMMITTED_RE.match(sha) for sha in shas):
+            return None, "one of its lines is not committed yet"
+
+        numbers: set[int] = set()
+        for sha in shas:
+            resolved = self._pulls(sha)
+            if resolved is None:
+                return None, f"the forge could not be asked about commit {sha[:7]}"
+            if not resolved:
+                return None, f"commit {sha[:7]} belongs to no pull request"
+            numbers |= resolved
+        if len(numbers) != 1:
+            named = ", ".join(f"#{number}" for number in sorted(numbers))
+            return None, f"its lines belong to more than one pull request ({named})"
+        return numbers.pop(), ""
+
+    def _blame(self, first: int, last: int) -> list[str] | None:
+        result = self._run("git", "blame", "--line-porcelain", "-L", f"{first},{last}", "--", self.name)
+        if result is None or result.returncode != 0:
+            return None
+        shas: list[str] = []
+        sha = None
+        for line in result.stdout.splitlines():
+            header = BLAME_HEADER_RE.match(line)
+            if header:
+                sha = header.group("sha")
+            elif line.startswith("\t") and line[1:].strip() and sha is not None:
+                shas.append(sha)
+        return list(dict.fromkeys(shas))
+
+    def _pulls(self, sha: str) -> set[int] | None:
+        if sha not in self._cache:
+            self._cache[sha] = self._ask(sha)
+        return self._cache[sha]
+
+    def _ask(self, sha: str) -> set[int] | None:
+        result = self._run(
+            "gh", "api", f"repos/{{owner}}/{{repo}}/commits/{sha}/pulls", "--jq", ".[].number"
+        )
+        if result is None or result.returncode != 0:
+            return None
+        return {int(token) for token in result.stdout.split() if token.isdigit()}
+
+    def _run(self, *args: str) -> subprocess.CompletedProcess[str] | None:
+        try:
+            return subprocess.run(
+                list(args), cwd=str(self.cwd), check=False, capture_output=True, text=True
+            )
+        except FileNotFoundError:
+            return None
+
+
+def _warn(message: str) -> None:
+    print(f"warning: {message}", file=sys.stderr)
 
 
 def extract_notes(changelog: Path, version: str, output: Path) -> None:
@@ -220,6 +343,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     prepare.add_argument("version")
     prepare.add_argument("--date", default=_datetime.date.today().isoformat())
 
+    subparsers.add_parser("stamp", help="write resolved pull request numbers onto Unreleased bullets")
+
     notes = subparsers.add_parser("notes", help="write release notes for the inline release")
     notes.add_argument("version")
     notes.add_argument("--output", type=Path, required=True)
@@ -228,6 +353,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "prepare":
             prepare_release(args.changelog, args.version, args.date)
+        elif args.command == "stamp":
+            stamp_pull_requests(args.changelog)
         elif args.command == "notes":
             extract_notes(args.changelog, args.version, args.output)
         else:

@@ -204,6 +204,8 @@ mod binaries;
 mod python_fixture;
 #[path = "../support/test_dir.rs"]
 mod test_dir;
+#[path = "../support/unique_dir_name.rs"]
+mod unique_dir_name;
 
 pub use python_fixture::{
     fixture_command, fixture_command_line, python_command, write_python_agent,
@@ -258,11 +260,11 @@ impl From<&Output> for CliRun {
 }
 
 pub fn unique_temp_dir(prefix: &str) -> TestDir {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time should be after unix epoch")
-        .as_nanos();
-    TestDir::create(std::env::temp_dir().join(format!("rhei-integ-{prefix}-{nanos}")))
+    // §REQ-cross-platform.6
+    TestDir::create(
+        std::env::temp_dir()
+            .join(unique_dir_name::unique_dir_name(&format!("rhei-integ-{prefix}"))),
+    )
 }
 
 pub fn unique_scratchpad_dir(prefix: &str) -> TestDir {

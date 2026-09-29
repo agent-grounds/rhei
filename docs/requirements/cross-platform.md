@@ -40,3 +40,25 @@ fixture too.
 Code never builds a path from `/`-joined strings, never compares two spellings
 of one location as strings, and treats a rooted or prefixed path as outside
 the workspace on every platform.
+
+## 6. A Test's Own Directory Is Its Own By Construction
+
+A test's private directory is named so that no other test can name the same
+one — by construction, not by luck. Two names asked for are distinct whether
+the two requests come from one process or from two, and whatever the clock read
+when they were made: a clock reading may be one ingredient of the name, never
+the whole of it.
+
+Nothing downstream catches a name two tests share. Creating a directory that is
+already there succeeds silently, so both tests proceed: each writes its fixture
+into the other's tree, each reads what the other wrote, and whichever finishes
+first removes the tree the other is still reading. The failure surfaces as a
+wrong assertion or a missing file somewhere else entirely, never as a complaint
+about the name.
+
+The supported platforms §REQ-cross-platform.1 do not agree on how finely a wall
+clock reads, and none of them promises a reading that has moved since the last
+one. A name that leans on the clock alone therefore holds where it was written
+and gives way where it is gated. That is a defect of the harness rather than a
+property of the platform §REQ-cross-platform.2, and it is the one way the
+three-platform gate §REQ-cross-platform.3 reports a failure that is not there.

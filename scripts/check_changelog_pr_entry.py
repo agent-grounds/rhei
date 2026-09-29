@@ -204,12 +204,46 @@ def _resolve_base(git: _Git, head_ref: str) -> tuple[str, str] | None:
     return best
 
 
+_GIT_ENV_ALLOWED = {
+    "GIT_EXEC_PATH",
+    "GIT_SSH",
+    "GIT_SSH_COMMAND",
+    "GIT_SSL_CAINFO",
+    "GIT_SSL_NO_VERIFY",
+    "GIT_CONFIG_COUNT",
+    "GIT_HTTP_PROXY_AUTHMETHOD",
+    "GIT_ALLOW_PROTOCOL",
+    "GIT_ASKPASS",
+}
+
+
+def _no_git_env() -> dict[str, str]:
+    """`os.environ` without the vars git exports into hook subprocesses.
+
+    `GIT_DIR` (and, without `GIT_WORK_TREE`, cwd becomes the working tree's
+    top per git's own rule) makes `rev-parse --show-toplevel` answer with
+    `self.cwd` itself rather than the real root whenever this runs from a
+    git hook, where git always sets `GIT_DIR` for the worktree it invoked
+    the hook from. pre-commit's own git.py strips the same variables for
+    the same documented reason (its `no_git_env`, pre-commit issue #300)
+    but only for its own git calls, not for a `language: system` hook's.
+    """
+    return {
+        k: v
+        for k, v in os.environ.items()
+        if not k.startswith("GIT_")
+        or k.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))
+        or k in _GIT_ENV_ALLOWED
+    }
+
+
 class _Git:
     """Git reads about the changelog, rooted wherever the changelog lives."""
 
     def __init__(self, changelog: Path) -> None:
         resolved = changelog.resolve()
         self.cwd = resolved.parent if resolved.parent.is_dir() else Path.cwd()
+        self.env = _no_git_env()
         self.root = self._root()
         self.relative = self._relative(resolved)
 
@@ -261,7 +295,12 @@ class _Git:
             return absent
         try:
             return subprocess.run(
-                [git, *args], cwd=str(self.cwd), check=False, capture_output=True, text=True
+                [git, *args],
+                cwd=str(self.cwd),
+                env=self.env,
+                check=False,
+                capture_output=True,
+                text=True,
             )
         except FileNotFoundError:
             return absent

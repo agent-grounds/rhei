@@ -499,15 +499,29 @@ Rhei never infers it from a profile's `command` or its arguments.
 ### 5.1. Price-Book Selection
 
 `rhei run ... --prices <PATH>` selects a caller-owned local price book for
-that run and takes precedence over profile-authored and built-in prices. Rhei
-reads and validates the file before starting any agent. The
+that run and takes precedence over profile-authored and built-in prices. The
+`defaults.prices` settings key ([§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults)) supplies the default value
+of that flag and nothing more, so one run draws its prices from the first of
+these that is present: `--prices`, then `defaults.prices`, then profile
+entries, then the built-in book. A book named either way is one **selected**
+caller-owned book from that point on, and every rule below — validation,
+copying, exact matching, coverage, currency — applies to both without
+distinction. Rhei reads and validates the file before starting any agent. The
 book must use the `rhei.accounting.prices.v1` schema shown above, provide a
 non-empty `price_book_id` and currency, use `1m_tokens` for every entry, and
 provide non-empty provider, model, and effective timestamp values. Duplicate
 provider/model entries are rejected because pricing uses one exact match.
 Missing, unreadable, malformed, wrong-schema, and unsupported books fail the
-run with a diagnostic that names the supplied path. Selection never fetches a
-book over the network.
+run with a diagnostic that names the supplied path, and, where the path came
+from `defaults.prices`, the settings file that declared it. Selection never
+fetches a book over the network.
+
+`defaults.prices` becomes a path when settings merge and a file only when a run
+prices, so a command that prices nothing never opens it: `rhei roster`,
+`rhei validate` and `rhei list` all succeed on a machine whose declared book is
+missing or misspelled, and `rhei roster` prints the authored string with the
+tier that wrote it rather than a resolved or canonical one
+([§FS-rhei-agents.1.3](rhei-agents.spec.md#13-merge-semantics)). A run is where the path is refused.
 
 The document object and each entry object accept arbitrary additional JSON
 properties as metadata. Rhei preserves every additional property's JSON value
@@ -521,10 +535,15 @@ The selected in-memory book is shared by sequential and parallel agent
 execution. Before any agent starts, Rhei atomically copies a caller-owned book
 to `runtime/accounting/prices.json` in the run root and every participating
 rhei execution root. Invocation pricing records the selected book's id and
-currency. An explicit book bypasses profile-book construction and its conflict
-checks while retaining its existing validation and exact-match behavior.
+currency — for a book named by `defaults.prices` that is the book's own
+`price_book_id`, never anything synthesized from the path. A selected book,
+named by the flag or by the settings key alike, bypasses profile-book
+construction and its conflict checks while retaining its existing validation
+and exact-match behavior. It is taken wholesale: the selected book is the run's
+rate table entire, and a profile's own `models.<id>.prices`
+([§FS-rhei-agents.1.1.3](rhei-agents.spec.md#113-models)) does not survive beside it.
 
-Without `--prices`, Rhei preflights every candidate invocation in the selected
+Without a selected book, Rhei preflights every candidate invocation in the selected
 run scope. Candidates include each selected task and its descendants, in their
 current state and in nonterminal states reachable through declared transitions
 under that task's node profile. Program and gating states contribute no agent
@@ -581,8 +600,11 @@ Before any agent starts, Rhei atomically writes the generated book to
 participating rhei execution root. An existing archive with identical bytes is
 reused; an existing path with different bytes is an error. No root is changed
 unless durable identity and currency validation succeeds for every
-participating root. Explicit caller-owned books continue to be copied only to
-`prices.json`; this contract does not archive them.
+participating root. Caller-owned books continue to be copied only to
+`prices.json`; this contract does not archive them, and a book named by
+`defaults.prices` is caller-owned in exactly that sense — copied, never
+archived, so reachability (§FS-rhei-cost-accounting.5.2) keeps the cases it
+already has.
 
 Every currency-bearing durable invocation record in a participating accounting
 root, including an unpriced record, must use the selected book's currency.
@@ -596,7 +618,20 @@ amounts, or replaces their currency.
 
 Price entries match provider and model exactly. A selected book with no exact
 entry leaves the measured invocation explicitly unpriced; it never implies a
-zero price or falls back to the built-in book. The selection applies only to
+zero price or falls back to the built-in book.
+
+That rule costs coverage when the book is named once per machine, and the loss
+is accepted rather than worked around. Declaring `defaults.prices` makes every
+run on that machine select the book, so a book that omits a provider/model pair
+the built-in book prices leaves those invocations unpriced where they were
+priced before — `anthropic` / `claude-sonnet-4-6`, the built-in book's one
+entry, is the pair this reaches. An author who wants a pair priced writes its
+entry into their own book. This is the only way `defaults.prices` can make an
+existing run report less than it does today, and it is the price of the book
+being authoritative: a run whose record names a `price_book_id` was priced by
+that book and by nothing else.
+
+The selection applies only to
 invocations recorded by that run: no older record's stored amount, currency, or
 price-book id is rewritten by it.
 

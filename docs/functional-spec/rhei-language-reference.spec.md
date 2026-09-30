@@ -118,6 +118,16 @@ Language changes must preserve a single discoverable entry point:
   counterpart: it is authored on the machine and the project settings tiers
   only, never on a plan or a profile
   ([§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys)).
+- The price book a machine or a project names once — the `defaults.prices`
+  settings key — is owned by
+  [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection), which says what a selected book
+  prices and what it bypasses. The `defaults` block that carries the key is
+  owned by [§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults) and its merge and path resolution by
+  [§FS-rhei-agents.1.3](rhei-agents.spec.md#13-merge-semantics); neither owns what the book prices. Like
+  `defaults.spend_per_day` it has no `profiles` counterpart and is authored on
+  the machine and project settings tiers only, but unlike it the key bounds
+  nothing: it is the default value of `rhei run --prices`
+  ([§FS-rhei-run.2](rhei-run.spec.md#2-options)), which still wins when given.
 - New execution references that appear in authored files must identify their
   owner spec from this page.
 

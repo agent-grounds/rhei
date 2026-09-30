@@ -392,9 +392,14 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
         // A narrowed reset can only speak for ticket-owned artifacts; run-scoped
         // rollups belong to the run, not the ticket. Say so rather than leaving
         // the operator to discover the difference. §FS-rhei-panta.6.4
+
+        // The note store is kept for the same reason and named beside them: one
+        // shared journal charged to every plan, not keyed by a ticket id.
+        // §FS-rhei-reset.2.1 §FS-rhei-note.3.1
         println!(
             "Kept run-scoped output not owned by any ticket (run report, dashboard, \
-             accounting rollups). Reset without `--rhei` to clear it."
+             accounting rollups) and the project note store (runtime/notes.md). \
+             Reset without `--rhei` to clear them."
         );
         #[cfg(test)]
         run_reset_before_unlock_hook(&decision);

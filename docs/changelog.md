@@ -22,7 +22,7 @@ pull request number: the release stamps `(PR #N)` onto it. See
   omitted for a supervising task exactly as the two context blocks already are,
   so a project that never calls the verb composes what it composes today. It
   dies with `rhei reset`; a narrowed `rhei reset --rhei` keeps it and says so.
-  (PR #N)
+  (PR #346)
 
 - Stop §FS-rhei-reset.2 offering as a hazard the one thing the ledger forbids.
   The point gave, as its reason for keeping `metadata.tasks.<id>.budgetTicketId`

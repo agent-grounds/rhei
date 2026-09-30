@@ -230,6 +230,7 @@ pub const BORROWED_AGENT_SETTINGS: &str = r#"{
       "command": ["true"],
       "model_flag": "--model",
       "stdin_prompt": true,
+      "timeout": "30m",
       "modes": { "x": ["--flag"] }
     }
   }

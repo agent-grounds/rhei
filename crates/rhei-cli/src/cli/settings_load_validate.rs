@@ -17,6 +17,36 @@ fn json_nested_field_present(raw: &serde_json::Value, section: &str, key: &str) 
     json_child(raw, section).as_object().map(|obj| obj.contains_key(key)).unwrap_or(false)
 }
 
+/// Fix what an authored `defaults.prices` names, without reading the
+/// filesystem.
+///
+/// A leading `~` expands to this process's home, an absolute path is used as
+/// written, and a relative one is joined to the directory of the settings file
+/// that **declared** it — never the working directory the command happened to
+/// run in, which is a different machine's answer every time. Nothing here
+/// stats, opens or canonicalizes, so a book that does not exist resolves just
+/// as well as one that does and only a run that prices finds out.
+/// §FS-rhei-agents.1.3
+fn resolve_settings_price_book(authored: &str, declared_in: &Path) -> PathBuf {
+    // `~foo/bar` is deliberately not a home: only `~` and `~/…` expand, and
+    // anything else stays the relative path it looks like.
+    let home = match authored.strip_prefix('~') {
+        Some("") => home_dir().ok(),
+        Some(rest) => {
+            rest.strip_prefix('/').and_then(|rest| home_dir().ok().map(|home| home.join(rest)))
+        }
+        None => None,
+    };
+    if let Some(path) = home {
+        return path;
+    }
+    let path = Path::new(authored);
+    match declared_in.parent() {
+        Some(directory) if !path.is_absolute() => directory.join(path),
+        _ => path.to_path_buf(),
+    }
+}
+
 fn merge_model_agent_binding(
     existing: &mut ModelAgentBinding,
     project: ModelAgentBinding,
@@ -343,6 +373,7 @@ fn load_merged_roster(
             "invocations_per_day",
             "invocation_lifetime_max",
             "spend_per_day",
+            "prices",
             "mcp_servers",
             "skills",
         ],
@@ -359,6 +390,7 @@ fn load_merged_roster(
         "invocations_per_day",
         "invocation_lifetime_max",
         "spend_per_day",
+        "prices",
         "mcp_servers",
         "skills",
     ] {
@@ -431,6 +463,11 @@ fn load_merged_roster(
         } else {
             global.defaults.spend_per_day
         },
+        prices: if json_nested_field_present(project_raw, "defaults", "prices") {
+            project.defaults.prices
+        } else {
+            global.defaults.prices
+        },
         mcp_servers: if json_nested_field_present(project_raw, "defaults", "mcp_servers") {
             project.defaults.mcp_servers
         } else {
@@ -442,6 +479,21 @@ fn load_merged_roster(
             global.defaults.skills
         },
     };
+
+    // Which tier declared the book is what a relative path is joined to, so
+    // the path is fixed here, where that winner is known, rather than where a
+    // run opens it. §FS-rhei-agents.1.3
+    let prices = defaults.prices.as_deref().and_then(|authored| {
+        let declared_in = if json_nested_field_present(project_raw, "defaults", "prices") {
+            sources.project.as_ref().map(|(path, _)| path.clone())
+        } else {
+            sources.global.clone()
+        }?;
+        Some(SettingsPriceBook {
+            path: resolve_settings_price_book(authored, &declared_in),
+            declared_in,
+        })
+    });
 
     let settings = RheiSettings {
         project_settings_file,
@@ -465,6 +517,7 @@ fn load_merged_roster(
         defaults,
         machine_bounds,
         project_bounds,
+        prices,
         agents,
         models,
         mcp_servers,

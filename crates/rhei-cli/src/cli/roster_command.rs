@@ -174,6 +174,10 @@ fn default_field_value(defaults: &SettingsDefaults, field: &str) -> serde_json::
         "agent_timeout" => optional_value(&defaults.agent_timeout),
         "program_timeout" => optional_value(&defaults.program_timeout),
         "attempts" => optional_value(&defaults.attempts),
+        // The string as authored: inspection shows the reader the path they
+        // wrote, not the one the merge resolved it to, and never opens it.
+        // §FS-rhei-agents.1.3 §FS-rhei-cost-accounting.5.1
+        "prices" => optional_value(&defaults.prices),
         "mcp_servers" => optional_value(&defaults.mcp_servers),
         "skills" => optional_value(&defaults.skills),
         _ => serde_json::Value::Null,

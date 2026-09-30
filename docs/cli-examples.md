@@ -82,6 +82,25 @@ This summary is read-only: ordinary accounting keeps its stored prices. The
 positional workspace and any repeatable `--rhei` flags bound which run records
 and immutable completion report may be selected.
 
+Name one price book for every run on this machine, instead of threading
+`--prices` through each entry point that might start one:
+
+```json
+{ "defaults": { "prices": "~/.config/rhei/prices.json" } }
+```
+
+```bash
+rhei roster            # prices: "~/.config/rhei/prices.json" [global]
+rhei run WORKSPACE     # prices from that book; no flag needed
+```
+
+Write it in `~/.config/rhei/settings.json` for the machine or
+`.agent-grounds/rhei/settings.json` for one project, where it replaces the
+machine's. `rhei run --prices <PATH>` still wins over both. A selected book is
+the run's whole rate table, so an entry the book omits is unpriced rather than
+falling back to the built-in one. See
+[§FS-rhei-cost-accounting.5.1](functional-spec/rhei-cost-accounting.spec.md#51-price-book-selection).
+
 Render a self-contained HTML Flow visualization and open it in the browser:
 
 ```bash

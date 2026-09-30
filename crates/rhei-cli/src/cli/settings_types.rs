@@ -65,6 +65,14 @@ struct RheiSettings {
     /// reader to different files. §FS-rhei-budgets.2.3
     #[serde(skip)]
     project_bounds: CountBoundTier,
+    /// What `defaults.prices` points at, once the merge has fixed it.
+    ///
+    /// Carried beside the merged `defaults` rather than inside it because
+    /// resolution is a property of the merge: a relative path is joined to
+    /// the directory of the tier that *declared* it, and the winning string
+    /// alone cannot say which tier that was. §FS-rhei-agents.1.3
+    #[serde(skip)]
+    prices: Option<SettingsPriceBook>,
     /// Registry of agent transport profiles keyed by agent id.
     #[serde(default)]
     agents: BTreeMap<String, CustomAgentProfile>,
@@ -248,6 +256,13 @@ struct SettingsDefaults {
     /// a profile may not declare. §FS-rhei-budgets.2.1
     #[serde(default, deserialize_with = "spend_per_day_micro")]
     spend_per_day: Option<u64>,
+    /// Path to the `rhei.accounting.prices.v1` book this machine or project
+    /// prices its runs from, held exactly as authored because that is what
+    /// inspection prints. What the string points at is resolved once by the
+    /// merge and carried as `RheiSettings::prices`.
+    /// §FS-rhei-agents.1.1.1 §FS-rhei-cost-accounting.5.1
+    #[serde(default)]
+    prices: Option<String>,
     #[serde(default)]
     mcp_servers: Option<Vec<StateMcpEntry>>,
     #[serde(default)]
@@ -273,6 +288,24 @@ where
             .map(Some)
             .map_err(serde::de::Error::custom),
     }
+}
+
+/// A `defaults.prices` value after the merge has decided what it names.
+///
+/// The authored string stays in `SettingsDefaults::prices`, because that is
+/// what `rhei roster` prints; this is the other half, and the two differ
+/// whenever a `~` expanded or a relative path was joined. Neither field is
+/// ever stat-ed to build this: a settings file whose book is missing still
+/// merges, and only a run that prices opens it.
+/// §FS-rhei-agents.1.3 §FS-rhei-cost-accounting.5.1
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct SettingsPriceBook {
+    /// The path a run opens.
+    path: PathBuf,
+    /// The settings file that declared it, so a refusal can name where the
+    /// path was written and not only the path — nobody typed it on a command
+    /// line. §FS-rhei-cost-accounting.5.1
+    declared_in: PathBuf,
 }
 
 /// The four bounds as one settings tier read them.

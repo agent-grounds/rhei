@@ -204,6 +204,15 @@ impl Journal {
         &self.project_id
     }
 
+    /// The account uuid this ledger belongs to, without the `panta:` prefix the
+    /// receipt envelope carries it under. This is the name an ancestry
+    /// descriptor's minting account is compared with, so it has to be the same
+    /// string `Account::uuid` hands a caller. §FS-rhei-budgets.5.1
+    /// §FS-rhei-budgets.7.1
+    pub fn account_uuid(&self) -> &str {
+        self.project_id.trim_start_matches("panta:")
+    }
+
     /// The day key this transaction draws against. §FS-rhei-budgets.3.3
     pub fn day(&self) -> &str {
         &self.day

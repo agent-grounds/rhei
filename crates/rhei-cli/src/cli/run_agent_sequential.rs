@@ -178,8 +178,13 @@ fn run_sequential_agent_invocation(
     )? {
         // Both counts on screen before any of this visit's capacity is spent.
         // §FS-rhei-budgets.9
-        BudgetAdmission::Admitted { bounds } => {
+        BudgetAdmission::Admitted { bounds, note } => {
             sink.emit(RunEvent::BudgetSnapshot { bounds });
+            // Nothing is wrong, so it is a note and not a warning.
+            // §FS-rhei-budgets.7.2
+            if let Some(note) = note {
+                sink.emit(RunEvent::Message { level: rhei_tui::MessageLevel::Info, text: note });
+            }
         }
         BudgetAdmission::NotAccounted => {}
         BudgetAdmission::Refused { halt, event } => {

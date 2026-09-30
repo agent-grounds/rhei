@@ -331,11 +331,12 @@ fn spawn_and_wait_agent(
             cmd.env("RHEI_SNAPSHOT_PARENT_REF", parent_ref.to_string());
         }
     }
-    // The ancestry descriptor this invocation's descendants draw on. No
-    // credential: a descendant charges the same account through the same
-    // locks. §FS-rhei-budgets.7 §AR-neural-admission.6
-    if let Some(reservation) = budget_ancestry_token(task_id) {
+    // The ancestry descriptor this invocation's descendants draw on: two
+    // variables together, because a reservation that does not say whose it is
+    // refuses every nested run of another project. §FS-rhei-budgets.7.1
+    if let Some((reservation, account)) = budget_ancestry_token(task_id) {
         cmd.env(PARENT_RESERVATION_ENV, reservation);
+        cmd.env(PARENT_ACCOUNT_ENV, account);
     }
     cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
 

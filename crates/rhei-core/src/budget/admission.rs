@@ -6,6 +6,7 @@
 //! both take the last unit.
 //! §FS-rhei-budgets.6 §AR-neural-admission.1
 
+use super::ancestry::{Ancestry, AncestryDescriptor};
 use super::journal::{Audit, Journal};
 use super::types::{add, BudgetError, Contract, Dimension, Exhaustion, SpendBasis};
 use super::Result;
@@ -32,29 +33,6 @@ pub struct EffectiveBounds {
     /// Measured spend the project may be charged this UTC day, in micro-units
     /// of its account's currency. §FS-rhei-budgets.3.4
     pub spend_per_day: u64,
-}
-
-/// Whose ancestor, and not only which one.
-///
-/// A reservation name says *which* reservation and never *whose*, and an
-/// ancestor is meaningful only in the journal that holds it: the same name in
-/// another project's ledger is not a dead ancestor, it is somebody else's live
-/// one. The minting account is what lets a child tell those two apart, and
-/// `origin` is how a caller lends its own provenance to a refusal without this
-/// layer learning where any caller reads its values from.
-/// §FS-rhei-budgets.7.1 §AR-neural-admission.6
-#[derive(Clone, Copy, Debug)]
-pub struct AncestryDescriptor<'a> {
-    /// The reservation the caller claims as its ancestor.
-    pub reservation: &'a str,
-    /// The account that minted `reservation`, where the caller knows it. Absent
-    /// is "take it as this project's", which is what a caller too old to say
-    /// whose it is gets, and it must lose nothing by it. §FS-rhei-budgets.7.1
-    pub account: Option<&'a str>,
-    /// A phrase naming where the value came from, interpolated into a refusal
-    /// so that `no such reservation` does not read as damaged budget state.
-    /// Absent leaves the refusal as it was. §FS-rhei-budgets.7.1
-    pub origin: Option<&'a str>,
 }
 
 pub struct AdmissionRequest<'a> {
@@ -103,13 +81,24 @@ pub struct ReservationGroup {
     pub reservation_ids: Vec<String>,
     /// The arm that carries the ticket's travel unit, where one was taken.
     pub travel_reservation_id: Option<String>,
+    /// What became of the ancestry the request claimed, so that a caller can
+    /// see a downgrade it did not ask for and say so. §FS-rhei-budgets.7.2
+    pub ancestry: Ancestry,
 }
 
 impl Journal {
     /// Inspection and mutation use the same checks; `preview` cannot debit, so
     /// `rhei validate` and `--dry-run` reach exactly this code.
-    /// §FS-rhei-budgets.6.3
-    pub fn preview(&self, request: &AdmissionRequest<'_>, bounds: EffectiveBounds) -> Result<()> {
+    ///
+    /// It answers with the ancestry it authenticated rather than with nothing,
+    /// so an inspection reports the downgrade of §FS-rhei-budgets.7.2 with the
+    /// bounds — still taking no mutating lock, appending no receipt and
+    /// debiting nothing. §FS-rhei-budgets.6.3
+    pub fn preview(
+        &self,
+        request: &AdmissionRequest<'_>,
+        bounds: EffectiveBounds,
+    ) -> Result<Ancestry> {
         self.validate_identity_sources()?;
         if !self.identity_installed(request.ticket_identity) {
             return Err(BudgetError::new(
@@ -120,7 +109,7 @@ impl Journal {
         if request.arms.is_empty() {
             return Err(BudgetError::bounds("admission needs at least one arm"));
         }
-        let ancestor = self.authenticate_ancestor(request)?;
+        let ancestry = self.authenticate_ancestor(request)?;
         let snapshot = self.snapshot()?;
         // Before any bound, because this is not a bound: an account
         // denominated in one currency cannot be charged in another, and
@@ -241,9 +230,12 @@ impl Journal {
                 return Err(BudgetError::corrupt("attempt identity was already reserved"));
             }
         }
-        if let Some((parent, envelope)) = ancestor {
-            let drawn = add(self.state.descendants_drawn(&parent)?, count)?;
-            if drawn > envelope {
+        // Only an ancestry this journal actually placed the child under draws
+        // on an envelope: one minted elsewhere bounds nothing here, because the
+        // child was never inside it. §FS-rhei-budgets.7.2
+        if let Ancestry::Placed { reservation: parent, envelope } = &ancestry {
+            let drawn = add(self.state.descendants_drawn(parent)?, count)?;
+            if drawn > *envelope {
                 return Err(BudgetError::new(
                     "ancestor_envelope_exhausted",
                     format!(
@@ -253,7 +245,7 @@ impl Journal {
                 ));
             }
         }
-        Ok(())
+        Ok(ancestry)
     }
 
     /// One receipt contains every arm. A partial append cannot leave a valid
@@ -265,7 +257,7 @@ impl Journal {
         bounds: EffectiveBounds,
         audit: &Audit,
     ) -> Result<ReservationGroup> {
-        self.preview(request, bounds)?;
+        let ancestry = self.preview(request, bounds)?;
         let window = self.day().to_string();
         let mut ids = Vec::new();
         let mut reservations = Vec::new();
@@ -279,7 +271,9 @@ impl Journal {
                 "attempt_identity": arm.attempt_identity,
                 "ticket_identity": request.ticket_identity,
                 "display_id": request.display_id,
-                "parent_reservation": request.parent_reservation.map(|d| d.reservation),
+                // What the identity test and the ledger decided, not what the
+                // caller asked for. §FS-rhei-budgets.7.2
+                "parent_reservation": ancestry.parent(),
                 "descendant_envelope": arm.descendant_envelope,
                 "execution_root": request.execution_root,
                 "invocation_units": 1,
@@ -305,6 +299,7 @@ impl Journal {
         Ok(ReservationGroup {
             travel_reservation_id: request.travel.then(|| ids[0].clone()),
             reservation_ids: ids,
+            ancestry,
         })
     }
 
@@ -419,23 +414,38 @@ impl Journal {
     /// Resolve the ancestor a nested or embedded caller claims, and return its
     /// declared descendant envelope.
     ///
-    /// An ancestry token is a name, not a capability: the ledger is what says
-    /// whether that reservation exists here, is still outstanding, and was
-    /// admitted with room for descendants. A child that cannot be placed under
-    /// a live ancestor of this very project refuses rather than opening a
-    /// balance of its own. §AR-neural-admission.6
-    fn authenticate_ancestor(
-        &self,
-        request: &AdmissionRequest<'_>,
-    ) -> Result<Option<(String, u64)>> {
+    /// Two questions, in this order, and the order is the whole of it: whose
+    /// descriptor this is, and then what the journal holds. A descriptor minted
+    /// for another account names **no ancestor here** — nothing was unavailable,
+    /// because there was no ancestry to authenticate — so the caller is admitted
+    /// unparented against its own ledger rather than refused for forgery. For a
+    /// descriptor of this very account an ancestry token is a name and not a
+    /// capability: the ledger is what says whether that reservation exists here,
+    /// is still outstanding, and was admitted with room for descendants, and a
+    /// child that cannot be placed under a live one refuses rather than opening
+    /// a balance of its own. §FS-rhei-budgets.7.1 §AR-neural-admission.6
+    fn authenticate_ancestor(&self, request: &AdmissionRequest<'_>) -> Result<Ancestry> {
         let Some(descriptor) = request.parent_reservation else {
-            return Ok(None);
+            return Ok(Ancestry::Unclaimed);
         };
         let parent = descriptor.reservation;
+        // A descriptor that names no account at all is taken as this project's,
+        // so a caller too old to say whose it is loses nothing.
+        // §FS-rhei-budgets.7.1
+        if let Some(account) = descriptor.account.filter(|a| *a != self.account_uuid()) {
+            return Ok(Ancestry::Elsewhere {
+                reservation: parent.to_owned(),
+                account: account.to_owned(),
+            });
+        }
+        // Provenance is the caller's to supply and this layer's only to
+        // interpolate: nothing here learns that any caller reads an
+        // environment. §FS-rhei-budgets.7.1 §AR-neural-admission.6
+        let origin = descriptor.origin.map(|origin| format!(" {origin}")).unwrap_or_default();
         let unavailable = |why: &str| {
             BudgetError::new(
                 "ancestor_unavailable",
-                format!("nested admission cannot use ancestor {parent}: {why}"),
+                format!("nested admission cannot use ancestor {parent}{origin}: {why}"),
             )
         };
         let reservation = self
@@ -455,7 +465,7 @@ impl Journal {
         if envelope == 0 {
             return Err(unavailable("it permits no nested neural work"));
         }
-        Ok(Some((parent.to_owned(), envelope)))
+        Ok(Ancestry::Placed { reservation: parent.to_owned(), envelope })
     }
 
     /// Release every reservation this account holds that no process could have

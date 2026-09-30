@@ -15,8 +15,12 @@ pull request number: the release stamps `(PR #N)` onto it. See
   (`RHEI_BUDGET_PARENT_ACCOUNT` beside the existing
   `RHEI_BUDGET_PARENT_RESERVATION`), identity is tested before the journal is
   consulted, a run whose account is not the ancestor's is admitted against its
-  own account and says so once per run, and a refusal names the variable the
-  value came from. Inside one account nothing moves: forging a name still buys
+  own account and says so once per run — an `info` note, not a warning, naming
+  the other project by the directory this machine has witnessed for it and by
+  its account uuid where it has witnessed none — and a refusal names the
+  variable the value came from. The receipt such a run writes records
+  `parent_reservation: null`, so replay keeps reading the chain as sound rather
+  than as corrupt. Inside one account nothing moves: forging a name still buys
   nothing, a same-project child is still placed under its ancestor and still
   bounded by its envelope, and a descriptor with no account beside it is taken as
   an ancestor exactly as before, so a parent too old to name its account loses

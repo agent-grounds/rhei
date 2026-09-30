@@ -235,8 +235,6 @@ fn a_midnight_renewal_enlarges_nothing_an_ancestor_already_holds() {
 /// Fails before the fix: today the name is looked up in this journal, is not
 /// found, and the admission is refused `no such reservation`.
 #[test]
-#[ignore = "pins agent-grounds/rhei#354 and fails until it is fixed; \
-    the fix removes this attribute. Run with `cargo test -- --ignored`."]
 fn a_descriptor_minted_for_another_account_opens_its_own_balance() {
     let case = Case::new();
     let mut journal = case.open();
@@ -269,8 +267,6 @@ fn a_descriptor_minted_for_another_account_opens_its_own_balance() {
 /// Fails before the fix: today the descriptor is placed under the live ancestor,
 /// so the receipt names it and the envelope of one is spent.
 #[test]
-#[ignore = "pins agent-grounds/rhei#354 and fails until it is fixed; \
-    the fix removes this attribute. Run with `cargo test -- --ignored`."]
 fn a_descriptor_minted_for_another_account_draws_no_envelope_here() {
     let case = Case::new();
     let mut journal = case.open();
@@ -381,8 +377,6 @@ fn a_descriptor_of_this_account_keeps_every_other_refusal() {
 ///
 /// Fails before the fix: the phrase is nowhere in the message.
 #[test]
-#[ignore = "pins agent-grounds/rhei#354 and fails until it is fixed; \
-    the fix removes this attribute. Run with `cargo test -- --ignored`."]
 fn a_refusal_names_the_origin_its_caller_supplied() {
     let case = Case::new();
     let mut journal = case.open();

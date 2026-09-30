@@ -104,6 +104,7 @@ include!("cli/settings_types.rs");
 include!("cli/agent_family.rs");
 include!("cli/settings_load_validate.rs");
 include!("cli/budget_bounds.rs");
+include!("cli/budget_ancestry.rs");
 include!("cli/budget_runtime.rs");
 include!("cli/budget_travel.rs");
 include!("cli/budget_command.rs");
@@ -274,6 +275,7 @@ mod tests {
     include!("cli/tests_summary_repricing.rs");
     include!("cli/tests_settings_tooling.rs");
     include!("cli/tests_budget_spend.rs");
+    include!("cli/tests_budget_ancestry.rs");
     include!("cli/tests_roster.rs");
     include!("cli/tests_snapshots_gc.rs");
     include!("cli/tests_snapshot_pointer.rs");

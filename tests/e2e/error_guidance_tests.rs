@@ -11,8 +11,14 @@ fn run_raw(args: &[&str], cwd: &std::path::Path) -> CliRun {
 
 /// The finished process itself, for the one test below whose subject is where
 /// the renderer broke a line rather than what the binary said.
+///
+/// The state home is a temporary directory of this call's own, never one
+/// spelled in terms of `cwd`: where a spawned process writes is a decision of
+/// its own, and a helper that joins the two leaves every caller standing in a
+/// real directory writing into it. §REQ-test-isolation.2
 fn capture(args: &[&str], cwd: &std::path::Path) -> std::process::Output {
-    super::rhei_command(cwd.join(".home"))
+    let home = unique_temp_dir("error-guidance-home");
+    super::rhei_command(&home)
         .current_dir(cwd)
         .args(args)
         .output()

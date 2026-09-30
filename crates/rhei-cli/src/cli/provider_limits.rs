@@ -56,17 +56,21 @@ fn strip_terminal_decoration(line: &str) -> std::borrow::Cow<'_, str> {
     .replace_all(line, "")
 }
 
-/// The closed set of providers whose session-limit line names a reset instant
-/// worth sleeping on. A provider joins it by a change to the specification, not
-/// by a project's configuration, and the agent registry id is never tested.
+/// The closed set of providers whose limit line names a reset instant worth
+/// sleeping on, whichever period — session or weekly — it says has run out. A
+/// provider joins it by a change to the specification, not by a project's
+/// configuration, and the agent registry id is never tested.
 /// §FS-rhei-agents.2.3
 const RECOGNIZED_PROVIDERS: [&str; 2] = ["openai", "anthropic"];
 
+/// One grammar, whose period word is a closed alternation and whose minutes are
+/// optional: `resets 6am` is the same sentence as `resets 6:00am`.
+/// §FS-rhei-agents.2.3
 fn provider_signal_regex() -> &'static Regex {
     static SIGNAL: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
     SIGNAL.get_or_init(|| {
         Regex::new(
-            r"^You've hit your session limit · resets ([1-9]|1[0-2]):([0-5][0-9])(am|pm) \(([^()\s]+)\)$",
+            r"^You've hit your (?:session|weekly) limit · resets (?<hour>[1-9]|1[0-2])(?::(?<minute>[0-5][0-9]))?(?<meridiem>am|pm) \((?<zone>[^()\s]+)\)$",
         )
         .expect("provider-limit signal regex is valid")
     })
@@ -122,14 +126,20 @@ fn classify_provider_limit(
     let [signal] = matching.as_slice() else { return None };
     let captures = provider_signal_regex().captures(signal)?;
 
-    let hour12 = captures.get(1)?.as_str().parse::<u32>().ok()?;
-    let minute = captures.get(2)?.as_str().parse::<u32>().ok()?;
-    let hour = match captures.get(3)?.as_str() {
+    let hour12 = captures.name("hour")?.as_str().parse::<u32>().ok()?;
+    // An absent minute group is that hour at `00`, not a failure to match: the
+    // group is optional, so it does not participate in `resets 6am`.
+    // §FS-rhei-agents.2.3
+    let minute = match captures.name("minute") {
+        Some(found) => found.as_str().parse::<u32>().ok()?,
+        None => 0,
+    };
+    let hour = match captures.name("meridiem")?.as_str() {
         "am" => hour12 % 12,
         "pm" => (hour12 % 12) + 12,
         _ => return None,
     };
-    let zone = captures.get(4)?.as_str().parse::<Tz>().ok()?;
+    let zone = captures.name("zone")?.as_str().parse::<Tz>().ok()?;
     let observed_utc: DateTime<Utc> = observed.into();
     let local_date = observed_utc.with_timezone(&zone).date_naive();
     let mut deadline = unique_safe_boundary(zone, local_date, hour, minute)?;

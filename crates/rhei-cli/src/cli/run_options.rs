@@ -154,6 +154,25 @@ impl RunOptions {
         self.standalone.prices.as_deref()
     }
 
+    /// Apply `defaults.prices` as the default value of `--prices`, answering
+    /// with the settings file that declared it when it was used.
+    ///
+    /// The settings key is that default and nothing more, so it is applied to
+    /// the option itself rather than carried beside it: every later site that
+    /// asks whether a caller-owned book was selected — the profile-book
+    /// bypass, the copy into each accounting root, mid-run admission — is then
+    /// right without a second test. A path given on the command line wins and
+    /// is left exactly as it was.
+    /// §FS-rhei-cost-accounting.5.1 §FS-rhei-run.2
+    fn default_prices_from_settings(&mut self, settings: &RheiSettings) -> Option<PathBuf> {
+        if self.standalone.prices.is_some() {
+            return None;
+        }
+        let book = settings.prices.as_ref()?;
+        self.standalone.prices = Some(book.path.clone());
+        Some(book.declared_in.clone())
+    }
+
     fn price_book(&self) -> &PriceBook {
         &self.price_book
     }

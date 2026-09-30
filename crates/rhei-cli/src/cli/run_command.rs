@@ -267,11 +267,25 @@ fn run_command(
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
     let machines = ExecutionMachines::build(&resolved, input, &loaded)?
         .with_state_machine_override(state_machine_path);
+    // Settings are read before the book because they may name it: from the
+    // next line on, a settings-declared book is the selected caller-owned
+    // book everywhere one is asked for. §FS-rhei-cost-accounting.5.1 §FS-rhei-run.2
+    let settings = load_merged_settings(&workspace_root)?;
+    let declared_in = opts.default_prices_from_settings(&settings);
     let custom_price_book = opts.prices_path().map(Path::to_path_buf);
     if let Some(path) = custom_price_book.as_deref() {
-        opts.select_price_book(load_price_book(path)?);
+        let book = load_price_book(path).map_err(|err| match declared_in.as_deref() {
+            None => err,
+            // Nobody typed this path, so the refusal names where it was
+            // written as well as what it said. §FS-rhei-cost-accounting.5.1
+            Some(file) => miette!(
+                help = "correct `defaults.prices` in that settings file, or pass --prices",
+                "{err}; that path came from `defaults.prices` in '{}'",
+                file.display()
+            ),
+        })?;
+        opts.select_price_book(book);
     }
-    let settings = load_merged_settings(&workspace_root)?;
     // Stamped only now: a run that queued behind someone else's lock began
     // when it got the lock, not when it was typed, and `rhei runs` orders by
     // this. §FS-rhei-run.2.7

@@ -181,6 +181,12 @@ than refused. `rhei budget show <plan-or-project>` says where a project stands,
 and [Bounded ticket travel, project invocations, and a day's spend](docs/functional-spec/rhei-budgets.spec.md)
 is the reference.
 
+The spend bound only bounds spending on runs that are priced: an invocation
+whose model the price book does not price is charged a flat reserve instead of
+what it cost. Name one book in `defaults.prices` and every run on the machine
+prices from it without `rhei run --prices`. See
+[Cost accounting](docs/functional-spec/rhei-cost-accounting.spec.md).
+
 ## Install
 
 ### Cargo

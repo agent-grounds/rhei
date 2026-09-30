@@ -327,6 +327,8 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             dry_run,
             keep_on_error,
             list_inputs,
+            into,
+            state_machine,
             input_args,
         } => templates::instantiate_command(
             template.as_deref(),
@@ -343,6 +345,8 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             dry_run,
             keep_on_error,
             list_inputs,
+            into.as_deref(),
+            state_machine.is_some(),
         ),
         Commands::Next { input, task, json, no_callbacks, peek, rhei, state_machine } => {
             let target = resolve_plan_target(input)?;

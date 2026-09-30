@@ -70,6 +70,7 @@ states:
     description: Review
     visits: 3
     agent: internal-agent
+    agent_timeout: 30m
     model: internal-model
     mcp_servers: [internal-tracker]
     skills: [internal-skill]
@@ -80,6 +81,7 @@ states:
   internal-observer:
     description: Reuse the review snapshot
     agent: internal-agent
+    agent_timeout: 30m
     model: internal-model
     snapshot:
       inherit:
@@ -188,6 +190,7 @@ states:
   observed:
     description: Observe an exposed child
     agent: review.reviewer
+    agent_timeout: 30m
     model: review.careful
     mcp_servers: [review.tracker]
     skills: [review.checklist]
@@ -200,6 +203,7 @@ states:
   targeted:
     description: Use an exposed execution target
     target: review.reviewer:fixture:review.careful
+    agent_timeout: 30m
   finished:
     description: Finished
     final: true

@@ -16,6 +16,7 @@ states:
   work:
     description: Runnable work
     target: codex:openai:gpt-5.5
+    agent_timeout: 30m
   done:
     description: Finished work
     final: true

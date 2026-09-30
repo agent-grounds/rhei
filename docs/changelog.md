@@ -77,6 +77,26 @@ pull request number: the release stamps `(PR #N)` onto it. See
   today. Add the entry to your own book.
   §FS-rhei-agents.1.1.1 §FS-rhei-agents.1.3 §FS-rhei-cost-accounting.5.1
 
+- Refuse an unbounded agent state at the preflight, not one line into the run.
+  `rhei validate` and `rhei run --dry-run` now resolve every non-gating,
+  non-final state's effective agent invocations and reject one that resolves to
+  no finite `agent_timeout` through `state.agent_timeout >
+  models.<id>.agents.<agent>.timeout > agents.<id>.timeout >
+  defaults.agent_timeout`, naming the state and the agent in the sentence
+  `rhei run` already gave it — so the two commands run before an unattended
+  launch stop predicting a spawn the launch refuses on its first pass. The one
+  line the error names, `"defaults": {"agent_timeout": "30m"}` in
+  `settings.json`, satisfies all three. The check resolves through the same
+  function execution spawns through, per task identity, so a `**Target:**`
+  override is judged as it would be spawned and a fan-out member by member;
+  `rhei run --no-agent` resolves no invocation and stays exempt; and the real
+  run's refusal moves from the first pass to admission without changing its
+  words. The shipped `code-review` and `fix` templates gained an
+  `agent_timeout` on each of their agent states — per state rather than through
+  `defaults`, because that key's ownership is exclusive at mount time and two
+  composed blocks owning it collide when `changeset-review` is instantiated.
+  §FS-rhei-validate.4 §FS-rhei-agents.3.2.2 §FS-rhei-run.4
+
 - Say what a plan with an unbounded agent state must satisfy, before anything
   is written to enforce it. §FS-rhei-agents.3.2.2 already called a state that
   resolves to no finite `agent_timeout` a validation error, but only the spawn

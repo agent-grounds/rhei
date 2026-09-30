@@ -40,6 +40,7 @@ states:
     initial: true
     description: Review round
     agent: claude-code
+    agent_timeout: 30m
     visits: {{ 2 * review_rounds + 1 }}
     instructions: Review round {visit_count}.
   completed:

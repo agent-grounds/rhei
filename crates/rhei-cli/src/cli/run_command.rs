@@ -333,6 +333,14 @@ fn run_command(
     report
         .errors
         .extend(validate_plan_settings_references(&loaded.rhei, &machines.set, &settings));
+    // Admission, not pass 1: a dry run aborts here exactly as the real run
+    // does, before any `Would spawn:` is projected. §FS-rhei-run.4
+    report.errors.extend(validate_orchestrator_timeouts(
+        &loaded.rhei,
+        &machines.set,
+        &settings,
+        &opts,
+    ));
     report.errors.extend(validate_snapshot_plan_context(&loaded, &resolved));
     if report.has_errors() {
         return Err(validation_report(

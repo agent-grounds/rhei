@@ -21,7 +21,7 @@ fn private_wrapper(root: &Path, fields: &str) -> PathBuf {
         "### Task observer: Observe\n**State:** observe\n\nObserve the settings boundary.\n",
     );
     write_fixture_file(&wrapper, "states.yaml", &format!(
-        "name: wrapper\nversion: 1\nstates:\n  observe:\n    description: Observer\n{fields}  finished:\n    final: true\ntransitions:\n  - {{ from: observe, to: finished }}\nprofiles:\n  primary: {{ initial: observe, allowed: [observe, finished] }}\nnode_policy: {{ root: primary, default: primary }}\n"
+        "name: wrapper\nversion: 1\nstates:\n  observe:\n    description: Observer\n    agent_timeout: 30m\n{fields}  finished:\n    final: true\ntransitions:\n  - {{ from: observe, to: finished }}\nprofiles:\n  primary: {{ initial: observe, allowed: [observe, finished] }}\nnode_policy: {{ root: primary, default: primary }}\n"
     ));
     wrapper
 }

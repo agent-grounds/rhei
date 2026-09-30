@@ -94,10 +94,6 @@ fn assert_refuses_missing_timeout(result: &CliRun, surface: &str) {
 
 /// `rhei validate` decides this, so a plan it accepts is a plan whose every
 /// orchestrator-driven agent state is bounded. §FS-rhei-validate.4
-// Written before the check exists, and failing for the reason #355 reports.
-// The pre-commit gate runs the whole suite, so it is committed ignored; the
-// change that adds the check removes this attribute rather than the test.
-#[ignore = "agent-grounds/rhei#355: validation does not check the timeout chain yet"]
 #[test]
 fn validate_refuses_a_state_that_resolves_no_agent_timeout() {
     let (_dir, plan, machine) = fixture("timeout-validate", UNBOUNDED);
@@ -109,10 +105,6 @@ fn validate_refuses_a_state_that_resolves_no_agent_timeout() {
 
 /// A dry run predicts the real run, including its exit status, so it may not
 /// print `Would spawn:` for an invocation admission refuses. §FS-rhei-run.4
-// Written before the check exists, and failing for the reason #355 reports.
-// The pre-commit gate runs the whole suite, so it is committed ignored; the
-// change that adds the check removes this attribute rather than the test.
-#[ignore = "agent-grounds/rhei#355: validation does not check the timeout chain yet"]
 #[test]
 fn dry_run_refuses_a_state_that_resolves_no_agent_timeout() {
     let (_dir, plan, machine) = fixture("timeout-dry-run", UNBOUNDED);

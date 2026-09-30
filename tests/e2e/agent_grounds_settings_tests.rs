@@ -44,6 +44,7 @@ states:
   work:
     initial: true
     agent: {agent}
+    agent_timeout: 30m
     description: Do the work
   completed:
     final: true

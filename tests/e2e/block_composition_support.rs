@@ -96,6 +96,7 @@ states:
   panel:
     description: Independent panel
     all_targets: ["mock:mock:alpha", "mock:mock:beta"]
+    agent_timeout: 30m
   done:
     description: Review complete
     final: true

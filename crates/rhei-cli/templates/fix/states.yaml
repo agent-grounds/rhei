@@ -7,6 +7,7 @@ states:
   prepare-workspace:
     description: Set up an isolated workspace ({{fix_prepare}}) before applying final fixes.
     target: {{smart_target}}
+    agent_timeout: 1h
     inputs:
       - name: final-decision
         path: runtime/decisions/{task_id}-final-decision.md
@@ -22,6 +23,7 @@ states:
   final-fix:
     description: Smart target applies the accepted final fixes.
     target: {{smart_target}}
+    agent_timeout: 1h
     inputs:
       - name: final-decision
         path: runtime/decisions/{task_id}-final-decision.md
@@ -46,6 +48,7 @@ states:
   commit-fix:
     description: Smart target commits or publishes the final fixes ({{fix_commit}}).
     target: {{smart_target}}
+    agent_timeout: 1h
     inputs:
       - name: final-fix-note
         path: runtime/fixes/{task_id}-final-fix.md

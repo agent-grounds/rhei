@@ -114,6 +114,7 @@ include!("cli/agent_effort.rs");
 include!("cli/agent_resolution.rs");
 include!("cli/agent_model_resolution.rs");
 include!("cli/settings_validate_references.rs");
+include!("cli/orchestrator_timeout_validation.rs");
 include!("cli/agent_log_files.rs");
 include!("cli/agent_spawn_records.rs");
 include!("cli/run_helpers.rs");
@@ -261,6 +262,7 @@ mod tests {
     include!("cli/tests_program_exit_routes.rs");
     include!("cli/tests_agent_execution_validation.rs");
     include!("cli/tests_effective_static_mode_validation.rs");
+    include!("cli/tests_orchestrator_timeout_validation.rs");
     include!("cli/tests_mode_selection.rs");
     include!("cli/tests_usage_report.rs");
     include!("cli/tests_accounting.rs");

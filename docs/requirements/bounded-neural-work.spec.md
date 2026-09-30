@@ -135,15 +135,19 @@ where it is least watched. §FS-rhei-budgets.6.2
 
 Neither count is ever created by an operation that is not one of its two lawful
 sources. `rhei reset`, a fresh `rhei run`, `--rhei` selection, snapshots,
-appended work, live member admission, a restart, a copy, a move, and a nested
-runtime create no travel and no invocation capacity, and in window mode none of
-them advances the window.
+appended work, live member admission, a restart, a copy or a move of a plan
+file, and a nested runtime create no travel and no invocation capacity, and in
+window mode none of them advances the window.
 
 Fresh invocation capacity has exactly two lawful sources: the passage of the
-window, and an audited `init` or `adjust` under the machine's ceiling. Fresh
-travel has exactly one: a genuinely new ticket identity. A ticket that is
-copied, moved, or re-instantiated keeps its history, so reset-and-rerun
-converges on the travel bound rather than escaping it.
+window, and an audited `init` or `adjust` under the machine's ceiling.
+
+Fresh travel has exactly one lawful source: a genuinely new ticket identity,
+which is a ticket whose id this project's account has never bound. A ticket
+that is copied, moved, or re-instantiated under an id the account has already
+bound keeps its history, so reset-and-rerun converges on the travel bound
+rather than escaping it. No operation may assert a ticket identity the account
+did not settle.
 
 Everything above is about the **counts**, and the scope is deliberate rather
 than incidental. A travel or invocation unit, once consumed, is consumed, and

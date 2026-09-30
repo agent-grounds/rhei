@@ -1,0 +1,9 @@
+runtime/decisions/{task_id}-final-decision.md
+runtime/findings/{task_id}-{target.slug}.md
+runtime/fixes/{task_id}-final-fix.md
+runtime/issues/{task_id}-candidate-issues.md
+runtime/manifests/{task_id}-architecture.md
+runtime/manifests/{task_id}-parts.md
+runtime/proposals/{task_id}-proposal-matrix.md
+runtime/proposals/{task_id}-{target.slug}.md
+runtime/validations/{task_id}-{target.slug}.md

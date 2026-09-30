@@ -35,16 +35,22 @@ The remaining three surfaces:
 - State machines: `states.yaml`. Owned by [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) and
   [§FS-rhei-transitions](rhei-transitions.spec.md#fs-rhei-transitions-rhei-transitions-specification); the per-state `session` field is owned jointly by
   §FS-rhei-states.1.2 and §FS-rhei-snapshots.4.7.
-- Templates and composable blocks: template directories with `template.yaml`
+- Templates and their composition: template directories with `template.yaml`
   plus rendered plan and state files. Template discovery, rendering, and
   single-template instantiation are owned by
   [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification);
-  recursive mounts, ports, seams, qualification, and lowering are owned by
+  composition is owned by
   [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks).
-  Input-selected declaration groups are owned by §FS-rhei-library.1.1, and
-  opt-in public state, task, and settings identities by
-  §FS-rhei-library.1.2. Checked terminal equivalence is owned by
-  §FS-rhei-library.7.1.
+  The two composition surfaces a user authors are `--into`, which unions a
+  template into a plan that already exists
+  ([§FS-rhei-library.10](rhei-library.spec.md#10---into-placing-a-template-into-a-plan)), and the `includes:` manifest field with its
+  optional `under:`, which builds a template out of templates
+  ([§FS-rhei-library.14](rhei-library.spec.md#14-includes-a-template-built-from-templates)); the rules that decide when two authored names are
+  one definition are owned by [§FS-rhei-library.11](rhei-library.spec.md#11-the-union-rules). The deprecated mount-and-seam
+  block compiler, its input-selected declaration groups
+  (§FS-rhei-library.1.1), its opt-in public identities
+  (§FS-rhei-library.1.2) and its checked terminal equivalence
+  (§FS-rhei-library.7.1) are owned by the same document.
 - Execution references: agent, model, MCP server, skill, snapshot, and program
   references. Owned by [§FS-rhei-agents](rhei-agents.spec.md#fs-rhei-agents-rhei-agents-specification), [§FS-rhei-programs](rhei-programs.spec.md#fs-rhei-programs-rhei-program-states-specification), and
   [§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification).
@@ -72,8 +78,10 @@ Use this order when learning or auditing the language:
 6. Read [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification) when the authored source is a reusable template
    rather than a concrete plan workspace.
 7. Read [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks)
-   when one template mounts reusable blocks or `rhei instantiate` composes
-   several blocks directly.
+   when a template is placed into a plan that already exists with `--into`, or is
+   built out of other templates with `includes:`. Start at
+   [§FS-rhei-library.9](rhei-library.spec.md#9-composition-by-graph-union), which is the composition model; sections 1–8
+   specify the deprecated block compiler it replaces.
 
 Command specs such as [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate), [§FS-rhei-migrate](rhei-migrate.spec.md#fs-rhei-migrate-rhei-migrate), [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next), [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition),
 Command specs such as [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate), [§FS-rhei-migrate](rhei-migrate.spec.md#fs-rhei-migrate-rhei-migrate), [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next), [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition),
@@ -103,10 +111,13 @@ Language changes must preserve a single discoverable entry point:
   [§FS-rhei-agents.2.2](rhei-agents.spec.md#22-modes).
 - New template syntax or manifest fields belong in [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification) and must
   be linked from this page.
-- Block-composition semantics belong in
+- Composition semantics belong in
   [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks);
   additions to `template.yaml` or `rhei instantiate` must also update
   [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification).
+  A composition never adds runtime syntax: it ends in the flat plan and state
+  files this page already maps, which is why a new composition surface updates
+  these two documents and no grammar.
 - The bounds a plan or a machine may author — `transition_limit` on a
   `profiles` entry, and the `defaults.transition_limit`,
   `defaults.invocations_per_day`, `defaults.invocation_lifetime_max` and

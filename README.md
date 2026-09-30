@@ -67,9 +67,11 @@ Rhei is the only agent runtime that combines all of:
   ready-to-execute workspace. Eleven templates ship inside the binary, so
   `rhei templates` is populated the moment `rhei` is installed. See
   [`docs/functional-spec/rhei-templates.spec.md`](docs/functional-spec/rhei-templates.spec.md).
-  Block compositions also write `.agent-grounds/rhei/composition.lock.json`,
-  tracing each flattened node to its declaration, mount, and source; digests
-  verify bytes, and exact replay needs an immutable source. See
+  A template can also be placed into a plan that already exists —
+  `rhei instantiate <template> --into <rhei>[.<task>]` adds its states, edges,
+  profile and tickets to what is there — and a template can be built out of
+  templates with `includes:`. Composition is graph union over the names their
+  authors wrote, so the result reads like a machine somebody wrote. See
   [`docs/functional-spec/rhei-library.spec.md`](docs/functional-spec/rhei-library.spec.md).
 
 See [`docs/functional-spec/comparison.md`](docs/functional-spec/comparison.md) for a detailed comparison against

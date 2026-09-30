@@ -38,9 +38,10 @@ Two things carry it, and they are the same mechanism seen from two sides:
 - `includes:` in `template.yaml` builds a template out of templates ([§FS-rhei-library.6](rhei-library.spec.md#6-includes-a-template-built-from-templates)), each
   entry optionally placing its tickets `under:` a task of the host.
 
-Nothing is written until the whole union validates. On error the target is
-byte-identical to what it was, and the error names both sources of the
-disagreement and the field they disagree on.
+Nothing is written until the union validates in the scope the target runs in
+([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan)). On error the target is byte-identical to what it was, and
+the error names both sources of the disagreement and the field they disagree
+on.
 
 ## 2. `--into`: placing a template into a plan
 
@@ -90,8 +91,10 @@ files — is not a placement's to refuse, which is the same reading `rhei new`
 takes of its own write ([§FS-rhei-new.5.2](rhei-new.spec.md#52-a-create-answers-for-the-errors-it-introduced)).
 
 The write takes the permanent sibling lock every rewriting command takes
-([§FS-rhei-new.4](rhei-new.spec.md#4-ids)) — the scope's own sidecar and each plan file the
-placement rewrites, from before the first host read through the write — so a
+([§FS-rhei-new.4](rhei-new.spec.md#4-ids)) — the scope's own sidecar, which for a member is
+the project's and so also covers the settings the hoist rewrites there, and
+each plan file the placement rewrites, from before the first host read through
+the write — so a
 union into a rhei with a live `rhei run` serializes against it rather than
 racing it, and it keeps the host's bytes and inserts the template's rendered
 entries at the end of each block, so a `git diff` after `--into` shows the added

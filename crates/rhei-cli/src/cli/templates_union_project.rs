@@ -1,10 +1,12 @@
     // What changes when the union's target is a *member* of a Panta project:
-    // where its settings go, and whose terms it is validated in.
+    // where its settings go, whose terms it is validated in, and what the
+    // scope lock has to cover.
     //
-    // Its own part because both answers are the same one fact — a member rhei
-    // is only correct in the project's terms, so the project is what the hoist
-    // writes to and what the validation loads. A union that answered either
-    // question from the rhei alone would leave a project it just broke.
+    // Its own part because all three answers are the same one fact — a member
+    // rhei is only correct in the project's terms, so the project is what the
+    // hoist writes to, what the validation loads, and what the write is
+    // serialized on. A union that answered any of them from the rhei alone
+    // would leave a project it just broke.
 
     // §FS-rhei-library.2 §FS-rhei-templates.6.2 §AR-rhei-library.5
 
@@ -20,6 +22,23 @@
         }
         let parent = root.parent()?;
         workspace::is_panta_project(parent).then(|| parent.to_path_buf())
+    }
+
+    /// The directory whose sidecar stands for the whole placement: the project
+    /// for a member, the rhei's own root outside one.
+    ///
+    /// The scope lock has to span every file the placement writes, and for a
+    /// member that includes the project's `settings.json`, which the hoist
+    /// reads, merges and writes back. Locking the member instead would leave
+    /// two unions into two members of one project racing over that one file,
+    /// the loser's agents lost and the project left naming a target it no
+    /// longer defines. Widening also serializes the placement against
+    /// `rhei new --under <member>`, which already resolves its own scope to the
+    /// project (§FS-rhei-new.1.1), and a project-wide scope is strictly broader
+    /// than a member one, so sibling numbering keeps its guarantee.
+    /// §FS-rhei-library.2 §FS-rhei-new.4
+    fn union_scope_root(host: &UnionHost) -> &Path {
+        host.project.as_deref().unwrap_or(&host.root)
     }
 
     /// Hoist a template's `settings.json` into the project, which is the only

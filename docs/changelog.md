@@ -77,6 +77,23 @@ pull request number: the release stamps `(PR #N)` onto it. See
   today. Add the entry to your own book.
   §FS-rhei-agents.1.1.1 §FS-rhei-agents.1.3 §FS-rhei-cost-accounting.5.1
 
+- Say what a plan with an unbounded agent state must satisfy, before anything
+  is written to enforce it. §FS-rhei-agents.3.2.2 already called a state that
+  resolves to no finite `agent_timeout` a validation error, but only the spawn
+  path refused one, and both its call sites were behind `if !opts.dry_run()` —
+  so `rhei validate` and `rhei run --dry-run`, the two commands run before an
+  unattended launch, predicted a spawn the launch refused on its first pass.
+  The rule is now stated where it can be checked: it ranges over every
+  non-gating, non-final state that resolves to an agent invocation, all three
+  commands refuse such a plan with the same sentence, `rhei run --no-agent`
+  stays exempt, and §FS-rhei-validate.4 step 3 is where the refusal is decided.
+  §FS-rhei-state-machine-writer.4 step 9 now says which half of its rule the
+  engine checks and which stays the writer's own, and
+  §REQ-bounded-neural-work.2 records the strain that level 1 is the one bound
+  with no built-in default. End-to-end tests pin all of it, and a new guard
+  instantiates every shipped template and validates it, which nothing did
+  before.
+
 - Wait for the run journal's own line before reading it. The eight-way
   provider-limit parking regression read `runtime/transitions.log` once, the
   instant the durable `nextAttemptAt:` waits became visible, and asserted that

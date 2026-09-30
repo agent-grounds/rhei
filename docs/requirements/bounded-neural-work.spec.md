@@ -65,6 +65,26 @@ clamped. Asking for more than the machine allows is never a validation refusal �
 otherwise a template written on one machine would either be invalid on another
 or would raise the cap of the machine that pays for it. [§FS-rhei-budgets.2](../functional-spec/rhei-budgets.spec.md#2-where-a-bound-comes-from)
 
+**Level 1 is the exception, and it is recorded here rather than resolved away.**
+Everything above is scoped to the count dimensions — levels 3 to 5 — which is
+what lets it promise no new refusal: each of them has a built-in value, so none
+of them can be unbound. Level 1, how long one orchestrated agent round may run,
+has no built-in default. It is the one bound that must still be authored, and a
+state that resolves none is refused rather than defaulted — by `rhei validate`,
+by `rhei run --dry-run` and by `rhei run` alike (§FS-rhei-agents.3.2.2).
+
+That is a real strain against the lead of this requirement, which wants a bound
+*without anyone declaring anything*, precisely because an authored bound is
+absent from the plans written before anyone thought about bounds. Two things
+make it the right asymmetry rather than an oversight. A timeout is not a ceiling
+that can be clamped like a count: exceeding it kills an agent mid-round, so a
+built-in number would silently bound work at a value nobody chose for their
+workload. And level 1 is the one bound whose absence breaks deterministic
+completion rather than merely leaving a count unbounded, which is why it is a
+validation error where the count dimensions are not. Shipping a built-in
+`defaults.agent_timeout` would close the asymmetry; that is a different decision
+from this one and would have to be argued as such.
+
 ## 3. Two counts and an amount
 
 **Ticket travel** is the number of applied transitions a ticket may make over

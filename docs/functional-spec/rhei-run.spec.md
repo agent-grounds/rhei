@@ -901,6 +901,17 @@ deadlines that work would create do not exist yet. A dry run still creates no
 descriptor, report, journal or event log, and a dry run without the option
 keeps its existing contract.
 
+The prediction is not only of the scan's outcome. An error raised at admission —
+before any pass runs, by the validation `rhei run` performs on the plan it is
+about to execute — aborts a dry run exactly as it aborts the real run: the same
+message, and the same non-zero exit. A dry run never reaches the point of
+printing `Would spawn:` for an invocation the real run would refuse before
+spawning it. A state that resolves to no finite `agent_timeout` is one such
+error (§FS-rhei-agents.3.2.2); the rule is the general one and this is an
+instance of it. It differs from the manual-only condition above only in where
+the condition is decided: that one is found by the scan, task by task, which is
+why it is reported for every task instead of aborting on the first.
+
 ## 5. Parallel Execution
 
 With `--parallel N`, up to `N` subprocesses run concurrently. The orchestrator:

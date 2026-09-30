@@ -1429,6 +1429,27 @@ that resolve to no timeout at any level are a validation error under
 `orchestrator` authority. Under `worker` authority there is no timeout
 enforcement.
 
+The rule ranges over **every non-gating, non-final state that resolves to an
+agent invocation**, judged from the plan and the merged settings alone. It is a
+property of a state, not of a pass: a state is refused whether or not this visit
+would have reached it, whether or not its declared `outputs:` already exist, and
+for every member of a fan-out — one member that resolves no timeout is the
+error, named by its agent. A state naming an `agent:` or a `target:` declares
+autonomous agent work and is held to this rule even in a plan otherwise worked
+by hand, because a manual worker needs no agent binding; a state that resolves
+no agent at all is not this error but whatever diagnostic its own binding earns.
+
+`rhei validate`, `rhei run --dry-run` and `rhei run` all refuse such a plan with
+the same sentence, naming the same state and agent, and the same non-zero exit.
+Validation is where the refusal is decided (§FS-rhei-validate.4 step 3), so a
+plan `rhei validate` accepts is one whose every orchestrator-driven agent state
+is bounded; the spawn path keeps the same guard at the boundary it protects.
+`rhei run --no-agent` resolves no agent invocation and is exempt, as it is from
+every other check about an effective agent binding. This point is about
+`agent_timeout` alone: the wider rule a state machine writer is held to — a
+finite `agent_timeout` **or** `program_timeout` — is
+§FS-rhei-state-machine-writer.4 step 9, whose program half is not engine-checked.
+
 This closes the one remaining non-determinism in the completion contract: an
 agent that hangs without producing outputs is bounded by the timeout and
 routed to the state's timeout transition (or fails the task with a warning
@@ -1878,7 +1899,9 @@ Resolution: state-level > model-agent binding > agent-profile > settings default
 
 Under `orchestrator` [Completion Authority](#31-completion-authority), a timeout
 must resolve to a finite value at some level of the chain; missing timeouts on
-orchestrator-driven states are a validation error. Under `worker` authority
+orchestrator-driven states are a validation error — raised by validation over
+this same chain and this same resolution, not only where the chain is consumed
+at spawn time (§FS-rhei-agents.3.2.2). Under `worker` authority
 the resolution is optional and the engine does not impose a timeout on manual
 work.
 

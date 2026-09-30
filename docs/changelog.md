@@ -6,6 +6,24 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- Add `rhei note`, the one channel that carries a fact sideways into the
+  future. A task that finds out something the next ticket would otherwise
+  rediscover spends its one slot on `rhei note "<fact>"`, and every ordinary
+  prompt composed afterwards — anywhere in the project, in any rhei, with no
+  declared prior between them — carries it under a new `### Project Notes`
+  block inside `## Position`. The store is one append-only file,
+  `runtime/notes.md` at the project execution root, written only through the
+  verb and under the lock the transition ledger already uses. A task holds one
+  slot, so endorsing another entry with `--restate` or removing one with
+  `--strike` costs the writer its own; an entry is bounded at 3 lines and an
+  exact duplicate of a live entry or of the writer's own standing context is
+  refused rather than truncated. The block is capped at 24 lines with the
+  overflow line naming the file, omitted entirely when the store is empty, and
+  omitted for a supervising task exactly as the two context blocks already are,
+  so a project that never calls the verb composes what it composes today. It
+  dies with `rhei reset`; a narrowed `rhei reset --rhei` keeps it and says so.
+  (PR #N)
+
 - Stop §FS-rhei-reset.2 offering as a hazard the one thing the ledger forbids.
   The point gave, as its reason for keeping `metadata.tasks.<id>.budgetTicketId`
   through a reset, that removing the key "would hand the ticket a fresh travel

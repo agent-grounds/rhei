@@ -143,6 +143,14 @@ Run-scoped output is **not** ticket-owned — the run report, the dashboard, and
 the accounting rollups describe a run, not a ticket — so a narrowed reset keeps
 it and says so on stdout. Reset without `--rhei` to clear it.
 
+The project note store is kept for the same reason and reported the same way
+([§FS-rhei-note.3.1](rhei-note.spec.md#31-where-it-lives)). It is one shared journal charged to every plan, not a
+ticket's artifact: it is not keyed by a ticket id, an in-scope ticket's entry
+may be the only record of a fact an out-of-scope ticket is relying on, and
+removing one ticket's lines would mean rewriting bytes that append-only exists
+to protect. A narrowed reset therefore keeps `runtime/notes.md` whole and says
+so on stdout; reset without `--rhei` removes it with the rest of `runtime/`.
+
 The reported moves are the moves this invocation will actually make, resolved
 over in-scope tickets only. A dry run is read as a promise about what changes,
 so it must not describe work outside its own scope: an earlier summary of every

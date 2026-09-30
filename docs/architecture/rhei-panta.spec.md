@@ -300,13 +300,22 @@ authored as a workspace directory gets a fully isolated runtime tree; that is
 the escape hatch when an operator wants per-rhei isolation rather than the shared
 project `runtime/`.
 
-The project `runtime/` therefore holds two coexisting things: the per-ticket
+The project `runtime/` therefore holds three coexisting things: the per-ticket
 artifacts of the single-file rheis (whose execution root is the project
-directory) and the cross-rhei rollups — aggregate cost accounting, project-level
-snapshots, and the unified visualization. Distinct subtrees
+directory), the cross-rhei rollups — aggregate cost accounting, project-level
+snapshots, and the unified visualization — and the project note store,
+`runtime/notes.md` ([§FS-rhei-note.3.1](../functional-spec/rhei-note.spec.md#31-where-it-lives)). Distinct subtrees
 (`runtime/results/`, `runtime/accounting/`, …) and project-qualified ids keep
 them from colliding, exactly as a standalone plan coexists its results and
 accounting in one `runtime/`.
+
+The store is a cross-rhei rollup by nature rather than by placement: it is one
+file for the whole project *because* a fact one rhei's ticket found is as often
+needed by another rhei's, and a per-rhei store would have to be copied or read
+through the execution-root map to serve one. A directory-workspace rhei's
+isolated `runtime/` therefore does **not** get a store of its own; the verb
+resolves the project root, not the owning rhei's
+([§FS-rhei-note.3.1](../functional-spec/rhei-note.spec.md#31-where-it-lives)).
 
 One durable thing is deliberately **not** per rhei and not under `runtime/`: the
 project's budget account, at `.agent-grounds/rhei/budgets/`

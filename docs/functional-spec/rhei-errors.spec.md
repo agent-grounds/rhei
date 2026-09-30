@@ -249,6 +249,13 @@ consumers see the same next action as humans:
 
 `help` is omitted when the error carries none.
 
+A command may carry named detail members beside `message` and `help`, where the
+refusal is about a subject the caller has to read rather than only act on — the
+state of an account, the two names a conflict is between. `message` and `help`
+keep their meaning exactly: the detail is what the prose already said, in the
+shape a reader does not have to parse it out of. Which members a command emits
+is that command's own contract and is specified where the command is.
+
 ## 6. Coverage
 
 The contract applies to every diagnostic `rhei` prints on a failing exit path.

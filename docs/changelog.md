@@ -119,6 +119,37 @@ pull request number: the release stamps `(PR #N)` onto it. See
   instantiates every shipped template and validates it, which nothing did
   before.
 
+- Say which of two things a reused path means, and give the operator a way to
+  answer. A project laid down at a path another project used before it resolves
+  to that project's account through the witness index, finds no journal of its
+  own, and is refused as a rolled-back one — the sequence
+  `examples/subtree-supervision/README.md` documents, on its second run. The
+  refusal stays, because path reuse and a rolled-back journal leave identical
+  state and the check exists for the second. What changes is everything the
+  refusal did with it. Where the journal is **wholly absent** it no longer
+  instructs a copy of the witness over it: that instruction succeeds, and hands
+  a brand-new project the entire spend of the one that held the path before it,
+  with nothing to say it happened. It now states both readings and names a
+  runnable command for each. `rhei budget show`, the one diagnostic the refusal
+  points at, works in the state it is offered for rather than failing to open
+  an account it was asked to describe, reports the account's `health` as
+  `damaged` with which of the three sub-cases it is — `journal_absent`,
+  `journal_truncated`, `chain_broken` — and under `--format json` emits the
+  machine-readable error object a harness can parse instead of rendered prose.
+  Where a journal is present its tail is what was lost, so the truncated and
+  chain-broken sub-cases keep the restore remedy unchanged. And `rhei budget
+  forget <TARGET> --reason <TEXT>` retires a stale root under an audited
+  receipt, keeping the receipts byte for byte under a `retired/` name and
+  retracting the root's entry so the next admission establishes a new identity
+  at zero consumed. It **refuses** an account whose journal verifies, which is
+  what keeps it a recovery command rather than a way to reset a working
+  balance: the residual §FS-rhei-budgets.5.3 always named is now a door with a
+  name on it rather than an `rm -rf` nobody recorded. §FS-rhei-budgets.5.4
+  splits the damaged remedy by sub-case, §FS-rhei-budgets.10 carries `forget`'s
+  contract and the closed `health` vocabulary, §FS-rhei-errors.5 permits the
+  named detail members that carry the facts, and §AR-neural-admission.4 no
+  longer states the defect's cause as a plain fact. (PR #TBD)
+
 - Wait for the run journal's own line before reading it. The eight-way
   provider-limit parking regression read `runtime/transitions.log` once, the
   instant the durable `nextAttemptAt:` waits became visible, and asserted that

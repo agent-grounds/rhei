@@ -395,10 +395,28 @@ directory to be outside the project.
 
 The witness is not a second spendable balance. It exists so that an accidentally
 lost tail is distinguishable from a fresh project: deleting the journal cannot
-recreate capacity. Deleting the journal **and** the witness is the stated
-residual of this design. Where an operator's state directory happens to sit
-under a project root, that residual narrows to one key: both copies are in the
-one tree, so removing the tree removes both.
+recreate capacity **while the journal that is left verifies**. Deleting the
+journal **and** the witness is the stated residual of this design. Where an
+operator's state directory happens to sit under a project root, that residual
+narrows to one key: both copies are in the one tree, so removing the tree
+removes both.
+
+The condition is the whole of what `rhei budget forget` is
+([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)). It puts an audited
+door where that residual already is rather than opening a second one: it
+**refuses** an account whose journal verifies, so no working balance is ever
+reset by it; it keeps the receipts rather than unlinking them; it records who
+retired the root, when, why and with what argv; and it retracts the root's
+entry from the witness index, which the bare `rm -rf` leaves behind. Measured
+against the residual it replaces, the bound is better guarded after the command
+exists than before.
+
+Retiring a root is not repairing an account and does not recreate the old one's
+capacity: the receipts stay readable under a retired name, the path stops
+resolving to any account, and the next admission establishes a new one at zero
+consumed under the lawful **absent** path
+([§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted)). Nothing
+carries over, in either direction.
 
 ### 5.4. Absent, damaged, adopted
 
@@ -413,8 +431,37 @@ required, no prompt is shown, and establishment mints nothing.
 
 **Damaged** — a witness exists for this root but the journal is absent,
 truncated, or its hash chain does not verify. New work is **refused**, naming
-both paths and saying that the journal is restored by copying the witness back.
-No repair command is added here.
+both paths. A damaged account is never repaired in place; what a refusal offers
+depends on which of three sub-cases it is, because they are not the same
+accident:
+
+| sub-case | what is true | what the refusal offers |
+|---|---|---|
+| `journal_absent` | the journal file is not there at all | both readings, and one runnable command for each |
+| `journal_truncated` | a journal exists but holds fewer receipts than the witness | restore it by copying the witness back |
+| `chain_broken` | a journal exists and its identity, sequence or hash chain does not verify | restore it by copying the witness back |
+
+The names are the vocabulary a machine reader gets
+([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)) and the reason the
+split exists. Where a journal is present, it **is** this project's journal and
+its tail is what was lost, so copying the witness over it restores this
+project's own history and is the remedy.
+
+Where the journal is **wholly absent**, that inference does not hold, because
+two different things produce byte-identical state: this project's journal was
+lost, or the path was previously held by a different project and this one is new
+at it. Rhei cannot tell them apart — the distinguishing fact is the operator's
+intent, and nothing on disk carries it — so it **does not choose**. The refusal
+states both readings and names the command that answers each: copying the
+witness back where the journal was this project's, and `rhei budget forget`
+where the path was reused. It may **not** instruct the copy as the remedy: on a
+reused path that instruction succeeds and silently charges a brand-new project
+for the whole spend of the one that used the path before it, with no signal that
+anything happened.
+
+The three states stay three. Path reuse is not a fourth, because it is not
+distinguishable from a rolled-back journal — which is the case this check exists
+to catch — and a state the tool cannot detect is not a state it can answer.
 
 **Adopted** — the journal is present and internally valid but this machine has
 no witness: a project cloned from git, or the same project on a new machine. The
@@ -767,9 +814,10 @@ accounting measured.
 rhei budget init <TARGET> --invocations <N> --reason <TEXT>
 rhei budget show <TARGET> [--rhei <ID>] [--format text|json]
 rhei budget adjust <TARGET> --invocations <N> --reason <TEXT>
+rhei budget forget <TARGET> --reason <TEXT>
 ```
 
-All three resolve the whole project and its single account even when the target
+All four resolve the whole project and its single account even when the target
 is one member rhei, and `--rhei` narrows display only.
 
 `init` moves the project from the window contract to the lifetime contract with
@@ -809,7 +857,60 @@ until the effective bound again exceeds consumption — by a raise, or, in windo
 mode, by the next window under the new ceiling.
 
 A command that cannot verify the account reports it as damaged ([§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted)) and
-performs no mutation.
+performs no mutation. `show` is the command that has to satisfy that in every
+sub-case, because it is the one a refusal sends an operator to: it may not fail
+to open an account it was asked to describe. On an account it cannot verify it
+**reports** — naming the journal path, the witness path, what the recorded
+history holds, and one runnable command per available remedy — writes nothing,
+creates nothing, and exits non-zero. An account whose journal is wholly absent
+is the case where there is nothing to open at all, and it is reported like any
+other rather than refused for the missing file.
+
+The account's `health` is a closed vocabulary of two values, `verified` and
+`damaged`. Where it is `damaged` the report additionally carries the `damage`
+sub-case — one of `journal_absent`, `journal_truncated`, `chain_broken`, the
+three of §FS-rhei-budgets.5.4 — and where it is `verified` there is no `damage`
+to carry. A reader may depend on both: neither gains a value without this
+section gaining it too.
+
+Under `--format json` a `show` that cannot verify the account emits the
+machine-readable error object of
+[§FS-rhei-errors.5](rhei-errors.spec.md#5-machine-readable-errors) on stderr and
+nothing on stdout, carrying the same facts the text report states as named
+members beside `message` and `help`. A harness reading a damaged account gets
+one shape whichever state it finds, rather than prose it cannot parse.
+
+`forget` retires a **root** rather than repairing an account: it is how an
+operator says that the path was reused and the recorded account was not this
+project's. Three cases, and only the third acts:
+
+| the account at this path | `forget` |
+|---|---|
+| journal present and verifying | **refuses**, exits non-zero, writes nothing, and names `adjust` as what changes an allowance |
+| no witness claims this root | **refuses**, exits non-zero, naming the path — the lawful **absent** state has nothing to retire, and a path with no record is far more often a typo |
+| damaged | retires it |
+
+The refusal on a sound account is the guarantee of
+§FS-rhei-budgets.5.3 and not a convenience: without it this command would be a
+way to reset a working balance, and the bound would hold only until someone ran
+it.
+
+Retiring is one audited move, and nothing is destroyed by it. The witness
+directory is moved under a `retired/` name beside the live ones, keeping
+`history.jsonl` byte for byte; a receipt is written beside it recording the
+actor, the UTC instant, the reason and the exact argv — the audit shape
+`adjust` already carries — together with the root, the uuid and the counts the
+history held; and the root's entry is retracted from the witness index, so the
+path resolves to no account. That last part is not optional: an entry left
+behind would hand the next project at the path the retired project's identity,
+and a retirement that leaves the identity in place has not retired the root.
+
+Because the uuid is gone, anything keyed to it starts fresh — a ticket's budget
+identity is `ticket:<project-uuid>:<…>` (§FS-rhei-budgets.5.2), so travel
+recorded against the retired account is not in the new one. On a reused path
+there is no such key to lose, the plan files being a fresh copy. Anywhere else
+that is a reason to restore rather than to forget, which is why `forget` refuses
+a sound account and why a damaged report puts restore first.
 
 ## 11. What does not change
 

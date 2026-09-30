@@ -105,7 +105,13 @@ work that runs today.
 
 The witness records every canonical root it has seen under its uuid, so a
 project directory that is deleted and recreated is still recognized as the same
-account.
+account. That is right where it is the same project and wrong where the path was
+reused by a different one, and the two leave identical state — so the recreated
+project is reported as **damaged** and an operator resolves which it was, rather
+than the recognition being assumed. `rhei budget forget` is the retraction that
+answers the second reading ([§FS-rhei-budgets.5.3](../functional-spec/rhei-budgets.spec.md#53-the-witness)), and it is refused on an
+account whose journal verifies, so the recognition can be given up but a balance
+cannot.
 
 ## 5. Replay, not balance
 

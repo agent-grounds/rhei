@@ -1,6 +1,6 @@
 //! What a placement does about a ticket's **budget identity**, which is the one
 //! thing `--into` could get wrong in a way nobody would notice.
-//! §FS-rhei-library.13 §FS-rhei-budgets.1 §REQ-bounded-neural-work.4
+//! §FS-rhei-library.5 §FS-rhei-budgets.1 §REQ-bounded-neural-work.4
 //!
 //! A budget identity belongs to a run, never to a template, so placement does
 //! one refusal and one deletion and reads nothing of the host's. Whether a
@@ -62,7 +62,7 @@ fn identities(index: &Path) -> Vec<(String, String)> {
 /// A template that declares a `budgetTicketId` is refused before anything is
 /// written, and the host's index is byte-identical afterwards. A budget
 /// identity belongs to a run and never to a template.
-/// §FS-rhei-library.13
+/// §FS-rhei-library.5
 #[test]
 fn into_refuses_a_template_that_declares_a_budget_identity() {
     let (dir, root) = host_workspace("identity-refuse-source");
@@ -91,7 +91,7 @@ fn into_refuses_a_template_that_declares_a_budget_identity() {
 /// The refusal must scan a placed **task file's** own metadata block too, not
 /// only the index's — otherwise it has a hole the moment a template carries its
 /// per-task metadata where §FS-rhei-plan-language.1.4 now allows it.
-/// §FS-rhei-library.13 §FS-rhei-library.12
+/// §FS-rhei-library.5 §FS-rhei-library.4
 #[test]
 fn the_identity_refusal_scans_a_task_files_own_metadata_block() {
     let (dir, root) = host_workspace("identity-refuse-task-file");
@@ -113,7 +113,7 @@ fn the_identity_refusal_scans_a_task_files_own_metadata_block() {
 
 /// The refusal fires in `--output` mode as well: a budget identity belongs to a
 /// run whether the template is being placed or laid standalone.
-/// §FS-rhei-library.13
+/// §FS-rhei-library.5
 #[test]
 fn the_identity_refusal_fires_for_output_mode_too() {
     let dir = unique_temp_dir("identity-refuse-output");
@@ -140,7 +140,7 @@ fn the_identity_refusal_fires_for_output_mode_too() {
 /// no binding for the pair it lands on, so the placed ticket gets a
 /// `budgetTicketId` of its own, its own `identity` receipt, and a travel bound
 /// the host ticket's spending has not touched.
-/// §FS-rhei-library.13 §FS-rhei-budgets.1 §REQ-bounded-neural-work.4
+/// §FS-rhei-library.5 §FS-rhei-budgets.1 §REQ-bounded-neural-work.4
 #[test]
 fn a_placement_under_a_free_id_mints_its_own_identity_and_bound() {
     let (dir, root) = host_workspace("identity-mint");
@@ -226,7 +226,7 @@ fn a_placement_under_a_free_id_mints_its_own_identity_and_bound() {
 /// identity-free template at the same id. The binding outlives the document, so
 /// the placed ticket adopts the deleted ticket's uuid and is halted on its first
 /// move — a placement is not a door back to a fresh counter.
-/// §FS-rhei-library.13 §FS-rhei-budgets.5.2 §REQ-bounded-neural-work.4
+/// §FS-rhei-library.5 §FS-rhei-budgets.5.2 §REQ-bounded-neural-work.4
 #[test]
 fn deleting_a_spent_ticket_and_re_placing_it_adopts_the_old_identity() {
     let (dir, root) = host_workspace("identity-reuse");

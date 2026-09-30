@@ -1,6 +1,6 @@
     // Writing a union: where the placed tickets go, what travels beside them,
     // the validation that happens before any of it lands, and the diff
-    // `--dry-run` prints instead. §FS-rhei-library.10 §AR-rhei-library.6.4
+    // `--dry-run` prints instead. §FS-rhei-library.2 §AR-rhei-library.5
 
     /// Place a template's tickets in a single-file rhei: under the parent's
     /// subtree, or at the end of `## Tasks`, which is the end of the file.
@@ -66,7 +66,7 @@
     /// `prompt_templates/*.md`, `scripts/*` and the rest of a template's bundle
     /// travel beside the rhei's own, under rule 1: a file both sides ship must
     /// be the same file. `README.md` describes the template and stays behind.
-    /// §FS-rhei-library.10 §FS-rhei-library.11.1
+    /// §FS-rhei-library.2 §FS-rhei-library.3.1
     fn copy_bundled_files(
         part_root: &Path,
         host_root: &Path,
@@ -92,7 +92,7 @@
     }
 
     /// One bundled file or directory, refused when the host already has a file
-    /// of that name with different bytes. §FS-rhei-library.11.1
+    /// of that name with different bytes. §FS-rhei-library.3.1
     fn copy_bundled_path(
         src: &Path,
         dst: &Path,
@@ -118,6 +118,11 @@
                     return Ok(());
                 }
             }
+            if dst.file_name().and_then(|name| name.to_str()) == Some("settings.json") {
+                let merged = union_settings(src, dst)?;
+                writes.files.push((dst.to_path_buf(), merged));
+                return Ok(());
+            }
             return Err(miette!(
                 help = "a union renames nothing: give the template's copy a name of its own.",
                 "'{}' is shipped by the template and already exists in the target with \
@@ -130,7 +135,7 @@
     }
 
     /// Validate the whole result before anything is written, by mirroring the
-    /// target's plan files with the union applied. §AR-rhei-library.6.4
+    /// target's plan files with the union applied. §AR-rhei-library.5
     fn validate_union(host: &UnionHost, writes: &UnionWrites) -> MietteResult<()> {
         let scratch = tempfile::tempdir().map_err(|err| {
             miette!(
@@ -230,7 +235,7 @@
     }
 
     /// Write the union, which is the first moment anything about the target
-    /// changes. §AR-rhei-library.6.4
+    /// changes. §AR-rhei-library.5
     fn apply_union(writes: &UnionWrites) -> MietteResult<()> {
         for (path, contents) in &writes.files {
             if let Some(parent) = path.parent() {
@@ -252,7 +257,7 @@
 
     /// The diff `--dry-run` prints: one block per file, the added lines and
     /// nothing else, which is what the union's byte discipline is for.
-    /// §FS-rhei-library.10 §FS-rhei-library.15.1
+    /// §FS-rhei-library.2 §FS-rhei-library.7.1
     fn print_union_diff(host: &UnionHost, part: &RenderedPart, writes: &UnionWrites) {
         println!(
             "Dry run: template '{}' would be placed into '{}'.",
@@ -291,4 +296,60 @@
             added.push(line.to_owned());
         }
         added
+    }
+
+    /// Two templates' `settings.json` join the way their machines do: rule 1 at
+    /// the granularity of a setting rather than of a file, so two templates
+    /// that each declare an agent of their own declare two agents, and one key
+    /// both set differently is a refusal naming it.
+    // §FS-rhei-library.3.1 §FS-rhei-templates.6.2
+    fn union_settings(src: &Path, dst: &Path) -> MietteResult<String> {
+        let read = |path: &Path| -> MietteResult<serde_json::Value> {
+            let raw = read_text(path)?;
+            serde_json::from_str(&raw).map_err(|err| {
+                miette!(
+                    help = "a template's settings.json must be valid JSON before it can join \
+                            another's.",
+                    "'{}' is not valid JSON: {err}",
+                    display_path(path).display()
+                )
+            })
+        };
+        let mut host = read(dst)?;
+        merge_settings(&mut host, &read(src)?, &mut Vec::new())?;
+        serde_json::to_string_pretty(&host)
+            .map(|text| text + "\n")
+            .map_err(|err| miette!(help = internal_error_help(), "failed to render settings: {err}"))
+    }
+
+    /// Recursively join `added` into `host`, refusing where a leaf both sides
+    /// set disagrees. §FS-rhei-library.3.1
+    fn merge_settings(
+        host: &mut serde_json::Value,
+        added: &serde_json::Value,
+        at: &mut Vec<String>,
+    ) -> MietteResult<()> {
+        let (serde_json::Value::Object(host_map), serde_json::Value::Object(added_map)) =
+            (&mut *host, added)
+        else {
+            if host == added {
+                return Ok(());
+            }
+            return Err(miette!(
+                help = "give the template's setting a name of its own, or make the two agree.",
+                "setting '{}' is set by both the target and the template, and they differ",
+                at.join(".")
+            ));
+        };
+        for (key, value) in added_map {
+            at.push(key.clone());
+            match host_map.get_mut(key) {
+                Some(existing) => merge_settings(existing, value, at)?,
+                None => {
+                    host_map.insert(key.clone(), value.clone());
+                }
+            }
+            at.pop();
+        }
+        Ok(())
     }

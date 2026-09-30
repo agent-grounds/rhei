@@ -590,7 +590,7 @@ enum Commands {
     /// Into a rhei: `rhei instantiate code-review HEAD~3 --into release`
     ///
     /// Into a task: `rhei instantiate code-review HEAD~3 --into release.ticket`
-    // §FS-rhei-library.10: the three forms `--into` leaves.
+    // §FS-rhei-library.2: the three forms `--into` leaves.
     Instantiate {
         /// Template name or path to a template directory
         #[arg(
@@ -598,8 +598,12 @@ enum Commands {
             add = ArgValueCompleter::new(templates::complete_template_reference)
         )]
         template: Option<String>,
-        /// Mount a reusable block as ALIAS=BLOCK (repeatable)
-        #[arg(long, value_name = "ALIAS=BLOCK")]
+        /// Removed: compose with `--into` or `includes:` instead
+        ///
+        /// Still parsed so that the refusal can say where composition went; a
+        /// removed flag that errors with `unexpected argument` teaches nothing.
+        // §FS-rhei-library.1
+        #[arg(long, value_name = "ALIAS=BLOCK", hide = true)]
         mount: Vec<String>,
         /// Set an input value (repeatable)
         #[arg(
@@ -618,11 +622,13 @@ enum Commands {
         /// Load input values from a YAML or JSON file (repeatable)
         #[arg(long, value_name = "FILE", add = ArgValueCompleter::new(complete_values_path))]
         values: Vec<PathBuf>,
-        /// Link a public completion port to the next block's entry
-        #[arg(long, value_name = "SOURCE=TARGET")]
+        /// Removed: an edge between two templates is the host's to write
+        // §FS-rhei-library.1
+        #[arg(long, value_name = "SOURCE=TARGET", hide = true)]
         seam: Vec<String>,
-        /// Pass one public runtime-data output to an input
-        #[arg(long, value_name = "SOURCE=TARGET")]
+        /// Removed: an artifact that crosses templates is a shared input
+        // §FS-rhei-library.1
+        #[arg(long, value_name = "SOURCE=TARGET", hide = true)]
         pass: Vec<String>,
         /// Output directory (default: <project>/<template-name>/ inside a Panta
         /// project, else ./<template-name>/, where <template-name> is the
@@ -647,7 +653,7 @@ enum Commands {
         list_inputs: bool,
         /// Place the template into a rhei that already exists, as
         /// `<rhei>` or `<rhei>.<task>`
-        // §FS-rhei-library.10
+        // §FS-rhei-library.2
         #[arg(long, value_name = "TARGET")]
         into: Option<String>,
         /// Path to a states YAML file (uses built-in default when omitted)
@@ -833,100 +839,6 @@ enum Commands {
         #[arg(long, value_name = "PATH", add = ArgValueCompleter::new(complete_any_path))]
         output: Option<PathBuf>,
         /// Print the destination path without writing files
-        #[arg(long)]
-        dry_run: bool,
-    },
-}
-
-/// Explicit authored-plan compatibility operations. §FS-rhei-migrate.1
-/// The invocation dimension only. A ticket's travel bound is a *settings*
-/// value rather than an account balance, so there is nothing here to set it
-/// with: it is raised in a settings file or on a profile.
-/// §FS-rhei-budgets.10
-#[derive(Subcommand, Debug)]
-enum BudgetCommand {
-    /// Move the project from the daily window to a lifetime invocation
-    /// allowance
-    Init {
-        /// Path to a plan, workspace, or Panta project; omitted, discover it
-        #[arg(
-            value_name = "RHEI_PLAN_OR_WORKSPACE",
-            add = ArgValueCompleter::new(complete_rhei_plan_path)
-        )]
-        input: Option<PathBuf>,
-        /// Invocations the project may ever be admitted, clamped by
-        /// `defaults.invocation_lifetime_max`
-        #[arg(long, value_name = "N")]
-        invocations: u64,
-        /// Why, recorded in the audited receipt beside the actor and the argv
-        #[arg(long, value_name = "TEXT")]
-        reason: String,
-    },
-    /// Report both counts, their bounds, and where each bound came from
-    Show {
-        /// Path to a plan, workspace, or Panta project; omitted, discover it
-        #[arg(
-            value_name = "RHEI_PLAN_OR_WORKSPACE",
-            add = ArgValueCompleter::new(complete_rhei_plan_path)
-        )]
-        input: Option<PathBuf>,
-        /// Narrow the display to the named rhei. One account, one balance,
-        /// whatever the selection
-        #[arg(long = "rhei", value_name = "RHEI_ID", add = ArgValueCompleter::new(complete_rhei_id))]
-        rhei: Vec<String>,
-        /// Output format
-        #[arg(long, value_enum, default_value_t = BudgetFormat::Text)]
-        format: BudgetFormat,
-    },
-    /// Change an existing lifetime allowance, never its consumption
-    Adjust {
-        /// Path to a plan, workspace, or Panta project; omitted, discover it
-        #[arg(
-            value_name = "RHEI_PLAN_OR_WORKSPACE",
-            add = ArgValueCompleter::new(complete_rhei_plan_path)
-        )]
-        input: Option<PathBuf>,
-        /// The new allowance. Above the ceiling it is clamped and reported;
-        /// below what is already consumed or outstanding it is refused
-        #[arg(long, value_name = "N")]
-        invocations: u64,
-        /// Why, recorded in the audited receipt beside the actor and the argv
-        #[arg(long, value_name = "TEXT")]
-        reason: String,
-    },
-    /// Retire a damaged root, keeping its receipts; refused where the journal
-    /// verifies
-    Forget {
-        /// Path to a plan, workspace, or Panta project; omitted, discover it
-        #[arg(
-            value_name = "RHEI_PLAN_OR_WORKSPACE",
-            add = ArgValueCompleter::new(complete_rhei_plan_path)
-        )]
-        input: Option<PathBuf>,
-        /// Why, recorded in the retirement receipt beside the actor and the
-        /// argv
-        #[arg(long, value_name = "TEXT")]
-        reason: String,
-    },
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
-enum BudgetFormat {
-    Text,
-    Json,
-}
-
-#[derive(Subcommand, Debug)]
-enum MigrateCommand {
-    /// Add direct Prior edges required by declared Consumes relationships
-    ExportPriors {
-        /// Path to a plan, workspace, or Panta project; omitted, discover it
-        #[arg(
-            value_name = "RHEI_PLAN_OR_WORKSPACE",
-            add = ArgValueCompleter::new(complete_rhei_plan_path)
-        )]
-        input: Option<PathBuf>,
-        /// Show the exact additions without replacing authored files
         #[arg(long)]
         dry_run: bool,
     },

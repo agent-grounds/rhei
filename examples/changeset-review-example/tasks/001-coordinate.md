@@ -1,7 +1,7 @@
-### Task coordinate: Coordinate review of {{change_ref}}
+### Task coordinate: Coordinate review of PR#42
 **State:** split
 
-Resolve `{{change_ref}}` to a concrete set of changed files. Follow the split
+Resolve `PR#42` to a concrete set of changed files. Follow the split
 state's instructions to write the architectural overview and part manifest,
 then create sibling review tasks and one aggregate task using this task's
 actual node kind and id prefix. The states are `split`, `review`,

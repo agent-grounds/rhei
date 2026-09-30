@@ -1,17 +1,22 @@
-# Fix block
+# `fix`
 
-`fix` is the reusable application half of `changeset-review`. It accepts the
-review block's `decision` state-file endpoint, prepares a workspace, applies and
-verifies the fix, and optionally records a commit or pull request. It contributes
-states to the task supplied by the preceding block rather than creating a
-second plan task.
+`fix` is the application half of `changeset-review`. It contributes the states
+that prepare a workspace, apply and verify an approved decision, and optionally
+record a commit or pull request — and no tickets of its own, because the ticket
+that walks them is the one the review already started. A host that chains it
+after a review writes the edge into its entry state and a profile whose
+`allowed` spans both halves.
+
+It reads the decision at `runtime/decisions/{task_id}-final-decision.md`, which
+is the path `code-review`'s `decide` writes: an artifact that crosses two
+templates is a path both sides name, not a mechanism.
 
 ```sh
-rhei instantiate \
-  --mount review=code-review --mount fix=fix \
-  --set review.change_ref=HEAD~3 \
-  --seam review.done=fix.entry \
-  --pass review.decision=fix.decision
+# Composed, as `changeset-review` composes it:
+rhei instantiate changeset-review HEAD~3
+
+# Or its states added to a plan that already has a review in it:
+rhei instantiate fix --into release
 ```
 
 Each agent state carries `agent_timeout: 1h` — `final-fix`, plus

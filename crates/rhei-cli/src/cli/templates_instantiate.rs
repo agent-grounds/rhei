@@ -32,34 +32,7 @@
             ));
         }
 
-        // Explicit mounts opt into composition; with no mount the positional
-        // grammar below stays byte-for-byte the legacy template grammar.
-        // §FS-rhei-library.3
-        if !mounts.is_empty() {
-            if template.is_some() || !input_args.is_empty() {
-                return Err(miette!(
-                    help = "use only repeatable `--mount alias=block` operands and qualified `--set alias.input=value` inputs.",
-                    "direct block composition cannot be combined with a positional template or positional inputs"
-                ));
-            }
-            return instantiate_direct_blocks(
-                mounts,
-                seams,
-                passes,
-                values_files,
-                set_values,
-                set_files,
-                output,
-                execute,
-                dry_run,
-                keep_on_error,
-                list_inputs,
-                execute_args,
-            );
-        }
-        if !seams.is_empty() || !passes.is_empty() {
-            return Err(miette!(help = "add --mount ALIAS=BLOCK before declaring a seam or pass", "--seam and --pass require at least one --mount"));
-        }
+        refuse_removed_composition_flags(mounts, seams, passes)?;
 
         let Some(template) = template else {
             // §FS-rhei-templates.6.1.2: an omitted template lists available templates.
@@ -70,29 +43,8 @@
         let template_dir = resolved_template.path();
         let manifest = load_template_manifest(template_dir)?;
 
-        // Selected interfaces take the same typed compilation path. §FS-rhei-library.1.1
-        if !manifest.block.mounts.is_empty() || manifest.select.is_some() {
-            let template_input_args =
-                template_input_args_without_execute_args(input_args, execute_args)?;
-            return instantiate_curated_block(
-                template,
-                template_dir,
-                &manifest,
-                &template_input_args,
-                set_values,
-                set_files,
-                values_files,
-                output,
-                execute,
-                dry_run,
-                keep_on_error,
-                list_inputs,
-                execute_args,
-            );
-        }
-
         // An including template is used exactly as a flat one is, so its input
-        // surface is the union before anything reads it. §FS-rhei-library.11.4
+        // surface is the union before anything reads it. §FS-rhei-library.3.4
         let mut manifest = manifest;
         check_include_cycles(template_dir, &manifest, &mut Vec::new())?;
         manifest.inputs = union_inputs(template_dir, &manifest)?;
@@ -187,7 +139,7 @@
             };
 
         // A budget identity belongs to a run and never to a template, whether
-        // the template is placed or laid standalone. §FS-rhei-library.13
+        // the template is placed or laid standalone. §FS-rhei-library.5
         if let Err(err) = refuse_rendered_identity(&manifest.name, &target_dir)
             .and_then(|()| apply_includes(template_dir, &manifest, &resolved_values, &target_dir, layout))
         {

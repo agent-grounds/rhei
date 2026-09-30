@@ -1,5 +1,5 @@
     // Shared transactional placement, settings preparation, validation,
-    // publication and execution. §FS-rhei-library.4 §FS-rhei-templates.6.2
+    // publication and execution. §FS-rhei-templates.6.1.2 §FS-rhei-templates.6.2
     #[allow(clippy::too_many_arguments)]
     fn finish_template_instantiation(
         mut materialized: MaterializedTemplate, output_dir: &Path, target_dir: &Path,

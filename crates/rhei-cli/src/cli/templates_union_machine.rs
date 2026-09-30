@@ -2,10 +2,10 @@
     // thing, scoping a template's wildcard to its own states, projecting its
     // node policy, and inserting what is new at the end of each block.
 
-    // §FS-rhei-library.11 §AR-rhei-library.6.1
+    // §FS-rhei-library.3 §AR-rhei-library.2
 
     /// One template's machine, as both text and parsed value, ready to join a
-    /// host's. §FS-rhei-library.11
+    /// host's. §FS-rhei-library.3
     struct PartMachine {
         /// The template's name, which every refusal names as a source.
         name: String,
@@ -21,7 +21,7 @@
         /// authors disagreeing, and they read better than the same machine's
         /// standalone defect reported from inside a placement. The whole result
         /// is validated before anything is written either way.
-        /// §FS-rhei-library.11.1 §AR-rhei-library.6.4
+        /// §FS-rhei-library.3.1 §AR-rhei-library.5
         fn load(name: &str, path: &Path) -> MietteResult<Self> {
             let text = fs::read_to_string(path)
                 .map_err(|err| file_io_report(path, "failed to read the template's states", err))?;
@@ -43,7 +43,7 @@
         }
 
         /// The template's own non-terminal states, which is the `sources:` set
-        /// its `from: "*"` edge is written with. §FS-rhei-library.11.2
+        /// its `from: "*"` edge is written with. §FS-rhei-library.3.2
         fn wildcard_sources(&self) -> Vec<String> {
             self.machine
                 .states
@@ -59,7 +59,7 @@
     ///
     /// Nothing about the host is rewritten: every result is the host's text
     /// with lines added, which is what lets `--dry-run` promise a diff of added
-    /// lines and nothing else. §FS-rhei-library.10 §FS-rhei-library.15.1
+    /// lines and nothing else. §FS-rhei-library.2 §FS-rhei-library.7.1
     fn union_machine(host_text: &str, part: &PartMachine) -> MietteResult<String> {
         let host_value: YamlValue = serde_yaml::from_str(host_text).map_err(|err| {
             miette!(help = union_target_help(), "the target's states.yaml does not parse: {err}")
@@ -117,7 +117,7 @@
 
     /// `states` and `profiles`: a named entry the host already defines must be
     /// the same thing, and one it does not is inserted as its author wrote it.
-    /// §FS-rhei-library.11.1
+    /// §FS-rhei-library.3.1
     fn union_named_block(
         part: &PartMachine,
         host_value: &YamlValue,
@@ -148,7 +148,7 @@
     ///
     /// For a terminal the test is its role rather than its spelling, so a
     /// template whose terminals are named something else is not refused for
-    /// having named them. §FS-rhei-library.11.1
+    /// having named them. §FS-rhei-library.3.1
     fn same_definition(
         key: &str,
         name: &str,
@@ -176,7 +176,7 @@
     }
 
     /// The refusal rule 1 owes: both sources and the field they disagree on,
-    /// and no winner picked. §FS-rhei-library.11.1
+    /// and no winner picked. §FS-rhei-library.3.1
     fn union_conflict(
         part: &PartMachine,
         key: &str,
@@ -201,7 +201,7 @@
 
     /// `transitions`: a template's `from: "*"` edge is scoped to that
     /// template's own states on the way in, and an edge the host already has is
-    /// added once. §FS-rhei-library.11.2
+    /// added once. §FS-rhei-library.3.2
     fn union_transitions(
         part: &PartMachine,
         host_value: &YamlValue,
@@ -252,7 +252,7 @@
 
     /// A `from: "*"` rule rewritten with `sources:` set to the template's own
     /// states, as both value and text. An already-scoped rule is its author's
-    /// and is left alone. §FS-rhei-library.11.2
+    /// and is left alone. §FS-rhei-library.3.2
     fn scope_wildcard(
         part: &PartMachine,
         rule: &YamlValue,
@@ -271,6 +271,12 @@
             let list = sources.iter().map(|name| YamlValue::String(name.clone())).collect();
             map.insert(YamlValue::String("sources".into()), YamlValue::Sequence(list));
         }
+        // A flow-style item has no block keys to insert a `sources:` line
+        // among, so the one rule the union rewrites is re-rendered rather than
+        // spliced. Every item it does not touch keeps its author's bytes.
+        if text.trim_start().trim_start_matches("- ").starts_with('{') {
+            return (scoped.clone(), rendered_sequence_item(&scoped, host_indent));
+        }
         let field = " ".repeat(host_indent + 2);
         let item = " ".repeat(host_indent + 4);
         let mut block = format!("{field}sources:\n");
@@ -283,8 +289,25 @@
         (scoped, format!("{head}\n{block}{tail}"))
     }
 
+    /// One YAML mapping as a block-style sequence item at `indent`.
+    fn rendered_sequence_item(value: &YamlValue, indent: usize) -> String {
+        let Ok(rendered) = serde_yaml::to_string(value) else {
+            return String::new();
+        };
+        let mut out = String::new();
+        for (index, line) in
+            rendered.lines().filter(|line| !line.trim().is_empty()).enumerate()
+        {
+            out.push_str(&" ".repeat(indent));
+            out.push_str(if index == 0 { "- " } else { "  " });
+            out.push_str(line);
+            out.push('\n');
+        }
+        out
+    }
+
     /// `models` joins as a set: a name both sides declare is one name.
-    /// §FS-rhei-library.10
+    /// §FS-rhei-library.2
     fn union_models(
         host_value: &YamlValue,
         part_value: &YamlValue,
@@ -313,7 +336,7 @@
 
     /// `node_policy`: only the template's `by_type` routes survive, because the
     /// host's `root`, `default` and `rhei` stand and its `overrides` key on a
-    /// level that is a fact about the placement. §FS-rhei-library.11.3
+    /// level that is a fact about the placement. §FS-rhei-library.3.3
     fn union_node_policy(
         out: &mut String,
         part: &PartMachine,
@@ -349,7 +372,7 @@
     }
 
     /// Insert routes at the end of `node_policy.by_type`, creating the map when
-    /// the host routes nothing by kind yet. §FS-rhei-library.11.3
+    /// the host routes nothing by kind yet. §FS-rhei-library.3.3
     fn insert_into_by_type(out: &mut String, added: &str) -> MietteResult<()> {
         let Some(policy) = yaml_blocks(out).get("node_policy").cloned() else {
             out.push_str("node_policy:\n  by_type:\n");
@@ -374,7 +397,7 @@
     }
 
     /// The whole of provenance: one comment line per inclusion, which the YAML
-    /// parser discards and a reader does not. §FS-rhei-library.15.1
+    /// parser discards and a reader does not. §FS-rhei-library.7.1
     fn fence_comment(
         name: &str,
         version: &str,

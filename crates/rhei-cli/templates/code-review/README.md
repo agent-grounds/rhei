@@ -1,15 +1,21 @@
-# Code review block
+# `code-review`
 
-`code-review` is the reusable review half of `changeset-review`. It begins at
-`split`, retains the review/validation/proposal fan-out states, gates the final
-decision at `human-review`, and exposes the decision written by `decide` as
-the `decision` state-file output. The approval gate requires that file before
-entry. State prompt files retain the review duties and resolve mounted state
-names and artifact paths from the compiled machine.
+`code-review` is the review half of `changeset-review`. It begins at `split`,
+fans out review, validation and proposal passes, and gates the final decision
+at `human-review`, which is a non-terminal state with an edge to `completed`:
+a gate a chain is continued from cannot be a terminal, and the union that
+places this template will not un-finalize one for you.
+
+`decide` writes `runtime/decisions/{task_id}-final-decision.md`, and the
+approval gate requires that file before entry. The state names are the ones
+written in `states.yaml` wherever this template is placed — `split`, `review`,
+`aggregate-reviews`, `validate-review`, `propose-fixes`,
+`aggregate-proposals`, `decide`, `human-review` — so a prompt can name a state
+rather than send its agent to look one up.
 
 ```sh
-rhei instantiate --mount review=code-review \
-  --set review.change_ref=HEAD~3
+rhei instantiate code-review HEAD~3 --output ./review
+rhei instantiate code-review HEAD~3 --into release.ticket
 ```
 
 Each of the seven agent states carries `agent_timeout: 1h`, because a state that

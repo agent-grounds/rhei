@@ -2,10 +2,10 @@
     // parts are rendered with the unioned input values and unioned in list
     // order before anything validates.
 
-    // §FS-rhei-library.14 §FS-rhei-library.14.1 §FS-rhei-library.11.4
+    // §FS-rhei-library.6 §FS-rhei-library.6.1 §FS-rhei-library.3.4
 
     /// One `includes:` entry: a bare name, or a mapping that also says which
-    /// task of the host its tickets go under. §FS-rhei-library.14
+    /// task of the host its tickets go under. §FS-rhei-library.6
     #[derive(Debug, Clone, Deserialize)]
     #[serde(untagged)]
     enum TemplateInclude {
@@ -36,13 +36,17 @@
     /// Resolve an entry's template: through the same discovery as `<template>`,
     /// or as a path relative to the including template, so a library may keep
     /// private pieces beside the template that composes them.
-    /// §FS-rhei-library.14
-    fn resolve_include(including: &Path, name: &str) -> MietteResult<PathBuf> {
+    ///
+    /// The `ResolvedTemplate` is returned rather than its path because a
+    /// built-in is extracted to a temporary directory that lives exactly as
+    /// long as the handle: dropping it deletes the template out from under the
+    /// caller. §FS-rhei-library.6 §FS-rhei-templates.1
+    fn resolve_include(including: &Path, name: &str) -> MietteResult<ResolvedTemplate> {
         let beside = including.join(name);
         if beside.join("template.yaml").is_file() {
-            return Ok(beside);
+            return Ok(ResolvedTemplate { path: beside, _extracted: None });
         }
-        Ok(resolve_template_reference(name)?.path().to_path_buf())
+        resolve_template_reference(name)
     }
 
     /// The union of a template's own inputs and every included template's, so
@@ -50,7 +54,7 @@
     ///
     /// The including template's declaration wins over an included default, and
     /// two included defaults that differ with no declaration above them are an
-    /// error naming both templates and the input. §FS-rhei-library.11.4
+    /// error naming both templates and the input. §FS-rhei-library.3.4
     fn union_inputs(
         template_dir: &Path,
         manifest: &TemplateManifest,
@@ -61,9 +65,10 @@
         let declared: BTreeSet<String> =
             manifest.inputs.iter().map(|input| input.name.clone()).collect();
         for entry in &manifest.includes {
-            let included_dir = resolve_include(template_dir, entry.template())?;
-            let included = load_template_manifest(&included_dir)?;
-            for input in union_inputs(&included_dir, &included)? {
+            let resolved = resolve_include(template_dir, entry.template())?;
+            let included_dir = resolved.path();
+            let included = load_template_manifest(included_dir)?;
+            for input in union_inputs(included_dir, &included)? {
                 if declared.contains(&input.name) {
                     continue;
                 }
@@ -91,13 +96,13 @@
     }
 
     /// Two declarations of one input are one input when they agree on
-    /// everything a caller passes. §FS-rhei-library.11.4
+    /// everything a caller passes. §FS-rhei-library.3.4
     fn same_input(left: &TemplateInputDef, right: &TemplateInputDef) -> bool {
         left.schema == right.schema
     }
 
     /// Refuse a cycle naming the chain, so the message says which templates
-    /// form the loop rather than that recursion ran out. §FS-rhei-library.14
+    /// form the loop rather than that recursion ran out. §FS-rhei-library.6
     fn check_include_cycles(
         template_dir: &Path,
         manifest: &TemplateManifest,
@@ -114,9 +119,9 @@
         }
         chain.push(manifest.name.clone());
         for entry in &manifest.includes {
-            let included_dir = resolve_include(template_dir, entry.template())?;
-            let included = load_template_manifest(&included_dir)?;
-            check_include_cycles(&included_dir, &included, chain)?;
+            let resolved = resolve_include(template_dir, entry.template())?;
+            let included = load_template_manifest(resolved.path())?;
+            check_include_cycles(resolved.path(), &included, chain)?;
         }
         chain.pop();
         Ok(())
@@ -124,7 +129,7 @@
 
     /// Render every included template with the unioned values and union them
     /// into `rendered` in list order, then leave the whole to be validated.
-    /// §FS-rhei-library.14
+    /// §FS-rhei-library.6
     fn apply_includes(
         template_dir: &Path,
         manifest: &TemplateManifest,
@@ -140,8 +145,9 @@
             TemplateLayout::SingleFile => rendered.join("plan.rhei.md"),
         };
         for entry in &manifest.includes {
-            let included_dir = resolve_include(template_dir, entry.template())?;
-            let included = load_template_manifest(&included_dir)?;
+            let resolved = resolve_include(template_dir, entry.template())?;
+            let included_dir = resolved.path();
+            let included = load_template_manifest(included_dir)?;
             let scratch = tempfile::tempdir().map_err(|err| {
                 miette!(
                     help = "an included template is rendered into a temp directory before it \
@@ -150,7 +156,7 @@
                 )
             })?;
             let part_root = scratch.path().join(&included.name);
-            let part = render_part(&included_dir, &included, values, &part_root, entry.under())?;
+            let part = render_part(included_dir, &included, values, &part_root, entry.under())?;
             let host = UnionHost {
                 root: rendered.to_path_buf(),
                 index: index.clone(),
@@ -177,7 +183,7 @@
     }
 
     /// Render one template into `root`, applying its own `includes:` first, so
-    /// what joins a host is always a whole rhei. §FS-rhei-library.14
+    /// what joins a host is always a whole rhei. §FS-rhei-library.6
     fn render_part(
         template_dir: &Path,
         manifest: &TemplateManifest,
@@ -205,7 +211,7 @@
     }
 
     /// A stable digest of a template's source, which is the `src:sha256:` half
-    /// of the fence comment. §FS-rhei-library.15.1
+    /// of the fence comment. §FS-rhei-library.7.1
     fn template_digest(template_dir: &Path) -> MietteResult<String> {
         use sha2::{Digest, Sha256};
         let mut hasher = Sha256::new();

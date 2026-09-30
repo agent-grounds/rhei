@@ -1,10 +1,10 @@
     // `rhei instantiate <template> --into <rhei>[.<task>]`: the whole union,
     // held in memory until it validates and then written as one insertion per
-    // block. §FS-rhei-library.9 §FS-rhei-library.10 §AR-rhei-library.6.4
+    // block. §FS-rhei-library.1 §FS-rhei-library.2 §AR-rhei-library.5
 
     /// A rendered template waiting to join a host: its files, and what the
     /// fence comment records about where they came from.
-    /// §FS-rhei-library.15.1
+    /// §FS-rhei-library.7.1
     struct RenderedPart {
         name: String,
         version: String,
@@ -17,7 +17,7 @@
     /// Everything a placement would write, kept until the whole union
     /// validates. There is no staging directory, so a refusal leaves the target
     /// byte-identical without a rollback path to get wrong.
-    /// §AR-rhei-library.6.4
+    /// §AR-rhei-library.5
     #[derive(Default)]
     struct UnionWrites {
         /// Whole new contents for a file the target owns.
@@ -29,7 +29,7 @@
     }
 
     /// Place one rendered template into `host`, writing nothing until the
-    /// result validates. §FS-rhei-library.9
+    /// result validates. §FS-rhei-library.1
     fn union_into_host(
         host: &UnionHost,
         part: &RenderedPart,
@@ -37,7 +37,12 @@
         mode: UnionMode,
     ) -> MietteResult<()> {
         let writes = plan_union(host, part, declaration)?;
-        validate_union(host, &writes)?;
+        // An entry is validated with the rest: an including template's own
+        // machine names states its parts bring, so it is a fragment until
+        // every entry has joined it. §FS-rhei-library.6 §AR-rhei-library.5
+        if mode != UnionMode::Compose {
+            validate_union(host, &writes)?;
+        }
         if mode == UnionMode::DryRun {
             print_union_diff(host, part, &writes);
             return Ok(());
@@ -60,7 +65,7 @@
     }
 
     /// Why a union is being written, which is what decides whether it reports
-    /// for itself. §FS-rhei-library.10 §FS-rhei-library.14
+    /// for itself. §FS-rhei-library.2 §FS-rhei-library.6
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum UnionMode {
         /// `--into`: the union is the command, so it prints its own summary.
@@ -71,7 +76,7 @@
         Compose,
     }
 
-    /// The whole union, decided in memory. §AR-rhei-library.6.4
+    /// The whole union, decided in memory. §AR-rhei-library.5
     fn plan_union(
         host: &UnionHost,
         part: &RenderedPart,
@@ -174,7 +179,7 @@
 
     /// Ticket depth 4 is a hard ceiling — `######` is the deepest heading
     /// Markdown gives — and it wins over growing `maxLevels`.
-    /// §FS-rhei-library.12.1
+    /// §FS-rhei-library.4.1
     fn check_depth(placed: &[String]) -> MietteResult<()> {
         let Some(overflow) = placed.iter().find(|id| id.split('.').count() > 4) else {
             return Ok(());
@@ -189,7 +194,7 @@
 
     /// A ticket id already taken in the target is refused before anything is
     /// written, so a template with tickets is placed once per parent.
-    /// §FS-rhei-library.12
+    /// §FS-rhei-library.4
     fn check_id_collisions(
         placed: &[String],
         host_files: &[(PathBuf, Vec<String>)],
@@ -229,7 +234,7 @@
 
     /// A budget identity belongs to a run and never to a template, so a
     /// rendered entry that declares one is refused before anything is written.
-    /// §FS-rhei-library.13
+    /// §FS-rhei-library.5
     fn refuse_declared_identity(
         name: &str,
         index_tasks: &BTreeMap<String, YamlValue>,
@@ -251,7 +256,7 @@
     }
 
     /// The key is removed unconditionally from every cloned entry, after
-    /// re-parenting and after the id-collision check. §FS-rhei-library.13
+    /// re-parenting and after the id-collision check. §FS-rhei-library.5
     fn strip_identity(tasks: &mut BTreeMap<String, YamlValue>) {
         for value in tasks.values_mut() {
             if let YamlValue::Mapping(map) = value {
@@ -261,7 +266,7 @@
     }
 
     /// Two states declaring one rhei-scoped artifact path — no per-task
-    /// variable in it — is a union-time collision. §FS-rhei-library.15.2
+    /// variable in it — is a union-time collision. §FS-rhei-library.7.2
     fn check_artifact_paths(host_text: &str, part: &PartMachine) -> MietteResult<()> {
         let host: YamlValue = serde_yaml::from_str(host_text).unwrap_or(YamlValue::Null);
         let mut claimed: BTreeMap<String, String> = BTreeMap::new();
@@ -331,7 +336,7 @@
     }
 
     /// `rhei instantiate <template> [inputs] --into <rhei>[.<task>]`.
-    /// §FS-rhei-library.10
+    /// §FS-rhei-library.2
     #[allow(clippy::too_many_arguments)]
     fn instantiate_into_command(
         template: Option<&str>,
@@ -383,7 +388,7 @@
     }
 
     /// Each combination `--into` refuses is an error naming the pair, rather
-    /// than a meaning invented for it. §FS-rhei-library.15.3
+    /// than a meaning invented for it. §FS-rhei-library.7.3
     fn refuse_into_combinations(
         output: Option<&Path>,
         execute: bool,
@@ -424,7 +429,7 @@
     }
 
     /// The identity refusal as it applies to a rendered tree, which is what
-    /// `--output` produces. §FS-rhei-library.13
+    /// `--output` produces. §FS-rhei-library.5
     fn refuse_rendered_identity(name: &str, root: &Path) -> MietteResult<()> {
         let index = root.join("index.rhei.md");
         let plan = root.join("plan.rhei.md");
@@ -439,4 +444,61 @@
             .unwrap_or_default();
         let tickets = read_part_tickets(root)?;
         refuse_declared_identity(name, &front, &tickets)
+    }
+
+    /// `--mount`, `--seam` and `--pass` are gone, and each says what replaced
+    /// it: a removed flag that errors with `unexpected argument` teaches
+    /// nothing about where composition went.
+    // §FS-rhei-library.1
+    fn refuse_removed_composition_flags(
+        mounts: &[String],
+        seams: &[String],
+        passes: &[String],
+    ) -> MietteResult<()> {
+        let named = [("--mount", mounts), ("--seam", seams), ("--pass", passes)]
+            .into_iter()
+            .filter(|(_, values)| !values.is_empty())
+            .map(|(flag, _)| flag)
+            .collect::<Vec<_>>();
+        if named.is_empty() {
+            return Ok(());
+        }
+        Err(miette!(
+            help = "compose by graph union instead:\n  \
+                    rhei instantiate <template> [inputs] --into <rhei>[.<task>]\n\
+                    and build a template out of templates with `includes:` in its \
+                    template.yaml, whose entries may place their tickets `under:` a task of \
+                    the host. Names in the result are the names their authors wrote, so \
+                    there is nothing to mount, seam or pass.",
+            "{} no longer exists: composition is graph union, not a mount-and-seam compile",
+            named.join(", ")
+        ))
+    }
+
+    /// The manifest fields the compiler owned, refused by name for the same
+    /// reason its flags are: silently ignoring `ports:` would leave a template
+    /// that reads as composed and is not.
+    // §FS-rhei-library.1
+    fn refuse_removed_manifest_fields(raw: &str, manifest_path: &Path) -> MietteResult<()> {
+        const REMOVED: [&str; 8] =
+            ["ports", "data", "expose", "use", "bind", "seams", "compatibility", "select"];
+        let source: YamlValue = match serde_yaml::from_str(raw) {
+            Ok(source) => source,
+            // The typed parse above reports a malformed manifest better.
+            Err(_) => return Ok(()),
+        };
+        let declared: Vec<&str> =
+            REMOVED.into_iter().filter(|key| source.get(*key).is_some()).collect();
+        if declared.is_empty() {
+            return Ok(());
+        }
+        Err(miette!(
+            help = "a template's states, edges, profiles, kinds and tickets join a host's by \
+                    name, so there is no interface to declare: delete the field, and compose \
+                    with `includes:` here or with `rhei instantiate --into <rhei>` at the \
+                    call site.",
+            "'{}' declares {}, which the block compiler owned and graph union replaced",
+            display_path(manifest_path).display(),
+            declared.join(", ")
+        ))
     }

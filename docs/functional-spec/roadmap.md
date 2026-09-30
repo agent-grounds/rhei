@@ -297,7 +297,7 @@ Status: planned. `agent-grounds/rhei#323` replaces the mount-and-seam block
 compiler with composition by **graph union**: `rhei instantiate --into` places a
 template into a plan that already exists, `includes:` with `under:` builds a
 template out of templates, and both end in the ordinary flat files every command
-already reads ([§FS-rhei-library.9](rhei-library.spec.md#9-composition-by-graph-union), [§DA-composition-by-union](../decisions/architectural/composition-by-union.md#da-composition-by-union-composition-is-graph-union-over-names-as-their-authors-wrote-them)). That is
+already reads ([§FS-rhei-library.1](rhei-library.spec.md#1-composition-by-graph-union), [§DA-composition-by-union](../decisions/architectural/composition-by-union.md#da-composition-by-union-composition-is-graph-union-over-names-as-their-authors-wrote-them)). That is
 steps 1 and 2 of the issue's own five. The block-library follow-ups this section
 used to list — a mount catalog, a textual composition language, conditional
 seams, expressions on a pass — close with the compiler: each was a gap in a
@@ -311,7 +311,7 @@ release decision:
   `**States:**` declaration and the cross-root name match
   ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)) are **deprecated with a warning**, not removed, so every
   laid plan runs unchanged. It also removes the interim declaration `--into`
-  writes today ([§FS-rhei-library.10.1](rhei-library.spec.md#101-the-machine-the-target-must-have)) and reaches the installed skills and
+  writes today ([§FS-rhei-library.2.1](rhei-library.spec.md#21-the-machine-the-target-must-have)) and reaches the installed skills and
   ephor's laid plans.
 - **Step 4 — `--into <project>`** (#348)**.** A member rhei with its own machine, or a
   project's default machine laid and rebound, with the tickets a rebind would

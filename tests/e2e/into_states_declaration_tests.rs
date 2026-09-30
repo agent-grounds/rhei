@@ -1,5 +1,5 @@
 //! `--into` and the target's **effective** state machine.
-//! §FS-rhei-library.10.1
+//! §FS-rhei-library.2.1
 //!
 //! Machine resolution in this slice is exactly today's, and under
 //! §FS-rhei-plan-language.1.3 rule 2 a rhei that omits `**States:**` inherits
@@ -32,7 +32,7 @@ fn project_with_member(prefix: &str, member_declares: bool) -> (TestDir, std::pa
 }
 
 /// Declared and matching: the union goes into that file and no declaration is
-/// written or changed. §FS-rhei-library.10.1
+/// written or changed. §FS-rhei-library.2.1
 #[test]
 fn a_declared_matching_machine_is_unioned_into_silently() {
     let (dir, root) = project_with_member("into-states-declared", true);
@@ -58,7 +58,7 @@ fn a_declared_matching_machine_is_unioned_into_silently() {
 
 /// The root file exists but the index declares nothing: the union is written and
 /// `--into` adds the declaration in the same write, saying so in the summary.
-/// This is the interim clause. §FS-rhei-library.10.1
+/// This is the interim clause. §FS-rhei-library.2.1
 #[test]
 fn a_silent_index_with_a_root_file_gets_the_declaration_written_and_reported() {
     let (dir, root) = project_with_member("into-states-silent", false);
@@ -90,7 +90,7 @@ fn a_silent_index_with_a_root_file_gets_the_declaration_written_and_reported() {
 
 /// No file in the rhei's root: refused, printing **both** remedies, because the
 /// copy alone changes nothing while resolution is today's.
-/// §FS-rhei-library.10.1
+/// §FS-rhei-library.2.1
 #[test]
 fn no_machine_of_its_own_is_refused_with_both_remedies() {
     let (dir, root) = project_with_member("into-states-none", false);
@@ -115,7 +115,7 @@ fn no_machine_of_its_own_is_refused_with_both_remedies() {
 /// The index declares a name the root file's `name:` does not match: refused
 /// naming both. This is a pre-existing load error, not one `--into` introduces,
 /// and the point of pinning it is that `--into` must not paper over it.
-/// §FS-rhei-library.10.1
+/// §FS-rhei-library.2.1
 #[test]
 fn a_declaration_the_root_file_contradicts_is_refused_naming_both() {
     let (dir, root) = project_with_member("into-states-mismatch", true);

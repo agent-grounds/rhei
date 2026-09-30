@@ -1,4 +1,4 @@
-# Reusable fix duties and stage contracts. §FS-rhei-library.7.2
+# Reusable fix duties and stage contracts. §FS-rhei-library.3
 name: fix
 version: 1.0.0
 # Bind runtime tokens for the later runtime pass. §FS-rhei-states.4.4
@@ -90,8 +90,11 @@ transitions:
   - {from: final-fix, to: completed}
 {% endif %}
   - {from: '*', to: cancelled}
+# A profile of its own, for the same reason `code-review` has one: two
+# `profiles.primary` with different `allowed` are what rule 1 refuses.
+# §FS-rhei-library.3.1 §FS-rhei-states.8.2
 profiles:
-  primary:
+  fix:
     initial: {% if fix_prepare == 'none' %}final-fix{% else %}prepare-workspace{% endif %}
     allowed: [{% if fix_prepare != 'none' %}prepare-workspace, {% endif %}final-fix, {% if fix_commit != 'none' %}commit-fix, {% endif %}completed, cancelled]
-node_policy: {root: primary, default: primary}
+node_policy: {root: fix, default: fix}

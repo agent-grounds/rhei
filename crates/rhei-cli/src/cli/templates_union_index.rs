@@ -2,7 +2,7 @@
     // template's node kinds, the depth the placement needs, and the placed
     // tickets' own `metadata.tasks` entries — and loses nothing.
 
-    // §FS-rhei-library.12 §FS-rhei-library.12.1
+    // §FS-rhei-library.4 §FS-rhei-library.4.1
 
     /// What a placement adds to the target's index.
     struct IndexAdditions<'a> {
@@ -11,13 +11,13 @@
         levels: u8,
         /// `metadata.tasks` entries, already re-keyed by the placed ids.
         tasks: &'a BTreeMap<String, YamlValue>,
-        /// The `**States:**` line the interim rule of [§FS-rhei-library.10.1]
+        /// The `**States:**` line the interim rule of [§FS-rhei-library.2.1]
         /// writes when the root file exists and the index is silent.
         declaration: Option<&'a str>,
     }
 
     /// The target's index with the additions inserted, keeping every line it
-    /// had. §FS-rhei-library.12
+    /// had. §FS-rhei-library.4
     fn union_index(raw: &str, add: &IndexAdditions<'_>) -> MietteResult<String> {
         let mut lines: Vec<String> = raw.lines().map(str::to_owned).collect();
         if let Some(name) = add.declaration {
@@ -27,15 +27,30 @@
                 .map_or(0, |at| at + 1);
             lines.insert(after, format!("**States:** {name}"));
         }
-        let span = frontmatter_span(&lines).unwrap_or_else(|| open_frontmatter(&mut lines));
+        // A frontmatter block is opened only when something goes in it: an
+        // empty `structure:` is not a mapping, and a plan that declared
+        // nothing and takes nothing keeps declaring nothing.
+        let Some(span) = frontmatter_span(&lines).or_else(|| {
+            let nothing = add.kinds.is_empty()
+                && add.tasks.is_empty()
+                && add.levels <= rhei_core::ast::DEFAULT_MAX_LEVELS;
+            (!nothing).then(|| open_frontmatter(&mut lines))
+        }) else {
+            return Ok(finish(&lines, raw));
+        };
         union_structure(&mut lines, &span, add);
         let span = frontmatter_span(&lines).expect("the frontmatter was just established");
         union_task_metadata(&mut lines, &span, add.tasks)?;
+        Ok(finish(&lines, raw))
+    }
+
+    /// Re-join the edited lines, keeping whether the file ended on a newline.
+    fn finish(lines: &[String], raw: &str) -> String {
         let mut out = lines.join("\n");
         if raw.ends_with('\n') {
             out.push('\n');
         }
-        Ok(out)
+        out
     }
 
     /// The `(start, end)` line indices of the frontmatter body, exclusive of
@@ -73,7 +88,7 @@
     }
 
     /// `structure`: `maxLevels` grows to the depth the placement needs and
-    /// `nodeKinds` gains the template's kinds. §FS-rhei-library.12.1
+    /// `nodeKinds` gains the template's kinds. §FS-rhei-library.4.1
     fn union_structure(lines: &mut Vec<String>, span: &(usize, usize), add: &IndexAdditions<'_>) {
         let (start, end) = *span;
         let structure = lines[start..end].iter().position(|line| line.trim_end() == "structure:");
@@ -100,7 +115,7 @@
 
     /// `maxLevels` is grown rather than refused: the depth a placement needs is
     /// the frontmatter union, not an ordinary create's limit.
-    /// §FS-rhei-library.12.1 §FS-rhei-new.3.3
+    /// §FS-rhei-library.4.1 §FS-rhei-new.3.3
     fn grow_max_levels(lines: &mut Vec<String>, start: usize, end: usize, needed: u8) {
         let Some(at) = lines[start..end].iter().position(|line| line.trim().starts_with("maxLevels:"))
         else {
@@ -122,7 +137,7 @@
     }
 
     /// A template's node kinds join the target's, in the form the target wrote
-    /// them in. §FS-rhei-library.12
+    /// them in. §FS-rhei-library.4
     fn add_node_kinds(lines: &mut Vec<String>, start: usize, end: usize, kinds: &[String]) {
         let Some(at) = lines[start..end].iter().position(|line| line.trim().starts_with("nodeKinds:"))
         else {
@@ -174,7 +189,7 @@
 
     /// `metadata.tasks` entries travel with their tickets, already re-keyed by
     /// the placed ids. A key both sides hold is the id collision already
-    /// refused. §FS-rhei-library.12
+    /// refused. §FS-rhei-library.4
     fn union_task_metadata(
         lines: &mut Vec<String>,
         span: &(usize, usize),

@@ -4,7 +4,7 @@
 //! Every template here is a *valid standalone template* as well as something to
 //! place, because that is the property the union rests on — a template works at
 //! any level, so the same bytes lay a rhei with `--output` and join one with
-//! `--into`. §FS-rhei-library.14
+//! `--into`. §FS-rhei-library.6
 
 use std::path::{Path, PathBuf};
 
@@ -22,7 +22,7 @@ pub fn run_into(args: &[&str], dir: &Path) -> CliRun {
 }
 
 /// The host's machine: three states, one profile, one kind, and a wildcard
-/// cancel edge written *unscoped*, which is the form §FS-rhei-library.11.2 says
+/// cancel edge written *unscoped*, which is the form §FS-rhei-library.3.2 says
 /// the host keeps and the union lets span what it takes in.
 pub const HOST_MACHINE: &str = r#"name: host
 version: 1
@@ -106,7 +106,7 @@ pub fn host_single_file(prefix: &str) -> (TestDir, PathBuf) {
 /// The `step` kind rather than `task` is deliberate — a template routes its
 /// tickets through a kind of its own, and a `task`-kind ticket that fell into
 /// the host's default lane would validate and be wrong.
-/// §FS-rhei-library.11.3
+/// §FS-rhei-library.3.3
 pub const REVIEW_TEMPLATE_MACHINE: &str = r#"name: review-loop
 version: 1
 states:
@@ -163,7 +163,7 @@ pub fn write_review_template(dir: &Path) -> PathBuf {
         "### Step coordinate: Coordinate review of {{change_ref}}\n**State:** review\n\nReview {{change_ref}}.\n",
     );
     // A sibling `**Prior:**` naming a *template* task: what placement has to
-    // rewrite to the placed id. §FS-rhei-library.12
+    // rewrite to the placed id. §FS-rhei-library.4
     write_fixture_file(
         &template,
         "tasks/002-record.md",

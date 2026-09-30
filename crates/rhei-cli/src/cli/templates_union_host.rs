@@ -1,6 +1,6 @@
     // The target of a `--into`: which rhei, which parent task, and which
     // machine file the union is written into.
-    // §FS-rhei-library.10 §FS-rhei-library.10.1
+    // §FS-rhei-library.2 §FS-rhei-library.2.1
 
     /// A rhei a union can be written into, in whichever layout it uses.
     struct UnionHost {
@@ -17,7 +17,7 @@
 
     /// Resolve `--into <rhei>[.<task>]` the way `rhei new --under` resolves a
     /// parent: the first segment names the rhei, the rest names a task in it.
-    /// §FS-rhei-new.3 §FS-rhei-library.10
+    /// §FS-rhei-new.3 §FS-rhei-library.2
     fn resolve_union_host(target: &str) -> MietteResult<UnionHost> {
         let (rhei_id, parent) = match target.split_once('.') {
             Some((rhei_id, parent)) if !parent.is_empty() => (rhei_id, Some(parent.to_owned())),
@@ -83,7 +83,7 @@
 
     /// What `--into` must do about the target's `**States:**` declaration
     /// before it writes a union into a file the rhei may not actually run
-    /// under. §FS-rhei-library.10.1
+    /// under. §FS-rhei-library.2.1
     enum MachineDeclaration {
         /// Declared and matching: union in, write no declaration.
         Matches,
@@ -92,7 +92,7 @@
         Write(String),
     }
 
-    /// The four cases of [§FS-rhei-library.10.1], decided before anything is
+    /// The four cases of [§FS-rhei-library.2.1], decided before anything is
     /// rendered.
     fn resolve_host_machine(host: &UnionHost) -> MietteResult<MachineDeclaration> {
         let index = fs::read_to_string(&host.index)
@@ -135,7 +135,7 @@
 
     /// The refusal for a rhei with no machine of its own, with **both**
     /// remedies: while resolution is today's, the copy alone changes nothing.
-    /// §FS-rhei-library.10.1
+    /// §FS-rhei-library.2.1
     fn no_machine_of_its_own(host: &UnionHost, declared: Option<&str>) -> Report {
         let machine = display_path(&host.machine).display().to_string();
         let project = host
@@ -159,7 +159,7 @@
     }
 
     /// Every ticket id the target already holds, rhei-local, and the file each
-    /// one lives in. §FS-rhei-library.12
+    /// one lives in. §FS-rhei-library.4
     fn host_ticket_files(host: &UnionHost) -> MietteResult<Vec<(PathBuf, Vec<String>)>> {
         if host.single_file {
             let raw = fs::read_to_string(&host.index)

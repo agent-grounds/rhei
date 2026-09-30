@@ -1,7 +1,7 @@
 //! The gate every built-in template is held to after the union: it instantiates
 //! standalone **and** `--into` a scratch rhei, both validate, and every ticket it
 //! placed resolves to a profile the template brought.
-//! §FS-rhei-library.14 §FS-rhei-library.11.3
+//! §FS-rhei-library.6 §FS-rhei-library.3.3
 //!
 //! The last clause is the one that needs stating: a `task`-kind ticket that fell
 //! into the host's default lane **validates** and is wrong, so a gate that only

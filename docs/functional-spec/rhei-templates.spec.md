@@ -18,7 +18,7 @@ A **template** is a directory containing:
 4. A **plan skeleton** — either a single-file plan (`plan.rhei.md`) or a directory-workspace layout (`index.rhei.md` + `tasks/`).
 5. **Additional files** — any non-manifest files bundled with the template. Text files are rendered with a restricted MiniJinja template environment; binary files are copied verbatim into the output.
 
-Materialized template files may contain **instantiation templates** (`{{ ... }}`, `{% ... %}`) that are resolved at instantiation time from user-supplied inputs. These are distinct from the single-brace **runtime variables** (`{name}`) defined by the state-machine and plan specifications. Rendering is ordered: first resolve MiniJinja templates across template files during `rhei instantiate`, then let later `rhei` commands resolve runtime `{...}` variables against the instantiated workspace. The manifest (`template.yaml`) is parsed before rendering and is never itself templated; opt-in `select` renders only the declaration groups in §FS-rhei-library.1.1 after input resolution.
+Materialized template files may contain **instantiation templates** (`{{ ... }}`, `{% ... %}`) that are resolved at instantiation time from user-supplied inputs. These are distinct from the single-brace **runtime variables** (`{name}`) defined by the state-machine and plan specifications. Rendering is ordered: first resolve MiniJinja templates across template files during `rhei instantiate`, then let later `rhei` commands resolve runtime `{...}` variables against the instantiated workspace. The manifest (`template.yaml`) is parsed before rendering and is never itself templated.
 
 State-machine prompt templates are runtime prompt fragments, not instantiation
 templates. When a template bundles `prompt_templates/*.md` next to
@@ -183,9 +183,9 @@ The warning's contract:
 
 A template must contain exactly one plan entry point: either `plan.rhei.md`
 (single-file) or `index.rhei.md` (directory workspace). Containing both is an
-error. A composition-only block declaring `use` is the exception: it may omit a
-local plan because its mounted children supply the compiled plan
-([§FS-rhei-library.1](rhei-library.spec.md#1-block-manifests-and-encapsulation)).
+error, and so is having neither: every template stands alone, including one
+built out of others, which is what makes it testable at any level
+([§FS-rhei-library.6](rhei-library.spec.md#6-includes-a-template-built-from-templates)).
 For single-file templates the entry-point filename also determines the
 ticket-id prefix of every instantiated workspace: the file stem is the rhei id,
 so `plan.rhei.md` yields tickets `plan.1`, `plan.2`, ..., regardless of the
@@ -229,15 +229,8 @@ inputs:
         default: <value>
       ...
 
-# Optional composition fields are specified by §FS-rhei-library.1–2.
-ports: <control-port mapping>
-data: <declared runtime endpoint mappings>
-expose: <typed public state, task, and settings identities>
-use: <ordered mount sequence>
-bind: <static input bindings>
-seams: <complete control/data seam sequence>
-compatibility: <checked stable-identity mappings>
-select: <optional restricted declaration-template string>
+# Templates this one is built out of, unioned in list order. §FS-rhei-library.6
+includes: <sequence of names, or of {template, under} mappings>
 ```
 
 ### 3.1. Validation Rules
@@ -261,10 +254,10 @@ select: <optional restricted declaration-template string>
 - `type: path` values are rendered exactly as supplied by the user or manifest `default`; instantiation does not rewrite them to absolute paths. Relative `path` values are interpreted relative to the instantiating process `cwd` only when the CLI itself must resolve that path for its own file operations. The exception is an omitted optional `path` input with no `default`, which resolves to the empty string.
 - `validate`, when present, is a Rust `regex`-crate pattern applied to the string representation of the resolved scalar value and anchored to the entire rendered value. It is enforced on every scalar it is declared on, including scalars nested inside `object` `properties` and `array` `items`; a failing match aborts instantiation with a path-qualified error (for example, `input 'agents[0].id' does not match validation pattern '…'`).
 - `format`, when present, names a built-in value check applied at instantiation time, before any file is rendered. The only format in v1 is `execution-target`, which parses the value as an execution target selector ([§FS-rhei-agents](rhei-agents.spec.md#fs-rhei-agents-rhei-agents-specification)) and reports a malformed value against the input the user supplied rather than against the rendered state machine ([§FS-rhei-errors.3.1](rhei-errors.spec.md#31-execution-target-inputs)). Like `validate`, it is only valid on scalar input types and is enforced on nested `properties` and `items` scalars. `format` and `validate` may be combined; both must pass.
-- `ports`, `data`, `use`, `bind`, `seams`, `compatibility`, and `select`, when present,
-  are validated under
-  [§FS-rhei-library.1](rhei-library.spec.md#1-block-manifests-and-encapsulation)
-  and [§FS-rhei-library.2](rhei-library.spec.md#2-mounts-bindings-and-seams).
+- `includes`, when present, is resolved and validated under
+  [§FS-rhei-library.6](rhei-library.spec.md#6-includes-a-template-built-from-templates); its
+  entries' inputs join this template's own
+  ([§FS-rhei-library.3.4](rhei-library.spec.md#34-inputs-union)).
 
 ## 4. Template-Shipped Settings
 
@@ -393,7 +386,6 @@ per-round identity. Unrolling is for when they do.
 The renderer is **strict**:
 
 - Referencing an undefined variable or missing object property is an error.
-- `template.yaml` is parsed before rendering; only its opt-in `select` scalar is rendered under §FS-rhei-library.1.1. The scalar may select the entire `expose` group, never an individual public member.
 - The environment does not load external templates; includes/imports are unavailable.
 
 ### 5.1. Resolution Rules
@@ -402,7 +394,7 @@ The renderer is **strict**:
 - Runtime variables (`{...}`) pass through instantiation untouched — they remain in the output for `rhei next` to resolve later.
 - An unresolved `{{name}}` or missing `foo.bar` property is an **error** (fail-closed), unlike runtime variables which fail-open. This catches typos early.
 - Instantiation always happens before any runtime `{...}` substitution from bundled or default state machines.
-- Instantiation variables can appear in any **text** file that is materialized into the output tree. `template.yaml` is parsed before rendering, is excluded from output, and may use `{{...}}` only inside the opt-in `select` scalar (§FS-rhei-library.1.1).
+- Instantiation variables can appear in any **text** file that is materialized into the output tree. `template.yaml` is parsed before rendering, is excluded from output, and is never itself templated.
 - A file is considered text if it contains no null bytes in its first 8 KiB; all other files are binary.
 - Text template files must decode as UTF-8. If a file is classified as text but cannot be decoded as UTF-8, instantiation fails with a file-read error.
 - Binary files (images, compiled artifacts) are copied without instantiation-variable resolution or UTF-8 decoding.
@@ -484,7 +476,6 @@ Create a concrete plan workspace from a template.
 ```
 rhei instantiate [template] [input ...] [options]
 rhei instantiate [template] [input ...] --into <rhei>[.<task>] [options]
-rhei instantiate --mount <alias>=<block> [--mount ...] [options]
 
 Arguments:
   [template]                   Template name or path to a template directory
@@ -509,12 +500,7 @@ Options:
                                  rhei's top level, `<rhei>.<task>` under that task.
                                  Mutually exclusive with --output, --execute,
                                  --keep-on-error and --state-machine.
-                                 §FS-rhei-library.10
-  --mount <alias>=<block>      Mount a block for direct composition (repeatable)
-  --seam <exit>=<entry>        Replace default ordering with an explicit seam
-                               (repeatable; the supplied set is the whole chain)
-  --pass <output>=<input>      Attach a declared runtime data pass to the unique
-                               seam between its endpoint mounts (repeatable)
+                                 §FS-rhei-library.2
 ```
 
 #### 6.1.1. Input UX
@@ -580,11 +566,9 @@ Input arguments are parsed as follows:
 - `--set-file KEY=PATH` remains the file-content form and has higher precedence
   than positional values, `KEY=VALUE`, and `--set`.
 
-With one or more `--mount` options, inputs are qualified and positional
-template/input arguments are unavailable. Mount, seam, pass, nested values,
-and qualified-input behavior is specified by
-[§FS-rhei-library.3](rhei-library.spec.md#3-command-line-composition-and-inputs).
-With no `--mount`, every rule above is unchanged.
+Every rule above holds for `--into` as it does for `--output`: the positional
+arguments are the template's inputs either way, which is why the destination is
+a flag ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan)).
 
 #### 6.1.2. Behavior
 
@@ -600,11 +584,11 @@ With no `--mount`, every rule above is unchanged.
    suggestion in the lookup error.
 3. **Load manifest.** Parse `template.yaml`, validate schema.
 4. **Collect inputs.** Resolve inputs using this precedence order: manifest defaults < `--values` files from left to right < positional input values < `KEY=VALUE` input arguments and `--set` flags from left to right < `--set-file` flags from left to right. Error on missing required inputs, unknown input names, ambiguous positional values, or duplicate `positional` declarations. Validate types and `validate` patterns. For `array` / `object` inputs, positional values, `KEY=VALUE`, `--set`, and `--set-file` values are parsed as YAML/JSON snippets before validation.
-5. **Select declarations and render templates.** If `select` is present, render and type-check only its `ports`, `data`, `expose`, and `compatibility` groups (§FS-rhei-library.1.1). Walk all materialized text files in the template directory and render them through the restricted MiniJinja environment. `template.yaml` is parsed before this step and is never rendered into the output. Error on any unresolved instantiation template reference.
-6. **Write staged output.** In normal mode outside a Panta project, copy the resolved tree to `--output` as before. For a prospective project member, render into a uniquely named hidden sibling of `--output` under the same parent. Project discovery ignores this incomplete directory, and same-parent placement permits atomic publication. `--output` must not already exist; instantiation fails rather than merging into or overwriting it. In `--dry-run` mode, the CLI skips the output-path existence check, materializes into a temporary scratch directory instead of `--output`, validates that scratch output, and reports what would have been written. Preserve directory structure and file permissions. Hidden files and directories (names starting with `.`) and `template.yaml` itself are excluded from copied template input. A root-level `settings.json` in the template is moved to `.agent-grounds/rhei/settings.json` under the output root; all other files preserve their template-relative paths. Curated `use` and direct `--mount` composition additionally generate `.agent-grounds/rhei/composition.lock.json` as specified by §FS-rhei-library.4.1; this generated hidden file is part of the staged output rather than copied template input.
+5. **Render templates.** Walk all materialized text files in the template directory and render them through the restricted MiniJinja environment. `template.yaml` is parsed before this step and is never rendered into the output. Error on any unresolved instantiation template reference.
+6. **Write staged output.** In normal mode outside a Panta project, copy the resolved tree to `--output` as before. For a prospective project member, render into a uniquely named hidden sibling of `--output` under the same parent. Project discovery ignores this incomplete directory, and same-parent placement permits atomic publication. `--output` must not already exist; instantiation fails rather than merging into or overwriting it. In `--dry-run` mode, the CLI skips the output-path existence check, materializes into a temporary scratch directory instead of `--output`, validates that scratch output, and reports what would have been written. Preserve directory structure and file permissions. Hidden files and directories (names starting with `.`) and `template.yaml` itself are excluded from copied template input. A root-level `settings.json` in the template is moved to `.agent-grounds/rhei/settings.json` under the output root; all other files preserve their template-relative paths. A template that declares `includes:` has each included template rendered and unioned into this staged tree in list order before it is validated (§FS-rhei-library.6).
 7. **Validate and publish.** Validate a prospective member through its project under the intended final member id, using the staged files as that member's source. For a composition, construct and serialize the complete lock before final validation, and validate with the lock present in the staged tree. Reconcile template settings with project settings for this validation without exposing a half-applied member or settings merge. Resolve the member's own state machine, callbacks, and every `agent`, `model`, `mcp_servers`, and `skills` reference in that final project context. After validation succeeds, commit the reconciled project settings and atomically rename the hidden sibling to `--output`; that rename publishes the flat workspace, settings, and lock together. A successful command publishes exactly one visible member. Validation, lock serialization/write, or publication failure removes staged output and restores prior project settings unless `--keep-on-error` is passed. With `--keep-on-error`, retain the whole staged set, including any successfully written lock and reconciled settings, at the requested visible path when safe or at the reported hidden staging path otherwise. Because the project loader is strict, invalid retained output makes project-scoped commands fail until it is repaired or removed. Standalone validation continues to use the output's `states.yaml` when present and the built-in default otherwise.
-8. **Or union into an existing rhei.** With `--into`, steps 6 and 7 are replaced: the rendered template is unioned into the target's own `states.yaml`, index frontmatter and task files under [§FS-rhei-library.11](rhei-library.spec.md#11-the-union-rules)'s three rules, the whole result is validated in memory, and only then is anything written — under the sibling lock a create takes ([§FS-rhei-new.4](rhei-new.spec.md#4-ids)), keeping the host's bytes and inserting the template's entries at the end of each block. Nothing is staged, so a refusal leaves the target byte-identical and `--keep-on-error` has nothing to keep. The target must have a machine in its own execution root ([§FS-rhei-library.10.1](rhei-library.spec.md#101-the-machine-the-target-must-have)). `settings.json` hoists exactly as [§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project) specifies. `--dry-run` prints the insertion and writes nothing.
-9. **Print summary.** After successful validation, print a human-readable instantiation summary with the output path, task/state counts, instantiated output tree (including the composition lock when present), rendered task tree, the last few rendered task definitions in source order, and a stop-point explanation. `--dry-run` performs the same lock construction, serialization, and validation in scratch, reports the lock in the would-write tree, and writes nothing at the requested output. For normal instantiation without `--execute`, the stop point is the next ready task and the reason is that execution has not started.
+8. **Or union into an existing rhei.** With `--into`, steps 6 and 7 are replaced: the rendered template is unioned into the target's own `states.yaml`, index frontmatter and task files under [§FS-rhei-library.3](rhei-library.spec.md#3-the-union-rules)'s three rules, the whole result is validated in memory, and only then is anything written — under the sibling lock a create takes ([§FS-rhei-new.4](rhei-new.spec.md#4-ids)), keeping the host's bytes and inserting the template's entries at the end of each block. Nothing is staged, so a refusal leaves the target byte-identical and `--keep-on-error` has nothing to keep. The target must have a machine in its own execution root ([§FS-rhei-library.2.1](rhei-library.spec.md#21-the-machine-the-target-must-have)). `settings.json` hoists exactly as [§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project) specifies. `--dry-run` prints the insertion and writes nothing.
+9. **Print summary.** After successful validation, print a human-readable instantiation summary with the output path, task/state counts, instantiated output tree, rendered task tree, the last few rendered task definitions in source order, and a stop-point explanation. `--dry-run` performs the same serialization and validation in scratch and writes nothing at the requested output. For normal instantiation without `--execute`, the stop point is the next ready task and the reason is that execution has not started. With `--into`, the summary is the insertion instead: what the union added, where, and how many tickets it placed.
 9. **Print invocation.** Print a shell-safe `rhei instantiate ... --output <path>` command that shows how to instantiate the same template and input values again. The printed command uses the resolved output path, so shell expressions such as `$(date ...)` appear as the concrete path value seen by the CLI.
 10. **Execute (optional).** When `--execute` is passed, invoke `rhei run <output>` after successful validation. `rhei run` uses the instantiated output's root `states.yaml` by default when present; otherwise it falls back to the built-in default.
 
@@ -618,13 +602,14 @@ settings are restored. With `--keep-on-error`, if the requested path cannot be
 used safely, keep the rendered tree and reconciled settings in hidden staging
 and report that location for inspection; otherwise remove staging as usual.
 
-For a curated block with `use`, or for direct `--mount` composition, steps 2–7
-expand and compile the block graph as
-[§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks)
-requires. The result then rejoins this procedure at ordinary output placement,
-validation, summary, reproducible invocation, and optional execution. Direct
-composition's default output name is the ordered aliases joined by `-`; a
-curated block retains its template name. Curated and direct mounts automatically consume the same author-declared `expose` surface without new CLI selection grammar (§FS-rhei-library.1.2, §FS-rhei-library.3).
+For a template that declares `includes:`, step 5 is followed by one union per
+entry, in list order, as
+[§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composition-by-graph-union)
+requires; the result then rejoins this procedure at ordinary output placement,
+validation, summary, reproducible invocation, and optional execution. An
+including template is discovered, listed, validated and gated exactly as a flat
+one is, keeps its own name, and shows the union of its own inputs and its parts'
+([§FS-rhei-library.3.4](rhei-library.spec.md#34-inputs-union)).
 
 #### 6.1.3. Instantiation Summary Output
 
@@ -1070,12 +1055,12 @@ All `{{...}}` are resolved during instantiation. All `{...}` remain for runtime.
 ## 8. Grammar Extension
 
 The `rhei_document` and `workspace_index` productions are unchanged. Templates
-and blocks are a pre-processing layer that produces valid Rhei documents — the
-parser never sees `{{...}}`, `use`, mount, binding, seam, or data-port syntax.
+are a pre-processing layer that produces valid Rhei documents — the parser never
+sees `{{...}}` or `includes:`.
 
 No changes to the Rhei plan grammar are required **by composition**. `--into`
 and `includes:` add none: the union ends in the ordinary flat files the parser
-already reads ([§FS-rhei-library.9](rhei-library.spec.md#9-composition-by-graph-union)). Changes to the `**States:**` declaration
+already reads ([§FS-rhei-library.1](rhei-library.spec.md#1-composition-by-graph-union)). Changes to the `**States:**` declaration
 itself are a plan-language question and are owned by
 [§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution), not by this section.
 
@@ -1089,15 +1074,7 @@ itself are a plan-language question and are owned by
 | `version` | YAML scalar | Yes | Informational metadata only in v1. |
 | `description` | string | Yes | Must be non-empty after trimming. |
 | `inputs` | sequence of mappings | No | Defaults to an empty list when omitted. |
-| `ports` | mapping | No | Public control entry and exits; required when mounted. §FS-rhei-library.1 |
-| `data` | mapping | No | Public typed runtime input/output endpoints. §FS-rhei-library.1 |
-| `expose` | mapping | No | Public typed state, task, and owned-settings identities. §FS-rhei-library.1.2 |
-| `use` | sequence of mappings | No | Ordered recursive child mounts. §FS-rhei-library.2 |
-| `bind` | sequence of mappings | No | Compile-time root-input to child-input bindings. §FS-rhei-library.2 |
-| `seams` | sequence of mappings | No | Complete explicit completion chain and optional runtime passes. §FS-rhei-library.2 |
-| `compatibility` | mapping | No | Checked stable identities and equivalent terminals for a curated wrapper. §FS-rhei-library.7 |
-| `select` | string | No | Restricted MiniJinja producing only ports, data, expose, and compatibility after static input resolution. §FS-rhei-library.1.1 |
-| `includes` | sequence | No | Templates this one is built from, unioned in list order. An entry is a bare template name, or a mapping with `template:` and an optional `under:` naming a template-relative task to place that template's tickets beneath. §FS-rhei-library.14 |
+| `includes` | sequence | No | Templates this one is built from, unioned in list order. An entry is a bare template name, or a mapping with `template:` and an optional `under:` naming a template-relative task to place that template's tickets beneath. §FS-rhei-library.6 |
 
 Each `inputs[]` entry is a YAML mapping with these fields:
 

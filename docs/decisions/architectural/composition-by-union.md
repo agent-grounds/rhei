@@ -12,7 +12,7 @@ Rhei shipped a block compiler to make workflow reusable. A template declared
 review.done=fix.entry --pass review.decision=fix.decision` composed two of them,
 and the result was one flat workspace, validated, with a
 `composition.lock.json` recording where every definition came from.
-[§FS-rhei-library](../../functional-spec/rhei-library.spec.md#fs-rhei-library-composable-blocks) [§AR-rhei-library](../../architecture/rhei-library.spec.md#ar-rhei-library-block-compiler-architecture)
+[§FS-rhei-library](../../functional-spec/rhei-library.spec.md#fs-rhei-library-composition-by-graph-union) [§AR-rhei-library](../../architecture/rhei-library.spec.md#ar-rhei-library-graph-union-architecture)
 
 It worked, and two things about it did not.
 
@@ -47,7 +47,7 @@ template's states, transitions, profiles, node kinds, `node_policy.by_type`
 routes, prompt templates, scripts and tickets are added to a machine and a plan
 that already exist, and nothing is renamed, qualified or alias-encoded to make
 the union possible.
-[§FS-rhei-library.9](../../functional-spec/rhei-library.spec.md#9-composition-by-graph-union)
+[§FS-rhei-library.1](../../functional-spec/rhei-library.spec.md#1-composition-by-graph-union)
 
 Five things follow, and they are the decision rather than its implementation.
 
@@ -57,29 +57,29 @@ Five things follow, and they are the decision rather than its implementation.
    inventing a third name: a state, edge, profile, kind, prompt or script both
    sides define must be identical apart from `description`, and a template that
    must exist twice in one machine takes a prefix as a declared input.
-   [§FS-rhei-library.11.1](../../functional-spec/rhei-library.spec.md#111-same-name-same-thing)
+   [§FS-rhei-library.3.1](../../functional-spec/rhei-library.spec.md#31-same-name-same-thing)
 2. **One noun and one verb.** A template is instantiated — into a new place with
    `--output`, into an existing one with `--into` — and a template may include
    templates. No second manifest, no tier, no catalog, and no vocabulary of
    block, mount, alias, port, seam, pass or lock.
-   [§FS-rhei-library.10](../../functional-spec/rhei-library.spec.md#10---into-placing-a-template-into-a-plan) [§FS-rhei-library.14](../../functional-spec/rhei-library.spec.md#14-includes-a-template-built-from-templates)
+   [§FS-rhei-library.2](../../functional-spec/rhei-library.spec.md#2---into-placing-a-template-into-a-plan) [§FS-rhei-library.6](../../functional-spec/rhei-library.spec.md#6-includes-a-template-built-from-templates)
 3. **Placement is one mechanism.** `under:` inside `includes:` is the `<task>`
    half of `--into <rhei>.<task>` applied one level in: the same re-parenting,
    heading deepening, `**Prior:**` rewrite, writer and refusals. A second
    placement code path would be the defect, because "a template works at any
    level" is then a fact about one function rather than a promise two functions
    have to keep.
-   [§FS-rhei-library.14.1](../../functional-spec/rhei-library.spec.md#141-under)
+   [§FS-rhei-library.6.1](../../functional-spec/rhei-library.spec.md#61-under)
 4. **The union happens at instantiation and ends in flat files.** No grammar
    change, no loader change, no namespace. Every other command reads what it
    already read, so a composed plan is indistinguishable at runtime from one a
    person typed — which is what keeps output predictable.
-   [§AR-rhei-library.6](../../architecture/rhei-library.spec.md#6-the-union-architecture)
+   [§AR-rhei-library](../../architecture/rhei-library.spec.md#ar-rhei-library-graph-union-architecture)
 5. **Provenance is one comment line.** `# --- <template> <version> src:sha256:…
    inputs: {…} ---` in `states.yaml` per inclusion. No lock file, no generated
    header, no per-node record: when a state keeps its author's name, what it
    came from is answered by reading it.
-   [§FS-rhei-library.15.1](../../functional-spec/rhei-library.spec.md#151-the-fence-comment-is-the-whole-of-provenance)
+   [§FS-rhei-library.7.1](../../functional-spec/rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-provenance)
 
 The block compiler and its vocabulary are removed rather than kept beside this.
 Two mechanisms for one job is the cost the readable one exists to avoid, and
@@ -117,7 +117,7 @@ goes away, because there are no compiled state names.
 ([§FS-rhei-states.8.2](../../functional-spec/rhei-states.spec.md#82-per-profile-validation)), so chaining two templates takes an edge and a
 spanning profile that the host writes. That is not a gap: a path across two
 templates is the one thing neither template knows.
-[§FS-rhei-library.11.5](../../functional-spec/rhei-library.spec.md#115-chaining-two-templates-is-the-hosts-work)
+[§FS-rhei-library.3.5](../../functional-spec/rhei-library.spec.md#35-chaining-two-templates-is-the-hosts-work)
 
 **Rule 1 has an author's bill.** Two built-ins that both declare
 `profiles.primary` cannot be unioned, so each is re-authored with a profile and
@@ -142,7 +142,7 @@ that declares a `budgetTicketId` and strips the key from the clone; whether a
 placed ticket travels fresh is decided by whether the project's account holds a
 binding for the pair it lands on. A union that read the ledger would be a second
 authority on travel.
-[§FS-rhei-library.13](../../functional-spec/rhei-library.spec.md#13-placement-and-ticket-identity) [§REQ-bounded-neural-work.4](../../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)
+[§FS-rhei-library.5](../../functional-spec/rhei-library.spec.md#5-placement-and-ticket-identity) [§REQ-bounded-neural-work.4](../../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)
 
 **`**States:**` and machine resolution are not settled by this.** `--into`
 requires the target's effective machine to be the `states.yaml` in its own root,
@@ -150,4 +150,4 @@ and today's resolution does not consult that root for a rhei whose index is
 silent — so `--into` writes the declaration as an interim. Simplifying
 resolution is separate work, and
 [§DA-per-rhei-state-machines](per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest) is untouched here.
-[§FS-rhei-library.10.1](../../functional-spec/rhei-library.spec.md#101-the-machine-the-target-must-have)
+[§FS-rhei-library.2.1](../../functional-spec/rhei-library.spec.md#21-the-machine-the-target-must-have)

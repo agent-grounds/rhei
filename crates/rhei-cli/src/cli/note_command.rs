@@ -203,8 +203,12 @@ fn append_note_record(
 ///
 /// The plan is loaded leniently, for the reason `rhei show`'s is: leaving a
 /// note is what an agent reaches for *while* something else is broken, and the
-/// store is not plan markdown, so a rhei that will not load costs the writer
-/// nothing but a warning.
+/// store is not plan markdown, so an unrelated rhei that will not load costs a
+/// writer in a healthy one nothing but a warning. It does not excuse the
+/// writing task itself: resolution is `rhei complete`'s, per §FS-rhei-note.1,
+/// and a task the plan cannot place is refused, because a record carries its
+/// writer's id as its provenance and an entry nothing can be traced to would
+/// stand in front of every later prompt.
 // §FS-rhei-note.1 §FS-rhei-note.2 §FS-rhei-note.4
 fn note_command(input: &Path, rhei_scope: &[String], options: &NoteOptions) -> MietteResult<()> {
     let input_buf = normalize_workspace_input(input);

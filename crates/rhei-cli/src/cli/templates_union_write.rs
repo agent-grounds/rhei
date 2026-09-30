@@ -140,7 +140,7 @@
                 help = "a union renames nothing: give the template's copy a name of its own.",
                 "'{}' is shipped by the template and already exists in the target with \
                  different contents",
-                display_path(dst).display()
+                display_slash(dst)
             ));
         }
         writes.copies.push((src.to_path_buf(), dst.to_path_buf()));
@@ -334,7 +334,7 @@
         println!(
             "Dry run: template '{}' would be placed into '{}'.",
             part.name,
-            display_path(&host.index).display()
+            display_slash(&host.index)
         );
         for (path, contents) in &writes.files {
             let before = fs::read_to_string(path).unwrap_or_default();
@@ -342,13 +342,13 @@
             if added.is_empty() {
                 continue;
             }
-            println!("--- {}", display_path(path).display());
+            println!("--- {}", display_slash(path));
             for line in added {
                 println!("+{line}");
             }
         }
         for (_, dst) in &writes.copies {
-            println!("--- {} (new)", display_path(dst).display());
+            println!("--- {} (new)", display_slash(dst));
         }
         for note in &writes.notes {
             println!("  {note}");
@@ -383,7 +383,7 @@
                     help = "a template's settings.json must be valid JSON before it can join \
                             another's.",
                     "'{}' is not valid JSON: {err}",
-                    display_path(path).display()
+                    display_slash(path)
                 )
             })
         };

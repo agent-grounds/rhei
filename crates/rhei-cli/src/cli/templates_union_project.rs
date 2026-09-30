@@ -69,7 +69,7 @@
                 miette!(help = internal_error_help(), "failed to render merged settings: {err}")
             })?
             + "\n";
-        let where_to = display_path(&target).display().to_string();
+        let where_to = display_slash(&target);
         if added.is_empty() && kept.is_empty() {
             writes.notes.push(format!("the project's settings at {where_to} already say all of it"));
         }

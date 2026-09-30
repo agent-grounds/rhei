@@ -221,6 +221,18 @@
         strip_to_relative(&resolved_path, &resolved_cwd).unwrap_or_else(|| path.to_path_buf())
     }
 
+    /// `display_path` spelled with `/` whatever the platform separator is.
+    ///
+    /// Path spelling is one of the platform differences §REQ-cross-platform.2
+    /// lets a specification declare at the point it shows; the union's messages
+    /// and dry-run diffs declare none, so they read the same on all three. Only
+    /// Windows is rewritten, where `\\` cannot occur inside a file name.
+    // §REQ-cross-platform.2: an undeclared difference is a defect, not a limitation.
+    pub(super) fn display_slash(path: &Path) -> String {
+        let rendered = display_path(path).to_string_lossy().into_owned();
+        if cfg!(windows) { rendered.replace('\\', "/") } else { rendered }
+    }
+
     /// `path` expressed relative to `base`, or `None` when it is not under it.
     fn strip_to_relative(path: &Path, base: &Path) -> Option<PathBuf> {
         match path.strip_prefix(base) {

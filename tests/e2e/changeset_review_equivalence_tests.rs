@@ -133,6 +133,79 @@ fn changeset_review_states_keep_their_authors_names() {
     );
 }
 
+/// The same gate, in the **example** the repository ships and in the templates
+/// that compose it. The example is a regenerated artifact of this change, so it
+/// is the one place a reader can see the assembled machine, and the two
+/// templates are where the gate and its exits are authored.
+/// §FS-rhei-library.3.5 §FS-rhei-library.6
+#[test]
+fn changeset_review_human_review_state_is_gating_in_shipped_workflows() {
+    let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("repo root");
+    let example_path = repo_root.join("examples/changeset-review-example/states.yaml");
+    // Through the directory-aware load `rhei validate` performs: a union copies
+    // each part's `prompt_templates/*.md` beside `states.yaml` rather than
+    // inlining them. §FS-rhei-library.2 §FS-rhei-states.4.4
+    let machine = rhei_cli::rhei_validator::StateMachine::from_yaml_file(&example_path)
+        .unwrap_or_else(|err| panic!("load {}: {err}", example_path.display()));
+    let human_review = machine
+        .states
+        .get("human-review")
+        .unwrap_or_else(|| panic!("{} missing human-review state", example_path.display()));
+    assert!(human_review.gating, "{} should mark human-review as gating", example_path.display());
+    assert!(
+        machine
+            .transitions
+            .iter()
+            .any(|rule| rule.from.0 == "decide" && rule.to.0 == "human-review"),
+        "{} should route final decisions through human-review",
+        example_path.display()
+    );
+    assert!(
+        machine
+            .transitions
+            .iter()
+            .any(|rule| rule.from.0 == "human-review" && rule.to.0 == "prepare-workspace"),
+        "{} should require human approval before workspace preparation",
+        example_path.display()
+    );
+
+    // The gate is declared by the template whose author wrote it, and the two
+    // edges *out* of it by the host that chains the two parts — which is the
+    // one thing no single template knows. §FS-rhei-library.3.5
+    let review_path = repo_root.join("crates/rhei-cli/templates/code-review/states.yaml");
+    let review = fs::read_to_string(&review_path).expect("read code-review states.yaml");
+    let start = review
+        .find("\n  human-review:\n")
+        .unwrap_or_else(|| panic!("{} missing human-review block", review_path.display()));
+    let end = review[start + 1..]
+        .find("\n  completed:\n")
+        .map(|offset| start + 1 + offset)
+        .unwrap_or(review.len());
+    let human_review_block = &review[start..end];
+    assert!(
+        human_review_block.contains("\n    gating: true\n"),
+        "{} should mark human-review as gating",
+        review_path.display()
+    );
+    assert!(
+        review.contains("\n  - from: decide\n    to: human-review\n"),
+        "{} should route final decisions through human-review",
+        review_path.display()
+    );
+
+    let host_path = repo_root.join("crates/rhei-cli/templates/changeset-review/states.yaml");
+    let host = fs::read_to_string(&host_path).expect("read changeset-review states.yaml");
+    assert!(
+        host.contains("\n  - from: human-review\n    to: prepare-workspace\n")
+            && host.contains("\n  - from: human-review\n    to: final-fix\n"),
+        "{} should require human approval before either fix path",
+        host_path.display()
+    );
+}
+
 /// The chain the wrapper writes actually runs: a driven ticket reaches the
 /// review's gate and then the fix's entry. `code-review`'s `human-review` is
 /// `final: true` with no outgoing edge today, so this cannot pass until its
@@ -167,20 +240,91 @@ fn a_driven_changeset_review_reaches_human_review_and_then_final_fix() {
         assert!(machine.contains(target), "the gate should reach {target}; got:\n{machine}");
     }
 
-    // And the move the runtime actually allows.
-    let moved = run_into(
-        &[
-            "transition",
-            "out",
-            "--task",
-            "coordinate",
-            "--from",
-            "human-review",
-            "--to",
-            "final-fix",
-            "--no-callbacks",
-        ],
-        &dir,
+    // And the walk the runtime actually allows, move by move. `split`'s only
+    // edge is to `completed`, because the states after it belong to the tickets
+    // the coordinator appends — so the walk starts where the coordinator puts
+    // it, with a ticket in `aggregate-reviews`.
+
+    // Nothing is forced: each state's declared output is written before the
+    // ticket may leave it. §FS-rhei-library.3.5
+    let workspace = dir.join("out");
+    write_fixture_file(
+        &workspace.join("tasks"),
+        "002-aggregate.md",
+        "### Task aggregate: Aggregate the part reviews\n**State:** aggregate-reviews\n\nThe task the coordinator appends beside the part reviews.\n",
     );
-    assert_success(&moved);
+    let loaded =
+        rhei_cli::rhei_validator::StateMachine::from_yaml_file(workspace.join("states.yaml"))
+            .expect("the instantiated machine loads");
+    let chain = [
+        ("aggregate-reviews", "validate-review"),
+        ("validate-review", "propose-fixes"),
+        ("propose-fixes", "aggregate-proposals"),
+        ("aggregate-proposals", "decide"),
+        ("decide", "human-review"),
+        ("human-review", "final-fix"),
+    ];
+    for (from, to) in chain {
+        satisfy_state_outputs(&loaded, &workspace, from, "out.aggregate");
+        let moved = run_into(
+            &[
+                "transition",
+                "out",
+                "--task",
+                "aggregate",
+                "--from",
+                from,
+                "--to",
+                to,
+                "--no-callbacks",
+            ],
+            &dir,
+        );
+        assert!(
+            moved.status.success(),
+            "the chain must walk {from} -> {to}; got:\nstdout:\n{}\nstderr:\n{}",
+            moved.stdout,
+            moved.stderr
+        );
+    }
+}
+
+/// Write every artifact a state owes before a ticket may leave it, resolved for
+/// one task. The machine's own declaration is the contract, so the walk
+/// satisfies it rather than forcing past it. §FS-rhei-states.3.2
+fn satisfy_state_outputs(
+    machine: &rhei_cli::rhei_validator::StateMachine,
+    workspace: &std::path::Path,
+    state: &str,
+    task_id: &str,
+) {
+    let def = machine.states.get(state).unwrap_or_else(|| panic!("the machine declares {state}"));
+    let targets: Vec<String> = if def.all_targets.is_empty() {
+        def.target.clone().into_iter().collect()
+    } else {
+        def.all_targets.clone()
+    };
+    for artifact in &def.outputs {
+        let resolved = artifact.path.replace("{task_id}", task_id);
+        let paths: Vec<String> = if resolved.contains("{target.slug}") {
+            targets
+                .iter()
+                .map(|target| resolved.replace("{target.slug}", &slug_of(target)))
+                .collect()
+        } else {
+            vec![resolved]
+        };
+        for path in paths {
+            let at = workspace.join(path);
+            fs::create_dir_all(at.parent().expect("an artifact path has a parent"))
+                .expect("create the artifact directory");
+            fs::write(&at, "fixture\n").expect("write the artifact the state owes");
+        }
+    }
+}
+
+fn slug_of(selector: &str) -> String {
+    rhei_cli::rhei_validator::parse_execution_target(selector)
+        .expect("a machine's target selector parses")
+        .slug()
 }

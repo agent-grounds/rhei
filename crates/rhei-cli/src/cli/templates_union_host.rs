@@ -1,5 +1,5 @@
-    // The target of a `--into`: which rhei, which parent task, and which
-    // machine file the union is written into.
+    // The target of a `--into`: which rhei, which parent task, which machine
+    // file the union is written into, and the hold taken on all of it.
     // §FS-rhei-library.2 §FS-rhei-library.2.1
 
     /// A rhei a union can be written into, in whichever layout it uses.
@@ -13,6 +13,10 @@
         machine: PathBuf,
         /// The parent task placed tickets go under, rhei-local.
         parent: Option<String>,
+        /// The Panta project the rhei is a member of, which is the settings
+        /// root it resolves and the scope it is validated in.
+        /// §FS-rhei-templates.6.2
+        project: Option<PathBuf>,
     }
 
     /// Resolve `--into <rhei>[.<task>]` the way `rhei new --under` resolves a
@@ -40,6 +44,7 @@
             return Ok(UnionHost {
                 index: root.join("index.rhei.md"),
                 machine: root.join("states.yaml"),
+                project: union_project(root, false),
                 root: root.clone(),
                 single_file: false,
                 parent,
@@ -51,6 +56,7 @@
             return Ok(UnionHost {
                 index: plan,
                 machine: root.join("states.yaml"),
+                project: union_project(&root, true),
                 root,
                 single_file: true,
                 parent,
@@ -199,4 +205,82 @@
             .max()
             .unwrap_or(0)
             + 1
+    }
+
+    /// The host as the union read it, under whatever hold the mode takes.
+    ///
+    /// A union is a read-splice-write of whole files, so the hold has to start
+    /// before the first host read: `new_lock.rs` documents the exact loss
+    /// otherwise — a write that splices a whole file while a completion
+    /// rewrites a `**State:**` line in it silently drops the completion.
+    /// `Drop` releases every lock on every exit path.
+    /// §FS-rhei-library.2 §FS-rhei-new.4
+    struct HeldHost {
+        /// Every ticket id the target holds, and the file each lives in.
+        files: Vec<(PathBuf, Vec<String>)>,
+        /// The scope lock first, then one per destination, in the order they
+        /// were taken. Held for the struct's lifetime and never read.
+        _locks: Vec<NewCreateLock>,
+    }
+
+    /// Read the host under the permanent sibling lock every rewriting command
+    /// takes: the scope lock, then one destination lock per file the placement
+    /// rewrites.
+    ///
+    /// Only a `--into` takes them. An `includes:` entry unions into a freshly
+    /// rendered tree nothing else can see, and a sidecar written there would
+    /// travel into the host with the rest of the bundle; `--dry-run` writes
+    /// nothing at all. §FS-rhei-new.4 §FS-rhei-library.7.1
+    fn hold_host(
+        host: &UnionHost,
+        tickets: &[PartTickets],
+        mode: UnionMode,
+    ) -> MietteResult<HeldHost> {
+        if mode != UnionMode::Place {
+            return Ok(HeldHost { files: host_ticket_files(host)?, _locks: Vec::new() });
+        }
+        let scope = lock_new_create(&host.root)?;
+        let files = host_ticket_files(host)?;
+        let mut locks = vec![scope];
+        for destination in union_destinations(host, &files, tickets) {
+            if locks.iter().any(|lock| same_path(lock.path(), &destination)) {
+                continue;
+            }
+            prepare_destination_lock_parent(&destination)?;
+            if let Some(lock) = lock_new_destination(&locks[0], &destination)? {
+                locks.push(lock);
+            }
+        }
+        Ok(HeldHost { files, _locks: locks })
+    }
+
+    /// The plan files a placement writes. The machine is not among them: no
+    /// other command rewrites `states.yaml`, and the scope lock already
+    /// serializes this union against another. §FS-rhei-new.3.1
+    fn union_destinations(
+        host: &UnionHost,
+        host_files: &[(PathBuf, Vec<String>)],
+        tickets: &[PartTickets],
+    ) -> Vec<PathBuf> {
+        let mut destinations = vec![host.index.clone()];
+        if host.single_file {
+            return destinations;
+        }
+        match host.parent.as_deref() {
+            Some(parent) => destinations.extend(
+                host_files
+                    .iter()
+                    .find(|(_, ids)| ids.iter().any(|id| id == parent))
+                    .map(|(path, _)| path.clone()),
+            ),
+            None => {
+                let mut number = next_task_number(host_files);
+                for file in tickets {
+                    let name = format!("{number:03}-{}.md", file.slug);
+                    destinations.push(host.root.join("tasks").join(name));
+                    number += 1;
+                }
+            }
+        }
+        destinations
     }

@@ -84,6 +84,8 @@ design error rather than as an optimization.
 |---|---|
 | where a ticket's file goes, and its three-digit name | [§FS-rhei-new.3.1](../functional-spec/rhei-new.spec.md#31-where-it-is-written) |
 | the permanent sibling lock a rewriting command takes | [§FS-rhei-new.4](../functional-spec/rhei-new.spec.md#4-ids) |
+| what a write is answerable for, over what it inherited | [§FS-rhei-new.5.2](../functional-spec/rhei-new.spec.md#52-a-create-answers-for-the-errors-it-introduced) |
+| validating a result in its project's terms | [§FS-rhei-templates.6.2](../functional-spec/rhei-templates.spec.md#62-instantiating-inside-a-panta-project) |
 | discovery, input resolution, rendering, settings hoisting | [§FS-rhei-templates.6.1.2](../functional-spec/rhei-templates.spec.md#612-behavior) |
 | the byte discipline a diff of added lines depends on | [§FS-rhei-new.3.1](../functional-spec/rhei-new.spec.md#31-where-it-is-written) |
 | frontmatter rewriting | [§FS-rhei-plan-language.1.2](../functional-spec/rhei-plan-language.spec.md#12-directory-workspace-agent-teams-high-concurrency) |
@@ -100,7 +102,13 @@ authority on travel.
 
 The union is **all-or-nothing against the target**. Every part is rendered,
 unioned and placed in memory; the whole result is validated; only then is
-anything written, under the lock, as one insertion per block. There is no
+anything written, under the lock, as one insertion per block. Validation runs
+over a mirror of the scope the target runs in — the project for a member rhei,
+the rhei's own root outside one — and twice over it, so what decides the outcome
+is the difference between the pass before the union and the pass after it
+([§FS-rhei-library.2](../functional-spec/rhei-library.spec.md#2---into-placing-a-template-into-a-plan)). The mirror carries the plan files and not
+`runtime/`, which is exactly the kind of inherited error the difference
+discounts. There is no
 staging directory, which is why `--keep-on-error` has nothing to keep and is
 refused ([§FS-rhei-library.7.3](../functional-spec/rhei-library.spec.md#73-flags---into-refuses)), and why a refusal leaves the target
 byte-identical without a rollback path to get wrong.

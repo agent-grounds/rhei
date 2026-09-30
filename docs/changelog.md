@@ -357,6 +357,19 @@ pull request number: the release stamps `(PR #N)` onto it. See
   stripped from every clone, so a ticket re-placed at a spent id is halted rather
   than handed a fresh counter ([§FS-rhei-library](functional-spec/rhei-library.spec.md#fs-rhei-library-composition-by-graph-union),
   [§REQ-bounded-neural-work.4](requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)).
+  A union into a member of a Panta project is a project-scoped write: the
+  template's `settings.json` hoists to the project rather than beside the rhei,
+  where nothing reads it, values the project already defines win and the summary
+  names both what was added and what was kept, and the result is validated in
+  the project's terms instead of the member's — so a placement can no longer
+  report success over a project its own machine has just made unloadable. The
+  union answers for the errors it introduced and not for the ones it found, the
+  write takes the permanent sibling lock every rewriting command takes so it
+  serializes against a live `rhei run` rather than racing it, and one state's
+  rhei-scoped artifact path walked by two placed tickets is a warning naming the
+  path and both tickets rather than silence
+  ([§FS-rhei-templates.6.2](functional-spec/rhei-templates.spec.md#62-instantiating-inside-a-panta-project),
+  [§FS-rhei-new.4](functional-spec/rhei-new.spec.md#4-ids)).
   `--mount`, `--seam`, `--pass`, `composition.lock.json`, `runtime/blocks/` and
   the manifest's `ports`, `data`, `expose`, `use`, `bind`, `seams`,
   `compatibility` and `select` fields are gone, and the removed flags name

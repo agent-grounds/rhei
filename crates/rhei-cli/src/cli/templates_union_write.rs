@@ -69,10 +69,17 @@
     /// §FS-rhei-library.2 §FS-rhei-library.3.1
     fn copy_bundled_files(
         part_root: &Path,
-        host_root: &Path,
+        host: &UnionHost,
         writes: &mut UnionWrites,
     ) -> MietteResult<()> {
         let skip = ["index.rhei.md", "plan.rhei.md", "states.yaml", "README.md", "tasks"];
+        // Inside a project the settings file is the one bundled file that does
+        // not travel beside the rhei: a member resolves the project's, so a
+        // copy here would be read by nothing. §FS-rhei-templates.6.2
+        let hoist = host.project.as_deref().and_then(|project| {
+            resolve_rhei_home_file(part_root, WORKSPACE_SETTINGS_FILE)
+                .map(|found| (found.into_path(), project))
+        });
         let mut entries: Vec<PathBuf> = fs::read_dir(part_root)
             .map_err(|err| file_io_report(part_root, "failed to read the rendered template", err))?
             .filter_map(Result::ok)
@@ -86,7 +93,7 @@
             if skip.contains(&name) {
                 continue;
             }
-            copy_bundled_path(&entry, &host_root.join(name), writes)?;
+            copy_bundled_path(&entry, &host.root.join(name), hoist.as_ref(), writes)?;
         }
         Ok(())
     }
@@ -96,6 +103,7 @@
     fn copy_bundled_path(
         src: &Path,
         dst: &Path,
+        hoist: Option<&(PathBuf, &Path)>,
         writes: &mut UnionWrites,
     ) -> MietteResult<()> {
         if src.is_dir() {
@@ -107,9 +115,14 @@
             entries.sort();
             for entry in entries {
                 let Some(name) = entry.file_name() else { continue };
-                copy_bundled_path(&entry, &dst.join(name), writes)?;
+                copy_bundled_path(&entry, &dst.join(name), hoist, writes)?;
             }
             return Ok(());
+        }
+        if let Some((source, project)) = hoist {
+            if same_path(src, source) {
+                return hoist_settings_into_project(src, project, writes);
+            }
         }
         if dst.exists() {
             let (left, right) = (fs::read(src), fs::read(dst));
@@ -135,7 +148,16 @@
     }
 
     /// Validate the whole result before anything is written, by mirroring the
-    /// target's plan files with the union applied. §AR-rhei-library.5
+    /// target's plan files and comparing the pass before the union with the one
+    /// after it.
+    ///
+    /// Two passes, because a union answers for the errors it *introduced* and
+    /// not for the ones it found — the same reading `rhei new` takes of its own
+    /// write (§FS-rhei-new.5.2). The mirror carries no `runtime/`, so a host
+    /// ticket whose result block links an artifact is already failing there
+    /// before the union touches anything, and a project may hold a defect of a
+    /// member the union never read. Neither is the placement's to refuse.
+    /// §AR-rhei-library.5
     fn validate_union(host: &UnionHost, writes: &UnionWrites) -> MietteResult<()> {
         let scratch = tempfile::tempdir().map_err(|err| {
             miette!(
@@ -144,23 +166,73 @@
                 "failed to create the validation directory: {err}"
             )
         })?;
-        let mirror = scratch.path().join("target");
-        mirror_plan_files(&host.root, &mirror)?;
+        // Named after the scope it copies: an id-qualified `> **Result:**` link
+        // in the host's own tickets stops resolving the moment the copy of a
+        // rhei is called something else. §FS-rhei-panta.2
+        let mirror = scratch.path().join(scope_name(host));
+        // A member rhei is only correct in the project's terms — the settings
+        // its machine names and the default it may inherit both resolve there —
+        // so that is the scope mirrored and validated. §FS-rhei-templates.6.2
+        let scope = match host.project.as_deref() {
+            Some(project) => {
+                mirror_project_files(project, &mirror)?;
+                project
+            }
+            None => {
+                mirror_plan_files(&host.root, &mirror)?;
+                host.root.as_path()
+            }
+        };
+        let entrypoint = if host.single_file && host.project.is_none() {
+            let name = host.index.file_name().unwrap_or_default();
+            mirror.join(name)
+        } else {
+            mirror.clone()
+        };
+        let inherited = union_validation_errors(&entrypoint);
         for (path, contents) in &writes.files {
-            write_mirrored(&host.root, &mirror, path, contents.as_bytes())?;
+            write_mirrored(scope, &mirror, path, contents.as_bytes())?;
         }
         for (src, dst) in &writes.copies {
             let bytes = fs::read(src)
                 .map_err(|err| file_io_report(src, "failed to read a template file", err))?;
-            write_mirrored(&host.root, &mirror, dst, &bytes)?;
+            write_mirrored(scope, &mirror, dst, &bytes)?;
         }
-        let entrypoint = if host.single_file {
-            let name = host.index.file_name().unwrap_or_default();
-            mirror.join(name)
-        } else {
-            mirror
-        };
-        validation_warnings_or_error(&entrypoint, None).map(|_| ())
+        match validation_pass(&entrypoint, None) {
+            Ok(pass) => {
+                let introduced = errors_introduced_over(&inherited, pass.errors);
+                if introduced.is_empty() {
+                    return Ok(());
+                }
+                Err(validation_report(
+                    &entrypoint,
+                    &pass.state_machine_sources,
+                    &introduced,
+                    &pass.help,
+                ))
+            }
+            // Unloadable before the union and unloadable in the same way after
+            // it: there is nothing here the placement is answerable for.
+            Err(report) if inherited.contains(&report.to_string()) => Ok(()),
+            Err(report) => Err(report),
+        }
+    }
+
+    /// Every error the mirrored scope's validation finds right now, as plain
+    /// strings — a scope that does not load at all reducing to the one report
+    /// it failed with, so one set difference decides that case too.
+    /// §FS-rhei-new.5.2
+    fn union_validation_errors(entrypoint: &Path) -> Vec<String> {
+        match validation_pass(entrypoint, None) {
+            Ok(pass) => pass.errors,
+            Err(report) => vec![report.to_string()],
+        }
+    }
+
+    /// The name the validation copy takes, which has to be the scope's own.
+    fn scope_name(host: &UnionHost) -> &std::ffi::OsStr {
+        let scope = host.project.as_deref().unwrap_or(&host.root);
+        scope.file_name().unwrap_or_else(|| std::ffi::OsStr::new("target"))
     }
 
     /// Copy the files a rhei's validation reads, and only those: a `runtime/`

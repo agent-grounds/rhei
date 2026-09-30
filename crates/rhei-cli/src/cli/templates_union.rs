@@ -36,7 +36,9 @@
         declaration: &MachineDeclaration,
         mode: UnionMode,
     ) -> MietteResult<()> {
-        let writes = plan_union(host, part, declaration)?;
+        let tickets = read_part_tickets(&part.root)?;
+        let held = hold_host(host, &tickets, mode)?;
+        let writes = plan_union(host, part, declaration, tickets, &held.files)?;
         // An entry is validated with the rest: an including template's own
         // machine names states its parts bring, so it is a fragment until
         // every entry has joined it. §FS-rhei-library.6 §AR-rhei-library.5
@@ -81,12 +83,13 @@
         host: &UnionHost,
         part: &RenderedPart,
         declaration: &MachineDeclaration,
+        mut tickets: Vec<PartTickets>,
+        host_files: &[(PathBuf, Vec<String>)],
     ) -> MietteResult<UnionWrites> {
         let mut writes = UnionWrites::default();
         let machine_path = part.root.join("states.yaml");
         let part_machine = PartMachine::load(&part.name, &machine_path)?;
 
-        let mut tickets = read_part_tickets(&part.root)?;
         let part_index = part.root.join("index.rhei.md");
         let part_plan = part.root.join("plan.rhei.md");
         let part_header = [part_index, part_plan]
@@ -119,16 +122,16 @@
         }
         strip_identity(&mut task_metadata);
 
-        let host_files = host_ticket_files(host)?;
         let placed: Vec<String> = tickets.iter().flat_map(|file| file.ids.clone()).collect();
         check_depth(&placed)?;
-        check_id_collisions(&placed, &host_files)?;
+        check_id_collisions(&placed, host_files)?;
         if let Some(parent) = host.parent.as_deref() {
-            check_parent_exists(parent, &host_files)?;
+            check_parent_exists(parent, host_files)?;
         }
 
         let host_machine_text = read_text(&host.machine)?;
         check_artifact_paths(&host_machine_text, &part_machine)?;
+        warn_shared_artifact_paths(&part_machine, &tickets);
         let mut machine = union_machine(&host_machine_text, &part_machine)?;
         if !machine.ends_with('\n') {
             machine.push('\n');
@@ -166,9 +169,9 @@
             writes.files.push((host.index.clone(), index));
         } else {
             writes.files.push((host.index.clone(), index));
-            place_workspace_tickets(host, &host_files, &tickets, &mut writes)?;
+            place_workspace_tickets(host, host_files, &tickets, &mut writes)?;
         }
-        copy_bundled_files(&part.root, &host.root, &mut writes)?;
+        copy_bundled_files(&part.root, host, &mut writes)?;
         writes.notes.push(format!(
             "{} ticket(s) placed, {} state(s) brought",
             placed.len(),
@@ -263,48 +266,6 @@
                 map.remove(YamlValue::String("budgetTicketId".into()));
             }
         }
-    }
-
-    /// Two states declaring one rhei-scoped artifact path — no per-task
-    /// variable in it — is a union-time collision. §FS-rhei-library.7.2
-    fn check_artifact_paths(host_text: &str, part: &PartMachine) -> MietteResult<()> {
-        let host: YamlValue = serde_yaml::from_str(host_text).unwrap_or(YamlValue::Null);
-        let mut claimed: BTreeMap<String, String> = BTreeMap::new();
-        for (source, states) in [(&host, "the target"), (&part.value, part.name.as_str())] {
-            let _ = states;
-            let Some(YamlValue::Mapping(states)) = source.get("states") else {
-                continue;
-            };
-            for (name, def) in states {
-                let Some(name) = name.as_str() else { continue };
-                for key in ["inputs", "outputs"] {
-                    let Some(YamlValue::Sequence(items)) = def.get(key) else { continue };
-                    for item in items {
-                        let Some(path) = item.get("path").and_then(YamlValue::as_str) else {
-                            continue;
-                        };
-                        if path.contains("{task_id}") {
-                            continue;
-                        }
-                        match claimed.get(path) {
-                            Some(other) if other != name => {
-                                return Err(miette!(
-                                    help = "put `{task_id}` in the path, or have one of the two \
-                                            states declare a path of its own.",
-                                    "states '{other}' and '{name}' both declare the rhei-scoped \
-                                     artifact path '{path}'"
-                                ));
-                            }
-                            Some(_) => {}
-                            None => {
-                                claimed.insert(path.to_owned(), name.to_owned());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
     }
 
     /// The node kinds a rendered template's index declares.

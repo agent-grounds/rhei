@@ -157,12 +157,14 @@
             })?;
             let part_root = scratch.path().join(&included.name);
             let part = render_part(included_dir, &included, values, &part_root, entry.under())?;
+            let single_file = layout == TemplateLayout::SingleFile;
             let host = UnionHost {
                 root: rendered.to_path_buf(),
                 index: index.clone(),
-                single_file: layout == TemplateLayout::SingleFile,
+                single_file,
                 machine: rendered.join("states.yaml"),
                 parent: entry.under().map(str::to_owned),
+                project: union_project(rendered, single_file),
             };
             let declaration = resolve_host_machine(&host)?;
             union_into_host(&host, &part, &declaration, UnionMode::Compose).map_err(|err| {

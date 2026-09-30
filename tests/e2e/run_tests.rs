@@ -936,66 +936,6 @@ transitions:
 }
 
 #[test]
-fn changeset_review_human_review_state_is_gating_in_shipped_workflows() {
-    let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .expect("repo root");
-    let example_path = repo_root.join("examples/changeset-review-example/states.yaml");
-    let example_yaml = fs::read_to_string(&example_path).expect("read example states.yaml");
-    let machine = rhei_cli::rhei_validator::StateMachine::from_yaml_str(&example_yaml)
-        .unwrap_or_else(|err| panic!("parse {}: {err}", example_path.display()));
-    let human_review = machine
-        .states
-        .get("human-review")
-        .unwrap_or_else(|| panic!("{} missing human-review state", example_path.display()));
-    assert!(human_review.gating, "{} should mark human-review as gating", example_path.display());
-    assert!(
-        machine
-            .transitions
-            .iter()
-            .any(|rule| rule.from.0 == "decide" && rule.to.0 == "human-review"),
-        "{} should route final decisions through human-review",
-        example_path.display()
-    );
-    assert!(
-        machine
-            .transitions
-            .iter()
-            .any(|rule| rule.from.0 == "human-review" && rule.to.0 == "prepare-workspace"),
-        "{} should require human approval before workspace preparation",
-        example_path.display()
-    );
-
-    let template_path = repo_root.join("crates/rhei-cli/templates/changeset-review/states.yaml");
-    let template = fs::read_to_string(&template_path).expect("read template states.yaml");
-    let start = template
-        .find("\n  human-review:\n")
-        .unwrap_or_else(|| panic!("{} missing human-review block", template_path.display()));
-    let end = template[start + 1..]
-        .find("\n  fix-spawn:\n")
-        .map(|offset| start + 1 + offset)
-        .unwrap_or(template.len());
-    let human_review_block = &template[start..end];
-    assert!(
-        human_review_block.contains("\n    gating: true\n"),
-        "{} should mark human-review as gating",
-        template_path.display()
-    );
-    assert!(
-        template.contains("\n  - from: decide\n    to: human-review\n"),
-        "{} should route final decisions through human-review",
-        template_path.display()
-    );
-    assert!(
-        template.contains("\n  - from: human-review\n    to: prepare-workspace\n")
-            && template.contains("\n  - from: human-review\n    to: final-fix\n"),
-        "{} should require human approval before either fix path",
-        template_path.display()
-    );
-}
-
-#[test]
 fn run_prefers_agent_mode_for_model_declared_workflows_without_falling_back_to_callbacks() {
     let (_dir, ws, machine_path) = create_workspace(
         "run-model-declared-agent-mode",

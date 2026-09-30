@@ -61,8 +61,9 @@ same reason `--under` is: the positional arguments are the template's inputs.
 Rendering, input collection and settings hoisting are the single-template path
 unchanged ([§FS-rhei-templates.6.1.2](rhei-templates.spec.md#612-behavior) steps 3–5;
 `settings.json` hoists as [§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project) specifies, to the project
-inside one and to the rhei's own settings root outside one). What `--into` adds
-is where the result goes:
+inside one and to the rhei's own settings root outside one, and nothing is left
+beside a member rhei, whose own settings root is read by nothing). What `--into`
+adds is where the result goes:
 
 1. The rendered index's **title and description are dropped** — the host's index
    describes the composition. Its frontmatter unions ([§FS-rhei-library.4](rhei-library.spec.md#4-placement-ids-tickets-and-frontmatter)).
@@ -76,11 +77,25 @@ is where the result goes:
    ([§FS-rhei-new.3.1](rhei-new.spec.md#31-where-it-is-written)) with their ids re-parented ([§FS-rhei-library.4](rhei-library.spec.md#4-placement-ids-tickets-and-frontmatter)).
 5. One fence comment records the inclusion ([§FS-rhei-library.7.1](rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-provenance)).
 
+The union is validated **in the scope the target actually runs in**, and
+nothing is written until it passes. For a member rhei that scope is its project:
+its settings and its machine both resolve there, so a union validated against
+the member alone can report success over a write that leaves every
+project-scoped command failing — the isolation
+[§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project)'s "Validation scope" already names for
+`--output`. Outside a project the rhei's own root is the scope. Either way the
+union answers for the errors it **introduced**: a defect the scope already
+carried — a member the union never read, a result artifact outside the plan
+files — is not a placement's to refuse, which is the same reading `rhei new`
+takes of its own write ([§FS-rhei-new.5.2](rhei-new.spec.md#52-a-create-answers-for-the-errors-it-introduced)).
+
 The write takes the permanent sibling lock every rewriting command takes
-([§FS-rhei-new.4](rhei-new.spec.md#4-ids)), so a union into a rhei with a live `rhei run` serializes
-against it rather than racing it, and it keeps the host's bytes and inserts the
-template's rendered entries at the end of each block — so a `git diff` after
-`--into` shows the added lines and nothing else. The placed tickets are appended
+([§FS-rhei-new.4](rhei-new.spec.md#4-ids)) — the scope's own sidecar and each plan file the
+placement rewrites, from before the first host read through the write — so a
+union into a rhei with a live `rhei run` serializes against it rather than
+racing it, and it keeps the host's bytes and inserts the template's rendered
+entries at the end of each block, so a `git diff` after `--into` shows the added
+lines and nothing else. The placed tickets are appended
 work, which creates no capacity: the project's invocation and spend accounts are
 exactly where they were ([§REQ-bounded-neural-work.4](../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)).
 
@@ -132,6 +147,15 @@ exist twice in one machine takes a prefix as a declared input.
 
 One definition standing for several identically named ones is therefore the
 ordinary case of a union rather than an exception to single ownership.
+
+`settings.json` is the one bundled file the rule applies to **key by key**
+rather than whole. Two templates that each declare an agent of their own declare
+two agents, and one key both set differently is a refusal naming it — the
+granularity [§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project) already merges at, and what lets
+`changeset-review` compose out of two templates that each ship one agent. Where
+the destination is a project, that section's precedence governs instead of a
+refusal: values the project already defines win, and the summary names both what
+was added and what was kept.
 
 For a **terminal** the rule is not a name test. Two terminals coalesce when
 `final: true` holds on both, neither has an outgoing exact transition, and both

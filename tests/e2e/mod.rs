@@ -74,6 +74,7 @@ mod installed_state_machine_guidance_tests;
 mod instantiate_output_default_tests;
 mod into_identity_tests;
 mod into_placement_tests;
+mod into_project_tests;
 mod into_refusal_tests;
 mod into_states_declaration_tests;
 mod into_support;

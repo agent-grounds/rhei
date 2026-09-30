@@ -34,6 +34,29 @@ pub struct EffectiveBounds {
     pub spend_per_day: u64,
 }
 
+/// Whose ancestor, and not only which one.
+///
+/// A reservation name says *which* reservation and never *whose*, and an
+/// ancestor is meaningful only in the journal that holds it: the same name in
+/// another project's ledger is not a dead ancestor, it is somebody else's live
+/// one. The minting account is what lets a child tell those two apart, and
+/// `origin` is how a caller lends its own provenance to a refusal without this
+/// layer learning where any caller reads its values from.
+/// §FS-rhei-budgets.7.1 §AR-neural-admission.6
+#[derive(Clone, Copy, Debug)]
+pub struct AncestryDescriptor<'a> {
+    /// The reservation the caller claims as its ancestor.
+    pub reservation: &'a str,
+    /// The account that minted `reservation`, where the caller knows it. Absent
+    /// is "take it as this project's", which is what a caller too old to say
+    /// whose it is gets, and it must lose nothing by it. §FS-rhei-budgets.7.1
+    pub account: Option<&'a str>,
+    /// A phrase naming where the value came from, interpolated into a refusal
+    /// so that `no such reservation` does not read as damaged budget state.
+    /// Absent leaves the refusal as it was. §FS-rhei-budgets.7.1
+    pub origin: Option<&'a str>,
+}
+
 pub struct AdmissionRequest<'a> {
     pub ticket_identity: &'a str,
     /// How the halt names the ticket: its display id, not its uuid.
@@ -44,7 +67,7 @@ pub struct AdmissionRequest<'a> {
     /// the proof of non-start. §FS-rhei-budgets.6.2
     pub execution_root: &'a str,
     pub arms: &'a [Arm<'a>],
-    pub parent_reservation: Option<&'a str>,
+    pub parent_reservation: Option<AncestryDescriptor<'a>>,
     /// Whether this admission holds a travel unit for the edge the visit is
     /// expected to apply. A spawn that cannot move the ticket holds none.
     pub travel: bool,
@@ -256,7 +279,7 @@ impl Journal {
                 "attempt_identity": arm.attempt_identity,
                 "ticket_identity": request.ticket_identity,
                 "display_id": request.display_id,
-                "parent_reservation": request.parent_reservation,
+                "parent_reservation": request.parent_reservation.map(|d| d.reservation),
                 "descendant_envelope": arm.descendant_envelope,
                 "execution_root": request.execution_root,
                 "invocation_units": 1,
@@ -405,9 +428,10 @@ impl Journal {
         &self,
         request: &AdmissionRequest<'_>,
     ) -> Result<Option<(String, u64)>> {
-        let Some(parent) = request.parent_reservation else {
+        let Some(descriptor) = request.parent_reservation else {
             return Ok(None);
         };
+        let parent = descriptor.reservation;
         let unavailable = |why: &str| {
             BudgetError::new(
                 "ancestor_unavailable",

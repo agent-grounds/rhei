@@ -554,10 +554,10 @@ append no receipt, and debit nothing.
 
 ## 7. Nested runs
 
-A nested `rhei run` inherits the project and its one account through an
-authenticated ancestry path, and **opens no balance of its own**. Every
-descendant admission charges the shared account and must additionally fit its
-ancestor's reservation envelope and deadline.
+A nested `rhei run` **of the same project** inherits that project and its one
+account through an authenticated ancestry path, and **opens no balance of its
+own**. Every descendant admission charges the shared account and must
+additionally fit its ancestor's reservation envelope and deadline.
 
 An absent, finished, envelope-less, or exhausted ancestor is a typed refusal
 before spawn, naming which of the four it is. Each nested neural start is
@@ -568,19 +568,75 @@ reservation an ancestor already holds.
 Ancestry is the one door through which anything a program does is counted
 ([§REQ-bounded-neural-work.6](../requirements/bounded-neural-work.spec.md#6-the-residual-gap)).
 
+An envelope bounds **the account that minted it**, and that is what decides the
+one nested run which is no descendant at all. A `rhei run` whose own account is
+not the one holding the ancestor was never inside that envelope, so opening a
+balance in its own ledger is the *absence* of an envelope to escape rather than
+an escape from one. Such a run is still counted — on its own project's bounds,
+§FS-rhei-budgets.7.2 — and what §REQ-bounded-neural-work.6 forbids is work
+counted **nowhere**. Reading that fallback as an escape hatch from the
+requirement has it backwards: the hatch would be to charge an account this run
+has no claim on.
+
 ### 7.1. How the descriptor reaches a nested run
 
-`RHEI_BUDGET_PARENT_RESERVATION` is set in the environment of every agent Rhei
-starts, naming the reservation that invocation was admitted on. A `rhei run`
-started inside that agent reads it and places its own admissions under that
-ancestor.
+Two variables are set **together** in the environment of every agent Rhei
+starts, and they are one descriptor rather than two facts:
+`RHEI_BUDGET_PARENT_RESERVATION` names the reservation that invocation was
+admitted on, and `RHEI_BUDGET_PARENT_ACCOUNT` names the account that minted it.
+A `rhei run` started inside that agent reads both, and asks whose the descriptor
+is before asking what the ledger holds — identity first, then the journal
+([§AR-neural-admission.6](../architecture/neural-admission.spec.md#6-ancestry)).
+The three answers differ in kind:
 
-It carries no credential, because there is nothing to credential: a descendant
-charges the same account through the same locks, and the ledger is what decides
-whether the name it was given buys anything ([§AR-neural-admission.6](../architecture/neural-admission.spec.md#6-ancestry)). A value
-naming a reservation this project's journal does not hold, or one that is not
-outstanding, is `ancestor_unavailable` before any spawn — which is why forging
-it buys nothing rather than buying a fresh balance.
+- **The accounts match.** The reservation is an ancestor of this run, and the
+  run places its own admissions under it. The descriptor carries no credential,
+  because there is nothing to credential: a descendant charges the same account
+  through the same locks, and the ledger is what decides whether the name it was
+  given buys anything. A value naming a reservation this project's journal does
+  not hold, or one that is not outstanding, is `ancestor_unavailable` before any
+  spawn — which is why forging it buys nothing rather than buying a fresh
+  balance.
+- **The accounts differ.** The descriptor was minted for another project and
+  names no ancestor of this run. This is not `ancestor_unavailable`, because
+  nothing was unavailable: there was no ancestry to authenticate. The run is
+  admitted unparented against its own account and says so once
+  (§FS-rhei-budgets.7.2).
+- **`RHEI_BUDGET_PARENT_ACCOUNT` is absent.** The reservation is taken as an
+  ancestor exactly as it is when the accounts match, refusal included. A parent
+  too old to name its account is the only thing that produces this case, and it
+  must lose nothing by it: the reservation variable's meaning and format are
+  unchanged, so anything that worked before the account variable existed works
+  after it.
+
+A refusal on this path names **where the value came from** as well as which
+value it was. `no such reservation` alone reads as damaged budget state and
+sends a reader to the account directory rather than to the environment, which is
+the wrong half of the machine.
+
+### 7.2. A descriptor minted for another project
+
+A run whose account is not the one holding the ancestor is admitted
+**unparented**: it draws nothing against the exporter's envelope, it is not held
+to the exporter's deadline, and the receipt it writes names no parent. It is not
+thereby unbounded. It is held to its own project's three bounds of
+§FS-rhei-budgets.1, resolved from that project's settings and clamped by the
+machine ceiling ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)), exactly as an unparented run always has
+been.
+
+The run says so **once**, as a note rather than a warning: nothing is wrong, and
+a warning invites someone to fix what is working. Once per `rhei run` — not once
+per admission and not once per pair of accounts — because the fact is a property
+of the run's environment and does not change while the run lasts, so a plan of
+thirty tickets repeats it no more than a plan of one. The note names the
+reservation, the project the descriptor was minted for, and the account this run
+charges instead, each by the directory a reader would recognize where that is
+known and by uuid where it is not ([§FS-rhei-budgets.8](rhei-budgets.spec.md#8-exhaustion)).
+
+This is the case that lets Rhei's own suite, and any `rhei run` of a plan
+outside the ancestor's project, run from inside an agent at all: each resolves a
+state root of its own, so each is a child of an account the descriptor was never
+minted for.
 
 ## 8. Exhaustion
 

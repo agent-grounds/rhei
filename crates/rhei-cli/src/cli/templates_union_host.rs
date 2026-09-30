@@ -120,7 +120,7 @@
                 miette!(
                     help = "a state machine names itself with a top-level `name:`.",
                     "'{}' declares no machine name",
-                    display_path(&host.machine).display()
+                    display_slash(&host.machine)
                 )
             })?;
         match declared {
@@ -129,11 +129,11 @@
                 help = format!(
                     "make them agree: either declare `**States:** {name}` in the index, or \
                      rename the machine in {}.",
-                    display_path(&host.machine).display()
+                    display_slash(&host.machine)
                 ),
                 "'{}' declares `**States:** {declared}`, but '{}' is named '{name}'",
-                display_path(&host.index).display(),
-                display_path(&host.machine).display()
+                display_slash(&host.index),
+                display_slash(&host.machine)
             )),
             None => Ok(MachineDeclaration::Write(name)),
         }
@@ -143,12 +143,12 @@
     /// remedies: while resolution is today's, the copy alone changes nothing.
     /// §FS-rhei-library.2.1
     fn no_machine_of_its_own(host: &UnionHost, declared: Option<&str>) -> Report {
-        let machine = display_path(&host.machine).display().to_string();
+        let machine = display_slash(&host.machine);
         let project = host
             .root
             .parent()
             .and_then(enclosing_project_for_new_rhei)
-            .map_or_else(|| "<project>".to_owned(), |dir| display_path(&dir).display().to_string());
+            .map_or_else(|| "<project>".to_owned(), |dir| display_slash(&dir));
         let declaration = declared.map_or("<name>", |name| name);
         miette!(
             help = format!(
@@ -157,10 +157,10 @@
                  **States:** {declaration}   (add this line to {})\n\
                  The rhei then stops following the project default: what the project changes \
                  later no longer reaches it.",
-                display_path(&host.index).display()
+                display_slash(&host.index)
             ),
             "'{}' has no states.yaml of its own, so a union written there would be inert",
-            display_path(&host.root).display()
+            display_slash(&host.root)
         )
     }
 

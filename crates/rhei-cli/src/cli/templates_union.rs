@@ -58,7 +58,7 @@
         println!(
             "Placed template '{}' into '{}'.",
             part.name,
-            display_path(&host.index).display()
+            display_slash(&host.index)
         );
         for note in &writes.notes {
             println!("  {note}");
@@ -150,7 +150,7 @@
             MachineDeclaration::Write(name) => {
                 writes.notes.push(format!(
                     "added `**States:** {name}` to {}, without which the union would be inert",
-                    display_path(&host.index).display()
+                    display_slash(&host.index)
                 ));
                 Some(name.as_str())
             }
@@ -459,7 +459,7 @@
                     with `includes:` here or with `rhei instantiate --into <rhei>` at the \
                     call site.",
             "'{}' declares {}, which the block compiler owned and graph union replaced",
-            display_path(manifest_path).display(),
+            display_slash(manifest_path),
             declared.join(", ")
         ))
     }

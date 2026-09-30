@@ -73,6 +73,18 @@ pass `--state-machine`.
    the same precedence and selector-bypass rules as execution, so it does not
    reject a shadowed settings fallback or speculate about a mode when no agent
    is effective. [§FS-rhei-agents.1.4.1](rhei-agents.spec.md#141-mode-resolution-order) [§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification)
+
+   Validation also resolves each non-gating, non-final state's effective agent
+   invocations and rejects one that resolves to no finite `agent_timeout`
+   through the four-level chain, naming the state and the agent
+   (§FS-rhei-agents.3.2.2). It resolves through the same function execution
+   spawns through, per task identity, so a `**Target:**` override is judged as
+   it would be spawned and a fan-out is judged member by member; and it honors
+   execution's own exemption, so `rhei run --no-agent`, which resolves no agent
+   invocation, resolves nothing to reject. `rhei validate` itself judges the
+   plan as it would run with agents. Like the mode check, this is a statically
+   decidable property of the effective agent binding, so it is decided here
+   rather than at the spawn that consumes it.
 4. Validate snapshot plan context and report orphaned snapshot diagnostics as
    warnings when a snapshot cache exists. [§FS-rhei-snapshot-operations](rhei-snapshot-operations.spec.md#fs-rhei-snapshot-operations-rhei-snapshot-operations-specification)
 5. Report every ticket that reached a successful terminal state while one of

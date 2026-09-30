@@ -208,6 +208,8 @@ The state machine writer follows this process:
    - Non-terminal states encode their exit conditions structurally — through required `outputs:` artifacts and through transition `condition` / `exit_code` fields — not in prose inside `instructions`. Gating states must instead tell the human reader not to transition autonomously.
    - Under `orchestrator` authority, every non-gating, non-final state resolves to a finite `agent_timeout` or `program_timeout` at some level of the timeout chain; see [Agents Specification — Timeout Requirement](rhei-agents.spec.md#322-timeout-requirement).
 
+     The two halves are not held to the same standard, and it is worth knowing which is which before a plan is launched. The `agent_timeout` half is **engine-checked**: a state that resolves to an agent invocation with no finite `agent_timeout` is rejected by `rhei validate`, by `rhei run --dry-run` and by `rhei run` alike, so the writer hears it from the tool (§FS-rhei-agents.3.2.2). The `program_timeout` half is checked **nowhere** — not by validation, not by the run — and stays an obligation the writer is trusted with: a `program:` state with no `program_timeout` at any level passes every check today. That asymmetry is written here rather than left implicit, because a writer who reads this step as one rule will assume the tool enforces both; until the program half is enforced too, review a machine's program states by hand.
+
 10. **Write the YAML file.** Emit the file conforming to the YAML State Machine Format.
 
 11. **Validate with the CLI.** If the `rhei` CLI is available, run `rhei states --state-machine <path>` to verify the file parses correctly.

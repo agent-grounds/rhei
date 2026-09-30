@@ -105,11 +105,15 @@ impl Dialect {
         }
     }
 
-    /// A path as one shell word. Quoted through the same rule a bare value
-    /// takes, so a path holding a space is one argument rather than two.
-    /// §FS-rhei-budgets.10
+    /// A path as one shell word, so a path holding a space is one argument
+    /// rather than two — and, under `cmd`, so a path holding a `/` is an
+    /// argument at all. §FS-rhei-budgets.10
     fn path(self, path: &Path) -> String {
-        self.quote(&path.display().to_string())
+        let text = path.display().to_string();
+        match self {
+            Self::Posix => quote_for_posix(&text),
+            Self::Cmd => quote_for_cmd_path(&text),
+        }
     }
 
     fn copy(self, from: &Path, to: &Path) -> String {
@@ -170,6 +174,11 @@ fn quote_for_posix(value: &str) -> String {
 /// beginning with an apostrophe — and no backslash escape either, since a
 /// backslash is its path separator. Doubling is how a literal `"` is written
 /// inside a quoted argument.
+///
+/// A `/` stays safe here, where the value is a word rather than a path `cmd`
+/// itself is handed: it is ordinary inside one, and a bare `ls -ld a/b/c.md` is
+/// what a printed hint wants. What a `/` costs in the other case is
+/// [`quote_for_cmd_path`]'s business.
 fn quote_for_cmd(value: &str) -> String {
     if value.is_empty() {
         return "\"\"".to_string();
@@ -197,6 +206,27 @@ fn quote_for_cmd(value: &str) -> String {
         return value.to_string();
     }
     format!("\"{}\"", value.replace('"', "\"\""))
+}
+
+/// A path `cmd` is handed: quoted whenever it carries a `/`, which `cmd` reads
+/// as beginning an *option* rather than as the separator Windows itself accepts.
+///
+/// Both bases this tool prints are one joined constant apiece —
+/// `rhei/budget-authority` and `.agent-grounds/rhei/budgets` — so every remedy it
+/// offers carries slashes into the middle of a path. Unquoted, `mkdir` was handed
+/// a `/rhei` switch and answered "The syntax of the command is incorrect", and
+/// `copy` could not find a source name it had read a switch out of. Inside quotes
+/// `cmd` parses no options and the file API takes either separator, so the path
+/// reaches the program as written.
+///
+/// A path, not every printed word: [`quote_for_cmd`] leaves a `/` bare, because
+/// `ls -ld /etc/shadow` is a hint *about* a path rather than a path `cmd` is
+/// given. §REQ-cross-platform.2
+fn quote_for_cmd_path(value: &str) -> String {
+    if value.contains('/') {
+        return format!("\"{}\"", value.replace('"', "\"\""));
+    }
+    quote_for_cmd(value)
 }
 
 /// `path` without the `\\?\` verbatim prefix Windows canonicalization adds.
@@ -320,6 +350,14 @@ mod tests {
         // escape: `cmd` never reads one as escaping the quote.
         assert_eq!(quote_for_cmd(r"C:\a b\"), r#""C:\a b\""#);
         assert_eq!(quote_for_cmd("50%"), r#""50%""#);
+        // A `/` is ordinary in a word: a printed hint wants `ls -ld a/b/c.md`.
+        assert_eq!(quote_for_cmd("a/b/c.md"), "a/b/c.md");
+        // In a path `cmd` is handed it begins an option, so that one is quoted.
+        assert_eq!(
+            quote_for_cmd_path(r"C:\p\.agent-grounds/rhei/budgets\u"),
+            r#""C:\p\.agent-grounds/rhei/budgets\u""#
+        );
+        assert_eq!(quote_for_cmd_path(r"C:\p\u"), r"C:\p\u");
     }
 
     /// The two commands a printed remedy is made of, in both dialects, on
@@ -352,6 +390,18 @@ mod tests {
         );
         // `-p` is a directory name to `cmd`, which makes the whole chain anyway.
         assert_eq!(Dialect::Cmd.make_directory(Path::new(r"C:\w\b")), r"mkdir C:\w\b");
+        // The spelling these two paths actually have: the account and witness
+        // bases are one joined constant each, slashes and all, so every printed
+        // remedy carries a `/` that `cmd` would otherwise read as an option.
+        let mixed = Path::new(r"C:\p\.agent-grounds/rhei/budgets\u");
+        assert_eq!(
+            Dialect::Cmd.make_directory(mixed),
+            r#"mkdir "C:\p\.agent-grounds/rhei/budgets\u""#
+        );
+        assert_eq!(
+            Dialect::Cmd.copy(Path::new(r"C:\s\rhei/budget-authority\u\history.jsonl"), mixed),
+            r#"copy "C:\s\rhei/budget-authority\u\history.jsonl" "C:\p\.agent-grounds/rhei/budgets\u""#
+        );
     }
 
     /// The public pair is this platform's dialect and nothing else, so a caller

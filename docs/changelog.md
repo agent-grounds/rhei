@@ -38,6 +38,23 @@ pull request number: the release stamps `(PR #N)` onto it. See
   own directory, that the checkout is not one, and that where a spawned process
   writes is chosen rather than derived from where it stands.
 
+- Let a machine name its price book once. `defaults.prices` in the machine or
+  project settings file holds the path to a `rhei.accounting.prices.v1` book and
+  supplies the default value of `rhei run --prices` — nothing more: the flag
+  still wins, a selected book is still taken wholesale and still bypasses
+  profile-book construction, and `rhei summary` is untouched. The key was
+  accepted and silently dropped before, so a machine that wrote it ran on the
+  built-in book's one `claude-sonnet-4-6` entry and recorded every other model
+  `unpriced`. The path is fixed when settings merge — `~` expands, a relative
+  path resolves beside the settings file that declared it — and opened only when
+  a run prices, so `rhei roster`, `rhei validate` and `rhei list` keep working on
+  a machine with a misspelled path and `roster` shows it verbatim with its tier.
+  One accepted regression comes with it: because a selected book replaces the
+  built-in one rather than composing with it, a book that omits
+  `anthropic` / `claude-sonnet-4-6` makes Sonnet runs unpriced that are priced
+  today. Add the entry to your own book.
+  §FS-rhei-agents.1.1.1 §FS-rhei-agents.1.3 §FS-rhei-cost-accounting.5.1
+
 - Wait for the run journal's own line before reading it. The eight-way
   provider-limit parking regression read `runtime/transitions.log` once, the
   instant the durable `nextAttemptAt:` waits became visible, and asserted that

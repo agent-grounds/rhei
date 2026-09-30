@@ -186,4 +186,111 @@ mod roster_unit_tests {
             assert!(errors.iter().any(|error| error.contains(needle)), "{errors:?}");
         }
     }
+
+    /// A roster whose only interesting content is `defaults`, each tier's block
+    /// written verbatim so a test can tell "absent", "authored", and "explicit
+    /// null" apart. §FS-rhei-agents.1.3
+    fn roster_with_defaults(
+        global_defaults: &str,
+        project_defaults: Option<&str>,
+    ) -> (tempfile::TempDir, std::path::PathBuf, MergedRoster) {
+        let root = tempfile::tempdir().expect("root");
+        let plan_root = root.path().join("project");
+        fs::create_dir_all(&plan_root).expect("project root");
+        write_json(
+            &home_dir().expect("home").join(".config/rhei/settings.json"),
+            &format!("{{ \"defaults\": {global_defaults} }}"),
+        );
+        if let Some(defaults) = project_defaults {
+            write_json(
+                &plan_root.join(PROJECT_SETTINGS_RELATIVE_PATH),
+                &format!("{{ \"defaults\": {defaults} }}"),
+            );
+        }
+        let roster = load_merged_roster(&plan_root, false).expect("merge roster");
+        (root, plan_root, roster)
+    }
+
+    /// `defaults.prices` is read from the block it sits in, carries the tier
+    /// that declared it, and is rendered as authored: the roster resolves no
+    /// path and canonicalizes nothing.
+    /// §FS-rhei-agents.1.1.1 §FS-rhei-agents.1.1.7 §FS-rhei-cost-accounting.5.1
+    #[test]
+    fn roster_reads_a_machine_price_book_and_renders_it_as_authored() {
+        let _home = TempHome::new();
+        let (_root, plan_root, roster) = roster_with_defaults(
+            r#"{ "agent_timeout": "30m", "prices": "~/books/machine.json" }"#,
+            None,
+        );
+
+        assert_eq!(
+            roster.provenance.defaults.get("agent_timeout"),
+            Some(&RosterOrigin::Global),
+            "the fixture's own block was not read"
+        );
+        assert_eq!(
+            roster.provenance.defaults.get("prices"),
+            Some(&RosterOrigin::Global),
+            "defaults.prices was dropped from the block beside it: {:?}",
+            roster.provenance.defaults
+        );
+        let payload = roster_json_value(&plan_root, &roster).expect("payload");
+        assert_eq!(payload["defaults"]["prices"], serde_json::json!("~/books/machine.json"));
+        let text = render_roster_text(&payload);
+        assert!(
+            text.contains("prices: \"~/books/machine.json\" [global]"),
+            "roster text was:\n{text}"
+        );
+    }
+
+    /// An authored project path replaces the machine book and an explicit
+    /// `null` clears it — the ordinary `defaults` merge, and not a ceiling the
+    /// machine tier holds. §FS-rhei-agents.1.3
+    #[test]
+    fn a_project_price_book_replaces_the_machine_one_and_null_clears_it() {
+        let _home = TempHome::new();
+        let (_replacing_root, plan_root, replaced) = roster_with_defaults(
+            r#"{ "prices": "~/books/machine.json" }"#,
+            Some(r#"{ "prices": "books/project.json" }"#),
+        );
+        assert_eq!(
+            replaced.provenance.defaults.get("prices"),
+            Some(&RosterOrigin::Project),
+            "the project file did not win: {:?}",
+            replaced.provenance.defaults
+        );
+        let payload = roster_json_value(&plan_root, &replaced).expect("payload");
+        assert_eq!(payload["defaults"]["prices"], serde_json::json!("books/project.json"));
+
+        let (_clearing_root, cleared_root, cleared) = roster_with_defaults(
+            r#"{ "prices": "~/books/machine.json" }"#,
+            Some(r#"{ "prices": null }"#),
+        );
+        assert_eq!(
+            cleared.provenance.defaults.get("prices"),
+            Some(&RosterOrigin::Project),
+            "the explicit clear was not attributed: {:?}",
+            cleared.provenance.defaults
+        );
+        // An explicit clear renders as `null`; an absent key renders as no key
+        // at all, and the two send a reader to different files.
+        // §FS-rhei-agents.1.1.7
+        let payload = roster_json_value(&cleared_root, &cleared).expect("payload");
+        let defaults = payload["defaults"].as_object().expect("defaults object");
+        assert!(defaults.contains_key("prices"), "the clear was dropped: {defaults:?}");
+        assert!(defaults["prices"].is_null(), "the clear did not render as null: {defaults:?}");
+    }
+
+    /// The path is fixed when settings merge and read only when a run prices,
+    /// so a machine whose book is misspelled still merges and still prints.
+    /// §FS-rhei-agents.1.3 §FS-rhei-cost-accounting.5.1
+    #[test]
+    fn a_price_book_path_that_names_nothing_still_merges_and_prints() {
+        let _home = TempHome::new();
+        let (_root, plan_root, roster) =
+            roster_with_defaults(r#"{ "prices": "books/never-written.json" }"#, None);
+
+        let payload = roster_json_value(&plan_root, &roster).expect("payload");
+        assert_eq!(payload["defaults"]["prices"], serde_json::json!("books/never-written.json"));
+    }
 }

@@ -176,6 +176,7 @@ choosing one.
 | `transition_limit` | integer or null | No | Applied transitions one ticket may make over the lifetime of its identity. Built-in `80`. [§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys) |
 | `invocations_per_day` | integer or null | No | Neural starts a project may be admitted per UTC day under the window contract. Built-in `200`. [§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys) |
 | `invocation_lifetime_max` | integer or null | No | Ceiling on an explicit lifetime invocation allowance; clamps `rhei budget init` and every `adjust`. Built-in `6000`. [§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys) |
+| `prices` | string or null | No | Path to a `rhei.accounting.prices.v1` price book, supplying the default value of `rhei run --prices` and nothing else. It is a path from the moment settings merge and a file only when a run prices, so a path that names nothing still merges and still prints. `null` clears an inherited book. [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection) |
 | `mcp_servers` | array | No | Default MCP server entries applied to every agent state. Entries are ids or inline definitions. See [MCP Servers](#114-mcp_servers). |
 | `skills` | array | No | Default skill entries applied to every agent state. Entries are ids or inline definitions. See [Skills](#115-skills). |
 
@@ -578,6 +579,18 @@ settings compose over the result:
 - `models.<id>.prices` is one optional object: absence inherits it, an authored
   object replaces it wholesale, and explicit `null` clears it. Its individual
   rate and metadata fields never merge.
+- `defaults.prices` is one optional path: absence inherits it, an authored path
+  replaces it, and explicit `null` clears it. It is an ordinary `defaults`
+  value a project file may replace or clear, **not** a ceiling the machine tier
+  holds the way `defaults.spend_per_day` is ([§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys)) — a price book
+  bounds nothing. The merge is also where the string becomes a path: a leading
+  `~` expands, an absolute path is used as written, and a relative path
+  resolves against the directory of the settings file that **declared** it,
+  never against the working directory the command ran in. Resolving it reads no
+  filesystem entry, so settings whose book is missing or misspelled still merge
+  and the authored string is still what inspection prints
+  ([§FS-rhei-agents.1.1.7](#117-inspecting-the-effective-roster)). What the book
+  at that path does is owned by [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection).
 - `mcp_servers` merge by server id.
 - `skills` merge by skill id.
 - `null` explicitly clears an inherited optional field.

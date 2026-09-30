@@ -32,6 +32,7 @@ mod templates {
 
     include!("cli/templates_builtin.rs");
     include!("cli/templates_list.rs");
+    include!("cli/templates_completion.rs");
     // §AR-source-file-size.3: block compilation is split by pipeline stage.
     include!("cli/templates_select.rs");
     include!("cli/templates_blocks_types.rs");
@@ -42,6 +43,15 @@ mod templates {
     include!("cli/templates_blocks_tasks.rs");
     include!("cli/templates_blocks_lower.rs");
     include!("cli/templates_blocks_cli.rs");
+    // §AR-rhei-library.6.1: the union is split by the decision each part owns.
+    include!("cli/templates_union_yaml.rs");
+    include!("cli/templates_union_machine.rs");
+    include!("cli/templates_union_place.rs");
+    include!("cli/templates_union_index.rs");
+    include!("cli/templates_union_host.rs");
+    include!("cli/templates_union_write.rs");
+    include!("cli/templates_union_includes.rs");
+    include!("cli/templates_union.rs");
     include!("cli/templates_instantiate.rs");
     include!("cli/templates_finish.rs");
     include!("cli/templates_publication.rs");
@@ -61,6 +71,7 @@ mod templates {
         include!("cli/tests_templates_blocks.rs");
         include!("cli/tests_templates_publication.rs");
         include!("cli/tests_templates_selection.rs");
+        include!("cli/tests_templates_union.rs");
     }
 }
 

@@ -583,13 +583,14 @@ enum Commands {
         )]
         source: String,
     },
-    /// Instantiate a template or compose mounted blocks into one workspace
+    /// Instantiate a template into a new workspace, or into one that exists
     ///
-    /// Legacy: `rhei instantiate changeset-review HEAD~3`
+    /// Standalone: `rhei instantiate changeset-review HEAD~3 --output ./review`
     ///
-    /// Composition: `rhei instantiate --mount review=code-review --mount
-    /// fix=fix --set review.change_ref=HEAD~3 --seam
-    /// review.done=fix.entry --pass review.decision=fix.decision`
+    /// Into a rhei: `rhei instantiate code-review HEAD~3 --into release`
+    ///
+    /// Into a task: `rhei instantiate code-review HEAD~3 --into release.ticket`
+    // §FS-rhei-library.10: the three forms `--into` leaves.
     Instantiate {
         /// Template name or path to a template directory
         #[arg(
@@ -644,6 +645,14 @@ enum Commands {
         /// Print the template input schema and exit
         #[arg(long)]
         list_inputs: bool,
+        /// Place the template into a rhei that already exists, as
+        /// `<rhei>` or `<rhei>.<task>`
+        // §FS-rhei-library.10
+        #[arg(long, value_name = "TARGET")]
+        into: Option<String>,
+        /// Path to a states YAML file (uses built-in default when omitted)
+        #[arg(long, value_name = "PATH", add = ArgValueCompleter::new(complete_yaml_path))]
+        state_machine: Option<PathBuf>,
         /// Positional input values or KEY=VALUE assignments
         #[arg(
             value_name = "INPUT",

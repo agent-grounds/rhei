@@ -335,6 +335,33 @@ pull request number: the release stamps `(PR #N)` onto it. See
   declared exact rule still governs, and a refusal now says so rather than
   listing the target it just refused as somewhere to go instead. (PR #328)
 
+- Compose two rheis by graph union, and retire the block compiler that
+  composed them by qualification. `rhei instantiate <template> --into <rhei>` and
+  `--into <rhei>.<task>` add a template's states, transitions, profiles, node
+  kinds, `by_type` routes, prompt templates, scripts and tickets to a plan that
+  already exists, under the names their authors wrote — nothing is renamed,
+  qualified or alias-encoded, so a composed machine reads as one somebody typed
+  and `changeset-review` now carries `split` and `final-fix` rather than
+  `m6_review__split` and `m3_fix__final-fix`. `includes:` in `template.yaml`
+  builds a template out of templates, each entry optionally placing its tickets
+  `under:` a task of the host, which is `--into`'s `<task>` half applied one
+  level in and the same re-parenting rather than a second one. Three rules decide
+  every union and each refuses rather than resolves: same name means the same
+  thing apart from `description`, a template's `from: "*"` edge is written scoped
+  to that template's own states, and only the host's `node_policy` routes. Inputs
+  union too, so an including template is used exactly as a flat one is. Nothing
+  is written until the whole union validates, and provenance is one fence comment
+  per inclusion rather than a lock file, a generated header or an alias-encoded
+  identity. A placement never asserts a ticket identity the ledger did not
+  settle: a template that declares a `budgetTicketId` is refused and the key is
+  stripped from every clone, so a ticket re-placed at a spent id is halted rather
+  than handed a fresh counter ([§FS-rhei-library](functional-spec/rhei-library.spec.md#fs-rhei-library-composable-blocks),
+  [§REQ-bounded-neural-work.4](requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)).
+  `--mount`, `--seam`, `--pass`, `composition.lock.json`, `runtime/blocks/` and
+  the manifest's `ports`, `data`, `expose`, `use`, `bind`, `seams`,
+  `compatibility` and `select` fields are gone, and the removed flags name
+  `--into` and `includes:` rather than erroring as unknown arguments. (PR #359)
+
 - Add `rhei show <ticket>`, the read that prints one task's body without the
   document around it. It prints one `## Task <id>: <title>` heading, a blank
   line, and the body as stored — an appended lifecycle record included — and

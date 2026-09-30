@@ -14,7 +14,16 @@
         dry_run: bool,
         keep_on_error: bool,
         list_inputs: bool,
+        into: Option<&str>,
+        state_machine_given: bool,
     ) -> MietteResult<()> {
+        if let Some(target) = into {
+            refuse_into_combinations(output, execute, keep_on_error, state_machine_given)?;
+            return instantiate_into_command(
+                template, input_args, set_values, set_files, values_files, target, dry_run,
+                list_inputs,
+            );
+        }
         if execute && dry_run {
             return Err(miette!(
                 help = "--dry-run renders and validates without writing anything, so there is \
@@ -81,6 +90,12 @@
                 execute_args,
             );
         }
+
+        // An including template is used exactly as a flat one is, so its input
+        // surface is the union before anything reads it. §FS-rhei-library.11.4
+        let mut manifest = manifest;
+        check_include_cycles(template_dir, &manifest, &mut Vec::new())?;
+        manifest.inputs = union_inputs(template_dir, &manifest)?;
 
         if list_inputs {
             print_template_inputs(&manifest, template);
@@ -170,6 +185,17 @@
                     return Err(err);
                 }
             };
+
+        // A budget identity belongs to a run and never to a template, whether
+        // the template is placed or laid standalone. §FS-rhei-library.13
+        if let Err(err) = refuse_rendered_identity(&manifest.name, &target_dir)
+            .and_then(|()| apply_includes(template_dir, &manifest, &resolved_values, &target_dir, layout))
+        {
+            if !dry_run {
+                let _ = remove_path(&target_dir, false);
+            }
+            return Err(err);
+        }
 
         finish_template_instantiation(materialized, &output_dir, &target_dir, prospective_member, &manifest.name, template, &template_input_args, set_values, set_files, values_files, execute, dry_run, keep_on_error, execute_args)
     }

@@ -6,6 +6,49 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- Compose two rheis by graph union, and retire the block compiler that
+  composed them by qualification. `rhei instantiate <template> --into <rhei>` and
+  `--into <rhei>.<task>` add a template's states, transitions, profiles, node
+  kinds, `by_type` routes, prompt templates, scripts and tickets to a plan that
+  already exists, under the names their authors wrote — nothing is renamed,
+  qualified or alias-encoded, so a composed machine reads as one somebody typed
+  and `changeset-review` now carries `split` and `final-fix` rather than
+  `m6_review__split` and `m3_fix__final-fix`. `includes:` in `template.yaml`
+  builds a template out of templates, each entry optionally placing its tickets
+  `under:` a task of the host, which is `--into`'s `<task>` half applied one
+  level in and the same re-parenting rather than a second one. Three rules decide
+  every union and each refuses rather than resolves: same name means the same
+  thing apart from `description`, a template's `from: "*"` edge is written scoped
+  to that template's own states, and only the host's `node_policy` routes. Inputs
+  union too, so an including template is used exactly as a flat one is. Nothing
+  is written until the union validates in the scope the target runs in, and
+  provenance is one fence comment
+  per inclusion rather than a lock file, a generated header or an alias-encoded
+  identity. A placement never asserts a ticket identity the ledger did not
+  settle: a template that declares a `budgetTicketId` is refused and the key is
+  stripped from every clone, so a ticket re-placed at a spent id is halted rather
+  than handed a fresh counter ([§FS-rhei-library](functional-spec/rhei-library.spec.md#fs-rhei-library-composition-by-graph-union),
+  [§REQ-bounded-neural-work.4](requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)).
+  A union into a member of a Panta project is a project-scoped write: the
+  template's `settings.json` hoists to the project rather than beside the rhei,
+  where nothing reads it, values the project already defines win and the summary
+  names both what was added and what was kept, and the result is validated in
+  the project's terms instead of the member's — so a placement can no longer
+  report success over a project its own machine has just made unloadable. The
+  union answers for the errors it introduced and not for the ones it found, the
+  write takes the permanent sibling lock every rewriting command takes — the
+  project's own sidecar for a member, so the hold covers the settings two
+  placements into two members would otherwise race over — and so serializes
+  against a live `rhei run` rather than racing it, and one state's
+  rhei-scoped artifact path walked by two placed tickets is a warning naming the
+  path and both tickets rather than silence
+  ([§FS-rhei-templates.6.2](functional-spec/rhei-templates.spec.md#62-instantiating-inside-a-panta-project),
+  [§FS-rhei-new.4](functional-spec/rhei-new.spec.md#4-ids)).
+  `--mount`, `--seam`, `--pass`, `composition.lock.json`, `runtime/blocks/` and
+  the manifest's `ports`, `data`, `expose`, `use`, `bind`, `seams`,
+  `compatibility` and `select` fields are gone, and the removed flags name
+  `--into` and `includes:` rather than erroring as unknown arguments. (PR #359)
+
 - Say whose ancestor a nested run inherits, and pin it. An ancestry descriptor
   named *which* reservation and never *whose*, so a `rhei run` charging a
   different project's journal looked the name up where it was never recorded and
@@ -334,49 +377,6 @@ pull request number: the release stamps `(PR #N)` onto it. See
   redirect are unchanged: each names only a state pair, so the pair's first
   declared exact rule still governs, and a refusal now says so rather than
   listing the target it just refused as somewhere to go instead. (PR #328)
-
-- Compose two rheis by graph union, and retire the block compiler that
-  composed them by qualification. `rhei instantiate <template> --into <rhei>` and
-  `--into <rhei>.<task>` add a template's states, transitions, profiles, node
-  kinds, `by_type` routes, prompt templates, scripts and tickets to a plan that
-  already exists, under the names their authors wrote — nothing is renamed,
-  qualified or alias-encoded, so a composed machine reads as one somebody typed
-  and `changeset-review` now carries `split` and `final-fix` rather than
-  `m6_review__split` and `m3_fix__final-fix`. `includes:` in `template.yaml`
-  builds a template out of templates, each entry optionally placing its tickets
-  `under:` a task of the host, which is `--into`'s `<task>` half applied one
-  level in and the same re-parenting rather than a second one. Three rules decide
-  every union and each refuses rather than resolves: same name means the same
-  thing apart from `description`, a template's `from: "*"` edge is written scoped
-  to that template's own states, and only the host's `node_policy` routes. Inputs
-  union too, so an including template is used exactly as a flat one is. Nothing
-  is written until the union validates in the scope the target runs in, and
-  provenance is one fence comment
-  per inclusion rather than a lock file, a generated header or an alias-encoded
-  identity. A placement never asserts a ticket identity the ledger did not
-  settle: a template that declares a `budgetTicketId` is refused and the key is
-  stripped from every clone, so a ticket re-placed at a spent id is halted rather
-  than handed a fresh counter ([§FS-rhei-library](functional-spec/rhei-library.spec.md#fs-rhei-library-composition-by-graph-union),
-  [§REQ-bounded-neural-work.4](requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)).
-  A union into a member of a Panta project is a project-scoped write: the
-  template's `settings.json` hoists to the project rather than beside the rhei,
-  where nothing reads it, values the project already defines win and the summary
-  names both what was added and what was kept, and the result is validated in
-  the project's terms instead of the member's — so a placement can no longer
-  report success over a project its own machine has just made unloadable. The
-  union answers for the errors it introduced and not for the ones it found, the
-  write takes the permanent sibling lock every rewriting command takes — the
-  project's own sidecar for a member, so the hold covers the settings two
-  placements into two members would otherwise race over — and so serializes
-  against a live `rhei run` rather than racing it, and one state's
-  rhei-scoped artifact path walked by two placed tickets is a warning naming the
-  path and both tickets rather than silence
-  ([§FS-rhei-templates.6.2](functional-spec/rhei-templates.spec.md#62-instantiating-inside-a-panta-project),
-  [§FS-rhei-new.4](functional-spec/rhei-new.spec.md#4-ids)).
-  `--mount`, `--seam`, `--pass`, `composition.lock.json`, `runtime/blocks/` and
-  the manifest's `ports`, `data`, `expose`, `use`, `bind`, `seams`,
-  `compatibility` and `select` fields are gone, and the removed flags name
-  `--into` and `includes:` rather than erroring as unknown arguments. (PR #359)
 
 - Add `rhei show <ticket>`, the read that prints one task's body without the
   document around it. It prints one `## Task <id>: <title>` heading, a blank

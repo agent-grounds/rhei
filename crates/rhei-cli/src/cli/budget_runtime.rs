@@ -132,7 +132,10 @@ fn budget_inspect_help() -> &'static str {
 }
 
 fn budget_inspect_help_for(project_root: &Path) -> String {
-    format!("inspect the project's account with: rhei budget show {}", budget_target(project_root))
+    format!(
+        "inspect the project's account with: rhei budget show {}",
+        budget_target_argument(project_root)
+    )
 }
 
 /// The project in the spelling every other budget surface prints it, so a help
@@ -144,6 +147,16 @@ fn budget_target(project_root: &Path) -> String {
         .unwrap_or_else(|_| project_root.to_path_buf())
         .display()
         .to_string()
+}
+
+/// The same path as an **argument** of a command the reader is meant to paste.
+///
+/// Prose names a path; a command line passes one, and a path holding a space
+/// passed bare is two arguments that `clap` rejects. Quoted only where the
+/// shell needs it, so the ordinary case reads exactly as it always has.
+/// §FS-rhei-errors.2 §FS-rhei-budgets.10
+fn budget_target_argument(project_root: &Path) -> String {
+    shell_quote(&budget_target(project_root))
 }
 
 /// The project's account, established when it is absent.

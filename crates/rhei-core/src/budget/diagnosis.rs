@@ -175,14 +175,22 @@ impl Diagnosis {
     /// because whether this history is this project's is the very thing that is
     /// unknown. Where the journal is wholly absent so is the directory that
     /// would hold it — `Account::inspect` reaches that sub-case precisely when
-    /// it does not exist — so the copy carries the one `mkdir` it needs. A
-    /// command a refusal names has to run in the state it is named for, which
-    /// is the whole reason `show` is readable there at all.
-    /// §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
+    /// it does not exist — so the copy carries the one directory creation it
+    /// needs. A command a refusal names has to run in the state it is named
+    /// for, which is the whole reason `show` is readable there at all.
+    ///
+    /// Both halves come from `platform`, so the line is in the operator's own
+    /// shell and every path in it is one word: `cmd` has neither `cp` nor
+    /// `mkdir -p`, and unquoted, a project path holding a space makes `mkdir -p`
+    /// read two words and build a directory tree relative to wherever the
+    /// operator was standing — a remedy that fails *and* writes somewhere it
+    /// did not name. §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
     pub fn restore_command(&self) -> String {
-        let copy = format!("cp {} {}", self.witness.display(), self.journal.display());
+        let copy = crate::platform::copy_command(&self.witness, &self.journal);
         match self.damage {
-            Damage::JournalAbsent => format!("mkdir -p {} && {copy}", self.directory().display()),
+            Damage::JournalAbsent => {
+                format!("{} && {copy}", crate::platform::make_directory_command(&self.directory()))
+            }
             Damage::JournalTruncated | Damage::ChainBroken => copy,
         }
     }
@@ -191,11 +199,17 @@ impl Diagnosis {
     /// project held the path before this one.
     ///
     /// `None` wherever a journal is present, because there the journal **is**
-    /// this project's and retiring the root would discard a real account.
-    /// §FS-rhei-budgets.5.4
+    /// this project's and retiring the root would discard a real account. The
+    /// root is quoted for the same reason the restore's paths are: unquoted, a
+    /// path with a space reaches `clap` as two arguments and the command is
+    /// rejected before it runs. §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
     pub fn forget_command(&self) -> Option<String> {
-        (!self.damage.journal_exists())
-            .then(|| format!("rhei budget forget {} --reason <TEXT>", self.root.display()))
+        (!self.damage.journal_exists()).then(|| {
+            format!(
+                "rhei budget forget {} --reason <TEXT>",
+                crate::platform::shell_quote(&self.root.display().to_string())
+            )
+        })
     }
 
     /// One line saying what is wrong, in the words the refusal uses.

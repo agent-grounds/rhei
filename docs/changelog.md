@@ -130,12 +130,17 @@ pull request number: the release stamps `(PR #N)` onto it. See
   instructs a copy of the witness over it: that instruction succeeds, and hands
   a brand-new project the entire spend of the one that held the path before it,
   with nothing to say it happened. It now states both readings and names a
-  runnable command for each. `rhei budget show`, the one diagnostic the refusal
-  points at, works in the state it is offered for rather than failing to open
-  an account it was asked to describe, reports the account's `health` as
-  `damaged` with which of the three sub-cases it is — `journal_absent`,
-  `journal_truncated`, `chain_broken` — and under `--format json` emits the
-  machine-readable error object a harness can parse instead of rendered prose.
+  runnable command for each — runnable on the operator's own platform, spelled
+  in that platform's shell and with every path in it quoted, so a project path
+  holding a space is offered a command that runs rather than one that fails
+  after building directories somewhere it never named. `rhei budget show`, the
+  one diagnostic the refusal points at, works in the state it is offered for
+  rather than failing to open an account it was asked to describe, reports the
+  account's `health` as `damaged` with which of the three sub-cases it is —
+  `journal_absent`, `journal_truncated`, `chain_broken` — and under
+  `--format json` emits the machine-readable error object a harness can parse
+  instead of rendered prose, whose `project_root` is the target as the operator
+  spelled it, the one spelling a sound report has ever printed there.
   Where a journal is present its tail is what was lost, so the truncated and
   chain-broken sub-cases keep the restore remedy unchanged. And `rhei budget
   forget <TARGET> --reason <TEXT>` retires a stale root under an audited

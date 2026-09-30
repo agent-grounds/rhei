@@ -21,7 +21,16 @@ added here is a ceiling over what this engine's own records say was spent
 
 **Travel** is the number of applied transitions one ticket may make over the
 lifetime of its identity. It is a property of the ticket, it is persisted with
-the ticket, and it survives `rhei reset`, a copy, a move, and re-instantiation.
+the ticket, and it survives `rhei reset`, a copy of its document, and a
+relocation of its document. A ticket's identity follows its **id**, not its
+bytes: the account binds the pair (full rhei-qualified display id, metadata
+file) to a ticket uuid, so a ticket placed or re-parented under a pair the
+account has never bound is a genuinely new ticket identity with a travel bound
+of its own ([§REQ-bounded-neural-work.4](../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)), and a pair the account has already
+bound keeps its history whatever placed it, including a ticket deleted and
+re-placed at the same id ([§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal)). A ticket's document never
+asserts an identity the account has not settled; `rhei instantiate` refuses a
+template that declares one ([§FS-rhei-library.13](rhei-library.spec.md#13-placement-and-ticket-identity)).
 
 **Invocations** are the neural starts a project may be admitted. They are a
 property of the **project** — one durable account shared by every rhei of the

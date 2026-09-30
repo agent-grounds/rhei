@@ -1,0 +1,38 @@
+Template: changeset-review
+Version: 1.1.0
+Description: Review a code change with two-agent review, validation, fix proposals, smart-agent adjudication, and smart-agent fixes.
+Inputs:
+  change_ref (string, required)
+    The change to review. Any of — a PR URL or number, a branch name, a commit SHA (or range `base..head`), or a path to a .diff/.patch file. The coordinator resolves it to an actual set of files before splitting.
+  review_targets (array, default below)
+    Execution targets that independently review each part of the change (one parallel pass per target)
+    default:
+      - claude-code[yolo]:anthropic:claude-opus-4-7
+      - codex[xhigh]:openai:gpt-5.5
+    copy: review_targets='["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"]'
+  validation_targets (array, default below)
+    Execution targets that independently validate whether the aggregated review issues are correct and actionable
+    default:
+      - claude-code[yolo]:anthropic:claude-opus-4-7
+      - codex[xhigh]:openai:gpt-5.5
+    copy: validation_targets='["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"]'
+  proposal_targets (array, default below)
+    Execution targets that independently propose concrete fixes for each validated issue
+    default:
+      - claude-code[yolo]:anthropic:claude-opus-4-7
+      - codex[xhigh]:openai:gpt-5.5
+    copy: proposal_targets='["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"]'
+  review_focus (array, default='[]')
+    Optional focus areas each reviewer must address as its own subsection (e.g., performance, security, concurrency). Empty means a general review.
+  smart_target (string, default='codex[xhigh]:openai:gpt-5.5')
+    Smarter execution target that aggregates reviews, adjudicates discrepancies, performs final fixes, and optionally commits them
+    format: execution-target
+  fix_prepare (string, default=none)
+    Optional pre-fix workspace isolation before the smart target applies final fixes. One of — none (apply in-tree), branch (create a new branch), worktree (create a git worktree), fork (fork the repo before working).
+    validate: ^(none|branch|worktree|fork)$
+  fix_commit (string, default=none)
+    Optional post-fix commit behavior. One of — none (leave uncommitted), commit (local commit), push (commit and push to remote), pr (commit, push, open PR).
+    validate: ^(none|commit|push|pr)$
+
+Instantiate it with:
+  rhei instantiate changeset-review change_ref='<value>'

@@ -291,34 +291,42 @@ and `rhei list --ready` excludes a held descendant by the ready set's own rule.
   predate that and still paste raw. Change them together, with one rule for
   every pasted body. [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition)
 
-## Planned: Block Library Follow-Ups
+## Planned: Composition by Union Follow-Ups
 
-Status: planned, deferred past 0.5.0 with no release assigned. The first
-increment of composable blocks ships in PR #282 for #47: `rhei instantiate`
-mounts blocks under aliases, links them with completion-only seams and direct
-data passes, and lowers the result to one ordinary workspace and one flat
-state machine ([§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composable-blocks)). The capabilities below were
-deliberately left outside that contract ([§FS-rhei-library.8](rhei-library.spec.md#8-diagnostics-and-deferred-surface)) and are
-tracked as tool-report intake tickets, whose lifecycle publishes each upstream
-issue; the ids here are the intake ids.
+Status: planned. `agent-grounds/rhei#323` replaces the mount-and-seam block
+compiler with composition by **graph union**: `rhei instantiate --into` places a
+template into a plan that already exists, `includes:` with `under:` builds a
+template out of templates, and both end in the ordinary flat files every command
+already reads ([§FS-rhei-library.9](rhei-library.spec.md#9-composition-by-graph-union), [§DA-composition-by-union](../decisions/architectural/composition-by-union.md#da-composition-by-union-composition-is-graph-union-over-names-as-their-authors-wrote-them)). That is
+steps 1 and 2 of the issue's own five. The block-library follow-ups this section
+used to list — a mount catalog, a textual composition language, conditional
+seams, expressions on a pass — close with the compiler: each was a gap in a
+mechanism that no longer exists.
 
-- Catalog and discovery for blocks beyond the template lookup composition
-  reuses today: a way to list mountable blocks and read their ports before
-  mounting one. Tracked as rhei.83.
-- A typed, total textual composition surface, evaluated against agent fluency
-  and predictability; composition is wired by `--mount`, `--seam`, `--pass`
-  and `--set` or a block's `use` today, and #47 chose no language. Tracked as
-  rhei.84.
-- Completed in PR #298: per-node provenance and richer lock metadata now trace
-  each flattened node through its declaration and mount to an honest source
-  revision. Tracked as rhei.85.
-- Typed exposure of selected state, task, agent, model, MCP-server, and skill
-  identities while keeping encapsulation the default. Delivered by #285 under
-  §FS-rhei-library.1.2.
-- Conditional or gated seams; a seam consumes exactly one terminal exit
-  today, and internal transitions stay untouched. Tracked as rhei.87.
-- Expressions and conversions on a pass; a pass wires two declared endpoints
-  of the same kind directly today. Tracked as rhei.88.
+The remaining steps are issues of their own, in order, and each is a separate
+release decision:
+
+- **Step 3 — machine resolution** (#347)**.** A rhei's machine is `states.yaml` in its own
+  root when present, then the project default, then built-in `rhei`. The
+  `**States:**` declaration and the cross-root name match
+  ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)) are **deprecated with a warning**, not removed, so every
+  laid plan runs unchanged. It also removes the interim declaration `--into`
+  writes today ([§FS-rhei-library.10.1](rhei-library.spec.md#101-the-machine-the-target-must-have)) and reaches the installed skills and
+  ephor's laid plans.
+- **Step 4 — `--into <project>`** (#348)**.** A member rhei with its own machine, or a
+  project's default machine laid and rebound, with the tickets a rebind would
+  strand named before anything is replaced.
+- **Step 5 — the decomposition** (#349)**.** Extract the shared tail of the workspace's
+  three ticket templates as templates of their own, make the three including
+  templates, and have the library's gate instantiate every template twice —
+  standalone and `--into` a scratch rhei. The first real user of `under:`.
+- **The deprecation removal** (#350), for the release after step 3: `**States:**` and
+  the cross-root name match deleted once the warnings have had a release.
+
+Two side-findings of #323's agora are filed against the ground rather than
+against composition: #351, where §FS-rhei-reset.2 gives the opposite of the
+engine's reason for keeping `budgetTicketId`, and #352, where the engine
+silently rebinds a live binding's `display_id`.
 
 ## Planned: Snapshot Adapter and Retention Work
 

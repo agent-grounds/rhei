@@ -76,75 +76,14 @@ fn append_state_transition_log_entry(
     ledger.append(task_id, from, to)
 }
 
-/// One exclusive hold on the central ledger's stable external sidecar.
-///
-/// Every writer and reset path uses this type. The sidecar lives outside the
-/// replaceable runtime tree, and the data file is opened only after the lock is
-/// acquired. A claim keeps the hold from preflight through either commit or
-/// reversal, so truncating its own partial append cannot erase a different
-/// writer's successful line. §AR-agent-orchestrator-workflow.3.3.1
+/// One exclusive hold on the central ledger, as the shared runtime-journal
+/// discipline holds any project-level append-only file
+/// ([`LockedRuntimeJournal`]). A claim keeps the hold from preflight through
+/// either commit or reversal, so truncating its own partial append cannot erase
+/// a different writer's successful line. §AR-agent-orchestrator-workflow.3.3.1
 /// §FS-rhei-next.3.1 §FS-rhei-viz.4
 struct LockedTransitionLedger {
-    _ledger_lock: fs::File,
-    file: Option<fs::File>,
-    path: PathBuf,
-    original_len: u64,
-    created_by_open: bool,
-}
-
-#[cfg(test)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum LedgerLockEvent {
-    Contended,
-    Acquired,
-}
-
-#[cfg(test)]
-thread_local! {
-    static LEDGER_LOCK_OBSERVER: std::cell::RefCell<Option<mpsc::Sender<LedgerLockEvent>>> =
-        const { std::cell::RefCell::new(None) };
-}
-
-#[cfg(test)]
-fn set_ledger_lock_observer(observer: mpsc::Sender<LedgerLockEvent>) {
-    LEDGER_LOCK_OBSERVER.with(|installed| *installed.borrow_mut() = Some(observer));
-}
-
-#[cfg(test)]
-fn notify_ledger_lock_observer(event: LedgerLockEvent) {
-    LEDGER_LOCK_OBSERVER.with(|installed| {
-        let observer = installed.borrow().clone();
-        if let Some(observer) = observer {
-            let _ = observer.send(event);
-        }
-        if event == LedgerLockEvent::Acquired {
-            installed.borrow_mut().take();
-        }
-    });
-}
-
-fn lock_transition_ledger(file: &fs::File, path: &Path) -> MietteResult<()> {
-    #[cfg(test)]
-    if LEDGER_LOCK_OBSERVER.with(|installed| installed.borrow().is_some()) {
-        match file.try_lock_exclusive() {
-            Ok(()) => {
-                notify_ledger_lock_observer(LedgerLockEvent::Acquired);
-                return Ok(());
-            }
-            Err(err) if lock_is_contended(&err) => {
-                notify_ledger_lock_observer(LedgerLockEvent::Contended);
-            }
-            Err(err) => {
-                return Err(file_io_report(path, "failed to lock state transition log", err));
-            }
-        }
-    }
-
-    file.lock_exclusive()
-        .map_err(|err| file_io_report(path, "failed to lock state transition log", err))?;
-    #[cfg(test)]
-    notify_ledger_lock_observer(LedgerLockEvent::Acquired);
-    Ok(())
+    journal: LockedRuntimeJournal,
 }
 
 impl LockedTransitionLedger {
@@ -152,117 +91,37 @@ impl LockedTransitionLedger {
     /// the replaceable runtime tree. Reset retains this form through cleanup;
     /// appenders open the current data pathname only after this succeeds.
     fn lock(workspace_root: &Path) -> MietteResult<Self> {
-        let workspace_root = rhei_core::platform::canonical_path(workspace_root).map_err(|err| {
-            file_io_report(workspace_root, "failed to resolve transition ledger root", err)
-        })?;
-        let transitions_file = workspace_root.join("runtime").join("state-transitions.log");
-        let ledger_lock_path = workspace_root.join("runtime.state-transitions.log.lock");
-        let ledger_lock = fs::OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .truncate(false)
-            .open(&ledger_lock_path)
-            .map_err(|err| miette!(
-                help = transition_log_help(),
-                "failed to open state transition log lock: {err}"
-            ))?;
-        lock_transition_ledger(&ledger_lock, &ledger_lock_path)?;
-
-        Ok(Self {
-            _ledger_lock: ledger_lock,
-            file: None,
-            path: transitions_file,
-            original_len: 0,
-            created_by_open: false,
-        })
+        Ok(Self { journal: LockedRuntimeJournal::lock(workspace_root, TRANSITION_LEDGER)? })
     }
 
     fn open(workspace_root: &Path) -> MietteResult<Self> {
-        let mut locked = Self::lock(workspace_root)?;
-        let runtime_dir = locked.path.parent().expect("ledger has a runtime parent");
-        fs::create_dir_all(runtime_dir)
-            .map_err(|err| miette!(
-                help = runtime_dir_help(),
-                "failed to create runtime directory: {err}"
-            ))?;
-
-        // Plain `write(true)`, not `append(true)`: on Windows an append-mode
-        // handle is granted `FILE_APPEND_DATA` but not `FILE_WRITE_DATA`, so
-        // `restore`'s `set_len` truncation back to `original_len` fails with
-        // access denied. The exclusive `_ledger_lock` already serializes every
-        // writer, so this handle can safely seek to end itself instead of
-        // relying on the kernel's O_APPEND positioning.
-        let (mut file, created_by_open) = match fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&locked.path)
-        {
-            Ok(file) => (file, true),
-            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {
-                let file = fs::OpenOptions::new()
-                    .write(true)
-                    .open(&locked.path)
-                    .map_err(|err| miette!(
-                        help = transition_log_help(),
-                        "failed to open state transition log: {err}"
-                    ))?;
-                (file, false)
-            }
-            Err(err) => {
-                return Err(miette!(
-                    help = transition_log_help(),
-                    "failed to open state transition log: {err}"
-                ));
-            }
-        };
-
-        let original_len = file
-            .metadata()
-            .map_err(|err| {
-                file_io_report(&locked.path, "failed to inspect state transition log", err)
-            })?
-            .len();
-        file.seek(std::io::SeekFrom::End(0)).map_err(|err| {
-            file_io_report(&locked.path, "failed to seek state transition log", err)
-        })?;
-        locked.file = Some(file);
-        locked.original_len = original_len;
-        locked.created_by_open = created_by_open;
-        Ok(locked)
+        Ok(Self { journal: LockedRuntimeJournal::open(workspace_root, TRANSITION_LEDGER)? })
     }
 
     fn path(&self) -> &Path {
-        &self.path
+        self.journal.path()
     }
 
     fn append(&mut self, task_id: &str, from: &str, to: &str) -> MietteResult<()> {
-        let file = self.file.as_mut().expect("ledger file held until drop");
         #[cfg(test)]
         if let Some(message) = take_claim_fault(ClaimFaultPoint::LedgerAppend) {
             // Model a write that reached the file only in part. The claim
             // reversal must truncate precisely this writer's bytes while its
             // exclusive ledger hold keeps every other writer outside.
+            let path = self.journal.path().to_path_buf();
+            let file = self.journal.handle();
             file.write_all(task_id.as_bytes()).map_err(|err| {
-                file_io_report(&self.path, "failed to inject partial transition entry", err)
+                file_io_report(&path, "failed to inject partial transition entry", err)
             })?;
             file.flush().map_err(|err| {
-                file_io_report(&self.path, "failed to flush partial transition entry", err)
+                file_io_report(&path, "failed to flush partial transition entry", err)
             })?;
             return Err(miette!(
                 help = transition_log_help(),
                 "ledger append injection after partial write: {message}"
             ));
         }
-        writeln!(file, "{} {}@{}", task_id, from, to).map_err(|err| {
-            miette!(
-                help = transition_log_help(),
-                "failed to write state transition log entry: {err}"
-            )
-        })?;
-        file.flush().map_err(|err| {
-            file_io_report(&self.path, "failed to flush state transition log", err)
-        })
+        self.journal.append_line(&format!("{} {}@{}", task_id, from, to))
     }
 
     /// Remove selected ticket lines while the stable sidecar excludes every
@@ -271,16 +130,13 @@ impl LockedTransitionLedger {
         // The sidecar remains the synchronization identity. Close an optional
         // append handle before replacing the data pathname: Windows will not
         // rename over a destination while this process still has it open.
-        if let Some(mut file) = self.file.take() {
-            file.flush().map_err(|err| {
-                file_io_report(&self.path, "failed to flush state transition log", err)
-            })?;
-        }
-        if !self.path.is_file() {
+        self.journal.release_handle()?;
+        let path = self.journal.path().to_path_buf();
+        if !path.is_file() {
             return Ok(false);
         }
-        let raw = fs::read_to_string(&self.path).map_err(|err| {
-            file_io_report(&self.path, "failed to read state transition log", err)
+        let raw = fs::read_to_string(&path).map_err(|err| {
+            file_io_report(&path, "failed to read state transition log", err)
         })?;
         // §FS-rhei-reset.2.1: validate adjacency before pruning both task-keyed rows.
         rhei_core::transition_history::parse(&raw).map_err(|err| diagnostic!("{err}"))?;
@@ -295,35 +151,19 @@ impl LockedTransitionLedger {
             return Ok(false);
         }
         if kept.is_empty() {
-            fs::remove_file(&self.path).map_err(|err| {
-                file_io_report(&self.path, "failed to remove state transition log", err)
+            fs::remove_file(&path).map_err(|err| {
+                file_io_report(&path, "failed to remove state transition log", err)
             })?;
             return Ok(true);
         }
         let mut content = kept.join("\n");
         content.push('\n');
-        write_file_atomic(&self.path, &content)?;
+        write_file_atomic(&path, &content)?;
         Ok(true)
     }
 
     fn restore(&mut self) -> MietteResult<()> {
-        let file = self.file.as_mut().expect("ledger file held until drop");
-        file.set_len(self.original_len).map_err(|err| {
-            file_io_report(&self.path, "failed to restore state transition log", err)
-        })?;
-        file.seek(std::io::SeekFrom::End(0)).map_err(|err| {
-            file_io_report(&self.path, "failed to seek restored state transition log", err)
-        })?;
-        file.flush().map_err(|err| {
-            file_io_report(&self.path, "failed to flush restored state transition log", err)
-        })?;
-        if self.created_by_open {
-            self.file.take();
-            fs::remove_file(&self.path).map_err(|err| {
-                file_io_report(&self.path, "failed to remove restored state transition log", err)
-            })?;
-        }
-        Ok(())
+        self.journal.restore()
     }
 }
 

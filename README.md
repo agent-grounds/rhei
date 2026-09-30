@@ -131,6 +131,9 @@ The runtime currently supports:
 - atomically advancing work with `rhei transition`, `rhei complete`, and
   `rhei reset`
 - orchestrating agents and deterministic programs with `rhei run`
+- carrying one fact sideways with `rhei note` — a task spends its single
+  slot on what the next ticket would otherwise rediscover, every later
+  prompt anywhere in the project carries it, and `rhei reset` clears it
 - recording runtime logs, results, snapshots, and dashboard state under
   `runtime/`
 - rendering plans as JSON, GitHub-style markdown, or terminal-oriented progress

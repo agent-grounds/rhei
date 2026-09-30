@@ -36,6 +36,12 @@ struct PromptMemory {
     /// The `runtime/` directory `rhei run` names agent logs under.
     // §FS-rhei-agents.8.1
     runtime_dir: PathBuf,
+    /// The project note store, `runtime/notes.md` at the **project** execution
+    /// root — the one memory path that is not under each rhei's own root, which
+    /// is why it is named rather than derived per rhei. Held whether or not the
+    /// file exists: the map names it before the verb creates it.
+    // §FS-rhei-memory.4.1 §FS-rhei-note.3.1
+    note_store: PathBuf,
     /// Tickets the current `rhei run` pass has spawned and not yet reaped.
     /// `rhei run` writes no `**Assignee:**` on claim, so this is the only
     /// witness that another agent of this pass is working. §FS-rhei-memory.4.3
@@ -86,6 +92,10 @@ mod memory_caps {
     pub const RESULT_LINES: usize = 100;
     /// §FS-rhei-memory.4.3: columns a Plan History summary is cut to.
     pub const SUMMARY_COLUMNS: usize = 120;
+    /// §FS-rhei-memory.4.5: lines of entries under `### Project Notes`.
+    pub const PROJECT_NOTES_LINES: usize = 24;
+    /// §FS-rhei-note.4: lines one note entry may run to, bounded at write time.
+    pub const NOTE_ENTRY_LINES: usize = 3;
 }
 
 /// Build the memory a prompt composes from, off an already-loaded plan.
@@ -109,6 +119,7 @@ fn prompt_memory(
         content_sections: loaded.rhei.content_sections.clone(),
         task_sources: loaded.task_sources.clone(),
         runtime_dir: runtime_dir.to_path_buf(),
+        note_store: project_note_store_path(input),
         run_in_flight,
         pastes_task_inputs: true,
         absolute_paths: false,

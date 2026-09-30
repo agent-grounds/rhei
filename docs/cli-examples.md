@@ -59,6 +59,37 @@ everyday shape is shorter: from inside a project the positional may be the bare
 ticket id, as `rhei show <ticket-id>`, which prints the same body. See
 [§FS-rhei-show](functional-spec/rhei-show.spec.md#fs-rhei-show-rhei-show).
 
+Leave one fact for whoever works next. `note` takes no plan positional: the
+store belongs to the project rather than to a plan, so it is found from the
+working directory, and these are run from inside the project:
+
+```bash
+rhei note "Three concurrent cargo builds under /tmp fill the root disk; build under ~/ag/tmp with --target-dir."
+rhei note --restate auth.2
+rhei note --strike auth.1
+```
+
+A task holds one slot, so the restate and the strike each spend the writer's
+own. The writing task comes from `RHEI_TASK_ID`, which `rhei run` exports to
+every agent it spawns; name it with `--task <ticket-id>` outside a run. Both
+refusals happen before anything is appended, and neither leaves a file behind:
+
+```console
+$ rhei note "$(printf 'one\ntwo\nthree\nfour')"
+  × an entry is bounded at 3 lines and this one has 4; nothing was written
+  help: shorten it, or leave the detail in your result file and note where it
+        is.
+
+$ rhei note "Three concurrent cargo builds under /tmp fill the root disk; build under ~/ag/tmp with --target-dir."
+  × auth.1 already left that entry; nothing was written
+  help: endorse it instead, which costs you the same slot: rhei note --restate
+        <task-id>.
+```
+
+Every ordinary prompt composed afterwards, anywhere in the project and in any
+rhei, carries the live entries under `### Project Notes` inside `## Position`.
+See [§FS-rhei-note](functional-spec/rhei-note.spec.md#fs-rhei-note-rhei-note).
+
 Render a plan as GitHub-style markdown without metadata or subtask body text:
 
 ```bash

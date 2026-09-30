@@ -33,6 +33,7 @@ const LEAVING_A_TRAIL: &str = "\
 What you write is what the next agent and the human see.
 - `runtime/results/<task-id>.md`: the first line is the one-line summary every later Plan History shows; detail below it.
 - You may append progress paragraphs to your own task body \u{2014} files touched, commands run, decisions made \u{2014} and append child tasks under your own task. Do not edit `**State:**` lines or any other task's body.
+- You may leave **one** note for later tickets anywhere in this project: `rhei note \"<fact>\"`, at most 3 lines, for something the next ticket would otherwise rediscover. A second call replaces it, and spending it on `rhei note --restate <id>` or `--strike <id>` leaves you none of your own. Never edit `runtime/notes.md` by hand.
 - Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` stops the plan from parsing for the whole run.
 ";
 
@@ -73,6 +74,13 @@ fn render_reading_the_rhei(render_context: &RuntimeTemplateContext<'_>) -> Strin
         out.push_str(&format!("  - `{id}` \u{2014} `{}`\n", memory_path(render_context, other)));
     }
     out.push_str(READING_THE_RHEI_ARTIFACTS);
+    // The store is the other path that is not under each execution root: one
+    // file for the whole project, named whether or not it exists yet, because
+    // the verb creates it on first write. §FS-rhei-memory.3.4 §FS-rhei-note.3.1
+    out.push_str(&format!(
+        "- Notes left for later tickets: `{}`\n",
+        memory_path(render_context, &memory.note_store)
+    ));
     // Transcripts are the one artifact that does not live per rhei: a run writes
     // them under the root it was started from, the project and not the member.
     // §FS-rhei-memory.3.4 §FS-rhei-agents.8

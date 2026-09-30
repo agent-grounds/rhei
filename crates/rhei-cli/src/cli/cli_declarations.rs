@@ -337,6 +337,12 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+    /// Leave one fact for whoever works next, anywhere in this project
+    // §FS-rhei-note.1: the only writer of the project note store.
+    Note {
+        #[command(flatten)]
+        options: NoteOptions,
+    },
     /// Resolve an interrupted operator transition with fresh typed confirmation.
     /// Agents must not invoke recovery; only an attended operator may resolve a marker.
     // §FS-rhei-recover.1

@@ -125,6 +125,12 @@ fn transition_log_help() -> &'static str {
     "rhei appends to runtime/state-transitions.log. Check that directory is writable."
 }
 
+/// Help for the project note store. §FS-rhei-note.3.1
+fn note_store_help() -> &'static str {
+    "rhei note appends to runtime/notes.md at the project execution root. Check that \
+     directory is writable."
+}
+
 /// Help for the log file a program state writes to.
 fn program_log_help() -> &'static str {
     "program output is logged under runtime/logs/. Check that directory is writable."

@@ -225,6 +225,12 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             let target = resolve_plan_target(input)?;
             show_command(target.path(), &target.scope_with(&[]), &task, json)
         }
+        // No plan positional: the store is not plan markdown, so the project is
+        // resolved from the working directory and nothing else. §FS-rhei-note.1
+        Commands::Note { options } => {
+            let target = resolve_plan_target(None)?;
+            note_command(target.path(), &target.scope_with(&[]), &options)
+        }
         Commands::Recover { execution_root } => recover_command(&execution_root),
         Commands::Transition {
             force,

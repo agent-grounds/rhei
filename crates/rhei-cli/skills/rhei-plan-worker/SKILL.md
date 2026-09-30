@@ -117,6 +117,7 @@ Log implementation progress by appending to each task node's body — do not inv
 - One short paragraph per leaf task node, written as you complete it (not batched at the end).
 - State the concrete change: files touched, functions added, commands run to verify. Do not restate the task title; extend the description.
 - When a task re-enters an earlier state in a custom machine, append a new paragraph describing the rework rather than rewriting history. If the machine uses counted visits, the re-rendered `**State:** <name>-<n>` line makes the visit explicit — do not edit that suffix by hand.
+- A fact the *next ticket* would otherwise rediscover goes in `rhei note "<fact>"` as well as in your body: the body is read by whoever reads your ticket, a note is read by every later prompt in the project, in any rhei and with no prior between you. You get **one** slot for the whole task — a second call replaces your entry, and `--restate <task-id>` or `--strike <task-id>` spends that same slot — at most 3 lines, and an exact duplicate of a live entry or of your own `### Rhei Context` / `### Project Context` is refused. Never edit `runtime/notes.md` by hand. A note is a discovery, not a standing rule: what every ticket in the project must do belongs in the plan's `conventions`, which this does not replace.
 
 ## Agent Review
 

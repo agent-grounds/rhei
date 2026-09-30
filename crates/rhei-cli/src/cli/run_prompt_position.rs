@@ -50,6 +50,28 @@ fn render_context_block(heading: &str, body: &str, source: &str) -> String {
     format!("\n### {heading}\n\n{}\n{overflow}", fenced_markdown(&kept))
 }
 
+/// `### Project Notes` — what earlier tickets left for whoever came next,
+/// folded off the store's bytes and capped.
+///
+/// A block of its own rather than an addition to `### Project Context`, because
+/// that section is the plan writer's content *verbatim*. An unreadable or
+/// absent store composes nothing, and so does one the task excludes; the map in
+/// §FS-rhei-memory.3.4 still names the path either way.
+// §FS-rhei-memory.3.1 §FS-rhei-memory.4.2
+fn render_project_notes_block(
+    render_context: &RuntimeTemplateContext<'_>,
+    memory: &PromptMemory,
+) -> String {
+    if !prompt_source_allowed(render_context, &memory.note_store) {
+        return String::new();
+    }
+    let Ok(contents) = fs::read_to_string(&memory.note_store) else { return String::new() };
+    render_project_notes(
+        &fold_note_store(&contents),
+        &memory_path(render_context, &memory.note_store),
+    )
+}
+
 /// Whether `candidate` waits on `subject`: a declared prior, or an export of
 /// `subject` it consumes. §FS-rhei-memory.4.2
 fn task_waits_on(candidate: &rhei_core::ast::Task, subject: &rhei_core::ast::Task) -> bool {
@@ -213,5 +235,8 @@ fn render_position(render_context: &RuntimeTemplateContext<'_>) -> String {
             ));
         }
     }
+    // After the project context, because a fact one ticket left is read against
+    // the standing rules rather than instead of them. §FS-rhei-memory.3.1
+    out.push_str(&render_project_notes_block(render_context, memory));
     out
 }

@@ -6,6 +6,23 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- Recognize a Claude weekly limit, and a reset that names no minutes, as the
+  same provider refusal a session limit already is. `You've hit your weekly
+  limit · resets 2pm (Europe/Zurich)` was an ordinary failure — the attempt was
+  charged, no wait was recorded, and two refusals spent a visit's budget for a
+  limit that clears on its own — while the identical line saying `session`
+  parked. A provider limit is by construction something every concurrent task
+  hits at once, so one weekly limit halted every ticket in flight in a
+  non-terminal state, with recovery by hand. The recognized sentence is now
+  `You've hit your <period> limit · resets <h>[:<mm>]<am|pm> (<zone>)`, and an
+  absent `:<mm>` means `00` through the same arithmetic, so `resets 6am` and
+  `resets 6:00am` are the same instant to the byte. Two things stay refused, now
+  as recorded decisions rather than as accidents of the sentence: the period
+  vocabulary is closed at `session` and `weekly`, a third word joining it by a
+  change to the specification exactly as a provider does, and a dated reset
+  (`resets Oct 1, 5:59am`) does not park, because it would have to infer a year
+  the line does not print. §FS-rhei-agents.2.3
+
 - Wait for the run journal's own line before reading it. The eight-way
   provider-limit parking regression read `runtime/transitions.log` once, the
   instant the durable `nextAttemptAt:` waits became visible, and asserted that

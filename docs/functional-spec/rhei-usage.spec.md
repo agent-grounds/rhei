@@ -118,7 +118,7 @@ Commands for authoring, inspecting, and running a workflow:
 `rhei run` and the manual-worker flow (`next` / `transition` / `complete`) are mutually exclusive per execution — they never overlap on the same task because `rhei run` holds transition responsibility for the states it drives. The typical manual-worker loop is `next` (claim) → work → `transition` (advance as needed) → `complete` (finish, record result, release).
 
 When an invocation on a provider Rhei recognizes reports the supported
-reset-bearing session-limit signal (§FS-rhei-agents.2.3), `rhei run` parks that
+reset-bearing limit signal (§FS-rhei-agents.2.3), `rhei run` parks that
 work until the displayed UTC deadline instead of reporting an ordinary failure.
 Foreground runs remain attached while waiting;
 headless launch still returns a run id and `rhei attach` shows the provider,

@@ -871,6 +871,15 @@ sub-case the directory the journal belongs in is missing too, so the restore is
 offered as the one command that creates it and copies — a remedy that fails with
 `No such file or directory` is the ticket's own complaint in miniature.
 
+Literal on the operator's own platform, too, because a command line is for the
+shell they are holding. The restore is spelled in that shell — `mkdir -p … && cp
+…` under a POSIX shell, `mkdir … && copy …` under `cmd`, where neither `cp` nor
+`mkdir -p` exists — and every path any printed command interpolates is quoted in
+that shell's own form. The quoting is not cosmetic: unquoted, a project path
+holding a space makes `mkdir -p` read two words and create a directory tree
+relative to wherever the operator happened to be standing, so the offered remedy
+fails *and* writes outside the path it named.
+
 The account's `health` is a closed vocabulary of two values, `verified` and
 `damaged`. Where it is `damaged` the report additionally carries the `damage`
 sub-case — one of `journal_absent`, `journal_truncated`, `chain_broken`, the
@@ -889,6 +898,13 @@ damaged account gets one shape whichever state it finds, rather than prose it
 cannot parse — and `project_id` and `account` mean there exactly what they mean
 in a verified report, the identity and the account **directory**, whether or not
 that directory is there.
+
+So does `project_root`, and its spelling is fixed for both health states: it is
+the target as the operator spelled it, which is what the text report's
+`Project:` line prints beside the identity. Everything that names where bytes are
+or which identity owns them is spelled **resolved** instead — `account`,
+`journal`, `witness`, and every command the report offers — because the witness
+index is keyed by the resolved root, and it is that key a retirement retracts.
 
 `forget` retires a **root** rather than repairing an account: it is how an
 operator says that the path was reused and the recorded account was not this

@@ -50,17 +50,27 @@ impl miette::Diagnostic for DetailedRefusal {
 /// The report goes to stdout under `--format text` and nowhere at all under
 /// `--format json`, where a reader parses one shape on stderr and must not
 /// find prose beside it. Nothing here writes to the account.
-/// §FS-rhei-budgets.10
-fn budget_report_damaged(diagnosis: &Diagnosis, format: BudgetFormat) -> miette::Report {
+///
+/// `target` is the project as the operator spelled it on the command line, and
+/// it is carried in rather than taken from the diagnosis because the diagnosis
+/// holds the **resolved** root — the key the witness index is by. One of the two
+/// belongs on the `Project:` line and under `project_root`, and it is the
+/// operator's spelling, which is what a verified `show` has always printed
+/// there. §FS-rhei-budgets.10
+fn budget_report_damaged(
+    diagnosis: &Diagnosis,
+    target: &Path,
+    format: BudgetFormat,
+) -> miette::Report {
     if matches!(format, BudgetFormat::Text) {
-        for line in budget_damaged_lines(diagnosis) {
+        for line in budget_damaged_lines(diagnosis, target) {
             println!("{line}");
         }
     }
     miette::Report::new(DetailedRefusal {
         message: diagnosis.headline(),
         help: budget_damaged_help(diagnosis),
-        details: budget_damaged_details(diagnosis),
+        details: budget_damaged_details(diagnosis, target),
     })
 }
 
@@ -84,17 +94,22 @@ fn budget_damaged_help(diagnosis: &Diagnosis) -> String {
 /// is `damaged` here and `verified` nowhere else, and `damage` is one of the
 /// three sub-cases.
 ///
-/// `project_id` and `account` are the members a verified report already
-/// carries, with the meanings it gives them — the identity and the account
-/// **directory**, absent or not. A key that named a directory in one state and
-/// a bare uuid in the other would be two shapes under one name, which is the
-/// one thing §FS-rhei-budgets.10 promises a reader against. §FS-rhei-errors.5
-fn budget_damaged_details(diagnosis: &Diagnosis) -> serde_json::Map<String, serde_json::Value> {
+/// `project_id`, `project_root` and `account` are the members a verified report
+/// already carries, with the meanings it gives them — the identity, the target
+/// as the operator spelled it, and the account **directory**, absent or not. A
+/// key that named a directory in one state and a bare uuid in the other, or a
+/// root resolved in one and given in the other, would be two shapes under one
+/// name, which is the one thing §FS-rhei-budgets.10 promises a reader against.
+/// §FS-rhei-errors.5
+fn budget_damaged_details(
+    diagnosis: &Diagnosis,
+    target: &Path,
+) -> serde_json::Map<String, serde_json::Value> {
     let mut details = serde_json::Map::new();
     details.insert("health".into(), "damaged".into());
     details.insert("damage".into(), diagnosis.damage.as_str().into());
     details.insert("project_id".into(), diagnosis.project_id().into());
-    details.insert("project_root".into(), serde_json::json!(diagnosis.root));
+    details.insert("project_root".into(), serde_json::json!(target));
     details.insert("account".into(), serde_json::json!(diagnosis.directory()));
     details.insert("journal".into(), serde_json::json!(diagnosis.journal));
     details.insert("witness".into(), serde_json::json!(diagnosis.witness));
@@ -113,9 +128,9 @@ fn budget_damaged_details(diagnosis: &Diagnosis) -> serde_json::Map<String, serd
 /// Where the journal is wholly absent both readings are stated and neither is
 /// chosen, because the distinguishing fact is the operator's intent and nothing
 /// on disk carries it. §FS-rhei-budgets.5.4
-fn budget_damaged_lines(diagnosis: &Diagnosis) -> Vec<String> {
+fn budget_damaged_lines(diagnosis: &Diagnosis, target: &Path) -> Vec<String> {
     let mut lines = vec![
-        format!("Project: {} (panta:{})", diagnosis.root.display(), diagnosis.uuid),
+        format!("Project: {} (panta:{})", target.display(), diagnosis.uuid),
         format!("Account: damaged [{}] — {}", diagnosis.damage, diagnosis.headline()),
         match diagnosis.damage {
             Damage::JournalAbsent => format!("Journal: {} (absent)", diagnosis.journal.display()),

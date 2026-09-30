@@ -191,8 +191,9 @@ A project laid down at a path a *different* project used before it is refused,
 because nothing on disk tells that apart from a journal somebody rolled back to
 buy capacity. `rhei budget show` says so and names both readings, and
 `rhei budget forget <plan-or-project> --reason <TEXT>` retires the stale record
-once you know which it was — it refuses an account whose journal verifies, so it
-recovers a reused path and never resets a working balance.
+once you know which it was — it refuses every account whose journal is still
+there, verifying or damaged, so it recovers a reused path and never resets a
+working balance or gives up a journal that should be restored instead.
 
 ## Install
 

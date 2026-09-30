@@ -117,7 +117,7 @@ fn show_reports_the_damaged_account_rather_than_failing_to_open_it() {
         "the report gives the reused-path reading a runnable command; got:\n{report}"
     );
     assert!(
-        report.contains(&world.witness(&uuid).display().to_string()) && report.contains("cp "),
+        report.contains(&restore_copy(&world, &uuid)),
         "the report gives the lost-journal reading a runnable command too, and does \
          not choose between them; got:\n{report}"
     );
@@ -131,30 +131,45 @@ fn show_reports_the_damaged_account_rather_than_failing_to_open_it() {
          got:\n{report}"
     );
 
-    assert_the_restore_actually_restores(&world, &report);
+    assert_the_restore_actually_restores(&world, &report, &uuid);
 }
 
-/// The offered restore, run as the operator would run it.
+/// The copy the report offers for this world's account, in the shell the
+/// platform gives the operator: `cp` under a POSIX shell, `copy` under `cmd`,
+/// each with its own quoting. A case that matched `"cp "` was asserting Unix.
+/// §FS-rhei-budgets.10
+fn restore_copy(world: &World, uuid: &str) -> String {
+    rhei_core::platform::copy_command(
+        &world.witness(uuid),
+        &world.account_dir(uuid).join("journal.jsonl"),
+    )
+}
+
+/// The offered restore, run through the platform's own shell as the operator
+/// would run it.
 ///
-/// Matching `cp ` proves only that a command was printed. What has to hold is
-/// that it *works* in the state it was offered for — where the account
-/// directory does not exist at all, a bare `cp` fails with
+/// Matching a copy command proves only that a line was printed. What has to hold
+/// is that it *works* in the state it was offered for — where the account
+/// directory does not exist at all, a bare copy fails with
 /// `No such file or directory`, which is the ticket's own complaint about
-/// `rhei budget show` in miniature. On Unix only, because the shell and both
-/// commands are the platform's. §FS-rhei-budgets.10
-#[cfg(unix)]
-fn assert_the_restore_actually_restores(world: &World, report: &str) {
+/// `rhei budget show` in miniature. Every platform, not Unix only: the claim
+/// §FS-rhei-budgets.10 makes is that the line is runnable on the platform it was
+/// printed on, and a Windows arm that only inspected the string is what let a
+/// `cp` / `mkdir -p` line — which `cmd` can run neither half of — go unnoticed.
+///
+/// The offered line is found as the one line naming **both** paths, which is
+/// what no other line of the report does, rather than by a leading word that
+/// differs per shell. §FS-rhei-budgets.10
+fn assert_the_restore_actually_restores(world: &World, report: &str, uuid: &str) {
+    let witness = world.witness(uuid).display().to_string();
+    let journal = world.account_dir(uuid).join("journal.jsonl").display().to_string();
     let offered = report
         .lines()
         .map(str::trim)
-        .find(|line| line.starts_with("mkdir ") || line.starts_with("cp "))
+        .find(|line| line.contains(&witness) && line.contains(&journal))
         .unwrap_or_else(|| panic!("the report offers a restore command; got:\n{report}"));
 
-    let restored = std::process::Command::new("sh")
-        .arg("-c")
-        .arg(offered)
-        .output()
-        .expect("the offered restore should run");
+    let restored = world.shell(offered);
 
     assert!(
         restored.status.success(),
@@ -168,15 +183,6 @@ fn assert_the_restore_actually_restores(world: &World, report: &str) {
         "the restore the report offers is the whole remedy: the account verifies \
          after it; got:\n{}",
         after.stdout
-    );
-}
-
-#[cfg(not(unix))]
-fn assert_the_restore_actually_restores(_world: &World, report: &str) {
-    assert!(
-        report.contains("mkdir "),
-        "the restore creates the directory it copies into, which is absent in this \
-         sub-case; got:\n{report}"
     );
 }
 
@@ -382,7 +388,7 @@ fn assert_restore_is_the_only_remedy(prefix: &str, damage: &str, break_it: fn(&P
         "the report names this sub-case rather than damage in general; got:\n{report}"
     );
     assert!(
-        report.contains("cp ") && report.contains(&world.witness(&uuid).display().to_string()),
+        report.contains(&restore_copy(&world, &uuid)),
         "restore from the witness is the remedy here, because the journal is this \
          project's; got:\n{report}"
     );
@@ -401,7 +407,7 @@ fn assert_restore_is_the_only_remedy(prefix: &str, damage: &str, break_it: fn(&P
     );
     let refusal = said(&refused);
     assert!(
-        refusal.contains("cp ") && refusal.contains(&world.witness(&uuid).display().to_string()),
+        refusal.contains(&restore_copy(&world, &uuid)),
         "the refusal names the restore, which is the remedy the sub-case has; got:\n{refusal}"
     );
     assert_eq!(
@@ -467,8 +473,11 @@ fn show_on_a_sound_account_reports_exactly_what_it_reports_today() {
     let json = CliRun::from(&world.show_json());
 
     assert_success(&text);
+    // The target as typed, which is what this line has always printed; asserting
+    // the resolved spelling asserted that the two agree, and on a runner whose
+    // temporary directory is a link they do not. §FS-rhei-budgets.10
     assert!(
-        text.stdout.contains(&format!("Project: {} (panta:{uuid})", world.canonical_project())),
+        text.stdout.contains(&format!("Project: {} (panta:{uuid})", world.project.display())),
         "the identity line is unchanged; got:\n{}",
         text.stdout
     );

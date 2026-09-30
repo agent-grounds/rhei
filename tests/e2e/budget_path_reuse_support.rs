@@ -30,11 +30,18 @@ pub(super) struct World {
 }
 
 pub(super) fn world(prefix: &str) -> World {
+    world_named(prefix, "p")
+}
+
+/// The same world with the project's own directory named, for the case that
+/// needs a path an operator plausibly has and a printed command has to survive:
+/// one with a space in it. §FS-rhei-budgets.10
+pub(super) fn world_named(prefix: &str, project: &str) -> World {
     let dir = unique_temp_dir(prefix);
     let agent = write_python_agent(&dir, "mock-agent.py", FINISHING_AGENT);
     write_machine_settings(&dir, &agent_defaults(&agent, ""));
     let machine = write_fixture_file(&dir, "states.yaml", FINISHING_MACHINE);
-    let project = dir.join("p");
+    let project = dir.join(project);
     World { dir, project, machine }
 }
 
@@ -108,8 +115,19 @@ impl World {
         self.budget(&["forget", &self.project.display().to_string(), "--reason", reason])
     }
 
+    /// The witness base in the spelling the **tool** resolves it to.
+    ///
+    /// Two things have to match, not one. `Authority::lock_at` resolves the state
+    /// directory before it joins anything, so an expectation built from the raw
+    /// temporary path is a second spelling of one location — which is every macOS
+    /// runner, where `/var` is a link to `/private/var`, and every Windows one,
+    /// where the temporary path arrives in its 8.3 form. And it joins the
+    /// multi-component literal `rhei/budget-authority` as a *single* component,
+    /// so on Windows that inner `/` survives inside a `\` path: this joins the
+    /// same literal the same way, because the expectation is the string the tool
+    /// prints rather than the tidiest spelling of the same place.
     pub(super) fn authority(&self) -> PathBuf {
-        home_for(&self.dir).join("state/rhei/budget-authority")
+        resolved(&home_for(&self.dir).join("state")).join("rhei/budget-authority")
     }
 
     pub(super) fn roots_index(&self) -> String {
@@ -135,18 +153,55 @@ impl World {
         self.authority().join(uuid).join("history.jsonl")
     }
 
+    /// The account directory in the spelling the tool prints, for the same two
+    /// reasons [`World::authority`] gives: `Account` resolves the root first and
+    /// joins `ACCOUNT_DIR` as one component.
     pub(super) fn account_dir(&self, uuid: &str) -> PathBuf {
-        self.project.join(".agent-grounds/rhei/budgets").join(uuid)
+        resolved(&self.project).join(".agent-grounds/rhei/budgets").join(uuid)
     }
 
-    /// The project path in the spelling the product prints it: canonical,
-    /// because macOS exposes a temporary directory under two names and the
-    /// refusal names the resolved one.
+    /// The project path in the spelling the product prints where it names the
+    /// **resolved** root — the witness index's key, which every offered command
+    /// and every path member carries. The `Project:` line and `project_root` are
+    /// the target as this fixture typed it instead, so they are asserted against
+    /// `self.project` rather than this. §FS-rhei-budgets.10
     pub(super) fn canonical_project(&self) -> String {
-        rhei_core::platform::canonical_path(&self.project)
-            .expect("the project path resolves")
-            .display()
-            .to_string()
+        resolved(&self.project).display().to_string()
+    }
+
+    /// Run a command line the report offered, from this world's own directory.
+    ///
+    /// The working directory matters: an unquoted path with a space in it makes
+    /// `mkdir` build a tree *relative to where the operator stood*, so a case
+    /// that ran the offered line from the checkout would write six directory
+    /// levels into it. Here a badly quoted command can only litter a temporary
+    /// directory, and the assertions that follow it still fail.
+    /// §FS-rhei-budgets.10
+    pub(super) fn shell(&self, line: &str) -> std::process::Output {
+        rhei_core::platform::system_shell_command(line)
+            .current_dir(&self.dir)
+            .output()
+            .expect("the offered command should run")
+    }
+}
+
+/// `canonical_path`, resolving the deepest ancestor that exists and keeping the
+/// rest — the same reading `authority.rs`'s `resolve_existing` makes, so a base
+/// the first run has not created yet still answers with the spelling it will
+/// have.
+fn resolved(path: &Path) -> PathBuf {
+    let mut ancestor = path;
+    loop {
+        if let Ok(base) = rhei_core::platform::canonical_path(ancestor) {
+            let rest = path.strip_prefix(ancestor).expect("an ancestor prefixes its own path");
+            // Never `join` an empty remainder: that appends a separator, and a
+            // path with a trailing one is not the string the tool printed.
+            return if rest.as_os_str().is_empty() { base } else { base.join(rest) };
+        }
+        match ancestor.parent() {
+            Some(parent) => ancestor = parent,
+            None => return path.to_path_buf(),
+        }
     }
 }
 

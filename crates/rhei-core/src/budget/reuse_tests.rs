@@ -113,10 +113,12 @@ fn retiring_an_account_whose_journal_is_present_is_refused_and_writes_nothing() 
         panic!("a journal that is present is refused; got {outcome:?}")
     };
     assert_eq!(diagnosis.damage, Damage::JournalTruncated);
-    assert!(
-        diagnosis.restore_command().contains("cp "),
-        "the refusal carries the remedy the sub-case has; got {}",
-        diagnosis.restore_command()
+    // The platform's own copy, not `cp`: this sub-case offers the bare copy, and
+    // matching a POSIX word here was asserting Unix. §FS-rhei-budgets.10
+    assert_eq!(
+        diagnosis.restore_command(),
+        crate::platform::copy_command(&diagnosis.witness, &diagnosis.journal),
+        "the refusal carries the remedy the sub-case has"
     );
     assert_eq!(fs::read(case.witness_path()).expect("read the witness"), witness);
     assert!(

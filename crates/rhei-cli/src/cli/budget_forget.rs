@@ -49,7 +49,7 @@ fn budget_sound_account(project_root: &Path) -> miette::Report {
     miette!(
         help = format!(
             "change an allowance with: rhei budget adjust {} --invocations <N> --reason <TEXT>",
-            budget_target(project_root)
+            budget_target_argument(project_root)
         ),
         "the budget account at {} verifies; retiring a sound account would recreate capacity",
         budget_target(project_root)
@@ -77,7 +77,7 @@ fn budget_nothing_to_retire(project_root: &Path) -> miette::Report {
     miette!(
         help = format!(
             "see what this path resolves to with: rhei budget show {}",
-            budget_target(project_root)
+            budget_target_argument(project_root)
         ),
         "no committed history claims {}, so there is no root to retire",
         budget_target(project_root)

@@ -55,10 +55,77 @@ pub fn system_shell_command(command: &str) -> Command {
 /// that runs the whole suite pins the other one's spelling too.
 // §FS-rhei-errors.2 §REQ-cross-platform.2
 pub fn shell_quote(value: &str) -> String {
-    if cfg!(windows) {
-        quote_for_cmd(value)
-    } else {
-        quote_for_posix(value)
+    Dialect::of_this_platform().quote(value)
+}
+
+/// The platform shell's own copy of one file over another, both paths quoted.
+///
+/// A printed remedy is a command line for the shell the operator is holding, so
+/// which words it is spelled in is a fact about the host rather than about what
+/// the remedy is for: `cp` is not a program `cmd` has, and `copy` is not one a
+/// POSIX shell does. §FS-rhei-budgets.10 §REQ-cross-platform.2
+pub fn copy_command(from: &Path, to: &Path) -> String {
+    Dialect::of_this_platform().copy(from, to)
+}
+
+/// The platform shell's own creation of a directory and every missing parent.
+///
+/// `mkdir -p` is the POSIX spelling; `cmd` makes the whole chain with its own
+/// `mkdir` under command extensions, which are on by default, and would read a
+/// `-p` as another directory to create. §FS-rhei-budgets.10 §REQ-cross-platform.2
+pub fn make_directory_command(directory: &Path) -> String {
+    Dialect::of_this_platform().make_directory(directory)
+}
+
+/// Which shell a printed command line is written for.
+///
+/// Named rather than left to `cfg!` at each point of use, so both halves are
+/// compiled everywhere and the platform that runs the whole suite pins the other
+/// one's spelling too — the alternative is a Windows command line no test on
+/// Linux can read. §REQ-cross-platform.2
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Dialect {
+    Posix,
+    Cmd,
+}
+
+impl Dialect {
+    fn of_this_platform() -> Self {
+        if cfg!(windows) {
+            Self::Cmd
+        } else {
+            Self::Posix
+        }
+    }
+
+    fn quote(self, value: &str) -> String {
+        match self {
+            Self::Posix => quote_for_posix(value),
+            Self::Cmd => quote_for_cmd(value),
+        }
+    }
+
+    /// A path as one shell word. Quoted through the same rule a bare value
+    /// takes, so a path holding a space is one argument rather than two.
+    /// §FS-rhei-budgets.10
+    fn path(self, path: &Path) -> String {
+        self.quote(&path.display().to_string())
+    }
+
+    fn copy(self, from: &Path, to: &Path) -> String {
+        let verb = match self {
+            Self::Posix => "cp",
+            Self::Cmd => "copy",
+        };
+        format!("{verb} {} {}", self.path(from), self.path(to))
+    }
+
+    fn make_directory(self, directory: &Path) -> String {
+        let verb = match self {
+            Self::Posix => "mkdir -p",
+            Self::Cmd => "mkdir",
+        };
+        format!("{verb} {}", self.path(directory))
     }
 }
 
@@ -253,6 +320,50 @@ mod tests {
         // escape: `cmd` never reads one as escaping the quote.
         assert_eq!(quote_for_cmd(r"C:\a b\"), r#""C:\a b\""#);
         assert_eq!(quote_for_cmd("50%"), r#""50%""#);
+    }
+
+    /// The two commands a printed remedy is made of, in both dialects, on
+    /// whichever platform runs the suite. A path holding a space is one word in
+    /// each, and each names a program its own shell actually has.
+    // §FS-rhei-budgets.10 §REQ-cross-platform.2
+    #[test]
+    fn a_printed_remedy_is_spelled_in_the_shell_it_is_offered_to() {
+        let spaced = Path::new("/tmp/my projects/ss/journal.jsonl");
+        assert_eq!(
+            Dialect::Posix.copy(Path::new("/w/history.jsonl"), Path::new("/w/journal.jsonl")),
+            "cp /w/history.jsonl /w/journal.jsonl"
+        );
+        assert_eq!(
+            Dialect::Posix.copy(Path::new("/w/history.jsonl"), spaced),
+            "cp /w/history.jsonl '/tmp/my projects/ss/journal.jsonl'"
+        );
+        assert_eq!(
+            Dialect::Posix.make_directory(spaced),
+            "mkdir -p '/tmp/my projects/ss/journal.jsonl'"
+        );
+        assert_eq!(
+            Dialect::Cmd.copy(Path::new(r"C:\w\history.jsonl"), Path::new(r"C:\w\journal.jsonl")),
+            r"copy C:\w\history.jsonl C:\w\journal.jsonl"
+        );
+        assert_eq!(
+            Dialect::Cmd
+                .copy(Path::new(r"C:\w\history.jsonl"), Path::new(r"C:\my projects\journal.jsonl")),
+            r#"copy C:\w\history.jsonl "C:\my projects\journal.jsonl""#
+        );
+        // `-p` is a directory name to `cmd`, which makes the whole chain anyway.
+        assert_eq!(Dialect::Cmd.make_directory(Path::new(r"C:\w\b")), r"mkdir C:\w\b");
+    }
+
+    /// The public pair is this platform's dialect and nothing else, so a caller
+    /// never has to ask which one it got.
+    // §FS-rhei-budgets.10
+    #[test]
+    fn the_printed_remedy_takes_this_platforms_dialect() {
+        let from = Path::new("from");
+        let to = Path::new("to");
+        assert_eq!(copy_command(from, to), Dialect::of_this_platform().copy(from, to));
+        assert_eq!(make_directory_command(to), Dialect::of_this_platform().make_directory(to));
+        assert!(copy_command(from, to).starts_with(if cfg!(windows) { "copy " } else { "cp " }));
     }
 
     /// The verbatim prefix is stripped only where a plain spelling exists, and

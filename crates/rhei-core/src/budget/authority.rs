@@ -62,13 +62,8 @@ impl Authority {
         let dir = resolved.join("rhei/budget-authority").join(uuid);
         durable_directories(&dir)?;
         let lock_path = dir.join("history.lock");
-        let lock = OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .read(true)
-            .write(true)
-            .open(&lock_path)
-            .map_err(|error| BudgetError::unreachable(&lock_path, &error))?;
+        let lock =
+            open_lock_file(&lock_path).map_err(|e| BudgetError::unreachable(&lock_path, &e))?;
         lock.lock_exclusive()?;
         let path = dir.join("history.jsonl");
         let bytes = match std::fs::read(&path) {
@@ -150,9 +145,11 @@ impl Authority {
     /// `&mut self` rather than `self`, so the lock this holds outlives the move
     /// and the caller's remaining writes are serialized by it: a retirement
     /// taken apart by an `Authority` that dropped here would leave the index
-    /// retraction unlocked. The `flock` travels with the directory, the open
-    /// handle keeping it across the `rename`, and the path is rewritten to where
-    /// the bytes now are so nothing afterwards reads a name that is gone.
+    /// retraction unlocked. The lock travels with the directory, the open handle
+    /// keeping it across the `rename`, and the path is rewritten to where the
+    /// bytes now are so nothing afterwards reads a name that is gone. That the
+    /// handle is open *inside* the directory being moved is why
+    /// [`open_lock_file`] asks Windows for delete sharing — see there.
     /// §AR-neural-admission.3 §FS-rhei-budgets.5.3 §FS-rhei-budgets.10
     pub(crate) fn retire(&mut self, stamp: &str, receipt: &serde_json::Value) -> Result<PathBuf> {
         let live = self.directory().to_path_buf();
@@ -261,6 +258,35 @@ pub(super) fn authority_base() -> Result<PathBuf> {
 /// rewrites the separators of every component pushed onto it, so the witness
 /// was reported in a spelling no other line of a run uses.
 /// §REQ-cross-platform.5
+/// The serializing handle on `history.lock`, opened so that the directory
+/// holding it can still be renamed while it is held.
+///
+/// Every platform but Windows moves a directory whatever is open inside it, and
+/// `retire` moves exactly this file's directory with this handle live — which is
+/// how the lock stays held across the move, and is not something the retirement
+/// can give up: all three of its writes have to be one serialized act
+/// (§AR-neural-admission.3). Windows refuses such a move unless every open
+/// handle in the tree was opened sharing delete, so this one is. That is the
+/// whole of the platform difference: `FILE_SHARE_DELETE` widens who may rename
+/// or unlink the file, not who may write it — the exclusive lock taken on the
+/// handle is what excludes another writer, on every platform alike.
+/// §FS-rhei-budgets.10 §REQ-cross-platform.5
+fn open_lock_file(path: &Path) -> std::io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.create(true).truncate(false).read(true).write(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt as _;
+        // The two Rust already asks for, plus delete. Named rather than pulled
+        // from a bindings crate this workspace does not depend on.
+        const FILE_SHARE_READ: u32 = 0x0000_0001;
+        const FILE_SHARE_WRITE: u32 = 0x0000_0002;
+        const FILE_SHARE_DELETE: u32 = 0x0000_0004;
+        options.share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE);
+    }
+    options.open(path)
+}
+
 fn resolve_existing(base: &Path) -> Result<PathBuf> {
     let mut ancestor = base;
     loop {

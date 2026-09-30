@@ -103,7 +103,9 @@ fn budget_show_command(
     };
     let journal = match budget_result_at(&project_root, account.inspect())? {
         Inspection::Verified(journal) => *journal,
-        Inspection::Damaged(diagnosis) => return Err(budget_report_damaged(&diagnosis, format)),
+        Inspection::Damaged(diagnosis) => {
+            return Err(budget_report_damaged(&diagnosis, &project_root, format))
+        }
         Inspection::Absent => return Err(budget_no_account(&project_root)),
     };
     let snapshot = budget_result_at(&project_root, journal.snapshot())?;

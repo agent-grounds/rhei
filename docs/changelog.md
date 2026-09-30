@@ -90,11 +90,16 @@ pull request number: the release stamps `(PR #N)` onto it. See
   function execution spawns through, per task identity, so a `**Target:**`
   override is judged as it would be spawned and a fan-out member by member;
   `rhei run --no-agent` resolves no invocation and stays exempt; and the real
-  run's refusal moves from the first pass to admission without changing its
-  words. The shipped `code-review` and `fix` templates gained an
-  `agent_timeout` on each of their agent states — per state rather than through
-  `defaults`, because that key's ownership is exclusive at mount time and two
-  composed blocks owning it collide when `changeset-review` is instantiated.
+  run's refusal moves from the first pass to admission, so the sentence is
+  unchanged but what surrounds it is not: it now arrives inside a validation
+  error rather than as a pass-1 diagnostic, the four places a timeout may be
+  set ride along inside it as a parenthetical rather than on a `help:` line of
+  their own, and no `runtime/run-report.md` is written for a refusal that
+  happens before the first pass. The shipped `code-review` and `fix` templates
+  gained an `agent_timeout` on each of their agent states — per state rather
+  than through `defaults`, because that key's ownership is exclusive at mount
+  time and two composed blocks owning it collide when `changeset-review` is
+  instantiated.
   §FS-rhei-validate.4 §FS-rhei-agents.3.2.2 §FS-rhei-run.4
 
 - Say what a plan with an unbounded agent state must satisfy, before anything

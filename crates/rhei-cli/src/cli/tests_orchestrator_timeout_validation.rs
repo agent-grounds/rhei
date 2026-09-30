@@ -270,3 +270,42 @@
 
         assert!(errors.is_empty(), "--no-agent spawns nothing, so it refuses nothing: {errors:?}");
     }
+
+    /// A binding that does not resolve at all belongs to the check that owns it
+    /// — an undeclared agent here — and the run refuses it at resolution,
+    /// before any spawn. So this check steps over it rather than restating it
+    /// as a missing timeout, which would replace a diagnostic the author can
+    /// act on with one they cannot. The state is otherwise exactly the refused
+    /// one: nothing but the unresolved agent keeps it out of the set.
+    /// §FS-rhei-agents.3.2.2
+    #[test]
+    fn validate_orchestrator_timeouts_leaves_an_unresolvable_binding_to_its_own_check() {
+        let mut settings = default_settings();
+        settings.defaults.agent = Some(AgentConfig::from("codex"));
+        assert!(
+            !settings.agents.contains_key("ghost"),
+            "the fixture rests on `ghost` being undeclared"
+        );
+        let machine = timeout_machine(
+            "  pending:\n    initial: true\n    description: x\n    \
+             target: ghost:anthropic:claude-opus-5\n",
+        );
+        assert!(
+            resolve_agent_invocations_for_task(
+                &machine,
+                "pending",
+                &settings,
+                &default_run_options(),
+                None,
+            )
+            .is_err(),
+            "the fixture must exercise the resolution-failure path, not the empty one"
+        );
+
+        let errors = refusals(&plan_without_tasks(), &machine, &settings);
+
+        assert!(
+            errors.is_empty(),
+            "an unresolvable binding is not restated as a missing timeout: {errors:?}"
+        );
+    }

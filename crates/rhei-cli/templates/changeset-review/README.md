@@ -32,7 +32,11 @@ The template ships a project `.agent-grounds/rhei/settings.json` that adds `high
 `xhigh` Codex modes. The default GPT-5.5 target uses `xhigh` reasoning effort.
 Claude Code remains available as a second default reviewer, but Rhei does not
 currently expose a Claude reasoning-effort flag; override the target arrays if
-you want every default review pass to use only xhigh-capable targets.
+you want every default review pass to use only xhigh-capable targets. Both
+composed blocks bound their agent states per state with `agent_timeout: 1h`
+rather than through `defaults.agent_timeout`, whose ownership is exclusive at
+mount time and so cannot be claimed by two blocks at once; change a bound by
+editing `agent_timeout` on the state in the rendered `states.yaml`.
 
 ## State Machine
 

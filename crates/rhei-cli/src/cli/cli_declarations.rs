@@ -885,6 +885,20 @@ enum BudgetCommand {
         #[arg(long, value_name = "TEXT")]
         reason: String,
     },
+    /// Retire a damaged root, keeping its receipts; refused where the journal
+    /// verifies
+    Forget {
+        /// Path to a plan, workspace, or Panta project; omitted, discover it
+        #[arg(
+            value_name = "RHEI_PLAN_OR_WORKSPACE",
+            add = ArgValueCompleter::new(complete_rhei_plan_path)
+        )]
+        input: Option<PathBuf>,
+        /// Why, recorded in the retirement receipt beside the actor and the
+        /// argv
+        #[arg(long, value_name = "TEXT")]
+        reason: String,
+    },
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]

@@ -117,8 +117,33 @@ fn budget_result<T>(result: Result<T, BudgetError>) -> MietteResult<T> {
     result.map_err(|err| miette!(help = budget_inspect_help(), "{}", err.message))
 }
 
+/// The same, spelled with the project the refusal is about.
+///
+/// A help line is a command the reader can paste, so it carries the target
+/// rather than leaving them to supply the one argument that mattered. `show`
+/// itself never takes this help: sending an operator back to the command they
+/// just ran is not a next action. §FS-rhei-errors.1.2
+fn budget_result_at<T>(project_root: &Path, result: Result<T, BudgetError>) -> MietteResult<T> {
+    result.map_err(|err| miette!(help = budget_inspect_help_for(project_root), "{}", err.message))
+}
+
 fn budget_inspect_help() -> &'static str {
     "inspect the project's account with: rhei budget show"
+}
+
+fn budget_inspect_help_for(project_root: &Path) -> String {
+    format!("inspect the project's account with: rhei budget show {}", budget_target(project_root))
+}
+
+/// The project in the spelling every other budget surface prints it, so a help
+/// line and the report it sends the reader to name one path. The witness index
+/// is keyed by the resolved root, and a root that does not resolve is spelled
+/// as it was given. §REQ-cross-platform.5
+fn budget_target(project_root: &Path) -> String {
+    rhei_core::platform::canonical_path(project_root)
+        .unwrap_or_else(|_| project_root.to_path_buf())
+        .display()
+        .to_string()
 }
 
 /// The project's account, established when it is absent.
@@ -130,7 +155,7 @@ fn open_project_account(project_root: &Path, reason: &str) -> MietteResult<Optio
         return Ok(None);
     }
     let audit = budget_audit(reason)?;
-    let (_, journal) = budget_result(Account::establish(project_root, &audit))?;
+    let (_, journal) = budget_result_at(project_root, Account::establish(project_root, &audit))?;
     Ok(Some(journal))
 }
 

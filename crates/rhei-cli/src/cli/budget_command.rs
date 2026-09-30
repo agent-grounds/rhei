@@ -8,7 +8,7 @@
 
 // §AR-source-file-size.3 §FS-rhei-budgets.10
 
-use rhei_core::budget::BudgetLine;
+use rhei_core::budget::{BudgetLine, Inspection};
 
 /// All three resolve the whole project and its single account even when the
 /// target is one member rhei: one account, one balance, whatever was named.
@@ -22,6 +22,7 @@ fn budget_command(command: BudgetCommand) -> MietteResult<()> {
         BudgetCommand::Adjust { input, invocations, reason } => {
             budget_adjust_command(input, invocations, &reason)
         }
+        BudgetCommand::Forget { input, reason } => budget_forget_command(input, &reason),
     }
 }
 
@@ -47,7 +48,8 @@ fn budget_init_command(
 ) -> MietteResult<()> {
     let (project_root, bounds) = budget_command_context(input)?;
     let audit = budget_audit(reason)?;
-    let (_, mut journal) = budget_result(Account::establish(&project_root, &audit))?;
+    let (_, mut journal) =
+        budget_result_at(&project_root, Account::establish(&project_root, &audit))?;
     if journal.contract().map(|contract| contract.is_lifetime()).unwrap_or(false) {
         return Err(miette!(
             help = "change an existing allowance with: rhei budget adjust",
@@ -72,37 +74,43 @@ fn budget_adjust_command(
     reason: &str,
 ) -> MietteResult<()> {
     let (project_root, bounds) = budget_command_context(input)?;
-    let Some(account) = budget_result(Account::locate(&project_root))? else {
+    let Some(account) = budget_result_at(&project_root, Account::locate(&project_root))? else {
         return Err(budget_no_account(&project_root));
     };
     let audit = budget_audit(reason)?;
-    let mut journal = budget_result(account.open(true))?;
+    let mut journal = budget_result_at(&project_root, account.open(true))?;
     let granted = budget_clamped_allowance(invocations, &bounds);
-    budget_result(journal.adjust(granted, &audit))?;
+    budget_result_at(&project_root, journal.adjust(granted, &audit))?;
     println!("{}", budget_grant_line(invocations, granted, &bounds));
     Ok(())
 }
 
 /// Read-only: it takes no lock that mutates, appends no receipt, and debits
-/// nothing. §FS-rhei-budgets.6.3
+/// nothing.
+///
+/// It is also the command a refusal sends an operator to, so it may not fail
+/// to open the account it was asked to describe: an account it cannot verify
+/// is **reported** rather than refused for the missing file, and still exits
+/// non-zero. §FS-rhei-budgets.6.3 §FS-rhei-budgets.10
 fn budget_show_command(
     input: Option<PathBuf>,
     rhei: &[String],
     format: BudgetFormat,
 ) -> MietteResult<()> {
     let (project_root, bounds) = budget_command_context(input)?;
-    let Some(account) = budget_result(Account::locate(&project_root))? else {
+    let Some(account) = budget_result_at(&project_root, Account::locate(&project_root))? else {
         return Err(budget_no_account(&project_root));
     };
-    let journal = budget_result(account.open(false))?;
-    let snapshot = budget_result(journal.snapshot())?;
-    let lines = budget_result(journal.lines(
-        None,
-        bounds.per_day.effective,
-        0,
-        bounds.spend.effective,
-        &run_is_gone,
-    ))?;
+    let journal = match budget_result_at(&project_root, account.inspect())? {
+        Inspection::Verified(journal) => *journal,
+        Inspection::Damaged(diagnosis) => return Err(budget_report_damaged(&diagnosis, format)),
+        Inspection::Absent => return Err(budget_no_account(&project_root)),
+    };
+    let snapshot = budget_result_at(&project_root, journal.snapshot())?;
+    let lines = budget_result_at(
+        &project_root,
+        journal.lines(None, bounds.per_day.effective, 0, bounds.spend.effective, &run_is_gone),
+    )?;
     // `--rhei` narrows display only. There is one account and one balance
     // whatever the selection, and a narrowing that showed a second would be
     // describing capacity that does not exist. §FS-rhei-budgets.10

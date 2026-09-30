@@ -21,6 +21,7 @@ mod admission;
 mod ancestry;
 mod authority;
 mod bounds;
+mod diagnosis;
 mod events;
 mod identity;
 mod journal;
@@ -37,6 +38,8 @@ mod ledger_tests;
 #[cfg(test)]
 mod nonstart_tests;
 #[cfg(test)]
+mod reuse_tests;
+#[cfg(test)]
 mod spend_tests;
 #[cfg(test)]
 mod test_support;
@@ -45,10 +48,11 @@ mod travel_tests;
 #[cfg(test)]
 mod window_tests;
 
-pub use account::{witnessed_root, Account, ACCOUNT_DIR};
+pub use account::{witnessed_root, Account, Retirement, ACCOUNT_DIR};
 pub use admission::{AdmissionRequest, AppliedEdge, Arm, EffectiveBounds, ReservationGroup};
 pub use ancestry::{Ancestry, AncestryDescriptor};
 pub use bounds::{halt_text, Bound, BoundSource, BoundUnit, Remedy};
+pub use diagnosis::{Damage, Diagnosis, History, Inspection, Retired};
 pub use events::{BudgetEvent, BudgetLine};
 pub use journal::{Audit, Journal, Receipt};
 pub use types::{

@@ -24,16 +24,46 @@ fn an_absent_account_is_established_by_the_first_admission() {
 }
 
 /// A witness that knows of receipts this root no longer has is **damaged**:
-/// new work is refused, and the message names both paths and says the journal
-/// is restored by copying the witness back. Establishing a fresh account over
-/// it would be exactly the minting this design exists to prevent.
+/// new work is refused. Where the journal is wholly absent the refusal says
+/// exactly that and names the witness, and it may **not** offer the copy: on a
+/// path a different project used before this one that instruction succeeds and
+/// charges the new project the whole spend of the old. Establishing a fresh
+/// account over it would be the minting this design exists to prevent.
 /// §FS-rhei-budgets.5.4
 #[test]
-fn a_witness_without_a_journal_refuses_and_names_both_paths() {
+fn a_witness_without_a_journal_refuses_without_offering_the_copy() {
     let case = Case::new();
     std::fs::remove_file(case.journal_path()).expect("lose the journal");
 
     let refused = case.account.open(false).expect_err("a lost journal is not a fresh project");
+
+    assert_eq!(refused.reason_code, "untrustworthy_ledger");
+    let witness = case.witness_path().display().to_string();
+    // The witness spelling quoted, because it is the path the operator has to
+    // go and look at to decide which reading is true. §REQ-cross-platform.5
+    assert!(refused.message.contains(&witness), "names the witness {witness}: {}", refused.message);
+    assert!(
+        refused.message.contains("this project has no budget journal"),
+        "says what it found: {}",
+        refused.message
+    );
+    assert!(
+        !refused.message.contains("copying the witness back"),
+        "the copy adopts a history that may not be this project's: {}",
+        refused.message
+    );
+}
+
+/// A journal that is *present* but short of the witness keeps that remedy,
+/// because there the journal **is** this project's and its tail is what was
+/// lost. The two sub-cases are the whole reason the split exists.
+/// §FS-rhei-budgets.5.4
+#[test]
+fn a_journal_the_witness_is_ahead_of_still_says_to_copy_it_back() {
+    let case = Case::new();
+    std::fs::write(case.journal_path(), "").expect("lose the tail");
+
+    let refused = case.account.open(false).expect_err("a lost tail is not a fresh project");
 
     assert_eq!(refused.reason_code, "untrustworthy_ledger");
     let journal = case.journal_path().display().to_string();

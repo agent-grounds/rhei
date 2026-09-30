@@ -7,6 +7,7 @@
 //! the append fails, and the next opener refuses the incomplete chain.
 //! §FS-rhei-budgets.5.2 §AR-neural-admission.4
 
+use super::diagnosis::{absent_journal_refusal, Damage, Damaged, History};
 use super::replay::State;
 use super::types::{add, uuid, BudgetError, Contract, Snapshot};
 use super::Result;
@@ -118,6 +119,27 @@ impl Journal {
     }
 
     fn locked(root: &Path, project_uuid: &str, writable: bool, create: bool) -> Result<Self> {
+        let (ledger, damaged) = Self::locked_or_damaged(root, project_uuid, writable, create)?;
+        match damaged {
+            // A caller that only wanted the account gets exactly the words it
+            // got before the classification became a value.
+            // §FS-rhei-budgets.5.4
+            Some(damaged) => Err(damaged.error),
+            None => Ok(ledger),
+        }
+    }
+
+    /// Open the account and say whether it is damaged, rather than refusing on
+    /// its behalf.
+    ///
+    /// The one entry point `rhei budget show` uses, so the report it renders and
+    /// the refusal a run raises are the same judgement. §FS-rhei-budgets.10
+    pub(crate) fn locked_or_damaged(
+        root: &Path,
+        project_uuid: &str,
+        writable: bool,
+        create: bool,
+    ) -> Result<(Self, Option<Damaged>)> {
         uuid(project_uuid)?;
         let authority = super::authority::Authority::lock(root, project_uuid)?;
         let dir = root.join(".agent-grounds/rhei/budgets").join(project_uuid);
@@ -145,7 +167,7 @@ impl Journal {
             writable,
             day: String::new(),
         };
-        ledger.load()?;
+        let damaged = ledger.load()?;
         // A kind this build does not understand is not a broken account: it is
         // a newer one. It reports, and it may not append.
         // §FS-rhei-budgets.5.2
@@ -156,40 +178,89 @@ impl Journal {
             &super::window::day_key(super::window::now()?),
             ledger.state.highest_day.as_deref(),
         );
-        Ok(ledger)
+        Ok((ledger, damaged))
     }
 
     /// The three ledger states of §FS-rhei-budgets.5.4, told apart by name.
-    fn load(&mut self) -> Result<()> {
-        let bytes = match File::open(&self.path) {
+    ///
+    /// Damage is returned rather than only raised, and it is returned
+    /// *classified*: a journal that is wholly absent is not the same accident
+    /// as one whose tail was lost, and only the first is indistinguishable from
+    /// a path a different project used before this one.
+    /// §FS-rhei-budgets.5.4
+    fn load(&mut self) -> Result<Option<Damaged>> {
+        let present = match File::open(&self.path) {
             Ok(mut file) => {
                 let mut bytes = Vec::new();
                 file.read_to_end(&mut bytes)?;
-                bytes
+                Some(bytes)
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(error.into()),
         };
+        let bytes = present.clone().unwrap_or_default();
         if bytes.is_empty() {
             // **Absent** when the witness agrees there is nothing; **damaged**
             // when the witness knows of receipts this root no longer has.
-            if !self.authority.is_empty() {
-                return Err(BudgetError::corrupt(format!(
-                    "the committed history at {} records receipts the project journal at {} \
-                     does not have; restore the journal by copying the witness back over it",
-                    self.authority.path().display(),
-                    self.path.display()
-                )));
+            if self.authority.is_empty() {
+                return Ok(None);
             }
-            return Ok(());
+            // The file itself is the seam: no file at all is the one case
+            // whose history may belong to another project, so the copy that
+            // adopts it may not be the remedy. §FS-rhei-budgets.5.4
+            return Ok(Some(match present {
+                None => Damaged {
+                    damage: Damage::JournalAbsent,
+                    error: absent_journal_refusal(self.authority.path(), &self.recorded_history()),
+                },
+                Some(_) => Damaged {
+                    damage: Damage::JournalTruncated,
+                    error: self.witness_ahead_refusal(),
+                },
+            }));
         }
         // Verify the chain on its own terms first, so an **adopted** journal is
         // one this machine has checked rather than one it merely inherited.
-        self.replay(&bytes)?;
-        if self.authority.is_empty() {
-            return self.authority.adopt(&bytes);
+        if let Err(error) = self.replay(&bytes) {
+            return Ok(Some(Damaged { damage: Damage::ChainBroken, error }));
         }
-        self.authority.verify(&bytes, &self.path)
+        if self.authority.is_empty() {
+            self.authority.adopt(&bytes)?;
+            return Ok(None);
+        }
+        match self.authority.verify(&bytes, &self.path) {
+            Ok(()) => Ok(None),
+            // A journal the witness merely continues lost its tail; one that
+            // diverges was rolled back or edited, which is the chain's own
+            // failure however it was spelled. §FS-rhei-budgets.5.4
+            Err(error) if self.authority.continues(&bytes) => {
+                Ok(Some(Damaged { damage: Damage::JournalTruncated, error }))
+            }
+            Err(error) => Ok(Some(Damaged { damage: Damage::ChainBroken, error })),
+        }
+    }
+
+    /// Today's words for a witness that knows of receipts the journal does not
+    /// have. Unchanged, because a journal that is present is this project's and
+    /// copying the witness back over it restores this project's own history.
+    /// §FS-rhei-budgets.5.4
+    fn witness_ahead_refusal(&self) -> BudgetError {
+        BudgetError::corrupt(format!(
+            "the committed history at {} records receipts the project journal at {} \
+             does not have; restore the journal by copying the witness back over it",
+            self.authority.path().display(),
+            self.path.display()
+        ))
+    }
+
+    /// What the committed history holds, for a caller that has no journal to
+    /// read. §FS-rhei-budgets.5.3
+    pub(crate) fn recorded_history(&self) -> History {
+        History::read(&self.project_id, self.authority.bytes())
+    }
+
+    pub(crate) fn authority_path(&self) -> &Path {
+        self.authority.path()
     }
 
     pub fn snapshot(&self) -> Result<Snapshot> {
@@ -335,29 +406,53 @@ impl Journal {
     }
 
     pub(crate) fn replay(&mut self, bytes: &[u8]) -> Result<()> {
-        if bytes.is_empty() || !bytes.ends_with(b"\n") {
-            return Err(BudgetError::corrupt("missing or truncated receipt"));
-        }
-        let mut ids = BTreeSet::new();
-        for line in bytes[..bytes.len() - 1].split(|byte| *byte == b'\n') {
-            let receipt: Receipt = serde_json::from_slice(line)?;
-            if receipt.schema != "rhei.budget.receipt.v1"
-                || receipt.project_id != self.project_id
-                || receipt.sequence != add(self.receipts.len() as u64, 1)?
-                || receipt.previous_hash != self.last_hash
-                || !ids.insert(receipt.receipt_id.clone())
-                || receipt.actor.is_empty()
-                || receipt.written_at.is_empty()
-                || !receipt.receipt_id.starts_with("receipt:")
-            {
-                return Err(BudgetError::corrupt("invalid identity, sequence, or hash chain"));
-            }
-            self.state.apply(&receipt)?;
-            self.receipts.push(receipt);
-            self.last_hash = Some(digest(line));
-        }
+        let replayed = replay_chain(&self.project_id, bytes)?;
+        self.state = replayed.state;
+        self.receipts = replayed.receipts;
+        self.last_hash = replayed.last_hash;
         Ok(())
     }
+}
+
+/// One verified chain, held apart from the transaction that opened it.
+/// §FS-rhei-budgets.5.2
+#[derive(Default)]
+pub(crate) struct Replayed {
+    pub(crate) state: State,
+    pub(crate) receipts: Vec<Receipt>,
+    pub(crate) last_hash: Option<String>,
+}
+
+/// Verify a chain of receipt bytes under one project identity.
+///
+/// A free function rather than a method, because the **witness** is
+/// byte-identical to a journal and a report that described it with a second
+/// parser could disagree with the account about what it holds.
+/// §FS-rhei-budgets.5.2 §FS-rhei-budgets.5.3
+pub(crate) fn replay_chain(project_id: &str, bytes: &[u8]) -> Result<Replayed> {
+    if bytes.is_empty() || !bytes.ends_with(b"\n") {
+        return Err(BudgetError::corrupt("missing or truncated receipt"));
+    }
+    let mut replayed = Replayed::default();
+    let mut ids = BTreeSet::new();
+    for line in bytes[..bytes.len() - 1].split(|byte| *byte == b'\n') {
+        let receipt: Receipt = serde_json::from_slice(line)?;
+        if receipt.schema != "rhei.budget.receipt.v1"
+            || receipt.project_id != project_id
+            || receipt.sequence != add(replayed.receipts.len() as u64, 1)?
+            || receipt.previous_hash != replayed.last_hash
+            || !ids.insert(receipt.receipt_id.clone())
+            || receipt.actor.is_empty()
+            || receipt.written_at.is_empty()
+            || !receipt.receipt_id.starts_with("receipt:")
+        {
+            return Err(BudgetError::corrupt("invalid identity, sequence, or hash chain"));
+        }
+        replayed.state.apply(&receipt)?;
+        replayed.receipts.push(receipt);
+        replayed.last_hash = Some(digest(line));
+    }
+    Ok(replayed)
 }
 
 pub(crate) fn digest(bytes: &[u8]) -> String {

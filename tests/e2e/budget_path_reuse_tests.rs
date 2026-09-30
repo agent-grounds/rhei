@@ -130,6 +130,54 @@ fn show_reports_the_damaged_account_rather_than_failing_to_open_it() {
         "the one command the operator already ran is not the next thing to try; \
          got:\n{report}"
     );
+
+    assert_the_restore_actually_restores(&world, &report);
+}
+
+/// The offered restore, run as the operator would run it.
+///
+/// Matching `cp ` proves only that a command was printed. What has to hold is
+/// that it *works* in the state it was offered for — where the account
+/// directory does not exist at all, a bare `cp` fails with
+/// `No such file or directory`, which is the ticket's own complaint about
+/// `rhei budget show` in miniature. On Unix only, because the shell and both
+/// commands are the platform's. §FS-rhei-budgets.10
+#[cfg(unix)]
+fn assert_the_restore_actually_restores(world: &World, report: &str) {
+    let offered = report
+        .lines()
+        .map(str::trim)
+        .find(|line| line.starts_with("mkdir ") || line.starts_with("cp "))
+        .unwrap_or_else(|| panic!("the report offers a restore command; got:\n{report}"));
+
+    let restored = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(offered)
+        .output()
+        .expect("the offered restore should run");
+
+    assert!(
+        restored.status.success(),
+        "the command the report offers runs in the state it is offered for; `{offered}` said:\n{}",
+        stderr(&restored)
+    );
+    let after = world.show();
+    assert_success(&after);
+    assert!(
+        after.stdout.contains("[verified]"),
+        "the restore the report offers is the whole remedy: the account verifies \
+         after it; got:\n{}",
+        after.stdout
+    );
+}
+
+#[cfg(not(unix))]
+fn assert_the_restore_actually_restores(_world: &World, report: &str) {
+    assert!(
+        report.contains("mkdir "),
+        "the restore creates the directory it copies into, which is absent in this \
+         sub-case; got:\n{report}"
+    );
 }
 
 /// The ticket names a harness that reuses a temporary path, and a harness reads
@@ -163,6 +211,19 @@ fn show_json_reports_the_damaged_account_as_a_machine_readable_error() {
         error["witness"],
         serde_json::json!(world.witness(&uuid)),
         "the witness path is a member rather than only prose:\n{line}"
+    );
+    // One key, one kind of value, across both states of one command: a harness
+    // that read `account` here and on a verified report got a bare uuid from one
+    // and a directory from the other. §FS-rhei-budgets.10
+    assert_eq!(
+        error["project_id"],
+        format!("panta:{uuid}"),
+        "the identity is spelled as a verified report spells it:\n{line}"
+    );
+    assert_eq!(
+        error["account"],
+        serde_json::json!(world.account_dir(&uuid)),
+        "`account` is the account directory, absent or not, as it is when verified:\n{line}"
     );
 }
 
@@ -295,8 +356,10 @@ fn forget_refuses_an_account_whose_journal_verifies_and_changes_nothing() {
 
 /// Where a journal is present, it **is** this project's journal: its tail was
 /// lost, and copying the witness back restores this project's own history. So
-/// the two sub-cases below keep today's remedy, and must not be offered a
-/// retirement that would discard a real account.
+/// the two sub-cases below keep today's remedy, must not be offered a
+/// retirement that would discard a real account — and must not perform one when
+/// `forget` is asked for it directly, which would leave the journal exactly as
+/// unverifiable as it is now with nothing left to retire.
 ///
 /// They are two cases rather than one loop so that a build can be half right
 /// and be told which half: a loop stops at the first sub-case and says nothing
@@ -307,6 +370,8 @@ fn assert_restore_is_the_only_remedy(prefix: &str, damage: &str, break_it: fn(&P
     assert_success(&world.run());
     let uuid = world.sole_witness_uuid();
     break_it(&world.account_dir(&uuid).join("journal.jsonl"));
+    let history = fs::read(world.witness(&uuid)).expect("the witness history is readable");
+    let roots = world.roots_index();
 
     let result = world.show();
 
@@ -325,6 +390,31 @@ fn assert_restore_is_the_only_remedy(prefix: &str, damage: &str, break_it: fn(&P
         !report.contains("rhei budget forget"),
         "retirement is not offered for a journal that exists: it would discard an \
          account that is genuinely this project's; got:\n{report}"
+    );
+
+    let refused = world.forget("asking for it anyway");
+
+    assert!(
+        !refused.status.success(),
+        "asked directly, `forget` refuses a journal that is there:\n{}",
+        said(&refused)
+    );
+    let refusal = said(&refused);
+    assert!(
+        refusal.contains("cp ") && refusal.contains(&world.witness(&uuid).display().to_string()),
+        "the refusal names the restore, which is the remedy the sub-case has; got:\n{refusal}"
+    );
+    assert_eq!(
+        fs::read(world.witness(&uuid)).expect("the witness history is readable"),
+        history,
+        "a refused retirement wrote nothing to the witness"
+    );
+    assert_eq!(world.roots_index(), roots, "a refused retirement left the witness index alone");
+    assert!(!world.authority().join("retired").exists(), "a refused retirement retired nothing");
+    assert_eq!(
+        said(&world.show()),
+        report,
+        "the account is reported exactly as it was: the refusal changed nothing"
     );
 }
 

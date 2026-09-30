@@ -97,6 +97,40 @@ fn retiring_a_sound_account_is_refused_and_writes_nothing() {
     );
 }
 
+/// The other refusal, at the same layer and for the same reason: a journal that
+/// is **there** is this project's, so the remedy is the restore and a retirement
+/// would discard a real account while leaving the journal unverifiable.
+/// §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
+#[test]
+fn retiring_an_account_whose_journal_is_present_is_refused_and_writes_nothing() {
+    let case = Case::new();
+    fs::write(case.journal_path(), "").expect("truncate the journal");
+    let witness = fs::read(case.witness_path()).expect("read the witness");
+
+    let outcome = case.account.retire(&audit()).expect("retire returns an outcome");
+
+    let Retirement::RestoreInstead(diagnosis) = outcome else {
+        panic!("a journal that is present is refused; got {outcome:?}")
+    };
+    assert_eq!(diagnosis.damage, Damage::JournalTruncated);
+    assert!(
+        diagnosis.restore_command().contains("cp "),
+        "the refusal carries the remedy the sub-case has; got {}",
+        diagnosis.restore_command()
+    );
+    assert_eq!(fs::read(case.witness_path()).expect("read the witness"), witness);
+    assert!(
+        !retired_names(&case).iter().any(|name| name.starts_with(case.account.uuid())),
+        "a refused retirement retired nothing; got {:?}",
+        retired_names(&case)
+    );
+    assert_eq!(
+        Account::locate(case.root()).expect("locate").map(|a| a.uuid().to_string()),
+        Some(case.account.uuid().to_string()),
+        "the path still resolves to the account it always did"
+    );
+}
+
 /// Retirement keeps every receipt, records who gave the root up, and retracts
 /// the identity so the next admission mints a fresh one.
 /// §FS-rhei-budgets.5.3 §FS-rhei-budgets.10

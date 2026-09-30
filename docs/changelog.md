@@ -141,10 +141,12 @@ pull request number: the release stamps `(PR #N)` onto it. See
   forget <TARGET> --reason <TEXT>` retires a stale root under an audited
   receipt, keeping the receipts byte for byte under a `retired/` name and
   retracting the root's entry so the next admission establishes a new identity
-  at zero consumed. It **refuses** an account whose journal verifies, which is
-  what keeps it a recovery command rather than a way to reset a working
-  balance: the residual §FS-rhei-budgets.5.3 always named is now a door with a
-  name on it rather than an `rm -rf` nobody recorded. §FS-rhei-budgets.5.4
+  at zero consumed. It **refuses** every account whose journal is still there —
+  one that verifies, because retiring it would reset a working balance, and a
+  damaged one, because that journal is this project's own and the remedy is to
+  restore its tail — which is what keeps it a recovery command: the residual
+  §FS-rhei-budgets.5.3 always named is now a door with a name on it rather than
+  an `rm -rf` nobody recorded. §FS-rhei-budgets.5.4
   splits the damaged remedy by sub-case, §FS-rhei-budgets.10 carries `forget`'s
   contract and the closed `health` vocabulary, §FS-rhei-errors.5 permits the
   named detail members that carry the facts, and §AR-neural-admission.4 no

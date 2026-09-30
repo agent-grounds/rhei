@@ -404,8 +404,10 @@ removes both.
 The condition is the whole of what `rhei budget forget` is
 ([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)). It puts an audited
 door where that residual already is rather than opening a second one: it
-**refuses** an account whose journal verifies, so no working balance is ever
-reset by it; it keeps the receipts rather than unlinking them; it records who
+**refuses** every account whose journal is still there, verifying or damaged, so
+no working balance is ever reset by it and no journal that is this project's own
+is given up instead of restored; it keeps the receipts rather than unlinking
+them; it records who
 retired the root, when, why and with what argv; and it retracts the root's
 entry from the witness index, which the bare `rm -rf` leaves behind. Measured
 against the residual it replaces, the bound is better guarded after the command
@@ -862,9 +864,12 @@ sub-case, because it is the one a refusal sends an operator to: it may not fail
 to open an account it was asked to describe. On an account it cannot verify it
 **reports** — naming the journal path, the witness path, what the recorded
 history holds, and one runnable command per available remedy — writes nothing,
-creates nothing, and exits non-zero. An account whose journal is wholly absent
+creates no account, directory, journal or receipt, and exits non-zero. An account whose journal is wholly absent
 is the case where there is nothing to open at all, and it is reported like any
-other rather than refused for the missing file.
+other rather than refused for the missing file. **Runnable** is literal: in that
+sub-case the directory the journal belongs in is missing too, so the restore is
+offered as the one command that creates it and copies — a remedy that fails with
+`No such file or directory` is the ticket's own complaint in miniature.
 
 The account's `health` is a closed vocabulary of two values, `verified` and
 `damaged`. Where it is `damaged` the report additionally carries the `damage`
@@ -877,23 +882,38 @@ Under `--format json` a `show` that cannot verify the account emits the
 machine-readable error object of
 [§FS-rhei-errors.5](rhei-errors.spec.md#5-machine-readable-errors) on stderr and
 nothing on stdout, carrying the same facts the text report states as named
-members beside `message` and `help`. A harness reading a damaged account gets
-one shape whichever state it finds, rather than prose it cannot parse.
+members beside `message` and `help`: `health`, `damage`, `project_id`,
+`project_root`, `account`, `journal`, `witness`, `receipts`, `invocations`,
+`restore`, and `forget` where the sub-case admits one. A harness reading a
+damaged account gets one shape whichever state it finds, rather than prose it
+cannot parse — and `project_id` and `account` mean there exactly what they mean
+in a verified report, the identity and the account **directory**, whether or not
+that directory is there.
 
 `forget` retires a **root** rather than repairing an account: it is how an
 operator says that the path was reused and the recorded account was not this
-project's. Three cases, and only the third acts:
+project's. Four cases, and only the last acts:
 
 | the account at this path | `forget` |
 |---|---|
 | journal present and verifying | **refuses**, exits non-zero, writes nothing, and names `adjust` as what changes an allowance |
+| journal present and damaged (`journal_truncated`, `chain_broken`) | **refuses**, exits non-zero, writes nothing, and names the restore of §FS-rhei-budgets.5.4 |
 | no witness claims this root | **refuses**, exits non-zero, naming the path — the lawful **absent** state has nothing to retire, and a path with no record is far more often a typo |
-| damaged | retires it |
+| damaged with the journal wholly absent (`journal_absent`) | retires it |
 
 The refusal on a sound account is the guarantee of
 §FS-rhei-budgets.5.3 and not a convenience: without it this command would be a
 way to reset a working balance, and the bound would hold only until someone ran
 it.
+
+The refusal where a journal is **present** follows from
+§FS-rhei-budgets.5.4 rather than adding to it: a journal that is there **is**
+this project's, so the remedy is to restore its tail, and retiring the root
+would discard a real account while leaving that journal exactly as unverifiable
+as it was — an operator left worse off than before they ran the command. Nothing
+is lost by narrowing, because a witness and a journal both present always have
+restore as their answer. A damaged report never offers `forget` in those
+sub-cases either; this says what happens when it is asked for anyway.
 
 Retiring is one audited move, and nothing is destroyed by it. The witness
 directory is moved under a `retired/` name beside the live ones, keeping

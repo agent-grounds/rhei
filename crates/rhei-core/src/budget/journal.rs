@@ -134,6 +134,15 @@ impl Journal {
     ///
     /// The one entry point `rhei budget show` uses, so the report it renders and
     /// the refusal a run raises are the same judgement. §FS-rhei-budgets.10
+    ///
+    /// `create` is about the **account** — the directory and the receipts — and
+    /// not about the lock file, which is this transaction's own handle. So a
+    /// journal that is *there* is opened whether or not a lock file is beside it:
+    /// a journal restored by hand, which is the remedy §FS-rhei-budgets.5.4
+    /// offers and a refusal prints, arrives without one, and refusing to open it
+    /// would make the offered restore a command that fixes nothing. Nothing of
+    /// the account is created by that, and where the account directory itself is
+    /// absent this still fails exactly as it did before. §FS-rhei-budgets.10
     pub(crate) fn locked_or_damaged(
         root: &Path,
         project_uuid: &str,
@@ -148,8 +157,9 @@ impl Journal {
         }
         let path = dir.join("journal.jsonl");
         let lock_path = dir.join("journal.jsonl.lock");
+        // A journal that is there is lockable, restored by hand or not.
         let lock = OpenOptions::new()
-            .create(create)
+            .create(create || path.exists())
             .truncate(false)
             .read(true)
             .write(true)
@@ -198,7 +208,11 @@ impl Journal {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(error.into()),
         };
-        let bytes = present.clone().unwrap_or_default();
+        // The presence is kept as a flag and the bytes are **moved**: the two
+        // branches below need to know whether there was a file, not to read its
+        // contents a second time, and this is every admission's path.
+        let existed = present.is_some();
+        let bytes = present.unwrap_or_default();
         if bytes.is_empty() {
             // **Absent** when the witness agrees there is nothing; **damaged**
             // when the witness knows of receipts this root no longer has.
@@ -208,15 +222,13 @@ impl Journal {
             // The file itself is the seam: no file at all is the one case
             // whose history may belong to another project, so the copy that
             // adopts it may not be the remedy. §FS-rhei-budgets.5.4
-            return Ok(Some(match present {
-                None => Damaged {
+            return Ok(Some(if existed {
+                Damaged { damage: Damage::JournalTruncated, error: self.witness_ahead_refusal() }
+            } else {
+                Damaged {
                     damage: Damage::JournalAbsent,
                     error: absent_journal_refusal(self.authority.path(), &self.recorded_history()),
-                },
-                Some(_) => Damaged {
-                    damage: Damage::JournalTruncated,
-                    error: self.witness_ahead_refusal(),
-                },
+                }
             }));
         }
         // Verify the chain on its own terms first, so an **adopted** journal is

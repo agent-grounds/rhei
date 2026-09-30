@@ -82,13 +82,20 @@ fn budget_damaged_help(diagnosis: &Diagnosis) -> String {
 /// The same facts as named members, for a harness that reads a damaged
 /// account. The vocabulary is the closed one of §FS-rhei-budgets.10: `health`
 /// is `damaged` here and `verified` nowhere else, and `damage` is one of the
-/// three sub-cases. §FS-rhei-errors.5
+/// three sub-cases.
+///
+/// `project_id` and `account` are the members a verified report already
+/// carries, with the meanings it gives them — the identity and the account
+/// **directory**, absent or not. A key that named a directory in one state and
+/// a bare uuid in the other would be two shapes under one name, which is the
+/// one thing §FS-rhei-budgets.10 promises a reader against. §FS-rhei-errors.5
 fn budget_damaged_details(diagnosis: &Diagnosis) -> serde_json::Map<String, serde_json::Value> {
     let mut details = serde_json::Map::new();
     details.insert("health".into(), "damaged".into());
     details.insert("damage".into(), diagnosis.damage.as_str().into());
+    details.insert("project_id".into(), diagnosis.project_id().into());
     details.insert("project_root".into(), serde_json::json!(diagnosis.root));
-    details.insert("account".into(), diagnosis.uuid.clone().into());
+    details.insert("account".into(), serde_json::json!(diagnosis.directory()));
     details.insert("journal".into(), serde_json::json!(diagnosis.journal));
     details.insert("witness".into(), serde_json::json!(diagnosis.witness));
     details.insert("receipts".into(), diagnosis.history.receipts.into());

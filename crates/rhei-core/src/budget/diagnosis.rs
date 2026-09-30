@@ -153,13 +153,38 @@ impl Diagnosis {
         }
     }
 
+    /// The account directory this project's journal belongs in, whether or not
+    /// anything is there.
+    ///
+    /// Spelled the way a verified report spells `account`, so a reader of one
+    /// member across both states of `show` gets one kind of value.
+    /// §FS-rhei-budgets.10
+    pub fn directory(&self) -> PathBuf {
+        self.journal.parent().expect("a journal path has a parent").to_path_buf()
+    }
+
+    /// The identity this account's receipts are written under, the same
+    /// `panta:<uuid>` a verified report carries. §FS-rhei-budgets.10
+    pub fn project_id(&self) -> String {
+        format!("panta:{}", self.uuid)
+    }
+
     /// The command that restores this project's own journal from the witness.
     ///
     /// Offered in full rather than run: it is a copy the tool cannot vouch for,
     /// because whether this history is this project's is the very thing that is
-    /// unknown. §FS-rhei-budgets.5.4
+    /// unknown. Where the journal is wholly absent so is the directory that
+    /// would hold it — `Account::inspect` reaches that sub-case precisely when
+    /// it does not exist — so the copy carries the one `mkdir` it needs. A
+    /// command a refusal names has to run in the state it is named for, which
+    /// is the whole reason `show` is readable there at all.
+    /// §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
     pub fn restore_command(&self) -> String {
-        format!("cp {} {}", self.witness.display(), self.journal.display())
+        let copy = format!("cp {} {}", self.witness.display(), self.journal.display());
+        match self.damage {
+            Damage::JournalAbsent => format!("mkdir -p {} && {copy}", self.directory().display()),
+            Damage::JournalTruncated | Damage::ChainBroken => copy,
+        }
     }
 
     /// The command that retires the record, for the reading where a different

@@ -136,13 +136,26 @@ reservation, and the maximum descendant envelope in invocation units. It carries
 no credential, because there is nothing to credential: the descendant charges
 the same account through the same locks.
 
-Admission authenticates the token by finding that reservation in **this
-project's own journal**. It must exist, have a recorded start, not be released,
-carry a descendant envelope above zero, and carry a deadline the descendant does
-not exceed. Anything else is `ancestor_unavailable`; a descendant that would
-take the ancestor's descendants past its envelope is
+Admission asks two questions in this order, and the order is the whole of it:
+whose descriptor this is, and then what the journal holds. A descriptor whose
+minting account is not this journal's own names **no ancestor here** — the caller
+is admitted unparented and its receipt records `parent_reservation: null`, which
+is what keeps replay (§AR-neural-admission.5) from later reading a receipt that
+names an ancestor this journal does not hold and calling the chain corrupt. A
+descriptor that names **no** minting account is taken as this project's, so a
+caller too old to say whose it is loses nothing.
+
+For a descriptor of **this** project, admission then finds that reservation in
+this project's own journal. It must exist, have a recorded start, not be
+released, carry a descendant envelope above zero, and carry a deadline the
+descendant does not exceed. Anything else is `ancestor_unavailable`; a descendant
+that would take the ancestor's descendants past its envelope is
 `ancestor_envelope_exhausted`. Both refuse before spawn, and replay re-derives
 every ancestry claim from the chain rather than trusting a cached number.
+
+Where the descriptor came *from* is data this layer carries and never learns: a
+caller supplies a phrase naming its own source, admission interpolates it into
+the refusal, and nothing here knows that any caller reads an environment at all.
 
 ## 7. Where it sits
 

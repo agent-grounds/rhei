@@ -6,6 +6,24 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- Say whose ancestor a nested run inherits, and pin it. An ancestry descriptor
+  named *which* reservation and never *whose*, so a `rhei run` charging a
+  different project's journal looked the name up where it was never recorded and
+  refused every admission it reached — which is every run of rhei's own suite
+  from inside an agent, and every `rhei run` of a plan outside the exporting
+  agent's project. The descriptor now carries the account that minted it
+  (`RHEI_BUDGET_PARENT_ACCOUNT` beside the existing
+  `RHEI_BUDGET_PARENT_RESERVATION`), identity is tested before the journal is
+  consulted, a run whose account is not the ancestor's is admitted against its
+  own account and says so once per run, and a refusal names the variable the
+  value came from. Inside one account nothing moves: forging a name still buys
+  nothing, a same-project child is still placed under its ancestor and still
+  bounded by its envelope, and a descriptor with no account beside it is taken as
+  an ancestor exactly as before, so a parent too old to name its account loses
+  nothing. §FS-rhei-budgets.7.1 and a new §FS-rhei-budgets.7.2 say so, and
+  §AR-neural-admission.6 scopes "anything else is `ancestor_unavailable`" to a
+  descriptor of this project.
+
 - Recognize a Claude weekly limit, and a reset that names no minutes, as the
   same provider refusal a session limit already is. `You've hit your weekly
   limit · resets 2pm (Europe/Zurich)` was an ordinary failure — the attempt was

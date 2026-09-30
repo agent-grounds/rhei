@@ -9,7 +9,9 @@
 
 // §AR-source-file-size.3 §FS-rhei-budgets.6 §AR-neural-admission.7
 
-use rhei_core::budget::{Account, AdmissionRequest, Arm, Audit, BudgetError, Journal, SpendBasis};
+use rhei_core::budget::{
+    Account, AdmissionRequest, AncestryDescriptor, Arm, Audit, BudgetError, Journal, SpendBasis,
+};
 
 /// Where a ticket's budget identity is persisted.
 ///
@@ -313,7 +315,11 @@ fn budget_admit_spawn(
             project_label: &project_label,
             execution_root: &execution_root,
             arms: &arms,
-            parent_reservation: parent.as_deref(),
+            parent_reservation: parent.as_deref().map(|reservation| AncestryDescriptor {
+                reservation,
+                account: None,
+                origin: None,
+            }),
             travel,
             spend_reserve_micro: built_in::SPEND_RESERVE,
             spend_currency: currency,

@@ -41,6 +41,7 @@ mod block_provenance_support;
 mod block_provenance_symlink_tests;
 mod block_provenance_tests;
 mod block_terminal_compatibility_tests;
+mod budget_ancestry_project_tests;
 mod budget_ceiling_tests;
 mod budget_declaration_free_tests;
 mod budget_spend_tests;

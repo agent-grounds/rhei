@@ -25,10 +25,25 @@ fn descendant<'a>(
     case: &'a Case,
     ticket: &'a str,
     arms: &'a [Arm<'a>],
-    parent: Option<&'a str>,
+    parent: Option<AncestryDescriptor<'a>>,
 ) -> AdmissionRequest<'a> {
     AdmissionRequest { parent_reservation: parent, ..request(case, ticket, arms, false) }
 }
+
+/// A descriptor as a caller too old to name its account sends one: the
+/// reservation alone, which is taken as this project's. §FS-rhei-budgets.7.1
+fn unscoped(reservation: &str) -> Option<AncestryDescriptor<'_>> {
+    Some(AncestryDescriptor { reservation, account: None, origin: None })
+}
+
+/// A descriptor that says whose reservation it is. §FS-rhei-budgets.7.1
+fn minted_by<'a>(reservation: &'a str, account: &'a str) -> Option<AncestryDescriptor<'a>> {
+    Some(AncestryDescriptor { reservation, account: Some(account), origin: None })
+}
+
+/// An account uuid no `Case` can have, so a descriptor carrying it is somebody
+/// else's by construction rather than by a coincidence of the fixture.
+const ANOTHER_ACCOUNT: &str = "99999999-9999-4999-8999-999999999999";
 
 /// A nested runtime that names an ancestor this ledger does not hold gets a
 /// typed refusal rather than a balance of its own — the laundering route the
@@ -42,7 +57,7 @@ fn a_descendant_of_an_unknown_ancestor_cannot_open_an_account() {
 
     let refused = journal
         .reserve(
-            &descendant(&case, &ticket, &arms, Some("reservation:absent")),
+            &descendant(&case, &ticket, &arms, unscoped("reservation:absent")),
             bounds(80, 200),
             &audit(),
         )
@@ -64,7 +79,7 @@ fn an_ancestor_whose_envelope_is_zero_lends_nothing() {
     let arms = arm("nested");
 
     let refused = journal
-        .reserve(&descendant(&case, &ticket, &arms, Some(&parent)), bounds(80, 200), &audit())
+        .reserve(&descendant(&case, &ticket, &arms, unscoped(&parent)), bounds(80, 200), &audit())
         .expect_err("a zero envelope permits nothing");
 
     assert_eq!(refused.reason_code, "ancestor_unavailable");
@@ -87,7 +102,7 @@ fn an_ancestor_that_has_not_started_lends_nothing() {
     let nested = arm("nested");
 
     let refused = journal
-        .reserve(&descendant(&case, &ticket, &nested, Some(&parent)), bounds(80, 200), &audit())
+        .reserve(&descendant(&case, &ticket, &nested, unscoped(&parent)), bounds(80, 200), &audit())
         .expect_err("an unstarted ancestor is not outstanding work");
 
     assert_eq!(refused.reason_code, "ancestor_unavailable");
@@ -109,7 +124,11 @@ fn a_descendant_fits_inside_its_ancestors_envelope_and_no_further() {
     for attempt in ["nested-1", "nested-2"] {
         let arms = arm(attempt);
         let group = journal
-            .reserve(&descendant(&case, &ticket, &arms, Some(&parent)), bounds(80, 200), &audit())
+            .reserve(
+                &descendant(&case, &ticket, &arms, unscoped(&parent)),
+                bounds(80, 200),
+                &audit(),
+            )
             .expect("inside the envelope");
         journal.record_start(&group.reservation_ids[0], true, &audit()).expect("start");
     }
@@ -119,7 +138,7 @@ fn a_descendant_fits_inside_its_ancestors_envelope_and_no_further() {
 
     let arms = arm("nested-3");
     let refused = journal
-        .reserve(&descendant(&case, &ticket, &arms, Some(&parent)), bounds(80, 200), &audit())
+        .reserve(&descendant(&case, &ticket, &arms, unscoped(&parent)), bounds(80, 200), &audit())
         .expect_err("a third would draw three against an envelope of two");
     assert_eq!(refused.reason_code, "ancestor_envelope_exhausted");
     assert!(refused.message.contains('2'), "{}", refused.message);
@@ -137,7 +156,11 @@ fn a_replayed_chain_re_derives_every_ancestry_claim() {
         let parent = live_ancestor(&case, &mut journal, 2);
         let arms = arm("nested-1");
         journal
-            .reserve(&descendant(&case, &ticket, &arms, Some(&parent)), bounds(80, 200), &audit())
+            .reserve(
+                &descendant(&case, &ticket, &arms, unscoped(&parent)),
+                bounds(80, 200),
+                &audit(),
+            )
             .expect("reserve the descendant");
         parent
     };
@@ -173,7 +196,11 @@ fn a_midnight_renewal_enlarges_nothing_an_ancestor_already_holds() {
         let parent = live_ancestor(&case, &mut journal, 1);
         let arms = arm("nested-1");
         journal
-            .reserve(&descendant(&case, &ticket, &arms, Some(&parent)), bounds(80, 200), &audit())
+            .reserve(
+                &descendant(&case, &ticket, &arms, unscoped(&parent)),
+                bounds(80, 200),
+                &audit(),
+            )
             .expect("the envelope's one unit");
         parent
     };
@@ -184,7 +211,7 @@ fn a_midnight_renewal_enlarges_nothing_an_ancestor_already_holds() {
 
     let arms = arm("nested-2");
     let refused = journal
-        .reserve(&descendant(&case, &ticket, &arms, Some(&parent)), bounds(80, 200), &audit())
+        .reserve(&descendant(&case, &ticket, &arms, unscoped(&parent)), bounds(80, 200), &audit())
         .expect_err("the envelope is not the day's");
     assert_eq!(refused.reason_code, "ancestor_envelope_exhausted");
 
@@ -196,5 +223,210 @@ fn a_midnight_renewal_enlarges_nothing_an_ancestor_already_holds() {
         snapshot.invocations,
         Counter::default(),
         "today's window has spent nothing, and yesterday's claims are not today's"
+    );
+}
+
+/// A descriptor minted for another account is **not** a dead ancestor, and the
+/// refusal is the wrong answer to it: the caller is opening a balance in a
+/// ledger the minting project has no claim on, so there is nothing to forge and
+/// no envelope to escape. It is admitted unparented.
+/// §FS-rhei-budgets.7.2
+///
+/// Fails before the fix: today the name is looked up in this journal, is not
+/// found, and the admission is refused `no such reservation`.
+#[test]
+#[ignore = "pins agent-grounds/rhei#354 and fails until it is fixed; \
+    the fix removes this attribute. Run with `cargo test -- --ignored`."]
+fn a_descriptor_minted_for_another_account_opens_its_own_balance() {
+    let case = Case::new();
+    let mut journal = case.open();
+    let ticket = case.ticket();
+    let arms = arm("nested");
+
+    let group = journal
+        .reserve(
+            &descendant(&case, &ticket, &arms, minted_by("reservation:elsewhere", ANOTHER_ACCOUNT)),
+            bounds(80, 200),
+            &audit(),
+        )
+        .expect("another project's descriptor names no ancestor here, so nothing refuses it");
+
+    let snapshot = journal.snapshot().expect("snapshot");
+    assert_eq!(
+        snapshot.reservations[&group.reservation_ids[0]]["parent_reservation"],
+        serde_json::Value::Null,
+        "a downgraded admission must record no parent, or replay reads the chain as corrupt"
+    );
+}
+
+/// The same rule where the name *does* resolve, which is the case replay
+/// depends on. A reservation id is a uuid and two accounts will not collide in
+/// practice, but the receipt must record what was **decided** rather than what
+/// was asked: an admission the identity test downgraded may not name a parent
+/// merely because the journal happens to hold that name, and it may not draw
+/// against that ancestor's envelope either. §FS-rhei-budgets.7.2
+///
+/// Fails before the fix: today the descriptor is placed under the live ancestor,
+/// so the receipt names it and the envelope of one is spent.
+#[test]
+#[ignore = "pins agent-grounds/rhei#354 and fails until it is fixed; \
+    the fix removes this attribute. Run with `cargo test -- --ignored`."]
+fn a_descriptor_minted_for_another_account_draws_no_envelope_here() {
+    let case = Case::new();
+    let mut journal = case.open();
+    let ticket = case.ticket();
+    let parent = live_ancestor(&case, &mut journal, 1);
+
+    let mut unparented = Vec::new();
+    for attempt in ["nested-1", "nested-2"] {
+        let arms = arm(attempt);
+        let group = journal
+            .reserve(
+                &descendant(&case, &ticket, &arms, minted_by(&parent, ANOTHER_ACCOUNT)),
+                bounds(80, 200),
+                &audit(),
+            )
+            .expect("neither child is under that ancestor, so its envelope of one bounds neither");
+        unparented.push(group.reservation_ids[0].clone());
+    }
+
+    let snapshot = journal.snapshot().expect("snapshot");
+    for reservation in &unparented {
+        assert_eq!(
+            snapshot.reservations[reservation]["parent_reservation"],
+            serde_json::Value::Null,
+            "the receipt records what was decided, not what was asked"
+        );
+    }
+}
+
+/// The other half of the contract, and the half that must not move: inside
+/// **one** account a name the journal does not hold still buys nothing.
+/// §FS-rhei-budgets.7.1
+///
+/// A guard: this passes before the fix and must keep passing after it.
+#[test]
+fn a_descriptor_of_this_account_naming_nothing_is_still_refused() {
+    let case = Case::new();
+    let mut journal = case.open();
+    let ticket = case.ticket();
+    let arms = arm("nested");
+    let own = case.account.uuid().to_owned();
+
+    let refused = journal
+        .reserve(
+            &descendant(&case, &ticket, &arms, minted_by("reservation:absent", &own)),
+            bounds(80, 200),
+            &audit(),
+        )
+        .expect_err("forging a name in one's own ledger buys nothing");
+
+    assert_eq!(refused.reason_code, "ancestor_unavailable");
+    assert!(refused.message.contains("no such reservation"), "{}", refused.message);
+}
+
+/// The released, unstarted and envelope-less arms of the same rule, each with
+/// the account named, so that scoping the descriptor does not quietly take the
+/// other three refusals with it. §FS-rhei-budgets.7.1
+///
+/// A guard: this passes before the fix and must keep passing after it.
+#[test]
+fn a_descriptor_of_this_account_keeps_every_other_refusal() {
+    let case = Case::new();
+    let mut journal = case.open();
+    let ticket = case.ticket();
+    let own = case.account.uuid().to_owned();
+
+    // Reserved and then given back as never-started, which is the one lawful
+    // release. §FS-rhei-budgets.6.2
+    let arms = [Arm { attempt_identity: "released", descendant_envelope: 4 }];
+    let released = journal
+        .reserve(&request(&case, &ticket, &arms, false), bounds(80, 200), &audit())
+        .expect("reserve the ancestor to be released")
+        .reservation_ids[0]
+        .clone();
+    journal.release_unstarted(&released, &audit()).expect("release it");
+
+    // Reserved and never started at all.
+    let arms = [Arm { attempt_identity: "unstarted", descendant_envelope: 4 }];
+    let unstarted = journal
+        .reserve(&request(&case, &ticket, &arms, false), bounds(80, 200), &audit())
+        .expect("reserve the unstarted ancestor")
+        .reservation_ids[0]
+        .clone();
+
+    let envelope_less = live_ancestor(&case, &mut journal, 0);
+
+    for (parent, why) in [
+        (&released, "has already been released"),
+        (&unstarted, "has not started"),
+        (&envelope_less, "permits no nested neural work"),
+    ] {
+        let arms = arm("nested");
+        let refused = journal
+            .reserve(
+                &descendant(&case, &ticket, &arms, minted_by(parent, &own)),
+                bounds(80, 200),
+                &audit(),
+            )
+            .expect_err("an ancestor of this account that is not outstanding lends nothing");
+        assert_eq!(refused.reason_code, "ancestor_unavailable", "{}", refused.message);
+        assert!(refused.message.contains(why), "expected {why:?} in: {}", refused.message);
+    }
+}
+
+/// Provenance is the caller's to supply and this layer's only to interpolate:
+/// the refusal says where the value came from without admission learning that
+/// any caller reads an environment. §FS-rhei-budgets.7.1
+///
+/// Fails before the fix: the phrase is nowhere in the message.
+#[test]
+#[ignore = "pins agent-grounds/rhei#354 and fails until it is fixed; \
+    the fix removes this attribute. Run with `cargo test -- --ignored`."]
+fn a_refusal_names_the_origin_its_caller_supplied() {
+    let case = Case::new();
+    let mut journal = case.open();
+    let ticket = case.ticket();
+    let arms = arm("nested");
+    let own = case.account.uuid().to_owned();
+    let descriptor = Some(AncestryDescriptor {
+        reservation: "reservation:absent",
+        account: Some(&own),
+        origin: Some("from RHEI_BUDGET_PARENT_RESERVATION"),
+    });
+
+    let refused = journal
+        .reserve(&descendant(&case, &ticket, &arms, descriptor), bounds(80, 200), &audit())
+        .expect_err("the name still buys nothing");
+
+    assert!(
+        refused.message.contains("from RHEI_BUDGET_PARENT_RESERVATION"),
+        "a refusal that names only the value sends a reader to the account directory: {}",
+        refused.message
+    );
+}
+
+/// And a caller that supplies none leaves the message byte-identical to the one
+/// this ledger has always printed. §FS-rhei-budgets.7.1
+///
+/// A guard: this passes before the fix and must keep passing after it.
+#[test]
+fn a_refusal_with_no_origin_reads_exactly_as_it_always_has() {
+    let case = Case::new();
+    let mut journal = case.open();
+    let ticket = case.ticket();
+    let arms = arm("nested");
+
+    let refused = journal
+        .reserve(
+            &descendant(&case, &ticket, &arms, unscoped("reservation:absent")),
+            bounds(80, 200),
+            &audit(),
+        )
+        .expect_err("the name buys nothing");
+
+    assert_eq!(
+        refused.message,
+        "nested admission cannot use ancestor reservation:absent: no such reservation"
     );
 }

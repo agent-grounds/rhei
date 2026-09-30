@@ -11,6 +11,7 @@ the point they realize it.
 |---|---|
 | [§REQ-cross-platform](cross-platform.md#req-cross-platform-one-tool-on-linux-macos-and-windows) | One tool on Linux, macOS, and Windows: parity, tested on all three, portable fixtures, paths as data |
 | [§REQ-bounded-neural-work](bounded-neural-work.spec.md#req-bounded-neural-work-every-unit-of-neural-work-is-bounded-before-it-starts) | Every unit of neural work is bounded before it starts: the four levels, bounded by default, and where the default numbers came from |
+| [§REQ-test-isolation](test-isolation.spec.md#req-test-isolation-a-test-writes-only-inside-its-own-directory) | A test writes only inside its own directory: the checkout is not one, and where a spawned process writes is chosen rather than derived |
 
 This index is navigational. Normative citations should target the specific
 declaration ID rather than this file.

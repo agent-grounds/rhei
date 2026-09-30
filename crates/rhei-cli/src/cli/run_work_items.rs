@@ -424,10 +424,8 @@ fn collect_ready_agent_work_items(
             continue;
         }
 
-        if !opts.dry_run() {
-            for resolved in &pending {
-                ensure_orchestrator_timeout(resolved, &current_state)?;
-            }
+        for resolved in &pending {
+            ensure_orchestrator_timeout(resolved, &current_state)?;
         }
 
         let is_concurrent = state_def.concurrent;

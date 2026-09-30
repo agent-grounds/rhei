@@ -64,6 +64,7 @@ states:
     description: Supervises the subtree beneath it
     execute_on: child-terminal
     target: codex:openai:alpha
+    agent_timeout: 30m
     visits: 12
   poll:
     description: A timed retry
@@ -76,10 +77,12 @@ states:
   parked:
     description: Agent work a provider limit can park
     target: codex:openai:alpha
+    agent_timeout: 30m
     attempts: 3
   timed:
     description: Agent work carrying both a poll deadline and a provider limit
     target: codex:openai:alpha
+    agent_timeout: 30m
     attempts: 3
     poll:
       interval: 30m

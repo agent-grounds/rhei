@@ -6,6 +6,7 @@ states:
   split:
     description: Coordinator writes an architectural overview of the change, then spawns one review task per logical part plus an aggregate task.
     target: {{smart_target}}
+    agent_timeout: 1h
     prompt_template:
       name: split
       values: { task_id: "{task_id}", task_title: "{task_title}" }
@@ -23,6 +24,7 @@ states:
 {%- for t in review_targets %}
       - {{ t }}
 {%- endfor %}
+    agent_timeout: 1h
     personality: |
       You are {target}, a rigorous reviewer. Focus on correctness,
       regressions, and material risks specific to the assigned part. Skip
@@ -38,6 +40,7 @@ states:
   aggregate-reviews:
     description: Smart target deduplicates reviewer findings into candidate issues.
     target: {{smart_target}}
+    agent_timeout: 1h
     personality: |
       You are the review aggregator. Deduplicate aggressively, preserve
       evidence, and do not invent issues beyond what reviewers reported.
@@ -55,6 +58,7 @@ states:
 {%- for t in validation_targets %}
       - {{ t }}
 {%- endfor %}
+    agent_timeout: 1h
     inputs:
       - name: review-issues
         path: runtime/issues/{task_id}-candidate-issues.md
@@ -75,6 +79,7 @@ states:
 {%- for t in proposal_targets %}
       - {{ t }}
 {%- endfor %}
+    agent_timeout: 1h
     inputs:
       - name: review-issues
         path: runtime/issues/{task_id}-candidate-issues.md
@@ -94,6 +99,7 @@ states:
   aggregate-proposals:
     description: Smart target aggregates fix proposals into a discrepancy matrix.
     target: {{smart_target}}
+    agent_timeout: 1h
     inputs:
       - name: review-issues
         path: runtime/issues/{task_id}-candidate-issues.md
@@ -112,6 +118,7 @@ states:
   decide:
     description: Smart target adjudicates validation/proposal discrepancies and writes the final fix plan.
     target: {{smart_target}}
+    agent_timeout: 1h
     inputs:
       - name: review-issues
         path: runtime/issues/{task_id}-candidate-issues.md

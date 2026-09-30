@@ -148,6 +148,7 @@ states:
     initial: true
     description: Produce a reusable snapshot
     target: codex[yolo]:openai:gpt-5.6-luna
+    agent_timeout: 30m
     snapshot:
       emit:
         name: impl
@@ -155,6 +156,7 @@ states:
   review:
     description: Consume the implementation snapshot
     target: codex[yolo]:openai:gpt-5.6-luna
+    agent_timeout: 30m
     snapshot:
       emit:
         name: reviewed

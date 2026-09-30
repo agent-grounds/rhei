@@ -1271,6 +1271,14 @@ fn validation_pass_for_loaded(
     report
         .errors
         .extend(validate_plan_settings_references(&loaded.rhei, &machines, &settings));
+    // `rhei validate` resolves nothing at runtime, so it judges the plan as it
+    // would run with agents. §FS-rhei-validate.4
+    report.errors.extend(validate_orchestrator_timeouts(
+        &loaded.rhei,
+        &machines,
+        &settings,
+        &default_run_options(),
+    ));
     report.errors.extend(validate_snapshot_plan_context(&loaded, &resolved));
     report.warnings.extend(snapshot_orphan_validation_warnings(
         &workspace_root,

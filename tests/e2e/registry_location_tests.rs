@@ -150,7 +150,9 @@ fn write_default_mode_settings(dir: &Path, mode: &str, default_agent: bool) {
     write_fixture_file(
         &settings_dir,
         "settings.json",
-        &format!(r#"{{ "defaults": {{ "agent_mode": "{mode}"{agent} }} }}"#),
+        &format!(
+            r#"{{ "defaults": {{ "agent_mode": "{mode}"{agent}, "agent_timeout": "30m" }} }}"#
+        ),
     );
 }
 

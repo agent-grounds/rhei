@@ -466,27 +466,20 @@ fn callback_contexts_for_state<'a>(
 /// a finite timeout through the chain
 /// `state.agent_timeout > models.<id>.agents.<agent>.timeout > agents.<id>.timeout > defaults.agent_timeout`.
 ///
-/// This is the runtime counterpart to the Completion Authority / Completion
-/// Condition rules. A missing timeout
-/// would mean the subprocess could hang indefinitely without a deterministic
-/// fallback, which defeats deterministic completion under `rhei run`.
-// §FS-rhei-agents.3.1 §FS-rhei-agents.3.2: Orchestrator completion timeout.
+/// Validation decides this over the same chain before any pass runs
+/// (§FS-rhei-validate.4), which makes this guard unreachable through the CLI.
+/// It is kept anyway, on the boundary the invariant must hold at whichever
+/// path reached it, and renders the one shared sentence so the run's refusal
+/// and validation's cannot drift apart.
+// §FS-rhei-agents.3.1 §FS-rhei-agents.3.2.2: Orchestrator completion timeout.
 fn ensure_orchestrator_timeout(resolved: &ResolvedAgent, state_name: &str) -> MietteResult<()> {
     if resolved.timeout_secs.is_some() {
         return Ok(());
     }
     Err(miette!(
-        help = format!(
-            "set `agent_timeout` on the state, on `models.<id>.agents.{}.timeout`, on \
-             `agents.{}.timeout`, or on `defaults.agent_timeout` in settings.json.",
-            resolved.agent.id(),
-            resolved.agent.id()
-        ),
-        "state '{}' is driven by `rhei run` (orchestrator completion authority) \
-         but no `agent_timeout` resolves for agent '{}'. Deterministic completion \
-         requires a finite timeout.",
-        state_name,
-        resolved.agent.id(),
+        help = format!("{}.", missing_agent_timeout_help(resolved.agent.id())),
+        "{}.",
+        missing_agent_timeout_sentence(state_name, resolved.agent.id()),
     ))
 }
 

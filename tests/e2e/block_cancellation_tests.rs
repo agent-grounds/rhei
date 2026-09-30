@@ -77,7 +77,7 @@ fn block_cancellation_is_not_a_completion_target_or_automatic_fallback() {
             &root,
             if mounted { "mounted" } else { "identity" },
             r#"
-states: {work: {target: codex:openai:gpt-5.5}, middle: {}, done: {final: true}, cancelled: {final: true}}
+states: {work: {target: codex:openai:gpt-5.5, agent_timeout: 30m}, middle: {}, done: {final: true}, cancelled: {final: true}}
 transitions:
   - {from: work, to: middle, condition: 'visitCount > 9'}
   - {from: middle, to: done}

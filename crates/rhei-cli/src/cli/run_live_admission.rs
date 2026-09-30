@@ -65,6 +65,13 @@ impl LiveRunContext {
         report
             .errors
             .extend(validate_plan_settings_references(&loaded.rhei, &machines.set, &settings));
+        // A rhei admitted mid-run is held to the same bound. §FS-rhei-run.4
+        report.errors.extend(validate_orchestrator_timeouts(
+            &loaded.rhei,
+            &machines.set,
+            &settings,
+            opts,
+        ));
         report.errors.extend(validate_snapshot_plan_context(&loaded, &resolved));
         if report.has_errors() {
             return Err(validation_report(

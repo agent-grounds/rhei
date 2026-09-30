@@ -325,6 +325,7 @@ version: 1
 states:
   review:
     description: Review in parallel
+    agent_timeout: 30m
     all_targets:
       - codex[yolo]:openai:gpt-5.5
       - codex[yolo]:openai:gpt-5.4

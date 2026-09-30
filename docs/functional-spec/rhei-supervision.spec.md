@@ -854,6 +854,7 @@ states:
     initial: true
     execute_on: descendant-terminal
     target: pi:anthropic:claude-sonnet-4-5
+    agent_timeout: 2h
     visits: 12
     snapshot:
       emit:    { name: supervisor, on: always }
@@ -865,12 +866,14 @@ states:
       is terminal, write your result and finish.
   review:
     agent: claude-code
+    agent_timeout: 1h
     outputs:
       - name: findings
         path: runtime/review/{task_id}.md
     instructions: Review as briefed; write findings to {output.findings.path}.
   fix:
     agent: claude-code
+    agent_timeout: 1h
     instructions: Apply exactly the fixes the brief asks for.
   human-review:
     gating: true

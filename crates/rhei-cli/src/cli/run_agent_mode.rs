@@ -444,14 +444,12 @@ fn run_agent_mode(
                 // Orchestrator Completion Authority: every invocation that
                 // `rhei run` will actually spawn must resolve to a finite
                 // timeout so that a non-returning agent cannot block forever.
-                // Invocations whose outputs already exist have been filtered
-                // out above and do not need a timeout.
+                // Admission already refused the plan that offends, per state
+                // rather than per pass, so this is the boundary's own guard.
 
-                // §FS-rhei-agents.3.1 §FS-rhei-agents.3.2: Require timeout.
-                if !opts.dry_run() {
-                    for resolved in &pending {
-                        ensure_orchestrator_timeout(resolved, &current_state)?;
-                    }
+                // §FS-rhei-agents.3.1 §FS-rhei-agents.3.2.2: Require timeout.
+                for resolved in &pending {
+                    ensure_orchestrator_timeout(resolved, &current_state)?;
                 }
 
                 for resolved in pending {

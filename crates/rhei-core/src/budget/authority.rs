@@ -146,8 +146,15 @@ impl Authority {
     /// live witness or the retired one and never half of each. The receipt is
     /// written afterwards, because a receipt beside receipts that did not move
     /// would describe a retirement that did not happen.
-    /// §FS-rhei-budgets.5.3 §FS-rhei-budgets.10
-    pub(crate) fn retire(self, stamp: &str, receipt: &serde_json::Value) -> Result<PathBuf> {
+    ///
+    /// `&mut self` rather than `self`, so the lock this holds outlives the move
+    /// and the caller's remaining writes are serialized by it: a retirement
+    /// taken apart by an `Authority` that dropped here would leave the index
+    /// retraction unlocked. The `flock` travels with the directory, the open
+    /// handle keeping it across the `rename`, and the path is rewritten to where
+    /// the bytes now are so nothing afterwards reads a name that is gone.
+    /// §AR-neural-admission.3 §FS-rhei-budgets.5.3 §FS-rhei-budgets.10
+    pub(crate) fn retire(&mut self, stamp: &str, receipt: &serde_json::Value) -> Result<PathBuf> {
         let live = self.directory().to_path_buf();
         let uuid = live
             .file_name()
@@ -162,6 +169,7 @@ impl Authority {
         let retired = retired_base.join(format!("{uuid}-{stamp}"));
         std::fs::rename(&live, &retired)
             .map_err(|error| BudgetError::unreachable(&retired, &error))?;
+        self.path = retired.join("history.jsonl");
         write_durable(&retired.join("retirement.json"), &serde_json::to_vec_pretty(receipt)?)?;
         sync_directory(&retired)?;
         sync_directory(&retired_base)?;

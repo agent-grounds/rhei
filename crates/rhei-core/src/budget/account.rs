@@ -123,25 +123,43 @@ impl Account {
     /// Retire this root: the operator's answer to the reading the tool cannot
     /// choose between.
     ///
-    /// The guard is here rather than in the command, because the guarantee of
-    /// §FS-rhei-budgets.5.3 is the account's and not a caller's to remember: an
-    /// account whose journal verifies is refused, and nothing is written.
+    /// The guards are here rather than in the command, because what they
+    /// protect is the account's and not a caller's to remember. Two refuse. An
+    /// account whose journal verifies is refused, which is the guarantee of
+    /// §FS-rhei-budgets.5.3. And so is a **damaged** account whose journal is
+    /// still there: that journal is this project's own and its tail is what was
+    /// lost, so the remedy is the restore, and retiring the root would give up
+    /// an account that is genuinely this project's while leaving the journal
+    /// that still fails to replay. Only a journal that is wholly absent is
+    /// retired, which is the one sub-case a reused path can produce.
+    /// §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
+    ///
     /// Classification happens under the **authority** lock alone, which is
     /// sound and is the only way it can be done once — that lock already
     /// excludes every writer, since every append takes it before the journal's,
     /// and taking the journal lock as well would mean locking the authority
     /// twice in one process. §AR-neural-admission.3
     ///
-    /// Retiring is then three writes, and all three are required. The witness
-    /// moves under a retired name, keeping every receipt. A receipt of the
-    /// retirement is written beside it. And this root's entry leaves the
-    /// witness index — not optional: an entry left behind would hand the next
-    /// project at this path the retired project's identity, and a retirement
-    /// that leaves the identity in place has not retired the root.
-    /// §FS-rhei-budgets.5.3 §FS-rhei-budgets.10
+    /// Retiring is then three writes, all three are required, and all three
+    /// happen while that lock is still held, so a retirement is one serialized
+    /// act rather than one locked write followed by two unlocked ones. Their
+    /// order is what a crash between them leaves. The index entry goes **first**
+    /// — not optional: an entry left behind would hand the next project at this
+    /// path the retired project's identity, and a retirement that leaves the
+    /// identity in place has not retired the root. The account directory a
+    /// refused establish left behind goes next, because until it is gone this
+    /// path still resolves to the uuid locally. Only then does the witness move
+    /// under a retired name, keeping every receipt, with a receipt of the
+    /// retirement written beside it.
+    ///
+    /// So a crash leaves either a path that still resolves to this damaged
+    /// account — `forget` run again finishes the job — or a path that resolves
+    /// to nothing, which is the outcome a completed retirement gives, with
+    /// every receipt still on disk. What it can never leave is an index entry
+    /// pointing at a witness that has moved. §FS-rhei-budgets.5.3 §FS-rhei-budgets.10
     pub fn retire(&self, audit: &Audit) -> Result<Retirement> {
         audit.validate()?;
-        let authority = super::authority::Authority::lock(&self.root, &self.uuid)?;
+        let mut authority = super::authority::Authority::lock(&self.root, &self.uuid)?;
         if authority.is_empty() {
             return Ok(Retirement::NothingToRetire);
         }
@@ -152,6 +170,15 @@ impl Account {
             return Ok(Retirement::Sound);
         };
         let history = History::read(&project_id, authority.bytes());
+        if damage.journal_exists() {
+            return Ok(Retirement::RestoreInstead(Box::new(Diagnosis::new(
+                damage,
+                &self.root,
+                &self.uuid,
+                authority.path(),
+                history,
+            ))));
+        }
         let receipt = serde_json::json!({
             "schema": "rhei.budget.retirement.v1",
             "uuid": self.uuid,
@@ -164,9 +191,9 @@ impl Account {
             "receipts": history.receipts,
             "invocations": history.invocations,
         });
-        let kept_at = authority.retire(&stamp(&audit.written_at), &receipt)?;
         retract_root(&self.root)?;
         self.drop_empty_account_directory(damage)?;
+        let kept_at = authority.retire(&stamp(&audit.written_at), &receipt)?;
         Ok(Retirement::Retired(Retired {
             uuid: self.uuid.clone(),
             root: self.root.clone(),
@@ -179,7 +206,9 @@ impl Account {
     /// The account directory a refused establish leaves behind holds the lock
     /// file and nothing else, and leaving it would resolve the path straight
     /// back to the uuid just retired — the very thing the index retraction is
-    /// for. Only where there is no journal, so nothing is destroyed.
+    /// for. Only where there is no journal, so nothing is destroyed: `retire`
+    /// refuses every damage a journal is present for, and this is the same
+    /// condition read a second time in front of a recursive remove.
     /// §FS-rhei-budgets.10
     fn drop_empty_account_directory(&self, damage: Damage) -> Result<()> {
         if damage.journal_exists() {
@@ -202,6 +231,10 @@ pub enum Retirement {
     /// The journal verifies: retiring it would recreate capacity, so nothing
     /// was written. §FS-rhei-budgets.5.3
     Sound,
+    /// The journal is damaged but **present**, so it is this project's own and
+    /// its tail is what was lost: the remedy is the restore this carries, and
+    /// nothing was written. §FS-rhei-budgets.5.4
+    RestoreInstead(Box<Diagnosis>),
     /// No witness claims this root — the lawful **absent** state has nothing
     /// to retire. §FS-rhei-budgets.5.4
     NothingToRetire,

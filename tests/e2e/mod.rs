@@ -44,6 +44,8 @@ mod block_terminal_compatibility_tests;
 mod budget_ancestry_project_tests;
 mod budget_ceiling_tests;
 mod budget_declaration_free_tests;
+mod budget_path_reuse_support;
+mod budget_path_reuse_tests;
 mod budget_spend_tests;
 mod budget_support;
 mod budget_travel_halt_tests;

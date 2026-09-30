@@ -187,6 +187,13 @@ what it cost. Name one book in `defaults.prices` and every run on the machine
 prices from it without `rhei run --prices`. See
 [Cost accounting](docs/functional-spec/rhei-cost-accounting.spec.md).
 
+A project laid down at a path a *different* project used before it is refused,
+because nothing on disk tells that apart from a journal somebody rolled back to
+buy capacity. `rhei budget show` says so and names both readings, and
+`rhei budget forget <plan-or-project> --reason <TEXT>` retires the stale record
+once you know which it was — it refuses an account whose journal verifies, so it
+recovers a reused path and never resets a working balance.
+
 ## Install
 
 ### Cargo

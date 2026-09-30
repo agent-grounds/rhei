@@ -40,6 +40,8 @@ mod templates {
     include!("cli/templates_union_place.rs");
     include!("cli/templates_union_index.rs");
     include!("cli/templates_union_host.rs");
+    include!("cli/templates_union_project.rs");
+    include!("cli/templates_union_artifacts.rs");
     include!("cli/templates_union_write.rs");
     include!("cli/templates_union_includes.rs");
     include!("cli/templates_union.rs");

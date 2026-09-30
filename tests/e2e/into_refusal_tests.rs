@@ -253,3 +253,32 @@ fn write_including_pair(dir: &Path, name: &str, includes: &str) {
         ),
     );
 }
+
+/// The other case of §FS-rhei-library.7.2, and the reason it is not a refusal:
+/// one state's rhei-scoped path walked by *two placed tickets* is a choice the
+/// author is allowed to make, so `--into` says it out loud and still succeeds.
+/// §FS-rhei-library.7.2
+#[test]
+fn one_rhei_scoped_artifact_path_walked_by_two_tickets_warns_and_succeeds() {
+    let (dir, root) = host_workspace("into-artifact-shared");
+    let template = write_review_template(&dir);
+    // Only the template claims the path, so the two-state refusal above does
+    // not fire — and both of its tickets start in `review`, which is what
+    // makes the path shared.
+    let template_machine = read(&template.join("states.yaml")).replace(
+        "      Review {{change_ref}} and write what you found.\n",
+        "      Review {{change_ref}} and write what you found.\n    outputs:\n      - name: notes\n        path: runtime/notes.md\n        description: The review notes\n",
+    );
+    write_fixture_file(&template, "states.yaml", &template_machine);
+
+    let result =
+        run_into(&["instantiate", "review-loop", "change_ref=HEAD~1", "--into", "release"], &dir);
+    assert_success(&result);
+    assert_stderr_contains(&result, "runtime/notes.md");
+    assert_stderr_contains(&result, "coordinate");
+    assert_stderr_contains(&result, "record");
+    assert!(
+        root.join("tasks/002-coordinate.md").is_file(),
+        "a warning is not a refusal: the placement still happened"
+    );
+}

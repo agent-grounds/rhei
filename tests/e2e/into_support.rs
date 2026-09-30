@@ -176,3 +176,62 @@ pub fn write_review_template(dir: &Path) -> PathBuf {
 pub fn read(path: &Path) -> String {
     std::fs::read_to_string(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()))
 }
+
+pub const PROJECT_INDEX: &str = r#"# Panta: Scratch
+
+## Overview
+
+The project whose member a template gets placed into.
+"#;
+
+/// Make the fixture directory a Panta project, so the host rhei beside it is a
+/// *member*: the settings root a member resolves is the project's and never its
+/// own, and the terms it is correct in are the project's.
+/// §FS-rhei-templates.6.2 §AR-rhei-panta.1
+pub fn make_project(dir: &Path) {
+    write_fixture_file(dir, "index.panta.md", PROJECT_INDEX);
+}
+
+/// Write a settings file into a rhei home under `base`, creating the home.
+pub fn write_settings(base: &Path, contents: &str) -> PathBuf {
+    let home = base.join(".agent-grounds/rhei");
+    std::fs::create_dir_all(&home).expect("create the rhei home");
+    write_fixture_file(&home, "settings.json", contents)
+}
+
+/// A template whose one state targets an agent it does *not* ship: whoever
+/// validates the union has to resolve the agent from the settings the rhei
+/// actually runs under.
+pub fn write_borrowed_agent_template(dir: &Path) -> PathBuf {
+    let template = dir.join(".agent-grounds/rhei/templates/polish");
+    std::fs::create_dir_all(template.join("tasks")).expect("create template");
+    write_fixture_file(
+        &template,
+        "template.yaml",
+        "name: polish\nversion: 1.0.0\ndescription: One state on an agent the project configures\n",
+    );
+    write_fixture_file(
+        &template,
+        "states.yaml",
+        "name: polish\nversion: 1\nstates:\n  polish:\n    description: Polish the change\n    target: borrowed[x]:openai:gpt-5.5\n    instructions: |\n      Polish it.\n  completed:\n    final: true\n    description: Done\n  cancelled:\n    final: true\n    description: Abandoned\ntransitions:\n  - from: polish\n    to: completed\n  - from: \"*\"\n    to: cancelled\nprofiles:\n  polish:\n    initial: polish\n    allowed: [polish, completed, cancelled]\nnode_policy:\n  root: polish\n  default: polish\n  by_type:\n    polish: polish\n",
+    );
+    write_fixture_file(
+        &template,
+        "index.rhei.md",
+        "# Rhei: Polish\n**States:** polish\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - polish\n---\n\n## Overview\n\nA polish step.\n",
+    );
+    template
+}
+
+/// The settings that define the agent `write_borrowed_agent_template` borrows.
+pub const BORROWED_AGENT_SETTINGS: &str = r#"{
+  "agents": {
+    "borrowed": {
+      "command": ["true"],
+      "model_flag": "--model",
+      "stdin_prompt": true,
+      "modes": { "x": ["--flag"] }
+    }
+  }
+}
+"#;

@@ -145,6 +145,10 @@ fn the_identity_refusal_fires_for_output_mode_too() {
 fn a_placement_under_a_free_id_mints_its_own_identity_and_bound() {
     let (dir, root) = host_workspace("identity-mint");
     write_review_template(&dir);
+    // Travel is only charged where the project has an account, and a lifetime
+    // allowance establishes one without admitting anything neural.
+    // §FS-rhei-budgets.5.2
+    establish_account(&dir);
 
     // Spend the host ticket's travel first, so the assertion that the placed
     // ticket's bound is untouched is about a bound that has actually been used.
@@ -159,6 +163,8 @@ fn a_placement_under_a_free_id_mints_its_own_identity_and_bound() {
             "--to",
             "completed",
             "--no-callbacks",
+            "--result",
+            "the host ticket shipped",
         ],
         &dir,
     );
@@ -212,6 +218,8 @@ fn a_placement_under_a_free_id_mints_its_own_identity_and_bound() {
             "--to",
             "completed",
             "--no-callbacks",
+            "--result",
+            "the placed ticket finished on its own bound",
         ],
         &dir,
     );
@@ -230,8 +238,14 @@ fn a_placement_under_a_free_id_mints_its_own_identity_and_bound() {
 #[test]
 fn deleting_a_spent_ticket_and_re_placing_it_adopts_the_old_identity() {
     let (dir, root) = host_workspace("identity-reuse");
-    write_review_template(&dir);
-    // One travel unit for the whole project, so one move spends a ticket.
+    let template = write_review_template(&dir);
+    // One ticket, because the id-collision refusal would otherwise fire on the
+    // surviving sibling before the re-placement is reached. §FS-rhei-library.4
+    fs::remove_file(template.join("tasks/002-record.md")).expect("drop the second ticket");
+    establish_account(&dir);
+    // One travel unit per lane, so one move spends a ticket. The template's own
+    // profile carries it, because the second placement joins a machine that
+    // already holds that profile. §FS-rhei-library.3.1
     write_fixture_file(
         &root,
         "states.yaml",
@@ -240,16 +254,18 @@ fn deleting_a_spent_ticket_and_re_placing_it_adopts_the_old_identity() {
             "profiles:\n  host:\n    initial: pending\n    transition_limit: 1\n",
         ),
     );
+    write_fixture_file(
+        &template,
+        "states.yaml",
+        &REVIEW_TEMPLATE_MACHINE.replace(
+            "  review-loop:\n    initial: review\n",
+            "  review-loop:\n    initial: review\n    transition_limit: 1\n",
+        ),
+    );
 
     let placed =
         run_into(&["instantiate", "review-loop", "change_ref=HEAD~1", "--into", "release"], &dir);
     assert_success(&placed);
-    // Give the placed lane the same single unit.
-    let machine = read(&root.join("states.yaml")).replace(
-        "  review-loop:\n    initial: review\n",
-        "  review-loop:\n    initial: review\n    transition_limit: 1\n",
-    );
-    write_fixture_file(&root, "states.yaml", &machine);
 
     let spend = run_into(
         &[
@@ -275,12 +291,11 @@ fn deleting_a_spent_ticket_and_re_placing_it_adopts_the_old_identity() {
     // Delete the ticket's document and its frontmatter entry: the plan now
     // looks, to a reader, as if `coordinate` had never existed.
     fs::remove_file(root.join("tasks/002-coordinate.md")).expect("delete the spent ticket");
-    fs::remove_file(root.join("tasks/003-record.md")).expect("delete its sibling");
     let index = read(&root.join("index.rhei.md"));
     let kept: Vec<&str> = index
         .lines()
         .filter(|line| !line.trim_start().starts_with("budgetTicketId:"))
-        .filter(|line| line.trim() != "coordinate:" && line.trim() != "record:")
+        .filter(|line| line.trim() != "coordinate:")
         .collect();
     let stripped = format!("{}\n", kept.join("\n"));
     write_fixture_file(&root, "index.rhei.md", &stripped);
@@ -315,13 +330,38 @@ fn deleting_a_spent_ticket_and_re_placing_it_adopts_the_old_identity() {
         combined.contains("ticket travel"),
         "the halt should name ticket travel; got:\n{combined}"
     );
-    let adopted = identities(&root.join("index.rhei.md"))
+    // The uuid is read from the ledger rather than from the plan, because a
+    // halted move rewrites nothing: the binding is what the account settled,
+    // and the document the placement wrote never got one of its own.
+
+    // One `identity` receipt for the id, still naming the deleted ticket's
+    // uuid, is the whole claim — a placement that had minted afresh would have
+    // written a second. §FS-rhei-budgets.5.2 §REQ-bounded-neural-work.4
+    let journal = receipts(&root);
+    let bound: Vec<&serde_json::Value> = kinds(&journal, "identity")
         .into_iter()
-        .find(|(id, _)| id == "coordinate")
-        .map(|(_, uuid)| uuid)
-        .expect("the re-placed ticket is bound");
-    assert_eq!(
-        adopted, spent_uuid,
-        "the binding outlives the document, so the re-placed ticket carries the deleted ticket's uuid"
+        .filter(|receipt| receipt["payload"]["display_id"] == "release.coordinate")
+        .collect();
+    assert_eq!(bound.len(), 1, "the re-placement minted no identity of its own: {bound:?}");
+    let adopted = bound[0]["payload"]["ticket_identity"]
+        .as_str()
+        .expect("an identity receipt names the ticket identity it settled");
+    assert!(
+        adopted.ends_with(&spent_uuid),
+        "the binding outlives the document, so the re-placed ticket carries the deleted ticket's \
+         uuid {spent_uuid}; got {adopted}"
     );
+}
+
+/// Put the project on a lifetime invocation allowance, which is what gives it a
+/// budget account: travel is charged against an account, and a rhei that never
+/// had one is not charged at all — so an identity assertion over a plan with no
+/// account would pass by there being nothing to assert.
+/// §FS-rhei-budgets.5.2 §REQ-bounded-neural-work.4
+fn establish_account(dir: &Path) {
+    let opened = run_into(
+        &["budget", "init", "--invocations", "50", "--reason", "identity fixture", "release"],
+        dir,
+    );
+    assert_success(&opened);
 }

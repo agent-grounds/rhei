@@ -74,7 +74,10 @@ gives the agent the map and the nearest detail; the agent fetches the rest.
 
 ## 2. The Store
 
-The memory is whatever the project already writes; this spec adds no store.
+The memory is almost entirely whatever the project already writes. This spec
+adds exactly one store of its own — the last row below — because every other
+row is written along an edge somebody declared, and a fact one ticket pays for
+is most needed by a ticket that could not have known to declare it.
 
 | Memory | Where | Written by |
 |---|---|---|
@@ -86,6 +89,7 @@ The memory is whatever the project already writes; this spec adds no store.
 | Direction from above | `runtime/supervise/<task-id>[/<state>].md` ([§FS-rhei-supervision.5.2](rhei-supervision.spec.md#52-the-brief)) | supervisors |
 | Same-task state handoffs | declared `outputs:` of an earlier state ([§FS-rhei-states.3.2](rhei-states.spec.md#32-state-handoffs)) | the earlier state |
 | Raw transcripts | `runtime/logs/task-…log` under the root `rhei run` was started from ([§FS-rhei-agents.8](rhei-agents.spec.md#8-log-capture)) | `rhei run` |
+| A fact one ticket leaves for later tickets | `runtime/notes.md` at the **project** execution root ([§FS-rhei-note.3.1](rhei-note.spec.md#31-where-it-lives)) | any task, through `rhei note` and nothing else |
 
 Each path is relative to the **execution root** of the rhei that owns the
 task ([§AR-rhei-panta.5](../architecture/rhei-panta.spec.md#5-execution-root-and-per-rhei-runtime)): the workspace directory of a Directory Workspace rhei,
@@ -93,7 +97,9 @@ the project directory for single-file rheis. Transcripts are the exception:
 one `rhei run` writes one log tree, under the root it was started from, so in a
 Panta the transcripts of every member rhei sit together at the project root and
 not under the member. A prompt therefore names that directory outright (§3.4)
-rather than describing it as a path under something else.
+rather than describing it as a path under something else. The note store is the
+other exception, and for the opposite reason: it is one file for the whole
+project, so a fact found in one rhei reaches a ticket in another ([§FS-rhei-note.3.1](rhei-note.spec.md#31-where-it-lives)).
 
 ## 3. The Sections
 
@@ -141,6 +147,14 @@ Panta: {panta-title} › rhei `{rhei-id}`: {rhei-title} › {Kind} {ancestor-id}
     ```markdown
     {content sections of index.panta.md, verbatim}
     ```
+
+### Project Notes
+
+Facts earlier tickets left for whoever came next, newest first.
+
+… {n} earlier notes not shown — read {store path}
+- [{task-id}] {entry}
+- [{task-id}] {entry}
 ```
 
 - The chain line names every ancestor, root first, each with its state. A
@@ -174,14 +188,26 @@ Panta: {panta-title} › rhei `{rhei-id}`: {rhei-title} › {Kind} {ancestor-id}
   A bare rhei with no Panta manifest has no `### Project Context`. Excluded
   source files contribute no payload; required current task and machine
   sources cannot reach composition because validation rejects that overlap.
-- For a supervising task, omit both context headings and their bodies. The
+- `### Project Notes` renders the live entries of the project note store
+  ([§FS-rhei-note.3](rhei-note.spec.md#3-the-store)), newest first, for an ordinary task. It is a block of its own rather
+  than an addition to `### Project Context`, because that section is the plan
+  writer's content *verbatim*: folding agent-written entries into it would make
+  a verbatim block no longer verbatim and leave one overflow line pointing at
+  two sources. A bare rhei has no `### Project Context` but does get
+  `### Project Notes` — its project is itself ([§FS-rhei-note.3.1](rhei-note.spec.md#31-where-it-lives)). The block is **omitted
+  entirely** when the store composes nothing, so a project that never calls
+  `rhei note` pays nothing for the capability. A task that excludes the store
+  gets no block; the map still names the path, as [§FS-rhei-memory.1.1](rhei-memory.spec.md#11-everything-before-is-reachable) requires.
+- For a supervising task, omit both context headings and their bodies, and
+  `### Project Notes` with them — one rule for the context blocks and no new
+  exception, so every supervisor prompt is unchanged. The
   rest of `## Position` is unchanged, and the prompt still carries the task's
   own content, child map, checkpoints, supervisor brief and declared inputs,
   previous-visit memory, and other applicable sections defined by
   [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition), [§FS-rhei-supervision.5](rhei-supervision.spec.md#5-prompt-composition), and this spec. `### Reading the rhei` (§3.4) names
-  the owning rhei document, project root, and read-only navigation commands, so
-  the full standing context remains directly reachable without its bytes being
-  copied into every supervisory handoff.
+  the owning rhei document, project root, the note store, and read-only
+  navigation commands, so the full standing context remains directly reachable
+  without its bytes being copied into every supervisory handoff.
 
 ### 3.2. `## Plan History`
 
@@ -286,6 +312,7 @@ Two fixed sub-sections follow the existing authority text and transition list.
 - Under each execution root: `runtime/results/<task-id>.md` (results),
   `runtime/exports/<task-id>/<name>.md` (exports), `runtime/supervise/<task-id>[/<state>].md` (briefs),
   `runtime/state-transitions.log` (order of events)
+- Notes left for later tickets: `{project note store}`
 - Agent transcripts: `{logs directory of this run}`
 - Read-only commands, always safe: `rhei list [--rhei <id>] [--terminal] [--has-prior <id>] [--parent <id>]`,
   `rhei render <plan> --format json --pretty`
@@ -295,6 +322,7 @@ Two fixed sub-sections follow the existing authority text and transition list.
 What you write is what the next agent and the human see.
 - `runtime/results/<task-id>.md`: the first line is the one-line summary every later Plan History shows; detail below it.
 - You may append progress paragraphs to your own task body — files touched, commands run, decisions made — and append child tasks under your own task. Do not edit `**State:**` lines or any other task's body.
+- You may leave **one** note for later tickets anywhere in this project: `rhei note "<fact>"`, at most 3 lines, for something the next ticket would otherwise rediscover. A second call replaces it, and spending it on `rhei note --restate <id>` or `--strike <id>` leaves you none of your own. Never edit `runtime/notes.md` by hand.
 - Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` stops the plan from parsing for the whole run.
 ```
 
@@ -308,10 +336,18 @@ log:` resolves against (§3.3) — because that tree belongs to the run and not 
 a rhei (§2). Paths are rendered relative to the execution root named in the
 prompt, or absolute when `RHEI_CHECKOUT_ROOT` differs from it, by the same rule
 `{output.<name>.path}` follows ([§FS-rhei-states.4](rhei-states.spec.md#4-template-variables-in-instructions-and-personality)). `rhei next`, which exports
-no checkout-root context, renders every such path absolute. `Leaving a trail`
+no checkout-root context, renders every such path absolute. `Notes left for
+later tickets` names `runtime/notes.md` at the **project** execution root
+([§FS-rhei-note.3.1](rhei-note.spec.md#31-where-it-lives)), the one memory path that is not under each execution root, which is
+why it gets a line of its own rather than joining the list above; the line is
+rendered whether or not the store exists yet, because a verb that creates it on
+first write needs the path named before there is anything to read.
+`Leaving a trail`
 describes artifacts and permitted edits; it says nothing about when to stop or
 how completion is detected, which stay with the completion condition
-([§FS-rhei-agents.3.1](rhei-agents.spec.md#31-completion-authority)).
+([§FS-rhei-agents.3.1](rhei-agents.spec.md#31-completion-authority)). Its note bullet is the one write it permits outside the
+task's own body, and it is permitted only through the verb: the slot, the line
+bound, the duplicate refusal and the lock live there ([§FS-rhei-note](rhei-note.spec.md#fs-rhei-note-rhei-note)).
 The map is never filtered by exclusions. A listed path may therefore identify
 an excluded source; `## Exclusions` in the agent prompt states the applicable
 guarantee and prevents the map from being mistaken for permission.
@@ -333,6 +369,11 @@ Given an invocation `I = (task, state, visit_count, identity)`:
 5. `X` — the task's exclusions resolved against its effective checkout, every
    owning-rhei execution root, and the authored project graph immediately
    before composition ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)).
+6. `N` — the bytes of the project note store, `runtime/notes.md` at the
+   **project** execution root ([§FS-rhei-note.3.1](rhei-note.spec.md#31-where-it-lives)), or nothing when the file does not exist.
+   Input 2 enumerates each *rhei's* execution root, which does not reach the
+   project root in a Panta whose members are all directory workspaces, so the
+   store is named as an input of its own.
 
 Before opening any candidate payload in §4.2–§4.4 or the prompt sections owned
 by [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition), compare its logical and canonical source to `X`. Omit an exact file match or a descendant of an
@@ -360,6 +401,26 @@ are never silently omitted here.
    = the content sections of `index.panta.md`. Each rendered context is capped
    at 1000 lines with the overflow line `… truncated; read <path>`. Omit either
    when empty.
+4. If the normalized `state(task)` declares `execute_on`, or `N` is empty or
+   excluded, render no `### Project Notes`. Otherwise fold `N` into the live
+   entries and render them after `### Project Context`:
+   1. Read `N` top to bottom. **File position is write order.**
+   2. For each task, keep only its **last** record; every earlier record by
+      that task is superseded. This is how a second note by one task replaces
+      its first — by the fold, not by rewriting the file.
+   3. Apply the surviving records in file position order. A `strikes` record
+      removes the named task's entry from the composed list; a `restates`
+      record moves it to the restating record's own position. A record naming
+      a task with no live entry at that point is **inert**.
+   4. Render what is left **newest first** — descending file position — as
+      `- [<task-id>] <entry>`, with the cap and overflow line of
+      [§FS-rhei-memory.4.5](rhei-memory.spec.md#45-fencing-and-rendering). Omit the
+      whole block when nothing is left.
+   A record composition cannot parse against the grammar of [§FS-rhei-note.3.2](rhei-note.spec.md#32-the-record-grammar) is
+   **skipped**, not fatal: a prompt must compose. One consequence follows from
+   step 2 rather than from a rule of its own — a task that strikes an entry and
+   later records a note of its own supersedes its own strike along with
+   everything else it wrote, and the struck entry comes back.
 
 ### 4.3. Plan History
 
@@ -452,6 +513,14 @@ are never silently omitted here.
 4. Caps are the numbers in this section. A settings surface may later override
    a cap with another number; it cannot introduce selection by relevance, and
    a cap of `0` removes the section rather than the overflow line.
+5. `### Project Notes` is capped at **24 lines** of entries, with the overflow
+   line `… {n} earlier notes not shown — read <store path>` emitted **first**,
+   where `{n}` counts the live entries the cap dropped. One entry is bounded at
+   **3 lines** at write time ([§FS-rhei-note.4](rhei-note.spec.md#4-refusals)); the block's cap is on lines rather than on
+   entries because an entry cap alone does not bound the line cost. 24 is
+   smaller than every other cap here except `### Siblings`, because this is the
+   only block an agent rather than a plan writer fills: a 40-ticket rhei at
+   three spawns each reads at most 2,880 lines of notes.
 
 ## 5. Surfaces
 
@@ -462,8 +531,9 @@ are never silently omitted here.
   ([§FS-rhei-supervision.3.4](rhei-supervision.spec.md#34-manual-workers)); JSON output carries each as a string field named
   after the section: `position`, `plan_history`, `previous_visits`,
   `navigation`. It uses that same role-aware `## Position` renderer, so a
-  supervising task omits inline rhei and project context on both surfaces and
-  an ordinary task keeps it on both. Two differences follow from what that
+  supervising task omits inline rhei and project context — and
+  `### Project Notes` — on both surfaces, and an ordinary task keeps all
+  three on both. Two differences follow from what that
   surface prints:
   - `rhei next` renders no `## Rhei Commands`, so the two sub-sections of §3.4
     would arrive with no `##` parent. On this surface they are wrapped in
@@ -497,6 +567,13 @@ Panta: Rhei › rhei `delivery`: Supervised delivery › Task delivery.deliver: 
 - Task delivery.deliver.review-2: Code review round 2 [review] — waits on this task
 …
 
+### Project Notes
+
+Facts earlier tickets left for whoever came next, newest first.
+
+- [delivery.deliver.review-1] The checkpoint fixture needs `maxLevels: 3`; without it the subtree never loads and the failure reads as a missing state.
+- [delivery.deliver.implement] Three concurrent cargo builds under /tmp fill the root disk; build under ~/ag/tmp with --target-dir.
+
 ## Plan History
 
 Finished work, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root.
@@ -527,4 +604,7 @@ Previous log: `runtime/logs/task-delivery.deliver.fix-1-fix.log`
 
 The two reviews are `see above` because they are this task's direct priors and
 already pasted in full under `## Prior Task Results`; the agent pays for each
-result once.
+result once. The two notes are `review-1`'s and `implement`'s one entry each,
+newest first, and they would reach a ticket in another rhei of this project
+just as they reach this one — that is the whole of what the store is for. The
+supervising parent, `delivery.deliver`, gets none of the three blocks.

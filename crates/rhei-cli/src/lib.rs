@@ -130,6 +130,7 @@ include!("cli/run_prompt_sections.rs");
 include!("cli/run_prompt_handoffs.rs");
 include!("cli/subtree_supervision_prompt.rs");
 include!("cli/run_prompt_memory.rs");
+include!("cli/note_store.rs");
 include!("cli/run_prompt_position.rs");
 include!("cli/run_prompt_history.rs");
 include!("cli/run_prompt_visits.rs");
@@ -312,6 +313,7 @@ mod tests {
     include!("cli/tests_prompt_memory_caps.rs");
     include!("cli/tests_prompt_memory_results.rs");
     include!("cli/tests_prompt_memory_visits.rs");
+    include!("cli/tests_prompt_notes.rs");
 }
 
 #[cfg(test)]

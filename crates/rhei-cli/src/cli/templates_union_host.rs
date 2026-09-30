@@ -225,7 +225,8 @@
 
     /// Read the host under the permanent sibling lock every rewriting command
     /// takes: the scope lock, then one destination lock per file the placement
-    /// rewrites.
+    /// rewrites. The scope is `union_scope_root`'s, so a member's lock covers
+    /// the project settings the hoist rewrites as well as the rhei itself.
     ///
     /// Only a `--into` takes them. An `includes:` entry unions into a freshly
     /// rendered tree nothing else can see, and a sidecar written there would
@@ -239,7 +240,7 @@
         if mode != UnionMode::Place {
             return Ok(HeldHost { files: host_ticket_files(host)?, _locks: Vec::new() });
         }
-        let scope = lock_new_create(&host.root)?;
+        let scope = lock_new_create(union_scope_root(host))?;
         let files = host_ticket_files(host)?;
         let mut locks = vec![scope];
         for destination in union_destinations(host, &files, tickets) {

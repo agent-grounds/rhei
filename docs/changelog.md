@@ -350,7 +350,8 @@ pull request number: the release stamps `(PR #N)` onto it. See
   thing apart from `description`, a template's `from: "*"` edge is written scoped
   to that template's own states, and only the host's `node_policy` routes. Inputs
   union too, so an including template is used exactly as a flat one is. Nothing
-  is written until the whole union validates, and provenance is one fence comment
+  is written until the union validates in the scope the target runs in, and
+  provenance is one fence comment
   per inclusion rather than a lock file, a generated header or an alias-encoded
   identity. A placement never asserts a ticket identity the ledger did not
   settle: a template that declares a `budgetTicketId` is refused and the key is
@@ -364,8 +365,10 @@ pull request number: the release stamps `(PR #N)` onto it. See
   the project's terms instead of the member's — so a placement can no longer
   report success over a project its own machine has just made unloadable. The
   union answers for the errors it introduced and not for the ones it found, the
-  write takes the permanent sibling lock every rewriting command takes so it
-  serializes against a live `rhei run` rather than racing it, and one state's
+  write takes the permanent sibling lock every rewriting command takes — the
+  project's own sidecar for a member, so the hold covers the settings two
+  placements into two members would otherwise race over — and so serializes
+  against a live `rhei run` rather than racing it, and one state's
   rhei-scoped artifact path walked by two placed tickets is a warning naming the
   path and both tickets rather than silence
   ([§FS-rhei-templates.6.2](functional-spec/rhei-templates.spec.md#62-instantiating-inside-a-panta-project),

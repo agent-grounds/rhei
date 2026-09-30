@@ -943,11 +943,13 @@ Recognition requires all of the following:
 - the invocation exited non-zero and was neither timed out nor interrupted;
 - after stripping terminal-control decoration and trimming surrounding
   whitespace from each captured stdout and stderr line, exactly one line is
-  `You've hit your session limit · resets <h>:<mm><am|pm> (<zone>)`, where
-  `<h>` is `1` through `12`, `<mm>` is two digits from `00` through `59`, the
-  meridiem is lowercase, and `<zone>` is an installed IANA time-zone name whose
-  local time is valid and unambiguous. Terminal decoration means ANSI escape
-  sequences; removing it must not otherwise rewrite the line.
+  `You've hit your <period> limit · resets <h>[:<mm>]<am|pm> (<zone>)`, where
+  `<period>` is `session` or `weekly`, matched exactly and case-sensitively,
+  `<h>` is `1` through `12`, `<mm>` — when present — is two digits from `00`
+  through `59` and an absent `:<mm>` means `00`, the meridiem is lowercase, and
+  `<zone>` is an installed IANA time-zone name whose local time is valid and
+  unambiguous. Terminal decoration means ANSI escape sequences; removing it must
+  not otherwise rewrite the line.
 
 The match does not search inside prose. An exit of `0`, absent or malformed
 reset information, an absent or invalid zone, a nonexistent or ambiguous local
@@ -964,6 +966,19 @@ this line names a reset instant worth sleeping on. A registry id cannot carry
 that claim, because an entry may be named anything and wrap anything
 (§FS-rhei-agents.2.1); an entry named `cld1` resolving `anthropic` is therefore
 recognized, and one named `codex` resolving `acme` is not.
+
+**The period vocabulary is closed on the same terms, and the reset names a time
+of day only.** `session` and `weekly` are the whole of the vocabulary, and a
+third period word joins it by a change to this specification rather than by a
+project's configuration — the rule the provider set is already held to. An open
+token slot would rest recognition on the provider set and a sentence shape
+alone, so a recognized provider printing `You've hit your disk limit · resets
+6am (Europe/Zurich)` would park. A **dated** reset — `resets Oct 1, 5:59am`, the
+form a reset further than a day out takes — is deliberately not recognized
+either, because §FS-rhei-run.3.3 resolves the reported local minute against the
+observation's own date precisely since this grammar carries none, and a dated
+reset would have to infer a year the line does not print. Both stay ordinary
+process results, and both are decisions rather than oversights.
 
 Two cases stay ordinary process results whatever the invocation printed. A
 resolved provider **outside the set**, including one differing only in case: a

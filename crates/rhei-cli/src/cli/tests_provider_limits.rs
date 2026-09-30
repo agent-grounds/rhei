@@ -81,10 +81,16 @@ mod provider_limits {
         .expect("a provider in the closed set is recognized");
         assert_eq!(recognized.identity.provider, "anthropic");
         assert_eq!(recognized.identity.agent, "codex", "the registry id is recorded, not tested");
+        // The first three are the long-standing rejections; the last three are
+        // decisions §FS-rhei-agents.2.3 now records: a dated reset names a date
+        // the grammar does not carry, and the period vocabulary is closed.
         for lookalike in [
             "You've hit your session limit - resets 10:20pm (Europe/Zurich)",
             "You've hit your session limit · resets 10:20PM (Europe/Zurich)",
             "You've hit your session limit · resets 10:20pm (Not/AZone)",
+            "You've hit your session limit · resets Oct 1, 5:59am (Europe/Zurich)",
+            "You've hit your 5-hour limit · resets 6am (Europe/Zurich)",
+            "You've hit your Weekly limit · resets 6am (Europe/Zurich)",
         ] {
             assert!(classify_provider_limit(
                 &resolved,
@@ -124,6 +130,54 @@ mod provider_limits {
             observed,
         )
         .is_none());
+    }
+
+    /// The refusal is one grammar with two period words and an optional minute
+    /// group. `weekly` parks on exactly the terms `session` already does, and a
+    /// reset with no minutes is that hour at `00` and nothing else: one
+    /// arithmetic, not two. §FS-rhei-agents.2.3 §FS-rhei-run.3.3
+    #[test]
+    fn both_period_words_and_a_bare_hour_reset_are_recognized() {
+        let resolved = codex_openai();
+        let observed = std::time::UNIX_EPOCH + Duration::from_secs(1_789_579_200);
+        let classify = |line: &str| {
+            classify_provider_limit(
+                &resolved,
+                status(1),
+                false,
+                false,
+                &[line.to_string()],
+                observed,
+            )
+        };
+
+        // One word away from the control fixture above, and nothing else: the
+        // same reset must reach the same deadline.
+        let weekly = classify("You've hit your weekly limit · resets 10:20pm (Europe/Zurich)")
+            .expect("the period word is not what carries the claim");
+        assert_eq!(weekly.next_attempt_at, "2026-09-16T20:21:00Z");
+
+        // A reset with no minutes, under either period word. Both boundaries
+        // fall before the observation, so both take the next local date.
+        let session_bare = classify("You've hit your session limit · resets 6am (Europe/Zurich)")
+            .expect("a bare hour names a reset instant");
+        assert_eq!(session_bare.next_attempt_at, "2026-09-17T04:01:00Z");
+        let weekly_bare = classify("You've hit your weekly limit · resets 2pm (Europe/Zurich)")
+            .expect("a bare hour names a reset instant");
+        assert_eq!(weekly_bare.next_attempt_at, "2026-09-17T12:01:00Z");
+
+        // An absent `:<mm>` means `00`, asserted rather than implied: the two
+        // spellings are the same instant to the byte.
+        let spelled = classify("You've hit your session limit · resets 6:00am (Europe/Zurich)")
+            .expect("the spelled-out equivalent is unchanged");
+        assert_eq!(session_bare.next_attempt_at, spelled.next_attempt_at);
+
+        // The record keeps the matched sentence verbatim and derives no period
+        // field from it. §FS-rhei-run.3.3
+        assert_eq!(
+            weekly_bare.signal,
+            "You've hit your weekly limit · resets 2pm (Europe/Zurich)"
+        );
     }
 
     /// Recognition keys on the resolved provider, in a closed set, and never on

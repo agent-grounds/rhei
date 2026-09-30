@@ -87,12 +87,13 @@ pub struct ReservationGroup {
 }
 
 impl Journal {
-    /// Inspection and mutation use the same checks; `preview` cannot debit, so
-    /// `rhei validate` and `--dry-run` reach exactly this code.
+    /// Inspection and mutation use the same checks, so an inspection can have an
+    /// admission's verdict without taking it. No command is wired to it today:
+    /// `reserve` and the cases beside it are its only callers.
     ///
-    /// It answers with the ancestry it authenticated rather than with nothing,
-    /// so an inspection reports the downgrade of §FS-rhei-budgets.7.2 with the
-    /// bounds — still taking no mutating lock, appending no receipt and
+    /// It answers with the ancestry it authenticated rather than with nothing, so
+    /// such a caller *can* report the downgrade of §FS-rhei-budgets.7.2 beside the
+    /// bounds — while still taking no mutating lock, appending no receipt and
     /// debiting nothing. §FS-rhei-budgets.6.3
     pub fn preview(
         &self,

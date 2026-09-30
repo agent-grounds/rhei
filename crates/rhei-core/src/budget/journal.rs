@@ -210,7 +210,7 @@ impl Journal {
     /// string `Account::uuid` hands a caller. §FS-rhei-budgets.5.1
     /// §FS-rhei-budgets.7.1
     pub fn account_uuid(&self) -> &str {
-        self.project_id.trim_start_matches("panta:")
+        self.project_id.strip_prefix("panta:").unwrap_or(&self.project_id)
     }
 
     /// The day key this transaction draws against. §FS-rhei-budgets.3.3

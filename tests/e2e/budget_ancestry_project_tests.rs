@@ -326,6 +326,15 @@ fn a_same_project_descriptor_still_places_the_child_under_its_ancestor() {
     let child = run_with_descriptor(&root, "beta", Some(&ancestor), Some(&own));
     assert_admitted(&child, "a descriptor of this very project names a live ancestor");
     assert_spawn_count(&root, 2, "the child should have spawned under its ancestor");
+
+    // The account travels beside the reservation, and it is this project's own:
+    // §FS-rhei-budgets.7.1 sets the two together, so a spawn handed a wrong or
+    // absent account would be no descendant of this ancestor at all.
+    let handed = handed_down(&root);
+    assert!(
+        handed.iter().all(|(_, _, account)| account == &own),
+        "every spawn should have read this account ({own}) out of its own environment: {handed:?}"
+    );
     let placed = reservations(&root)
         .into_iter()
         .filter(|row| row["parent_reservation"] == serde_json::Value::String(ancestor.clone()))

@@ -23,6 +23,21 @@ pull request number: the release stamps `(PR #N)` onto it. See
   (`resets Oct 1, 5:59am`) does not park, because it would have to infer a year
   the line does not print. §FS-rhei-agents.2.3
 
+- Stop the end-to-end suite writing into the checkout it is run from. One test
+  wanted the repository as its working directory and said nothing about where the
+  binary's state should go, and the helper it called derived the spawned `rhei`'s
+  `HOME` and `XDG_STATE_HOME` from that working directory — so a full
+  `cargo test --workspace --all-targets` left an untracked
+  `.home/state/rhei/root-guards/<sha>.lock` at the checkout root, and one more
+  file there per run, because the lock is named for a project root that is a
+  fresh temporary directory each time. Every gate that reads the working tree —
+  this repository's own pre-commit and pre-push hooks among them — then saw the
+  checkout as modified when it was not, and an artifact under a dot directory
+  nobody wrote cost whoever found it the work of proving their own command had
+  not written it. §REQ-test-isolation now says that a test writes only inside its
+  own directory, that the checkout is not one, and that where a spawned process
+  writes is chosen rather than derived from where it stands.
+
 - Wait for the run journal's own line before reading it. The eight-way
   provider-limit parking regression read `runtime/transitions.log` once, the
   instant the durable `nextAttemptAt:` waits became visible, and asserted that

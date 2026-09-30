@@ -355,7 +355,7 @@ pull request number: the release stamps `(PR #N)` onto it. See
   identity. A placement never asserts a ticket identity the ledger did not
   settle: a template that declares a `budgetTicketId` is refused and the key is
   stripped from every clone, so a ticket re-placed at a spent id is halted rather
-  than handed a fresh counter ([§FS-rhei-library](functional-spec/rhei-library.spec.md#fs-rhei-library-composable-blocks),
+  than handed a fresh counter ([§FS-rhei-library](functional-spec/rhei-library.spec.md#fs-rhei-library-composition-by-graph-union),
   [§REQ-bounded-neural-work.4](requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)).
   `--mount`, `--seam`, `--pass`, `composition.lock.json`, `runtime/blocks/` and
   the manifest's `ports`, `data`, `expose`, `use`, `bind`, `seams`,

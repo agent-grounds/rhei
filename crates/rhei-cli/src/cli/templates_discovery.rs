@@ -212,17 +212,12 @@
         let raw = fs::read_to_string(&manifest_path).map_err(|err| {
             file_io_report(&manifest_path, "failed to read template manifest", err)
         })?;
-        let mut manifest: TemplateManifest = serde_yaml::from_str(&raw)
+        let manifest: TemplateManifest = serde_yaml::from_str(&raw)
             .map_err(|err| miette!(
                 help = template_manifest_help(),
                 "failed to parse '{}': {err}", manifest_path.display()
             ))?;
-        // Presence, including an empty group, forbids a selected duplicate. §FS-rhei-library.1.1
-        if manifest.select.is_some() {
-            let source: YamlValue = serde_yaml::from_str(&raw).map_err(|e| miette!(help = "fix the YAML in template.yaml, then retry", "{e}"))?;
-            manifest.static_declarations = ["ports", "data", "compatibility"].into_iter()
-                .filter(|key| source.get(*key).is_some()).map(str::to_string).collect();
-        }
+        refuse_removed_manifest_fields(&raw, &manifest_path)?;
         validate_template_manifest(&manifest, template_dir)?;
         Ok(manifest)
     }
@@ -335,181 +330,7 @@
             }
         }
 
-        match detect_template_layout(template_dir) {
-            Ok(_) => {}
-            Err(_) if !manifest.block.mounts.is_empty()
-                && !template_dir.join("plan.rhei.md").is_file()
-                && !template_dir.join("index.rhei.md").is_file() => {}
-            Err(err) => return Err(err),
-        }
-
-        validate_block_manifest(manifest, template_dir, &ident)?;
-
-        Ok(())
-    }
-
-    /// Validate manifest-local block syntax before resolution or rendering.
-    /// Cross-block references are checked after recursive expansion.
-    /// §FS-rhei-library.1–2 §FS-rhei-library.8
-    fn validate_block_manifest(
-        manifest: &TemplateManifest,
-        template_dir: &Path,
-        ident: &Regex,
-    ) -> MietteResult<()> {
-        let source = template_dir.join("template.yaml");
-        let block = &manifest.block;
-        if !block.is_block() && manifest.select.is_none() {
-            return Ok(());
-        }
-        if block.ports.is_none() && manifest.select.is_none() {
-            return Err(miette!(help = "declare ports.entry and the public exits", "block manifest '{}' must declare ports", source.display()));
-        }
-        if let Some(ports) = &block.ports {
-            if ports.exits.is_empty() {
-                return Err(miette!(help = "declare at least one public exit under ports.exits", "block manifest '{}' must declare at least one exit port", source.display()));
-            }
-            for name in ports.exits.keys() {
-                if !ident.is_match(name) {
-                    return Err(miette!(help = "rename the public exit to a valid identifier", "block manifest '{}' contains invalid public identifier '{name}'; use a letter then letters, digits, '_' or '-'", source.display()));
-                }
-            }
-        }
-        for name in block.data.inputs.keys().chain(block.data.outputs.keys()) {
-            if !ident.is_match(name) {
-                return Err(miette!(help = "rename the data endpoint to a valid identifier", "block manifest '{}' contains invalid public identifier '{name}'; use a letter then letters, digits, '_' or '-'", source.display()));
-            }
-        }
-        let mut aliases = BTreeMap::<&str, &str>::new();
-        for mount in &block.mounts {
-            if !ident.is_match(&mount.alias) {
-                return Err(miette!(
-                    help = "a mount alias must start with a letter and continue with letters, digits, '_' or '-'.",
-                    "invalid mount alias '{}' in '{}'",
-                    mount.alias,
-                    source.display()
-                ));
-            }
-            if let Some(previous) = aliases.insert(&mount.alias, &mount.block) {
-                return Err(miette!(
-                    help = "use distinct aliases for the mounted blocks",
-                    "duplicate mount alias '{}' in '{}': '{}' and '{}'",
-                    mount.alias,
-                    source.display(),
-                    previous,
-                    mount.block
-                ));
-            }
-        }
-        if let Some((first, second, target)) = block.compatibility.collision() {
-            return Err(miette!(
-                help = "give each stable identity a distinct target",
-                "compatibility collision in '{}': stable identities '{}' and '{}' both target '{}'",
-                source.display(), first, second, target
-            ));
-        }
-        Ok(())
-    }
-
-    fn validate_template_value_schema(
-        template_name: &str,
-        label: &str,
-        schema: &TemplateValueSchema,
-    ) -> MietteResult<()> {
-        if let Some(pattern) = schema.validate.as_deref() {
-            if matches!(schema.value_type, TemplateInputType::Array | TemplateInputType::Object) {
-                return Err(miette!(
-                    help = template_manifest_help(),
-                    "template '{}' input '{}' cannot set validate on {} values",
-                    template_name,
-                    label,
-                    schema.value_type.as_str()
-                ));
-            }
-            let _ = compile_full_match_regex(pattern).map_err(|err| {
-                miette!(
-                    help = template_manifest_help(),
-                    "template '{}' input '{}' has invalid validate regex: {err}",
-                    template_name,
-                    label
-                )
-            })?;
-        }
-
-        if let Some(format) = schema.format {
-            if matches!(schema.value_type, TemplateInputType::Array | TemplateInputType::Object) {
-                return Err(miette!(
-                    help = format!(
-                        "move `format: {}` onto the scalar it applies to — the array's `items` \
-                         entry or the object property — instead of the {} itself.",
-                        format.as_str(),
-                        schema.value_type.as_str()
-                    ),
-                    "template '{}' input '{}' cannot set format on {} values",
-                    template_name,
-                    label,
-                    schema.value_type.as_str()
-                ));
-            }
-        }
-
-        match schema.value_type {
-            TemplateInputType::Array => {
-                let Some(items) = schema.items.as_deref() else {
-                    return Err(miette!(
-                        help = template_manifest_help(),
-                        "template '{}' input '{}' with type array must declare items",
-                        template_name,
-                        label
-                    ));
-                };
-                if !schema.properties.is_empty() {
-                    return Err(miette!(
-                        help = template_manifest_help(),
-                        "template '{}' input '{}' with type array cannot declare properties",
-                        template_name,
-                        label
-                    ));
-                }
-                validate_template_value_schema(template_name, label, items)?;
-            }
-            TemplateInputType::Object => {
-                if schema.items.is_some() {
-                    return Err(miette!(
-                        help = template_manifest_help(),
-                        "template '{}' input '{}' with type object cannot declare items",
-                        template_name,
-                        label
-                    ));
-                }
-                for (property, property_schema) in &schema.properties {
-                    validate_template_value_schema(
-                        template_name,
-                        &format!("{label}.{property}"),
-                        property_schema,
-                    )?;
-                }
-            }
-            _ => {
-                if schema.items.is_some() {
-                    return Err(miette!(
-                        help = template_manifest_help(),
-                        "template '{}' input '{}' with type {} cannot declare items",
-                        template_name,
-                        label,
-                        schema.value_type.as_str()
-                    ));
-                }
-                if !schema.properties.is_empty() {
-                    return Err(miette!(
-                        help = template_manifest_help(),
-                        "template '{}' input '{}' with type {} cannot declare properties",
-                        template_name,
-                        label,
-                        schema.value_type.as_str()
-                    ));
-                }
-            }
-        }
+        detect_template_layout(template_dir)?;
 
         Ok(())
     }

@@ -1,7 +1,7 @@
 //! `changeset-review` after the union: same name, same inputs, same ticket ids,
 //! same artifact paths — and a machine whose states are the names their authors
 //! wrote rather than `m6_review__split`.
-//! §FS-rhei-library.9 §FS-rhei-library.14
+//! §FS-rhei-library.1 §FS-rhei-library.6
 //!
 //! This is the one test that says the **non-breaking promise held**. Rule 1
 //! refuses two `profiles.primary`, so `code-review` and `fix` are re-authored
@@ -30,7 +30,7 @@ fn golden(name: &str) -> String {
 /// `--list-inputs` byte for byte. An input renamed, reordered, retyped or given
 /// a different default is a break for every caller that scripts the template,
 /// and re-authoring the internals must not be one.
-/// §FS-rhei-library.11.4
+/// §FS-rhei-library.3.4
 #[test]
 fn changeset_review_list_inputs_is_byte_identical() {
     let dir = unique_temp_dir("changeset-golden-inputs");
@@ -77,7 +77,7 @@ fn changeset_review_writes_the_same_ticket_ids() {
 /// Every artifact path the machine declares. `--into` leaves paths alone, so
 /// re-authoring must too: a path is the contract between two states and, in this
 /// template, between the review's `decide` and the fix's entry.
-/// §FS-rhei-library.12
+/// §FS-rhei-library.4
 #[test]
 fn changeset_review_declares_the_same_artifact_paths() {
     let dir = unique_temp_dir("changeset-golden-paths");
@@ -105,7 +105,7 @@ fn changeset_review_declares_the_same_artifact_paths() {
 /// The machine reads like a machine somebody wrote: `split` and `final-fix`
 /// rather than `m6_review__split` and `m3_fix__final-fix`. This is the one thing
 /// a user could notice, and the reason the change is worth making.
-/// §FS-rhei-library.9
+/// §FS-rhei-library.1
 #[test]
 fn changeset_review_states_keep_their_authors_names() {
     let dir = unique_temp_dir("changeset-names");
@@ -137,7 +137,7 @@ fn changeset_review_states_keep_their_authors_names() {
 /// review's gate and then the fix's entry. `code-review`'s `human-review` is
 /// `final: true` with no outgoing edge today, so this cannot pass until its
 /// author makes it a non-final gate — the union never un-finalizes a terminal.
-/// §FS-rhei-library.11.1 §FS-rhei-library.11.5
+/// §FS-rhei-library.3.1 §FS-rhei-library.3.5
 #[test]
 fn a_driven_changeset_review_reaches_human_review_and_then_final_fix() {
     let dir = unique_temp_dir("changeset-driven");

@@ -417,9 +417,8 @@ pub struct Profile {
     ///
     /// Presence is the declaration, so the field is omitted rather than
     /// serialized as `null`: a profile that declares no bound renders
-    /// byte-for-byte what it did, and the composition lock written before this
-    /// field existed still agrees with the digest the compiler now takes over
-    /// the rendered profile. §FS-rhei-library.4.1
+    /// byte-for-byte what it did, which is what lets a union promise a diff of
+    /// added lines and nothing else. §FS-rhei-library.7.1
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transition_limit: Option<u64>,
 }

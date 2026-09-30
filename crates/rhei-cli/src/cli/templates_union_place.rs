@@ -6,7 +6,7 @@
     // `--into <rhei>.<task>` outside it — is the property that makes "a
     // template works at any level" a fact about one code path.
 
-    // §FS-rhei-library.12 §FS-rhei-library.14.1 §AR-rhei-library.6.2
+    // §FS-rhei-library.4 §FS-rhei-library.6.1 §AR-rhei-library.3
 
     /// One ticket-bearing file a template contributes, with its ids read out.
     #[derive(Debug, Clone)]
@@ -130,7 +130,7 @@
     /// template's tree, `--into <rhei>.<task>` calls it against the host's, and
     /// the two compose by being applied in turn. A second code path here would
     /// be the defect the design exists to prevent.
-    /// §FS-rhei-library.12 §FS-rhei-library.14.1 §AR-rhei-library.6.2
+    /// §FS-rhei-library.4 §FS-rhei-library.6.1 §AR-rhei-library.3
     fn reparent(files: &mut [PartTickets], parent: Option<&str>) {
         let Some(parent) = parent else {
             return;
@@ -155,7 +155,7 @@
 
     /// The markdown half of a re-parenting: headings gain the prefix and a
     /// level of depth, and every reference to a template task is rewritten to
-    /// the placed id. §FS-rhei-library.12
+    /// the placed id. §FS-rhei-library.4
     fn reparent_body(body: &str, parent: &str, known: &BTreeSet<String>) -> String {
         let mut in_code_block = false;
         let mut out = String::with_capacity(body.len() + 64);
@@ -194,7 +194,7 @@
 
     /// `**Prior:**` and `**Consumes:**` naming a template task are rewritten to
     /// the placed id; anything else — a cross-rhei id, an id no template task
-    /// declares — is left exactly as written. §FS-rhei-library.12
+    /// declares — is left exactly as written. §FS-rhei-library.4
     fn reparent_reference_line(
         text: &str,
         parent: &str,

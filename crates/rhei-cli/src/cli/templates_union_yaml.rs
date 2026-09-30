@@ -5,7 +5,7 @@
     // template's rendered lines at the end of each block, so every decision
     // below is about spans of the source rather than about a re-serialization.
 
-    // §FS-rhei-library.10 §FS-rhei-library.15.1
+    // §FS-rhei-library.2 §FS-rhei-library.7.1
 
     use std::ops::Range;
 
@@ -21,7 +21,7 @@
     #[derive(Debug, Clone)]
     struct YamlBlock {
         /// Byte offset just past the block's last non-blank line, which is
-        /// where an insertion goes. §FS-rhei-library.10
+        /// where an insertion goes. §FS-rhei-library.2
         body_end: usize,
         /// The indent its entries are written at, so an insertion matches.
         indent: usize,
@@ -182,7 +182,7 @@
 
     /// A YAML value reduced to a form two authors' spellings compare equal in:
     /// mapping order is dropped and `description` is not an operative field.
-    /// §FS-rhei-library.11.1
+    /// §FS-rhei-library.3.1
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Canon {
         Scalar(String),
@@ -214,7 +214,7 @@
 
     /// The first operative field two definitions disagree on, for the message
     /// rule 1 owes: a refusal that names the field is one an author can act on.
-    /// §FS-rhei-library.11.1
+    /// §FS-rhei-library.3.1
     fn differing_field(left: &YamlValue, right: &YamlValue) -> Option<String> {
         let (Canon::Map(left), Canon::Map(right)) = (canonical(left), canonical(right)) else {
             return None;

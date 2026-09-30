@@ -15,6 +15,7 @@ pub mod rhei_viz_model;
 // §AR-source-file-size: The CLI is split into bounded include parts.
 include!("cli/path_guards.rs");
 include!("cli/cli_declarations.rs");
+include!("cli/cli_subcommands.rs");
 include!("cli/complete_result_input.rs");
 include!("cli/cli_dispatch.rs");
 include!("cli/command_target_dispatch.rs");
@@ -33,17 +34,7 @@ mod templates {
     include!("cli/templates_builtin.rs");
     include!("cli/templates_list.rs");
     include!("cli/templates_completion.rs");
-    // §AR-source-file-size.3: block compilation is split by pipeline stage.
-    include!("cli/templates_select.rs");
-    include!("cli/templates_blocks_types.rs");
-    include!("cli/templates_blocks_provenance.rs");
-    include!("cli/templates_blocks_inventory.rs");
-    include!("cli/templates_blocks_compile.rs");
-    include!("cli/templates_blocks_qualify.rs");
-    include!("cli/templates_blocks_tasks.rs");
-    include!("cli/templates_blocks_lower.rs");
-    include!("cli/templates_blocks_cli.rs");
-    // §AR-rhei-library.6.1: the union is split by the decision each part owns.
+    // §AR-rhei-library.2: the union is split by the decision each part owns.
     include!("cli/templates_union_yaml.rs");
     include!("cli/templates_union_machine.rs");
     include!("cli/templates_union_place.rs");
@@ -58,6 +49,7 @@ mod templates {
     include!("cli/templates_rename.rs");
     include!("cli/templates_project.rs");
     include!("cli/templates_discovery.rs");
+    include!("cli/templates_input_schema.rs");
     include!("cli/templates_inputs.rs");
     include!("cli/templates_render_scan.rs");
     include!("cli/templates_render.rs");
@@ -68,9 +60,7 @@ mod templates {
     #[cfg(test)]
     mod tests {
         include!("cli/tests_templates_render.rs");
-        include!("cli/tests_templates_blocks.rs");
         include!("cli/tests_templates_publication.rs");
-        include!("cli/tests_templates_selection.rs");
         include!("cli/tests_templates_union.rs");
     }
 }

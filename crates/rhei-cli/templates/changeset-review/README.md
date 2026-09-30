@@ -5,10 +5,11 @@ two-agent review loop: independent review, smart aggregation, independent
 validation, independent fix proposals, smart adjudication, and smart final
 fixing.
 
-The reusable halves are also shipped as the independently discoverable
-`code-review` and `fix` blocks. They can be recomposed with
-`--pass review.decision=fix.decision`; the established `changeset-review`
-command remains the compatibility surface for existing callers.
+Both halves are shipped as independently discoverable templates,
+`code-review` and `fix`, which this one lists under `includes:`. Each can be
+instantiated on its own or placed into a plan that already exists; this
+template is the composition, and its name, inputs, ticket ids and artifact
+paths are what they have always been.
 
 Instantiate this workspace inside the repository being reviewed. The
 instantiated directory is a scratchpad, not the source tree itself, so agents
@@ -40,19 +41,27 @@ editing `agent_timeout` on the state in the rendered `states.yaml`.
 
 ## State Machine
 
-The wrapper compiles the state fragments from
-[`code-review`](../code-review/states.yaml) and [`fix`](../fix/states.yaml),
-then applies its checked compatibility map so existing state and artifact names
-remain stable. `compatibility.terminals` checks that both child terminal pairs
-have matching effective contracts before sharing public `completed`/`cancelled`
-identities. Cancellation remains available at the human approval gate.
+This template is built out of [`code-review`](../code-review/states.yaml) and
+[`fix`](../fix/states.yaml), which it lists under `includes:`. Their states,
+edges, profiles and routes join its own by graph union, under the names their
+authors wrote: the machine carries `split`, `review`, `human-review` and
+`final-fix`, not an alias-encoded spelling of them, so a prompt can name a
+state instead of being sent to look one up.
 
-The manifest's opt-in `select: |` scalar selects only `ports`, `data`, or
-`compatibility` after resolving its static inputs. Here it omits mappings for
-preparation/commit stages when the respective input is `none`; the reusable
-`fix` block selects matching entry/data ports. No placeholder state or extra
-workspace/commit artifact is required. The static input schema, mounts, binds,
-and seams are unchanged. See §FS-rhei-library.1.1 and §FS-rhei-library.7.1–2.
+What this template owns is the part neither half knows: the edge out of
+`code-review`'s `human-review` gate into `fix`'s entry, and the profile whose
+`allowed` spans both, mapped by `by_type` to the `task` kind the coordinate
+ticket carries. `code-review` makes its own gate non-terminal and gives it an
+edge to `completed`, because a union never un-finalizes a terminal — its author
+does. The two templates' `completed` and `cancelled` coalesce by role rather
+than by spelling, and their `settings.json` join by key, so each contributes its
+own agent. Cancellation remains available at the human approval gate.
+
+When `fix_prepare` or `fix_commit` is `none`, `fix` renders without the
+corresponding states and edges, so no placeholder state or extra
+workspace/commit artifact appears. The input schema a caller passes is
+unchanged. See [§FS-rhei-library.3](../../../../docs/functional-spec/rhei-library.spec.md#3-the-union-rules)
+and [§FS-rhei-library.6](../../../../docs/functional-spec/rhei-library.spec.md#6-includes-a-template-built-from-templates).
 
 Per-task paths through the machine:
 
@@ -90,14 +99,12 @@ rhei instantiate changeset-review \
   --output ./.agent-grounds/scratchpad/changeset-review/
 ```
 
-The equivalent reusable block boundary is:
+Either half can also be used on its own, or placed into a plan that already
+exists:
 
 ```bash
-rhei instantiate \
-  --mount review=code-review --mount fix=fix \
-  --set review.change_ref=PR#42 \
-  --seam review.done=fix.entry \
-  --pass review.decision=fix.decision
+rhei instantiate code-review PR#42 --output ./review
+rhei instantiate code-review PR#42 --into release.ticket
 ```
 
 ## Example

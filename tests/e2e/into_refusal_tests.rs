@@ -1,5 +1,5 @@
 //! What `--into` refuses, and the message each refusal prints.
-//! §FS-rhei-library.11 §FS-rhei-library.12 §FS-rhei-library.15
+//! §FS-rhei-library.3 §FS-rhei-library.4 §FS-rhei-library.7
 //!
 //! Each refusal fires on a composition the block compiler could not express at
 //! all, so nothing that worked stops working — but a refusal that arrives as a
@@ -17,7 +17,7 @@ use super::*;
 /// Give the template a state the host already defines, differing in an
 /// operative field. Rule 1 refuses and names both sources and the field; it
 /// does not pick a winner and does not qualify either name.
-/// §FS-rhei-library.11.1
+/// §FS-rhei-library.3.1
 #[test]
 fn a_same_named_state_that_differs_is_refused_naming_both_sources() {
     let (dir, root) = host_workspace("into-state-clash");
@@ -46,7 +46,7 @@ fn a_same_named_state_that_differs_is_refused_naming_both_sources() {
 /// Two same-named profiles is the case that makes the shipped built-ins owe a
 /// re-authoring: `code-review` and `fix` both declare `profiles.primary` with
 /// different `initial` and different `allowed`, and `allowed` is wholesale.
-/// §FS-rhei-library.11.1 §FS-rhei-states.8.2
+/// §FS-rhei-library.3.1 §FS-rhei-states.8.2
 #[test]
 fn two_same_named_profiles_are_refused() {
     let (dir, root) = host_workspace("into-profile-clash");
@@ -67,7 +67,7 @@ fn two_same_named_profiles_are_refused() {
 
 /// A ticket id already taken in the target is refused before anything is
 /// written, with the message the placement rule specifies verbatim.
-/// §FS-rhei-library.12
+/// §FS-rhei-library.4
 #[test]
 fn a_taken_ticket_id_is_refused_with_its_own_message() {
     let (dir, root) = host_workspace("into-id-collision");
@@ -99,7 +99,7 @@ fn a_taken_ticket_id_is_refused_with_its_own_message() {
 /// is a union-time collision, refused naming both states and the path. The
 /// other case, one state walked by two tickets, is a warning rather than a
 /// refusal, because whether it matters is the author's call.
-/// §FS-rhei-library.15.2
+/// §FS-rhei-library.7.2
 #[test]
 fn one_rhei_scoped_artifact_path_claimed_by_two_states_is_refused() {
     let (dir, root) = host_workspace("into-artifact-clash");
@@ -128,7 +128,7 @@ fn one_rhei_scoped_artifact_path_claimed_by_two_states_is_refused() {
 
 /// The basin holds unfiled tickets that run under the project default and has
 /// no machine of its own, so it is never a `--into` target.
-/// §FS-rhei-library.10.1
+/// §FS-rhei-library.2.1
 #[test]
 fn the_basin_is_never_a_target() {
     let dir = unique_temp_dir("into-basin");
@@ -146,7 +146,7 @@ fn the_basin_is_never_a_target() {
 
 /// Each flag `--into` cannot be combined with is an error naming the pair,
 /// rather than a meaning invented for the combination.
-/// §FS-rhei-library.15.3
+/// §FS-rhei-library.7.3
 #[test]
 fn into_refuses_the_flags_it_cannot_combine_with() {
     let (dir, _root) = host_workspace("into-flag-clashes");
@@ -171,7 +171,7 @@ fn into_refuses_the_flags_it_cannot_combine_with() {
 
 /// `--mount`, `--seam` and `--pass` are gone, and each says what replaced it:
 /// a removed flag that errors with `unexpected argument` teaches nothing.
-/// §FS-rhei-library.9
+/// §FS-rhei-library.1
 #[test]
 fn the_removed_composition_flags_name_their_replacement() {
     let dir = unique_temp_dir("into-removed-flags");
@@ -214,7 +214,7 @@ fn the_removed_composition_flags_name_their_replacement() {
 
 /// An `includes:` cycle is an error naming the chain, so the message says which
 /// templates form the loop rather than that recursion ran out.
-/// §FS-rhei-library.14
+/// §FS-rhei-library.6
 #[test]
 fn an_includes_cycle_names_the_chain() {
     let dir = unique_temp_dir("into-includes-cycle");

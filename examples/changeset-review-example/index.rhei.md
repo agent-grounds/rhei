@@ -45,7 +45,8 @@ Flow:
    proposal matrix.
 7. The smart target (`codex[xhigh]:openai:gpt-5.5`) decides discrepancies and writes the
    final fix plan.
-8. The smart target applies the accepted fixes in a `worktree` workspace and performs the `pr` commit step.
+8. A human reviews the final fix plan and explicitly approves the fix phase.
+9. The smart target applies the accepted fixes in a `worktree` workspace and performs the `pr` commit step.
 
 ## Notes
 

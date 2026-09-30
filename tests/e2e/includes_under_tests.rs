@@ -1,14 +1,14 @@
 //! `includes:` in `template.yaml`, and `under:` on an entry: a template built
 //! out of templates, with an included template's tickets placed beneath a task
 //! of the host.
-//! §FS-rhei-library.14 §FS-rhei-library.14.1
+//! §FS-rhei-library.6 §FS-rhei-library.6.1
 //!
 //! `under:` is the `<task>` half of `--into <rhei>.<task>` applied one level in,
 //! so what these tests pin is that it is the *same* mechanism: the same
 //! re-parenting, the same heading deepening, the same `**Prior:**` rewrite, the
 //! same writer and the same refusals. A second placement code path would pass
 //! some of these and be the defect the design exists to prevent.
-//! §AR-rhei-library.6.2
+//! §AR-rhei-library.3
 //!
 //! Today every one of these fails: `includes:` is not a manifest field, so the
 //! including template is refused at manifest validation.
@@ -32,7 +32,7 @@ fn write_including_template(dir: &Path, includes: &str) -> PathBuf {
     );
     // The host writes the edge into the included template's entry state and the
     // profile whose `allowed` spans both: a path across templates is the one
-    // thing no single template knows. §FS-rhei-library.11.5
+    // thing no single template knows. §FS-rhei-library.3.5
     write_fixture_file(
         &template,
         "states.yaml",
@@ -81,7 +81,7 @@ node_policy:
 /// `under: ticket` places the included template's tickets beneath the host's
 /// `ticket` task: placed ids, deepened headings, the included template's own
 /// `**Prior:**` rewritten to the composed id, and `rhei validate` clean.
-/// §FS-rhei-library.14.1
+/// §FS-rhei-library.6.1
 #[test]
 fn under_places_an_included_templates_tickets_beneath_a_host_task() {
     let dir = unique_temp_dir("includes-under");
@@ -129,7 +129,7 @@ fn under_places_an_included_templates_tickets_beneath_a_host_task() {
 }
 
 /// `under:` omitted places at the including template's top level — the shape a
-/// wrapper that chains two templates as siblings needs. §FS-rhei-library.14.1
+/// wrapper that chains two templates as siblings needs. §FS-rhei-library.6.1
 #[test]
 fn an_entry_without_under_places_at_the_top_level() {
     let dir = unique_temp_dir("includes-no-under");
@@ -164,7 +164,7 @@ fn an_entry_without_under_places_at_the_top_level() {
 /// `under:` resolves against the task tree as it stands when the entry is
 /// reached, so a name no earlier entry has placed is an error naming the entry,
 /// the id, and the ids that *are* available — a message about order rather than
-/// a mystery. §FS-rhei-library.14.1
+/// a mystery. §FS-rhei-library.6.1
 #[test]
 fn an_under_naming_an_unplaced_task_lists_what_is_available() {
     let dir = unique_temp_dir("includes-forward-ref");
@@ -183,7 +183,7 @@ fn an_under_naming_an_unplaced_task_lists_what_is_available() {
 
 /// The same template under two parents is legal — different parents, different
 /// ids — which is "once per parent" with a way to say the parent. Twice under
-/// one parent is the id collision. §FS-rhei-library.14.1 §FS-rhei-library.12
+/// one parent is the id collision. §FS-rhei-library.6.1 §FS-rhei-library.4
 #[test]
 fn the_same_template_under_two_parents_is_legal_and_twice_under_one_is_not() {
     let dir = unique_temp_dir("includes-two-parents");
@@ -229,7 +229,7 @@ fn the_same_template_under_two_parents_is_legal_and_twice_under_one_is_not() {
 /// The two re-parentings compose and both depth limits are checked **once** on
 /// the final ids: `under: ticket` inside the template plus
 /// `--into <rhei>.<task>` outside it puts the included ticket three deep and
-/// grows the host's `maxLevels` to reach it. §FS-rhei-library.12.1
+/// grows the host's `maxLevels` to reach it. §FS-rhei-library.4.1
 #[test]
 fn under_and_into_a_task_compose_into_one_depth_check() {
     let dir = unique_temp_dir("includes-compose-depth");
@@ -260,7 +260,7 @@ fn under_and_into_a_task_compose_into_one_depth_check() {
 
 /// Depth 4 is a hard ceiling, because `######` is the deepest heading Markdown
 /// gives, and it wins over growing `maxLevels`: a placement past it is refused
-/// naming the id that overflows. §FS-rhei-library.12.1
+/// naming the id that overflows. §FS-rhei-library.4.1
 #[test]
 fn a_placement_past_depth_four_is_refused_naming_the_id() {
     let dir = unique_temp_dir("includes-depth-ceiling");
@@ -295,7 +295,7 @@ fn a_placement_past_depth_four_is_refused_naming_the_id() {
 
 /// An including template shows its inputs as the **union** of its own and its
 /// parts', so it is used exactly as a flat template is.
-/// §FS-rhei-library.11.4
+/// §FS-rhei-library.3.4
 #[test]
 fn an_including_template_lists_the_unioned_inputs() {
     let dir = unique_temp_dir("includes-input-union");

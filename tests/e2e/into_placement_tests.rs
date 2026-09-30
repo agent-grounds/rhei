@@ -1,7 +1,7 @@
 //! `rhei instantiate <template> --into <rhei>[.<task>]`: a template's states,
 //! edges, profile, kind and tickets added to a plan that already exists, under
 //! the names their authors wrote.
-//! §FS-rhei-library.9 §FS-rhei-library.10 §FS-rhei-library.12
+//! §FS-rhei-library.1 §FS-rhei-library.2 §FS-rhei-library.4
 //!
 //! Every test here fails today with `error: unexpected argument '--into'
 //! found`, because the flag does not exist. That is absence rather than a
@@ -17,7 +17,7 @@ use super::*;
 /// template's own wildcard is written *scoped* to its own states; the tickets
 /// land where `rhei new` writes them with their `**Prior:**` rewritten; the
 /// fence records the inclusion; and the host's own bytes do not move.
-/// §FS-rhei-library.10 §FS-rhei-library.11.2 §FS-rhei-library.15.1
+/// §FS-rhei-library.2 §FS-rhei-library.3.2 §FS-rhei-library.7.1
 #[test]
 fn into_a_rhei_adds_the_templates_graph_and_tickets() {
     let (dir, root) = host_workspace("into-top-level");
@@ -30,7 +30,7 @@ fn into_a_rhei_adds_the_templates_graph_and_tickets() {
     assert_success(&result);
 
     let machine = read(&root.join("states.yaml"));
-    // The names the author wrote, not `m6_review__review`. §FS-rhei-library.9
+    // The names the author wrote, not `m6_review__review`. §FS-rhei-library.1
     for state in ["review:", "decide:"] {
         assert!(machine.contains(state), "machine should gain state {state}; got:\n{machine}");
     }
@@ -48,7 +48,7 @@ fn into_a_rhei_adds_the_templates_graph_and_tickets() {
         "the host's own wildcard must stay unscoped; got:\n{machine}"
     );
     // The template's wildcard is scoped to the template's own states, so its
-    // cancel-from-anywhere edge cannot capture the host's. §FS-rhei-library.11.2
+    // cancel-from-anywhere edge cannot capture the host's. §FS-rhei-library.3.2
     assert!(
         machine.contains("sources:"),
         "the template's wildcard must be written with sources:; got:\n{machine}"
@@ -111,7 +111,7 @@ fn into_a_rhei_adds_the_templates_graph_and_tickets() {
 /// the `**Prior:**` inside the template to the placed id, appends to the
 /// parent's file because a task file owns its subtree, and grows the host's
 /// `maxLevels` to the depth the placement needs.
-/// §FS-rhei-library.12 §FS-rhei-library.12.1
+/// §FS-rhei-library.4 §FS-rhei-library.4.1
 #[test]
 fn into_a_task_reparents_the_placed_tickets() {
     let (dir, root) = host_workspace("into-under-task");
@@ -180,7 +180,7 @@ fn into_a_single_file_rhei_writes_inside_the_tasks_section() {
 
 /// `--dry-run` prints the insertion and writes nothing: the diff a caller reads
 /// before landing a union, and the promise that a refusal leaves the target
-/// byte-identical. §FS-rhei-library.10
+/// byte-identical. §FS-rhei-library.2
 #[test]
 fn into_dry_run_prints_the_diff_and_writes_nothing() {
     let (dir, root) = host_workspace("into-dry-run");
@@ -212,7 +212,7 @@ fn into_dry_run_prints_the_diff_and_writes_nothing() {
 /// Placing the same template twice adds nothing to the machine and refuses only
 /// the tickets whose ids are taken — so under *another* task it succeeds, and
 /// the machine is unchanged because every definition is already there and
-/// identical. §FS-rhei-library.11.1 §FS-rhei-library.13
+/// identical. §FS-rhei-library.3.1 §FS-rhei-library.5
 #[test]
 fn the_same_template_twice_adds_the_machine_once() {
     let (dir, root) = host_workspace("into-twice");

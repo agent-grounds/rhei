@@ -1,14 +1,45 @@
-name: |-
-  changeset-review-legacy-surface
-  human-review:
-    gating: true
+# The host of a two-template chain: what no single template knows is the path
+# between them, so the crossing edges and the spanning profile are written here.
+# §FS-rhei-library.3.5 §FS-rhei-library.6
+name: changeset-review
+version: 1.1.0
 
-  - from: decide
-    to: human-review
+states:
+  completed:
+    description: Task is done.
+    final: true
+
+  cancelled:
+    description: Task was cancelled before completion.
+    final: true
+
+transitions:
+  # Out of `code-review`'s human gate and into `fix`'s entry, which is the one
+  # edge neither template could have written. §FS-rhei-library.3.5
+{% if fix_prepare != 'none' %}
   - from: human-review
     to: prepare-workspace
+    description: A human approved the decision; isolate a workspace before fixing.
+{% else %}
   - from: human-review
     to: final-fix
-version: 1
-states: {}
-transitions: []
+    description: A human approved the decision; apply the accepted fixes in-tree.
+{% endif %}
+  - from: "*"
+    to: cancelled
+
+# `allowed` is wholesale and profiles never merge, so the ticket that walks the
+# whole chain needs one profile spanning both parts.
+# §FS-rhei-library.3.5 §FS-rhei-states.8.2
+profiles:
+  changeset-review:
+    initial: split
+    allowed: [split, review, aggregate-reviews, validate-review, propose-fixes, aggregate-proposals, decide, human-review, {% if fix_prepare != 'none' %}prepare-workspace, {% endif %}final-fix, {% if fix_commit != 'none' %}commit-fix, {% endif %}completed, cancelled]
+
+# The host routes, and `task` is the kind the chain's ticket carries.
+# §FS-rhei-library.3.3
+node_policy:
+  root: changeset-review
+  default: changeset-review
+  by_type:
+    task: changeset-review

@@ -1,6 +1,6 @@
 // The union's own four decisions, each tested where it is made rather than
 // through a placement that would exercise all of them at once.
-// §AR-rhei-library.6.1 §FS-rhei-library.11 §FS-rhei-library.12
+// §AR-rhei-library.2 §FS-rhei-library.3 §FS-rhei-library.4
 mod templates_union_tests {
     use super::super::*;
 
@@ -49,7 +49,7 @@ node_policy:
 
     /// `description` is not an operative field and declaration order is not a
     /// difference, so a state written two ways is one state.
-    /// §FS-rhei-library.11.1
+    /// §FS-rhei-library.3.1
     #[test]
     fn rule_one_ignores_description_and_declaration_order() {
         // Same `pending`, fields reordered and the prose rewritten.
@@ -69,7 +69,7 @@ node_policy:
     }
 
     /// An operative field that differs is refused naming both sources and the
-    /// field, with no winner picked. §FS-rhei-library.11.1
+    /// field, with no winner picked. §FS-rhei-library.3.1
     #[test]
     fn rule_one_refuses_a_differing_operative_field_naming_it() {
         let template = HOST
@@ -89,7 +89,7 @@ node_policy:
     /// whose terminals are named something else — as the shipped
     /// `spec-implementation-discrepancy-audit` names its six, none of them
     /// `completed` — is not refused for having named them.
-    /// §FS-rhei-library.11.1 §FS-rhei-states.1.4
+    /// §FS-rhei-library.3.1 §FS-rhei-states.1.4
     #[test]
     fn the_terminal_clause_is_a_role_test_not_a_name_test() {
         let host = HOST
@@ -115,7 +115,7 @@ node_policy:
 
     /// A template's `from: "*"` edge is written with `sources:` set to that
     /// template's own non-terminal states, and the host's own wildcard is left
-    /// exactly as written. §FS-rhei-library.11.2
+    /// exactly as written. §FS-rhei-library.3.2
     #[test]
     fn a_templates_wildcard_is_scoped_to_its_own_states() {
         let template = r#"name: review-loop
@@ -190,7 +190,7 @@ node_policy:
     /// At union only a template's `by_type` entries survive: its `root`,
     /// `default` and `rhei` are dropped because the host's stand, and its
     /// `overrides` because they key on a level that is a fact about the
-    /// placement. §FS-rhei-library.11.3
+    /// placement. §FS-rhei-library.3.3
     #[test]
     fn only_a_templates_by_type_routes_survive_the_union() {
         let template = HOST
@@ -232,7 +232,7 @@ node_policy:
     /// The union inserts the bytes the author wrote, which is why `--dry-run`
     /// can promise a diff of added lines and nothing else — a profile that
     /// declares `transition_limit` renders it exactly, and one that omits it
-    /// still omits it. §FS-rhei-library.15.1
+    /// still omits it. §FS-rhei-library.7.1
     #[test]
     fn a_declared_transition_limit_is_inserted_byte_for_byte() {
         let template = HOST
@@ -293,7 +293,7 @@ node_policy:
     /// Two templates that declare an input of the same name declare one input,
     /// and an input only an included template declares joins the union — so an
     /// including template is used exactly as a flat one is.
-    /// §FS-rhei-library.11.4
+    /// §FS-rhei-library.3.4
     #[test]
     fn inputs_union_across_an_inclusion() {
         let dir = union_test_dir("inputs");
@@ -315,7 +315,7 @@ node_policy:
 
     /// An including template fixes an included value by declaring the input
     /// itself, and its declaration wins over any included default.
-    /// §FS-rhei-library.11.4
+    /// §FS-rhei-library.3.4
     #[test]
     fn an_including_templates_declaration_wins_over_an_included_default() {
         let dir = union_test_dir("inputs-wins");
@@ -336,7 +336,7 @@ node_policy:
     }
 
     /// Two included defaults that differ with no declaration above them are an
-    /// error naming both templates and the input. §FS-rhei-library.11.4
+    /// error naming both templates and the input. §FS-rhei-library.3.4
     #[test]
     fn two_differing_included_defaults_are_refused_naming_both() {
         let dir = union_test_dir("inputs-clash");
@@ -376,7 +376,7 @@ node_policy:
 
     /// Re-parenting rewrites the heading id, deepens the heading, and rewrites
     /// every `**Prior:**` and `**Consumes:**` that names a template task.
-    /// §FS-rhei-library.12
+    /// §FS-rhei-library.4
     #[test]
     fn reparenting_rewrites_ids_headings_and_references() {
         let mut files = vec![ticket_file("review", REVIEW_FILE)];
@@ -395,7 +395,7 @@ node_policy:
     /// `under:` inside a template and `--into <rhei>.<task>` outside it are the
     /// same function applied twice, and they compose: this is what makes "a
     /// template works at any level" a fact about one code path.
-    /// §FS-rhei-library.12.1 §AR-rhei-library.6.2
+    /// §FS-rhei-library.4.1 §AR-rhei-library.3
     #[test]
     fn two_reparentings_compose() {
         let mut files = vec![ticket_file("review", REVIEW_FILE)];
@@ -411,7 +411,7 @@ node_policy:
     }
 
     /// A reference that names no template task is left exactly as written, so a
-    /// cross-rhei `**Prior:**` survives a placement. §FS-rhei-library.12
+    /// cross-rhei `**Prior:**` survives a placement. §FS-rhei-library.4
     #[test]
     fn a_reference_outside_the_template_is_left_alone() {
         let body = "### Step record: Record\n**State:** review\n**Prior:** other-rhei.gate\n";
@@ -429,7 +429,7 @@ node_policy:
     /// `under:` resolves against the task tree as it stands when the entry is
     /// reached, so an id an earlier entry placed is available to a later one,
     /// and one nothing has placed is an error listing what is.
-    /// §FS-rhei-library.14.1
+    /// §FS-rhei-library.6.1
     #[test]
     fn under_resolves_against_the_tree_accumulated_so_far() {
         let base = vec![(PathBuf::from("tasks/001-ticket.md"), vec!["ticket".to_owned()])];
@@ -450,7 +450,7 @@ node_policy:
 
     /// The same template under two parents is legal — different parents,
     /// different ids — and twice under one is the id collision.
-    /// §FS-rhei-library.14.1 §FS-rhei-library.12
+    /// §FS-rhei-library.6.1 §FS-rhei-library.4
     #[test]
     fn the_same_template_under_two_parents_is_two_id_sets() {
         let mut first = vec![ticket_file("review", REVIEW_FILE)];
@@ -481,7 +481,7 @@ node_policy:
     /// A rendered entry that declares a `budgetTicketId` is refused, whether it
     /// is the index's `metadata.tasks` or a task file's own block — and the key
     /// is removed unconditionally from every cloned entry.
-    /// §FS-rhei-library.13
+    /// §FS-rhei-library.5
     #[test]
     fn budget_identities_are_refused_at_the_source_and_stripped_from_the_clone() {
         let identity = |uuid: &str| -> YamlValue {
@@ -499,7 +499,7 @@ node_policy:
         assert!(error.contains("budgetTicketId"), "{error}");
         assert!(error.contains("coordinate"), "{error}");
 
-        // And in a task file's own metadata block, which §FS-rhei-library.12
+        // And in a task file's own metadata block, which §FS-rhei-library.4
         // re-keys the same way — the hole the refusal would have if it read
         // only the index.
         let mut file = ticket_file("coordinate", "### Step coordinate: Go\n**State:** review\n");

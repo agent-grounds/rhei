@@ -1,4 +1,4 @@
-# Reusable review duties and stage contracts. §FS-rhei-library.7
+# Reusable review duties and stage contracts. §FS-rhei-library.3
 name: code-review
 version: 1.0.0
 # Bind runtime tokens for the later runtime pass. §FS-rhei-states.4.4
@@ -139,7 +139,6 @@ states:
         description: Smart-target adjudication and final fix plan
 
   human-review:
-    final: true
     description: Human approval gate before autonomous final fixes run.
     gating: true
     inputs:
@@ -191,10 +190,22 @@ transitions:
     to: human-review
     description: Final decision is written; wait for human approval.
 
+  # The gate is where a chain is continued from, so it is not a terminal and it
+  # has a way out of its own. A host that continues past it adds its own edge;
+  # standalone, approval is the end. §FS-rhei-library.3.1 §FS-rhei-library.3.5
+  - from: human-review
+    to: completed
+    description: A human approved the decision and asked for no further work.
+
   - from: "*"
     to: cancelled
+# A profile of its own, because rule 1 refuses two same-named profiles that
+# differ and `allowed` is wholesale. §FS-rhei-library.3.1 §FS-rhei-states.8.2
 profiles:
-  primary:
+  code-review:
     initial: split
     allowed: [split, review, aggregate-reviews, validate-review, propose-fixes, aggregate-proposals, decide, human-review, completed, cancelled]
-node_policy: {root: primary, default: primary}
+# No `by_type` route: the coordinate ticket is a plain `task`, so it means the
+# host's default lane, and a host that chains this template past its gate maps
+# `task` to a profile spanning both. §FS-rhei-library.3.3 §FS-rhei-library.3.5
+node_policy: {root: code-review, default: code-review}

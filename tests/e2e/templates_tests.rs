@@ -521,8 +521,10 @@ Body for step 6.
 /// derived home above put a `.home/` at the repository root. Nothing the
 /// summary asserts depends on the working directory: the template is built into
 /// the binary rather than found by searching upwards, the task ids come from
-/// `--output`, and the summary is byte-identical from a directory that is no
-/// git repository at all. §REQ-test-isolation.1
+/// `--output`, and no git ancestry is read. The summary is not independent of
+/// the working directory — the template's relative `path` defaults render as
+/// `<cwd>/master` and `<cwd>/graalvm/*` — but no assertion below reads those
+/// lines. §REQ-test-isolation.1
 #[test]
 fn instantiate_project_hourly_human_intervention_template_prints_summary() {
     let dir = unique_temp_dir("templates-hourly-human-intervention");

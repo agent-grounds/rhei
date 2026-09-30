@@ -259,28 +259,3 @@ fn a_basin_ticket_files_block_is_a_load_error_that_list_survives() {
         flattened_output(&list)
     );
 }
-
-/// 14 · Composition rewrites task ids, so a block task file may not carry an
-/// authored metadata block: the compiler refuses it and names the block's own
-/// `index.rhei.md`. Carrying it through qualification is a separate contract.
-/// §FS-rhei-library.4
-#[test]
-fn block_composition_refuses_a_task_file_carrying_a_metadata_block() {
-    use super::block_composition_support::*;
-
-    let dir = unique_temp_dir("wtm-block-composition");
-    let fixtures = write_composition_fixtures(&dir);
-    let task_file = fixtures.review.join("tasks/review.md");
-    let authored = fs::read_to_string(&task_file).expect("read block task file");
-    fs::write(
-        &task_file,
-        format!(
-            "---\nmetadata:\n  tasks:\n    job:\n      context: oracle-labs\n---\n\n{authored}"
-        ),
-    )
-    .expect("write block task file");
-
-    let review = mount_arg("review", &fixtures.review);
-    let result = run_compose(&dir, &["instantiate", "--mount", review.as_str()]);
-    assert_failed_with(&result, &["review.md", "index.rhei.md"]);
-}

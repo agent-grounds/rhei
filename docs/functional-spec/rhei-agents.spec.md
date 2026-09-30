@@ -1015,7 +1015,7 @@ When `rhei run` spawns an agent for a task, it composes a prompt from the state 
 
 ## Position
 
-{where this task sits: Panta › rhei › ancestors; siblings; the parent's body; rhei and project content sections — §FS-rhei-memory.3.1}
+{where this task sits: Panta › rhei › ancestors; siblings; the parent's body; rhei and project content sections; the project note store — §FS-rhei-memory.3.1}
 
 ## Instructions
 

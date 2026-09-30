@@ -92,6 +92,7 @@ Execution:
   snapshot    Inspect, prune, or continue from session snapshots
   next        Claim the next ready task, or explicitly claim a named task
   complete    Complete a task: transition to terminal state, write ledger/result,\n              link it from the task, and remove the assignee
+  note        Leave one fact for whoever works next, anywhere in this project
   release     Drop a ticket's assignee so abandoned work can be claimed again
   reset       Return every task to the state it was authored in; for workspaces,\n              also remove runtime output
 

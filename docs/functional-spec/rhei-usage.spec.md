@@ -114,6 +114,7 @@ Commands for authoring, inspecting, and running a workflow:
 | `rhei snapshot`    | Lists, shows, prunes, or continues from session snapshots captured by `rhei run` |
 | `rhei roster`      | Inspects the effective agents, models, bindings, defaults, sources, and merge provenance for a project ([§FS-rhei-agents.1.1.7](rhei-agents.spec.md#117-inspecting-the-effective-roster)) |
 | `rhei show`       | Prints one task's heading and body by id, and nothing else; `--json` for the machine form ([§FS-rhei-show](rhei-show.spec.md#fs-rhei-show-rhei-show)) |
+| `rhei note`       | Leaves one fact in the project note store for whoever works next, spending the writing task's single slot ([§FS-rhei-note](rhei-note.spec.md#fs-rhei-note-rhei-note)) |
 
 `rhei run` and the manual-worker flow (`next` / `transition` / `complete`) are mutually exclusive per execution — they never overlap on the same task because `rhei run` holds transition responsibility for the states it drives. The typical manual-worker loop is `next` (claim) → work → `transition` (advance as needed) → `complete` (finish, record result, release).
 

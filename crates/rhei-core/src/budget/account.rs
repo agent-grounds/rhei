@@ -5,6 +5,7 @@
 //! per rhei would let a project add a rhei to buy capacity.
 //! §FS-rhei-budgets.5.1 §AR-neural-admission.7
 
+use super::diagnosis::{journal_path, Damage, Diagnosis, History, Inspection, Retired};
 use super::journal::{Audit, Journal};
 use super::types::BudgetError;
 use super::Result;
@@ -79,6 +80,167 @@ impl Account {
     pub fn ticket_identity(&self, ticket_uuid: &str) -> String {
         format!("ticket:{}:{ticket_uuid}", self.uuid)
     }
+
+    /// Read the account, describing a damaged one rather than failing to open
+    /// it.
+    ///
+    /// This is what makes `rhei budget show` runnable in the state a refusal
+    /// sends an operator to. Where the account directory is **absent** there is
+    /// no journal lock to take and none is taken: the authority sits above the
+    /// journal in §AR-neural-admission.3's lock order and already excludes the
+    /// only writer that could create one, so classifying under it alone is
+    /// correctly serialized. Wherever the directory exists the journal lock is
+    /// taken exactly as before. §FS-rhei-budgets.10
+    pub fn inspect(&self) -> Result<Inspection> {
+        if !self.directory().exists() {
+            let authority = super::authority::Authority::lock(&self.root, &self.uuid)?;
+            if authority.is_empty() {
+                return Ok(Inspection::Absent);
+            }
+            let history = History::read(&format!("panta:{}", self.uuid), authority.bytes());
+            return Ok(Inspection::Damaged(Box::new(Diagnosis::new(
+                Damage::JournalAbsent,
+                &self.root,
+                &self.uuid,
+                authority.path(),
+                history,
+            ))));
+        }
+        let (journal, damaged) = Journal::locked_or_damaged(&self.root, &self.uuid, false, false)?;
+        let Some(damaged) = damaged else {
+            return Ok(Inspection::Verified(Box::new(journal)));
+        };
+        let diagnosis = Diagnosis::new(
+            damaged.damage,
+            &self.root,
+            &self.uuid,
+            journal.authority_path(),
+            journal.recorded_history(),
+        );
+        Ok(Inspection::Damaged(Box::new(diagnosis)))
+    }
+
+    /// Retire this root: the operator's answer to the reading the tool cannot
+    /// choose between.
+    ///
+    /// The guard is here rather than in the command, because the guarantee of
+    /// §FS-rhei-budgets.5.3 is the account's and not a caller's to remember: an
+    /// account whose journal verifies is refused, and nothing is written.
+    /// Classification happens under the **authority** lock alone, which is
+    /// sound and is the only way it can be done once — that lock already
+    /// excludes every writer, since every append takes it before the journal's,
+    /// and taking the journal lock as well would mean locking the authority
+    /// twice in one process. §AR-neural-admission.3
+    ///
+    /// Retiring is then three writes, and all three are required. The witness
+    /// moves under a retired name, keeping every receipt. A receipt of the
+    /// retirement is written beside it. And this root's entry leaves the
+    /// witness index — not optional: an entry left behind would hand the next
+    /// project at this path the retired project's identity, and a retirement
+    /// that leaves the identity in place has not retired the root.
+    /// §FS-rhei-budgets.5.3 §FS-rhei-budgets.10
+    pub fn retire(&self, audit: &Audit) -> Result<Retirement> {
+        audit.validate()?;
+        let authority = super::authority::Authority::lock(&self.root, &self.uuid)?;
+        if authority.is_empty() {
+            return Ok(Retirement::NothingToRetire);
+        }
+        let project_id = format!("panta:{}", self.uuid);
+        let journal = read_journal(&journal_path(&self.root, &self.uuid))?;
+        let Some(damage) = classify(&project_id, journal.as_deref(), authority.bytes(), &authority)
+        else {
+            return Ok(Retirement::Sound);
+        };
+        let history = History::read(&project_id, authority.bytes());
+        let receipt = serde_json::json!({
+            "schema": "rhei.budget.retirement.v1",
+            "uuid": self.uuid,
+            "root": self.root,
+            "damage": damage.as_str(),
+            "actor": audit.actor,
+            "written_at": audit.written_at,
+            "reason": audit.reason,
+            "argv": audit.argv,
+            "receipts": history.receipts,
+            "invocations": history.invocations,
+        });
+        let kept_at = authority.retire(&stamp(&audit.written_at), &receipt)?;
+        retract_root(&self.root)?;
+        self.drop_empty_account_directory(damage)?;
+        Ok(Retirement::Retired(Retired {
+            uuid: self.uuid.clone(),
+            root: self.root.clone(),
+            kept_at,
+            damage,
+            history,
+        }))
+    }
+
+    /// The account directory a refused establish leaves behind holds the lock
+    /// file and nothing else, and leaving it would resolve the path straight
+    /// back to the uuid just retired — the very thing the index retraction is
+    /// for. Only where there is no journal, so nothing is destroyed.
+    /// §FS-rhei-budgets.10
+    fn drop_empty_account_directory(&self, damage: Damage) -> Result<()> {
+        if damage.journal_exists() {
+            return Ok(());
+        }
+        let directory = self.directory();
+        if !directory.exists() || journal_path(&self.root, &self.uuid).exists() {
+            return Ok(());
+        }
+        std::fs::remove_dir_all(&directory)
+            .map_err(|error| BudgetError::unreachable(&directory, &error))
+    }
+}
+
+/// What `retire` found, so the command can say which of the three cases it was
+/// without classifying the account a second time. §FS-rhei-budgets.10
+#[derive(Debug)]
+pub enum Retirement {
+    Retired(Retired),
+    /// The journal verifies: retiring it would recreate capacity, so nothing
+    /// was written. §FS-rhei-budgets.5.3
+    Sound,
+    /// No witness claims this root — the lawful **absent** state has nothing
+    /// to retire. §FS-rhei-budgets.5.4
+    NothingToRetire,
+}
+
+fn read_journal(path: &Path) -> Result<Option<Vec<u8>>> {
+    match std::fs::read(path) {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(BudgetError::unreachable(path, &error)),
+    }
+}
+
+/// The three sub-cases of §FS-rhei-budgets.5.4, from the bytes alone. `None`
+/// is a journal that replays and matches the witness: the account is sound.
+fn classify(
+    project_id: &str,
+    journal: Option<&[u8]>,
+    witness: &[u8],
+    authority: &super::authority::Authority,
+) -> Option<Damage> {
+    let Some(journal) = journal else { return Some(Damage::JournalAbsent) };
+    if journal.is_empty() {
+        return Some(Damage::JournalTruncated);
+    }
+    if super::journal::replay_chain(project_id, journal).is_err() {
+        return Some(Damage::ChainBroken);
+    }
+    if journal == witness {
+        return None;
+    }
+    Some(if authority.continues(journal) { Damage::JournalTruncated } else { Damage::ChainBroken })
+}
+
+/// The UTC instant compacted into something that names a directory on every
+/// platform: `2026-09-30T13:44:02Z` becomes `20260930T134402Z`.
+/// §REQ-cross-platform.5
+fn stamp(written_at: &str) -> String {
+    written_at.chars().filter(|c| c.is_ascii_alphanumeric()).collect()
 }
 
 fn canonical(root: &Path) -> Result<PathBuf> {
@@ -148,12 +310,28 @@ fn witnessed_roots() -> Result<BTreeMap<PathBuf, String>> {
 }
 
 fn record_root(root: &Path, uuid: &str) -> Result<()> {
-    let path = roots_index_path()?;
-    super::authority::durable_directories(path.parent().expect("index has a parent"))?;
     let mut index = witnessed_roots()?;
     index.insert(root.to_path_buf(), uuid.to_string());
+    write_roots(&index)
+}
+
+/// Drop a root from the witness index, so the path resolves to no account and
+/// the next admission mints a fresh identity for it. §FS-rhei-budgets.5.3
+fn retract_root(root: &Path) -> Result<()> {
+    let mut index = witnessed_roots()?;
+    if index.remove(root).is_none() {
+        return Ok(());
+    }
+    write_roots(&index)
+}
+
+/// The same write-pending-then-rename both directions use, so a retraction is
+/// exactly as durable as the record it undoes. §FS-rhei-budgets.5.1
+fn write_roots(index: &BTreeMap<PathBuf, String>) -> Result<()> {
+    let path = roots_index_path()?;
+    super::authority::durable_directories(path.parent().expect("index has a parent"))?;
     let pending = path.with_extension(format!("{}.pending", uuid::Uuid::new_v4()));
-    std::fs::write(&pending, serde_json::to_vec_pretty(&index)?)
+    std::fs::write(&pending, serde_json::to_vec_pretty(index)?)
         .map_err(|error| BudgetError::unreachable(&pending, &error))?;
     std::fs::rename(&pending, &path).map_err(|error| BudgetError::unreachable(&path, &error))?;
     Ok(())

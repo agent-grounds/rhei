@@ -118,6 +118,56 @@ impl Authority {
         self.bytes.is_empty()
     }
 
+    pub(crate) fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Whether the witness merely *continues* the journal it was compared
+    /// against, which is a journal whose tail was lost rather than one that
+    /// was rolled back or edited. §FS-rhei-budgets.5.4
+    pub(crate) fn continues(&self, journal: &[u8]) -> bool {
+        self.bytes.len() > journal.len() && self.bytes.starts_with(journal)
+    }
+
+    /// The directory this witness lives in.
+    pub(crate) fn directory(&self) -> &Path {
+        self.path.parent().expect("authority has a parent")
+    }
+
+    /// Retire this root: keep every receipt, under a name that is not a uuid.
+    ///
+    /// Unlinking `history.jsonl` would destroy the audit trail the account was
+    /// bounded by, so the bytes move rather than go. Retirement is expressed by
+    /// **the name** — under `retired/`, which no lookup spells — so no reader
+    /// needs a new condition: a later `lock` for this uuid simply finds nothing
+    /// and reads as the lawful **absent** state.
+    ///
+    /// The whole directory moves in one `rename`, so a crash leaves either the
+    /// live witness or the retired one and never half of each. The receipt is
+    /// written afterwards, because a receipt beside receipts that did not move
+    /// would describe a retirement that did not happen.
+    /// §FS-rhei-budgets.5.3 §FS-rhei-budgets.10
+    pub(crate) fn retire(self, stamp: &str, receipt: &serde_json::Value) -> Result<PathBuf> {
+        let live = self.directory().to_path_buf();
+        let uuid = live
+            .file_name()
+            .ok_or_else(|| BudgetError::corrupt("the witness directory has no name"))?
+            .to_string_lossy()
+            .into_owned();
+        let retired_base = live
+            .parent()
+            .ok_or_else(|| BudgetError::corrupt("the witness directory has no parent"))?
+            .join("retired");
+        durable_directories(&retired_base)?;
+        let retired = retired_base.join(format!("{uuid}-{stamp}"));
+        std::fs::rename(&live, &retired)
+            .map_err(|error| BudgetError::unreachable(&retired, &error))?;
+        write_durable(&retired.join("retirement.json"), &serde_json::to_vec_pretty(receipt)?)?;
+        sync_directory(&retired)?;
+        sync_directory(&retired_base)?;
+        Ok(retired)
+    }
+
     pub(crate) fn adopted(&self) -> bool {
         self.adopted
     }
@@ -142,16 +192,22 @@ impl Authority {
     }
 
     fn write_initial(&mut self, bytes: &[u8]) -> Result<()> {
-        let pending = self.path.with_extension(format!("{}.pending", uuid::Uuid::new_v4()));
-        let mut file = OpenOptions::new().write(true).create_new(true).open(&pending)?;
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        drop(file);
-        std::fs::rename(&pending, &self.path)?;
-        sync_directory(self.path.parent().expect("authority has a parent"))?;
+        write_durable(&self.path, bytes)?;
         self.bytes.extend_from_slice(bytes);
         Ok(())
     }
+}
+
+/// Write-pending-then-rename, the one way durable state appears here: a reader
+/// sees the whole file or none of it. §FS-rhei-budgets.5.1
+pub(crate) fn write_durable(path: &Path, bytes: &[u8]) -> Result<()> {
+    let pending = path.with_extension(format!("{}.pending", uuid::Uuid::new_v4()));
+    let mut file = OpenOptions::new().write(true).create_new(true).open(&pending)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    drop(file);
+    std::fs::rename(&pending, path)?;
+    sync_directory(path.parent().expect("a durable write has a parent"))
 }
 
 /// Where this process keeps its witnesses, resolved from the environment once.

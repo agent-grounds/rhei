@@ -379,7 +379,7 @@ impl State {
     }
 
     /// Every invocation the account has ever admitted, whatever the contract.
-    fn lifetime_counter(&self) -> Result<Counter> {
+    pub(crate) fn lifetime_counter(&self) -> Result<Counter> {
         self.counter(None)
     }
 

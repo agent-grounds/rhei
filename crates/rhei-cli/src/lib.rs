@@ -108,6 +108,8 @@ include!("cli/budget_ancestry.rs");
 include!("cli/budget_runtime.rs");
 include!("cli/budget_travel.rs");
 include!("cli/budget_command.rs");
+include!("cli/budget_report.rs");
+include!("cli/budget_forget.rs");
 include!("cli/roster_command.rs");
 include!("cli/tooling_resolution.rs");
 include!("cli/agent_effort.rs");
@@ -278,6 +280,7 @@ mod tests {
     include!("cli/tests_settings_tooling.rs");
     include!("cli/tests_budget_spend.rs");
     include!("cli/tests_budget_ancestry.rs");
+    include!("cli/tests_budget_forget.rs");
     include!("cli/tests_roster.rs");
     include!("cli/tests_snapshots_gc.rs");
     include!("cli/tests_snapshot_pointer.rs");

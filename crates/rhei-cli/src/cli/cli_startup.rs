@@ -386,6 +386,12 @@ fn command_wants_json(command: &Commands) -> bool {
         // `show --json` exists so a script reads three keys every time, so its
         // failures are the machine shape too. §FS-rhei-errors.5
         Commands::Show { json, .. } => *json,
+        // A damaged account is a failure, and without this arm it renders as
+        // prose where the contract promises an object. Narrowed to `show`:
+        // nothing else under `budget` has a `--format`. §FS-rhei-budgets.10
+        Commands::Budget { command: BudgetCommand::Show { format, .. } } => {
+            matches!(format, BudgetFormat::Json)
+        }
         Commands::Templates { json, .. } => *json,
         Commands::Cost { json, .. } => *json,
         Commands::Runs { json, .. } => *json,
@@ -403,6 +409,14 @@ fn emit_json_error(err: &miette::Report) {
     let mut error = serde_json::json!({ "message": err.to_string() });
     if let Some(help) = err.help() {
         error["help"] = serde_json::Value::String(help.to_string());
+    }
+    // A refusal about a subject the caller has to read carries the facts as
+    // named members beside `message` and `help`, which keep their meaning.
+    // §FS-rhei-errors.5
+    if let Some(detailed) = err.downcast_ref::<DetailedRefusal>() {
+        for (key, value) in detailed.members() {
+            error[key] = value.clone();
+        }
     }
     let payload = serde_json::json!({ "error": error });
     let serialized = serde_json::to_string(&payload)

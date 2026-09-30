@@ -195,9 +195,12 @@ fn a_settings_price_book_that_names_nothing_stops_only_the_run() {
 
     let roster = run_roster(&dir.join(".home"), &dir, Some(&plan), false);
     assert_success(&roster);
+    // The roster prints the value as authored, so compare against the JSON text
+    // the settings file carries -- on Windows a separator is `\\` in both.
+    let as_written = serde_json::to_string(&authored).expect("encode authored path");
     assert!(
-        portable(&roster.stdout).contains(&portable(&authored)),
-        "roster hid the path it was given:\n{}",
+        roster.stdout.contains(&as_written),
+        "roster hid the path it was given as {as_written}:\n{}",
         roster.stdout
     );
     assert_success(&run_cli("validate", &plan, &machine, &[]));

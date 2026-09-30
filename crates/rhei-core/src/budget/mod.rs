@@ -18,6 +18,7 @@
 
 mod account;
 mod admission;
+mod ancestry;
 mod authority;
 mod bounds;
 mod events;
@@ -44,10 +45,9 @@ mod travel_tests;
 #[cfg(test)]
 mod window_tests;
 
-pub use account::{Account, ACCOUNT_DIR};
-pub use admission::{
-    AdmissionRequest, AncestryDescriptor, AppliedEdge, Arm, EffectiveBounds, ReservationGroup,
-};
+pub use account::{witnessed_root, Account, ACCOUNT_DIR};
+pub use admission::{AdmissionRequest, AppliedEdge, Arm, EffectiveBounds, ReservationGroup};
+pub use ancestry::{Ancestry, AncestryDescriptor};
 pub use bounds::{halt_text, Bound, BoundSource, BoundUnit, Remedy};
 pub use events::{BudgetEvent, BudgetLine};
 pub use journal::{Audit, Journal, Receipt};

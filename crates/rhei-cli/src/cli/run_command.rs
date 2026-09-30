@@ -236,6 +236,10 @@ fn run_command(
     // SIGINT/SIGTERM/SIGHUP interrupts the run instead of killing the
     // supervisor out from under its subprocesses. §FS-rhei-run.3.2
     install_interrupt_handlers();
+    // A run is what the cross-project note is said once per, so the latch is
+    // armed here rather than once per process: two runs in one process are two
+    // runs. §FS-rhei-budgets.7.2
+    begin_budget_run();
     let input_buf = run_artifact_root(input);
     let input = input_buf.as_path();
     // A headless parent retains shared access while awaiting this child. Take

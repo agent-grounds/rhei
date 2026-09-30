@@ -122,8 +122,13 @@ fn spawn_parallel_agent_work_item(
         &opts.price_book().currency,
     )? {
         // §FS-rhei-budgets.9
-        BudgetAdmission::Admitted { bounds } => {
+        BudgetAdmission::Admitted { bounds, note } => {
             sink.emit(rhei_tui::RunEvent::BudgetSnapshot { bounds });
+            // Nothing is wrong, so it is a note and not a warning.
+            // §FS-rhei-budgets.7.2
+            if let Some(note) = note {
+                emit_run_message(sink, rhei_tui::MessageLevel::Info, note);
+            }
         }
         BudgetAdmission::NotAccounted => {}
         BudgetAdmission::Refused { halt, event } => {

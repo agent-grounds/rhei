@@ -126,6 +126,18 @@ fn roots_index_path() -> Result<PathBuf> {
     Ok(super::authority::authority_base()?.join("rhei/budget-authority/roots.json"))
 }
 
+/// The canonical root the witness index holds for an account uuid, where this
+/// machine has ever seen that account.
+///
+/// The one way to name a project this run does not own: an ancestry descriptor
+/// carries a uuid, and a note that printed the uuid would name the account on
+/// disk rather than a directory a reader recognizes. `None` is an account this
+/// machine has never witnessed, which is not an error — it is a note that falls
+/// back to the uuid. §FS-rhei-budgets.5.3 §FS-rhei-budgets.7.2
+pub fn witnessed_root(uuid: &str) -> Result<Option<PathBuf>> {
+    Ok(witnessed_roots()?.into_iter().find(|(_, held)| held == uuid).map(|(root, _)| root))
+}
+
 fn witnessed_roots() -> Result<BTreeMap<PathBuf, String>> {
     let path = roots_index_path()?;
     match std::fs::read(&path) {

@@ -218,8 +218,6 @@ fn handed_down(root: &Path) -> Vec<(String, String, String)> {
 /// is looked up in a journal that never recorded it, and the run is refused
 /// `no such reservation` before a single agent starts.
 #[test]
-#[ignore = "pins agent-grounds/rhei#354 and fails until it is fixed; \
-    the fix removes this attribute. Run with `cargo test -- --ignored`."]
 fn a_run_charging_another_account_is_admitted_against_its_own() {
     let (_dir, root) = project("ancestry-cross-project", &["alpha"]);
 
@@ -243,8 +241,6 @@ fn a_run_charging_another_account_is_admitted_against_its_own() {
 ///
 /// **Fails before the fix**: the run is refused before any note could exist.
 #[test]
-#[ignore = "pins agent-grounds/rhei#354 and fails until it is fixed; \
-    the fix removes this attribute. Run with `cargo test -- --ignored`."]
 fn a_cross_project_descriptor_is_reported_once_per_run() {
     let (_dir, root) = project("ancestry-note", &["alpha"]);
     let single =
@@ -278,8 +274,6 @@ fn a_cross_project_descriptor_is_reported_once_per_run() {
 ///
 /// **Fails before the fix**: the message names the reservation and nothing else.
 #[test]
-#[ignore = "pins agent-grounds/rhei#354 and fails until it is fixed; \
-    the fix removes this attribute. Run with `cargo test -- --ignored`."]
 fn a_refused_descriptor_names_the_variable_it_came_from() {
     let (_dir, root) = project("ancestry-provenance", &["alpha", "beta"]);
     // One clean admission, only so that the project has an account to name.

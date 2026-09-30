@@ -10,7 +10,8 @@
 // §AR-source-file-size.3 §FS-rhei-budgets.6 §AR-neural-admission.7
 
 use rhei_core::budget::{
-    Account, AdmissionRequest, AncestryDescriptor, Arm, Audit, BudgetError, Journal, SpendBasis,
+    Account, AdmissionRequest, Ancestry, AncestryDescriptor, Arm, Audit, BudgetError, Journal,
+    SpendBasis,
 };
 
 /// Where a ticket's budget identity is persisted.
@@ -21,16 +22,16 @@ use rhei_core::budget::{
 /// §FS-rhei-reset.2 §FS-rhei-budgets.5.2
 const BUDGET_TICKET_KEY: &str = rhei_core::metadata::BUDGET_TICKET_ID_KEY;
 
-/// The ancestry token a nested `rhei run` inherits from the invocation that
-/// started it. §FS-rhei-budgets.7
-const PARENT_RESERVATION_ENV: &str = "RHEI_BUDGET_PARENT_RESERVATION";
-
 /// What an admission decided, in the three shapes the caller acts on.
 enum BudgetAdmission {
     /// Every unit is reserved and the spawn may proceed. The report is where
     /// both counts now stand, for the surfaces that show it while it is spent
     /// rather than only at exhaustion. §FS-rhei-budgets.9
-    Admitted { bounds: Vec<rhei_tui::BoundReport> },
+    ///
+    /// `note` is the one thing an admitted spawn may still owe an operator: the
+    /// descriptor this run inherited was minted elsewhere, so the run charges
+    /// its own account and says so once. §FS-rhei-budgets.7.2
+    Admitted { bounds: Vec<rhei_tui::BoundReport>, note: Option<String> },
     /// A bound, or an account that cannot be trusted, refused the spawn. The
     /// text is the whole halt of §FS-rhei-budgets.8, ready to print, and the
     /// record carries the same facts in a form a reader can route on.
@@ -53,6 +54,12 @@ enum BudgetAdmission {
 struct HeldClaim {
     travel: Option<String>,
     arms: Vec<String>,
+    /// The account this claim was admitted against, so that the descriptor
+    /// handed to a descendant can say whose its reservation is. Kept beside the
+    /// arms rather than re-resolved at the spawn: the two halves must name the
+    /// same admission or the child would compare against an account nothing
+    /// minted. §FS-rhei-budgets.7.1
+    account: String,
     /// Whether a start has been recorded for this claim. Until one has, the
     /// engine's own knowledge that it never spawned *is* the proof of
     /// non-start; after one has, nothing refunds it. §FS-rhei-budgets.6.2
@@ -302,7 +309,7 @@ fn budget_admit_spawn(
         .collect();
     let execution_root = workspace_root.to_string_lossy().into_owned();
     let project_label = budget_project_label(&project_root);
-    let parent = nested_parent_reservation();
+    let parent = InheritedAncestry::from_environment();
     let admitted = (|| -> Result<_, BudgetError> {
         journal.bind_ticket(&ticket, task_id_str, &route.metadata_file, &audit)?;
         // A reservation a crashed run left outstanding is given back before
@@ -315,11 +322,7 @@ fn budget_admit_spawn(
             project_label: &project_label,
             execution_root: &execution_root,
             arms: &arms,
-            parent_reservation: parent.as_deref().map(|reservation| AncestryDescriptor {
-                reservation,
-                account: None,
-                origin: None,
-            }),
+            parent_reservation: parent.as_ref().map(InheritedAncestry::descriptor),
             travel,
             spend_reserve_micro: built_in::SPEND_RESERVE,
             spend_currency: currency,
@@ -331,10 +334,15 @@ fn budget_admit_spawn(
             // The reserve spent, so the ticket has earned its durable identity.
             identity.commit()?;
             let bounds = budget_reports(&journal, &ticket, &bounds).unwrap_or_default();
+            // Said once per run, and only where the ledger actually declined
+            // the ancestry rather than where this process merely offered one.
+            // §FS-rhei-budgets.7.2
+            let note = cross_project_note(&group.ancestry, &project_label);
             with_claims(|claims| {
                 let claim = claims.entry(task_id_str.to_string()).or_insert_with(|| HeldClaim {
                     travel: None,
                     arms: Vec::new(),
+                    account: account.uuid().to_string(),
                     started: false,
                     measured: Vec::new(),
                 });
@@ -343,7 +351,7 @@ fn budget_admit_spawn(
                 }
                 claim.arms.extend(group.reservation_ids.clone());
             });
-            Ok(BudgetAdmission::Admitted { bounds })
+            Ok(BudgetAdmission::Admitted { bounds, note })
         }
         Err(refusal) => Ok(BudgetAdmission::Refused {
             halt: budget_halt_text(&refusal, &bounds, &journal),
@@ -361,19 +369,20 @@ fn budget_project_label(project_root: &Path) -> String {
         .unwrap_or_else(|| project_root.display().to_string())
 }
 
-fn nested_parent_reservation() -> Option<String> {
-    std::env::var(PARENT_RESERVATION_ENV).ok().filter(|value| !value.is_empty())
-}
-
-/// The reservation a spawn's own descendants may be placed under: the arm this
-/// visit was admitted on.
+/// The descriptor a spawn's own descendants are handed: the arm this visit was
+/// admitted on, and the account that minted it.
 ///
 /// A descriptor rather than a capability — the ledger decides whether the name
 /// buys anything, and a child that cannot be placed under a live ancestor of
-/// this very project refuses rather than opening a balance of its own.
-/// §FS-rhei-budgets.7 §AR-neural-admission.6
-fn budget_ancestry_token(task_id_str: &str) -> Option<String> {
-    with_claims(|claims| claims.get(task_id_str).and_then(|claim| claim.arms.first().cloned()))
+/// this very project refuses rather than opening a balance of its own. Both
+/// halves or neither, because a reservation without its account is read as this
+/// project's and that is only true of the account that minted it.
+/// §FS-rhei-budgets.7 §FS-rhei-budgets.7.1 §AR-neural-admission.6
+fn budget_ancestry_token(task_id_str: &str) -> Option<(String, String)> {
+    with_claims(|claims| {
+        let claim = claims.get(task_id_str)?;
+        Some((claim.arms.first()?.clone(), claim.account.clone()))
+    })
 }
 
 /// Record that the subprocess is being created.

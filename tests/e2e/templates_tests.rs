@@ -3,12 +3,27 @@ use std::process::Command;
 
 use super::*;
 
+/// Spawn the built binary standing in `cwd`, with its state under a private
+/// home of this call's own.
+///
+/// Where a spawned process writes and where it stands are two decisions, and
+/// this helper used to spell the first in terms of the second —
+/// `rhei_command(cwd.join(".home"))`. That made the pair impossible to vary:
+/// every caller that wanted a real directory to stand in got that same
+/// directory as its state home, and got it silently, because the home is
+/// created before the spawn and so raises nothing to notice. The first caller
+/// that passed the checkout wrote into it. §REQ-test-isolation.2
+///
+/// The home is a temporary directory of this call's own, removed when the call
+/// returns, so nothing of the spawn outlives the process it was pinned for
+/// (§REQ-test-isolation.1). A test that has to *choose* its home — one that
+/// plants a user-tier template under it, say — spawns through [`rhei_command`]
+/// directly, which already takes the home and the working directory as the two
+/// separate arguments they are.
 pub fn run_raw(args: &[&str], cwd: &std::path::Path) -> CliRun {
-    let output = rhei_command(cwd.join(".home"))
-        .current_dir(cwd)
-        .args(args)
-        .output()
-        .expect("rhei command should run");
+    let home = unique_temp_dir("run-raw-home");
+    let output =
+        rhei_command(&home).current_dir(cwd).args(args).output().expect("rhei command should run");
     CliRun::from(&output)
 }
 
@@ -498,12 +513,18 @@ Body for step 6.
     );
 }
 
+/// §FS-rhei-templates.1: the built-in `hourly-human-intervention` template
+/// instantiates and reports what it laid down.
+///
+/// It stands in a temporary directory of its own. It used to stand in the
+/// checkout — `CARGO_MANIFEST_DIR/../..` canonicalized — and that is how the
+/// derived home above put a `.home/` at the repository root. Nothing the
+/// summary asserts depends on the working directory: the template is built into
+/// the binary rather than found by searching upwards, the task ids come from
+/// `--output`, and the summary is byte-identical from a directory that is no
+/// git repository at all. §REQ-test-isolation.1
 #[test]
 fn instantiate_project_hourly_human_intervention_template_prints_summary() {
-    let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .expect("repo root");
     let dir = unique_temp_dir("templates-hourly-human-intervention");
     let output_dir = dir.join("hourly");
 
@@ -514,7 +535,7 @@ fn instantiate_project_hourly_human_intervention_template_prints_summary() {
             "--output",
             output_dir.to_str().expect("output path"),
         ],
-        &repo_root,
+        &dir,
     );
     assert_success(&result);
     assert!(

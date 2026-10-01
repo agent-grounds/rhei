@@ -351,7 +351,7 @@ fn budget_admit_spawn(
     let project_label = budget_project_label(&project_root);
     let parent = InheritedAncestry::from_environment();
     let admitted = (|| -> Result<_, BudgetError> {
-        journal.bind_ticket(&ticket, task_id_str, &route.metadata_file, &audit)?;
+        let moved = journal.bind_ticket(&ticket, task_id_str, &route.metadata_file, &audit)?;
         // A reservation a crashed run left outstanding is given back before
         // this one is weighed, so a dead run's claim never refuses a live one.
         // §FS-rhei-budgets.6.2
@@ -367,10 +367,15 @@ fn budget_admit_spawn(
             spend_reserve_micro: built_in::SPEND_RESERVE,
             spend_currency: currency,
         };
-        journal.reserve(&request, bounds.effective(), &audit)
+        Ok((journal.reserve(&request, bounds.effective(), &audit)?, moved))
     })();
     match admitted {
-        Ok(group) => {
+        Ok((group, moved)) => {
+            // §FS-rhei-budgets.5.2.1: a permitted move is said out loud, here
+            // rather than in the core, which has no channel to say it on.
+            if let Some(moved) = moved {
+                eprintln!("{}", moved.warning());
+            }
             // The reserve spent, so the ticket has earned its durable identity.
             identity.commit()?;
             let bounds = budget_reports(&journal, &ticket, &bounds).unwrap_or_default();

@@ -30,7 +30,8 @@ use regex::Regex;
 use rhei_core::ast::{Metadata, TaskId};
 use rhei_core::callback::{CallbackContext, CallbackExecutor, ShellCallbackExecutor};
 use rhei_core::metadata::{
-    author_task_metadata, frontmatter_to_json, keys_cleared_by_reset, UnrepresentableValue,
+    author_task_metadata, frontmatter_to_json, keys_cleared_by_reset, MetadataForm,
+    UnrepresentableValue,
 };
 use rhei_core::workspace;
 use rhei_validator::{

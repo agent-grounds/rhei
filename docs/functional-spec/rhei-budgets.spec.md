@@ -431,7 +431,11 @@ error: ticket 'plan.2' claims a budget identity the account holds for 'plan.1'
 ```
 
 It names both display ids, the uuid, and the file they are both live in, because
-those are what a person needs in order to find the key they duplicated. Its
+those are what a person needs in order to find the key they duplicated. A
+whole-file copy puts them in two files rather than one — `plan.1` and `work.1`
+claiming one uuid in two live documents whose bytes agree — and the line then
+names both paths instead of one file name, because a bare name would not locate
+either of them: `claimed by:  plan.1 and work.1, live in <path> and <path>`. Its
 **one** remedy — §FS-rhei-budgets.8 requires exactly one — is a fresh
 `budgetTicketId` for the copy. Deleting the copy's key is not offered and is not
 a way out: in an account whose binding has already moved, a keyless copy
@@ -444,7 +448,7 @@ the move is no longer silent: it is reported on the warning channel, beside the
 edge that caused it.
 
 ```text
-warning: travel for 7f3c1a90-…-bc5de10f12e7 now counts against 'plan.3'; it was
+warning: travel for 7f3c1a90-5e21-4d8b-9a6c-bc5de10f12e7 now counts against 'plan.3'; it was
          counted against 'plan.1', which this plan no longer has
 ```
 

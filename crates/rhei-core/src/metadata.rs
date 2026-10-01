@@ -1,5 +1,6 @@
-//! The keys rhei writes into a task's metadata, and the one conversion every
-//! JSON surface that publishes frontmatter uses.
+//! The keys rhei writes into a task's metadata, which document that metadata
+//! lives in, and the one conversion every JSON surface that publishes
+//! frontmatter uses.
 //!
 //! `metadata.tasks.<id>` is one flat map holding an author's fields beside
 //! rhei's own bookkeeping, with nothing in the shape to tell them apart
@@ -13,8 +14,11 @@
 
 use serde_json::{Map, Value};
 use serde_yaml::{Mapping, Number, Value as YamlValue};
+use std::path::Path;
 
 use crate::ast::Metadata;
+use crate::parser::{self, ParseError};
+use crate::workspace::{PANTA_INDEX_FILE, RHEI_INDEX_FILE};
 
 /// Entry counters per state, for a counted loop or a poll's attempts.
 /// §FS-rhei-transitions.2.3
@@ -67,6 +71,90 @@ pub fn is_rhei_written_key(name: &str) -> bool {
 /// §FS-rhei-reset.2 §FS-rhei-transitions.2.5
 pub fn keys_cleared_by_reset() -> impl Iterator<Item = &'static str> {
     RHEI_WRITTEN_KEYS.iter().filter(|key| key.cleared_by_reset).map(|key| key.name)
+}
+
+/// Which document form holds a ticket's runtime metadata.
+///
+/// One dispatch rather than one per caller. Three readers need to know where a
+/// ticket's metadata lives — the transition path that rewrites it, the manifest
+/// read that also wants the structure, and the budget's identity guard that
+/// counts who claims a uuid — and a second copy of this match is a second
+/// opinion about the same question. §FS-rhei-panta.6.1
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MetadataForm {
+    /// A Directory Workspace index (`index.rhei.md`), keyed rhei-locally.
+    WorkspaceIndex,
+    /// A Panta project manifest (`index.panta.md`), where basin tickets are
+    /// keyed by their qualified ids.
+    PantaManifest,
+    /// A single-file plan, keyed rhei-locally.
+    Plan,
+}
+
+impl MetadataForm {
+    /// The form the file at `path` is read as, decided by its name alone — the
+    /// same name the loader routed on. §FS-rhei-panta.6.1
+    pub fn of(path: &Path) -> Self {
+        match path.file_name().and_then(|name| name.to_str()) {
+            Some(PANTA_INDEX_FILE) => Self::PantaManifest,
+            Some(RHEI_INDEX_FILE) => Self::WorkspaceIndex,
+            _ => Self::Plan,
+        }
+    }
+}
+
+/// A metadata file that would not parse, carrying the form it was read as so
+/// that a caller can name the document rather than guess at it.
+/// §FS-rhei-panta.6.1
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MetadataParseError {
+    pub form: MetadataForm,
+    pub error: ParseError,
+}
+
+/// The frontmatter mapping of the file that owns a ticket's runtime metadata.
+///
+/// Every caller that reads `metadata.tasks.<id>` off disk comes through here,
+/// so none of them can disagree with another about which parse a file name
+/// asks for. §FS-rhei-panta.6.1
+pub fn parse_metadata_file(
+    path: &Path,
+    raw: &str,
+) -> std::result::Result<Option<Metadata>, MetadataParseError> {
+    let form = MetadataForm::of(path);
+    let parsed = match form {
+        MetadataForm::PantaManifest => {
+            parser::parse_panta_manifest(raw).map(|manifest| manifest.metadata)
+        }
+        MetadataForm::WorkspaceIndex => {
+            parser::parse_workspace_index(raw).map(|index| index.metadata)
+        }
+        MetadataForm::Plan => parser::parse(raw).map(|rhei| rhei.metadata),
+    };
+    parsed.map_err(|error| MetadataParseError { form, error })
+}
+
+/// How many of a document's tickets claim `identity` as their budget identity.
+///
+/// The count is what the one-identity-one-live-ticket rule turns on: a
+/// definition copied onto a sibling and a definition renumbered in place are
+/// the same bytes at the same path, and how many tickets still name the uuid is
+/// what tells them apart. §FS-rhei-budgets.5.2.1
+pub fn budget_identity_claimants(metadata: Option<&Metadata>, identity: &str) -> usize {
+    let Some(tasks) = metadata
+        .and_then(|root| root.get("metadata"))
+        .and_then(YamlValue::as_mapping)
+        .and_then(|section| section.get("tasks"))
+        .and_then(YamlValue::as_mapping)
+    else {
+        return 0;
+    };
+    tasks
+        .values()
+        .filter_map(YamlValue::as_mapping)
+        .filter_map(|task| task.get(BUDGET_TICKET_ID_KEY))
+        .filter(|claimed| claimed.as_str() == Some(identity))
+        .count()
 }
 
 /// Why JSON has no image for a frontmatter value. §FS-rhei-render.3.1.1

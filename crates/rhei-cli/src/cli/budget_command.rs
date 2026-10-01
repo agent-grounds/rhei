@@ -223,11 +223,16 @@ fn budget_grant_line(requested: u64, granted: u64, bounds: &CountBounds) -> Stri
     format!("lifetime invocation allowance: {granted}")
 }
 
+/// An absent account is lawful and silent, so the help names every route that
+/// ends it: establishment follows the first charge of either kind, and applying
+/// an edge by hand is one of them. A refusal at a bound sends its reader here,
+/// so a route this line leaves out is a route they will not find.
+/// §FS-rhei-budgets.5.4
 fn budget_no_account(project_root: &Path) -> miette::Report {
     miette!(
-        help = "an account is established by the first neural start; run the plan, or \
-                establish one explicitly with: rhei budget init <TARGET> --invocations <N> \
-                --reason <TEXT>",
+        help = "an account is established by the first charge of either kind: run the plan, \
+                apply an edge with `rhei transition`, or establish one explicitly with: \
+                rhei budget init <TARGET> --invocations <N> --reason <TEXT>",
         "{} has no budget account yet",
         project_root.display()
     )

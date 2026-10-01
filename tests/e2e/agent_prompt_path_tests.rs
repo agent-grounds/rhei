@@ -1,5 +1,4 @@
 use std::fs;
-use std::process::Command;
 
 use super::*;
 
@@ -19,9 +18,8 @@ use super::*;
 #[test]
 fn prompt_paths_resolve_against_the_artifact_root_when_the_run_root_is_relative() {
     let dir = unique_temp_dir("agent-prompt-path-base");
-    let git = Command::new("git").arg("init").arg("-q").current_dir(&dir).status();
-    if !git.map(|status| status.success()).unwrap_or(false) {
-        eprintln!("skipping: git unavailable");
+    if !git_init_or_absent(&dir) {
+        eprintln!("skipping: git is not on this machine");
         return;
     }
 
@@ -204,9 +202,8 @@ fn an_artifact_root_reached_through_a_symlink_keeps_the_name_it_was_given() {
 
     // The repository is the workspace itself, so the checkout root and the
     // artifact root are one directory reached by its two names. §FS-rhei-agents.4.1
-    let git = Command::new("git").arg("init").arg("-q").current_dir(&workspace).status();
-    if !git.map(|status| status.success()).unwrap_or(false) {
-        eprintln!("skipping: git unavailable");
+    if !git_init_or_absent(&workspace) {
+        eprintln!("skipping: git is not on this machine");
         return;
     }
 

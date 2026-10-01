@@ -45,7 +45,7 @@ fn reported_by_git(dir: &Path, names: &BTreeSet<String>) -> Vec<String> {
     if names.is_empty() {
         return Vec::new();
     }
-    let Ok(mut child) = Command::new("git")
+    let Ok(mut child) = git_command()
         .arg("-C")
         .arg(dir)
         .args(["check-ignore", "--stdin"])
@@ -215,7 +215,6 @@ fn decoy_state(repo: &Path) -> DecoyState {
 /// `set_var` would race every other test in this binary. Setting them first and
 /// letting the removal run afterwards is the same seam in the same order.
 #[test]
-#[ignore = "pins agent-grounds/rhei#375; the removal it names is not written yet"]
 fn a_suite_spawn_carries_no_git_variable_it_was_not_given() {
     let decoy = unique_temp_dir("suite-isolation-git-env");
     let staged: Vec<(&str, std::ffi::OsString)> = repository_env_as_a_hook_leaves_it(&decoy)
@@ -252,7 +251,6 @@ fn a_suite_spawn_carries_no_git_variable_it_was_not_given() {
 /// reads the decoy back: a repository no test named, which must have the `HEAD`,
 /// the index and the configuration it started with.
 #[test]
-#[ignore = "pins agent-grounds/rhei#375; the removal it names is not written yet"]
 fn a_git_fixture_leaves_the_repository_git_dir_names_untouched() {
     let root = unique_temp_dir("suite-isolation-git-decoy");
     let decoy = root.join("decoy");
@@ -314,7 +312,6 @@ fn run_fixture_git(decoy: &Path, args: &[&str], refused: &mut Vec<String>) {
 /// corrected in place leaves the next caller the same mistake to make, and the
 /// next caller is a file nobody will think to check.
 #[test]
-#[ignore = "pins agent-grounds/rhei#375; the call sites it names are not routed yet"]
 fn only_the_shared_helper_names_git_as_a_program() {
     let tests = repo_root().join("tests");
     let helper = tests.join("support").join("git_env.rs");

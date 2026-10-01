@@ -5,7 +5,7 @@
 // `//` rather than `//!`: an inner doc comment cannot open an included file.
 #![allow(dead_code)]
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::process::Command;
 
@@ -21,10 +21,31 @@ use std::process::Command;
 ///
 /// §REQ-test-isolation.3
 pub fn scrub_git_repository_env(cmd: &mut Command) {
-    // Deliberately empty. The removal is the behaviour §REQ-test-isolation.3
-    // asks for, and it is written by the change the tests around this seam
-    // pin — not by the commit that writes them.
-    let _ = cmd;
+    // Both lists are collected before anything is removed: `get_envs` borrows
+    // `cmd`, so a removal taken while reading it would not borrow-check — and
+    // the inherited names have to be spelled out on the command too, because
+    // `env_remove` is the only way to say "not this one" about a variable the
+    // child would otherwise be handed by the parent.
+    let staged: Vec<OsString> = cmd
+        .get_envs()
+        .map(|(key, _)| key.to_os_string())
+        .filter(|key| is_git_variable(key))
+        .collect();
+    let inherited: Vec<OsString> =
+        std::env::vars_os().map(|(key, _)| key).filter(|key| is_git_variable(key)).collect();
+    for key in staged.into_iter().chain(inherited) {
+        cmd.env_remove(key);
+    }
+}
+
+/// The prefix, not a list of names.
+///
+/// `GIT_CONFIG_PARAMETERS` is covered because it begins the same way as the rest
+/// — which is the point of a prefix: it carries git's `-c` settings down the
+/// same inheritance, so a list that forgot it would let an outer `-c
+/// core.hooksPath=…` reach every fixture. §REQ-test-isolation.3
+fn is_git_variable(key: &OsStr) -> bool {
+    key.as_encoded_bytes().starts_with(b"GIT_")
 }
 
 /// Every `git` the suite spawns.
@@ -35,6 +56,31 @@ pub fn git_command() -> Command {
     let mut cmd = Command::new("git");
     scrub_git_repository_env(&mut cmd);
     cmd
+}
+
+/// `git init` for a fixture that would rather skip than fail when the machine
+/// has no `git` at all, with the one skip §REQ-test-isolation.3 allows.
+///
+/// `false` means the program failed to start, which is the only thing that is a
+/// skip. A `git` that started and *refused* panics here instead, naming the
+/// directory and what git said: the test has not exercised what it claims to,
+/// and a refusal is exactly what an inherited `GIT_DIR` produces — so a test
+/// that skips on one reports `ok` under the gate and nowhere else.
+pub fn git_init_or_absent(dir: &Path) -> bool {
+    let output = match git_command().args(["init", "-q"]).current_dir(dir).output() {
+        Ok(output) => output,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return false,
+        Err(error) => panic!("`git init` at {} could not be started: {error}", dir.display()),
+    };
+    assert!(
+        output.status.success(),
+        "`git init` at {} was refused: {}. A `git` that started and refused fails the test \
+         that owns it rather than skipping, because a refusal is what an inherited repository \
+         variable produces (§REQ-test-isolation.3).",
+        dir.display(),
+        String::from_utf8_lossy(&output.stderr).trim()
+    );
+    true
 }
 
 /// The variables git exports into a hook, pointed at `repo`.

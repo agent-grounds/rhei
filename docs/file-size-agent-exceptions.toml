@@ -569,7 +569,7 @@ path = "tests/e2e/mod.rs"
 match = "exact"
 rules = ["source"]
 kind = "structural"
-max_accepted = { value = 600, unit = "lines" }
+max_accepted = { value = 700, unit = "lines" }
 until = "indefinite"
 reason = """
 Rust requires these sibling e2e modules to be declared at the test crate root so their existing super::* imports, shared private helpers, and stable test paths resolve in one namespace. Moving declarations into a nested registry would change that namespace rather than extract a cohesive source responsibility; an include-only registry would merely hide the same indivisible manifest behind another file.

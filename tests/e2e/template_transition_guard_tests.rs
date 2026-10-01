@@ -100,6 +100,36 @@ fn text_files(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
+/// The readable files git tracks under `root`, which is what "tracked" has to
+/// mean for a guard that calls what it finds a tracked plan: `text_files` walks
+/// the working tree and filters nothing, so it reads untracked scratch and
+/// gitignored paths too — `panta/` is an unanchored ignore rule, so a run's own
+/// plan under one of these roots is invisible to `git status` and visible to the
+/// walk. `git ls-files` reads the index instead, so a staged plan is still
+/// listed and the accident this guards against stays covered.
+fn tracked_files(root: &Path) -> Vec<PathBuf> {
+    let output = Command::new("git")
+        .current_dir(repo_root())
+        // A suite started from inside a `rhei run` inherits these, and they
+        // would point git at a repository other than the checkout under test.
+        .env_remove("GIT_DIR")
+        .env_remove("GIT_WORK_TREE")
+        .args(["ls-files", "-z", "--"])
+        .arg(root)
+        // git's own complaint goes to the test's stderr rather than into a
+        // buffer this file would have to decode itself.
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .expect("git ls-files should run");
+    assert!(output.status.success(), "git ls-files failed for {}", root.display());
+    String::from_utf8_lossy(&output.stdout)
+        .split('\0')
+        .filter(|entry| !entry.is_empty())
+        .map(|entry| repo_root().join(entry))
+        .filter(|path| fs::read_to_string(path).is_ok())
+        .collect()
+}
+
 #[test]
 fn every_template_transition_invocation_names_from() {
     let templates_root = repo_root().join("crates/rhei-cli/templates");
@@ -139,10 +169,14 @@ fn every_template_transition_invocation_names_from() {
 ///
 /// The committed examples and the e2e fixtures are scanned beside the two
 /// template roots, because they are tracked plans a reader drives by hand for
-/// exactly the same reason, and `examples/` is a route into the template roots
-/// this guard already defends: `template_example_sync_tests` holds each
-/// `examples/<name>-example/` byte-identical to what instantiating its template
+/// exactly the same reason, and `examples/` is also a route into the template
+/// roots this guard already defends: `template_example_sync_tests` holds the
+/// five examples it names byte-identical to what instantiating their template
 /// produces.
+///
+/// Only what git tracks is read, because an identity ships by being committed:
+/// untracked scratch and gitignored run directories under these roots hold a
+/// `budgetTicketId` lawfully, which is where §FS-rhei-budgets.5.4 puts it.
 // §FS-rhei-library.5 §FS-rhei-budgets.5.4
 #[test]
 fn no_template_source_carries_a_budget_ticket_identity() {
@@ -155,8 +189,7 @@ fn no_template_source_carries_a_budget_ticket_identity() {
     let mut offenders = Vec::new();
     for root in roots {
         let root = repo_root().join(root);
-        let mut files = Vec::new();
-        text_files(&root, &mut files);
+        let files = tracked_files(&root);
         assert!(!files.is_empty(), "no tracked files found under {}", root.display());
         for path in files {
             if fs::read_to_string(&path).expect("read tracked file").contains("budgetTicketId") {

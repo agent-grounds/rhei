@@ -244,6 +244,7 @@ Before returning the template, verify:
 - Every blind participant carries the necessary `**Excludes:**` entries after `**Consumes:**`; each path stays within its declared root, each export resolves to a declared `**Provides:**`, and no exclusion overlaps consumed or required input.
 - Every `{{...}}` variable is declared in `manifest.inputs` (or is a nested property on an object input); runtime `{name}` variables passing through are valid against the active machine's namespace (`{task_id}`, `{task_title}`, `{visit_count}`, `{visits}`, `{model}`, `{input.<name>.path}`, `{output.<name>.path}`, `{meta.<key>}`).
 - If `states.yaml` is bundled: the rendered plan's `**States:** <name>` matches its `name`; it begins with the ASCII diagram comment block; it passes the state-machine-writer checklist; placeholder-bearing source is inspected/validated only via the rendered workspace; and every MCP/skill/agent id it references is declared in a bundled or global `settings.json`. If the workflow needs a custom machine, `states.yaml` exists as a concrete artifact, not prose.
+- For every state in `states.yaml`, ask who reads what it writes: if anyone but the next state of the same task does, it is a task with `**Provides:**`, not a state ([references/shape.md](references/shape.md)); and every parent task in the rendered plan steers, integrates, or speaks for its children.
 - If the template fans out tasks for parallel execution, `rhei run <workspace> --parallel N --dry-run` schedules multiple tasks in one pass (not "Deferred … to a later pass"). Deferral means missing `concurrent: true` or a shared `**Prior:**`.
 - If `settings.json` is bundled, it is valid JSON after rendering.
 - `rhei instantiate <template> --dry-run ...` succeeds; every array/object input has been exercised through `--values`; the rendered workspace has been inspected for malformed `**Prior:**` metadata and passes both `rhei validate` and `rhei run --dry-run`.
@@ -297,6 +298,10 @@ qualified union. The default output directory joins aliases in mount order.
 ## Pattern Library — Canonical Examples
 
 When a workflow is more than a linear checklist, start from a proven template. Each entry is a checked-in, `rhei validate`-passing reference — read its `states.yaml` (diagram in the top comment), its `tasks/`, and its `README.md`, then adapt. Paths are repo-relative.
+
+**State or task?** (the shape decision every entry below already made)
+- Examples `examples/shape/`: four pairs, each the same work authored flat and nested, both validating and runnable with the mock agent — [`reproducer`](../../../../examples/shape/reproducer/README.md), [`review-against-spec`](../../../../examples/shape/review-against-spec/README.md), [`cve-category`](../../../../examples/shape/cve-category/README.md) and [`parts-of-a-feature`](../../../../examples/shape/parts-of-a-feature/README.md). [references/shape.md](references/shape.md) carries the memory test, the three reasons and the decision table of [§FS-rhei-shape](../../../../docs/functional-spec/rhei-shape.spec.md#fs-rhei-shape-state-task-subtask-rhei-or-prose).
+- Technique: a product only the next state of the same task reads is a state — a counted `review → fix` loop whose rounds nobody reads is states of one task. A product a later task, a supervisor or a person names is a task with `**Provides:**`. A parent earns children only when it steers, integrates or speaks for them; otherwise they are flat siblings chained with `**Prior:**`.
 
 **Counted loops** (`review → fix → review …`)
 - Template `crates/rhei-cli/templates/spec-review/`; examples `examples/spec-review-example/` and the callback-driven `examples/review-fix-visits/`.

@@ -1,0 +1,17 @@
+{
+  "defaults": {
+    "agent": "mock",
+    "agent_timeout": "5m"
+  },
+  "agents": {
+    "mock": {
+      "command": [
+        "python3",
+        "-c",
+        "import pathlib, re, runpy, sys; prompt = next((sys.argv[i + 1] for i, arg in enumerate(sys.argv[:-1]) if arg == '--prompt'), ''); root = re.search(r'(?m)^- This rhei: `([^`]+)`', prompt); root or sys.exit('prompt has no Rhei execution root'); runpy.run_path(str(pathlib.Path(root.group(1)) / 'workflow.py'), run_name='__main__')"
+      ],
+      "prompt_flag": "--prompt",
+      "timeout": "5m"
+    }
+  }
+}

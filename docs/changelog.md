@@ -19,6 +19,22 @@ pull request number: the release stamps `(PR #N)` onto it. See
   (§FS-rhei-run-tui.1.5.3). The plain non-TTY lines, `## Task Final States`,
   `--json`, `events.jsonl` and `rhei list` keep one row per task. (PR #381)
 
+- Whether a unit of work is a state, a task, a subtask, a rhei or body prose now
+  has one stated answer, §FS-rhei-shape, which an author can look up in three
+  places. The installed `rhei-plan-writer`, `rhei-state-machine-writer` and
+  `rhei-template-writer` skills each ship `references/shape.md`, a checked
+  extract of the rule's memory test, its three reasons a task has children and
+  its decision table; `rhei-plan-writer` no longer tells an author to nest by
+  default, and the state machine writer's one-state-per-phase rule now says
+  when a phase is a task instead. And `examples/shape/` holds four pairs —
+  `reproducer`, `parts-of-a-feature`, `review-against-spec` and `cve-category`
+  — each the same work authored flat and nested, both runnable with the mock
+  agent through `cargo xtask examples run shape-<pair>-<flat|nested>`, with a
+  README that quotes what each run tells the next task and prints for a person,
+  and says which shape the rule picks and when the other is right anyway.
+  `cargo xtask examples` names the `rhei` binary, so it runs again now that the
+  CLI crate also builds `rh`. (PR #381)
+
 - A retried attempt is now told which artifacts it still owes, rather than
   always being told it did not write the result file. The retry paragraph of
   `## Previous Visits` named the result path wherever any edge out of the state

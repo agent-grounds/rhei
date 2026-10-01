@@ -97,14 +97,13 @@ transitions:
         );
     }
 
-    /// `name (`path`)` with the path joined rather than spelled with a
-    /// separator. §REQ-cross-platform
-    fn owed_entry(name: &str, relative: &[&str]) -> String {
-        let mut path = PathBuf::new();
-        for part in relative {
-            path.push(part);
-        }
-        format!("{name} (`{}`)", path.display())
+    /// `name (`path`)` with the path spelled the way its author wrote it.
+    ///
+    /// Not rebuilt component by component: the clause may not re-separate a
+    /// path, so an expectation that it does is an expectation against the point
+    /// this arm cites. §FS-rhei-agents.4.1 §REQ-cross-platform
+    fn owed_entry(name: &str, relative: &str) -> String {
+        format!("{name} (`{relative}`)")
     }
 
     const OWES: &str = " It did not write what this visit still owes: ";
@@ -132,7 +131,7 @@ transitions:
         assert!(
             notice.contains(&format!(
                 "{OWES}{}.",
-                owed_entry("issue", &["runtime", "triage", "plan.1.3.issue.md"])
+                owed_entry("issue", "runtime/triage/plan.1.3.issue.md")
             )),
             "got:\n{notice}"
         );
@@ -170,7 +169,7 @@ transitions:
         assert!(
             notice.contains(&format!(
                 "{OWES}{}.",
-                owed_entry("result", &["runtime", "results", "plan.1.3.md"])
+                owed_entry("result", "runtime/results/plan.1.3.md")
             )),
             "got:\n{notice}"
         );
@@ -197,8 +196,8 @@ transitions:
         assert!(
             notice.contains(&format!(
                 "{OWES}{}, {}.",
-                owed_entry("issue", &["runtime", "triage", "plan.1.3.issue.md"]),
-                owed_entry("result", &["runtime", "results", "plan.1.3.md"])
+                owed_entry("issue", "runtime/triage/plan.1.3.issue.md"),
+                owed_entry("result", "runtime/results/plan.1.3.md")
             )),
             "got:\n{notice}"
         );
@@ -260,10 +259,13 @@ transitions:
             memory_context(dir.path(), &plan_path, &loaded, &memory, &machine, task, "review");
 
         let notice = render_retry_notice(&context, dir.path());
-        let templated =
-            Path::new("runtime").join("triage").join("{not_a_variable}.issue.md");
+        // The authored spelling, verbatim: the marker is about the brace the
+        // template left, and the path around it is not re-separated to say so.
+        // §FS-rhei-agents.4.1
         assert!(
-            notice.contains(&format!("issue (`{}`, unresolved template)", templated.display())),
+            notice.contains(
+                "issue (`runtime/triage/{not_a_variable}.issue.md`, unresolved template)"
+            ),
             "got:\n{notice}"
         );
     }
@@ -291,7 +293,7 @@ transitions:
 
         let notice = render_retry_notice(&context, dir.path());
         assert!(
-            notice.contains(&owed_entry("issue", &["runtime", "triage", "plan.1.3-alpha.issue.md"])),
+            notice.contains(&owed_entry("issue", "runtime/triage/plan.1.3-alpha.issue.md")),
             "got:\n{notice}"
         );
         assert!(

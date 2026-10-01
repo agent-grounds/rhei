@@ -9,6 +9,20 @@ pull request number: the release stamps `(PR #N)` onto it. See
 - Resolve project summaries from each member's state machine when no default
   machine is configured, and reject mixed-machine scopes.
 
+- Which repository a command the test suite spawns acts on is now a choice
+  rather than an inheritance (§REQ-test-isolation.3): git puts `GIT_DIR` and its
+  companions into the environment of every hook it runs and of everything that
+  hook spawns, and this repository's pre-commit and pre-push hooks run the whole
+  suite — so the fixtures were acting on the repository being committed to, and
+  `-C <fixture>` named only a work tree. The requirement now states the rule as
+  every `GIT_*` the child would otherwise see, with the deliberate names set on
+  the spawn afterwards, and `tests/support/git_env.rs` is the one place the suite
+  names `git` as a program. A fixture whose git setup is refused now fails the
+  test that owns it — only `git` missing from the machine is a skip — where
+  three tests used to report `ok` having exercised nothing. Three tests in
+  `tests/e2e/suite_isolation_tests.rs` pin it against a decoy repository no test
+  names.
+
 - A rhei's state machine is now the `states.yaml` in its own execution root
   whatever its index says, then the project root's, then the built-in `rhei`
   machine (§FS-rhei-plan-language.1.3) — so a machine file written into a rhei's

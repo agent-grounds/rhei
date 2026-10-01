@@ -166,8 +166,8 @@
                 parent: entry.under().map(str::to_owned),
                 project: union_project(rendered, single_file),
             };
-            let declaration = resolve_host_machine(&host)?;
-            union_into_host(&host, &part, &declaration, UnionMode::Compose).map_err(|err| {
+            resolve_host_machine(&host)?;
+            union_into_host(&host, &part, UnionMode::Compose).map_err(|err| {
                 // The entry is what an author fixes, so it leads the message
                 // rather than trailing the refusal as a hint.
                 miette!(

@@ -18,8 +18,12 @@ pull request number: the release stamps `(PR #N)` onto it. See
   unique-`name` match across rhei roots are **deprecated, not removed**: both
   still resolve, both still win wherever they resolve this release so every laid
   plan runs unchanged, and each prints one `warning:` line on stderr where it
-  disagrees with the new resolution (§FS-rhei-states-deprecation). They are
-  removed in the release after this one.
+  disagrees with the new resolution (§FS-rhei-states-deprecation). The three
+  skills `rhei install-skills` installs — `rhei-plan-writer`,
+  `rhei-state-machine-writer` and `rhei-plan-worker` — teach placement as the
+  mechanism instead of the declaration, and say what the line still does for the
+  length of the window. Both mechanisms are removed in the release after this
+  one.
 
 - Establish the project's budget account on the first hand-applied edge, so
   `rhei transition` spends its travel unit like every other writer of a move. A

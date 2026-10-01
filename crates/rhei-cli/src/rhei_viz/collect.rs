@@ -138,10 +138,10 @@ fn resolve_project_machines(
 ) -> io::Result<crate::rhei_validator::MachineSet> {
     let default = resolve_machine(path, machine_override, &loaded.rhei)?;
     let mut per_rhei = std::collections::BTreeMap::new();
-    let mut declared: Vec<(&String, &String)> = loaded.rhei_machines.iter().collect();
-    declared.sort();
-    for (rhei_id, machine_name) in declared {
-        if machine_override.is_some() {
+    if machine_override.is_some() {
+        let mut declared: Vec<(&String, &String)> = loaded.rhei_machines.iter().collect();
+        declared.sort();
+        for (rhei_id, machine_name) in declared {
             if *machine_name != default.name {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
@@ -151,53 +151,61 @@ fn resolve_project_machines(
                     ),
                 ));
             }
-            continue;
         }
+        return Ok(crate::rhei_validator::MachineSet { default, per_rhei });
+    }
 
-        let restates_builtin_default =
-            *machine_name == default.name && *machine_name == StateMachine::builtin_default().name;
-        if !restates_builtin_default {
-            // Restating the built-in default stays equivalent to omission in
-            // every respect (§AR-rhei-panta.4): only a custom same-name
-            // declaration gives its own candidate local first refusal.
-            if let Some(root) = loaded.rhei_roots.get(rhei_id) {
-                let candidate = root.join("states.yaml");
-                if candidate.is_file() {
-                    // Static collection gives every explicit declaration local
-                    // first refusal, including a repeated default name. §FS-rhei-plan-language.1.3
-                    let machine = load_machine(&candidate)?;
-                    if machine.name == *machine_name {
-                        per_rhei.insert(rhei_id.clone(), machine);
-                        continue;
-                    }
+    // Static viz mirrors CLI resolution: the roots are what is iterated, so a
+    // rhei that declares nothing still has its own root read, behind the
+    // deprecated declaration pass that wins for one release.
+
+    // §FS-rhei-plan-language.1.3 §FS-rhei-states-deprecation.1
+    let mut roots: Vec<(&String, &PathBuf)> = loaded.rhei_roots.iter().collect();
+    roots.sort();
+    for (rhei_id, root) in roots {
+        let candidate = root.join("states.yaml");
+        let declared = loaded.rhei_machines.get(rhei_id);
+        if let Some(machine_name) = declared {
+            let restates_builtin_default = *machine_name == default.name
+                && *machine_name == StateMachine::builtin_default().name;
+            if !restates_builtin_default && candidate.is_file() {
+                // An explicit declaration gives its own candidate first
+                // refusal, including a repeated default name. §AR-rhei-panta.4
+                let machine = load_machine(&candidate)?;
+                if machine.name == *machine_name {
+                    per_rhei.insert(rhei_id.clone(), machine);
+                    continue;
                 }
             }
-        }
-        if *machine_name == default.name {
-            continue;
-        }
-
-        let candidates = [path.join("states.yaml")];
-        let mut resolved = None;
-        for candidate in candidates {
-            if !candidate.is_file() {
+            if *machine_name == default.name {
                 continue;
             }
-            let machine = load_machine(&candidate)?;
-            if machine.name == *machine_name {
-                resolved = Some(machine);
-                break;
+            let project_candidate = path.join("states.yaml");
+            if project_candidate.is_file() {
+                let machine = load_machine(&project_candidate)?;
+                if machine.name == *machine_name {
+                    per_rhei.insert(rhei_id.clone(), machine);
+                    continue;
+                }
+            }
+            if *machine_name == StateMachine::builtin_default().name {
+                continue;
             }
         }
-        let Some(machine) = resolved else {
+        // §FS-rhei-plan-language.1.3 clause 1: the rhei's own root, whatever
+        // the file's `name:` and whatever the index says.
+        if candidate.is_file() {
+            per_rhei.insert(rhei_id.clone(), load_machine(&candidate)?);
+            continue;
+        }
+        if let Some(machine_name) = declared {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
                     "rhei '{rhei_id}' declares state machine '{machine_name}', but no states                      file declaring it was found in its root or the project root"
                 ),
             ));
-        };
-        per_rhei.insert(rhei_id.clone(), machine);
+        }
     }
     Ok(crate::rhei_validator::MachineSet { default, per_rhei })
 }
@@ -219,29 +227,28 @@ fn resolve_machine(
         plan_or_dir.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
     };
     let candidate = dir.join("states.yaml");
-    if candidate.is_file() {
-        // Static viz mirrors CLI state-machine discovery: a matching local file
-        // overrides the built-in `rhei` machine. §FS-rhei-viz.8
-        let machine = load_machine(&candidate)?;
-        if machine.name == rhei.states {
-            return Ok(machine);
+    let builtin = StateMachine::builtin_default();
+    let declared = rhei.states_declared.then(|| rhei.states.trim()).filter(|name| !name.is_empty());
+    // The deprecated declaration pass first, so a tree the previous release
+    // resolved resolves the same way. §FS-rhei-states-deprecation.1
+    if let Some(declared) = declared {
+        if candidate.is_file() {
+            let machine = load_machine(&candidate)?;
+            if machine.name == declared {
+                return Ok(machine);
+            }
         }
-        let builtin = StateMachine::builtin_default();
-        if rhei.states != builtin.name {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "plan declares state machine '{}', but auto-discovered states file '{}' declares '{}'",
-                    rhei.states,
-                    candidate.display(),
-                    machine.name
-                ),
-            ));
+        if declared == builtin.name {
+            return Ok(builtin);
         }
-        return Ok(builtin);
     }
-    if rhei.states == StateMachine::builtin_default().name {
-        return Ok(StateMachine::builtin_default());
+    // Static viz mirrors CLI resolution: the `states.yaml` beside the plan is
+    // the machine whatever its `name:`. §FS-rhei-viz.8 §FS-rhei-plan-language.1.3
+    if candidate.is_file() {
+        return load_machine(&candidate);
+    }
+    if declared.is_none() {
+        return Ok(builtin);
     }
     load_machine(&candidate)
 }

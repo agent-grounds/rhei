@@ -21,6 +21,7 @@ include!("cli/cli_dispatch.rs");
 include!("cli/command_target_dispatch.rs");
 include!("cli/completion_candidates.rs");
 include!("cli/completion_context.rs");
+include!("cli/states_deprecated_resolution.rs");
 include!("cli/list_command.rs");
 include!("cli/show_command.rs");
 include!("cli/error_guidance.rs");

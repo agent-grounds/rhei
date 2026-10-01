@@ -11,22 +11,12 @@
         levels: u8,
         /// `metadata.tasks` entries, already re-keyed by the placed ids.
         tasks: &'a BTreeMap<String, YamlValue>,
-        /// The `**States:**` line the interim rule of [§FS-rhei-library.2.1]
-        /// writes when the root file exists and the index is silent.
-        declaration: Option<&'a str>,
     }
 
     /// The target's index with the additions inserted, keeping every line it
     /// had. §FS-rhei-library.4
     fn union_index(raw: &str, add: &IndexAdditions<'_>) -> MietteResult<String> {
         let mut lines: Vec<String> = raw.lines().map(str::to_owned).collect();
-        if let Some(name) = add.declaration {
-            let after = lines
-                .iter()
-                .position(|line| line.starts_with("# Rhei:") || line.starts_with("# Panta:"))
-                .map_or(0, |at| at + 1);
-            lines.insert(after, format!("**States:** {name}"));
-        }
         // A frontmatter block is opened only when something goes in it: an
         // empty `structure:` is not a mapping, and a plan that declared
         // nothing and takes nothing keeps declaring nothing.

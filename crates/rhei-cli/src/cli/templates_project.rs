@@ -282,7 +282,7 @@ help = template_manifest_help(),
     /// message cannot follow later in the process and contradict this one.
     /// §FS-rhei-templates.6.2
     fn warn_settings_superseded_by_hoist(superseded: &Path, merged: &Path) {
-        let _ = claim_deprecated_rhei_home_warning(superseded);
+        let _ = claim_deprecation_warning(&format!("rhei-home:{}", superseded.display()));
         eprintln!(
             "warning: {} is deprecated, and the merge just written to {} supersedes it — \
              the merged file holds that file's keys plus the template's. Nothing reads the \

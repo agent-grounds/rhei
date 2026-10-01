@@ -33,12 +33,11 @@
     fn union_into_host(
         host: &UnionHost,
         part: &RenderedPart,
-        declaration: &MachineDeclaration,
         mode: UnionMode,
     ) -> MietteResult<()> {
         let tickets = read_part_tickets(&part.root)?;
         let held = hold_host(host, &tickets, mode)?;
-        let writes = plan_union(host, part, declaration, tickets, &held.files)?;
+        let writes = plan_union(host, part, tickets, &held.files)?;
         // An entry is validated with the rest: an including template's own
         // machine names states its parts bring, so it is a fragment until
         // every entry has joined it. §FS-rhei-library.6 §AR-rhei-library.5
@@ -82,7 +81,6 @@
     fn plan_union(
         host: &UnionHost,
         part: &RenderedPart,
-        declaration: &MachineDeclaration,
         mut tickets: Vec<PartTickets>,
         host_files: &[(PathBuf, Vec<String>)],
     ) -> MietteResult<UnionWrites> {
@@ -146,23 +144,8 @@
 
         let kinds = declared_node_kinds(&part_front);
         let levels = placed.iter().map(|id| id.split('.').count() as u8).max().unwrap_or(1);
-        let declared = match declaration {
-            MachineDeclaration::Write(name) => {
-                writes.notes.push(format!(
-                    "added `**States:** {name}` to {}, without which the union would be inert",
-                    display_slash(&host.index)
-                ));
-                Some(name.as_str())
-            }
-            MachineDeclaration::Matches => None,
-        };
         let index_raw = read_text(&host.index)?;
-        let additions = IndexAdditions {
-            kinds: &kinds,
-            levels,
-            tasks: &task_metadata,
-            declaration: declared,
-        };
+        let additions = IndexAdditions { kinds: &kinds, levels, tasks: &task_metadata };
         let mut index = union_index(&index_raw, &additions)?;
         if host.single_file {
             index = place_tickets_in_file(&index, host.parent.as_deref(), &tickets);
@@ -326,7 +309,7 @@
         }
 
         let host = resolve_union_host(target)?;
-        let declaration = resolve_host_machine(&host)?;
+        resolve_host_machine(&host)?;
         let values = collect_template_inputs(
             &manifest,
             template,
@@ -345,7 +328,7 @@
         let part_root = scratch.path().join(&manifest.name);
         let part = render_part(template_dir, &manifest, &values, &part_root, None)?;
         let mode = if dry_run { UnionMode::DryRun } else { UnionMode::Place };
-        union_into_host(&host, &part, &declaration, mode)
+        union_into_host(&host, &part, mode)
     }
 
     /// Each combination `--into` refuses is an error naming the pair, rather

@@ -386,12 +386,16 @@ impl ExecutionMachines {
     }
 }
 
-/// Resolve every machine a loaded plan runs under: the default via the
-/// existing project rules, plus each self-declaring rhei's machine — its own
-/// execution root's `states.yaml` first, then the shared name-match rules.
-/// An explicit `--state-machine` stays a whole-scope override and errors when
-/// a rhei in scope declares a different machine name.
-// §AR-rhei-panta.4
+/// Resolve every machine a loaded plan runs under: the project default, plus
+/// one entry per rhei whose machine is not that default.
+///
+/// Per rhei, the deprecated `**States:**` pass runs first and wins wherever it
+/// resolves (§FS-rhei-states-deprecation.1); where it resolves nothing, clause 1
+/// reads the `states.yaml` in the rhei's own execution root whatever the index
+/// says, and a rhei with no file of its own is governed by the default. An
+/// explicit `--state-machine` stays a whole-scope override and errors when a
+/// rhei in scope declares a different machine name.
+// §FS-rhei-plan-language.1.3 §AR-rhei-panta.4
 fn resolve_state_machines_for_loaded_plan(
     input: &Path,
     loaded: &LoadedPlan,
@@ -399,130 +403,130 @@ fn resolve_state_machines_for_loaded_plan(
 ) -> MietteResult<ResolvedMachineSet> {
     let default = resolve_state_machine_for_loaded_plan(input, loaded, state_machine_path)?;
 
-    let mut per_rhei = BTreeMap::new();
-    let mut declared: Vec<(&String, &String)> = loaded.rhei_machines.iter().collect();
-    declared.sort();
-    for (rhei_id, machine_name) in declared {
-        if let Some(override_path) = state_machine_path {
-            if *machine_name != default.machine.name {
-                return Err(miette!(
-help = "--state-machine replaces resolution for the whole scope. Narrow the scope with --rhei, or drop the override and let each rhei resolve its own machine.",
+    if let Some(override_path) = state_machine_path {
+        reject_declarations_the_override_cannot_mean(loaded, override_path, &default)?;
+        return Ok(ResolvedMachineSet { default, per_rhei: BTreeMap::new() });
+    }
 
-                    "--state-machine '{}' declares '{}', but rhei '{rhei_id}' declares state \
-                     machine '{machine_name}'. The override replaces resolution for the whole \
-                     scope; it cannot reinterpret that rhei's states under another machine. \
-                     Narrow the invocation or drop the override.",
-                    override_path.display(),
-                    default.machine.name,
-                ));
+    // Iterating the roots rather than the declarations is the whole of the
+    // change: a rhei that declares nothing used to have no entry here, which
+    // is why its own root was never consulted. §FS-rhei-plan-language.1.3
+    let mut per_rhei = BTreeMap::new();
+    if loaded.is_panta_project() {
+        let mut roots: Vec<(&String, &PathBuf)> = loaded.rhei_roots.iter().collect();
+        roots.sort();
+        for (rhei_id, root) in roots {
+            let declared = loaded.rhei_machines.get(rhei_id).map(String::as_str);
+            if let Some(resolved) =
+                resolve_rhei_machine(input, loaded, rhei_id, root, declared, &default)?
+            {
+                per_rhei.insert(rhei_id.clone(), resolved);
             }
-            continue;
         }
-        let resolved = resolve_declared_rhei_machine(
-            input,
-            loaded,
-            rhei_id,
-            machine_name,
-            &default,
-        )?;
-        per_rhei.insert(rhei_id.clone(), resolved);
     }
 
     Ok(ResolvedMachineSet { default, per_rhei })
 }
 
-/// Resolve one self-declaring rhei's machine file: the rhei's own execution
-/// root first — the shape every instantiated template ships — then the
-/// resolved default for a same-name declaration or the project-level
-/// name-match rules. §FS-rhei-plan-language.1.3 §AR-rhei-panta.4
-fn resolve_declared_rhei_machine(
+/// `--state-machine` replaces resolution for the whole scope, so a rhei in
+/// scope that declares some other machine is a contradiction rather than a
+/// narrowing. §AR-rhei-panta.4
+fn reject_declarations_the_override_cannot_mean(
+    loaded: &LoadedPlan,
+    override_path: &Path,
+    default: &ResolvedStateMachine,
+) -> MietteResult<()> {
+    let mut declared: Vec<(&String, &String)> = loaded.rhei_machines.iter().collect();
+    declared.sort();
+    for (rhei_id, machine_name) in declared {
+        if *machine_name == default.machine.name {
+            continue;
+        }
+        return Err(miette!(
+            help = "--state-machine replaces resolution for the whole scope. Narrow the scope with --rhei, or drop the override and let each rhei resolve its own machine.",
+            "--state-machine '{}' declares '{}', but rhei '{rhei_id}' declares state \
+             machine '{machine_name}'. The override replaces resolution for the whole \
+             scope; it cannot reinterpret that rhei's states under another machine. \
+             Narrow the invocation or drop the override.",
+            override_path.display(),
+            default.machine.name,
+        ));
+    }
+    Ok(())
+}
+
+/// One rhei's machine, or `None` where the project default governs it.
+///
+/// The deprecated declaration pass first (§FS-rhei-states-deprecation.1), then
+/// clause 1 — the `states.yaml` in this rhei's own execution root, whatever
+/// its `name:` and whatever the index says. A declaration neither of them
+/// resolved is still the validation error, never a fall through to the
+/// project default. §FS-rhei-plan-language.1.3
+fn resolve_rhei_machine(
     input: &Path,
     loaded: &LoadedPlan,
     rhei_id: &str,
-    machine_name: &str,
+    root: &Path,
+    declared: Option<&str>,
     default: &ResolvedStateMachine,
-) -> MietteResult<ResolvedStateMachine> {
-    let builtin_name = &rhei_validator::StateMachine::builtin_default().name;
-    let restates_builtin_default =
-        machine_name == default.machine.name && machine_name == builtin_name;
-    let mut candidates: Vec<PathBuf> = Vec::new();
-    if !restates_builtin_default {
-        // Restating the built-in default stays equivalent to omission in
-        // every respect (§AR-rhei-panta.4): only a custom same-name
-        // declaration gives its own candidate first refusal.
-        if let Some(root) = loaded.rhei_roots.get(rhei_id) {
-            let candidate = root.join("states.yaml");
-            if candidate.is_file() {
-                // An explicit declaration always gives its own candidate first
-                // refusal, even when it repeats the default name. §FS-rhei-plan-language.1.3
-                let machine = load_state_machine(Some(&candidate))?;
-                if machine.name == machine_name {
-                    return Ok(ResolvedStateMachine { machine, path: Some(candidate) });
-                }
-            }
-        }
-    }
-    if machine_name == default.machine.name {
-        return Ok(default.clone());
-    }
-    candidates.push(auto_state_machine_path(input));
-    let mut roots: Vec<&PathBuf> = loaded.rhei_roots.values().collect();
-    roots.sort();
-    roots.dedup();
-    for root in roots {
-        candidates.push(root.join("states.yaml"));
+) -> MietteResult<Option<ResolvedStateMachine>> {
+    // The basin is synthetic: it has no index of its own, holds unfiled
+    // tickets, and runs under the project default. §FS-rhei-panta.2
+    if rhei_id == workspace::BASIN_RHEI_ID {
+        return Ok(None);
     }
 
-    let mut seen: HashSet<PathBuf> = HashSet::new();
-    let mut matches: Vec<(PathBuf, rhei_validator::StateMachine)> = Vec::new();
-    for candidate in candidates {
-        if !seen.insert(candidate.clone()) || !candidate.is_file() {
-            continue;
+    let subject = DeclarationSubject::Rhei { id: rhei_id, root };
+    if let Some(machine_name) = declared {
+        if let Some(found) =
+            resolve_declared_rhei_machine(input, loaded, rhei_id, machine_name, default)?
+        {
+            warn_about_deprecated_resolution(&subject, machine_name, &found);
+            return Ok(Some(found.resolved));
         }
-        // An unloadable candidate is a real project problem; swallowing it
-        // here would surface as a misleading "not found" instead.
+    }
+
+    let candidate = root.join("states.yaml");
+    if candidate.is_file() {
         let machine = load_state_machine(Some(&candidate))?;
-        if machine.name == machine_name {
-            matches.push((candidate, machine));
+        if let Some(machine_name) = declared {
+            warn_declaration_nothing_supplies(&subject, machine_name, &candidate, &machine.name);
         }
+        return Ok(Some(ResolvedStateMachine { machine, path: Some(candidate) }));
     }
 
-    // An explicit built-in name falls back only after the matching-file lookup
-    // finds nothing. §FS-rhei-plan-language.1.3
-    if matches.is_empty() {
-        let builtin = rhei_validator::StateMachine::builtin_default();
-        if machine_name == builtin.name {
-            return Ok(ResolvedStateMachine { machine: builtin, path: None });
-        }
-    }
-
-    match matches.len() {
-        0 => Err(miette!(
-help = missing_state_machine_help(),
-
+    match declared {
+        // A declaration naming a machine nothing supplies never silently
+        // resolves to some other machine. §FS-rhei-plan-language.1.3
+        Some(machine_name) => Err(miette!(
+            help = missing_state_machine_help(),
             "rhei '{rhei_id}' declares state machine '{machine_name}', but no states file \
              declaring it was found in the rhei's root, the project root, or any other \
              rhei root. This project declares: {}. Add a `states.yaml` declaring \
              '{machine_name}' next to the rhei, or pass --state-machine <path>.",
             state_machine_names_in(input, loaded).join(", "),
         )),
-        1 => {
-            let (path, machine) = matches.into_iter().next().expect("single match");
-            Ok(ResolvedStateMachine { machine, path: Some(path) })
-        }
-        _ => {
-            let paths: Vec<String> =
-                matches.iter().map(|(path, _)| format!("'{}'", path.display())).collect();
-            Err(miette!(
-help = states_declaration_help(),
-
-                "rhei '{rhei_id}' declares state machine '{machine_name}', and more than one \
-                 root holds a states file declaring it: {}.\nMove the definitive file to the \
-                 rhei's own root or pass --state-machine <path>.",
-                paths.join(", ")
-            ))
-        }
+        None => Ok(None),
     }
+}
+
+/// Every rhei execution root in the project, deduplicated and ordered.
+// §AR-rhei-panta.4
+fn sorted_rhei_roots(loaded: &LoadedPlan) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = loaded.rhei_roots.values().cloned().collect();
+    roots.sort();
+    roots.dedup();
+    roots
+}
+
+/// The same for the roots a ticket resolves through, which is what the
+/// project default's cross-root match has always searched.
+// §AR-rhei-panta.4
+fn sorted_task_roots(loaded: &LoadedPlan) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = loaded.task_roots.values().cloned().collect();
+    roots.sort();
+    roots.dedup();
+    roots
 }
 
 /// Every state machine name a `**States:**` declaration in this project can
@@ -536,10 +540,7 @@ fn state_machine_names_in(input: &Path, loaded: &LoadedPlan) -> Vec<String> {
     let mut names: BTreeSet<String> =
         BTreeSet::from([rhei_validator::StateMachine::builtin_default().name]);
     let mut candidates = vec![auto_state_machine_path(input)];
-    let mut roots: Vec<&PathBuf> = loaded.rhei_roots.values().collect();
-    roots.sort();
-    roots.dedup();
-    candidates.extend(roots.into_iter().map(|root| root.join("states.yaml")));
+    candidates.extend(sorted_rhei_roots(loaded).into_iter().map(|root| root.join("states.yaml")));
     for candidate in candidates {
         if candidate.is_file() {
             if let Ok(machine) = load_state_machine(Some(&candidate)) {
@@ -583,6 +584,15 @@ fn normalize_workspace_input(input: &Path) -> PathBuf {
         .unwrap_or_else(|| input.to_path_buf())
 }
 
+/// The project default: what governs the Panta root, the basin, and every
+/// rhei with no machine of its own.
+///
+/// The manifest's own deprecated declaration resolves first and wins wherever
+/// it resolves (§FS-rhei-states-deprecation.1); behind it the `states.yaml` at
+/// the project root is the default by its presence, whether or not
+/// `index.panta.md` names it, and the built-in machine is the last word. A
+/// declaration neither pass supplied is still a validation error.
+// §FS-rhei-plan-language.1.3
 fn resolve_state_machine_for_loaded_plan(
     input: &Path,
     loaded: &LoadedPlan,
@@ -602,76 +612,40 @@ fn resolve_state_machine_for_loaded_plan(
         return Ok(ResolvedStateMachine { machine, path: Some(path.to_path_buf()) });
     }
 
-    let builtin = rhei_validator::StateMachine::builtin_default();
-    let declared_name = loaded.rhei.states.trim();
     let candidate = auto_state_machine_path(input);
+    let declared =
+        loaded.rhei.states_declared.then(|| loaded.rhei.states.trim()).filter(|name| !name.is_empty());
+    let root = candidate.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
+    let subject = DeclarationSubject::Manifest { root: &root };
 
-    if !loaded.rhei.states_declared {
-        return Ok(ResolvedStateMachine { machine: builtin, path: None });
+    if let Some(declared_name) = declared {
+        if let Some(found) = resolve_declared_project_default(input, loaded, declared_name)? {
+            warn_about_deprecated_resolution(&subject, declared_name, &found);
+            return Ok(found.resolved);
+        }
     }
 
-    let mut mismatch: Option<String> = None;
+    // Clauses 1 and 2 name the same file here: a project's own execution root
+    // is the project root. §FS-rhei-plan-language.1.3
     if candidate.is_file() {
         let machine = load_state_machine(Some(&candidate))?;
-        if machine.name == declared_name {
-            return Ok(ResolvedStateMachine { machine, path: Some(candidate) });
+        if let Some(declared_name) = declared {
+            warn_declaration_nothing_supplies(&subject, declared_name, &candidate, &machine.name);
         }
-        mismatch = Some(machine.name);
+        return Ok(ResolvedStateMachine { machine, path: Some(candidate) });
     }
 
-    // §AR-rhei-panta.4: when the project-root file is absent or mismatched,
-    // a *unique* `name:` match in a rhei root resolves the machine file;
-    // several matches are ambiguous — a stale copy must not win silently.
-    if declared_name != builtin.name {
-        let mut roots: Vec<&PathBuf> = loaded.task_roots.values().collect();
-        roots.sort();
-        roots.dedup();
-        let mut matches: Vec<(PathBuf, rhei_validator::StateMachine)> = Vec::new();
-        for root in roots {
-            let rhei_candidate = root.join("states.yaml");
-            if rhei_candidate == candidate || !rhei_candidate.is_file() {
-                continue;
-            }
-            // An unloadable candidate is a real project problem; swallowing
-            // it here would surface as a misleading "not found" instead.
-            let machine = load_state_machine(Some(&rhei_candidate))?;
-            if machine.name == declared_name {
-                matches.push((rhei_candidate, machine));
-            }
-        }
-        if matches.len() > 1 {
-            let paths: Vec<String> =
-                matches.iter().map(|(path, _)| format!("'{}'", path.display())).collect();
-            return Err(miette!(
-                help = states_declaration_help(),
-                "plan declares state machine '{}', and more than one rhei root holds a \
-                 states file declaring it: {}.\nMove the definitive file to the project \
-                 root or pass --state-machine <path>.",
-                declared_name,
-                paths.join(", ")
-            ));
-        }
-        if let Some((path, machine)) = matches.into_iter().next() {
-            return Ok(ResolvedStateMachine { machine, path: Some(path) });
-        }
-        return Err(match mismatch {
-            Some(found) => miette!(
-                help = states_declaration_help(),
-                "plan declares state machine '{}', but auto-discovered states file '{}' declares '{}', and no rhei root holds a states file declaring it.\nUse --state-machine <path> to override the default location.",
-                declared_name,
-                candidate.display(),
-                found
-            ),
-            None => miette!(
-                help = states_declaration_help(),
-                "plan declares state machine '{}', but no auto-discovered states file was found at '{}' or, by name, in any rhei root.\nUse --state-machine <path> to override the default location.",
-                declared_name,
-                candidate.display()
-            ),
-        });
+    if let Some(declared_name) = declared {
+        return Err(miette!(
+            help = states_declaration_help(),
+            "plan declares state machine '{declared_name}', but no auto-discovered states file \
+             was found at '{}' or, by name, in any rhei root.\nUse --state-machine <path> to \
+             override the default location.",
+            candidate.display()
+        ));
     }
 
-    Ok(ResolvedStateMachine { machine: builtin, path: None })
+    Ok(ResolvedStateMachine { machine: rhei_validator::StateMachine::builtin_default(), path: None })
 }
 
 /// Resolve the state machine for `rhei states`.

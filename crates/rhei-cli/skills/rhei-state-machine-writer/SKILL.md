@@ -5,7 +5,7 @@ description: Design and generate custom Rhei state machine YAML files from proje
 
 # Rhei State Machine Writer
 
-Design a custom Rhei state machine only when the built-in `rhei` workflow is too generic. Produce a YAML file matching the project's real phases, actors, gates, retries, and automation hooks, ready to be referenced by a plan's `**States:**` declaration. The state machine writer runs before the plan writer: it defines the workflow the plan later uses.
+Design a custom Rhei state machine only when the built-in `rhei` workflow is too generic. Produce a YAML file matching the project's real phases, actors, gates, retries, and automation hooks, placed where the thing it governs lives (see *File Placement*). The state machine writer runs before the plan writer: it defines the workflow the plan later uses.
 
 ## When To Use This Skill
 
@@ -237,7 +237,7 @@ When the workflow needs several agents to **deliberate** — take each other's p
 6. Draft transitions, including cancellation and recovery paths.
 7. Draft profiles and `node_policy` — start with one default profile; add `by_type` / `overrides` only when kinds need different flows.
 8. Add callbacks only where the workflow truly integrates with external automation.
-9. Write the YAML where the plan that declares it will find it (see *File Placement*). For a template, write to `<template>/states.yaml` and ensure the plan skeleton declares the same machine name via `**States:**`.
+9. Write the YAML where the thing it governs lives (see *File Placement*): the rhei's own execution root for that rhei's own process, the project root for the default. For a template, write to `<template>/states.yaml`, which lands at the instantiated rhei's own root.
 10. Validate with the CLI when available.
 
 ## Validation Checklist
@@ -269,12 +269,20 @@ When the CLI is available, validate with `rhei states --state-machine <path>` (a
 Rhei finds a machine only where state-machine resolution looks, and only in a file named `states.yaml` ([§FS-rhei-state-machine-writer.5](../../../../docs/functional-spec/rhei-state-machine-writer.spec.md#5-file-placement)). Place it by what it governs:
 
 - **A single-file plan** — `states.yaml` in the plan's directory.
-- **A Directory Workspace** — `states.yaml` at the workspace root.
-- **A Panta project's custom default** — `states.yaml` at the project root (the directory holding `index.panta.md`), named by the manifest's `**States:**`. Every rhei that declares no `**States:**` runs under it. When an adopted project has no matching project-root file, one unique matching member-root file may supply this custom default.
-- **A Panta project's explicitly declared built-in `rhei` default** — when the manifest declares `**States:** rhei`, an optional matching `states.yaml` at the project root replaces the built-in machine. Without that project-root file, the project uses built-in `pending`/`completed`; a matching file found only in a member rhei root does not replace the default, whether the member inherits or restates `rhei`.
-- **An omitted effective declaration** — after Panta inheritance is applied, a plan or rhei with no effective `**States:**` uses built-in `rhei` and ignores automatically discovered project-root and member-root files. A member that inherits the manifest's explicit `**States:** rhei` remains in the preceding case; its effective declaration is not omitted.
-- **One rhei's own process** — `states.yaml` at that rhei's execution root, named by the rhei's own `**States:**`. This is where an instantiated template's `states.yaml` lands. An explicit declaration of a *custom* name gives that local file first refusal, even when it repeats the project default's name; omit the rhei's `**States:**` line to inherit the resolved project machine wholesale instead. Restating the project's built-in `rhei` default is different and stays equivalent to omission in every respect: its own root gets no precedence either, so it can supply a custom default only through that default's unique name-match fallback and can never supply the built-in `rhei` project default from a member root ([§AR-rhei-panta.4](../../../../docs/architecture/rhei-panta.spec.md#4-state-machine-binding)).
+- **One rhei's own process** — `states.yaml` at that rhei's execution root: a Directory Workspace's root, or the directory holding a single-file plan. This is where an instantiated template's `states.yaml` lands, and it is read whatever the index says. A rhei that needs a machine of its own is a directory with that file in it.
+- **A Panta project's default** — `states.yaml` at the project root, the directory holding `index.panta.md`. Every rhei with no file of its own runs under it, as does the basin. The file's presence is what makes it the default; the manifest does not have to name it.
+- **Nowhere** — with no file in either place, the rhei runs under the built-in `rhei` machine and its `pending`/`completed` states.
 
-The YAML's `name` must equal the `**States:**` value that selects it. No other directory or file name is searched. A machine kept anywhere else loads only when every invocation passes `--state-machine <path>`, and that flag replaces resolution for the whole scope: it works for a plan, a workspace, or a project that runs a single machine, but it cannot supply one machine among several.
+The file's own `name:` is the machine's name. No other directory or file name is searched. A machine kept anywhere else loads only when every invocation passes `--state-machine <path>`, and that flag replaces resolution for the whole scope: it works for a plan, a workspace, or a project that runs a single machine, but it cannot supply one machine among several.
+
+### The deprecated declaration, for one more release
+
+The `**States:**` declaration in `index.rhei.md` and `index.panta.md`, and resolving such a declaration from a `states.yaml` in **another** rhei's root, are deprecated and removed in the next release ([§FS-rhei-states-deprecation](../../../../docs/functional-spec/rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). Do not write one. Until the removal they are still resolved, and resolved **first**, so for this release:
+
+- a declaration that still resolves wins over the file in the rhei's own root, and `rhei states` prints one `warning:` saying which file takes over next release;
+- a declaration naming a machine nothing supplies falls through to the rhei's own root rather than failing, and warns;
+- a declaration resolved from another rhei's root still resolves, and warns; several roots declaring the one name is still the ambiguity error.
+
+So when a project you are writing a machine for already carries the line, keep the YAML's `name` equal to it: while the declaration resolves, a mismatch is what defers your file by a release ([§AR-rhei-panta.4](../../../../docs/architecture/rhei-panta.spec.md#4-state-machine-binding)).
 
 Write the machine before anything points at it. In a Panta project a rhei binds to one with `rhei new "<title>" --states <name>`, and that create resolves the name at create time: with no `states.yaml` declaring it, the create is refused and rolled back, and `--keep-on-error` is what writes the declaration anyway. The order is machine first, rhei second — a rhei points at a machine, never the other way round.

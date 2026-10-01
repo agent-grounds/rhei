@@ -83,7 +83,9 @@ fn task_waits_on(candidate: &rhei_core::ast::Task, subject: &rhei_core::ast::Tas
     })
 }
 
-/// The parent's other children, in plan order, each marked when it waits.
+/// The parent's other children, in plan order, each marked when it waits and
+/// each saying how large a subtree of its own it stands for — the same count
+/// `## Plan History` folds a finished sibling's subtree into.
 // §FS-rhei-memory.4.2
 fn render_siblings(
     render_context: &RuntimeTemplateContext<'_>,
@@ -101,8 +103,15 @@ fn render_siblings(
         } else {
             ""
         };
+        // The set, the cap and the overflow line are unchanged; only the line
+        // gains the suffix, after the marker where both apply.
+        // §FS-rhei-memory.4.2
+        let subtree = match descendant_count(sibling) {
+            0 => String::new(),
+            count => format!(" \u{2014} {count} subtasks"),
+        };
         out.push_str(&format!(
-            "- {}: {} [{}]{marker}\n",
+            "- {}: {} [{}]{marker}{subtree}\n",
             memory_node_label(sibling),
             sibling.title,
             memory_state_name(sibling, render_context.machine)

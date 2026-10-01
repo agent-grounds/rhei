@@ -445,6 +445,28 @@ pull request number: the release stamps `(PR #N)` onto it. See
   non-scalar key used to drop the entire document and a non-finite float used to
   become `null`. (PR #330)
 
+- List in `## Plan History` the path a reader walked rather than the whole tree,
+  and let a listed parent speak for its subtree in one line. The section now
+  names the plan's top-level tasks plus the children of the invoked task and of
+  each of its ancestors; a listed task with descendants carries
+  `— {n} subtasks: {breakdown}`, every descendant bucketed by its own state name
+  in the machine's declaration order, and the preamble names `rhei list --parent
+  <id>` once as the way into a folded subtree. An open off-path parent is
+  accounted for under `### In Flight`, which now admits a non-terminal task with
+  any finished descendant and appends `— {k} of {n} subtasks finished`; a row
+  naming a real agent is never dropped from the cap in favour of one reporting
+  progress, and the invoked task's own ancestors are excluded there because
+  `## Position` already names them. A sibling with children says so in
+  `### Siblings` too. Before this, a parent decomposed into forty subtasks put
+  forty-one lines into every later prompt and the 40-line cap then evicted the
+  plan's real decisions — the oldest finished root tasks — to make room for
+  results that were only ever owed to their parent. `rhei next --json`'s
+  `plan_history` keeps its name, its type and its presence rule and changes what
+  it contains; `rhei list` is unchanged and stays the complete tree every folded
+  line points at. §FS-rhei-memory.1.1 is deliberately amended so that a finished
+  task reachable by the command a folded line names counts as reachable, which is
+  what licenses the fold. (PR #377)
+
 ## 2. [0.5.1] - 2026-09-28
 
 - Let an `agents.<id>` profile name the built-in family it belongs to. A wrapper

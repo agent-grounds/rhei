@@ -5,7 +5,8 @@
 //
 // Its own part because Position, Plan History, Previous Visits, and the
 // navigation block each render a different slice of the same memory; the slice
-// is theirs, the reading of it is shared.
+// is theirs, the reading of it is shared. The shape of the task tree is read
+// next door, in `run_prompt_tree.rs`.
 
 // §AR-source-file-size.3 §FS-rhei-memory.4
 
@@ -153,30 +154,6 @@ fn memory_state_name(
     machine: &rhei_validator::StateMachine,
 ) -> String {
     normalized_state_name(task.state.as_str(), machine)
-}
-
-/// Every task of the merged graph, in plan order, parents before children.
-// §FS-rhei-plan-language.1.2
-fn flatten_task_slice(tasks: &[rhei_core::ast::Task]) -> Vec<&rhei_core::ast::Task> {
-    fn collect<'a>(task: &'a rhei_core::ast::Task, out: &mut Vec<&'a rhei_core::ast::Task>) {
-        out.push(task);
-        for child in &task.children {
-            collect(child, out);
-        }
-    }
-    let mut out = Vec::new();
-    for task in tasks {
-        collect(task, &mut out);
-    }
-    out
-}
-
-/// Whether a ticket's authored state is terminal under its machine.
-fn task_state_is_terminal(
-    task: &rhei_core::ast::Task,
-    machine: &rhei_validator::StateMachine,
-) -> bool {
-    is_terminal_state(&memory_state_name(task, machine), machine)
 }
 
 /// Render a filesystem path the way `{output.<name>.path}` renders one:
@@ -493,17 +470,4 @@ fn results_pasted_in_full(
         }
     }
     Ok(pasted)
-}
-
-/// Descendants of `task` whose results this prompt already pasted, which drop
-/// out of `own` rather than repeating as one-liners. §FS-rhei-memory.4.3
-fn pasted_descendant_ids(
-    render_context: &RuntimeTemplateContext<'_>,
-    pasted_in_full: &BTreeSet<String>,
-) -> BTreeSet<String> {
-    flatten_task_slice(&render_context.task.children)
-        .into_iter()
-        .map(|task| task.id.to_string())
-        .filter(|id| pasted_in_full.contains(id))
-        .collect()
 }

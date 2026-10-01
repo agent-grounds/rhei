@@ -43,6 +43,11 @@ account holds it. Unlike either count it is an amount of money: admission
 tallies no unit of it, and its value comes from the accounting record the
 invocation produced §FS-rhei-cost-accounting.
 
+Because travel is per identity, how many travel bounds a pipeline holds is
+decided by its shape rather than by this page: one task with six states holds
+one, and the same pipeline with three phases promoted to tasks holds three
+([§FS-rhei-shape.5](rhei-shape.spec.md#5-what-promoting-a-phase-costs)).
+
 Travel and invocations are integer counts. Neither is a duration and neither is
 an amount of money. Neither is `visits:`, `attempts:`, or a poll counter: those
 bound a state entry, and they may refresh or increment without touching either

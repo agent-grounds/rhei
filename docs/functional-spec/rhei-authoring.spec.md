@@ -48,7 +48,15 @@ A typical plan grows in three passes:
 Keep content sections before `## Tasks`. Everything after `## Tasks` is
 parsed as task structure.
 
-## 3. Tasks and Child Tasks
+## 3. Tasks and Child Tasks: Choosing the Shape, Then Spelling It
+
+Before spelling a task, decide whether the work is one. Ask who reads what the
+step writes: a product only the next phase of the same task reads is a state,
+and anything read from outside that chain is a task. A task is a flat sibling
+chained with `**Prior:**` unless the parent steers, integrates or speaks for
+its children — progressive disclosure is not a reason for depth. The rule, the
+decision table and the cases behind them are [§FS-rhei-shape](rhei-shape.spec.md#fs-rhei-shape-state-task-subtask-rhei-or-prose);
+this guide shows how to spell whichever one the rule picked.
 
 ### 3.1. Numeric vs named tasks
 
@@ -71,6 +79,10 @@ Root tasks live at `###` (H3). Child tasks are declared at the next heading
 level (`####`, H4), their children at `#####` (H5), and so on. A child task
 is a full task node — it carries its own `**State:**` line and may declare
 `**Prior:**` dependencies just like a root task.
+
+Write a child only where the parent owes something of its own — it steers the
+children, integrates them, or speaks for them to a later reader. Everything
+else is a flat sibling with `**Prior:**` ([§FS-rhei-shape.3](rhei-shape.spec.md#3-children)).
 
 Child ids extend the parent id by exactly one segment, joined with a dot. Any
 segment may be numeric or named. So children of `Task 2` are `Task 2.1`,
@@ -102,6 +114,10 @@ structure:
   maxLevels: 4
   nodeKinds: [task, bug]
 ```
+
+Declaring depth permits it; it does not recommend it. A plan earns each level
+the same way a single child is earned — a parent that steers, integrates or
+speaks for what is under it ([§FS-rhei-shape.3.2](rhei-shape.spec.md#32-the-three-reasons-a-task-has-children)).
 
 `maxLevels` counts from the root (a root task alone has `maxLevels: 1`;
 root plus direct children is `maxLevels: 2`). Validation rejects nodes

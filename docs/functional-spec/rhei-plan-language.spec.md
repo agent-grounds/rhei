@@ -1415,7 +1415,8 @@ This is a plan-level handoff, deliberately outside the state machine. State
 handoffs ([§FS-rhei-states.3.2](rhei-states.spec.md#32-state-handoffs)) carry notes between the states of *one* task and
 are declared in `states.yaml`; exports carry work product between *different*
 tasks and are declared in the plan, because the dependency graph — not the
-workflow — is what orders them.
+workflow — is what orders them. That sentence generalizes past exports
+to the whole shape decision in [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test).
 
 **Fields.** `**Provides:**` is a comma-separated list of export names.
 `**Consumes:**` is a comma-separated list of `<task-id>:<name>` references. An

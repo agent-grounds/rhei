@@ -498,11 +498,35 @@ report, TUI, and dashboard show. Each row is four aligned columns:
 Only `!` rows take saturated attention color. `✓`, `·`, and `⊘` rows are calm
 chrome so a healthy run reads as quiet.
 
-To keep large plans scannable, a subtree whose every descendant is in a
-terminal-success state collapses to a single trailing `… N completed tasks
-collapsed` line. Every halted, gated, cancelled, or otherwise non-terminal task
-is always shown, never collapsed, so nothing that needs a human disappears. The
-report's Task Final States section (§5) is the un-collapsed source of truth.
+To keep large plans scannable, the tree folds in two independent ways, and
+neither may hide a row that needs a human.
+
+**A terminal parent speaks for its subtree.** When a task with descendants is
+itself in a terminal state and **no descendant is an attention row (`!`) or a
+gate (`⏸`)**, its descendants render no rows of their own and the parent's
+detail column gains the clause ` — {n} subtasks: {breakdown}`. That is the
+clause [§FS-rhei-memory.3.2](rhei-memory.spec.md#32--plan-history) already writes on the prompt
+side, spelled identically here: `{n}` is every descendant at any depth, and
+`{breakdown}` buckets **every** descendant by its normalized state name, in the
+order the resolved state machine declares those states, omitting a bucket with
+no members, so the numbers always sum to `{n}` and a custom terminal state
+appears under its own name. Two surfaces folding one subtree must not spell the
+fold two ways. A parent that is still open renders its finished children exactly
+as before, so a person watching a long run keeps seeing progress; where a
+descendant needs attention, that row and every ancestor above it stay expanded.
+
+**A long tree drops calm rows.** Past forty shown rows, remaining
+terminal-success rows collapse to a single trailing `… N completed tasks
+collapsed` line. This runs *after* the subtree fold, on whatever rows are left.
+
+Every halted, gated, cancelled, or otherwise non-terminal task is always shown
+by both mechanisms, so nothing that needs a human disappears, and where the two
+could each claim a row that guarantee wins over both. Folding is a rendering
+decision and changes no number: a folded descendant is still counted in every
+Attention, header, and ledger tally it was counted in before. The report's Task
+Final States section (§2, item 5) is the un-collapsed source of truth, and
+`rhei list --parent <id>` is the drill-down a folded line points a reader at
+[§FS-rhei-list.4.1](rhei-list.spec.md#41-text-default).
 
 ### 3.3. Reused-output runs look different
 
@@ -552,6 +576,11 @@ Final states: blocked=5, cancelled=1, completed=9, human-gate=2
   - Task ui-test-canonical-example.poll-exhaustion: Poll exhaustion [blocked]
   …
 ```
+
+Neither fold of §3.2 reaches this path. The subtree fold and the forty-row
+collapse belong to the rich summary a person reads on a terminal; the preserved
+lines keep one row per task whatever the plan's shape, because a script that
+greps them must not have to know it.
 
 The durable Markdown report (§1, §4) now backs the non-TTY path: after the
 preserved line-oriented output, `rhei run` prints a greppable `Report:

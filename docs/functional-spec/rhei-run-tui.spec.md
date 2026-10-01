@@ -376,7 +376,7 @@ surroundings model of [§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspecto
 | `h` / `l`, `←` / `→` | previous / next view |
 | `Tab` | (Flow) toggle focus between outline and inspector |
 | `PgUp` / `PgDn` | scroll the focused pane |
-| `Enter` | (inspector header) open its items; (inspector item) activate it; (Flow outline on gating task) open gate choices |
+| `Enter` | (inspector header) open its items; (inspector item) activate it; (Flow outline on gating task) open gate choices; (Flow outline on a folded parent) expand its subtree in place |
 | `Esc` | close an open inspector section or clear the active modal/filter |
 | `/` | filter the active view (`Flow`/task-cost rows by id, title, or state; `Machine` by state/task text; `Journal` by line text); `Esc` clears |
 | `g` | (Cost) cycle grouping: task → agent → model → state |
@@ -409,6 +409,14 @@ bounded head excerpt — up to 8 non-blank lines, each clamped to the pane's
 clipping rules, with a trailing dim `…` row when the file continues. Paths that escape
 the workspace are never read. The excerpt makes a parked node's report — the
 borrowed previous-state outputs of [§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector) — readable in place.
+
+The outline folds a terminal parent's subtree by the rule and the clause of
+[§FS-rhei-run-report.3.2](rhei-run-report.spec.md#32-task-tree), so one finished forty-child parent is one line
+here too. Because the outline is navigable and has no expand key of its own
+(§1.5.2), `Enter` on a folded parent row expands it in place rather than
+leaving finished children unreachable; the inspector's `children` section
+remains the other way in. A gating task under a folded parent cannot arise: a
+gate anywhere in the subtree prevents the fold.
 
 On load, the TUI auto-selects the first running task, then the first
 state-derived active task, then the first task. The only animated element is the

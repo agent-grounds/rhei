@@ -12,6 +12,7 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match) | The one-release window in which `**States:**` and the cross-root name match still resolve |
 | [§FS-rhei-usage](rhei-usage.spec.md#fs-rhei-usage-how-rhei-is-used) | Roles, coordination patterns, and agent workflows |
 | [§FS-rhei-authoring](rhei-authoring.spec.md#fs-rhei-authoring-rhei-plan-language-usage-guide) | Practical plan authoring guide |
+| [§FS-rhei-shape](rhei-shape.spec.md#fs-rhei-shape-state-task-subtask-rhei-or-prose) | Which construct a unit of work becomes: state, task, subtask, rhei, or body prose |
 | [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) | State machine format and default states |
 | [§FS-rhei-transitions](rhei-transitions.spec.md#fs-rhei-transitions-rhei-transitions-specification) | Transition system, callbacks, and YAML schema |
 | [§FS-rhei-callbacks](rhei-callbacks.spec.md#fs-rhei-callbacks-transition-callback-examples) | Transition callback examples |

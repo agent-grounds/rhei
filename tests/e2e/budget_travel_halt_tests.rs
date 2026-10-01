@@ -7,6 +7,8 @@
 // §FS-rhei-budgets.4.1 §FS-rhei-budgets.8 §FS-rhei-run.3.4
 
 use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use super::budget_support::*;
 use super::*;
@@ -156,4 +158,314 @@ fn a_manual_edge_after_a_lost_identity_write_meets_the_bound_it_already_spent() 
     assert!(!moved.status.success(), "a manual edge cannot be the door back to a fresh counter");
     assert_halt_mentions(&moved, "ticket travel");
     assert_task_state(&plan, &machine, "1", "work");
+}
+
+// ---------------------------------------------------------------------------
+// One identity, one live ticket
+// ---------------------------------------------------------------------------
+
+const SIX_MOVES: &str = r#", "transition_limit": 6"#;
+
+/// A ping-pong that declares no output artifacts.
+///
+/// These two scenarios take every edge by hand, and `rhei transition` holds a
+/// state's declared outputs against the move — no agent runs here, so nothing
+/// would ever write one. [`PING_PONG_MACHINE`] declares them because the
+/// scenarios above let `rhei run` drive the loop. §FS-rhei-states.3.3
+const BARE_PING_PONG_MACHINE: &str = r#"name: budget-identity-ping-pong
+version: 1
+states:
+  work:
+    initial: true
+    description: Do a round of work
+    agent: mock
+    agent_timeout: 30s
+  review:
+    description: Send it back for another round
+    agent: mock
+    agent_timeout: 30s
+  cancelled:
+    description: Stop
+    final: true
+transitions:
+  - { from: work, to: review, description: Round done }
+  - { from: review, to: work, description: Another round }
+  - { from: work, to: cancelled, description: Stop }
+  - { from: review, to: cancelled, description: Stop }
+"#;
+
+/// Two tasks in one plan, which is one metadata file. That is the shape the
+/// binding key cannot read: a definition copied onto a sibling and a definition
+/// renumbered in place are the same bytes at the same path.
+/// §FS-rhei-budgets.5.2.1
+const TWO_TASK_PLAN: &str = r#"# Rhei: Bounded work
+
+## Tasks
+
+### Task 1: The original
+**State:** work
+
+### Task 2: The copy
+**State:** work
+"#;
+
+/// A ticket's travel history cannot be taken from it by a second ticket naming
+/// its identity, and a travel bound cannot be doubled by copying a task
+/// definition.
+///
+/// `plan.1` earns a binding and spends two of its six units. A person copies its
+/// definition onto `plan.2`, `budgetTicketId` and all — which no command does and
+/// `cp` does for free — and moves the copy. Today the binding's `display_id`
+/// silently becomes `plan.2`: the two tickets draw one counter, and once `plan.1`
+/// no longer matches the binding it is minted a whole second bound. The ticket
+/// that earned the history is the one that loses it.
+// §FS-rhei-budgets.5.2.1 §REQ-bounded-neural-work.4
+#[test]
+fn a_copy_claiming_a_live_ticket_s_identity_is_refused_rather_than_rebound() {
+    let (dir, plan, machine) = setup_identity_plan("budget-identity-claimed", TWO_TASK_PLAN);
+
+    assert_success(&edge(&plan, &machine, "1"));
+    assert_success(&edge(&plan, &machine, "1"));
+    let uuid = budget_identity(&plan, "1").expect("plan.1 earned a budget identity");
+    let bindings = receipts(&dir, "identity");
+
+    copy_budget_identity(&plan, "1", "2");
+    let refused = edge(&plan, &machine, "2");
+
+    assert!(
+        !refused.status.success(),
+        "a second live ticket claiming a bound identity is refused\nstdout:\n{}\nstderr:\n{}",
+        refused.stdout,
+        refused.stderr
+    );
+    // Both display ids and the uuid, because those are what a person needs to
+    // find the key they duplicated.
+    assert_stderr_names(&refused, "plan.1");
+    assert_stderr_names(&refused, "plan.2");
+    assert_stderr_names(&refused, &uuid);
+    assert_task_state(&plan, &machine, "2", "work");
+    assert_eq!(
+        receipts(&dir, "identity"),
+        bindings,
+        "a refused admission moves no binding, so it appends no identity receipt"
+    );
+
+    // And the original still spends against its own counter: two of six gone,
+    // four left, and no fifth.
+    for spent in 2..6 {
+        assert_success(&edge(&plan, &machine, "1"));
+        assert_eq!(
+            receipts(&dir, "transition"),
+            vec![(uuid.clone(), "plan.1".to_owned()); spent + 1],
+            "every unit charged against this identity was drawn by the ticket that owns it"
+        );
+    }
+    let halted = edge(&plan, &machine, "1");
+
+    assert!(!halted.status.success(), "the bound plan.1 earned is the bound plan.1 meets");
+    assert_halt_mentions(&halted, "ticket travel");
+}
+
+/// The lawful half, pinned as lawful. A renumbered ticket is the same ticket:
+/// the key follows it, the travel comes with it, and the move is reported rather
+/// than silent.
+///
+/// This is the case the refusal cannot reach — one live ticket claims the
+/// identity, so the document cannot be told from a relocation — which is exactly
+/// why it owes the warning. Travel following a heading edit in silence is the
+/// surprise this point exists to remove.
+// §FS-rhei-budgets.5.2.1
+#[test]
+fn a_renumbered_ticket_keeps_its_travel_and_says_where_it_went() {
+    let (dir, plan, machine) = setup_identity_plan("budget-identity-renumbered", PLAN);
+
+    assert_success(&edge(&plan, &machine, "1"));
+    assert_success(&edge(&plan, &machine, "1"));
+    let uuid = budget_identity(&plan, "1").expect("plan.1 earned a budget identity");
+
+    renumber_task(&plan, "1", "3");
+    let moved = edge(&plan, &machine, "3");
+
+    assert_success(&moved);
+    assert_eq!(
+        budget_identity(&plan, "3").as_deref(),
+        Some(uuid.as_str()),
+        "a renumbered ticket is the same ticket: nothing is minted for it"
+    );
+    assert_eq!(
+        receipts(&dir, "transition"),
+        vec![
+            (uuid.clone(), "plan.1".to_owned()),
+            (uuid.clone(), "plan.1".to_owned()),
+            (uuid.clone(), "plan.3".to_owned()),
+        ],
+        "the travel plan.1 spent is the travel plan.3 carries on spending"
+    );
+    // Asserted on stderr alone: the move's own line on stdout already names
+    // plan.3, so a test that read both would pass on a build that says nothing.
+    for named in ["warning:", "plan.1", "plan.3", uuid.as_str()] {
+        assert_stderr_names(&moved, named);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The fixture for the two scenarios above
+// ---------------------------------------------------------------------------
+
+/// A ping-pong workspace over `plan_text`, with the project's budget account
+/// already established.
+///
+/// `rhei transition` charges an applied edge against an account that exists; it
+/// does not establish one, which is why `budget init` is part of the fixture
+/// rather than of the scenario. §FS-rhei-budgets.5.4
+fn setup_identity_plan(prefix: &str, plan_text: &str) -> (TestDir, PathBuf, PathBuf) {
+    let dir = unique_temp_dir(prefix);
+    let plan = write_fixture_file(&dir, "plan.rhei.md", plan_text);
+    let machine = write_fixture_file(&dir, "states.yaml", BARE_PING_PONG_MACHINE);
+    let agent = write_python_agent(&dir, "mock-agent.py", RECORDING_AGENT);
+    write_machine_settings(&dir, &agent_defaults(&agent, SIX_MOVES));
+    assert_success(&budget_init(&plan));
+    (dir, plan, machine)
+}
+
+/// Assert a run named something **on stderr**, which is where a refusal and a
+/// warning both belong.
+///
+/// [`assert_halt_mentions`] reads stdout as well, and would be satisfied here by
+/// the move's own `Task plan.2 transitioned` line — so a build that refused
+/// nothing and said nothing would pass.
+fn assert_stderr_names(result: &CliRun, expected: &str) {
+    assert!(
+        result.stderr.contains(expected),
+        "stderr must name {expected:?}\nstdout:\n{}\nstderr:\n{}",
+        result.stdout,
+        result.stderr
+    );
+}
+
+/// `rhei budget init`, which cannot go through [`run_at`]: `budget` takes its own
+/// subcommand where that helper puts the plan.
+fn budget_init(plan: &Path) -> CliRun {
+    let root = plan.parent().expect("plan has a parent");
+    let mut cmd: Command = rhei_command(home_for(root));
+    cmd.arg("budget").arg("init").arg(plan);
+    cmd.arg("--invocations").arg("100").arg("--reason").arg("pin the identity rule");
+    CliRun::from(&cmd.output().expect("rhei budget init should run"))
+}
+
+/// One ping-pong edge for a task, whichever of the two states it stands in.
+///
+/// The state is read from the document rather than tracked, because these
+/// scenarios edit the document between invocations and a counted move would
+/// stop meaning what it says the moment one of those edits lands.
+fn edge(plan: &Path, machine: &Path, task: &str) -> CliRun {
+    let (from, to) = match task_state(plan, task).as_str() {
+        "work" => ("work", "review"),
+        "review" => ("review", "work"),
+        other => panic!("plan.{task} stands in '{other}', which this fixture does not drive"),
+    };
+    run_at(
+        "transition",
+        plan,
+        machine,
+        None,
+        &["--task", task, "--from", from, "--to", to, "--no-callbacks"],
+    )
+}
+
+/// The state the document records for a task.
+fn task_state(plan: &Path, task: &str) -> String {
+    let text = fs::read_to_string(plan).expect("read the plan");
+    let heading = format!("### Task {task}:");
+    let mut lines = text.lines().skip_while(|line| !line.starts_with(&heading)).skip(1);
+    lines
+        .find_map(|line| {
+            line.trim().strip_prefix("**State:**").map(|state| state.trim().to_owned())
+        })
+        .unwrap_or_else(|| panic!("plan.{task} has no state in {}", plan.display()))
+}
+
+/// The `budgetTicketId` the plan's frontmatter carries for a task, if any.
+///
+/// Read line by line rather than through a YAML parse because the metadata keys
+/// are task *numbers*, which a parser hands back as integers while every caller
+/// here has a display id in hand. §FS-rhei-budgets.5.2
+fn budget_identity(plan: &Path, task: &str) -> Option<String> {
+    let text = fs::read_to_string(plan).expect("read the plan");
+    let mut under: Option<&str> = None;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if let Some(id) = trimmed.strip_suffix(':') {
+            if !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()) {
+                under = Some(id);
+            }
+        }
+        if under == Some(task) {
+            if let Some(uuid) = trimmed.strip_prefix("budgetTicketId:") {
+                return Some(uuid.trim().to_owned());
+            }
+        }
+    }
+    None
+}
+
+/// Give `to` the identity the plan carries for `from`: the hand copy of a task
+/// definition that no command performs and `cp` performs for free.
+/// §FS-rhei-budgets.5.2.1
+fn copy_budget_identity(plan: &Path, from: &str, to: &str) {
+    let uuid = budget_identity(plan, from)
+        .unwrap_or_else(|| panic!("plan.{from} carries no identity to copy"));
+    let text = fs::read_to_string(plan).expect("read the plan");
+    assert_eq!(text.matches("  tasks:\n").count(), 1, "the plan has one tasks block:\n{text}");
+    let copied =
+        text.replace("  tasks:\n", &format!("  tasks:\n    {to}:\n      budgetTicketId: {uuid}\n"));
+    fs::write(plan, copied).expect("write the plan with the copied identity");
+}
+
+/// Renumber a task, heading and metadata key together, which is how a person
+/// relocates one: the identity keeps exactly one live claimant and the display
+/// id the account counts against is gone. §FS-rhei-budgets.5.2.1
+fn renumber_task(plan: &Path, from: &str, to: &str) {
+    let text = fs::read_to_string(plan).expect("read the plan");
+    let (heading, metadata) = (format!("### Task {from}:"), format!("{from}:"));
+    let mut renamed = String::with_capacity(text.len());
+    let (mut headings, mut keys) = (0, 0);
+    for line in text.lines() {
+        if line.starts_with(&heading) {
+            headings += 1;
+            renamed.push_str(&line.replacen(&heading, &format!("### Task {to}:"), 1));
+        } else if line.trim() == metadata {
+            keys += 1;
+            renamed.push_str(&line.replacen(&metadata, &format!("{to}:"), 1));
+        } else {
+            renamed.push_str(line);
+        }
+        renamed.push('\n');
+    }
+    assert_eq!((headings, keys), (1, 1), "plan.{from} has one heading and one key:\n{text}");
+    fs::write(plan, renamed).expect("write the renumbered plan");
+}
+
+/// Every receipt of `kind` in the project's account, as (ticket uuid, display
+/// id) in the order they were appended. §FS-rhei-budgets.5.2
+fn receipts(root: &Path, kind: &str) -> Vec<(String, String)> {
+    let accounts = root.join(".agent-grounds/rhei/budgets");
+    let mut journal = String::new();
+    for account in fs::read_dir(&accounts).expect("the project has a budget account") {
+        let path = account.expect("an account directory").path().join("journal.jsonl");
+        journal.push_str(&fs::read_to_string(&path).unwrap_or_default());
+    }
+    journal
+        .lines()
+        .filter_map(|line| {
+            let receipt: serde_json::Value =
+                serde_json::from_str(line).expect("every journal line is one JSON receipt");
+            if receipt["kind"] != kind {
+                return None;
+            }
+            let identity = receipt["payload"]["ticket_identity"].as_str()?;
+            let display = receipt["payload"]["display_id"].as_str()?;
+            Some((identity.rsplit(':').next()?.to_owned(), display.to_owned()))
+        })
+        .collect()
 }

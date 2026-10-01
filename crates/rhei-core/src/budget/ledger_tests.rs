@@ -23,6 +23,54 @@ fn an_absent_account_is_established_by_the_first_admission() {
     assert_eq!(journal.snapshot().expect("snapshot").lifetime_invocations, Counter::default());
 }
 
+/// An applied edge is the other charge that may establish an account, and it
+/// has everything the `initialize` receipt wants.
+///
+/// `Journal::establish` records the resolved contract and the caller's audit
+/// record, and an applied edge builds exactly that audit record — so
+/// establishing and charging travel in **one** transaction yields a contiguous
+/// chain of `initialize` then `transition` that verifies on re-open, with no
+/// field the applied-edge caller could not supply. This is pinned below the CLI
+/// so that a later change to establishment cannot quietly make the manual path
+/// need a field only an admission has. §FS-rhei-budgets.5.4 §FS-rhei-budgets.4.1
+#[test]
+fn an_applied_edge_can_establish_an_account_and_charge_travel_in_one_transaction() {
+    let case = Case::new();
+    // A root of its own under the case, so this is an establishment rather than
+    // the one the case already performed.
+    let root = case.root().join("hand-driven");
+    std::fs::create_dir(&root).expect("a project root with no account");
+
+    let (account, mut journal) = Account::establish(&root, &audit()).expect("establish");
+    let ticket = account.ticket_identity("22222222-2222-4222-8222-222222222222");
+    journal
+        .charge_travel(
+            &AppliedEdge {
+                ticket: &ticket,
+                display_id: "plan.1",
+                from: "work",
+                to: "review",
+                reservation: None,
+                transition_limit: 2,
+            },
+            &audit(),
+        )
+        .expect("the unit is charged inside the transaction establishment opened");
+    drop(journal);
+
+    let reopened = account.open(false).expect("the chain verifies on its own terms");
+    assert_eq!(
+        reopened.receipts().iter().map(|receipt| receipt.kind.as_str()).collect::<Vec<_>>(),
+        ["initialize", "transition"],
+        "one transaction, two receipts, in the order they were appended"
+    );
+    assert_eq!(
+        reopened.snapshot().expect("snapshot").travel_for(&ticket).consumed,
+        1,
+        "the edge the account was established for is itself charged"
+    );
+}
+
 /// A witness that knows of receipts this root no longer has is **damaged**:
 /// new work is refused. Where the journal is wholly absent the refusal says
 /// exactly that and names the witness, and it may **not** offer the copy: on a

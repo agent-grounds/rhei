@@ -124,6 +124,43 @@ fn every_template_transition_invocation_names_from() {
     );
 }
 
+/// Guard: no template source carries a ticket's budget identity.
+///
+/// A hand-applied edge establishes the project's account and writes the moving
+/// ticket's `budgetTicketId` into the plan it moved
+/// ([§FS-rhei-budgets.5.4](../../docs/functional-spec/rhei-budgets.spec.md#54-absent-damaged-adopted)),
+/// and a template source is a tracked plan: driving one by hand to try it out
+/// leaves a committable identity behind. `rhei instantiate` refuses a template
+/// that carries one — a budget identity belongs to a run and never to a template
+/// ([§FS-rhei-library.5](../../docs/functional-spec/rhei-library.spec.md#5-placement-and-ticket-identity)) —
+/// so the accident ships as a user's `rhei instantiate` failing. Nothing else in
+/// this repository reads a template plan's metadata, which is why it is caught
+/// here.
+// §FS-rhei-library.5 §FS-rhei-budgets.5.4
+#[test]
+fn no_template_source_carries_a_budget_ticket_identity() {
+    let roots = ["crates/rhei-cli/templates", ".agent-grounds/rhei/templates"];
+    let mut offenders = Vec::new();
+    for root in roots {
+        let root = repo_root().join(root);
+        let mut files = Vec::new();
+        text_files(&root, &mut files);
+        assert!(!files.is_empty(), "no template files found under {}", root.display());
+        for path in files {
+            if fs::read_to_string(&path).expect("read template").contains("budgetTicketId") {
+                offenders.push(path.display().to_string());
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "a budget identity belongs to a run and never to a template, and `rhei instantiate` \
+         refuses one that carries it. Remove the key from:\n{}",
+        offenders.join("\n")
+    );
+}
+
 /// The guard reads one invocation at a time: a `--from` that belongs to a
 /// neighbouring command, or to the prose around it, never excuses a defective
 /// one, and a command the prose wrapped is still read whole.

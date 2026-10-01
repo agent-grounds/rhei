@@ -345,7 +345,7 @@ fn render_help(f: &mut Frame, area: Rect, state: &UiState) {
         Line::from("  1–4         Flow · Machine · Cost · Journal"),
         Line::from("  h/l ←/→     previous / next view"),
         Line::from("  Tab         (Flow) outline ⇄ inspector"),
-        Line::from("  Enter       open inspector section / activate item / gate"),
+        Line::from("  Enter       open inspector section / activate item / gate / expand fold"),
         Line::from("  Esc         return from inspector item view to section headers"),
         Line::from("  PgUp/PgDn   scroll the focused pane"),
         Line::from("  /           filter the active view (Esc clears)"),

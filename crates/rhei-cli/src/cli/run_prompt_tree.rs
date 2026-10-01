@@ -91,15 +91,28 @@ fn descendant_state_breakdown(
     descendants: &[&rhei_core::ast::Task],
     machine: &rhei_validator::StateMachine,
 ) -> String {
+    state_breakdown(
+        descendants.iter().map(|descendant| memory_state_name(descendant, machine)),
+        |name| machine.states.get_index_of(name).unwrap_or(usize::MAX),
+    )
+}
+
+/// `{breakdown}` over bare state names, given each name's declared position.
+///
+/// The bucketing itself, apart from the AST, so a surface that holds only a
+/// flattened task list — the TUI outline — spells a fold with the same code
+/// rather than a copy of it. §FS-rhei-run-report.3.2 §FS-rhei-run-tui.1.5.3
+fn state_breakdown(
+    names: impl IntoIterator<Item = String>,
+    declared: impl Fn(&str) -> usize,
+) -> String {
     let mut counted: Vec<(String, usize)> = Vec::new();
-    for descendant in descendants {
-        let name = memory_state_name(descendant, machine);
+    for name in names {
         match counted.iter_mut().find(|(seen, _)| seen == &name) {
             Some((_, count)) => *count += 1,
             None => counted.push((name, 1)),
         }
     }
-    let declared = |name: &str| machine.states.get_index_of(name).unwrap_or(usize::MAX);
     counted.sort_by_key(|(name, _)| declared(name));
     counted
         .iter()
@@ -119,11 +132,14 @@ fn subtree_fold_clause(
     if descendants.is_empty() {
         return String::new();
     }
-    format!(
-        " \u{2014} {} subtasks: {}",
-        descendants.len(),
-        descendant_state_breakdown(&descendants, machine)
-    )
+    fold_clause(descendants.len(), &descendant_state_breakdown(&descendants, machine))
+}
+
+/// ` — {n} subtasks: {breakdown}`, the one spelling of a fold on every surface
+/// that prints one: Plan History, the console task tree and the TUI outline.
+// §FS-rhei-memory.3.2 §FS-rhei-run-report.3.2 §FS-rhei-run-tui.1.5.3
+fn fold_clause(count: usize, breakdown: &str) -> String {
+    format!(" \u{2014} {count} subtasks: {breakdown}")
 }
 
 /// ` — {k} of {n} subtasks finished`: what an `### In Flight` row says about an

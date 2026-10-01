@@ -626,10 +626,7 @@ transitions:
 
     // ------------------------------------------------------------------------
     // The subtree fold. A terminal parent speaks for its subtree on the
-    // console tree, with the clause the prompt side already writes. Every
-    // test below is ignored until the fold exists: the gate runs the whole
-    // suite at pre-commit, so a contract that fails cannot also be committed
-    // green. Remove the attribute with the implementation.
+    // console tree, with the clause the prompt side already writes.
 
     // §FS-rhei-run-report.3.2 §FS-rhei-shape.3.2
 
@@ -711,7 +708,6 @@ transitions:
     /// person scrolls past to reach the one that does not.
     // §FS-rhei-run-report.3.2
     #[test]
-    #[ignore = "pins agent-grounds/rhei#324; remove this attribute with the fold"]
     fn a_terminal_parent_speaks_for_its_finished_subtree() {
         let report = fold_report(
             "### Task 1: Harden the parser\n**State:** completed\n\n\
@@ -739,7 +735,6 @@ transitions:
     /// buckets would have reported `shipped` as something it is not.
     // §FS-rhei-run-report.3.2 §FS-rhei-memory.3.2
     #[test]
-    #[ignore = "pins agent-grounds/rhei#324; remove this attribute with the fold"]
     fn the_breakdown_names_every_bucket_in_the_machines_own_order() {
         let report = fold_report(
             "### Task 1: Release the parser\n**State:** completed\n\n\
@@ -761,7 +756,6 @@ transitions:
     /// machine merely declares.
     // §FS-rhei-run-report.3.2
     #[test]
-    #[ignore = "pins agent-grounds/rhei#324; remove this attribute with the fold"]
     fn an_empty_bucket_is_omitted_from_the_breakdown() {
         let report = fold_report(
             "### Task 1: Parent\n**State:** completed\n\n\
@@ -833,7 +827,6 @@ transitions:
     /// row a person has to act on.
     // §FS-rhei-run-report.3.2
     #[test]
-    #[ignore = "pins agent-grounds/rhei#324; remove this attribute with the fold"]
     fn the_subtree_fold_and_the_forty_row_budget_compose() {
         let mut tasks = String::new();
         // Enough flat finished roots that the budget still has work to do once
@@ -875,7 +868,6 @@ transitions:
     /// task still has a line of its own two sections below it.
     // §FS-rhei-run-report.3.2
     #[test]
-    #[ignore = "pins agent-grounds/rhei#324; remove this attribute with the fold"]
     fn the_task_final_states_section_stays_un_collapsed() {
         let report = fold_report(
             "### Task 1: Parent\n**State:** completed\n\n\

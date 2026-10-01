@@ -13,8 +13,8 @@ use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use ratatui::Frame;
 
 use super::derive::{
-    artifact_rows, has_children, inspector_sections, machine_groups, subtree_progress, task_direct,
-    task_subtree, CostRollup, InspectorSectionKind,
+    artifact_rows, has_children, inspector_sections, machine_groups, outline_fold, outline_order,
+    subtree_progress, task_direct, task_subtree, CostRollup, InspectorSectionKind,
 };
 use super::render::{format_cost_micro, format_tokens, render_list, state_pill};
 use super::state::{FlowFocus, JournalEntry, ProcessKind, TaskRow, UiState};
@@ -56,7 +56,10 @@ fn outline_row(state: &UiState, task: &TaskRow) -> Line<'static> {
     spans.push(Span::raw(truncate_chars(&task.title, 32)));
     spans.push(Span::raw("  "));
     spans.extend(state_pill(theme, &state.plan.machine, &task.state));
-    if let Some((done, total)) = subtree_progress(&state.plan, task) {
+    // A folded parent says what its subtree came to in place of its progress. §FS-rhei-run-tui.1.5.3
+    if let Some(clause) = outline_fold(state, task) {
+        spans.push(Span::styled(format!(" {clause}"), Style::default().fg(theme.dim())));
+    } else if let Some((done, total)) = subtree_progress(&state.plan, task) {
         spans.push(Span::styled(format!("  {done}/{total} ✓"), Style::default().fg(theme.dim())));
     }
     Line::from(spans)
@@ -106,7 +109,7 @@ fn render_outline(f: &mut Frame, area: Rect, state: &UiState) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    let order = state.visible_task_indices();
+    let order = outline_order(state);
     if order.is_empty() {
         render_placeholder(f, inner, state, "no tasks match");
         return;

@@ -730,6 +730,8 @@ pub struct RunSummaryReport {
     /// next action is "nothing to do on this ticket". §FS-rhei-supervision.3.4
     waiting: Vec<AttentionRow>,
     rows: Vec<TaskRow>,
+    /// Which rows the console tree folds into a finished parent. §FS-rhei-run-report.3.2
+    folds: SubtreeFolds,
     dashboard: Option<String>,
     // ── Durable-report fields (§FS-rhei-run-report.1, .2, .4, .7) ────────────
     run_id: String,
@@ -886,6 +888,7 @@ impl RunSummaryReport {
             }
         }
 
+        let folds = SubtreeFolds::of(&rhei.tasks, machines, &rows);
         let total_tasks = rows.len();
 
         // Counts in canonical order: success, gate, attention, cancelled.
@@ -942,6 +945,7 @@ impl RunSummaryReport {
             attention,
             waiting,
             rows,
+            folds,
             dashboard: stats.dashboard,
             run_id: stats.run_id,
             started_at: stats.started_at,
@@ -1321,16 +1325,16 @@ impl RunSummaryReport {
         let mut out = String::new();
         let mut collapsed = 0usize;
         let mut shown = 0usize;
-        for row in &self.rows {
-            // Collapse calm completed leaf rows once the tree grows long, but
-            // never hide anything that needs a human. §FS-rhei-run-report.3.2
-            if shown >= MAX_TASK_ROWS && row.marker == Marker::Done {
+        for (row, folded) in self.folds.visible(&self.rows) {
+            // Collapse calm completed rows once the tree grows long, but never one that needs a
+            // human, nor a folded parent: it is its subtree's only row. §FS-rhei-run-report.3.2
+            if shown >= MAX_TASK_ROWS && row.marker == Marker::Done && folded.is_none() {
                 collapsed += 1;
                 continue;
             }
             shown += 1;
             let gutter = if row.depth > 0 { "│ ".repeat(row.depth) } else { String::new() };
-            let detail = row.detail.as_deref().unwrap_or("");
+            let detail = folded.or(row.detail.as_deref()).unwrap_or("");
             // Pad the state column *outside* the color codes so that empty-detail
             // rows can have their trailing padding trimmed away.
             let state_cell = c.colored(row.marker.color(), &row.state);

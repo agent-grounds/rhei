@@ -429,11 +429,12 @@ pub(super) fn subtree_fold(plan: &VizModel, task: &TaskRow) -> Option<String> {
 /// Whether the outline shows `task` folded right now: the rule folds it and
 /// nothing holds it open. `Enter` holds a parent open, and so do the selection
 /// standing inside it and an active filter — the outline never hides the row a
-/// person is on or looked for. §FS-rhei-run-tui.1.5.3
+/// person is on or looked for. A filter counts when the outline would filter
+/// by it, so one of only whitespace holds nothing. §FS-rhei-run-tui.1.5.3
 pub(super) fn outline_fold(state: &UiState, task: &TaskRow) -> Option<String> {
     let prefix = format!("{}.", task.id);
     let held_open = state.expanded.contains(&task.id)
-        || state.filter.as_deref().is_some_and(|filter| !filter.is_empty())
+        || state.filter_needle().is_some()
         || state.selected.as_deref().is_some_and(|id| id.starts_with(&prefix));
     if held_open {
         return None;

@@ -829,11 +829,8 @@ transitions:
     #[test]
     fn the_subtree_fold_and_the_forty_row_budget_compose() {
         let mut tasks = String::new();
-        // Enough flat finished roots that the budget still has work to do once
-        // every subtree has folded.
-        for root in 1..=45 {
-            tasks.push_str(&format!("### Task f{root}: Flat {root}\n**State:** completed\n\n"));
-        }
+        // The parents come first, so their folded rows sit inside the first
+        // forty, where the budget leaves them alone.
         for parent in 1..=6 {
             tasks.push_str(&format!("### Task p{parent}: Parent {parent}\n**State:** completed\n\n"));
             for child in 1..=4 {
@@ -841,6 +838,11 @@ transitions:
                     "#### Task p{parent}.{child}: Child {parent}.{child}\n**State:** completed\n\n"
                 ));
             }
+        }
+        // Enough flat finished roots that the budget still has work to do once
+        // every subtree has folded.
+        for root in 1..=45 {
+            tasks.push_str(&format!("### Task f{root}: Flat {root}\n**State:** completed\n\n"));
         }
         tasks.push_str("### Task last: Needs a person\n**State:** human-gate\n");
 
@@ -860,6 +862,65 @@ transitions:
         assert!(
             tree_ids(&report).contains(&"last".to_string()),
             "and the gate is shown whatever either mechanism would prefer; got:\n{tty}"
+        );
+    }
+
+    /// The budget bounds a tree of folded parents the way it bounds a flat one:
+    /// past the fortieth row a folded parent collapses with its subtree, and
+    /// the collapsed count carries the parent and every task it spoke for.
+    /// One row per finished parent, with no bound, is the tree the fold was
+    /// meant to shorten.
+    // §FS-rhei-run-report.3.2
+    #[test]
+    fn the_forty_row_budget_collapses_a_folded_parent_with_its_subtree() {
+        let mut tasks = String::new();
+        for parent in 1..=45 {
+            tasks.push_str(&format!(
+                "### Task p{parent}: Parent {parent}\n**State:** completed\n\n\
+                 #### Task p{parent}.1: Child {parent}\n**State:** completed\n\n"
+            ));
+        }
+
+        let report = fold_report(&tasks);
+        let tty = report.render_tty(false);
+        assert_eq!(tree_ids(&report).len(), 40, "forty rows survive the budget; got:\n{tty}");
+        assert!(
+            tty.contains("\u{2026} 10 completed tasks collapsed"),
+            "five folded parents collapse, each with its one child; got:\n{tty}"
+        );
+    }
+
+    /// A folded parent whose breakdown names a cancelled descendant is the only
+    /// place that descendant appears on the tree, and the collapsed line counts
+    /// completed tasks, so the budget keeps that parent shown past forty rows.
+    // §FS-rhei-run-report.3.2
+    #[test]
+    fn the_budget_keeps_a_folded_parent_that_speaks_for_a_cancelled_task() {
+        let mut tasks = String::new();
+        for parent in 1..=45 {
+            tasks.push_str(&format!(
+                "### Task p{parent}: Parent {parent}\n**State:** completed\n\n\
+                 #### Task p{parent}.1: Child {parent}\n**State:** completed\n\n"
+            ));
+        }
+        tasks.push_str(
+            "### Task q: Parent with a cancelled child\n**State:** completed\n\n\
+             #### Task q.1: Dropped\n**State:** cancelled\n",
+        );
+
+        let report = fold_report(&tasks);
+        let tty = report.render_tty(false);
+        assert!(
+            tty.contains("\u{2014} 1 subtasks: 1 cancelled"),
+            "the parent still folds its subtree; got:\n{tty}"
+        );
+        assert!(
+            tree_ids(&report).contains(&"q".to_string()),
+            "and stays shown past the fortieth row; got:\n{tty}"
+        );
+        assert!(
+            tty.contains("\u{2026} 10 completed tasks collapsed"),
+            "while the calm parents before it still collapse; got:\n{tty}"
         );
     }
 

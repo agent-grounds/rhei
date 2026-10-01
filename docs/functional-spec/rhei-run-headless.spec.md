@@ -215,6 +215,20 @@ failure must not invent a pending-recovery hop. An established recovery marker,
 even with unreadable or corrupt contents, retains the strict refusal in
 §FS-rhei-recover.4.
 
+**Unknown is a verdict about one probe, not a state the entry carries.** When
+access returns there is nothing to recover: the outage pruned nothing and wrote
+nothing, so the next probe classifies the entry afresh — live if the run is
+still live, ended if it ended while its root was unreadable — and either way
+the entry stays resolvable by id and listed, among the live runs or under the
+history heading `--all` gives an ended one. That is the whole of what an outage
+owes the entry. **The run's own survival across the outage is not promised, and
+must not be read as part of this guarantee.** The carve-out here is for the
+observer; a participant that cannot read the state it is required to check
+stops instead (§FS-rhei-recover.4), so a run whose own execution root goes
+unreadable underneath it may well end there. A surface that still reports such
+a run as **running** afterwards is reporting that the outage happened to miss
+it, not that recovery kept it alive.
+
 An ambiguous prefix is an error that lists the matching runs rather than picking
 one. It lists **at most ten** and then says how many more there are: with a
 hundred retained entries, a full listing is not an answer to "which one did you

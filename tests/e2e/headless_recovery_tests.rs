@@ -206,6 +206,12 @@ fn an_unreadable_workspace_keeps_its_entry_and_says_so() {
 
     fs::set_permissions(&rhei_dir, fs::Permissions::from_mode(0o000)).expect("chmod 000");
     let blind = ws.rhei(&["runs"]);
+    // The outage is the run's own death sentence: an unreadable `.rhei` fails
+    // the engine's recovery-marker check, which ends the run §FS-rhei-recover.4.
+    // Hold the window open until it has, so what follows is pinned, not raced.
+    wait_until("the outage to end the run it covers", Duration::from_secs(60), || {
+        ws.descriptor().is_some_and(|d| d["status"] == "failed" || d["status"] == "finished")
+    });
     fs::set_permissions(&rhei_dir, fs::Permissions::from_mode(0o755)).expect("chmod 755");
 
     let text = stdout(&blind);

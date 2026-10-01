@@ -6,6 +6,14 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- Say in §FS-rhei-run-headless.3 what an access outage owes a registry entry and
+  what it does not: unknown is a verdict about one probe, so when access returns
+  the entry is classified afresh and stays resolvable by id, while the run's own
+  survival across the outage is not promised — a participant that cannot read
+  the state it must check stops instead. The end-to-end test that covers the
+  outage now holds its unreadable window open until the run it covers has
+  provably ended, so what it asserts afterwards is pinned rather than raced.
+
 - Refuse a copied task definition that claims a ticket identity another live
   ticket still holds. The project's budget account counts one ticket uuid's
   travel against one display id, and that key was allowed to move to a second

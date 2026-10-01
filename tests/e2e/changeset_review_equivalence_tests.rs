@@ -31,6 +31,20 @@ fn golden(name: &str) -> String {
 /// a different default is a break for every caller that scripts the template,
 /// and re-authoring the internals must not be one.
 /// §FS-rhei-library.3.4
+///
+/// Unix only, and the assertion is the stronger for it. `--list-inputs` quotes
+/// a value for the shell it will be pasted into, which is the platform's own:
+/// POSIX single quotes on Unix, `cmd`'s doubled double quotes on Windows
+/// (§FS-rhei-errors.2). The golden was captured from the live block compiler,
+/// on a POSIX host, and the compiler it was captured from is deleted by this
+/// change — so there is no second capture to take, and no portable form of a
+/// byte-for-byte golden exists. Comparing the two quoting styles modulo their
+/// quotes would weaken what this guard claims on the two platforms where
+/// byte-identity is simply true. The quoting rule keeps its three-platform
+/// coverage elsewhere: `quote_for_posix` and `quote_for_cmd` are unit-tested
+/// directly in `rhei-core`'s `platform.rs`, compiled everywhere.
+/// §REQ-cross-platform.3
+#[cfg(unix)]
 #[test]
 fn changeset_review_list_inputs_is_byte_identical() {
     let dir = unique_temp_dir("changeset-golden-inputs");

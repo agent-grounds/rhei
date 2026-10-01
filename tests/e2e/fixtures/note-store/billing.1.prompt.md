@@ -53,9 +53,13 @@ A transition from this state can finish this task. The finished task's result is
 
 ## Plan History
 
-Finished work, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root.
+Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
 
 - Task auth.2: Implement token refresh — completed — see above (rhei `auth`, prior)
+
+### In Flight
+
+- Task mentor.1: Carry the fact down a subtree [pending] — 1 of 2 subtasks finished
 
 ## Rhei Commands
 

@@ -1,7 +1,6 @@
     // The owed clause of the retry paragraph: which artifacts a re-spawned
-    // invocation is told it still owes, under which names, in which order, and
-    // when the clause is not there at all. The fixtures are the ones in
-    // `tests_prompt_memory.rs`. §FS-rhei-memory.3.3 §FS-rhei-memory.4.4
+    // invocation is told it still owes, under which names and in which order,
+    // and when the clause is not there at all. §FS-rhei-memory.3.3 §FS-rhei-memory.4.4
 
     /// `review` declares one output and has an edge into a `final: true`
     /// state — the shape of every agent state of a `grounded-ticket` machine,

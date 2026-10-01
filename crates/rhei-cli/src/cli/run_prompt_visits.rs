@@ -81,6 +81,58 @@ fn render_previous_log(render_context: &RuntimeTemplateContext<'_>) -> String {
     format!("\nPrevious log: `{}`\n", memory_path(render_context, &path))
 }
 
+/// What this retry still owes: every required artifact of *this* invocation's
+/// completion condition that is not on disk as the prompt is composed, under the
+/// names and in the order the missing-output warning gives them, and nothing at
+/// all where nothing is unmet.
+///
+/// The list is the collector's, not a second walk over `outputs:` here: the
+/// warning, the halt line, the run report and this clause are four readings of
+/// one question, and the one a paid attempt reads is the one that may not
+/// disagree. Two answers the collector cannot supply from a prompt come from the
+/// prompt's own side of the same questions — the terminal edge, because no
+/// transition has been selected yet, and the visit count, so that the result
+/// named here and the result `## Result` names are one path.
+///
+/// Paths go through `memory_path`, which every other path in this section
+/// already uses, including the transcript in this same sentence.
+// §FS-rhei-memory.4.4 §FS-rhei-agents.3.2.1
+fn render_owed_clause(render_context: &RuntimeTemplateContext<'_>, visit: u64) -> String {
+    let owed = missing_required_outputs_for_invocation(
+        // The root `## Result` and `## Artifacts` resolve against, so the clause
+        // cannot name a path they spell another way. §FS-rhei-panta.6.2
+        render_context.workspace_root,
+        render_context.machine,
+        render_context.task,
+        render_context.state_name,
+        visit,
+        terminal_state_reachable_from(render_context.machine, render_context.state_name),
+        (
+            render_context.target,
+            render_context.model,
+            render_context.model_provider,
+            render_context.model_name,
+            render_context.agent,
+            render_context.agent_mode,
+        ),
+    );
+    if owed.is_empty() {
+        return String::new();
+    }
+    let entries: Vec<String> = owed
+        .iter()
+        .map(|entry| {
+            let shown = memory_path(render_context, &entry.path);
+            if is_unresolved_template(&shown) {
+                format!("{} (`{shown}`, unresolved template)", entry.name)
+            } else {
+                format!("{} (`{shown}`)", entry.name)
+            }
+        })
+        .collect();
+    format!(" It did not write what this visit still owes: {}.", entries.join(", "))
+}
+
 /// What this visit already tried, when it has already tried something.
 ///
 /// A re-spawn used to receive the prompt of the attempt it was recovering from,
@@ -89,9 +141,7 @@ fn render_previous_log(render_context: &RuntimeTemplateContext<'_>) -> String {
 /// stalled ticket never left this one. So attempt two did what attempt one did
 /// and left the same thing unwritten. This paragraph is the difference: it says
 /// that this is a retry, which attempt it is, how the last one ended, and which
-/// file that attempt was obliged to write and did not — the result path, which
-/// the prompt already showed as where a finished task's result is *read from*,
-/// and which agents read as description rather than as obligation.
+/// files that attempt was obliged to write and did not.
 ///
 /// Rendered only when the record belongs to *this* visit. A record from an
 /// earlier stay in the state is not a retry, and telling a fresh entry that it
@@ -114,13 +164,7 @@ fn render_retry_notice(render_context: &RuntimeTemplateContext<'_>, task_root: &
         agent_log_suffix(render_context.target, render_context.model, Some(visit)).as_deref(),
     );
     let Some(previous) = plan.previous.as_ref() else { return String::new() };
-    let owed = match terminal_result_path_shown(render_context) {
-        Some(path) => format!(
-            " It did not write `{path}`, which a transition out of this state reads to finish \
-             this task."
-        ),
-        None => String::new(),
-    };
+    let owed = render_owed_clause(render_context, visit);
     format!(
         "\nRetrying this visit: attempt {}. The previous attempt {}.{owed} Its transcript is \
          `{}`.\n",

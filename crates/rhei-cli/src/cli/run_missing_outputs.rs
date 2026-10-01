@@ -109,15 +109,69 @@ fn emit_missing_required_outputs_warning(
     });
 }
 
+/// Does this path still carry a `{...}` template — a reference to a variable
+/// outside the namespace, which artifact resolution leaves verbatim by design?
+///
+/// Asked here for every surface that names an unwritten artifact, because a
+/// template is not a path that was checked and none of them may present one as
+/// though it were.
+// §FS-rhei-agents.3.2.1 §FS-rhei-memory.4.4
+fn is_unresolved_template(shown: &str) -> bool {
+    shown.contains('{')
+}
+
 /// Render one missing required output as `name (path)`, flagging a path that
-/// still carries a `{...}` template — that means the path referenced a variable
-/// outside the namespace, which artifact resolution leaves verbatim by design.
+/// still carries a `{...}` template.
 // §FS-rhei-agents.3.2.1: Missing-output warning names the resolved path.
 fn format_missing_required_output(name: &str, relative: &str) -> String {
-    if relative.contains('{') {
+    if is_unresolved_template(relative) {
         format!("{name} ({relative}, unresolved template)")
     } else {
         format!("{name} ({relative})")
+    }
+}
+
+/// One required artifact of a completion condition that is not on disk.
+///
+/// Kept as data rather than as a rendered line because the two surfaces that
+/// read this list spell a path by different rules: the run log names a declared
+/// output relative to the artifact root and the result absolutely, while a
+/// prompt spells every path it carries by one rule (§FS-rhei-agents.4.1), so one
+/// bare relative path beside absolute neighbours is worse there than none. The
+/// name, the path whose absence put it in the list, and the log's own spelling
+/// of that path are the whole of what either surface needs.
+// §FS-rhei-agents.3.2.1 §FS-rhei-memory.4.4
+struct MissingRequiredOutput {
+    /// The declared artifact's name, or `result` for the ticket's result.
+    name: String,
+    /// The path that was checked, spelled the way the platform spells one — a
+    /// prompt's rule, which the warning's own spelling does not follow.
+    path: PathBuf,
+    /// That path as the missing-output warning spells it.
+    warning_spelling: String,
+}
+
+/// `relative` — a path a template or a format string wrote with `/` — joined
+/// onto `root` one component at a time.
+///
+/// `Path::join` over the whole string keeps the `/` the author typed, which is
+/// what the missing-output warning prints and what `## Artifacts` shows the
+/// worker. A path in `## Previous Visits` is spelled the way the platform
+/// spells one, as the transcript beside the owed clause already is, so the
+/// clause joins rather than pastes.
+// §FS-rhei-memory.4.4 §REQ-cross-platform
+fn joined_under_root(root: &Path, relative: &str) -> PathBuf {
+    relative
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .fold(root.to_path_buf(), |path, part| path.join(part))
+}
+
+impl MissingRequiredOutput {
+    /// This entry as the missing-output warning and the halt line print it.
+    // §FS-rhei-agents.3.2.1
+    fn warning_entry(&self) -> String {
+        format_missing_required_output(&self.name, &self.warning_spelling)
     }
 }
 
@@ -155,13 +209,13 @@ fn selected_forward_transition(
 /// rhei's root, and a relative path resolved against the wrong root is one an
 /// operator cannot paste.
 // §FS-rhei-states.3.3 §FS-rhei-agents.3.2 §FS-rhei-agents.3.2.1 §FS-rhei-run.3
-fn missing_terminal_result_output(
+fn missing_terminal_result_entry(
     result_root: &Path,
     machine: &rhei_validator::StateMachine,
     task: &rhei_core::ast::Task,
     selected_to: Option<&str>,
     invocation: ResultInvocation<'_>,
-) -> Option<String> {
+) -> Option<MissingRequiredOutput> {
     if !is_terminal_state(selected_to?, machine) {
         return None;
     }
@@ -173,7 +227,24 @@ fn missing_terminal_result_output(
         return None;
     }
     let shown = std::path::absolute(&path).unwrap_or(path);
-    Some(format_missing_required_output("result", &shown.display().to_string()))
+    Some(MissingRequiredOutput {
+        name: "result".to_string(),
+        path: joined_under_root(result_root, &result_relative_path(&task_id, invocation)),
+        warning_spelling: shown.display().to_string(),
+    })
+}
+
+/// [`missing_terminal_result_entry`] as the warning prints it.
+// §FS-rhei-agents.3.2.1
+fn missing_terminal_result_output(
+    result_root: &Path,
+    machine: &rhei_validator::StateMachine,
+    task: &rhei_core::ast::Task,
+    selected_to: Option<&str>,
+    invocation: ResultInvocation<'_>,
+) -> Option<String> {
+    missing_terminal_result_entry(result_root, machine, task, selected_to, invocation)
+        .map(|entry| entry.warning_entry())
 }
 
 /// The required artifacts a program's exit leaves unwritten, chosen by what the
@@ -293,23 +364,7 @@ fn collect_missing_required_outputs(
     let mut seen = HashSet::new();
     let visit = render_visit_count(metadata, &task.id, state_name, task.state.as_str(), machine);
     let visit_count = Some(visit);
-    let contexts: Vec<TransitionInvocationContext<'_>> = if invocations.is_empty() {
-        transition_contexts_for_state(state_def, &invocations).into_iter().collect()
-    } else {
-        invocations
-            .iter()
-            .map(|resolved| {
-                (
-                    resolved.target.as_ref(),
-                    resolved.model.as_deref(),
-                    resolved.model_provider.as_deref(),
-                    resolved.model_name.as_deref(),
-                    Some(resolved.agent.id()),
-                    resolved.mode.as_deref(),
-                )
-            })
-            .collect()
-    };
+    let contexts = transition_contexts_for_state(state_def, &invocations);
     let mut terminal_results: Vec<String> = Vec::new();
     for (target, model, model_provider, model_name, agent, agent_mode) in contexts {
         for artifact in &state_def.outputs {
@@ -358,8 +413,80 @@ fn collect_missing_required_outputs(
     missing
 }
 
-// The invocation is already resolved, so there is no settings re-load here —
-// unlike `collect_missing_required_outputs`, one root suffices.
+/// What one invocation of `state_name` still owes: its declared `outputs:` in
+/// declaration order, each judged by whether the path it resolves to exists,
+/// then the ticket's result where the edge this exit takes is terminal and the
+/// result has no content.
+///
+/// Takes the invocation as its six identity fields rather than as a resolution,
+/// so a caller that never resolved an agent — prompt composition, which is
+/// handed the identity it is composing for — asks this question here instead of
+/// walking `outputs:` a second time and getting a second chance to name a
+/// different file. The invocation is already chosen either way, so there is no
+/// settings re-load, unlike [`collect_missing_required_outputs`], and one root
+/// suffices.
+///
+/// `visit` is passed rather than derived, because a caller that has already
+/// resolved this invocation's artifacts against a visit count must not be
+/// answered against another one: that is how `## Result` and the retry
+/// paragraph would come to name two files. §FS-rhei-memory.4.4
+// §FS-rhei-agents.3.2 condition (2) §FS-rhei-states.3.3
+#[allow(clippy::too_many_arguments)]
+fn missing_required_outputs_for_invocation(
+    artifact_root: &Path,
+    machine: &rhei_validator::StateMachine,
+    task: &rhei_core::ast::Task,
+    state_name: &str,
+    visit: u64,
+    selected_to: Option<&str>,
+    invocation: TransitionInvocationContext<'_>,
+) -> Vec<MissingRequiredOutput> {
+    let (target, model, model_provider, model_name, agent, agent_mode) = invocation;
+    let terminal_result = missing_terminal_result_entry(
+        artifact_root,
+        machine,
+        task,
+        selected_to,
+        ResultInvocation {
+            state: state_name,
+            visit_count: visit,
+            identity: fanout_result_identity(machine.states.get(state_name), target, model)
+                .as_deref(),
+        },
+    );
+    let Some(state_def) = machine.states.get(state_name) else {
+        return terminal_result.into_iter().collect();
+    };
+
+    let mut missing = Vec::new();
+    for artifact in &state_def.outputs {
+        let (relative, path) = resolve_artifact_path(
+            artifact_root,
+            artifact,
+            &task.id.to_string(),
+            state_name,
+            Some(visit),
+            target,
+            model,
+            model_provider,
+            model_name,
+            agent,
+            agent_mode,
+        );
+        if !path.exists() {
+            missing.push(MissingRequiredOutput {
+                name: artifact.name.clone(),
+                path: joined_under_root(artifact_root, &relative),
+                warning_spelling: relative,
+            });
+        }
+    }
+    missing.extend(terminal_result);
+    missing
+}
+
+/// [`missing_required_outputs_for_invocation`] as the warning prints it, for
+/// the exit paths that hold the resolution and report the stall.
 // §FS-rhei-agents.3.2 condition (2)
 #[allow(clippy::too_many_arguments)]
 fn collect_missing_required_outputs_for_resolved_invocation(
@@ -372,49 +499,16 @@ fn collect_missing_required_outputs_for_resolved_invocation(
     resolved: &ResolvedAgent,
 ) -> Vec<String> {
     let visit = render_visit_count(metadata, &task.id, state_name, task.state.as_str(), machine);
-    let visit_count = Some(visit);
-    let terminal_result = missing_terminal_result_output(
+    missing_required_outputs_for_invocation(
         artifact_root,
         machine,
         task,
+        state_name,
+        visit,
         selected_to,
-        ResultInvocation {
-            state: state_name,
-            visit_count: visit,
-            identity: fanout_result_identity(
-                machine.states.get(state_name),
-                resolved.target.as_ref(),
-                resolved.model.as_deref(),
-            )
-            .as_deref(),
-        },
-    );
-    let Some(state_def) = machine.states.get(state_name) else {
-        return terminal_result.into_iter().collect();
-    };
-    if state_def.outputs.is_empty() {
-        return terminal_result.into_iter().collect();
-    }
-
-    let mut missing = Vec::new();
-    for artifact in &state_def.outputs {
-        let (relative, path) = resolve_artifact_path(
-            artifact_root,
-            artifact,
-            &task.id.to_string(),
-            state_name,
-            visit_count,
-            resolved.target.as_ref(),
-            resolved.model.as_deref(),
-            resolved.model_provider.as_deref(),
-            resolved.model_name.as_deref(),
-            Some(resolved.agent.id()),
-            resolved.mode.as_deref(),
-        );
-        if !path.exists() {
-            missing.push(format_missing_required_output(&artifact.name, &relative));
-        }
-    }
-    missing.extend(terminal_result);
-    missing
+        invocation_context(resolved),
+    )
+    .iter()
+    .map(MissingRequiredOutput::warning_entry)
+    .collect()
 }

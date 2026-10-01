@@ -306,3 +306,54 @@ fn keep_on_error_retains_new_entries_after_machine_validation_fails() {
     assert!(dir.join("billing/tasks").is_dir());
     assert_eq!(fs::read(dir.join("billing/states.yaml")).expect("machine"), mismatched.as_bytes());
 }
+
+/// The restored refusal in its own words, and the property that makes it
+/// correct: it fires ahead of the validation pass, so the create never prints
+/// §FS-rhei-states-deprecation.2.1's "delete the line" warning about a line it
+/// is in the middle of rolling back.
+/// §FS-rhei-new.1.2 §FS-rhei-states-deprecation.1
+#[test]
+fn an_undeclared_states_name_is_refused_before_any_deprecation_warning() {
+    let dir = project("new-adopt-undeclared");
+    prospective_billing(&dir, &machine("other", "drafting", "filed"));
+
+    let result = create_billing(&dir, &[]);
+    assert!(!result.status.success());
+    let said = flattened_output(&result);
+    for fragment in [
+        "--states 'custom'",
+        "no states file declaring it was found",
+        "this project's states files declare:",
+        "alpha",
+        "other",
+    ] {
+        assert!(said.contains(fragment), "missing {fragment:?} from the refusal:\n{said}");
+    }
+    assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md.lock", "states.yaml"]);
+    assert!(
+        !result.stderr.contains("warning:"),
+        "a create that is rolling its write back warned about it:\n{}",
+        result.stderr
+    );
+}
+
+/// One unreadable `states.yaml` anywhere else in the project does not abandon
+/// that refusal: the file is skipped, named as unread, and the name nothing
+/// declares is still refused.
+/// §FS-rhei-new.1.2 §FS-rhei-states-deprecation.1
+#[test]
+fn an_unreadable_states_file_elsewhere_does_not_excuse_an_undeclared_name() {
+    let dir = project("new-adopt-unreadable-elsewhere");
+    prospective_billing(&dir, &machine("other", "drafting", "filed"));
+    // The project root's own file, broken: it is not this create's to report,
+    // and counting it as declaring nothing would be a licence to keep the line.
+    write_fixture_file(&dir, "states.yaml", "not: [valid yaml\n");
+
+    let result = create_billing(&dir, &[]);
+    assert!(!result.status.success());
+    let said = flattened_output(&result);
+    assert!(said.contains("no states file declaring it was found"), "wrong failure:\n{said}");
+    assert!(said.contains("Not read"), "the unreadable file was not named:\n{said}");
+    assert!(said.contains("states.yaml"), "the unreadable file was not named:\n{said}");
+    assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md.lock", "states.yaml"]);
+}

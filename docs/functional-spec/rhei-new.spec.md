@@ -138,10 +138,12 @@ Everything invoice-related, including dunning.
 ```
 
 `--states` only writes the declaration; it does not create the machine. A rhei
-declaring a machine that no `states.yaml` provides is an error at the next
-load, naming where the file is looked for, the machine names the project does
-provide, and `/rhei-state-machine-writer` for authoring the one that is missing
-([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding), §6). Every other flag with a declared set of legal values
+declaring a machine that no `states.yaml` provides is an error, naming where the
+file is looked for, the machine names the project does provide, and
+`/rhei-state-machine-writer` for authoring the one that is missing
+([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding), §6). The create refuses that fault itself, ahead of the
+validation pass of §5.2, so it never writes a line and in the same breath warns
+the author to delete it ([§FS-rhei-states-deprecation.1](rhei-states-deprecation.spec.md#1-the-deprecated-resolution-runs-first)). Every other flag with a declared set of legal values
 lists that set when the value is wrong, and this one is no exception just
 because its set lives in files rather than in the plan. This is the
 honest order: the machine is authored, and the rhei points at it — so the
@@ -632,14 +634,14 @@ for it. The `rhei init` on-ramp is where this shows: `rhei init` prints
 <id>`, and with a single dangling `**Prior:**` anywhere in the project the second
 step was refused for an error the first step's own rhei list had reworded.
 
-- Errors the create introduced — a `--prior` naming nothing, a `--states`
-  naming a machine no `states.yaml` provides — undo the write: a created file
-  is removed, and a modified file is restored byte-for-byte. For an adopted
-  workspace, this removes only the invocation-created index and task directory;
-  the pre-existing root, state machine, and prompt templates survive
-  byte-for-byte. Permanent sidecars and the directories necessary to preserve
-  their identities also survive and are not described as authored output. The
-  report lists only those new errors, with the validator's own code frames.
+- Errors the create introduced — a `--prior` naming nothing, for instance —
+  undo the write: a created file is removed, and a modified file is restored
+  byte-for-byte. For an adopted workspace, this removes only the
+  invocation-created index and task directory; the pre-existing root, state
+  machine, and prompt templates survive byte-for-byte. Permanent sidecars and
+  the directories necessary to preserve their identities also survive and are
+  not described as authored output. The report lists only those new errors,
+  with the validator's own code frames.
 - Errors that were already there do not. When the post-write errors are the
   ones the pre-write pass already found, the write is **kept** and the command
   succeeds, with a warning saying the project was already failing validation

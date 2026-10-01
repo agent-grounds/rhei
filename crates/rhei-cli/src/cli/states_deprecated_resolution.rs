@@ -145,8 +145,7 @@ fn resolve_declared_rhei_machine(
     }
 
     let own_root = loaded.rhei_roots.get(rhei_id);
-    let mut candidates: Vec<PathBuf> = vec![auto_state_machine_path(input)];
-    candidates.extend(sorted_rhei_roots(loaded).into_iter().map(|root| root.join("states.yaml")));
+    let candidates = declared_machine_candidates(input, loaded.rhei_roots.values());
     let matches = candidates_declaring(&candidates, machine_name)?;
 
     // An explicit built-in name falls back only after the matching-file lookup
@@ -244,25 +243,60 @@ fn resolve_declared_project_default(
     }))
 }
 
-/// Every distinct candidate that loads and declares `machine_name`. An
-/// unloadable candidate is a real project problem; swallowing it here would
-/// surface as a misleading "not found" instead. §AR-rhei-panta.4
-fn candidates_declaring(
+/// The one flat candidate set a rhei's `**States:**` line is resolved against:
+/// the project root's `states.yaml` and every rhei execution root's, in a
+/// single list rather than in sequence. Two files among them declaring the name
+/// are therefore the ambiguity error wherever they sit, and the project root is
+/// one of the roots that can be ambiguous rather than a step before them.
+///
+/// It is a function because `rhei viz`'s static mirror resolves the same
+/// declarations off the same tree, and a mirror that enumerates its own set is
+/// a second answer to the same question. §FS-rhei-states-deprecation.1
+fn declared_machine_candidates<'a>(
+    input: &Path,
+    rhei_roots: impl IntoIterator<Item = &'a PathBuf>,
+) -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = rhei_roots.into_iter().cloned().collect();
+    roots.sort();
+    roots.dedup();
+    let mut candidates = vec![auto_state_machine_path(input)];
+    candidates.extend(roots.into_iter().map(|root| root.join("states.yaml")));
+    candidates
+}
+
+/// Every distinct candidate that loads and declares `machine_name`, with the
+/// loader injected so that the viz mirror counts this set rather than one of
+/// its own. An unloadable candidate is a real project problem; swallowing it
+/// here would surface as a misleading "not found" instead. §AR-rhei-panta.4
+fn declaring_candidates<E>(
     candidates: &[PathBuf],
     machine_name: &str,
-) -> MietteResult<Vec<(PathBuf, rhei_validator::StateMachine)>> {
+    load: impl Fn(&Path) -> Result<rhei_validator::StateMachine, E>,
+) -> Result<Vec<(PathBuf, rhei_validator::StateMachine)>, E> {
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let mut matches = Vec::new();
     for candidate in candidates {
         if !seen.insert(candidate.clone()) || !candidate.is_file() {
             continue;
         }
-        let machine = load_state_machine(Some(candidate))?;
+        let machine = load(candidate)?;
         if machine.name == machine_name {
             matches.push((candidate.clone(), machine));
         }
     }
     Ok(matches)
+}
+
+/// [`declaring_candidates`] under this pass's own loader, which reports an
+/// unreadable candidate the way every other `miette` diagnostic reports one.
+// §AR-rhei-panta.4
+fn candidates_declaring(
+    candidates: &[PathBuf],
+    machine_name: &str,
+) -> MietteResult<Vec<(PathBuf, rhei_validator::StateMachine)>> {
+    declaring_candidates(candidates, machine_name, |candidate| {
+        load_state_machine(Some(candidate))
+    })
 }
 
 fn quoted_paths(matches: &[(PathBuf, rhei_validator::StateMachine)]) -> String {

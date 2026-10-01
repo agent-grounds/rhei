@@ -30,8 +30,11 @@ After `--state-machine`, and before
 [§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) clause 1, a rhei that **carries a
 declaration** — its own `**States:**`, or `index.panta.md`'s by inheritance —
 resolves it exactly as the previous release did: its own execution root for a
-custom same-name declaration, then the project root, then a unique `name:`
-match among the project's candidate rhei roots. A rhei that carries no
+custom same-name declaration, then one flat candidate set — the project root's
+`states.yaml` together with every candidate rhei root's — in which a unique
+`name:` match resolves. The project root is one of the roots that can be
+ambiguous rather than a step ahead of them, so two declaring files among them
+are the ambiguity error wherever the two sit. A rhei that carries no
 declaration at all has nothing to resolve here and goes straight to clause 1,
 which is why a project whose manifest declares nothing and whose member
 declares nothing reads that member's own `states.yaml` in this release rather

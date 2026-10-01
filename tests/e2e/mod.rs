@@ -25,6 +25,7 @@ mod agent_prompt_size_tests;
 mod agent_reentry_completion_tests;
 mod agent_reentry_support;
 mod agent_reentry_tests;
+mod agent_retry_notice_tests;
 mod budget_ancestry_project_tests;
 mod budget_ceiling_tests;
 mod budget_declaration_free_tests;

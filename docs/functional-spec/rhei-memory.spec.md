@@ -315,8 +315,8 @@ Result entries so far:
 Previous log: `runtime/logs/{log file of the previous visit of this state}`
 
 Retrying this visit: attempt {n}. The previous attempt {ending}. It did not
-write `{result path}`, which a transition out of this state reads to finish
-this task. Its transcript is `{previous attempt log}`.
+write what this visit still owes: {name} (`{path}`), … . Its transcript is
+`{previous attempt log}`.
 ```
 
 - The trail is the state sequence of this task's ledger lines, in order — the
@@ -338,10 +338,22 @@ this task. Its transcript is `{previous attempt log}`.
   ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)). It exists because a re-spawn that is handed the same
   prompt as the attempt it is recovering from will do the same thing again: the
   invocation has to be told that it is a retry, what ended the last attempt, and
-  which file that attempt was obliged to write and did not. The result path is
-  named because naming it is the whole point — the built-in prompt already shows
-  it as where a finished task's result is *read from*, which agents read as
-  description rather than obligation.
+  which file that attempt was obliged to write and did not.
+- The owed clause names **every required artifact of this invocation's
+  completion condition that is not on disk when the prompt is composed**, under
+  the same names and in the same order as the missing-output warning of
+  ([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)) — so the clause and that warning are two
+  renderings of one list rather than two answers to one question. It is omitted
+  when there is none: a retry whose artifacts are all present is told that it is
+  a retry and nothing about files, because naming no file beats naming a file
+  that is there.
+- The result path is named when the result is **one of** those unmet artifacts,
+  and naming it there is the whole point — the built-in prompt already shows it
+  as where a finished task's result is *read from*, which agents read as
+  description rather than obligation. Naming it when it is already on disk is
+  the same mistake in the other direction, and worse: `Result entries so far:`
+  pastes that file's contents four lines above, so the paragraph refutes itself
+  and the artifact actually missing appears in neither place.
 
 ### 3.4. `## Rhei Commands` Additions
 
@@ -565,11 +577,48 @@ are never silently omitted here.
    one exists **and** it belongs to this visit: its `moves` equals the number of
    moves the ticket has made, i.e. the ticket has not left the state since that
    spawn. Render the retry paragraph from it — `attempt` + 1 as `{n}`, its
-   `ending` and `code` as `{ending}`, its `log` as `{previous attempt log}` —
-   and name the result path this invocation is handed as `{result path}`,
-   omitting that clause on a state no terminal edge leaves. A record from an
-   earlier visit is not a retry and renders nothing: re-entering a state is a
-   fresh start, not a second attempt.
+   `ending` and `code` as `{ending}`, its `log` as `{previous attempt log}`. A
+   record from an earlier visit is not a retry and renders nothing: re-entering
+   a state is a fresh start, not a second attempt.
+5. `owed` = the required artifacts of *this* invocation's completion condition
+   that are not on disk when the prompt is composed, computed as
+   ([§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition)) computes it for one resolved invocation:
+   `state`'s declared `outputs:`, resolved for this invocation's identity and
+   `visit_count`, in declaration order and each judged by whether its resolved
+   path exists; followed by the ticket's result under the name `result`, where
+   some edge declared out of `state` by name reaches a `final: true` state and
+   this invocation's result file ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)) has no content. That
+   terminal-edge question is the one `## Result` already asks, asked once and
+   answered for both, so the obligation that section states and the obligation
+   this clause reports cannot disagree. A fanned-out invocation is told about
+   its own fragment and its own declared paths; a sibling identity's are not
+   its business.
+6. Render `owed` as ` It did not write what this visit still owes: ` followed
+   by one entry per element, comma-separated in the order of item 5, and a
+   closing `.`. An entry is the artifact's name, then its path in backticks in
+   parentheses — the entry of the missing-output warning of
+   ([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)), with the path spelled for a prompt:
+
+   ```
+   issue (`runtime/triage/plan.1.issue.md`), result (`runtime/results/plan.1.md`)
+   ```
+
+   A path is spelled by ([§FS-rhei-agents.4.1](rhei-agents.spec.md#41-paths-in-the-prompt)), the rule the transcript
+   path beside it follows, so the two cannot read against different bases. A
+   path that still carries an unresolved `{...}` template keeps the warning's
+   own marker, inside the parentheses and after the path:
+
+   ```
+   issue (`runtime/triage/{reviewer}.issue.md`, unresolved template)
+   ```
+
+   A template is not a path that was checked, and the clause may not present
+   one as though it were.
+
+   Omit the whole clause, and the space before it, when `owed` is empty. The
+   precedent is the clause's own: it was already omitted on a state no terminal
+   edge leaves, which is one case of nothing being owed rather than a rule of
+   its own.
 
 ### 4.5. Fencing and Rendering
 

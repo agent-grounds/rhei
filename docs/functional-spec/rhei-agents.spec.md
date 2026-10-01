@@ -1394,9 +1394,16 @@ Under `orchestrator` authority, `rhei run`:
      different facts and a retry says which it is retrying.
    - A retry is only worth spawning if it can do better than the attempt before
      it, so a re-spawned invocation is told it is one. Its prompt names the
-     attempt number, what the previous attempt left unmet, and the result path
-     it did not write ([§FS-rhei-memory.4.4](rhei-memory.spec.md#44-previous-visits)). Without that the retry receives a
+     attempt number, how the previous attempt ended, and **every required
+     artifact of this invocation still unwritten** when the prompt is composed —
+     each by the same `<name> (<path>)` entry as the warning above, the ticket's
+     result among them under the name `result`
+     ([§FS-rhei-memory.4.4](rhei-memory.spec.md#44-previous-visits)). Without that the retry receives a
      byte-identical prompt and repeats the attempt it is meant to recover from.
+     Where nothing is unmet the prompt names no file: the retry is told that it
+     is a retry and nothing more. This warning and that prompt are two readings
+     of one list, and the prompt is the one a paid attempt reads, so it may not
+     name a file the warning did not.
    - The retry is bounded, per state visit, by the **attempt budget** of §3.2.3.
      Spawn number `{budget} + 1` of a visit does not happen: the ticket stays
      where it is, is not scheduled again for the rest of the run, and the engine

@@ -6,6 +6,23 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- A retried attempt is now told which artifacts it still owes, rather than
+  always being told it did not write the result file. The retry paragraph of
+  `## Previous Visits` named the result path wherever any edge out of the state
+  reached a terminal one, whatever was actually unwritten — so a state that
+  declares `outputs:` and wrote its result was handed a sentence naming a file
+  82 bytes long on disk, four lines below `Result entries so far:` pasting that
+  same file's contents, while the artifact that was missing appeared in neither
+  place. The clause now names every required artifact of the retried
+  invocation's completion condition that is not on disk when its prompt is
+  composed, under the same `<name> (<path>)` entries and in the same order as
+  the `required outputs are missing` warning — the result among them, under the
+  name `result`, when the result is one of them — and is omitted entirely where
+  nothing is owed (§FS-rhei-memory.3.3, §FS-rhei-memory.4.4,
+  §FS-rhei-agents.3.2.1). The run log, the halt line and the run report's
+  `MissingOutputs` cause are unchanged: the warning and the retry prompt are now
+  two renderings of one list.
+
 - Resolve project summaries from each member's state machine when no default
   machine is configured, and reject mixed-machine scopes.
 

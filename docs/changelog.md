@@ -6,6 +6,26 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- Refuse a copied task definition that claims a ticket identity another live
+  ticket still holds. The project's budget account counts one ticket uuid's
+  travel against one display id, and that key was allowed to move to a second
+  display id while the first was still in the document and still claiming the
+  uuid. So copying a task definition by hand, `budgetTicketId` and all, made two
+  tickets draw one counter — and then minted the original a fresh uuid and a
+  fresh travel bound once it no longer matched the binding: eight applied edges
+  against a bound of six, with the copy inheriting the history its source
+  earned, which is backwards from what anyone copying a ticket would expect.
+  Nothing said so. That admission is now refused before a receipt is appended,
+  naming both display ids, the uuid, and the file they are both live in, and
+  offering the one edit that resolves it — a fresh `budgetTicketId` for the copy.
+  The two lawful moves still work and no longer work in silence: a renumbered
+  task and a renamed plan file carry their travel to the new display id and say
+  on the warning channel which id it was counted against before, which is the
+  one case the refusal cannot reach because the document cannot be told from a
+  relocation. An account already in that state is repaired by the same hand edit
+  the refusal names. §FS-rhei-budgets.5.2.1 draws the rule;
+  §REQ-bounded-neural-work.4 already required it. (PR #TBD)
+
 - Add `rhei note`, the one channel that carries a fact sideways into the
   future. A task that finds out something the next ticket would otherwise
   rediscover spends its one slot on `rhei note "<fact>"`, and every ordinary

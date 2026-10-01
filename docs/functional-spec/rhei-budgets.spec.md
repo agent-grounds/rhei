@@ -372,8 +372,11 @@ version is owed.
 
 A ticket's identity is bound by **source path and content hash**, so several
 live sources are tolerated only while their bytes agree. That is what makes a
-copied or moved ticket keep its travel, and what makes two documents claiming
-one identity with different content a conflict rather than a fork.
+*moved* ticket keep its travel, and only a moved one: agreeing bytes are what
+distinguishes a relocated document from a conflicting one, and say nothing about
+whether one identity has two live claimants, so a *copy* does not take the
+travel of the ticket it was copied from §FS-rhei-budgets.5.2.1. Two documents
+claiming one identity with different content are a conflict rather than a fork.
 
 The binding is also what a ticket carrying no identity is resolved *from*. A
 ticket whose document names no identity is not therefore a new ticket: the
@@ -387,7 +390,73 @@ comes back. The key is rhei's own and registered as one
 ([§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes)), which
 is also what keeps it out of the author metadata a query publishes. The display id is part of the key, because one document holds every
 ticket of a rhei and a binding matched on the path alone would hand one ticket's
-travel to its sibling.
+travel to its sibling — and the key may only move to a display id the document
+no longer claims the identity under §FS-rhei-budgets.5.2.1.
+
+#### 5.2.1. One identity, one live ticket
+
+A binding counts one uuid's travel against one display id, and that display id
+may move: a renumbered task and a renamed plan file both carry their travel with
+them. What it may not do is move while the display id it is counted against is
+still claiming the uuid. A bound uuid is **refused** admission under a second
+display id while more than one live ticket claims it.
+
+One travel bound covers one ticket, so two tickets drawing on one binding is one
+bound covering two — capacity created out of a copied task definition, for which
+[§REQ-bounded-neural-work.4](../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity) allows no source: fresh travel comes from a
+genuinely new ticket identity and from nothing else. The ticket that earned the
+history is also the one that would lose it, because the display id the account
+counts against would name the copy instead.
+
+The edit itself cannot be read. One metadata file holds every ticket of a rhei,
+so a definition copied onto a sibling and a definition renumbered in place are
+the same bytes at the same path. What tells them apart is what the live sources
+still claim, and that is the one fact this rule turns on — how many live tickets
+name the uuid.
+
+**More than one — refused.** The admission is refused under
+§FS-rhei-budgets.8's contract rather than as a halt: no arm is started, no edge
+is applied, no task result is written, and the ticket stays in the state it is
+in. No bound is what stopped it, so it carries the plain `error:` shape rather
+than the six-row report of an exhausted bound:
+
+```text
+error: ticket 'plan.2' claims a budget identity the account holds for 'plan.1'
+       identity:    7f3c1a90-5e21-4d8b-9a6c-bc5de10f12e7
+       claimed by:  plan.1 and plan.2, both live in plan.rhei.md
+       why:         one travel bound covers one ticket, and these two would
+                    draw on one
+       to fix it:   give the copy a fresh `budgetTicketId` in that file; the
+                    account holds this history for 'plan.1'
+```
+
+It names both display ids, the uuid, and the file they are both live in, because
+those are what a person needs in order to find the key they duplicated. Its
+**one** remedy — §FS-rhei-budgets.8 requires exactly one — is a fresh
+`budgetTicketId` for the copy. Deleting the copy's key is not offered and is not
+a way out: in an account whose binding has already moved, a keyless copy
+resolves to the binding that moved and adopts it again.
+
+**Exactly one, or none — permitted, and reported.** The display id the uuid was
+counted against is gone from every live source, which is a move. The key follows
+the ticket as it does today and the travel comes with it. What changes is that
+the move is no longer silent: it is reported on the warning channel, beside the
+edge that caused it.
+
+```text
+warning: travel for 7f3c1a90-…-bc5de10f12e7 now counts against 'plan.3'; it was
+         counted against 'plan.1', which this plan no longer has
+```
+
+A move is the one case the refusal cannot reach — delete the original's key and
+then write it onto a second ticket, and the document says exactly one ticket owns
+the identity — so without that line, travel following a heading edit in silence
+is what would be left standing.
+
+A ticket carrying no identity never reaches this rule. It resolves through the
+binding on its own display id and source path, so the display id it then binds
+is the one already recorded and the binding does not move: the lost-write case
+of §FS-rhei-budgets.5.2 keeps its answer.
 
 ### 5.3. The witness
 

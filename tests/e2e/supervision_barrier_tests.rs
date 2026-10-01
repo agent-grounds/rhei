@@ -249,8 +249,8 @@ structure:
         "and it carries the sibling's own result; got:\n{outer}"
     );
     // Everything above `## Plan History` is this task's own inputs, checkpoints
-    // included; the history below it names every finished descendant on
-    // purpose, so the collision check stops there. §FS-rhei-memory.3.2
+    // included; the history below it names the finished children of this task
+    // on purpose, so the collision check stops there. §FS-rhei-memory.3.2
     let inputs = outer.split("\n## Plan History").next().unwrap_or(outer.as_str());
     assert!(
         !inputs.contains("Task plan.1.1.2 finished fix."),

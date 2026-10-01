@@ -35,8 +35,9 @@
         let history = render_plan_history(&context).expect("history");
         assert!(
             history.starts_with(
-                "\n## Plan History\n\nFinished work, oldest first. Full text: \
-                 `runtime/results/<id>.md` under the owning rhei's execution root.\n\n"
+                "\n## Plan History\n\nFinished work on the way from the plan's roots to this \
+                 task, oldest first. Full text: `runtime/results/<id>.md` under the owning \
+                 rhei's execution root; a folded subtree: `rhei list --parent <id>`.\n\n"
             ),
             "got:\n{history}"
         );

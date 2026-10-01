@@ -134,6 +134,7 @@ include!("cli/run_prompt_memory.rs");
 include!("cli/note_store.rs");
 include!("cli/note_options.rs");
 include!("cli/note_command.rs");
+include!("cli/run_prompt_tree.rs");
 include!("cli/run_prompt_position.rs");
 include!("cli/run_prompt_history.rs");
 include!("cli/run_prompt_visits.rs");
@@ -314,6 +315,7 @@ mod tests {
     include!("cli/tests_exclusion_requirements.rs");
     include!("cli/tests_prompt_memory_supervisors.rs");
     include!("cli/tests_prompt_memory_history.rs");
+    include!("cli/tests_prompt_memory_fold.rs");
     include!("cli/tests_prompt_memory_caps.rs");
     include!("cli/tests_prompt_memory_results.rs");
     include!("cli/tests_prompt_memory_visits.rs");

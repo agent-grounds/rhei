@@ -7,10 +7,13 @@
 
 // §AR-source-file-size.3 §FS-rhei-memory.3.2 §FS-rhei-memory.4.3
 
-/// The preamble that says what the list is and where the full text lives.
+/// The preamble that says what the list is, where the full text lives, and —
+/// once rather than on every folded line — how a subtree it speaks for is read.
 // §FS-rhei-memory.3.2
-const PLAN_HISTORY_PREAMBLE: &str = "Finished work, oldest first. Full text: \
-     `runtime/results/<id>.md` under the owning rhei's execution root.";
+const PLAN_HISTORY_PREAMBLE: &str = "Finished work on the way from the plan's \
+     roots to this task, oldest first. Full text: `runtime/results/<id>.md` \
+     under the owning rhei's execution root; a folded subtree: `rhei list \
+     --parent <id>`.";
 
 /// One rendered history line, kept structured until the cap has been applied.
 struct HistoryEntry {
@@ -23,6 +26,9 @@ struct HistoryEntry {
     /// The rhei tag a task outside the owning rhei carries.
     // §FS-rhei-memory.3.2
     foreign_rhei: Option<String>,
+    /// ` — {n} subtasks: {breakdown}` where this task speaks for a subtree,
+    /// empty where it is a leaf. §FS-rhei-memory.3.2
+    fold: String,
 }
 
 impl HistoryEntry {
@@ -33,8 +39,8 @@ impl HistoryEntry {
             .map(|rhei| format!(" (rhei `{rhei}`, prior)"))
             .unwrap_or_default();
         format!(
-            "- {}: {} \u{2014} {} \u{2014} {}{tag}\n",
-            self.label, self.title, self.state, self.summary
+            "- {}: {} \u{2014} {} \u{2014} {}{}{tag}\n",
+            self.label, self.title, self.state, self.summary, self.fold
         )
     }
 }
@@ -77,7 +83,14 @@ fn transitive_priors<'a>(
     order.iter().copied().filter(|candidate| reached.contains(&candidate.id.to_string())).collect()
 }
 
-/// The terminal tasks of the owning rhei, ordered by when they finished.
+/// The terminal tasks of the owning rhei **on this invocation's path**, ordered
+/// by when they finished.
+///
+/// The path rather than the tree, because a subtask's result is owed to its
+/// parent: the plan's top-level tasks, plus the children of the reader and of
+/// each of its ancestors. An off-path finished task contributes no line and is
+/// counted by the listed ancestor above it, which is what keeps forty results
+/// owed to one parent from evicting the plan's own decisions.
 ///
 /// A task with no ledger line was never moved by this project — an imported
 /// plan, or one completed before the ledger existed — so it cannot be placed in
@@ -88,6 +101,7 @@ fn own_history_tasks<'a>(
     order: &[&'a rhei_core::ast::Task],
     rhei_id: &str,
     skip: &BTreeSet<String>,
+    path: &ReaderPath,
 ) -> MietteResult<Vec<&'a rhei_core::ast::Task>> {
     let memory = render_context.memory.expect("history renders only with memory");
     let root = memory
@@ -102,6 +116,11 @@ fn own_history_tasks<'a>(
         .copied()
         .filter(|candidate| rhei_id_of(candidate).as_deref() == Some(rhei_id))
         .filter(|candidate| candidate.id != render_context.task.id)
+        // `## Position` names each ancestor with its state and pastes the
+        // nearest one's body, so a line here would be the third telling.
+        // §FS-rhei-memory.4.2
+        .filter(|candidate| !path.named_in_position(candidate))
+        .filter(|candidate| path.lists(candidate))
         .filter(|candidate| !skip.contains(&candidate.id.to_string()))
         .filter(|candidate| task_state_is_terminal(candidate, render_context.machine))
         .collect();
@@ -118,24 +137,39 @@ fn own_history_tasks<'a>(
     Ok(unrecorded)
 }
 
-/// `### In Flight` — every other agent touching this project right now.
+/// `### In Flight` — every other agent touching this project right now, and
+/// every open subtree something has already happened in.
+///
+/// A row is admitted by a claim — an `**Assignee:**`, or this pass having
+/// spawned it — or by a terminal descendant alone, which is how an open off-path
+/// parent is accounted for once its finished children no longer have lines of
+/// their own. A claimed row is never pushed out of the cap by one that only
+/// reports progress.
 // §FS-rhei-memory.3.2 §FS-rhei-memory.4.3
 fn render_in_flight(
     render_context: &RuntimeTemplateContext<'_>,
     order: &[&rhei_core::ast::Task],
+    path: &ReaderPath,
 ) -> String {
     let memory = render_context.memory.expect("history renders only with memory");
-    let claimed: Vec<(&rhei_core::ast::Task, String)> = order
+    let claimed: Vec<(&rhei_core::ast::Task, Option<String>)> = order
         .iter()
         .copied()
         .filter(|candidate| candidate.id != render_context.task.id)
+        // The chain line already names every ancestor with its state.
+        // §FS-rhei-memory.4.3
+        .filter(|candidate| !path.named_in_position(candidate))
         .filter(|candidate| !task_state_is_terminal(candidate, render_context.machine))
         .filter_map(|candidate| match candidate.assignee.as_deref() {
-            Some(assignee) => Some((candidate, assignee.to_string())),
+            Some(assignee) => Some((candidate, Some(assignee.to_string()))),
             // `rhei run` claims by spawning, not by writing `**Assignee:**`, so
             // the pass's own set is the only witness for its workers.
             None if memory.run_in_flight.contains(&candidate.id.to_string()) => {
-                Some((candidate, "this run".to_string()))
+                Some((candidate, Some("this run".to_string())))
+            }
+            // Nobody holds it, but something has finished inside it.
+            None if descendant_progress(candidate, render_context.machine).0 > 0 => {
+                Some((candidate, None))
             }
             None => None,
         })
@@ -143,19 +177,39 @@ fn render_in_flight(
     if claimed.is_empty() {
         return String::new();
     }
+    // The cap drops the rows admitted only by progress first, so a row naming a
+    // real agent is never pushed out by one reporting it. §FS-rhei-memory.4.3
+    let held = claimed.iter().filter(|(_, holder)| holder.is_some()).count();
+    let mut progress_budget = memory_caps::IN_FLIGHT.saturating_sub(held);
+    let mut shown = 0;
     let mut out = String::from("\n### In Flight\n\n");
-    for (task, assignee) in claimed.iter().take(memory_caps::IN_FLIGHT) {
+    for (task, holder) in claimed.iter() {
+        if shown == memory_caps::IN_FLIGHT {
+            break;
+        }
+        if holder.is_none() {
+            if progress_budget == 0 {
+                continue;
+            }
+            progress_budget -= 1;
+        }
+        let progress = subtree_progress_clause(task, render_context.machine);
+        let trailing = match holder {
+            Some(holder) => format!(" \u{2014} {holder}{progress}"),
+            None => progress,
+        };
         out.push_str(&format!(
-            "- {}: {} [{}] \u{2014} {assignee}\n",
+            "- {}: {} [{}]{trailing}\n",
             memory_node_label(task),
             task.title,
             memory_state_name(task, render_context.machine)
         ));
+        shown += 1;
     }
-    if claimed.len() > memory_caps::IN_FLIGHT {
+    if claimed.len() > shown {
         out.push_str(&format!(
             "\u{2026} {} more \u{2014} rhei list --non-terminal\n",
-            claimed.len() - memory_caps::IN_FLIGHT
+            claimed.len() - shown
         ));
     }
     out
@@ -222,7 +276,8 @@ fn render_plan_history(render_context: &RuntimeTemplateContext<'_>) -> MietteRes
 
     let pasted_in_full = results_pasted_in_full(render_context)?;
     let skip = pasted_descendant_ids(render_context, &pasted_in_full);
-    let own = own_history_tasks(render_context, &order, &rhei_id, &skip)?;
+    let path = reader_path(plan_tasks, render_context.task);
+    let own = own_history_tasks(render_context, &order, &rhei_id, &skip, &path)?;
     let own_ids: BTreeSet<String> = own.iter().map(|task| task.id.to_string()).collect();
     let priors: Vec<&rhei_core::ast::Task> =
         transitive_priors(&index, &order, render_context.task)
@@ -244,6 +299,7 @@ fn render_plan_history(render_context: &RuntimeTemplateContext<'_>) -> MietteRes
             state: memory_state_name(task, render_context.machine),
             summary: task_history_summary(render_context, &task.id, &pasted_in_full)?,
             foreign_rhei: None,
+            fold: subtree_fold_clause(task, render_context.machine),
         });
     }
     for task in priors {
@@ -253,10 +309,11 @@ fn render_plan_history(render_context: &RuntimeTemplateContext<'_>) -> MietteRes
             state: memory_state_name(task, render_context.machine),
             summary: task_history_summary(render_context, &task.id, &pasted_in_full)?,
             foreign_rhei: rhei_id_of(task).filter(|owner| owner != &rhei_id),
+            fold: subtree_fold_clause(task, render_context.machine),
         });
     }
 
-    let in_flight = render_in_flight(render_context, &order);
+    let in_flight = render_in_flight(render_context, &order, &path);
     let dependents = render_dependents(render_context, &order);
     if entries.is_empty() && in_flight.is_empty() && dependents.is_empty() {
         return Ok(String::new());

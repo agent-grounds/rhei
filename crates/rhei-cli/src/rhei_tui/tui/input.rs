@@ -6,7 +6,7 @@ use crossterm::event::{KeyCode, KeyModifiers};
 
 use crate::rhei_tui::event::MessageLevel;
 
-use super::derive::{inspector_sections, ChipAction};
+use super::derive::{inspector_sections, outline_fold, outline_order, ChipAction};
 use super::state::{Composer, ComposerKind, FlowFocus, UiState, View};
 
 /// What the render loop should do after a key event.
@@ -132,7 +132,7 @@ fn move_focus(state: &mut UiState, delta: isize) {
     match state.view {
         View::Flow => match state.flow_focus {
             FlowFocus::Outline => {
-                let order = state.visible_task_indices();
+                let order = outline_order(state);
                 state.move_selected_in(&order, delta);
             }
             FlowFocus::Inspector => {
@@ -187,11 +187,25 @@ fn clamp_scroll(current: u16, delta: isize) -> u16 {
     (current as isize + delta).max(0) as u16
 }
 
+/// Expand the selected outline row in place when it is a folded parent, so a
+/// finished child is never unreachable from the outline. §FS-rhei-run-tui.1.5.3
+fn expand_folded(state: &mut UiState) -> bool {
+    let Some(task) = state.selected_task() else { return false };
+    if outline_fold(state, task).is_none() {
+        return false;
+    }
+    let id = task.id.clone();
+    state.expanded.insert(id)
+}
+
 fn handle_enter(state: &mut UiState) {
     match state.view {
         View::Flow if state.flow_focus == FlowFocus::Outline => {
-            // Enter on a gating task opens the human-gate chooser (§1.5.5).
-            open_gate(state);
+            // Enter on a folded parent expands it in place (§1.5.3); on a gating
+            // task it opens the human-gate chooser (§1.5.5). No gate is ever folded.
+            if !expand_folded(state) {
+                open_gate(state);
+            }
         }
         View::Flow => {
             let Some(id) = state.selected.clone() else { return };

@@ -5,6 +5,7 @@
 use crate::rhei_viz_model::{Machine, TaskRow, VizModel};
 
 use super::state::{UiState, UsageRecord};
+use super::theme::{category, Category};
 
 /// What following an inspector chip does (§FS-rhei-run-tui.1.5.2): select a
 /// neighbor task, or mark a target state in the Machine view.
@@ -393,4 +394,65 @@ pub(super) fn subtree_progress(plan: &VizModel, task: &TaskRow) -> Option<(usize
     }
     let done = descendants.iter().filter(|t| t.state == "completed").count();
     Some((done, descendants.len()))
+}
+
+/// Whether a task is over with nothing in it for a human: terminal, and neither
+/// a failure nor a gate — the console tree's `✓` and `⊘` rows rather than its
+/// `!` and `⏸` ones. §FS-rhei-run-report.3.2
+fn is_settled(machine: &Machine, state: &str) -> bool {
+    let terminal = machine.states.iter().any(|s| s.name == state && s.terminal);
+    terminal && matches!(category(machine, state), Category::Done | Category::Retired)
+}
+
+/// The clause a parent's outline row carries for its finished subtree, or
+/// `None` when the rule keeps the subtree open: a leaf, a parent still open, or
+/// one above a row that needs a human.
+///
+/// The rule and the clause are the console tree's, and the clause is spelled by
+/// the same helper, so one subtree never reads two ways. §FS-rhei-run-tui.1.5.3
+/// §FS-rhei-run-report.3.2
+pub(super) fn subtree_fold(plan: &VizModel, task: &TaskRow) -> Option<String> {
+    let prefix = format!("{}.", task.id);
+    let descendants: Vec<&TaskRow> =
+        plan.tasks.iter().filter(|t| t.id.starts_with(&prefix)).collect();
+    let settled = |row: &TaskRow| is_settled(&plan.machine, &row.state);
+    if descendants.is_empty() || !settled(task) || !descendants.iter().all(|row| settled(row)) {
+        return None;
+    }
+    let states = &plan.machine.states;
+    let declared = |name: &str| states.iter().position(|s| s.name == name).unwrap_or(usize::MAX);
+    let breakdown =
+        crate::state_breakdown(descendants.iter().map(|row| row.state.clone()), declared);
+    Some(crate::fold_clause(descendants.len(), &breakdown))
+}
+
+/// Whether the outline shows `task` folded right now: the rule folds it and
+/// nothing holds it open. `Enter` holds a parent open, and so do the selection
+/// standing inside it and an active filter — the outline never hides the row a
+/// person is on or looked for. §FS-rhei-run-tui.1.5.3
+pub(super) fn outline_fold(state: &UiState, task: &TaskRow) -> Option<String> {
+    let prefix = format!("{}.", task.id);
+    let held_open = state.expanded.contains(&task.id)
+        || state.filter.as_deref().is_some_and(|filter| !filter.is_empty())
+        || state.selected.as_deref().is_some_and(|id| id.starts_with(&prefix));
+    if held_open {
+        return None;
+    }
+    subtree_fold(&state.plan, task)
+}
+
+/// The Flow outline's rows: the visible tasks, less every row a folded parent
+/// speaks for. §FS-rhei-run-tui.1.5.3
+pub(super) fn outline_order(state: &UiState) -> Vec<usize> {
+    let visible = state.visible_task_indices();
+    let folded: Vec<String> = visible
+        .iter()
+        .map(|i| &state.plan.tasks[*i])
+        .filter(|task| outline_fold(state, task).is_some())
+        .map(|task| format!("{}.", task.id))
+        .collect();
+    visible
+        .into_iter()
+        .filter(|i| !folded.iter().any(|prefix| state.plan.tasks[*i].id.starts_with(prefix)))
+        .collect()
 }

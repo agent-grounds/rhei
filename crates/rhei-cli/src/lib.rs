@@ -202,6 +202,7 @@ include!("cli/run_pass_remaining_work.rs");
 include!("cli/run_summary_usage.rs");
 include!("cli/run_summary_accounting.rs");
 include!("cli/run_summary_bounds.rs");
+include!("cli/run_summary_fold.rs");
 include!("cli/run_summary.rs");
 include!("cli/ready_transition.rs");
 include!("cli/ready_run_views.rs");

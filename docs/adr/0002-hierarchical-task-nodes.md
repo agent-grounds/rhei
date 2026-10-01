@@ -239,6 +239,17 @@ migrated to the hierarchical `Task` form in the same change:
 
 ## Consequences
 
+**Note, later: progressive disclosure has narrowed as a reason for depth.** The
+decision stands — recursive children and configurable node kinds are what the
+language has — but the rationale above and the second bullet below treated
+progressive disclosure as a reason to nest.
+[§FS-rhei-shape.3.1](../functional-spec/rhei-shape.spec.md#31-the-default-is-flat)
+withdraws that: depth is earned only where a parent steers, integrates or
+speaks for what is under it, and a reader who wants depth on demand gets it
+from `rhei list --parent <id>` and from the folded line a parent carries. What
+this ADR removed is still removed; what it permits is still permitted. Only the
+advice to use it for disclosure is gone.
+
 - The language matches the implementation more honestly: current subtasks are
   already stateful workflow nodes, and this proposal removes the naming fiction.
 - Plans can use progressive disclosure beyond two levels without inventing

@@ -198,6 +198,21 @@ With `--dry-run`, print each action (symlink, copy, append) without executing.
 
 With `--uninstall`, remove symlinks/copied files and delete the registered section from agent config files.
 
+### 4.8. Bundled reference files
+
+A skill directory's `references/` subtree is part of the skill: every file under
+it, at any depth, is installed with the `SKILL.md` for every target in §3, and
+is resolved from the same source as the skill itself (§4.3).
+
+One of those files is shared. `references/shape.md` ships under
+`rhei-plan-writer`, `rhei-state-machine-writer` and `rhei-template-writer`, and
+it is an extract of [§FS-rhei-shape](rhei-shape.spec.md#fs-rhei-shape-state-task-subtask-rhei-or-prose) rather than
+prose of its own: the three installed copies are byte-identical to each other,
+and their extracted block is byte-identical to that page's ([§FS-rhei-shape.7](rhei-shape.spec.md#7-the-one-normative-copy)).
+Three real files ship rather than one file and two links, because the skills are
+embedded in the binary at build time and a symlink does not survive that — nor
+every platform [§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity).
+
 ## Example Output
 
 ### Global (default)

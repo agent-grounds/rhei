@@ -106,7 +106,7 @@ anything written, under the lock, as one insertion per block. Validation runs
 over a mirror of the scope the target runs in — the project for a member rhei,
 the rhei's own root outside one — and twice over it, so what decides the outcome
 is the difference between the pass before the union and the pass after it
-([§FS-rhei-library.2](../functional-spec/rhei-library.spec.md#2---into-placing-a-template-into-a-plan)). The mirror carries the plan files and not
+([§FS-rhei-library.2](../functional-spec/rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project)). The mirror carries the plan files and not
 `runtime/`, which is exactly the kind of inherited error the difference
 discounts. There is no
 staging directory, which is why `--keep-on-error` has nothing to keep and is

@@ -45,7 +45,7 @@ The remaining three surfaces:
   [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composition-by-graph-union).
   The two composition surfaces a user authors are `--into`, which unions a
   template into a plan that already exists
-  ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan)), and the `includes:` manifest field with its
+  ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project)), and the `includes:` manifest field with its
   optional `under:`, which builds a template out of templates
   ([§FS-rhei-library.6](rhei-library.spec.md#6-includes-a-template-built-from-templates)); the rules that decide when two authored names are
   one definition are owned by [§FS-rhei-library.3](rhei-library.spec.md#3-the-union-rules), and how a placed ticket's

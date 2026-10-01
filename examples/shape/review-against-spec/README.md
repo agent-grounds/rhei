@@ -131,10 +131,9 @@ cargo xtask examples run shape-review-against-spec-flat
 cargo xtask examples run shape-review-against-spec-nested
 ```
 
-Each `index.rhei.md` names its machine with
-`**States:** shape-review-against-spec`, so a copy runs with
-`rhei run <copy> --no-tui` and no `--state-machine` flag. `<t>` above stands
-for a duration, which differs on every run. A real reviewer would also give
-`supervising` and `check` a `snapshot:` block, so each check continues the
-reading's transcript instead of reading the change again; the mock agent has
-no transcript to continue.
+Each shape keeps its machine in the `states.yaml` beside its `index.rhei.md`,
+so a copy of the directory runs with `rhei run <copy> --no-tui` and no
+`--state-machine` flag. `<t>` above stands for a duration, which differs on
+every run. A real reviewer would also give `supervising` and `check` a
+`snapshot:` block, so each check continues the reading's transcript instead of
+reading the change again; the mock agent has no transcript to continue.

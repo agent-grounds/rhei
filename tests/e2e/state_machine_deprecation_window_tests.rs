@@ -323,3 +323,40 @@ fn shell_completion_is_silent_about_the_deprecated_resolution() {
     assert_success(&ordinary);
     assert_one_warning(&ordinary, &["m1", "leftover"]);
 }
+
+/// `rhei viz` refuses every tree every other command refuses. Its static mirror
+/// counts the one candidate set the deprecated pass counts, so a project root
+/// declaring the name alongside a rhei root is the ambiguity error there too. A
+/// mirror that resolved from the project root *before* counting rendered the
+/// tree happily, which is a second answer to the same question.
+/// §FS-rhei-states-deprecation.1 §FS-rhei-viz.7.2
+#[test]
+fn viz_refuses_the_ambiguity_every_other_command_refuses() {
+    let dir = unique_temp_dir("window-ambiguous-viz");
+    let home = dir.join(".home");
+    // The manifest naming the built-in machine keeps the project default off
+    // the root file's name, so `m1`'s declaration reaches the candidate count
+    // instead of short-circuiting on a default that happens to share it.
+    let root = project(&dir, Some("rhei"));
+    project_machine(&root, &machine("atroot", "surveying", "signed-off"));
+    let m1 = member(&root, "m1", Some("atroot"), "surveying");
+    member_machine(&m1, &machine("mine", "drafting", "filed"));
+    let m2 = member(&root, "m2", None, "surveying");
+    member_machine(&m2, &machine("atroot", "surveying", "signed-off"));
+    let project_arg = root.display().to_string();
+    let out = dir.join("view.html");
+
+    assert_failure(&rhei_in(&dir, &home, &["validate", &project_arg]), "atroot");
+
+    let viz = rhei_in(
+        &dir,
+        &home,
+        &["viz", &project_arg, "--output", out.to_str().expect("utf8 output path")],
+    );
+    assert!(!viz.status.success(), "viz resolved a tree validate refuses:\n{}", viz.stdout);
+    let said = flattened_output(&viz);
+    for fragment in ["m1", "atroot", "more than one root"] {
+        assert!(said.contains(fragment), "the viz refusal should name {fragment:?}; got:\n{said}");
+    }
+    assert!(!out.exists(), "a tree that does not resolve must render nothing");
+}

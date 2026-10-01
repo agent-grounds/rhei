@@ -27,6 +27,12 @@ mod fixtures;
 mod binaries;
 use binaries::rhei_binary;
 
+// `git_env.rs` opens with its own `#![allow(dead_code)]` too, so it comes in
+// the same way. One helper reaching both homes is what keeps the removal off
+// the call sites someone remembered. §REQ-test-isolation.3
+#[path = "../../support/git_env.rs"]
+mod git_env;
+
 /// Every `rhei` this harness spawns, with **both** state locations pinned into
 /// a directory of its own.
 ///

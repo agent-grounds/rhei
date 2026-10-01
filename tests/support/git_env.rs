@@ -1,8 +1,8 @@
-// Git's repository variables, kept out of everything the suite spawns.
-//
-// Shared verbatim by the CLI's two harnesses — one pulls it in with `#[path]`,
-// the other with `include!` into its flat module — so the comments here are
-// `//` rather than `//!`: an inner doc comment cannot open an included file.
+//! Git's repository variables, kept out of everything the suite spawns.
+//!
+//! Shared verbatim by the CLI's two harnesses, and both take it with `#[path]
+//! mod`: the file opens with an inner attribute of its own, so it has to arrive
+//! as a module root rather than be spliced into another file's.
 #![allow(dead_code)]
 
 use std::ffi::{OsStr, OsString};
@@ -66,7 +66,21 @@ pub fn git_command() -> Command {
 /// directory and what git said: the test has not exercised what it claims to,
 /// and a refusal is exactly what an inherited `GIT_DIR` produces — so a test
 /// that skips on one reports `ok` under the gate and nowhere else.
+///
+/// `dir` is checked first so that the `NotFound` arm below means what it says.
+/// A `current_dir` that does not exist fails the spawn with the same
+/// `ErrorKind::NotFound`, down to the message, as a `git` that is not on the
+/// machine — so without this a fixture handed a missing directory would skip
+/// and report `ok` having exercised nothing, which is the one thing the rule
+/// above exists to remove.
 pub fn git_init_or_absent(dir: &Path) -> bool {
+    assert!(
+        dir.is_dir(),
+        "`git init` was asked for at {}, which is not a directory. A fixture that has not \
+         created its own directory is a defect in the test, not a `git` missing from the \
+         machine — and the latter is the only skip §REQ-test-isolation.3 allows.",
+        dir.display()
+    );
     let output = match git_command().args(["init", "-q"]).current_dir(dir).output() {
         Ok(output) => output,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return false,

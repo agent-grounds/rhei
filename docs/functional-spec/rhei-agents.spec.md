@@ -1081,7 +1081,7 @@ These are notes from previous `{source-state}` state of this same task. They are
 
 ## Plan History
 
-{one line per finished task of this rhei and per transitive prior, with In Flight and Dependents — §FS-rhei-memory.3.2}
+{one line per finished task of this rhei on the path from its roots to this one — each folding its own subtree into a count — and per transitive prior, with In Flight and Dependents — §FS-rhei-memory.3.2}
 
 ## Previous Visits
 

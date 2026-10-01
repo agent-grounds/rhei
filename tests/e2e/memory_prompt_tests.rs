@@ -3,6 +3,7 @@
 // manual worker.
 
 use std::fs;
+use std::path::Path;
 
 use super::supervision_tests::{prompt_for, setup_supervision};
 use super::*;
@@ -284,4 +285,151 @@ fn rhei_next_prints_one_spelling_of_the_state() {
         serde_json::from_str(&json.stdout).expect("next --json parses");
     assert_eq!(payload["state"], "review-3", "got: {payload}");
     assert_eq!(payload["from_state"], "review-3", "got: {payload}");
+}
+
+/// A four-state workflow with no agent on any state: `--peek` composes the
+/// prompt and spawns nothing, so a fold fixture needs no mock transport.
+const FOLD_MACHINE: &str = r#"name: fold-e2e
+version: 1
+states:
+  pending:
+    initial: true
+    description: Ready for work
+    instructions: Do the work for Task {task_id}.
+  completed:
+    description: Done
+    final: true
+  cancelled:
+    description: Dropped
+    final: true
+transitions:
+  - { from: pending, to: completed, description: Work done }
+  - { from: "*", to: cancelled, description: Dropped }
+"#;
+
+/// The `plan_history` field of `rhei next --peek --json` for one task: the same
+/// bytes the text surface prints, which is what §FS-rhei-memory.5 requires of
+/// the one renderer.
+fn peeked_plan_history(plan_path: &Path, machine_path: &Path, task: &str) -> String {
+    let json = run_cli("next", plan_path, machine_path, &["--task", task, "--peek", "--json"]);
+    assert_success(&json);
+    let payload: serde_json::Value =
+        serde_json::from_str(&json.stdout).expect("next --json parses");
+    payload["plan_history"].as_str().expect("plan_history").to_string()
+}
+
+/// §FS-rhei-memory.4.3 step 1: a decomposed parent costs one folded line, not one
+/// line per child — so the 40-line cap of §FS-rhei-memory.4.3 no longer evicts
+/// the plan's own decisions to make room for results that were only ever owed
+/// to their parent.
+// §FS-rhei-memory.1.1 §FS-rhei-memory.3.2
+#[test]
+fn a_decomposed_parent_folds_instead_of_evicting_the_plans_decisions() {
+    let dir = unique_temp_dir("memory-fold-eviction");
+    let mut plan = String::from("# Rhei: Eviction\n\n## Tasks\n\n");
+    for index in 1..=8 {
+        plan.push_str(&format!(
+            "### Task d{index}: Decision {index} the plan actually made\n\
+             **State:** completed\n\n"
+        ));
+    }
+    plan.push_str("### Task big: Sweep every dependency\n**State:** completed\n\n");
+    for index in 1..=40 {
+        plan.push_str(&format!(
+            "#### Task big.s{index:02}: Check dependency {index:02}\n**State:** completed\n\n"
+        ));
+    }
+    plan.push_str("### Task later: Write the report\n**State:** pending\n");
+    let plan_path = write_fixture_file(&dir, "plan.rhei.md", &plan);
+    let machine_path = write_fixture_file(&dir, "states.yaml", FOLD_MACHINE);
+
+    let history = peeked_plan_history(&plan_path, &machine_path, "later");
+
+    // Every decision the plan actually made reaches the reader. Today all eight
+    // are evicted: `own` is 49 entries against the cap, and nine oldest-first
+    // drops take the roots before anything else.
+    for index in 1..=8 {
+        assert!(
+            history.contains(&format!(
+                "- Task plan.d{index}: Decision {index} the plan actually made \u{2014} completed"
+            )),
+            "root decision d{index} is memory the reader is owed; got:\n{history}"
+        );
+    }
+    // §FS-rhei-memory.3.2: the parent speaks for its subtree in one line, and
+    // the breakdown buckets every descendant by its own state name.
+    assert!(
+        history.contains(
+            "- Task plan.big: Sweep every dependency \u{2014} completed \u{2014} (no result) \
+             \u{2014} 40 subtasks: 40 completed\n"
+        ),
+        "got:\n{history}"
+    );
+    // §FS-rhei-memory.4.3 step 1: forty off-path results are not forty lines.
+    assert!(
+        !history.contains("- Task plan.big.s"),
+        "a subtask's result is owed to its parent; got:\n{history}"
+    );
+    // Nine entries against a cap of forty: the cap stops binding here at all.
+    assert!(!history.contains("earlier tasks not shown"), "got:\n{history}");
+}
+
+/// §FS-rhei-memory.4.3 step 1: the listed set is the path, not the tree — the rhei's
+/// top-level tasks plus the children of the reader and of each of its
+/// ancestors; §FS-rhei-memory.4.3 step 5: an open off-path parent is accounted for by
+/// `### In Flight` instead, with the count standing alone where no agent holds
+/// the row.
+// §FS-rhei-memory.3.2
+#[test]
+fn a_depth_two_reader_sees_the_path_and_the_progress_of_what_is_off_it() {
+    let dir = unique_temp_dir("memory-fold-path");
+    let plan_path = write_fixture_file(
+        &dir,
+        "plan.rhei.md",
+        "# Rhei: Three Roots\n\n## Tasks\n\n\
+         ### Task a: Establish the approach\n**State:** completed\n\n\
+         #### Task a.1: Survey the options\n**State:** completed\n\n\
+         #### Task a.2: Pick one\n**State:** cancelled\n\n\
+         ### Task b: Build it\n**State:** pending\n\n\
+         #### Task b.1: Write the spec\n**State:** completed\n\n\
+         #### Task b.2: Implement it\n**State:** pending\n\n\
+         ### Task c: Ship it\n**State:** pending\n\n\
+         #### Task c.1: Draft the notes\n**State:** completed\n\n\
+         #### Task c.2: Tag the release\n**State:** pending\n",
+    );
+    let machine_path = write_fixture_file(&dir, "states.yaml", FOLD_MACHINE);
+
+    let history = peeked_plan_history(&plan_path, &machine_path, "b.2");
+
+    // A top-level task, folding its two finished children — one of them
+    // cancelled, so the breakdown names both states in the machine's own order.
+    assert!(
+        history.contains(
+            "- Task plan.a: Establish the approach \u{2014} completed \u{2014} (no result) \
+             \u{2014} 2 subtasks: 1 completed, 1 cancelled\n"
+        ),
+        "got:\n{history}"
+    );
+    // The reader's own sibling, a leaf: no fold clause, the line it always had.
+    assert!(
+        history
+            .contains("- Task plan.b.1: Write the spec \u{2014} completed \u{2014} (no result)\n"),
+        "got:\n{history}"
+    );
+    // Off the path: `a`'s children are spoken for by `a`'s own line, and `c`'s
+    // by `c`'s In Flight count.
+    assert!(!history.contains("- Task plan.a."), "got:\n{history}");
+    assert!(!history.contains("- Task plan.c."), "got:\n{history}");
+    // §FS-rhei-memory.4.3 step 5: `c` qualifies on a terminal descendant alone, with
+    // no assignee, so the count is the whole trailing column.
+    assert!(
+        history.contains(
+            "\n### In Flight\n\n- Task plan.c: Ship it [pending] \u{2014} 1 of 2 subtasks \
+             finished\n"
+        ),
+        "got:\n{history}"
+    );
+    // §FS-rhei-memory.4.3 step 5: the reader's own parent is named by `## Position`
+    // and is never reported as in flight elsewhere.
+    assert!(!history.contains("- Task plan.b: Build it"), "got:\n{history}");
 }

@@ -214,6 +214,15 @@ fn decoy_state(repo: &Path) -> DecoyState {
 /// The variables are staged on the child rather than on this process, because
 /// `set_var` would race every other test in this binary. Setting them first and
 /// letting the removal run afterwards is the same seam in the same order.
+///
+/// Both of the rule's two sources are watched, because the staged one is not
+/// what produces the defect. A variable this process inherited is removed by
+/// spelling it on the command, which `get_envs` reports as `(key, None)` and the
+/// staged assertion therefore cannot see — so the inherited half is read off a
+/// command with nothing staged, where every removal present is an inherited one.
+/// That half is vacuous under a plain `cargo test`, whose environment carries no
+/// `GIT_*`; under a hook, the one configuration §REQ-test-isolation.3 is written
+/// for, it is the whole of the rule.
 #[test]
 fn a_suite_spawn_carries_no_git_variable_it_was_not_given() {
     let decoy = unique_temp_dir("suite-isolation-git-env");
@@ -240,6 +249,30 @@ fn a_suite_spawn_carries_no_git_variable_it_was_not_given() {
          spawned command acts on is chosen, never inherited (§REQ-test-isolation.3): only \
          a variable set after the removal is deliberate, and these were staged as a hook \
          leaves them — {names:?}."
+    );
+
+    // The inherited half, which is the one a hook produces: nothing is staged
+    // here, so every removal the command carries is one this process was handed.
+    // §REQ-test-isolation.3
+    let bare = git_command();
+    let taken_off: BTreeSet<String> = bare
+        .get_envs()
+        .filter(|(_, value)| value.is_none())
+        .map(|(key, _)| key.to_string_lossy().into_owned())
+        .collect();
+    let left_on: Vec<String> = std::env::vars_os()
+        .map(|(key, _)| key.to_string_lossy().into_owned())
+        .filter(|key| key.starts_with("GIT_"))
+        .filter(|key| !taken_off.contains(key))
+        .collect();
+    assert!(
+        left_on.is_empty(),
+        "this harness process was handed {left_on:?} and a `git` the suite builds does not \
+         take them off, so the child acts on whatever repository they name \
+         (§REQ-test-isolation.3) — which under a hook is the repository being committed to. \
+         An inherited variable has to be spelled on the command as a removal, because \
+         `env_remove` is the only way to say \"not this one\" about a variable the parent \
+         would otherwise pass down."
     );
 }
 

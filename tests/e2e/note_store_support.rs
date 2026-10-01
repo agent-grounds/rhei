@@ -256,13 +256,28 @@ pub fn note_prompt(root: &Path, task: &str) -> String {
 /// A prompt with everything that varies between machines taken out: the
 /// fixture root becomes `{ROOT}`, and separators become `/` so one baseline
 /// serves Windows too.
+///
+/// One location, up to three spellings in one prompt, and they nest — so the
+/// set has to be complete and the order longest first (§REQ-cross-platform.5).
+/// macOS hands out `/var/folders/…` and canonicalizes it to
+/// `/private/var/folders/…`; substituting the shorter one first rewrites the
+/// inside of the longer one and leaves `/private{ROOT}/…` behind. Windows puts
+/// `TEMP` under the 8.3 short name, while the run spells its own working
+/// directory as the long name — which is what `fs::canonicalize` returns once
+/// its `\\?\` verbatim prefix is off, and which neither of the other two
+/// spellings covers.
 pub fn normalize_prompt(root: &Path, prompt: &str) -> String {
+    let slashed = |path: &Path| path.display().to_string().replace('\\', "/");
+    let canonical = slashed(&fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf()));
+    let bare = canonical.strip_prefix("//?/").unwrap_or(&canonical).to_string();
+
+    let mut spellings = vec![slashed(root), bare, canonical];
+    spellings.sort_by_key(|spelling| std::cmp::Reverse(spelling.len()));
+    spellings.dedup();
+
     let mut out = prompt.replace('\\', "/");
-    for spelling in
-        [root.to_path_buf(), fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf())]
-    {
-        let spelled = spelling.display().to_string().replace('\\', "/");
-        out = out.replace(&spelled, "{ROOT}");
+    for spelling in spellings {
+        out = out.replace(&spelling, "{ROOT}");
     }
     out
 }

@@ -1,6 +1,6 @@
 ---
 name: rhei-plan-worker
-description: Execute tasks in a Rhei Plan markdown document without an orchestrator. Takes one required argument `<plan>` — the path to a `.rhei.md` file or a Directory Workspace `index.rhei.md` (e.g. `rhei-plan-worker docs/my-plan.rhei.md`). Use when the user asks to work, implement, advance, drive, or make progress on a specific `.rhei.md` plan — the worker self-selects the next eligible task, works in its current state, logs subtask progress, advances state, finalizes with a result, and respects human-review gates.
+description: Execute tasks in a Rhei Plan markdown document without an orchestrator. Takes one required argument `<plan>` — the path to a `.rhei.md` file or a Directory Workspace `index.rhei.md` (e.g. `rhei-plan-worker docs/my-plan.rhei.md`). Use when the user asks to work, implement, advance, drive, or make progress on a specific `.rhei.md` plan — the worker self-selects the next eligible task, works in its current state, logs progress notes, advances state, finalizes with a result, and respects human-review gates.
 argument-hint: <plan>
 ---
 
@@ -8,7 +8,7 @@ argument-hint: <plan>
 
 Pick up a Rhei Plan and make progress on it without any external scheduler. The worker is driven by the plan itself: the state machine defines what is legal, `**Prior:**` edges define what is ready, and each state's `instructions` field defines what to do.
 
-Do not repurpose this skill for plan authoring — use `rhei-plan-writer` for that. Structural edits to the plan are limited to logging subtask progress and updating child task states; all root-task state changes and assignments go through the CLI.
+Do not repurpose this skill for plan authoring — use `rhei-plan-writer` for that. Structural edits to the plan are limited to logging progress notes and updating the states of child task nodes — a subtask is a child task node, nothing else; all root-task state changes and assignments go through the CLI.
 
 ## Parameters
 
@@ -24,7 +24,7 @@ Execute this loop until no eligible task remains or a human gate stops you:
 
 1. **Validate the plan.** Run `rhei validate <plan>`. If it fails, stop and report — do not work a broken plan, and never skip validation.
 2. **Load the state machine.** Run `rhei states` against the plan (or `rhei states --state-machine <path>`) to read allowed states, their `instructions`, and the transition graph. The CLI resolves the machine by place — the `states.yaml` in the rhei's own execution root, else the one at the project root, else the built-in machine — so the file beside the plan is the machine. A deprecated `**States:**` line, where an older plan still carries one, is resolved first and wins for one more release, and the CLI prints a `warning:` where the two disagree. Add `--json` for structured data. Fall back to reading the YAML directly, or [default-states.md](../rhei-plan-writer/references/default-states.md), if the CLI is unavailable.
-3. **Read the plan.** Prefer `rhei render <plan> --format json --pretty` for structured access. Read the raw markdown too — you will edit it in place to log subtask progress.
+3. **Read the plan.** Prefer `rhei render <plan> --format json --pretty` for structured access. Read the raw markdown too — you will edit it in place to log progress notes.
 4. **Claim the next task.** Run `rhei next <plan>`. It atomically selects the next claimable task (see *Task Selection*), writes `**Assignee:**` on it, and prints the task id, current state, and resolved instructions. If nothing is claimable, stop — the plan is done or blocked.
     - Use `rhei next <plan> --peek` first for a read-only look at what would be claimed.
     - If `rhei next` fails with a missing-artifact error, the current state requires an input file that does not exist — surface it; do not skip ahead.

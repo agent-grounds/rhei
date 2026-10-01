@@ -100,6 +100,32 @@ fn installs_from_a_binary_outside_any_checkout() {
     assert!(home.join(".claude/skills/rhei-plan-writer/references/default-states.md").exists());
 }
 
+/// The shape rule's extract ships under every skill that authors a plan or a
+/// machine, as three real files with one content, from the binary's embedded
+/// copy as well as from a checkout — a symlink would not survive embedding.
+/// §FS-rhei-install-skills.4.8 §FS-rhei-shape.7
+#[test]
+fn the_shape_extract_ships_under_every_authoring_skill() {
+    let source = fs::read_to_string(
+        super::repo_root().join("crates/rhei-cli/skills/rhei-plan-writer/references/shape.md"),
+    )
+    .expect("the checkout carries the extract");
+    let bin_dir = unique_temp_dir("install-shape-bin");
+    let cwd = unique_temp_dir("install-shape-cwd");
+    let embedded = binary_outside_checkout(&bin_dir);
+    for (label, bin) in [("embedded", embedded), ("checkout", rhei_binary())] {
+        let home = unique_temp_dir(&format!("install-shape-{label}"));
+        let result = run_install_skills_with(&home, &bin, &cwd, &["--agent", "claude-code"]);
+        assert!(result.status.success(), "{label}: install failed\n{}", result.stderr);
+        for skill in ["rhei-plan-writer", "rhei-state-machine-writer", "rhei-template-writer"] {
+            let path = home.join(".claude/skills").join(skill).join("references/shape.md");
+            let installed = fs::read_to_string(&path)
+                .unwrap_or_else(|err| panic!("{label}: {} is installed: {err}", path.display()));
+            assert_eq!(installed, source, "{label}: {skill} ships the one extract");
+        }
+    }
+}
+
 /// The extraction is temporary, so a symlink into it would dangle. Say that
 /// instead of installing something broken. §FS-rhei-install-skills.4.4
 #[test]

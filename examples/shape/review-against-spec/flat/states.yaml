@@ -1,0 +1,96 @@
+name: shape-review-against-spec
+version: 1
+
+# One machine for both shapes of the review-against-spec pair. The flat shape
+# reads the pull request in a `work` task and gives each check, and the
+# verdict, a sibling task of its own. The nested shape makes the reading a
+# *supervisor*: `execute_on: child-terminal` wakes it after each check under it
+# finishes, and the visit that finds every check in writes the verdict.
+#
+# The supervisor's three outgoing edges are tried in declaration order:
+#
+#   1. exhaustion  `visitCount >= visits` — the budget ran out; a human decides
+#   2. terminal    `openDescendants < 1`  — every check is in; the verdict is written
+#   3. self-loop   (unconditional)        — release the next check and wait
+#
+# Every state runs the `mock` agent so the example runs with no credentials. A
+# real reviewer would add a `snapshot:` block so each check starts inside the
+# reading's transcript rather than re-reading the change.
+
+states:
+  work:
+    initial: true
+    agent: mock
+    description: Do the task's work and record why it ends where it does.
+    instructions: |
+      Do Task {task_id} as its body describes. Write every export its
+      `**Provides:**` names before you finish, and your result last.
+
+  supervising:
+    execute_on: child-terminal
+    agent: mock
+    visits: 8
+    description: >-
+      The reading, woken after each check under it finishes. Briefs the checks
+      on its first visit and writes the verdict once every check is in.
+    instructions: |
+      You review Task {task_id}. On your first visit, read the change and its
+      spec, and brief each check under you at the path named in
+      `## Rhei Commands`. Judge every entry under `## Checkpoints` as it
+      arrives. Write your `## Result`, the verdict, only on the visit where
+      every check is terminal.
+
+  check:
+    agent: mock
+    description: Hold the change to one point of its spec.
+    instructions: |
+      Hold the change to the one point Task {task_id} names, and write what
+      you found as your result.
+
+  human-review:
+    gating: true
+    description: >-
+      The reading spent its visit budget without every check coming in. A
+      human reads the checkpoints and decides.
+    instructions: |
+      Transition Task {task_id} back to `supervising` to give it more visits,
+      or to `cancelled` to stop.
+
+  completed:
+    description: Done.
+    final: true
+
+  cancelled:
+    description: Dropped. The reserved name, so a cancelled step owes no export.
+    final: true
+
+transitions:
+  - from: work
+    to: completed
+    description: The work is done and its result written.
+
+  - from: supervising
+    to: human-review
+    description: Visit budget exhausted; a human decides.
+    condition: visitCount >= visits
+
+  - from: supervising
+    to: completed
+    description: Every check is in and the verdict is written.
+    condition: openDescendants < 1
+
+  - from: supervising
+    to: supervising
+    description: Released the next check; wait for it.
+
+  - from: check
+    to: completed
+    description: Finding written.
+
+  - from: human-review
+    to: supervising
+    description: A human gave the reading more visits.
+
+  - from: "*"
+    to: cancelled
+    description: Dropped.

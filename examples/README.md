@@ -19,6 +19,10 @@ Use this table when you know the job you want to model:
 | A parent that steers its subtree while it runs | `subtree-supervision/` | A supervising state wakes the parent at every finished child and holds the rest of the subtree in between. |
 | A full delivery one supervisor drives | `supervised-delivery-example/` | Implement, code review alongside product review, fix, coverage, and docs — every step released by the supervisor's brief, every handoff a plan export. |
 | Live dashboard regression testing | `ui-test-canonical-example/` | Canonical runnable fixture for Flow and TUI/dashboard behavior. |
+| A step a later task reads by name: task or state? | `shape/reproducer/` | The reproduction authored as a sibling of triage and as a child of it; the rule picks the sibling. |
+| The parts of one feature: siblings or children? | `shape/parts-of-a-feature/` | Column, endpoint and page authored flat and under a parent that can only say they are done; the rule picks flat. |
+| Checks a verdict is owed: siblings or children? | `shape/review-against-spec/` | One check per spec point, as siblings joined by exports and as children of a supervising reading; the rule picks children. |
+| Work whose count is unknown until it runs | `shape/cve-category/` | One assessment per CVE, appended as siblings by a lister and as children by a supervising parent; the rule picks children. |
 
 ## Files
 
@@ -122,6 +126,18 @@ Use this table when you know the job you want to model:
     terminal examples
   - Run the mock workflow with `cargo xtask examples run ui-test-canonical --viz`.
 
+- `shape/`
+  Paired examples of the shape rule, `docs/functional-spec/rhei-shape.spec.md`,
+  one directory per decision:
+  - `reproducer/`, `parts-of-a-feature/`, `review-against-spec/` and
+    `cve-category/`, each holding the same work authored twice, as `flat/` and
+    `nested/`, both valid and runnable with a committed mock agent
+  - one `states.yaml` per pair, copied into both shapes so each runs alone
+  - a `README.md` per pair that quotes what the next task is told under
+    `## Plan History` and the console task tree its nested run prints, gives
+    the ruling in one sentence, and says when the other shape is right anyway
+  - Run either shape with `cargo xtask examples run shape-<pair>-<flat|nested>`.
+
 - `states-with-spaces.yaml`
   Companion states file for `escaped-state-values.rhei.md`.
 
@@ -141,7 +157,7 @@ Direct CLI invocations still work if you need a one-off — for example, renderi
 an example as JSON:
 
 ```bash
-cargo run -p rhei-cli -- render examples/release-automation.rhei.md --format json --pretty
+cargo run -p rhei-cli --bin rhei -- render examples/release-automation.rhei.md --format json --pretty
 ```
 
 ## Notes on current behavior

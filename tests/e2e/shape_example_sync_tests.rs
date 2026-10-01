@@ -121,7 +121,6 @@ fn run_shape(pair: &str, shape: &str) -> (TestDir, PathBuf) {
 /// stating one rule in four wordings is how #324 happened.
 // §FS-rhei-shape.7 §FS-rhei-install-skills.4.8
 #[test]
-#[ignore = "pins agent-grounds/rhei#324; remove this attribute with the change"]
 fn the_shape_rule_is_one_normative_copy_every_skill_extracts() {
     let spec = shape_spec();
     let mut copies = Vec::new();
@@ -156,7 +155,6 @@ fn the_shape_rule_is_one_normative_copy_every_skill_extracts() {
 /// of these shipped in the same binary as the other.
 // §FS-rhei-shape.2 §FS-rhei-state-machine-writer.3.1
 #[test]
-#[ignore = "pins agent-grounds/rhei#324; remove this attribute with the change"]
 fn no_authoring_skill_contradicts_the_shape_rule() {
     let plan_writer =
         fs::read_to_string(skills_root().join("rhei-plan-writer/SKILL.md")).expect("skill");
@@ -216,7 +214,6 @@ fn no_authoring_skill_contradicts_the_shape_rule() {
 /// nothing, because the complaint was never that the other shape is rejected.
 // §FS-rhei-shape.4
 #[test]
-#[ignore = "pins agent-grounds/rhei#324; remove this attribute with the change"]
 fn every_shape_pair_ships_both_shapes_and_both_validate() {
     for pair in PAIRS {
         for shape in ["flat", "nested"] {

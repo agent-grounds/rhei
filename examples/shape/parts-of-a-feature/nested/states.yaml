@@ -1,0 +1,34 @@
+name: shape-parts-of-a-feature
+version: 1
+
+# One machine for both shapes of the parts-of-a-feature pair, so the only
+# difference between them is whether the three parts sit under a parent named
+# for the feature (nested) or beside each other, chained with `**Prior:**`
+# (flat).
+#
+# Every state runs the `mock` agent so the example runs with no credentials.
+
+states:
+  work:
+    initial: true
+    agent: mock
+    description: Do the task's work and record why it ends where it does.
+    instructions: |
+      Do Task {task_id} as its body describes, and write your result last.
+
+  completed:
+    description: Done.
+    final: true
+
+  cancelled:
+    description: Dropped.
+    final: true
+
+transitions:
+  - from: work
+    to: completed
+    description: The work is done and its result written.
+
+  - from: "*"
+    to: cancelled
+    description: Dropped.

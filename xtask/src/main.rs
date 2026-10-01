@@ -111,6 +111,56 @@ const EXAMPLES: &[Example] = &[
         state_machine: Some("examples/ui-test-canonical-example/states.yaml"),
         runnable: true,
     },
+    // The shape pairs: the same work authored flat and nested, both runnable with the
+    // mock agent, so the difference a run shows is the shape. §FS-rhei-shape.4
+    Example {
+        name: "shape-reproducer-flat",
+        path: "examples/shape/reproducer/flat",
+        state_machine: Some("examples/shape/reproducer/flat/states.yaml"),
+        runnable: true,
+    },
+    Example {
+        name: "shape-reproducer-nested",
+        path: "examples/shape/reproducer/nested",
+        state_machine: Some("examples/shape/reproducer/nested/states.yaml"),
+        runnable: true,
+    },
+    Example {
+        name: "shape-review-against-spec-flat",
+        path: "examples/shape/review-against-spec/flat",
+        state_machine: Some("examples/shape/review-against-spec/flat/states.yaml"),
+        runnable: true,
+    },
+    Example {
+        name: "shape-review-against-spec-nested",
+        path: "examples/shape/review-against-spec/nested",
+        state_machine: Some("examples/shape/review-against-spec/nested/states.yaml"),
+        runnable: true,
+    },
+    Example {
+        name: "shape-cve-category-flat",
+        path: "examples/shape/cve-category/flat",
+        state_machine: Some("examples/shape/cve-category/flat/states.yaml"),
+        runnable: true,
+    },
+    Example {
+        name: "shape-cve-category-nested",
+        path: "examples/shape/cve-category/nested",
+        state_machine: Some("examples/shape/cve-category/nested/states.yaml"),
+        runnable: true,
+    },
+    Example {
+        name: "shape-parts-of-a-feature-flat",
+        path: "examples/shape/parts-of-a-feature/flat",
+        state_machine: Some("examples/shape/parts-of-a-feature/flat/states.yaml"),
+        runnable: true,
+    },
+    Example {
+        name: "shape-parts-of-a-feature-nested",
+        path: "examples/shape/parts-of-a-feature/nested",
+        state_machine: Some("examples/shape/parts-of-a-feature/nested/states.yaml"),
+        runnable: true,
+    },
 ];
 
 fn workspace_root() -> PathBuf {
@@ -202,7 +252,7 @@ fn cmd_validate_one(name: &str) -> ExitCode {
 fn run_validate(ex: &Example) -> bool {
     let root = workspace_root();
     let mut cmd = Command::new(cargo());
-    cmd.current_dir(&root).args(["run", "-q", "-p", "rhei-cli", "--"]);
+    cmd.current_dir(&root).args(["run", "-q", "-p", "rhei-cli", "--bin", "rhei", "--"]);
     if let Some(sm) = ex.state_machine {
         cmd.args(["--state-machine", sm]);
     }
@@ -241,7 +291,7 @@ fn cmd_run(name: &str, viz_after: bool) -> ExitCode {
     println!("==> running {} in {}", ex.name, dest.display());
     let status = Command::new(cargo())
         .current_dir(&root)
-        .args(["run", "-q", "-p", "rhei-cli", "--"])
+        .args(["run", "-q", "-p", "rhei-cli", "--bin", "rhei", "--"])
         .arg("--state-machine")
         .arg(&sm_abs)
         .arg("run")

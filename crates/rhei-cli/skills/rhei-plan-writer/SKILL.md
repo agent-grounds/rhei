@@ -126,7 +126,7 @@ Decompose a task with nested `Task` nodes at a deeper heading level. Child nodes
 
 Apply these rules:
 - The child id extends the parent id by exactly one new `.`-separated segment (`1.1`, `1.2.3`, `api.cache`). Numeric children increment from `1` within their parent; named children use short identifiers; mixed numeric/named segments are allowed as long as depth matches. Sibling ids must be unique under the same parent.
-- Default to adding child tasks whenever a task benefits from progressive disclosure and per-step logging. Skip them only when the work is clearly atomic — and then make the task description explicit enough to act as a single implementation log entry. A ticket captured with `rhei new` starts as a leaf and stays valid as one; give it children when you come back to plan it, not to satisfy this rule at capture time.
+- Give a task children only when it owes them one of the three reasons in *Task Shape* below — it steers, integrates, or speaks for them. Progressive disclosure is not one of them: everything else is a flat sibling chained with `**Prior:**`. A ticket captured with `rhei new` starts as a leaf and stays valid as one.
 - Heading depth is bounded by the plan's `structure.maxLevels` (default `2`, maximum `4`). H3 is depth 1, H4 is depth 2, H5 is depth 3, H6 is depth 4. A plan that needs more than two levels must declare `structure.maxLevels` in frontmatter.
 - A parent is a ticket, not a folder. Once its children are all terminal it is handed to a worker like any other task — or, when the active machine puts it in a state that declares `execute_on:`, at every checkpoint *while* its children run — and that worker must have something to finish: integration, verification, the summary that ties the children together, or the judgement a supervisor makes between steps. Write the parent's description as that work. Nothing stamps a parent from its children, so a parent authored as an empty container becomes a ticket whose worker has no instructions.
 
@@ -148,7 +148,7 @@ structure:
 ## Planning Workflow
 
 1. Extract deliverables, constraints, and sequencing needs from the request.
-2. Decompose the work into independently completable tasks.
+2. Decompose in the authoring order of *Task Shape*: the *how* is the state machine, the *what* is flat tasks, and depth comes last, only where a parent owes its children something.
 3. Assign only real prerequisites to maximize parallel execution.
 4. Build a dependency DAG and remove cycles before drafting. Ensure the graph is topologically sortable for execution order.
 5. Draft concise context sections only when they improve implementation clarity.
@@ -171,7 +171,7 @@ Validate every response against all checks:
 - Every task (root or child) has `**State:**` with an allowed value from the resolved profile; `**Prior:**` appears only after `**State:**`; no `**Assignee:**` or `> **Result:**` is authored; no other metadata fields appear.
 - Each `**Prior:**` references only existing tasks (resolved across the merged workspace graph in a Directory Workspace). Dependencies are acyclic: a task never self-references nor lists its parent or any ancestor — follow-up work that must wait for a parent is a top-level sibling, not a child.
 - ID style is consistent; each child id extends its parent by exactly one segment; sibling ids under one parent are unique.
-- Each task has child tasks unless it is clearly simple and non-decomposable. This applies to a plan drafted as a document; a ticket captured one at a time with `rhei new` is a leaf by construction, and decomposing it later is `rhei new --under <ticket-id>` or a plan edit.
+- Every parent steers, integrates, or speaks for its children (*Task Shape*); a parent whose body could only say "the children below are done" is removed and its children become siblings. Decomposing a captured ticket later is `rhei new --under <ticket-id>` or a plan edit.
 - Heading depth ≤ `structure.maxLevels`; if mixed kinds are used, every heading keyword appears in `structure.nodeKinds` and `rhei` never does.
 
 When the CLI is available, run `rhei validate <plan>` after writing — it performs the full grammar, state, dependency, link, and terminal-coherence checks the checklist only approximates.
@@ -223,6 +223,16 @@ When modifying an existing Rhei Plan:
 ## Missing Information Handling
 
 If required input is missing, ask the user to provide it. If the missing information is project-related, the user can instruct you to summon a researcher.
+
+## Task Shape: State, Task or Subtask
+
+Ask of every step: **who reads what it writes?** If anyone but the next state of the same task reads it, it is a task; otherwise it is a state of the machine and not a task at all ([§FS-rhei-shape.2](../../../../docs/functional-spec/rhei-shape.spec.md#2-the-memory-test)). [references/shape.md](references/shape.md) carries the memory test, the three reasons and the decision table, extracted from the spec byte for byte.
+
+- **Flat by default.** Every task is a sibling chained with `**Prior:**` unless the parent owes something of its own ([§FS-rhei-shape.3.1](../../../../docs/functional-spec/rhei-shape.spec.md#31-the-default-is-flat)). `rhei list --parent <id>` and the folded lines of the run report already give a reader depth on demand.
+- **Three reasons for children.** The parent **steers** them (decides what each child is, between the children), **integrates** them (its deliverable is made out of theirs), or **speaks for** them (its line is what a later reader gets instead of the subtree). A parent that does none of the three is a folder, and its children are siblings ([§FS-rhei-shape.3.2](../../../../docs/functional-spec/rhei-shape.spec.md#32-the-three-reasons-a-task-has-children)).
+- **Promotion runs one way.** Author the *how* as the state machine, the *what* as flat tasks, then add depth only where a parent owes one of the three. When a phase's product is read from outside but no parent owes anything, it is a flat sibling ([§FS-rhei-shape.3.3](../../../../docs/functional-spec/rhei-shape.spec.md#33-promotion)).
+
+Two runnable pairs show it: [`examples/shape/parts-of-a-feature`](../../../../examples/shape/parts-of-a-feature/README.md) rules flat, because nothing is owed above a schema, an endpoint and a UI, and [`examples/shape/review-against-spec`](../../../../examples/shape/review-against-spec/README.md) rules for subtasks, because the verdict is made of the checks and speaks for them.
 
 ## Important: Task Granularity
 

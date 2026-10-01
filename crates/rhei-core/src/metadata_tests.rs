@@ -42,8 +42,10 @@ fn the_register_names_every_key_rhei_writes() {
 
 /// The `Cleared by rhei reset` column as `rhei reset` was measured to behave:
 /// the counters, the parked provider wait and the supervision block go; the
-/// poll deadline is one state's own scheduling and the budget identity would
-/// hand the ticket a fresh travel history. §FS-rhei-reset.2
+/// poll deadline is one state's own scheduling and the budget identity is kept
+/// because the document must not be made to disagree with the ledger — deleting
+/// it buys no travel, it only leaves a binding the document no longer names.
+/// §FS-rhei-reset.2
 #[test]
 fn the_reset_column_is_what_reset_actually_deletes() {
     let cleared: Vec<&str> = keys_cleared_by_reset().collect();

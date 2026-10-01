@@ -426,20 +426,24 @@ error: ticket 'plan.2' claims a budget identity the account holds for 'plan.1'
        claimed by:  plan.1 and plan.2, both live in plan.rhei.md
        why:         one travel bound covers one ticket, and these two would
                     draw on one
-       to fix it:   give the copy a fresh `budgetTicketId` in that file; the
-                    account holds this history for 'plan.1'
+       to fix it:   give whichever of these did not earn this history a fresh
+                    `budgetTicketId` in that file; the account counts it
+                    against 'plan.1'
 ```
 
 It names both display ids, the uuid, and the file they are both live in, because
-those are what a person needs in order to find the key they duplicated. A
-whole-file copy puts them in two files rather than one — `plan.1` and `work.1`
-claiming one uuid in two live documents whose bytes agree — and the line then
-names both paths instead of one file name, because a bare name would not locate
-either of them: `claimed by:  plan.1 and work.1, live in <path> and <path>`. Its
-**one** remedy — §FS-rhei-budgets.8 requires exactly one — is a fresh
-`budgetTicketId` for the copy. Deleting the copy's key is not offered and is not
-a way out: in an account whose binding has already moved, a keyless copy
-resolves to the binding that moved and adopts it again.
+those are what a person needs in order to find the key they duplicated. It does
+not name one of them as the copy: the refused ticket is usually the copy and
+sometimes the ticket that earned the history, and which it is, is not in the
+document. A whole-file copy puts them in two files rather than one — `plan.1`
+and `work.1` claiming one uuid in two live documents whose bytes agree — and the
+line then names both paths instead of one file name, because a bare name would
+not locate either of them:
+`claimed by:  plan.1 and work.1, live in <path> and <path>`. Its **one** remedy
+— §FS-rhei-budgets.8 requires exactly one — is a fresh `budgetTicketId` for
+whichever of the two did not earn the history, in that file. Deleting a key is
+not offered and is not a way out: in an account whose binding has already moved,
+a keyless copy resolves to the binding that moved and adopts it again.
 
 **Exactly one, or none — permitted, and reported.** The display id the uuid was
 counted against is gone from every live source, which is a move. The key follows
@@ -452,15 +456,32 @@ warning: travel for 7f3c1a90-5e21-4d8b-9a6c-bc5de10f12e7 now counts against 'pla
          counted against 'plan.1', which this plan no longer has
 ```
 
-A move is the one case the refusal cannot reach — delete the original's key and
-then write it onto a second ticket, and the document says exactly one ticket owns
-the identity — so without that line, travel following a heading edit in silence
-is what would be left standing.
+A move is the case the refusal cannot reach — delete the original's key and then
+write it onto a second ticket, and the document says exactly one ticket owns the
+identity — so without that line, travel following a heading edit in silence is
+what would be left standing. The line is owed to what the journal did rather
+than to what the edge did: the binding has moved durably by the time anything
+else about that edge can refuse it, so a move whose edge then meets an exhausted
+bound is reported all the same.
 
 A ticket carrying no identity never reaches this rule. It resolves through the
 binding on its own display id and source path, so the display id it then binds
 is the one already recorded and the binding does not move: the lost-write case
 of §FS-rhei-budgets.5.2 keeps its answer.
+
+That resolution is where the rule reaches its limit, and this point says so
+rather than claiming otherwise. A renumber leaves the binding naming the id it
+freed until the renumbered ticket takes its next edge, so a brand-new ticket
+authored at that id before then resolves to the history that id had — and the
+ticket that earned it is the second claimant from that moment on, and the one
+refused. Declining the adoption is not the way out: that document is the same
+bytes as the one a deleted key leaves beside a copy that still holds it, where
+declining mints the ticket a second bound to spend beside the one it already
+spent against and lets the copy move into the first — eight edges against a
+bound of six, the capacity this point exists to deny. Between two documents that
+cannot be told apart, the bound is what is kept. That is why the refusal names
+both claimants and the display id the account counts the history against, and
+leaves **which of the two earned it** to the person, who can tell.
 
 ### 5.3. The witness
 

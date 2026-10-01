@@ -52,6 +52,12 @@ impl Journal {
     /// The display id is part of the key rather than decoration: one metadata
     /// file holds every task of a rhei, so a binding matched on the path alone
     /// would hand one ticket's travel to its sibling.
+    ///
+    /// Asked unconditionally, and on purpose: the document a renumber leaves —
+    /// one keyless ticket beside one that holds the uuid — is the same document
+    /// a deleted key leaves beside a copy that holds it, and declining to
+    /// answer the first mints a second bound for the ticket that already spent
+    /// against the first. §FS-rhei-budgets.5.2.1
     pub fn bound_ticket(&self, display: &str, source: &Path) -> Result<Option<String>> {
         let source = match std::fs::canonicalize(source) {
             Ok(source) => source,
@@ -160,8 +166,11 @@ impl Journal {
 ///
 /// A renumbered task and a renamed plan file are both this, and neither can be
 /// told from the other in the document — which is why the move is reported
-/// rather than refused. §FS-rhei-budgets.5.2.1
+/// rather than refused. A writer that drops it says nothing about a binding
+/// that moved durably, so the type insists on being used.
+/// §FS-rhei-budgets.5.2.1
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use = "a binding that moved is reported on the warning channel"]
 pub struct IdentityMove {
     /// The ticket uuid, as the account's own receipts spell it.
     pub identity: String,
@@ -174,11 +183,17 @@ pub struct IdentityMove {
 impl IdentityMove {
     /// The warning channel's words for a move, in the shape
     /// §FS-rhei-budgets.5.2.1 fixes.
+    ///
+    /// The continuation is indented to the message's own column rather than to
+    /// wherever the source happens to wrap: this line is printed plain rather
+    /// than through a reporter, so what is built here is exactly what is read.
     pub fn warning(&self) -> String {
         let (identity, to, from) = (&self.identity, &self.to, &self.from);
+        // `counted` aligns under `travel`, which is the width of the label.
+        let indent = " ".repeat("warning: ".len());
         format!(
-            "warning: travel for {identity} now counts against '{to}'; it was
-                      counted against '{from}', which this plan no longer has"
+            "warning: travel for {identity} now counts against '{to}'; it was\n\
+             {indent}counted against '{from}', which this plan no longer has"
         )
     }
 }
@@ -228,7 +243,11 @@ fn claimants(path: &Path, bytes: &str, id: &str) -> usize {
 /// Two live tickets claiming one identity, in the plain `error:` shape of
 /// §FS-rhei-budgets.8 — no bound is what stopped this — with both display ids,
 /// the uuid, the file they are live in, and one remedy.
-/// §FS-rhei-budgets.5.2.1 §FS-rhei-errors.1
+///
+/// The remedy names neither of them as the copy. The refused ticket is usually
+/// the copy and sometimes the ticket that earned the history — a renumber whose
+/// freed display id was authored over before it moved — and which it is, is not
+/// in the document. §FS-rhei-budgets.5.2.1 §FS-rhei-errors.1
 fn claimed_by_two(id: &str, held: &str, display: &str, claiming: &[&PathBuf]) -> BudgetError {
     let lines = [
         format!("ticket '{display}' claims a budget identity the account holds for '{held}'"),
@@ -236,8 +255,9 @@ fn claimed_by_two(id: &str, held: &str, display: &str, claiming: &[&PathBuf]) ->
         row("claimed by:", &format!("{held} and {display}, {}", live_in(claiming))),
         row("why:", "one travel bound covers one ticket, and these two would"),
         row("", "draw on one"),
-        row("to fix it:", "give the copy a fresh `budgetTicketId` in that file; the"),
-        row("", &format!("account holds this history for '{held}'")),
+        row("to fix it:", "give whichever of these did not earn this history a fresh"),
+        row("", "`budgetTicketId` in that file; the account counts it"),
+        row("", &format!("against '{held}'")),
     ];
     BudgetError::new("identity_claimed", lines.join("\n"))
 }

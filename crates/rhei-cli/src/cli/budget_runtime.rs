@@ -350,8 +350,15 @@ fn budget_admit_spawn(
     let execution_root = workspace_root.to_string_lossy().into_owned();
     let project_label = budget_project_label(&project_root);
     let parent = InheritedAncestry::from_environment();
-    let admitted = (|| -> Result<_, BudgetError> {
-        let moved = journal.bind_ticket(&ticket, task_id_str, &route.metadata_file, &audit)?;
+    // §FS-rhei-budgets.5.2.1: said out loud here, where there is a channel for
+    // it, and on what the journal did rather than on what the reservation did —
+    // the binding has moved by the time a refusal could swallow the line.
+    let bound = journal.bind_ticket(&ticket, task_id_str, &route.metadata_file, &audit);
+    if let Ok(Some(moved)) = &bound {
+        eprintln!("{}", moved.warning());
+    }
+    // Reported already, so what the move was is of no further interest here.
+    let admitted = bound.and_then(|_| {
         // A reservation a crashed run left outstanding is given back before
         // this one is weighed, so a dead run's claim never refuses a live one.
         // §FS-rhei-budgets.6.2
@@ -367,15 +374,10 @@ fn budget_admit_spawn(
             spend_reserve_micro: built_in::SPEND_RESERVE,
             spend_currency: currency,
         };
-        Ok((journal.reserve(&request, bounds.effective(), &audit)?, moved))
-    })();
+        journal.reserve(&request, bounds.effective(), &audit)
+    });
     match admitted {
-        Ok((group, moved)) => {
-            // §FS-rhei-budgets.5.2.1: a permitted move is said out loud, here
-            // rather than in the core, which has no channel to say it on.
-            if let Some(moved) = moved {
-                eprintln!("{}", moved.warning());
-            }
+        Ok(group) => {
             // The reserve spent, so the ticket has earned its durable identity.
             identity.commit()?;
             let bounds = budget_reports(&journal, &ticket, &bounds).unwrap_or_default();

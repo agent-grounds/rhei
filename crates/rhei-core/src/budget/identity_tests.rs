@@ -94,9 +94,17 @@ fn one_live_claimant_under_a_new_display_id_moves_and_says_so() {
         moved,
         IdentityMove { identity: UUID.into(), from: "plan.1".into(), to: "plan.3".into() }
     );
-    for named in ["warning:", "plan.1", "plan.3", UUID] {
-        assert!(moved.warning().contains(named), "the warning names {named}: {}", moved.warning());
-    }
+    // Both lines in full, indentation included: §FS-rhei-budgets.5.2.1 aligns
+    // `counted` under `travel`, and this line is printed plain rather than
+    // through a reporter, so what is built is what a person reads.
+    assert_eq!(
+        moved.warning(),
+        format!(
+            "warning: travel for {UUID} now counts against 'plan.3'; it was\n\
+             {blank:9}counted against 'plan.1', which this plan no longer has",
+            blank = ""
+        )
+    );
     assert_eq!(display_of(&journal, &ticket), "plan.3", "the binding followed the ticket");
 }
 

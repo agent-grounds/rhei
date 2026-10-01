@@ -166,6 +166,10 @@ fn a_manual_edge_after_a_lost_identity_write_meets_the_bound_it_already_spent() 
 
 const SIX_MOVES: &str = r#", "transition_limit": 6"#;
 
+/// A bound small enough that the edge a move arrives on is the edge that meets
+/// it, which is the case a move's warning used to be lost in.
+const TWO_MOVES: &str = r#", "transition_limit": 2"#;
+
 /// A ping-pong that declares no output artifacts.
 ///
 /// These two scenarios take every edge by hand, and `rhei transition` holds a
@@ -222,7 +226,8 @@ const TWO_TASK_PLAN: &str = r#"# Rhei: Bounded work
 // §FS-rhei-budgets.5.2.1 §REQ-bounded-neural-work.4
 #[test]
 fn a_copy_claiming_a_live_ticket_s_identity_is_refused_rather_than_rebound() {
-    let (dir, plan, machine) = setup_identity_plan("budget-identity-claimed", TWO_TASK_PLAN);
+    let (dir, plan, machine) =
+        setup_identity_plan("budget-identity-claimed", TWO_TASK_PLAN, SIX_MOVES);
 
     assert_success(&edge(&plan, &machine, "1"));
     assert_success(&edge(&plan, &machine, "1"));
@@ -277,7 +282,7 @@ fn a_copy_claiming_a_live_ticket_s_identity_is_refused_rather_than_rebound() {
 // §FS-rhei-budgets.5.2.1
 #[test]
 fn a_renumbered_ticket_keeps_its_travel_and_says_where_it_went() {
-    let (dir, plan, machine) = setup_identity_plan("budget-identity-renumbered", PLAN);
+    let (dir, plan, machine) = setup_identity_plan("budget-identity-renumbered", PLAN, SIX_MOVES);
 
     assert_success(&edge(&plan, &machine, "1"));
     assert_success(&edge(&plan, &machine, "1"));
@@ -308,6 +313,38 @@ fn a_renumbered_ticket_keeps_its_travel_and_says_where_it_went() {
     }
 }
 
+/// A lawful move is reported on what the journal did, never on what the edge
+/// did.
+///
+/// `bind_ticket` appends the `identity` receipt before anything is charged, so
+/// the binding's display id has moved durably whatever the charge then does.
+/// Printing the line only where the whole edge succeeded dropped it exactly
+/// where it mattered most — an exhausted bound — and dropped it for good: the
+/// next edge matches the recorded display id and has no move to report.
+// §FS-rhei-budgets.5.2.1
+#[test]
+fn a_move_whose_edge_is_then_refused_still_says_the_binding_moved() {
+    let (dir, plan, machine) = setup_identity_plan("budget-identity-move-refused", PLAN, TWO_MOVES);
+
+    assert_success(&edge(&plan, &machine, "1"));
+    assert_success(&edge(&plan, &machine, "1"));
+    let uuid = budget_identity(&plan, "1").expect("plan.1 earned a budget identity");
+
+    renumber_task(&plan, "1", "3");
+    let refused = edge(&plan, &machine, "3");
+
+    assert!(!refused.status.success(), "plan.1 spent both units, so plan.3 meets the bound");
+    assert_halt_mentions(&refused, "ticket travel");
+    for named in ["warning: travel for", "plan.1", "plan.3", uuid.as_str()] {
+        assert_stderr_names(&refused, named);
+    }
+    assert_eq!(
+        receipts(&dir, "identity").last().map(|(_, display)| display.clone()),
+        Some("plan.3".to_owned()),
+        "the binding moved durably, which is why the line may not be dropped"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // The fixture for the two scenarios above
 // ---------------------------------------------------------------------------
@@ -318,12 +355,12 @@ fn a_renumbered_ticket_keeps_its_travel_and_says_where_it_went() {
 /// `rhei transition` charges an applied edge against an account that exists; it
 /// does not establish one, which is why `budget init` is part of the fixture
 /// rather than of the scenario. §FS-rhei-budgets.5.4
-fn setup_identity_plan(prefix: &str, plan_text: &str) -> (TestDir, PathBuf, PathBuf) {
+fn setup_identity_plan(prefix: &str, plan_text: &str, moves: &str) -> (TestDir, PathBuf, PathBuf) {
     let dir = unique_temp_dir(prefix);
     let plan = write_fixture_file(&dir, "plan.rhei.md", plan_text);
     let machine = write_fixture_file(&dir, "states.yaml", BARE_PING_PONG_MACHINE);
     let agent = write_python_agent(&dir, "mock-agent.py", RECORDING_AGENT);
-    write_machine_settings(&dir, &agent_defaults(&agent, SIX_MOVES));
+    write_machine_settings(&dir, &agent_defaults(&agent, moves));
     assert_success(&budget_init(&plan));
     (dir, plan, machine)
 }

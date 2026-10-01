@@ -312,7 +312,7 @@ fn record_poll_self_loop_if_needed(
         machine,
     )
     .saturating_add(1);
-    // §FS-rhei-panta.6.1: the write lands in the owning rhei's metadata file
+    // §FS-rhei-panta.6: the write lands in the owning rhei's metadata file
     // under that file's own key space — the same one the exit-time
     // clear_poll_state_metadata removes.
     let route = loaded.task_route(&task.id.to_string(), input);
@@ -343,7 +343,7 @@ fn record_poll_self_loop_if_needed(
 /// than this function's, because the budget's identity guard reads the same
 /// files and the two must not disagree about where a ticket's metadata lives.
 /// What is left here is how each form's failure is reported.
-/// §FS-rhei-panta.6.1
+/// §FS-rhei-panta.6
 fn parse_metadata_from_raw(path: &Path, raw: &str) -> MietteResult<Option<Metadata>> {
     rhei_core::metadata::parse_metadata_file(path, raw).map_err(|failed| match failed.form {
         MetadataForm::PantaManifest => miette!(
@@ -370,7 +370,7 @@ struct MetadataManifest {
 
 /// Parse the manifest that owns a ticket's runtime metadata, dispatching on
 /// which index form `path` names. A Panta manifest reaches here only for basin
-/// tickets, which have no index of their own. §FS-rhei-panta.6.1
+/// tickets, which have no index of their own. §FS-rhei-panta.6
 fn parse_metadata_manifest(path: &Path, raw: &str) -> MietteResult<MetadataManifest> {
     if MetadataForm::of(path) == MetadataForm::PantaManifest {
         let manifest = rhei_core::parser::parse_panta_manifest(raw).map_err(|err| {

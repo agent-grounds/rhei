@@ -79,7 +79,7 @@ pub fn keys_cleared_by_reset() -> impl Iterator<Item = &'static str> {
 /// ticket's metadata lives — the transition path that rewrites it, the manifest
 /// read that also wants the structure, and the budget's identity guard that
 /// counts who claims a uuid — and a second copy of this match is a second
-/// opinion about the same question. §FS-rhei-panta.6.1
+/// opinion about the same question. §FS-rhei-panta.6
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetadataForm {
     /// A Directory Workspace index (`index.rhei.md`), keyed rhei-locally.
@@ -93,7 +93,7 @@ pub enum MetadataForm {
 
 impl MetadataForm {
     /// The form the file at `path` is read as, decided by its name alone — the
-    /// same name the loader routed on. §FS-rhei-panta.6.1
+    /// same name the loader routed on. §FS-rhei-panta.6
     pub fn of(path: &Path) -> Self {
         match path.file_name().and_then(|name| name.to_str()) {
             Some(PANTA_INDEX_FILE) => Self::PantaManifest,
@@ -105,7 +105,7 @@ impl MetadataForm {
 
 /// A metadata file that would not parse, carrying the form it was read as so
 /// that a caller can name the document rather than guess at it.
-/// §FS-rhei-panta.6.1
+/// §FS-rhei-panta.6
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MetadataParseError {
     pub form: MetadataForm,
@@ -116,7 +116,7 @@ pub struct MetadataParseError {
 ///
 /// Every caller that reads `metadata.tasks.<id>` off disk comes through here,
 /// so none of them can disagree with another about which parse a file name
-/// asks for. §FS-rhei-panta.6.1
+/// asks for. §FS-rhei-panta.6
 pub fn parse_metadata_file(
     path: &Path,
     raw: &str,

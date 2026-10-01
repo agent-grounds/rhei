@@ -9,9 +9,7 @@
 
 // §AR-source-file-size.3 §FS-rhei-budgets.4.1 §FS-rhei-budgets.8
 
-use rhei_core::budget::{
-    halt_text, AppliedEdge, Contract, Dimension, IdentityMove, Remedy, SpendMarks,
-};
+use rhei_core::budget::{halt_text, AppliedEdge, Contract, Dimension, Remedy, SpendMarks};
 
 /// Render a refusal as the halt of §FS-rhei-budgets.8, or as itself when what
 /// refused was the account rather than a bound.
@@ -165,32 +163,29 @@ fn budget_charge_applied_edge(
     let mut journal = budget_result(account.open(true))?;
     let (settled, ticket_uuid) = budget_ticket_id_in_metadata(&journal, charge, metadata)?;
     let ticket = account.ticket_identity(&ticket_uuid);
-    let charged = (|| -> Result<Option<IdentityMove>, BudgetError> {
-        let moved =
-            journal.bind_ticket(&ticket, charge.task_id_str, charge.metadata_file, &audit)?;
-        journal.charge_travel(
-            &AppliedEdge {
-                ticket: &ticket,
-                display_id: charge.task_id_str,
-                from: charge.from,
-                to: charge.to,
-                reservation: held.as_deref(),
-                transition_limit: bounds.travel.effective,
-            },
-            &audit,
-        )?;
-        Ok(moved)
-    })();
-    match charged {
-        // A move the rule permits is reported beside the edge that caused it,
-        // on the warning channel rather than on the move's own line.
-        // §FS-rhei-budgets.5.2.1
-        Ok(moved) => {
+    // Written between the two calls: the `identity` receipt is durable the
+    // moment `bind_ticket` returns, so an edge refused after it would move the
+    // binding in silence, for good. §FS-rhei-budgets.5.2.1
+    let charged = journal
+        .bind_ticket(&ticket, charge.task_id_str, charge.metadata_file, &audit)
+        .and_then(|moved| {
             if let Some(moved) = moved {
                 eprintln!("{}", moved.warning());
             }
-            Ok(settled)
-        }
+            journal.charge_travel(
+                &AppliedEdge {
+                    ticket: &ticket,
+                    display_id: charge.task_id_str,
+                    from: charge.from,
+                    to: charge.to,
+                    reservation: held.as_deref(),
+                    transition_limit: bounds.travel.effective,
+                },
+                &audit,
+            )
+        });
+    match charged {
+        Ok(()) => Ok(settled),
         Err(refusal) => Err(miette!(
             help = budget_inspect_help(),
             "{}",

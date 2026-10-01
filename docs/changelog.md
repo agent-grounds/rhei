@@ -17,13 +17,18 @@ pull request number: the release stamps `(PR #N)` onto it. See
   earned, which is backwards from what anyone copying a ticket would expect.
   Nothing said so. That admission is now refused before a receipt is appended,
   naming both display ids, the uuid, and the file they are both live in, and
-  offering the one edit that resolves it — a fresh `budgetTicketId` for the copy.
-  The two lawful moves still work and no longer work in silence: a renumbered
-  task and a renamed plan file carry their travel to the new display id and say
-  on the warning channel which id it was counted against before, which is the
-  one case the refusal cannot reach because the document cannot be told from a
-  relocation. An account already in that state is repaired by the same hand edit
-  the refusal names. §FS-rhei-budgets.5.2.1 draws the rule;
+  offering the one edit that resolves it — a fresh `budgetTicketId` for
+  whichever of the two did not earn the history, which a person can say and the
+  document cannot. The two lawful moves still work and no longer work in
+  silence: a renumbered task and a renamed plan file carry their travel to the
+  new display id and say on the warning channel which id it was counted against
+  before, which is the one case the refusal cannot reach because the document
+  cannot be told from a relocation. That line is written on what the journal
+  did rather than on what the edge did, so a move whose edge is then refused —
+  for the travel bound it has just met — still says the binding moved, instead
+  of moving it durably and in silence. An account already in that state is
+  repaired by the same hand edit the refusal names.
+  §FS-rhei-budgets.5.2.1 draws the rule;
   §REQ-bounded-neural-work.4 already required it. (PR #TBD)
 
 - Add `rhei note`, the one channel that carries a fact sideways into the

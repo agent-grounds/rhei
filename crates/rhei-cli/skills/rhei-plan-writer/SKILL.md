@@ -19,13 +19,13 @@ Default to Single-File unless the user asks for high concurrency or merge-confli
 ### Single-File Plan
 
 - Emit exactly one H1: `# Rhei: <title>`.
-- Optionally emit `**States:** <state-machine-name>` as the first non-empty line after the H1 to declare which state machine the plan follows. Omit to use the built-in `rhei` state machine.
-- Optionally emit a YAML frontmatter block (see *Frontmatter*) after the `**States:**` field, before any H2 section.
+- Do **not** emit a `**States:**` line. Which machine a plan runs under is decided by where `states.yaml` sits — beside a single-file plan, at a Directory Workspace's root, or at the project root for the default — and the declaration is deprecated and removed in the next release ([§FS-rhei-states-deprecation](../../../../docs/functional-spec/rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). Keep an existing one when editing a plan that has it: for this release it still wins over the file beside it, so deleting it can change which machine the plan runs under.
+- Optionally emit a YAML frontmatter block (see *Frontmatter*) directly after the H1, before any H2 section.
 - Emit zero or more contextual H2 sections before tasks, then `## Tasks` as the final H2 section with at least one task.
 
 ### Directory Workspace
 
-- Emit `index.rhei.md` at the workspace root: H1, optional `**States:**`, optional frontmatter, optional H2 context sections — **no** `## Tasks` section.
+- Emit `index.rhei.md` at the workspace root: H1, optional frontmatter, optional H2 context sections — **no** `## Tasks` section. A workspace that needs its own machine gets a `states.yaml` at that root, not a declaration.
 - Emit one or more task files under `tasks/`. Each file begins directly with `### <kind> <id>:` headers and contains no `# Rhei:` header and no independent frontmatter.
 - Frontmatter (including `structure`, `metadata.tasks.*`) lives only in `index.rhei.md` — the workspace has exactly one authoritative metadata map.
 - Numeric IDs are the default here too, as long as tickets are added with `rhei new` (see *Adding to a Live Project*): it allocates the next free number under a lock, which is exactly the collision the format used to fear. Prefer letter-prefixed or name-style IDs (e.g., `task-avatar`, `bug-null-cache`) only when task files are hand-authored in parallel branches, where nothing is holding that lock.
@@ -51,50 +51,55 @@ Apply these rules:
 
 ### Allowed States
 
-Run `rhei states` in the project to discover the allowed state values, their agent instructions, and the declared transitions for the state machine the plan will follow. Use `rhei states --state-machine <path>` to target a specific YAML file (e.g. the one a plan's `**States:**` line references), and `--json` when machine-readable output is preferred. Use only state values reported by that command, follow the printed instructions when describing task work, and respect the declared transitions when choosing initial states.
+Run `rhei states` in the project to discover the allowed state values, their agent instructions, and the declared transitions for the state machine the plan will follow. Use `rhei states --state-machine <path>` to target a specific YAML file, and `--json` when machine-readable output is preferred. Use only state values reported by that command, follow the printed instructions when describing task work, and respect the declared transitions when choosing initial states.
 
 #### No-CLI state-machine resolution
 
-If the `rhei` CLI is unavailable, resolve the effective declaration using this
-table and then read the selected YAML directly. An explicit matching
-`--state-machine <path>` remains a whole-scope override and is read first.
+If the `rhei` CLI is unavailable, resolve the machine by **where the file is**
+and then read that YAML directly. An explicit `--state-machine <path>` remains
+a whole-scope override and is read first. Otherwise a rhei's machine is the
+first of three places that has a `states.yaml`
+([§FS-rhei-plan-language.1.3](../../../../docs/functional-spec/rhei-plan-language.spec.md#13-state-machine-resolution)):
+
+1. the rhei's **own execution root** — the directory holding a single-file
+   plan, or a Directory Workspace's root — whatever that file's `name:` is and
+   whatever the index says;
+2. otherwise the **project root**, the directory holding `index.panta.md`,
+   whatever its `name:` is and whether or not the manifest names it;
+3. otherwise the built-in `rhei` machine in
+   [default-states.md](references/default-states.md).
+
+A declaration naming a machine no file supplies, with no file in the rhei's own
+root either, is still an error rather than a fall through.
+
+For one release the deprecated `**States:**` declaration is resolved *before*
+those three and wins wherever it resolves, so a project written against the
+previous rules runs under exactly the machine it did
+([§FS-rhei-states-deprecation](../../../../docs/functional-spec/rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). Read the deprecated rows below only where
+the plan you are working on carries that line; the CLI prints one `warning:`
+per declaration where the two disagree.
 
 | Invocation scope | Effective `**States:**` | Matching file available | Resolution |
 |---|---|---|---|
-| Panta project default (inherited or restated) | `rhei` | project-root `states.yaml` | project-root file |
-| Panta project default (inherited or restated) | `rhei` | member-root `states.yaml` only | built-in `rhei` |
+| Any rhei, by placement | none | `states.yaml` in the rhei's own execution root | own-root file, whatever its `name:` |
+| Any rhei, by placement | none | project-root `states.yaml` only | project-root file, whatever its `name:` |
+| Any rhei, by placement | none | none in either place | built-in `rhei` |
 | Standalone single-file plan | `rhei` | sibling `states.yaml` | sibling file |
 | Standalone Directory Workspace | `rhei` | workspace-root `states.yaml` | workspace-root file |
+| Panta project default (inherited or restated) | `rhei` | project-root `states.yaml` | project-root file |
+| Panta project default (inherited or restated) | `rhei` | member-root `states.yaml` only | built-in `rhei` |
 | Panta custom project default | non-`rhei` | one matching member-root `states.yaml` | unique member-root file |
 | Panta custom project default | `rhei` (member's own, differing) | none found anywhere | built-in `rhei` |
 | Panta custom project default, restated by the member's own declaration | non-`rhei` (equal to the default) | matching own-execution-root `states.yaml` | own-root file |
 | Panta custom project default, restated by the member's own declaration | non-`rhei` (equal to the default) | own-root file absent, or names another machine | already-resolved project default |
 
-A plan with no effective `**States:**` declaration uses the built-in machine in
-[default-states.md](references/default-states.md) and ignores automatically
-discovered files. For a declared `rhei`, use a matching file only at the local
-lookup location shown above; without one, use that same built-in machine and its
-`pending`/`completed` states. In particular, a member that inherits or restates
-a Panta project default named `rhei` cannot replace it with a member-root file —
-including its own: restating the built-in default is equivalent to omission in
-every respect, unlike restating a custom default.
-
-For a non-`rhei` declaration outside a Panta project, use a matching sibling
-`states.yaml` for a single-file plan or a matching `states.yaml` at a Directory
-Workspace root. In a Panta project, a member's own declaration of a custom name
-checks its execution root first — whether that name differs from the project
-default or restates it. For a restated name, an absent or differently-named
-own-root file falls back directly to the already-resolved project default and
-nothing further is checked. For a differing name, when the own-root file is
-absent or names another machine, check the Panta project root next, or,
-outside a project, the plan's directory or Directory Workspace root; if that
-is absent or names a different machine, look in every rhei directory, its own
-included: if exactly one has a `states.yaml` with that name, use it. A missing
-match is an error — except that a member's own differing declaration of `rhei`
-itself falls back to the built-in machine instead of erroring. Multiple
-matches or an unreadable candidate remain errors in every case, and no other
-automatic location is searched
-([§FS-rhei-plan-language.1.3](../../../../docs/functional-spec/rhei-plan-language.spec.md#13-state-machine-resolution)).
+The last eight rows are the deprecated declaration's and go in the next
+release; the first three are the rule that remains. Where a declaration still
+resolves, an unrelated `states.yaml` sitting in the rhei's own root does not
+take over until then — which is what the CLI's warning says. Multiple rhei
+roots declaring one name is an ambiguity error, an unreadable candidate is a
+load error, and no directory or file name other than `states.yaml` in those
+places is ever searched.
 
 Each node's initial state comes from the machine's `profiles.<name>.initial` via `node_policy` — **not** from a state-level `initial: true` flag. In the built-in `rhei` machine the initial state is `pending`, so every task in a new plan under that machine starts in `pending`.
 
@@ -160,7 +165,7 @@ structure:
 Validate every response against all checks:
 
 - One H1 matching `# Rhei: <title>` (Single-File Plan) or an `index.rhei.md` (Directory Workspace).
-- If present, `**States:**` is the first non-empty line after the H1, and any YAML frontmatter sits between it and the first H2.
+- No `**States:**` line is authored; a pre-existing one is left where it was, as the first non-empty line after the H1, with any YAML frontmatter between it and the first H2.
 - `## Tasks` is present and last in Single-File Plans; omitted entirely from `index.rhei.md`.
 - Every root task is `### <Kind> <id>: <title>` and every child is `#### <Kind> <parent>.<child>: <title>` (deeper at H5/H6 when `structure.maxLevels` permits).
 - Every task (root or child) has `**State:**` with an allowed value from the resolved profile; `**Prior:**` appears only after `**State:**`; no `**Assignee:**` or `> **Result:**` is authored; no other metadata fields appear.

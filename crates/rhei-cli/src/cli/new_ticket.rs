@@ -157,15 +157,20 @@ fn resolve_state_machines_for_create(
 ) -> MietteResult<ResolvedMachineSet> {
     let default = resolve_state_machine_for_loaded_plan(input, loaded, None)?;
     let mut per_rhei = BTreeMap::new();
-    let mut declared: Vec<(&String, &String)> = loaded.rhei_machines.iter().collect();
-    declared.sort();
-    for (rhei_id, machine_name) in declared {
-        // Creation preserves explicit declaration provenance when selecting
-        // both the initial state and an explicit state. §FS-rhei-plan-language.1.3
-        match resolve_declared_rhei_machine(input, loaded, rhei_id, machine_name, &default) {
-            Ok(resolved) => {
+    let mut roots: Vec<(&String, &PathBuf)> =
+        loaded.is_panta_project().then(|| loaded.rhei_roots.iter().collect()).unwrap_or_default();
+    roots.sort();
+    for (rhei_id, root) in roots {
+        // Creation resolves each rhei the way every command does: its own root
+        // whatever its index says, behind the deprecated declaration pass.
+
+        // §FS-rhei-plan-language.1.3
+        let declared = loaded.rhei_machines.get(rhei_id).map(String::as_str);
+        match resolve_rhei_machine(input, loaded, rhei_id, root, declared, &default) {
+            Ok(Some(resolved)) => {
                 per_rhei.insert(rhei_id.clone(), resolved);
             }
+            Ok(None) => {}
             Err(report) if rhei_id == target_rhei => return Err(report),
             Err(_) => {}
         }

@@ -1,11 +1,21 @@
-// Where a state machine can be kept. The state-machine-writer spec names four
-// placements and the one override, and each case here lays that placement down
-// on a temporary tree and runs the real binary against it. Every machine uses
-// states the built-in machine lacks, so a plan that validates can only have
-// loaded the file the case placed. The spec once recommended `docs/states.yaml`,
-// which resolution has never searched (#110).
+// Where a state machine can be kept: beside a single-file plan, at a rhei's own
+// execution root, at the project root for the default — and nowhere else
+// without `--state-machine`. Each case lays one placement down on a temporary
+// tree and runs the real binary against it. Every machine uses states the
+// built-in machine lacks, so a plan that validates can only have loaded the
+// file the case placed. The spec once recommended `docs/states.yaml`, which
+// resolution has never searched (#110).
+//
+// Every case here carries a `**States:**` declaration, because every one of
+// them predates the rule that made the declaration unnecessary, and under the
+// deprecation window that declaration is still what resolves them: these are
+// therefore the regression controls for the window, and each resolves to
+// exactly the machine it did before. Three of them now also print one
+// `warning:` line on stderr, which none of them asserts on; the trees where
+// the *placement* alone resolves are in `state_machine_resolution_tests.rs`,
+// and the warnings themselves in `state_machine_deprecation_window_tests.rs`.
 
-// §FS-rhei-state-machine-writer.5
+// §FS-rhei-state-machine-writer.5 §FS-rhei-states-deprecation.1
 
 use std::path::{Path, PathBuf};
 
@@ -74,8 +84,9 @@ fn two_machine_project(dir: &Path) -> PathBuf {
     project
 }
 
-/// A single-file plan finds the `states.yaml` in its own directory — the issue's
-/// working case. §FS-rhei-plan-language.1.3
+/// Beside a single-file plan: the `states.yaml` in the plan's own directory is
+/// the machine — the issue's working case, and clause 1 for a plan whose
+/// execution root is the directory holding it. §FS-rhei-plan-language.1.3
 #[test]
 fn a_machine_beside_a_single_file_plan_is_found() {
     let dir = unique_temp_dir("placement-single");
@@ -87,8 +98,8 @@ fn a_machine_beside_a_single_file_plan_is_found() {
     assert_validates(&rhei_in(&tree, &dir.join(".home"), &["validate", "plan.rhei.md"]));
 }
 
-/// A Directory Workspace finds the `states.yaml` at its root.
-/// §FS-rhei-plan-language.1.3
+/// At a rhei's own execution root: a Directory Workspace's root is that root,
+/// and the `states.yaml` there is its machine. §FS-rhei-plan-language.1.3
 #[test]
 fn a_machine_at_a_directory_workspace_root_is_found() {
     // The helper's own `states.yaml` sits beside the workspace, not in it, and
@@ -104,9 +115,9 @@ fn a_machine_at_a_directory_workspace_root_is_found() {
     assert_validates(&rhei_in(&dir, &dir.join(".home"), &["validate", &ws_arg]));
 }
 
-/// A project's default at the project root and one rhei's own machine at that
-/// rhei's execution root are both found, and `rhei states` names both files.
-/// §FS-rhei-plan-language.1.3
+/// The two placements side by side: the default at the project root and one
+/// rhei's own machine at that rhei's execution root are both found, and
+/// `rhei states` names both files. §FS-rhei-plan-language.1.3
 #[test]
 fn a_project_default_and_a_rheis_own_machine_are_both_found() {
     let dir = unique_temp_dir("placement-project");
@@ -170,8 +181,9 @@ fn a_member_declaring_rhei_prefers_its_matching_file_to_the_builtin() {
     assert_validates(&rhei_in(&dir, &dir.join(".home"), &["validate", &project_arg]));
 }
 
-/// The fallback belongs only to the built-in name. An unknown member machine
-/// without a matching definition remains a resolution error.
+/// Nothing that errors stops erroring: a declaration naming a machine nothing
+/// supplies, with no file at the rhei's own root either, is still a resolution
+/// error rather than a fall through to the project default.
 /// §FS-rhei-plan-language.1.3
 #[test]
 fn a_member_declaring_an_unknown_machine_without_a_file_is_rejected() {
@@ -297,9 +309,11 @@ fn same_name_member_grouping_uses_content_independent_of_source() {
     }
 }
 
-/// A same-name declaration falls back to the resolved project default when
-/// the member has no local candidate or its valid local file names another
-/// machine. §FS-rhei-plan-language.1.3
+/// A declaration restating the project default still resolves, so the member
+/// keeps the default where it has no local candidate — and, in the second
+/// iteration, where its own root holds a `beta` that clause 1 would otherwise
+/// take: the window defers that file by a release and says so in a warning
+/// this case does not read. §FS-rhei-states-deprecation.2.2
 #[test]
 fn same_name_member_without_a_matching_local_file_uses_the_project_default() {
     for local_machine in [None, Some(machine("beta", "queuing", "settled"))] {
@@ -357,10 +371,12 @@ fn an_invalid_same_name_local_candidate_reports_its_load_error() {
     assert_failure(&result, &billing.join("states.yaml").display().to_string());
 }
 
-/// With no project-root file, default lookup may find the unique `alpha` in
-/// `billing`'s root. The explicit member selects that file locally while the
-/// omitted `audit` inherits the resolved default, preserving adopted projects
-/// without collapsing the two declaration semantics. §FS-rhei-plan-language.1.3
+/// The deprecated cross-root match, still resolving: with no project-root
+/// file, the manifest's `alpha` is found in `billing`'s root and becomes the
+/// default for the whole project, `audit` included. This resolution is the
+/// previous release's and must not move; it now also prints the cross-root
+/// warning, which this case does not read.
+/// §FS-rhei-states-deprecation.2.3
 #[test]
 fn a_restated_default_found_in_the_rheis_own_root_runs_from_there() {
     let dir = unique_temp_dir("placement-adopted-default");
@@ -389,11 +405,13 @@ fn a_restated_default_found_in_the_rheis_own_root_runs_from_there() {
     );
 }
 
-/// A Panta project whose effective default is the built-in `rhei` machine does
-/// not adopt a matching machine found only in a member root. The inheriting
-/// member remains valid on `pending`; the restating member's `drafting` state is
-/// rejected, and `rhei states` reports the built-in source.
-/// §FS-rhei-plan-language.1.3
+/// A declaration that resolves to the built-in machine counts as resolving, so
+/// a project whose effective default is built-in `rhei` does not adopt a
+/// matching machine found only in a member root — including that member's own.
+/// `agent-grounds/rhei#244`'s contract, carried through the window: the
+/// inheriting member remains valid on `pending`, the restating member's
+/// `drafting` is rejected, and `rhei states` reports the built-in source.
+/// §FS-rhei-states-deprecation.1
 #[test]
 fn issue_244_contract_builtin_project_default_ignores_a_member_only_rhei_machine() {
     let dir = unique_temp_dir("placement-builtin-project-default");
@@ -436,8 +454,8 @@ fn issue_244_contract_builtin_project_default_ignores_a_member_only_rhei_machine
     println!("passing `rhei validate` control:\n{said}");
 }
 
-/// `docs/states.yaml` is not a place resolution looks: the plan fails with the
-/// not-found error, and the same file loads only through `--state-machine` —
+/// Nowhere else: `docs/` is not one of the three places, so the plan fails with
+/// the not-found error and the same file loads only through `--state-machine` —
 /// the issue's cases A and C. §FS-rhei-plan-language.1.3
 #[test]
 fn a_machine_under_docs_is_found_only_through_the_override() {

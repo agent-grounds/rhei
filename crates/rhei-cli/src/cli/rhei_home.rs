@@ -140,20 +140,27 @@ fn real_path(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
-/// Whether this process still owes a warning about `read`, taking the debt when
-/// it does. Once per distinct deprecated path: templates and settings are
-/// resolved repeatedly inside one `rhei run`, so a per-lookup warning would
-/// bury the run's own output. §FS-rhei-templates.1.3
-fn claim_deprecated_rhei_home_warning(read: &Path) -> bool {
+/// Whether this process still owes a warning about `subject`, taking the debt
+/// when it does. Once per distinct subject rather than per lookup: templates,
+/// settings and state machines are all resolved repeatedly inside one
+/// `rhei run`, and a per-lookup warning would bury the run's own output.
+///
+/// The subject rather than the path, because this project has a second
+/// deprecation to serve — the `**States:**` declaration and the cross-root
+/// name match (§FS-rhei-states-deprecation.3) — and two deprecations with two
+/// guards are how they start behaving differently for no reason. Each caller
+/// prefixes its own kind, so two subjects never collide.
+/// §FS-rhei-templates.1.3
+fn claim_deprecation_warning(subject: &str) -> bool {
     if serving_shell_completion() {
         return false;
     }
-    static WARNED: std::sync::OnceLock<Mutex<HashSet<PathBuf>>> = std::sync::OnceLock::new();
+    static WARNED: std::sync::OnceLock<Mutex<HashSet<String>>> = std::sync::OnceLock::new();
     let warned = WARNED.get_or_init(|| Mutex::new(HashSet::new()));
     let Ok(mut warned) = warned.lock() else {
         return false;
     };
-    warned.insert(read.to_path_buf())
+    warned.insert(subject.to_owned())
 }
 
 /// Whether this run is answering a Tab press, recorded rather than read from
@@ -179,7 +186,7 @@ fn serving_shell_completion() -> bool {
 /// reader who copies instead ends up editing a file that the copy at the
 /// current name now shadows. §FS-rhei-templates.1.3
 fn warn_deprecated_rhei_home(read: &Path, move_to: &Path) {
-    if !claim_deprecated_rhei_home_warning(read) {
+    if !claim_deprecation_warning(&format!("rhei-home:{}", read.display())) {
         return;
     }
     eprintln!(

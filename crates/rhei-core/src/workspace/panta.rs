@@ -48,13 +48,12 @@ pub struct PantaProject {
     /// Rhei ids in presentation order; `basin` is always last when present.
     pub rhei_ids: Vec<String>,
     /// State-machine name each rhei declared with its own `**States:**` line.
-    /// Absent for rheis that declare nothing — they run the project default.
-    /// The merge records ownership instead of discarding it, so every consumer
-    /// can resolve a ticket's machine through its owning rhei.
-    // §DA-per-rhei-state-machines: the machine is per-rhei, defaulted by the manifest.
+    /// Absent for rheis that declare nothing; what the deprecated declaration
+    /// still buys is precedence over the rhei's own root, for one release.
+    // §DA-per-rhei-state-machines §FS-rhei-states-deprecation.1
     pub rhei_machines: HashMap<String, String>,
-    /// Execution root of each rhei, keyed by rhei id — where a self-declared
-    /// machine's `states.yaml` resolves first. §AR-rhei-panta.4
+    /// Execution root of each rhei, keyed by rhei id — the `states.yaml` here
+    /// is that rhei's machine whatever its index says. §AR-rhei-panta.4
     pub rhei_roots: HashMap<String, PathBuf>,
     /// Title each rhei declared in its own `# Rhei:` heading, keyed by rhei id.
     ///
@@ -316,12 +315,12 @@ fn load_panta_project_with(
     let mut content_sections = manifest.content_sections.clone();
     let mut content_section_roots = vec![dir.to_path_buf(); content_sections.len()];
     for (rhei_id, mut rhei, sources, root, entry) in rheis {
-        // Machine ownership survives the merge: a declared `**States:**` is
-        // the rhei's own machine; silence means the project default. The
-        // synthetic basin is built on the manifest machine and records no
-        // declaration.
+        // Machine ownership survives the merge, and the root is what carries
+        // it: resolution reads the `states.yaml` there whatever the index
+        // says, and the declaration only outranks it for one more release.
+        // The basin is built on the manifest machine and declares nothing.
 
-        // §DA-per-rhei-state-machines
+        // §DA-per-rhei-state-machines §FS-rhei-states-deprecation.1
         if rhei.states_declared && rhei_id != BASIN_RHEI_ID {
             rhei_machines.insert(rhei_id.clone(), rhei.states.trim().to_string());
         }

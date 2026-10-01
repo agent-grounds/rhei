@@ -79,7 +79,6 @@ mod into_placement_tests;
 mod into_project_tests;
 mod into_refusal_tests;
 mod into_root_machine_tests;
-mod into_states_declaration_tests;
 mod into_support;
 mod into_template_gate_tests;
 mod laid_output_root_tests;

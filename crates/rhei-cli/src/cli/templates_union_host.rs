@@ -87,20 +87,15 @@
         plans
     }
 
-    /// What `--into` must do about the target's `**States:**` declaration
-    /// before it writes a union into a file the rhei may not actually run
-    /// under. §FS-rhei-library.2.1
-    enum MachineDeclaration {
-        /// Declared and matching: union in, write no declaration.
-        Matches,
-        /// A root file with a silent index: write the declaration too. This is
-        /// the interim clause of the slice that introduces `--into`.
-        Write(String),
-    }
-
-    /// The four cases of [§FS-rhei-library.2.1], decided before anything is
+    /// The three cases of §FS-rhei-library.2.1, decided before anything is
     /// rendered.
-    fn resolve_host_machine(host: &UnionHost) -> MietteResult<MachineDeclaration> {
+    ///
+    /// Under §FS-rhei-plan-language.1.3 clause 1 the target's own root is
+    /// consulted whatever its index says, so writing the union into the root
+    /// file is the whole of it and `--into` has nothing left to declare. What
+    /// survives is the pair of refusals: no file in the root, and an index
+    /// naming a machine that file is not.
+    fn resolve_host_machine(host: &UnionHost) -> MietteResult<()> {
         let index = fs::read_to_string(&host.index)
             .map_err(|err| file_io_report(&host.index, "failed to read the target's index", err))?;
         let declared = index
@@ -108,7 +103,7 @@
             .find_map(|line| line.trim().strip_prefix("**States:**"))
             .map(|name| name.trim().to_owned());
         if !host.machine.is_file() {
-            return Err(no_machine_of_its_own(host, declared.as_deref()));
+            return Err(no_machine_of_its_own(host));
         }
         let text = fs::read_to_string(&host.machine).map_err(|err| {
             file_io_report(&host.machine, "failed to read the target's states", err)
@@ -124,7 +119,7 @@
                 )
             })?;
         match declared {
-            Some(declared) if declared == name => Ok(MachineDeclaration::Matches),
+            Some(declared) if declared == name => Ok(()),
             Some(declared) => Err(miette!(
                 help = format!(
                     "make them agree: either declare `**States:** {name}` in the index, or \
@@ -135,29 +130,30 @@
                 display_slash(&host.index),
                 display_slash(&host.machine)
             )),
-            None => Ok(MachineDeclaration::Write(name)),
+            // A silent index is now the ordinary case: clause 1 reads the file
+            // the union lands in, so the target already runs under it.
+            None => Ok(()),
         }
     }
 
-    /// The refusal for a rhei with no machine of its own, with **both**
-    /// remedies: while resolution is today's, the copy alone changes nothing.
+    /// The refusal for a rhei with no machine of its own, with the **one**
+    /// remedy that makes it eligible: the copy is the whole of it now that the
+    /// rhei's own root is what resolution reads. A declaration printed beside
+    /// it would ask the reader to write a line that is going away.
     /// §FS-rhei-library.2.1
-    fn no_machine_of_its_own(host: &UnionHost, declared: Option<&str>) -> Report {
+    fn no_machine_of_its_own(host: &UnionHost) -> Report {
         let machine = display_slash(&host.machine);
         let project = host
             .root
             .parent()
             .and_then(enclosing_project_for_new_rhei)
             .map_or_else(|| "<project>".to_owned(), |dir| display_slash(&dir));
-        let declaration = declared.map_or("<name>", |name| name);
         miette!(
             help = format!(
-                "give the rhei a machine of its own, then declare it:\n  \
-                 cp {project}/states.yaml {machine}\n  \
-                 **States:** {declaration}   (add this line to {})\n\
+                "give the rhei a machine of its own:\n  \
+                 cp {project}/states.yaml {machine}\n\
                  The rhei then stops following the project default: what the project changes \
-                 later no longer reaches it.",
-                display_slash(&host.index)
+                 later no longer reaches it."
             ),
             "'{}' has no states.yaml of its own, so a union written there would be inert",
             display_slash(&host.root)

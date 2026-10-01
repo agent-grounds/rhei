@@ -427,7 +427,7 @@ error: ticket 'plan.2' claims a budget identity the account holds for 'plan.1'
        why:         one travel bound covers one ticket, and these two would
                     draw on one
        to fix it:   give whichever of these did not earn this history a fresh
-                    `budgetTicketId` in that file; the account counts it
+                    `budgetTicketId` in its file; the account counts it
                     against 'plan.1'
 ```
 
@@ -441,9 +441,12 @@ line then names both paths instead of one file name, because a bare name would
 not locate either of them:
 `claimed by:  plan.1 and work.1, live in <path> and <path>`. Its **one** remedy
 — §FS-rhei-budgets.8 requires exactly one — is a fresh `budgetTicketId` for
-whichever of the two did not earn the history, in that file. Deleting a key is
-not offered and is not a way out: in an account whose binding has already moved,
-a keyless copy resolves to the binding that moved and adopts it again.
+whichever of the two did not earn the history, in its file. Deleting a key is not
+offered, because whether it resolves anything depends on which of the two takes
+the next edge: in an account whose binding has already moved, a keyless ticket
+resolves to the binding that moved and adopts it again. Writing a fresh key
+resolves it whichever of them moves first, which is why that is the remedy
+named.
 
 **Exactly one, or none — permitted, and reported.** The display id the uuid was
 counted against is gone from every live source, which is a move. The key follows

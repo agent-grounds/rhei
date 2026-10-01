@@ -345,6 +345,58 @@ fn a_move_whose_edge_is_then_refused_still_says_the_binding_moved() {
     );
 }
 
+/// One invocation for the whole day, so the second `rhei run` is refused before
+/// it spawns anything. §FS-rhei-budgets.3.1
+const ONE_INVOCATION: &str = r#", "invocations_per_day": 1"#;
+
+/// The same rule on the `rhei run` path, which is a second writer with its own
+/// copy of the report.
+///
+/// `rhei transition` and `rhei run` admit through two different call sites, and
+/// the scenario above pins only the first. Here what refuses the edge is not an
+/// exhausted travel bound but the day's spent invocation capacity, and the move
+/// is owed all the same: `bind_ticket` appended the `identity` receipt before the
+/// reservation was weighed, so the binding has moved whatever the reservation
+/// then says. The whole two-line warning is asserted rather than the pieces of
+/// it, and so is its place above the refusal: a writer that reported the move
+/// only where the admission succeeded would still leave every piece of it
+/// somewhere in the output of the runs that did.
+// §FS-rhei-budgets.5.2.1
+#[test]
+fn a_run_whose_invocation_is_refused_still_says_the_binding_moved() {
+    let (dir, plan, machine) = setup_with_agent(
+        "budget-identity-run-refused",
+        PING_PONG_MACHINE,
+        RECORDING_AGENT,
+        ONE_INVOCATION,
+    );
+
+    let first = run_plan(&plan, &machine, None);
+    assert!(!first.status.success(), "one invocation a day ends the first run, not the second");
+    let uuid = budget_identity(&plan, "1").expect("plan.1 earned a budget identity");
+
+    renumber_task(&plan, "1", "3");
+    let refused = run_plan(&plan, &machine, None);
+
+    let warning = format!(
+        "warning: travel for {uuid} now counts against 'plan.3'; it was\n\
+         {blank:9}counted against 'plan.1', which this plan no longer has",
+        blank = ""
+    );
+    let moved = refused.stderr.find(&warning).unwrap_or_else(|| {
+        panic!("stderr owes the move's whole warning:\n{warning}\ngot:\n{}", refused.stderr)
+    });
+    let spent = refused.stderr.find("invocation capacity").unwrap_or_else(|| {
+        panic!("stderr owes the run's own refusal as well; got:\n{}", refused.stderr)
+    });
+    assert!(moved < spent, "the move is said first, by the writer that made it");
+    assert_eq!(
+        receipts(&dir, "identity").last().map(|(_, display)| display.clone()),
+        Some("plan.3".to_owned()),
+        "the binding moved durably, which is why a refused reservation may not drop the line"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // The fixture for the two scenarios above
 // ---------------------------------------------------------------------------

@@ -18,8 +18,10 @@ use rhei_core::budget::{
 ///
 /// Which of rhei's own keys `rhei reset` deletes is the register's own column
 /// (§FS-rhei-transitions.2.5); this key is deliberately not among them, because
-/// removing it would hand the ticket a fresh travel history.
-/// §FS-rhei-reset.2 §FS-rhei-budgets.5.2
+/// the document must not be made to disagree with the ledger. Removing it buys
+/// no travel: `TicketIdentity::settle` below resolves a document that names no
+/// identity from the binding the ledger already holds for it rather than minting
+/// a new one. §FS-rhei-reset.2 §FS-rhei-budgets.5.2
 const BUDGET_TICKET_KEY: &str = rhei_core::metadata::BUDGET_TICKET_ID_KEY;
 
 /// What an admission decided, in the three shapes the caller acts on.

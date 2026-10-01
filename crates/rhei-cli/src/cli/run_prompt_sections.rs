@@ -177,6 +177,33 @@ fn render_terminal_result(render_context: &RuntimeTemplateContext<'_>) -> String
     )
 }
 
+/// The `final: true` state an edge declared out of `state_name` **by name**
+/// reaches, or `None` where none does.
+///
+/// One question, two readers: the section that states the result obligation and
+/// the retry paragraph that reports it unmet. Both need it, and a prompt is
+/// composed before any transition has been selected, so this is also the
+/// `selected_to` the completion condition is judged against there
+/// ([`missing_terminal_result_output`]) — the state an edge out of here would
+/// land on to finish the task, which is the basis `## Result` already names the
+/// path on. A second copy of the question would be a second chance to answer it
+/// differently.
+///
+/// Wildcards do not count, for the reason [`render_terminal_result`] gives.
+// §FS-rhei-states.3.3 §FS-rhei-memory.4.4
+fn terminal_state_reachable_from<'a>(
+    machine: &'a rhei_validator::StateMachine,
+    state_name: &str,
+) -> Option<&'a str> {
+    machine.transitions().iter().find_map(|rule| {
+        if rule.from.0 != state_name {
+            return None;
+        }
+        let terminal = machine.states.get(&rule.to.0).map(|def| def.terminal).unwrap_or(false);
+        terminal.then_some(rule.to.0.as_str())
+    })
+}
+
 /// The result path shown to this invocation, or `None` on a state no terminal
 /// edge leaves.
 ///
@@ -185,18 +212,7 @@ fn render_terminal_result(render_context: &RuntimeTemplateContext<'_>) -> String
 /// would be a second chance to name a different file.
 // §FS-rhei-states.3.3 §FS-rhei-memory.4.4
 fn terminal_result_path_shown(render_context: &RuntimeTemplateContext<'_>) -> Option<String> {
-    let can_finish = render_context.machine.transitions().iter().any(|rule| {
-        rule.from.0 == render_context.state_name
-            && render_context
-                .machine
-                .states
-                .get(&rule.to.0)
-                .map(|def| def.terminal)
-                .unwrap_or(false)
-    });
-    if !can_finish {
-        return None;
-    }
+    terminal_state_reachable_from(render_context.machine, render_context.state_name)?;
     let task_id = render_context.task.id.to_string();
     // A fanned-out invocation writes its own fragment, resolved through the
     // same helper and off the same visit count. §FS-rhei-states.3.3

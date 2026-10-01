@@ -416,24 +416,29 @@ type TransitionInvocationContext<'a> =
         Option<&'a str>,
     );
 
+/// The six identity fields of one already-resolved invocation, in the order
+/// every artifact path resolves them.
+///
+/// One place that destructures a [`ResolvedAgent`] into the tuple, so a caller
+/// that holds the resolution and a caller that holds only the identity reach
+/// the same resolver with the same six answers.
+fn invocation_context(resolved: &ResolvedAgent) -> TransitionInvocationContext<'_> {
+    (
+        resolved.target.as_ref(),
+        resolved.model.as_deref(),
+        resolved.model_provider.as_deref(),
+        resolved.model_name.as_deref(),
+        Some(resolved.agent.id()),
+        resolved.mode.as_deref(),
+    )
+}
+
 fn transition_contexts_for_state<'a>(
     state_def: &'a rhei_validator::StateDef,
     resolved_invocations: &'a [ResolvedAgent],
 ) -> Vec<TransitionInvocationContext<'a>> {
     if !resolved_invocations.is_empty() {
-        return resolved_invocations
-            .iter()
-            .map(|resolved| {
-                (
-                    resolved.target.as_ref(),
-                    resolved.model.as_deref(),
-                    resolved.model_provider.as_deref(),
-                    resolved.model_name.as_deref(),
-                    Some(resolved.agent.id()),
-                    resolved.mode.as_deref(),
-                )
-            })
-            .collect();
+        return resolved_invocations.iter().map(invocation_context).collect();
     }
 
     if !state_def.all_models.is_empty() {

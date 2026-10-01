@@ -108,12 +108,11 @@ fn text_files(dir: &Path, out: &mut Vec<PathBuf>) {
 /// walk. `git ls-files` reads the index instead, so a staged plan is still
 /// listed and the accident this guards against stays covered.
 fn tracked_files(root: &Path) -> Vec<PathBuf> {
-    let output = Command::new("git")
+    // `git_command` keeps the inherited repository variables out: a suite run
+    // from a hook would otherwise point git at the repository being committed
+    // to rather than the checkout under test. §REQ-test-isolation.3
+    let output = git_command()
         .current_dir(repo_root())
-        // A suite started from inside a `rhei run` inherits these, and they
-        // would point git at a repository other than the checkout under test.
-        .env_remove("GIT_DIR")
-        .env_remove("GIT_WORK_TREE")
         .args(["ls-files", "-z", "--"])
         .arg(root)
         // git's own complaint goes to the test's stderr rather than into a

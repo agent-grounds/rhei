@@ -221,7 +221,7 @@ mod test_dir;
 mod unique_dir_name;
 
 pub use git_env::{
-    git_command, git_command_as_if_inherited, git_command_with_staged_env,
+    git_command, git_command_as_if_inherited, git_command_with_staged_env, git_init_or_absent,
     repository_env_as_a_hook_leaves_it, repository_env_names_no_report_mentioned,
 };
 pub use python_fixture::{
@@ -419,6 +419,9 @@ pub fn rhei_process_at(bin: impl AsRef<Path>) -> Command {
     let mut cmd = Command::new(bin.as_ref());
     cmd.env_remove("FORCE_COLOR");
     cmd.env_remove("CLICOLOR_FORCE");
+    // Which repository the spawn acts on is the test's to choose too, and a
+    // caller that wants one sets it after this. §REQ-test-isolation.3
+    git_env::scrub_git_repository_env(&mut cmd);
     cmd
 }
 

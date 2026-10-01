@@ -184,7 +184,7 @@ fn write_session_fake_agent_settings(dir: &Path, script_path: &Path, timeout: &s
 }
 
 fn run_git(args: &[&str]) {
-    let output = Command::new("git").args(args).output().expect("git should run");
+    let output = git_env::git_command().args(args).output().expect("git should run");
     assert!(
         output.status.success(),
         "git {:?} failed\nstdout:\n{}\nstderr:\n{}",
@@ -195,7 +195,7 @@ fn run_git(args: &[&str]) {
 }
 
 fn git_stdout(args: &[&str]) -> String {
-    let output = Command::new("git").args(args).output().expect("git should run");
+    let output = git_env::git_command().args(args).output().expect("git should run");
     assert!(
         output.status.success(),
         "git {:?} failed\nstdout:\n{}\nstderr:\n{}",

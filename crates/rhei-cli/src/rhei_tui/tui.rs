@@ -403,4 +403,6 @@ fn forward_sigint_to_self() -> io::Result<()> {
 #[cfg(test)]
 mod consumes_tests;
 #[cfg(test)]
+mod outline_fold_tests;
+#[cfg(test)]
 mod tests;

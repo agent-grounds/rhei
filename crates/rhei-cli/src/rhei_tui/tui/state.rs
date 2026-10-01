@@ -223,6 +223,8 @@ pub(super) struct UiState {
 
     pub(super) view: View,
     pub(super) selected: Option<String>,
+    /// Folded parents `Enter` expanded in place. §FS-rhei-run-tui.1.5.3
+    pub(super) expanded: HashSet<String>,
     auto_selected: bool,
     pub(super) flow_focus: FlowFocus,
     pub(super) inspector_section: usize,
@@ -279,6 +281,7 @@ impl UiState {
             links: Vec::new(),
             view: View::Flow,
             selected: None,
+            expanded: HashSet::new(),
             auto_selected: false,
             flow_focus: FlowFocus::Outline,
             inspector_section: 0,

@@ -6,6 +6,19 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- A finished parent now speaks for its subtree at the end of a run
+  (§FS-rhei-run-report.3.2): when a task with children is terminal and nothing
+  under it needs attention or waits at a gate, the console task tree prints one
+  row for it, ending ` — {n} subtasks: {breakdown}` — every descendant at any
+  depth, bucketed by state in the machine's own order, spelled exactly as the
+  Plan History line already is — instead of a row per descendant. A subtree
+  with a blocked, failed, gated or open task keeps every row above it, an open
+  parent still shows the children that finished, and the forty-row budget
+  collapses calm rows only after the fold. The TUI's Flow outline folds by the
+  same rule, and `Enter` on a folded parent expands it in place
+  (§FS-rhei-run-tui.1.5.3). The plain non-TTY lines, `## Task Final States`,
+  `--json`, `events.jsonl` and `rhei list` keep one row per task. (PR #381)
+
 - A retried attempt is now told which artifacts it still owes, rather than
   always being told it did not write the result file. The retry paragraph of
   `## Previous Visits` named the result path wherever any edge out of the state

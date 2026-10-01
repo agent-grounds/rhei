@@ -316,6 +316,50 @@
         );
     }
 
+    /// §FS-rhei-memory.4.3 step 5: the cap drops the rows admitted only by a
+    /// terminal descendant before any row naming a real agent, so a subtree
+    /// reporting progress never pushes out an agent someone can ask.
+    #[test]
+    fn in_flight_drops_a_progress_row_before_a_row_naming_an_agent() {
+        let mut plan =
+            String::from("# Rhei: Priority\n\n---\nstructure:\n  maxLevels: 3\n---\n\n## Tasks\n\n");
+        // First in plan order, so only the drop priority can keep them out.
+        for n in 1..=3 {
+            plan.push_str(&format!(
+                "### Task p{n}: Subtree {n}\n**State:** pending\n\n\
+                 #### Task p{n}.1: Finished inside it\n**State:** completed\n\n\
+                 #### Task p{n}.2: Still open\n**State:** pending\n\n"
+            ));
+        }
+        for n in 1..=20 {
+            plan.push_str(&format!(
+                "### Task w{n}: Step {n}\n**State:** pending\n**Assignee:** worker-{n}\n\n"
+            ));
+        }
+        plan.push_str("### Task mine: Mine\n**State:** review\n");
+        let dir = memory_dir(&[("plan.rhei.md", plan.as_str())]);
+        let plan_path = dir.path().join("plan.rhei.md");
+        let loaded = load_plan(&plan_path).expect("plan loads");
+        let memory =
+            prompt_memory(&loaded, &plan_path, &dir.path().join("runtime"), BTreeSet::new());
+        let machine = memory_machine();
+        let task = find_task_by_id_str(&loaded.rhei.tasks, "plan.mine").expect("task mine");
+        let context =
+            memory_context(dir.path(), &plan_path, &loaded, &memory, &machine, task, "review");
+
+        let history = render_plan_history(&context).expect("history");
+        // Every row naming an agent survives, and fills the cap on its own.
+        let held = history.lines().filter(|line| line.contains("\u{2014} worker-")).count();
+        assert_eq!(held, memory_caps::IN_FLIGHT);
+        // None of the three rows admitted only by progress does.
+        assert!(!history.contains("- Task plan.p"), "got:\n{history}");
+        assert!(!history.contains("subtasks finished"), "got:\n{history}");
+        assert!(
+            history.contains("\u{2026} 3 more \u{2014} rhei list --non-terminal\n"),
+            "got:\n{history}"
+        );
+    }
+
     /// §FS-rhei-memory.4.3: the cut counts characters, not bytes — a summary of
     /// multi-byte characters keeps 120 of them and stays valid UTF-8.
     #[test]

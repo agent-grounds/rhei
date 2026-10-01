@@ -338,19 +338,28 @@ fn record_poll_self_loop_if_needed(
 /// `index.rhei.md` manifest, a Panta `index.panta.md` manifest, or a
 /// single-file plan). Keys are rhei-local, except in the project manifest,
 /// where basin tickets are keyed by their qualified ids. See [`TaskRoute`].
+///
+/// Which form the file name asks for is [`MetadataForm`]'s to decide rather
+/// than this function's, because the budget's identity guard reads the same
+/// files and the two must not disagree about where a ticket's metadata lives.
+/// What is left here is how each form's failure is reported.
+/// §FS-rhei-panta.6.1
 fn parse_metadata_from_raw(path: &Path, raw: &str) -> MietteResult<Option<Metadata>> {
-    match path.file_name().and_then(|name| name.to_str()) {
-        Some("index.rhei.md") | Some(workspace::PANTA_INDEX_FILE) => {
-            Ok(parse_metadata_manifest(path, raw)?.metadata)
+    rhei_core::metadata::parse_metadata_file(path, raw).map_err(|failed| match failed.form {
+        MetadataForm::PantaManifest => miette!(
+            help = plan_authoring_help(),
+            "failed to parse Panta manifest for transition metadata: {}",
+            failed.error.message
+        ),
+        MetadataForm::WorkspaceIndex => miette!(
+            help = plan_authoring_help(),
+            "failed to parse workspace index for transition metadata: {}",
+            failed.error.message
+        ),
+        MetadataForm::Plan => {
+            miette!(help = plan_authoring_help(), "{}: {}", path.display(), failed.error.message)
         }
-        _ => {
-            let rhei = rhei_core::parse(raw)
-                .map_err(|err| miette!(
-help = plan_authoring_help(),
-"{}: {}", path.display(), err.message))?;
-            Ok(rhei.metadata)
-        }
-    }
+    })
 }
 
 /// Structure and metadata shared by both manifest forms.
@@ -363,7 +372,7 @@ struct MetadataManifest {
 /// which index form `path` names. A Panta manifest reaches here only for basin
 /// tickets, which have no index of their own. §FS-rhei-panta.6.1
 fn parse_metadata_manifest(path: &Path, raw: &str) -> MietteResult<MetadataManifest> {
-    if path.file_name().and_then(|name| name.to_str()) == Some(workspace::PANTA_INDEX_FILE) {
+    if MetadataForm::of(path) == MetadataForm::PantaManifest {
         let manifest = rhei_core::parser::parse_panta_manifest(raw).map_err(|err| {
             miette!(
                 help = plan_authoring_help(),

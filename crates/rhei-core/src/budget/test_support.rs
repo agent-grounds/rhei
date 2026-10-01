@@ -80,7 +80,7 @@ impl Case {
         let mut journal = self.account.open(true).expect("open account");
         let ticket = self.ticket();
         if !journal.identity_installed(&ticket) {
-            journal.bind_ticket(&ticket, "plan.1", &self.source, &audit()).expect("bind");
+            let _ = journal.bind_ticket(&ticket, "plan.1", &self.source, &audit()).expect("bind");
         }
         journal
     }

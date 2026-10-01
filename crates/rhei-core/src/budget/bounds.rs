@@ -204,7 +204,10 @@ pub enum Remedy {
 /// on every surface. §FS-rhei-budgets.8
 const LABEL: usize = 13;
 
-fn row(label: &str, value: &str) -> String {
+/// One continuation row of a refusal, indented under the `error: ` headline and
+/// aligned on its values. Shared with the identity refusals, which print this
+/// shape without the six-row bound report. §FS-rhei-budgets.8
+pub(super) fn row(label: &str, value: &str) -> String {
     format!("       {label:<LABEL$}{value}")
 }
 

@@ -34,6 +34,8 @@ mod adjust_tests;
 #[cfg(test)]
 mod ancestry_tests;
 #[cfg(test)]
+mod identity_tests;
+#[cfg(test)]
 mod ledger_tests;
 #[cfg(test)]
 mod nonstart_tests;
@@ -54,6 +56,7 @@ pub use ancestry::{Ancestry, AncestryDescriptor};
 pub use bounds::{halt_text, Bound, BoundSource, BoundUnit, Remedy};
 pub use diagnosis::{Damage, Diagnosis, History, Inspection, Retired};
 pub use events::{BudgetEvent, BudgetLine};
+pub use identity::IdentityMove;
 pub use journal::{Audit, Journal, Receipt};
 pub use types::{
     BudgetError, Contract, Counter, Dimension, Exhaustion, Snapshot, SpendBasis, SpendMarks,

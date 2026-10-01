@@ -412,10 +412,16 @@ transitions:
         }
         plan.push_str("### Task big: Sweep every dependency\n**State:** completed\n\n");
         for index in 1..=40 {
+            // s02 hangs off s01 rather than off big, so the forty below can only be
+            // reached by counting descendants at every depth.
+            let (depth, path) = match index {
+                2 => ("#####", "s01.s02".to_string()),
+                _ => ("####", format!("s{index:02}")),
+            };
             plan.push_str(&format!(
-                "#### Task big.s{index:02}: Check dependency {index:02}\n**State:** completed\n\n"
+                "{depth} Task big.{path}: Check dependency {index:02}\n**State:** completed\n\n"
             ));
-            ledger.push_str(&format!("plan.big.s{index:02} pending@completed\n"));
+            ledger.push_str(&format!("plan.big.{path} pending@completed\n"));
         }
         ledger.push_str("plan.big pending@completed\n");
         plan.push_str("### Task later: Write the report\n**State:** pending\n");

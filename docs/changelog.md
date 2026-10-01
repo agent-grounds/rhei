@@ -6,6 +6,9 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- Resolve project summaries from each member's state machine when no default
+  machine is configured, and reject mixed-machine scopes.
+
 - A rhei's state machine is now the `states.yaml` in its own execution root
   whatever its index says, then the project root's, then the built-in `rhei`
   machine (§FS-rhei-plan-language.1.3) — so a machine file written into a rhei's

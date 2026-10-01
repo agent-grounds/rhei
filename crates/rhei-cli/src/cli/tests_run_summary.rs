@@ -623,3 +623,273 @@ transitions:
             "an unselected run reaches none of this"
         );
     }
+
+    // ------------------------------------------------------------------------
+    // The subtree fold. A terminal parent speaks for its subtree on the
+    // console tree, with the clause the prompt side already writes. Every
+    // test below is ignored until the fold exists: the gate runs the whole
+    // suite at pre-commit, so a contract that fails cannot also be committed
+    // green. Remove the attribute with the implementation.
+
+    // §FS-rhei-run-report.3.2 §FS-rhei-shape.3.2
+
+    /// A machine with a terminal success, a cancellation, a gate, a second
+    /// terminal of its own name, and one open work state — the five classes
+    /// the fold's predicate and its breakdown have to tell apart.
+    fn fold_machine() -> rhei_validator::StateMachine {
+        rhei_validator::StateMachine::from_yaml_str(
+            r#"name: fold
+version: 1
+states:
+  work:
+    initial: true
+    description: open work
+  human-gate:
+    description: awaiting a human
+    gating: true
+  completed:
+    description: finished
+    final: true
+  shipped:
+    description: finished and released
+    final: true
+  cancelled:
+    description: not done
+    final: true
+transitions:
+  - from: work
+    to: completed
+  - from: work
+    to: shipped
+  - from: work
+    to: cancelled
+  - from: work
+    to: human-gate
+  - from: human-gate
+    to: completed
+"#,
+        )
+        .expect("valid state machine")
+    }
+
+    /// Build a report from a plan body, under [`fold_machine`] and a depth that
+    /// permits grandchildren.
+    fn fold_report(tasks: &str) -> RunSummaryReport {
+        let rhei = rhei_core::parse(&format!(
+            "# Rhei: Fold\n---\nstructure:\n  maxLevels: 4\n---\n\n## Tasks\n\n{tasks}"
+        ))
+        .expect("plan parses");
+        RunSummaryReport::build(
+            &rhei,
+            &rhei_validator::MachineSet::single(fold_machine()),
+            &SummarySink::new(),
+            test_stats(),
+            "plan.rhei.md",
+            &no_task_roots(),
+        )
+    }
+
+    /// Every row id the console tree actually prints, in order.
+    fn tree_ids(report: &RunSummaryReport) -> Vec<String> {
+        let tty = report.render_tty(false);
+        let ids: Vec<String> = report
+            .rows
+            .iter()
+            .map(|row| row.id.clone())
+            .filter(|id| {
+                tty.lines().any(|line| {
+                    line.split_whitespace().any(|token| token == id.as_str())
+                })
+            })
+            .collect();
+        ids
+    }
+
+    /// A terminal parent renders one row for its whole finished subtree, and
+    /// the count is every descendant at any depth rather than its direct
+    /// children. Four nested rows that say the same thing are four rows a
+    /// person scrolls past to reach the one that does not.
+    // §FS-rhei-run-report.3.2
+    #[test]
+    #[ignore = "pins agent-grounds/rhei#324; remove this attribute with the fold"]
+    fn a_terminal_parent_speaks_for_its_finished_subtree() {
+        let report = fold_report(
+            "### Task 1: Harden the parser\n**State:** completed\n\n\
+             #### Task 1.1: Review parser\n**State:** completed\n\n\
+             ##### Task 1.1.1: Read the spec\n**State:** completed\n\n\
+             #### Task 1.2: Fix findings\n**State:** completed\n\n\
+             ### Task 2: Next\n**State:** work\n",
+        );
+
+        let tty = report.render_tty(false);
+        assert!(
+            tty.contains("— 3 subtasks: 3 completed"),
+            "the parent carries the clause for every descendant at any depth; got:\n{tty}"
+        );
+        assert_eq!(
+            tree_ids(&report),
+            vec!["1", "2"],
+            "the finished subtree renders no rows of its own; got:\n{tty}"
+        );
+    }
+
+    /// `{breakdown}` buckets every descendant by its normalized state name, in
+    /// the order the machine declares those states, so the numbers sum to
+    /// `{n}` and a custom terminal appears under its own name. Two fixed
+    /// buckets would have reported `shipped` as something it is not.
+    // §FS-rhei-run-report.3.2 §FS-rhei-memory.3.2
+    #[test]
+    #[ignore = "pins agent-grounds/rhei#324; remove this attribute with the fold"]
+    fn the_breakdown_names_every_bucket_in_the_machines_own_order() {
+        let report = fold_report(
+            "### Task 1: Release the parser\n**State:** completed\n\n\
+             #### Task 1.1: First\n**State:** completed\n\n\
+             #### Task 1.2: Second\n**State:** shipped\n\n\
+             #### Task 1.3: Third\n**State:** cancelled\n\n\
+             #### Task 1.4: Fourth\n**State:** completed\n",
+        );
+
+        let tty = report.render_tty(false);
+        assert!(
+            tty.contains("— 4 subtasks: 2 completed, 1 shipped, 1 cancelled"),
+            "declaration order, every descendant bucketed, nothing omitted; got:\n{tty}"
+        );
+    }
+
+    /// A bucket with no members is omitted, so an all-completed subtree reads
+    /// the way it always did and no empty count is invented for a state the
+    /// machine merely declares.
+    // §FS-rhei-run-report.3.2
+    #[test]
+    #[ignore = "pins agent-grounds/rhei#324; remove this attribute with the fold"]
+    fn an_empty_bucket_is_omitted_from_the_breakdown() {
+        let report = fold_report(
+            "### Task 1: Parent\n**State:** completed\n\n\
+             #### Task 1.1: First\n**State:** completed\n\n\
+             #### Task 1.2: Second\n**State:** completed\n",
+        );
+
+        let tty = report.render_tty(false);
+        assert!(tty.contains("— 2 subtasks: 2 completed"), "got:\n{tty}");
+        assert!(
+            !tty.contains("0 cancelled") && !tty.contains("0 shipped"),
+            "a bucket with no members is not rendered; got:\n{tty}"
+        );
+    }
+
+    /// A descendant that needs attention or waits on a person keeps its own
+    /// row, and so does every ancestor above it. The fold may make a run look
+    /// quiet; it may never make a run look quiet that is not.
+    // §FS-rhei-run-report.3.2
+    #[test]
+    fn a_descendant_needing_attention_prevents_the_fold() {
+        for (label, state) in [("blocked", "work"), ("gated", "human-gate")] {
+            let report = fold_report(&format!(
+                "### Task 1: Parent\n**State:** completed\n\n\
+                 #### Task 1.1: Finished\n**State:** completed\n\n\
+                 #### Task 1.2: Not finished\n**State:** {state}\n\n\
+                 ##### Task 1.2.1: Under it\n**State:** completed\n"
+            ));
+
+            let tty = report.render_tty(false);
+            assert!(
+                !tty.contains("subtasks:"),
+                "{label}: a subtree with a {label} descendant does not fold; got:\n{tty}"
+            );
+            assert_eq!(
+                tree_ids(&report),
+                vec!["1", "1.1", "1.2", "1.2.1"],
+                "{label}: the row and every ancestor stay expanded; got:\n{tty}"
+            );
+        }
+    }
+
+    /// A parent still open renders its finished children exactly as before, so
+    /// a person watching a long run keeps seeing evidence of progress. The
+    /// fold is about a subtree that is over, not about one in flight.
+    // §FS-rhei-run-report.3.2
+    #[test]
+    fn an_open_parent_still_shows_the_children_that_finished() {
+        let report = fold_report(
+            "### Task 1: Parent\n**State:** work\n\n\
+             #### Task 1.1: Done\n**State:** completed\n\n\
+             #### Task 1.2: Also done\n**State:** completed\n",
+        );
+
+        let tty = report.render_tty(false);
+        assert!(
+            !tty.contains("subtasks:"),
+            "an open parent does not speak for its subtree; got:\n{tty}"
+        );
+        assert_eq!(
+            tree_ids(&report),
+            vec!["1", "1.1", "1.2"],
+            "its finished children keep their rows; got:\n{tty}"
+        );
+    }
+
+    /// The two collapse mechanisms compose: the subtree fold runs first, the
+    /// forty-row budget runs on whatever is left, and neither hides the one
+    /// row a person has to act on.
+    // §FS-rhei-run-report.3.2
+    #[test]
+    #[ignore = "pins agent-grounds/rhei#324; remove this attribute with the fold"]
+    fn the_subtree_fold_and_the_forty_row_budget_compose() {
+        let mut tasks = String::new();
+        // Enough flat finished roots that the budget still has work to do once
+        // every subtree has folded.
+        for root in 1..=45 {
+            tasks.push_str(&format!("### Task f{root}: Flat {root}\n**State:** completed\n\n"));
+        }
+        for parent in 1..=6 {
+            tasks.push_str(&format!("### Task p{parent}: Parent {parent}\n**State:** completed\n\n"));
+            for child in 1..=4 {
+                tasks.push_str(&format!(
+                    "#### Task p{parent}.{child}: Child {parent}.{child}\n**State:** completed\n\n"
+                ));
+            }
+        }
+        tasks.push_str("### Task last: Needs a person\n**State:** human-gate\n");
+
+        let report = fold_report(&tasks);
+        assert_eq!(report.rows.len(), 76, "45 flat, 6 parents with 4 children each, one gate");
+
+        let tty = report.render_tty(false);
+        assert_eq!(
+            tty.matches("\u{2014} 4 subtasks: 4 completed").count(),
+            6,
+            "the fold runs first, once per finished parent; got:\n{tty}"
+        );
+        assert!(
+            tty.contains("completed tasks collapsed"),
+            "51 rows survive the fold, so the forty-row budget still fires; got:\n{tty}"
+        );
+        assert!(
+            tree_ids(&report).contains(&"last".to_string()),
+            "and the gate is shown whatever either mechanism would prefer; got:\n{tty}"
+        );
+    }
+
+    /// `## Task Final States` is the un-collapsed source of truth, so the
+    /// console line that says *N subtasks* is honest only because every folded
+    /// task still has a line of its own two sections below it.
+    // §FS-rhei-run-report.3.2
+    #[test]
+    #[ignore = "pins agent-grounds/rhei#324; remove this attribute with the fold"]
+    fn the_task_final_states_section_stays_un_collapsed() {
+        let report = fold_report(
+            "### Task 1: Parent\n**State:** completed\n\n\
+             #### Task 1.1: First\n**State:** completed\n\n\
+             #### Task 1.2: Second\n**State:** completed\n",
+        );
+
+        assert!(report.render_tty(false).contains("— 2 subtasks: 2 completed"));
+        let markdown = report.render_markdown();
+        let section = markdown
+            .split("## Task Final States")
+            .nth(1)
+            .expect("the report carries the section");
+        for id in ["`1`", "`1.1`", "`1.2`"] {
+            assert!(section.contains(id), "{id} keeps its own line; got:\n{section}");
+        }
+    }

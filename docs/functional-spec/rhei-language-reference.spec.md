@@ -141,6 +141,11 @@ Language changes must preserve a single discoverable entry point:
   ([§FS-rhei-run.2](rhei-run.spec.md#2-options)), which still wins when given.
 - New execution references that appear in authored files must identify their
   owner spec from this page.
+- Which construct a unit of work becomes — a state, a task, a child task, a
+  rhei of its own, or body prose — is owned by [§FS-rhei-shape](rhei-shape.spec.md#fs-rhei-shape-state-task-subtask-rhei-or-prose). It adds
+  no syntax, so it appears in no map above; it decides which of the constructs
+  those maps already carry an author should write, and every skill that states
+  the rule extracts its copy from there ([§FS-rhei-shape.7](rhei-shape.spec.md#7-the-one-normative-copy)).
 
 Task metadata may also control execution without changing the state machine:
 `**Target:**` and `**Model:**` select an execution identity

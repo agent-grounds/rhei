@@ -6,6 +6,23 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- Stop §FS-rhei-reset.2 offering as a hazard the one thing the ledger forbids.
+  The point gave, as its reason for keeping `metadata.tasks.<id>.budgetTicketId`
+  through a reset, that removing the key "would hand the ticket a fresh travel
+  history" — the opposite of what the engine does, and of what
+  §FS-rhei-budgets.5.2 and §REQ-bounded-neural-work.4 both already say. A ticket
+  whose document names no identity is resolved from the binding the ledger holds
+  for it rather than minted a new one, so deleting the key converges on the
+  travel bound already spent; `tests/e2e/budget_travel_halt_tests.rs` has pinned
+  that convergence all along. Because the sentence was the stated *reason* for a
+  behaviour, a reader who trusted it concluded that travel identity lives in the
+  document rather than in the ledger — the reading `agent-grounds/rhei#323`'s
+  agora corrected in two sibling points, of which this was the third surviving
+  copy. The reason is now that the document must not be made to disagree with
+  the ledger, and it forwards to §FS-rhei-budgets.5.2 for the mechanism instead
+  of paraphrasing it a fourth time. What reset does is unchanged: the key is
+  still kept, and an entry holding only it is still not pruned as empty.
+
 - Compose two rheis by graph union, and retire the block compiler that
   composed them by qualification. `rhei instantiate <template> --into <rhei>` and
   `--into <rhei>.<task>` add a template's states, transitions, profiles, node

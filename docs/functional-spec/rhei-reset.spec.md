@@ -87,9 +87,15 @@ Reset does **not**:
   metadata keys reset deletes is the register's `Cleared by rhei reset` column
   ([§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes)), not a
   second list kept here; the budget identity is deliberately **not** among them,
-  because removing it would hand the ticket a fresh travel history. It is also why a
+  because the document must not be made to disagree with the ledger. Removing the
+  key buys no travel: a ticket whose document names no identity is resolved from
+  the binding the ledger already holds for it rather than minted a new one
+  ([§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal)), so it converges
+  on the bound it has already spent, which is what the lead says of
+  reset-and-rerun. What it does leave is a ledger holding a binding the document
+  no longer names, for a later reader to reconcile. That is also why a
   `metadata.tasks.<id>` entry holding only that key is **not** removed as empty:
-  it is a record of something.
+  unlike an entry emptied by step 3, it is a record of something.
 
 Reset is project-wide by default. Because it destroys runtime state across
 every in-scope rhei, it reports its resolved scope and the affected rheis

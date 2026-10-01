@@ -15,7 +15,7 @@ A **template** is a directory containing:
 3. **Prompt templates** (`prompt_templates/*.md`) — optional; when present next
    to `states.yaml`, the directory declares reusable state prompt fragments
    referenced by state-level `prompt_template` fields.
-4. A **plan skeleton** — either a single-file plan (`plan.rhei.md`) or a directory-workspace layout (`index.rhei.md` + `tasks/`).
+4. A **plan skeleton** — either a single-file plan (`plan.rhei.md`) or a directory-workspace layout (`index.rhei.md` + `tasks/`) — or, for a **project template**, a Panta manifest (`index.panta.md`) in its place (§FS-rhei-templates.2).
 5. **Additional files** — any non-manifest files bundled with the template. Text files are rendered with a restricted MiniJinja template environment; binary files are copied verbatim into the output.
 
 Materialized template files may contain **instantiation templates** (`{{ ... }}`, `{% ... %}`) that are resolved at instantiation time from user-supplied inputs. These are distinct from the single-brace **runtime variables** (`{name}`) defined by the state-machine and plan specifications. Rendering is ordered: first resolve MiniJinja templates across template files during `rhei instantiate`, then let later `rhei` commands resolve runtime `{...}` variables against the instantiated workspace. The manifest (`template.yaml`) is parsed before rendering and is never itself templated.
@@ -178,14 +178,22 @@ The warning's contract:
 ├── tasks/                 # Directory-workspace task skeletons
 │   ├── 01-step.md
 │   └── ...
+│   ── OR ──
+├── index.panta.md         # Project template: the Panta manifest (§FS-rhei-templates.6.4)
 └── ...                    # Additional files (text rendered; binary copied)
 ```
 
-A template must contain exactly one plan entry point: either `plan.rhei.md`
-(single-file) or `index.rhei.md` (directory workspace). Containing both is an
-error, and so is having neither: every template stands alone, including one
-built out of others, which is what makes it testable at any level
+A template must contain exactly one entry point of three: `plan.rhei.md`
+(single-file), `index.rhei.md` (directory workspace), or `index.panta.md` (a
+**project template**). Containing more than one is an error, and so is having
+none: every template stands alone, including one built out of others, which is
+what makes it testable at any level
 ([§FS-rhei-library.6](rhei-library.spec.md#6-includes-a-template-built-from-templates)).
+A project template stands alone by laying a whole project with `--output`, which
+`rhei validate` then passes (§FS-rhei-templates.6.4); its `states.yaml` is the project's default
+machine and its `includes:` entries are the project's members. The layout is
+the whole of the distinction — no field in `template.yaml` declares it — and
+`rhei templates` reports it (§FS-rhei-templates.6.3).
 For single-file templates the entry-point filename also determines the
 ticket-id prefix of every instantiated workspace: the file stem is the rhei id,
 so `plan.rhei.md` yields tickets `plan.1`, `plan.2`, ..., regardless of the
@@ -568,7 +576,7 @@ Input arguments are parsed as follows:
 
 Every rule above holds for `--into` as it does for `--output`: the positional
 arguments are the template's inputs either way, which is why the destination is
-a flag ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan)).
+a flag ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project)).
 
 #### 6.1.2. Behavior
 
@@ -733,18 +741,21 @@ the only news is that it exists.
 property of the rhei, defaulted by the project ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding),
 [§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)): a template that declares its own machine lands as a member
 running under it, its `states.yaml` staying in the workspace root where
-per-rhei resolution finds it, and the project manifest is never edited. A
-template that declares nothing inherits the project default. Ten templates
-with ten machines coexist in one project — each is a distinct process, and
-that is the product's normal shape, not an edge case.
+per-rhei resolution finds it, and the project manifest is not edited on a
+member's behalf. A template that declares nothing inherits the project default.
+Ten templates with ten machines coexist in one project — each is a distinct
+process, and that is the product's normal shape, not an edge case.
 
 Two earlier mechanisms are deliberately gone. *Refusal* — rejecting a template
 whose machine differed from the project's — walled off every template but the
-first, contradicting the multi-routine pitch. *Adoption* — writing the first
-template's machine into `index.panta.md` as the project default — silently
-re-governed every later plain rhei: a hand-written `launch.rhei.md` on
-`pending`/`completed` then validated against the template's machine and
-failed. Both existed only to police a uniformity the model no longer requires.
+first, contradicting the multi-routine pitch. *Silent adoption* — writing the
+machine of a template laid as a member into `index.panta.md` as the project
+default — silently re-governed every later plain rhei: a hand-written
+`launch.rhei.md` on `pending`/`completed` then validated against the template's
+machine and failed. Both existed only to police a uniformity the model no longer
+requires. A template whose only job is to lay a project's default is a different
+thing, laid outright rather than as a side effect of laying a member
+(§FS-rhei-templates.6.4).
 
 **Settings hoist.** A template's bundled `settings.json` (§4) is written to the
 *project's* `.agent-grounds/rhei/settings.json` rather than the workspace's, merged
@@ -823,6 +834,11 @@ and built-in copies appear only when no project ancestor already contributed
 that name. `--source` filters this listing by tier without changing named
 lookup precedence.
 
+A project template (§FS-rhei-templates.2) is listed like any other, never dropped: the listing
+is how a caller finds out what `--output` will produce. The JSON entry carries a
+`layout` key — `single-file`, `workspace`, or `project` — and the human table
+marks a project template as one.
+
 With a template name (or a path to a template directory), prints that
 template's detail: source, path, and the same input schema
 `rhei instantiate <template> --list-inputs` prints, followed by an
@@ -865,6 +881,59 @@ This is what lets a caller build an input form rather than a text box:
 `format: execution-target` says a value is an agent selector and not free
 text, `items.format` says the same of every element of an array, and
 `positional` says which input the template treats as its principal one.
+
+### 6.4. Laying a Panta project
+
+A **project template** carries `index.panta.md` where a plan template carries
+its plan (§FS-rhei-templates.2). It is how a *project* — a lifecycle machine, the scripts and
+prompt fragments that machine runs, the settings it needs, and the member rheis
+that belong to it — ships as a template rather than as a hand-written script
+that renders a machine, copies it over a project's, links its bundle and edits
+the manifest.
+
+`rhei instantiate <project-template> --output <dir>` lays a whole project at a
+`<dir>` that does not exist yet, after rendering with the collected inputs
+exactly as §FS-rhei-templates.6.1.2 steps 3–5 do:
+
+- **the manifest**: the rendered `index.panta.md` at `<dir>`;
+- **the default machine**: the rendered `states.yaml` at `<dir>/states.yaml`.
+  That file's presence is what makes it the project default
+  ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) clause 2), so laying it writes **no `**States:**`
+  line** anywhere — the declaration is deprecated
+  ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)), and a template's manifest should not carry one;
+- **the bundle**: `prompt_templates/*` and `scripts/*` **copied** beside the
+  manifest, never symlinked, so the project is self-contained even when the
+  template is a built-in inside the binary and nothing platform-specific enters
+  the behaviour ([§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity)). Other bundled files travel as they
+  do for a plan template, except `README.md`, which describes the template;
+- **the settings**: a bundled `settings.json` hoisted to
+  `<dir>/.agent-grounds/rhei/settings.json` as §FS-rhei-templates.6.2 specifies;
+- **the members**: one member rhei per `includes:` entry, laid at
+  `<dir>/<entry-name>/` by the same member-laying path the default `--output`
+  inside a project takes (§FS-rhei-templates.6.2) — rendered, staged, validated through the
+  project and published the same way. A member is a directory whose name is its
+  rhei id ([§AR-rhei-panta.1](../architecture/rhei-panta.spec.md#1-on-disk-layout)). An entry carrying `under:` is refused naming the
+  entry ([§FS-rhei-library.6.1](rhei-library.spec.md#61-under)).
+
+The laid project is then validated as a project, and nothing is published
+unless it passes: a project template that does not lay a valid project is not a
+template that stands alone. A laid project is an ordinary project — `rhei
+validate`, `rhei run` and `rhei list` cannot tell it was laid.
+
+`rhei instantiate <project-template> --into <project>` lays the same parts into
+a project that already exists: it keeps the project's own manifest, lays the
+default machine by replacing the root `states.yaml`, and lays only the members
+that are not already there ([§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target)). Replacing a default refuses
+before writing when it would strand a ticket ([§FS-rhei-library.2.3](rhei-library.spec.md#23-the-default-machine-is-replaced-never-unioned-into)). `--output`
+and `--into` are the same renderer and the same writer, told apart by whether
+the project is already there, and the same template laid both ways — once into
+a scratch directory, once onto a fresh project — produces the same default
+machine, the same bundle, the same settings and the same members.
+
+This is not the silent adoption §FS-rhei-templates.6.2 rules out. Naming the project's default is
+the whole of what a project template is for, so writing it is the command the
+caller ran rather than a side effect of laying something else
+([§DA-per-rhei-state-machines](../decisions/architectural/per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest) item 8).
 
 ## Example
 

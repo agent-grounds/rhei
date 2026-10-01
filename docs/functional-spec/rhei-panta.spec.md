@@ -80,6 +80,12 @@ governs it. A `states.yaml` that happens to sit in `basin/` beside the unfiled
 tickets is not a rhei's own machine — nobody authored a rhei there — and is not
 read as one, by any command or by the rendered graph.
 
+The basin is therefore a reader of the project default whose author never chose
+it, and replacing that default checks the basin's tickets with every member that
+runs under it: `rhei instantiate --into <project>` refuses, naming a basin ticket
+whose state the new default does not allow, before it writes anything
+(§FS-rhei-library.2.3).
+
 ## 3. One unified view
 
 Because every rhei hangs off the same Panta, a project loads and renders as one

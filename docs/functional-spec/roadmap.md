@@ -317,9 +317,14 @@ release decision:
   ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)), with the two deprecated mechanisms resolving
   ahead of it for one release and warning where they disagree
   ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)).
-- **Step 4 — `--into <project>`** (#348)**.** A member rhei with its own machine, or a
+- ~~**Step 4 — `--into <project>`** (#348)**.** A member rhei with its own machine, or a
   project's default machine laid and rebound, with the tickets a rebind would
-  strand named before anything is replaced.
+  strand named before anything is replaced.~~ Done: a template carrying
+  `index.panta.md` lays a whole project with `--output` and binds one with
+  `--into`, writing its machine as the project root's `states.yaml` and laying
+  each `includes:` entry as a member once ([§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project),
+  [§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target)); a replacement refuses before writing, naming every
+  ticket it would strand ([§FS-rhei-library.2.3](rhei-library.spec.md#23-the-default-machine-is-replaced-never-unioned-into)).
 - **Step 5 — the decomposition** (#349)**.** Extract the shared tail of the workspace's
   three ticket templates as templates of their own, make the three including
   templates, and have the library's gate instantiate every template twice —

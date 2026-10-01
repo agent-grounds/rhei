@@ -83,11 +83,34 @@ The state machine is a property of the **rhei**, defaulted by the project.
    ([§FS-rhei-states-deprecation](../../functional-spec/rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). [§AR-rhei-panta.4](../../architecture/rhei-panta.spec.md#4-state-machine-binding)
 7. `--state-machine` stays a whole-scope override and errors when any
    in-scope rhei declares a name different from the override file's.
-8. Machine **adoption** is removed everywhere it existed — `rhei instantiate`
-   no longer writes a template's machine into `index.panta.md`, and
-   `rhei init` no longer adopts a unanimously-declared machine — because
-   adoption's only purpose was to satisfy the uniformity rule this decision
-   removes, and its side effect was re-governing future silent rheis.
+8. **Silent** machine adoption is removed everywhere it existed —
+   `rhei instantiate` no longer writes the machine of a template it lays as a
+   *member* into `index.panta.md`, and `rhei init` no longer adopts a
+   unanimously-declared machine — because adoption's only purpose was to
+   satisfy the uniformity rule this decision removes, and its side effect was
+   re-governing future silent rheis as a consequence of a command nobody ran
+   for that.
+
+   Laying a project's default machine **outright** is a different act and is
+   admitted. A project template (§FS-rhei-templates.2) carries
+   `index.panta.md` and a machine and nothing else: naming the project's
+   default is the whole of what it does, so writing it — the `states.yaml` at
+   the project root, never a `**States:**` line (§FS-rhei-templates.6.4) — is
+   the command the caller ran rather than a side effect of another one.
+   Re-governing later silent rheis is then the intended meaning of "project
+   default" — a rhei with no machine of its own runs under whatever the
+   project's default is, whenever it was written — and the protection a replacement owes is
+   a pre-write refusal naming every ticket it would strand
+   (§FS-rhei-library.2.3).
+
+   The first-session failure in Context stands unchanged and is still refused:
+   it happened because laying *one unrelated template as a member* re-governed
+   the project, and no member-laying path writes the manifest.
+
+   Ruled by the project owner on agent-grounds/rhei#348: "a project default
+   governs later silent rheis too, item 8 narrows to silent adoption, and the
+   pre-write stranding refusal is the protection a rebind owes."
+   `https://github.com/agent-grounds/rhei/issues/348#issuecomment-5928025863`
 
 ## Consequences
 

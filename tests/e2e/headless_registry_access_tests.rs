@@ -34,11 +34,17 @@ fn headless_unreadable_root_keeps_unknown_and_allows_unrelated_stop_by_id() {
     ];
     let before = paths.each_ref().map(|path| fs::read(path).unwrap());
     let restricted = blind.root.join(".rhei");
+    // One outage per claim, each closed before its own snapshot: a window
+    // spanning both commands cannot say which left the root alone, and three of
+    // these paths need `.rhei` searchable to read. §FS-rhei-run-headless.3
     fs::set_permissions(&restricted, fs::Permissions::from_mode(0o000)).unwrap();
     let listing = healthy.rhei(&["runs"]);
+    fs::set_permissions(&restricted, fs::Permissions::from_mode(0o755)).unwrap();
+    let after_listing = paths.each_ref().map(|path| fs::read(path).unwrap());
+    fs::set_permissions(&restricted, fs::Permissions::from_mode(0o000)).unwrap();
     let stopped = healthy.rhei(&["stop", &healthy_id, "--wait"]);
     fs::set_permissions(&restricted, fs::Permissions::from_mode(0o755)).unwrap();
-    let after = paths.each_ref().map(|path| fs::read(path).unwrap());
+    let after_stop = paths.each_ref().map(|path| fs::read(path).unwrap());
     let readable = blind.rhei(&["runs"]);
     // Tidy both real runs before checking outputs that could fail the test.
     let blind_stop = blind.rhei(&["stop", &blind_id, "--wait"]);
@@ -51,8 +57,17 @@ fn headless_unreadable_root_keeps_unknown_and_allows_unrelated_stop_by_id() {
     assert!(!stderr(&listing).contains("forced recovery pending"));
     assert!(stopped.status.success(), "{}", stderr(&stopped));
     assert!(stdout(&stopped).contains(&format!("Asked run {healthy_id}")), "{}", stdout(&stopped));
-    assert_eq!(after, before, "the inaccessible root and its external entry remain untouched");
+    // Each outage is answerable on its own: the blind listing neither read nor
+    // mutated the root it could not check, and stopping an unrelated run did
+    // not reach it either. §FS-rhei-run-headless.3
+    assert_eq!(after_listing, before, "the blind listing left the inaccessible root untouched");
+    assert_eq!(after_stop, after_listing, "nor did the unrelated stop reach it");
     assert!(!marker.exists());
-    assert!(stdout(&readable).contains(&format!("{blind_id}  running")), "{}", stdout(&readable));
+    // Access is back, so the entry is classified afresh §FS-rhei-run-headless.3 —
+    // live here — and a listing with no flags is live runs only, not the undecided
+    // block that printed this same line blind. §FS-rhei-run-headless.6.1
+    let again = stdout(&readable);
+    assert!(!again.contains("could not be checked"), "nothing is undecided now: {again}");
+    assert!(again.contains(&format!("{blind_id}  running")), "{again}");
     assert!(blind_stop.status.success(), "{}", stderr(&blind_stop));
 }

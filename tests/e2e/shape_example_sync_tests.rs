@@ -6,10 +6,9 @@
 //! This is the acceptance of agent-grounds/rhei#324 ported from the
 //! reproducer that validation left: the question *state, task or subtask?* had
 //! no stated answer, two shipped skills answered it opposite ways, and nothing
-//! in `examples/` showed either answer running. Every test here fails for that
-//! absence and is `#[ignore]`d until it is closed — the commit gate runs the
-//! whole suite, so a contract cannot be both committed and red. Remove the
-//! attribute with the change that satisfies it.
+//! in `examples/` showed either answer running. Each test here failed for that
+//! absence, and each now runs in the suite, so a README that stops quoting its
+//! own run, or a skill that paraphrases the rule, fails the commit gate.
 // §FS-rhei-shape §FS-rhei-install-skills.4.8 §FS-rhei-run-report.3.2
 
 use std::fs;
@@ -217,8 +216,13 @@ fn no_authoring_skill_contradicts_the_shape_rule() {
 fn every_shape_pair_ships_both_shapes_and_both_validate() {
     for pair in PAIRS {
         for shape in ["flat", "nested"] {
-            let dir = pair_dir(pair, shape);
-            assert!(dir.is_dir(), "examples/shape/{pair}/{shape} is missing");
+            let source = pair_dir(pair, shape);
+            assert!(source.is_dir(), "examples/shape/{pair}/{shape} is missing");
+            // A scratch copy, because the CLI keeps its home beside the plan
+            // and the checkout must stay clean after a suite run.
+            let scratch = unique_scratchpad_dir(&format!("shape-validate-{pair}-{shape}"));
+            let dir = scratch.join(shape);
+            copy_dir_recursive(&source, &dir);
             let machine = dir.join("states.yaml");
             let result = run_cli("validate", &dir, &machine, &[]);
             assert_success(&result);
@@ -240,18 +244,25 @@ fn every_shape_pair_ships_both_shapes_and_both_validate() {
 /// quoted output cannot drift from the output.
 // §FS-rhei-memory.3.2
 #[test]
-#[ignore = "pins agent-grounds/rhei#324; remove this attribute with the change"]
 fn a_pair_readme_quotes_the_plan_history_its_own_run_renders() {
     for pair in PAIRS {
         let (_dir, workspace) = run_shape(pair, "nested");
         let machine = workspace.join("states.yaml");
+        // The run finished every task, and a finished plan has no next task to
+        // peek; one open task added after it is the reader the history is for.
+        fs::write(
+            workspace.join("tasks/99-probe.md"),
+            "### Task 9: Read what came before\n**State:** work\n\n\
+             A task added after the run, so the run's history has a reader.\n",
+        )
+        .expect("add the probe task");
         let peeked = run_cli("next", &workspace, &machine, &["--peek"]);
         assert_success(&peeked);
         let prompt = peeked.stdout.clone();
         let rendered = prompt
             .split("## Plan History")
             .nth(1)
-            .map(|rest| rest.split("\n## ").next().unwrap_or(rest).trim_end())
+            .map(|rest| rest.split("\n## ").next().unwrap_or(rest).trim_matches('\n').trim_end())
             .unwrap_or_else(|| panic!("{pair}: the peeked prompt carries Plan History"));
 
         let readme = fs::read_to_string(pair_root(pair).join("README.md")).expect("README");
@@ -272,7 +283,6 @@ fn a_pair_readme_quotes_the_plan_history_its_own_run_renders() {
 /// ConPTY on Windows, one case on every supported platform.
 // §FS-rhei-run-report.3.2 §REQ-cross-platform.2
 #[test]
-#[ignore = "pins agent-grounds/rhei#324; remove this attribute with the change"]
 fn a_pair_readme_quotes_the_console_tree_its_own_run_renders() {
     for pair in PAIRS {
         let dir = unique_scratchpad_dir(&format!("shape-tree-{pair}"));
@@ -324,6 +334,9 @@ fn run_on_a_terminal(workspace: &Path) -> String {
     command.arg("run");
     command.arg(workspace);
     command.arg("--no-dashboard");
+    // The plain console frontend: on a pty `Auto` picks the TUI, which waits
+    // for `q` after the run (§FS-rhei-run-tui.1.4) and never returns here.
+    command.arg("--no-tui");
 
     let pair = native_pty_system()
         .openpty(PtySize { rows: 60, cols: 240, pixel_width: 0, pixel_height: 0 })

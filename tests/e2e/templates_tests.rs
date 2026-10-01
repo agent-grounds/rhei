@@ -1,5 +1,4 @@
 use std::fs;
-use std::process::Command;
 
 use super::*;
 
@@ -33,9 +32,8 @@ pub fn run_raw(args: &[&str], cwd: &std::path::Path) -> CliRun {
 #[test]
 fn standalone_instantiation_notes_untracked_workspace_in_git_repo() {
     let dir = unique_temp_dir("templates-standalone-git");
-    let git = Command::new("git").arg("init").arg("-q").current_dir(&dir).status();
-    if !git.map(|status| status.success()).unwrap_or(false) {
-        eprintln!("skipping: git unavailable");
+    if !git_init_or_absent(&dir) {
+        eprintln!("skipping: git is not on this machine");
         return;
     }
     let template_dir = dir.join(".agent-grounds/rhei/templates/hello");

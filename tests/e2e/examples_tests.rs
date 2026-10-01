@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use super::*;
 
@@ -380,9 +379,8 @@ fn example_spec_review_runs_with_mock_agents() {
 #[test]
 fn bundled_ui_fixture_instantiates_and_runs_to_its_human_gate() {
     let dir = unique_temp_dir("example-ui-test-canonical");
-    let git = Command::new("git").arg("init").arg("-q").current_dir(&dir).status();
-    if !git.map(|status| status.success()).unwrap_or(false) {
-        eprintln!("skipping: git unavailable");
+    if !git_init_or_absent(&dir) {
+        eprintln!("skipping: git is not on this machine");
         return;
     }
     let template = dir.join(".agent-grounds/rhei/templates/ui-test-canonical");

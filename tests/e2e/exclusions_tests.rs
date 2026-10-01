@@ -339,11 +339,8 @@ fn deny_read_adapter_blocks_file_directory_descendant_and_export_reads() {
         ),
     ];
     let (dir, workspace, machine) = create_workspace("deny-read-adapter", index, &tasks);
-    let git = std::process::Command::new("git")
-        .args(["init", "-q"])
-        .arg(&workspace)
-        .status()
-        .expect("git init should run");
+    let git =
+        git_command().args(["init", "-q"]).arg(&workspace).status().expect("git init should run");
     assert!(git.success(), "fixture checkout should initialize");
     fs::write(&machine, EXCLUSION_MACHINE).expect("machine");
     fs::write(workspace.join("allowed.txt"), "allowed\n").expect("allowed file");

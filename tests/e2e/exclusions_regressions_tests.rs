@@ -24,12 +24,7 @@ fn exclusions_reject_selected_template_for_run_and_next_with_allowed_control() {
     for exclusion in ["prompt_templates/review.md", "prompt_templates/", "unused.md"] {
         let plan = format!("# Rhei: Template boundary\n\n## Tasks\n\n### Task 1: Review\n**State:** review\n**Excludes:** checkout={exclusion}\n");
         let (dir, plan_path, machine) = setup_single_file("exclusions-template", &plan);
-        assert!(std::process::Command::new("git")
-            .args(["init", "-q"])
-            .arg(&*dir)
-            .status()
-            .unwrap()
-            .success());
+        assert!(git_command().args(["init", "-q"]).arg(&*dir).status().unwrap().success());
         fs::write(
             &machine,
             MACHINE.replace("    agent: mock", "    agent: mock\n    prompt_template: review"),
@@ -117,12 +112,7 @@ fn exclusions_adapter_distinguishes_missing_file_and_recursive_directory() {
         let alias_parent = if cfg!(unix) { "alias/" } else { "" };
         let plan = format!("# Rhei: Future directory\n\n## Tasks\n\n### Task 1: Review\n**State:** review\n**Excludes:** checkout={alias_parent}private{suffix}\n");
         let (dir, plan_path, machine) = setup_single_file("exclusions-future-directory", &plan);
-        assert!(std::process::Command::new("git")
-            .args(["init", "-q"])
-            .arg(&*dir)
-            .status()
-            .unwrap()
-            .success());
+        assert!(git_command().args(["init", "-q"]).arg(&*dir).status().unwrap().success());
         fs::write(&machine, MACHINE).unwrap();
         #[cfg(unix)]
         {

@@ -61,6 +61,10 @@ fn rhei_command() -> Command {
     let mut cmd = Command::new(rhei_binary());
     cmd.env("HOME", home);
     cmd.env("XDG_STATE_HOME", home.join("state"));
+    // Which repository the spawn acts on is this harness's to choose too, and
+    // the four fixtures that want a ceiling set it on the command they get back.
+    // §REQ-test-isolation.3
+    git_env::scrub_git_repository_env(&mut cmd);
     cmd
 }
 

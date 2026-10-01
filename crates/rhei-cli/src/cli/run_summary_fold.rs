@@ -1,6 +1,7 @@
 // The console task tree's subtree fold: which terminal parents speak for their
-// finished subtree, what the line they print instead says, and which rows that
-// leaves for the tree to print.
+// finished subtree, what the line they print instead says, which rows that
+// leaves for the tree to print, and which of those the forty-row budget may
+// collapse.
 //
 // Its own part because the fold is a rendering decision over rows the report has
 // already classified, and nothing else in the report reads it: the tallies,
@@ -15,8 +16,9 @@ enum RowFold {
     /// Printed as it always was.
     Shown,
     /// A terminal parent printed once for its whole finished subtree, carrying
-    /// this detail column in place of its descendants' rows.
-    Speaks(String),
+    /// this detail column in place of its descendants' rows, and the tasks it
+    /// adds to the budget's collapsed count when every one of them is `✓`.
+    Speaks(String, Option<usize>),
     /// Under a parent that speaks for it, so the tree prints no row for it.
     Hidden,
 }
@@ -29,7 +31,9 @@ enum RowFold {
 /// ` — {n} subtasks: {breakdown}`. That clause is [`subtree_fold_clause`], the
 /// one the prompt side writes, so two surfaces folding one subtree cannot spell
 /// the fold two ways. An open parent, or one above a row a human must act on,
-/// keeps every row. §FS-rhei-run-report.3.2 §FS-rhei-memory.3.2
+/// keeps every row. The fold runs before the forty-row budget, which then
+/// collapses a folded parent with its subtree only when every row it speaks for
+/// is `✓`. §FS-rhei-run-report.3.2 §FS-rhei-memory.3.2
 #[derive(Default)]
 struct SubtreeFolds(Vec<RowFold>);
 
@@ -60,7 +64,9 @@ impl SubtreeFolds {
             };
             let clause = subtree_fold_clause(task, machines.for_task(&task.id));
             let detail = format!("{}{clause}", rows[index].detail.as_deref().unwrap_or(""));
-            folds[index] = RowFold::Speaks(detail.trim_start().to_string());
+            let calm = rows[index..end].iter().all(|row| row.marker == Marker::Done);
+            folds[index] =
+                RowFold::Speaks(detail.trim_start().to_string(), calm.then_some(end - index));
             folds[index + 1..end].iter_mut().for_each(|fold| *fold = RowFold::Hidden);
             index = end;
         }
@@ -68,17 +74,22 @@ impl SubtreeFolds {
     }
 
     /// The rows the tree prints, in order, each with the detail column a
-    /// folded parent carries instead of its own. A row the fold never saw is
-    /// printed as it always was.
+    /// folded parent carries instead of its own and the number of tasks the
+    /// forty-row budget adds to its collapsed count if it collapses the row.
+    /// That number is `None` for a row the budget must keep: one that is not
+    /// `✓`, or a folded parent whose clause is the only place a row that is not
+    /// `✓` appears. A row the fold never saw is printed as it always was.
     // §FS-rhei-run-report.3.2
     fn visible<'a>(
         &'a self,
         rows: &'a [TaskRow],
-    ) -> impl Iterator<Item = (&'a TaskRow, Option<&'a str>)> + 'a {
+    ) -> impl Iterator<Item = (&'a TaskRow, Option<&'a str>, Option<usize>)> + 'a {
         rows.iter().enumerate().filter_map(|(index, row)| match self.0.get(index) {
             Some(RowFold::Hidden) => None,
-            Some(RowFold::Speaks(detail)) => Some((row, Some(detail.as_str()))),
-            Some(RowFold::Shown) | None => Some((row, None)),
+            Some(RowFold::Speaks(detail, calm)) => Some((row, Some(detail.as_str()), *calm)),
+            Some(RowFold::Shown) | None => {
+                Some((row, None, (row.marker == Marker::Done).then_some(1)))
+            }
         })
     }
 }

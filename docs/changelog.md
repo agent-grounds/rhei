@@ -13,11 +13,14 @@ pull request number: the release stamps `(PR #N)` onto it. See
   depth, bucketed by state in the machine's own order, spelled exactly as the
   Plan History line already is — instead of a row per descendant. A subtree
   with a blocked, failed, gated or open task keeps every row above it, an open
-  parent still shows the children that finished, and the forty-row budget
-  collapses calm rows only after the fold. The TUI's Flow outline folds by the
-  same rule, and `Enter` on a folded parent expands it in place
-  (§FS-rhei-run-tui.1.5.3). The plain non-TTY lines, `## Task Final States`,
-  `--json`, `events.jsonl` and `rhei list` keep one row per task. (PR #381)
+  parent still shows the children that finished, and the forty-row budget runs
+  after the fold and collapses a finished parent with its whole subtree, so a
+  tree of many finished parents stays bounded; a parent that speaks for a
+  cancelled task stays shown. The TUI's Flow outline folds by the same rule,
+  `Enter` on a folded parent expands it in place, and a selection inside the
+  subtree or an active `/` filter holds it open (§FS-rhei-run-tui.1.5.3). The
+  plain non-TTY lines, `## Task Final States`, `--json`, `events.jsonl` and
+  `rhei list` keep one row per task. (PR #381)
 
 - Whether a unit of work is a state, a task, a subtask, a rhei or body prose now
   has one stated answer, §FS-rhei-shape, which an author can look up in three

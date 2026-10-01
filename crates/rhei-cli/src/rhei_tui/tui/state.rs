@@ -638,7 +638,9 @@ impl UiState {
         self.slots.get_mut(idx)
     }
 
-    fn filter_needle(&self) -> Option<String> {
+    /// The active `/` filter as every view matches it, trimmed and lowercased,
+    /// or `None` when it filters nothing.
+    pub(super) fn filter_needle(&self) -> Option<String> {
         self.filter
             .as_ref()
             .map(|value| value.trim().to_lowercase())

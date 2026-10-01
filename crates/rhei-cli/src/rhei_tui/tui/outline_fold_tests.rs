@@ -127,3 +127,29 @@ fn enter_on_a_folded_parent_expands_it_in_place() {
     handle_key_event(&mut ui, KeyCode::Enter, KeyModifiers::NONE);
     assert_eq!(outline_ids(&ui), ["1", "1.1", "1.1.1", "1.2", "2"]);
 }
+
+/// The selection standing inside a folded subtree holds it open, so selecting
+/// a finished child, through the inspector's `children` chip say, never leaves
+/// the selected row off the outline. §FS-rhei-run-tui.1.5.3
+#[test]
+fn a_selection_inside_a_finished_subtree_holds_it_open() {
+    let mut ui = outline(&[("1", "completed"), ("1.1", "completed"), ("1.2", "completed")]);
+    assert_eq!(outline_ids(&ui), ["1"]);
+
+    assert!(ui.select_task("1.2"));
+    assert_eq!(outline_ids(&ui), ["1", "1.1", "1.2"]);
+}
+
+/// An active `/` filter holds every subtree open, so a row the filter found is
+/// never folded away; a filter of only whitespace filters nothing, so it holds
+/// nothing either. §FS-rhei-run-tui.1.5.3
+#[test]
+fn an_active_filter_holds_a_finished_subtree_open_and_whitespace_does_not() {
+    let mut ui = outline(&[("1", "completed"), ("1.1", "completed"), ("1.2", "completed")]);
+
+    ui.filter = Some("task".to_string());
+    assert_eq!(outline_ids(&ui), ["1", "1.1", "1.2"]);
+
+    ui.filter = Some("   ".to_string());
+    assert_eq!(outline_ids(&ui), ["1"]);
+}

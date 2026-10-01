@@ -1325,11 +1325,11 @@ impl RunSummaryReport {
         let mut out = String::new();
         let mut collapsed = 0usize;
         let mut shown = 0usize;
-        for (row, folded) in self.folds.visible(&self.rows) {
-            // Collapse calm completed rows once the tree grows long, but never one that needs a
-            // human, nor a folded parent: it is its subtree's only row. §FS-rhei-run-report.3.2
-            if shown >= MAX_TASK_ROWS && row.marker == Marker::Done && folded.is_none() {
-                collapsed += 1;
+        for (row, folded, calm) in self.folds.visible(&self.rows) {
+            // Once the tree is long, collapse `✓` rows and folded parents with their subtrees,
+            // never a row that is not `✓` nor a parent speaking for one. §FS-rhei-run-report.3.2
+            if let Some(tasks) = calm.filter(|_| shown >= MAX_TASK_ROWS) {
+                collapsed += tasks;
                 continue;
             }
             shown += 1;

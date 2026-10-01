@@ -415,8 +415,11 @@ The outline folds a terminal parent's subtree by the rule and the clause of
 here too. Because the outline is navigable and has no expand key of its own
 (§1.5.2), `Enter` on a folded parent row expands it in place rather than
 leaving finished children unreachable; the inspector's `children` section
-remains the other way in. A gating task under a folded parent cannot arise: a
-gate anywhere in the subtree prevents the fold.
+remains the other way in. The selection standing inside a folded subtree, or an
+active `/` filter, holds that subtree open too, so the outline never hides the
+row a person is on or looked for; a filter of only whitespace is no filter and
+holds nothing. A gating task under a folded parent cannot arise: a gate anywhere
+in the subtree prevents the fold.
 
 On load, the TUI auto-selects the first running task, then the first
 state-derived active task, then the first task. The only animated element is the

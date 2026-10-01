@@ -65,6 +65,7 @@ mod templates {
         include!("cli/tests_templates_publication.rs");
         include!("cli/tests_templates_union.rs");
         include!("cli/tests_templates_union_hold.rs");
+        include!("cli/tests_templates_union_fence.rs");
     }
 }
 

@@ -221,11 +221,30 @@
         Ok(format!("{:x}", hasher.finalize()))
     }
 
+    /// A relative path's contribution to the digest, spelled the one way on
+    /// every platform.
+    ///
+    /// The digest is the `src:sha256:` half of a fence comment, which a user
+    /// reads out of their own `states.yaml`, so it may not depend on which
+    /// separator the host spells a nested entry with: `prompt_templates/split.md`
+    /// and `prompt_templates\split.md` are one source file and must digest
+    /// alike. Joined from `components()` rather than substituted, because on a
+    /// POSIX host a backslash is an ordinary character in a file name and
+    /// rewriting it would fold two different templates together.
+    /// §REQ-cross-platform.2 §FS-rhei-library.7.1
+    fn digest_path_component(relative: &Path) -> String {
+        relative
+            .components()
+            .map(|component| component.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
     fn hash_tree(root: &Path, path: &Path, hasher: &mut sha2::Sha256) -> MietteResult<()> {
         use sha2::Digest;
         if path.is_file() {
             let relative = path.strip_prefix(root).unwrap_or(path);
-            hasher.update(relative.to_string_lossy().as_bytes());
+            hasher.update(digest_path_component(relative).as_bytes());
             hasher.update(
                 fs::read(path).map_err(|err| file_io_report(path, "failed to read", err))?,
             );

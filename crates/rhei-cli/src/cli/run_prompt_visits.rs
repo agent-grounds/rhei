@@ -95,7 +95,18 @@ fn render_previous_log(render_context: &RuntimeTemplateContext<'_>) -> String {
 /// named here and the result `## Result` names are one path.
 ///
 /// Paths go through `memory_path`, which every other path in this section
-/// already uses, including the transcript in this same sentence.
+/// already uses, including the transcript in this same sentence, so the clause
+/// and that transcript cannot read against different bases. What it is handed is
+/// the path that was checked — a single join of the relative spelling its author
+/// wrote, which `memory_path` answers textually and therefore gives back
+/// unchanged, so the `/` the author typed survives to the prompt on every
+/// platform and the `result` entry is the string `## Result` already shows.
+/// §FS-rhei-agents.4.1
+///
+/// Whether a path still carries a `{...}` template is the collector's answer
+/// about the authored spelling, not a question asked of the rendered string: an
+/// artifact root that happens to contain a brace would otherwise make every
+/// entry claim to be a template the warning never called one.
 // §FS-rhei-memory.4.4 §FS-rhei-agents.3.2.1
 fn render_owed_clause(render_context: &RuntimeTemplateContext<'_>, visit: u64) -> String {
     let owed = missing_required_outputs_for_invocation(
@@ -123,7 +134,7 @@ fn render_owed_clause(render_context: &RuntimeTemplateContext<'_>, visit: u64) -
         .iter()
         .map(|entry| {
             let shown = memory_path(render_context, &entry.path);
-            if is_unresolved_template(&shown) {
+            if entry.unresolved_template {
                 format!("{} (`{shown}`, unresolved template)", entry.name)
             } else {
                 format!("{} (`{shown}`)", entry.name)

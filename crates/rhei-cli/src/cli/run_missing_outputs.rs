@@ -144,27 +144,22 @@ fn format_missing_required_output(name: &str, relative: &str) -> String {
 struct MissingRequiredOutput {
     /// The declared artifact's name, or `result` for the ticket's result.
     name: String,
-    /// The path that was checked, spelled the way the platform spells one — a
-    /// prompt's rule, which the warning's own spelling does not follow.
+    /// The path `.exists()` was asked about, as it was asked — one `join` of
+    /// the authored relative onto the root, never re-derived from it. Re-joining
+    /// component by component writes the platform's separator and hands a prompt
+    /// a path nobody typed, which §FS-rhei-agents.4.1 forbids by name.
+    // §FS-rhei-agents.4.1
     path: PathBuf,
+    /// Whether the *authored* spelling of that path still carries a `{...}`
+    /// template, which artifact resolution leaves verbatim by design.
+    ///
+    /// Answered here, where the authored relative is still in hand, rather than
+    /// by any reader of the rendered string: a root that happens to contain a
+    /// brace is not a template, and a path that was checked may not be presented
+    /// as though it were one. §FS-rhei-memory.4.4
+    unresolved_template: bool,
     /// That path as the missing-output warning spells it.
     warning_spelling: String,
-}
-
-/// `relative` — a path a template or a format string wrote with `/` — joined
-/// onto `root` one component at a time.
-///
-/// `Path::join` over the whole string keeps the `/` the author typed, which is
-/// what the missing-output warning prints and what `## Artifacts` shows the
-/// worker. A path in `## Previous Visits` is spelled the way the platform
-/// spells one, as the transcript beside the owed clause already is, so the
-/// clause joins rather than pastes.
-// §FS-rhei-memory.4.4 §REQ-cross-platform
-fn joined_under_root(root: &Path, relative: &str) -> PathBuf {
-    relative
-        .split('/')
-        .filter(|part| !part.is_empty())
-        .fold(root.to_path_buf(), |path, part| path.join(part))
 }
 
 impl MissingRequiredOutput {
@@ -226,10 +221,13 @@ fn missing_terminal_result_entry(
     if file_has_content(&path) {
         return None;
     }
-    let shown = std::path::absolute(&path).unwrap_or(path);
+    let shown = std::path::absolute(&path).unwrap_or_else(|_| path.clone());
     Some(MissingRequiredOutput {
         name: "result".to_string(),
-        path: joined_under_root(result_root, &result_relative_path(&task_id, invocation)),
+        path,
+        // A result path is written by a format string over values the engine
+        // holds, so there is no variable left in it to be outside a namespace.
+        unresolved_template: false,
         warning_spelling: shown.display().to_string(),
     })
 }
@@ -476,7 +474,8 @@ fn missing_required_outputs_for_invocation(
         if !path.exists() {
             missing.push(MissingRequiredOutput {
                 name: artifact.name.clone(),
-                path: joined_under_root(artifact_root, &relative),
+                path,
+                unresolved_template: is_unresolved_template(&relative),
                 warning_spelling: relative,
             });
         }

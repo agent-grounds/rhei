@@ -31,6 +31,25 @@ fn registry_path(ws: &Workspace, id: &str) -> std::path::PathBuf {
     ws.home.join("state").join("rhei").join("runs").join(format!("{id}.json"))
 }
 
+/// How `rhei runs --all --json` classified one entry — `live`, `ended`, or
+/// `absent` when its `rhei.run-history.v1` object does not hold the id at all.
+/// `--json` reports what could not be checked on stderr, so an id found here
+/// was classified rather than merely printed.
+// §FS-rhei-run-headless.6.1
+#[cfg(unix)]
+fn history_liveness(out: &std::process::Output, id: &str) -> String {
+    assert!(out.status.success(), "`rhei runs --all --json`: {}", stderr(out));
+    let text = stdout(out);
+    let parsed: serde_json::Value = serde_json::from_str(&text)
+        .unwrap_or_else(|err| panic!("not a run-history object ({err}): {text}"));
+    assert_eq!(parsed["schema"], "rhei.run-history.v1", "got: {text}");
+    parsed["runs"]
+        .as_array()
+        .and_then(|runs| runs.iter().find(|run| run["id"] == id))
+        .map_or("absent", |run| run["liveness"].as_str().unwrap_or("unlabelled"))
+        .to_string()
+}
+
 /// Launch, then wait for the run to record its own end.
 // Only the detached-run cases use it, and those are Unix-only.
 // §FS-rhei-run-headless.1.3
@@ -209,7 +228,10 @@ fn an_unreadable_workspace_keeps_its_entry_and_says_so() {
     // The outage is the run's own death sentence: an unreadable `.rhei` fails
     // the engine's recovery-marker check, which ends the run §FS-rhei-recover.4.
     // Hold the window open until it has, so what follows is pinned, not raced.
-    wait_until("the outage to end the run it covers", Duration::from_secs(60), || {
+    let dying = "the outage to end the run it covers — a timeout here means an unreadable \
+                 `.rhei` no longer fails the recovery-marker check, so this test's premise \
+                 has moved rather than its budget being too short";
+    wait_until(dying, Duration::from_secs(60), || {
         ws.descriptor().is_some_and(|d| d["status"] == "failed" || d["status"] == "finished")
     });
     fs::set_permissions(&rhei_dir, fs::Permissions::from_mode(0o755)).expect("chmod 755");
@@ -219,8 +241,18 @@ fn an_unreadable_workspace_keeps_its_entry_and_says_so() {
     assert!(text.contains(&id), "and named: {text}");
     assert!(registry_path(&ws, &id).is_file(), "and kept");
 
-    // Readable again, live again — nothing was lost to the outage.
-    assert!(stdout(&ws.rhei(&["runs"])).contains(&format!("{id}  running")));
+    // Access is back, so `unknown` is spent: the entry is classified afresh, and
+    // here afresh means ended — the run died under its own unreadable root.
+    // §FS-rhei-run-headless.3
+    let history = ws.rhei(&["runs", "--all", "--json"]);
+    let live_only = ws.rhei(&["runs"]);
+    assert!(registry_entry(&ws, &id).is_some(), "the outage pruned nothing to classify");
+    assert_eq!(history_liveness(&history, &id), "ended", "{}", stdout(&history));
+    // And a listing with none of the three flags is live runs only, so it is no
+    // place for an ended one. The old coda asserted it belonged there.
+    // §FS-rhei-run-headless.6.1
+    assert!(live_only.status.success(), "{}", stderr(&live_only));
+    assert!(!stdout(&live_only).contains(&id), "nor live: {}", stdout(&live_only));
 }
 
 /// An older binary reading a newer one's registry must not destroy it.

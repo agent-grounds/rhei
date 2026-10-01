@@ -10,9 +10,18 @@ pull request number: the release stamps `(PR #N)` onto it. See
   what it does not: unknown is a verdict about one probe, so when access returns
   the entry is classified afresh and stays resolvable by id, while the run's own
   survival across the outage is not promised — a participant that cannot read
-  the state it must check stops instead. The end-to-end test that covers the
-  outage now holds its unreadable window open until the run it covers has
-  provably ended, so what it asserts afterwards is pinned rather than raced.
+  the state it must check stops instead. The two end-to-end tests that cover
+  the outage now assert that rather than the phase the outage happened to leave
+  behind. `an_unreadable_workspace_keeps_its_entry_and_says_so` holds its
+  unreadable window open until the run it covers has provably ended, and then
+  pins what the point promises — the entry unpruned, classified `ended` by
+  `rhei runs --all --json`, and absent from the live-only listing — in place of
+  a coda whose own `chmod 000` falsified it, which is what reddened the
+  end-to-end target on a loaded runner.
+  `headless_unreadable_root_keeps_unknown_and_allows_unrelated_stop_by_id` pins
+  the other branch, a run still live when access returns, and gives the blind
+  listing and the unrelated stop an outage each, so "the inaccessible root was
+  left untouched" is claimed once per command instead of once across both.
 
 - Refuse a copied task definition that claims a ticket identity another live
   ticket still holds. The project's budget account counts one ticket uuid's

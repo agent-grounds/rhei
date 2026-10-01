@@ -124,7 +124,7 @@ fn every_template_transition_invocation_names_from() {
     );
 }
 
-/// Guard: no template source carries a ticket's budget identity.
+/// Guard: no tracked plan source carries a ticket's budget identity.
 ///
 /// A hand-applied edge establishes the project's account and writes the moving
 /// ticket's `budgetTicketId` into the plan it moved
@@ -136,18 +136,30 @@ fn every_template_transition_invocation_names_from() {
 /// so the accident ships as a user's `rhei instantiate` failing. Nothing else in
 /// this repository reads a template plan's metadata, which is why it is caught
 /// here.
+///
+/// The committed examples and the e2e fixtures are scanned beside the two
+/// template roots, because they are tracked plans a reader drives by hand for
+/// exactly the same reason, and `examples/` is a route into the template roots
+/// this guard already defends: `template_example_sync_tests` holds each
+/// `examples/<name>-example/` byte-identical to what instantiating its template
+/// produces.
 // §FS-rhei-library.5 §FS-rhei-budgets.5.4
 #[test]
 fn no_template_source_carries_a_budget_ticket_identity() {
-    let roots = ["crates/rhei-cli/templates", ".agent-grounds/rhei/templates"];
+    let roots = [
+        "crates/rhei-cli/templates",
+        ".agent-grounds/rhei/templates",
+        "examples",
+        "tests/e2e/fixtures",
+    ];
     let mut offenders = Vec::new();
     for root in roots {
         let root = repo_root().join(root);
         let mut files = Vec::new();
         text_files(&root, &mut files);
-        assert!(!files.is_empty(), "no template files found under {}", root.display());
+        assert!(!files.is_empty(), "no tracked files found under {}", root.display());
         for path in files {
-            if fs::read_to_string(&path).expect("read template").contains("budgetTicketId") {
+            if fs::read_to_string(&path).expect("read tracked file").contains("budgetTicketId") {
                 offenders.push(path.display().to_string());
             }
         }
@@ -155,8 +167,8 @@ fn no_template_source_carries_a_budget_ticket_identity() {
 
     assert!(
         offenders.is_empty(),
-        "a budget identity belongs to a run and never to a template, and `rhei instantiate` \
-         refuses one that carries it. Remove the key from:\n{}",
+        "a budget identity belongs to a run and never to a tracked plan, and `rhei instantiate` \
+         refuses a template that carries it. Remove the key from:\n{}",
         offenders.join("\n")
     );
 }

@@ -101,8 +101,8 @@ impl Journal {
 
     /// Open the account, establishing it when it is **absent** — no journal and
     /// no witness claiming this root. That is lawful and silent: the first
-    /// admission mints it inside the transaction it is already holding.
-    /// §FS-rhei-budgets.5.4
+    /// charge of either kind — an admission or an applied edge — mints it
+    /// inside the transaction it is already holding. §FS-rhei-budgets.5.4
     pub fn establish(root: &Path, project_uuid: &str, audit: &Audit) -> Result<Self> {
         audit.validate()?;
         let mut ledger = Self::locked(root, project_uuid, true, true)?;

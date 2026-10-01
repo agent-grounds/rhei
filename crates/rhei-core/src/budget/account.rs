@@ -53,9 +53,10 @@ impl Account {
 
     /// The project's account, minted when it is absent.
     ///
-    /// Establishment is part of the first admission rather than a migration
-    /// step, and it mints nothing: a new account starts at zero consumed under
-    /// the window contract. §FS-rhei-budgets.5.4
+    /// Establishment is part of the first charge of either kind — an admission
+    /// or an applied edge — rather than a migration step, and it mints nothing:
+    /// a new account starts at zero consumed under the window contract.
+    /// §FS-rhei-budgets.5.4
     pub fn establish(project_root: &Path, audit: &Audit) -> Result<(Self, Journal)> {
         let account = match Self::locate(project_root)? {
             Some(account) => account,

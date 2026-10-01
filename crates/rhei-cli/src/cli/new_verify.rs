@@ -47,6 +47,12 @@ fn new_write_failure(
     if let Some(failure) = vanished_ids_failure(target, before) {
         return Some(failure);
     }
+    // Before the pass, because the pass no longer refuses every tree this
+    // fault produces, and because a create whose own flag is wrong should not
+    // first be told about the project it momentarily broke. §FS-rhei-new.1.2
+    if let Some(failure) = undeclared_created_machine_failure(target, write) {
+        return Some(failure);
+    }
     match validation_pass(target, None) {
         Ok(pass) => {
             let introduced = errors_introduced_over(inherited, pass.errors);
@@ -71,6 +77,65 @@ fn new_write_failure(
         }
     }
     verify_created_id(target, write).err()
+}
+
+/// Refuse a create whose `--states` names a machine no `states.yaml` in the
+/// project declares.
+///
+/// The rule is §FS-rhei-new.1.2's and the fault is this create's: `--states`
+/// writes the declaration and does not author the machine, so a name nothing
+/// declares is a fault in the flag. It needs saying here because the project's
+/// validation pass no longer says it for every such tree — while the
+/// `**States:**` declaration is deprecated, a declaration nothing supplies
+/// falls through to whatever `states.yaml` sits in the rhei's own root
+/// (§FS-rhei-states-deprecation.2.1). That indulgence is for a tree already on
+/// disk, which a release has been spent warning. Creation is authoring: the
+/// one command whose job is to write a correct index must not write a
+/// `**States:**` line and, in the same breath, warn that the line should be
+/// deleted.
+///
+/// A check on the *name*, not a second precedence rule: which file the created
+/// rhei runs under is still the one resolution path §FS-rhei-new.2.1.1 names.
+/// Reading the candidates strictly is what keeps it from answering the wrong
+/// fault — a `states.yaml` that will not parse is the validator's to report,
+/// and counting it as declaring nothing would call it missing instead.
+// §FS-rhei-new.1.2 §FS-rhei-new.2.1.1 §FS-rhei-new.5.2
+fn undeclared_created_machine_failure(
+    target: &Path,
+    write: &NewWrite,
+) -> Option<CreateFailure> {
+    let declared = write.declared_machine.as_deref()?.trim();
+    if declared.is_empty() {
+        return None;
+    }
+    let loaded = load_plan_leniently(target).ok()?;
+    let mut names = vec![rhei_validator::StateMachine::builtin_default().name];
+    let mut candidates = vec![auto_state_machine_path(target)];
+    candidates.extend(sorted_rhei_roots(&loaded).into_iter().map(|root| root.join("states.yaml")));
+    for candidate in candidates {
+        if candidate.is_file() {
+            names.push(load_state_machine(Some(&candidate)).ok()?.name);
+        }
+    }
+    if names.iter().any(|name| name == declared) {
+        return None;
+    }
+    names.sort();
+    names.dedup();
+    Some(CreateFailure {
+        report: miette!(
+help = format!(
+    "this project's states files declare: {}. Author the machine first — `/rhei-state-machine-writer` writes one — then re-run, or pass a `--states` naming one of those.",
+    names.join(", ")
+),
+
+            "--states '{declared}' writes `**States:** {declared}`, but no states file \
+             declaring it was found in the new rhei's root, the project root, or any other \
+             rhei root. `--states` only writes the declaration; it does not create the \
+             state machine, so the rhei would point at nothing."
+        ),
+        reason: "its `--states` names a machine no states file declares",
+    })
 }
 
 /// Every id the project holds right now: its rheis, and every ticket in them.

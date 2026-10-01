@@ -10,11 +10,15 @@ pull request number: the release stamps `(PR #N)` onto it. See
   whatever its index says, then the project root's, then the built-in `rhei`
   machine (§FS-rhei-plan-language.1.3) — so a machine file written into a rhei's
   directory stops being inert, and `rhei instantiate --into` no longer writes a
-  `**States:**` line to make one count (§FS-rhei-library.2.1). **One behaviour
-  change:** a `states.yaml` at a project root that `index.panta.md` does not
-  declare is now the project default, where it used to be ignored in favour of
-  the built-in machine; a loose plan beside such a manifest can stop validating
-  if the two vocabularies differ. The `**States:**` declaration and the
+  `**States:**` line to make one count (§FS-rhei-library.2.1). The own-root
+  clause covers a lone plan too — the `states.yaml` beside it is its machine,
+  whatever the file's `name:` — and a declaration naming a machine nothing
+  supplies now resolves to the file in that root rather than failing the load;
+  both of those only turn an error into a resolution, and the second one warns.
+  **One behaviour change:** a `states.yaml` at a project root that
+  `index.panta.md` does not declare is now the project default, where it used to
+  be ignored in favour of the built-in machine; a loose plan beside such a
+  manifest can stop validating if the two vocabularies differ. The `**States:**` declaration and the
   unique-`name` match across rhei roots are **deprecated, not removed**: both
   still resolve, both still win wherever they resolve this release so every laid
   plan runs unchanged, and each prints one `warning:` line on stderr where it

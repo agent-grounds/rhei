@@ -128,6 +128,58 @@ fn a_declaration_nothing_supplies_with_no_own_file_is_still_an_error() {
     );
 }
 
+/// The basin is synthetic, so a `states.yaml` sitting in `basin/` is nobody's
+/// own machine: the project default governs the basin's tickets, in the CLI and
+/// in the rendered graph alike. Clause 1 reads a rhei's own execution root, and
+/// the basin has no authored root to be one.
+/// §FS-rhei-panta.2 §FS-rhei-plan-language.1.3
+#[test]
+fn a_machine_at_the_basins_root_does_not_govern_the_basin() {
+    let dir = unique_temp_dir("resolution-basin-own-file");
+    let home = dir.join(".home");
+    let root = project(&dir, None);
+    project_machine(&root, &machine("proj-machine", "surveying", "signed-off"));
+    member(&root, "audit", None, "surveying");
+    std::fs::create_dir_all(root.join("basin")).expect("create the basin");
+    write_fixture_file(
+        &root.join("basin"),
+        "001-loose.md",
+        "### Task 1: Captured\n**State:** surveying\n",
+    );
+    // A machine whose only state is one the project default lacks, so a basin
+    // running under it could not validate at all.
+    write_fixture_file(
+        &root.join("basin"),
+        "states.yaml",
+        &machine("basin-machine", "filed", "shelved"),
+    );
+    let project_arg = root.display().to_string();
+
+    assert_validates(&rhei_in(&dir, &home, &["validate", &project_arg]));
+
+    let states = rhei_in(&dir, &home, &["states", &project_arg]);
+    assert_success(&states);
+    assert_source(&states, &default_source(&root.join("states.yaml")));
+    assert!(
+        !states.stdout.contains("basin-machine"),
+        "the file in `basin/` is not a rhei's own machine; got:\n{}",
+        states.stdout
+    );
+
+    let out = dir.join("view.html");
+    let viz = rhei_in(
+        &dir,
+        &home,
+        &["viz", &project_arg, "--output", out.to_str().expect("utf8 output path")],
+    );
+    assert_success(&viz);
+    let html = std::fs::read_to_string(&out).expect("read the rendered view");
+    assert!(
+        !html.contains("basin-machine"),
+        "the graph must not give the basin a machine the CLI does not"
+    );
+}
+
 /// The control for `agent-grounds/rhei#314`, which this change is measured
 /// against rather than fixing. With the project default fully resolved — a
 /// declaration plus the matching file at the project root, which is what the new

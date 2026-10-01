@@ -163,6 +163,12 @@ fn resolve_project_machines(
     let mut roots: Vec<(&String, &PathBuf)> = loaded.rhei_roots.iter().collect();
     roots.sort();
     for (rhei_id, root) in roots {
+        // The basin is synthetic and runs under the project default, so a
+        // `states.yaml` sitting in `basin/` is nobody's own machine.
+        // §FS-rhei-panta.2
+        if rhei_id == workspace::BASIN_RHEI_ID {
+            continue;
+        }
         let candidate = root.join("states.yaml");
         let declared = loaded.rhei_machines.get(rhei_id);
         if let Some(machine_name) = declared {
@@ -188,6 +194,15 @@ fn resolve_project_machines(
                     continue;
                 }
             }
+            // The deprecated pass also matches `name:` across the other rhei
+            // roots, and a viz that stopped there would render a different
+            // machine than every command runs. §FS-rhei-states-deprecation.2.3
+            if let Some(machine) =
+                cross_root_name_match(path, loaded, rhei_id, machine_name, &candidate)?
+            {
+                per_rhei.insert(rhei_id.clone(), machine);
+                continue;
+            }
             if *machine_name == StateMachine::builtin_default().name {
                 continue;
             }
@@ -208,6 +223,53 @@ fn resolve_project_machines(
         }
     }
     Ok(crate::rhei_validator::MachineSet { default, per_rhei })
+}
+
+/// The deprecated unique-`name` match across the project's other rhei roots,
+/// as the CLI's deprecated pass resolves it: one match resolves, several are
+/// the ambiguity error, none falls through.
+///
+/// `already_tried` is the declaring rhei's own candidate, which the caller has
+/// read already; the project root is reached through the `rhei_roots` entry it
+/// has when a single-file member lives there, and is excluded here because the
+/// caller tried it too.
+// §FS-rhei-states-deprecation.2.3 §AR-rhei-panta.4
+fn cross_root_name_match(
+    path: &Path,
+    loaded: &workspace::PantaProject,
+    rhei_id: &str,
+    machine_name: &str,
+    already_tried: &Path,
+) -> io::Result<Option<StateMachine>> {
+    let project_candidate = path.join("states.yaml");
+    let mut seen: std::collections::BTreeSet<PathBuf> =
+        [already_tried.to_path_buf(), project_candidate].into_iter().collect();
+    let mut roots: Vec<&PathBuf> = loaded.rhei_roots.values().collect();
+    roots.sort();
+    let mut matches: Vec<(PathBuf, StateMachine)> = Vec::new();
+    for root in roots {
+        let candidate = root.join("states.yaml");
+        if !seen.insert(candidate.clone()) || !candidate.is_file() {
+            continue;
+        }
+        let machine = load_machine(&candidate)?;
+        if machine.name == machine_name {
+            matches.push((candidate, machine));
+        }
+    }
+    if matches.len() > 1 {
+        let named: Vec<String> =
+            matches.iter().map(|(path, _)| format!("'{}'", path.display())).collect();
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "rhei '{rhei_id}' declares state machine '{machine_name}', and more than one \
+                 root holds a states file declaring it: {}",
+                named.join(", ")
+            ),
+        ));
+    }
+    Ok(matches.into_iter().next().map(|(_, machine)| machine))
 }
 
 /// Resolve the state machine for a plan: an explicit `--states` override wins,

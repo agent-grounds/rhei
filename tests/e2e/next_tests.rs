@@ -53,35 +53,39 @@ transitions:
     );
 }
 
+/// A lone plan that declares nothing runs under the `states.yaml` beside it —
+/// whatever the file's `name:`, and even where that name is the built-in's.
+///
+/// The sibling machine here is named `rhei` and gives `pending` instructions
+/// the built-in machine does not, so the claim below can only have been judged
+/// by the file. Under the previous rule the sibling was inert and the built-in
+/// machine governed, which is the one shape of clause 1 with no project around
+/// it. §FS-rhei-plan-language.1.3
 #[test]
-fn next_omitted_states_uses_builtin_even_with_sibling_states_yaml() {
-    let plan = r#"# Rhei: Builtin Default
+fn next_omitted_states_reads_the_sibling_states_yaml_whatever_its_name() {
+    let plan = r#"# Rhei: Sibling Machine
 
 ## Tasks
 
-### Task 1: Use builtin machine
+### Task 1: Use the sibling machine
 **State:** pending
 "#;
     let sibling_machine = r#"name: rhei
 version: 1
 states:
-  draft:
+  pending:
     initial: true
-    description: Planned
-  review:
-    description: Custom review
-    instructions: This sibling machine should be ignored.
+    description: Ready
+    instructions: The sibling machine governs.
   completed:
     final: true
     description: Done
 transitions:
-  - from: draft
-    to: review
-  - from: review
+  - from: pending
     to: completed
 "#;
 
-    let dir = unique_temp_dir("next-omitted-states-built-in");
+    let dir = unique_temp_dir("next-omitted-states-sibling");
     let plan_path = write_fixture_file(&dir, "plan.rhei.md", plan);
     write_fixture_file(&dir, "states.yaml", sibling_machine);
 
@@ -92,7 +96,12 @@ transitions:
     assert_eq!(json["task_id"], "plan.1");
     assert_eq!(json["state"], "pending");
     assert_eq!(json["from_state"], "pending");
-    assert_eq!(json["instructions"], "Do the task.");
+    assert_eq!(
+        json["instructions"], "The sibling machine governs.",
+        "the file beside the plan is the machine, not the built-in one it is named after; \
+         got:\n{}",
+        result.stdout
+    );
     let content = fs::read_to_string(&plan_path).expect("read claimed plan");
     assert!(
         content.contains("**State:** pending\n**Assignee:** manual"),

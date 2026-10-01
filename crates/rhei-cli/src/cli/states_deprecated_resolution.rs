@@ -36,39 +36,64 @@ struct DeprecatedResolution {
 /// inherit warns once and names the manifest.
 /// §FS-rhei-states-deprecation.3
 enum DeclarationSubject<'a> {
-    /// `index.panta.md`'s own declaration, naming the project default.
-    Manifest { root: &'a Path },
+    /// The top-level plan's own declaration, naming the project default: a
+    /// project's `index.panta.md`, a Directory Workspace's `index.rhei.md`, or
+    /// a lone plan itself. `file` is the one that carries the line.
+    Manifest { root: &'a Path, file: &'a Path },
     /// A rhei's own `**States:**` line.
     Rhei { id: &'a str, root: &'a Path },
 }
 
 impl DeclarationSubject<'_> {
-    /// The once-per-process key. The declaration's own root is what makes two
-    /// projects loaded in one process two subjects.
+    /// The once-per-process key. It is the declaration that is the subject, so
+    /// a rhei's id is part of its key: two single-file members of one project
+    /// share an execution root and carry two distinct declarations.
     /// §FS-rhei-states-deprecation.3
     fn key(&self) -> String {
         match self {
-            Self::Manifest { root } => format!("states-declaration:manifest:{}", root.display()),
-            Self::Rhei { root, .. } => format!("states-declaration:rhei:{}", root.display()),
+            Self::Manifest { root, .. } => {
+                format!("states-declaration:manifest:{}", root.display())
+            }
+            Self::Rhei { id, root } => {
+                format!("states-declaration:rhei:{}:{id}", root.display())
+            }
         }
     }
 
-    /// How the warning names whoever carries the line.
+    /// How the warning names whoever carries the line — the file for a
+    /// top-level declaration, because a lone plan and a Directory Workspace
+    /// have no `index.panta.md` to be told to edit.
+    /// §FS-rhei-states-deprecation.2
     fn names_itself(&self) -> String {
         match self {
-            Self::Manifest { .. } => format!("'{}'", workspace::PANTA_INDEX_FILE),
+            Self::Manifest { file, .. } => format!("'{}'", file.display()),
             Self::Rhei { id, .. } => format!("rhei '{id}'"),
         }
     }
 
     /// The execution root whose `states.yaml` §FS-rhei-plan-language.1.3
-    /// clause 1 would read. For the manifest that is the project root, which
-    /// is also what clause 2 reads.
+    /// clause 1 would read. For a top-level declaration that is the directory
+    /// holding the file, which is also what clause 2 reads.
     fn root(&self) -> &Path {
         match self {
-            Self::Manifest { root } | Self::Rhei { root, .. } => root,
+            Self::Manifest { root, .. } | Self::Rhei { root, .. } => root,
         }
     }
+}
+
+/// The file that actually carries a top-level `**States:**` declaration:
+/// `index.panta.md` for a project, `index.rhei.md` for a Directory Workspace,
+/// and the plan itself for a lone plan. Naming a file the tree does not hold
+/// tells the reader to delete a line from nowhere.
+// §FS-rhei-states-deprecation.2
+fn declaring_plan_file(input: &Path) -> PathBuf {
+    if let Some(project_dir) = workspace::panta_project_dir(input) {
+        return project_dir.join(workspace::PANTA_INDEX_FILE);
+    }
+    if let Some(workspace_dir) = workspace::workspace_dir(input) {
+        return workspace_dir.join(workspace::RHEI_INDEX_FILE);
+    }
+    input.to_path_buf()
 }
 
 /// The deprecated resolution of one rhei's own `**States:**` line, exactly as
@@ -280,8 +305,10 @@ fn warn_declaration_nothing_supplies(
     resolved_from: &Path,
     resolved_name: &str,
 ) {
+    // "beside it" is true of all three top-level shapes; "at the project root"
+    // was only true of one of them. §FS-rhei-states-deprecation.2
     let place = match subject {
-        DeclarationSubject::Manifest { .. } => "at the project root",
+        DeclarationSubject::Manifest { .. } => "beside it",
         DeclarationSubject::Rhei { .. } => "in its own root",
     };
     say_once(

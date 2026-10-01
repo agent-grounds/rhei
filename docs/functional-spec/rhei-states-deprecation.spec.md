@@ -42,8 +42,23 @@ would have found a different file. Where it resolves several candidates it is
 still the ambiguity error, with its message and its two fixes unchanged. Where
 it resolves nothing, resolution continues at clause 1 — and where clause 1 then
 finds nothing either, the declaration is the validation error
-[§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) keeps for it. Nothing that errors in the previous
-release stops erroring in this one.
+[§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) keeps for it.
+
+So the window does turn some of the previous release's errors into resolutions,
+and only in that direction. A declaration naming a machine nothing supplies, in
+a rhei whose own execution root holds *some* `states.yaml`, failed that release
+and runs under that file in this one, with [§FS-rhei-states-deprecation.2.1](rhei-states-deprecation.spec.md#21-a-declaration-nothing-supplies-with-an-own-root-file-behind-it)'s
+warning beside it. What does not change is the refusal with nowhere to fall
+through to — the same declaration with no file in that root at all — and the
+ambiguity error above, which is a disagreement between candidates rather than
+an absence of them. Nothing that resolves today resolves to a different machine,
+and nothing starts erroring that did not.
+
+One caller is deliberately held to the stricter rule: `rhei new --states <name>`
+still refuses a name no `states.yaml` declares, because creation authors the
+tree rather than reading one, and the one command whose job is to write a
+correct index must not write a line it would warn the author to delete
+([§FS-rhei-new.1.2](rhei-new.spec.md#12-options-that-create-a-rhei)).
 
 Two consequences are decisions rather than readings. A declaration that resolves
 to the **built-in** machine counts as resolving, so a rhei restating the

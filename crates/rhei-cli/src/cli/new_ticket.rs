@@ -83,6 +83,8 @@ fn new_ticket_write(
         title: options.title.trim().to_string(),
         path: placed.path,
         state: Some(state),
+        // Only a rhei create writes a declaration. §FS-rhei-new.5.3
+        declared_machine: None,
         contents: placed.contents,
         preview: block,
         dirs: placed.dirs,

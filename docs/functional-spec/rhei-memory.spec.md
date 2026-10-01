@@ -32,11 +32,23 @@ From any invocation, the agent can determine — without guessing, and without
 help from anything outside the prompt and the files it names — for **every
 task in the Panta** that is terminal when the prompt is composed: its qualified
 id, its title, its final state, and its result. Tasks in the invocation's own
-rhei and every transitive prior are listed in the prompt itself (§3.2); every
+rhei are **listed, or reachable by the command a folded line names** (§3.2);
+every transitive prior is listed; every
 other rhei is reachable through the map in §3.4, which names each rhei's
 execution root, so no terminal task in the project is unreachable from any
 other. The ledger of each execution root ([§FS-rhei-complete.3.1](rhei-complete.spec.md#31-state-transition-ledger)) gives the
 order in which they finished.
+
+The own-rhei clause was **amended deliberately** to admit that second way, and
+it is the only way this requirement is satisfied other than by a line in the
+prompt. The reason is §1.3: that point already pairs every cap with an overflow
+line naming the **command or file** that holds the rest, so the specification
+had already decided that a command is an acceptable holder of what the prompt
+leaves out — §1.1 and §1.3 simply did not agree. The 40-line cap made the
+earlier clause false whenever a decomposed parent pushed the list past it
+(§4.3.4), so the amendment widens an exception the spec admits rather than
+opening a new one. A folded line (§3.2) is therefore not an omission: it names
+every descendant it stands for and the command that reaches them.
 
 Reachability is navigation, not permission to read every payload. A task's
 resolved `**Excludes:**` policy ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)) may remove source bytes, but it never removes a task's
@@ -128,7 +140,8 @@ Panta: {panta-title} › rhei `{rhei-id}`: {rhei-title} › {Kind} {ancestor-id}
 ### Siblings
 
 - {Kind} {id}: {title} [{state}]
-- {Kind} {id}: {title} [{state}] — waits on this task
+- {Kind} {id}: {title} [{state}] — {n} subtasks
+- {Kind} {id}: {title} [{state}] — waits on this task — {n} subtasks
 
 ### Parent: {Kind} {parent-id}: {title}
 
@@ -167,7 +180,10 @@ Facts earlier tickets left for whoever came next, newest first.
   prompt has one form.
 - `### Siblings` renders only when the task has a parent: the parent's other
   children, in plan order. A sibling that lists this task in `**Prior:**` or
-  consumes one of its exports carries ` — waits on this task`. A root task has
+  consumes one of its exports carries ` — waits on this task`. A sibling that
+  has descendants of its own carries a trailing ` — {n} subtasks`, after that
+  marker where both apply: the set this section lists is the current level, and
+  the suffix says where a level continues below it. A root task has
   no sibling list; `## Plan History` and `### In Flight` cover the rest of the
   rhei.
 - `### Parent` pastes the nearest ancestor's body in full, fenced, unless that
@@ -211,14 +227,16 @@ Facts earlier tickets left for whoever came next, newest first.
 
 ### 3.2. `## Plan History`
 
-What finished before this invocation, one line per task.
+What finished before this invocation **on the way from the plan's roots to it**,
+one line per task, and one line for each whole subtree a listed task speaks for.
 
 ```
 ## Plan History
 
-Finished work, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root.
+Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
 
 - {Kind} {id}: {title} — {state} — {summary}
+- {Kind} {id}: {title} — {state} — {summary} — {n} subtasks: {breakdown}
 - {Kind} {id}: {title} — {state} — see above
 - {Kind} {rhei}.{id}: {title} — {state} — {summary}   (rhei `{rhei}`, prior)
 … {n} earlier tasks not shown — `rhei list --rhei {rhei-id} --terminal`
@@ -226,7 +244,8 @@ Finished work, oldest first. Full text: `runtime/results/<id>.md` under the owni
 ### In Flight
 
 - {Kind} {id}: {title} [{state}] — {assignee}
-- {Kind} {id}: {title} [{state}] — this run
+- {Kind} {id}: {title} [{state}] — this run — {k} of {n} subtasks finished
+- {Kind} {id}: {title} [{state}] — {k} of {n} subtasks finished
 
 ### Dependents
 
@@ -234,10 +253,24 @@ Finished work, oldest first. Full text: `runtime/results/<id>.md` under the owni
 - {Kind} {id}: {title} [{state}] — consumes `{export}`
 ```
 
-- The list covers every terminal task of the **owning rhei** and every
-  **transitive prior** of this task in any rhei, including cancelled tasks —
-  why something was not done is memory too. Tasks outside the owning rhei
-  carry a trailing `(rhei `<id>`, prior)`.
+- The list covers the terminal tasks of the **owning rhei that are on this
+  invocation's path** — the rhei's top-level tasks, and the children of this
+  task and of each of its ancestors — and every **transitive prior** of this
+  task in any rhei, including cancelled tasks: why something was not done is
+  memory too. An off-path finished task contributes no line of its own; the
+  listed ancestor above it counts it. The predicate is §4.3 step 1. Tasks
+  outside the owning rhei carry a trailing `(rhei `<id>`, prior)`.
+- **A listed task with descendants folds its subtree into its own line**, with
+  the clause ` — {n} subtasks: {breakdown}`. `{n}` is every descendant at any
+  depth; `{breakdown}` buckets **every** descendant by its normalized state
+  name, so the numbers always sum to `{n}`, and a parent cancelled with children
+  left pending reads `5 subtasks: 1 pending, 3 completed, 1 cancelled` rather
+  than a line that does not add up. Buckets render in the order the resolved
+  state machine declares those states, and a bucket with no members is omitted,
+  so a custom terminal state appears under its own name. A task with no
+  descendant renders no such clause, and its line is the shape it has always
+  had. The preamble names the drill-down once — `rhei list --parent <id>` — so
+  no folded line repeats it.
 - `{summary}` is derived by the rule in §4.3, never written by a model. An
   excluded result is not opened and renders `payload excluded` while keeping
   the task, state, and result location visible. A task
@@ -245,8 +278,16 @@ Finished work, oldest first. Full text: `runtime/results/<id>.md` under the owni
   Results`, `## Child Task Results`, or `## Checkpoints` — shows `see above`
   instead.
 - `### In Flight` lists every non-terminal task in the Panta, other than this
-  one, that carries an `**Assignee:**` or is spawned by the same `rhei run`
-  pass: what other agents are touching right now. Omitted when there is none.
+  one and other than its own ancestors, that carries an `**Assignee:**`, is
+  spawned by the same `rhei run` pass, or **has at least one terminal
+  descendant**: what other agents are touching right now, and which subtrees
+  something has already happened in. A row whose task has any descendant
+  carries ` — {k} of {n} subtasks finished`, appended after the assignee or
+  `this run` where there is one and standing alone as the whole trailing column
+  where there is neither — which is how an open off-path parent is accounted
+  for once its finished children no longer have lines of their own. The clause
+  renders even at `0 of {n}`: that a subtree exists and is untouched is worth a
+  reader knowing. Omitted when there is no row.
 - `### Dependents` lists every task in the Panta that names this task in
   `**Prior:**` or names one of its exports in `**Consumes:**`, with the
   relation. This is who reads what this task writes; omitted when there is
@@ -392,7 +433,9 @@ are never silently omitted here.
    minus `task`; cap 30, overflow line
    `… {n} more — rhei list --parent <P>`. Mark a sibling `— waits on this task`
    when `task ∈ Prior(sibling)` or `Consumes(sibling)` names an export of
-   `task`. Paste `body(P)`, fenced (§4.5); cap 200 lines, overflow line
+   `task`, and append `— {n} subtasks` where the sibling has `n > 0`
+   descendants at any depth — the set, the cap and the overflow line are
+   unchanged; only the line gains that suffix. Paste `body(P)`, fenced (§4.5); cap 200 lines, overflow line
    `… truncated; read <task file path of P>`.
 3. If the normalized `state(task)` declares `execute_on`, render neither
    `### Rhei Context` nor `### Project Context`. Otherwise, `### Rhei Context`
@@ -424,11 +467,29 @@ are never silently omitted here.
 
 ### 4.3. Plan History
 
-1. `own` = terminal tasks of `R₀` other than `task` and its descendants
-   already rendered under `## Child Task Results` or `## Checkpoints`.
-   Order: by the position in `L(R₀)` of each task's last line entering a
+1. `own` = every terminal task `T` of `R₀` that is **on the path** of this
+   invocation. `T` is on the path when either `T` is a top-level task of `R₀`'s
+   plan, or the parent of `T` is `task` or an ancestor of `task`. Excluded:
+   `task` itself; every ancestor of `task`, since `## Position` already names
+   each one with its state and pastes the nearest one's body (§4.2); and every
+   descendant of `task` already rendered under `## Child Task Results` or
+   `## Checkpoints`. Membership is a predicate on `T` rather than a walk, so a
+   task on the path that belongs to another rhei contributes no line and prunes
+   nothing: its own children are still candidates, and it is itself reached
+   through the map of §3.4 and through `priors` where it is one. Order:
+   unchanged — by the position in `L(R₀)` of each task's last line entering a
    terminal state; tasks with no ledger line (imported plans) come first, in
    plan order.
+
+   A listed `T` with `n > 0` descendants at any depth renders the fold clause of
+   §3.2: `— {n} subtasks: {breakdown}`, where `{breakdown}` buckets all `n`
+   descendants by the normalized state name §3.1 defines, in the resolved
+   machine's declaration order, omitting empty buckets. `n` is the size of the
+   subtree rather than a selection from it: every descendant counts, whatever
+   its state and whatever rhei owns it, and whether or not it also keeps a line
+   of its own under step 2. A count is navigation, so it is unaffected by
+   `X`: no fold clause opens a file, and an excluded subtree is still counted in
+   full (§1.1, [§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)).
 2. `priors` = the transitive closure of `Prior(task)` minus `own`, in plan
    order, each tagged `(rhei <R>, prior)`.
 3. When `T`'s result source is excluded, do not open it and render `payload
@@ -452,12 +513,19 @@ are never silently omitted here.
    dropped **oldest first** until the cap holds, and the overflow line
    `… {n} earlier tasks not shown — rhei list --rhei <R₀> --terminal` is
    emitted once, first.
-5. `### In Flight` = non-terminal tasks of `G` other than `task` with an
-   `**Assignee:**`, or spawned by the current `rhei run` pass; plan order;
-   cap 20, overflow `… {n} more — rhei list --non-terminal`. The trailing
-   column is the `**Assignee:**` value, or the literal `this run` for a ticket
-   this pass spawned: `rhei run` claims by spawning and writes no assignee, so
-   the pass's own set is the only witness for its workers.
+5. `### In Flight` = non-terminal tasks of `G` other than `task` and other than
+   every ancestor of `task`, that carry an `**Assignee:**`, were spawned by the
+   current `rhei run` pass, or have at least one terminal descendant. Plan
+   order; cap 20, and when more than 20 qualify, rows admitted only by a
+   terminal descendant are dropped first, so a row naming a real agent is never
+   pushed out by one reporting progress; overflow
+   `… {n} more — rhei list --non-terminal`, unchanged. The trailing column is
+   the `**Assignee:**` value, or the literal `this run` for a ticket this pass
+   spawned — `rhei run` claims by spawning and writes no assignee, so the
+   pass's own set is the only witness for its workers; a row whose task has any
+   descendant appends `— {k} of {n} subtasks finished`, where `n` counts every
+   descendant and `k` those in a terminal state, and where there is neither an
+   assignee nor `this run` that clause is the whole trailing column.
 6. `### Dependents` = tasks of `G` with `task ∈ Prior(·)` or consuming an
    export of `task`; plan order; each with `— prior` and/or
    `— consumes <export>`; cap 30, overflow
@@ -547,11 +615,14 @@ are never silently omitted here.
   claiming a ticket; claim-mode `rhei next` output ([§FS-rhei-next.3.2](rhei-next.spec.md#32-output-claim-mode)) is the
   way to see it today, and a dry-run form is tracked on the roadmap.
 
-## 6. Example
+## 6. Examples
+
+### 6.1. A Flat Subtree, Two Levels Deep
 
 In the supervised-delivery example, the second invocation of
 `deliver.fix-1` in state `fix`, after round-1 reviews finished and the first
-`fix` visit timed out:
+`fix` visit timed out. Every task of that plan is a leaf, so no line folds and
+the path set is the whole finished list:
 
 ```
 ## Position
@@ -576,7 +647,7 @@ Facts earlier tickets left for whoever came next, newest first.
 
 ## Plan History
 
-Finished work, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root.
+Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
 
 - Task delivery.deliver.implement: Implement … — completed — Landed execute_on, hold/release, checkpoints; 41 tests
 - Task delivery.deliver.review-1: Code review round 1 — completed — see above
@@ -608,3 +679,84 @@ result once. The two notes are `review-1`'s and `implement`'s one entry each,
 newest first, and they would reach a ticket in another rhei of this project
 just as they reach this one — that is the whole of what the store is for. The
 supervising parent, `delivery.deliver`, gets none of the three blocks.
+
+### 6.2. A Depth-3 Invocation Under a Finished Subtree
+
+The case the path rule and the fold exist for. A release plan four roots wide and
+three deep; the invocation is `release.ship.gate.test`, at depth 3 under the
+second root. Ledger order of the finishes: `audit.scan`, `audit.triage`,
+`audit`, `announce.draft`, `ship.notes`, `archive.pack`, `ship.gate.lint`.
+
+```text
+Task release.audit: Audit the dependencies [completed]
+  Task release.audit.scan: Scan the lockfile [completed]
+  Task release.audit.triage: Triage the findings [cancelled]
+Task release.ship: Ship 2.0 [pending]
+  Task release.ship.notes: Write the notes [completed]
+  Task release.ship.gate: Clear the gate [pending]
+    Task release.ship.gate.lint: Run the linter [completed]
+    Task release.ship.gate.test: Run the suite [pending]       <- this invocation
+    Task release.ship.gate.perf: Run the benchmarks [pending]  Assignee: bob
+      Task release.ship.gate.perf.micro: Microbenchmarks [pending]
+      Task release.ship.gate.perf.macro: End-to-end timings [pending]
+Task release.announce: Announce it [pending]                   Assignee: alice
+  Task release.announce.draft: Draft the post [completed]
+  Task release.announce.send: Send it [pending]
+Task release.archive: Archive the artifacts [pending]
+  Task release.archive.pack: Pack the binaries [completed]
+  Task release.archive.upload: Upload them [pending]
+```
+
+```
+## Position
+
+Panta: Rhei › rhei `release`: Release 2.0 › Task release.ship: Ship 2.0 [pending] › Task release.ship.gate: Clear the gate [pending]
+› **Task release.ship.gate.test: Run the suite [pending]** ← this invocation (visit 1)
+
+### Siblings
+
+- Task release.ship.gate.lint: Run the linter [completed]
+- Task release.ship.gate.perf: Run the benchmarks [pending] — 2 subtasks
+…
+
+## Plan History
+
+Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
+
+- Task release.audit: Audit the dependencies — completed — Lockfile clean after two pins moved. — 2 subtasks: 1 completed, 1 cancelled
+- Task release.ship.notes: Write the notes — completed — Notes at docs/changelog.md under 2.0.
+- Task release.ship.gate.lint: Run the linter — completed — Clean; two allow attributes removed.
+
+### In Flight
+
+- Task release.ship.gate.perf: Run the benchmarks [pending] — bob — 0 of 2 subtasks finished
+- Task release.announce: Announce it [pending] — alice — 1 of 2 subtasks finished
+- Task release.archive: Archive the artifacts [pending] — 1 of 2 subtasks finished
+```
+
+The `…` stands for the parent body and the two context blocks of §3.1, which
+this example does not pin; every other line above is the exact bytes.
+
+Read the three sections against each other and the rule is visible:
+
+- **Three history lines where the earlier rule gave seven.** The path is the
+  root tasks, then the children of `ship` and of `ship.gate` — the two
+  ancestors. `audit.scan`, `audit.triage`, `announce.draft` and `archive.pack`
+  are off the path and get no line; `ship.gate.perf` and `announce.send` never
+  finished.
+- **The fold says where the four went.** `audit`'s own line carries
+  `2 subtasks: 1 completed, 1 cancelled`, so the cancelled `audit.triage` is
+  accounted for by state even though its reason is now a number, and the
+  preamble names `rhei list --parent release.audit` as the way to its text. The
+  two leaf lines carry no clause and are byte-identical to what they would have
+  been before.
+- **`### In Flight` carries the open subtrees.** `archive` qualifies on a
+  terminal descendant alone, with no assignee, so its count is the whole
+  trailing column; `announce` and `ship.gate.perf` have assignees and append to
+  them. `ship.gate.perf` renders `0 of 2` because the subtree exists, which is
+  the honest report of two children nobody has started.
+- **The reader's ancestors appear once, in `## Position`.** `ship` and
+  `ship.gate` are non-terminal with terminal descendants, so the bare predicate
+  would admit both to `### In Flight`; step 5 excludes them, because the chain
+  line already names each with its state and the nearest one's body is pasted in
+  full.

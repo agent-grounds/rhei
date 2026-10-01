@@ -211,6 +211,8 @@ pub use shared_fixtures::*;
 // module tree and `include!`s the same file.
 #[path = "../support/binaries.rs"]
 mod binaries;
+#[path = "../support/git_env.rs"]
+mod git_env;
 #[path = "../support/python_fixture.rs"]
 mod python_fixture;
 #[path = "../support/test_dir.rs"]
@@ -218,6 +220,10 @@ mod test_dir;
 #[path = "../support/unique_dir_name.rs"]
 mod unique_dir_name;
 
+pub use git_env::{
+    git_command, git_command_as_if_inherited, git_command_with_staged_env,
+    repository_env_as_a_hook_leaves_it, repository_env_names_no_report_mentioned,
+};
 pub use python_fixture::{
     fixture_command, fixture_command_line, python_command, write_python_agent,
 };

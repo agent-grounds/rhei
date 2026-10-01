@@ -136,3 +136,230 @@ fn spawning_rhei_from_the_checkout_adds_nothing_git_would_report() {
         root.display()
     );
 }
+
+/// The decoy repository's three tells, read with a `git` pointed at it on
+/// purpose: its `HEAD`, how many entries its index holds, and the local
+/// configuration a fixture would leave in it.
+#[derive(Debug, PartialEq, Eq)]
+struct DecoyState {
+    head: String,
+    index_entries: usize,
+    config: Vec<String>,
+}
+
+/// A `git` aimed at `repo` by flag rather than by environment.
+///
+/// `--git-dir` and `--work-tree` beat an inherited `GIT_DIR`, so this reads and
+/// builds the decoy the same way whether or not the removal under test exists
+/// yet — and `GIT_INDEX_FILE` is pinned because no flag covers it.
+/// §REQ-test-isolation.3
+fn decoy_git(repo: &Path) -> Command {
+    let git_dir = repo.join(".git");
+    let mut cmd = git_command();
+    cmd.arg("--git-dir").arg(&git_dir).arg("--work-tree").arg(repo);
+    cmd.env("GIT_INDEX_FILE", git_dir.join("index"));
+    cmd
+}
+
+fn decoy_git_stdout(repo: &Path, args: &[&str]) -> String {
+    let output = decoy_git(repo).args(args).output().expect("git should run on the decoy");
+    assert!(
+        output.status.success(),
+        "git {args:?} on the decoy at {} failed: {}",
+        repo.display(),
+        stderr(&output)
+    );
+    String::from_utf8_lossy(&output.stdout).into_owned()
+}
+
+/// A repository no test names, with five tracked files and one commit — the
+/// stand-in for the checkout a hook is committing to.
+fn build_decoy_repository(repo: &Path) {
+    std::fs::create_dir_all(repo).expect("create the decoy directory");
+    decoy_git_stdout(repo, &["init", "-q"]);
+    for index in 1..=5 {
+        std::fs::write(repo.join(format!("f{index}")), format!("{index}\n"))
+            .expect("write a decoy file");
+    }
+    decoy_git_stdout(repo, &["add", "-A"]);
+    decoy_git_stdout(
+        repo,
+        &[
+            "-c",
+            "user.name=decoy",
+            "-c",
+            "user.email=decoy@example.invalid",
+            "commit",
+            "-qm",
+            "decoy",
+        ],
+    );
+}
+
+fn decoy_state(repo: &Path) -> DecoyState {
+    DecoyState {
+        head: decoy_git_stdout(repo, &["rev-parse", "HEAD"]).trim().to_string(),
+        index_entries: decoy_git_stdout(repo, &["ls-files"]).lines().count(),
+        config: decoy_git_stdout(repo, &["config", "--local", "--list"])
+            .lines()
+            .filter(|line| line.starts_with("user.") || line.starts_with("core.bare"))
+            .map(str::to_string)
+            .collect(),
+    }
+}
+
+/// §REQ-test-isolation.3: every `GIT_*` the child would otherwise see is taken
+/// off, and only what the test sets afterwards is deliberate.
+///
+/// The variables are staged on the child rather than on this process, because
+/// `set_var` would race every other test in this binary. Setting them first and
+/// letting the removal run afterwards is the same seam in the same order.
+#[test]
+#[ignore = "pins agent-grounds/rhei#375; the removal it names is not written yet"]
+fn a_suite_spawn_carries_no_git_variable_it_was_not_given() {
+    let decoy = unique_temp_dir("suite-isolation-git-env");
+    let staged: Vec<(&str, std::ffi::OsString)> = repository_env_as_a_hook_leaves_it(&decoy)
+        .into_iter()
+        .chain(repository_env_names_no_report_mentioned(&decoy))
+        .collect();
+    let names: Vec<&str> = staged.iter().map(|(key, _)| *key).collect();
+
+    let mut cmd = git_command_with_staged_env(&staged);
+    // Set on the command the helper returned, so it is the deliberate one. Four
+    // fixtures set this to bound git's ancestor discovery to their own directory.
+    cmd.env("GIT_CEILING_DIRECTORIES", decoy.as_ref() as &Path);
+
+    let carried: Vec<String> = cmd
+        .get_envs()
+        .filter(|(key, value)| value.is_some() && key.to_string_lossy().starts_with("GIT_"))
+        .map(|(key, _)| key.to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(
+        carried,
+        vec!["GIT_CEILING_DIRECTORIES".to_string()],
+        "a spawn the suite built carries {carried:?} into the child. Which repository a \
+         spawned command acts on is chosen, never inherited (§REQ-test-isolation.3): only \
+         a variable set after the removal is deliberate, and these were staged as a hook \
+         leaves them — {names:?}."
+    );
+}
+
+/// §REQ-test-isolation.3: the repository `GIT_DIR` names is not written to.
+///
+/// The failing fixtures are the symptom; the writes are the defect. This runs
+/// the sequence `init_git_repo` runs in the integration harness, with git's
+/// repository variables staged on the child as a hook leaves them, and then
+/// reads the decoy back: a repository no test named, which must have the `HEAD`,
+/// the index and the configuration it started with.
+#[test]
+#[ignore = "pins agent-grounds/rhei#375; the removal it names is not written yet"]
+fn a_git_fixture_leaves_the_repository_git_dir_names_untouched() {
+    let root = unique_temp_dir("suite-isolation-git-decoy");
+    let decoy = root.join("decoy");
+    let fixture = root.join("fixture");
+    build_decoy_repository(&decoy);
+    let before = decoy_state(&decoy);
+
+    std::fs::create_dir_all(&fixture).expect("create the fixture repository directory");
+    let at = fixture.to_str().expect("fixture path should be unicode");
+    let mut refused: Vec<String> = Vec::new();
+    for args in [
+        vec!["-C", at, "init", "-q"],
+        vec!["-C", at, "config", "user.email", "rhei@example.test"],
+        vec!["-C", at, "config", "user.name", "Rhei Test"],
+    ] {
+        run_fixture_git(&decoy, &args, &mut refused);
+    }
+    std::fs::write(fixture.join("README.md"), "repo\n").expect("write the fixture readme");
+    for args in [vec!["-C", at, "add", "README.md"], vec!["-C", at, "commit", "-qm", "initial"]] {
+        run_fixture_git(&decoy, &args, &mut refused);
+    }
+
+    let after = decoy_state(&decoy);
+    assert_eq!(
+        before,
+        after,
+        "a fixture's git wrote into {}, a repository no test named — the one a hook-run \
+         suite is handed as `GIT_DIR`, which is the repository being committed to \
+         (§REQ-test-isolation.3). `-C {at}` named a work tree and settled nothing about \
+         which repository was written. What the fixture's own git reported: {refused:?}",
+        decoy.display()
+    );
+    assert!(
+        refused.is_empty(),
+        "a fixture's git setup did not succeed, and a fixture whose git setup does not \
+         succeed fails the test that owns it rather than contending for another \
+         repository's index (§REQ-test-isolation.3): {refused:?}"
+    );
+}
+
+/// One fixture `git`, with the repository variables staged as a hook leaves
+/// them. A refusal is collected rather than asserted, so that the decoy is read
+/// back even when the first call is the one that fails.
+fn run_fixture_git(decoy: &Path, args: &[&str], refused: &mut Vec<String>) {
+    let output = git_command_as_if_inherited(decoy)
+        .args(args)
+        .output()
+        .expect("the fixture's git should run");
+    if !output.status.success() {
+        refused.push(format!("git {args:?}: {}", stderr(&output).trim().replace('\n', " / ")));
+    }
+}
+
+/// §REQ-test-isolation.3: removing the way is what holds it — no file in the
+/// suite names `git` as a program except the one helper that applies the
+/// removal.
+///
+/// This is the difference between a fix and a fix that holds. A call site
+/// corrected in place leaves the next caller the same mistake to make, and the
+/// next caller is a file nobody will think to check.
+#[test]
+#[ignore = "pins agent-grounds/rhei#375; the call sites it names are not routed yet"]
+fn only_the_shared_helper_names_git_as_a_program() {
+    let tests = repo_root().join("tests");
+    let helper = tests.join("support").join("git_env.rs");
+    // Spelled rather than written, so that this file does not count itself.
+    let needle = format!("Command::new({:?})", "git");
+    let mut offenders: Vec<String> = Vec::new();
+    for path in rust_sources_under(&tests) {
+        if path == helper {
+            continue;
+        }
+        let text = std::fs::read_to_string(&path).expect("a test source should be readable");
+        let count = text.matches(needle.as_str()).count();
+        if count > 0 {
+            let shown = path.strip_prefix(repo_root()).unwrap_or(&path).display().to_string();
+            offenders.push(format!("{shown} ({count})"));
+        }
+    }
+    offenders.sort();
+    assert!(
+        offenders.is_empty(),
+        "{} file(s) under tests/ spawn `git` without going through \
+         `tests/support/git_env.rs`, so each one inherits whatever repository `GIT_DIR` \
+         names (§REQ-test-isolation.3): {offenders:?}. Build the command with \
+         `git_command()` instead, and set only what the fixture deliberately wants.",
+        offenders.len()
+    );
+}
+
+/// Every `.rs` file under `dir`, so the guard above reads the suite rather than
+/// a list of files someone kept up to date.
+fn rust_sources_under(dir: &Path) -> Vec<std::path::PathBuf> {
+    let mut found = Vec::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(next) = pending.pop() {
+        let Ok(entries) = std::fs::read_dir(&next) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                found.push(path);
+            }
+        }
+    }
+    found
+}

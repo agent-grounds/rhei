@@ -45,7 +45,7 @@ A transition from this state can finish this task. The finished task's result is
 
 ## Plan History
 
-Finished work, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root.
+Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
 
 - Task mentor.1.1: First child — completed — (no result)
 

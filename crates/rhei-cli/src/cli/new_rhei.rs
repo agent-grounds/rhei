@@ -52,6 +52,7 @@ help = "create a project first: `rhei init` writes index.panta.md, and `rhei new
         title: options.title.trim().to_string(),
         path,
         state: None,
+        declared_machine: header.states.map(|name| name.trim().to_owned()),
         preview: contents.clone(),
         contents,
         dirs,

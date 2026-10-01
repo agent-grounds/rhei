@@ -18,6 +18,10 @@ struct NewWrite {
     path: PathBuf,
     /// The new ticket's state; `None` for a rhei, which has none.
     state: Option<String>,
+    /// The `**States:**` name a rhei create is writing, from `--states`;
+    /// `None` for a ticket, and for a rhei created without the flag.
+    /// §FS-rhei-new.2.1.1
+    declared_machine: Option<String>,
     /// Full contents to write to `path`.
     contents: String,
     /// What a reader cares to see: a whole new file, or just the inserted

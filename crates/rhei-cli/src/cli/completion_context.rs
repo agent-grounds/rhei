@@ -616,7 +616,8 @@ fn resolve_state_machine_for_loaded_plan(
     let declared =
         loaded.rhei.states_declared.then(|| loaded.rhei.states.trim()).filter(|name| !name.is_empty());
     let root = candidate.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
-    let subject = DeclarationSubject::Manifest { root: &root };
+    let declaring = declaring_plan_file(input);
+    let subject = DeclarationSubject::Manifest { root: &root, file: &declaring };
 
     if let Some(declared_name) = declared {
         if let Some(found) = resolve_declared_project_default(input, loaded, declared_name)? {

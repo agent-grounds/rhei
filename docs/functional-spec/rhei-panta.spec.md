@@ -72,6 +72,14 @@ first unfiled ticket appears. Filing a basin ticket into a domain rhei is a
 reparenting operation that changes its project id from `basin.<local-id>` to
 `<target-rhei>.<local-id>`.
 
+Being synthetic also decides which state machine the basin runs under: **the
+project default, always**. It has no index of its own to carry a `**States:**`
+declaration and no authored execution root to place a `states.yaml` in, so
+[§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) clause 1 has nothing to read for it and clause 2
+governs it. A `states.yaml` that happens to sit in `basin/` beside the unfiled
+tickets is not a rhei's own machine — nobody authored a rhei there — and is not
+read as one, by any command or by the rendered graph.
+
 ## 3. One unified view
 
 Because every rhei hangs off the same Panta, a project loads and renders as one

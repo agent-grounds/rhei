@@ -354,8 +354,13 @@ fn validate_auto_discovers_workspace_root_state_machine_from_states_declaration(
     assert!(stdout.contains("Validation succeeded"));
 }
 
+/// A lone plan declaring a machine nothing supplies, with a differently named
+/// `states.yaml` beside it: the sibling file resolves whatever its `name:`, and
+/// one `warning:` line says the declaration is deprecated. The previous release
+/// failed this tree, which is what the window turns into a resolution.
+/// §FS-rhei-plan-language.1.3 §FS-rhei-states-deprecation.2.1
 #[test]
-fn validate_reports_mismatched_auto_discovered_state_machine_name() {
+fn validate_resolves_a_mismatched_auto_discovered_machine_and_warns() {
     let dir = unique_temp_dir("auto-states-mismatch");
     let plan_path = write_fixture_file(
         &dir,
@@ -368,29 +373,32 @@ fn validate_reports_mismatched_auto_discovered_state_machine_name() {
         "name: wrong-machine\nversion: 1\nstates:\n  draft:\n    initial: true\n    description: Start\n  completed:\n    final: true\n    description: Done\ntransitions:\n  - from: draft\n    to: completed\n",
     );
 
-    let output = rhei_command()
-        .arg("validate")
-        .arg(&plan_path)
-        .output()
-        .expect("validate command should run");
-
+    let output =
+        rhei_command().arg("validate").arg(&plan_path).output().expect("validate should run");
+    let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        !output.status.success(),
-        "validate should fail when auto-discovered machine name mismatches\nstdout: {}\nstderr: {}",
-        String::from_utf8_lossy(&output.stdout),
-        stderr
+        output.status.success() && stdout.contains("Validation succeeded"),
+        "the own-root file resolves whatever its name\nstdout: {stdout}\nstderr: {stderr}"
     );
-    assert!(
-        stderr.contains("plan declares state machine 'custom-review'"),
-        "expected mismatch diagnostic, got:\n{}",
-        stderr
-    );
-    assert!(
-        stderr.contains("declares 'wrong-machine'"),
-        "expected discovered machine name in diagnostic, got:\n{}",
-        stderr
-    );
+
+    let warnings: Vec<&str> =
+        stderr.lines().filter(|line| line.trim_start().starts_with("warning:")).collect();
+    assert_eq!(warnings.len(), 1, "one warning per declaration; stderr was:\n{stderr}");
+    let said = warnings[0];
+    // It names the file that carries the line — the plan, since this tree has
+    // no `index.panta.md` to be told to edit.
+    for fragment in [
+        format!("'{}'", plan_path.display()),
+        "custom-review".to_owned(),
+        "which no states file declares".to_owned(),
+        "wrong-machine".to_owned(),
+        "beside it".to_owned(),
+        "delete the line".to_owned(),
+    ] {
+        assert!(said.contains(&fragment), "the warning should name {fragment:?}; got:\n{said}");
+    }
+    assert!(!said.contains("index.panta.md"), "no manifest in this tree; got:\n{said}");
 }
 
 #[test]

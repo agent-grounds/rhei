@@ -149,6 +149,76 @@ fn a_member_declaration_resolved_from_another_root_warns_about_the_crossing() {
     );
 }
 
+/// `rhei viz` renders the machine the run would use, so its static mirror of
+/// resolution has to include the deprecated cross-root pass too. On the W3
+/// fixture the local `mach-y` is stale and `m2`'s `mach-x` is what resolves; a
+/// mirror that stopped at the own root and the project root would quietly
+/// render the stale one, where the previous release refused the tree outright.
+/// §FS-rhei-states-deprecation.2.3
+#[test]
+fn viz_renders_the_cross_root_match_that_every_command_resolves() {
+    let dir = unique_temp_dir("window-cross-root-viz");
+    let home = dir.join(".home");
+    let root = project(&dir, Some("alpha"));
+    project_machine(&root, &machine("alpha", "surveying", "signed-off"));
+    let m1 = member(&root, "m1", Some("mach-x"), "crossing");
+    member_machine(&m1, &machine("mach-y", "stale", "gone"));
+    let m2 = member(&root, "m2", Some("mach-x"), "crossing");
+    member_machine(&m2, &machine("mach-x", "crossing", "crossed"));
+    let project_arg = root.display().to_string();
+    let out = dir.join("view.html");
+
+    let viz = rhei_in(
+        &dir,
+        &home,
+        &["viz", &project_arg, "--output", out.to_str().expect("utf8 output path")],
+    );
+    assert_success(&viz);
+    let html = std::fs::read_to_string(&out).expect("read the rendered view");
+    assert!(!html.contains("mach-y"), "the stale local file must not reach the graph either");
+    assert!(html.contains("mach-x"), "the machine every command resolves is the one rendered");
+}
+
+/// Two single-file members of one project share the project directory as their
+/// execution root and carry two distinct declarations. The subject of a warning
+/// is the declaration, so both are told; a guard keyed on the root alone
+/// swallows the second. §FS-rhei-states-deprecation.3
+#[test]
+fn each_single_file_members_declaration_warns_for_itself() {
+    let dir = unique_temp_dir("window-two-single-file-members");
+    let home = dir.join(".home");
+    let root = project(&dir, None);
+    project_machine(&root, &machine("proj", "surveying", "signed-off"));
+    for (id, declares) in [("alpha", "absent-alpha"), ("beta", "absent-beta")] {
+        write_fixture_file(
+            &root,
+            &format!("{id}.rhei.md"),
+            &format!(
+                "# Rhei: {id}\n**States:** {declares}\n\n## Tasks\n\n### Task 1: Placed\n\
+                 **State:** surveying\n"
+            ),
+        );
+    }
+    let project_arg = root.display().to_string();
+
+    let states = rhei_in(&dir, &home, &["states", &project_arg]);
+    assert_success(&states);
+    let said = warnings(&states);
+    assert_eq!(
+        said.len(),
+        2,
+        "one warning per declaration, not per execution root; stderr was:\n{}",
+        states.stderr
+    );
+    for declaration in ["absent-alpha", "absent-beta"] {
+        assert!(
+            said.iter().any(|line| line.contains(declaration)),
+            "{declaration} was swallowed; stderr was:\n{}",
+            states.stderr
+        );
+    }
+}
+
 /// The shape every instantiated template ships — a rhei declaring `custom` with
 /// `custom` in its own root, beside a rhei with no file of its own that inherits
 /// the project default — prints no warning on any command. Every laid plan has

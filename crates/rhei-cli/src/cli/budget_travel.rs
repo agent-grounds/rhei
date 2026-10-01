@@ -135,32 +135,46 @@ struct TransitionCharge<'a> {
 /// person running `rhei transition`. A manual path that moved for free would be
 /// the bypass. §FS-rhei-budgets.4.1
 ///
-/// A project with **no account** is charged nothing, because there is nothing
-/// to charge against: an account is established by the first admission
-/// ([§FS-rhei-budgets.5.4](../../../docs/functional-spec/rhei-budgets.spec.md)),
-/// and a project that has never admitted a neural start has never had the
-/// runaway this bound exists for. It is also what keeps a plan that never runs
-/// an agent exactly as it is today, down to the bytes of its metadata.
+/// A project with **no account** is given one here: this charge is one of the
+/// two the first of which establishes it, so an edge applied by hand mints the
+/// uuid, the directory and the witness inside the transaction it is already
+/// holding, and does it silently — nothing is printed and nothing is prompted
+/// for. That is what makes `defaults.transition_limit` bind a project nobody
+/// has run. §FS-rhei-budgets.5.4 §FS-rhei-budgets.4.1
+///
+/// The lock order is unchanged by establishing here: the caller's metadata lock
+/// is above the journal's either way. §AR-neural-admission.3
 fn budget_charge_applied_edge(
     charge: &TransitionCharge<'_>,
     metadata: Option<&Metadata>,
 ) -> MietteResult<Option<Metadata>> {
     let project_root = budget_project_root(charge.workspace_root);
-    let Some(account) = budget_result(Account::locate(&project_root))? else {
+    // The one thing this charge passes over: a project directory that is not
+    // there is nothing to account against, which is not a refusal.
+    if !project_root.is_dir() {
         return Ok(None);
-    };
+    }
+    let audit = budget_audit("apply an edge")?;
+    // Established rather than located, because this charge is the one that
+    // establishes an absent account, and the journal it returns is opened
+    // before the identity is settled: settling reads it. §FS-rhei-budgets.5.4
+    let (account, mut journal) =
+        budget_result_at(&project_root, Account::establish(&project_root, &audit))?;
     let bounds =
         resolve_count_bounds(charge.settings, node_transition_limit(charge.machine, charge.task));
     // The unit admission is holding for this very edge, where the move came
     // from a spawn this run admitted. Taken rather than read: an edge is
     // applied once. §FS-rhei-budgets.4.1
-    let held =
-        with_claims(|claims| claims.get_mut(charge.task_id_str).and_then(|c| c.travel.take()));
-    let audit = budget_audit("apply an edge")?;
-    // The journal is opened before the identity is settled, because settling
-    // reads the replayed ledger. The lock order is unchanged: the caller's
-    // metadata lock is above this one either way. §AR-neural-admission.3
-    let mut journal = budget_result(account.open(true))?;
+
+    // Only from a claim this very account admitted: a reservation names
+    // nothing in a journal that did not mint it, and consuming another
+    // account's would spend a unit its own settle owes. §FS-rhei-budgets.7.1
+    let held = with_claims(|claims| {
+        claims
+            .get_mut(charge.task_id_str)
+            .filter(|claim| claim.account == account.uuid())
+            .and_then(|claim| claim.travel.take())
+    });
     let (settled, ticket_uuid) = budget_ticket_id_in_metadata(&journal, charge, metadata)?;
     let ticket = account.ticket_identity(&ticket_uuid);
     // Written between the two calls: the `identity` receipt is durable the

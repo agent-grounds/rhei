@@ -49,8 +49,9 @@ had already decided that a command is an acceptable holder of what the prompt
 leaves out — §1.1 and §1.3 simply did not agree. The 40-line cap made the
 earlier clause false whenever a decomposed parent pushed the list past it
 (§4.3.4), so the amendment widens an exception the spec admits rather than
-opening a new one. A folded line (§3.2) is therefore not an omission: it names
-every descendant it stands for and the command that reaches them.
+opening a new one. A folded line (§3.2) is therefore not an omission: it counts
+every descendant it stands for and names the command that lists the next rung
+down, which reaches the whole subtree one rung at a time (§1.3).
 
 Reachability is navigation, not permission to read every payload. A task's
 resolved `**Excludes:**` policy ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)) may remove source bytes, but it never removes a task's

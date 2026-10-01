@@ -307,9 +307,10 @@ transitions:
   - { from: "*", to: cancelled, description: Dropped }
 "#;
 
-/// The `plan_history` field of `rhei next --peek --json` for one task: the same
-/// bytes the text surface prints, which is what §FS-rhei-memory.5 requires of
-/// the one renderer.
+/// The `plan_history` field of `rhei next --peek --json` for one task. Both
+/// `rhei next` surfaces come from the one renderer (§FS-rhei-memory.5), but
+/// `--json` serializes each section trimmed, so a full-line expectation here
+/// anchors with `ends_with` and carries no trailing newline.
 fn peeked_plan_history(plan_path: &Path, machine_path: &Path, task: &str) -> String {
     let json = run_cli("next", plan_path, machine_path, &["--task", task, "--peek", "--json"]);
     assert_success(&json);

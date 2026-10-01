@@ -462,10 +462,12 @@ pull request number: the release stamps `(PR #N)` onto it. See
   plan's real decisions — the oldest finished root tasks — to make room for
   results that were only ever owed to their parent. `rhei next --json`'s
   `plan_history` keeps its name, its type and its presence rule and changes what
-  it contains; `rhei list` is unchanged and stays the complete tree every folded
-  line points at. §FS-rhei-memory.1.1 is deliberately amended so that a finished
-  task reachable by the command a folded line names counts as reachable, which is
-  what licenses the fold. (PR #377)
+  it contains; `rhei list` is unchanged and stays the drill-down a folded line
+  points at — `--parent <id>` lists a task's direct children, so a deeper
+  subtree is walked rung by rung rather than returned at once.
+  §FS-rhei-memory.1.1 is deliberately amended so that a finished task reachable
+  by the command a folded line names counts as reachable, which is what licenses
+  the fold. (PR #377)
 
 ## 2. [0.5.1] - 2026-09-28
 

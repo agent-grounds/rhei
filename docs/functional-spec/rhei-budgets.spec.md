@@ -532,10 +532,13 @@ Three states, and the specification distinguishes them by name because they are
 answered differently:
 
 **Absent** — no `budgets/` directory and no witness claiming this canonical
-root. This is **lawful and silent**. The first admission mints the uuid, creates
-the directory and the witness, and writes the `initialize` receipt recording the
-resolved defaults, all inside that same atomic admission. No command is
-required, no prompt is shown, and establishment mints nothing.
+root. This is **lawful and silent**. The first thing the project is **charged**
+for establishes it: an admission ([§FS-rhei-budgets.6.1](rhei-budgets.spec.md#61-the-transaction))
+or an applied edge ([§FS-rhei-budgets.4.1](rhei-budgets.spec.md#41-travel)),
+whichever comes first. That charge mints the uuid, creates the directory and the
+witness, and writes the `initialize` receipt recording the resolved defaults,
+all inside the one transaction it was already holding. No command is required,
+no prompt is shown, nothing is printed, and establishment mints nothing.
 
 **Damaged** — a witness exists for this root but the journal is absent,
 truncated, or its hash chain does not verify. New work is **refused**, naming
@@ -1069,7 +1072,7 @@ a sound account and why a damaged report puts restore first.
 | cost accounting | unchanged in how it measures, prices and rolls up. What is new is that one record it already wrote is now read by the spend dimension ([§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)) |
 | a plan with no spend field | there is no spend field to omit: `spend_per_day` is not plan-declarable, and every plan runs under the machine's value or the built-in (§FS-rhei-budgets.2.1) |
 | `rhei budget init` / `adjust` | neither gains a spend argument, because there is no spend allowance to grant (§FS-rhei-budgets.10) |
-| git | the account is machine state and is gitignored; a project that commits it anyway is *adopted* on the next machine ([§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted)) |
+| git | the account is machine state and is gitignored; a project that commits it anyway is *adopted* on the next machine ([§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted)). The rule is seeded by `rhei init` ([§FS-rhei-budgets.5.1](rhei-budgets.spec.md#51-where-it-lives)), so a directory holding a hand-driven plan that `rhei init` never created owns the ignore rule itself |
 
 Six things do change for someone, and they are the point rather than a side
 effect:

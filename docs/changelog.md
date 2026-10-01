@@ -6,6 +6,23 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- Establish the project's budget account on the first hand-applied edge, so
+  `rhei transition` spends its travel unit like every other writer of a move. A
+  project that had never been run had no account, and the applied-edge charge
+  returned without charging anything when it found none — so an edge applied by
+  hand was free, and `defaults.transition_limit` bound nothing at all until
+  `rhei run` or `rhei budget init` had touched the project once. The same number
+  in the same file refused the engine's own edge and the one `budget init` had
+  prepared for, and said nothing about the manual one: a template under
+  development, an operator stepping a stuck ticket or a fixture driving its own
+  edges could ping-pong without limit, with every edge exiting `0`. The first
+  hand edge now mints the account, its journal and its witness inside the
+  transaction it was already holding, gives the ticket that moved its
+  `budgetTicketId`, and charges the unit — printing nothing and prompting for
+  nothing, exactly as the move did before. A repository that drives plans by
+  hand should ignore `.agent-grounds/rhei/budgets/`: the account is machine
+  state, and `rhei init` is what seeds that rule for a project it created.
+
 - Say in §FS-rhei-run-headless.3 what an access outage owes a registry entry and
   what it does not: unknown is a verdict about one probe, so when access returns
   the entry is classified afresh and stays resolvable by id, while the run's own

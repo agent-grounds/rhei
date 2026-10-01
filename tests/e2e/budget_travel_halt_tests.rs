@@ -10,6 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use super::budget_edge_support::*;
 use super::budget_support::*;
 use super::*;
 
@@ -169,34 +170,6 @@ const SIX_MOVES: &str = r#", "transition_limit": 6"#;
 /// A bound small enough that the edge a move arrives on is the edge that meets
 /// it, which is the case a move's warning used to be lost in.
 const TWO_MOVES: &str = r#", "transition_limit": 2"#;
-
-/// A ping-pong that declares no output artifacts.
-///
-/// These two scenarios take every edge by hand, and `rhei transition` holds a
-/// state's declared outputs against the move — no agent runs here, so nothing
-/// would ever write one. [`PING_PONG_MACHINE`] declares them because the
-/// scenarios above let `rhei run` drive the loop. §FS-rhei-states.3.3
-const BARE_PING_PONG_MACHINE: &str = r#"name: budget-identity-ping-pong
-version: 1
-states:
-  work:
-    initial: true
-    description: Do a round of work
-    agent: mock
-    agent_timeout: 30s
-  review:
-    description: Send it back for another round
-    agent: mock
-    agent_timeout: 30s
-  cancelled:
-    description: Stop
-    final: true
-transitions:
-  - { from: work, to: review, description: Round done }
-  - { from: review, to: work, description: Another round }
-  - { from: work, to: cancelled, description: Stop }
-  - { from: review, to: cancelled, description: Stop }
-"#;
 
 /// Two tasks in one plan, which is one metadata file. That is the shape the
 /// binding key cannot read: a definition copied onto a sibling and a definition
@@ -404,9 +377,11 @@ fn a_run_whose_invocation_is_refused_still_says_the_binding_moved() {
 /// A ping-pong workspace over `plan_text`, with the project's budget account
 /// already established.
 ///
-/// `rhei transition` charges an applied edge against an account that exists; it
-/// does not establish one, which is why `budget init` is part of the fixture
-/// rather than of the scenario. §FS-rhei-budgets.5.4
+/// `budget init` is part of the fixture rather than of the scenario: these
+/// scenarios are about the travel identity inside an account that exists, so
+/// the account is there before the first edge and establishing one is somebody
+/// else's subject ([`super::budget_travel_establish_tests`]).
+/// §FS-rhei-budgets.5.4
 fn setup_identity_plan(prefix: &str, plan_text: &str, moves: &str) -> (TestDir, PathBuf, PathBuf) {
     let dir = unique_temp_dir(prefix);
     let plan = write_fixture_file(&dir, "plan.rhei.md", plan_text);
@@ -474,30 +449,6 @@ fn task_state(plan: &Path, task: &str) -> String {
         .unwrap_or_else(|| panic!("plan.{task} has no state in {}", plan.display()))
 }
 
-/// The `budgetTicketId` the plan's frontmatter carries for a task, if any.
-///
-/// Read line by line rather than through a YAML parse because the metadata keys
-/// are task *numbers*, which a parser hands back as integers while every caller
-/// here has a display id in hand. §FS-rhei-budgets.5.2
-fn budget_identity(plan: &Path, task: &str) -> Option<String> {
-    let text = fs::read_to_string(plan).expect("read the plan");
-    let mut under: Option<&str> = None;
-    for line in text.lines() {
-        let trimmed = line.trim();
-        if let Some(id) = trimmed.strip_suffix(':') {
-            if !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()) {
-                under = Some(id);
-            }
-        }
-        if under == Some(task) {
-            if let Some(uuid) = trimmed.strip_prefix("budgetTicketId:") {
-                return Some(uuid.trim().to_owned());
-            }
-        }
-    }
-    None
-}
-
 /// Give `to` the identity the plan carries for `from`: the hand copy of a task
 /// definition that no command performs and `cp` performs for free.
 /// §FS-rhei-budgets.5.2.1
@@ -538,20 +489,10 @@ fn renumber_task(plan: &Path, from: &str, to: &str) {
 /// Every receipt of `kind` in the project's account, as (ticket uuid, display
 /// id) in the order they were appended. §FS-rhei-budgets.5.2
 fn receipts(root: &Path, kind: &str) -> Vec<(String, String)> {
-    let accounts = root.join(".agent-grounds/rhei/budgets");
-    let mut journal = String::new();
-    for account in fs::read_dir(&accounts).expect("the project has a budget account") {
-        let path = account.expect("an account directory").path().join("journal.jsonl");
-        journal.push_str(&fs::read_to_string(&path).unwrap_or_default());
-    }
-    journal
-        .lines()
-        .filter_map(|line| {
-            let receipt: serde_json::Value =
-                serde_json::from_str(line).expect("every journal line is one JSON receipt");
-            if receipt["kind"] != kind {
-                return None;
-            }
+    account_journal(root)
+        .iter()
+        .filter(|receipt| receipt["kind"] == kind)
+        .filter_map(|receipt| {
             let identity = receipt["payload"]["ticket_identity"].as_str()?;
             let display = receipt["payload"]["display_id"].as_str()?;
             Some((identity.rsplit(':').next()?.to_owned(), display.to_owned()))

@@ -204,57 +204,48 @@ recommended for Directory Workspaces. Because the grammar requires an
 
 ### 1.3. State Machine Resolution
 
-State-machine resolution is normative for all commands:
+State-machine resolution is normative for all commands.
 
-1. `--state-machine <path>` loads the specified YAML file and overrides
-   automatic lookup. If the target plan or rhei declares `**States:**`, or
-   inherits a Panta default declaration, the loaded file's `name` must match that
-   effective value; if the effective field is omitted, the loaded file's `name`
-   becomes the active state-machine name for this invocation.
-2. For a rhei inside a Panta Project, both the presence and the value of its
-   `**States:**` declaration are resolved per rhei. After rule 1, a declaration
-   in the rhei itself gives its execution root first refusal: a matching
-   `<rhei>/states.yaml` wins even when the declared name equals the resolved
-   project default. An absent local file, or a valid local file with another
-   name, falls back to that already-resolved default in the same-name case and
-   otherwise continues through the project-level name-match rules. An invalid
-   local candidate is a load error, not a fallback. If the rhei omits
-   `**States:**`, it inherits the resolved project machine wholesale and its
-   own root is not consulted. Thus restating a custom default is equivalent to
-   omission only for the effective machine *name*, not for definition-file
-   precedence ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)). Restating the project's effective
-   built-in `rhei` default is the one exception where that equivalence is
-   total: rule 4 governs that case, and the rhei's own root is not consulted
-   there either.
-3. When `**States:**` is omitted after Panta inheritance has been applied, the
-   plan or rhei uses the built-in `rhei` state machine. Sibling, workspace, or
-   project `states.yaml` files are ignored in this case.
-4. When `**States:** rhei` is declared and no override is supplied, a matching
-   `states.yaml` named `rhei` may be used only from the invocation's local
-   lookup location: beside a standalone single-file plan, at a standalone
-   Directory Workspace root, or at the Panta project root for the project's
-   effective default. A member whose own declaration differs from the
-   project's effective default instead resolves the same way rule 5 describes
-   for a non-`rhei` declaration — its own execution root first, then a unique
-   `name`-match among the project's candidate roots. Otherwise — including
-   when that candidate search finds nothing for a member whose Panta default
-   names a different machine — the plan falls back to the built-in `rhei`
-   state machine. In particular, when a Panta project's effective default is
-   `rhei`, a member that inherits or restates that default does not let a
-   matching file found only in a member rhei root replace the built-in fallback.
-5. When a non-`rhei` `**States:** <name>` is declared and no override is
-   supplied, the CLI resolves the file from a sibling `states.yaml` for a
-   single-file plan, from `<workspace>/states.yaml` for a Directory Workspace,
-   from the declaring rhei's execution root for any member rhei's own
-   declaration, or from the already-resolved project machine when the
-   declaration was inherited from `index.panta.md` — falling back, where rule
-   2 requires project-level name lookup, to a unique `name`-match among the
-   project's candidate roots ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)).
-   This candidate-root fallback does not apply to the effective Panta project
-   default `rhei` governed by rule 4. A resolved file's `name` must match
-   `<name>`.
-6. A declared non-`rhei` state machine without a matching auto-discovered file
-   is a validation error; it never falls back to the built-in machine.
+`--state-machine <path>` overrides automatic lookup for the whole scope: it
+loads the named YAML file for every plan and rhei in scope. Where the target
+plan or rhei declares `**States:**`, or inherits a Panta default declaration,
+the loaded file's `name` must match that effective value; where the effective
+field is omitted, the loaded file's `name` becomes the active state-machine
+name for this invocation.
+
+Otherwise a rhei's machine is the first of these that resolves:
+
+1. The `states.yaml` in the rhei's **own execution root**, when present —
+   whatever its `name:`, and whatever the index says. That file's `name:` is
+   the rhei's effective machine name. A single-file plan's execution root is
+   the directory holding it, so the `states.yaml` beside a lone plan resolves
+   here; a Directory Workspace's root is the workspace directory. A single-file
+   member of a Panta project shares the project directory as its root, so for
+   it this clause and the next name the same file.
+2. Otherwise the **project default**: the `states.yaml` at the Panta project
+   root, when present. The file's presence decides, not whether
+   `index.panta.md` names it. The project default also governs the Panta root's
+   node policy and the synthetic `basin` rhei ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)).
+3. Otherwise the built-in `rhei` state machine.
+
+`states.yaml` is the only file name searched and no other directory is
+searched; a machine kept anywhere else loads only through `--state-machine`. An
+invalid candidate is a load error, never a fallback — it would otherwise
+surface as a misleading "no states file found".
+
+A declared machine still has to exist. While the `**States:**` declaration
+exists at all ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)), a rhei that carries one — its own,
+or the manifest's by inheritance — and for which neither the deprecated
+resolution nor clause 1 found a file is a **validation error**, not a fall
+through to clauses 2 and 3: a declaration naming a machine nothing supplies
+never silently resolves to some other machine. This clause is removed with the
+declaration.
+
+For one release the deprecated `**States:**` declaration is resolved *before*
+clause 1 and wins wherever it resolves, so no plan written against the previous
+rules changes the machine it runs under.
+[§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match) owns that window, the three warnings it prints,
+and the release it ends in.
 
 ### 1.4. Directory Workspace Metadata
 

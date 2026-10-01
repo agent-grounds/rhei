@@ -9,6 +9,7 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-language-reference](rhei-language-reference.spec.md#fs-rhei-language-reference-rhei-language-reference) | Entry point for the complete user-authored Rhei language surface |
 | [§FS-rhei-panta](rhei-panta.spec.md#fs-rhei-panta-panta-the-project-root-above-all-rheis) | Panta, the invisible project root above all rheis and tickets |
 | [§FS-rhei-plan-language](rhei-plan-language.spec.md#fs-rhei-plan-language-rhei-plan-language-specification) | Rhei plan language grammar and semantics |
+| [§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match) | The one-release window in which `**States:**` and the cross-root name match still resolve |
 | [§FS-rhei-usage](rhei-usage.spec.md#fs-rhei-usage-how-rhei-is-used) | Roles, coordination patterns, and agent workflows |
 | [§FS-rhei-authoring](rhei-authoring.spec.md#fs-rhei-authoring-rhei-plan-language-usage-guide) | Practical plan authoring guide |
 | [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) | State machine format and default states |

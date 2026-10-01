@@ -306,13 +306,17 @@ mechanism that no longer exists.
 The remaining steps are issues of their own, in order, and each is a separate
 release decision:
 
-- **Step 3 — machine resolution** (#347)**.** A rhei's machine is `states.yaml` in its own
+- ~~**Step 3 — machine resolution** (#347)**.** A rhei's machine is `states.yaml` in its own
   root when present, then the project default, then built-in `rhei`. The
   `**States:**` declaration and the cross-root name match
   ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)) are **deprecated with a warning**, not removed, so every
   laid plan runs unchanged. It also removes the interim declaration `--into`
   writes today ([§FS-rhei-library.2.1](rhei-library.spec.md#21-the-machine-the-target-must-have)) and reaches the installed skills and
-  ephor's laid plans.
+  ephor's laid plans.~~ Done: resolution reads the rhei's own root, then the
+  project root, then the built-in machine
+  ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)), with the two deprecated mechanisms resolving
+  ahead of it for one release and warning where they disagree
+  ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)).
 - **Step 4 — `--into <project>`** (#348)**.** A member rhei with its own machine, or a
   project's default machine laid and rebound, with the tickets a rebind would
   strand named before anything is replaced.

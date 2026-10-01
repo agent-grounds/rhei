@@ -86,13 +86,15 @@ the boundary. Neither `--force` nor `--here` bypasses it.
    one ([§AR-rhei-panta.1](../architecture/rhei-panta.spec.md#1-on-disk-layout) discovery does not recurse into rhei roots).
 4. **Write the manifest**: `# Panta: <title>`, and nothing else. The state
    machine is per-rhei, defaulted by the project ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)): a
-   discovered rhei that declares its own machine runs under it, and one that
-   declares nothing was authored against the built-in default and keeps it.
-   There is nothing for init to adopt — writing a discovered machine into the
-   manifest would silently re-govern every *future* rhei that declares
-   nothing. (An earlier revision adopted a unanimously-declared machine as
-   the project default, back when a divergent member was a load error; the
-   per-rhei model removed both the error and the need.)
+   discovered rhei keeps the `states.yaml` in its own root, and one with no
+   file of its own takes the project default
+   ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)). There is nothing for init to adopt — every
+   machine file already resolves where its rhei kept it, and naming one in the
+   manifest would make it the default that silently re-governs every *future*
+   rhei with no file of its own. (An earlier revision adopted a
+   unanimously-declared machine as the project default, back when a divergent
+   member was a load error; the per-rhei model removed both the error and the
+   need.)
 5. **Seed ignore rules** (§3).
 6. **Write the agent-discovery note** unless `--no-agents` (§4).
 7. **Report what became visible** (§5).

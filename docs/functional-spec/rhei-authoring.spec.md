@@ -28,9 +28,10 @@ The file stem becomes the rhei id that prefixes every ticket id in command
 output (`my-plan.rhei.md` → tickets `my-plan.1`, `my-plan.2`, ...), so choose
 it like an identifier: start with a letter, then letters, digits, `_`, or `-`.
 
-When no `**States:**` field is declared, a standalone plan uses the built-in
-`rhei` state machine. Inside a Panta Project, a rhei that omits `**States:**`
-may inherit the project default from `index.panta.md`.
+A plan runs under the `states.yaml` in its own directory when there is one,
+otherwise under the Panta project's own `states.yaml`, otherwise under the
+built-in `rhei` machine ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)). Where to put the file is
+the whole of how a plan chooses its process; nothing has to be declared.
 
 ## 2. Authoring Workflow
 
@@ -351,14 +352,14 @@ without an effort mapping ignore the field. See
 [§FS-rhei-states.5](rhei-states.spec.md#5-agent-field) and
 [§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents).
 
-Inside a Panta project, an explicit declaration also selects where the
-definition is resolved. For example, if `index.panta.md` declares `alpha` and
+Inside a Panta project, where the file sits is what selects the definition. If
 the project-root `states.yaml` defines `surveying → signed-off`, a `billing`
-member that declares `**States:** alpha` beside its own matching `states.yaml`
-uses that member-local definition — for example `drafting → filed`. Remove the
-member's `**States:**` line to inherit the already-resolved project definition
-instead. The same-name declaration inherits the default's *name*, not its
-definition file ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)).
+member with a `states.yaml` of its own defining `drafting → filed` runs under
+its own; delete that file for `billing` to run under the project's instead
+([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)). A `**States:**` line is deprecated and still
+read: for one release it wins wherever it resolves, which is the one case where
+deleting the file is not enough to move a rhei and deleting the line is
+([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)).
 
 ## 6. Common Pitfalls
 

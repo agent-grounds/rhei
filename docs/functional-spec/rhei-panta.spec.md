@@ -286,18 +286,15 @@ tickets store it in `index.panta.md` under their **project-qualified** ids
 metadata document, basin tickets could not transition at all: every command
 that advances a ticket must read and write its counters.
 
-The state machine is per-rhei, defaulted by the project. The `index.panta.md`
-declaration — or the built-in `rhei` machine when the manifest declares none —
-governs every rhei that does not declare its own `**States:**`, plus the
-synthetic `basin` rhei and the Panta root's node policy. A rhei that declares
-its own machine runs under it ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)): a machine is a *process*,
-and one project holds several processes the moment it holds two instantiated
-templates. Restating a custom default is legal and inherits the same effective
-machine *name*, but its explicit declaration still gives a matching
-member-local `states.yaml` precedence. Restating the built-in `rhei` default
-is the exception: that precedence does not apply, and the restatement is
-equivalent to omission in every respect. Omitting the line instead inherits the
-already-resolved project machine wholesale. Each ticket validates, transitions,
+The state machine is per-rhei, defaulted by the project. A rhei runs under the
+`states.yaml` in its own execution root when there is one; the project root's
+file — or the built-in `rhei` machine when there is none — governs every rhei
+with no file of its own, plus the synthetic `basin` rhei and the Panta root's
+node policy ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution), [§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)). A machine is a
+*process*, and one project holds several processes the moment it holds two
+instantiated templates. A `**States:**` declaration in either index is
+deprecated and resolves ahead of this for one release, winning wherever it
+resolves ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). Each ticket validates, transitions,
 and completes under its owning rhei's machine; the only place two machines meet
 is a cross-rhei prior, judged under the target's machine (§6.1).
 

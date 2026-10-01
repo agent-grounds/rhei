@@ -196,19 +196,20 @@ qualification could add is a wrong id.
 
 ## 4. State-machine binding
 
-The state machine is a property of the **rhei**, defaulted by the project.
-`index.panta.md` supplies the project *default* machine — the built-in `rhei`
-machine when the manifest declares none — and every rhei that does not declare
-its own `**States:**` runs under that default, as do the synthetic `basin` rhei
-and the Panta root's node policy. A rhei that declares its own `**States:**`
-runs under the machine it names: a state machine here is the *process* — state
+The state machine is a property of the **rhei**, defaulted by the project. The
+rhei's own execution root is where its machine file lives: a `states.yaml`
+there governs that rhei, whatever its index says. Failing that, the project
+default is the `states.yaml` at the project root, which also governs the
+synthetic `basin` rhei, every single-file member, and the Panta root's node
+policy; failing that, the built-in `rhei` machine
+([§FS-rhei-plan-language.1.3](../functional-spec/rhei-plan-language.spec.md#13-state-machine-resolution)). A state machine here is the *process* — state
 vocabulary, transitions, per-state agent bindings, artifact contracts — and
 different workstreams in one project legitimately follow different processes
-(every instantiated template is one). The merge records which rhei declared
-which machine ([§DA-per-rhei-state-machines](../decisions/architectural/per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest)); the graph stays one merged,
+(every instantiated template is one). The merge records which machine each rhei
+resolved ([§DA-per-rhei-state-machines](../decisions/architectural/per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest)); the graph stays one merged,
 project-qualified task list, and every consumer resolves a ticket's machine
 through its owning rhei. Inheritance stays a default, never a merge: a rhei
-that omits `**States:**` takes the project default wholesale, and machines are
+with no file of its own takes the project default wholesale, and machines are
 never combined or namespaced.
 
 Cross-rhei semantics need no shared vocabulary. The one computation where two
@@ -218,46 +219,34 @@ machine** ([§FS-rhei-panta.6.1](../functional-spec/rhei-panta.spec.md#61-readin
 ticket's state, transition legality, completion-target selection, artifact
 contracts, agent bindings — is a per-ticket question answered by the owning
 rhei's machine. The resolved source of each machine is surfaced in diagnostics
-— CLI override path, rhei declaration, `index.panta.md` declaration, or
+— CLI override path, the rhei's own root file, the project-root file, or
 built-in `rhei` fallback.
 
-A machine's *definition file* resolves per declaration. Declaration presence,
-not whether its value differs from the default name, decides whether a member
-root gets first refusal — for a *custom* default. For any rhei-local
-declaration of a custom name, the rhei's execution root `states.yaml` resolves
-it first when its `name:` matches — the shape every instantiated template
-ships — including when that name equals the resolved project default. An
-absent local file, or a valid one naming another machine, falls back to the
-already-resolved project default for that same-name declaration. An invalid
-local candidate is an error rather than a fallback. A rhei that omits
-`**States:**` instead inherits the resolved project machine wholesale; its
-root is not consulted on the inherited declaration's behalf. Restating the
-project's effective built-in `rhei` default is not a custom same-name
-declaration: it is equivalent to omission in every respect, including
-definition-file precedence, so a rhei's own root is never consulted for it
-either, exactly as the paragraph below requires for other roots.
+A machine's *definition file* therefore resolves from **one** place per rhei —
+its own execution root — and from the project root for every rhei that has
+none. Where the own-root file is what resolves, its `name:` is the rhei's
+effective machine name; nothing has to be declared twice for the two to agree,
+which is why the second place an author used to say it is going away. An
+invalid candidate is an error rather than a fallback: it would otherwise
+surface as a misleading "no states file found". Discovery does not recurse
+([§AR-rhei-panta.1](rhei-panta.spec.md#1-on-disk-layout)), so every rhei is either a directory workspace whose own
+root this reads, or a single-file plan whose execution root *is* the project
+directory — there is no member whose machine file is somewhere only a search
+across roots would find.
 
-For a different rhei-local name, and while resolving the manifest's own
-default declaration, resolution otherwise proceeds as before: the project
-root's `states.yaml` resolves first; when that is absent or names a different
-machine, a `states.yaml` in a discovered rhei's root whose declared `name:`
-matches may resolve it — but only a **unique** match. The explicitly declared
-built-in project default `**States:** rhei` is the exception: only a matching
-project-root file replaces the built-in machine as the manifest's default. A
-member that inherits or restates that explicit default cannot make any
-member-root file — including its own — the project default. When the
-manifest's declaration is omitted entirely, automatic project-root and
-member-root files are ignored and built-in `rhei` is used. When several
-candidate roots hold files declaring a
-custom default's name, resolution is ambiguous and errors, naming the
-candidates and the fixes (move the definitive file to the project root, or
-pass `--state-machine`): a stale copy silently driving tickets would be far
-worse than asking once. A candidate that fails to load is likewise an error,
-not a silent non-match — it would otherwise surface as a misleading "no states
-file found". Name-match resolution is file resolution, not shadowing, and it
-is what lets a project initialized over existing plans by `rhei init` keep
-each machine file where its rhei always kept it
-([§FS-rhei-init.2](../functional-spec/rhei-init.spec.md#2-behavior)).
+For one release the deprecated `**States:**` declaration still resolves ahead
+of this, by the previous release's rules — own root for a custom same-name
+declaration, then the project root, then a unique `name:` match among the
+project's candidate rhei roots — and wins wherever it resolves, with a warning
+where that disagrees with the resolution above
+([§FS-rhei-states-deprecation](../functional-spec/rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). Within that pass the previous release's
+rules hold unchanged, including its refusals: an explicitly declared built-in
+project default `**States:** rhei` is replaced only by a matching project-root
+file and never by a member-root one, a declaration naming a machine no file
+anywhere declares is a validation error, and several candidate roots holding a
+custom default's name is an ambiguity error naming the candidates and the fixes
+(move the definitive file to the project root, or pass `--state-machine`) —
+a stale copy silently driving tickets would be far worse than asking once.
 
 `--state-machine <path>` stays a whole-scope override: it replaces resolution
 for every rhei in scope, and errors when any in-scope rhei declares a machine
@@ -266,7 +255,7 @@ reinterpreted one rhei's states under another rhei's process would corrupt
 exactly the runs the flag exists to debug.
 
 For a member discovered by a live run, machine resolution is repeated from its
-own declaration and source root before admission. The run initializes that
+own source root before admission. The run initializes that
 machine's callback base and validates the refreshed graph and execution
 references with freshly merged settings. Cached bindings for existing members
 may be reused only when equivalent to that refreshed context. A whole-run

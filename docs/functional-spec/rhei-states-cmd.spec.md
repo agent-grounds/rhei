@@ -42,9 +42,9 @@ default" is no longer a claim about the rest of the project.
 
 1. Load the explicit states YAML file when `--state-machine` is supplied.
    [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification)
-2. Otherwise resolve the target plan and load the machine its `**States:**`
-   declaration selects, including a declaration inherited from
-   `index.panta.md`. [§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)
+2. Otherwise resolve the target plan and load each rhei's machine by where its
+   file sits: the rhei's own execution root, then the project root, then the
+   built-in machine. [§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)
 3. Fall back to the built-in default state machine when no plan or project
    resolves — there is then nothing to declare a machine.
 4. Render a complete inspection view of the machine. For a project whose rheis
@@ -85,6 +85,12 @@ Text output opens with a `Source:` line naming the resolved states file, or
 `the built-in default state machine` when no file backs it. The resolution
 rules have several outcomes and the rendered machine alone does not distinguish
 them.
+
+A deprecation warning about how a machine resolved is written to **stderr**,
+beside the `Source:` lines rather than inside them, so neither the text block
+nor `--json` stdout carries it
+([§FS-rhei-states-deprecation.3](rhei-states-deprecation.spec.md#3-the-warning-contract)). `rhei states` is where resolution is read, so
+it is where those warnings are most often seen.
 
 ## 4. Text Output
 

@@ -11,7 +11,7 @@ prompt name a state instead of being sent to look one up.
 
 Composition happens entirely inside `rhei instantiate`, through two surfaces
 that are one mechanism seen from two sides: `--into` places a template into a
-plan that already exists ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan)), and `includes:` in `template.yaml`
+plan that already exists ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project)), and `includes:` in `template.yaml`
 builds a template out of templates ([§FS-rhei-library.6](rhei-library.spec.md#6-includes-a-template-built-from-templates)). Three rules decide every
 union and each of them refuses rather than resolves ([§FS-rhei-library.3](rhei-library.spec.md#3-the-union-rules)).
 
@@ -34,30 +34,37 @@ than invents wherever two authors disagree.
 
 Two things carry it, and they are the same mechanism seen from two sides:
 
-- `--into <target>` places a template into a plan that already exists ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan));
+- `--into <target>` places a template into a plan, or a project, that already
+  exists ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project));
 - `includes:` in `template.yaml` builds a template out of templates ([§FS-rhei-library.6](rhei-library.spec.md#6-includes-a-template-built-from-templates)), each
   entry optionally placing its tickets `under:` a task of the host.
 
 Nothing is written until the union validates in the scope the target runs in
-([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan)). On error the target is byte-identical to what it was, and
+([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project)). On error the target is byte-identical to what it was, and
 the error names both sources of the disagreement and the field they disagree
 on.
 
-## 2. `--into`: placing a template into a plan
+## 2. `--into`: placing a template into a plan or a project
 
-`rhei instantiate` gains one flag with two forms:
+`rhei instantiate` gains one flag with three forms:
 
 ```text
 rhei instantiate <template> [inputs] --into <rhei>         # tickets at the rhei's top level
 rhei instantiate <template> [inputs] --into <rhei>.<task>  # tickets under that task
+rhei instantiate <template> [inputs] --into <project>      # a member, or the project's default machine
 rhei instantiate <template> [inputs] --output <dir>        # standalone, unchanged
 ```
 
 `<template>` resolves through the discovery chain of
 [§FS-rhei-templates.1.2](rhei-templates.spec.md#12-the-ancestor-walk-checks-both-names-at-each-level) or is a
-path, exactly as it does for `--output`. `--into` resolves its target the way
+path, exactly as it does for `--output`. `--into` resolves a rhei target the way
 `rhei new --under` resolves a parent ([§FS-rhei-new.3](rhei-new.spec.md#3-creating-a-ticket)), and it is a flag for the
 same reason `--under` is: the positional arguments are the template's inputs.
+Which of the three forms a target is, is decided by what is on disk rather than
+by its spelling, and a target that could be both a rhei and a project is an
+error ([§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target)). The rest of this section and
+[§FS-rhei-library.2.1](rhei-library.spec.md#21-the-machine-the-target-must-have) are about a rhei target; [§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target) and
+[§FS-rhei-library.2.3](rhei-library.spec.md#23-the-default-machine-is-replaced-never-unioned-into) are about a project target.
 
 Rendering, input collection and settings hoisting are the single-template path
 unchanged ([§FS-rhei-templates.6.1.2](rhei-templates.spec.md#612-behavior) steps 3–5;
@@ -127,9 +134,189 @@ nothing for `--into` to declare. The three cases:
   govern the rhei for a release, which makes the refusal more necessary rather
   than less.
 
-The basin ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)) is never a `--into` target: it holds unfiled
-tickets that run under the project default and has no machine of its own to add
-to.
+The basin ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)) is never a `--into` target as a rhei: it holds
+unfiled tickets that run under the project default and has no machine of its own
+to add to. When the target is the basin's **project**, its tickets are exactly
+what the check of [§FS-rhei-library.2.3](rhei-library.spec.md#23-the-default-machine-is-replaced-never-unioned-into) reads, because a project default laid
+there governs them.
+
+### 2.2. A project target
+
+A Panta project is the third target form: a directory holding
+`index.panta.md` ([§AR-rhei-panta.1](../architecture/rhei-panta.spec.md#1-on-disk-layout)). What `--into` does there is decided by the
+template's layout ([§FS-rhei-templates.2](rhei-templates.spec.md#2-directory-layout)), not by a flag:
+
+- a template carrying `plan.rhei.md` or `index.rhei.md` is **laid as a member**
+  of the project. This is the documented equivalent of the default `--output`
+  inside a project — `--into <project>` and `--output <project>/<template-name>`
+  produce the same member, the same settings hoist and the same refusals,
+  because both run the one member-laying path
+  ([§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project));
+- a template carrying `index.panta.md` — a **project template** — **lays or
+  rebinds the project's default machine** and lays its members, as
+  [§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project) specifies for a project laid with `--output`, with
+  the differences below.
+
+**Resolving the target.** `--into` resolves what is on disk rather than
+guessing from the spelling, as [§FS-rhei-library.6](rhei-library.spec.md#6-includes-a-template-built-from-templates) does for a template's layout:
+
+1. `basin` is refused, as [§FS-rhei-library.2.1](rhei-library.spec.md#21-the-machine-the-target-must-have) says.
+2. A target that is a single path segment not beginning with `.` is a **bare
+   id**, and keeps the split on its first `.` into `<rhei>.<task>`. Anything
+   else — `.`, `./reports`, `../panta/reports`, an absolute path — is a
+   **path** and is never split, since a rhei id is a single segment
+   ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)).
+3. A bare id is looked up at the candidate roots a rhei target has always had —
+   `<cwd>/<id>`, then `<enclosing project>/<id>` — as a Directory Workspace and
+   as `<id>.rhei.md`, and additionally as a directory holding `index.panta.md`,
+   which is a **project** target.
+4. A path resolves to exactly one of: a directory holding `index.rhei.md` (a
+   rhei), or a directory holding `index.panta.md` (a project). Anything else is
+   the existing "no rhei to place into" error.
+5. A bare id that finds a rhei at one candidate root and a project at another
+   is **refused, naming both paths** and the two spellings that say which was
+   meant. It is never resolved by preference: before this form existed the rhei
+   was taken silently, and the cost of guessing wrong is a write into the wrong
+   one.
+
+```text
+× `--into reports` names two different things
+  │   a rhei:    panta/reports/index.rhei.md
+  │   a project: reports/index.panta.md
+  ╰─▶ say which one with a path: `--into panta/reports` for the rhei,
+      `--into ./reports` for the project.
+```
+
+A project target carrying a `.<task>` half is an error naming it: a project has
+no task tree, so there is no task to place under.
+
+**What `--into <project>` writes, for a project template.** Everything
+[§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project) lists for `--output`, with three differences that
+all follow from the project already existing:
+
+- **The project manifest is never edited.** The template's own
+  `index.panta.md` is dropped, as a rhei template's title and description are
+  dropped under `--into <rhei>` ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project) item 1): the project's manifest
+  describes the project. In particular `--into` **never writes a
+  `**States:**` line**. Laying the default is writing `states.yaml` at the
+  project root, because that file's presence is what makes a machine the
+  project default ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) clause 2), and the declaration is
+  deprecated ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)); the one command whose job is to lay a
+  correct project must not write a line it would warn the author to delete,
+  which is the rule [§FS-rhei-states-deprecation.1](rhei-states-deprecation.spec.md#1-the-deprecated-resolution-runs-first) already holds `rhei new --states`
+  to.
+- **A manifest that declares another machine is refused before anything is
+  written.** For as long as the deprecated declaration exists, a manifest's own
+  `**States:** X` is resolved ahead of the root file and wins
+  ([§FS-rhei-states-deprecation.1](rhei-states-deprecation.spec.md#1-the-deprecated-resolution-runs-first)), so a default laid under a machine whose `name:`
+  is not `X` would govern nothing for a release. The refusal names the manifest
+  and its line, both machine names, and the remedy — delete the deprecated line
+  — and leaves the project byte-identical. This is the third case of
+  [§FS-rhei-library.2.1](rhei-library.spec.md#21-the-machine-the-target-must-have) for the same reason: a write the declaration defers is a
+  write that does not govern. A manifest that declares the laid machine's own
+  name is neither refused nor edited, and one that declares nothing is the
+  ordinary case.
+
+  ```text
+  × 'reports/index.panta.md' declares `**States:** housemachine`, so the
+  │ default this lays, 'laidmachine', would not govern the project until the
+  │ declaration is removed
+  ╰─▶ delete the `**States:**` line from 'reports/index.panta.md' — the
+      declaration is deprecated, and the states.yaml at the project root is
+      the default without it — then run this again.
+  ```
+- **Members are laid once and never touched again.** An `includes:` entry whose
+  member directory does not exist is laid by the member-laying path. One whose
+  directory already exists is **skipped and reported**: not replaced, and not
+  unioned into. A member is a rhei with live tickets, run state and history, so
+  replacing it destroys work, and unioning into it would append the template's
+  tickets again on every rebind. "Replaced, never unioned into" is the rule for
+  the *default machine* ([§FS-rhei-library.2.3](rhei-library.spec.md#23-the-default-machine-is-replaced-never-unioned-into)); for a member it is the opposite, for the
+  same reason — the default is a definition and a member is work. A member that
+  should follow its template is brought forward by `rhei instantiate <entry>
+  --into <member>`. A directory that exists and is not a rhei is the
+  member-laying path's existing "already exists" error.
+
+Before writing, the command checks the replacement ([§FS-rhei-library.2.3](rhei-library.spec.md#23-the-default-machine-is-replaced-never-unioned-into)) and
+validates the prospective project in the project's own terms, under the
+project's sidecar lock, as a union into a member already is
+([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project)). On any refusal the project is byte-identical to what it was.
+
+The summary says what happened to each part, and says it on every run, so a
+skipped member is never silent:
+
+```text
+Rebound the Panta project at reports.
+  default machine: laidmachine replaced housemachine
+  checked:         4 tickets in 2 rheis and the basin
+  members:         review-loop already exists and was left as it is
+  copied:          prompt_templates/ (1 file), scripts/ (1 file)
+  settings:        added agents.rev
+```
+
+The first line says `Laid` where the project had no root `states.yaml` and
+`Rebound` where it had one; a default laid again under the same name says the
+machine was written again rather than replaced. `--dry-run` prints the same
+summary, runs the check and the validation, and writes nothing.
+
+### 2.3. The default machine is replaced, never unioned into
+
+Every rhei that has no machine of its own and the basin inherit the project
+default wholesale ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)), so composing into it would change what
+they run under without their authors having said anything. A project template
+therefore **replaces** the root `states.yaml` whole, and laying it again is a
+rebind: the default laid again. Machines are never combined
+([§DA-per-rhei-state-machines](../decisions/architectural/per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest) item 4).
+
+A replacement **refuses before writing a byte when it would strand a ticket**:
+leave one in a state its new machine does not allow it, or bring a
+`node_policy.by_type` key that names a node kind the project's structure does
+not declare. The refusal names every such ticket with its rhei and its state,
+and every such node kind with each member the new default would govern that
+does not declare it and the `structure.nodeKinds` entry to add there, and says
+nothing was written:
+
+```text
+× replacing the default machine of 'reports' would strand 2 tickets
+  │
+  │ the project default becomes 'laidmachine'; these tickets run under the
+  │ default and hold a state it does not allow them:
+  │
+  │   stranded.one   work
+  │   basin.1        work   (the basin runs under the project default)
+  │
+  ╰─▶ move each ticket to a state the new machine has, then run this again.
+      Nothing was written: the project is byte-identical to what it was.
+```
+
+**Which tickets the check reads is resolution's answer, not the check's.** The
+check builds the project's machine set twice through the one resolution path
+every command uses ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)) — once as the project stands,
+once with the root file replaced by the template's machine — validates the
+second, and reports only the errors the replacement **introduces**. A defect the
+project already carried is reported as the project failing, not blamed on the
+rebind, which is the reading [§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project) takes of a union. A check that
+decided governance itself — "a member with no `states.yaml` of its own runs
+under the default" — would be wrong for as long as the deprecated declaration
+exists: a member whose own `**States:** Y` resolves to a file in another rhei's
+root ([§FS-rhei-states-deprecation.1](rhei-states-deprecation.spec.md#1-the-deprecated-resolution-runs-first)) runs under `Y` whatever the default is,
+so its tickets are not the replacement's to strand, and they are not named.
+
+"Allow" is the rule that already exists: an authored `**State:**` must appear in
+its node's resolved profile's `allowed` set, and every `node_policy.by_type` key
+must be a declared node kind ([§FS-rhei-states.9.3](rhei-states.spec.md#93-validation)). So the check resolves each
+ticket's profile under the replacement by kind and level rather than comparing
+against a flat list of state names.
+
+The check **refuses and never rewrites**. `rhei instantiate` does not become a
+writer of other rheis' ticket bodies or frontmatter: moving a stranded ticket,
+or adding a node kind to a member that lacks one, is the author's edit. The
+list the refusal prints is what such an edit works from.
+
+What a pre-write refusal protects is the project as it stands when the command
+runs. A rhei written *later* with no machine of its own also runs under the
+default, and that is what "project default" means
+([§DA-per-rhei-state-machines](../decisions/architectural/per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest) item 8).
 
 ## 3. The union rules
 
@@ -348,8 +535,12 @@ written there.
 
 Every template stands alone, so every template is discovered, listed, validated
 and gated exactly as a template is today. A template with `index.rhei.md` or
-`plan.rhei.md` lays a rhei with `--output` and joins one with `--into`; no field
-declares which, the layout does.
+`plan.rhei.md` lays a rhei with `--output` and joins one with `--into`. A
+template with `index.panta.md` lays a project with `--output` and binds one with
+`--into` ([§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project), [§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target)), and in it each `includes:`
+entry lands as a **member rhei** of that project, through the same member-laying
+path the default `--output` inside a project takes, rather than unioning into a
+host plan. No field declares which, the layout does.
 
 ### 6.1. `under:`
 
@@ -360,6 +551,13 @@ calls the same re-parenting, the same heading deepening, the same `**Prior:**`
 and `**Consumes:**` rewrite, the same writer and the same refusals ([§FS-rhei-library.4](rhei-library.spec.md#4-placement-ids-tickets-and-frontmatter)). There
 is no second placement mechanism — if `under:` needed one, `--into
 <rhei>.<task>` would be wrong.
+
+`under:` on an entry of a **project template** is an error naming the entry,
+raised before anything is rendered. There is no host task tree to resolve it
+against — each entry of a project template is a member rhei of its own — and
+inventing a meaning for it would be the second placement mechanism this point
+rules out. Edges between members are ordinary cross-rhei `**Prior:**` lines in
+the placed tickets.
 
 It resolves against the task tree **as it stands when the entry is reached**:
 the including template's own `tasks/` are the base, and each entry's placements
@@ -429,7 +627,7 @@ it:
 | `--output` | two destinations for one instantiation |
 | `--execute` | it means `rhei run` on a **new** workspace; the target may already be running, and a second run is not what the flag promises |
 | `--keep-on-error` | there is no staging directory to keep: nothing is written until the union validates, and on error the target is byte-identical |
-| `--state-machine` | an invocation override; a union is a durable write and must go into the file the target actually runs under |
+| `--state-machine` | an invocation override, and both things `--into` writes are durable: a union must go into the file the target actually runs under, and laying a project's default writes the file the whole project runs under |
 
 `--state-machine` keeps its meaning everywhere else.
 

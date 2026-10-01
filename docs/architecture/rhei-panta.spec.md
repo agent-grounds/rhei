@@ -13,7 +13,8 @@ task files into one plan, a Panta merges rheis into one project.
 
 ```
 panta/                   ← the Panta: a project directory (point the tools here)
-  index.panta.md         ← Panta manifest: project title, default **States:**
+  index.panta.md         ← Panta manifest: project title and overview
+  states.yaml            ← optional: the project default machine (§AR-rhei-panta.4)
   auth.rhei.md           ← a single-file rhei, directly in the project dir
   billing/               ← or a rhei as a Directory Workspace
     index.rhei.md
@@ -35,8 +36,10 @@ single-file rhei's root is the project directory, so its artifacts and the
 project-level rollups share the project `runtime/` (§6).
 
 `index.panta.md` is the Panta manifest. It plays the role `index.rhei.md` plays
-for a workspace: project title, default state-machine declaration, and content
-sections; it contains no authored nodes. Rhei discovery scans the project
+for a workspace: project title and content sections — the default machine is
+the `states.yaml` beside it (§AR-rhei-panta.4), and a `**States:**` line here is the
+deprecated declaration (§FS-rhei-states-deprecation); it contains no authored
+nodes. Rhei discovery scans the project
 directory's **immediate children** in deterministic, `/`-normalized order: each
 non-hidden `*.rhei.md` file is a single-file rhei, and each non-hidden
 subdirectory containing `index.rhei.md` is a Directory Workspace rhei.
@@ -45,6 +48,14 @@ the project directory, so a `*.rhei.md` buried in a grouping folder is not
 promoted to a rhei. The `runtime/` artifact tree and the reserved `basin/`
 directory are skipped (the latter is loaded as the synthetic basin rhei). A
 directory is a Panta when it contains `index.panta.md`.
+
+A project laid from a project template (§FS-rhei-templates.6.4) is this layout
+and nothing more: its default machine is the root `states.yaml`, the
+`prompt_templates/` and `scripts/` that machine runs are copied beside the
+manifest, its settings are the project's `.agent-grounds/rhei/settings.json`,
+and each member it laid is a Directory Workspace directly in the project
+directory whose directory name is its rhei id. Nothing marks it as laid, so
+discovery, loading and every command treat it as a project a person wrote.
 
 ## 2. Load model
 
@@ -211,6 +222,16 @@ project-qualified task list, and every consumer resolves a ticket's machine
 through its owning rhei. Inheritance stays a default, never a merge: a rhei
 with no file of its own takes the project default wholesale, and machines are
 never combined or namespaced.
+
+The project default is written by a person, or by `rhei instantiate` laying a
+project template (§FS-rhei-templates.6.4) — never as a side effect of laying a
+member (§DA-per-rhei-state-machines item 8). Because every rhei with no file of
+its own and the basin inherit it wholesale, a laid default **replaces** the root
+file whole and is never unioned into, and the replacement is checked first
+against every ticket resolution sends to the project root, through the same
+resolved machine set validation uses, refusing on any it would strand
+(§FS-rhei-library.2.3). Which tickets those are is resolution's answer above,
+deprecated pass included, and is not recomputed by the writer.
 
 Cross-rhei semantics need no shared vocabulary. The one computation where two
 machines meet is readiness: a `**Prior:**` into another rhei is satisfied when

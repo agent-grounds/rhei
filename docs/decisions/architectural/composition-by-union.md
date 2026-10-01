@@ -60,16 +60,24 @@ Five things follow, and they are the decision rather than its implementation.
    [§FS-rhei-library.3.1](../../functional-spec/rhei-library.spec.md#31-same-name-same-thing)
 2. **One noun and one verb.** A template is instantiated — into a new place with
    `--output`, into an existing one with `--into` — and a template may include
-   templates. No second manifest, no tier, no catalog, and no vocabulary of
-   block, mount, alias, port, seam, pass or lock.
-   [§FS-rhei-library.2](../../functional-spec/rhei-library.spec.md#2---into-placing-a-template-into-a-plan) [§FS-rhei-library.6](../../functional-spec/rhei-library.spec.md#6-includes-a-template-built-from-templates)
+   templates. What the place is, the template's layout says: a plan template
+   lays or joins a rhei, and a project template lays or binds a project and
+   lands each of its `includes:` as a member rhei
+   ([§FS-rhei-templates.2](../../functional-spec/rhei-templates.spec.md#2-directory-layout), [§FS-rhei-library.2.2](../../functional-spec/rhei-library.spec.md#22-a-project-target)). No second manifest, no tier,
+   no catalog, and no vocabulary of block, mount, alias, port, seam, pass or
+   lock.
+   [§FS-rhei-library.2](../../functional-spec/rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project) [§FS-rhei-library.6](../../functional-spec/rhei-library.spec.md#6-includes-a-template-built-from-templates)
 3. **Placement is one mechanism.** `under:` inside `includes:` is the `<task>`
    half of `--into <rhei>.<task>` applied one level in: the same re-parenting,
    heading deepening, `**Prior:**` rewrite, writer and refusals. A second
    placement code path would be the defect, because "a template works at any
    level" is then a fact about one function rather than a promise two functions
-   have to keep.
-   [§FS-rhei-library.6.1](../../functional-spec/rhei-library.spec.md#61-under)
+   have to keep. The same holds one level up: a member rhei is laid by one
+   path whichever door it came through — the default `--output` inside a
+   project, `--into <project>` with a plan template, or an `includes:` entry of
+   a project template — and `under:` in a project template is refused rather
+   than given a second meaning.
+   [§FS-rhei-library.6.1](../../functional-spec/rhei-library.spec.md#61-under) [§FS-rhei-library.2.2](../../functional-spec/rhei-library.spec.md#22-a-project-target)
 4. **The union happens at instantiation and ends in flat files.** No grammar
    change, no loader change, no namespace. Every other command reads what it
    already read, so a composed plan is indistinguishable at runtime from one a

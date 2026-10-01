@@ -166,8 +166,11 @@ impl Journal {
 ///
 /// A renumbered task and a renamed plan file are both this, and neither can be
 /// told from the other in the document — which is why the move is reported
-/// rather than refused. A writer that drops it says nothing about a binding
-/// that moved durably, so the type insists on being used.
+/// rather than refused. A writer that drops it says nothing about a binding that
+/// moved durably, so every writer binds it by name and reports it before
+/// anything else about the edge can refuse it. The `#[must_use]` below is a
+/// reminder rather than a guard: `bind_ticket` hands the move back inside an
+/// `Option`, and `unused_must_use` does not look through one.
 /// §FS-rhei-budgets.5.2.1
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[must_use = "a binding that moved is reported on the warning channel"]
@@ -256,7 +259,7 @@ fn claimed_by_two(id: &str, held: &str, display: &str, claiming: &[&PathBuf]) ->
         row("why:", "one travel bound covers one ticket, and these two would"),
         row("", "draw on one"),
         row("to fix it:", "give whichever of these did not earn this history a fresh"),
-        row("", "`budgetTicketId` in that file; the account counts it"),
+        row("", "`budgetTicketId` in its file; the account counts it"),
         row("", &format!("against '{held}'")),
     ];
     BudgetError::new("identity_claimed", lines.join("\n"))

@@ -32,7 +32,9 @@ From any invocation, the agent can determine — without guessing, and without
 help from anything outside the prompt and the files it names — for **every
 task in the Panta** that is terminal when the prompt is composed: its qualified
 id, its title, its final state, and its result. Tasks in the invocation's own
-rhei are **listed, or reachable by the command a folded line names** (§3.2);
+rhei are **listed, or reachable by the command a folded line or an
+`### In Flight` progress row names** (§3.2) — the row carries the pointer where
+the subtree's open parent has no line of its own to fold into;
 every transitive prior is listed; every
 other rhei is reachable through the map in §3.4, which names each rhei's
 execution root, so no terminal task in the project is unreachable from any

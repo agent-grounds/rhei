@@ -356,12 +356,13 @@ fn a_decomposed_parent_folds_instead_of_evicting_the_plans_decisions() {
             "root decision d{index} is memory the reader is owed; got:\n{history}"
         );
     }
-    // §FS-rhei-memory.3.2: the parent speaks for its subtree in one line, and
-    // the breakdown buckets every descendant by its own state name.
+    // §FS-rhei-memory.3.2: the parent speaks for its subtree in one line, the
+    // breakdown buckets every descendant, and `--json` trims the section, so
+    // the end of the string is this last line's end-of-line anchor.
     assert!(
-        history.contains(
+        history.ends_with(
             "- Task plan.big: Sweep every dependency \u{2014} completed \u{2014} (no result) \
-             \u{2014} 40 subtasks: 40 completed\n"
+             \u{2014} 40 subtasks: 40 completed"
         ),
         "got:\n{history}"
     );
@@ -420,12 +421,13 @@ fn a_depth_two_reader_sees_the_path_and_the_progress_of_what_is_off_it() {
     // by `c`'s In Flight count.
     assert!(!history.contains("- Task plan.a."), "got:\n{history}");
     assert!(!history.contains("- Task plan.c."), "got:\n{history}");
-    // §FS-rhei-memory.4.3 step 5: `c` qualifies on a terminal descendant alone, with
-    // no assignee, so the count is the whole trailing column.
+    // §FS-rhei-memory.4.3 step 5: `c` qualifies on a terminal descendant alone,
+    // so the count is the whole trailing column; `--json` trims the section, so
+    // the end of the string is this last row's end-of-line anchor.
     assert!(
-        history.contains(
+        history.ends_with(
             "\n### In Flight\n\n- Task plan.c: Ship it [pending] \u{2014} 1 of 2 subtasks \
-             finished\n"
+             finished"
         ),
         "got:\n{history}"
     );

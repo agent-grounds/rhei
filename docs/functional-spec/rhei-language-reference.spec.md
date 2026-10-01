@@ -26,9 +26,11 @@ its role, and the spec that owns its grammar and behavior:
 A bare rhei — a lone `*.rhei.md` or workspace with no enclosing
 `index.panta.md` — loads as a one-rhei project. Load order, id namespacing,
 execution roots, and state-machine binding for all of the above are specified in
-[§AR-rhei-panta](../architecture/rhei-panta.spec.md#ar-rhei-panta-panta-root-architecture). The `**States:**` declaration in these files resolves to
-`states.yaml`, which belongs to the state-machine surface below — not to this
-map.
+[§AR-rhei-panta](../architecture/rhei-panta.spec.md#ar-rhei-panta-panta-root-architecture). Which `states.yaml` governs a rhei is decided by where the file
+sits ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)); the `**States:**` declaration these files may
+still carry is deprecated and resolves ahead of it for one release
+([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). Either way the machine belongs to the
+state-machine surface below — not to this map.
 
 The remaining three surfaces:
 

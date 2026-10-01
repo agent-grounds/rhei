@@ -110,26 +110,22 @@ and writes nothing.
 `--into` requires the target rhei's **effective** state machine to be the
 `states.yaml` in its own execution root, because that is the only file a union
 can be written into and have the rhei run under it. Under
-[§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) rule 2 a rhei that omits `**States:**` inherits the
-project default wholesale and its own root is **not consulted**, so a
-`states.yaml` written into such a rhei's root would be inert. The four cases:
+[§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) clause 1 a rhei's own root is consulted whatever
+its index says, so writing the union into that file is enough — there is
+nothing for `--into` to declare. The three cases:
 
-- the index declares `**States:** <name>` and the root file's `name` matches —
-  union into that file; no declaration is written or changed;
-- the root file exists and the index declares nothing — the union is written and
-  `--into` adds `**States:** <that file's name>` to the index in the same write,
-  reporting that it did so in the summary;
-- there is no file in the root — **refused**, printing *both* remedies, because
-  the copy alone changes nothing: `cp <project>/states.yaml <rhei>/states.yaml`
-  *and* the `**States:** <name>` line to add to the index, with the note that
-  the rhei then stops following the project default;
-- the index declares a name the root file's `name` does not match — **refused**,
-  naming both. This is a pre-existing load error, not one `--into` introduces.
-
-The declaration-writing case is an **interim** rule of the slice that introduces
-`--into`: it exists only because machine resolution is still the resolution
-above. When resolution is simplified so that a rhei's own root is consulted
-whatever its index declares, this clause and the line it writes go.
+- the root file exists — union into that file; no declaration is written or
+  changed, whether the index declares the matching name or declares nothing;
+- there is no file in the root — **refused**, printing the one remedy that
+  makes the target eligible: `cp <project>/states.yaml <rhei>/states.yaml`,
+  with the note that the rhei then stops following the project default;
+- the index declares a name the root file's `name` does not match —
+  **refused**, naming both. This is a pre-existing load error, not one `--into`
+  introduces, and it survives the deprecation window
+  ([§FS-rhei-states-deprecation.1](rhei-states-deprecation.spec.md#1-the-deprecated-resolution-runs-first)) for as long as the declaration does: during
+  the window a union written into a file the declaration defers would not
+  govern the rhei for a release, which makes the refusal more necessary rather
+  than less.
 
 The basin ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)) is never a `--into` target: it holds unfiled
 tickets that run under the project default and has no machine of its own to add

@@ -15,12 +15,12 @@ A task has children when the parent **steers** them, **integrates** them, or
 
 - **steers** — the parent decides what each child is, on which tier, and in
   which order, between the children rather than before them. That judgement is
-  the parent's own work and nothing else can hold it [§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule).
+  the parent's own work and nothing else can hold it [§FS-rhei-supervision.3.1](../../../../../docs/functional-spec/rhei-supervision.spec.md#31-the-rule).
 - **integrates** — the parent's deliverable is made *out of* the children's:
   the merge, the comparison, the report that is not any one child's.
 - **speaks for** — the parent is the line a later reader gets instead of the
   subtree, so the subtree's outcome must be something the parent can state
-  [§FS-rhei-memory.3.2](rhei-memory.spec.md#32--plan-history).
+  [§FS-rhei-memory.3.2](../../../../../docs/functional-spec/rhei-memory.spec.md#32--plan-history).
 
 ## The decision table
 

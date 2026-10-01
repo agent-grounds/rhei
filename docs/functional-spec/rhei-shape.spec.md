@@ -86,8 +86,9 @@ that is the shape to copy.
 Progressive disclosure is **not** a reason for a child. A parent added only so
 that a reader meets three items one level down adds an identity, a travel
 bound §5, a result file and a prompt that has to say something, in exchange for
-an indentation. `rhei list --parent <id>` and the folded lines of §4 already
-give a reader depth on demand.
+an indentation. `rhei list --parent <id>` and the folded lines of
+[§FS-rhei-memory.3.2](rhei-memory.spec.md#32--plan-history) and [§FS-rhei-run-report.3.2](rhei-run-report.spec.md#32-task-tree) already give a reader depth on
+demand.
 
 ### 3.2. The three reasons a task has children
 

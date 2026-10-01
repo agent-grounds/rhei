@@ -240,6 +240,6 @@ Right-sizing tasks balances competing constraints:
 
 - **Too large:** the implementing agent exhausts its context window before finishing.
 - **Too small:** task-management overhead (transitions, re-reads, cold context) dominates useful work.
-- **Right-sized:** a task fits comfortably in one agent session and produces a meaningful, reviewable unit of change. Child tasks should decompose work the agent can reuse context for — shared files, related functions, sequential build steps.
+- **Right-sized:** a task fits comfortably in one agent session and produces a meaningful, reviewable unit of change. Sequential build steps are flat siblings chained with `**Prior:**`; children exist only where the parent steers, integrates or speaks for them (Task Shape above).
 
 The state machine defines what happens at each stage of a task's lifecycle — read it before deciding granularity. Heavyweight review gates (multi-agent review, human sign-off, multi-team handoffs) justify larger tasks to amortize that overhead; a lightweight machine (implement → done) allows smaller, more focused tasks. When a task is simple enough that child tasks would just be a checklist, omit them and use inline TODO lists in the description instead.

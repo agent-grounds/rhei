@@ -138,15 +138,35 @@ fn the_shape_rule_is_one_normative_copy_every_skill_extracts() {
     }
 
     // The extract is an extract: every one of its quoted blocks is in the spec
-    // verbatim, so editing the spec is the only way to change the rule.
+    // verbatim, so editing the spec is the only way to change the rule. Only a
+    // link's target may differ, because each copy links from where it lives.
+    let spec = link_targets_by_name(&spec);
     for block in first.split("\n\n").filter(|block| block.len() > 80) {
         if block.starts_with("- ") || block.starts_with("| ") || block.starts_with("> ") {
             assert!(
-                spec.contains(block.trim_end()),
+                spec.contains(&link_targets_by_name(block.trim_end())),
                 "the extract may not say what §FS-rhei-shape does not:\n{block}"
             );
         }
     }
+}
+
+/// `text` with every Markdown link target cut to its last path segment, the
+/// file name and anchor, so a link the spec writes from `docs/functional-spec/`
+/// and the same link a skill writes from its `references/` compare equal while
+/// the link text and every other byte still compare exactly.
+fn link_targets_by_name(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find("](") {
+        let (head, tail) = rest.split_at(at + 2);
+        out.push_str(head);
+        let end = tail.find(')').unwrap_or(tail.len());
+        out.push_str(tail[..end].rsplit('/').next().unwrap_or_default());
+        rest = &tail[end..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// (2) The two instructions that contradicted each other are gone, and the

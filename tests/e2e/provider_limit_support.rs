@@ -14,33 +14,46 @@ const PROVIDER_WAIT_PATIENCE: Duration = Duration::from_secs(30);
 /// paid only while refused, so it is sized for a loaded Windows runner.
 const REFUSAL_PATIENCE: Duration = Duration::from_secs(10);
 
-/// A live `rhei run` and the file in the test's own directory that its stderr
-/// goes to, so a run that dies says why instead of leaving a wait to time out.
+/// A live `rhei run` and the files in the test's own directory that its stdout
+/// and stderr go to, so a run that dies or stalls says why instead of leaving a
+/// wait to time out: `rhei run` tells what it spawned and advanced on stdout, and
+/// its warnings and errors - an agent's timeout, a halt - on stderr.
 pub(super) struct RunningChild {
     child: Option<Child>,
+    stdout: PathBuf,
     stderr: PathBuf,
 }
 
 impl RunningChild {
-    /// Adopt a run whose stderr the caller already sent to `stderr`.
-    pub(super) fn new(child: Child, stderr: PathBuf) -> Self {
-        Self { child: Some(child), stderr }
+    /// Adopt a run whose stdout and stderr the caller already sent to `output`.
+    pub(super) fn new(child: Child, output: PathBuf) -> Self {
+        Self { child: Some(child), stdout: output.clone(), stderr: output }
     }
 
-    /// Spawn `command`, keeping its stderr in `stderr`.
-    pub(super) fn spawn(command: &mut Command, stderr: PathBuf) -> Self {
-        let log = fs::File::create(&stderr).expect("create the run's stderr file");
-        Self::new(command.stderr(log).spawn().expect("spawn rhei run"), stderr)
+    /// Spawn `command`, keeping its stdout in `<name>.stdout` and its stderr in
+    /// `<name>.stderr`, both in `dir`.
+    pub(super) fn spawn(command: &mut Command, dir: &Path, name: &str) -> Self {
+        let stdout = dir.join(format!("{name}.stdout"));
+        let stderr = dir.join(format!("{name}.stderr"));
+        let out = fs::File::create(&stdout).expect("create the run's stdout file");
+        let err = fs::File::create(&stderr).expect("create the run's stderr file");
+        let child = command.stdout(out).stderr(err).spawn().expect("spawn rhei run");
+        Self { child: Some(child), stdout, stderr }
     }
 
     pub(super) fn child(&mut self) -> &mut Child {
         self.child.as_mut().expect("run child")
     }
 
-    /// What the run has written to stderr so far, read through the harness's
-    /// seam like every other captured stderr. §FS-rhei-errors.2
-    pub(super) fn stderr(&self) -> String {
-        stderr_from_file(&self.stderr)
+    /// What the run has printed so far, for the message of a wait that failed:
+    /// its stdout and its stderr, each read through the harness's seam.
+    /// §FS-rhei-errors.2
+    pub(super) fn output(&self) -> String {
+        let stderr = stderr_from_file(&self.stderr);
+        if self.stdout == self.stderr {
+            return format!("its output:\n{stderr}");
+        }
+        format!("its stdout:\n{}\nits stderr:\n{stderr}", stdout_from_file(&self.stdout))
     }
 
     /// Wait for the run to exit, as long as the slowest runner needs.
@@ -51,7 +64,10 @@ impl RunningChild {
                 return status;
             }
             if Instant::now() >= deadline {
-                panic!("timed out waiting for {what}: the run stayed live for {PROVIDER_WAIT_PATIENCE:?}");
+                panic!(
+                    "timed out waiting for {what}: the run stayed live for {PROVIDER_WAIT_PATIENCE:?}; {}",
+                    self.output()
+                );
             }
             thread::sleep(Duration::from_millis(25));
         }
@@ -74,7 +90,7 @@ impl Drop for RunningChild {
 /// Wait for `condition` while `run` is live. The exit is inspected before the
 /// condition, so a condition that holds once the run has finished is still met;
 /// a run that exited without it fails the wait at once, with its exit status and
-/// its stderr, rather than spinning out the patience as a timeout. §FS-rhei-run.3.3
+/// its output, rather than spinning out the patience as a timeout. §FS-rhei-run.3.3
 pub(super) fn wait_for(what: &str, run: &mut RunningChild, mut condition: impl FnMut() -> bool) {
     let deadline = Instant::now() + PROVIDER_WAIT_PATIENCE;
     loop {
@@ -83,11 +99,12 @@ pub(super) fn wait_for(what: &str, run: &mut RunningChild, mut condition: impl F
             return;
         }
         if let Some(status) = exited {
-            panic!("the run exited {status} before {what}; its stderr:\n{}", run.stderr());
+            panic!("the run exited {status} before {what}; {}", run.output());
         }
         if Instant::now() >= deadline {
             panic!(
-                "timed out waiting for {what}: the run stayed live for {PROVIDER_WAIT_PATIENCE:?}"
+                "timed out waiting for {what}: the run stayed live for {PROVIDER_WAIT_PATIENCE:?}; {}",
+                run.output()
             );
         }
         thread::sleep(Duration::from_millis(25));
@@ -207,8 +224,8 @@ pub(super) fn wait_for_provider_waits(
 
         if let Some(status) = run.child().try_wait().expect("inspect run status") {
             panic!(
-                "recognized provider limits followed the ordinary failure path: the {expected}-worker run exited {status} instead of parking; its stderr:\n{}",
-                run.stderr()
+                "recognized provider limits followed the ordinary failure path: the {expected}-worker run exited {status} instead of parking; {}",
+                run.output()
             );
         }
         if let Some((_, text)) = observation.filter(|(observed, _)| *observed == expected) {
@@ -221,7 +238,8 @@ pub(super) fn wait_for_provider_waits(
                 .map(|error| format!("; last Markdown read error: {error}"))
                 .unwrap_or_default();
             panic!(
-                "the run stayed live but persisted only {most_observed} of {expected} provider waits within {PROVIDER_WAIT_PATIENCE:?}{read_detail}"
+                "the run stayed live but persisted only {most_observed} of {expected} provider waits within {PROVIDER_WAIT_PATIENCE:?}{read_detail}; {}",
+                run.output()
             );
         }
         thread::sleep(Duration::from_millis(25));
@@ -270,13 +288,14 @@ pub(super) fn wait_for_parked_journal_lines(
             .unwrap_or_default();
         if let Some(status) = exited {
             panic!(
-                "the run exited {status} having written only {most_observed} of {expected} `{OUTCOME}` journal lines{read_detail}; its stderr:\n{}",
-                run.stderr()
+                "the run exited {status} having written only {most_observed} of {expected} `{OUTCOME}` journal lines{read_detail}; {}",
+                run.output()
             );
         }
         if Instant::now() >= deadline {
             panic!(
-                "the run stayed live but wrote only {most_observed} of {expected} `{OUTCOME}` journal lines within {PROVIDER_WAIT_PATIENCE:?}{read_detail}"
+                "the run stayed live but wrote only {most_observed} of {expected} `{OUTCOME}` journal lines within {PROVIDER_WAIT_PATIENCE:?}{read_detail}; {}",
+                run.output()
             );
         }
         thread::sleep(Duration::from_millis(25));

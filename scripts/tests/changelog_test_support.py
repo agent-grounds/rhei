@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fixtures for the changelog gate, stamper and release-due tests. §FS-rhei-distribution.5
+"""Fixtures for the changelog stamper, release-due and shape tests. §FS-rhei-distribution.5
 
 The tests drive the scripts as subprocesses over a throwaway git repository, so
 what they pin is the contract a contributor and a workflow actually meet: the
@@ -25,7 +25,6 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-GATE = REPO_ROOT / "scripts" / "check_changelog_pr_entry.py"
 STAMPER = REPO_ROOT / "scripts" / "prepare_changelog_release.py"
 PRE_COMMIT_CONFIG = REPO_ROOT / ".pre-commit-config.yaml"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
@@ -60,8 +59,6 @@ def clean_env(**overrides: str | None) -> dict[str, str]:
     `pre-commit` hook, so a `GIT_DIR` left in place aims `TempRepo`'s own `git
     init`, `checkout -b` and `commit` at the repository being committed to rather
     than at the temporary directory - real branches written, real `HEAD` moved.
-    The scripts under test strip the same variables for their own calls
-    (`check_changelog_pr_entry._no_git_env`); the harness has to do it too.
     """
     env = {
         key: value
@@ -138,9 +135,6 @@ class TempRepo:
     def read_changelog(self) -> str:
         return (self.path / "docs" / "changelog.md").read_text(encoding="utf-8")
 
-    def touch_source(self, name: str, text: str = "the change itself\n") -> None:
-        (self.path / name).write_text(text, encoding="utf-8")
-
     def write(self, relative: str, text: str = "changed\n") -> None:
         """Write a file at a `/`-separated path under the repository."""
         path = self.path.joinpath(*relative.split("/"))
@@ -165,14 +159,6 @@ path = os.environ.get("GH_STUB_PULLS")
 if path and os.path.exists(path):
     with open(path, encoding="utf-8") as handle:
         pulls = json.load(handle)
-
-if argv[:1] == ["pr"]:
-    number = os.environ.get("GH_STUB_PR", "")
-    if not number:
-        sys.stderr.write('no pull requests found for branch "fix/the-thing"\n')
-        sys.exit(1)
-    sys.stdout.write(number + "\n")
-    sys.exit(0)
 
 if argv[:1] == ["api"]:
     sha = None
@@ -299,64 +285,11 @@ class ScriptTestCase(unittest.TestCase):
         return f"exit={result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
 
-def hook_stages(hook_id: str) -> list[str]:
-    """The `stages:` of a hook in `.pre-commit-config.yaml`, read without PyYAML.
-
-    The tests may not assume a YAML library: the `lint` job installs
-    `pre-commit` and nothing else (§AR-ci-release.1).
-    """
-    lines = PRE_COMMIT_CONFIG.read_text(encoding="utf-8").splitlines()
-    start = None
-    for index, line in enumerate(lines):
-        if re.match(rf"^\s*-\s+id:\s+{re.escape(hook_id)}\s*$", line):
-            start = index
-            break
-    if start is None:
-        raise AssertionError(f"no hook with id {hook_id!r} in {PRE_COMMIT_CONFIG}")
-    for line in lines[start + 1 :]:
-        if re.match(r"^\s*-\s+id:\s", line):
-            break
-        found = re.match(r"^\s*stages:\s*\[(?P<items>[^\]]*)\]\s*$", line)
-        if found:
-            return [item.strip() for item in found.group("items").split(",") if item.strip()]
-    return []
-
-
-def checkout_fetch_depth(job: str) -> str | None:
-    """The `fetch-depth:` of a CI job's `actions/checkout`, read without PyYAML.
-
-    Same reason as `hook_stages`: the `lint` job installs `pre-commit` and
-    nothing else (§AR-ci-release.1).
-    """
-    lines = CI_WORKFLOW.read_text(encoding="utf-8").splitlines()
-    start = None
-    for index, line in enumerate(lines):
-        if re.match(rf"^  {re.escape(job)}:\s*$", line):
-            start = index
-            break
-    if start is None:
-        raise AssertionError(f"no job {job!r} in {CI_WORKFLOW}")
-
-    end = next((index for index in range(start + 1, len(lines)) if re.match(r"^  \S", lines[index])), len(lines))
-    within = lines[start:end]
-    for index, line in enumerate(within):
-        if "actions/checkout" not in line:
-            continue
-        for following in within[index + 1 :]:
-            if re.match(r"^\s*-\s", following):
-                return None
-            found = re.match(r"^\s*fetch-depth:\s*(?P<depth>\S+)\s*$", following)
-            if found:
-                return found.group("depth")
-        return None
-    raise AssertionError(f"job {job!r} has no actions/checkout step")
-
-
 def job_lines(workflow: Path, job: str) -> list[str]:
     """The lines of one job of a workflow, its `name:` and `steps:` included.
 
-    Read without PyYAML for the reason `hook_stages` gives: the `lint` job
-    installs `pre-commit` and nothing else (§AR-ci-release.1).
+    Read without PyYAML, because the tests may not assume a YAML library: the
+    `lint` job installs `pre-commit` and nothing else (§AR-ci-release.1).
     """
     lines = workflow.read_text(encoding="utf-8").splitlines()
     start = next((index for index, line in enumerate(lines) if re.match(rf"^  {re.escape(job)}:\s*$", line)), None)

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Neither script hands a bare tool name to the process launcher. §REQ-cross-platform.3
+"""The release script hands no bare tool name to the process launcher. §REQ-cross-platform.3
 
 What the resolution buys only shows on Windows, where `CreateProcess` appends
 `.exe` and nothing else, so a `gh` installed as a `.bat` - which is how a shim is
 written, and how these tests' own stub is written - is unreachable. The stamp
 tests are the behavioural proof and they run on that platform in CI
-(§AR-ci-release.1); this reads the two sources instead, so that dropping the
+(§AR-ci-release.1); this reads the source instead, so that dropping the
 resolution fails on every platform rather than on the one leg.
 """
 
@@ -15,9 +15,9 @@ import ast
 import unittest
 from pathlib import Path
 
-from scripts.tests.changelog_test_support import GATE, STAMPER
+from scripts.tests.changelog_test_support import STAMPER
 
-# The tools both scripts spawn, and the only two whose lookup is at stake.
+# The tools the script spawns, and the only two whose lookup is at stake.
 SPAWNED = ("git", "gh")
 
 
@@ -55,9 +55,6 @@ class ToolLookupTests(unittest.TestCase):
                 continue
             self.assertTrue(node.args, f"{script.name}:{node.lineno} spawns with no argv")
             yield node.args[0]
-
-    def test_the_gate_resolves_what_it_spawns(self):
-        self.assert_no_bare_name_is_spawned(GATE)
 
     def test_the_stamper_resolves_what_it_spawns(self):
         self.assert_no_bare_name_is_spawned(STAMPER)

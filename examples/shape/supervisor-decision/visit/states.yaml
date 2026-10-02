@@ -1,0 +1,84 @@
+name: shape-supervisor-decision
+version: 1
+
+# One machine for both shapes of the supervisor-decision pair. The supervising
+# state is copied from `examples/subtree-supervision`: `execute_on:
+# descendant-terminal` makes the parent a supervisor, woken after every child
+# that finishes, and its three outgoing edges are tried in declaration order —
+# exhaustion, then the terminal edge once the subtree is closed, then the
+# unconditional self-loop that releases the next child and waits.
+#
+# The `visit` shape makes the decision in the parent's visit and writes it
+# into the next child's brief; the `child` shape gives the decision a child of
+# its own. Every state runs the `mock` agent so the example runs with no
+# credentials.
+
+states:
+  supervising:
+    execute_on: descendant-terminal
+    description: >-
+      The parent, woken between its children. Judges what the last child left,
+      briefs the next one, and finishes once the subtree is closed.
+    agent: mock
+    visits: 6
+    instructions: |
+      You supervise Task {task_id}.
+
+      Judge every entry under `## Checkpoints`, then decide what the next
+      child does and write that decision as its brief, at the path named in
+      `## Rhei Commands`.
+
+      Write your own `## Result` only on the visit where every child is
+      terminal, and say in it what you decided along the way.
+
+  work:
+    initial: true
+    agent: mock
+    description: Do the task's work as briefed, and record why it ends where it does.
+    instructions: |
+      Do Task {task_id} as its body and any `## Supervisor Brief` describe,
+      and write your result last.
+
+  human-review:
+    description: >-
+      The supervisor spent its visit budget without closing the subtree. A human
+      reads the checkpoints and decides.
+    gating: true
+    instructions: |
+      The supervisor ran out of visits. Transition Task {task_id} back to
+      `supervising` to give it more rope, or to `cancelled` to stop.
+
+  completed:
+    description: Done.
+    final: true
+
+  cancelled:
+    description: Dropped. The reserved name, so a cancelled step owes no export.
+    final: true
+
+transitions:
+  - from: supervising
+    to: human-review
+    description: Supervisor budget exhausted; a human decides.
+    condition: visitCount >= visits
+
+  - from: supervising
+    to: completed
+    description: Every child is terminal and the supervisor wrote its result.
+    condition: openDescendants < 1
+
+  - from: supervising
+    to: supervising
+    description: Released the next child; wait for the next checkpoint.
+
+  - from: work
+    to: completed
+    description: The work is done and its result written.
+
+  - from: human-review
+    to: supervising
+    description: A human gave the supervisor more rope.
+
+  - from: "*"
+    to: cancelled
+    description: Dropped.

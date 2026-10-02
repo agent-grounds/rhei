@@ -72,7 +72,6 @@ class DueTests(ScriptTestCase):
     def notices(self, result) -> list[str]:
         return [line for line in result.stdout.splitlines() if line.startswith("::notice::")]
 
-    @unittest.expectedFailure
     def test_code_then_its_write_up_is_due(self):
         repo, _ = self.released()
         repo.write(SOURCE)
@@ -85,7 +84,6 @@ class DueTests(ScriptTestCase):
         self.assertEqual(self.ok(), ["ok=true"], self.report(result))
         self.assertNotIn("wait for their release section", result.stdout)
 
-    @unittest.expectedFailure
     def test_code_merged_after_the_write_up_holds(self):
         """The ticket's case: the workflow would release code no bullet describes."""
         repo, _ = self.released()
@@ -103,7 +101,6 @@ class DueTests(ScriptTestCase):
         self.assertIn(SOURCE, result.stdout, "the notice lists what is waiting")
         self.assertNotIn(EARLIER_SOURCE, result.stdout, "only what merged after the write-up waits")
 
-    @unittest.expectedFailure
     def test_the_dev_advance_after_a_release_holds(self):
         """Today this reaches `prepare` with nothing pending and the run goes red."""
         repo, tagged = self.released()
@@ -116,7 +113,6 @@ class DueTests(ScriptTestCase):
         self.assertIn(hold_notice(tagged), self.notices(result), "the tag counts as the last write")
         self.assertIn("Cargo.toml", result.stdout)
 
-    @unittest.expectedFailure
     def test_only_docs_and_ci_since_the_tag_is_not_due(self):
         """The filter the workflow ran inline, moved into the script unchanged."""
         repo, _ = self.released()
@@ -131,7 +127,6 @@ class DueTests(ScriptTestCase):
         self.assertIn(DOCS_NOTICE, self.notices(result), self.report(result))
         self.assertNotIn("wait for their release section", result.stdout)
 
-    @unittest.expectedFailure
     def test_an_edit_to_the_note_above_the_section_is_not_a_write(self):
         repo, tagged = self.released(note=NOTE)
         repo.write(SOURCE)
@@ -158,7 +153,6 @@ class AutoBumpGateStepTests(unittest.TestCase):
         self.assertIn(self.STEP, names, f"{AUTO_BUMP_WORKFLOW.name} lost its gate step")
         return steps, names.index(self.STEP)
 
-    @unittest.expectedFailure
     def test_the_gate_step_is_one_due_call(self):
         steps, at = self.steps()
         step = steps[at]

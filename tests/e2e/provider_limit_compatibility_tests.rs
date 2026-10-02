@@ -80,7 +80,7 @@ result('## Result\n\nDone.\n')
             }
             let mut run = fixture.start(&args);
             fixture.parked(&mut run);
-            wait_for("all refusals to release their slots", || {
+            wait_for("all refusals to release their slots", &mut run, || {
                 fixture.events().iter().filter(|e| e["outcome"] == "provider_limited").count()
                     == parallel
             });
@@ -205,7 +205,7 @@ fn provider_limit_signal_does_not_override_interruption() {
             args.push("--continue-on-error");
         }
         let mut run = fixture.start(&args);
-        wait_for("captured provider text before interrupt", || {
+        wait_for("captured provider text before interrupt", &mut run, || {
             fixture
                 .events()
                 .iter()

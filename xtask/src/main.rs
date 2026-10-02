@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[derive(Clone, Copy)]
 struct Example {
     name: &'static str,
     path: &'static str,
@@ -111,57 +112,47 @@ const EXAMPLES: &[Example] = &[
         state_machine: Some("examples/ui-test-canonical-example/states.yaml"),
         runnable: true,
     },
-    // The shape pairs: the same work authored flat and nested, both runnable with the
-    // mock agent, so the difference a run shows is the shape. §FS-rhei-shape.4
-    Example {
-        name: "shape-reproducer-flat",
-        path: "examples/shape/reproducer/flat",
-        state_machine: Some("examples/shape/reproducer/flat/states.yaml"),
-        runnable: true,
-    },
-    Example {
-        name: "shape-reproducer-nested",
-        path: "examples/shape/reproducer/nested",
-        state_machine: Some("examples/shape/reproducer/nested/states.yaml"),
-        runnable: true,
-    },
-    Example {
-        name: "shape-review-against-spec-flat",
-        path: "examples/shape/review-against-spec/flat",
-        state_machine: Some("examples/shape/review-against-spec/flat/states.yaml"),
-        runnable: true,
-    },
-    Example {
-        name: "shape-review-against-spec-nested",
-        path: "examples/shape/review-against-spec/nested",
-        state_machine: Some("examples/shape/review-against-spec/nested/states.yaml"),
-        runnable: true,
-    },
-    Example {
-        name: "shape-cve-category-flat",
-        path: "examples/shape/cve-category/flat",
-        state_machine: Some("examples/shape/cve-category/flat/states.yaml"),
-        runnable: true,
-    },
-    Example {
-        name: "shape-cve-category-nested",
-        path: "examples/shape/cve-category/nested",
-        state_machine: Some("examples/shape/cve-category/nested/states.yaml"),
-        runnable: true,
-    },
-    Example {
-        name: "shape-parts-of-a-feature-flat",
-        path: "examples/shape/parts-of-a-feature/flat",
-        state_machine: Some("examples/shape/parts-of-a-feature/flat/states.yaml"),
-        runnable: true,
-    },
-    Example {
-        name: "shape-parts-of-a-feature-nested",
-        path: "examples/shape/parts-of-a-feature/nested",
-        state_machine: Some("examples/shape/parts-of-a-feature/nested/states.yaml"),
-        runnable: true,
-    },
 ];
+
+/// Every example: the hand-written ones, then the shape pairs found on disk.
+fn examples() -> Vec<Example> {
+    EXAMPLES.iter().copied().chain(shape_examples(&workspace_root())).collect()
+}
+
+/// The shape pairs: the same work authored two ways, both runnable with the mock
+/// agent, so the difference a run shows is the shape. Every
+/// `examples/shape/<pair>/<shape>/` is `shape-<pair>-<shape>`, found on disk so
+/// a pair is added by its directories alone. The names are leaked once per
+/// process, so they read like the static table's. §FS-rhei-shape.4
+fn shape_examples(root: &Path) -> Vec<Example> {
+    let leak = |text: String| -> &'static str { Box::leak(text.into_boxed_str()) };
+    let mut found = Vec::new();
+    for pair in subdirectories(&root.join("examples/shape")) {
+        for shape in subdirectories(&root.join("examples/shape").join(&pair)) {
+            let path = format!("examples/shape/{pair}/{shape}");
+            found.push(Example {
+                name: leak(format!("shape-{pair}-{shape}")),
+                state_machine: Some(leak(format!("{path}/states.yaml"))),
+                path: leak(path),
+                runnable: true,
+            });
+        }
+    }
+    found
+}
+
+/// The names of the directories directly under `dir`, sorted; none when it is absent.
+fn subdirectories(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -209,27 +200,29 @@ fn main() -> ExitCode {
 }
 
 fn cmd_list() {
-    let width = EXAMPLES.iter().map(|e| e.name.len()).max().unwrap_or(0);
-    for ex in EXAMPLES {
+    let examples = examples();
+    let width = examples.iter().map(|e| e.name.len()).max().unwrap_or(0);
+    for ex in &examples {
         let tag = if ex.runnable { "validate, run" } else { "validate" };
         println!("  {:<width$}  {}", ex.name, tag, width = width);
     }
 }
 
-fn find(name: &str) -> Option<&'static Example> {
-    EXAMPLES.iter().find(|e| e.name == name)
+fn find(name: &str) -> Option<Example> {
+    examples().into_iter().find(|e| e.name == name)
 }
 
 fn cmd_validate_all() -> ExitCode {
+    let examples = examples();
     let mut failed: Vec<&str> = Vec::new();
-    for ex in EXAMPLES {
+    for ex in &examples {
         println!("==> validate {}", ex.name);
         if !run_validate(ex) {
             failed.push(ex.name);
         }
     }
     if failed.is_empty() {
-        println!("\nAll {} examples validated.", EXAMPLES.len());
+        println!("\nAll {} examples validated.", examples.len());
         ExitCode::SUCCESS
     } else {
         eprintln!("\nFailed: {}", failed.join(", "));
@@ -242,7 +235,7 @@ fn cmd_validate_one(name: &str) -> ExitCode {
         eprintln!("unknown example: {name}");
         return ExitCode::from(2);
     };
-    if run_validate(ex) {
+    if run_validate(&ex) {
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
@@ -353,8 +346,9 @@ fn cmd_viz_all() -> ExitCode {
         eprintln!("failed to create {}: {err}", out_dir.display());
         return ExitCode::FAILURE;
     }
+    let examples = examples();
     let mut failed: Vec<&str> = Vec::new();
-    for ex in EXAMPLES {
+    for ex in &examples {
         println!("==> viz {}", ex.name);
         match render_example(ex, &out_dir) {
             Ok(path) => println!("    {}", path.display()),
@@ -364,7 +358,7 @@ fn cmd_viz_all() -> ExitCode {
             }
         }
     }
-    println!("\nWrote {} HTML file(s) to {}", EXAMPLES.len() - failed.len(), out_dir.display());
+    println!("\nWrote {} HTML file(s) to {}", examples.len() - failed.len(), out_dir.display());
     if failed.is_empty() {
         ExitCode::SUCCESS
     } else {
@@ -383,7 +377,7 @@ fn cmd_viz_one(name: &str, open: bool) -> ExitCode {
         eprintln!("failed to create {}: {err}", out_dir.display());
         return ExitCode::FAILURE;
     }
-    match render_example(ex, &out_dir) {
+    match render_example(&ex, &out_dir) {
         Ok(path) => {
             println!("{}", path.display());
             if open {
@@ -476,5 +470,53 @@ fn copy_symlink(src: &Path, dst: &Path) -> io::Result<()> {
         std::os::windows::fs::symlink_dir(target, dst)
     } else {
         std::os::windows::fs::symlink_file(target, dst)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A pair is added by its directories alone, so every shape on disk is
+    /// listed and runnable under `shape-<pair>-<shape>`, and the eight names the
+    /// first four pairs shipped under still resolve. §FS-rhei-shape.4
+    #[test]
+    fn every_shape_directory_is_a_listed_runnable_example() {
+        let root = workspace_root();
+        let shapes = root.join("examples/shape");
+        let mut seen = 0;
+        for pair in fs::read_dir(&shapes).expect("examples/shape is readable") {
+            let pair = pair.expect("pair entry");
+            if !pair.file_type().expect("file type").is_dir() {
+                continue;
+            }
+            for shape in fs::read_dir(pair.path()).expect("pair is readable") {
+                let shape = shape.expect("shape entry");
+                if !shape.file_type().expect("file type").is_dir() {
+                    continue;
+                }
+                let pair = pair.file_name().to_string_lossy().into_owned();
+                let shape = shape.file_name().to_string_lossy().into_owned();
+                let name = format!("shape-{pair}-{shape}");
+                let example = find(&name).unwrap_or_else(|| panic!("{name} is listed"));
+                assert!(example.runnable, "{name} runs with the mock agent");
+                assert_eq!(example.path, format!("examples/shape/{pair}/{shape}"));
+                assert!(root.join(example.path).is_dir(), "{name} runs from its directory");
+                seen += 1;
+            }
+        }
+        assert!(seen >= 8, "the shape pairs are found on disk, {seen} shapes");
+        for landed in [
+            "shape-reproducer-flat",
+            "shape-reproducer-nested",
+            "shape-review-against-spec-flat",
+            "shape-review-against-spec-nested",
+            "shape-cve-category-flat",
+            "shape-cve-category-nested",
+            "shape-parts-of-a-feature-flat",
+            "shape-parts-of-a-feature-nested",
+        ] {
+            assert!(find(landed).is_some(), "{landed} still resolves");
+        }
     }
 }

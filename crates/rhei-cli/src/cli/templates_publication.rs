@@ -78,6 +78,31 @@ fn respell_staging(report: Report, staged: &Path, output: &Path) -> Report {
     }
 }
 
+/// Each spelling of a copy a message may use — as written, as resolution
+/// canonicalized it, and as a diagnostic shortens it against the working
+/// directory — paired with the path it stands for. A copy already removed is
+/// resolved through its parent.
+///
+/// Longest first: a canonical spelling can hold the written one, as macOS's
+/// `/private/var/…` holds `/var/…` and Windows' `\\?\C:\…` holds `C:\…`, and
+/// replacing the shorter first would leave the rest of the longer in front of
+/// the path it was respelled to.
+fn copy_respellings(copy: &Path, original: &Path) -> Vec<(String, String)> {
+    let shown = |path: &Path| path.display().to_string();
+    let resolved = fs::canonicalize(copy).ok().or_else(|| {
+        let parent = fs::canonicalize(copy.parent()?).ok()?;
+        Some(parent.join(copy.file_name()?))
+    });
+    let mut respellings = vec![(shown(copy), shown(original))];
+    if let Some(resolved) = resolved {
+        respellings.push((shown(&resolved), shown(original)));
+    }
+    respellings.push((crate::display_path(copy), crate::display_path(original)));
+    respellings.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
+    respellings.dedup_by(|a, b| a.0 == b.0);
+    respellings
+}
+
 /// `report` with each `(from, to)` replaced in its message and its help, or
 /// `report` itself when it names none of them. Every report a template command
 /// builds is text and help, so nothing else is lost in the rebuild; one with

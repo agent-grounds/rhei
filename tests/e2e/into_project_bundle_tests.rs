@@ -43,6 +43,13 @@ fn rhei_with_tmp(dir: &Path, cwd: &Path, tmp: &Path, args: &[&str]) -> CliRun {
     CliRun::from(&output)
 }
 
+/// Assert stderr names `path`, given `/`-separated: each printer spells a path
+/// with the platform's separator. §REQ-cross-platform.2
+fn assert_stderr_names(run: &CliRun, path: &str) {
+    let seen = run.stderr.replace('\\', "/");
+    assert!(seen.contains(path), "expected stderr to name {path:?}; got:\n{}", run.stderr);
+}
+
 /// The output's `replaced:` line.
 fn replaced_line(run: &CliRun) -> String {
     run.stdout
@@ -178,7 +185,7 @@ fn a_deprecated_project_settings_file_is_named_once_by_its_own_path() {
         "the deprecated file is named once; got:\n{}",
         dry.stderr
     );
-    assert_stderr_contains(&dry, "reports/.agents/rhei/settings.json");
+    assert_stderr_names(&dry, "reports/.agents/rhei/settings.json");
     assert!(
         !dry.stderr.contains(&tmp.display().to_string()),
         "no copy's path reaches the output; got:\n{}",
@@ -215,7 +222,7 @@ fn a_validation_refusal_names_the_project_not_its_copy() {
     let rebound = rhei_with_tmp(&dir, &dir, &tmp, &["instantiate", "untimed", "--into", "reports"]);
     assert!(!rebound.status.success(), "the replacement is refused; got:\n{}", rebound.stdout);
     assert_stderr_contains(&rebound, "agent_timeout");
-    assert_stderr_contains(&rebound, "reports/states.yaml");
+    assert_stderr_names(&rebound, "reports/states.yaml");
     assert!(
         !rebound.stderr.contains(&tmp.display().to_string()),
         "the refusal names the project, not the copy; got:\n{}",
@@ -227,7 +234,7 @@ fn a_validation_refusal_names_the_project_not_its_copy() {
     let unloadable =
         rhei_with_tmp(&dir, &dir, &tmp, &["instantiate", "untimed", "--into", "reports"]);
     assert!(!unloadable.status.success(), "got:\n{}", unloadable.stdout);
-    assert_stderr_contains(&unloadable, "reports/broken.rhei.md");
+    assert_stderr_names(&unloadable, "reports/broken.rhei.md");
     assert!(
         !unloadable.stderr.contains(".tmp"),
         "the parse error names the project's file, not the copy's; got:\n{}",
@@ -247,7 +254,7 @@ fn a_failed_member_lay_names_the_member_not_its_staging() {
 
     let placed = rhei_in(&dir, &dir, &["instantiate", "lifecycle", "--into", "reports"]);
     assert!(!placed.status.success(), "a duplicate member id is refused; got:\n{}", placed.stdout);
-    let stderr = placed.stderr.replace('\n', " ");
+    let stderr = placed.stderr.replace('\n', " ").replace('\\', "/");
     assert!(!stderr.contains(".rhei-instantiate-"), "no staging path; got:\n{}", placed.stderr);
     assert!(
         stderr.match_indices("reports/intake").any(|(at, _)| !stderr[at + 14..].starts_with('.')),
@@ -259,8 +266,26 @@ fn a_failed_member_lay_names_the_member_not_its_staging() {
     write_project_template(&dir, "broken", &laid_machine(&[]), "includes:\n  - bad\n");
     let laid = rhei_in(&dir, &dir, &["instantiate", "broken", "--output", "laid"]);
     assert!(!laid.status.success(), "the bad member is refused; got:\n{}", laid.stdout);
-    assert_stderr_contains(&laid, "laid/bad");
+    assert_stderr_names(&laid, "laid/bad");
     assert!(!laid.stderr.contains(".rhei-instantiate-"), "no staging path; got:\n{}", laid.stderr);
+
+    // `--dry-run` lays in scratch, and names the member as the real run does.
+    let other = write_project(&dir, "other", PLAIN_MANIFEST, Some(&laid_machine(&[])));
+    std::fs::create_dir_all(other.join("prompt_templates")).expect("the project's bundle");
+    write_fixture_file(&other.join("prompt_templates"), "brief.md", "Brief {subject}.\n");
+    for (target, named) in [(["--into", "other"], "other/bad"), (["--output", "laid"], "laid/bad")]
+    {
+        let dry = rhei_in(
+            &dir,
+            &dir,
+            &[&["instantiate", "broken"][..], &target, &["--dry-run"]].concat(),
+        );
+        assert!(!dry.status.success(), "the bad member is refused; got:\n{}", dry.stdout);
+        assert_stderr_names(&dry, named);
+        for scratch in [".tmp", "instantiate-output"] {
+            assert!(!dry.stderr.contains(scratch), "no scratch path; got:\n{}", dry.stderr);
+        }
+    }
 }
 
 /// A rebind that fails after writing the root puts back each file's mode as

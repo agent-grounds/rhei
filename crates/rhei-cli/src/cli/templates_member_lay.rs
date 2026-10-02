@@ -38,19 +38,32 @@
     /// one no-replace rename; anything else is rendered in place. Nothing is
     /// published unless it validates. §FS-rhei-templates.6.1.2 §FS-rhei-templates.6.2
     fn lay_member_rhei(lay: &MemberLay<'_>) -> MietteResult<LaidRhei> {
-        let scratch = if lay.dry_run {
-            Some(tempfile::tempdir().map_err(|err| miette!(
-                help = "--dry-run renders into a temp directory. Check that $TMPDIR exists and is writable.",
-                "failed to create temporary output directory: {err}"
-            ))?)
-        } else {
-            None
-        };
+        if !lay.dry_run {
+            return lay_member_rhei_at(lay, None);
+        }
+        let scratch = tempfile::tempdir().map_err(|err| miette!(
+            help = "--dry-run renders into a temp directory. Check that $TMPDIR exists and is writable.",
+            "failed to create temporary output directory: {err}"
+        ))?;
+        // A `--dry-run` failure names the rhei asked for, as the real run's does,
+        // never the scratch it was rendered in — by its path or by the id a
+        // directory's name gives it. §FS-rhei-errors.4
+        let name = lay.output_dir.file_name().unwrap_or(std::ffi::OsStr::new("instantiate-output"));
+        let target = scratch.path().join(name);
+        let respellings = copy_respellings(&target, lay.output_dir);
+        let mut laid = lay_member_rhei_at(lay, Some(&target))
+            .map_err(|report| respell_report(report, &respellings))?;
+        laid._scratch = Some(scratch);
+        Ok(laid)
+    }
+
+    /// [`lay_member_rhei`] rendering into `scratch` under `--dry-run`.
+    fn lay_member_rhei_at(lay: &MemberLay<'_>, scratch: Option<&Path>) -> MietteResult<LaidRhei> {
         let prospective_member = !lay.dry_run
             && lay.layout == TemplateLayout::Workspace
             && owning_project_of(lay.output_dir).is_some();
-        let target_dir = if let Some(scratch) = scratch.as_ref() {
-            scratch.path().join("instantiate-output")
+        let target_dir = if let Some(scratch) = scratch {
+            scratch.to_path_buf()
         } else if prospective_member {
             hidden_staging_path(lay.output_dir)?
         } else {
@@ -136,7 +149,7 @@
             publish_staged_member(&target_dir, lay.output_dir, settings.as_ref(), lay.keep_on_error)?;
             materialized.output_dir = lay.output_dir.to_path_buf();
         }
-        Ok(LaidRhei { materialized, placement, settings, _scratch: scratch })
+        Ok(LaidRhei { materialized, placement, settings, _scratch: None })
     }
 
     /// `rhei instantiate <plan-template> --into <project>`: the member the

@@ -1,32 +1,42 @@
-    // What laying into a project that already exists must not write through: a
-    // symbolic link among the paths the root write writes, or among their
-    // parents inside the project. Its own part because the answer is a refusal,
-    // made the same way on every platform before anything is written.
+    // What laying a project template into a project that already exists must
+    // not write through: a symbolic link among the paths it writes, or among
+    // their parents inside the project. Its own part because the answer is a
+    // refusal, made the same way on every platform before anything is written.
 
     // §FS-rhei-library.2.2 §REQ-cross-platform.2
 
-    /// Refuse a root write that would write through a symbolic link. A bundle
-    /// linked to a template's own directory would otherwise have that
+    /// Refuse a root write that would write through a symbolic link, or a
+    /// member's settings hoist that would when `settings` names its path. A
+    /// bundle linked to a template's own directory would otherwise have that
     /// template's source overwritten with its rendered text. A refusal rather
     /// than a replacement of the link, because removing a link to a directory
     /// is a different operation on each platform. §FS-rhei-library.2.2
     /// §REQ-cross-platform.2
-    fn refuse_linked_root_writes(writes: &UnionWrites, project: &Path) -> MietteResult<()> {
-        let links = links_written_through(writes, project);
+    fn refuse_linked_root_writes(
+        writes: &UnionWrites,
+        settings: Option<&Path>,
+        project: &Path,
+    ) -> MietteResult<()> {
+        let links = links_written_through(writes, settings, project);
         if links.is_empty() {
             return Ok(());
         }
         Err(linked_root_refusal(&links))
     }
 
-    /// Every link the root write would write through — a path it writes, or a
-    /// parent of one below the project root — each once, in path order.
-    fn links_written_through(writes: &UnionWrites, project: &Path) -> Vec<PathBuf> {
+    /// Every link the lay would write through — a path it writes, or a parent
+    /// of one below the project root — each once, in path order.
+    fn links_written_through(
+        writes: &UnionWrites,
+        settings: Option<&Path>,
+        project: &Path,
+    ) -> Vec<PathBuf> {
         let written = writes
             .files
             .iter()
-            .map(|(path, _)| path)
-            .chain(writes.copies.iter().map(|(_, dst)| dst));
+            .map(|(path, _)| path.as_path())
+            .chain(writes.copies.iter().map(|(_, dst)| dst.as_path()))
+            .chain(settings);
         let mut links: Vec<PathBuf> = Vec::new();
         for path in written {
             for at in path.ancestors().take_while(|at| *at != project && at.starts_with(project)) {
@@ -52,7 +62,7 @@
             [link] => (
                 format!(
                     "'{}' is a symbolic link to '{}', and {reason}",
-                    display_slash(link),
+                    link_slash(link),
                     pointing(link)
                 ),
                 format!(
@@ -65,9 +75,9 @@
                     "{} paths this would write through are symbolic links, and {reason}:\n",
                     links.len()
                 );
-                let width = links.iter().map(|link| display_slash(link).len()).max().unwrap_or(0);
+                let width = links.iter().map(|link| link_slash(link).len()).max().unwrap_or(0);
                 for link in links {
-                    let shown = display_slash(link);
+                    let shown = link_slash(link);
                     subject.push_str(&format!("\n  {shown:<width$} -> {}", pointing(link)));
                 }
                 let remedy = format!(
@@ -87,7 +97,7 @@
     fn unlink_command(links: &[PathBuf]) -> String {
         if !cfg!(windows) {
             let paths: Vec<String> =
-                links.iter().map(|link| shell_quote(&display_slash(link))).collect();
+                links.iter().map(|link| shell_quote(&link_slash(link))).collect();
             return format!("`rm {}`", paths.join(" "));
         }
         links
@@ -95,8 +105,31 @@
             .map(|link| {
                 let directory = fs::metadata(link).is_ok_and(|meta| meta.is_dir());
                 let verb = if directory { "rmdir" } else { "del" };
-                format!("`{verb} \"{}\"`", display_path(link).display())
+                format!("`{verb} \"{}\"`", link_path(link).display())
             })
             .collect::<Vec<_>>()
             .join(" then ")
+    }
+
+    /// A link as a message names it: its parent spelled as every report spells
+    /// a path, and its own name joined on. `display_path` resolves a path it
+    /// cannot shorten as written, and resolving a link names what it points
+    /// to, so a command built from that spelling would remove the target.
+    /// §FS-rhei-library.2.2
+    fn link_path(link: &Path) -> PathBuf {
+        let (Some(parent), Some(name)) = (link.parent(), link.file_name()) else {
+            return link.to_path_buf();
+        };
+        if parent.as_os_str().is_empty() {
+            return link.to_path_buf();
+        }
+        let parent = display_path(parent);
+        if parent == Path::new(".") { PathBuf::from(name) } else { parent.join(name) }
+    }
+
+    /// [`link_path`] spelled with `/`, as `display_slash` spells any other path.
+    /// §REQ-cross-platform.2
+    fn link_slash(link: &Path) -> String {
+        let shown = link_path(link).to_string_lossy().into_owned();
+        if cfg!(windows) { shown.replace('\\', "/") } else { shown }
     }

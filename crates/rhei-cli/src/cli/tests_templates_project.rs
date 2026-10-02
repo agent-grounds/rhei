@@ -141,6 +141,23 @@ mod templates_project_tests {
         assert!(!nothing.contains("never split at a dot"), "{nothing}");
     }
 
+    /// A path to a single-file rhei's plan names no task of it: the hint is
+    /// the rhei's bare id, never a task called `rhei.md`. §FS-rhei-library.2.2
+    #[test]
+    fn a_path_to_a_single_file_rheis_plan_gives_its_bare_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = project_in(dir.path(), "proj");
+        write(&project, "reports.rhei.md", "# Rhei: Reports\n");
+
+        let Err(err) = resolve_into_target_from(dir.path(), "proj/reports.rhei.md") else {
+            panic!("a plan file is not a directory to place into");
+        };
+        let help = err.help().map(|help| help.to_string()).unwrap_or_default();
+        assert!(help.contains("`--into reports`"), "{help}");
+        assert!(help.contains("from 'proj', or from anywhere inside its project"), "{help}");
+        assert!(!help.contains("task"), "{help}");
+    }
+
     /// The basin, a project with a task half, and a name that is both a rhei
     /// and a project are each refused, the last naming both. §FS-rhei-library.2.2
     #[test]
@@ -191,7 +208,7 @@ mod templates_project_tests {
         let after_set = resolve_state_machines_for_loaded_plan(root, &after, None).unwrap();
         let introduced = errors_the_replacement_introduces(
             &after.rhei,
-            &before_set.validator_set(),
+            Some(&before_set.validator_set()),
             &after_set.validator_set(),
         );
         (sort_introduced(&after.rhei, introduced), checked_tickets(&after, &after_set))

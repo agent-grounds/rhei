@@ -10,6 +10,10 @@ pub(super) const LIMIT_SIGNAL: &str =
 
 const PROVIDER_WAIT_PATIENCE: Duration = Duration::from_secs(30);
 
+/// How long a harness edit waits out a refusal by another open handle. It is
+/// paid only while refused, so it is sized for a loaded Windows runner.
+const REFUSAL_PATIENCE: Duration = Duration::from_secs(10);
+
 /// A live `rhei run` and the file in the test's own directory that its stderr
 /// goes to, so a run that dies says why instead of leaving a wait to time out.
 pub(super) struct RunningChild {
@@ -88,6 +92,31 @@ pub(super) fn wait_for(what: &str, run: &mut RunningChild, mut condition: impl F
         }
         thread::sleep(Duration::from_millis(25));
     }
+}
+
+/// Repeat `attempt` - a read or a replacement of a file the live run also reads
+/// and replaces - while the run's open handle refuses it, as Windows does, and
+/// panic with `what` and the last error once the refusal outlasts
+/// `REFUSAL_PATIENCE`. A refusal is judged the way rhei's own writer judges
+/// one, and any other failure panics at once. §FS-rhei-transition-cmd.3
+fn waiting_out_refusals<T>(what: &str, mut attempt: impl FnMut() -> std::io::Result<T>) -> T {
+    let deadline = Instant::now() + REFUSAL_PATIENCE;
+    loop {
+        match attempt() {
+            Ok(value) => return value,
+            Err(error) if refused(&error) && Instant::now() < deadline => {
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => panic!("{what}: {error:?}"),
+        }
+    }
+}
+
+/// `PermissionDenied` everywhere, and Windows's sharing and lock violations
+/// (os errors 32 and 33) on Windows only, where std gives them no kind.
+fn refused(error: &std::io::Error) -> bool {
+    error.kind() == std::io::ErrorKind::PermissionDenied
+        || (cfg!(windows) && matches!(error.raw_os_error(), Some(32 | 33)))
 }
 
 pub(super) fn markdown_text(path: &Path) -> String {
@@ -266,7 +295,7 @@ pub(super) fn expire_provider_deadlines(path: &Path) {
         if path.extension().and_then(|extension| extension.to_str()) != Some("md") {
             continue;
         }
-        let original = fs::read_to_string(&path).expect("read markdown");
+        let original = waiting_out_refusals("read markdown", || fs::read_to_string(&path));
         let mut changed = false;
         let rewritten = original
             .lines()
@@ -284,7 +313,9 @@ pub(super) fn expire_provider_deadlines(path: &Path) {
         if changed {
             let staged = path.with_extension("md.tmp");
             fs::write(&staged, format!("{rewritten}\n")).expect("expire provider deadline");
-            fs::rename(staged, path).expect("replace provider deadline atomically");
+            waiting_out_refusals("replace provider deadline atomically", || {
+                fs::rename(&staged, &path)
+            });
         }
     }
 }
@@ -425,7 +456,9 @@ pub(super) fn limit_record(deadline: u64) -> serde_json::Value {
 }
 
 pub(super) fn metadata(root: &Path) -> serde_json::Value {
-    let text = fs::read_to_string(root.join("index.rhei.md")).unwrap();
+    let text = waiting_out_refusals("read index metadata", || {
+        fs::read_to_string(root.join("index.rhei.md"))
+    });
     serde_json::to_value(
         rhei_core::parser::parse_workspace_index(&text).unwrap().metadata.unwrap_or_default(),
     )
@@ -453,7 +486,7 @@ pub(super) fn yaml_metadata(value: &serde_json::Value) -> String {
 /// replacement so its next scan cannot observe a partial record. §FS-rhei-run.3.3
 pub(super) fn edit_metadata(root: &Path, edit: impl FnOnce(&mut serde_json::Value)) {
     let path = root.join("index.rhei.md");
-    let raw = fs::read_to_string(&path).unwrap();
+    let raw = waiting_out_refusals("read index metadata", || fs::read_to_string(&path));
     let mut value = metadata(root);
     edit(&mut value);
     let (heading, tail) = match raw.split_once("\n---\n") {
@@ -462,7 +495,7 @@ pub(super) fn edit_metadata(root: &Path, edit: impl FnOnce(&mut serde_json::Valu
     };
     let staged = root.join("clock-edit.md.tmp");
     fs::write(&staged, format!("{heading}\n---\n{}---{tail}", yaml_metadata(&value))).unwrap();
-    fs::rename(staged, path).unwrap();
+    waiting_out_refusals("replace index metadata atomically", || fs::rename(&staged, &path));
 }
 
 pub(super) fn assert_stays_parked(fixture: &ProviderFixture, run: &mut RunningChild) {

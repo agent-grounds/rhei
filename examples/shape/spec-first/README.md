@@ -11,7 +11,8 @@ Issue 412 asks for a CSV export that streams its rows. The work starts by
 writing what "done" means — a spec point and a test that fails today — and only
 then builds the change. After the change, a review holds it to that contract
 and the gate runs the contract's test **by name**. Three later steps read the
-contract, and none of them is the step that builds to it.
+contract: the one that builds to it, and two that come after that one, the
+review and the gate.
 
 ## The two shapes
 
@@ -82,8 +83,8 @@ the lines of the steps that came after it.
 
 ## What the person sees
 
-The task run's console task tree gives the contract a row, a duration and a
-cost of its own
+The task run's console task tree gives the contract a row and a duration of
+its own, and a cost of its own once a real agent's spend is accounted
 ([§FS-rhei-run-report.3.2](../../../docs/functional-spec/rhei-run-report.spec.md#32-task-tree)):
 
 <!-- rhei:task-tree task -->

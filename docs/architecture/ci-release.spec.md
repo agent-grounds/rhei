@@ -37,12 +37,16 @@ The suite's mock agents, programs, and callbacks are Python scripts, which is
 what lets one command run on all three platforms, so each `test` job installs a
 Python alongside the Rust toolchain.
 
-That Python is also what runs the repository's gate scripts, so the `test` job
-runs their own tests as a fifth command. The changelog gate of
-[§FS-rhei-distribution.6](../functional-spec/rhei-distribution.spec.md#6-local-gates) runs on contributors' machines
-rather than only in CI, which makes it a behaviour the cross-platform
-requirement covers: proving it on Linux alone would leave the two platforms it
-also refuses pushes on unproven ([§REQ-cross-platform.3](../requirements/cross-platform.md#3-tested-not-assumed)).
+That Python is also what runs the repository's release scripts, so the `test`
+job runs their own tests as a fifth command. The pre-commit hook runs the same
+tests on every contributor's machine
+([§FS-rhei-distribution.6](../functional-spec/rhei-distribution.spec.md#6-local-gates)), Windows included, which makes
+them a behaviour the cross-platform requirement covers: proving them on Linux
+alone would leave two of the three platforms they run on unproven
+([§REQ-cross-platform.3](../requirements/cross-platform.md#3-tested-not-assumed)). One of them reads the repository's own
+`docs/changelog.md` and checks the shape the release reads
+([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-who-writes-unreleased-and-when)), so a malformed write-up fails on its own
+pull request rather than on the scheduled release.
 
 Subprocess-driving E2E and integration harnesses must ask Cargo to verify and,
 when needed, rebuild the `rhei-cli` binary from the current checkout before the
@@ -68,38 +72,27 @@ only the path sends a reader hunting in a checkout that built correctly.
 files with the cargo hooks skipped — `test` has just run them on three
 platforms, and running the suite a second time on one of them bought nothing —
 so the remaining hook contract (fissile, lychee, attribution boilerplate) is
-enforced remotely, and on pull requests the changelog entry check, which is
-passed the pull request's base commit alongside its number so that it compares
-the section against what the pull request actually added
-([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-what-the-pull-request-check-requires)). Passing that
-commit obliges the job to hold it, so this checkout fetches the full history
-rather than the single commit a checkout takes by default: a base the clone does
-not hold is a base the check refuses on, and before it refused, a gate that
-could not see what the pull request added passed everything. The gate
-binaries (`grund`, `lychee`, `fissile`) are installed from source only on a
-cache miss: they live under a root of their own keyed by their pinned versions,
-so a version bump rebuilds exactly that tool and nothing else.
+enforced remotely. It runs no changelog step, because no pull request is checked
+for a bullet ([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-who-writes-unreleased-and-when)), and so it checks out the
+single commit a checkout takes by default: nothing in the job needs the pull
+request's base. The job keeps its name,
+`repository gates (grund, fissile, lychee, changelog, attribution)`, because
+`main`'s ruleset requires it as a status check by that exact name, and a
+renamed job is a check no pull request can satisfy until a person edits the
+ruleset. The gate binaries (`grund`, `lychee`, `fissile`) are installed from
+source only on a cache miss: they live under a root of their own keyed by their
+pinned versions, so a version bump rebuilds exactly that tool and nothing else.
 
 Both jobs stay inside the one `CI` workflow because the release helpers (§3)
 look the green run up by workflow name.
 
 ## 2. Local Hooks
 
-The pre-commit hooks run `grund`, formatting, clippy, build, tests, the gate
+The pre-commit hooks run `grund`, formatting, clippy, build, tests, the release
 scripts' tests, link checks, and attribution boilerplate checks before a
-commit. The pre-push hook reruns tests and checks `docs/changelog.md` against
-the branch's base, whether or not a pull request is open
-([§FS-rhei-distribution.6](../functional-spec/rhei-distribution.spec.md#6-local-gates)); a pull request the hook can
-resolve supplies a number to check, and its absence is not a reason to skip.
-
-The changelog hook stays at the pre-push stage alone, and that placement is
-load-bearing rather than incidental. CI's repository-gates job runs
-`pre-commit run --all-files`, which runs the pre-commit stage, so a changelog
-hook registered there would fire the same check twice inside one CI run with
-different arguments — two gates disagreeing about one file, which is what
-[§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-what-the-pull-request-check-requires) exists
-to stop. Both halves of the check, local and remote, therefore run one
-implementation over one definition of a bullet.
+commit. The pre-push hook reruns the Rust tests and nothing else
+([§FS-rhei-distribution.6](../functional-spec/rhei-distribution.spec.md#6-local-gates)): no hook, at either stage, checks
+`docs/changelog.md` for a bullet, because a change adds none.
 
 ## 3. Release Workflows
 
@@ -122,6 +115,23 @@ where their authors left them. The stamped changelog rides the version bump
 commit, so no bot commit and no branch-protection bypass is added. Resolving a
 commit to its pull request is a forge read, which is the one permission the
 stamping adds to these workflows.
+
+`Auto bump` first asks the release script whether a release is due
+([§FS-rhei-distribution.5.3](../functional-spec/rhei-distribution.spec.md#53-when-the-scheduled-release-waits)). Its step
+`Gate - non-doc/CI changes since last tag` is one call,
+`prepare_changelog_release.py due <tag> --output "$GITHUB_OUTPUT"`, which writes
+the step's `ok` output and the notice the run leaves when it holds. The step
+keeps its id, so every later step keeps the condition it already carries, the
+advance to the next `-dev` version included, and that advance holds with the
+release. The answer lives in the script rather than in the workflow's shell,
+because "last written" is about a section inside a file and needs the parser
+`stamp` and `prepare` read the section with, and because a script is tested on
+all three platforms where a workflow's shell is tested on none. The script
+carries the docs-and-CI filter the step used to run inline, unchanged.
+
+`Release minor` does not ask: a person started it, and starting it is the
+decision. `prepare` refuses an empty section on its behalf, and the wording of
+that refusal is the only change `Release minor` sees.
 
 ## 4. PGO Boundary
 

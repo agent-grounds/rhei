@@ -17,7 +17,6 @@ from scripts.tests.changelog_test_support import (
     ScriptTestCase,
     changelog,
     checkout_fetch_depth,
-    hook_stages,
 )
 
 # A bullet already in the section before the branch exists. The section is not
@@ -268,16 +267,7 @@ class ChangelogGateTests(ScriptTestCase):
         self.assertNotEqual(empty.returncode, 0, self.report(empty))
         self.assertIn("bullet", empty.stderr)
 
-    # --- where the hook is registered ---------------------------------------
-
-    def test_the_hook_is_registered_at_the_pre_push_stage_only(self):
-        """Passes today, and is here so it cannot be moved without a test failing.
-
-        At the `pre-commit` stage it would also fire inside CI's
-        `pre-commit run --all-files`, with different arguments - two gates over
-        one file, which is the defect (§AR-ci-release.2).
-        """
-        self.assertEqual(hook_stages("changelog-pr-entry"), ["pre-push"])
+    # --- where CI runs it ----------------------------------------------------
 
     def test_the_lint_jobs_checkout_holds_the_whole_history(self):
         """CI's half is passed a base commit, so its clone has to hold one.

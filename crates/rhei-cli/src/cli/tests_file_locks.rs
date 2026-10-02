@@ -381,4 +381,47 @@ mod file_lock_tests {
         assert_eq!(fs::read_to_string(&path).expect("read back"), "after\n");
         assert_eq!(seen, "before\n", "the reader reads the bytes it opened");
     }
+
+    /// Step 15 replaces the task file a second time, to link the result, while
+    /// the transition still holds its sidecar. A refusal there is waited out as
+    /// at step 13: otherwise a reader fails a transition whose state write has
+    /// already landed, and leaves the ticket terminal without its result link.
+    // §FS-rhei-transition-cmd.3 §AR-agent-orchestrator-workflow.3.3.1.1
+    #[test]
+    fn issue_390_a_refused_result_link_replacement_is_waited_out() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let path = plan_file(
+            &dir,
+            "# Rhei: Test\n\n## Tasks\n\n### Task 1: Alpha\n**State:** completed\n**Assignee:** agent-1\n",
+        );
+        let machine = rhei_validator::StateMachine::from_yaml_str(
+            "name: t\nversion: 1\nstates:\n  pending:\n    description: p\n  completed:\n    description: c\n    final: true\ntransitions:\n  - from: pending\n    to: completed\n",
+        )
+        .expect("machine");
+        let locked = LockedPlanFile::open(&path).expect("lock the task file");
+
+        refuse_replacements(Some(3), permission_denied);
+        let recorded = record_transition_result(
+            dir.path(),
+            &path,
+            "1",
+            &machine,
+            "1",
+            "pending",
+            "completed",
+            Some("Done."),
+        );
+        let attempts = replace_attempts();
+        locked.release();
+
+        recorded.expect("a refused result-link replacement must be waited out, not reported");
+        assert_eq!(
+            attempts, 4,
+            "the result link must be written by the replacement that waits out a refusal: \
+             three refused attempts, then the one that lands"
+        );
+        let content = fs::read_to_string(&path).expect("read back");
+        assert!(content.contains("> **Result:** [1](runtime/results/1.md)"), "{content}");
+        assert!(!content.contains("**Assignee:**"), "{content}");
+    }
 }

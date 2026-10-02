@@ -307,7 +307,8 @@ fn rewrite_task_completion(
         output.push('\n');
     }
 
-    // Atomic write.
+    // Atomic write, made as step 13 makes its own: the transition still holds
+    // the task's sidecar here. §FS-rhei-transition-cmd.3 §AR-agent-orchestrator-workflow.3.3.1.1
     let parent = task_file.parent().unwrap_or(Path::new("."));
     let mut tmp = tempfile::NamedTempFile::new_in(parent)
         .map_err(|err| miette!(
@@ -318,7 +319,7 @@ fn rewrite_task_completion(
         help = temp_write_help(),
         "failed to write temp file: {err}"
     ))?;
-    tmp.persist(task_file).map_err(|err| miette!(
+    persist_locked(tmp, task_file).map_err(|err| miette!(
         help = temp_write_help(),
         "failed to persist temp file: {err}"
     ))?;

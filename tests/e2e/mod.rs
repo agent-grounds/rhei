@@ -78,6 +78,7 @@ mod instantiate_output_default_tests;
 mod into_identity_tests;
 mod into_placement_tests;
 mod into_project_bundle_tests;
+mod into_project_hand_bound_tests;
 mod into_project_lay_support;
 mod into_project_lay_tests;
 mod into_project_rebind_tests;

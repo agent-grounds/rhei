@@ -108,4 +108,24 @@ mod templates_publication_tests {
             .unwrap()
             .contains("publication-fixture"));
     }
+
+    /// A canonical spelling that holds the written one, as macOS's
+    /// `/private/var/…` holds `/var/…`, is respelled whole rather than left
+    /// with its extra prefix in front of the path. §FS-rhei-templates.6.1.2
+    #[cfg(unix)]
+    #[test]
+    fn a_canonical_spelling_that_holds_the_written_one_is_respelled_whole() {
+        let scratch = tempfile::tempdir().unwrap();
+        let base = fs::canonicalize(scratch.path()).unwrap();
+        let real = base.join("private").join(base.strip_prefix("/").unwrap()).join("t");
+        fs::create_dir_all(real.join("copy")).unwrap();
+        std::os::unix::fs::symlink(&real, base.join("t")).unwrap();
+        let written = base.join("t/copy");
+        let canonical = fs::canonicalize(&written).unwrap();
+        assert!(canonical.to_string_lossy().contains(&*written.to_string_lossy()));
+
+        let report = miette!("failed in {}", canonical.display());
+        let respelled = respell_report(report, &copy_respellings(&written, Path::new("/proj")));
+        assert_eq!(respelled.to_string(), "failed in /proj");
+    }
 }

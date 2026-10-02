@@ -106,11 +106,18 @@
     /// A path is never split at a dot, so `panta/reports.ticket` names a
     /// directory called `reports.ticket`. When the part of its last segment
     /// before the dot is a rhei in that directory, say so and give the bare
-    /// spelling that does split. §FS-rhei-library.2.2
+    /// spelling that does split; for a segment that is a single-file rhei's
+    /// plan, `reports.rhei.md`, that spelling is the rhei's bare id.
+    /// §FS-rhei-library.2.2
     fn dotted_path_hint(cwd: &Path, target: &str) -> Option<String> {
         let (holder, last) = target.trim_end_matches(['/', '\\']).rsplit_once(['/', '\\'])?;
-        let (rhei_id, task) = last.split_once('.')?;
-        if rhei_id.is_empty() || task.is_empty() {
+        // A single-file rhei's plan names the rhei itself, never a task of it.
+        let plan_file = last.strip_suffix(".rhei.md");
+        let (rhei_id, task) = match plan_file {
+            Some(rhei_id) => (rhei_id, ""),
+            None => last.split_once('.')?,
+        };
+        if rhei_id.is_empty() || (plan_file.is_none() && task.is_empty()) {
             return None;
         }
         let dir = into_target_path(cwd, if holder.is_empty() { "/" } else { holder });
@@ -125,6 +132,12 @@
         } else {
             ""
         };
+        if plan_file.is_some() {
+            return Some(format!(
+                "'{target}' names the plan file of rhei '{rhei_id}', and `--into` names a rhei \
+                 by its id: name it bare, `--into {rhei_id}`, from {from}{anywhere}."
+            ));
+        }
         Some(format!(
             "a path is never split at a dot, so '{target}' names a directory called '{last}'. \
              To place under task '{task}' of rhei '{rhei_id}', name it bare, `--into \

@@ -32,6 +32,7 @@ Use this table when you know the job you want to model:
 | Opening the draft pull request: a state or a task? | `shape/draft-pull-request/` | Opening the pull request authored as a program state of the task that committed and as a task of its own; the rule picks the state. |
 | A supervisor's decision: the parent's visit or a child? | `shape/supervisor-decision/` | A supervisor's decision between two children authored in the parent's visit and brief and as a decision child; the rule picks the visit. |
 | Classifying an issue: states of the triage or a task? | `shape/classifying-an-issue/` | Classifying an issue authored as an agent state then a program state of the task that triages it and as a task of its own; the rule picks the states. |
+| A discussion to a ruling: its own rhei or children? | `shape/discussion-to-a-ruling/` | A discussion with participants, rounds and a ruling authored as a rhei of its own in a two-rheis project and as children of a parent that rules; the rule picks the rhei. |
 
 ## Files
 
@@ -142,7 +143,10 @@ Use this table when you know the job you want to model:
     shape is: `flat/` and `nested/` where two task trees are compared, and
     `state/` and `task/`, `loop/` and `tasks/` and the like elsewhere; both are
     valid and runnable with a committed mock agent
-  - each shape keeps its own machine beside its plan, so a copy runs alone
+  - each shape keeps its own machine beside its plan, so a copy runs alone;
+    the one pair that is a project, `discussion-to-a-ruling/rhei/`, keeps a
+    default machine beside its `index.panta.md` and its discussion's own
+    machine beside that rhei
   - a `README.md` per pair that quotes, for both shapes, what the next task is
     told under `## Plan History` and the console task tree the run prints,
     gives the ruling in one sentence, and says when the other shape is right

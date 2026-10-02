@@ -5,8 +5,10 @@ so both shapes run with no credentials and touch no forge: the claim writes
 the assignee to `forge/issue-87.md` instead. The work is keyed by task title,
 not id.
 
-The claim's result says what it found when it ran: whether any task had
-already finished, and so whether the claim came before the work it guards.
+The claim says what it found when it ran: whether any task had already
+finished, and so whether the claim came before the work it guards. It writes
+that to the stand-in issue beside the assignee, and as its task's result when
+the claim is a task of its own.
 
 The first line of each result is the one-line summary every later Plan History
 shows for the task, so it is written as a sentence a later reader can use.
@@ -37,8 +39,11 @@ def claimed():
     return 'Claimed issue 87 for this machine before anything was spent on it.'
 
 
-PROGRAM_WRITES = {'claim': {'forge/issue-87.md': 'assignee: this machine\n'}}
-PROGRAM_RESULTS = {('claim', 'Claim issue 87'): claimed, ('claim', 'Work issue 87'): claimed}
+PROGRAM_WRITES = {
+    'claim': {'forge/issue-87.md': lambda: 'assignee: this machine\nclaim: %s\n' % claimed()},
+}
+# The claim on the root is not the ticket's last word: the ticket's own work is.
+PROGRAM_RESULTS = {('claim', 'Claim issue 87'): claimed}
 
 EXPORTS = {}
 
@@ -71,7 +76,7 @@ def program(step):
     task = os.environ['RHEI_TASK_ID']
     title = title_of(os.environ['RHEI_TASK_ID_LOCAL'])
     for path, text in PROGRAM_WRITES.get(step, {}).items():
-        write(path, text)
+        write(path, text() if callable(text) else text)
     for name, text in PROGRAM_EXPORTS.get((step, title), {}).items():
         write(pathlib.Path('runtime') / 'exports' / task / (name + '.md'), text)
     summary = PROGRAM_RESULTS.get((step, title))

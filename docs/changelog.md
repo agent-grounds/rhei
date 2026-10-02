@@ -17,7 +17,11 @@ pull request number: the release stamps `(PR #N)` onto it. See
   (§FS-rhei-templates.6.4). `--into` now also takes a project
   (§FS-rhei-library.2.2): a plan template is laid there as a member, exactly as
   the default `--output` would lay it, and a project template replaces the
-  default machine and lays only the members not already there. Replacing a
+  default machine and its bundle and lays only the members not already there.
+  Every bundle file it replaces is named on a `replaced:` line, and a bundle
+  file the template does not carry is left alone; a project whose bundle,
+  default machine or settings is reached through a symbolic link is refused
+  naming the link, since nothing is written through one. Replacing a
   default refuses before writing when it would strand a ticket of any rhei with
   no machine of its own or of the basin, or leave a node kind its `node_policy`
   names undeclared, naming each with what it holds; which tickets that reads is
@@ -27,8 +31,9 @@ pull request number: the release stamps `(PR #N)` onto it. See
   that names both a rhei and a project is refused naming both. A `--into` path
   is now taken as written and never split at a dot, since a rhei id is one
   segment: `--into fix/scratch.ticket` no longer means task `ticket` of
-  `fix/scratch` — name the task on the bare id from the rhei's directory,
-  `--into scratch.ticket`.
+  `fix/scratch` — name the task on the bare id, `--into scratch.ticket`, from
+  the directory that holds the rhei, or from anywhere inside its project; the
+  refusal for such a path now says so.
 
 - A finished parent now speaks for its subtree at the end of a run
   (§FS-rhei-run-report.3.2): when a task with children is terminal and nothing

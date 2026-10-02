@@ -240,4 +240,145 @@ mod file_lock_tests {
             "only the persistent writer sidecar remains"
         );
     }
+
+    fn staged(dir: &tempfile::TempDir, contents: &[u8]) -> tempfile::NamedTempFile {
+        let mut tmp = tempfile::NamedTempFile::new_in(dir.path()).expect("temp file");
+        tmp.write_all(contents).expect("write temp");
+        tmp
+    }
+
+    fn permission_denied() -> std::io::Error {
+        std::io::Error::from(std::io::ErrorKind::PermissionDenied)
+    }
+
+    /// A replacement refused while another handle holds the destination - what
+    /// Windows does to every reader's handle - is waited out under the held
+    /// sidecar instead of failing the write. The refusal is arranged rather than
+    /// provoked, so this pins the wait on every platform.
+    // §AR-agent-orchestrator-workflow.3.3.1.1 §FS-rhei-transition-cmd.3
+    #[test]
+    fn issue_390_a_refused_replacement_is_waited_out_under_the_sidecar() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let path = plan_file(&dir, "before\n");
+        let locked = LockedPlanFile::open(&path).expect("lock the plan");
+
+        refuse_replacements(Some(3), permission_denied);
+        let persisted = persist_locked(staged(&dir, b"after\n"), &path);
+        let attempts = replace_attempts();
+        locked.release();
+
+        persisted.expect("a refusal that stops must be waited out, not reported");
+        assert_eq!(attempts, 4, "three refused attempts, then the one that lands");
+        assert_eq!(fs::read_to_string(&path).expect("read back"), "after\n");
+        let mut leftovers: Vec<String> = fs::read_dir(dir.path())
+            .expect("read dir")
+            .map(|entry| entry.expect("entry").file_name().to_string_lossy().into_owned())
+            .filter(|name| name != "plan.rhei.md")
+            .collect();
+        leftovers.sort();
+        assert_eq!(leftovers, vec!["plan.rhei.md.lock"], "the staged file is what was renamed");
+    }
+
+    /// The wait is bounded: a refusal that never stops is retried, then reported
+    /// unchanged, and the destination keeps its previous bytes. The bound is the
+    /// code's to choose; this holds only that there is one.
+    // §AR-agent-orchestrator-workflow.3.3.1.1 §FS-rhei-transition-cmd.3
+    #[test]
+    fn issue_390_a_refusal_that_outlasts_the_bound_is_reported_with_the_plan_intact() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let path = plan_file(&dir, "before\n");
+        let locked = LockedPlanFile::open(&path).expect("lock the plan");
+
+        refuse_replacements(None, permission_denied);
+        let started = Instant::now();
+        let persisted = persist_locked(staged(&dir, b"after\n"), &path);
+        let waited = started.elapsed();
+        let attempts = replace_attempts();
+        locked.release();
+
+        let refused = persisted.expect_err("a refusal that never stops must be reported");
+        assert_eq!(refused.error.kind(), std::io::ErrorKind::PermissionDenied, "{refused:?}");
+        assert!(attempts > 1, "the refusal was reported after {attempts} attempt(s), unretried");
+        assert!(waited < Duration::from_secs(15), "the wait is bounded, but took {waited:?}");
+        assert!(refused.file.path().exists(), "the error hands the staged file back");
+        assert_eq!(fs::read_to_string(&path).expect("read back"), "before\n");
+    }
+
+    /// Only a refusal is waited out. A failure that says nothing about another
+    /// handle is reported after the one attempt that met it.
+    // §AR-agent-orchestrator-workflow.3.3.1.1
+    #[test]
+    fn issue_390_a_failure_that_is_not_a_refusal_is_reported_at_once() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let path = plan_file(&dir, "before\n");
+        let locked = LockedPlanFile::open(&path).expect("lock the plan");
+
+        refuse_replacements(None, || std::io::Error::from(std::io::ErrorKind::NotFound));
+        let persisted = persist_locked(staged(&dir, b"after\n"), &path);
+        let attempts = replace_attempts();
+        locked.release();
+
+        let failed = persisted.expect_err("the arranged failure must be reported");
+        assert_eq!(failed.error.kind(), std::io::ErrorKind::NotFound, "{failed:?}");
+        assert_eq!(attempts, 1, "a failure that is not a refusal is not retried");
+        assert_eq!(fs::read_to_string(&path).expect("read back"), "before\n");
+    }
+
+    /// Windows also refuses a replacement as a sharing violation (os error 32)
+    /// or a lock violation (os error 33), which std reads as no `ErrorKind` of
+    /// its own. Windows-only because those numbers are Windows's: on Unix they
+    /// are `EPIPE` and `EDOM`, which no rename refusal means, so there is no
+    /// portable form of the raw code.
+    // §AR-agent-orchestrator-workflow.3.3.1.1
+    #[cfg(windows)]
+    #[test]
+    fn issue_390_a_windows_sharing_or_lock_violation_is_waited_out() {
+        let violations: [fn() -> std::io::Error; 2] =
+            [|| std::io::Error::from_raw_os_error(32), || std::io::Error::from_raw_os_error(33)];
+        for (violation, code) in violations.into_iter().zip([32, 33]) {
+            let dir = tempfile::tempdir().expect("tmpdir");
+            let path = plan_file(&dir, "before\n");
+            let locked = LockedPlanFile::open(&path).expect("lock the plan");
+
+            refuse_replacements(Some(2), violation);
+            let persisted = persist_locked(staged(&dir, b"after\n"), &path);
+            let attempts = replace_attempts();
+            locked.release();
+
+            persisted.unwrap_or_else(|err| panic!("os error {code} must be waited out: {err:?}"));
+            assert_eq!(attempts, 3, "os error {code}: two refused attempts, then the landing");
+            assert_eq!(fs::read_to_string(&path).expect("read back"), "after\n");
+        }
+    }
+
+    /// The platform rule itself: another thread holds a plain read handle on the
+    /// destination while the replacement starts, and lets go shortly after.
+    /// Linux and macOS replace under the handle; Windows refuses until it closes,
+    /// so this is the test that proves the waiting out against a real handle.
+    // §AR-agent-orchestrator-workflow.3.3.1.1 §FS-rhei-transition-cmd.3
+    #[test]
+    fn issue_390_a_reader_holding_the_plan_open_does_not_fail_its_replacement() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let path = plan_file(&dir, "before\n");
+        let locked = LockedPlanFile::open(&path).expect("lock the plan");
+        let reader_path = path.clone();
+        let (held_tx, held_rx) = mpsc::channel();
+        let reader = std::thread::spawn(move || {
+            let mut handle = fs::File::open(&reader_path).expect("open the plan for reading");
+            held_tx.send(()).expect("say the handle is held");
+            std::thread::sleep(Duration::from_millis(250));
+            let mut seen = String::new();
+            handle.read_to_string(&mut seen).expect("read through the held handle");
+            seen
+        });
+        held_rx.recv_timeout(Duration::from_secs(5)).expect("the reader holds the plan open");
+
+        let persisted = persist_locked(staged(&dir, b"after\n"), &path);
+        locked.release();
+        let seen = reader.join().expect("reader thread");
+
+        persisted.expect("a reader holding the plan open must not fail its replacement");
+        assert_eq!(fs::read_to_string(&path).expect("read back"), "after\n");
+        assert_eq!(seen, "before\n", "the reader reads the bytes it opened");
+    }
 }

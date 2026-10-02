@@ -37,7 +37,7 @@ result('## Result\n\nDone.\n')
     fixture.parked(&mut run);
     let original = metadata(&fixture.root)["metadata"]["tasks"]["1"]["providerLimits"].clone();
     fs::write(fixture.root.join("release-beta"), "go").unwrap();
-    wait_for("beta's successful slot release", || {
+    wait_for("beta's successful slot release", &mut run, || {
         fixture.events().iter().any(|e| e["event"] == "slot_released" && e["exit_code"] == 0)
     });
     assert_stays_parked(&fixture, &mut run);
@@ -71,7 +71,7 @@ result('## Result\n\nDone.\n')
         }}});
     });
     let mut first = fixture.start(&[]);
-    wait_for("unrelated beta to complete before expiry", || {
+    wait_for("unrelated beta to complete before expiry", &mut first, || {
         fixture.events().iter().any(|e| e["event"] == "slot_released" && e["exit_code"] == 0)
     });
     assert_stays_parked(&fixture, &mut first);
@@ -127,7 +127,7 @@ write(root/(model + '-finished'), 'done')
         m["metadata"]["tasks"]["1"]["providerLimits"]["working"]["nextAttemptAt"] =
             utc_at(epoch_now() + 3).into();
     });
-    wait_for("alpha to resume while beta is alive", || {
+    wait_for("alpha to resume while beta is alive", &mut run, || {
         fixture.root.join("alpha-finished").exists()
     });
     assert!(!fixture.root.join("beta-finished").exists());
@@ -175,7 +175,7 @@ write(root/(local + '-finished'), 'done')
         }
         let mut run = fixture.start(&args);
         fixture.parked(&mut run);
-        wait_for("unrelated task to refill the slot", || {
+        wait_for("unrelated task to refill the slot", &mut run, || {
             fixture
                 .events()
                 .iter()
@@ -197,13 +197,15 @@ write(root/(local + '-finished'), 'done')
         );
         assert!(!events.iter().any(|e| e["event"] == "run_finished"));
         expire_provider_deadlines(&fixture.root);
-        wait_for("resumed task to claim the free slot", || {
+        wait_for("resumed task to claim the free slot", &mut run, || {
             fs::read_to_string(fixture.root.join("1-starts")).unwrap().lines().count() == 2
         });
         assert!(!fixture.root.join("3-starts").exists(), "two live tasks consume capacity");
         assert!(!fixture.root.join("2-finished").exists());
         fs::write(fixture.root.join("release-resumed"), "go").unwrap();
-        wait_for("queued identity to resume", || fixture.root.join("3-finished").exists());
+        wait_for("queued identity to resume", &mut run, || {
+            fixture.root.join("3-finished").exists()
+        });
         fs::write(fixture.root.join("release-sibling"), "go").unwrap();
         fixture.finish_success(&mut run);
         assert!(!markdown_text(&fixture.root).contains("providerLimits:"));

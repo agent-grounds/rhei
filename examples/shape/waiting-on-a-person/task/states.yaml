@@ -5,7 +5,9 @@ version: 1
 # question and hands over to `wait`, a polling program that reads the stand-in
 # forge, `forge/issue-412.md`, for the author's reply. A reply ends the wait and
 # becomes its task's `answer` export; no reply yet is exit 75, which the
-# self-loop turns into another look after `interval`. The state shape runs
+# self-loop turns into another look after `interval`. Each such look keeps an
+# answer saying no reply came, so when the budget runs out the exhaustion edge
+# ends the task in `unanswered` with its export written. The state shape runs
 # `ask -> wait` in the asking task; the task shape gives the wait a task.
 #
 # Every agent state runs the `mock` agent so the example runs with no
@@ -41,7 +43,7 @@ states:
     final: true
 
   unanswered:
-    description: The author never replied within the poll budget.
+    description: The author never replied within the poll budget; the answer says so.
     final: true
 
   cancelled:

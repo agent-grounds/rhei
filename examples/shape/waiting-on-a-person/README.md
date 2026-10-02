@@ -81,7 +81,8 @@ later task needs, and a wait whose line is the answer.
 
 The state run's console task tree has one row for the exchange
 ([§FS-rhei-run-report.3.2](../../../docs/functional-spec/rhei-run-report.spec.md#32-task-tree)),
-and `program×2` counts its two invocations, the question and the look:
+and `program×2` counts its two invocations, the question's agent and the
+look's program: the label counts them all and names only the driver of the last:
 
 <!-- rhei:task-tree state -->
 ```text
@@ -131,5 +132,9 @@ cargo xtask examples run shape-waiting-on-a-person-task
 Each shape keeps its machine in the `states.yaml` beside its `index.rhei.md`,
 so a copy of the directory runs with `rhei run <copy> --no-tui` and no
 `--state-machine` flag. Delete the `author:` line of `forge/issue-412.md` in the
-copy to watch the wait look three times and give up. `<t>` above stands for a
-duration, which differs on every run.
+copy to watch the wait look three times and give up: every look that finds no
+reply keeps an `answer` saying so and exits 75, so the poll budget ends the
+waiting task in `unanswered` with its export written, and the run still exits
+0. The export task runs anyway, because a final state satisfies the
+`**Prior:**` that names it, and reads the no-reply answer by name. `<t>` above
+stands for a duration, which differs on every run.

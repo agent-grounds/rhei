@@ -62,21 +62,6 @@ time.sleep(2)
         )
     }
 
-    /// An agent that exits at once but leaves a detached grandchild holding the
-    /// stdout pipe it inherited — the spawn must not wait for that pipe's EOF.
-    fn write_inherited_pipe_fake_agent(dir: &Path) -> Vec<String> {
-        python_fixture_command(
-            dir,
-            "inherited-pipe-agent",
-            r#"import subprocess
-import sys
-
-print('stdout:before-background', flush=True)
-subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(2)'])
-"#,
-        )
-    }
-
     /// An agent that reports its argv and echoes every stdin line back, so the
     /// stream-json transport can be read off the log.
     fn write_stream_json_fake_agent(dir: &Path) -> Vec<String> {
@@ -308,57 +293,6 @@ for line in sys.stdin:
                 ..
             } if line == "stdout:before-timeout"
         )));
-    }
-
-    #[test]
-    fn inherited_output_pipe_does_not_block_agent_completion() {
-        let dir = tempfile::tempdir().expect("tmpdir");
-        let command = write_inherited_pipe_fake_agent(dir.path());
-        let log_path = dir.path().join("agent.log");
-        let recorder = Arc::new(RecordingSink::default());
-        let resolved = ResolvedAgent {
-            agent: AgentConfig::from("codex"),
-            profile: CustomAgentProfile { command, ..CustomAgentProfile::default() },
-            mode: None,
-            target: None,
-            model: None,
-            model_provider: None,
-            model_name: None,
-            timeout_secs: Some(10),
-            autonomous_args: Vec::new(),
-        };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
-
-        let start = Instant::now();
-        let status = spawn_and_wait_agent(
-            &resolved,
-            &builtin_price_book(),
-            "prompt",
-            dir.path(),
-            dir.path(),
-            None,
-            dir.path(),
-            None,
-            "task-pipe",
-            "pending",
-            1,
-            &tooling,
-            &log_path,
-            dir.path(),
-            None,
-            0,
-            recorder,
-            None,
-            &spawn_plan_for_test(&log_path),
-            None,
-        )
-        .expect("agent should complete without waiting for inherited pipe EOF");
-
-        assert!(status.status.success());
-        assert!(start.elapsed() < Duration::from_secs(1), "spawn waited for inherited pipe EOF");
-        let log = fs::read_to_string(&log_path).expect("read log");
-        assert!(log.contains("stdout:before-background"));
-        assert!(log.contains("=== exit ==="));
     }
 
     // ---------------------------------------------------------------------

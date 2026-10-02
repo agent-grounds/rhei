@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """One definition of an `Unreleased` changelog bullet. §FS-rhei-distribution.5.1
 
-The pull request check (`check_changelog_pr_entry.py`) and the release stamper
-(`prepare_changelog_release.py stamp`) both read `docs/changelog.md` through
-this module. The defect they exist to close is two gates disagreeing about one
-file, so a bullet the check counted has to be a bullet the stamper can find, and
-that only holds while there is a single definition of what a bullet is
-(§FS-rhei-distribution.5.2).
+The release stamper (`prepare_changelog_release.py stamp`,
+§FS-rhei-distribution.5.2) and the test that checks the repository's own
+changelog has the shape the release reads both read `docs/changelog.md` through
+this module, so a bullet the write-up passed that check with is a bullet the
+stamper can find.
 
 A bullet is its `- ` line together with every following line up to the next
 bullet or the end of the section; trailing blank lines belong to no bullet, so a
-bullet's last line is the last line carrying text. Two bullets are the same
-bullet when their text matches once runs of whitespace collapse to single spaces
-and a trailing pull-request token is dropped.
+bullet's last line is the last line carrying text.
 """
 
 from __future__ import annotations
@@ -26,8 +23,8 @@ BULLET_RE = re.compile(r"^- ")
 
 PLACEHOLDER = "TBD"
 
-# The token a bullet ends with, which normalisation drops: the number the
-# release stamped, or the placeholder that stands in for one until it does.
+# The token a bullet ends with: the number the release stamped, or the
+# placeholder that stands in for one until it does.
 _TRAILING_TOKEN_RE = re.compile(
     r"(?i)\s*(?:\(\s*(?:PR|pull request)\s*#\s*(?P<parenthesised>[0-9]+|TBD)\s*\)"
     r"|(?:PR|pull request)\s*#\s*(?P<bare>[0-9]+|TBD))\s*$"
@@ -57,11 +54,6 @@ class Bullet:
     def raw(self) -> str:
         """The bullet as written, one space per line break."""
         return " ".join(line_text(line) for line in self.lines)
-
-    @property
-    def text(self) -> str:
-        """What decides whether two bullets are the same bullet."""
-        return _TRAILING_TOKEN_RE.sub("", _collapse(self.raw)).strip()
 
     @property
     def token(self) -> str | None:
@@ -142,11 +134,6 @@ def bullets(lines: Sequence[str]) -> list[Bullet]:
             last_with_text = index
     close()
     return found
-
-
-def bullets_in(text: str) -> list[Bullet]:
-    """The bullets of a changelog held as one string rather than as lines."""
-    return bullets(text.splitlines())
 
 
 def _collapse(text: str) -> str:

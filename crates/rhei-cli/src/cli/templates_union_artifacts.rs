@@ -62,6 +62,17 @@
     ) -> MietteResult<()> {
         let host: YamlValue = serde_yaml::from_str(host_text).unwrap_or(YamlValue::Null);
         let host_paths = classify_artifact_paths(&host);
+        let coalesces = |writer: &str| {
+            match (
+                host.get("states").and_then(|states| states.get(writer)),
+                part.value.get("states").and_then(|states| states.get(writer)),
+            ) {
+                (Some(host_state), Some(part_state)) => {
+                    same_definition("states", writer, host_state, part_state, part)
+                }
+                _ => false,
+            }
+        };
         let (host_side, part_side) = match sides {
             ArtifactSides::Placement => ("the target".to_owned(), format!("template '{}'", part.name)),
             ArtifactSides::Includes { including, entry } => {
@@ -77,17 +88,16 @@
                     if other == name {
                         continue;
                     }
-                    // Either coalesced writer makes this pair internal to one side. §FS-rhei-library.7.2.4
+                    // Ignore incoming outputs discarded with a coalesced definition. §FS-rhei-library.3.1
+                    // Such a state is not a writer of this path in the result. §FS-rhei-library.7.2.1
+                    if !host_declarations.writers.contains(name) && coalesces(name) {
+                        continue;
+                    }
+                    // Internal pairs need a coalesced writer of this path on both sides. §FS-rhei-library.7.2.4
                     if [other, name].into_iter().any(|writer| {
-                        match (
-                            host.get("states").and_then(|states| states.get(writer)),
-                            part.value.get("states").and_then(|states| states.get(writer)),
-                        ) {
-                            (Some(host_state), Some(part_state)) => {
-                                same_definition("states", writer, host_state, part_state, part)
-                            }
-                            _ => false,
-                        }
+                        host_declarations.writers.contains(writer)
+                            && declarations.writers.contains(writer)
+                            && coalesces(writer)
                     }) {
                         continue;
                     }

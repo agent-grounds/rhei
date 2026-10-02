@@ -444,6 +444,12 @@ pub fn stdout(out: &Output) -> String {
     String::from_utf8_lossy(&out.stdout).into_owned()
 }
 
+/// Redirected stdout, as the process wrote it; missing while a caller polls is
+/// empty. The file seam matches `stdout`.
+pub fn stdout_from_file(path: impl AsRef<Path>) -> String {
+    fs::read_to_string(path).unwrap_or_default()
+}
+
 /// Captured stderr exactly as the process wrote it — miette's gutter, soft wrap, and all.
 ///
 /// Rendering tests use this; message assertions use `stderr` so terminal width cannot decide them. §FS-rhei-errors.2

@@ -1,0 +1,33 @@
+name: shape-epic-of-issues
+version: 1
+
+# One machine for both shapes of the epic-of-issues pair: every task is one
+# agent state. The shapes differ only in whether the three issues sit under a
+# parent named for the epic.
+#
+# Every state runs the `mock` agent so the example runs with no credentials.
+
+states:
+  work:
+    initial: true
+    agent: mock
+    description: Do the task's work and record why it ends where it does.
+    instructions: |
+      Do Task {task_id} as its body describes, and write your result last.
+
+  completed:
+    description: Done.
+    final: true
+
+  cancelled:
+    description: Dropped. The reserved name, so a cancelled step owes no export.
+    final: true
+
+transitions:
+  - from: work
+    to: completed
+    description: The work is done and its result written.
+
+  - from: "*"
+    to: cancelled
+    description: Dropped.

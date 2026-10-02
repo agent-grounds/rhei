@@ -16,7 +16,10 @@ pull request number: the release stamps `(PR #N)` onto it. See
   opening a pull request, classifying an issue and claiming the work, its
   reproducer row now covers a contract and a gate's verdict, and the installed
   `references/shape.md` carries the memory test's corollaries
-  (§FS-rhei-shape.4).
+  (§FS-rhei-shape.4). `examples/shape/` grows from four pairs to sixteen, each
+  runnable with the mock agent through
+  `cargo xtask examples run shape-<pair>-<shape>`, which now finds them on
+  disk; every pair's README quotes both of its runs, and the suite checks both.
 
 - Composing templates no longer refuses a hand-off. One state writing a
   rhei-scoped artifact path and others reading it compose silently, whether

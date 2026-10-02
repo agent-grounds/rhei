@@ -12,7 +12,7 @@
 use std::path::Path;
 
 use super::into_support::*;
-use super::union_artifact_paths_support::snapshot;
+use super::union_artifact_paths_support::{prepare_placement_sidecars, snapshot};
 use super::*;
 
 /// Give the template a state the host already defines, differing in an
@@ -117,6 +117,10 @@ fn one_rhei_scoped_artifact_path_claimed_by_two_states_is_refused() {
         "      Review {{change_ref}} and write what you found.\n    outputs:\n      - name: plan-note\n        path: runtime/notes/plan.md\n        description: The one plan note\n",
     );
     write_fixture_file(&template, "states.yaml", &template_machine);
+    prepare_placement_sidecars(
+        &root,
+        &["tasks/002-coordinate.md.lock", "tasks/003-record.md.lock"],
+    );
     let machine_before = read(&root.join("states.yaml"));
     let target_before = snapshot(&root);
 

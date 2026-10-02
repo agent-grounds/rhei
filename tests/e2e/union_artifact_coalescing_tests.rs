@@ -67,6 +67,7 @@ fn placement_refuses_exclusive_writers_even_beside_a_coalesced_writer() {
         &[("pending", &[Writes(NOTE)]), ("draft", &[Writes(NOTE)])],
     );
     placed(&dir, "drafts", &[("pending", &[Writes(NOTE)]), ("polish", &[Writes(NOTE)])]);
+    prepare_placement_sidecars(&root, &["tasks/002-work.md.lock"]);
     let before = snapshot(&root);
 
     let result = run_into(&["instantiate", "drafts", "--into", "release"], &dir);
@@ -117,6 +118,7 @@ fn placement_does_not_treat_conflicting_same_named_writers_as_coalesced() {
         let machine = template.join("states.yaml");
         std::fs::write(&machine, read(&machine).replace("Do the pending step.", "Different work."))
             .expect("change pending's definition");
+        prepare_placement_sidecars(&root, &["tasks/002-work.md.lock"]);
         let before = snapshot(&root);
 
         let result = run_into(&["instantiate", "drafts", "--into", "release"], &dir);

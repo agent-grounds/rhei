@@ -138,8 +138,17 @@
         if !path.is_file() {
             return Ok(Vec::new());
         }
+        // A post-validation YAML failure needs a report, even after cleanup. §FS-rhei-errors.1.2
         let machine: YamlValue = serde_yaml::from_str(&read_text(path)?).map_err(|err| {
-            miette!("failed to read the laid machine '{}': {err}", display_slash(path))
+            miette!(
+                help = format!(
+                    "{} The machine '{}' failed YAML parsing after validation; include its \
+                     path and the parse error above even if cleanup removes the generated file.",
+                    internal_error_help(),
+                    display_slash(path)
+                ),
+                "failed to read the laid machine '{}': {err}", display_slash(path)
+            )
         })?;
         Ok(shared_input_warnings(&machine))
     }

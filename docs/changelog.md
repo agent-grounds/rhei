@@ -28,6 +28,10 @@ pull request number: the release stamps `(PR #N)` onto it. See
   templates rhei ships (§FS-rhei-library.6), and that template prose names
   tasks by id and never by the template's own file names, since placement
   renames them (§FS-rhei-library.4.2).
+- `clean.sh` at the repository root gives back the disk a checkout's builds
+  took: it runs `cargo clean`, then removes every directory holding a valid
+  `CACHEDIR.TAG`, such as a plan's scratch build under `panta/`. It is the clean
+  verb `ephor clean` runs at the root of a branch checkout no live run holds.
 - A template can now lay a whole Panta project. A *project template* carries
   `index.panta.md` where a plan template carries its plan, and is the third
   layout `rhei templates` lists, under a new `layout` key in its JSON

@@ -13,31 +13,42 @@ pre-commit install --install-hooks
 That installs the pre-commit, pre-push and commit-msg hooks the repository
 declares. Never get past a hook with `--no-verify`.
 
-## The changelog rule
+## The changelog
 
-Every pull request adds a bullet of its own under `## Unreleased` in
-[`docs/changelog.md`](docs/changelog.md), describing the change in the terms
-someone reading release notes would want.
+A pull request adds no changelog bullet and leaves
+[`docs/changelog.md`](docs/changelog.md) alone. The issue it closes already says
+what changed, so nothing checks a branch for a bullet.
 
-**Do not write the pull request number.** You cannot know it: it does not exist
-until the pull request is opened, which is after the push that would have to
-check it. The release stamps `(PR #N)` onto your bullet when it cuts the version.
-Write `(PR #TBD)` if you would rather leave a visible placeholder — that is
-accepted too, and the release replaces it.
+The changelog is written before a release instead, by whoever cuts it, in one
+pull request of its own that lands before either release helper runs
+([§FS-rhei-distribution.5.1](docs/functional-spec/rhei-distribution.spec.md#51-who-writes-unreleased-and-when)):
 
-The pre-push hook refuses a push whose `## Unreleased` section holds no new or
-changed bullet against your branch's base, and says what to add. Rewrapping or
-renumbering a bullet somebody else wrote is not a bullet of your own.
+- The list is every pull request merged since the previous release tag that
+  changed more than docs and CI. Docs and CI are the paths under `docs/` and
+  `.github/`, every `*.md` file, and the root `LICENSE` and `lychee.toml`.
+- Each pull request on the list gets a bullet under `## Unreleased`, or is named
+  in one.
+- A bullet's words come from the issues its pull request closed, or from the
+  pull request's own description where it closed none.
+- Every bullet ends in its own pull request's number, written `(PR #N)`.
+- A pull request whose bullet is already pending is skipped.
 
-For a branch that is not becoming a pull request — a spike, a scratch branch —
-push it past the check explicitly:
+From a checkout with the release tags fetched (`git fetch --tags`), this prints
+that list, each pull request with the issues it closed:
 
 ```bash
-SKIP=changelog-pr-entry git push
+tag="$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1)"
+gh pr list --state merged --base main --limit 200 \
+  --search "merged:>$(git log -1 --format=%cI "$tag")" \
+  --json number,title,body,files \
+  --jq '.[] | select(any(.files[].path; test("^(docs/|\\.github/)|\\.md$|^(LICENSE|lychee\\.toml)$") | not))
+        | "#\(.number) \(.title) [closes: \([.body | scan("(?i)\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+#([0-9]+)")[] | "#\(.)"] | join(" "))]"'
 ```
 
-That skip is local, and CI does not honour it, so the pull request is still
-checked.
+Until the section is written, the scheduled `Auto bump` holds: its run ends
+green with a notice naming the changes that wait for their bullets
+([§FS-rhei-distribution.5.3](docs/functional-spec/rhei-distribution.spec.md#53-when-the-scheduled-release-waits)).
+A release started by hand refuses an empty section instead.
 
 ## The rest of the gates
 

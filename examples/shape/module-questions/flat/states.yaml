@@ -2,9 +2,9 @@ name: shape-module-questions
 version: 1
 
 # One machine for both shapes of the module-questions pair: every task, the
-# questions and the report alike, is one agent state. The shapes differ only
-# in where the report sits: the parent of the questions in `nested`, a sibling
-# after them in `flat`.
+# question to each module and the report alike, is one agent state. The shapes
+# differ only in where the report sits: the parent of the questions in
+# `nested`, a sibling after them in `flat`.
 #
 # Every state runs the `mock` agent so the example runs with no credentials.
 

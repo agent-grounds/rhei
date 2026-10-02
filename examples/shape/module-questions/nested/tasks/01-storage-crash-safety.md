@@ -1,20 +1,20 @@
-### Task 1: Report how storage survives a crash
+### Task 1: Report whether a crash can lose a committed write
 **State:** work
 
-Say how the storage module survives a crash at any point, from the three
-answers below.
+Say whether the database can lose a committed write in a crash at any point,
+from the three modules' answers below.
 
-#### Task 1.1: When is the WAL flushed?
+#### Task 1.1: Can a crash lose a committed write in the WAL?
 **State:** work
 
-Read `wal.rs` and say when the log reaches disk.
+Read `wal.rs` and answer for the write-ahead log.
 
-#### Task 1.2: When is a page fsynced?
+#### Task 1.2: Can a crash lose a committed write in the pager?
 **State:** work
 
-Read `pager.rs` and say when a page reaches disk.
+Read `pager.rs` and answer for the pager.
 
-#### Task 1.3: What does recovery replay?
+#### Task 1.3: Can a crash lose a committed write in recovery?
 **State:** work
 
-Read `recovery.rs` and say what is replayed after a crash.
+Read `recovery.rs` and answer for recovery.

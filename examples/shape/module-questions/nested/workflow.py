@@ -10,14 +10,17 @@ import pathlib
 import re
 import sys
 
-REPORT = ('Crash-safe: the WAL reaches disk before any page it covers, and recovery '
-          'replays it from the last checkpoint.')
+REPORT = ('No: the WAL reaches disk before any page it covers, and recovery replays it '
+          'from the last checkpoint.')
 
 RESULTS = {
-    'When is the WAL flushed?': 'On every commit, before the commit returns.',
-    'When is a page fsynced?': 'At a checkpoint, after the WAL records that cover it are flushed.',
-    'What does recovery replay?': 'The WAL from the last checkpoint forward.',
-    'Report how storage survives a crash': REPORT,
+    'Can a crash lose a committed write in the WAL?':
+        'No: the log is flushed on every commit, before the commit returns.',
+    'Can a crash lose a committed write in the pager?':
+        'Yes, on its own: a page reaches disk only at a checkpoint, after its WAL records.',
+    'Can a crash lose a committed write in recovery?':
+        'No: recovery replays the WAL from the last checkpoint forward.',
+    'Report whether a crash can lose a committed write': REPORT,
 }
 
 EXPORTS = {}

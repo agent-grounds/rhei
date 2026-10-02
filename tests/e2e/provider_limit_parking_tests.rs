@@ -2,7 +2,6 @@
 
 use std::fs;
 use std::path::Path;
-use std::process::Stdio;
 use std::thread;
 use std::time::Duration;
 
@@ -151,14 +150,9 @@ fn eight_parallel_codex_limits_park_and_resume_without_spending_attempts() {
     let (dir, workspace, machine) = provider_limit_workspace();
     let starts = workspace.join("runtime/provider-limit-starts");
     let mut command = rhei_command(workspace.join(".home"));
-    command
-        .arg("--state-machine")
-        .arg(&machine)
-        .arg("run")
-        .arg(&workspace)
-        .args(["--no-tui", "--no-dashboard", "--no-callbacks", "--parallel", "8"])
-        .stdout(Stdio::null());
-    let mut run = RunningChild::spawn(&mut command, dir.join("run.stderr"));
+    command.arg("--state-machine").arg(&machine).arg("run").arg(&workspace);
+    command.args(["--no-tui", "--no-dashboard", "--no-callbacks", "--parallel", "8"]);
+    let mut run = RunningChild::spawn(&mut command, &dir, "run");
 
     wait_for("all eight controlled agents to start", &mut run, || count_files(&starts) == 8);
     let parked = wait_for_provider_waits(&workspace, &mut run, 8);
@@ -213,20 +207,15 @@ fn sequential_provider_limit_wakes_and_resumes_in_process() {
     let (dir, workspace, machine) =
         sequential_provider_limit_workspace("provider-limit-sequential-wakeup");
     let mut command = rhei_command(workspace.join(".home"));
-    command
-        .arg("--state-machine")
-        .arg(&machine)
-        .arg("run")
-        .arg(&workspace)
-        .args(["--no-tui", "--no-dashboard", "--no-callbacks"])
-        .stdout(Stdio::null());
-    let mut run = RunningChild::spawn(&mut command, dir.join("run.stderr"));
+    command.arg("--state-machine").arg(&machine).arg("run").arg(&workspace);
+    command.args(["--no-tui", "--no-dashboard", "--no-callbacks"]);
+    let mut run = RunningChild::spawn(&mut command, &dir, "run");
     wait_for("the sequential provider wait", &mut run, || {
         markdown_text(&workspace).contains("nextAttemptAt:")
     });
     expire_provider_deadlines(&workspace);
     let status = run.wait_for_exit("the parked run to resume");
-    assert!(status.success(), "the resumed run exited {status}; its stderr:\n{}", run.stderr());
+    assert!(status.success(), "the resumed run exited {status}; {}", run.output());
     assert_all_tasks_in_state(&workspace, &machine, "completed");
     let starts = fs::read_to_string(workspace.join("runtime/provider-limit-starts.txt")).unwrap();
     assert_eq!(starts.lines().collect::<Vec<_>>(), ["1", "2"]);
@@ -238,24 +227,19 @@ fn sequential_provider_limit_wakes_and_resumes_in_process() {
 fn restart_before_provider_deadline_remains_parked() {
     let (dir, workspace, machine) =
         sequential_provider_limit_workspace("provider-limit-restart-future");
-    let spawn = |stderr: &str| {
+    let spawn = |name: &str| {
         let mut command = rhei_command(workspace.join(".home"));
-        command
-            .arg("--state-machine")
-            .arg(&machine)
-            .arg("run")
-            .arg(&workspace)
-            .args(["--no-tui", "--no-dashboard", "--no-callbacks"])
-            .stdout(Stdio::null());
-        RunningChild::spawn(&mut command, dir.join(stderr))
+        command.arg("--state-machine").arg(&machine).arg("run").arg(&workspace);
+        command.args(["--no-tui", "--no-dashboard", "--no-callbacks"]);
+        RunningChild::spawn(&mut command, &dir, name)
     };
-    let mut first = spawn("first-run.stderr");
+    let mut first = spawn("first-run");
     wait_for("the persisted provider wait", &mut first, || {
         markdown_text(&workspace).contains("nextAttemptAt:")
     });
     first.stop();
 
-    let mut restarted = spawn("restarted-run.stderr");
+    let mut restarted = spawn("restarted-run");
     thread::sleep(Duration::from_millis(750));
     assert!(restarted.child().try_wait().unwrap().is_none(), "restart must keep waiting");
     let starts = fs::read_to_string(workspace.join("runtime/provider-limit-starts.txt")).unwrap();

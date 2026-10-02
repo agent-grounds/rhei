@@ -149,6 +149,7 @@ mod session_continuation_support;
 mod session_continuation_tests;
 mod session_continuation_validation_tests;
 mod shape_example_sync_tests;
+mod shape_example_terminal_tests;
 mod show_json_tests;
 mod show_support;
 mod show_tests;

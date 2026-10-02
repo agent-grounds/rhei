@@ -1,7 +1,7 @@
 //! The shape rule's gate: the rule is stated once, every authoring skill
 //! carries that one copy rather than a paraphrase of it, every rule a skill
 //! states has a runnable pair behind it, and each pair's README quotes the
-//! output its own run produces.
+//! output both of its runs produce.
 //!
 //! This is the acceptance of agent-grounds/rhei#324 ported from the
 //! reproducer that validation left: the question *state, task or subtask?* had
@@ -11,15 +11,24 @@
 //! own run, or a skill that paraphrases the rule, fails the commit gate.
 // §FS-rhei-shape §FS-rhei-install-skills.4.8 §FS-rhei-run-report.3.2
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use super::shape_example_terminal_tests::run_on_a_terminal;
 use super::*;
 
-/// The four pairs the skills are allowed to link. The rest of the decision
-/// table lives in the spec, where a row needs no example to be normative.
-const PAIRS: [&str; 4] =
-    ["reproducer", "review-against-spec", "cve-category", "parts-of-a-feature"];
+/// Every pair under `examples/shape/`, each with the directory names of its two
+/// shapes, the one the rule picks first. The one extract every authoring skill
+/// ships links every pair here, so a pair joins this list and those links in
+/// the same commit; a row of the decision table with no pair stays normative
+/// in the spec alone.
+const PAIRS: &[(&str, [&str; 2])] = &[
+    ("reproducer", ["flat", "nested"]),
+    ("review-against-spec", ["nested", "flat"]),
+    ("cve-category", ["nested", "flat"]),
+    ("parts-of-a-feature", ["flat", "nested"]),
+];
 
 /// Every skill that states the rule, and so must carry the extract and the
 /// links. `rhei-plan-worker` reads plans rather than authoring them.
@@ -43,12 +52,12 @@ const RESTATEMENTS: [(&str, &str); 4] = [
     ),
 ];
 
-/// The marker comments that delimit a README block this gate owns. The prose
-/// around them is the author's; the bytes between them are the renderer's.
-const PROMPT_OPEN: &str = "<!-- rhei:plan-history -->";
-const PROMPT_CLOSE: &str = "<!-- /rhei:plan-history -->";
-const CONSOLE_OPEN: &str = "<!-- rhei:task-tree -->";
-const CONSOLE_CLOSE: &str = "<!-- /rhei:task-tree -->";
+/// The marker comments that delimit a README block this gate owns, named for
+/// the shape whose run it quotes. The prose around them is the author's; the
+/// bytes between them are the renderer's.
+fn markers(block: &str, shape: &str) -> (String, String) {
+    (format!("<!-- rhei:{block} {shape} -->"), format!("<!-- /rhei:{block} {shape} -->"))
+}
 
 fn skills_root() -> PathBuf {
     repo_root().join("crates/rhei-cli/skills")
@@ -119,17 +128,6 @@ fn pair_root(pair: &str) -> PathBuf {
 
 fn pair_dir(pair: &str, shape: &str) -> PathBuf {
     pair_root(pair).join(shape)
-}
-
-/// Copy one shape of one pair into a scratch workspace and run it to the end.
-fn run_shape(pair: &str, shape: &str) -> (TestDir, PathBuf) {
-    let dir = unique_scratchpad_dir(&format!("shape-{pair}-{shape}"));
-    let workspace = dir.join(shape);
-    copy_dir_recursive(&pair_dir(pair, shape), &workspace);
-    let machine = workspace.join("states.yaml");
-    let result = run_cli("run", &workspace, &machine, &["--no-tui"]);
-    assert_success(&result);
-    (dir, workspace)
 }
 
 /// (1) The rule has one normative copy and every authoring skill carries that
@@ -284,7 +282,7 @@ fn no_authoring_skill_contradicts_the_shape_rule() {
         let text = fs::read_to_string(skills_root().join(skill).join("SKILL.md")).expect("skill");
         let reference = fs::read_to_string(skills_root().join(skill).join("references/shape.md"))
             .expect("extract");
-        for pair in PAIRS {
+        for (pair, _) in PAIRS {
             let link = format!("examples/shape/{pair}");
             assert!(
                 text.contains(&link) || reference.contains(&link),
@@ -300,8 +298,8 @@ fn no_authoring_skill_contradicts_the_shape_rule() {
 // §FS-rhei-shape.4
 #[test]
 fn every_shape_pair_ships_both_shapes_and_both_validate() {
-    for pair in PAIRS {
-        for shape in ["flat", "nested"] {
+    for (pair, shapes) in PAIRS {
+        for shape in shapes {
             let source = pair_dir(pair, shape);
             assert!(source.is_dir(), "examples/shape/{pair}/{shape} is missing");
             // A scratch copy, because the CLI keeps its home beside the plan
@@ -309,8 +307,7 @@ fn every_shape_pair_ships_both_shapes_and_both_validate() {
             let scratch = unique_scratchpad_dir(&format!("shape-validate-{pair}-{shape}"));
             let dir = scratch.join(shape);
             copy_dir_recursive(&source, &dir);
-            let machine = dir.join("states.yaml");
-            let result = run_cli("validate", &dir, &machine, &[]);
+            let result = run_cli_without_machine("validate", &dir, &[]);
             assert_success(&result);
         }
         let readme = pair_root(pair).join("README.md");
@@ -325,203 +322,111 @@ fn every_shape_pair_ships_both_shapes_and_both_validate() {
     }
 }
 
-/// (4) What a later task is told. The README's Plan History block is compared
-/// byte for byte against the prompt the pair's own run renders, so the
-/// quoted output cannot drift from the output.
-// §FS-rhei-memory.3.2
+/// (4) `PAIRS` is what the gate runs and the skills' links are checked
+/// against, so a pair on disk it does not list would ship a README nothing
+/// compares with its run, and a listed pair or shape with no directory would
+/// be a link to nothing.
+// §FS-rhei-shape.7
 #[test]
-fn a_pair_readme_quotes_the_plan_history_its_own_run_renders() {
-    for pair in PAIRS {
-        let (_dir, workspace) = run_shape(pair, "nested");
-        let machine = workspace.join("states.yaml");
-        // The run finished every task, and a finished plan has no next task to
-        // peek; one open task added after it is the reader the history is for.
-        fs::write(
-            workspace.join("tasks/99-probe.md"),
-            "### Task 9: Read what came before\n**State:** work\n\n\
-             A task added after the run, so the run's history has a reader.\n",
-        )
-        .expect("add the probe task");
-        let peeked = run_cli("next", &workspace, &machine, &["--peek"]);
-        assert_success(&peeked);
-        let prompt = peeked.stdout.clone();
-        let rendered = prompt
-            .split("## Plan History")
-            .nth(1)
-            .map(|rest| rest.split("\n## ").next().unwrap_or(rest).trim_matches('\n').trim_end())
-            .unwrap_or_else(|| panic!("{pair}: the peeked prompt carries Plan History"));
-
-        let readme = fs::read_to_string(pair_root(pair).join("README.md")).expect("README");
-        let quoted = marked_block(&readme, PROMPT_OPEN, PROMPT_CLOSE).unwrap_or_else(|| {
-            panic!("{pair}: README quotes Plan History between {PROMPT_OPEN} and {PROMPT_CLOSE}")
-        });
-        assert_eq!(
-            unfenced(&quoted),
-            normalize(rendered, &workspace),
-            "{pair}: the README's Plan History is not what the run renders"
-        );
-    }
-}
-
-/// (5) What a person sees. The console task tree is the rich summary, which
-/// `rhei run` writes only to a terminal (§FS-rhei-run-report.3.4), so the run
-/// is driven through the suite's `portable-pty` harness — native on Unix,
-/// ConPTY on Windows, one case on every supported platform.
-// §FS-rhei-run-report.3.2 §REQ-cross-platform.2
-#[test]
-fn a_pair_readme_quotes_the_console_tree_its_own_run_renders() {
-    for pair in PAIRS {
-        let dir = unique_scratchpad_dir(&format!("shape-tree-{pair}"));
-        let workspace = dir.join("nested");
-        copy_dir_recursive(&pair_dir(pair, "nested"), &workspace);
-        let transcript = run_on_a_terminal(&workspace);
-        let rendered = transcript
-            .split("\nTasks")
-            .nth(1)
-            .map(|rest| rest.split("\n\n").next().unwrap_or(rest))
-            .unwrap_or_else(|| {
-                panic!("{pair}: the terminal summary carries a task tree:\n{transcript}")
-            });
-
-        let readme = fs::read_to_string(pair_root(pair).join("README.md")).expect("README");
-        let quoted = marked_block(&readme, CONSOLE_OPEN, CONSOLE_CLOSE).unwrap_or_else(|| {
-            panic!("{pair}: README quotes the task tree between {CONSOLE_OPEN} and {CONSOLE_CLOSE}")
-        });
-        let rendered = normalize(rendered, &workspace);
-        assert!(
-            rendered.contains("subtasks:"),
-            "{pair}: a finished parent speaks for its subtree on the console tree; got:\n{rendered}"
-        );
-        assert_eq!(
-            unfenced(&quoted),
-            rendered.trim_matches('\n'),
-            "{pair}: the README's task tree is not what the run renders"
-        );
-    }
-}
-
-/// Run a workspace to the end on a real terminal and return everything it
-/// wrote there, so the rich end-of-run summary is reached at all.
-fn run_on_a_terminal(workspace: &Path) -> String {
-    use portable_pty::{native_pty_system, CommandBuilder, PtySize};
-    use std::io::Read;
-
-    let source = rhei_command(workspace.join(".home"));
-    let mut command = CommandBuilder::new(source.get_program());
-    for (key, value) in source.get_envs() {
-        match value {
-            Some(value) => command.env(key, value),
-            None => command.env_remove(key),
-        }
-    }
-    command.env("NO_COLOR", "1");
-    command.arg("--state-machine");
-    command.arg(workspace.join("states.yaml"));
-    command.arg("run");
-    command.arg(workspace);
-    command.arg("--no-dashboard");
-    // The plain console frontend: on a pty `Auto` picks the TUI, which waits
-    // for `q` after the run (§FS-rhei-run-tui.1.4) and never returns here.
-    command.arg("--no-tui");
-
-    let pair = native_pty_system()
-        .openpty(PtySize { rows: TERMINAL_ROWS, cols: 240, pixel_width: 0, pixel_height: 0 })
-        .expect("open a pty");
-    let mut child = pair.slave.spawn_command(command).expect("spawn the run on a pty");
-    drop(pair.slave);
-    let mut reader = pair.master.try_clone_reader().expect("read the pty");
-    let transcript = std::thread::spawn(move || {
-        let mut text = String::new();
-        let mut buffer = [0u8; 4096];
-        while let Ok(count) = reader.read(&mut buffer) {
-            if count == 0 {
-                break;
-            }
-            text.push_str(&String::from_utf8_lossy(&buffer[..count]));
-        }
-        text
-    });
-    let status = child.wait().expect("the run returns on its own");
-    drop(pair.master);
-    let transcript = transcript.join().expect("terminal transcript drained");
-    assert_eq!(status.exit_code(), 0, "the example run finishes:\n{transcript}");
-    untransported(&transcript)
-}
-
-/// The height of the terminal the run is driven on, which is also the row a
-/// newline stops advancing at once the screen scrolls.
-const TERMINAL_ROWS: u16 = 60;
-
-/// The rows the run wrote, without what the terminal added carrying them. A
-/// native pty passes the bytes through, but ConPTY re-renders its screen
-/// (§REQ-cross-platform.2): it sets the window title, toggles modes and the
-/// cursor, and while the output still fits the screen it spells a jump down the
-/// viewport as a cursor position rather than the newlines it stands for. So
-/// CSI and OSC sequences, a bare `\r` and trailing blanks are dropped, and a
-/// forward cursor position becomes the newlines it replaced. Nothing a row
-/// says is touched, so the console tree of §FS-rhei-run-report.3.2 is still
-/// compared byte for byte.
-fn untransported(transcript: &str) -> String {
-    let mut text = String::new();
-    let mut row = 1;
-    let mut chars = transcript.chars().peekable();
-    while let Some(c) = chars.next() {
-        match c {
-            '\x1b' if chars.peek() == Some(&'[') => {
-                chars.next();
-                let mut params = String::new();
-                let mut command = None;
-                for c in chars.by_ref() {
-                    if ('\x40'..='\x7e').contains(&c) {
-                        command = Some(c);
-                        break;
-                    }
-                    params.push(c);
-                }
-                if command == Some('H') {
-                    let target = params.split(';').next().and_then(|r| r.parse().ok()).unwrap_or(1);
-                    if target > row {
-                        text.push_str(&"\n".repeat(target - row));
-                    }
-                    row = target;
-                }
-            }
-            '\x1b' if chars.peek() == Some(&']') => {
-                while let Some(c) = chars.next() {
-                    if c == '\x07' || (c == '\x1b' && chars.next_if_eq(&'\\').is_some()) {
-                        break;
-                    }
-                }
-            }
-            '\x1b' => {
-                chars.next();
-            }
-            '\r' => {}
-            '\n' => {
-                row = (row + 1).min(usize::from(TERMINAL_ROWS));
-                text.push('\n');
-            }
-            c => text.push(c),
-        }
-    }
-    text.lines().map(str::trim_end).collect::<Vec<_>>().join("\n")
-}
-
-/// The bytes ConPTY wrote for `parts-of-a-feature` on `windows-latest`, cut
-/// to the end of the run: the blank lines around `Tasks` arrive as cursor
-/// positions, and must come back as the blank lines the task tree is cut by.
-// §FS-rhei-run-report.3.2 §REQ-cross-platform.2
-#[test]
-fn a_conpty_transcript_reads_as_the_rows_the_run_wrote() {
-    let conpty = "\x1b[?9001h\x1b[?25l\x1b[2J\x1b[m\x1b[HRunning workspace\r\n\
-                  \x1b]0;D:\\a\\rhei.exe\x07\x1b[?25hRun Report  3.2s\r\n  completed\x1b[4;1H\
-                  \x20 Work      4 agents\x1b[6;1HTasks   4 tasks \u{b7} source order\r\n\
-                  \x20 \u{2713} nested.1   completed \u{2014} 3 subtasks: 3 completed\x1b[9;1H\
-                  Report     runtime/run-report.md\r\n\x1b[?25h\x1b[?9001l";
+fn the_shape_pairs_on_disk_are_the_pairs_listed() {
+    let subdirectories = |dir: &Path| -> BTreeSet<String> {
+        fs::read_dir(dir)
+            .unwrap_or_else(|err| panic!("{} is readable: {err}", dir.display()))
+            .map(|entry| entry.expect("directory entry"))
+            .filter(|entry| entry.file_type().expect("file type").is_dir())
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect()
+    };
+    let listed: BTreeSet<String> = PAIRS.iter().map(|(pair, _)| pair.to_string()).collect();
     assert_eq!(
-        untransported(conpty),
-        "Running workspace\nRun Report  3.2s\n  completed\n  Work      4 agents\n\nTasks   4 tasks \
-         \u{b7} source order\n  \u{2713} nested.1   completed \u{2014} 3 subtasks: 3 completed\n\n\
-         Report     runtime/run-report.md"
+        subdirectories(&repo_root().join("examples/shape")),
+        listed,
+        "examples/shape/ and PAIRS must name the same pairs"
     );
+    for (pair, shapes) in PAIRS {
+        let declared: BTreeSet<String> = shapes.iter().map(|shape| shape.to_string()).collect();
+        assert_eq!(
+            subdirectories(&pair_root(pair)),
+            declared,
+            "examples/shape/{pair}/ and its PAIRS entry must name the same shapes"
+        );
+    }
+}
+
+/// (5) What a later task is told and what a person sees, for both shapes. Each
+/// shape runs once on a terminal, because the console task tree is the rich
+/// summary `rhei run` writes only there (§FS-rhei-run-report.3.4); a probe task
+/// is then added to the same workspace, and `rhei next --peek` renders the Plan
+/// History it would be told. Both are compared byte for byte with the README's
+/// blocks for that shape, so neither the ruled shape's output nor the compared
+/// one's can drift from what it renders.
+// §FS-rhei-memory.3.2 §FS-rhei-run-report.3.2 §REQ-cross-platform.2
+#[test]
+fn a_pair_readme_quotes_what_both_its_runs_render() {
+    for (pair, shapes) in PAIRS {
+        let readme = fs::read_to_string(pair_root(pair).join("README.md")).expect("README");
+        for shape in shapes {
+            let dir = unique_scratchpad_dir(&format!("shape-{pair}-{shape}"));
+            let workspace = dir.join(shape);
+            copy_dir_recursive(&pair_dir(pair, shape), &workspace);
+
+            let transcript = run_on_a_terminal(&workspace);
+            let tree = transcript
+                .split("\nTasks")
+                .nth(1)
+                .map(|rest| rest.split("\n\n").next().unwrap_or(rest))
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{pair}/{shape}: the terminal summary carries a task tree:\n{transcript}"
+                    )
+                });
+            let tree = normalize(tree, &workspace);
+            if *shape == "nested" {
+                assert!(
+                    tree.contains("subtasks:"),
+                    "{pair}/{shape}: a finished parent speaks for its subtree on the console \
+                     tree; got:\n{tree}"
+                );
+            }
+            let (open, close) = markers("task-tree", shape);
+            let quoted = marked_block(&readme, &open, &close).unwrap_or_else(|| {
+                panic!("{pair}: README quotes the {shape} task tree between {open} and {close}")
+            });
+            assert_eq!(
+                unfenced(&quoted),
+                tree.trim_matches('\n'),
+                "{pair}: the README's {shape} task tree is not what the run renders"
+            );
+
+            // The run finished every task, and a finished plan has no next task
+            // to peek; one open task added after it is the reader the history is for.
+            fs::write(
+                workspace.join("tasks/99-probe.md"),
+                "### Task 99: Read what came before\n**State:** work\n\n\
+                 A task added after the run, so the run's history has a reader.\n",
+            )
+            .expect("add the probe task");
+            let peeked = run_cli_without_machine("next", &workspace, &["--peek"]);
+            assert_success(&peeked);
+            let history = peeked
+                .stdout
+                .split("## Plan History")
+                .nth(1)
+                .map(|rest| {
+                    rest.split("\n## ").next().unwrap_or(rest).trim_matches('\n').trim_end()
+                })
+                .unwrap_or_else(|| {
+                    panic!("{pair}/{shape}: the peeked prompt carries Plan History")
+                });
+            let (open, close) = markers("plan-history", shape);
+            let quoted = marked_block(&readme, &open, &close).unwrap_or_else(|| {
+                panic!("{pair}: README quotes the {shape} Plan History between {open} and {close}")
+            });
+            assert_eq!(
+                unfenced(&quoted),
+                normalize(history, &workspace),
+                "{pair}: the README's {shape} Plan History is not what the run renders"
+            );
+        }
+    }
 }

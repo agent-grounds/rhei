@@ -1,0 +1,48 @@
+name: shape-candidate-lookup
+version: 1
+
+# The task shape of the candidate-lookup pair: the lookup is a task of its
+# own, whose candidates are its export. The state shape keeps its own
+# machine beside its plan.
+#
+# `lookup` is a program: it searches the stand-in tracker, `forge/issues.md`,
+# for issues that share a word with the report. Every agent state runs the
+# `mock` agent so the example runs with no credentials, and the program is the
+# same Python file.
+
+states:
+  work:
+    initial: true
+    agent: mock
+    description: Do the task's work and record why it ends where it does.
+    instructions: |
+      Do Task {task_id} as its body describes. Write every export its
+      `**Provides:**` names before you finish, and your result last.
+
+  lookup:
+    description: Find the issues that might be duplicates, and export them.
+    program:
+      command: ["python3", "workflow.py", "--program", "lookup"]
+    program_timeout: 1m
+
+  completed:
+    description: Done.
+    final: true
+
+  cancelled:
+    description: Dropped. The reserved name, so a cancelled step owes no export.
+    final: true
+
+transitions:
+  - from: work
+    to: completed
+    description: The work is done and its result written.
+
+  - from: lookup
+    to: completed
+    exit_code: 0
+    description: The candidates are listed and exported.
+
+  - from: "*"
+    to: cancelled
+    description: Dropped.

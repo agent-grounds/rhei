@@ -393,7 +393,7 @@ pull request number: the release stamps `(PR #N)` onto it. See
   than through `defaults`, because that key's ownership is exclusive at mount
   time and two composed blocks owning it collide when `changeset-review` is
   instantiated.
-  §FS-rhei-validate.4 §FS-rhei-agents.3.2.2 §FS-rhei-run.4
+  §FS-rhei-validate.4 §FS-rhei-agents.3.2.2 §FS-rhei-run.4 (PR #362)
 
 - Say what a plan with an unbounded agent state must satisfy, before anything
   is written to enforce it. §FS-rhei-agents.3.2.2 already called a state that
@@ -410,7 +410,7 @@ pull request number: the release stamps `(PR #N)` onto it. See
   §REQ-bounded-neural-work.2 records the strain that level 1 is the one bound
   with no built-in default. End-to-end tests pin all of it, and a new guard
   instantiates every shipped template and validates it, which nothing did
-  before.
+  before. (PR #362)
 
 - Say which of two things a reused path means, and give the operator a way to
   answer. A project laid down at a path another project used before it resolves

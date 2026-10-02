@@ -57,6 +57,9 @@
                 Ok(laid) => {
                     let verb = if lay.dry_run { "would be laid" } else { "laid" };
                     summary.members.push(member_line(name, verb, &laid));
+                    // Skipped members bring no machine to diagnose again.
+                    // §FS-rhei-library.7.2.3
+                    summary.shared_inputs.extend(laid.shared_inputs);
                     laid_dirs.push(dir);
                 }
                 Err(err) => {
@@ -70,6 +73,11 @@
                 }
             }
         }
+        // The replacement and every new member have passed validation. Read
+        // the default once, also for the preview. §FS-rhei-library.7.2.3
+        let mut shared_inputs = shared_input_warnings_in_file(&rendered.root.join("states.yaml"))?;
+        shared_inputs.append(&mut summary.shared_inputs);
+        summary.shared_inputs = shared_inputs;
         summary.print(project, lay.dry_run);
         Ok(())
     }

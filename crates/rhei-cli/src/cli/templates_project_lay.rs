@@ -397,6 +397,9 @@
             // Laid for real even under `--dry-run`: `staged` is then scratch.
             let laid = lay_project_member(lay, member, staged, false)?;
             summary.members.push(member_line(&member.manifest.name, verb, &laid));
+            // Hold each member's advisories until the whole project succeeds.
+            // §FS-rhei-library.7.2.3
+            summary.shared_inputs.extend(laid.shared_inputs);
         }
         let pass = validation_pass(staged, None)?;
         if !pass.errors.is_empty() {
@@ -408,6 +411,11 @@
             ));
         }
         summary.warnings = pass.warnings;
+        // The validated default is one machine of its own, diagnosed once.
+        // §FS-rhei-library.7.2.3
+        let mut shared_inputs = shared_input_warnings_in_file(&staged.join("states.yaml"))?;
+        shared_inputs.append(&mut summary.shared_inputs);
+        summary.shared_inputs = shared_inputs;
         Ok(summary)
     }
 

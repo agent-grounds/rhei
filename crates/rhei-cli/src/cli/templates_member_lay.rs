@@ -27,6 +27,9 @@
         materialized: MaterializedTemplate,
         placement: ProjectPlacement,
         settings: Option<PreparedProjectSettings>,
+        /// Computed after validation, emitted only when the whole instantiation
+        /// succeeds, including a project's later members. §FS-rhei-library.7.2.3
+        shared_inputs: Vec<String>,
         /// The `--dry-run` render, kept until the summary has read it.
         _scratch: Option<tempfile::TempDir>,
     }
@@ -144,12 +147,17 @@
             return Err(fail(settings.as_ref(), err));
         }
 
+        // Every include has joined; diagnose this member's own machine once.
+        // Inherited defaults are diagnosed by the project lay. §FS-rhei-library.7.2.3
+        let shared_inputs = shared_input_warnings_in_file(&target_dir.join("states.yaml"))
+            .map_err(|err| fail(settings.as_ref(), err))?;
+
         if prospective_member {
             // No-replace rename is the only publication point. §FS-rhei-templates.6.1.2
             publish_staged_member(&target_dir, lay.output_dir, settings.as_ref(), lay.keep_on_error)?;
             materialized.output_dir = lay.output_dir.to_path_buf();
         }
-        Ok(LaidRhei { materialized, placement, settings, _scratch: None })
+        Ok(LaidRhei { materialized, placement, settings, shared_inputs, _scratch: None })
     }
 
     /// `rhei instantiate <plan-template> --into <project>`: the member the

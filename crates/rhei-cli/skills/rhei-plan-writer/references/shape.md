@@ -69,3 +69,4 @@ A task has children when the parent **steers** them, **integrates** them, or
 2. [`examples/shape/review-against-spec`](../../../../../examples/shape/review-against-spec/README.md)
 3. [`examples/shape/cve-category`](../../../../../examples/shape/cve-category/README.md)
 4. [`examples/shape/parts-of-a-feature`](../../../../../examples/shape/parts-of-a-feature/README.md)
+5. [`examples/shape/spec-first`](../../../../../examples/shape/spec-first/README.md)

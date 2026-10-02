@@ -1,0 +1,62 @@
+name: shape-spec-first
+version: 1
+
+# One machine for both shapes of the spec-first pair. The task shape runs every
+# task in `work`, and the contract is the first task's export. The state shape
+# runs its first task through `specify -> implement`, and the contract is a
+# handoff between those two states. Only where the contract lives differs.
+#
+# Every state runs the `mock` agent so the example runs with no credentials.
+
+states:
+  work:
+    initial: true
+    agent: mock
+    description: Do the task's work and record why it ends where it does.
+    instructions: |
+      Do Task {task_id} as its body describes. Write every export its
+      `**Provides:**` names before you finish, and your result last.
+
+  specify:
+    agent: mock
+    description: Write the spec point and the failing test, and hand both to implement.
+    instructions: |
+      Write the spec point and the failing test Task {task_id} needs, and name
+      both in `{output.contract.path}`.
+    outputs:
+      - name: contract
+        path: runtime/contract/{task_id}.md
+
+  implement:
+    agent: mock
+    description: Build the change the contract names.
+    instructions: |
+      Build what `{input.contract.path}` names, and write your result.
+    inputs:
+      - name: contract
+        path: runtime/contract/{task_id}.md
+
+  completed:
+    description: Done.
+    final: true
+
+  cancelled:
+    description: Dropped. The reserved name, so a cancelled step owes no export.
+    final: true
+
+transitions:
+  - from: work
+    to: completed
+    description: The work is done and its result written.
+
+  - from: specify
+    to: implement
+    description: The contract is written; build to it.
+
+  - from: implement
+    to: completed
+    description: The change is built and its result written.
+
+  - from: "*"
+    to: cancelled
+    description: Dropped.

@@ -23,6 +23,7 @@ Use this table when you know the job you want to model:
 | The parts of one feature: siblings or children? | `shape/parts-of-a-feature/` | Column, endpoint and page authored flat and under a parent that can only say they are done; the rule picks flat. |
 | Checks a verdict is owed: siblings or children? | `shape/review-against-spec/` | One check per spec point, as siblings joined by exports and as children of a supervising reading; the rule picks children. |
 | Work whose count is unknown until it runs | `shape/cve-category/` | One assessment per CVE, appended as siblings by a lister and as children by a supervising parent; the rule picks children. |
+| Spec first: is the contract a task or a handoff? | `shape/spec-first/` | The spec point and failing test authored as a task three later steps consume and as a `specify → implement` handoff; the rule picks the task. |
 
 ## Files
 

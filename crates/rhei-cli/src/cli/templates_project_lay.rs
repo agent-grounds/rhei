@@ -141,20 +141,26 @@
         writes: UnionWrites,
         /// Each top-level bundle entry copied, as the summary names it.
         copied: Vec<String>,
+        /// Each file the project already has whose bytes or mode the copy
+        /// changes, by its `/`-separated path in the project.
+        replaced: Vec<String>,
     }
 
     /// The default machine whole, the bundle copied beside it, and the bundled
     /// settings hoisted into the project's home. The machine and the
     /// `prompt_templates/` and `scripts/` it runs are replaced, never unioned
-    /// into; another bundled file keeps the plan template's rule, that a file
-    /// the project already has must be the same file. §FS-rhei-templates.6.4
-    /// §FS-rhei-library.2.3 §FS-rhei-library.3.1
+    /// into, and every file of the project's that the copy changes is named
+    /// rather than lost silently; another bundled file keeps the plan
+    /// template's rule, that a file the project already has must be the same
+    /// file. §FS-rhei-templates.6.4 §FS-rhei-library.2.2 §FS-rhei-library.2.3
+    /// §FS-rhei-library.3.1
     fn plan_project_root(rendered: &Path, project: &Path) -> MietteResult<ProjectRoot> {
         let mut writes = UnionWrites::default();
         writes
             .files
             .push((project.join("states.yaml"), read_text(&rendered.join("states.yaml"))?));
         let mut copied = Vec::new();
+        let mut changed = Vec::new();
         let mut entries: Vec<PathBuf> = fs::read_dir(rendered)
             .map_err(|err| file_io_report(rendered, "failed to read the rendered template", err))?
             .filter_map(Result::ok)
@@ -178,14 +184,20 @@
             for src in &files {
                 let relative = src.strip_prefix(rendered).unwrap_or(src);
                 let dst = project.join(relative);
-                if !replaced && dst.is_file() && fs::read(&dst).ok() != fs::read(src).ok() {
-                    return Err(miette!(
-                        help = "a project template renames nothing: give the template's copy a \
-                                name of its own.",
-                        "'{}' is shipped by the template and already exists in the project with \
-                         different contents",
-                        display_slash(&dst)
-                    ));
+                if dst.is_file() {
+                    let bytes_differ = fs::read(&dst).ok() != fs::read(src).ok();
+                    if !replaced && bytes_differ {
+                        return Err(miette!(
+                            help = "a project template renames nothing: give the template's copy \
+                                    a name of its own.",
+                            "'{}' is shipped by the template and already exists in the project \
+                             with different contents",
+                            display_slash(&dst)
+                        ));
+                    }
+                    if bytes_differ || permissions_of(&dst) != permissions_of(src) {
+                        changed.push(display_slash(relative));
+                    }
                 }
                 writes.copies.push((src.clone(), dst));
             }
@@ -198,7 +210,11 @@
         if let Some(found) = resolve_rhei_home_file(rendered, WORKSPACE_SETTINGS_FILE) {
             hoist_settings_into_project(found.path(), project, &mut writes)?;
         }
-        Ok(ProjectRoot { writes, copied })
+        Ok(ProjectRoot { writes, copied, replaced: changed })
+    }
+
+    fn permissions_of(path: &Path) -> Option<fs::Permissions> {
+        fs::metadata(path).ok().map(|meta| meta.permissions())
     }
 
     /// Every file under `path`, in a stable order.
@@ -238,12 +254,21 @@
         Ok(())
     }
 
-    /// The bytes every root write is about to replace, so a failure after the
-    /// root is written puts the project back byte for byte. The project's
-    /// settings file is always kept, because a member's hoist writes it too.
+    /// The bytes and permissions every root write is about to replace, so a
+    /// failure after the root is written puts the project back as it was — a
+    /// copy carries its source's mode, so the bytes alone would leave a script
+    /// with the template's. The project's settings file is always kept,
+    /// because a member's hoist writes it too.
     struct RootBackup {
         project: PathBuf,
-        saved: Vec<(PathBuf, Option<Vec<u8>>)>,
+        saved: Vec<(PathBuf, Option<SavedFile>)>,
+    }
+
+    /// A file as it stood before the root write, `None` beside its path when
+    /// there was none.
+    struct SavedFile {
+        bytes: Vec<u8>,
+        permissions: Option<fs::Permissions>,
     }
 
     impl RootBackup {
@@ -258,8 +283,10 @@
             paths.sort();
             paths.dedup();
             let saved = paths.into_iter().map(|path| {
-                let bytes = fs::read(&path).ok();
-                (path, bytes)
+                let kept = fs::read(&path)
+                    .ok()
+                    .map(|bytes| SavedFile { bytes, permissions: permissions_of(&path) });
+                (path, kept)
             });
             Self { project: project.to_path_buf(), saved: saved.collect() }
         }
@@ -267,10 +294,13 @@
         /// Put every saved path back as it was, removing what did not exist
         /// and the directories created only to hold it.
         fn restore(&self) {
-            for (path, bytes) in &self.saved {
-                match bytes {
-                    Some(bytes) => {
-                        let _ = fs::write(path, bytes);
+            for (path, kept) in &self.saved {
+                match kept {
+                    Some(kept) => {
+                        let _ = fs::write(path, &kept.bytes);
+                        if let Some(permissions) = &kept.permissions {
+                            let _ = fs::set_permissions(path, permissions.clone());
+                        }
                     }
                     None => {
                         if fs::remove_file(path).is_ok() {
@@ -306,7 +336,9 @@
             Some(scratch) => scratch.path().join(output_dir.file_name().unwrap_or_default()),
             None => hidden_staging_path(output_dir)?,
         };
-        let laid = lay_project_staged(lay, &rendered, output_dir, &staged);
+        // A refusal names the project the caller asked for, not its staging.
+        let laid = lay_project_staged(lay, &rendered, output_dir, &staged)
+            .map_err(|err| respell_staging(err, &staged, output_dir));
         let summary = match laid {
             Ok(summary) => summary,
             Err(err) if lay.dry_run || !keep_on_error => {

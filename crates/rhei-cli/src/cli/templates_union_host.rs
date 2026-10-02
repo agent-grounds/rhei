@@ -96,8 +96,40 @@
             (true, true) => Err(ambiguous_into_target(target, &workspace_host(&root, None), &root)),
             (true, false) => Ok(IntoTarget::Rhei(workspace_host(&root, None))),
             (false, true) => Ok(IntoTarget::Project(root)),
-            (false, false) => Err(no_rhei_to_place_into(target)),
+            (false, false) => Err(match dotted_path_hint(cwd, target) {
+                Some(hint) => miette!(help = hint, "no rhei '{target}' to place into"),
+                None => no_rhei_to_place_into(target),
+            }),
         }
+    }
+
+    /// A path is never split at a dot, so `panta/reports.ticket` names a
+    /// directory called `reports.ticket`. When the part of its last segment
+    /// before the dot is a rhei in that directory, say so and give the bare
+    /// spelling that does split. §FS-rhei-library.2.2
+    fn dotted_path_hint(cwd: &Path, target: &str) -> Option<String> {
+        let (holder, last) = target.trim_end_matches(['/', '\\']).rsplit_once(['/', '\\'])?;
+        let (rhei_id, task) = last.split_once('.')?;
+        if rhei_id.is_empty() || task.is_empty() {
+            return None;
+        }
+        let dir = into_target_path(cwd, if holder.is_empty() { "/" } else { holder });
+        let rhei = dir.join(rhei_id).join("index.rhei.md").is_file()
+            || dir.join(format!("{rhei_id}.rhei.md")).is_file();
+        if !rhei {
+            return None;
+        }
+        let from = if dir == cwd { "this directory".to_owned() } else { format!("'{holder}'") };
+        let anywhere = if workspace::is_panta_project(&dir) {
+            ", or from anywhere inside its project"
+        } else {
+            ""
+        };
+        Some(format!(
+            "a path is never split at a dot, so '{target}' names a directory called '{last}'. \
+             To place under task '{task}' of rhei '{rhei_id}', name it bare, `--into \
+             {rhei_id}.{task}`, from {from}{anywhere}."
+        ))
     }
 
     /// `cwd` joined with `target`, `.` and `..` folded away lexically, so `.`

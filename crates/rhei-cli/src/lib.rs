@@ -52,6 +52,7 @@ mod templates {
     // §FS-rhei-templates.6.4: laying a project, and rebinding one that exists.
     include!("cli/templates_project_lay.rs");
     include!("cli/templates_project_rebind.rs");
+    include!("cli/templates_project_links.rs");
     include!("cli/templates_publication.rs");
     include!("cli/templates_rename.rs");
     include!("cli/templates_project.rs");

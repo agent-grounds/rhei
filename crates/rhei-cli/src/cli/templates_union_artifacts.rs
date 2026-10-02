@@ -77,15 +77,19 @@
                     if other == name {
                         continue;
                     }
-                    // A definition the union coalesces adds no writer, even
-                    // beside another writer already in the host. §FS-rhei-library.3.1
-                    if let (Some(host_state), Some(part_state)) = (
-                        host.get("states").and_then(|states| states.get(name)),
-                        part.value.get("states").and_then(|states| states.get(name)),
-                    ) {
-                        if same_definition("states", name, host_state, part_state, part) {
-                            continue;
+                    // Either coalesced writer makes this pair internal to one side. §FS-rhei-library.7.2.4
+                    if [other, name].into_iter().any(|writer| {
+                        match (
+                            host.get("states").and_then(|states| states.get(writer)),
+                            part.value.get("states").and_then(|states| states.get(writer)),
+                        ) {
+                            (Some(host_state), Some(part_state)) => {
+                                same_definition("states", writer, host_state, part_state, part)
+                            }
+                            _ => false,
                         }
+                    }) {
+                        continue;
                     }
                     return Err(miette!(
                         help = "give the two states distinct artifact paths, or keep one of \

@@ -904,7 +904,8 @@ exactly as §FS-rhei-templates.6.1.2 steps 3–5 do:
 - **the bundle**: `prompt_templates/*` and `scripts/*` **copied** beside the
   manifest, never symlinked, so the project is self-contained even when the
   template is a built-in inside the binary and nothing platform-specific enters
-  the behaviour ([§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity)). Other bundled files travel as they
+  the behaviour ([§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity)), and `--into` never writes through a link a project
+  already has ([§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target)). Other bundled files travel as they
   do for a plan template, except `README.md`, which describes the template;
 - **the settings**: a bundled `settings.json` hoisted to
   `<dir>/.agent-grounds/rhei/settings.json` as §FS-rhei-templates.6.2 specifies;
@@ -922,8 +923,9 @@ validate`, `rhei run` and `rhei list` cannot tell it was laid.
 
 `rhei instantiate <project-template> --into <project>` lays the same parts into
 a project that already exists: it keeps the project's own manifest, lays the
-default machine by replacing the root `states.yaml`, and lays only the members
-that are not already there ([§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target)). Replacing a default refuses
+default machine by replacing the root `states.yaml`, replaces the bundle with
+it and names every bundle file that changes, and lays only the members that are
+not already there ([§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target)). Replacing a default refuses
 before writing when it would strand a ticket ([§FS-rhei-library.2.3](rhei-library.spec.md#23-the-default-machine-is-replaced-never-unioned-into)). `--output`
 and `--into` are the same renderer and the same writer, told apart by whether
 the project is already there, and the same template laid both ways — once into

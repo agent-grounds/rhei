@@ -31,6 +31,7 @@ Use this table when you know the job you want to model:
 | Running the gate: a task or implement's last state? | `shape/running-the-gate/` | The gate authored as a program task whose verdict ship consumes and as the last state of implement; the rule picks the task. |
 | Opening the draft pull request: a state or a task? | `shape/draft-pull-request/` | Opening the pull request authored as a program state of the task that committed and as a task of its own; the rule picks the state. |
 | A supervisor's decision: the parent's visit or a child? | `shape/supervisor-decision/` | A supervisor's decision between two children authored in the parent's visit and brief and as a decision child; the rule picks the visit. |
+| Classifying an issue: states of the triage or a task? | `shape/classifying-an-issue/` | Classifying an issue authored as an agent state then a program state of the task that triages it and as a task of its own; the rule picks the states. |
 
 ## Files
 

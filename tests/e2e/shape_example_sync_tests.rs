@@ -36,6 +36,7 @@ const PAIRS: &[(&str, [&str; 2])] = &[
     ("running-the-gate", ["task", "state"]),
     ("draft-pull-request", ["state", "task"]),
     ("supervisor-decision", ["visit", "child"]),
+    ("classifying-an-issue", ["state", "task"]),
 ];
 
 /// Every skill that states the rule, and so must carry the extract and the

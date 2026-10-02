@@ -1,0 +1,65 @@
+name: shape-classifying-an-issue
+version: 1
+
+# One machine for both shapes of the classifying-an-issue pair. `classify` is
+# an agent state that judges the kind and hands it to `labelling` through a
+# state output; `labelling` is a program that puts the label on the stand-in
+# forge, `forge/issue-87.md`, and writes the kind into its task's `kind`
+# export. The state shape runs both inside the task that triages; the task
+# shape gives classifying a task of its own after triage.
+#
+# Every agent state runs the `mock` agent so the example runs with no
+# credentials, and the program is the same Python file.
+
+states:
+  work:
+    initial: true
+    agent: mock
+    description: Do the task's work and record why it ends where it does.
+    instructions: |
+      Do Task {task_id} as its body describes, and write your result last.
+
+  classify:
+    agent: mock
+    description: Judge the issue's kind and hand it to labelling.
+    outputs:
+      - name: kind
+        path: runtime/classify/{task_id}.md
+    instructions: |
+      Judge which kind issue 87 is — bug, feature, usability or tokens — and
+      write the one word to {output.kind.path}. Labelling runs after you.
+
+  labelling:
+    description: Label the issue with the kind, and export it.
+    inputs:
+      - name: kind
+        path: runtime/classify/{task_id}.md
+    program:
+      command: ["python3", "workflow.py", "--program", "labelling"]
+    program_timeout: 1m
+
+  completed:
+    description: Done.
+    final: true
+
+  cancelled:
+    description: Dropped. The reserved name, so a cancelled step owes no export.
+    final: true
+
+transitions:
+  - from: work
+    to: completed
+    description: The work is done and its result written.
+
+  - from: classify
+    to: labelling
+    description: The kind is judged; put the label on.
+
+  - from: labelling
+    to: completed
+    exit_code: 0
+    description: The issue is labelled and the kind exported.
+
+  - from: "*"
+    to: cancelled
+    description: Dropped.

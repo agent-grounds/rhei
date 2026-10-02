@@ -75,3 +75,4 @@ A task has children when the parent **steers** them, **integrates** them, or
 8. [`examples/shape/waiting-on-a-person`](../../../../../examples/shape/waiting-on-a-person/README.md)
 9. [`examples/shape/candidate-lookup`](../../../../../examples/shape/candidate-lookup/README.md)
 10. [`examples/shape/running-the-gate`](../../../../../examples/shape/running-the-gate/README.md)
+11. [`examples/shape/draft-pull-request`](../../../../../examples/shape/draft-pull-request/README.md)

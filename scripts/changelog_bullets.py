@@ -2,10 +2,12 @@
 """One definition of an `Unreleased` changelog bullet. §FS-rhei-distribution.5.1
 
 The release stamper (`prepare_changelog_release.py stamp`,
-§FS-rhei-distribution.5.2) and the test that checks the repository's own
-changelog has the shape the release reads both read `docs/changelog.md` through
+§FS-rhei-distribution.5.2), the scheduled release's gate (`due`, which counts a
+commit as writing the section only when it changed the bullets,
+§FS-rhei-distribution.5.3) and the test that checks the repository's own
+changelog has the shape the release reads all read `docs/changelog.md` through
 this module, so a bullet the write-up passed that check with is a bullet the
-stamper can find.
+stamper can find and the gate can see.
 
 A bullet is its `- ` line together with every following line up to the next
 bullet or the end of the section; trailing blank lines belong to no bullet, so a

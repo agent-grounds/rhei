@@ -5,6 +5,10 @@
 bullets they left, and runs before `prepare` promotes the section, because the
 numbers are resolved from the commits the bullets were written in
 (§FS-rhei-distribution.5.2).
+
+`due` is the scheduled release's gate: it holds while code has merged since
+`Unreleased` was last written, so no release ships code its section does not
+describe (§FS-rhei-distribution.5.3).
 """
 
 from __future__ import annotations
@@ -28,6 +32,8 @@ RELEASE_RE = re.compile(
     r"^## (?P<number>[0-9]+)\. \[(?P<version>[0-9]+\.[0-9]+\.[0-9]+)\] - (?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2})\s*$"
 )
 OLDER_RE = re.compile(r"^## (?P<number>[0-9]+)\. Older releases\s*$")
+# What a release is not cut for: docs and CI. §FS-rhei-distribution.5.1
+DOCS_AND_CI_RE = re.compile(r"^(?:docs/|\.github/)|\.md$|^(?:LICENSE|lychee\.toml)$")
 BLAME_HEADER_RE = re.compile(r"^(?P<sha>[0-9a-f]{40,64}) [0-9]+ [0-9]+")
 UNCOMMITTED_RE = re.compile(r"^0+$")
 
@@ -160,7 +166,7 @@ class _Forge:
         return numbers.pop(), ""
 
     def _blame(self, first: int, last: int) -> list[str] | None:
-        result = self._run("git", "blame", "--line-porcelain", "-L", f"{first},{last}", "--", self.name)
+        result = _spawn(self.cwd, "git", "blame", "--line-porcelain", "-L", f"{first},{last}", "--", self.name)
         if result is None or result.returncode != 0:
             return None
         shas: list[str] = []
@@ -179,26 +185,112 @@ class _Forge:
         return self._cache[sha]
 
     def _ask(self, sha: str) -> set[int] | None:
-        result = self._run(
-            "gh", "api", f"repos/{{owner}}/{{repo}}/commits/{sha}/pulls", "--jq", ".[].number"
+        result = _spawn(
+            self.cwd, "gh", "api", f"repos/{{owner}}/{{repo}}/commits/{sha}/pulls", "--jq", ".[].number"
         )
         if result is None or result.returncode != 0:
             return None
         return {int(token) for token in result.stdout.split() if token.isdigit()}
 
-    def _run(self, *args: str) -> subprocess.CompletedProcess[str] | None:
-        # The resolved path rather than the bare name: on Windows a bare name
-        # reaches only a `.exe`, so a `gh` shim would read as a forge that could
-        # not be asked. §REQ-cross-platform.3
-        executable = tool(args[0])
-        if executable is None:
-            return None
-        try:
-            return subprocess.run(
-                [executable, *args[1:]], cwd=str(self.cwd), check=False, capture_output=True, text=True
+
+def release_due(changelog: Path, tag: str, output: Path) -> None:
+    """Answer `Auto bump`'s gate step: is a release due since `tag`?
+
+    `ok=true` goes to `output` only when code has merged since the tag and
+    `Unreleased` was last written after all of it. Otherwise the step holds with
+    a notice that says why, and a hold exits 0 like a release does: it is the
+    expected answer between a merge and its write-up, and only an error fails
+    the run. §FS-rhei-distribution.5.3
+    """
+    history = _History(changelog)
+    tagged = history.commit(tag)
+    due = False
+    if not history.code_changed_since(tagged):
+        print(f"::notice::Only docs/CI changes since {tag}; skipping.")
+    else:
+        # The tag sits on the release commit, which empties the section, so
+        # with no write since, the tag is the last write.
+        written = history.last_write_after(tagged) or tagged
+        waiting = history.code_changed_since(written)
+        if waiting:
+            print(
+                f"::notice::Changes merged since ## Unreleased was last written ({written[:7]}) "
+                "wait for their release section; skipping."
             )
-        except FileNotFoundError:
-            return None
+            for path in waiting:
+                print(f"  {path}")
+        else:
+            due = True
+    with output.open("a", encoding="utf-8") as handle:
+        handle.write(f"ok={'true' if due else 'false'}\n")
+
+
+class _History:
+    """What changed since a commit, and when `Unreleased` was last written, asked of git."""
+
+    def __init__(self, changelog: Path) -> None:
+        resolved = changelog.resolve()
+        self.cwd = resolved.parent if resolved.parent.is_dir() else Path.cwd()
+        self.name = resolved.name
+        self._bullets: dict[str, tuple[str, ...]] = {}
+
+    def commit(self, ref: str) -> str:
+        return self._git("rev-parse", "--verify", f"{ref}^{{commit}}").strip()
+
+    def code_changed_since(self, commit: str) -> list[str]:
+        """The paths outside docs and CI that differ between `commit` and `HEAD`."""
+        paths = self._git("diff", "--name-only", "-z", commit, "HEAD").split("\0")
+        return [path for path in paths if path and not DOCS_AND_CI_RE.search(path)]
+
+    def last_write_after(self, commit: str) -> str | None:
+        """The newest first-parent commit after `commit` that changed `Unreleased`'s bullets.
+
+        A bullet is read as §FS-rhei-distribution.5.1 reads it, so an edit to the
+        note above the section, or to the blank lines between bullets, is not a
+        write. §FS-rhei-distribution.5.3
+        """
+        for line in self._git("rev-list", "--first-parent", "--parents", f"{commit}..HEAD").splitlines():
+            child, *parents = line.split()
+            before = self._unreleased(parents[0]) if parents else ()
+            if self._unreleased(child) != before:
+                return child
+        return None
+
+    def _unreleased(self, commit: str) -> tuple[str, ...]:
+        """The bullets of `Unreleased` at `commit`; none where it has no such section."""
+        if commit not in self._bullets:
+            # `./` makes the path relative to `cwd`, which is the changelog's own directory.
+            result = _spawn(self.cwd, "git", "show", f"{commit}:./{self.name}")
+            if result is None:
+                raise ChangelogError("`git` is not on PATH")
+            lines = result.stdout.splitlines(keepends=True) if result.returncode == 0 else []
+            try:
+                found = changelog_bullets.bullets(lines)
+            except changelog_bullets.ChangelogFormatError:
+                found = []
+            self._bullets[commit] = tuple(bullet.raw for bullet in found)
+        return self._bullets[commit]
+
+    def _git(self, *args: str) -> str:
+        result = _spawn(self.cwd, "git", *args)
+        if result is None:
+            raise ChangelogError("`git` is not on PATH")
+        if result.returncode != 0:
+            raise ChangelogError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
+        return result.stdout
+
+
+def _spawn(cwd: Path, *args: str) -> subprocess.CompletedProcess[str] | None:
+    # The resolved path rather than the bare name: on Windows a bare name
+    # reaches only a `.exe`, so a `gh` shim would read as a forge that could
+    # not be asked. §REQ-cross-platform.3
+    executable = tool(args[0])
+    if executable is None:
+        return None
+    try:
+        return subprocess.run([executable, *args[1:]], cwd=str(cwd), check=False, capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
 
 
 def _warn(message: str) -> None:
@@ -351,6 +443,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     subparsers.add_parser("stamp", help="write resolved pull request numbers onto Unreleased bullets")
 
+    due = subparsers.add_parser("due", help="say whether the scheduled release is due, as a step output")
+    due.add_argument("tag")
+    due.add_argument("--output", type=Path, required=True)
+
     notes = subparsers.add_parser("notes", help="write release notes for the inline release")
     notes.add_argument("version")
     notes.add_argument("--output", type=Path, required=True)
@@ -361,6 +457,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             prepare_release(args.changelog, args.version, args.date)
         elif args.command == "stamp":
             stamp_pull_requests(args.changelog)
+        elif args.command == "due":
+            release_due(args.changelog, args.tag, args.output)
         elif args.command == "notes":
             extract_notes(args.changelog, args.version, args.output)
         else:

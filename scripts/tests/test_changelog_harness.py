@@ -23,8 +23,8 @@ class HarnessTests(ScriptTestCase):
         """A wrapper forwarding to the real git is a shell, and `cmd` eats `^`.
 
         Windows reads `^` as its own escape character, so a `.bat` forwarding `%*`
-        hands git `main{commit}` where `_Git.commit` wrote `main^{commit}`; every
-        base candidate then fails to resolve and the check degrades. This reads the
+        hands git `v0.1.0{commit}` where `_History.commit` wrote `v0.1.0^{commit}`,
+        and the tag `due` was asked about then fails to resolve. This reads the
         same on all three platforms, so the rule holds on the legs it never broke.
         """
         path = f"{self.bin}{os.pathsep}{os.environ.get('PATH', '')}"

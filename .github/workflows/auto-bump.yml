@@ -54,24 +54,16 @@ jobs:
             echo "::notice::No commits since ${{ steps.versions.outputs.current_tag }}; skipping."
           fi
 
+      # The release script answers, because "last written" is about a section
+      # inside the changelog: it holds, green, while code has merged since
+      # `## Unreleased` was last written. Every later step waits on `ok`. §AR-ci-release.3
       - name: Gate - non-doc/CI changes since last tag
         id: gate_substantive
         if: steps.gate_commits.outputs.count != '0'
         shell: bash
         run: |
           set -euo pipefail
-          tag="${{ steps.versions.outputs.current_tag }}"
-          substantive="$(git diff --name-only "$tag"..HEAD \
-            | grep -Ev '^(docs/|\.github/)' \
-            | grep -Ev '\.md$' \
-            | grep -Ev '^(LICENSE|lychee\.toml|AGENTS\.md|CLAUDE\.md)$' \
-            || true)"
-          if [ -z "$substantive" ]; then
-            echo "::notice::Only docs/CI changes since $tag; skipping."
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-          fi
+          python3 scripts/prepare_changelog_release.py due "${{ steps.versions.outputs.current_tag }}" --output "$GITHUB_OUTPUT"
 
       - name: Gate - CI on current main tip is green
         if: steps.gate_substantive.outputs.ok == 'true'

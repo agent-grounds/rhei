@@ -25,6 +25,7 @@ Use this table when you know the job you want to model:
 | Work whose count is unknown until it runs | `shape/cve-category/` | One assessment per CVE, appended as siblings by a lister and as children by a supervising parent; the rule picks children. |
 | Spec first: is the contract a task or a handoff? | `shape/spec-first/` | The spec point and failing test authored as a task three later steps consume and as a `specify → implement` handoff; the rule picks the task. |
 | Review rounds: a loop or a task per round? | `shape/review-rounds/` | Two review and fix rounds authored as a counted loop of states in one task and as four tasks; the rule picks the loop. |
+| Claiming the issue: a task or the root's first state? | `shape/claiming-the-issue/` | The claim authored as a program task beside the ticket and as the ticket's first state, which runs after its subtree; the rule picks the sibling. |
 
 ## Files
 

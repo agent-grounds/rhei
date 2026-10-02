@@ -30,6 +30,7 @@ const PAIRS: &[(&str, [&str; 2])] = &[
     ("parts-of-a-feature", ["flat", "nested"]),
     ("spec-first", ["task", "state"]),
     ("review-rounds", ["loop", "tasks"]),
+    ("claiming-the-issue", ["sibling", "root-state"]),
 ];
 
 /// Every skill that states the rule, and so must carry the extract and the

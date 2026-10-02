@@ -13,6 +13,23 @@ fn count_files(path: &Path) -> usize {
     fs::read_dir(path).map(|entries| entries.filter_map(Result::ok).count()).unwrap_or(0)
 }
 
+/// How long each worker waits for all eight to start: as long as the harness's
+/// own wait for them, so the eight refusals are in flight together however
+/// slowly a loaded runner starts them. It ends at the eighth start.
+const START_PATIENCE: Duration = PROVIDER_WAIT_PATIENCE;
+
+/// How long each worker then holds its refusal: the controlled delay
+/// §FS-rhei-run.3.3 has the parking observed under, past the fixed 10 s that
+/// observation once allowed.
+const CONTROLLED_DELAY: Duration = Duration::from_secs(11);
+
+/// The workers' timeout: a whole patience past the longest a worker lives, its
+/// start wait and its delay, so a slow runner never turns a refusal into a
+/// timeout.
+const WORKER_TIMEOUT: Duration = Duration::from_secs(
+    START_PATIENCE.as_secs() + CONTROLLED_DELAY.as_secs() + PROVIDER_WAIT_PATIENCE.as_secs(),
+);
+
 fn provider_limit_workspace() -> (TestDir, std::path::PathBuf, std::path::PathBuf) {
     let index = "# Rhei: Provider limit parking\n";
     let tasks = (1..=8)
@@ -38,15 +55,17 @@ write(starts / (local + '.txt'), env('RHEI_ATTEMPT'))
 marker = root / 'runtime' / 'provider-limit-refusals' / (local + '.txt')
 if not marker.exists():
     write(marker, 'refused\n')
-    deadline = time.time() + 5
+    deadline = time.time() + {start_patience}
     while len(list(starts.glob('*.txt'))) < 8 and time.time() < deadline:
         time.sleep(0.01)
-    time.sleep(11)
+    time.sleep({controlled_delay})
     print({LIMIT_SIGNAL:?}, file=sys.stderr, flush=True)
     raise SystemExit(1)
 result('## Result\n\nResumed after the provider wait.\n')
 write(root / 'runtime' / 'provider-limit-resumed' / (local + '.txt'), 'resumed\n')
-"#
+"#,
+            start_patience = START_PATIENCE.as_secs(),
+            controlled_delay = CONTROLLED_DELAY.as_secs(),
         ),
     );
     let settings_dir = workspace.join(".agent-grounds/rhei");
@@ -59,12 +78,13 @@ write(root / 'runtime' / 'provider-limit-resumed' / (local + '.txt'), 'resumed\n
     "codex": {{
       "command": {},
       "stdin_prompt": true,
-      "timeout": "20s",
+      "timeout": "{}s",
       "modes": {{ "yolo": [] }}
     }}
   }}
 }}"#,
-            fixture_command(&agent)
+            fixture_command(&agent),
+            WORKER_TIMEOUT.as_secs()
         ),
     )
     .expect("write settings");

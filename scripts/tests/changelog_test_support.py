@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fixtures for the changelog gate and stamper tests. §FS-rhei-distribution.5
+"""Fixtures for the changelog gate, stamper and release-due tests. §FS-rhei-distribution.5
 
 The tests drive the scripts as subprocesses over a throwaway git repository, so
 what they pin is the contract a contributor and a workflow actually meet: the
@@ -20,6 +20,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -28,6 +29,10 @@ GATE = REPO_ROOT / "scripts" / "check_changelog_pr_entry.py"
 STAMPER = REPO_ROOT / "scripts" / "prepare_changelog_release.py"
 PRE_COMMIT_CONFIG = REPO_ROOT / ".pre-commit-config.yaml"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+AUTO_BUMP_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "auto-bump.yml"
+RELEASE_MINOR_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release-minor.yml"
+CHANGELOG = REPO_ROOT / "docs" / "changelog.md"
+SCRIPTS = REPO_ROOT / "scripts"
 
 WINDOWS = os.name == "nt"
 
@@ -84,6 +89,24 @@ def changelog(unreleased: list[str], released: str = "- Something released. (PR 
     return f"# Changelog\n\n## Unreleased\n\n{body}\n## 0.5.1 - 2026-09-20\n\n{released}\n"
 
 
+def release_changelog(unreleased: list[str], note: str | None = None) -> str:
+    """A `docs/changelog.md` in the shape `prepare` reads, the note optional.
+
+    `## Unreleased`, then the inline release, then `Older releases`, which is
+    what the release promotes and what the shape test asks of the real file
+    (§FS-rhei-distribution.5.1).
+    """
+    lead = f"{note}\n\n" if note is not None else ""
+    body = "\n\n".join(unreleased)
+    if body:
+        body += "\n\n"
+    return (
+        f"# Changelog\n\n{lead}## Unreleased\n\n{body}"
+        "## 2. [0.1.0] - 2026-09-20\n\n- The first release. (PR #1)\n\n"
+        "## 3. Older releases\n\n- [0.0.9](changelog/0.0.9.md) - 2026-09-01: Before it.\n"
+    )
+
+
 class TempRepo:
     """A git repository with a `docs/changelog.md`, thrown away after the test."""
 
@@ -117,6 +140,12 @@ class TempRepo:
 
     def touch_source(self, name: str, text: str = "the change itself\n") -> None:
         (self.path / name).write_text(text, encoding="utf-8")
+
+    def write(self, relative: str, text: str = "changed\n") -> None:
+        """Write a file at a `/`-separated path under the repository."""
+        path = self.path.joinpath(*relative.split("/"))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
 
     def commit(self, message: str) -> str:
         self.git("add", "-A")
@@ -321,3 +350,61 @@ def checkout_fetch_depth(job: str) -> str | None:
                 return found.group("depth")
         return None
     raise AssertionError(f"job {job!r} has no actions/checkout step")
+
+
+def job_lines(workflow: Path, job: str) -> list[str]:
+    """The lines of one job of a workflow, its `name:` and `steps:` included.
+
+    Read without PyYAML for the reason `hook_stages` gives: the `lint` job
+    installs `pre-commit` and nothing else (§AR-ci-release.1).
+    """
+    lines = workflow.read_text(encoding="utf-8").splitlines()
+    start = next((index for index, line in enumerate(lines) if re.match(rf"^  {re.escape(job)}:\s*$", line)), None)
+    if start is None:
+        raise AssertionError(f"no job {job!r} in {workflow}")
+    end = next((index for index in range(start + 1, len(lines)) if re.match(r"^  \S", lines[index])), len(lines))
+    return lines[start:end]
+
+
+def workflow_steps(workflow: Path, job: str) -> list[dict[str, str]]:
+    """Each step of one job as its top-level keys, with `run:` as its script.
+
+    A step's `name`, `id`, `if` and `uses` are read as written; a block `run: |`
+    is the step's script, dedented, and `raw` is the step's every line. Nested
+    keys such as `with:` are only in `raw`. (§AR-ci-release.3)
+    """
+    lines = job_lines(workflow, job)
+    at = next((index for index, line in enumerate(lines) if re.match(r"^\s*steps:\s*$", line)), None)
+    if at is None:
+        raise AssertionError(f"job {job!r} in {workflow} has no steps")
+
+    blocks: list[list[str]] = []
+    indent = None
+    for line in lines[at + 1 :]:
+        item = re.match(r"^(?P<indent> *)- (?P<rest>.*)$", line)
+        if item and (indent is None or len(item.group("indent")) == indent):
+            indent = len(item.group("indent"))
+            blocks.append([" " * (indent + 2) + item.group("rest")])
+        elif blocks:
+            blocks[-1].append(line)
+    return [_step(block, (indent or 0) + 2) for block in blocks]
+
+
+def _step(block: list[str], indent: int) -> dict[str, str]:
+    step: dict[str, str] = {"raw": "\n".join(block)}
+    key_re = re.compile(rf"^ {{{indent}}}(?P<key>[A-Za-z_-]+):\s*(?P<value>.*)$")
+    index = 0
+    while index < len(block):
+        found = key_re.match(block[index])
+        index += 1
+        if found is None:
+            continue
+        key, value = found.group("key"), found.group("value").strip()
+        if value in ("|", ">"):
+            body: list[str] = []
+            while index < len(block) and (not block[index].strip() or block[index].startswith(" " * (indent + 1))):
+                body.append(block[index])
+                index += 1
+            value = textwrap.dedent("\n".join(body)).strip("\n")
+        step[key] = value
+    return step

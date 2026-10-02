@@ -83,6 +83,46 @@ class ChangelogStampTests(ScriptTestCase):
         self.assertEqual(repo.read_changelog(), before)
         self.assertIn("left unstamped", self.output(result))
 
+    # --- one number, one bullet ---------------------------------------------
+
+    GUARDED = "left unstamped (PR #500 would go into 2 bullets; write each its own (PR #500))"
+
+    @unittest.expectedFailure
+    def test_a_number_two_bullets_resolve_to_goes_into_neither(self):
+        """A write-up merged as one pull request is not credited with the release.
+
+        Both bullets were written in one commit, which resolves to #500, so today
+        each becomes `(PR #500)` (§FS-rhei-distribution.5.2).
+        """
+        repo, _ = self.repo_with(["- The first change.", "- The second change."], pulls_for_head=[500])
+
+        before = repo.read_changelog()
+        result = self.stamp(repo)
+        self.assertEqual(result.returncode, 0, "stamping never fails a release")
+        self.assertEqual(repo.read_changelog(), before, "neither bullet is stamped")
+        self.assertEqual(self.output(result).count(self.GUARDED), 2, self.report(result))
+
+    @unittest.expectedFailure
+    def test_a_placeholder_counts_as_no_number(self):
+        repo, _ = self.repo_with(["- The first change. (PR #TBD)", "- The second change."], pulls_for_head=[500])
+
+        before = repo.read_changelog()
+        result = self.stamp(repo)
+        self.assertEqual(result.returncode, 0, self.report(result))
+        self.assertEqual(repo.read_changelog(), before, "the placeholder stays where it stands")
+        self.assertEqual(self.output(result).count(self.GUARDED), 2, self.report(result))
+
+    def test_a_bullet_already_carrying_the_number_is_not_counted(self):
+        """Passes today, and must keep passing: a lone unnumbered bullet is stamped."""
+        repo, _ = self.repo_with(["- The first change. (PR #500)", "- The second change."], pulls_for_head=[500])
+
+        result = self.stamp(repo)
+        self.assertEqual(result.returncode, 0, self.report(result))
+        after = repo.read_changelog()
+        self.assertIn("- The first change. (PR #500)", after)
+        self.assertIn("- The second change. (PR #500)", after)
+        self.assertNotIn("would go into", self.output(result))
+
     def test_it_warns_and_writes_nothing_with_no_gh_on_path(self):
         repo, _ = self.repo_with(["- The change this branch made."])
 

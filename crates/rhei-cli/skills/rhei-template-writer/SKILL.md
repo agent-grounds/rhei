@@ -7,7 +7,7 @@ description: Create or edit Rhei Templates — parameterized, reusable bundles o
 
 Create or edit a Rhei Template directory — a manifest plus a plan skeleton (and, when needed, a state machine and settings) that `rhei instantiate` renders into a concrete, executable workspace. The template writer runs before `rhei instantiate`: it packages a proven workflow; `rhei instantiate` materializes it with user-supplied inputs. It does not replace the plan writer or state machine writer — it composes their outputs into something reusable.
 
-For anything beyond a linear checklist — counted loops, multi-agent fan-out and aggregation, parallel tasks, git-worktree isolation, or a coordinator that creates follow-up tasks at run time — do not design from scratch. Start from the [Pattern Library](#pattern-library--canonical-examples): it maps each pattern to a checked-in, `rhei validate`-passing reference template to read and adapt.
+For anything beyond a linear checklist — counted loops, multi-agent fan-out and aggregation, parallel tasks, git-worktree isolation, or a coordinator that creates follow-up tasks at run time — do not design from scratch. Start from the [Pattern Library](references/pattern-library.md): it maps each pattern to a checked-in, `rhei validate`-passing reference template to read and adapt.
 
 ## When To Use This Skill
 
@@ -306,97 +306,11 @@ qualified union. The default output directory joins aliases in mount order.
 
 ## Pattern Library — Canonical Examples
 
-When a workflow is more than a linear checklist, start from a proven template. Each entry is a checked-in, `rhei validate`-passing reference — read its `states.yaml` (diagram in the top comment), its `tasks/`, and its `README.md`, then adapt. Paths are repo-relative.
-
-**State or task?** (the shape decision every entry below already made)
-- Examples `examples/shape/`: four pairs, each the same work authored flat and nested, both validating and runnable with the mock agent — [`reproducer`](../../../../examples/shape/reproducer/README.md), [`review-against-spec`](../../../../examples/shape/review-against-spec/README.md), [`cve-category`](../../../../examples/shape/cve-category/README.md) and [`parts-of-a-feature`](../../../../examples/shape/parts-of-a-feature/README.md). [references/shape.md](references/shape.md) carries the memory test, the three reasons and the decision table of [§FS-rhei-shape](../../../../docs/functional-spec/rhei-shape.spec.md#fs-rhei-shape-state-task-subtask-rhei-or-prose).
-- Technique: a product only the next state of the same task reads is a state — a counted `review → fix` loop whose rounds nobody reads is states of one task. A product a later task, a supervisor or a person names is a task with `**Provides:**`. A parent earns children only when it steers, integrates or speaks for them; otherwise they are flat siblings chained with `**Prior:**`.
-
-**Counted loops** (`review → fix → review …`)
-- Template `crates/rhei-cli/templates/spec-review/`; examples `examples/spec-review-example/` and the callback-driven `examples/review-fix-visits/`.
-- Technique: a state pair both declaring `visits: N`, with a transition gated `condition: visitCount < visits` (loop back) vs `visitCount >= visits` (exit). The smallest loop in the repo.
-
-**Multi-agent review + aggregation** (fan out across reviewers, then merge)
-- Template `crates/rhei-cli/templates/changeset-review/` (the richest: `split → fan-out review → aggregate-reviews → propose-fixes → aggregate-proposals → decide → human gate → fix`); also `crates/rhei-cli/templates/spec-implementation/`.
-- Technique: `all_targets: <array_input>` fans one state across many agents inside a single task; a following aggregator state run by a single `smart_target` merges the per-agent artifacts. Reviewer multiplicity is an input, never hardcoded.
-
-**Multi-target / multi-model fan-out**
-- Template `crates/rhei-cli/templates/multi-model-analysis/`; example `examples/multi-model-analysis-example/`.
-- Technique: an `analyze` state with `all_targets` over an `agents` object-array, then one synthesis state. Per-target artifact paths slugify a structured field: `path: …/{{ t.selector|slug }}.md` (the `|slug` filter — the only filter available).
-
-**Multi-round discussion / deliberation** (participants take each other's points into account across rounds, then converge or escalate)
-- Example `examples/agent-discussion/` (callback-driven; no template yet — a candidate to parameterize: participant list, their stances/goals, and the round budget are the natural inputs).
-- Technique: a `collect ↔ judge` loop. `collect` declares `all_models` so the position callback fans out once per participant; every round after the first reads the previous round's judge digest, so positions move instead of repeating. The `judge` callback writes a per-round digest and returns a `nextState` redirect — `converged` (consensus, records `decision.md`), `escalated` (a **gating** human handoff once the round budget is spent), or no redirect to loop back. Participants argue from assigned project goals (distinct stances), so it is a multi-perspective deliberation rather than a one-shot poll, and the converged `decision.md` gates a downstream task via `**Prior:**`. Contrast with *Multi-agent review + aggregation*, which fans out once and merges; this loops and lets participants respond to each other.
-- **Gotcha:** the loop is driven by the judge's `nextState` redirect, **not** by `visits`. Do not put `visits` on the `all_models` `collect` state — the engine runs an `all_models`+`visits` state per-target *per-visit* and spins on a `state → state-2` self-loop. Bound the loop in the judge callback (a `CAP`) instead.
-
-**Dynamic / agent-driven task creation** (a coordinator analyzes, then spawns a run-time-decided number of tasks)
-- Template `crates/rhei-cli/templates/analyze-and-dispatch/`; example `examples/analyze-and-dispatch-example/`. The same coordinator mechanism also lives inside `spec-implementation/` and `changeset-review/`.
-- Technique: the rhei "API" for adding tasks is **writing a conforming `tasks/NN-<slug>.md` file** into a directory workspace — `rhei run` re-parses `tasks/` every pass, so there is no `rhei add` command. A coordinator state's agent decides how many tasks to create (the count is *not* fixed at instantiation), writes one file per work item with `**Prior:** Task {task_id}` — its own runtime-substituted id, copied verbatim, so spawned tasks wait for the coordinator — and optionally a final aggregate task whose `**Prior:**` lists every spawned id. Use when the number of follow-ups depends on what the agent finds; contrast with *Parallel execution* below, where the count is fixed at instantiation by an array input. (`##` headings are reserved in task files, and a multi-line free-text input must not be interpolated into a `states.yaml` block scalar — keep it in the markdown task body.)
-
-**Parallel execution** (many *independent* tasks advancing at once)
-- Template `crates/rhei-cli/templates/parallel-worktrees/`; example `examples/parallel-worktrees-example/`.
-- Technique: a directory workspace whose `tasks/` file `{% for %}`-fans out sibling tasks with **no `**Prior:**`** between them, and working states marked `concurrent: true`. Both are required (see State machine rule 6). The example README shows the `--parallel N` dry-run beside the sequential one.
-
-**Per-task git worktrees** (isolate concurrent edits)
-- Template `crates/rhei-cli/templates/parallel-worktrees/` (clean), and the `prepare-workspace` state of `changeset-review/` (worktree as one branch of a `none|branch|worktree|fork` choice).
-- Technique: worktree creation is an **instruction the agent runs** (`git worktree add <root>/{task_id} -b <prefix>/{task_id}`), not a Rhei primitive. Key each worktree + branch on `{task_id}` so parallel agents never collide; write runtime artifacts back to the scratchpad, not inside the worktree. Mix instantiation-time `{{...}}` and runtime `{task_id}` in one path to get a per-task, per-instantiation location.
-
-**Supervised delivery pipeline** (a parent that decides what its subtree does next, one step at a time)
-- Template `crates/rhei-cli/templates/supervised-delivery/`; example `examples/supervised-delivery-example/`.
-- Technique: the root task's state declares `execute_on: child-terminal`, so the orchestrator wakes it after every finished child and holds the rest of the subtree in between ([§FS-rhei-supervision](../../../../docs/functional-spec/rhei-supervision.spec.md#fs-rhei-supervision-subtree-supervision-specification)). Three things turn that into a working template. (1) **The brief is the release gate**: every child state declares a *required* `inputs:` entry at `runtime/supervise/{task_id}.md`, so a step whose brief the supervisor has not written is never dispatched — without it a released subtree runs whatever the prerequisite graph allows and the supervisor only watches. (2) **The channel is plan exports**: `**Provides:**` / `**Consumes:**` ([§FS-rhei-plan-language.3.12](../../../../docs/functional-spec/rhei-plan-language.spec.md#312-task-exports)) declare which handoffs the engine injects into prompts; they are data-flow, not filesystem visibility, so workers may still read undeclared sibling exports under `runtime/exports/`. Concurrent scheduling and explicit briefs can reduce accidental cross-reading but cannot enforce blindness once an export exists. Declare the same path as the producing state's `outputs:` so the completion condition refuses a step that did not publish it, and put the schema in a `prompt_templates/` fragment several states share. (3) **Rounds are unrolled** with `{% raw %}{% for k in range(1, review_rounds + 1) %}{% endraw %}` because each round needs its own `**Prior:**` and exports.
-- **Gotchas, both learned the hard way:** do *not* declare `outputs:` on the supervising state — a satisfied completion condition makes `rhei run` advance a ticket without spawning it, so a file written on visit 1 silently skips every later visit; use an `optional: true` **input** instead and branch on `{if input.<name>.exists}` to tell the first visit from the rest. And chain each later phase to the *first* task of the previous phase, never the last: `cancelled` does not satisfy a prerequisite ([§FS-rhei-states.1.4](../../../../docs/functional-spec/rhei-states.spec.md#14-reserved-state-names)), so the first round the supervisor cancels would strand everything after it.
-
-**Human gates / branch / fork isolation / counted decision loops**
-- Templates `crates/rhei-cli/templates/changeset-review/` and `crates/rhei-cli/templates/hourly-human-intervention/`.
+[references/pattern-library.md](references/pattern-library.md) maps each workflow pattern — counted loops, fan-out and aggregation, multi-round discussion, run-time task creation, parallel execution, worktrees, supervised delivery, human gates — to a checked-in, `rhei validate`-passing reference to read and adapt.
 
 ## Example Skeleton
 
-A minimal one-input template using the built-in `rhei` machine and a single-file plan:
-
-```yaml
-# release-notes/template.yaml
-name: release-notes
-version: 1.0
-description: Draft, review, and publish release notes for a version
-
-inputs:
-  - name: version
-    description: Semantic version being released (e.g., 1.4.0)
-    type: string
-    validate: "^\\d+\\.\\d+\\.\\d+$"
-  - name: channel
-    description: Publication channel
-    default: beta
-```
-
-```markdown
-# release-notes/plan.rhei.md
-# Rhei: Release {{version}} notes
-
-## Tasks
-
-### Task draft: Draft notes for {{version}}
-**State:** pending
-
-Draft the release notes for `{{version}}` targeting the `{{channel}}` channel.
-Include highlights, breaking changes, and migration notes.
-
-### Task review: Review draft
-**State:** pending
-**Prior:** Task draft
-
-Review the draft for accuracy, tone, and completeness.
-
-### Task publish: Publish to {{channel}}
-**State:** pending
-**Prior:** Task review
-
-Publish the reviewed notes to the `{{channel}}` channel.
-```
-
-```bash
-rhei instantiate release-notes --set version=1.4.0 --set channel=stable --output ./releases/1.4.0/
-```
+[references/example-skeleton.md](references/example-skeleton.md) is a minimal one-input template on the built-in `rhei` machine: its manifest, its single-file plan and the `rhei instantiate` command that renders it.
 
 ## Missing Information Handling
 

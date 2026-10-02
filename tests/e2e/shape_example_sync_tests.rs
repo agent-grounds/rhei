@@ -26,6 +26,23 @@ const PAIRS: [&str; 4] =
 const AUTHORING_SKILLS: [&str; 3] =
     ["rhei-plan-writer", "rhei-state-machine-writer", "rhei-template-writer"];
 
+/// The heading the extract's links sit under; everything above it is the rule's.
+const LINKS_HEADING: &str = "## The paired examples";
+
+/// What tells corollary 3 of §FS-rhei-shape.2 from corollary 1.
+const COROLLARY_3_QUESTION: &str = "could the product be wrong while the task's outcome is right?";
+
+/// Where the memory test is restated in one sentence, and words that find it.
+const RESTATEMENTS: [(&str, &str); 4] = [
+    ("docs/functional-spec/rhei-authoring.spec.md", "Ask who reads what the"),
+    ("crates/rhei-cli/skills/rhei-plan-writer/SKILL.md", "If anyone but the next state"),
+    ("crates/rhei-cli/skills/rhei-template-writer/SKILL.md", "ask who reads what it writes"),
+    (
+        "crates/rhei-cli/skills/rhei-template-writer/references/pattern-library.md",
+        "a product only the next state",
+    ),
+];
+
 /// The marker comments that delimit a README block this gate owns. The prose
 /// around them is the author's; the bytes between them are the renderer's.
 const PROMPT_OPEN: &str = "<!-- rhei:plan-history -->";
@@ -118,7 +135,7 @@ fn run_shape(pair: &str, shape: &str) -> (TestDir, PathBuf) {
 /// (1) The rule has one normative copy and every authoring skill carries that
 /// copy, byte for byte, rather than a paraphrase that drifts. Four surfaces
 /// stating one rule in four wordings is how #324 happened.
-// §FS-rhei-shape.7 §FS-rhei-install-skills.4.8
+// §FS-rhei-shape.7 §FS-rhei-shape.2 §FS-rhei-install-skills.4.8
 #[test]
 fn the_shape_rule_is_one_normative_copy_every_skill_extracts() {
     let spec = shape_spec();
@@ -140,15 +157,44 @@ fn the_shape_rule_is_one_normative_copy_every_skill_extracts() {
     // The extract is an extract: every one of its quoted blocks is in the spec
     // verbatim, so editing the spec is the only way to change the rule. Only a
     // link's target may differ, because each copy links from where it lives.
-    let spec = link_targets_by_name(&spec);
-    for block in first.split("\n\n").filter(|block| block.len() > 80) {
-        if block.starts_with("- ") || block.starts_with("| ") || block.starts_with("> ") {
+    // A numbered block is §2's corollaries; the numbered links below the rule
+    // are the extract's own.
+    let (rule, _links) = first.split_once(LINKS_HEADING).expect("the extract ends with its links");
+    let spec_text = link_targets_by_name(&spec);
+    for block in rule.split("\n\n").filter(|block| block.len() > 80) {
+        if ["- ", "| ", "> "].iter().any(|lead| block.starts_with(lead)) || numbered(block) {
             assert!(
-                spec.contains(&link_targets_by_name(block.trim_end())),
+                spec_text.contains(&link_targets_by_name(block.trim_end())),
                 "the extract may not say what §FS-rhei-shape does not:\n{block}"
             );
         }
     }
+
+    // And it carries the corollaries rather than only being allowed them: the
+    // test's one line alone answers "task" for rows its own table rules a state.
+    let memory_test = spec.split("\n## ").find(|s| s.starts_with("2. ")).expect("the memory test");
+    let corollaries: Vec<&str> =
+        memory_test.split("\n\n").skip(1).filter(|b| numbered(b)).collect();
+    assert!(!corollaries.is_empty(), "§FS-rhei-shape.2 numbers its corollaries");
+    let extracted = link_targets_by_name(rule);
+    for block in corollaries {
+        assert!(
+            extracted.contains(&link_targets_by_name(block.trim_end())),
+            "the extract leaves out a corollary of §FS-rhei-shape.2:\n{block}"
+        );
+    }
+    for (skill, text) in &copies {
+        let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            text.contains(COROLLARY_3_QUESTION),
+            "{skill}: references/shape.md does not ask {COROLLARY_3_QUESTION:?}"
+        );
+    }
+}
+
+/// Does this block open a numbered list item, `1. …`?
+fn numbered(block: &str) -> bool {
+    block.split_once(". ").is_some_and(|(n, _)| n.parse::<u32>().is_ok())
 }
 
 /// `text` with every Markdown link target cut to its last path segment, the
@@ -171,8 +217,10 @@ fn link_targets_by_name(text: &str) -> String {
 
 /// (2) The two instructions that contradicted each other are gone, and the
 /// phase rule carries its qualifier in the skill as well as in the spec. One
-/// of these shipped in the same binary as the other.
-// §FS-rhei-shape.2 §FS-rhei-state-machine-writer.3.1
+/// of these shipped in the same binary as the other. Every restatement of the
+/// test also keeps a task's own outcome a state, or a shipped surface still
+/// tells an author to make the step that opens the pull request a task.
+// §FS-rhei-shape.2 §FS-rhei-state-machine-writer.3.1 §FS-rhei-authoring.3
 #[test]
 fn no_authoring_skill_contradicts_the_shape_rule() {
     let plan_writer =
@@ -210,6 +258,24 @@ fn no_authoring_skill_contradicts_the_shape_rule() {
         assert!(
             rule.contains("unless") || rule.contains("read by"),
             "{label}: the phase rule is still unqualified: {rule}"
+        );
+        assert!(
+            rule.contains("own outcome"),
+            "{label}: the phase rule still makes a task of its task's own outcome: {rule}"
+        );
+    }
+    for (path, words) in RESTATEMENTS {
+        let text = fs::read_to_string(repo_root().join(path)).expect(path);
+        let at = text.find(words).unwrap_or_else(|| panic!("{path} restates the memory test"));
+        // The paragraph or list item the restatement sits in, and nothing past it.
+        let start =
+            [text[..at].rfind("\n\n"), text[..at].rfind("\n- ")].into_iter().flatten().max();
+        let rest = &text[at..];
+        let end = [rest.find("\n\n"), rest.find("\n- ")].into_iter().flatten().min();
+        let restated = &text[start.map_or(0, |i| i + 1)..at + end.unwrap_or(rest.len())];
+        assert!(
+            restated.contains("own outcome"),
+            "{path}: the restated memory test has no \"own outcome\" clause:\n{restated}"
         );
     }
 

@@ -80,3 +80,4 @@ A task has children when the parent **steers** them, **integrates** them, or
 13. [`examples/shape/classifying-an-issue`](../../../../../examples/shape/classifying-an-issue/README.md)
 14. [`examples/shape/discussion-to-a-ruling`](../../../../../examples/shape/discussion-to-a-ruling/README.md)
 15. [`examples/shape/module-questions`](../../../../../examples/shape/module-questions/README.md)
+16. [`examples/shape/epic-of-issues`](../../../../../examples/shape/epic-of-issues/README.md)

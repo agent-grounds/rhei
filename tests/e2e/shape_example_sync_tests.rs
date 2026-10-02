@@ -39,6 +39,7 @@ const PAIRS: &[(&str, [&str; 2])] = &[
     ("classifying-an-issue", ["state", "task"]),
     ("discussion-to-a-ruling", ["rhei", "children"]),
     ("module-questions", ["nested", "flat"]),
+    ("epic-of-issues", ["flat", "nested"]),
 ];
 
 /// The shapes that are a Panta project rather than one plan, each with the

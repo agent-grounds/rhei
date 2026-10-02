@@ -33,6 +33,7 @@ Use this table when you know the job you want to model:
 | A supervisor's decision: the parent's visit or a child? | `shape/supervisor-decision/` | A supervisor's decision between two children authored in the parent's visit and brief and as a decision child; the rule picks the visit. |
 | Classifying an issue: states of the triage or a task? | `shape/classifying-an-issue/` | Classifying an issue authored as an agent state then a program state of the task that triages it and as a task of its own; the rule picks the states. |
 | A discussion to a ruling: its own rhei or children? | `shape/discussion-to-a-ruling/` | A discussion with participants, rounds and a ruling authored as a rhei of its own in a two-rheis project and as children of a parent that rules; the rule picks the rhei. |
+| Questions about a module: subtasks under the report or siblings? | `shape/module-questions/` | Three questions about a module authored as children of the report that integrates their answers and as siblings before it; the rule picks the subtasks. |
 
 ## Files
 

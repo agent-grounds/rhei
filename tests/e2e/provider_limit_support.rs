@@ -33,11 +33,10 @@ impl RunningChild {
         self.child.as_mut().expect("run child")
     }
 
-    /// What the run has written to stderr so far.
+    /// What the run has written to stderr so far, read through the harness's
+    /// seam like every other captured stderr. §FS-rhei-errors.2
     pub(super) fn stderr(&self) -> String {
-        fs::read_to_string(&self.stderr).unwrap_or_else(|error| {
-            format!("<cannot read the run's stderr '{}': {error}>", self.stderr.display())
-        })
+        stderr_from_file(&self.stderr)
     }
 
     /// Wait for the run to exit, as long as the slowest runner needs.

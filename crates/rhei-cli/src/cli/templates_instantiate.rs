@@ -55,6 +55,12 @@
         }
 
         let layout = detect_template_layout(template_dir)?;
+        // An entry that cannot be a member is refused before anything is
+        // rendered. §FS-rhei-library.6.1
+        let members = match layout {
+            TemplateLayout::Project => project_members(template_dir, &manifest)?,
+            TemplateLayout::SingleFile | TemplateLayout::Workspace => Vec::new(),
+        };
         let template_input_args =
             template_input_args_without_execute_args(input_args, execute_args)?;
         let resolved_values = collect_template_inputs(
@@ -82,8 +88,13 @@
         // Inside a project the default home is the project itself; defaulting
         // to the working directory dropped the workspace where discovery never
         // looks, so no command listed it. §FS-rhei-templates.6.2
-        let default_output =
-            enclosing_project_for_new_rhei(&cwd).unwrap_or(cwd).join(template_name);
+        let default_output = match layout {
+            // A project is never a member of another. §FS-rhei-templates.6.4
+            TemplateLayout::Project => cwd.join(template_name),
+            TemplateLayout::SingleFile | TemplateLayout::Workspace => {
+                enclosing_project_for_new_rhei(&cwd).unwrap_or(cwd).join(template_name)
+            }
+        };
         let explicit_output = output.is_some();
         let output_dir = output.map(Path::to_path_buf).unwrap_or(default_output);
 
@@ -96,60 +107,49 @@
             ));
         }
 
-        let scratch = if dry_run {
-            Some(
-                tempfile::tempdir()
-                    .map_err(|err| miette!(
-                        help = "--dry-run renders into a temp directory. Check that $TMPDIR exists and is writable.",
-                        "failed to create temporary output directory: {err}"
-                    ))?,
-            )
-        } else {
-            None
-        };
-        let prospective_member = !dry_run
-            && layout == TemplateLayout::Workspace
-            && owning_project_of(&output_dir).is_some();
-        let target_dir = if let Some(scratch) = scratch.as_ref() {
-            scratch.path().join("instantiate-output")
-        } else if prospective_member {
-            hidden_staging_path(&output_dir)?
-        } else {
-            output_dir.clone()
-        };
-
-        // §FS-rhei-errors.4: a --dry-run target is scratch space the user never
-        // chose and never sees, so failures there name template-relative paths.
-        let materialized =
-            match materialize_template(
+        let entrypoint = if layout == TemplateLayout::Project {
+            let lay = ProjectLay {
                 template_dir,
-                template,
-                layout,
-                &target_dir,
-                &resolved_values,
+                template_ref: template,
+                manifest: &manifest,
+                values: &resolved_values,
+                members: &members,
                 dry_run,
-            ) {
-                Ok(materialized) => materialized,
-                Err(err) => {
-                    if !dry_run {
-                        let _ = remove_path(&target_dir, false);
-                    }
-                    return Err(err);
-                }
             };
+            lay_project_output(&lay, &output_dir, keep_on_error)?;
+            output_dir.clone()
+        } else {
+            let laid = lay_member_rhei(&MemberLay {
+                template_dir,
+                template_ref: template,
+                manifest: &manifest,
+                layout,
+                values: &resolved_values,
+                output_dir: &output_dir,
+                dry_run,
+                keep_on_error,
+            })?;
+            report_laid_rhei(&laid, &output_dir, &manifest.name, dry_run)?;
+            laid.materialized.entrypoint()
+        };
+        print_template_instantiation_command(
+            template,
+            &template_input_args,
+            set_values,
+            set_files,
+            values_files,
+            &output_dir,
+        );
 
-        // A budget identity belongs to a run and never to a template, whether
-        // the template is placed or laid standalone. §FS-rhei-library.5
-        if let Err(err) = refuse_rendered_identity(&manifest.name, &target_dir)
-            .and_then(|()| apply_includes(template_dir, &manifest, &resolved_values, &target_dir, layout))
-        {
-            if !dry_run {
-                let _ = remove_path(&target_dir, false);
-            }
-            return Err(err);
+        if execute {
+            // A project resolves its own machines; its root file is the default,
+            // never an override for the whole scope. §FS-rhei-plan-language.1.3
+            let state_machine_path = Some(output_dir.join("states.yaml"))
+                .filter(|path| layout != TemplateLayout::Project && path.is_file());
+            let opts = parse_execute_run_options(&entrypoint, execute_args)?;
+            return run_command(&entrypoint, state_machine_path.as_deref(), opts);
         }
-
-        finish_template_instantiation(materialized, &output_dir, &target_dir, prospective_member, &manifest.name, template, &template_input_args, set_values, set_files, values_files, execute, dry_run, keep_on_error, execute_args)
+        Ok(())
     }
 
     /// A standalone workspace inside a git repository is tracked content

@@ -47,7 +47,11 @@ mod templates {
     include!("cli/templates_union_includes.rs");
     include!("cli/templates_union.rs");
     include!("cli/templates_instantiate.rs");
+    include!("cli/templates_member_lay.rs");
     include!("cli/templates_finish.rs");
+    // §FS-rhei-templates.6.4: laying a project, and rebinding one that exists.
+    include!("cli/templates_project_lay.rs");
+    include!("cli/templates_project_rebind.rs");
     include!("cli/templates_publication.rs");
     include!("cli/templates_rename.rs");
     include!("cli/templates_project.rs");
@@ -67,6 +71,7 @@ mod templates {
         include!("cli/tests_templates_union.rs");
         include!("cli/tests_templates_union_hold.rs");
         include!("cli/tests_templates_union_fence.rs");
+        include!("cli/tests_templates_project.rs");
     }
 }
 

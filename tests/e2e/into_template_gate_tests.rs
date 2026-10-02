@@ -103,8 +103,13 @@ fn every_built_in_instantiates_standalone_and_into_a_scratch_rhei() {
         let spanned = if routes.is_empty() { declared_states(&machine) } else { BTreeSet::new() };
         let host = scratch_host(&dir.join(name), &spanned);
 
-        let placed =
-            run_into(&["instantiate", name, "--into", &format!("{name}/scratch.ticket")], &dir);
+        // A path is never split at a dot, so the task half rides on the bare id,
+        // named from the directory the scratch rhei sits in. §FS-rhei-library.2.2
+        let placed = super::into_project_lay_support::rhei_in(
+            &dir,
+            &dir.join(name),
+            &["instantiate", name, "--into", "scratch.ticket"],
+        );
         assert!(
             placed.status.success(),
             "{name} instantiates standalone but not `--into` a scratch rhei; got:\nstdout:\n{}\nstderr:\n{}",

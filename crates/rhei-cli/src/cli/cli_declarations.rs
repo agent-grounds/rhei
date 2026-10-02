@@ -598,7 +598,11 @@ enum Commands {
     /// Into a rhei: `rhei instantiate code-review HEAD~3 --into release`
     ///
     /// Into a task: `rhei instantiate code-review HEAD~3 --into release.ticket`
-    // §FS-rhei-library.2: the three forms `--into` leaves.
+    ///
+    /// Into a project: `rhei instantiate lifecycle --into ./panta` lays a
+    /// project template's default machine and members, or a plan template as a
+    /// member
+    // §FS-rhei-library.2: the three forms `--into` takes. §FS-rhei-library.2.2: the project form.
     Instantiate {
         /// Template name or path to a template directory
         #[arg(
@@ -659,9 +663,9 @@ enum Commands {
         /// Print the template input schema and exit
         #[arg(long)]
         list_inputs: bool,
-        /// Place the template into a rhei that already exists, as
-        /// `<rhei>` or `<rhei>.<task>`
-        // §FS-rhei-library.2
+        /// Place the template into a rhei or Panta project that already
+        /// exists, as `<rhei>`, `<rhei>.<task>` or `<project>`
+        // §FS-rhei-library.2 §FS-rhei-library.2.2
         #[arg(long, value_name = "TARGET")]
         into: Option<String>,
         /// Path to a states YAML file (uses built-in default when omitted)

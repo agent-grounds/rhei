@@ -6,6 +6,30 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- A template can now lay a whole Panta project. A *project template* carries
+  `index.panta.md` where a plan template carries its plan, and is the third
+  layout `rhei templates` lists, under a new `layout` key in its JSON
+  (§FS-rhei-templates.2). `rhei instantiate <project-template> --output <dir>`
+  lays the manifest, the project's default machine as the root `states.yaml` —
+  never a `**States:**` line — the `prompt_templates/` and `scripts/` bundle
+  copied beside it, the hoisted settings, and one member rhei per `includes:`
+  entry, then validates the whole project before publishing any of it
+  (§FS-rhei-templates.6.4). `--into` now also takes a project
+  (§FS-rhei-library.2.2): a plan template is laid there as a member, exactly as
+  the default `--output` would lay it, and a project template replaces the
+  default machine and lays only the members not already there. Replacing a
+  default refuses before writing when it would strand a ticket of any rhei with
+  no machine of its own or of the basin, or leave a node kind its `node_policy`
+  names undeclared, naming each with what it holds; which tickets that reads is
+  what resolution says, so a member governed by its own declaration is never
+  read (§FS-rhei-library.2.3). A manifest whose deprecated `**States:**` names
+  a different machine is refused naming the line to delete. A bare `--into` id
+  that names both a rhei and a project is refused naming both. A `--into` path
+  is now taken as written and never split at a dot, since a rhei id is one
+  segment: `--into fix/scratch.ticket` no longer means task `ticket` of
+  `fix/scratch` — name the task on the bare id from the rhei's directory,
+  `--into scratch.ticket`.
+
 - A finished parent now speaks for its subtree at the end of a run
   (§FS-rhei-run-report.3.2): when a task with children is terminal and nothing
   under it needs attention or waits at a gate, the console task tree prints one

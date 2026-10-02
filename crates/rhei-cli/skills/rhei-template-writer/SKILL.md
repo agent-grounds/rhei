@@ -45,13 +45,14 @@ A template is a directory. Required layout:
 ├── tasks/                 # Directory-workspace task skeletons (only with index.rhei.md)
 │   ├── 01-step.md
 │   └── ...
+├── index.panta.md         # — OR — a project manifest skeleton (see *Project templates*)
 └── ...                    # Additional files: text rendered, binary copied
 ```
 
 Rules:
 
 - The directory name is the template identifier and must match `manifest.name` exactly.
-- Exactly one plan entry point: `plan.rhei.md` **or** `index.rhei.md`. Having both is an error.
+- Exactly one entry point: `plan.rhei.md`, `index.rhei.md` **or** `index.panta.md`. Having two is an error. `rhei templates` shows which layout each template is.
 - `template.yaml` is parsed before rendering, is never templated itself, and is excluded from the output. Hidden files/directories (names beginning with `.`) are also excluded.
 - A root-level `settings.json` is moved to `.agent-grounds/rhei/settings.json` in the output — do not write the `.agent-grounds/rhei/` path in the template source.
 - Binary files (null bytes in the first 8 KiB) are copied verbatim. Text files are rendered through the instantiation environment and must decode as UTF-8.
@@ -188,6 +189,10 @@ The renderer is strict: referencing an undefined variable or missing object prop
 5. **Do not validate or reason from raw templated `states.yaml` as if it were final YAML** while it still contains placeholders — instantiate first, then inspect or validate the rendered `states.yaml`.
 6. **For task-level parallelism, set `concurrent: true` on the working states and ship a directory workspace.** `rhei run --parallel N` runs up to N ready tasks at once, but only schedules multiple tasks in the *same* state together when that state declares `concurrent: true` (default `false`); otherwise it defers them one-per-pass and the fan-out serializes. `--parallel` is also ignored on single-file `plan.rhei.md` plans. Real parallelism needs **both** independent ready tasks (sibling tasks with no shared `**Prior:**`, e.g. one per array entry via `{% for %}` in the `tasks/` file) **and** `concurrent: true` states. This is orthogonal to `all_targets` / `all_models`, which fan a *single* task's state across multiple targets inside one task. See the `parallel-worktrees` template.
 
+### Project templates
+
+A template whose entry point is `index.panta.md` lays a whole Panta project ([§FS-rhei-templates.6.4](../../../../docs/functional-spec/rhei-templates.spec.md#64-laying-a-panta-project)). Its `states.yaml` is required and becomes the project default at the root, so the manifest never carries `**States:**`; `prompt_templates/` and `scripts/` are copied beside it (`README.md` is not), `settings.json` is hoisted, and each `includes:` entry — a directory-workspace template, never with `under:` — is laid as a member at `<project>/<entry-name>/`. A member that should not follow the default carries its own `states.yaml`. `--output <dir>` lays a new project; `--into <project>` keeps the manifest, replaces the default and lays only the members not already there, refusing before it writes when a ticket would be stranded. Validate and dry-run the laid project like any plan.
+
 ### Authoring verification
 
 1. **Instantiate before validating** — the authoritative artifact is the rendered workspace, not the placeholder-bearing source.
@@ -214,7 +219,7 @@ The renderer is strict: referencing an undefined variable or missing object prop
 1. Determine whether this is a new template or an edit to an existing template.
 2. For edits, read the existing `template.yaml`, README, plan skeleton, optional `states.yaml` / `settings.json`, checked-in example, and any reported validation error before changing files. Preserve the template's public input contract unless the user requested a breaking change.
 3. Confirm workflow, parameters, and state-machine scope with the user when they are not clear from the existing template or request.
-4. Pick single-file (`plan.rhei.md`) or directory workspace (`index.rhei.md` + `tasks/`). Prefer single-file unless per-file concurrency matters; do not change an existing template's shape without a concrete reason.
+4. Pick single-file (`plan.rhei.md`) or directory workspace (`index.rhei.md` + `tasks/`). Prefer single-file unless per-file concurrency matters; do not change an existing template's shape without a concrete reason. Pick a project template (`index.panta.md`) only when what ships is a project's default machine and its members (see *Project templates*).
 5. Draft or update `template.yaml` with the minimum required inputs.
 6. Draft or update the plan skeleton — interpolate `{{...}}` only where input shapes the output; keep runtime `{...}` variables where they belong.
 7. Decide whether to bundle or update `states.yaml`. If yes, apply `rhei-state-machine-writer` for the full machine, wire in `{{...}}` where needed, and add or maintain the diagram comment block.
@@ -291,6 +296,7 @@ qualified union. The default output directory joins aliases in mount order.
 | `--set-file KEY=<path>` | Inject long text (briefs, descriptions) without shell-quoting hell. |
 | `--dry-run` | Render + validate into a scratch dir, write nothing. Catches rendering and validation errors. |
 | `--output <path>` | Defaults to `<project>/<template-name>/` inside a Panta project, else `./<template-name>/` ([§FS-rhei-templates.6.2](../../../../docs/functional-spec/rhei-templates.spec.md#62-instantiating-inside-a-panta-project)). Must **not** already exist (except under `--dry-run`); instantiation refuses to merge/overwrite. |
+| `--into <target>` | Place into what already exists instead of writing a new directory: `<rhei>` or `<rhei>.<task>` unions a plan template into that rhei, and `<project>` lays a plan template as a member or a project template's default and missing members. |
 | `--keep-on-error` | Keep the output dir when post-instantiation validation fails, so you can inspect the broken render. First move when an example won't validate. |
 | `--list-inputs` | Print the resolved input schema and exit — quick way to confirm the manifest parses. |
 | `--execute` | Instantiate then immediately `rhei run` (mutually exclusive with `--dry-run`). |

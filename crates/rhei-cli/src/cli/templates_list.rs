@@ -38,17 +38,31 @@
         }
     }
 
+    /// Which entry point a template carries, which is the whole of what it
+    /// lays: a plan file, a Directory Workspace, or a Panta project.
+    /// §FS-rhei-templates.2
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum TemplateLayout {
         SingleFile,
         Workspace,
+        /// `index.panta.md`: a project template. §FS-rhei-templates.6.4
+        Project,
     }
 
     impl TemplateLayout {
         fn entrypoint(self, output_dir: &Path) -> PathBuf {
             match self {
                 TemplateLayout::SingleFile => output_dir.join("plan.rhei.md"),
-                TemplateLayout::Workspace => output_dir.to_path_buf(),
+                TemplateLayout::Workspace | TemplateLayout::Project => output_dir.to_path_buf(),
+            }
+        }
+
+        /// The `layout` key `rhei templates --json` reports. §FS-rhei-templates.6.3
+        fn as_str(self) -> &'static str {
+            match self {
+                TemplateLayout::SingleFile => "single-file",
+                TemplateLayout::Workspace => "workspace",
+                TemplateLayout::Project => "project",
             }
         }
     }
@@ -186,6 +200,7 @@
         manifest: TemplateManifest,
         path: PathBuf,
         source: TemplateSource,
+        layout: TemplateLayout,
     }
 
     #[derive(Debug)]
@@ -252,8 +267,13 @@
 
         println!("Templates:");
         for template in templates {
+            // The table marks a project template as one. §FS-rhei-templates.6.3
+            let marker = match template.layout {
+                TemplateLayout::Project => "  (project template)",
+                TemplateLayout::SingleFile | TemplateLayout::Workspace => "",
+            };
             println!(
-                "{}  {}  {}",
+                "{}  {}  {}{marker}",
                 template.manifest.name,
                 template.manifest.version_string(),
                 template.source.as_str(),
@@ -274,6 +294,7 @@
             "description": template.manifest.description,
             "source": template.source.as_str(),
             "path": template.path,
+            "layout": template.layout.as_str(),
             "required_inputs": template.manifest.required_input_count(),
             "inputs": template.manifest.inputs.iter().map(|input| {
                 let mut entry = template_schema_json(&input.schema);
@@ -345,6 +366,7 @@ help = internal_error_help(),
                 manifest,
                 path: resolved.path().to_path_buf(),
                 source: TemplateSource::Project,
+                layout: detect_template_layout(resolved.path())?,
             };
             let mut value = template_json_entry(&entry);
             // A directory reference has no discovery tier to report.

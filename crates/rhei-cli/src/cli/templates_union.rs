@@ -279,8 +279,8 @@
         fs::read_to_string(path).map_err(|err| file_io_report(path, "failed to read", err))
     }
 
-    /// `rhei instantiate <template> [inputs] --into <rhei>[.<task>]`.
-    /// §FS-rhei-library.2
+    /// `rhei instantiate <template> [inputs] --into <rhei>[.<task>]`, or
+    /// `--into <project>`. §FS-rhei-library.2 §FS-rhei-library.2.2
     #[allow(clippy::too_many_arguments)]
     fn instantiate_into_command(
         template: Option<&str>,
@@ -308,8 +308,31 @@
             return Ok(());
         }
 
-        let host = resolve_union_host(target)?;
-        resolve_host_machine(&host)?;
+        let layout = detect_template_layout(template_dir)?;
+        // An entry that cannot be a member is refused before anything else is
+        // read, so `under:` is named whatever the target. §FS-rhei-library.6.1
+        let members = match layout {
+            TemplateLayout::Project => project_members(template_dir, &manifest)?,
+            TemplateLayout::SingleFile | TemplateLayout::Workspace => Vec::new(),
+        };
+        // What `--into` does is decided by the target on disk and the
+        // template's layout, never by a flag. §FS-rhei-library.2.2
+        let target = resolve_into_target(target)?;
+        if let IntoTarget::Rhei(host) = &target {
+            if layout == TemplateLayout::Project {
+                return Err(miette!(
+                    help = format!(
+                        "lay it into a project with `--into <project>`, or as a project of its \
+                         own with `--output <dir>`; '{}' is a rhei.",
+                        display_slash(&host.root)
+                    ),
+                    "template '{}' is a project template: it lays a project's default machine \
+                     and members, so it is never placed into a rhei",
+                    manifest.name
+                ));
+            }
+            resolve_host_machine(host)?;
+        }
         let values = collect_template_inputs(
             &manifest,
             template,
@@ -318,6 +341,26 @@
             set_values,
             set_files,
         )?;
+        let host = match target {
+            IntoTarget::Rhei(host) => host,
+            IntoTarget::Project(project) if layout == TemplateLayout::Project => {
+                let lay = ProjectLay {
+                    template_dir,
+                    template_ref: template,
+                    manifest: &manifest,
+                    values: &values,
+                    members: &members,
+                    dry_run,
+                };
+                return lay_project_into(&lay, &project);
+            }
+            IntoTarget::Project(project) => {
+                return lay_member_into_project(
+                    template_dir, template, &manifest, layout, &values, input_args, &project,
+                    dry_run,
+                );
+            }
+        };
         let scratch = tempfile::tempdir().map_err(|err| {
             miette!(
                 help = "a template is rendered into a temp directory before it joins a plan. \
@@ -365,8 +408,9 @@
         if state_machine {
             return Err(refuse(
                 "--state-machine",
-                "that is an invocation override; a union is a durable write and goes into the \
-                 file the target actually runs under.",
+                "that is an invocation override, and both things `--into` writes are durable: a \
+                 union goes into the file the target actually runs under, and laying a \
+                 project's default writes the file the whole project runs under.",
             ));
         }
         Ok(())

@@ -87,8 +87,8 @@
     }
 
     /// Copy the files a *project's* validation reads: its manifest, its default
-    /// machine and bundle, the settings every member resolves through it, and
-    /// each member rhei's own plan files.
+    /// machine and bundle, the settings every member resolves through it, each
+    /// member rhei's own plan files, and the basin's tickets.
     ///
     /// Mirroring the member alone is what let a union report success over a
     /// write that made every project-scoped command fail — the same isolation
@@ -113,6 +113,12 @@
         for entry in entries {
             let Some(name) = entry.file_name() else { continue };
             mirror_plan_files(&entry, &mirror.join(name))?;
+        }
+        // The basin runs under the project default, so a check of what the
+        // default governs has to read its tickets too. §FS-rhei-library.2.3
+        let basin = project.join(rhei_core::workspace::BASIN_RHEI_ID);
+        if basin.is_dir() {
+            copy_tree(&basin, &mirror.join(rhei_core::workspace::BASIN_RHEI_ID))?;
         }
         Ok(())
     }

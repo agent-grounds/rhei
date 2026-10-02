@@ -73,6 +73,10 @@ Rhei is the only agent runtime that combines all of:
   templates with `includes:`. Composition is graph union over the names their
   authors wrote, so the result reads like a machine somebody wrote. See
   [`docs/functional-spec/rhei-library.spec.md`](docs/functional-spec/rhei-library.spec.md).
+  A *project template* carries `index.panta.md` instead of a plan and lays a
+  whole Panta project — its default machine, the scripts and prompts that
+  machine runs, its settings and its member rheis — with `--output <dir>` for
+  a new project or `--into <project>` for one that already exists.
 
 See [`docs/functional-spec/comparison.md`](docs/functional-spec/comparison.md) for a detailed comparison against
 beads, beans, opencode, Claude Code TodoWrite, Cline, Cursor, Roo, Devin, and

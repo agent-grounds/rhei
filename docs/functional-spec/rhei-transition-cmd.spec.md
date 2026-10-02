@@ -188,7 +188,8 @@ compare-and-swap and every mutable guard before computing any effect.
     Append `--result`, when given, to `runtime/results/<task-id>.md`; when the
     effective target is `final: true`, also perform the terminal finalization
     of [§FS-rhei-complete.3](rhei-complete.spec.md#3-result-file) — ensure the result file, drop `**Assignee:**`, and
-    link the result from the task body.
+    link the result from the task body. That rewrite replaces the task file the
+    way step 13 does, under the same held sidecar.
 16. Release the sidecar lock.
 
 Steps 10, 12, and 15 are the same code on every verb that can move a task, so a

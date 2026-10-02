@@ -125,7 +125,7 @@ The state machine writer follows these rules when designing a state machine:
 
 ### 3.1. State Design
 
-1. **Every distinct workflow phase gets its own state unless what it writes is read by anyone but the next state of the same task — then it is a task.** A state's outputs reach one reader, so a phase whose product a later step names by hand has to carry an identity, and that identity is a task ([§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test)). Don't overload a single state with multiple meanings. If two phases have different instructions or different exit conditions, they are different states.
+1. **Every distinct workflow phase gets its own state unless what it writes is read by anyone but the next state of the same task — then it is a task, unless it is that task's own outcome.** A state's outputs reach one reader, so a phase whose product a later step names by hand has to carry an identity, and that identity is a task ([§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test)). A product that cannot be wrong apart from its task's outcome — the pull request the task opened, the kind it gave an issue, the answer it waited for — is the exception: a state writes it into that task's export, and the phase stays a state. Don't overload a single state with multiple meanings. If two phases have different instructions or different exit conditions, they are different states.
 
 2. **Name states after what is happening, not who is doing it.** Prefer `security-review` over `security-team`. The state describes the phase; the instructions describe the actor.
 

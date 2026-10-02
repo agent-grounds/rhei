@@ -3,8 +3,8 @@
 When a workflow is more than a linear checklist, start from a proven template. Each entry is a checked-in, `rhei validate`-passing reference — read its `states.yaml` (diagram in the top comment), its `tasks/`, and its `README.md`, then adapt. Paths are repo-relative.
 
 **State or task?** (the shape decision every entry below already made)
-- Examples `examples/shape/`: pairs of the same work authored two ways, both validating and runnable with the mock agent. [shape.md](shape.md) carries the memory test, the three reasons and the decision table of [§FS-rhei-shape](../../../../../docs/functional-spec/rhei-shape.spec.md#fs-rhei-shape-state-task-subtask-rhei-or-prose), and links every pair.
-- Technique: a product only the next state of the same task reads is a state — a counted `review → fix` loop whose rounds nobody reads is states of one task. A product a later task, a supervisor or a person names is a task with `**Provides:**`. A parent earns children only when it steers, integrates or speaks for them; otherwise they are flat siblings chained with `**Prior:**`.
+- Examples `examples/shape/`: pairs of the same work authored two ways, both validating and runnable with the mock agent. [shape.md](shape.md) carries the memory test with its corollaries, the three reasons and the decision table of [§FS-rhei-shape](../../../../../docs/functional-spec/rhei-shape.spec.md#fs-rhei-shape-state-task-subtask-rhei-or-prose), and links every pair.
+- Technique: a product only the next state of the same task reads is a state — a counted `review → fix` loop whose rounds nobody reads is states of one task. A product a later task, a supervisor or a person names is a task with `**Provides:**`, unless it is that task's own outcome. A parent earns children only when it steers, integrates or speaks for them; otherwise they are flat siblings chained with `**Prior:**`.
 
 **Counted loops** (`review → fix → review …`)
 - Template `crates/rhei-cli/templates/spec-review/`; examples `examples/spec-review-example/` and the callback-driven `examples/review-fix-visits/`.

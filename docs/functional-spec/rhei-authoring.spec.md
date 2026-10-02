@@ -52,10 +52,11 @@ parsed as task structure.
 
 Before spelling a task, decide whether the work is one. Ask who reads what the
 step writes: a product only the next phase of the same task reads is a state,
-and anything read from outside that chain is a task. A task is a flat sibling
-chained with `**Prior:**` unless the parent steers, integrates or speaks for
-its children — progressive disclosure is not a reason for depth. The rule, the
-decision table and the cases behind them are [§FS-rhei-shape](rhei-shape.spec.md#fs-rhei-shape-state-task-subtask-rhei-or-prose);
+and anything read from outside that chain is a task, unless it is that task's
+own outcome. A task is a flat sibling chained with `**Prior:**` unless the
+parent steers, integrates or speaks for its children — progressive disclosure
+is not a reason for depth. The rule, the decision table and the cases behind
+them are [§FS-rhei-shape](rhei-shape.spec.md#fs-rhei-shape-state-task-subtask-rhei-or-prose);
 this guide shows how to spell whichever one the rule picked.
 
 ### 3.1. Numeric vs named tasks

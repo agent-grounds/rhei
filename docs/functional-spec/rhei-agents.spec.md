@@ -1342,6 +1342,11 @@ state also declares `outputs:`.
 Under `orchestrator` authority, `rhei run`:
 
 1. Spawns the subprocess and waits on `(subprocess exit) OR (timeout fires)`.
+   The exit that ends the wait is the direct subprocess's: a descendant that
+   still holds the stdout or stderr it inherited does not delay completion.
+   After that exit each captured stream gets a short drain grace, and a reader
+   still open when the grace runs out is detached, so output a descendant
+   writes later reaches the log only best-effort.
 2. On timeout, sends `SIGTERM` to the subprocess, 10 s grace, then `SIGKILL`.
    Timeout transitions fire per [Timeout Handling](#7-timeout-handling). Agents
    that fork long-running descendants should install their own cleanup; the
@@ -2026,6 +2031,9 @@ including independent CLI overrides (§FS-rhei-agents.1.4, §FS-rhei-agents.1.5)
 ## 8. Log Capture
 
 All agent stdout and stderr are captured to log files in the `runtime/logs/` directory relative to the workspace or plan root.
+The one exception is output a descendant writes after the agent itself has
+exited and its drain grace has run out: that is captured best-effort
+(§FS-rhei-agents.3.2.1).
 
 Token and cost accounting is captured separately under `runtime/accounting/`.
 Agent logs remain human-readable transcripts; accounting extractors must use

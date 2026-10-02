@@ -9,6 +9,15 @@ pull request number: the release stamps `(PR #N)` onto it. See
 - The opencode `todo.ts` link in the comparison spec points at the
   repository's new home, `anomalyco/opencode`. GitHub refuses the old
   `sst/opencode` redirect to the CI link check with a 503.
+- The shape rule now says when a step whose product a later step reads stays a
+  state: when the product is its own task's outcome — the pull request it
+  opened, the kind it gave an issue, the answer it waited for — and cannot be
+  wrong apart from it (§FS-rhei-shape.2). The decision table gains rows for
+  opening a pull request, classifying an issue and claiming the work, its
+  reproducer row now covers a contract and a gate's verdict, and the installed
+  `references/shape.md` carries the memory test's corollaries
+  (§FS-rhei-shape.4).
+
 - Composing templates no longer refuses a hand-off. One state writing a
   rhei-scoped artifact path and others reading it compose silently, whether
   they sit in one template or on two sides of an `includes:` or `--into`

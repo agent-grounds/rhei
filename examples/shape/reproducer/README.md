@@ -45,10 +45,14 @@ reproduction sits differs.
 ```
 
 A third shape tempts a template author more than either: the reproduction as a
-*state* of triage, `triage → reproduce → summarize`, with the script's path
-written into triage's summary. It cannot even be written as a handoff —
-`**Consumes:**` names a task, never a state — so the fix would have to fish the
-path out of prose.
+*state* of triage, `triage → reproduce → summarize`. A state may write its
+task's export, so triage could declare `**Provides:** reproducer` itself and the
+fix consume `1:reproducer`. It is still the wrong shape.
+[§FS-rhei-shape.2](../../../docs/functional-spec/rhei-shape.spec.md#2-the-memory-test)
+tells a task's own outcome from an outcome of its own by one question: *could
+the product be wrong while the task's outcome is right?* A script can fail to
+reproduce what triage rightly judged real, so the reproduction is an outcome of
+its own, and it is a task.
 
 ## What the next task sees
 

@@ -29,6 +29,7 @@ Use this table when you know the job you want to model:
 | Waiting on a person: a state or a task? | `shape/waiting-on-a-person/` | A wait for the author's reply authored as a polling state of the asking task and as a wait task; the rule picks the state, and the answer is the asker's export. |
 | Candidate lookup before a verdict: a state or a task? | `shape/candidate-lookup/` | A search for duplicate candidates authored as a program state feeding triage's verdict state and as a search task; the rule picks the state. |
 | Running the gate: a task or implement's last state? | `shape/running-the-gate/` | The gate authored as a program task whose verdict ship consumes and as the last state of implement; the rule picks the task. |
+| Opening the draft pull request: a state or a task? | `shape/draft-pull-request/` | Opening the pull request authored as a program state of the task that committed and as a task of its own; the rule picks the state. |
 
 ## Files
 

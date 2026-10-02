@@ -51,43 +51,49 @@ work, and its result can only say that they are done.
 A task added after the nested run is told this under `## Plan History`
 (`rhei next --peek`):
 
-<!-- rhei:plan-history -->
+<!-- rhei:plan-history nested -->
 ```text
 Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
 
 - Task nested.1: Avatar upload — completed — The three parts below are done. — 3 subtasks: 3 completed
 ```
-<!-- /rhei:plan-history -->
+<!-- /rhei:plan-history nested -->
 
 Everything a later task could use — the column's name, the endpoint's path —
 is folded under a line that says nothing. The flat run tells the same task:
 
+<!-- rhei:plan-history flat -->
 ```text
+Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
+
 - Task flat.1: Add the avatar column — completed — Added the nullable `avatar_url` column to `users`, with migration 0042.
 - Task flat.2: Add the upload endpoint — completed — Added `PUT /users/{id}/avatar`; it stores the image and writes its URL to `avatar_url`.
 - Task flat.3: Show the avatar on the profile page — completed — The profile page shows the avatar, and the initials when there is none.
 ```
+<!-- /rhei:plan-history flat -->
 
 ## What the person sees
 
 The nested run's console task tree folds the finished parent into its line
 ([§FS-rhei-run-report.3.2](../../../docs/functional-spec/rhei-run-report.spec.md#32-task-tree)):
 
-<!-- rhei:task-tree -->
+<!-- rhei:task-tree nested -->
 ```text
    4 tasks · source order
   ✓ nested.1                   completed   agent  <t> — 3 subtasks: 3 completed
 ```
-<!-- /rhei:task-tree -->
+<!-- /rhei:task-tree nested -->
 
 The flat run's tree is one row per part:
 
+<!-- rhei:task-tree flat -->
 ```text
    3 tasks · source order
   ✓ flat.1                     completed   agent  <t>
   ✓ flat.2                     completed   agent  <t>
   ✓ flat.3                     completed   agent  <t>
 ```
+<!-- /rhei:task-tree flat -->
 
 The nested shape also costs the parent an identity, a result file and an agent
 visit of its own, spent on writing *the three parts below are done*.

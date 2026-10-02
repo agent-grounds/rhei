@@ -66,41 +66,46 @@ reading it needs; the flat checks each consume the whole reading instead.
 A task added after the nested run is told this under `## Plan History`
 (`rhei next --peek`):
 
-<!-- rhei:plan-history -->
+<!-- rhei:plan-history nested -->
 ```text
 Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
 
 - Task nested.1: Review pull request 412 against its spec — completed — Request changes: G1 fails, a 1 GB export peaks at 340 MB; R1 and N1 hold. — 3 subtasks: 3 completed
 ```
-<!-- /rhei:plan-history -->
+<!-- /rhei:plan-history nested -->
 
 One line, and it is the verdict. The flat run tells the same task five lines,
 of which the reader wants the last:
 
+<!-- rhei:plan-history flat -->
 ```text
+Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
+
 - Task flat.1: Read pull request 412 — completed — Read pull request 412: a streaming CSV writer behind the existing export command.
 - Task flat.2: Check R1, exports stream their rows — completed — R1 holds: rows go to the file through a 64 KB buffer, never a whole file.
 - Task flat.3: Check G1, a 1 GB export stays under 200 MB — completed — G1 fails: the 1 GB fixture peaks at 340 MB; the writer buffers a page before flushing.
 - Task flat.4: Check N1, no new export format — completed — N1 holds: `--format` still accepts csv and json, nothing else.
 - Task flat.5: Write the verdict — completed — Request changes: G1 fails, a 1 GB export peaks at 340 MB; R1 and N1 hold.
 ```
+<!-- /rhei:plan-history flat -->
 
 ## What the person sees
 
 The nested run's console task tree folds the finished review into its line
 ([§FS-rhei-run-report.3.2](../../../docs/functional-spec/rhei-run-report.spec.md#32-task-tree)):
 
-<!-- rhei:task-tree -->
+<!-- rhei:task-tree nested -->
 ```text
    4 tasks · source order
   ✓ nested.1                   completed   agent×4  <t> — 3 subtasks: 3 completed
 ```
-<!-- /rhei:task-tree -->
+<!-- /rhei:task-tree nested -->
 
 `agent×4` is the reading's four visits: one to brief, one after each check.
 `rhei list --parent nested.1` opens the fold. The flat run's tree is one row
 per task:
 
+<!-- rhei:task-tree flat -->
 ```text
    5 tasks · source order
   ✓ flat.1                     completed   agent  <t>
@@ -109,6 +114,7 @@ per task:
   ✓ flat.4                     completed   agent  <t>
   ✓ flat.5                     completed   agent  <t>
 ```
+<!-- /rhei:task-tree flat -->
 
 ## The ruling
 

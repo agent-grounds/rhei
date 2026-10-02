@@ -128,15 +128,18 @@ Use this table when you know the job you want to model:
 
 - `shape/`
   Paired examples of the shape rule, `docs/functional-spec/rhei-shape.spec.md`,
-  one directory per decision:
-  - `reproducer/`, `parts-of-a-feature/`, `review-against-spec/` and
-    `cve-category/`, each holding the same work authored twice, as `flat/` and
-    `nested/`, both valid and runnable with a committed mock agent
-  - one `states.yaml` per pair, copied into both shapes so each runs alone
-  - a `README.md` per pair that quotes what the next task is told under
-    `## Plan History` and the console task tree its nested run prints, gives
-    the ruling in one sentence, and says when the other shape is right anyway
-  - Run either shape with `cargo xtask examples run shape-<pair>-<flat|nested>`.
+  one directory per decision, each listed in the table above:
+  - the same work authored twice, one directory per shape, named for what the
+    shape is: `flat/` and `nested/` where two task trees are compared, and
+    `state/` and `task/`, `loop/` and `tasks/` and the like elsewhere; both are
+    valid and runnable with a committed mock agent
+  - each shape keeps its own machine beside its plan, so a copy runs alone
+  - a `README.md` per pair that quotes, for both shapes, what the next task is
+    told under `## Plan History` and the console task tree the run prints,
+    gives the ruling in one sentence, and says when the other shape is right
+    anyway
+  - Run any shape with `cargo xtask examples run shape-<pair>-<shape>`; the
+    shapes are found on disk.
 
 - `states-with-spaces.yaml`
   Companion states file for `escaped-state-values.rhei.md`.

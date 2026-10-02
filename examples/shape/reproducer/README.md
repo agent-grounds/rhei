@@ -59,7 +59,7 @@ its own, and it is a task.
 A task added after the nested run is told this under `## Plan History`
 (`rhei next --peek`):
 
-<!-- rhei:plan-history -->
+<!-- rhei:plan-history nested -->
 ```text
 Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
 
@@ -67,36 +67,41 @@ Finished work on the way from the plan's roots to this task, oldest first. Full 
 - Task nested.2: Fix the parser — completed — The parser rejects the literal with E0412 instead of panicking; the reproducer exits 1.
 - Task nested.3: Run the gate — completed — Gate green: 412 tests pass and the reproducer exits 1 with E0412.
 ```
-<!-- /rhei:plan-history -->
+<!-- /rhei:plan-history nested -->
 
 The reproduction is gone from the history: triage speaks for its subtree, and
 `2 subtasks: 2 completed` is all that is left of it. The flat run tells the
 same task:
 
+<!-- rhei:plan-history flat -->
 ```text
+Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
+
 - Task flat.1: Triage the overflow report — completed — Issue 87 is real and new: no earlier report, and its input panics the parser.
 - Task flat.2: Reproduce the overflow — completed — Reproduced: a 20-digit literal panics the parser; the script is the `reproducer` export.
 - Task flat.3: Fix the parser — completed — The parser rejects the literal with E0412 instead of panicking; the reproducer exits 1.
 - Task flat.4: Run the gate — completed — Gate green: 412 tests pass and the reproducer exits 1 with E0412.
 ```
+<!-- /rhei:plan-history flat -->
 
 ## What the person sees
 
 The nested run's console task tree folds the finished triage into its line
 ([§FS-rhei-run-report.3.2](../../../docs/functional-spec/rhei-run-report.spec.md#32-task-tree)):
 
-<!-- rhei:task-tree -->
+<!-- rhei:task-tree nested -->
 ```text
    5 tasks · source order
   ✓ nested.1                   completed   agent  <t> — 2 subtasks: 2 completed
   ✓ nested.2                   completed   agent  <t>
   ✓ nested.3                   completed   agent  <t>
 ```
-<!-- /rhei:task-tree -->
+<!-- /rhei:task-tree nested -->
 
 `rhei list --parent nested.1` opens the fold. The flat run's tree is one row
 per task, the reproduction among them:
 
+<!-- rhei:task-tree flat -->
 ```text
    4 tasks · source order
   ✓ flat.1                     completed   agent  <t>
@@ -104,6 +109,7 @@ per task, the reproduction among them:
   ✓ flat.3                     completed   agent  <t>
   ✓ flat.4                     completed   agent  <t>
 ```
+<!-- /rhei:task-tree flat -->
 
 ## The ruling
 

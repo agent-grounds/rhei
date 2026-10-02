@@ -29,6 +29,7 @@ const PAIRS: &[(&str, [&str; 2])] = &[
     ("cve-category", ["nested", "flat"]),
     ("parts-of-a-feature", ["flat", "nested"]),
     ("spec-first", ["task", "state"]),
+    ("review-rounds", ["loop", "tasks"]),
 ];
 
 /// Every skill that states the rule, and so must carry the extract and the

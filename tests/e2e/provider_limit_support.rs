@@ -8,7 +8,21 @@ use std::time::{Duration, Instant};
 pub(super) const LIMIT_SIGNAL: &str =
     "You've hit your session limit · resets 10:20pm (Europe/Zurich)";
 
-const PROVIDER_WAIT_PATIENCE: Duration = Duration::from_secs(30);
+/// How long a watched wait gives a live run to show the next event it waits on.
+pub(super) const PROVIDER_WAIT_PATIENCE: Duration = Duration::from_secs(30);
+
+/// How long a fixture agent waits for a marker the test writes. One agent can be
+/// alive across several of the harness's watched waits - the scheduling test's
+/// in-flight sibling outlives four, and the test's own edits between them - so
+/// the marker wait is a patience longer than four: a stuck run is reported by
+/// the wait that watches it, never by a fixture agent that gave up first. It is
+/// paid only when a marker never comes.
+const MARKER_PATIENCE: Duration = Duration::from_secs(5 * PROVIDER_WAIT_PATIENCE.as_secs());
+
+/// The fixture profile's timeout: a patience past the marker wait, so a marker
+/// that never comes ends the agent with the fixture's own error, not a timeout.
+const FIXTURE_TIMEOUT: Duration =
+    Duration::from_secs(MARKER_PATIENCE.as_secs() + PROVIDER_WAIT_PATIENCE.as_secs());
 
 /// How long a harness edit waits out a refusal by another open handle. It is
 /// paid only while refused, so it is sized for a loaded Windows runner.
@@ -202,21 +216,27 @@ fn try_markdown_text(path: &Path) -> Result<String, String> {
 }
 
 /// Observe every durable, state-qualified provider wait while the run remains
-/// live. Transient Markdown locks consume the same finite test deadline rather
-/// than starting a new per-file clock. §FS-rhei-run.3.3
+/// live. The patience bounds a stall, not the batch: it starts again whenever
+/// one more wait is durable, because a loaded runner persists a burst of
+/// refusals one at a time and slowly, and only a run that persists nothing more
+/// for a whole patience is stuck. Transient Markdown locks consume the same
+/// deadline rather than starting a new per-file clock. §FS-rhei-run.3.3
 pub(super) fn wait_for_provider_waits(
     path: &Path,
     run: &mut RunningChild,
     expected: usize,
 ) -> String {
-    let deadline = Instant::now() + PROVIDER_WAIT_PATIENCE;
+    let mut deadline = Instant::now() + PROVIDER_WAIT_PATIENCE;
     let mut most_observed = 0;
 
     loop {
         let (observation, read_error) = match try_markdown_text(path) {
             Ok(text) => {
                 let observed = text.matches("nextAttemptAt:").count();
-                most_observed = most_observed.max(observed);
+                if observed > most_observed {
+                    most_observed = observed;
+                    deadline = Instant::now() + PROVIDER_WAIT_PATIENCE;
+                }
                 (Some((observed, text)), None)
             }
             Err(error) => (None, Some(error)),
@@ -238,7 +258,7 @@ pub(super) fn wait_for_provider_waits(
                 .map(|error| format!("; last Markdown read error: {error}"))
                 .unwrap_or_default();
             panic!(
-                "the run stayed live but persisted only {most_observed} of {expected} provider waits within {PROVIDER_WAIT_PATIENCE:?}{read_detail}; {}",
+                "the run stayed live but persisted only {most_observed} of {expected} provider waits, none more within {PROVIDER_WAIT_PATIENCE:?}{read_detail}; {}",
                 run.output()
             );
         }
@@ -250,7 +270,8 @@ pub(super) fn wait_for_provider_waits(
 /// `end@<state> … outcome=provider_limited` line. A parked invocation's durable
 /// wait and its retained spawn record are both observable before the release
 /// carrying that line is emitted, so an observer that has seen either must wait
-/// for the line itself rather than read the journal once. §FS-rhei-run-tui.1.7
+/// for the line itself rather than read the journal once. The patience starts
+/// again with every new line, as for the waits. §FS-rhei-run-tui.1.7
 pub(super) fn wait_for_parked_journal_lines(
     path: &Path,
     run: &mut RunningChild,
@@ -259,7 +280,7 @@ pub(super) fn wait_for_parked_journal_lines(
     const OUTCOME: &str = "outcome=provider_limited";
 
     let journal = path.join("runtime/transitions.log");
-    let deadline = Instant::now() + PROVIDER_WAIT_PATIENCE;
+    let mut deadline = Instant::now() + PROVIDER_WAIT_PATIENCE;
     let mut most_observed = 0;
 
     loop {
@@ -270,7 +291,10 @@ pub(super) fn wait_for_parked_journal_lines(
         let (observation, read_error) = match fs::read_to_string(&journal) {
             Ok(text) => {
                 let observed = text.matches(OUTCOME).count();
-                most_observed = most_observed.max(observed);
+                if observed > most_observed {
+                    most_observed = observed;
+                    deadline = Instant::now() + PROVIDER_WAIT_PATIENCE;
+                }
                 (Some((observed, text)), None)
             }
             Err(error) => {
@@ -294,7 +318,7 @@ pub(super) fn wait_for_parked_journal_lines(
         }
         if Instant::now() >= deadline {
             panic!(
-                "the run stayed live but wrote only {most_observed} of {expected} `{OUTCOME}` journal lines within {PROVIDER_WAIT_PATIENCE:?}{read_detail}; {}",
+                "the run stayed live but wrote only {most_observed} of {expected} `{OUTCOME}` journal lines, none more within {PROVIDER_WAIT_PATIENCE:?}{read_detail}; {}",
                 run.output()
             );
         }
@@ -368,13 +392,14 @@ impl ProviderFixture {
         let (dir, root, machine) = create_workspace(name, "# Rhei: Provider controls\n", tasks);
         let body = format!(
             r#"def await_marker(path):
-    until = time.monotonic() + 9
+    until = time.monotonic() + {marker_patience}
     while not path.exists():
         if time.monotonic() >= until:
             raise RuntimeError('missing fixture marker: ' + str(path))
         time.sleep(.025)
 
-{body}"#
+{body}"#,
+            marker_patience = MARKER_PATIENCE.as_secs()
         );
         let agent = write_python_agent(&dir, "agent.py", &body);
         let settings = root.join(".agent-grounds/rhei");
@@ -382,7 +407,7 @@ impl ProviderFixture {
         let profile = serde_json::json!({
             "command": serde_json::from_str::<serde_json::Value>(&fixture_command(&agent)).unwrap(),
             "stdin_prompt": true,
-            "timeout": "12s"
+            "timeout": format!("{}s", FIXTURE_TIMEOUT.as_secs())
         });
         fs::write(
             settings.join("settings.json"),

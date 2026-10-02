@@ -14,12 +14,16 @@ runs, and the ticket speaks for both. Whoever wonders whether issue 87 is taken
 looks at the claim, not at the fix.
 
 No forge is touched: the claim program writes the assignee to
-`forge/issue-87.md` in the run's copy, the stand-in for assigning the issue.
+`forge/issue-87.md` in the run's copy, the stand-in for assigning the issue,
+and notes beside it what it found when it ran.
 
 ## The two shapes
 
-Both run one machine, `states.yaml`, with a `work` state for the agent and a
-`claim` state that runs a program. Only where the claim sits differs.
+Both shapes have a `work` state for the agent and a `claim` state that runs a
+program, and only where the claim sits differs. Each keeps its own
+`states.yaml`, because the claim leads somewhere different: the sibling's claim
+task ends at `completed`, and the root's claim hands over to the ticket's own
+`work`.
 
 **Sibling** — the claim is a task beside the ticket, and the ticket's work
 starts after it (`sibling/tasks/01-work-issue-87.md`):
@@ -35,8 +39,13 @@ starts after it (`sibling/tasks/01-work-issue-87.md`):
 #### Task 2.2: Run the gate
 ```
 
-**Root state** — the claim is the first state of the ticket itself
-(`root-state/tasks/01-work-issue-87.md`):
+The first child names the claim in its own `**Prior:**`, because a parent's
+Prior does not hold back its children: without that line the fix starts in the
+same pass as the claim.
+
+**Root state** — the claim is the first state of the ticket itself, and the
+ticket's own `work` follows it, `claim -> work`, to speak for the fix and the
+gate (`root-state/tasks/01-work-issue-87.md`):
 
 ```markdown
 ### Task 1: Work issue 87
@@ -48,7 +57,9 @@ starts after it (`sibling/tasks/01-work-issue-87.md`):
 The ticket is an ordinary parent, and an ordinary parent runs only once its
 subtree is closed. So the claim on the root runs **last**, after the fix and
 the gate it was meant to guard. That is a scheduling fact, not the rule; the
-claim program finds it out by counting the results already on disk.
+claim program finds it out by counting the results already on disk, and the
+run's `forge/issue-87.md` reads `claim: Claimed issue 87 after 2 tasks had
+already finished: the claim guarded nothing.`
 
 ## What the next task sees
 
@@ -71,18 +82,18 @@ the same task:
 ```text
 Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
 
-- Task root-state.1: Work issue 87 — completed — Claimed issue 87 after 2 tasks had already finished: the claim guarded nothing. — 2 subtasks: 2 completed
+- Task root-state.1: Work issue 87 — completed — Issue 87 fixed: the parser rejects the literal with E0412, and the gate is green. — 2 subtasks: 2 completed
 ```
 <!-- /rhei:plan-history root-state -->
 
-The claim ran after two tasks had finished, so it guarded nothing. Its line is
-also the ticket's line now: the root's only state was the claim, so what the
-ticket did is folded under what the claim found.
+The ticket keeps its line, and that line is the fix and the gate. The claim
+has no line of its own: it ran last, after both tasks had finished, and nothing
+a later task is told says so. Only the stand-in issue does.
 
 ## What the person sees
 
 The sibling run's console task tree gives the claim a row a person can check,
-with its own duration and cost
+with its own duration
 ([§FS-rhei-run-report.3.2](../../../docs/functional-spec/rhei-run-report.spec.md#32-task-tree)):
 
 <!-- rhei:task-tree sibling -->
@@ -93,12 +104,15 @@ with its own duration and cost
 ```
 <!-- /rhei:task-tree sibling -->
 
-The root-state run has one row, and the program it ran is the ticket's:
+The root-state run has one row, the ticket's, and the claim is one of the two
+invocations its `agent×2` counts: the label counts them all and names only the
+driver of the last, the ticket's own agent, so the claim's program has no row
+and no duration of its own:
 
 <!-- rhei:task-tree root-state -->
 ```text
    3 tasks · source order
-  ✓ root-state.1               completed   program  <t> — 2 subtasks: 2 completed
+  ✓ root-state.1               completed   agent×2  <t> — 2 subtasks: 2 completed
 ```
 <!-- /rhei:task-tree root-state -->
 

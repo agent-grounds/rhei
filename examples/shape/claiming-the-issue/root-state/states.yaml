@@ -1,11 +1,12 @@
 name: shape-claiming-the-issue
 version: 1
 
-# One machine for both shapes of the claiming-the-issue pair. `claim` is a
-# program: it assigns the issue on the stand-in forge, `forge/issue-87.md`, and
-# writes its task's result. The sibling shape gives the claim a task beside the
-# ticket; the root-state shape makes it the first state of the ticket itself,
-# an ordinary parent, which runs only once its subtree is closed.
+# The root-state shape of the claiming-the-issue pair: the claim is the first
+# state of the ticket itself, `claim -> work`, and the ticket's own `work` then
+# speaks for its subtree. `claim` is a program: it assigns the issue on the
+# stand-in forge, `forge/issue-87.md`, and notes there what it found. The
+# ticket is an ordinary parent, which runs only once its subtree is closed. The
+# sibling shape keeps its own machine beside its plan.
 #
 # Every agent state runs the `mock` agent so the example runs with no
 # credentials, and the program is the same Python file.
@@ -39,9 +40,9 @@ transitions:
     description: The work is done and its result written.
 
   - from: claim
-    to: completed
+    to: work
     exit_code: 0
-    description: The issue is assigned and the claim recorded.
+    description: The issue is assigned; the ticket goes on to its own work.
 
   - from: "*"
     to: cancelled

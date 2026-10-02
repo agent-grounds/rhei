@@ -172,7 +172,11 @@ guessing from the spelling, as [§FS-rhei-library.6](rhei-library.spec.md#6-incl
    which is a **project** target.
 4. A path resolves to exactly one of: a directory holding `index.rhei.md` (a
    rhei), or a directory holding `index.panta.md` (a project). Anything else is
-   the existing "no rhei to place into" error.
+   the existing "no rhei to place into" error. When the path's last segment
+   holds a `.` and the part before it names a rhei in the same directory, the
+   error says that a path is never split at a dot and gives the spelling that
+   is: the bare `<rhei>.<task>`, from the directory that holds the rhei or, for
+   a member, from anywhere inside its project.
 5. A bare id that finds a rhei at one candidate root and a project at another
    is **refused, naming both paths** and the two spellings that say which was
    meant. It is never resolved by preference: before this form existed the rhei
@@ -191,7 +195,7 @@ A project target carrying a `.<task>` half is an error naming it: a project has
 no task tree, so there is no task to place under.
 
 **What `--into <project>` writes, for a project template.** Everything
-[§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project) lists for `--output`, with three differences that
+[§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project) lists for `--output`, with four differences that
 all follow from the project already existing:
 
 - **The project manifest is never edited.** The template's own
@@ -236,6 +240,40 @@ all follow from the project already existing:
   should follow its template is brought forward by `rhei instantiate <entry>
   --into <member>`. A directory that exists and is not a rhei is the
   member-laying path's existing "already exists" error.
+- **The machine's bundle is replaced with the machine.** `prompt_templates/*`
+  and `scripts/*` are what the default's `states.yaml` runs, so they are laid
+  again with it: every file the template carries is written whole, a file in
+  those directories that the template does not carry is left as it is, and
+  every file whose bytes or mode change is **named** on the summary's
+  `replaced:` line by its path in the project — under `--dry-run` too, before
+  anything is written. A local edit to a bundle file is lost exactly as a local
+  edit to the root `states.yaml` is, and naming it is what keeps that from being
+  silent, as a skipped member is never silent. This is not a union, so rule 1
+  of [§FS-rhei-library.3.1](rhei-library.spec.md#31-same-name-same-thing) does not refuse a differing file: that rule governs two
+  templates meeting in one host, while a rebind replaces the machine laid
+  before it, and refusing a differing script would refuse nearly every rebind of
+  a template that has moved on, sending its author back to deleting files by
+  hand. Any other bundled file keeps that rule.
+
+  `--into` **never writes through a symbolic link.** Before anything is
+  written, every path the root write would write — the root `states.yaml`, each
+  bundle file, the hoisted settings file — and each of its parent directories
+  below the project root is checked, and a link among them is refused, naming
+  each link and where it points and leaving the project byte-identical. A
+  bundle linked to a template's own directory, as projects were bound by hand
+  before this command, would otherwise have that template's source overwritten
+  with its rendered text. It is a refusal rather than a replacement of the link
+  because removing a link to a directory is a different operation on each
+  platform, and a refusal behaves the same on all of them
+  ([§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity)); the remedy is the one command that removes the link and
+  nothing it points to.
+
+  ```text
+  × 'tool-reports/scripts' is a symbolic link to '…/grounded-ticket/scripts',
+  │ and a rebind copies the machine's bundle — it never writes through a link
+  ╰─▶ remove the link (`rm tool-reports/scripts` removes the link, not what it
+      points to), then run this again. Nothing was written.
+  ```
 
 Before writing, the command checks the replacement ([§FS-rhei-library.2.3](rhei-library.spec.md#23-the-default-machine-is-replaced-never-unioned-into)) and
 validates the prospective project in the project's own terms, under the
@@ -251,12 +289,15 @@ Rebound the Panta project at reports.
   checked:         4 tickets in 2 rheis and the basin
   members:         review-loop already exists and was left as it is
   copied:          prompt_templates/ (1 file), scripts/ (1 file)
+  replaced:        scripts/run.sh
   settings:        added agents.rev
 ```
 
 The first line says `Laid` where the project had no root `states.yaml` and
 `Rebound` where it had one; a default laid again under the same name says the
-machine was written again rather than replaced. `--dry-run` prints the same
+machine was written again rather than replaced. The `replaced:` line names
+each bundle file the project already had whose bytes or mode the write
+changes, and is left out when there is none. `--dry-run` prints the same
 summary, runs the check and the validation, and writes nothing.
 
 ### 2.3. The default machine is replaced, never unioned into
@@ -316,7 +357,11 @@ list the refusal prints is what such an edit works from.
 What a pre-write refusal protects is the project as it stands when the command
 runs. A rhei written *later* with no machine of its own also runs under the
 default, and that is what "project default" means
-([§DA-per-rhei-state-machines](../decisions/architectural/per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest) item 8).
+([§DA-per-rhei-state-machines](../decisions/architectural/per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest) item 8). Nor is a ticket that moves while the command
+runs: the project's sidecar lock keeps two instantiations apart, but `rhei run`
+and `rhei transition` lock only the plan they rewrite, so a ticket that moves
+between the check and the write is not seen. Rebind a project while no run is
+live on it.
 
 ## 3. The union rules
 

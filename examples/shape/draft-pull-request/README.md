@@ -85,8 +85,9 @@ task's own line could have said.
 
 The state run's console task tree gives the work two rows
 ([§FS-rhei-run-report.3.2](../../../docs/functional-spec/rhei-run-report.spec.md#32-task-tree)),
-the first labelled `program×2` for its two invocations, the commit and the
-opening:
+the first labelled `program×2` for its two invocations, the commit's agent and
+the opening's program: the label counts them all and names only the driver of
+the last:
 
 <!-- rhei:task-tree state -->
 ```text

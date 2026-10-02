@@ -58,16 +58,6 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
-      # Stays at the pre-push stage alone: at pre-commit it would also fire
-      # inside CI's `pre-commit run --all-files`, with different arguments.
-      # §AR-ci-release.2
-      - id: changelog-pr-entry
-        name: changelog PR entry
-        entry: python scripts/check_changelog_pr_entry.py --local-pr
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]
       - id: lychee
         name: lychee
         entry: lychee --no-progress --include-fragments README.md docs examples packages

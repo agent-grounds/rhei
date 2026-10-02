@@ -91,58 +91,41 @@ release section. Release automation promotes `Unreleased` into a numbered
 release section, archives the previous inline section under `docs/changelog/`,
 and extracts the inline section for GitHub release notes.
 
-Every pull request is represented in `Unreleased` by a bullet of its own, and
-the pull request's number is stamped onto that bullet by the release rather
-than written by its author. The author cannot know the number: it does not
-exist until the pull request is opened, which is after the push a gate could
-refuse, so a rule that asked for it could first be enforced by CI and nowhere
-earlier.
+No pull request adds a bullet to `Unreleased`, and none is refused for leaving
+the changelog alone. The section is written once, before a release, from what
+merged since the previous one (§5.1); the scheduled release waits for it rather
+than ship code the section does not yet describe (§5.3); and the release stamps
+a pull request number only onto a bullet that is missing one and that it can
+credit to a pull request of its own (§5.2).
 
-### 5.1. What the pull request check requires
+### 5.1. Who writes `Unreleased`, and when
 
-A pull request is checked for a bullet, and for a number only when a number is
-known. `Unreleased` must hold at least one bullet that the same section does
-not already hold at the merge base of the pull request's base and head. A
-bullet is its `- ` line together with every line up to the next bullet or the
-end of the section, and two bullets are the same bullet when their text matches
-once runs of whitespace collapse to single spaces and a trailing pull-request
-token - a written number, or the placeholder that stands in for one - is
-dropped. So rewrapping a bullet is not a change and rewording one is; writing a
-number onto a bullet somebody else wrote is not a change; a bullet moved into
-the section from elsewhere is new, and one moved out is not.
+A change does not record itself. The issue a pull request closes already says
+what changed, so asking every change for a bullet made every change pay for a
+line the release can write once: the line, its number, a conflict on every
+rebase, and a gate that turned finished work red. No pull request is checked for
+a bullet, and none needs to touch `docs/changelog.md`.
 
-The comparison is against the merge base rather than against the base branch's
-tip, because a release promotion that lands on the base after the branch point
-would otherwise read as the branch putting the promoted bullets back under
-`Unreleased`, and a branch that added nothing would pass.
+Whoever cuts a release writes the section first, in one pull request, before
+either release helper runs, by this rule:
 
-The base is named by the caller where the caller knows it, and looked for
-otherwise. A caller that names one is making a claim about its own checkout, so
-a named base the checkout cannot resolve is a refusal naming the ref, never a
-check that carries on without it: a clone too shallow to hold the base would
-otherwise gate nothing at all, and the advice a missing base earns a
-contributor - fetch the base branch - cannot be taken by the workflow that
-named it.
+- The list is every pull request merged since the previous release tag that
+  changed more than docs and CI. Docs and CI are the paths under `docs/` and
+  `.github/`, every `*.md` file, and the root `LICENSE` and `lychee.toml`.
+- Each pull request on the list gets a bullet, or is named in one.
+- A bullet's words come from the issues its pull request closed, or from the
+  pull request's own description where it closed none.
+- Every bullet ends in its own pull request's number, written `(PR #N)`, so the
+  release has nothing to stamp onto it.
+- A pull request whose bullet is already pending is skipped.
 
-Where no base is named, the branch's base is looked for among the push remote's
-`main`, `origin/main`, `upstream/main` and `main`, and of those that resolve the
-one whose merge base with the head is the most recent is the base. Taking the
-first that merely resolves would let a default branch left behind decide it -
-a fork's `origin/main` never synced while the branch itself merged upstream in -
-and every bullet that merge brought along would then read as the pull request's
-own, which is the two gates disagreeing about one file again.
-
-Where a number is known, a bullet the pull request added or changed may not
-carry a different pull request's number, and the placeholder is not a number.
-The number a bullet carries is its trailing token and only that, so a number
-written in a bullet's prose - a revert naming the pull request it reverses - is
-not a number that bullet carries. Bullets from earlier pull requests keep their
-own numbers and are not examined. A number that cannot be resolved is not an
-error, which is the ordinary case before the pull request exists.
-
-The refusal names the missing bullet and says that no number is needed, because
-for a contributor meeting the rule for the first time that message is the only
-place the rule is stated at the moment it applies.
+A bullet is its `- ` line together with every following line up to the next
+bullet or the end of the section; trailing blank lines belong to no bullet.
+Every line of the section that carries text belongs to a bullet, and the section
+comes first, followed by the inline release section and then `Older releases`.
+That is the shape the release reads, and it is checked on every pull request, so
+a malformed write-up fails on its own pull request rather than on the release it
+was written for. An empty section has that shape too.
 
 ### 5.2. What the release stamps
 
@@ -157,10 +140,51 @@ stamped. A bullet written on the release branch and later corrected by a pull
 request belongs to neither, and crediting it to the correction would be worse
 than leaving it blank.
 
+A number goes into one bullet at most. Every bullet is resolved before any is
+written, and a pull request that more than one bullet resolves to is stamped
+onto none of them: every bullet a write-up writes resolves to the write-up's own
+pull request, and crediting a whole release to the pull request that described
+it would be worse than leaving the bullets blank. Each bullet so left is
+reported with the reason
+`PR #N would go into K bullets; write each its own (PR #N)`.
+A bullet that already ends in its own number is neither written nor counted, and
+a placeholder counts as no number.
+
 Stamping never fails a release. A bullet that cannot be resolved is left as
 written and reported as a warning naming the bullet and the reason, and so is a
 forge that cannot be reached at all: a release that could not be cut over a
 changelog annotation would cost more than the missing annotation does.
+
+### 5.3. When the scheduled release waits
+
+The scheduled release ships only what `Unreleased` describes. Before it cuts
+anything it looks at what changed outside docs and CI (§5.1) since the previous
+release tag:
+
+- Nothing did: it does not release, and says
+  `Only docs/CI changes since <tag>; skipping.`
+- Something did after the section was last written: it does not release, and
+  says
+  `Changes merged since ## Unreleased was last written (<short sha>) wait for their release section; skipping.`,
+  followed by the paths that changed.
+
+Otherwise the release is due. A run that holds ends green: holding is the
+expected answer between a merge and its write-up, not a failure, and only an
+error fails the run.
+
+The section was last written by the newest commit after the tag, on the default
+branch's first-parent line, whose `Unreleased` body - its bullets, read as §5.1
+reads them - differs from the body in that commit's first parent. Where no such
+commit exists, the tag counts as the last write. An edit elsewhere in
+`docs/changelog.md`, the note above the section included, is not a write. The
+tag sits on the release commit, which empties the section, so right after a
+release nothing has been written yet, and the version advance that follows the
+release holds until the next write-up.
+
+A release a person starts does not hold: starting it is the decision that a
+release is due. It refuses an empty `Unreleased` instead, with
+`## Unreleased has no bullet entries to promote; write the release section first`,
+because writing the section is the one thing that lets it proceed.
 
 ## 6. Local Gates
 
@@ -168,19 +192,10 @@ The local pre-commit configuration mirrors the CI checks that are cheap enough
 to run before a commit, and the pre-push hook reruns the Rust test suite. The
 release PGO build is intentionally excluded from local commit hooks.
 
-The pre-push hook also runs the changelog check of §5.1, and runs it whether or
-not a pull request exists, so that a push whose `Unreleased` section holds no
-new or changed bullet against the branch's base is refused on the contributor's
-own machine. That is the only place the rule can reach them before CI does, and
-it is why the check asks for a bullet rather than for a number. The refusal
-names `SKIP=changelog-pr-entry` as the way to push a branch that is not
-becoming a pull request; that skip is local and CI does not honour it, so the
-pull request is still checked. Where the branch's base resolves to no ref at
-all the hook degrades to requiring the section to hold a bullet and says which
-refs it tried, because a refusal a contributor cannot act on is worse than the
-CI failure it is preventing. That degrade is the hook's, because the hook is the
-side that has to find the base; a caller that named one is refused instead
-(§5.1).
+The pre-commit configuration also runs the release scripts' own tests with
+`python -m unittest discover -s scripts/tests -t .`, so the shape check of §5.1,
+the stamping of §5.2 and the hold of §5.3 are proven on the contributor's own
+platform before a commit, and no hook checks a branch for a changelog bullet.
 
 ## 7. Supported Platforms
 

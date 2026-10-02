@@ -1,0 +1,73 @@
+name: shape-review-rounds
+version: 1
+
+# One machine for both shapes of the review-rounds pair. The loop shape runs
+# its review task through the counted `review -> fix` loop of
+# examples/review-fix-visits: two passes of each, every round's notes reaching
+# only the next state. The tasks shape gives every round a task of its own,
+# each run in `work`.
+#
+# Every state runs the `mock` agent so the example runs with no credentials.
+
+states:
+  work:
+    initial: true
+    agent: mock
+    description: Do the task's work and record why it ends where it does.
+    instructions: |
+      Do Task {task_id} as its body describes. Write every export its
+      `**Provides:**` names before you finish, and your result last.
+
+  review:
+    agent: mock
+    visits: 2
+    description: Review pass that writes the findings the next fix pass reads.
+    instructions: |
+      Review pass {visit_count} of {visits} for Task {task_id}: {task_title}.
+      Write the findings to `{output.review-notes.path}`.
+    outputs:
+      - name: review-notes
+        path: runtime/reviews/task-{task_id}-review.md
+
+  fix:
+    agent: mock
+    visits: 2
+    description: Fix pass that consumes the review notes the loop produced.
+    instructions: |
+      Fix pass {visit_count} of {visits} for Task {task_id}: {task_title}.
+      Fix what `{input.review-notes.path}` names. Once every review-fix cycle
+      is complete, write your result.
+    inputs:
+      - name: review-notes
+        path: runtime/reviews/task-{task_id}-review.md
+
+  completed:
+    description: Done.
+    final: true
+
+  cancelled:
+    description: Dropped. The reserved name, so a cancelled step owes no export.
+    final: true
+
+transitions:
+  - from: work
+    to: completed
+    description: The work is done and its result written.
+
+  - from: review
+    to: fix
+    description: Findings written; hand them to the next fix pass.
+
+  - from: fix
+    to: review
+    description: Fixed; re-enter review for the next pass.
+    condition: visitCount < visits
+
+  - from: fix
+    to: completed
+    description: Every review-fix cycle is complete.
+    condition: visitCount >= visits
+
+  - from: "*"
+    to: cancelled
+    description: Dropped.

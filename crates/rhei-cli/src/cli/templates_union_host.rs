@@ -19,53 +19,187 @@
         project: Option<PathBuf>,
     }
 
-    /// Resolve `--into <rhei>[.<task>]` the way `rhei new --under` resolves a
-    /// parent: the first segment names the rhei, the rest names a task in it.
-    /// §FS-rhei-new.3 §FS-rhei-library.2
-    fn resolve_union_host(target: &str) -> MietteResult<UnionHost> {
+    /// What a `--into` names, decided by what is on disk rather than by how it
+    /// is spelled: a rhei, perhaps with a task in it, or a Panta project.
+    /// §FS-rhei-library.2.2
+    enum IntoTarget {
+        Rhei(UnionHost),
+        Project(PathBuf),
+    }
+
+    /// Resolve `--into <target>` from the working directory. §FS-rhei-library.2.2
+    fn resolve_into_target(target: &str) -> MietteResult<IntoTarget> {
+        let cwd = std::env::current_dir().map_err(|err| {
+            miette!(help = cwd_help(), "failed to determine working directory: {err}")
+        })?;
+        resolve_into_target_from(&cwd, target)
+    }
+
+    /// A bare id is one path segment not beginning with `.`, and only a bare id
+    /// is split into `<rhei>.<task>`; anything else is a path, never split,
+    /// since a rhei id is a single segment. §FS-rhei-library.2.2 §FS-rhei-panta.2
+    fn is_bare_into_id(target: &str) -> bool {
+        !target.is_empty()
+            && !target.starts_with('.')
+            && !target.contains(['/', '\\'])
+            && !Path::new(target).is_absolute()
+    }
+
+    /// The five rules of §FS-rhei-library.2.2, in order: the basin is refused,
+    /// a bare id keeps its split and is looked up at the candidate roots a rhei
+    /// target has always had, a path is exactly one thing or none, and a bare id
+    /// naming a rhei at one root and a project at another is refused naming
+    /// both. `rhei new --under` resolves a parent the same way. §FS-rhei-new.3
+    fn resolve_into_target_from(cwd: &Path, target: &str) -> MietteResult<IntoTarget> {
+        if !is_bare_into_id(target) {
+            return resolve_into_path(cwd, target);
+        }
         let (rhei_id, parent) = match target.split_once('.') {
             Some((rhei_id, parent)) if !parent.is_empty() => (rhei_id, Some(parent.to_owned())),
             _ => (target, None),
         };
         if rhei_id == rhei_core::workspace::BASIN_RHEI_ID {
-            return Err(miette!(
-                help = "file the ticket into a rhei of its own, or `rhei new --under <rhei>`; \
-                        the basin's tickets run under the project default.",
-                "the basin is never a `--into` target: it holds unfiled tickets that run under \
-                 the project default and has no machine of its own to add to"
-            ));
+            return Err(basin_is_never_a_target());
         }
-        let cwd = std::env::current_dir().map_err(|err| {
-            miette!(help = cwd_help(), "failed to determine working directory: {err}")
-        })?;
-        let roots = union_candidate_roots(&cwd, rhei_id);
-        let workspace = roots.iter().find(|root| root.join("index.rhei.md").is_file());
-        if let Some(root) = workspace {
-            return Ok(UnionHost {
-                index: root.join("index.rhei.md"),
-                machine: root.join("states.yaml"),
-                project: union_project(root, false),
-                root: root.clone(),
-                single_file: false,
-                parent,
+        let roots = union_candidate_roots(cwd, rhei_id);
+        let rhei = roots
+            .iter()
+            .find(|root| root.join("index.rhei.md").is_file())
+            .map(|root| workspace_host(root, parent.clone()))
+            .or_else(|| {
+                let plan = union_candidate_plans(cwd, rhei_id).into_iter().find(|plan| plan.is_file())?;
+                Some(single_file_host(plan, cwd, parent.clone()))
             });
+        let project = roots.iter().find(|root| workspace::is_panta_project(root));
+        match (rhei, project) {
+            (Some(host), Some(project)) => Err(ambiguous_into_target(target, &host, project)),
+            (Some(host), None) => Ok(IntoTarget::Rhei(host)),
+            (None, Some(project)) => match parent {
+                Some(task) => Err(project_has_no_tasks(target, project, &task)),
+                None => Ok(IntoTarget::Project(project.clone())),
+            },
+            (None, None) => Err(no_rhei_to_place_into(rhei_id)),
         }
-        let plan = union_candidate_plans(&cwd, rhei_id).into_iter().find(|plan| plan.is_file());
-        if let Some(plan) = plan {
-            let root = plan.parent().unwrap_or(&cwd).to_path_buf();
-            return Ok(UnionHost {
-                index: plan,
-                machine: root.join("states.yaml"),
-                project: union_project(&root, true),
-                root,
-                single_file: true,
-                parent,
-            });
+    }
+
+    /// A path target: a directory holding `index.rhei.md` is a rhei, one
+    /// holding `index.panta.md` is a project, and anything else is nothing to
+    /// place into. §FS-rhei-library.2.2
+    fn resolve_into_path(cwd: &Path, target: &str) -> MietteResult<IntoTarget> {
+        let root = into_target_path(cwd, target);
+        let in_project = root.parent().is_some_and(workspace::is_panta_project);
+        if in_project && root.file_name() == Some(std::ffi::OsStr::new(rhei_core::workspace::BASIN_RHEI_ID)) {
+            return Err(basin_is_never_a_target());
         }
-        Err(miette!(
-            help = "`--into` names a rhei that already exists; list them with `rhei list`.",
-            "no rhei '{rhei_id}' to place into"
-        ))
+        let rhei = root.join("index.rhei.md").is_file();
+        match (rhei, workspace::is_panta_project(&root)) {
+            (true, true) => Err(ambiguous_into_target(target, &workspace_host(&root, None), &root)),
+            (true, false) => Ok(IntoTarget::Rhei(workspace_host(&root, None))),
+            (false, true) => Ok(IntoTarget::Project(root)),
+            (false, false) => Err(no_rhei_to_place_into(target)),
+        }
+    }
+
+    /// `cwd` joined with `target`, `.` and `..` folded away lexically, so `.`
+    /// names the working directory itself rather than a directory called `.`.
+    fn into_target_path(cwd: &Path, target: &str) -> PathBuf {
+        let mut path = PathBuf::new();
+        for component in cwd.join(target).components() {
+            match component {
+                std::path::Component::CurDir => {}
+                std::path::Component::ParentDir => {
+                    path.pop();
+                }
+                other => path.push(other.as_os_str()),
+            }
+        }
+        path
+    }
+
+    fn workspace_host(root: &Path, parent: Option<String>) -> UnionHost {
+        UnionHost {
+            index: root.join("index.rhei.md"),
+            machine: root.join("states.yaml"),
+            project: union_project(root, false),
+            root: root.to_path_buf(),
+            single_file: false,
+            parent,
+        }
+    }
+
+    fn single_file_host(plan: PathBuf, cwd: &Path, parent: Option<String>) -> UnionHost {
+        let root = plan.parent().unwrap_or(cwd).to_path_buf();
+        UnionHost {
+            index: plan,
+            machine: root.join("states.yaml"),
+            project: union_project(&root, true),
+            root,
+            single_file: true,
+            parent,
+        }
+    }
+
+    fn basin_is_never_a_target() -> Report {
+        miette!(
+            help = "file the ticket into a rhei of its own, or `rhei new --under <rhei>`; \
+                    the basin's tickets run under the project default.",
+            "the basin is never a `--into` target: it holds unfiled tickets that run under \
+             the project default and has no machine of its own to add to"
+        )
+    }
+
+    fn no_rhei_to_place_into(target: &str) -> Report {
+        miette!(
+            help = "`--into` names a rhei or a Panta project that already exists; list the \
+                    rheis with `rhei list`.",
+            "no rhei '{target}' to place into"
+        )
+    }
+
+    /// A bare id that finds both a rhei and a project is never resolved by
+    /// preference: guessing wrong writes into the wrong one. The refusal names
+    /// both and the path spelling that says each. §FS-rhei-library.2.2
+    fn ambiguous_into_target(target: &str, rhei: &UnionHost, project: &Path) -> Report {
+        let rhei_spelling = if rhei.single_file {
+            format!(
+                "'{}' is a single-file rhei, which only its id names, so rename one of them \
+                 to place into the rhei",
+                display_slash(&rhei.index)
+            )
+        } else {
+            format!("`--into {}` for the rhei", path_spelling(&rhei.root))
+        };
+        miette!(
+            help = format!(
+                "say which one with a path: {rhei_spelling}, `--into {}` for the project.",
+                path_spelling(project)
+            ),
+            "`--into {target}` names two different things\n  a rhei:    {}\n  a project: {}",
+            display_slash(&rhei.index),
+            display_slash(&project.join(workspace::PANTA_INDEX_FILE))
+        )
+    }
+
+    /// A directory spelled so that `--into` reads it as a path: a single
+    /// segment would be a bare id again, so it gains a leading `./`.
+    fn path_spelling(dir: &Path) -> String {
+        let shown = display_slash(dir);
+        if is_bare_into_id(&shown) { format!("./{shown}") } else { shown }
+    }
+
+    /// A project has no task tree, so there is no task in it to place under.
+    /// §FS-rhei-library.2.2
+    fn project_has_no_tasks(target: &str, project: &Path, task: &str) -> Report {
+        let shown = path_spelling(project);
+        miette!(
+            help = format!(
+                "name the project alone, `--into {shown}`, or a member rhei inside it, \
+                 `--into {shown}/<member>`."
+            ),
+            "`--into {target}` names task '{task}' in the Panta project at '{}', but a project \
+             has no tasks to place under",
+            display_slash(project)
+        )
     }
 
     /// Where a directory-workspace rhei named `rhei_id` could be: beside the

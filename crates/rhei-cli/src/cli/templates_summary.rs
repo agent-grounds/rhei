@@ -371,3 +371,87 @@
             })
             .collect()
     }
+
+    /// What laying a project did to each part, said on every run so a skipped
+    /// member is never silent. §FS-rhei-library.2.2 §FS-rhei-templates.6.4
+    struct ProjectSummary {
+        template: String,
+        machine: String,
+        /// Under `--into`: the root machine the project had, if it had one, and
+        /// the tickets the replacement check read.
+        into: Option<(Option<String>, CheckedTickets)>,
+        members: Vec<String>,
+        copied: Vec<String>,
+        settings: Vec<String>,
+        warnings: Vec<String>,
+    }
+
+    impl ProjectSummary {
+        fn new(manifest: &TemplateManifest, machine: &str, root: &ProjectRoot) -> Self {
+            Self {
+                template: manifest.name.clone(),
+                machine: machine.to_owned(),
+                into: None,
+                members: Vec::new(),
+                copied: root.copied.clone(),
+                settings: root.writes.notes.clone(),
+                warnings: Vec::new(),
+            }
+        }
+
+        /// `Laid` where the project had no root machine and `Rebound` where it
+        /// had one; a default laid again under its own name was written again
+        /// rather than replaced. §FS-rhei-library.2.2
+        fn print(&self, project: &Path, dry_run: bool) {
+            let at = project_label(project);
+            let previous = self.into.as_ref().and_then(|(previous, _)| previous.as_deref());
+            match (previous.is_some(), dry_run) {
+                (true, false) => println!("Rebound the Panta project at {at}."),
+                (false, false) => println!("Laid the Panta project at {at}."),
+                (rebind, true) => println!(
+                    "Dry run OK: project template '{}' would {} the Panta project at {at}.",
+                    self.template,
+                    if rebind { "rebind" } else { "lay" }
+                ),
+            }
+            let machine = match previous {
+                None => self.machine.clone(),
+                Some(previous) if previous == self.machine => {
+                    format!("{} written again", self.machine)
+                }
+                Some(previous) => format!("{} replaced {previous}", self.machine),
+            };
+            print_summary_lines("default machine:", &[machine]);
+            if let Some((_, checked)) = &self.into {
+                print_summary_lines("checked:", &[checked_line(checked)]);
+            }
+            print_summary_lines("members:", &self.members);
+            if !self.copied.is_empty() {
+                print_summary_lines("copied:", &[self.copied.join(", ")]);
+            }
+            print_summary_lines("settings:", &self.settings);
+            for warning in &self.warnings {
+                println!("warning: {warning}");
+            }
+        }
+    }
+
+    /// One labelled block of the project summary, its later lines aligned
+    /// under the first.
+    fn print_summary_lines(label: &str, values: &[String]) {
+        for (index, value) in values.iter().enumerate() {
+            let label = if index == 0 { label } else { "" };
+            println!("  {label:<17}{value}");
+        }
+    }
+
+    /// `4 tickets in 2 rheis and the basin`. §FS-rhei-library.2.2
+    fn checked_line(checked: &CheckedTickets) -> String {
+        let scope = match (checked.rheis, checked.basin) {
+            (0, false) => return "no rhei runs under the default".to_owned(),
+            (0, true) => "the basin".to_owned(),
+            (rheis, false) => plural(rheis, "rhei"),
+            (rheis, true) => format!("{} and the basin", plural(rheis, "rhei")),
+        };
+        format!("{} in {scope}", plural(checked.tickets, "ticket"))
+    }

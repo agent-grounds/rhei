@@ -13,6 +13,8 @@
         }
     }
 
+    /// Every template the chosen tiers hold, in precedence order, each with the
+    /// layout its one entry point says it is. §FS-rhei-templates.1 §FS-rhei-templates.2
     fn discover_templates(filter: TemplateSourceFilter) -> MietteResult<Vec<DiscoveredTemplate>> {
         let mut templates = Vec::new();
         let mut seen = HashSet::new();
@@ -32,6 +34,9 @@
                     let Ok(manifest) = load_template_manifest(extracted.path()) else {
                         continue;
                     };
+                    let Ok(layout) = detect_template_layout(extracted.path()) else {
+                        continue;
+                    };
                     seen.insert(name.clone());
                     templates.push(DiscoveredTemplate {
                         manifest,
@@ -39,6 +44,7 @@
                         // how it is referenced.
                         path: PathBuf::from(&name),
                         source,
+                        layout,
                     });
                 }
                 continue;
@@ -66,7 +72,12 @@
                     continue;
                 }
 
+                // A project template is listed like any other: the listing is how a
+                // caller finds out what `--output` will produce. §FS-rhei-templates.6.3
                 let Ok(manifest) = load_template_manifest(&path) else {
+                    continue;
+                };
+                let Ok(layout) = detect_template_layout(&path) else {
                     continue;
                 };
 
@@ -75,7 +86,7 @@
                 // §FS-rhei-templates.1.3
                 root.warn_if_deprecated();
                 seen.insert(name);
-                templates.push(DiscoveredTemplate { manifest, path, source });
+                templates.push(DiscoveredTemplate { manifest, path, source, layout });
             }
         }
 
@@ -335,15 +346,17 @@
         Ok(())
     }
 
+    /// Which of the three entry points a template carries: `plan.rhei.md`,
+    /// `index.rhei.md`, or `index.panta.md` for a project template. Exactly one
+    /// is allowed — two leave instantiation guessing which to lay, and none
+    /// leaves a template that cannot stand alone. §FS-rhei-templates.2
     fn detect_template_layout(template_dir: &Path) -> MietteResult<TemplateLayout> {
-        let plan_path = template_dir.join("plan.rhei.md");
-        let index_path = template_dir.join("index.rhei.md");
-        let has_plan = plan_path.is_file();
-        let has_index = index_path.is_file();
-
-        match (has_plan, has_index) {
-            (true, false) => Ok(TemplateLayout::SingleFile),
-            (false, true) => {
+        const ENTRY_POINTS: [&str; 3] = ["plan.rhei.md", "index.rhei.md", workspace::PANTA_INDEX_FILE];
+        let found: Vec<&str> =
+            ENTRY_POINTS.into_iter().filter(|name| template_dir.join(name).is_file()).collect();
+        match found.as_slice() {
+            ["plan.rhei.md"] => Ok(TemplateLayout::SingleFile),
+            ["index.rhei.md"] => {
                 let tasks_dir = template_dir.join("tasks");
                 if !tasks_dir.is_dir() {
                     return Err(miette!(
@@ -354,15 +367,17 @@
                 }
                 Ok(TemplateLayout::Workspace)
             }
-            (true, true) => Err(miette!(
+            [_] => Ok(TemplateLayout::Project),
+            [] => Err(miette!(
                 help = template_manifest_help(),
-                "template '{}' contains both plan.rhei.md and index.rhei.md",
+                "template '{}' must contain one of plan.rhei.md, index.rhei.md or index.panta.md",
                 template_dir.display()
             )),
-            (false, false) => Err(miette!(
+            several => Err(miette!(
                 help = template_manifest_help(),
-                "template '{}' must contain either plan.rhei.md or index.rhei.md",
-                template_dir.display()
+                "template '{}' contains {}, but a template has exactly one entry point",
+                template_dir.display(),
+                several.join(" and ")
             )),
         }
     }

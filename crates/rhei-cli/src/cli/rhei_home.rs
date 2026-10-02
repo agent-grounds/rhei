@@ -152,7 +152,7 @@ fn real_path(path: &Path) -> PathBuf {
 /// prefixes its own kind, so two subjects never collide.
 /// §FS-rhei-templates.1.3
 fn claim_deprecation_warning(subject: &str) -> bool {
-    if serving_shell_completion() {
+    if serving_shell_completion() || SCRATCH_PASSES.with(std::cell::Cell::get) > 0 {
         return false;
     }
     static WARNED: std::sync::OnceLock<Mutex<HashSet<String>>> = std::sync::OnceLock::new();
@@ -161,6 +161,31 @@ fn claim_deprecation_warning(subject: &str) -> bool {
         return false;
     };
     warned.insert(subject.to_owned())
+}
+
+thread_local! {
+    /// How many passes over a scratch copy of the user's files are running on
+    /// this thread. A warning raised there names a temp path that is gone before
+    /// anyone reads it, about a file the pass over the real one already named.
+    /// §FS-rhei-templates.1.3 §FS-rhei-states-deprecation.3
+    static SCRATCH_PASSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Held for the length of a validation pass over a scratch copy, which says no
+/// deprecation of its own. §FS-rhei-templates.1.3
+struct ScratchPass;
+
+impl ScratchPass {
+    fn begin() -> Self {
+        SCRATCH_PASSES.with(|passes| passes.set(passes.get() + 1));
+        Self
+    }
+}
+
+impl Drop for ScratchPass {
+    fn drop(&mut self) {
+        SCRATCH_PASSES.with(|passes| passes.set(passes.get().saturating_sub(1)));
+    }
 }
 
 /// Whether this run is answering a Tab press, recorded rather than read from

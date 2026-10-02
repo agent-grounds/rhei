@@ -143,11 +143,24 @@
         let index = match layout {
             TemplateLayout::Workspace => rendered.join("index.rhei.md"),
             TemplateLayout::SingleFile => rendered.join("plan.rhei.md"),
+            // A project template's entries are its members, each laid as a rhei
+            // of its own rather than unioned into a host. §FS-rhei-templates.6.4
+            TemplateLayout::Project => return Ok(()),
         };
         for entry in &manifest.includes {
             let resolved = resolve_include(template_dir, entry.template())?;
             let included_dir = resolved.path();
             let included = load_template_manifest(included_dir)?;
+            if detect_template_layout(included_dir)? == TemplateLayout::Project {
+                return Err(miette!(
+                    help = "include it in a project template instead, or lay it on its own \
+                            with `--output` or `--into <project>`.",
+                    "`includes:` entry '{}' of template '{}' is a project template, which lays \
+                     a project and is never placed into a rhei",
+                    entry.template(),
+                    manifest.name
+                ));
+            }
             let scratch = tempfile::tempdir().map_err(|err| {
                 miette!(
                     help = "an included template is rendered into a temp directory before it \

@@ -12,6 +12,7 @@
 use std::path::Path;
 
 use super::into_support::*;
+use super::union_artifact_paths_support::snapshot;
 use super::*;
 
 /// Give the template a state the host already defines, differing in an
@@ -95,11 +96,12 @@ fn a_taken_ticket_id_is_refused_with_its_own_message() {
     );
 }
 
-/// Two states declaring one rhei-scoped artifact path — no `{task_id}` in it —
-/// is a union-time collision, refused naming both states and the path. The
-/// other case, one state walked by two tickets, is a warning rather than a
-/// refusal, because whether it matters is the author's call.
-/// §FS-rhei-library.7.2
+/// Two states on opposite sides of the union both declaring one rhei-scoped
+/// artifact path in `outputs:` is a union-time collision, refused naming both
+/// states, the side each is on and the path, with help that does not send the
+/// author to `{task_id}`. The other case, one state walked by two tickets, is a
+/// warning rather than a refusal, because whether it matters is the author's
+/// call. §FS-rhei-library.7.2.1
 #[test]
 fn one_rhei_scoped_artifact_path_claimed_by_two_states_is_refused() {
     let (dir, root) = host_workspace("into-artifact-clash");
@@ -116,6 +118,7 @@ fn one_rhei_scoped_artifact_path_claimed_by_two_states_is_refused() {
     );
     write_fixture_file(&template, "states.yaml", &template_machine);
     let machine_before = read(&root.join("states.yaml"));
+    let target_before = snapshot(&root);
 
     let result =
         run_into(&["instantiate", "review-loop", "change_ref=HEAD~1", "--into", "release"], &dir);
@@ -123,7 +126,23 @@ fn one_rhei_scoped_artifact_path_claimed_by_two_states_is_refused() {
     assert_stderr_contains(&result, "runtime/notes/plan.md");
     assert_stderr_contains(&result, "pending");
     assert_stderr_contains(&result, "review");
+    assert_stderr_contains(
+        &result,
+        "states 'pending' (in the target) and 'review' (in template 'review-loop') both declare \
+         the rhei-scoped artifact path 'runtime/notes/plan.md' in `outputs:`",
+    );
+    assert_stderr_contains(
+        &result,
+        "help: give the two states distinct artifact paths, or keep one of them as the path's \
+         writer and have the other list it under `inputs:`.",
+    );
+    assert!(
+        !result.stderr.contains("{task_id}"),
+        "`{{task_id}}` is no remedy for two writers:\n{}",
+        result.stderr
+    );
     assert_eq!(machine_before, read(&root.join("states.yaml")), "the target is left alone");
+    assert_eq!(target_before, snapshot(&root), "the target is byte-identical");
 }
 
 /// The basin holds unfiled tickets that run under the project default and has
@@ -257,7 +276,9 @@ fn write_including_pair(dir: &Path, name: &str, includes: &str) {
 /// The other case of §FS-rhei-library.7.2, and the reason it is not a refusal:
 /// one state's rhei-scoped path walked by *two placed tickets* is a choice the
 /// author is allowed to make, so `--into` says it out loud and still succeeds.
-/// §FS-rhei-library.7.2
+/// The sentence claims no overwrite a reading state cannot cause, and offers
+/// `{task_id}` only where each ticket writes the file it reads.
+/// §FS-rhei-library.7.2.5
 #[test]
 fn one_rhei_scoped_artifact_path_walked_by_two_tickets_warns_and_succeeds() {
     let (dir, root) = host_workspace("into-artifact-shared");
@@ -277,8 +298,51 @@ fn one_rhei_scoped_artifact_path_walked_by_two_tickets_warns_and_succeeds() {
     assert_stderr_contains(&result, "runtime/notes.md");
     assert_stderr_contains(&result, "coordinate");
     assert_stderr_contains(&result, "record");
+    assert_stderr_contains(&result, &two_tickets_line("runtime/notes.md"));
+    assert!(
+        !result.stderr.contains("overwrites the first"),
+        "the old sentence is gone:\n{}",
+        result.stderr
+    );
     assert!(
         root.join("tasks/002-coordinate.md").is_file(),
         "a warning is not a refusal: the placement still happened"
     );
+}
+
+/// A state that lists the shared path under both `inputs:` and `outputs:` is
+/// still one state declaring one path, so the warning is printed once rather
+/// than once per list. §FS-rhei-library.7.2.5
+#[test]
+fn a_path_one_state_lists_in_both_lists_is_warned_about_once() {
+    let (dir, _root) = host_workspace("into-artifact-shared-both");
+    let template = write_review_template(&dir);
+    let template_machine = read(&template.join("states.yaml")).replace(
+        "      Review {{change_ref}} and write what you found.\n",
+        "      Review {{change_ref}} and write what you found.\n    inputs:\n      - name: earlier\n        path: runtime/notes.md\n        description: The notes so far\n        optional: true\n    outputs:\n      - name: notes\n        path: runtime/notes.md\n        description: The review notes\n",
+    );
+    write_fixture_file(&template, "states.yaml", &template_machine);
+
+    let result =
+        run_into(&["instantiate", "review-loop", "change_ref=HEAD~1", "--into", "release"], &dir);
+    assert_success(&result);
+    let warned = result
+        .stderr
+        .lines()
+        .filter(|line| line.starts_with("warning: state 'review' declares 'runtime/notes.md'"))
+        .count();
+    assert_eq!(warned, 1, "one state, one path, one line:\n{}", result.stderr);
+    assert_stderr_contains(&result, &two_tickets_line("runtime/notes.md"));
+}
+
+/// The two-tickets warning for `review-loop`'s `review` and its two tickets.
+/// §FS-rhei-library.7.2.5
+fn two_tickets_line(path: &str) -> String {
+    format!(
+        "warning: state 'review' declares '{path}', which is scoped to the rhei rather than to a \
+         task, and 2 placed tickets walk it: coordinate, record. These tickets share the same \
+         file; if work writes it, one ticket's content may overwrite another's. Keep the shared \
+         path when that is intentional, or use `{{task_id}}` for a per-ticket artifact — which \
+         works only where each ticket writes the file it reads."
+    )
 }

@@ -59,6 +59,11 @@ two authored definitions agree:
    `**Consumes:**` and `metadata.tasks` keys against a parent
    ([§FS-rhei-library.4](../functional-spec/rhei-library.spec.md#4-placement-ids-tickets-and-frontmatter)).
 
+Both artifact-path diagnostics live here as well
+([§FS-rhei-library.7.2](../functional-spec/rhei-library.spec.md#72-artifact-paths)). The writer refusal judges two definitions, as the
+four decisions do; the shared-input warning reads a whole machine, which is why
+it runs once, at the end of an instantiation, rather than at each union.
+
 Nothing else is its own, and in particular no representation is: every one of
 the four is decided over the shared values of [§AR-rhei-library.1](rhei-library.spec.md#1-the-shared-representation).
 

@@ -446,7 +446,7 @@ positional values resolve against the unioned schema unchanged.
 
 An artifact path that crosses templates is therefore an input with a default on
 both sides: agreeing on it is giving one value, and no mechanism is needed to
-pass data from one part to another.
+pass data from one part to another ([§FS-rhei-library.7.2.2](rhei-library.spec.md#722-a-hand-off-is-silent)).
 
 ### 3.5. Chaining two templates is the host's work
 
@@ -519,6 +519,22 @@ placed ids against the final target:
 Where both could fire the ceiling wins, because growing `maxLevels` past 4 is
 not a thing a host can be given.
 
+### 4.2. Template prose names tasks by id, never by file
+
+Placement renames task files: a template's `tasks/01-ticket.md` lands under
+whatever name the target's next file takes, or inside its parent's file, and an
+`includes:` entry is placed the same way. So prose in a template — instructions,
+task bodies, briefs it tells an agent to write — never names the template's own
+files. It names a task by id, through `{task_id}`, `{task_id_local}` or
+`$RHEI_TASK_ID`; the plan by `{plan_path}`; and the files it hands over by
+`{input.<name>.path}` and `{output.<name>.path}`
+([§FS-rhei-states.4.1](rhei-states.spec.md#41-variable-namespace)). Prose that says "add the line in `tasks/01-ticket.md`" is
+right standalone and wrong the moment the template is placed or included.
+
+Nothing checks this. The union does not read prose, and a literal `tasks/` path
+is legitimate where a template writes new task files of its own rather than
+naming the ones it shipped.
+
 ## 5. Placement and ticket identity
 
 A budget identity belongs to a run and never to a template. Placement therefore
@@ -586,7 +602,9 @@ the spanning profiles of [§FS-rhei-library.3.5](rhei-library.spec.md#35-chainin
 written there.
 
 Every template stands alone, so every template is discovered, listed, validated
-and gated exactly as a template is today. A template with `index.rhei.md` or
+and gated exactly as a template is today. The gate shipped with rhei covers the
+templates rhei ships; templates in project and user tiers are gated by their
+owning projects. A template with `index.rhei.md` or
 `plan.rhei.md` lays a rhei with `--output` and joins one with `--into`. A
 template with `index.panta.md` lays a project with `--output` and binds one with
 `--into` ([§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project), [§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target)), and in it each `includes:`
@@ -660,9 +678,68 @@ else, so it is a property of the union rather than of any lock.
 
 ### 7.2. Artifact paths
 
-Two states from two templates declaring the **same literal path with no
-per-task variable in it** is a union-time collision and is refused, naming both
-states and the path.
+Artifact-path diagnostics read the rendered state declarations. A rhei-scoped
+path carries no per-task variable — neither `{task_id}` nor `{task_id_local}`.
+For these diagnostics, a state declaring such a path in `outputs:` is a declared
+writer, and a state declaring it in `inputs:` is a declared reader. A state
+declaring both counts once, as a writer. Identical same-named state definitions
+coalesced by the union count as one state. These terms describe the
+file-existence contracts, not an exhaustive account of filesystem reads and
+writes by agents, programs, callbacks or operators.
+
+#### 7.2.1. Two writers across a union are refused
+
+Two distinct states on opposite sides of a union declaring the same rhei-scoped
+path in `outputs:` are a union-time collision and are refused before writing,
+naming both states, their sides and the path. Two `outputs:` declarations are
+two required claims on one file, and nothing in the declarations says which of
+them the file is to hold, so the union refuses rather than choose; the refusal
+does not establish that their intended contents differ. For `includes:`, the
+sides are the accumulated including machine and the next included machine; for
+`--into`, they are the target machine and the placed machine. The remedy is to
+give the writers distinct artifacts, or to keep one writer and have the other
+state require its file as an input.
+
+#### 7.2.2. A hand-off is silent
+
+One declared writer and any number of other states declaring that path only in
+`inputs:` receive no artifact-collision diagnostic, within one template or
+across a union. The shared path value is supplied through agreeing input
+defaults as the inputs-union rule prescribes ([§FS-rhei-library.3.4](rhei-library.spec.md#34-inputs-union)); no
+artifact path is rewritten. `{task_id}` is not a repair for a hand-off between
+different tasks, because it would make the reader require a file the writer
+never produced.
+
+#### 7.2.3. Readers with no declared writer are warned about
+
+Two or more states declaring one rhei-scoped path in `inputs:`, with no state
+declaring it in `outputs:`, are warned about by `rhei instantiate` and never
+refused, within one template or across a union. The warning is computed once,
+on the completed machine — after every `includes:` entry has joined, and over
+the target and the placed machine together under `--into` — so a writer any
+included template contributes clears it, and nesting does not repeat it. It
+names the path and every reader, optional readers included, and says the file
+may be supplied by a program, callback, operator or instructions. That is its
+caveat: absence of an output declaration does not establish absence of a
+producer. Outputs are required existence contracts and can be completion
+signals, so a supervisor may intentionally write its shared plan through an
+optional input to preserve its repeated execution. Required-input existence
+remains checked at execution time; an optional input's absence does not block
+entry, but its existence is exposed to the work. `rhei validate` and `rhei run`
+do not repeat the warning.
+
+#### 7.2.4. What the checks do not diagnose
+
+The union-time writer-collision check does not diagnose two states within
+either side's own machine merely because that machine is instantiated or
+placed. Such an internal pair was not introduced by the union. Every template
+stands alone, and composition produces the same ordinary flat runtime files as
+a typed plan; a new cross-boundary collision remains the union's to refuse.
+These checks compare equal rendered path strings. They do not infer filesystem
+effects from prose or scripts, establish task ordering, or prove freedom from
+overwrites.
+
+#### 7.2.5. Two tickets walking one state
 
 One state with a rhei-scoped path walked by **two tickets** is not a union
 question and is not refused: whether the second overwriting the first matters is

@@ -1,0 +1,59 @@
+name: shape-draft-pull-request
+version: 1
+
+# One machine for both shapes of the draft-pull-request pair. `opening` is a
+# program: it pushes the branch and opens the draft pull request on the
+# stand-in forge, `forge/pulls.md`, and writes the pull request into its task's
+# `pr` export. The state shape runs it after the commit, `commit -> opening`, in
+# the task that committed; the task shape gives it a task of its own.
+#
+# Every agent state runs the `mock` agent so the example runs with no
+# credentials, and the program is the same Python file.
+
+states:
+  work:
+    initial: true
+    agent: mock
+    description: Do the task's work and record why it ends where it does.
+    instructions: |
+      Do Task {task_id} as its body describes. Write every export its
+      `**Provides:**` names before you finish, and your result last.
+
+  commit:
+    agent: mock
+    description: Write and commit the change, then hand over to opening.
+    instructions: |
+      Write and commit what Task {task_id} describes. The draft pull request
+      is opened after you.
+
+  opening:
+    description: Push the branch, open the draft pull request, and export it.
+    program:
+      command: ["python3", "workflow.py", "--program", "opening"]
+    program_timeout: 1m
+
+  completed:
+    description: Done.
+    final: true
+
+  cancelled:
+    description: Dropped. The reserved name, so a cancelled step owes no export.
+    final: true
+
+transitions:
+  - from: work
+    to: completed
+    description: The work is done and its result written.
+
+  - from: commit
+    to: opening
+    description: The change is committed; open its draft pull request.
+
+  - from: opening
+    to: completed
+    exit_code: 0
+    description: The draft pull request is open and exported.
+
+  - from: "*"
+    to: cancelled
+    description: Dropped.

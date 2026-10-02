@@ -122,12 +122,12 @@ result('## Result\n\nPoll done.\n')
         }
         m["metadata"]["tasks"]["2"]["pollNextAttemptAt"]["working"] = earlier_poll.into();
     });
-    wait_for("earlier poll boundary", || epoch_now() >= earlier_poll);
+    wait_for("earlier poll boundary", &mut run, || epoch_now() >= earlier_poll);
     assert!(
         !fixture.root.join("start-order").exists(),
         "provider deadline still blocks both tasks"
     );
-    wait_for("task 2's provider eligibility", || {
+    wait_for("task 2's provider eligibility", &mut run, || {
         fixture.events().iter().any(|e| e["event"] == "slot_released" && e["task"] == "workspace.2")
     });
     assert_eq!(fs::read_to_string(fixture.root.join("start-order")).unwrap(), "2\n");

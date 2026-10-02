@@ -150,7 +150,69 @@ fn read_plan_source(path: &Path, action: &str) -> MietteResult<String> {
 /// Rename a temp file over the unlocked destination pathname.
 // §AR-agent-orchestrator-workflow.3.3.1
 fn persist_locked(tmp: tempfile::NamedTempFile, path: &Path) -> Result<(), tempfile::PersistError> {
+    replace_once(tmp, path)
+}
+
+/// One replacement attempt: the rename a platform may refuse while another
+/// handle holds the destination, and so the unit every retry repeats.
+// §AR-agent-orchestrator-workflow.3.3.1.1
+fn replace_once(tmp: tempfile::NamedTempFile, path: &Path) -> Result<(), tempfile::PersistError> {
+    #[cfg(test)]
+    if let Some(error) = take_replace_refusal() {
+        return Err(tempfile::PersistError { error, file: tmp });
+    }
     tmp.persist(path).map(|_| ())
+}
+
+/// Refusals a test arranges for this thread's next replacement attempts, in
+/// place of the open handle that makes Windows refuse a rename, so the waiting
+/// out is pinned on every platform. §AR-agent-orchestrator-workflow.3.3.1.1
+#[cfg(test)]
+struct ReplaceRefusals {
+    /// Attempts still to refuse; `None` refuses every attempt.
+    remaining: Option<usize>,
+    /// The error each refused attempt reports.
+    refusal: fn() -> std::io::Error,
+    /// Every attempt made while the refusals were installed, refused or not.
+    attempts: usize,
+}
+
+#[cfg(test)]
+thread_local! {
+    static REPLACE_REFUSALS: std::cell::RefCell<Option<ReplaceRefusals>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Refuse this thread's next `count` replacement attempts (`None`: all of them)
+/// with `refusal`, counting every attempt until `replace_attempts`.
+#[cfg(test)]
+fn refuse_replacements(count: Option<usize>, refusal: fn() -> std::io::Error) {
+    REPLACE_REFUSALS.with(|installed| {
+        *installed.borrow_mut() = Some(ReplaceRefusals { remaining: count, refusal, attempts: 0 })
+    });
+}
+
+/// Remove the arranged refusals and say how many attempts were made under them.
+#[cfg(test)]
+fn replace_attempts() -> usize {
+    REPLACE_REFUSALS.with(|installed| installed.borrow_mut().take().map_or(0, |r| r.attempts))
+}
+
+#[cfg(test)]
+fn take_replace_refusal() -> Option<std::io::Error> {
+    REPLACE_REFUSALS.with(|installed| {
+        let mut installed = installed.borrow_mut();
+        let refusals = installed.as_mut()?;
+        refusals.attempts += 1;
+        match refusals.remaining.as_mut() {
+            Some(0) => None,
+            Some(remaining) => {
+                *remaining -= 1;
+                Some((refusals.refusal)())
+            }
+            None => Some((refusals.refusal)()),
+        }
+    })
 }
 
 /// Whether a failed try-lock — or a read a lock refused — means *somebody

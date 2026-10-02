@@ -374,6 +374,35 @@ synced adjacent audit pair is the commit witness. Only `rhei recover` may
 restore the before-images before that witness or install after-images after it.
 No ordinary loader performs recovery. §FS-rhei-recover
 
+##### 3.3.1.1. A Replacement Refused by an Open Handle
+
+Atomic replacement renames a staged same-directory temp file over the
+destination pathname. Linux and macOS never refuse that rename because another
+process has the destination open. Windows does: its classic replace is refused
+while any other handle on the destination is open, a plain read handle
+included, and it reports the refusal as access denied (os error 5) or as a
+sharing or lock violation (os errors 32 and 33). Readers take no lock, so the
+holder can be anything that reads the plan by its pathname - an editor,
+`rhei list`, the dashboard, a parked run re-reading its waits, a test polling
+the workspace - and nothing in this protocol can, or should, keep it away:
+locking the destination is exactly what the sidecar exists to avoid.
+
+A writer therefore treats a refused replacement as transient. It retries the
+same staged temp file for a bounded time, pausing briefly between attempts,
+and it keeps holding the sidecar it already took, so no other writer can slip
+in between two attempts and the replacement stays atomic. It classifies the
+refusal by what the error says, not by the platform it ran on: a permission
+refusal (`PermissionDenied`) is retried on every platform, and the Windows
+sharing and lock violations are retried where they do not already read as one.
+One code path runs everywhere; on Linux and macOS a genuine permission refusal
+costs at most the bound before the same error. Any other failure is reported
+at once, after a single attempt.
+
+Only a refusal that outlasts the bound is reported, as the I/O failure it is:
+the last error unchanged and the destination's previous bytes intact.
+Exclusion is never dropped, and the destination never locked, to make the
+rename possible. §REQ-cross-platform.2 §FS-rhei-transition-cmd.3
+
 ### 3.4. Durable State and Git Boundary
 
 Rhei-owned durable state is the authored plan/workspace task state plus the

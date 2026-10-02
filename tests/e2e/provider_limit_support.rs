@@ -1,7 +1,7 @@
 //! Controlled provider fixtures and durable wait edits. §FS-rhei-run.3.3
 
 use super::*;
-use std::process::Child;
+use std::process::{Child, Command, ExitStatus};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -10,15 +10,52 @@ pub(super) const LIMIT_SIGNAL: &str =
 
 const PROVIDER_WAIT_PATIENCE: Duration = Duration::from_secs(30);
 
-pub(super) struct RunningChild(pub(super) Option<Child>);
+/// A live `rhei run` and the file in the test's own directory that its stderr
+/// goes to, so a run that dies says why instead of leaving a wait to time out.
+pub(super) struct RunningChild {
+    child: Option<Child>,
+    stderr: PathBuf,
+}
 
 impl RunningChild {
+    /// Adopt a run whose stderr the caller already sent to `stderr`.
+    pub(super) fn new(child: Child, stderr: PathBuf) -> Self {
+        Self { child: Some(child), stderr }
+    }
+
+    /// Spawn `command`, keeping its stderr in `stderr`.
+    pub(super) fn spawn(command: &mut Command, stderr: PathBuf) -> Self {
+        let log = fs::File::create(&stderr).expect("create the run's stderr file");
+        Self::new(command.stderr(log).spawn().expect("spawn rhei run"), stderr)
+    }
+
     pub(super) fn child(&mut self) -> &mut Child {
-        self.0.as_mut().expect("run child")
+        self.child.as_mut().expect("run child")
+    }
+
+    /// What the run has written to stderr so far.
+    pub(super) fn stderr(&self) -> String {
+        fs::read_to_string(&self.stderr).unwrap_or_else(|error| {
+            format!("<cannot read the run's stderr '{}': {error}>", self.stderr.display())
+        })
+    }
+
+    /// Wait for the run to exit, as long as the slowest runner needs.
+    pub(super) fn wait_for_exit(&mut self, what: &str) -> ExitStatus {
+        let deadline = Instant::now() + PROVIDER_WAIT_PATIENCE;
+        loop {
+            if let Some(status) = self.child().try_wait().expect("inspect run status") {
+                return status;
+            }
+            if Instant::now() >= deadline {
+                panic!("timed out waiting for {what}: the run stayed live for {PROVIDER_WAIT_PATIENCE:?}");
+            }
+            thread::sleep(Duration::from_millis(25));
+        }
     }
 
     pub(super) fn stop(&mut self) {
-        if let Some(mut child) = self.0.take() {
+        if let Some(mut child) = self.child.take() {
             let _ = child.kill();
             let _ = child.wait();
         }
@@ -31,15 +68,27 @@ impl Drop for RunningChild {
     }
 }
 
-pub(super) fn wait_for(what: &str, mut condition: impl FnMut() -> bool) {
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while Instant::now() < deadline {
+/// Wait for `condition` while `run` is live. The exit is inspected before the
+/// condition, so a condition that holds once the run has finished is still met;
+/// a run that exited without it fails the wait at once, with its exit status and
+/// its stderr, rather than spinning out the patience as a timeout. §FS-rhei-run.3.3
+pub(super) fn wait_for(what: &str, run: &mut RunningChild, mut condition: impl FnMut() -> bool) {
+    let deadline = Instant::now() + PROVIDER_WAIT_PATIENCE;
+    loop {
+        let exited = run.child().try_wait().expect("inspect run status");
         if condition() {
             return;
         }
+        if let Some(status) = exited {
+            panic!("the run exited {status} before {what}; its stderr:\n{}", run.stderr());
+        }
+        if Instant::now() >= deadline {
+            panic!(
+                "timed out waiting for {what}: the run stayed live for {PROVIDER_WAIT_PATIENCE:?}"
+            );
+        }
         thread::sleep(Duration::from_millis(25));
     }
-    panic!("timed out waiting for {what}");
 }
 
 pub(super) fn markdown_text(path: &Path) -> String {
@@ -130,7 +179,8 @@ pub(super) fn wait_for_provider_waits(
 
         if let Some(status) = run.child().try_wait().expect("inspect run status") {
             panic!(
-                "recognized provider limits followed the ordinary failure path: the {expected}-worker run exited {status} instead of parking"
+                "recognized provider limits followed the ordinary failure path: the {expected}-worker run exited {status} instead of parking; its stderr:\n{}",
+                run.stderr()
             );
         }
         if let Some((_, text)) = observation.filter(|(observed, _)| *observed == expected) {
@@ -192,7 +242,8 @@ pub(super) fn wait_for_parked_journal_lines(
             .unwrap_or_default();
         if let Some(status) = exited {
             panic!(
-                "the run exited {status} having written only {most_observed} of {expected} `{OUTCOME}` journal lines{read_detail}"
+                "the run exited {status} having written only {most_observed} of {expected} `{OUTCOME}` journal lines{read_detail}; its stderr:\n{}",
+                run.stderr()
             );
         }
         if Instant::now() >= deadline {
@@ -296,6 +347,7 @@ impl ProviderFixture {
         Self { dir, root, machine, agent }
     }
 
+    /// Start the run; its stdout events and its stderr share `run.jsonl`.
     pub fn start(&self, extra: &[&str]) -> RunningChild {
         let output = fs::File::create(self.root.join("run.jsonl")).unwrap();
         let mut command = rhei_command(self.root.join(".home"));
@@ -308,7 +360,8 @@ impl ProviderFixture {
             .args(extra)
             .stdout(output.try_clone().unwrap())
             .stderr(output);
-        RunningChild(Some(command.spawn().expect("start controlled provider run")))
+        let child = command.spawn().expect("start controlled provider run");
+        RunningChild::new(child, self.root.join("run.jsonl"))
     }
 
     pub fn output(&self) -> String {
@@ -320,20 +373,15 @@ impl ProviderFixture {
     }
 
     pub fn parked(&self, run: &mut RunningChild) {
-        wait_for("provider-limited release event", || {
-            assert!(run.child().try_wait().unwrap().is_none(), "{}", self.output());
+        wait_for("provider-limited release event", run, || {
             self.events().iter().any(|event| event["outcome"] == "provider_limited")
         });
+        assert!(run.child().try_wait().unwrap().is_none(), "{}", self.output());
         assert!(markdown_text(&self.root).contains("providerLimits:"));
     }
 
-    pub fn finish(&self, run: &mut RunningChild) -> std::process::ExitStatus {
-        let mut status = None;
-        wait_for("controlled run completion", || {
-            status = run.child().try_wait().unwrap();
-            status.is_some()
-        });
-        status.unwrap()
+    pub fn finish(&self, run: &mut RunningChild) -> ExitStatus {
+        run.wait_for_exit("controlled run completion")
     }
 
     pub fn finish_success(&self, run: &mut RunningChild) {

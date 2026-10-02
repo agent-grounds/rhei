@@ -174,6 +174,13 @@ compare-and-swap and every mutable guard before computing any effect.
     `runtime/results/<task-id>.md` already has content or `--result` carried a
     message. Neither, and the transition is refused with the plan untouched.
 13. Rewrite the task's `**State:**` line to the new state value (with counted-visit suffix when applicable) and write the file atomically (temp file + rename).
+    Someone reading the file does not fail the write. Windows refuses to
+    replace a file another process has open - an editor, `rhei list`, the
+    dashboard, a run reading its plan - where Linux and macOS never do. There
+    the rename is retried for a bounded time under the held sidecar, and only a
+    refusal that outlasts the bound fails the transition, as an I/O error that
+    leaves the file as it was
+    (§AR-agent-orchestrator-workflow.3.3.1.1).
 14. Execute the `on_enter` callback on the target state, if any, unless `--no-callbacks` is set. The write comes first so the callback observes the plan already in the state it is entering; the callback still sees the attempt's central-ledger status as pending. A callback that fails rolls the write back to the file's previous contents, and the transition fails. When the rollback itself fails, the error says so — the plan file may then be inconsistent.
 15. Append one state-transition entry to `runtime/state-transitions.log` as
     `<task-id> <from>@<to>`, creating the `runtime/` directory if needed. The
@@ -210,7 +217,8 @@ letting it pass unremarked.
 Counted-visit accounting: if the target state declares a `visits` budget and `--to` is a loop-back re-entry, the runtime increments `metadata.tasks.<id>.stateVisits.<target>` and renders the new visit number in `**State:**` using the `-<n>` suffix. See [Transitions Specification — Counted Loops](rhei-transitions.spec.md#43-counted-loops).
 
 All plan-writing verbs that use this path share that identity, acquisition
-order, authoritative-read rule, and lifetime. Metadata is acquired before a
+order, authoritative-read rule, step 13's replacement, and lifetime, so a
+reader holding a plan or task file open fails none of them. Metadata is acquired before a
 distinct task sidecar, the ledger last, and release is in reverse order;
 canonical identity deduplication makes a single-file plan one acquisition.
 Configured recovery first releases this stack and then runs as a separate

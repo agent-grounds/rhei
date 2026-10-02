@@ -198,6 +198,7 @@ mod terminal_result_tests;
 mod timeout_preflight_tests;
 mod transition_tests;
 mod transition_writer_lock_tests;
+mod union_artifact_coalescing_tests;
 mod union_artifact_paths_support;
 mod union_artifact_paths_tests;
 mod union_shared_input_warning_tests;

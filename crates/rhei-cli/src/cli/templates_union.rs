@@ -34,15 +34,24 @@
         host: &UnionHost,
         part: &RenderedPart,
         mode: UnionMode,
+        sides: ArtifactSides<'_>,
     ) -> MietteResult<()> {
         let tickets = read_part_tickets(&part.root)?;
         let held = hold_host(host, &tickets, mode)?;
-        let writes = plan_union(host, part, tickets, &held.files)?;
+        let writes = plan_union(host, part, tickets, &held.files, sides)?;
         // An entry is validated with the rest: an including template's own
         // machine names states its parts bring, so it is a fragment until
         // every entry has joined it. §FS-rhei-library.6 §AR-rhei-library.5
         if mode != UnionMode::Compose {
             validate_union(host, &writes)?;
+            // Diagnose the completed target plus part only after validation;
+            // nested and partial includes never emit it. §FS-rhei-library.7.2.3
+            if let Some((_, text)) = writes.files.iter().find(|(path, _)| path == &host.machine) {
+                let machine = serde_yaml::from_str(text).unwrap_or(YamlValue::Null);
+                for warning in shared_input_warnings(&machine) {
+                    eprintln!("{warning}");
+                }
+            }
         }
         if mode == UnionMode::DryRun {
             print_union_diff(host, part, &writes);
@@ -83,6 +92,7 @@
         part: &RenderedPart,
         mut tickets: Vec<PartTickets>,
         host_files: &[(PathBuf, Vec<String>)],
+        sides: ArtifactSides<'_>,
     ) -> MietteResult<UnionWrites> {
         let mut writes = UnionWrites::default();
         let machine_path = part.root.join("states.yaml");
@@ -128,7 +138,7 @@
         }
 
         let host_machine_text = read_text(&host.machine)?;
-        check_artifact_paths(&host_machine_text, &part_machine)?;
+        check_artifact_paths(&host_machine_text, &part_machine, sides)?;
         warn_shared_artifact_paths(&part_machine, &tickets);
         let mut machine = union_machine(&host_machine_text, &part_machine)?;
         if !machine.ends_with('\n') {
@@ -371,7 +381,7 @@
         let part_root = scratch.path().join(&manifest.name);
         let part = render_part(template_dir, &manifest, &values, &part_root, None)?;
         let mode = if dry_run { UnionMode::DryRun } else { UnionMode::Place };
-        union_into_host(&host, &part, mode)
+        union_into_host(&host, &part, mode, ArtifactSides::Placement)
     }
 
     /// Each combination `--into` refuses is an error naming the pair, rather

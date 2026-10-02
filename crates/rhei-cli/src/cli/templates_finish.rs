@@ -12,6 +12,11 @@
         dry_run: bool,
     ) -> MietteResult<()> {
         let state_machine_path = laid.materialized.state_machine_path();
+        // The validation report precedes advisories, which precede the summary.
+        // §FS-rhei-library.7.2.3
+        for warning in &laid.shared_inputs {
+            eprintln!("{warning}");
+        }
         if dry_run {
             println!(
                 "Dry run OK: '{}' would be instantiated into '{}'.",

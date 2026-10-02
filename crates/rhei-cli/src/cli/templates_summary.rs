@@ -385,6 +385,9 @@
         replaced: Vec<String>,
         settings: Vec<String>,
         warnings: Vec<String>,
+        /// One advisory list per machine actually laid, held until success.
+        /// §FS-rhei-library.7.2.3
+        shared_inputs: Vec<String>,
     }
 
     impl ProjectSummary {
@@ -398,6 +401,7 @@
                 replaced: root.replaced.clone(),
                 settings: root.writes.notes.clone(),
                 warnings: Vec::new(),
+                shared_inputs: Vec::new(),
             }
         }
 
@@ -405,6 +409,14 @@
         /// had one; a default laid again under its own name was written again
         /// rather than replaced. §FS-rhei-library.2.2
         fn print(&self, project: &Path, dry_run: bool) {
+            // Validation advisories, shared inputs, then the instantiation summary.
+            // §FS-rhei-library.7.2.3
+            for warning in &self.warnings {
+                println!("warning: {warning}");
+            }
+            for warning in &self.shared_inputs {
+                eprintln!("{warning}");
+            }
             let at = project_label(project);
             let previous = self.into.as_ref().and_then(|(previous, _)| previous.as_deref());
             match (previous.is_some(), dry_run) {
@@ -437,9 +449,6 @@
                 print_summary_lines("replaced:", &[self.replaced.join(", ")]);
             }
             print_summary_lines("settings:", &self.settings);
-            for warning in &self.warnings {
-                println!("warning: {warning}");
-            }
         }
     }
 

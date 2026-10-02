@@ -180,7 +180,10 @@
                 project: union_project(rendered, single_file),
             };
             resolve_host_machine(&host)?;
-            union_into_host(&host, &part, UnionMode::Compose).map_err(|err| {
+            // Refusals name the accumulated template and the entry as written.
+            // §FS-rhei-library.7.2.1
+            let sides = ArtifactSides::Includes { including: &manifest.name, entry: entry.template() };
+            union_into_host(&host, &part, UnionMode::Compose, sides).map_err(|err| {
                 // The entry is what an author fixes, so it leads the message
                 // rather than trailing the refusal as a hint.
                 miette!(

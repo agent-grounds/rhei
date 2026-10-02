@@ -112,7 +112,8 @@ three fixes, or a supervisor that decides the next issue from what the last
 one found — the parent integrates or steers, and the issues are its subtasks.
 And when each issue carries its own lifecycle — a claim, an implementation,
 review rounds and a ship — each issue is a rhei of its own, one plan per
-issue, rather than a task of an epic's plan.
+issue, rather than a task of an epic's plan
+([§FS-rhei-shape.1](../../../docs/functional-spec/rhei-shape.spec.md#1-the-constructs)).
 
 ## Run it
 

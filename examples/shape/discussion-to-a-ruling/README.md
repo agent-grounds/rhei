@@ -50,7 +50,9 @@ a child authored in advance (`children/tasks/01-decide-the-merge-policy.md`):
 #### Task 1.3: Round 1: judge the round
 **Prior:** Task 1.1, Task 1.2
 #### Task 1.4: Round 2: claude's position
+**Prior:** Task 1.3
 #### Task 1.5: Round 2: codex's position
+**Prior:** Task 1.3
 #### Task 1.6: Round 2: judge the round
 **Prior:** Task 1.4, Task 1.5
 
@@ -86,7 +88,7 @@ Finished work on the way from the plan's roots to this task, oldest first. Full 
 <!-- /rhei:plan-history children -->
 
 The ticket's plan now carries the discussion: a parent that speaks for six
-children, two rounds that were fixed when the plan was written.
+children, every position and judgement a task of the ticket's own plan.
 
 ## What the person sees
 
@@ -103,8 +105,8 @@ however many rounds it took:
 ```
 <!-- /rhei:task-tree rhei -->
 
-The children run's tree folds eight tasks into two rows, and only the rounds
-someone authored could ever run:
+The children run's tree folds eight tasks into two rows, the discussion's six
+under the ticket's parent:
 
 <!-- rhei:task-tree children -->
 ```text
@@ -117,17 +119,26 @@ someone authored could ever run:
 ## The ruling
 
 **Its own rhei**: a discussion with participants, rounds and a ruling is a
-plan, not a state, nor a parent's children. It is the decision table's row for
-*a discussion with participants, rounds and a ruling*
+plan, not a state. It is the decision table's row for *a discussion with
+participants, rounds and a ruling*
 ([§FS-rhei-shape.4](../../../docs/functional-spec/rhei-shape.spec.md#4-the-decision-table)).
-Work becomes a rhei when it has participants, rounds or a ruling that the
-parent plan would otherwise have to model
-([§FS-rhei-shape.1](../../../docs/functional-spec/rhei-shape.spec.md#1-the-constructs)):
-the participants become a fan-out, the rounds a loop the judge closes when it
-rules, and the ruling the discussion's own export. Authored as children, each
-round is a task written before anyone knows whether it is needed; if the
-judge had ruled in round 1 the second round would still run, and a third could
-not.
+A rhei is a plan of its own, with its own execution root and its own state
+machine, and work becomes one when it has participants, rounds or a ruling that
+the parent plan would otherwise have to model as states
+([§FS-rhei-shape.1](../../../docs/functional-spec/rhei-shape.spec.md#1-the-constructs)).
+Here those states are the discussion's machine: `collect` fans out to the
+participants, `judge` loops back for another round until it rules, and the
+ruling is the discussion's export. As a rhei, that machine and every round it
+runs stay under the discussion's own execution root, while the ticket keeps its
+one machine and still consumes the ruling by name
+([§FS-rhei-panta.3](../../../docs/functional-spec/rhei-panta.spec.md#3-one-unified-view)).
+As children, the ticket's plan carries the discussion itself, every position
+and judgement a task of the ticket. The two fixed rounds are not the point: a
+parent could append a round whenever its judge asks for one, as the table
+allows for children whose count is unknown when the plan is authored
+([§FS-rhei-shape.3.2](../../../docs/functional-spec/rhei-shape.spec.md#32-the-three-reasons-a-task-has-children)),
+and the discussion would still be modelled in the ticket's plan. What makes it
+a rhei is that it has participants, rounds and a ruling at all.
 
 ## When the other shape is right anyway
 

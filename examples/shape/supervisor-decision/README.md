@@ -72,8 +72,8 @@ Finished work on the way from the plan's roots to this task, oldest first. Full 
 <!-- /rhei:plan-history child -->
 
 The decision has moved out of the one line a later reader gets and into the
-folded subtree, behind `rhei list --parent child.1`. The parent can only point
-at it.
+folded subtree, behind `rhei list --parent child.1`. The decision is no longer
+the parent's to state: its line can only repeat what the child decided.
 
 ## What the person sees
 

@@ -210,6 +210,25 @@ pub fn shared_input_line(path: &str, readers: &[&str]) -> String {
     )
 }
 
+/// Establish only the scope and named destination sidecars before a refusal
+/// snapshot. These empty regular files remain after failed placement, while
+/// every authored byte must stay unchanged. §FS-rhei-new.4 §FS-rhei-library.2
+pub fn prepare_placement_sidecars(root: &Path, destination_sidecars: &[&str]) {
+    for relative in
+        std::iter::once("index.rhei.md.lock").chain(destination_sidecars.iter().copied())
+    {
+        let path = root.join(relative);
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(_) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(err) => panic!("create sidecar {}: {err}", path.display()),
+        }
+        let metadata = std::fs::symlink_metadata(&path).expect("inspect permanent sidecar");
+        assert!(metadata.is_file(), "sidecar must be a regular file: {}", path.display());
+        assert_eq!(metadata.len(), 0, "sidecar must be empty: {}", path.display());
+    }
+}
+
 /// Every file under `root` with its bytes, for a byte-for-byte comparison.
 pub fn snapshot(root: &Path) -> Vec<(PathBuf, Vec<u8>)> {
     let mut files = Vec::new();

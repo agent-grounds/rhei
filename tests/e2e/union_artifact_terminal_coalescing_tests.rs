@@ -58,6 +58,7 @@ fn placement_refuses_a_retained_terminal_writer_missing_from_the_incoming_path()
         if let Some(path) = incoming_output {
             set_terminal_output(&template, path);
         }
+        prepare_placement_sidecars(&root, &["tasks/002-work.md.lock"]);
         let before = snapshot(&root);
 
         let result = run_into(&["instantiate", "drafts", "--into", "release"], &dir);
@@ -119,6 +120,7 @@ fn placement_checks_actual_writers_after_retaining_the_target_terminal() {
             let polish: &[Decl] = if polish_writes { &[Writes(NOTE)] } else { &[] };
             let template = placed(&dir, "drafts", &[("polish", polish)]);
             set_terminal_output(&template, NOTE);
+            prepare_placement_sidecars(&root, &["tasks/002-work.md.lock"]);
             let before = snapshot(&root);
             let before_machine = machine_value(&root);
 

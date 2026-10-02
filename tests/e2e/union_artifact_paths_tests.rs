@@ -214,6 +214,7 @@ fn a_state_listing_the_path_in_both_lists_is_one_writer_and_hands_off() {
 fn a_reader_that_also_writes_the_targets_path_is_refused() {
     let (dir, root) = target_with("artifact-reader-writer", &[("pending", &[Writes(NOTE)])]);
     placed(&dir, "rewrite", &[("review", &[Reads(NOTE), Writes(NOTE)])]);
+    prepare_placement_sidecars(&root, &["tasks/002-work.md.lock"]);
     let before = snapshot(&root);
 
     let result = run_into(&["instantiate", "rewrite", "--into", "release"], &dir);

@@ -6,6 +6,25 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- Composing templates no longer refuses a hand-off. One state writing a
+  rhei-scoped artifact path and others reading it compose silently, whether
+  they sit in one template or on two sides of an `includes:` or `--into`
+  union, and a pair inside one side's own machine is no longer the union's to
+  diagnose (§FS-rhei-library.7.2.2, §FS-rhei-library.7.2.4). The one refusal
+  left is two states on opposite sides of a union that both list the path
+  under `outputs:`; it now names the side each is on, and its help no longer
+  offers `{task_id}`, which cannot repair a hand-off (§FS-rhei-library.7.2.1).
+  A path carrying `{task_id_local}` is per-task, as one carrying `{task_id}`
+  is. Where two or more states read a rhei-scoped path that no state declares
+  writing, `rhei instantiate` prints one `warning: shared input` line naming
+  the readers, computed once on the completed machine, and still succeeds
+  (§FS-rhei-library.7.2.3). The warning about two placed tickets walking one
+  state no longer claims the second overwrites the first, and is printed once
+  for a path a state lists in both lists (§FS-rhei-library.7.2.5). The
+  specification now also says that rhei's own template gate covers the
+  templates rhei ships (§FS-rhei-library.6), and that template prose names
+  tasks by id and never by the template's own file names, since placement
+  renames them (§FS-rhei-library.4.2).
 - A template can now lay a whole Panta project. A *project template* carries
   `index.panta.md` where a plan template carries its plan, and is the third
   layout `rhei templates` lists, under a new `layout` key in its JSON

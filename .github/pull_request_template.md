@@ -6,7 +6,5 @@
 
 ## Checklist
 
-- [ ] `docs/changelog.md` has a bullet under `## Unreleased` for this change
-      (no pull request number needed — the release fills it in)
 - [ ] The most-specific spec point is updated and cited with a `§` marker
 - [ ] `pre-commit run --all-files` passes locally

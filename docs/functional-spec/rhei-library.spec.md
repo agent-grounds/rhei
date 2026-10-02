@@ -255,18 +255,19 @@ all follow from the project already existing:
   a template that has moved on, sending its author back to deleting files by
   hand. Any other bundled file keeps that rule.
 
-  `--into` **never writes through a symbolic link.** Before anything is
-  written, every path the root write would write — the root `states.yaml`, each
-  bundle file, the hoisted settings file — and each of its parent directories
+  A project template's `--into` **never writes through a symbolic link.** Before
+  anything is written, every path it would write — the root `states.yaml`, each
+  bundle file, and the project's settings file whichever hoist writes it, the
+  template's or that of a member it lays — and each of its parent directories
   below the project root is checked, and a link among them is refused, naming
-  each link and where it points and leaving the project byte-identical. A
-  bundle linked to a template's own directory, as projects were bound by hand
-  before this command, would otherwise have that template's source overwritten
-  with its rendered text. It is a refusal rather than a replacement of the link
-  because removing a link to a directory is a different operation on each
-  platform, and a refusal behaves the same on all of them
-  ([§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity)); the remedy is the one command that removes the link and
-  nothing it points to.
+  each link and where it points and leaving the project byte-identical. A bundle
+  linked to a template's own directory, as projects were bound by hand before
+  this command, would otherwise have that template's source overwritten with its
+  rendered text. It is a refusal rather than a replacement of the link because
+  removing a link to a directory is a different operation on each platform, and
+  a refusal behaves the same on all of them
+  ([§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity)); the
+  remedy is the one command that removes the link and nothing it points to.
 
   ```text
   × 'tool-reports/scripts' is a symbolic link to '…/grounded-ticket/scripts',
@@ -336,7 +337,13 @@ every command uses ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-
 once with the root file replaced by the template's machine — validates the
 second, and reports only the errors the replacement **introduces**. A defect the
 project already carried is reported as the project failing, not blamed on the
-rebind, which is the reading [§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project) takes of a union. A check that
+rebind, which is the reading [§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project) takes of a union. A default that cannot
+load as the project stands — its prompt templates gone, as a hand-bound
+project's are once its links are removed — is the defect the rebind replaces,
+not a reason to refuse it. The check reads it as it stands with the bundle the
+rebind lays; when even that cannot load, it has no errors to subtract, so every
+error the replacement leaves is reported, and a project that cannot load under
+the replacement either is refused with what that load reports. A check that
 decided governance itself — "a member with no `states.yaml` of its own runs
 under the default" — would be wrong for as long as the deprecated declaration
 exists: a member whose own `**States:** Y` resolves to a file in another rhei's

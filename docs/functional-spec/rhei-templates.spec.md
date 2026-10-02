@@ -904,7 +904,7 @@ exactly as §FS-rhei-templates.6.1.2 steps 3–5 do:
 - **the bundle**: `prompt_templates/*` and `scripts/*` **copied** beside the
   manifest, never symlinked, so the project is self-contained even when the
   template is a built-in inside the binary and nothing platform-specific enters
-  the behaviour ([§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity)), and `--into` never writes through a link a project
+  the behaviour ([§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity)), and a project template's `--into` never writes through a link a project
   already has ([§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target)). Other bundled files travel as they
   do for a plan template, except `README.md`, which describes the template;
 - **the settings**: a bundled `settings.json` hoisted to

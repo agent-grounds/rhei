@@ -1,0 +1,58 @@
+name: shape-running-the-gate
+version: 1
+
+# One machine for both shapes of the running-the-gate pair. `gate` is a
+# program: it runs the stand-in suite, `gate.py`, and keeps the suite's own
+# last line as its task's `verdict` export. The task shape gives the gate a
+# task of its own; the state shape runs it as the last state of implement,
+# `build -> gate`.
+#
+# Every agent state runs the `mock` agent so the example runs with no
+# credentials, and the program is the same Python file.
+
+states:
+  work:
+    initial: true
+    agent: mock
+    description: Do the task's work and record why it ends where it does.
+    instructions: |
+      Do Task {task_id} as its body describes. Write every export its
+      `**Provides:**` names before you finish, and your result last.
+
+  build:
+    agent: mock
+    description: Build the change, then hand over to the gate.
+    instructions: |
+      Build the change Task {task_id} describes. The gate runs after you.
+
+  gate:
+    description: Run the suite and keep its own words as the verdict.
+    program:
+      command: ["python3", "workflow.py", "--program", "gate"]
+    program_timeout: 1m
+
+  completed:
+    description: Done.
+    final: true
+
+  cancelled:
+    description: Dropped. The reserved name, so a cancelled step owes no export.
+    final: true
+
+transitions:
+  - from: work
+    to: completed
+    description: The work is done and its result written.
+
+  - from: build
+    to: gate
+    description: The change is built; run the gate.
+
+  - from: gate
+    to: completed
+    exit_code: 0
+    description: The gate is green and its verdict kept.
+
+  - from: "*"
+    to: cancelled
+    description: Dropped.

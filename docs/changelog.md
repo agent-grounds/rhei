@@ -6,6 +6,9 @@ pull request number: the release stamps `(PR #N)` onto it. See
 
 ## Unreleased
 
+- The opencode `todo.ts` link in the comparison spec points at the
+  repository's new home, `anomalyco/opencode`. GitHub refuses the old
+  `sst/opencode` redirect to the CI link check with a 503.
 - Composing templates no longer refuses a hand-off. One state writing a
   rhei-scoped artifact path and others reading it compose silently, whether
   they sit in one template or on two sides of an `includes:` or `--into`

@@ -79,13 +79,14 @@ Finished work on the way from the plan's roots to this task, oldest first. Full 
 <!-- /rhei:plan-history state -->
 
 The verdict is still there, but it is now a clause of the implementation's
-line. When the gate goes red, so does the task that built the change, and the
-two can no longer be told apart.
+line. It has no line, no result file and no cost of its own: the ship step
+reads it as implement's export, and a reader of the history finds it after the
+build's summary.
 
 ## What the person sees
 
-The task run's console task tree gives the gate a row, a duration and a cost
-of its own
+The task run's console task tree gives the gate a row and a duration of its
+own
 ([§FS-rhei-run-report.3.2](../../../docs/functional-spec/rhei-run-report.spec.md#32-task-tree)):
 
 <!-- rhei:task-tree task -->
@@ -98,7 +99,8 @@ of its own
 <!-- /rhei:task-tree task -->
 
 The state run folds the gate into implement's row, where `program×2` counts
-its two invocations, the build and the gate:
+its two invocations, the build's agent and the gate's program: the label counts
+them all and names only the driver of the last:
 
 <!-- rhei:task-tree state -->
 ```text
@@ -118,8 +120,9 @@ a gate's verdict a later step consumes by name*
 ([§FS-rhei-shape.4](../../../docs/functional-spec/rhei-shape.spec.md#4-the-decision-table)).
 Corollary 3 does not keep it a state: *could the product be wrong while the
 task's outcome is right?* A gate can go red on a flaky test while the change is
-right, so the verdict is an outcome of its own. Only a task can be listed,
-priced and rerun by name; a state cannot
+right, so the verdict is an outcome of its own. A task has a result file, a
+line in Plan History and a cost of its own, and can be listed, priced or
+cancelled by name; a state has none of these
 ([§FS-rhei-shape.1](../../../docs/functional-spec/rhei-shape.spec.md#1-the-constructs)).
 
 ## When the other shape is right anyway

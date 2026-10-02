@@ -60,7 +60,7 @@ Finished work on the way from the plan's roots to this task, oldest first. Full 
 <!-- /rhei:plan-history loop -->
 
 One line for the rounds, saying what the code now does. The tasks run tells the
-same task four lines more, one per round:
+same task in four lines in place of that one, one per review and per fix:
 
 <!-- rhei:plan-history tasks -->
 ```text

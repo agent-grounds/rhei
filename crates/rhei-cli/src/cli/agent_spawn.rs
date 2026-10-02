@@ -23,6 +23,9 @@ struct AgentSpawnOutcome {
     provider_limit: Option<ProviderLimit>,
 }
 
+/// How long each captured stream may keep draining once the direct agent has
+/// exited, before its reader is detached (§FS-rhei-agents.3.2.1). The test
+/// build waits less.
 #[cfg(not(test))]
 const AGENT_OUTPUT_DRAIN_GRACE: Duration = Duration::from_millis(100);
 #[cfg(test)]
@@ -132,6 +135,9 @@ where
     })
 }
 
+/// Join a stream's reader after the direct agent has exited, waiting at most
+/// `AGENT_OUTPUT_DRAIN_GRACE`: a descendant that still holds the inherited
+/// pipe does not delay completion (§FS-rhei-agents.3.2.1).
 fn drain_agent_output_reader(
     handle: std::thread::JoinHandle<std::io::Result<()>>,
     stream: rhei_tui::AgentStream,

@@ -1,0 +1,65 @@
+name: shape-candidate-lookup
+version: 1
+
+# The state shape of the candidate-lookup pair: triage runs `lookup ->
+# verdict`, and the candidates reach the verdict as a handoff between
+# the two states. The task shape keeps its own machine beside its plan.
+#
+# `lookup` is a program: it searches the stand-in tracker, `forge/issues.md`,
+# for issues that share a word with the report. Every agent state runs the
+# `mock` agent so the example runs with no credentials, and the program is the
+# same Python file.
+
+states:
+  work:
+    initial: true
+    agent: mock
+    description: Do the task's work and record why it ends where it does.
+    instructions: |
+      Do Task {task_id} as its body describes. Write every export its
+      `**Provides:**` names before you finish, and your result last.
+
+  lookup:
+    description: Find the issues that might be duplicates, for the verdict to judge.
+    program:
+      command: ["python3", "workflow.py", "--program", "lookup"]
+    program_timeout: 1m
+    outputs:
+      - name: candidates
+        path: runtime/candidates/{task_id}.md
+
+  verdict:
+    agent: mock
+    description: Judge the report against the candidates, and write the verdict.
+    instructions: |
+      Judge Task {task_id} against the candidates in
+      `{input.candidates.path}`, and write the verdict as your result.
+    inputs:
+      - name: candidates
+        path: runtime/candidates/{task_id}.md
+
+  completed:
+    description: Done.
+    final: true
+
+  cancelled:
+    description: Dropped. The reserved name, so a cancelled step owes no export.
+    final: true
+
+transitions:
+  - from: work
+    to: completed
+    description: The work is done and its result written.
+
+  - from: lookup
+    to: verdict
+    exit_code: 0
+    description: The candidates are listed; judge them.
+
+  - from: verdict
+    to: completed
+    description: The verdict is written.
+
+  - from: "*"
+    to: cancelled
+    description: Dropped.

@@ -27,6 +27,7 @@ Use this table when you know the job you want to model:
 | Review rounds: a loop or a task per round? | `shape/review-rounds/` | Two review and fix rounds authored as a counted loop of states in one task and as four tasks; the rule picks the loop. |
 | Claiming the issue: a task or the root's first state? | `shape/claiming-the-issue/` | The claim authored as a program task beside the ticket and as the ticket's first state, which runs after its subtree; the rule picks the sibling. |
 | Waiting on a person: a state or a task? | `shape/waiting-on-a-person/` | A wait for the author's reply authored as a polling state of the asking task and as a wait task; the rule picks the state, and the answer is the asker's export. |
+| Candidate lookup before a verdict: a state or a task? | `shape/candidate-lookup/` | A search for duplicate candidates authored as a program state feeding triage's verdict state and as a search task; the rule picks the state. |
 
 ## Files
 

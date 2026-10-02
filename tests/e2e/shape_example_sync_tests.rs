@@ -32,6 +32,7 @@ const PAIRS: &[(&str, [&str; 2])] = &[
     ("review-rounds", ["loop", "tasks"]),
     ("claiming-the-issue", ["sibling", "root-state"]),
     ("waiting-on-a-person", ["state", "task"]),
+    ("candidate-lookup", ["state", "task"]),
 ];
 
 /// Every skill that states the rule, and so must carry the extract and the

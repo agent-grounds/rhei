@@ -14,6 +14,7 @@ describe (§FS-rhei-distribution.5.3).
 from __future__ import annotations
 
 import argparse
+import collections
 import datetime as _datetime
 import re
 import subprocess
@@ -61,7 +62,9 @@ def prepare_release(changelog: Path, version: str, release_date: str) -> None:
 
     unreleased_body = _trim_blank_lines(lines[unreleased + 1 : latest])
     if not _has_bullet(unreleased_body):
-        raise ChangelogError("## Unreleased has no bullet entries to promote")
+        # A person started this release, so it does not hold; it says what lets it proceed.
+        # §FS-rhei-distribution.5.3
+        raise ChangelogError("## Unreleased has no bullet entries to promote; write the release section first")
 
     previous_version = latest_match.group("version")
     previous_date = latest_match.group("date")
@@ -101,7 +104,10 @@ def stamp_pull_requests(changelog: Path) -> None:
     It is allowed to achieve nothing. A bullet it cannot resolve to exactly one
     pull request is left as written and reported, and so is a forge it cannot
     reach at all: a release that could not be cut over a changelog annotation
-    would cost more than the missing annotation does. §FS-rhei-distribution.5.2
+    would cost more than the missing annotation does. One number goes into one
+    bullet at most, so every bullet is resolved before any is written: a number
+    that more than one bullet resolves to belongs to the write-up that wrote
+    them all, and goes into none of them. §FS-rhei-distribution.5.2
     """
     lines = _read_lines(changelog)
     try:
@@ -116,9 +122,14 @@ def stamp_pull_requests(changelog: Path) -> None:
         return
 
     forge = _Forge(changelog)
+    resolved = [(bullet, *forge.pull_request_for(bullet)) for bullet in unstamped]
+    # Only the unstamped are counted: a bullet already ending in its number is not written.
+    claims = collections.Counter(number for _, number, _ in resolved if number is not None)
     stamped = False
-    for bullet in unstamped:
-        number, reason = forge.pull_request_for(bullet)
+    for bullet, number, reason in resolved:
+        if number is not None and claims[number] > 1:
+            reason = f"PR #{number} would go into {claims[number]} bullets; write each its own (PR #{number})"
+            number = None
         if number is None:
             _warn(
                 f"docs/changelog.md ## Unreleased: bullet at line {bullet.first + 1} "

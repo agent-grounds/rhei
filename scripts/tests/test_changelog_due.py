@@ -184,7 +184,6 @@ class AutoBumpGateStepTests(unittest.TestCase):
 class PrepareRefusalTests(ScriptTestCase):
     """What `Release minor` meets when nobody wrote the section. §FS-rhei-distribution.5.3"""
 
-    @unittest.expectedFailure
     def test_prepare_refuses_an_empty_section_and_says_to_write_it(self):
         repo = self.repo()
         repo.write_changelog(release_changelog([]))

@@ -87,7 +87,6 @@ class ChangelogStampTests(ScriptTestCase):
 
     GUARDED = "left unstamped (PR #500 would go into 2 bullets; write each its own (PR #500))"
 
-    @unittest.expectedFailure
     def test_a_number_two_bullets_resolve_to_goes_into_neither(self):
         """A write-up merged as one pull request is not credited with the release.
 
@@ -102,7 +101,6 @@ class ChangelogStampTests(ScriptTestCase):
         self.assertEqual(repo.read_changelog(), before, "neither bullet is stamped")
         self.assertEqual(self.output(result).count(self.GUARDED), 2, self.report(result))
 
-    @unittest.expectedFailure
     def test_a_placeholder_counts_as_no_number(self):
         repo, _ = self.repo_with(["- The first change. (PR #TBD)", "- The second change."], pulls_for_head=[500])
 

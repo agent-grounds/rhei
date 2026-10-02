@@ -15,7 +15,7 @@ import pathlib
 import re
 import sys
 
-CONTRACT = 'Point 3 of `docs/export.spec.md`: an export streams its rows.\\nTest `streams_rows_under_200_mb`: fails today, peaking at 340 MB.\\n'
+CONTRACT = 'Point 3 of `docs/export.spec.md`: an export streams its rows.\nTest `streams_rows_under_200_mb`: fails today, peaking at 340 MB.\n'
 
 RESULTS = {
     'Write the spec and the failing test':

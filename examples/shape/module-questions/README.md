@@ -1,4 +1,4 @@
-# Questions About a Module: Subtasks Under the Report, Not Siblings
+# One Question Across Modules: Subtasks Under the Report, Not Siblings
 
 One of the paired examples of
 [§FS-rhei-shape](../../../docs/functional-spec/rhei-shape.spec.md#fs-rhei-shape-state-task-subtask-rhei-or-prose):
@@ -7,38 +7,38 @@ agent, so the difference you see is the shape and nothing else.
 
 ## The situation
 
-The storage module must survive a crash at any point. Three questions are
-asked about it — when the write-ahead log is flushed, when a page is fsynced,
-what recovery replays — and a report says how the answers add up. Somebody
-reads the report; nobody reads one answer without the other two, because
-crash safety is in how they fit together.
+A crash at any point must not lose a committed write. That one question is
+asked of each module a write passes through — the write-ahead log, the pager,
+recovery — and a report says what the three answers add up to. Somebody reads
+the report; nobody reads one module's answer without the other two, because
+the answer is in how they fit together: the pager, read alone, says yes.
 
 Nothing outside the plan is touched, and no code is read: the mock answers
-each question from its title, so there is no stand-in file.
+each module's question from its title, so there is no stand-in file.
 
 ## The two shapes
 
 Both run one machine, `states.yaml`, with one agent state. Only where the
 report sits differs.
 
-**Nested** — the report is the parent of the three questions
-(`nested/tasks/01-storage-crash-safety.md`):
+**Nested** — the report poses the question and is the parent of one child per
+module (`nested/tasks/01-storage-crash-safety.md`):
 
 ```markdown
-### Task 1: Report how storage survives a crash
-#### Task 1.1: When is the WAL flushed?
-#### Task 1.2: When is a page fsynced?
-#### Task 1.3: What does recovery replay?
+### Task 1: Report whether a crash can lose a committed write
+#### Task 1.1: Can a crash lose a committed write in the WAL?
+#### Task 1.2: Can a crash lose a committed write in the pager?
+#### Task 1.3: Can a crash lose a committed write in recovery?
 ```
 
-**Flat** — the questions and the report are siblings, the report after the
-three answers (`flat/tasks/01-storage-crash-safety.md`):
+**Flat** — one sibling per module and the report beside them, after the three
+answers (`flat/tasks/01-storage-crash-safety.md`):
 
 ```markdown
-### Task 1: When is the WAL flushed?
-### Task 2: When is a page fsynced?
-### Task 3: What does recovery replay?
-### Task 4: Report how storage survives a crash
+### Task 1: Can a crash lose a committed write in the WAL?
+### Task 2: Can a crash lose a committed write in the pager?
+### Task 3: Can a crash lose a committed write in recovery?
+### Task 4: Report whether a crash can lose a committed write
 **Prior:** Task 1, Task 2, Task 3
 ```
 
@@ -51,7 +51,7 @@ A task added after the nested run is told this under `## Plan History`
 ```text
 Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
 
-- Task nested.1: Report how storage survives a crash — completed — Crash-safe: the WAL reaches disk before any page it covers, and recovery replays it from the last checkpoint. — 3 subtasks: 3 completed
+- Task nested.1: Report whether a crash can lose a committed write — completed — No: the WAL reaches disk before any page it covers, and recovery replays it from the last checkpoint. — 3 subtasks: 3 completed
 ```
 <!-- /rhei:plan-history nested -->
 
@@ -63,15 +63,15 @@ task:
 ```text
 Finished work on the way from the plan's roots to this task, oldest first. Full text: `runtime/results/<id>.md` under the owning rhei's execution root; a folded subtree: `rhei list --parent <id>`.
 
-- Task flat.1: When is the WAL flushed? — completed — On every commit, before the commit returns.
-- Task flat.2: When is a page fsynced? — completed — At a checkpoint, after the WAL records that cover it are flushed.
-- Task flat.3: What does recovery replay? — completed — The WAL from the last checkpoint forward.
-- Task flat.4: Report how storage survives a crash — completed — Crash-safe: the WAL reaches disk before any page it covers, and recovery replays it from the last checkpoint.
+- Task flat.1: Can a crash lose a committed write in the WAL? — completed — No: the log is flushed on every commit, before the commit returns.
+- Task flat.2: Can a crash lose a committed write in the pager? — completed — Yes, on its own: a page reaches disk only at a checkpoint, after its WAL records.
+- Task flat.3: Can a crash lose a committed write in recovery? — completed — No: recovery replays the WAL from the last checkpoint forward.
+- Task flat.4: Report whether a crash can lose a committed write — completed — No: the WAL reaches disk before any page it covers, and recovery replays it from the last checkpoint.
 ```
 <!-- /rhei:plan-history flat -->
 
 Four lines of equal rank, three of them fragments the fourth already
-combined.
+combined, and one of those, the pager's, reads as the opposite of the answer.
 
 ## What the person sees
 
@@ -112,8 +112,8 @@ the one line that could speak for the subtree is the fourth of four.
 
 ## When the other shape is right anyway
 
-When nothing is synthesized — each answer is read on its own, by whoever
-asked that question, and no report is made out of them — no parent owes
+When nothing is synthesized — each module's owner reads their module's
+answer on its own, by name, and no report is made out of them — no parent owes
 anything, and the questions are flat siblings
 ([§FS-rhei-shape.3.1](../../../docs/functional-spec/rhei-shape.spec.md#31-the-default-is-flat)).
 

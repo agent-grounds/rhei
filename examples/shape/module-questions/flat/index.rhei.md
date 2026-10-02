@@ -1,10 +1,10 @@
-# Rhei: How does storage survive a crash?
+# Rhei: Can a crash lose a committed write?
 **States:** shape-module-questions
 
 ## Overview
 
-The storage module must survive a crash at any point. Answer three questions
-about it, and report how the answers add up.
+A crash at any point must not lose a committed write. Ask that one question of
+each module a write passes through, and report what their answers add up to.
 
 The questions and the report are flat siblings; the report comes after the
 three answers.

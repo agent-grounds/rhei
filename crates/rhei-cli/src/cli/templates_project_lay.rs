@@ -336,9 +336,16 @@
             Some(scratch) => scratch.path().join(output_dir.file_name().unwrap_or_default()),
             None => hidden_staging_path(output_dir)?,
         };
-        // A refusal names the project the caller asked for, not its staging.
-        let laid = lay_project_staged(lay, &rendered, output_dir, &staged)
-            .map_err(|err| respell_staging(err, &staged, output_dir));
+        // A refusal names the project the caller asked for, not its staging, nor
+        // the scratch `--dry-run` lays it in. §FS-rhei-errors.4
+        let respellings = copy_respellings(&staged, output_dir);
+        let laid = lay_project_staged(lay, &rendered, output_dir, &staged).map_err(|err| {
+            if lay.dry_run {
+                respell_report(err, &respellings)
+            } else {
+                respell_staging(err, &staged, output_dir)
+            }
+        });
         let summary = match laid {
             Ok(summary) => summary,
             Err(err) if lay.dry_run || !keep_on_error => {

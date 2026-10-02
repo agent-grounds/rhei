@@ -71,3 +71,4 @@ A task has children when the parent **steers** them, **integrates** them, or
 4. [`examples/shape/parts-of-a-feature`](../../../../../examples/shape/parts-of-a-feature/README.md)
 5. [`examples/shape/spec-first`](../../../../../examples/shape/spec-first/README.md)
 6. [`examples/shape/review-rounds`](../../../../../examples/shape/review-rounds/README.md)
+7. [`examples/shape/claiming-the-issue`](../../../../../examples/shape/claiming-the-issue/README.md)

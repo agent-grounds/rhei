@@ -382,6 +382,7 @@
         into: Option<(Option<String>, CheckedTickets)>,
         members: Vec<String>,
         copied: Vec<String>,
+        replaced: Vec<String>,
         settings: Vec<String>,
         warnings: Vec<String>,
     }
@@ -394,6 +395,7 @@
                 into: None,
                 members: Vec::new(),
                 copied: root.copied.clone(),
+                replaced: root.replaced.clone(),
                 settings: root.writes.notes.clone(),
                 warnings: Vec::new(),
             }
@@ -428,6 +430,11 @@
             print_summary_lines("members:", &self.members);
             if !self.copied.is_empty() {
                 print_summary_lines("copied:", &[self.copied.join(", ")]);
+            }
+            // A bundle file a rebind replaces is named, never lost silently.
+            // §FS-rhei-library.2.2
+            if !self.replaced.is_empty() {
+                print_summary_lines("replaced:", &[self.replaced.join(", ")]);
             }
             print_summary_lines("settings:", &self.settings);
             for warning in &self.warnings {

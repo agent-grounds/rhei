@@ -115,6 +115,32 @@ mod templates_project_tests {
         }
     }
 
+    /// A path whose last segment is `<rhei>.<task>` for a rhei that exists
+    /// there is refused with the bare spelling that does split, and from where;
+    /// one naming no rhei keeps the plain refusal. §FS-rhei-library.2.2
+    #[test]
+    fn a_dotted_path_naming_a_rhei_gives_the_spelling_that_splits() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = project_in(dir.path(), "panta");
+        write(&project, "reports/index.rhei.md", "# Rhei: Reports\n");
+
+        let help = |cwd: &Path, target: &str| {
+            let Err(err) = resolve_into_target_from(cwd, target) else {
+                panic!("`{target}` names a directory that does not exist");
+            };
+            err.help().map(|help| help.to_string()).unwrap_or_default()
+        };
+        let from_outside = help(dir.path(), "panta/reports.ticket");
+        assert!(from_outside.contains("never split at a dot"), "{from_outside}");
+        assert!(from_outside.contains("`--into reports.ticket`"), "{from_outside}");
+        assert!(from_outside.contains("from 'panta'"), "{from_outside}");
+        assert!(from_outside.contains("anywhere inside its project"), "{from_outside}");
+        let from_inside = help(&project, "./reports.ticket");
+        assert!(from_inside.contains("from this directory"), "{from_inside}");
+        let nothing = help(dir.path(), "panta/nothing.ticket");
+        assert!(!nothing.contains("never split at a dot"), "{nothing}");
+    }
+
     /// The basin, a project with a task half, and a name that is both a rhei
     /// and a project are each refused, the last naming both. §FS-rhei-library.2.2
     #[test]

@@ -17,6 +17,7 @@
         // §FS-rhei-library.2 §FS-rhei-new.4
         let _lock = if lay.dry_run { None } else { Some(lock_new_create(project)?) };
         let root = plan_project_root(&rendered.root, project)?;
+        refuse_linked_root_writes(&root.writes, project)?;
         let checked = check_replacement(project, &root, &rendered.machine)?;
         // A directory that exists and is not a rhei is the member-laying
         // path's "already exists", raised before the root is written.
@@ -128,22 +129,25 @@
                 "failed to create the validation directory: {err}"
             )
         })?;
-        // Each deprecation is said once, about the real files; the passes over
-        // the copy would name paths gone before anyone reads them.
-        if let Ok(loaded) = load_plan_for_validation(project) {
-            let _ = resolve_state_machines_for_loaded_plan(project, &loaded, None);
-        }
+        // Each deprecation is said once, about the real files — settings too, so the
+        // whole pass runs here; the copy's paths are gone before anyone reads them.
+        // §FS-rhei-templates.1.3
+        let _ = validation_pass(project, None);
         let _quiet = ScratchPass::begin();
         // Named after the project, so an id-qualified link still resolves.
         let name = project.file_name().unwrap_or_else(|| std::ffi::OsStr::new("project"));
         let mirror = scratch.path().join(name);
         mirror_project_files(project, &mirror)?;
+        // A refusal names the project's files, never the copy it read them in.
+        let onto = |report: Report| respell_report(report, &mirror_respellings(&mirror, project));
         let inherited = union_validation_errors(&mirror);
-        let before = load_plan_for_validation(&mirror)?;
-        let before_set = resolve_state_machines_for_loaded_plan(&mirror, &before, None)?;
-        write_project_root(&root.writes, project, &mirror)?;
-        let after = load_plan_for_validation(&mirror)?;
-        let after_set = resolve_state_machines_for_loaded_plan(&mirror, &after, None)?;
+        let before = load_plan_for_validation(&mirror).map_err(onto)?;
+        let before_set =
+            resolve_state_machines_for_loaded_plan(&mirror, &before, None).map_err(onto)?;
+        write_project_root(&root.writes, project, &mirror).map_err(onto)?;
+        let after = load_plan_for_validation(&mirror).map_err(onto)?;
+        let after_set =
+            resolve_state_machines_for_loaded_plan(&mirror, &after, None).map_err(onto)?;
 
         let introduced = errors_the_replacement_introduces(
             &after.rhei,
@@ -152,7 +156,7 @@
         );
         let stranding = sort_introduced(&after.rhei, introduced);
         if !stranding.tickets.is_empty() || !stranding.kinds.is_empty() {
-            let rebase = |path: &Path| project.join(path.strip_prefix(&mirror).unwrap_or(path));
+            let rebase = |path: &Path| onto_project(path, &mirror, project);
             let kinds: Vec<(String, Vec<(String, PathBuf)>)> = stranding
                 .kinds
                 .iter()
@@ -167,17 +171,61 @@
             return Err(stranding_refusal(project, machine, &stranding.tickets, &kinds));
         }
 
-        let pass = validation_pass(&mirror, None)?;
+        let pass = validation_pass(&mirror, None).map_err(onto)?;
         let introduced = errors_a_rebind_introduces(&inherited, pass.errors);
         if !introduced.is_empty() {
-            return Err(validation_report(
-                &mirror,
-                &pass.state_machine_sources,
-                &introduced,
-                &pass.help,
-            ));
+            let (sources, help) = (&pass.state_machine_sources, &pass.help);
+            return Err(mirror_validation_report(project, &mirror, sources, &introduced, help));
         }
         Ok(checked_tickets(&after, &after_set))
+    }
+
+    /// A path in the validation copy, respelled as the project's own: the copy
+    /// is gone before anyone reads the message. Either spelling of the copy
+    /// counts, as written and as resolution may have canonicalized it.
+    fn onto_project(path: &Path, mirror: &Path, project: &Path) -> PathBuf {
+        let resolved = fs::canonicalize(mirror).ok();
+        let onto = [Some(mirror), resolved.as_deref()]
+            .into_iter()
+            .flatten()
+            .find_map(|copy| path.strip_prefix(copy).ok())
+            .map_or_else(|| path.to_path_buf(), |relative| project.join(relative));
+        onto
+    }
+
+    /// The validation refusal for an error the replacement introduces, naming
+    /// the project and its own files rather than the copy it was found in.
+    /// §FS-rhei-library.2.3 §FS-rhei-validate.6
+    fn mirror_validation_report(
+        project: &Path,
+        mirror: &Path,
+        sources: &[ValidationMachineSource],
+        errors: &[String],
+        help: &[String],
+    ) -> Report {
+        let sources: Vec<ValidationMachineSource> = sources
+            .iter()
+            .map(|source| ValidationMachineSource {
+                path: source.path.as_deref().map(|path| onto_project(path, mirror, project)),
+                ..source.clone()
+            })
+            .collect();
+        let report = validation_report(project, &sources, errors, help);
+        respell_report(report, &mirror_respellings(mirror, project))
+    }
+
+    /// Each spelling of the validation copy a message may use — as written,
+    /// as resolution canonicalized it, and as a diagnostic shortens it against
+    /// the working directory — paired with the project's own.
+    fn mirror_respellings(mirror: &Path, project: &Path) -> Vec<(String, String)> {
+        let shown = |path: &Path| path.display().to_string();
+        let mut respellings = vec![(shown(mirror), shown(project))];
+        if let Ok(resolved) = fs::canonicalize(mirror) {
+            respellings.push((shown(&resolved), shown(project)));
+        }
+        respellings.push((crate::display_path(mirror), crate::display_path(project)));
+        respellings.dedup();
+        respellings
     }
 
     /// The errors replacing the default introduces: the project validated under

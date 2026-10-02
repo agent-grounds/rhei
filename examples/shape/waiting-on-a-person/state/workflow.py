@@ -3,8 +3,9 @@
 Stands in for a real agent, and for the program that reads an issue's
 comments, so both shapes run with no credentials and touch no forge. The
 author's reply is already in `forge/issue-412.md`, the stand-in issue, so the
-first look finds it; take the reply out and the wait exits 75 until the poll
-budget runs out. The work is keyed by task title, not id.
+first look finds it; take the reply out and every look keeps an answer saying
+no reply came and exits 75, until the poll budget ends the wait. The work is
+keyed by task title, not id.
 
 The first line of each result is the one-line summary every later Plan History
 shows for the task, so it is written as a sentence a later reader can use.
@@ -22,33 +23,18 @@ RESULTS = {
         'The export writes UTF-8 with a byte-order mark, as the author answered.',
 }
 
+# What the export does when the answer it consumes says no reply came.
+UNANSWERED_RESULTS = {
+    'Implement the export':
+        'No answer came on issue 412, so the export writes plain UTF-8 until one does.',
+}
+
 ANSWERED = 'The author answered: UTF-8 with a byte-order mark, so Excel opens the file.'
-
-
-def reply():
-    """The author's reply on the stand-in issue, or exit 75 to look again later."""
-    issue = pathlib.Path('forge') / 'issue-412.md'
-    found = re.search(r'^author: (.+)$', issue.read_text(encoding='utf-8'), re.MULTILINE)
-    if not found:
-        sys.exit(75)
-    return found.group(1).strip() + '\n'
-
-
-# The wait's export is the reply itself, read when the wait runs.
-PROGRAM_EXPORTS = {
-    ('wait', 'Ask the author which encoding to use'): lambda: {'answer': reply()},
-    ('wait', "Wait for the author's answer"): lambda: {'answer': reply()},
-}
-PROGRAM_RESULTS = {
-    ('wait', 'Ask the author which encoding to use'): ANSWERED,
-    ('wait', "Wait for the author's answer"): ANSWERED,
-}
+NO_REPLY = 'No reply came on issue 412.'
 
 EXPORTS = {}
 
 STATE_OUTPUTS = {}
-
-PROGRAM_WRITES = {}
 
 
 def write(path, text):
@@ -58,32 +44,25 @@ def write(path, text):
         handle.write(text)
 
 
-def title_of(local):
-    """A program has no prompt: its task's title is read from the plan."""
-    plan = pathlib.Path(os.environ['RHEI_PLAN_PATH'])
-    root = plan if plan.is_dir() else plan.parent
-    for path in sorted(root.glob('tasks/*.md')):
-        found = re.search(r'^#+ Task %s: (.+)$' % re.escape(local),
-                          path.read_text(encoding='utf-8'), re.MULTILINE)
-        if found:
-            return found.group(1).strip()
-    return local
+def reply():
+    """The author's reply on the stand-in issue, or None when there is none yet."""
+    issue = pathlib.Path('forge') / 'issue-412.md'
+    found = re.search(r'^author: (.+)$', issue.read_text(encoding='utf-8'), re.MULTILINE)
+    return found.group(1).strip() + '\n' if found else None
 
 
-def program(step):
-    """A program state: it writes what its step makes, keyed by the task."""
-    task = os.environ['RHEI_TASK_ID']
-    title = title_of(os.environ['RHEI_TASK_ID_LOCAL'])
-    for path, text in PROGRAM_WRITES.get(step, {}).items():
-        write(path, text)
-    exports = PROGRAM_EXPORTS.get((step, title), {})
-    for name, text in (exports() if callable(exports) else exports).items():
-        write(pathlib.Path('runtime') / 'exports' / task / (name + '.md'), text)
-    summary = PROGRAM_RESULTS.get((step, title))
-    if callable(summary):
-        summary = summary()
-    if summary:
-        write(os.environ['RHEI_RESULT_PATH'], summary + '\n')
+def wait():
+    """One look. A reply becomes the task's `answer` and ends the wait with exit
+    0. No reply yet keeps an answer that says so and exits 75, another look after
+    the interval: whichever look the poll budget ends the wait on has left the
+    `answer` its task owes, and the result counts the looks."""
+    found = reply()
+    looks = int(os.environ['RHEI_VISIT_COUNT'])
+    answer, summary = (found, ANSWERED) if found else (
+        NO_REPLY + '\n', 'The author had not replied on issue 412 after %d looks.' % looks)
+    write(pathlib.Path('runtime') / 'exports' / os.environ['RHEI_TASK_ID'] / 'answer.md', answer)
+    write(os.environ['RHEI_RESULT_PATH'], summary + '\n')
+    sys.exit(0 if found else 75)
 
 
 def prompt_arg():
@@ -95,9 +74,8 @@ def prompt_arg():
     return ''
 
 
-if sys.argv[1:2] == ['--program']:
-    program(sys.argv[2])
-    sys.exit(0)
+if sys.argv[1:3] == ['--program', 'wait']:
+    wait()
 
 prompt = prompt_arg()
 root_match = re.search(r'^- This rhei: `([^`]+)`', prompt, re.MULTILINE)
@@ -120,4 +98,6 @@ for pattern, text in STATE_OUTPUTS.get(os.environ.get('RHEI_STATE'), {}).items()
 if result_match:
     path = pathlib.Path(result_match.group(1))
     summary = RESULTS.get(title, 'Did %s.' % title)
+    if NO_REPLY in prompt:
+        summary = UNANSWERED_RESULTS.get(title, summary)
     write(path if path.is_absolute() else root / path, summary + '\n')

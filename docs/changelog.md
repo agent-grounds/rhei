@@ -1,7 +1,8 @@
 # Changelog
 
-*Every pull request adds a bullet under `## Unreleased`. Do not write the
-pull request number: the release stamps `(PR #N)` onto it. See
+*No pull request adds a bullet here. Whoever cuts a release writes
+`## Unreleased` first, one bullet per pull request merged since the last
+release, each ending in its own `(PR #N)`. See
 [CONTRIBUTING.md](../CONTRIBUTING.md).*
 
 ## Unreleased

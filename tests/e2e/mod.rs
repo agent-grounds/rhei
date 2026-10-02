@@ -201,6 +201,7 @@ mod transition_writer_lock_tests;
 mod union_artifact_coalescing_tests;
 mod union_artifact_paths_support;
 mod union_artifact_paths_tests;
+mod union_artifact_terminal_coalescing_tests;
 mod union_shared_input_warning_tests;
 mod unrecognized_input_directory_tests;
 mod until_idle_deadline_tests;

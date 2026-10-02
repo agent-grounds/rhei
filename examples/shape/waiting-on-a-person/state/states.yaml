@@ -1,0 +1,77 @@
+name: shape-waiting-on-a-person
+version: 1
+
+# One machine for both shapes of the waiting-on-a-person pair. `ask` posts the
+# question and hands over to `wait`, a polling program that reads the stand-in
+# forge, `forge/issue-412.md`, for the author's reply. A reply ends the wait and
+# becomes its task's `answer` export; no reply yet is exit 75, which the
+# self-loop turns into another look after `interval`. The state shape runs
+# `ask -> wait` in the asking task; the task shape gives the wait a task.
+#
+# Every agent state runs the `mock` agent so the example runs with no
+# credentials, and the program is the same Python file.
+
+states:
+  work:
+    initial: true
+    agent: mock
+    description: Do the task's work and record why it ends where it does.
+    instructions: |
+      Do Task {task_id} as its body describes. Write every export its
+      `**Provides:**` names before you finish, and your result last.
+
+  ask:
+    agent: mock
+    description: Post the question on the issue, then hand over to the wait.
+    instructions: |
+      Post the question Task {task_id} asks as a comment on its issue.
+
+  wait:
+    description: Look for the author's reply, and keep it as the task's answer.
+    program:
+      command: ["python3", "workflow.py", "--program", "wait"]
+    program_timeout: 1m
+    poll:
+      interval: 1s
+      max_attempts: 3
+      waiting_on: author
+
+  completed:
+    description: Done.
+    final: true
+
+  unanswered:
+    description: The author never replied within the poll budget.
+    final: true
+
+  cancelled:
+    description: Dropped. The reserved name, so a cancelled step owes no export.
+    final: true
+
+transitions:
+  - from: work
+    to: completed
+    description: The work is done and its result written.
+
+  - from: ask
+    to: wait
+    description: The question is posted; wait for the reply.
+
+  - from: wait
+    to: wait
+    exit_code: 75
+    description: No reply yet; look again after the interval.
+
+  - from: wait
+    to: completed
+    exit_code: 0
+    description: The author replied; the answer is the task's export.
+
+  - from: wait
+    to: unanswered
+    condition: pollAttempts >= pollMaxAttempts
+    description: No reply within the poll budget.
+
+  - from: "*"
+    to: cancelled
+    description: Dropped.

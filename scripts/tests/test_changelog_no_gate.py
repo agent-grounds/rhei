@@ -39,7 +39,6 @@ class NoChangelogGateTests(unittest.TestCase):
         self.assertTrue(hooks, f"no hooks read from {PRE_COMMIT_CONFIG.name}")
         self.assertEqual([hook for hook in hooks if "changelog" in hook.lower()], [])
 
-    @unittest.expectedFailure
     def test_ci_runs_no_changelog_check(self):
         for job in ("test", "lint"):
             for step in workflow_steps(CI_WORKFLOW, job):
@@ -47,12 +46,10 @@ class NoChangelogGateTests(unittest.TestCase):
                 self.assertNotIn("changelog", (step.get("name") or "").lower(), where)
                 self.assertNotIn("check_changelog_pr_entry", step.get("run", ""), where)
 
-    @unittest.expectedFailure
     def test_the_lint_job_checks_out_one_commit(self):
         """The full history was only for the gate's base commit (§AR-ci-release.1)."""
         self.assertEqual([line for line in job_lines(CI_WORKFLOW, "lint") if "fetch-depth" in line], [])
 
-    @unittest.expectedFailure
     def test_the_gate_script_and_its_tests_are_gone(self):
         for path in ("scripts/check_changelog_pr_entry.py", "scripts/tests/test_changelog_gate.py"):
             self.assertFalse((REPO_ROOT / path).exists(), path)

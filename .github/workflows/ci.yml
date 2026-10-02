@@ -63,9 +63,9 @@ jobs:
         timeout-minutes: 45
         run: cargo test --workspace --all-targets --locked --no-fail-fast
 
-      # The changelog gate refuses pushes on contributors' machines, Windows
-      # included, so proving it on Linux alone would leave two of the three
-      # platforms it runs on unproven. §REQ-cross-platform.3
+      # The pre-commit hook runs the release scripts' tests on contributors'
+      # machines, Windows included, so proving them on Linux alone would leave
+      # two of the three platforms they run on unproven. §AR-ci-release.1
       - name: gate script tests
         run: python -m unittest discover -s scripts/tests -t .
 
@@ -80,13 +80,7 @@ jobs:
       FISSILE_VERSION: 0.8.3
       TOOLS_ROOT: ${{ github.workspace }}/.ci-tools
     steps:
-      # The whole history, because the changelog step below is passed the pull
-      # request's base commit and a depth-1 clone does not hold it: the check
-      # refuses a base it cannot reach, so a shallow clone here would fail the
-      # job rather than let the gate pass everything. §AR-ci-release.1
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - name: Install current stable Rust for tooling
         uses: dtolnay/rust-toolchain@stable
@@ -139,10 +133,3 @@ jobs:
         env:
           SKIP: cargo-fmt-check,cargo-clippy,cargo-build,cargo-test
         run: pre-commit run --all-files --show-diff-on-failure
-
-      - name: changelog PR entry
-        if: github.event_name == 'pull_request'
-        run: |
-          python scripts/check_changelog_pr_entry.py \
-            --pr-number "${{ github.event.pull_request.number }}" \
-            --base-ref "${{ github.event.pull_request.base.sha }}"

@@ -1,0 +1,90 @@
+name: shape-discussion-to-a-ruling-discussion
+version: 1
+
+# The discussion's own machine, copied from `examples/agent-discussion` with
+# two participants instead of four and no `apply` state: applying the ruling is
+# the ticket's work, in the other member.
+#
+# A real loop: collect <-> judge.
+#   collect  fans the position callback out across both participants (all_models)
+#   judge    digests the round, then redirects via the callback's `nextState`:
+#              - converged  : the judge ruled, and the ruling is the task's export
+#              - escalated  : round budget (CAP in workflow.py) spent, human gate
+#              - no redirect: loop back to `collect` for another round
+# `visits` is deliberately NOT used: it must not be combined with `all_models`,
+# so the loop is bounded by the judge callback instead.
+models:
+  - claude
+  - codex
+
+states:
+  collect:
+    initial: true
+    description: >-
+      Each participant writes its position for the current round. From round 2
+      on it reads the previous round's digest and answers the other directly.
+    all_models: [claude, codex]
+    instructions: |
+      Discussion round for Task {task_id}: {task_title}.
+
+      Read any digest under runtime/discussion/digest/, then write your position
+      for this round. Hand off to the judge once every participant has written.
+
+  judge:
+    description: >-
+      An impartial judge digests the round and decides whether the participants
+      converged, need another round, or must escalate to a human.
+    model: codex
+    instructions: |
+      Judge the current round for Task {task_id}. If the participants converged,
+      write the ruling into the task's `ruling` export and your result.
+
+  converged:
+    description: The discussion reached a ruling, kept in the task's export.
+    final: true
+
+  escalated:
+    description: >-
+      The discussion could not converge within the round budget; a human reads
+      the positions and digests and records the ruling.
+    gating: true
+    instructions: |
+      Do not transition out of this state autonomously. A human records a
+      ruling and moves the task to `converged`, or to `cancelled`.
+
+  cancelled:
+    description: The discussion was stopped before reaching a ruling.
+    final: true
+
+transitions:
+  - from: collect
+    to: judge
+    description: Every participant has written this round's position; hand off to the judge.
+    on_leave: "cli:python3 ./workflow.py write-position"
+
+  - from: judge
+    to: collect
+    description: >-
+      Default — no ruling yet and rounds remain, so run another round. The judge
+      callback redirects to `converged` or `escalated` instead.
+    on_leave: "cli:python3 ./workflow.py judge-round"
+
+  - from: judge
+    to: converged
+    description: Redirect target — the judge ruled.
+
+  - from: judge
+    to: escalated
+    description: Redirect target — the round budget was spent without a ruling.
+
+  - from: escalated
+    to: converged
+    description: A human recorded a ruling.
+
+  - from: escalated
+    to: cancelled
+    description: A human abandoned the discussion.
+
+  - from: "*"
+    to: cancelled
+    description: Cancel the discussion from any non-final state.

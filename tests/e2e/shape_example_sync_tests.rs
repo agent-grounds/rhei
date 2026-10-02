@@ -37,7 +37,21 @@ const PAIRS: &[(&str, [&str; 2])] = &[
     ("draft-pull-request", ["state", "task"]),
     ("supervisor-decision", ["visit", "child"]),
     ("classifying-an-issue", ["state", "task"]),
+    ("discussion-to-a-ruling", ["rhei", "children"]),
 ];
+
+/// The shapes that are a Panta project rather than one plan, each with the
+/// member its probe task joins: a project's tasks all belong to its rheis, so
+/// the reader of a run's history is a task of one of them. §FS-rhei-panta.1
+const PROJECT_SHAPES: &[(&str, &str, &str)] = &[("discussion-to-a-ruling", "rhei", "ticket")];
+
+/// The member a pair's shape is read from: itself, or the named rhei of a project.
+fn probe_home(pair: &str, shape: &str, workspace: &Path) -> PathBuf {
+    PROJECT_SHAPES
+        .iter()
+        .find(|(p, s, _)| *p == pair && *s == shape)
+        .map_or_else(|| workspace.to_path_buf(), |(_, _, member)| workspace.join(member))
+}
 
 /// Every skill that states the rule, and so must carry the extract and the
 /// links. `rhei-plan-worker` reads plans rather than authoring them.
@@ -311,6 +325,13 @@ fn every_shape_pair_ships_both_shapes_and_both_validate() {
         for shape in shapes {
             let source = pair_dir(pair, shape);
             assert!(source.is_dir(), "examples/shape/{pair}/{shape} is missing");
+            let project = PROJECT_SHAPES.iter().any(|(p, s, _)| p == pair && s == shape);
+            let manifest = if project { "index.panta.md" } else { "index.rhei.md" };
+            assert!(
+                source.join(manifest).is_file(),
+                "examples/shape/{pair}/{shape} is a {} with its {manifest}",
+                if project { "project" } else { "plan" }
+            );
             // A scratch copy, because the CLI keeps its home beside the plan
             // and the checkout must stay clean after a suite run.
             let scratch = unique_scratchpad_dir(&format!("shape-validate-{pair}-{shape}"));
@@ -410,7 +431,7 @@ fn a_pair_readme_quotes_what_both_its_runs_render() {
             // The run finished every task, and a finished plan has no next task
             // to peek; one open task added after it is the reader the history is for.
             fs::write(
-                workspace.join("tasks/99-probe.md"),
+                probe_home(pair, shape, &workspace).join("tasks/99-probe.md"),
                 "### Task 99: Read what came before\n**State:** work\n\n\
                  A task added after the run, so the run's history has a reader.\n",
             )

@@ -122,17 +122,20 @@ fn examples() -> Vec<Example> {
 /// The shape pairs: the same work authored two ways, both runnable with the mock
 /// agent, so the difference a run shows is the shape. Every
 /// `examples/shape/<pair>/<shape>/` is `shape-<pair>-<shape>`, found on disk so
-/// a pair is added by its directories alone. The names are leaked once per
-/// process, so they read like the static table's. §FS-rhei-shape.4
+/// a pair is added by its directories alone. A shape that is a project, with an
+/// `index.panta.md`, names no machine: each of its rheis finds its own
+/// (§FS-rhei-panta.1). The names are leaked once per process, so they read like
+/// the static table's. §FS-rhei-shape.4
 fn shape_examples(root: &Path) -> Vec<Example> {
     let leak = |text: String| -> &'static str { Box::leak(text.into_boxed_str()) };
     let mut found = Vec::new();
     for pair in subdirectories(&root.join("examples/shape")) {
         for shape in subdirectories(&root.join("examples/shape").join(&pair)) {
             let path = format!("examples/shape/{pair}/{shape}");
+            let project = root.join(&path).join("index.panta.md").is_file();
             found.push(Example {
                 name: leak(format!("shape-{pair}-{shape}")),
-                state_machine: Some(leak(format!("{path}/states.yaml"))),
+                state_machine: (!project).then(|| leak(format!("{path}/states.yaml"))),
                 path: leak(path),
                 runnable: true,
             });
@@ -276,20 +279,20 @@ fn cmd_run(name: &str, viz_after: bool) -> ExitCode {
         eprintln!("failed to copy example: {err}");
         return ExitCode::FAILURE;
     }
-    let sm = ex.state_machine.expect("runnable examples must declare a state machine");
-    let sm_rel = Path::new(sm)
-        .strip_prefix(ex.path)
-        .expect("runnable example's state machine must live under its directory");
-    let sm_abs = dest.join(sm_rel);
+    // A project shape names no machine, so each of its rheis runs on its own.
+    let sm_abs = ex.state_machine.map(|sm| {
+        let sm_rel = Path::new(sm)
+            .strip_prefix(ex.path)
+            .expect("runnable example's state machine must live under its directory");
+        dest.join(sm_rel)
+    });
     println!("==> running {} in {}", ex.name, dest.display());
-    let status = Command::new(cargo())
-        .current_dir(&root)
-        .args(["run", "-q", "-p", "rhei-cli", "--bin", "rhei", "--"])
-        .arg("--state-machine")
-        .arg(&sm_abs)
-        .arg("run")
-        .arg(&dest)
-        .status();
+    let mut command = Command::new(cargo());
+    command.current_dir(&root).args(["run", "-q", "-p", "rhei-cli", "--bin", "rhei", "--"]);
+    if let Some(sm) = &sm_abs {
+        command.arg("--state-machine").arg(sm);
+    }
+    let status = command.arg("run").arg(&dest).status();
     let success = matches!(status, Ok(ref s) if s.success());
     if success {
         println!("\nArtifacts left in {}", dest.display());
@@ -302,7 +305,7 @@ fn cmd_run(name: &str, viz_after: bool) -> ExitCode {
     }
 
     if viz_after {
-        match viz_run_output(ex.name, &dest, Some(&sm_abs)) {
+        match viz_run_output(ex.name, &dest, sm_abs.as_deref()) {
             Ok(path) => {
                 println!("Viz: {}", path.display());
                 if let Err(err) = open_in_browser(&path) {
@@ -478,8 +481,9 @@ mod tests {
     use super::*;
 
     /// A pair is added by its directories alone, so every shape on disk is
-    /// listed and runnable under `shape-<pair>-<shape>`, and the eight names the
-    /// first four pairs shipped under still resolve. §FS-rhei-shape.4
+    /// listed and runnable under `shape-<pair>-<shape>`, on the machine beside
+    /// it or, for a project, on its rheis' own, and the eight names the first
+    /// four pairs shipped under still resolve. §FS-rhei-shape.4
     #[test]
     fn every_shape_directory_is_a_listed_runnable_example() {
         let root = workspace_root();
@@ -502,6 +506,14 @@ mod tests {
                 assert!(example.runnable, "{name} runs with the mock agent");
                 assert_eq!(example.path, format!("examples/shape/{pair}/{shape}"));
                 assert!(root.join(example.path).is_dir(), "{name} runs from its directory");
+                let project = root.join(example.path).join("index.panta.md").is_file();
+                match example.state_machine {
+                    None => assert!(project, "{name} names its machine unless it is a project"),
+                    Some(machine) => {
+                        assert!(!project, "{name} is a project, whose rheis find their own");
+                        assert!(root.join(machine).is_file(), "{name} runs on {machine}");
+                    }
+                }
                 seen += 1;
             }
         }

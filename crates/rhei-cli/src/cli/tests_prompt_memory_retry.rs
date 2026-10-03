@@ -207,9 +207,9 @@ transitions:
     /// the whole paragraph, byte for byte: the retry is told that it is a
     /// retry, how the last attempt ended, and where its transcript is.
     ///
-    /// The opening sentence is wrong here — the condition was met and no
-    /// transition matched — and that is deliberately not this test's business
-    /// (agent-grounds/rhei#376, out of scope by the ticket's own answer).
+    /// The condition was met and no transition matched, so the paragraph does
+    /// not say it went unmet: that claim is made only where the owed clause
+    /// names what is unmet (agent-grounds/rhei#400).
     // §FS-rhei-memory.3.3 §FS-rhei-memory.4.4
     #[test]
     fn a_retry_that_owes_nothing_names_no_file() {
@@ -232,10 +232,67 @@ transitions:
         assert_eq!(
             render_retry_notice(&context, dir.path()),
             format!(
-                "\nRetrying this visit: attempt 2. The previous attempt exited 0 without meeting \
-                 this state's completion condition. Its transcript is `{}`.\n",
+                "\nRetrying this visit: attempt 2. The previous attempt exited 0. Its transcript \
+                 is `{}`.\n",
                 transcript.display()
             )
+        );
+    }
+
+    /// An exit-0 attempt that left something owed is the one ending the
+    /// completion-condition sentence is read for: the owed clause beside it
+    /// names what is unmet, from the same reading. §FS-rhei-memory.4.4
+    // §FS-rhei-agents.3.2.1
+    #[test]
+    fn an_exit_0_retry_that_owes_something_says_the_condition_went_unmet() {
+        let dir =
+            memory_plan_dir(&[("runtime/state-transitions.log", "plan.1.3 pending@review\n")]);
+        write_retry_record(dir.path(), "review", None, 1, Some(0));
+        let plan_path = dir.path().join("plan.rhei.md");
+        let loaded = load_plan(&plan_path).expect("plan loads");
+        let memory =
+            prompt_memory(&loaded, &plan_path, &dir.path().join("runtime"), BTreeSet::new());
+        let machine = owed_machine("runtime/triage/{task_id}.issue.md");
+        let task = find_task_by_id_str(&loaded.rhei.tasks, "plan.1.3").expect("task 1.3");
+        let context =
+            memory_context(dir.path(), &plan_path, &loaded, &memory, &machine, task, "review");
+
+        let notice = render_retry_notice(&context, dir.path());
+        assert!(
+            notice.contains(&format!(
+                "The previous attempt exited 0 without meeting this state's completion \
+                 condition.{OWES}{}",
+                owed_entry("issue", "runtime/triage/plan.1.3.issue.md")
+            )),
+            "got:\n{notice}"
+        );
+    }
+
+    /// A record with no exit code is an attempt a signal ended. It is told as
+    /// that, never as `exited 0`, and the owed clause still names what is owed
+    /// (agent-grounds/rhei#400).
+    // §FS-rhei-memory.4.4 §FS-rhei-agents.3.2.1
+    #[test]
+    fn a_retry_after_a_signal_is_not_told_the_attempt_exited_0() {
+        let dir =
+            memory_plan_dir(&[("runtime/state-transitions.log", "plan.1.3 pending@review\n")]);
+        write_retry_record(dir.path(), "review", None, 1, None);
+        let plan_path = dir.path().join("plan.rhei.md");
+        let loaded = load_plan(&plan_path).expect("plan loads");
+        let memory =
+            prompt_memory(&loaded, &plan_path, &dir.path().join("runtime"), BTreeSet::new());
+        let machine = owed_machine("runtime/triage/{task_id}.issue.md");
+        let task = find_task_by_id_str(&loaded.rhei.tasks, "plan.1.3").expect("task 1.3");
+        let context =
+            memory_context(dir.path(), &plan_path, &loaded, &memory, &machine, task, "review");
+
+        let notice = render_retry_notice(&context, dir.path());
+        assert!(
+            notice.contains(&format!(
+                "The previous attempt ended without an exit code (a signal ended it).{OWES}{}",
+                owed_entry("issue", "runtime/triage/plan.1.3.issue.md")
+            )),
+            "got:\n{notice}"
         );
     }
 

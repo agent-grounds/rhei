@@ -17,6 +17,12 @@ mod spawn_records {
     }
 
     fn ended(plan: &SpawnPlan, ending: &str, code: i32) {
+        ended_with(plan, ending, Some(code));
+    }
+
+    /// `code: None` is what a subprocess ended by a signal leaves: it did not
+    /// exit, so it has no code to record. §FS-rhei-agents.8.4
+    fn ended_with(plan: &SpawnPlan, ending: &str, code: Option<i32>) {
         plan.record_spawn(SpawnEnding {
             task_id: "plan.1",
             state_name: "implement",
@@ -25,7 +31,7 @@ mod spawn_records {
             started: "2026-08-29T10:00:00Z",
             ended: "2026-08-29T10:00:01Z",
             duration: "1s",
-            code: Some(code),
+            code,
             ending,
         });
     }
@@ -52,9 +58,11 @@ mod spawn_records {
         let second = plan_for(dir.path());
         assert_eq!(second.attempt, 2);
         assert!(second.log.ends_with("task-plan.1-implement-attempt2.log"));
+        // The ending, and only the ending: a clean exit does not by itself say
+        // the completion condition went unmet. §FS-rhei-agents.3.2.1
         assert_eq!(
             second.previous.as_ref().map(SpawnRecord::ending_sentence).as_deref(),
-            Some("exited 0 without meeting this state's completion condition")
+            Some("exited 0")
         );
     }
 
@@ -203,5 +211,38 @@ mod spawn_records {
                 .map(|record| record.worker),
             Some("mock".to_string())
         );
+    }
+
+    /// The previous attempt's ending, as the `Re-spawning` line and the retry
+    /// paragraph both say it.
+    fn previous_ending(root: &std::path::Path) -> Option<String> {
+        plan_for(root).previous.as_ref().map(SpawnRecord::ending_sentence)
+    }
+
+    /// A subprocess the kernel or an external `kill` ended has no exit code.
+    /// That is its own ending, not a clean exit (agent-grounds/rhei#400).
+    // §FS-rhei-agents.3.2.1
+    #[test]
+    fn a_record_without_an_exit_code_never_reads_as_exited_0() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        ledger(dir.path(), "plan.1 draft@implement\n");
+        ended_with(&plan_for(dir.path()), "exited", None);
+
+        assert_eq!(
+            previous_ending(dir.path()).as_deref(),
+            Some("ended without an exit code (a signal ended it)")
+        );
+    }
+
+    /// The record's `ending` decides before its code: a provider-limited spawn
+    /// that has no code is still provider-limited, not a clean exit.
+    // §FS-rhei-agents.3.2.1
+    #[test]
+    fn a_provider_limited_record_without_a_code_reads_as_provider_limited() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        ledger(dir.path(), "plan.1 draft@implement\n");
+        ended_with(&plan_for(dir.path()), "provider_limited", None);
+
+        assert_eq!(previous_ending(dir.path()).as_deref(), Some("was provider-limited"));
     }
 }

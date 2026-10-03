@@ -27,6 +27,9 @@ mod agent_prompt_size_tests;
 mod agent_reentry_completion_tests;
 mod agent_reentry_support;
 mod agent_reentry_tests;
+// A signal ending exists only on Unix. §FS-rhei-agents.3.2.1
+#[cfg(unix)]
+mod agent_retry_ending_tests;
 mod agent_retry_notice_tests;
 mod budget_ancestry_project_tests;
 mod budget_ceiling_tests;

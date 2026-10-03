@@ -314,8 +314,8 @@ Result entries so far:
 
 Previous log: `runtime/logs/{log file of the previous visit of this state}`
 
-Retrying this visit: attempt {n}. The previous attempt {ending}. It did not
-write what this visit still owes: {name} (`{path}`), … . Its transcript is
+Retrying this visit: attempt {n}. The previous attempt {ending}{unmet}. It did
+not write what this visit still owes: {name} (`{path}`), … . Its transcript is
 `{previous attempt log}`.
 ```
 
@@ -580,6 +580,22 @@ are never silently omitted here.
    `ending` and `code` as `{ending}`, its `log` as `{previous attempt log}`. A
    record from an earlier visit is not a retry and renders nothing: re-entering
    a state is a fresh start, not a second attempt.
+   `{ending}` is the sentence of the `Re-spawning` line
+   (§FS-rhei-agents.3.2.1), word for word, so the operator and the retry
+   read one ending: the record's `ending` before its `code`, and a record with
+   no `code` is `ended without an exit code (a signal ended it)`, never
+   `exited 0`. `{unmet}` is ` without meeting this state's completion
+   condition` when the record is `exited` with code `0` **and** `owed`
+   (item 5) is non-empty, and empty otherwise. The paragraph claims the
+   condition unmet only where the owed clause beside it names what is unmet,
+   from the same reading, so the two cannot disagree:
+
+   ```
+   The previous attempt exited 0 without meeting this state's completion condition. It did not write what this visit still owes: issue (`runtime/triage/plan.1.issue.md`).
+   The previous attempt exited 0. Its transcript is `runtime/logs/task-plan.1-publishing.log`.
+   The previous attempt ended without an exit code (a signal ended it). It did not write what this visit still owes: issue (`runtime/triage/plan.1.issue.md`).
+   The previous attempt ended without an exit code (a signal ended it). Its transcript is `runtime/logs/task-plan.1-publishing.log`.
+   ```
 5. `owed` = the required artifacts of *this* invocation's completion condition
    that are not on disk when the prompt is composed, computed as
    ([§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition)) computes it for one resolved invocation:

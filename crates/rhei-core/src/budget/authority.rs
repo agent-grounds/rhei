@@ -13,9 +13,12 @@ use fs2::FileExt;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::thread::ThreadId;
 
 pub(crate) struct Authority {
     _lock: File,
+    _held: Held,
     path: PathBuf,
     bytes: Vec<u8>,
     /// True when this machine had no witness for a journal that verifies, and
@@ -72,7 +75,7 @@ impl Authority {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
             Err(e) => return Err(BudgetError::unreachable(&path, &e)),
         };
-        Ok(Self { _lock: lock, path, bytes, adopted: false })
+        Ok(Self { _lock: lock, _held: Held::mark(uuid), path, bytes, adopted: false })
     }
 
     /// The journal and the witness must be the same bytes.
@@ -275,6 +278,43 @@ pub(super) fn authority_base() -> Result<PathBuf> {
 /// is not capacity and which no lookup spells — a root resolves through the
 /// index, and every scan of this base takes directories only.
 /// §FS-rhei-budgets.10 §REQ-cross-platform.2
+/// The uuids whose authority lock a thread of this process holds.
+///
+/// `flock` is not re-entrant across two opens of one file, so a thread that
+/// takes a uuid's lock while it already holds it waits on itself forever. A
+/// resolution reached under the lock — a run that locates its account with the
+/// journal open — asks here first. §AR-neural-admission.4
+static HELD: Mutex<Vec<(String, ThreadId)>> = Mutex::new(Vec::new());
+
+/// Whether the calling thread holds `uuid`'s authority lock.
+pub(crate) fn held_by_this_thread(uuid: &str) -> bool {
+    let me = std::thread::current().id();
+    HELD.lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .any(|(held, by)| held == uuid && *by == me)
+}
+
+/// One entry of [`HELD`], removed when the [`Authority`] carrying it drops.
+struct Held(String, ThreadId);
+
+impl Held {
+    fn mark(uuid: &str) -> Self {
+        let by = std::thread::current().id();
+        HELD.lock().unwrap_or_else(|e| e.into_inner()).push((uuid.to_string(), by));
+        Self(uuid.to_string(), by)
+    }
+}
+
+impl Drop for Held {
+    fn drop(&mut self) {
+        let mut held = HELD.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(at) = held.iter().position(|(uuid, by)| *uuid == self.0 && *by == self.1) {
+            held.swap_remove(at);
+        }
+    }
+}
+
 fn open_lock_file(path: &Path) -> std::io::Result<File> {
     OpenOptions::new().create(true).truncate(false).read(true).write(true).open(path)
 }

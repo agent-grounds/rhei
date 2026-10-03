@@ -33,8 +33,22 @@ fn budget_project_with_agent(
     selector: &str,
 ) -> (TestDir, PathBuf, PathBuf) {
     let dir = unique_temp_dir(prefix);
+    let (plan, machine) = write_budget_project(&dir, moves, starts, prologue, profile, selector);
+    (dir, plan, machine)
+}
+
+/// The project [`budget_project_with_agent`] describes, written at `dir`, which
+/// the caller owns - so a case can put it somewhere other than its own root.
+fn write_budget_project(
+    dir: &Path,
+    moves: u64,
+    starts: u64,
+    prologue: &str,
+    profile: &str,
+    selector: &str,
+) -> (PathBuf, PathBuf) {
     let agent = write_python_agent(
-        &dir,
+        dir,
         "looping-agent.py",
         &format!(
             r#"{prologue}root = pathlib.Path(env('RHEI_ROOT'))
@@ -63,7 +77,7 @@ write(root / 'runtime' / 'review.md', 'review\n')
     )
     .expect("project settings");
     let machine = write_fixture_file(
-        &dir,
+        dir,
         "states.yaml",
         &format!(
             r#"name: budget-no-minting
@@ -96,11 +110,11 @@ transitions:
         ),
     );
     let plan = write_fixture_file(
-        &dir,
+        dir,
         "plan.rhei.md",
         "# Rhei: No minting\n\n## Tasks\n\n### Task 1: Work\n**State:** work\n",
     );
-    (dir, plan, machine)
+    (plan, machine)
 }
 
 /// Every applied move the engine recorded. Travel is counted from these, so
@@ -213,14 +227,25 @@ fn appending_a_ticket_to_a_spent_project_creates_no_capacity() {
 /// A project whose agent resolves a provider and a model, which is what makes
 /// `rhei run` snapshot a state exit at all: an agent that resolves neither is
 /// skipped by auto-emission, and a fixture that is skipped pins nothing.
-// §FS-rhei-snapshots.3.1 §FS-rhei-agents.1.1
+///
+/// The project is `project/` inside a git work tree that is the test's own
+/// directory, which is where a developer's `TMPDIR` may put any fixture: an
+/// agent that found its root from where it stands would write at the work
+/// tree's root instead. The second path is the project's root.
+// §FS-rhei-snapshots.3.1 §FS-rhei-agents.1.1 §REQ-test-isolation.4
 fn snapshotting_budget_project(
     prefix: &str,
     moves: u64,
     starts: u64,
-) -> (TestDir, PathBuf, PathBuf) {
-    budget_project_with_agent(
-        prefix,
+) -> (TestDir, PathBuf, PathBuf, PathBuf) {
+    let dir = unique_temp_dir(prefix);
+    if !git_env::git_init_or_absent(&dir) {
+        eprintln!("git is not on this machine: the project runs with no work tree around it");
+    }
+    let root = dir.join("project");
+    fs::create_dir_all(&root).expect("project directory");
+    let (plan, machine) = write_budget_project(
+        &root,
         moves,
         starts,
         r#"session_dir = ''
@@ -234,7 +259,8 @@ write(pathlib.Path(session_dir) / 'session.jsonl', '{"provider":"openai","model"
 "#,
         r#""session": { "session_dir_flag": "--session-dir", "layout": { "kind": "FlatById", "ext": "jsonl" } }"#,
         "target: mock:openai:model",
-    )
+    );
+    (dir, root, plan, machine)
 }
 
 /// A snapshot stages a session, not capacity. The run caches one at every
@@ -246,20 +272,26 @@ write(pathlib.Path(session_dir) / 'session.jsonl', '{"provider":"openai","model"
 // §FS-rhei-budgets.11 §REQ-bounded-neural-work.4
 #[test]
 fn snapshotting_a_spent_project_creates_no_capacity() {
-    let (dir, plan, machine) = snapshotting_budget_project("budget-snapshot", 2, 50);
+    let (dir, root, plan, machine) = snapshotting_budget_project("budget-snapshot", 2, 50);
 
     run_run_command(&plan, &machine, &["--no-callbacks"]);
-    assert_eq!(applied_moves(&dir), 2, "the first run spends the project's two travel units");
+    // Nothing lands at the enclosing work tree's root: the agent writes beneath
+    // the project it was handed. §REQ-test-isolation.4
+    assert!(
+        !dir.join("runtime").exists(),
+        "the agent wrote runtime/ at the enclosing git work tree's root, outside the project"
+    );
+    assert_eq!(applied_moves(&root), 2, "the first run spends the project's two travel units");
     // The precondition, asserted rather than assumed: without it this case
     // would pass on a run that snapshotted nothing at all.
     assert!(
-        !collect_run_agent_snapshot_manifests(&dir).is_empty(),
+        !collect_run_agent_snapshot_manifests(&root).is_empty(),
         "the run cached a snapshot, so the seam under test was actually reached"
     );
 
     let again = run_run_command(&plan, &machine, &["--no-callbacks"]);
 
-    assert_eq!(applied_moves(&dir), 2, "the cached session buys no further move");
+    assert_eq!(applied_moves(&root), 2, "the cached session buys no further move");
     assert!(!again.status.success(), "and the rerun is halted rather than quietly idle");
     assert!(
         format!("{}{}", again.stdout, again.stderr).contains("ticket travel"),

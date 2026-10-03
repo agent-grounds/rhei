@@ -7,6 +7,11 @@
 //! template tests check instantiation mechanics for a handful of templates,
 //! never that all of them validate clean, which is how three of them drifted.
 //! §FS-rhei-templates.6 §FS-rhei-validate.4 §FS-rhei-agents.3.2.2
+//!
+//! What it gates is the shipped template and nothing else: a same-named
+//! template in a rhei home above the test's directory must never stand in for
+//! it, so the fixture plants one there and the guard has to pass regardless.
+//! §REQ-test-isolation.4
 
 use std::fs;
 use std::path::Path;
@@ -50,11 +55,33 @@ fn required_inputs(dir: &Path, template: &str) -> Vec<String> {
         .collect()
 }
 
+/// A rhei home at `fixture`, holding an `agora` whose one required input is an
+/// array the built-in `agora` does not have, so instantiating it with the
+/// placeholder fails as the stand-in and never as the shipped template.
+fn plant_ancestor_agora(fixture: &Path) {
+    let agora = fixture.join(".agent-grounds/rhei/templates/agora");
+    fs::create_dir_all(&agora).expect("create the ancestor agora");
+    fs::write(
+        agora.join("template.yaml"),
+        "name: agora\nversion: 1.0.0\ndescription: not the built-in agora\ninputs:\n  \
+         - name: participants\n    description: the discussants\n    type: array\n    \
+         required: true\n    items:\n      type: string\n",
+    )
+    .expect("write the ancestor agora's manifest");
+    fs::write(
+        agora.join("plan.rhei.md"),
+        "# Rhei: Ancestor agora\n\n## Tasks\n\n### Task 1: Discuss\n**State:** pending\n",
+    )
+    .expect("write the ancestor agora's plan");
+}
+
 #[test]
 fn every_shipped_template_instantiates_into_a_workspace_validate_accepts() {
-    let dir = unique_temp_dir("template-validates");
-    // The command searches upwards for a rhei home, so a template of the same
-    // name above the temporary directory would be the one instantiated.
+    let fixture = unique_temp_dir("template-validates");
+    // A rhei home above where the commands run, with an incompatible same-named
+    // template, as a developer's home above TMPDIR may hold. §REQ-test-isolation.4
+    plant_ancestor_agora(&fixture);
+    let dir = fixture.join("work");
     fs::create_dir_all(dir.join(".agent-grounds/rhei/templates")).expect("create rhei home");
 
     for template in shipped_templates() {

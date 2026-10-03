@@ -405,7 +405,9 @@ For each agent invocation:
    extractor declares any extra arguments, environment variables, or capture
    paths needed for structured usage. Rhei's built-in capture contract sets
    `RHEI_ACCOUNTING_USAGE_PATH` and
-   `RHEI_ACCOUNTING_USAGE_SCHEMA=rhei.accounting.usage.v1`.
+   `RHEI_ACCOUNTING_USAGE_SCHEMA=rhei.accounting.usage.v1`. An agent with no
+   extractor receives no capture pair, even when Rhei's own environment carries
+   one: that pair names another invocation's capture file (§FS-rhei-agents.4).
 2. `rhei run` spawns the agent normally.
 3. The extractor observes structured usage as it is produced and appends
    normalized usage events to `runtime/accounting/captures/*.jsonl`.

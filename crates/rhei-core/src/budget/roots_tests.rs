@@ -155,3 +155,24 @@ fn retiring_a_copy_keeps_its_claim_and_leaves_the_holder_alone() {
     assert_ne!(fresh.uuid(), case.account.uuid());
     assert!(Account::locate(case.root()).expect("locate").expect("holder").held_by().is_none());
 }
+
+/// A root the index lost, located by the thread that holds its journal open,
+/// is recorded again rather than waiting on the authority lock it already
+/// holds: `flock` is not re-entrant, and a run that did this hung for good.
+/// §FS-rhei-budgets.5.4.1 §AR-neural-admission.4
+#[test]
+fn locating_an_unindexed_root_under_its_own_open_journal_does_not_wait_on_itself() {
+    let case = Case::new();
+    let root = crate::platform::canonical_path(case.root()).expect("resolve");
+    let journal = case.open();
+    super::roots::retract_root(&root).expect("lose the root from the index");
+
+    let located = Account::locate(&root).expect("locate").expect("the root keeps its account");
+
+    assert!(located.held_by().is_none());
+    assert_eq!(
+        super::roots::witnessed_roots().expect("index").get(&root),
+        Some(&located.uuid().to_string())
+    );
+    drop(journal);
+}

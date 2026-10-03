@@ -349,6 +349,19 @@ fn distinct_legacy_attempts(
 /// are dropped, while ambiguous or contradictory records are reported.
 /// §FS-rhei-panta.6.5 §FS-rhei-cost-accounting.3.7
 fn read_cost_inspection_over(roots: &[AccountingRoot], scope: &RheiScope) -> CostInspection {
+    read_cost_inspection_beside(roots, scope, None)
+}
+
+/// [`read_cost_inspection_over`], reconciled against the run root's agent
+/// spawns as well as against those beside each root: `rhei run` writes an
+/// agent's spawn record under the run root, so a reading narrowed to members
+/// would otherwise see none of its own agents. Both reading commands read
+/// through here. §FS-rhei-cost-accounting.6.2.1
+fn read_cost_inspection_beside(
+    roots: &[AccountingRoot],
+    scope: &RheiScope,
+    run_root: Option<&Path>,
+) -> CostInspection {
     // §FS-rhei-recover.4: direct accounting readers share the same root boundary.
     let execution_roots = roots.iter().filter_map(|root| root.path.parent()?.parent())
         .filter(|root| root.exists()).map(Path::to_path_buf).collect::<Vec<_>>();
@@ -435,6 +448,20 @@ fn read_cost_inspection_over(roots: &[AccountingRoot], scope: &RheiScope) -> Cos
             .then_with(|| a.record.invocation_id.cmp(&b.record.invocation_id))
     });
 
+    // The run root's spawns, scoped by `task` as a shared root's are, and read
+    // once when the run root is already one of the reading's roots.
+    // §FS-rhei-cost-accounting.6.2.1
+    if let Some(run_root) = run_root {
+        let run_accounting = run_root.join(ACCOUNTING_DIR);
+        let key = canonical_root_key(&run_accounting);
+        if !roots.iter().any(|root| canonical_root_key(&root.path) == key) {
+            let (root_spawns, mut spawn_errors) = read_agent_spawns(&run_accounting);
+            errors.append(&mut spawn_errors);
+            spawns.extend(
+                root_spawns.into_iter().filter(|spawn| task_in_rhei_scope(scope, &spawn.task)),
+            );
+        }
+    }
     let unrecorded = unrecorded_agent_spawns(spawns, &invocations);
     let inspection = CostInspection {
         summary: None,

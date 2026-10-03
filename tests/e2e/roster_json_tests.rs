@@ -196,5 +196,10 @@ fn roster_json_reports_layered_values_clears_and_field_provenance() {
     assert_eq!(payload["provenance"]["defaults"]["agent_mode"], "project");
     assert_eq!(payload["provenance"]["defaults"]["mcp_servers"], "global");
     assert_eq!(payload["provenance"]["defaults"]["skills"], "project");
-    assert!(result.stderr.is_empty(), "current settings do not warn: {}", result.stderr);
+    // Only the no-family warning its custom agents earn. §FS-rhei-agents.1.1.2
+    assert!(
+        result.stderr.lines().all(|line| line.contains("declares no family")),
+        "current settings do not warn: {}",
+        result.stderr
+    );
 }

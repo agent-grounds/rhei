@@ -204,7 +204,12 @@ fn roster_text_summarizes_sources_defaults_agents_modes_models_and_bindings() {
     {
         assert!(result.stdout.contains(text), "text roster omitted {text:?}:\n{}", result.stdout);
     }
-    assert!(result.stderr.is_empty(), "text diagnostics leaked: {}", result.stderr);
+    // Only the no-family warning its custom agents earn. §FS-rhei-agents.1.1.2
+    assert!(
+        result.stderr.lines().all(|line| line.contains("declares no family")),
+        "text diagnostics leaked: {}",
+        result.stderr
+    );
 }
 
 /// Both renderings only inspect settings. Even malformed task markdown must

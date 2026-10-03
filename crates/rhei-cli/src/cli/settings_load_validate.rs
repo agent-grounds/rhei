@@ -535,7 +535,9 @@ fn load_merged_roster(
 /// Preserve execution's settings-only interface while sharing exactly the
 /// merge used by roster inspection. §FS-rhei-agents.1.1.7
 fn load_merged_settings(plan_root: &Path) -> MietteResult<RheiSettings> {
-    Ok(load_merged_roster(plan_root, true)?.settings)
+    let settings = load_merged_roster(plan_root, true)?.settings;
+    warn_unmeasured_agent_profiles(&settings.agents);
+    Ok(settings)
 }
 
 fn validate_snapshot_plan_context(

@@ -39,6 +39,10 @@ mod foreign_tail_tests;
 #[cfg(test)]
 mod identity_tests;
 #[cfg(test)]
+mod index_refusal_tests;
+#[cfg(test)]
+mod index_refusals;
+#[cfg(test)]
 mod ledger_tests;
 #[cfg(test)]
 mod nonstart_tests;

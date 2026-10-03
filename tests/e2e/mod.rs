@@ -200,6 +200,7 @@ mod terminal_result_fanout_tests;
 mod terminal_result_redirect_tests;
 mod terminal_result_stall_tests;
 mod terminal_result_tests;
+mod timeout_charge_halt_tests;
 mod timeout_preflight_tests;
 mod transition_tests;
 mod transition_writer_lock_tests;

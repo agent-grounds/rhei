@@ -412,6 +412,16 @@ headless, and JSONL surfaces; no new output record family is introduced.
    [Complete Command — Result File](rhei-complete.spec.md#3-result-file).
 9. Repeat until no pass makes progress. Exit `0` when the plan reaches a state where every task is terminal. Exit non-zero when progress halts with non-terminal tasks remaining and no further advancement is possible.
 
+   **A halt that follows a transition the engine could not fire says so.**
+   When a timeout transition was selected for a task and failed to apply - its
+   charge refused, say, because the budget path could not be reached - the run
+   has already printed a `warning: failed to fire timeout transition` line
+   naming the task and the cause. The halt that follows keeps its exit status,
+   but its help does not describe the remaining tasks as blocked, gated, or
+   assigned, which that task is not, and does not send the reader to `rhei
+   list`, which cannot show why. It says a timeout transition could not be
+   fired and points at the warning above.
+
    **With `--until-idle`, this step has a third outcome.** Where a continuous
    run with nothing ready would consult the earliest effective deadline and
    sleep (§5.1), a selected run performs the same final live-member admission

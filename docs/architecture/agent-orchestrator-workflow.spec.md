@@ -403,6 +403,29 @@ the last error unchanged and the destination's previous bytes intact.
 Exclusion is never dropped, and the destination never locked, to make the
 rename possible. §REQ-cross-platform.2 §FS-rhei-transition-cmd.3
 
+###### 3.3.1.1.1. The Budget Witness Index
+
+The budget witness index, `rhei/budget-authority/roots.json` under the state
+directory (§FS-rhei-budgets.5.3), is one file every rhei on the machine shares.
+Every account a process establishes, locates, or retires reads it; establishing
+and retiring replace it; the ancestry note reads it to name a project. So any
+other rhei's read handle on it is exactly the open handle above, and the same
+rule governs it: a refusal is transient and waited out, by the same refusal
+test, for the same bounded time, with the same pause between attempts. No
+setting widens or narrows it.
+
+The rule covers the index's **read** as well as its replacement. Windows
+refuses a read while a replacement holds the destination, so a process reading
+the index while another replaces it meets the same refusal from the other
+side. Absence is not a refusal: a missing index is an empty one at once, as it
+always was. Any other failure is reported after a single attempt.
+
+Only a refusal that outlasts the bound is reported, and it is reported as
+before: the budget path could not be reached, naming the index. A charge that
+needed the index is then refused, with the account and its journal untouched.
+The pending file a replacement stages has a fresh name no other process opens,
+so its write is not retried. §FS-rhei-budgets.5.4 §REQ-cross-platform.2
+
 ### 3.4. Durable State and Git Boundary
 
 Rhei-owned durable state is the authored plan/workspace task state plus the

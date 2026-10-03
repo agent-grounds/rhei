@@ -150,9 +150,13 @@ not theirs. A lock taken by the tests that move `HOME` does not hold this: it
 orders only the tests that take it, and a test that reads the user tier without
 knowing it does is exactly the one that never would.
 
-The measure is the process's `HOME` itself. Whatever it names — a directory
-holding settings that are invalid on purpose, the developer's own, or nothing —
-every test in the binary reaches the same verdict, and no test's run leaves it
-naming anything other than what it named before. This governs the tests only:
+The measure is the process's `HOME` itself. Whatever directory it names — one
+holding settings that are invalid on purpose, or the developer's own — every
+test in the binary reaches the same verdict, and no test's run leaves it naming
+anything other than what it named before. What this point governs is the user
+tier read through the home. Where a test's account state goes is not that: with
+`XDG_STATE_HOME` unset, the state directory still falls back to `HOME`, so a
+test that keeps state needs `HOME` or `XDG_STATE_HOME` to name somewhere, and
+this point says nothing about it. This governs the tests only:
 the built `rhei` still takes its user tier from `HOME`, as
 [§REQ-test-isolation.2](test-isolation.spec.md#2-where-a-spawned-process-writes-is-chosen-never-derived-from-where-it-stands) relies on when a test pins it for a spawned binary.

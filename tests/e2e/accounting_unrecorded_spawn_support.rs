@@ -70,6 +70,8 @@ transitions:
 
 /// One ticket on `priced`. The lost-write scenario runs it, makes the
 /// invocations directory read-only, and runs a second ticket appended to it.
+/// Unix only, like the scenario: read-only directories are a Unix permission.
+#[cfg(unix)]
 pub const LOSTWRITE_PLAN: &str = r#"# Rhei: Lost write
 
 ## Tasks
@@ -78,6 +80,7 @@ pub const LOSTWRITE_PLAN: &str = r#"# Rhei: Lost write
 **State:** work
 "#;
 
+#[cfg(unix)]
 pub const LOSTWRITE_SECOND_TICKET: &str = r#"
 ### Task 2: Second ticket
 **State:** work
@@ -195,6 +198,7 @@ impl SpawnWorkspace {
         json_files(&self.root.join("runtime/accounting/invocations"))
     }
 
+    #[cfg(unix)]
     pub fn invocations_dir(&self) -> PathBuf {
         self.root.join("runtime/accounting/invocations")
     }

@@ -375,7 +375,7 @@ fn spawn_parallel_agent_work_item(
     // Ambiguity is recorded *before* the worker is handed the spawn, on this
     // thread, so a crash between here and the process can never refund the
     // invocation. §FS-rhei-budgets.6.2
-    budget_record_start(workspace_root, &item.task_id_str, false);
+    budget_record_start(workspace_root, &item.task_id_str, false, sink);
     let handle = std::thread::spawn(move || {
         inherit_run_owner(run_owner);
         let thread_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

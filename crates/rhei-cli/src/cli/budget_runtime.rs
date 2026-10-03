@@ -74,6 +74,11 @@ struct HeldClaim {
     /// free — that class writes no record at all, so a settle-side fallback
     /// would never run for it. §FS-rhei-budgets.6.2
     measured: Vec<Measurement>,
+    /// The ticket's account identity and the bounds it was admitted under, so
+    /// the account read after each later receipt reports the same lines the
+    /// admission did. §FS-rhei-run-json.2.1
+    ticket: String,
+    bounds: CountBounds,
 }
 
 /// One invocation's cost as the settle will write it. §FS-rhei-budgets.6.2
@@ -380,7 +385,7 @@ fn budget_admit_spawn(
         Ok(group) => {
             // The reserve spent, so the ticket has earned its durable identity.
             identity.commit()?;
-            let bounds = budget_reports(&journal, &ticket, &bounds).unwrap_or_default();
+            let reports = budget_reports(&journal, &ticket, &bounds).unwrap_or_default();
             // Said once per run, and only where the ledger actually declined
             // the ancestry rather than where this process merely offered one.
             // §FS-rhei-budgets.7.2
@@ -392,13 +397,15 @@ fn budget_admit_spawn(
                     account: account.uuid().to_string(),
                     started: false,
                     measured: Vec::new(),
+                    ticket: ticket.clone(),
+                    bounds: bounds.clone(),
                 });
                 if claim.travel.is_none() {
                     claim.travel = group.travel_reservation_id.clone();
                 }
                 claim.arms.extend(group.reservation_ids.clone());
             });
-            Ok(BudgetAdmission::Admitted { bounds, note })
+            Ok(BudgetAdmission::Admitted { bounds: reports, note })
         }
         Err(refusal) => Ok(BudgetAdmission::Refused {
             halt: budget_halt_text(&refusal, &bounds, &journal),
@@ -438,20 +445,42 @@ fn budget_ancestry_token(task_id_str: &str) -> Option<(String, String)> {
 /// refined after it returns. A crash between the two can never refund the
 /// invocation; confirmation only refines what was already consumed.
 /// §FS-rhei-budgets.6.2
-fn budget_record_start(workspace_root: &Path, task_id_str: &str, confirmed: bool) {
-    let arms = with_claims(|claims| {
+fn budget_record_start(
+    workspace_root: &Path,
+    task_id_str: &str,
+    confirmed: bool,
+    sink: &Arc<dyn rhei_tui::EventSink>,
+) {
+    let held = with_claims(|claims| {
         claims.get_mut(task_id_str).map(|claim| {
             claim.started = true;
-            claim.arms.clone()
+            (claim.arms.clone(), claim.ticket.clone(), claim.bounds.clone())
         })
     });
-    let Some(arms) = arms else { return };
+    let Some((arms, ticket, bounds)) = held else { return };
     let Ok(audit) = budget_audit("record a neural start") else { return };
     let project_root = budget_project_root(workspace_root);
     let Ok(Some(account)) = Account::locate(&project_root) else { return };
     let Ok(mut journal) = account.open(true) else { return };
     for arm in &arms {
         let _ = journal.record_start(arm, confirmed, &audit);
+    }
+    emit_budget_account(sink, &journal, &ticket, &bounds);
+}
+
+/// Where the account stands now that a receipt is durable, on the same event
+/// the admission emits, so every surface that reads it ends at the run's last
+/// receipt rather than at its last admission. Best effort like the receipt it
+/// follows: an account that cannot be read emits nothing.
+/// §FS-rhei-run-json.2.1 §FS-rhei-budgets.9
+fn emit_budget_account(
+    sink: &Arc<dyn rhei_tui::EventSink>,
+    journal: &Journal,
+    ticket: &str,
+    bounds: &CountBounds,
+) {
+    if let Ok(bounds) = budget_reports(journal, ticket, bounds) {
+        sink.emit(rhei_tui::RunEvent::BudgetSnapshot { bounds });
     }
 }
 
@@ -492,7 +521,11 @@ fn budget_record_spend(task_id_str: &str, usage: Option<&rhei_tui::UsageSummary>
 /// consumed, ambiguous or not. And once a start exists, every arm owes the
 /// day an amount: what the record said, or the worst case that was reserved
 /// for it. §FS-rhei-budgets.4.1 §FS-rhei-budgets.6.2
-fn budget_settle_visit(workspace_root: &Path, task_id_str: &str) {
+fn budget_settle_visit(
+    workspace_root: &Path,
+    task_id_str: &str,
+    sink: &Arc<dyn rhei_tui::EventSink>,
+) {
     let Some(claim) = with_claims(|claims| claims.remove(task_id_str)) else { return };
     // Best effort by design: a visit that ends while the account cannot be
     // opened leaves the unit outstanding, which is the conservative direction.
@@ -519,14 +552,17 @@ fn budget_settle_visit(workspace_root: &Path, task_id_str: &str) {
             let currency = measured.and_then(|m| m.currency.as_deref()).unwrap_or(fallback);
             let _ = journal.settle_spend(arm, amount, currency, basis, &audit);
         }
-        if let Some(travel) = claim.travel {
-            let _ = journal.release_travel(&travel, &audit);
+        if let Some(travel) = &claim.travel {
+            let _ = journal.release_travel(travel, &audit);
         }
-        return;
+    } else {
+        // Nothing started, so the whole reservation goes back — its invocation
+        // unit, its travel unit, and the worst case it reserved against the day.
+        for arm in &claim.arms {
+            let _ = journal.release_unstarted(arm, &audit);
+        }
     }
-    // Nothing started, so the whole reservation goes back — its invocation
-    // unit, its travel unit, and the worst case it reserved against the day.
-    for arm in &claim.arms {
-        let _ = journal.release_unstarted(arm, &audit);
-    }
+    // The settle is the visit's last receipt, so this is the account the run
+    // ends on when it is the run's last visit. §FS-rhei-run-json.2.1
+    emit_budget_account(sink, &journal, &claim.ticket, &claim.bounds);
 }

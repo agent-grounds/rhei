@@ -30,7 +30,8 @@ fn handle_parallel_agent_exit(
         task_id_str,
         state_name,
         started_at,
-        // Emitted when this function returns. §FS-rhei-states.2.2
+        // Emitted when this function returns, or just before its settle.
+        // §FS-rhei-states.2.2
         mut release,
         resolved,
         log,
@@ -49,7 +50,7 @@ fn handle_parallel_agent_exit(
     let machine = machines.for_task_str(&task_id_str);
     // The process returned, so the start that was ambiguous is now confirmed.
     // §FS-rhei-budgets.6.2
-    budget_record_start(workspace_root, &task_id_str, true);
+    budget_record_start(workspace_root, &task_id_str, true, sink);
     *progress.agents_spawned += 1;
     let target_id = parse_task_id(&task_id_str);
     let reloaded = load_plan(input)?;
@@ -87,10 +88,14 @@ fn handle_parallel_agent_exit(
             effective.identity.provider,
             effective.next_attempt_at
         );
+        // The slot goes first so the settle's account is the visit's last
+        // record, as on the sequential path. §FS-rhei-run-json.2.1
+        drop(release);
+
         // A provider limit gives the *attempt* back and never the invocation:
         // the process ran. The travel unit goes back because no edge was
         // applied. §FS-rhei-budgets.4.2 §FS-rhei-agents.3.2.3
-        budget_settle_visit(workspace_root, &task_id_str);
+        budget_settle_visit(workspace_root, &task_id_str, sink);
         return Ok(());
     }
     if status.success() && stayed_in_state {
@@ -557,9 +562,13 @@ fn handle_parallel_agent_exit(
         }
     }
 
+    // The slot goes first so the settle's account is the visit's last
+    // record, as on the sequential path. §FS-rhei-run-json.2.1
+    drop(release);
+
     // The visit is over and whatever edge it was going to apply has been
     // applied: a travel unit still held is one nothing moved against, and it
     // goes back. §FS-rhei-budgets.4.1
-    budget_settle_visit(workspace_root, &task_id_str);
+    budget_settle_visit(workspace_root, &task_id_str, sink);
     Ok(())
 }

@@ -69,14 +69,17 @@ impl BoundsSection {
             return String::new();
         }
         let mut out = String::from("## Bounds\n\n");
+        // Outstanding gets a column of its own so every row adds up to its
+        // bound, a reservation still held at the end included. §FS-rhei-run-report.3.1
         out.push_str(
-            "| Dimension | Bound | Mode | Consumed at start | Consumed at end | Remaining |\n\
-             | --- | --- | --- | ---: | ---: | ---: |\n",
+            "| Dimension | Bound | Mode | Consumed at start | Consumed at end | \
+             Outstanding at end | Remaining |\n\
+             | --- | --- | --- | ---: | ---: | ---: | ---: |\n",
         );
         for (dimension, bound) in &self.last {
             let started = self.first.get(dimension).map(|b| b.consumed).unwrap_or(bound.consumed);
             out.push_str(&format!(
-                "| {} | {} | {} | {} | {} | {} |\n",
+                "| {} | {} | {} | {} | {} | {} | {} |\n",
                 md_cell(dimension),
                 md_cell(&Self::provenance(bound)),
                 md_cell(bound.window.as_deref().unwrap_or(&bound.mode)),
@@ -86,6 +89,7 @@ impl BoundsSection {
                     Self::amount(bound, bound.consumed),
                     Self::estimated(bound)
                 )),
+                md_cell(&Self::amount(bound, bound.outstanding)),
                 md_cell(&Self::amount(bound, bound.remaining)),
             ));
         }

@@ -5,7 +5,7 @@ from typing import Sequence
 
 import rhei_cli
 
-__version__ = "0.5.2-dev"
+__version__ = "0.6.0"
 
 
 def run(

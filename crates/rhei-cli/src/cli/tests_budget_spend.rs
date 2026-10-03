@@ -85,3 +85,18 @@ fn spend_per_day_resolves_on_the_machine_and_project_tiers_only() {
         "and every surface reports all four, in dimension order"
     );
 }
+
+/// A test's home is its own without moving the process's: `HOME` names what it
+/// named before while a `TempHome` is alive, and the user tier still resolves
+/// under the test's own directory. §REQ-test-isolation.5
+#[test]
+fn a_temp_home_leaves_the_process_home_where_it_was() {
+    let before = std::env::var_os("HOME");
+    let home = TempHome::new();
+    let during = std::env::var_os("HOME");
+    let resolved = home_dir().unwrap();
+    let own = home.dir.path().to_path_buf();
+    drop(home);
+    assert_eq!(during, before, "TempHome moved the process-wide HOME");
+    assert_eq!(resolved, own, "the user tier did not resolve under the test's home");
+}

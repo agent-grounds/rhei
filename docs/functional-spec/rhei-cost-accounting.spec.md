@@ -894,8 +894,13 @@ selection against those spawn records before they report coverage.
 1. **Which spawns.** The spawn records under `runtime/spawns/` of each root
    whose accounting the reading covers, scoped exactly as that root's records
    are (§FS-rhei-panta.6.5): the root decides where it belongs to one in-scope
-   rhei, and the spawn's `task` decides where the root is shared. Only
-   `kind: agent` counts. A program spawn is never counted, because a program
+   rhei, and the spawn's `task` decides where the root is shared. The run
+   root's `runtime/spawns/` is read too, even when the reading is narrowed to
+   members and does not read the run root's accounting: `rhei run` writes an
+   agent's spawn record under the run root, wherever its task's records go,
+   so a member reading that skipped it would see none of its own agents. Its
+   spawns are scoped by `task`, as a shared root's are, and a run root that is
+   already one of the reading's roots is read once. Only `kind: agent` counts. A program spawn is never counted, because a program
    writes no invocation record. An absent `runtime/spawns/` holds nothing to
    reconcile. A spawn record that cannot be parsed is reported the way a
    malformed accounting artifact is (§FS-rhei-cost-accounting.11) and skipped.
@@ -904,7 +909,10 @@ selection against those spawn records before they report coverage.
    `state` and its attempt identity (§FS-rhei-cost-accounting.3.7) names the spawn's `moves` and
    `attempt`. A legacy record, whose identity carries neither, records a spawn
    of the same task and state whose `[started, ended]` interval contains its
-   `started_at`. Both are matched as fields, never by counting files or by
+   `started_at`. A spawn record's times are whole seconds, so the instant is
+   compared at whole seconds, and one second before `started` still counts:
+   the record's clock is read just before the spawn's, and the two can fall
+   either side of a second boundary. Both are matched as fields, never by counting files or by
    file-name prefix. A spawn no record matches is **unrecorded**, whatever
    its profile's family, its `ending`, or its exit code: goal 1 holds for every
    agent invocation, a failed one included.

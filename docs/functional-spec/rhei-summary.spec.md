@@ -106,9 +106,10 @@ One numbered entry per invocation record, ordered by `started_at`:
   either timestamp is missing.
 - An agent spawn with no accounting record (§FS-rhei-cost-accounting.6.2.1)
   is an entry too, placed by its `started`. It carries the task id, the state,
-  `(visit N)` under the same rule, the spawn's `worker`, its duration from
-  `started` and `ended`, and the words `no accounting record` in place of a
-  model and token counts, which the spawn does not know:
+  the spawn's `worker`, its duration from `started` and `ended`, and the words
+  `no accounting record` in place of a model and token counts, which the spawn
+  does not know. It carries no `(visit N)`: a spawn record names no visit, and
+  its file name is never matched to find one (§FS-rhei-agents.8.4):
   `` 3. `plan.1` implement — cdx — 1s — no accounting record ``
 - With explicit `--run`/`--prices`, entries come only from that exact run after
   accounting-root filtering and record-identity deduplication. The same

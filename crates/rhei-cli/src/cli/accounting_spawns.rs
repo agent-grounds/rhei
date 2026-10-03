@@ -156,10 +156,10 @@ fn record_answers_for(record: &AccountingInvocationRecord, spawn: &SpawnRecordFa
         return identity == (spawn.moves, spawn.attempt);
     }
     // Spawn times are whole seconds, so the record's instant is compared at
-    // the same grain.
+    // the same grain, a second early allowed: its clock is read first.
     let secs = |text: &str| epoch_secs(rhei_tui::parse_rfc3339(text)?);
     match (record_started_at_secs(record), secs(&spawn.started), secs(&spawn.ended)) {
-        (Some(at), Some(started), Some(ended)) => started <= at && at <= ended,
+        (Some(at), Some(started), Some(ended)) => started - 1 <= at && at <= ended,
         _ => false,
     }
 }

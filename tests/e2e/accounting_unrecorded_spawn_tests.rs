@@ -178,3 +178,61 @@ fn the_unrecorded_count_is_zero_when_every_agent_spawn_has_a_record() {
     let json = workspace.cost_json(&[]);
     assert_eq!(json["summary"]["unrecorded_agent_invocation_count"], 0, "cost: {json:#}");
 }
+
+/// A reading narrowed to a member of a Panta project: `rhei run` writes every
+/// agent spawn record under the project, the run root, while the member's
+/// records go under the member. The member reading must still see its agents,
+/// so a lost record reads `Partial` there as it does project-wide.
+// §FS-rhei-cost-accounting.6.2.1 §FS-rhei-panta.6.5
+#[test]
+fn a_member_reading_sees_the_agent_spawns_the_run_root_holds() {
+    use std::fs;
+
+    use super::accounting_unrecorded_spawn_support::{json_files, member_workspace};
+    use super::{assert_success, run_cli};
+
+    let workspace = member_workspace("unrecorded-member");
+    assert_success(&run_cli(
+        "run",
+        &workspace.root,
+        &workspace.machine,
+        &["--no-tui", "--no-callbacks"],
+    ));
+    // The fixture: both agent spawns under the project, both records under the
+    // member, and no agent spawn beside the member's records.
+    workspace.assert_shape(2, 0);
+    let member_spawns = json_files(&workspace.plan.join("runtime/spawns"));
+    assert!(
+        member_spawns.iter().all(|spawn| spawn["kind"].as_str() != Some("agent")),
+        "fixture: no agent spawn beside the member's records {member_spawns:#?}"
+    );
+    let invocations = workspace.plan.join("runtime/accounting/invocations");
+    let mut records = fs::read_dir(&invocations)
+        .expect("read member invocations")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("json"))
+        .collect::<Vec<_>>();
+    assert_eq!(records.len(), 2, "fixture: member records {records:#?}");
+
+    let summary = workspace.summary_details();
+    assert_eq!(coverage_row(&summary), "| coverage | Complete |", "got:\n{summary}");
+    let text = workspace.cost_text(&[]);
+    assert!(text.contains("| Coverage Complete | Invocations 2"), "got:\n{text}");
+
+    fs::remove_file(records.pop().expect("a member record")).expect("lose one record");
+
+    let summary = workspace.summary_details();
+    assert_eq!(
+        coverage_row(&summary),
+        "| coverage | Partial (1 of 2 agent invocations have no accounting record) |",
+        "the member reading must see the run root's agent spawns; got:\n{summary}"
+    );
+    let text = workspace.cost_text(&[]);
+    assert!(
+        text.contains(
+            "| Coverage Partial (1 of 2 agent invocations have no accounting record) | Invocations 1"
+        ),
+        "got:\n{text}"
+    );
+}

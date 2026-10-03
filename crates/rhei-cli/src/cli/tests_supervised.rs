@@ -226,6 +226,60 @@
             wait_until("the interrupted group to be gone", || !pid_is_alive(pgid));
         }
 
+        /// Whether `pid` has died and waits to be reaped. `ps` rather than
+        /// `waitid(WNOWAIT)`, which macOS does not offer through `nix`.
+        fn is_zombie(pid: i32) -> bool {
+            std::process::Command::new("ps")
+                .args(["-o", "stat=", "-p", &pid.to_string()])
+                .output()
+                .map(|out| String::from_utf8_lossy(&out.stdout).trim_start().starts_with('Z'))
+                .unwrap_or(false)
+        }
+
+        /// A child that ends before `wait` first polls it, while the run's
+        /// shutdown is already under way: the token is set, then the child
+        /// runs `script` to its end and is left unreaped.
+        fn wait_on_a_child_that_ended_under_a_shutdown(script: &str, label: &str) -> Ended {
+            let token = StopToken::new();
+            let mut supervised = Supervised::spawn(&mut sh(script), label).expect("spawn");
+            let pgid = supervised.pgid;
+            token.raise(Signal::SIGTERM as i32);
+            wait_until("the child to die and await its reaping", || is_zombie(pgid));
+            supervised.wait(None, &token, &ignore_notice).expect("wait")
+        }
+
+        /// An agent dead of its own copy of the signal that stopped the run —
+        /// systemd's `KillMode=control-group` delivers it to the whole cgroup at
+        /// once — is interrupted, not exited: the attempt must not be charged.
+        // §FS-rhei-run.3.2
+        #[test]
+        fn a_child_killed_by_the_shutdowns_own_signal_reports_interrupted() {
+            let ended =
+                wait_on_a_child_that_ended_under_a_shutdown("kill -TERM $$", "unit@cgroup");
+            assert_eq!(ended.status.signal(), Some(Signal::SIGTERM as i32));
+            assert_eq!(ended.cause, EndCause::Interrupted);
+        }
+
+        /// An agent that traps the signal and exits non-zero did not finish its
+        /// work either, so it is interrupted like one the signal killed.
+        // §FS-rhei-run.3.2
+        #[test]
+        fn a_child_that_exits_non_zero_under_a_shutdown_reports_interrupted() {
+            let ended = wait_on_a_child_that_ended_under_a_shutdown("exit 143", "unit@trapped");
+            assert_eq!(ended.status.code(), Some(143));
+            assert_eq!(ended.cause, EndCause::Interrupted);
+        }
+
+        /// A clean exit at that instant finished its work before the shutdown
+        /// could stop it, and keeps its real ending.
+        // §FS-rhei-run.3.2
+        #[test]
+        fn a_child_that_exits_zero_under_a_shutdown_keeps_exited() {
+            let ended = wait_on_a_child_that_ended_under_a_shutdown("exit 0", "unit@clean");
+            assert!(ended.status.success());
+            assert_eq!(ended.cause, EndCause::Exited);
+        }
+
         /// The unit `rhei run` owns is the group, not the child: a subprocess
         /// that hands its work to a grandchild cannot outlive its own death
         /// certificate.

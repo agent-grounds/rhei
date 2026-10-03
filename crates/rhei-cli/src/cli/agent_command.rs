@@ -38,11 +38,16 @@ fn stdin_message_bytes(format: AgentStdinFormat, message: &str) -> Vec<u8> {
     }
 }
 
-/// Remove the enclosing run's identity before any autonomous agent starts.
+/// Remove the enclosing run's identity and accounting capture pair before any
+/// autonomous agent starts.
 ///
 /// `Command` otherwise inherits values that were present on `rhei run` itself,
 /// so merely ceasing to set these names would still leak them through custom
 /// wrappers and every child the worker launches. §FS-rhei-agents.4
+///
+/// The capture pair is another invocation's output path: an agent with no
+/// extractor would append its usage to the outer record. It is set again, after
+/// this, only for an agent whose extractor declares it. §FS-rhei-cost-accounting.4
 fn remove_outer_rhei_identity(cmd: &mut std::process::Command) {
     for name in [
         "RHEI_ROOT",
@@ -50,6 +55,8 @@ fn remove_outer_rhei_identity(cmd: &mut std::process::Command) {
         "RHEI_RESULT_PATH",
         "RHEI_TASK_ID",
         "RHEI_TASK_ID_LOCAL",
+        "RHEI_ACCOUNTING_USAGE_PATH",
+        "RHEI_ACCOUNTING_USAGE_SCHEMA",
     ] {
         cmd.env_remove(name);
     }

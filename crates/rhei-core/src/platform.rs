@@ -77,6 +77,13 @@ pub fn make_directory_command(directory: &Path) -> String {
     Dialect::of_this_platform().make_directory(directory)
 }
 
+/// The platform shell's own move of one file to a new name, both paths quoted:
+/// a remedy that sets a file aside keeps every byte under the new name.
+/// §FS-rhei-budgets.5.4.2 §REQ-cross-platform.2
+pub fn move_command(from: &Path, to: &Path) -> String {
+    Dialect::of_this_platform().move_file(from, to)
+}
+
 /// Which shell a printed command line is written for.
 ///
 /// Named rather than left to `cfg!` at each point of use, so both halves are
@@ -120,6 +127,14 @@ impl Dialect {
         let verb = match self {
             Self::Posix => "cp",
             Self::Cmd => "copy",
+        };
+        format!("{verb} {} {}", self.path(from), self.path(to))
+    }
+
+    fn move_file(self, from: &Path, to: &Path) -> String {
+        let verb = match self {
+            Self::Posix => "mv",
+            Self::Cmd => "move",
         };
         format!("{verb} {} {}", self.path(from), self.path(to))
     }
@@ -413,6 +428,7 @@ mod tests {
         let to = Path::new("to");
         assert_eq!(copy_command(from, to), Dialect::of_this_platform().copy(from, to));
         assert_eq!(make_directory_command(to), Dialect::of_this_platform().make_directory(to));
+        assert_eq!(move_command(from, to), Dialect::of_this_platform().move_file(from, to));
         assert!(copy_command(from, to).starts_with(if cfg!(windows) { "copy " } else { "cp " }));
     }
 

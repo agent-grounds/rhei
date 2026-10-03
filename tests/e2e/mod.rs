@@ -210,6 +210,7 @@ mod terminal_result_fanout_tests;
 mod terminal_result_redirect_tests;
 mod terminal_result_stall_tests;
 mod terminal_result_tests;
+mod terminal_watch_support;
 mod timeout_charge_halt_tests;
 mod timeout_preflight_tests;
 mod transition_tests;

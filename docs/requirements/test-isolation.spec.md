@@ -5,7 +5,9 @@ afterwards. Every automated test writes beneath one private directory of its
 own, outside the checkout, named so that no other test can name the same one
 ([§REQ-cross-platform.6](cross-platform.md#6-a-tests-own-directory-is-its-own-by-construction)). This requirement holds for every feature from the moment it
 is specified: an artifact a test leaves behind is a defect of the harness, never
-a cost of testing. [§GOAL-rhei-outcomes](../functional-spec/goals.md#goal-rhei-outcomes-goals)
+a cost of testing. Reading is held to the same line as writing: what a test
+reads is its own too, so its verdict never turns on what another test or the
+machine put somewhere shared. [§GOAL-rhei-outcomes](../functional-spec/goals.md#goal-rhei-outcomes-goals)
 
 ## 1. The Checkout Is Not A Test's Directory
 
@@ -128,3 +130,29 @@ above its directory. A test exposed to one of these discoveries carries the
 proof itself, by planting inside its own directory - above where its commands
 run - the thing that would otherwise stand in: a same-named template in a rhei
 home, or a git work tree enclosing the project.
+
+## 5. A Test's Home Is Its Own, And Never Another's
+
+A test's verdict depends on the code it exercises and on nothing that another
+test, or the machine it runs on, controls. The case that made this a rule is
+the home directory. Settings, templates, tooling and snapshot records all have
+a user tier read from under the home, and the home is named by `HOME` — one
+variable for the whole test process, which every test in a binary shares.
+
+So no test changes the process's `HOME` to give itself a home. A test that
+needs a user tier gets a home of its own by a means no other test can see, and
+a test that names no home sees an empty one: neither a sibling's, nor the real
+user's. Either of those turns one test's verdict into a question of which
+sibling the scheduler ran beside it, or of what the developer happens to keep
+in `~/.config/rhei` — and the failure then names a file and a key that the
+change under test never touched, so whoever meets it first has to prove it is
+not theirs. A lock taken by the tests that move `HOME` does not hold this: it
+orders only the tests that take it, and a test that reads the user tier without
+knowing it does is exactly the one that never would.
+
+The measure is the process's `HOME` itself. Whatever it names — a directory
+holding settings that are invalid on purpose, the developer's own, or nothing —
+every test in the binary reaches the same verdict, and no test's run leaves it
+naming anything other than what it named before. This governs the tests only:
+the built `rhei` still takes its user tier from `HOME`, as
+[§REQ-test-isolation.2](test-isolation.spec.md#2-where-a-spawned-process-writes-is-chosen-never-derived-from-where-it-stands) relies on when a test pins it for a spawned binary.

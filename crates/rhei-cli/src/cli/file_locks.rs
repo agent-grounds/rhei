@@ -149,49 +149,23 @@ fn read_plan_source(path: &Path, action: &str) -> MietteResult<String> {
     fs::read_to_string(path).map_err(|err| file_io_report(path, action, err))
 }
 
-/// How long a writer waits out a replacement that another open handle refuses
-/// before it reports the refusal. §AR-agent-orchestrator-workflow.3.3.1.1
-const REPLACE_REFUSAL_PATIENCE: Duration = Duration::from_secs(2);
-
-/// The pause between two attempts at a refused replacement.
-const REPLACE_REFUSAL_PAUSE: Duration = Duration::from_millis(20);
-
 /// Rename a temp file over the unlocked destination pathname, waiting out a
 /// refusal by another open handle - a reader's included - for a bounded time.
 ///
 /// Every attempt renames the same staged file, which a refused attempt hands
 /// back, and the caller's sidecar stays held across all of them. A failure that
-/// is not a refusal, or a refusal that outlasts `REPLACE_REFUSAL_PATIENCE`, is
-/// returned as the last attempt met it, the destination untouched.
+/// is not a refusal, or a refusal that outlasts `rhei_core::open_handle::PATIENCE`,
+/// is returned as the last attempt met it, the destination untouched.
 // §AR-agent-orchestrator-workflow.3.3.1 §AR-agent-orchestrator-workflow.3.3.1.1
 fn persist_locked(tmp: tempfile::NamedTempFile, path: &Path) -> Result<(), tempfile::PersistError> {
-    let deadline = Instant::now() + REPLACE_REFUSAL_PATIENCE;
+    let wait = rhei_core::open_handle::Wait::start();
     let mut staged = tmp;
     loop {
         match replace_once(staged, path) {
-            Err(refused) if replacement_refused(&refused.error) && Instant::now() < deadline => {
-                std::thread::sleep(REPLACE_REFUSAL_PAUSE);
-                staged = refused.file;
-            }
+            Err(refused) if wait.again(&refused.error) => staged = refused.file,
             outcome => return outcome,
         }
     }
-}
-
-/// Whether a failed replacement was refused because another handle holds the
-/// destination, judged by what the error says rather than by the platform.
-///
-/// `PermissionDenied` is a refusal everywhere: Windows reports a rename over an
-/// open file as os error 5. Windows's sharing and lock violations (os errors 32
-/// and 33) read as no `ErrorKind` of their own, so their raw codes count too -
-/// on Windows only, because on Unix those numbers are `EPIPE` and `EDOM`.
-// §AR-agent-orchestrator-workflow.3.3.1.1
-fn replacement_refused(error: &std::io::Error) -> bool {
-    const ERROR_SHARING_VIOLATION: i32 = 32;
-    const ERROR_LOCK_VIOLATION: i32 = 33;
-    error.kind() == std::io::ErrorKind::PermissionDenied
-        || (cfg!(windows)
-            && matches!(error.raw_os_error(), Some(ERROR_SHARING_VIOLATION | ERROR_LOCK_VIOLATION)))
 }
 
 /// One replacement attempt: the rename a platform may refuse while another

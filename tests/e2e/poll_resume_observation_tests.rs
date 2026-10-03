@@ -9,17 +9,15 @@ fn unix_ns() -> u128 {
 
 /// Port of triage's observer-only delay: keep the old plan, then let the real
 /// exit-75 retry finish before reading its independent counter.
+/// The plan is captured while stopped, before a verified pre-deadline restart.
+/// That later clock check bounds the capture under the same nondecreasing-clock
+/// assumption as invocation evidence; no callback clock sample is capture proof.
 /// §FS-rhei-run.3.5
 #[test]
 fn a_lawful_retry_during_snapshot_observation_is_accepted() {
-    resumed_poll_scenario(|workspace, deadline| {
-        workspace.snapshot_with_gap(|| {
-            let plan_read_ns = unix_ns();
-            assert!(
-                plan_read_ns < u128::from(deadline) * 1_000_000_000,
-                "the controlled observation must begin before the deadline"
-            );
-            eprintln!("BOUNDARY plan_read_ns={plan_read_ns} deadline={deadline}");
+    resumed_poll_scenario(|workspace, deadline, captured_plan| {
+        let mixed = workspace.snapshot_from_plan_with_gap(captured_plan, || {
+            eprintln!("BOUNDARY observer_resumed_ns={} deadline={deadline}", unix_ns());
             wait_for("real attempt 2 and its exit-75 self-loop during observer delay", || {
                 let after = workspace.snapshot();
                 after.attempts == 2
@@ -38,7 +36,20 @@ fn a_lawful_retry_during_snapshot_observation_is_accepted() {
                     .is_some_and(|value| value["attempt"] == 2 && value["code"] == 75)
             });
             eprintln!("BOUNDARY completed_spawn={}", fs::read_to_string(record).unwrap());
-        })
+        });
+        assert_eq!(
+            mixed.attempts, 2,
+            "the delayed counter must include the real retry: {mixed:#?}"
+        );
+        assert_eq!(mixed.state, "triage", "the captured plan must remain polling: {mixed:#?}");
+        assert_eq!(mixed.visits, Some(2), "keep the captured first-attempt plan: {mixed:#?}");
+        assert_eq!(
+            mixed.deadline,
+            Some(deadline),
+            "keep the original captured deadline: {mixed:#?}"
+        );
+        eprintln!("BOUNDARY mixed_snapshot={mixed:#?}");
+        mixed
     });
 }
 

@@ -83,14 +83,13 @@ line carries a single word of it.
 
 The state run's console task tree
 ([§FS-rhei-run-report.3.2](../../../docs/functional-spec/rhei-run-report.spec.md#32-task-tree))
-gives triage one row, where `program×2` counts its two invocations, the
-judgement's agent and the label's program: the label counts them all and names
-only the driver of the last:
+gives triage one row, where `agent+program` names the judgement's agent and the
+label's program, once each:
 
 <!-- rhei:task-tree state -->
 ```text
    2 tasks · source order
-  ✓ state.1                    completed   program×2  <t>
+  ✓ state.1                    completed   agent+program  <t>
   ✓ state.2                    completed   agent  <t>
 ```
 <!-- /rhei:task-tree state -->
@@ -103,7 +102,7 @@ agent invocation the state run does not have:
 ```text
    3 tasks · source order
   ✓ task.1                     completed   agent  <t>
-  ✓ task.2                     completed   program×2  <t>
+  ✓ task.2                     completed   agent+program  <t>
   ✓ task.3                     completed   agent  <t>
 ```
 <!-- /rhei:task-tree task -->

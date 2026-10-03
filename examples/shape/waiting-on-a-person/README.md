@@ -81,13 +81,12 @@ later task needs, and a wait whose line is the answer.
 
 The state run's console task tree has one row for the exchange
 ([§FS-rhei-run-report.3.2](../../../docs/functional-spec/rhei-run-report.spec.md#32-task-tree)),
-and `program×2` counts its two invocations, the question's agent and the
-look's program: the label counts them all and names only the driver of the last:
+and `agent+program` names the question's agent and the look's program, once each:
 
 <!-- rhei:task-tree state -->
 ```text
    2 tasks · source order
-  ✓ state.1                    completed   program×2  <t>
+  ✓ state.1                    completed   agent+program  <t>
   ✓ state.2                    completed   agent  <t>
 ```
 <!-- /rhei:task-tree state -->

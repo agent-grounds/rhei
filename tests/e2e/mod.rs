@@ -28,6 +28,8 @@ mod agent_reentry_tests;
 mod agent_retry_notice_tests;
 mod budget_ancestry_project_tests;
 mod budget_ceiling_tests;
+mod budget_copied_project_support;
+mod budget_copied_project_tests;
 mod budget_declaration_free_tests;
 mod budget_edge_support;
 mod budget_path_reuse_quoting_tests;

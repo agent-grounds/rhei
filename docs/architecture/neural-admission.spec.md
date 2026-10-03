@@ -113,6 +113,15 @@ answers the second reading ([§FS-rhei-budgets.5.3](../functional-spec/rhei-budg
 account whose journal verifies, so the recognition can be given up but a balance
 cannot.
 
+The record is also checked, not only read. Resolving a project to its account
+compares the root presenting a uuid with the root the index binds it to, under
+that uuid's authority lock and **before the journal is opened** — the place the
+absent-directory lookup already sits in §AR-neural-admission.3's order — so a
+copied project is refused before any byte reaches the holder's history, and a
+moved one is rebound there. On one machine a uuid has at most one live root:
+one root holds an account and one root writes its witness
+([§FS-rhei-budgets.5.4.1](../functional-spec/rhei-budgets.spec.md#541-a-second-root-presenting-the-account)).
+
 ## 5. Replay, not balance
 
 No balance is stored. `consumed` and `outstanding` are derived by replaying the

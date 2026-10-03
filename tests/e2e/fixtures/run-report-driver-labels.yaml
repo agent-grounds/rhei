@@ -1,0 +1,73 @@
+# §FS-rhei-run-report.3.2
+# Port of rhei.32: commit -> opening, prepare -> write, draft -> revise -> polish.
+# Extra entry states pin unequal mixed counts and homogeneous labels.
+name: run-report-driver-labels
+version: 1
+states:
+  commit:
+    agent: mock
+    description: Commit the work.
+  opening:
+    description: Open the result.
+    program:
+      command: PROGRAM_COMMAND
+    program_timeout: 10s
+  prepare:
+    initial: true
+    description: Prepare the work.
+    program:
+      command: PROGRAM_COMMAND
+    program_timeout: 10s
+  write:
+    agent: mock
+    description: Write the work.
+  draft:
+    agent: mock
+    description: Draft the work.
+  revise:
+    agent: mock
+    description: Revise the work.
+  polish:
+    agent: mock
+    description: Polish the work.
+  double_agent:
+    agent: mock
+    description: Work before committing.
+  prepare_twice:
+    description: Work before preparing.
+    program:
+      command: PROGRAM_COMMAND
+    program_timeout: 10s
+  double_program:
+    description: Work before opening.
+    program:
+      command: PROGRAM_COMMAND
+    program_timeout: 10s
+  completed:
+    final: true
+    description: Done.
+transitions:
+  - from: commit
+    to: opening
+  - from: opening
+    to: completed
+    exit_code: 0
+  - from: prepare
+    to: write
+    exit_code: 0
+  - from: write
+    to: completed
+  - from: draft
+    to: revise
+  - from: revise
+    to: polish
+  - from: polish
+    to: completed
+  - from: double_agent
+    to: commit
+  - from: prepare_twice
+    to: prepare
+    exit_code: 0
+  - from: double_program
+    to: opening
+    exit_code: 0

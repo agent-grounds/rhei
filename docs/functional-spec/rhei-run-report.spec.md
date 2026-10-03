@@ -537,6 +537,16 @@ report, TUI, and dashboard show. Each row is four aligned columns:
   same proven blocker shown in Attention; for terminal-at-start rows, `terminal
   at start`.
 
+  Each multiplier counts only this run's invocations of the kind immediately
+  named. A task that ran both kinds lists `agent` then `program`, joined by `+`,
+  regardless of invocation order; omit `×1`. Thus one agent and one program
+  read `agent+program`, two agents and one program read `agent×2+program`, and
+  one agent and two programs read `agent+program×2`. Homogeneous work keeps
+  `agent`, `program`, or its repeated-kind spelling such as `agent×3` or
+  `program×2`. This label rule applies to both the console task tree and the
+  persisted report's Task Final States tree (§FS-rhei-run-report.2); timing
+  semantics are unchanged.
+
 Only `!` rows take saturated attention color. `✓`, `·`, and `⊘` rows are calm
 chrome so a healthy run reads as quiet.
 

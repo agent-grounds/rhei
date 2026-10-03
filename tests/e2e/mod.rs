@@ -147,6 +147,7 @@ mod roster_json_tests;
 mod roster_scope_tests;
 mod roster_support;
 mod run_lock_wait_tests;
+mod run_report_driver_labels_tests;
 mod run_shell_program_tests;
 mod run_shutdown_delivery_tests;
 mod run_signals_tests;

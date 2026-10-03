@@ -66,6 +66,12 @@ distinct models, and the task tally:
 - Agent invocations are the records under the accounting roots the invocation's
   scope selects ([§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary)); the model count is the distinct `model`
   values among them.
+- When agent spawns in that scope have no accounting record
+  (§FS-rhei-cost-accounting.6.2.1), the invocation count is the known agent
+  invocations rather than the records, and the gap follows the model count,
+  which still counts the records' models:
+  `` `mixed-agents` workflow: 4 agent invocations across 1 model, 2 of them with no accounting record; 2 tasks completed. ``
+  The records alone are never presented as the run's invocation count.
 - The task tally counts the tasks **of that same scope** per terminal state, in
   machine declaration order; when non-terminal tasks exist, `, N in progress` is
   appended, so a mid-run summary says it is one. One sentence must not describe
@@ -98,6 +104,12 @@ One numbered entry per invocation record, ordered by `started_at`:
   distinguishable and one-shot steps stay clean.
 - Duration is `ended_at - started_at`, humanized (`18m04s`); omitted when
   either timestamp is missing.
+- An agent spawn with no accounting record (§FS-rhei-cost-accounting.6.2.1)
+  is an entry too, placed by its `started`. It carries the task id, the state,
+  `(visit N)` under the same rule, the spawn's `worker`, its duration from
+  `started` and `ended`, and the words `no accounting record` in place of a
+  model and token counts, which the spawn does not know:
+  `` 3. `plan.1` implement — cdx — 1s — no accounting record ``
 - With explicit `--run`/`--prices`, entries come only from that exact run after
   accounting-root filtering and record-identity deduplication. The same
   selected records supply the lead, steps, and accounting table.
@@ -121,6 +133,15 @@ Token accounting was not measured for this run.
 
 Pricing and coverage semantics are the accounting spec's
 ([§FS-rhei-cost-accounting.5](rhei-cost-accounting.spec.md#5-pricing)); this command adds no pricing of its own.
+
+When agent spawns in scope have no accounting record, the coverage row says
+how many, after the coverage word that §FS-rhei-cost-accounting.6.2.1 demoted:
+
+```text
+| coverage | Partial (2 of 4 agent invocations have no accounting record) |
+```
+
+A summary with nothing missing prints the row as before.
 
 An explicit alternate-book reading adds these rows before its token rows:
 

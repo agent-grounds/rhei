@@ -128,4 +128,33 @@ mod templates_publication_tests {
         let respelled = respell_report(report, &copy_respellings(&written, Path::new("/proj")));
         assert_eq!(respelled.to_string(), "failed in /proj");
     }
+
+    /// The process `HOME` decides no test's verdict: the victim of #397, run
+    /// alone in a fresh copy of this binary whose `HOME` holds a settings file
+    /// that is invalid on purpose - the file a sibling's home held when it
+    /// failed - still validates. §REQ-test-isolation.5
+    #[test]
+    fn a_publication_verdict_does_not_turn_on_the_process_home() {
+        const VICTIM: &str = "templates::tests::templates_publication_tests::\
+            issue_205_publication_preserves_a_destination_created_after_validation";
+        let home = tempfile::tempdir().unwrap();
+        fs::create_dir_all(home.path().join(".config/rhei")).unwrap();
+        fs::write(
+            home.path().join(".config/rhei/settings.json"),
+            r#"{ "defaults": { "spend_per_day": "unlimited" } }"#,
+        )
+        .unwrap();
+        let out = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", VICTIM, "--test-threads=1"])
+            .env("HOME", home.path())
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            out.status.success() && stdout.contains("1 passed"),
+            "the victim's verdict changed with HOME:\n{stdout}\n{stderr}"
+        );
+    }
 }

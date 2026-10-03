@@ -265,6 +265,8 @@ fn narrowed_reset_serializes_pruning_with_an_untargeted_transition() {
     let (done_tx, done_rx) = mpsc::channel();
     let transition_project = project.to_path_buf();
     let transition = std::thread::spawn(move || {
+        // rhei#424: a slow runner starts the contender late; the test must still wait for it.
+        std::thread::sleep(Duration::from_secs(3));
         set_ledger_lock_observer(ledger_lock_tx);
         let result = transition_command(
             &transition_project,

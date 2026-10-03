@@ -820,6 +820,40 @@ they are.
 each bound with its value, source, and what the predicted pass would cost, and
 debits nothing.
 
+### 3.5. Resumed Program Poll Deadline Regression
+
+Restarting a program poll during its persisted backoff keeps autonomous
+execution selected (§FS-rhei-run.3), but must not create the next subprocess before the
+original deadline (§FS-rhei-run.5.1). After that deadline, the resumed run must execute
+the program and route from its actual exit (§FS-rhei-programs.3.2). Restart
+does not supply an exit code or complete the task without an invocation.
+
+Regression coverage must include an observer delayed between reading the
+plan and reading the attempt counter, across a lawful retry at the deadline.
+That mixed snapshot must not be rejected as an early spawn merely because
+the observer checked its clock before reading it. Conversely, the same
+timing oracle must reject evidence of a pre-deadline invocation even when
+the counter observation or interpreter entry is after the deadline. A
+synthetic negative control must be identified as such and exercise the
+regression's oracle, rather than only an independent trace classifier.
+
+Invocation evidence must identify the resumed second attempt and its actual
+exit, independently of the observer's earlier clock sample. Completed
+records must be awaited with bounded patience: independently published plan,
+counter, log, and spawn files are not an atomic snapshot. Any timestamp used
+as proof must account for its precision and whether it samples before
+process creation; a pre-creation sample is a lower bound, not an exact
+creation time. Interpreter-entry time alone cannot exclude an early process.
+The ordinary Unix regression must not depend on Linux process tracing.
+
+With a three-attempt exit-75 fixture, coverage must retain restart before the
+original deadline, exactly two real attempts at the second checkpoint, state
+`triage`, visits increasing from 2 to 3, an advanced retry deadline, actual
+exit 75, and no `triage@resolved` transition. No relaxed deadline, extra
+timing allowance, skipped waiting assertion, or eventual counter alone
+substitutes for this proof. These are observation requirements for the
+existing scheduling and routing rules, not new runtime semantics.
+
 ## 4. Dry Run
 
 With `--dry-run`, `rhei run` performs the same scan and selection logic but

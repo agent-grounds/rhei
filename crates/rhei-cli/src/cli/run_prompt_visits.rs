@@ -176,9 +176,15 @@ fn render_retry_notice(render_context: &RuntimeTemplateContext<'_>, task_root: &
     );
     let Some(previous) = plan.previous.as_ref() else { return String::new() };
     let owed = render_owed_clause(render_context, visit);
+    // Unmet only where the owed clause names what is unmet. §FS-rhei-memory.4.4
+    let unmet = if previous.exited_zero() && !owed.is_empty() {
+        " without meeting this state's completion condition"
+    } else {
+        ""
+    };
     format!(
-        "\nRetrying this visit: attempt {}. The previous attempt {}.{owed} Its transcript is \
-         `{}`.\n",
+        "\nRetrying this visit: attempt {}. The previous attempt {}{unmet}.{owed} Its transcript \
+         is `{}`.\n",
         plan.attempt,
         previous.ending_sentence(),
         memory_path(render_context, &previous.log)

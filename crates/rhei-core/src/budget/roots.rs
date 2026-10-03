@@ -54,6 +54,8 @@ pub(crate) fn read(index: &BTreeMap<PathBuf, String>, root: &Path, uuid: &str) -
 /// authority lock and both decided again under it, so two processes racing to
 /// claim one uuid cannot both write. The lock is released before the caller
 /// opens the journal, which takes it again: one process may not hold it twice.
+/// A caller that reaches here already holding it keeps it rather than waiting
+/// on itself.
 /// A move is said once, on stderr, by the charge that rebinds it; every later
 /// resolution reads `Home`. §FS-rhei-budgets.5.3 §FS-rhei-budgets.5.4.1
 /// §AR-neural-admission.4
@@ -63,7 +65,11 @@ pub(crate) fn settle(root: &Path, uuid: &str) -> Result<Option<PathBuf>> {
         Reading::Copy { holder } => return Ok(Some(holder)),
         Reading::Adopted | Reading::Move { .. } => {}
     }
-    let _authority = super::authority::Authority::lock(root, uuid)?;
+    // A thread already holding the lock already excludes every other writer.
+    let _authority = match super::authority::held_by_this_thread(uuid) {
+        true => None,
+        false => Some(super::authority::Authority::lock(root, uuid)?),
+    };
     let mut index = witnessed_roots()?;
     let stale = match read(&index, root, uuid) {
         Reading::Home => return Ok(None),

@@ -82,17 +82,34 @@ fn budget_report_damaged(
 /// command that lets the operator say — and never the copy, which succeeds and
 /// charges a new project for the spend of the one that used the path before
 /// it. §FS-rhei-budgets.5.4
+///
+/// A copy is offered `forget` for itself and moving the holder for the other
+/// reading, and a tail from another root the set-aside; neither is offered the
+/// copy of the witness. §FS-rhei-budgets.5.4.1 §FS-rhei-budgets.5.4.2
 fn budget_damaged_help(diagnosis: &Diagnosis) -> String {
-    match diagnosis.forget_command() {
-        Some(forget) => format!("if the path was reused, retire that record with: {forget}"),
-        None => format!("restore this project's journal with: {}", diagnosis.restore_command()),
+    if let Some(set_aside) = diagnosis.set_aside_command() {
+        return format!("set the witness aside, keeping every byte, with: {set_aside}");
+    }
+    match (diagnosis.forget_command(), &diagnosis.held_by) {
+        (Some(forget), Some(holder)) => format!(
+            "if this is a copy, give it an account of its own with: {forget}; if it is meant to \
+             replace {}, move or delete that project first",
+            holder.display()
+        ),
+        (Some(forget), None) => format!("if the path was reused, retire that record with: {forget}"),
+        (None, _) => format!(
+            "restore this project's journal with: {}",
+            diagnosis.restore_command().unwrap_or_default()
+        ),
     }
 }
 
 /// The same facts as named members, for a harness that reads a damaged
 /// account. The vocabulary is the closed one of §FS-rhei-budgets.10: `health`
 /// is `damaged` here and `verified` nowhere else, and `damage` is one of the
-/// three sub-cases.
+/// five sub-cases. `held_by` and `foreign_root` name the other root under the
+/// two sub-cases that have one, and `restore` is absent where the witness is not
+/// this root's to restore from.
 ///
 /// `project_id`, `project_root` and `account` are the members a verified report
 /// already carries, with the meanings it gives them — the identity, the target
@@ -115,9 +132,17 @@ fn budget_damaged_details(
     details.insert("witness".into(), serde_json::json!(diagnosis.witness));
     details.insert("receipts".into(), diagnosis.history.receipts.into());
     details.insert("invocations".into(), diagnosis.history.invocations.into());
-    details.insert("restore".into(), diagnosis.restore_command().into());
+    if let Some(restore) = diagnosis.restore_command() {
+        details.insert("restore".into(), restore.into());
+    }
     if let Some(forget) = diagnosis.forget_command() {
         details.insert("forget".into(), forget.into());
+    }
+    if let Some(holder) = &diagnosis.held_by {
+        details.insert("held_by".into(), serde_json::json!(holder));
+    }
+    if let Some(foreign) = &diagnosis.foreign {
+        details.insert("foreign_root".into(), serde_json::json!(foreign.root));
     }
     details
 }
@@ -140,18 +165,46 @@ fn budget_damaged_lines(diagnosis: &Diagnosis, target: &Path) -> Vec<String> {
         format!("  {}", diagnosis.history.summary()),
         String::new(),
     ];
+    if let Some(holder) = &diagnosis.held_by {
+        // §FS-rhei-budgets.5.4.1
+        lines.push(format!("Held by: {}, which still holds this account", holder.display()));
+        lines.push(String::new());
+        lines.push("  if this project is a copy, give it an account of its own:".into());
+        lines.push(format!("    {}", diagnosis.forget_command().unwrap_or_default()));
+        lines.push(String::new());
+        lines.push(format!(
+            "  if it is meant to replace {}, move or delete that project first",
+            holder.display()
+        ));
+        return lines;
+    }
+    if let (Some(foreign), Some(set_aside)) = (&diagnosis.foreign, diagnosis.set_aside_command()) {
+        // §FS-rhei-budgets.5.4.2
+        let receipts = match foreign.receipts {
+            1 => "1 receipt".to_string(),
+            n => format!("{n} receipts"),
+        };
+        lines.push(format!(
+            "The {receipts} past this journal were written from {}, not from this project; \
+             copying the witness back would import them.",
+            foreign.root.display()
+        ));
+        lines.push("Set the witness aside, keeping every byte; the next run adopts this journal:".into());
+        lines.push(format!("  {set_aside}"));
+        return lines;
+    }
     let Some(forget) = diagnosis.forget_command() else {
         lines.push(
             "This journal is this project's own and its tail is what was lost — restore it:"
                 .into(),
         );
-        lines.push(format!("  {}", diagnosis.restore_command()));
+        lines.push(format!("  {}", diagnosis.restore_command().unwrap_or_default()));
         return lines;
     };
     lines.push("Rhei cannot tell which of two things happened, so it does not choose:".into());
     lines.push(String::new());
     lines.push("  this project's journal was lost — restore it:".into());
-    lines.push(format!("    {}", diagnosis.restore_command()));
+    lines.push(format!("    {}", diagnosis.restore_command().unwrap_or_default()));
     lines.push(String::new());
     lines.push("  the path was previously held by a different project — retire that record:".into());
     lines.push(format!("    {forget}"));

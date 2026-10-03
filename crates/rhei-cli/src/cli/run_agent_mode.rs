@@ -1233,7 +1233,7 @@ fn run_agent_mode(
             )
         {
             return Err(miette!(
-                help = nothing_claimable_help(),
+                help = run_halt_help(),
                 "rhei run halted with non-terminal tasks remaining and no further advancement possible"
             ));
         }

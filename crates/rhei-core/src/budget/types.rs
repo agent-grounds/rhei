@@ -321,8 +321,11 @@ impl BudgetError {
     /// Separate from [`Self::corrupt`] because the two send an operator to
     /// different places: `untrustworthy_ledger` means a chain failed to verify
     /// and the witness is how it is restored, while this one means the file or
-    /// directory was not there — and so it names it, rather than blaming a
+    /// directory could not be reached — absent, or refused, as another
+    /// process's open handle refuses the witness index on Windows past the
+    /// bound it is waited out for — and so it names it, rather than blaming a
     /// ledger that is fine. §FS-rhei-budgets.5.4
+    /// §AR-agent-orchestrator-workflow.3.3.1.1.1
     pub(crate) fn unreachable(path: &std::path::Path, error: &std::io::Error) -> Self {
         Self::new(
             "unreachable_budget_path",

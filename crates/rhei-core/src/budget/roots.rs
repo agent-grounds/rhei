@@ -194,22 +194,30 @@ fn write_roots(index: &BTreeMap<PathBuf, String>) -> Result<()> {
     Ok(())
 }
 
-/// One read of the index by its pathname: the access another process's open
-/// handle can refuse. §AR-agent-orchestrator-workflow.3.3.1.1.1
+/// Read the index by its pathname, waiting out a refusal of the kind another
+/// process's open handle causes - it may be replacing the index this moment.
+/// Absence is not a refusal, so a missing index is reported at once.
+/// §AR-agent-orchestrator-workflow.3.3.1.1.1
 fn read_index(path: &Path) -> std::io::Result<Vec<u8>> {
-    #[cfg(test)]
-    if let Some(error) = super::index_refusals::take_index_refusal(IndexAccess::Read) {
-        return Err(error);
-    }
-    std::fs::read(path)
+    crate::open_handle::wait_out(|| {
+        #[cfg(test)]
+        if let Some(error) = super::index_refusals::take_index_refusal(IndexAccess::Read) {
+            return Err(error);
+        }
+        std::fs::read(path)
+    })
 }
 
-/// One rename of the staged pending file over the index: the replacement
-/// another process's open handle can refuse. §AR-agent-orchestrator-workflow.3.3.1.1.1
+/// Rename the staged pending file over the index, waiting out a refusal by
+/// another process's open handle. A refused rename leaves both files as they
+/// were, so every attempt renames the same pending file and a refusal that
+/// outlasts the bound keeps the previous index. §AR-agent-orchestrator-workflow.3.3.1.1.1
 fn replace_index(pending: &Path, path: &Path) -> std::io::Result<()> {
-    #[cfg(test)]
-    if let Some(error) = super::index_refusals::take_index_refusal(IndexAccess::Replace) {
-        return Err(error);
-    }
-    std::fs::rename(pending, path)
+    crate::open_handle::wait_out(|| {
+        #[cfg(test)]
+        if let Some(error) = super::index_refusals::take_index_refusal(IndexAccess::Replace) {
+            return Err(error);
+        }
+        std::fs::rename(pending, path)
+    })
 }

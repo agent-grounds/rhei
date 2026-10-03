@@ -123,6 +123,8 @@ thread_local! {
     // `lock_path` reads the environment on every call and the test binary is one
     // process, so a case that needs its own account state directory overrides the
     // base here rather than racing every other test through `XDG_STATE_HOME`.
+    // It is per thread: a case that contends across threads sets it on each of
+    // them, or its threads can lock different files and never contend.
     static LOCK_BASE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
     // Opens to fail with `Interrupted` before the real attempt runs.
     static INTERRUPTS: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };

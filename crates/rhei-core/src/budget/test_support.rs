@@ -37,7 +37,7 @@ fn witness_home() -> &'static Path {
 
 /// A project root, its witness directory, and the environment that points one
 /// at the other. Dropping it restores whatever the process had before.
-pub(super) struct Case {
+pub(crate) struct Case {
     _guard: MutexGuard<'static, ()>,
     project: tempfile::TempDir,
     previous_state_home: Option<std::ffi::OsString>,

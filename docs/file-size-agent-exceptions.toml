@@ -654,3 +654,13 @@ until = "The Agent runtime capability list is replaced by a link to the command 
 reason = """
 Two lines over the accepted shape before this change, and this touch added two more: a bullet for rhei show beside the rhei next one, because the list is what tells a reader which verbs exist. The boundary that is missing is that this list is a second hand-maintained copy of the command surface the functional spec already carries per verb, so every new verb is written twice and the README grows by the same bullet twice. Nothing here can shorten until the list is a link to that table and the orientation above it is what stays; deleting the bullet instead would leave the README naming rhei next and not the verb that reads what rhei next refuses.
 """
+[[exceptions]]
+path = "docs/functional-spec/rhei-budgets.spec.md"
+match = "exact"
+rules = ["citable-spec"]
+kind = "deferred"
+max_accepted = { value = 1000, unit = "lines" }
+until = "Section 10 (`rhei budget`) (the command surface: show's report and JSON members, adjust, forget and its table) is a declaration of its own under docs/functional-spec/, and every FS-rhei-budgets.10 citation in the crates, the tests and the sibling specs has been repointed at it."
+reason = """
+The boundary that is missing is a document for the `rhei budget` command surface. Section 10 describes what the operator types and reads — show's text and JSON members, adjust, and forget's case table — and is cited from 26 places in the crates and tests, so lifting it needs its own grund declaration and a re-point of every one of those markers, which is a restructure with its own review. What is edited here is one ticket's specification point (agent-grounds/rhei#411: a copied project is refused at its first charge, a moved one keeps its account), written into sections 5.3 and 5.4 and two new points 5.4.1 and 5.4.2 whose ids the approved proposal named; splitting the document in the same commit would move every section citation alongside a behaviour change, which a spec-first commit must not hide.
+"""

@@ -162,7 +162,9 @@ fn an_exhausted_budget_halts_the_ticket_where_it_is_and_says_what_it_owes() {
 
 /// The re-spawn line is the only place an operator sees the loop while it is
 /// running, so it carries the attempt, the budget, and *why* the attempt before
-/// it did not finish — not one canned rule for every ending.
+/// it did not finish — not one canned rule for every ending. It says the
+/// ending and nothing it cannot read: an exit 0 is re-spawned with its
+/// condition met too, so the line makes no claim about the condition.
 // §FS-rhei-agents.3.2.1
 #[test]
 fn a_respawn_names_the_attempt_the_budget_and_what_ended_the_previous_one() {
@@ -180,7 +182,7 @@ fn a_respawn_names_the_attempt_the_budget_and_what_ended_the_previous_one() {
     assert!(
         combined.contains(
             "Re-spawning Task plan.1 in state 'implement': attempt 2 of 2; the previous attempt \
-             exited 0 without meeting this state's completion condition"
+             exited 0 (previous log: "
         ),
         "the note says which attempt, out of how many, and what happened; got:\n{combined}"
     );

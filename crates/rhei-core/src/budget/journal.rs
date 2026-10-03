@@ -7,7 +7,9 @@
 //! the append fails, and the next opener refuses the incomplete chain.
 //! §FS-rhei-budgets.5.2 §AR-neural-admission.4
 
-use super::diagnosis::{absent_journal_refusal, Damage, Damaged, History};
+use super::diagnosis::{
+    absent_journal_refusal, foreign_tail, foreign_tail_refusal, Damage, Damaged, Diagnosis, History,
+};
 use super::replay::State;
 use super::types::{add, uuid, BudgetError, Contract, Snapshot};
 use super::Result;
@@ -67,6 +69,8 @@ pub struct Receipt {
 pub struct Journal {
     pub(crate) authority: super::authority::Authority,
     _lock: File,
+    /// The canonical project root this account was opened at.
+    root: PathBuf,
     pub(crate) path: PathBuf,
     pub(crate) project_id: String,
     pub(crate) state: State,
@@ -169,6 +173,9 @@ impl Journal {
         let mut ledger = Self {
             authority,
             _lock: lock,
+            // Resolved, because a foreign tail is told by whether a source path
+            // lies under it, and sources are recorded resolved. §FS-rhei-budgets.5.4.2
+            root: crate::platform::canonical_path(root).unwrap_or_else(|_| root.to_path_buf()),
             path,
             project_id: format!("panta:{project_uuid}"),
             state: State::default(),
@@ -223,18 +230,19 @@ impl Journal {
             // whose history may belong to another project, so the copy that
             // adopts it may not be the remedy. §FS-rhei-budgets.5.4
             return Ok(Some(if existed {
-                Damaged { damage: Damage::JournalTruncated, error: self.witness_ahead_refusal() }
+                self.truncated(&bytes, self.witness_ahead_refusal())
             } else {
                 Damaged {
                     damage: Damage::JournalAbsent,
                     error: absent_journal_refusal(self.authority.path(), &self.recorded_history()),
+                    foreign: None,
                 }
             }));
         }
         // Verify the chain on its own terms first, so an **adopted** journal is
         // one this machine has checked rather than one it merely inherited.
         if let Err(error) = self.replay(&bytes) {
-            return Ok(Some(Damaged { damage: Damage::ChainBroken, error }));
+            return Ok(Some(Damaged { damage: Damage::ChainBroken, error, foreign: None }));
         }
         if self.authority.is_empty() {
             self.authority.adopt(&bytes)?;
@@ -246,9 +254,32 @@ impl Journal {
             // diverges was rolled back or edited, which is the chain's own
             // failure however it was spelled. §FS-rhei-budgets.5.4
             Err(error) if self.authority.continues(&bytes) => {
-                Ok(Some(Damaged { damage: Damage::JournalTruncated, error }))
+                Ok(Some(self.truncated(&bytes, error)))
             }
-            Err(error) => Ok(Some(Damaged { damage: Damage::ChainBroken, error })),
+            Err(error) => Ok(Some(Damaged { damage: Damage::ChainBroken, error, foreign: None })),
+        }
+    }
+
+    /// A witness ahead of a present journal lost this project's tail — unless
+    /// that tail was written from another root, which the restore would import.
+    /// §FS-rhei-budgets.5.4 §FS-rhei-budgets.5.4.2
+    fn truncated(&self, bytes: &[u8], error: BudgetError) -> Damaged {
+        let Some(foreign) = foreign_tail(&self.root, bytes, self.authority.bytes()) else {
+            return Damaged { damage: Damage::JournalTruncated, error, foreign: None };
+        };
+        let uuid = self.account_uuid();
+        let diagnosis = Diagnosis::new(
+            Damage::ForeignTail,
+            &self.root,
+            uuid,
+            self.authority.path(),
+            self.recorded_history(),
+        )
+        .with_foreign(Some(foreign.clone()));
+        Damaged {
+            damage: Damage::ForeignTail,
+            error: foreign_tail_refusal(&diagnosis),
+            foreign: Some(foreign),
         }
     }
 

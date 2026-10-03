@@ -117,7 +117,7 @@ fn retiring_an_account_whose_journal_is_present_is_refused_and_writes_nothing() 
     // matching a POSIX word here was asserting Unix. §FS-rhei-budgets.10
     assert_eq!(
         diagnosis.restore_command(),
-        crate::platform::copy_command(&diagnosis.witness, &diagnosis.journal),
+        Some(crate::platform::copy_command(&diagnosis.witness, &diagnosis.journal)),
         "the refusal carries the remedy the sub-case has"
     );
     assert_eq!(fs::read(case.witness_path()).expect("read the witness"), witness);

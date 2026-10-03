@@ -204,7 +204,9 @@ buy capacity. `rhei budget show` says so and names both readings, and
 `rhei budget forget <plan-or-project> --reason <TEXT>` retires the stale record
 once you know which it was — it refuses every account whose journal is still
 there, verifying or damaged, so it recovers a reused path and never resets a
-working balance or gives up a journal that should be restored instead.
+working balance or gives up a journal that should be restored instead. A project
+copied with `cp -r` still presents the original's account, so it is refused at its first
+charge until `rhei budget forget` gives it one of its own; a moved project keeps its account.
 
 ## Install
 

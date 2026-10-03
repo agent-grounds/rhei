@@ -60,8 +60,9 @@ enum BudgetCommand {
         #[arg(long, value_name = "TEXT")]
         reason: String,
     },
-    /// Retire a damaged root, keeping its receipts; refused where the journal
-    /// verifies
+    /// Retire a damaged root, keeping its receipts: a reused path's stale
+    /// record, or a copied project's claim on the account its original still
+    /// holds. Refused where this root's own journal verifies
     Forget {
         /// Path to a plan, workspace, or Panta project; omitted, discover it
         #[arg(

@@ -13,6 +13,8 @@ mod accounting_profile_price_lifecycle_tests;
 mod accounting_profile_prices_tests;
 mod accounting_settings_prices_tests;
 mod accounting_support;
+mod accounting_unrecorded_spawn_support;
+mod accounting_unrecorded_spawn_tests;
 mod agent_environment_tests;
 mod agent_family_support;
 mod agent_family_tests;

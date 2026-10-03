@@ -7,9 +7,16 @@ use std::time::Duration;
 /// An already-active reader delays exclusive publication until its operation ends. §FS-rhei-recover.4
 #[test]
 fn operator_root_guard_excludes_an_active_reader() {
+    active_reader_excludes_publication(|| ());
+}
+
+/// The body of the case above; `between` runs on the test thread after its
+/// acquisition and before the writer's, and what it returns lives to the end.
+fn active_reader_excludes_publication<T>(between: impl FnOnce() -> T) {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_path_buf();
     let held = RootAccessGuard::shared(&root).unwrap();
+    let _between = between();
     let (contended_tx, contended_rx) = mpsc::channel();
     let (acquired_tx, acquired_rx) = mpsc::channel();
     let writer = std::thread::spawn(move || {
@@ -27,8 +34,15 @@ fn operator_root_guard_excludes_an_active_reader() {
 /// A reader queued before publication rechecks the marker after acquisition. §FS-rhei-recover.4
 #[test]
 fn operator_queued_reader_refuses_newly_published_marker() {
+    queued_reader_refuses_newly_published_marker(|| ());
+}
+
+/// The body of the case above, with the same `between` as
+/// [`active_reader_excludes_publication`].
+fn queued_reader_refuses_newly_published_marker<T>(between: impl FnOnce() -> T) {
     let dir = tempfile::tempdir().unwrap();
     let held = RootAccessGuard::exclusive(dir.path()).unwrap();
+    let _between = between();
     let root = dir.path().to_path_buf();
     let (tx, rx) = mpsc::channel();
     let reader = std::thread::spawn(move || {
@@ -95,6 +109,13 @@ fn operator_multiple_roots_are_sorted_and_reader_guards_are_external() {
 /// A basin marker published while a reader queues is visible from every related entry. §FS-rhei-recover.4
 #[test]
 fn operator_basin_queued_readers_recheck_project_manifest_and_member_access() {
+    basin_queued_readers_recheck_every_entry(|| ());
+}
+
+/// The body of the case above; `between` runs once per entry, after the holds
+/// and before the reader, with the same contract as
+/// [`active_reader_excludes_publication`].
+fn basin_queued_readers_recheck_every_entry<T>(mut between: impl FnMut() -> T) {
     for entry in ["", "index.panta.md", "basin", "basin/work.md", "member", "member/index.rhei.md"]
     {
         let dir = tempfile::tempdir().unwrap();
@@ -108,6 +129,7 @@ fn operator_basin_queued_readers_recheck_project_manifest_and_member_access() {
         assert_eq!(roots, [project.clone(), project.join("basin"), project.join("member")]);
         let holds =
             roots.iter().map(|root| RootAccessGuard::exclusive(root).unwrap()).collect::<Vec<_>>();
+        let _between = between();
         let input = project.join(entry);
         let (tx, rx) = mpsc::channel();
         let reader = std::thread::spawn(move || {
@@ -127,6 +149,40 @@ fn operator_basin_queued_readers_recheck_project_manifest_and_member_access() {
         assert!(error.contains(&project.join("basin").display().to_string()));
         assert_eq!(error.matches("rhei recover ").count(), 1);
     }
+}
+
+/// Both sides of a contention case lock the same file even when the process's
+/// `XDG_STATE_HOME` moves between their acquisitions, as a budget case in this
+/// same binary moves it (agent-grounds/rhei#408): a reader that is never
+/// contended proves nothing about the interlock. §FS-rhei-recover.4
+#[test]
+#[ignore = "fails until agent-grounds/rhei#408 gives the contention cases their own lock base"]
+fn operator_active_reader_survives_a_moved_state_home() {
+    active_reader_excludes_publication(moved_state_home);
+}
+
+/// The queued-reader case under the same move. §FS-rhei-recover.4
+#[test]
+#[ignore = "fails until agent-grounds/rhei#408 gives the contention cases their own lock base"]
+fn operator_queued_reader_survives_a_moved_state_home() {
+    queued_reader_refuses_newly_published_marker(moved_state_home);
+}
+
+/// The basin case under the same move, for every entry. §FS-rhei-recover.4
+#[test]
+#[ignore = "fails until agent-grounds/rhei#408 gives the contention cases their own lock base"]
+fn operator_basin_queued_readers_survive_a_moved_state_home() {
+    basin_queued_readers_recheck_every_entry(moved_state_home);
+}
+
+/// Point `XDG_STATE_HOME` at a directory no acquisition can have used yet, under
+/// the budget suites' environment lock so this races none of them; dropping the
+/// pair puts the old value back and then removes the directory.
+fn moved_state_home() -> (crate::budget::test_support::Case, tempfile::TempDir) {
+    let case = crate::budget::test_support::Case::new();
+    let home = tempfile::tempdir().unwrap();
+    std::env::set_var("XDG_STATE_HOME", home.path());
+    (case, home)
 }
 
 /// Direct files retain both basin and project guards without creating project files. §FS-rhei-panta.6.6

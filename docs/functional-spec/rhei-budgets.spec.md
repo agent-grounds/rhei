@@ -496,8 +496,18 @@ leaves **which of the two earned it** to the person, who can tell.
 A byte-identical copy of the committed receipts lives at
 `$XDG_STATE_HOME/rhei/budget-authority/<uuid>/history.jsonl`, falling back to
 `$HOME/.local/state` (or `%USERPROFILE%\.local\state`). It is keyed by the
-project uuid and records every canonical root it has seen, so an absent project
-directory is still recognized.
+project uuid, and beside the histories an index binds each uuid to the
+canonical root that **holds** it — whose own `budgets/` contains that uuid — so
+an absent project directory is still recognized.
+
+Every charge compares the root presenting a uuid with that binding, before the
+journal is opened and before anything is appended. A root is recorded when it
+mints an account, when it adopts one, and when an account moves to it; a move
+drops the roots that no longer hold the uuid. A second root is **refused** while
+the bound one still holds it
+([§FS-rhei-budgets.5.4.1](rhei-budgets.spec.md#541-a-second-root-presenting-the-account)),
+so on one machine a uuid has at most one live root and one root writes its
+history.
 
 Where that directory is, is the operator's. The one place the witness may **not**
 be is inside the account it witnesses — a chain verifying against itself
@@ -515,9 +525,12 @@ removes both.
 The condition is the whole of what `rhei budget forget` is
 ([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)). It puts an audited
 door where that residual already is rather than opening a second one: it
-**refuses** every account whose journal is still there, verifying or damaged, so
-no working balance is ever reset by it and no journal that is this project's own
-is given up instead of restored; it keeps the receipts rather than unlinking
+**refuses** every account whose journal is still there and is this root's own,
+verifying or damaged, so no working balance is ever reset by it and no journal
+that is this project's own is given up instead of restored. The one present
+journal it retires is a copy's claim on an account another root still holds,
+and that retirement touches neither the witness nor the index, which are the
+holder's ([§FS-rhei-budgets.5.4.1](rhei-budgets.spec.md#541-a-second-root-presenting-the-account)). It keeps the receipts rather than unlinking
 them; it records who
 retired the root, when, why and with what argv; and it retracts the root's
 entry from the witness index, which the bare `rm -rf` leaves behind. Measured
@@ -546,22 +559,27 @@ all inside the one transaction it was already holding. No command is required,
 no prompt is shown, nothing is printed, and establishment mints nothing.
 
 **Damaged** — a witness exists for this root but the journal is absent,
-truncated, or its hash chain does not verify. New work is **refused**, naming
-both paths. A damaged account is never repaired in place; what a refusal offers
-depends on which of three sub-cases it is, because they are not the same
-accident:
+truncated, or its hash chain does not verify; or the account this root presents
+is held by another root; or the witness's tail was written from another root.
+New work is **refused**, naming both paths. A damaged account is never repaired
+in place; what a refusal offers depends on which of five sub-cases it is,
+because they are not the same accident:
 
 | sub-case | what is true | what the refusal offers |
 |---|---|---|
 | `journal_absent` | the journal file is not there at all | both readings, and one runnable command for each |
 | `journal_truncated` | a journal exists but holds fewer receipts than the witness | restore it by copying the witness back |
 | `chain_broken` | a journal exists and its identity, sequence or hash chain does not verify | restore it by copying the witness back |
+| `held_elsewhere` | the uuid this root presents is bound to another root that still holds it | both roots, and `rhei budget forget` for this one (§FS-rhei-budgets.5.4.1) |
+| `foreign_tail` | the witness runs past the journal and that tail names another root | the other root, and setting the witness aside; never the copy (§FS-rhei-budgets.5.4.2) |
 
 The names are the vocabulary a machine reader gets
 ([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)) and the reason the
-split exists. Where a journal is present, it **is** this project's journal and
-its tail is what was lost, so copying the witness over it restores this
-project's own history and is the remedy.
+split exists. Where a journal is present **and its uuid is bound to this root,
+or to no root that still holds it**, it **is** this project's journal and its
+tail is what was lost, so copying the witness over it restores this project's
+own history and is the remedy. Where either half fails, the journal or the tail
+belongs to someone else, and the copy would import it.
 
 Where the journal is **wholly absent**, that inference does not hold, because
 two different things produce byte-identical state: this project's journal was
@@ -577,16 +595,85 @@ anything happened.
 
 The three states stay three. Path reuse is not a fourth, because it is not
 distinguishable from a rolled-back journal — which is the case this check exists
-to catch — and a state the tool cannot detect is not a state it can answer.
+to catch — and a state the tool cannot detect is not a state it can answer. A
+copy is not a fourth either: it **is** detectable, because the root it was
+copied from still holds the uuid, and by the same reasoning that is what admits
+it to the vocabulary — as a sub-case of **damaged**, not a state of its own.
 
 **Adopted** — the journal is present and internally valid but this machine has
 no witness: a project cloned from git, or the same project on a new machine. The
-witness is written from the journal's own bytes and the run proceeds. This mints
+witness is written from the journal's own bytes, the root is recorded in the
+index — so a later copy of it is detectable — and the run proceeds. This mints
 nothing, because the consumed counts travelled with the journal. It is a
 deliberate loosening: refusing every fresh clone would refuse work that runs
 today, which [§REQ-bounded-neural-work.2](../requirements/bounded-neural-work.spec.md#2-bounded-by-default-refusing-nothing-that-runs-today) forbids. **The witness catches an
 accidentally lost tail, not a hand-edited ledger**, and that is the whole of
 what it claims.
+
+#### 5.4.1. A second root presenting the account
+
+A project copied with its `budgets/` directory — `cp -r` for a fixture, a backup
+or an experiment — presents the original's uuid from a root the index does not
+bind to it. What the index says about that uuid decides the answer, and one fact
+on disk tells a copy from a move: whether the bound root's own `budgets/` still
+**holds** the uuid.
+
+| the index binds the uuid to | reading | answer |
+|---|---|---|
+| this root | its home | proceed |
+| no root | **adopted** (§FS-rhei-budgets.5.4) | proceed, and record this root |
+| another root that still holds it | **copy** — `held_elsewhere` | refused before anything is appended |
+| only roots that no longer hold it — gone, holding another uuid, or holding no account | **move** | rebind to this root, drop the stale roots, warn once, proceed |
+
+A copy is refused rather than given a fresh account, because either silent
+answer creates something no one asked for. Proceeding writes the copy's
+receipts into the original's history and locks the original out; minting would
+make `cp -r` a way to restart a project at zero consumed, and
+[§REQ-bounded-neural-work.4](../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity) names a copy of a plan among the things that
+create no capacity. This is §FS-rhei-budgets.5.2.1's argument one level up: a
+copied ticket does not take the original's travel, and a copied project does not
+take the original's account.
+
+The refusal names the account, **this root**, and the **holding root**, says
+that the charge would be written into the holder's history, and offers two
+answers: `rhei budget forget '<this root>' --reason '<why>'` where this is a
+copy, and moving or deleting the holder first where this root is meant to
+replace it. The holder is untouched — its next charge proceeds as if the copy
+had never been made. `rhei budget forget` in the copy retires the copy's claim
+(§FS-rhei-budgets.10), and its next charge opens a fresh account at zero
+consumed; the two projects then run side by side.
+
+A **moved** project keeps its account and its history. Its first charge at the
+new root prints one line on stderr and proceeds:
+
+```text
+warning: budget account panta:<uuid> moved to <this root>; it was held at <old root>, which no longer holds it
+```
+
+After a move the old path is free: a new project laid there gets a fresh account
+rather than the moved one's, which lives on at its new root.
+
+Deleting a copy's `budgets/` by hand still gives it a fresh account, as it gives
+any root one. That is the residual §FS-rhei-budgets.5.3 already states, and this
+rule neither widens nor narrows it.
+
+#### 5.4.2. A tail written from another root
+
+A witness written to by a copy before §FS-rhei-budgets.5.4.1 refused it runs
+past the original's journal, and the original reads as truncated. Where that
+extra tail holds an `identity` receipt whose `source_path` lies outside this
+root, the tail is not this project's lost history, and the account is reported
+as `foreign_tail` instead of `journal_truncated`.
+
+The refusal and `rhei budget show` name the other root and how many receipts in
+the tail came from it, and **never** offer copying the witness over the journal:
+that copy would write transitions this project never took and spend it never
+made into its history. They offer one runnable command that moves the witness
+aside under a kept name, keeping every byte; the next charge then adopts the
+journal that is this project's own (§FS-rhei-budgets.5.4).
+
+A tail that carries no `identity` receipt cannot be told apart from a tail this
+project lost, so it stays `journal_truncated`, with the restore.
 
 ### 5.5. One currency per account
 
@@ -996,8 +1083,8 @@ fails *and* writes outside the path it named.
 
 The account's `health` is a closed vocabulary of two values, `verified` and
 `damaged`. Where it is `damaged` the report additionally carries the `damage`
-sub-case — one of `journal_absent`, `journal_truncated`, `chain_broken`, the
-three of §FS-rhei-budgets.5.4 — and where it is `verified` there is no `damage`
+sub-case — one of `journal_absent`, `journal_truncated`, `chain_broken`,
+`held_elsewhere`, `foreign_tail`, the five of §FS-rhei-budgets.5.4 — and where it is `verified` there is no `damage`
 to carry. A reader may depend on both: neither gains a value without this
 section gaining it too.
 
@@ -1007,7 +1094,9 @@ machine-readable error object of
 nothing on stdout, carrying the same facts the text report states as named
 members beside `message` and `help`: `health`, `damage`, `project_id`,
 `project_root`, `account`, `journal`, `witness`, `receipts`, `invocations`,
-`restore`, and `forget` where the sub-case admits one. A harness reading a
+`restore`, and `forget` where the sub-case admits one; `held_by`, the holding
+root, under `held_elsewhere`; and `foreign_root`, the root the tail came from,
+under `foreign_tail`. A harness reading a
 damaged account gets one shape whichever state it finds, rather than prose it
 cannot parse — and `project_id` and `account` mean there exactly what they mean
 in a verified report, the identity and the account **directory**, whether or not
@@ -1021,15 +1110,17 @@ or which identity owns them is spelled **resolved** instead — `account`,
 index is keyed by the resolved root, and it is that key a retirement retracts.
 
 `forget` retires a **root** rather than repairing an account: it is how an
-operator says that the path was reused and the recorded account was not this
-project's. Four cases, and only the last acts:
+operator says that the path was reused, or the root is a copy, and the recorded
+account was not this project's. Six cases, and two act:
 
 | the account at this path | `forget` |
 |---|---|
 | journal present and verifying | **refuses**, exits non-zero, writes nothing, and names `adjust` as what changes an allowance |
 | journal present and damaged (`journal_truncated`, `chain_broken`) | **refuses**, exits non-zero, writes nothing, and names the restore of §FS-rhei-budgets.5.4 |
+| journal present and its tail from another root (`foreign_tail`) | **refuses**, exits non-zero, writes nothing, and names setting the witness aside (§FS-rhei-budgets.5.4.2) |
 | no witness claims this root | **refuses**, exits non-zero, naming the path — the lawful **absent** state has nothing to retire, and a path with no record is far more often a typo |
 | damaged with the journal wholly absent (`journal_absent`) | retires it |
+| the account is held by another root (`held_elsewhere`) | retires **this root's claim**: moves `budgets/<uuid>/` to `budgets/retired/<uuid>-<stamp>/` with the audit receipt beside it, and touches neither the witness nor the index |
 
 The refusal on a sound account is the guarantee of
 §FS-rhei-budgets.5.3 and not a convenience: without it this command would be a
@@ -1037,13 +1128,16 @@ way to reset a working balance, and the bound would hold only until someone ran
 it.
 
 The refusal where a journal is **present** follows from
-§FS-rhei-budgets.5.4 rather than adding to it: a journal that is there **is**
-this project's, so the remedy is to restore its tail, and retiring the root
+§FS-rhei-budgets.5.4 rather than adding to it: a journal that is there and bound
+to this root **is** this project's, so the remedy is to restore its tail, and retiring the root
 would discard a real account while leaving that journal exactly as unverifiable
 as it was — an operator left worse off than before they ran the command. Nothing
 is lost by narrowing, because a witness and a journal both present always have
 restore as their answer. A damaged report never offers `forget` in those
-sub-cases either; this says what happens when it is asked for anyway.
+sub-cases either; this says what happens when it is asked for anyway. A copy's
+journal is the one present journal that is not this root's: the account is the
+holder's, so retiring the copy's claim gives up nothing of this project's and
+leaves the holder's history exactly as it was (§FS-rhei-budgets.5.4.1).
 
 Retiring is one audited move, and nothing is destroyed by it. The witness
 directory is moved under a `retired/` name beside the live ones, keeping

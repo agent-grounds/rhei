@@ -23,7 +23,7 @@ fn cost_command(options: CostCommandOptions<'_>) -> MietteResult<()> {
     }
     let roots = accounting_roots(&loaded, &execution_workspace_root(&input_buf), &scope);
     let inspection = read_cost_inspection_over(&roots, &scope);
-    let selected = selection.apply(inspection.scoped(), inspection.unreadable_root);
+    let selected = inspection.select(&selection);
 
     if options.json {
         let payload = cost_json_payload(&loaded.rhei, &inspection, &selection, &selected, options);
@@ -139,7 +139,7 @@ fn cost_json_payload(
             "unattributed": selected.unattributed_summary(),
         },
         "summary": selected.summary(),
-        "task": options.task.map(|task_id| task_cost_json(rhei, &selected.records, task_id)),
+        "task": options.task.map(|task_id| task_cost_json(rhei, selected, task_id)),
         "groups": grouped_cost_json(selected, options.by),
         "errors": inspection.errors,
     })
@@ -150,12 +150,13 @@ fn cost_json_payload(
 /// The plan tree is a selection axis like the others and composes with them, so
 /// a task's totals are drawn from what `--run` and the window left standing —
 /// not from every record the workspace holds.
-// §FS-rhei-cost-accounting.6.1 §FS-rhei-cost-accounting.8.2
+// §FS-rhei-cost-accounting.6.1 §FS-rhei-cost-accounting.8.2 §FS-rhei-cost-accounting.6.2.1
 fn task_cost_json(
     rhei: &rhei_core::ast::Rhei,
-    records: &[ScopedRecord<'_>],
+    selected: &CostSelectionResult<'_>,
     task_id: &str,
 ) -> serde_json::Value {
+    let records = &selected.records;
     let title = flatten_tasks(rhei)
         .into_iter()
         .find(|task| task.id.to_string() == task_id)
@@ -164,8 +165,10 @@ fn task_cost_json(
         // §FS-rhei-cost-accounting.8: JSON uses stable runtime schema names.
         "task_id": task_id,
         "title": title,
-        "direct": summarize_records(direct_records(records, task_id)),
-        "subtree": summarize_records(subtree_records(records, task_id)),
+        "direct": summarize_records(direct_records(records, task_id))
+            .map(|summary| count_unrecorded(summary, selected.unrecorded_at(task_id, false))),
+        "subtree": summarize_records(subtree_records(records, task_id))
+            .map(|summary| count_unrecorded(summary, selected.unrecorded_at(task_id, true))),
         // The records themselves as stored, and the elapsed time of any that
         // stored none. §FS-rhei-cost-accounting.3.4.1
         "invocations": subtree_records(records, task_id)
@@ -203,7 +206,7 @@ fn grouped_cost_json(
             serde_json::json!({
                 "key": key.key,
                 "unattributed": key.unattributed,
-                "summary": selected.group_summary(by, key.unattributed, &records),
+                "summary": selected.group_summary(by, &key, &records),
             })
         })
         .collect()
@@ -217,12 +220,13 @@ fn print_run_cost(
 ) {
     if let Some(summary) = selected.summary() {
         println!(
-            "Cost {} | Total {} | In {} | Out {} | Coverage {:?} | Invocations {}",
+            "Cost {} | Total {} | In {} | Out {} | Coverage {} | Invocations {}",
             format_summary_cost(&summary),
             format_dimension_value(&summary.total),
             format_dimension_value(&summary.input_total),
             format_dimension_value(&summary.output_total),
-            summary.coverage,
+            // The gap is named beside the word. §FS-rhei-cost-accounting.6.2.1
+            coverage_label(&summary),
             summary.invocation_count
         );
     }
@@ -234,15 +238,15 @@ fn print_run_cost(
     }
     println!("\nBy {:?}:", by);
     for (key, records) in grouped_records(selected, by) {
-        if let Some(summary) = selected.group_summary(by, key.unattributed, &records) {
+        if let Some(summary) = selected.group_summary(by, &key, &records) {
             println!(
-                "  {}: {} total={} in={} out={} coverage={:?}",
+                "  {}: {} total={} in={} out={} coverage={}",
                 key.key,
                 format_summary_cost(&summary),
                 format_dimension_value(&summary.total),
                 format_dimension_value(&summary.input_total),
                 format_dimension_value(&summary.output_total),
-                summary.coverage
+                coverage_label(&summary)
             );
         }
     }

@@ -318,6 +318,7 @@ fn zero_run_accounting() -> rhei_tui::AccountingRunSummary {
         invocation_count: 0,
         measured_invocation_count: 0,
         missing_invocation_count: 0,
+        unrecorded_agent_invocation_count: 0,
     }
 }
 
@@ -334,7 +335,7 @@ fn this_runs_rollup(inspection: &CostInspection) -> rhei_tui::AccountingRunSumma
         return demote_if(zero_run_accounting(), true);
     };
     let selection = CostSelection::resolve(Some(&run_id), None, None).unwrap_or_default();
-    let selected = selection.apply(inspection.scoped(), inspection.unreadable_root);
+    let selected = inspection.select(&selection);
     selected
         .summary()
         .unwrap_or_else(|| demote_if(zero_run_accounting(), !selected.unattributed.is_empty()))

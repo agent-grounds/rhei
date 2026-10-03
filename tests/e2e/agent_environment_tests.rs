@@ -265,3 +265,123 @@ transitions:
         fs::read_to_string(dir.join("nested-command.txt")).unwrap_or_default(),
     );
 }
+
+/// A capture path in Rhei's own environment belongs to whichever invocation
+/// launched it, typically an outer measured agent whose commands run a nested
+/// `rhei run`. An agent with no usage extractor must not inherit it, or the
+/// tokens it reports are summed into that other invocation's record (#407).
+/// §FS-rhei-agents.4 §FS-rhei-cost-accounting.4
+#[test]
+fn an_agent_without_an_extractor_cannot_inherit_a_foreign_capture_path() {
+    const FOREIGN_CAPTURE: &[u8] = b"{\"schema\":\"rhei.accounting.usage.v1\",\"usage\":\
+{\"input_tokens\":2884736,\"output_tokens\":16686}}\n";
+
+    let dir = unique_temp_dir("agent-environment-capture-path");
+    let foreign = dir.join("outer/runtime/accounting/captures/outer-invocation.jsonl");
+    fs::create_dir_all(foreign.parent().expect("capture parent")).expect("outer captures");
+    fs::write(&foreign, FOREIGN_CAPTURE).expect("foreign capture");
+
+    // The body of `PRICED_FINISHING_AGENT`, the fixture the issue caught writing
+    // into a Codex agent's capture file, plus a record of what it was handed.
+    let agent = write_python_agent(
+        &dir,
+        "mock-agent.py",
+        r#"import json
+
+sys.stdin.read()
+names = ('RHEI_ACCOUNTING_USAGE_PATH', 'RHEI_ACCOUNTING_USAGE_SCHEMA')
+write(pathlib.Path.cwd() / 'observed-env.json', json.dumps(
+    {name: os.environ.get(name) for name in names},
+    indent=2,
+    sort_keys=True,
+) + '\n')
+capture = os.environ.get('RHEI_ACCOUNTING_USAGE_PATH')
+if capture:
+    append(
+        capture,
+        '{"schema": "rhei.accounting.usage.v1", "usage": '
+        '{"total_tokens": 280000, "input_tokens": 100000, "output_tokens": 180000}}\n',
+    )
+result('done\n')
+"#,
+    );
+    let agent_command =
+        serde_json::to_string(&vec![python_command().to_string(), agent.display().to_string()])
+            .expect("serialize mock agent command");
+    let settings_dir = dir.join(".agent-grounds/rhei");
+    fs::create_dir_all(&settings_dir).expect("create settings directory");
+    fs::write(
+        settings_dir.join("settings.json"),
+        format!(
+            r#"{{
+  "defaults": {{ "agent": "mock", "agent_timeout": "30s" }},
+  "agents": {{
+    "mock": {{ "command": {agent_command}, "stdin_prompt": true, "timeout": "30s" }}
+  }}
+}}"#
+        ),
+    )
+    .expect("write settings");
+
+    let plan_path = write_fixture_file(
+        &dir,
+        "plan.rhei.md",
+        r#"# Rhei: Nested Worker
+
+## Tasks
+
+### Task 1: Report usage if a capture path is offered
+**State:** work
+"#,
+    );
+    let machine_path = write_fixture_file(
+        &dir,
+        "states.yaml",
+        r#"name: capture-path-isolation
+version: 1
+states:
+  work:
+    initial: true
+    agent: mock
+  completed:
+    final: true
+transitions:
+  - from: work
+    to: completed
+"#,
+    );
+
+    let output = rhei_command(dir.join(".home"))
+        .current_dir(&dir)
+        .env("GIT_CEILING_DIRECTORIES", dir.parent().expect("fixture has a temporary parent"))
+        .env("RHEI_ACCOUNTING_USAGE_PATH", &foreign)
+        .env("RHEI_ACCOUNTING_USAGE_SCHEMA", "rhei.accounting.usage.v1")
+        .arg("--state-machine")
+        .arg(&machine_path)
+        .arg("run")
+        .arg(&plan_path)
+        .args(["--no-tui", "--no-callbacks"])
+        .output()
+        .expect("nested rhei run");
+    let stdout = stdout(&output);
+    let stderr = stderr(&output);
+    assert!(output.status.success(), "nested run failed:\nstdout:\n{stdout}\nstderr:\n{stderr}");
+
+    let observed: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(dir.join("observed-env.json")).expect("agent records environment"),
+    )
+    .expect("recorded environment is JSON");
+    let leaked = ["RHEI_ACCOUNTING_USAGE_PATH", "RHEI_ACCOUNTING_USAGE_SCHEMA"]
+        .iter()
+        .filter_map(|name| observed[*name].as_str().map(|value| (*name, value)))
+        .collect::<Vec<_>>();
+    let foreign_after = fs::read(&foreign).expect("read foreign capture");
+
+    assert!(
+        leaked.is_empty() && foreign_after == FOREIGN_CAPTURE,
+        "an agent with no extractor inherited the outer invocation's capture contract:\n\
+         leaked variables: {leaked:?}\n\
+         outer capture file now:\n{}",
+        String::from_utf8_lossy(&foreign_after),
+    );
+}

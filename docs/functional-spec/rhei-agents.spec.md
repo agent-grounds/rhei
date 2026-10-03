@@ -1563,9 +1563,9 @@ files and rerunning composes the prompt normally.
 ## 4. Environment Variables
 
 An autonomous agent subprocess must not receive the outer run's execution
-identity through its process environment. Before spawning any configured agent
-profile, Rhei removes these five variables even when its own parent environment
-contains them:
+identity or another invocation's output contract through its process
+environment. Before spawning any configured agent profile, Rhei removes these
+seven variables even when its own parent environment contains them:
 
 | Removed variable | Authoritative agent surface |
 |------------------|-----------------------------|
@@ -1574,13 +1574,23 @@ contains them:
 | `RHEI_RESULT_PATH` | `## Result`, on an invocation whose state can finish the task |
 | `RHEI_TASK_ID` | The qualified task identity in `## Position` and the task heading |
 | `RHEI_TASK_ID_LOCAL` | The task heading in the named rhei |
+| `RHEI_ACCOUNTING_USAGE_PATH` | Set again only for an agent whose usage extractor declares it, to that invocation's own capture file (§FS-rhei-cost-accounting.4) |
+| `RHEI_ACCOUNTING_USAGE_SCHEMA` | Set again together with `RHEI_ACCOUNTING_USAGE_PATH` |
 
-The composed prompt (§3) is authoritative for those values. A custom agent
-wrapper must read the prompt instead of these legacy variables. Because an
-agent's commands inherit its environment, removal also keeps an independently
-launched nested Rhei from adopting the outer plan, task, artifact root, or
-result path. This is an intentional compatibility break: neither task-id
-spelling is retained as ambient compatibility state.
+The composed prompt (§3) is authoritative for the five identity values. A
+custom agent wrapper must read the prompt instead of these legacy variables.
+Because an agent's commands inherit its environment, removal also keeps an
+independently launched nested Rhei from adopting the outer plan, task, artifact
+root, result path, or accounting capture file. This is an intentional
+compatibility break: neither task-id spelling is retained as ambient
+compatibility state.
+
+The capture pair is a per-invocation output path, like the result path. An
+agent of a nested run that inherited it would append its own usage to the
+outer invocation's capture file, and Rhei would sum those tokens into the outer
+record. Clearing the pair prevents a nested run from overwriting the running
+task's accounting files, as `rhei snapshot continue` already does for the same
+pair (§FS-rhei-snapshot-operations.1.5).
 
 This isolation applies only to autonomous agent workers. Program states keep
 their explicit environment contract ([§FS-rhei-programs.2](rhei-programs.spec.md#2-environment-variables)), and transition callbacks keep their own

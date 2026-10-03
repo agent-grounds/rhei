@@ -163,10 +163,12 @@ struct MissingRequiredOutput {
 }
 
 impl MissingRequiredOutput {
-    /// This entry as the missing-output warning and the halt line print it.
-    // §FS-rhei-agents.3.2.1
+    /// This entry as the missing-output warning and the halt line print it, marked
+    /// from the flag the retry prompt reads, never from the root-bearing spelling.
+    // §FS-rhei-agents.3.2.1 §FS-rhei-memory.4.4
     fn warning_entry(&self) -> String {
-        format_missing_required_output(&self.name, &self.warning_spelling)
+        let marker = if self.unresolved_template { ", unresolved template" } else { "" };
+        format!("{} ({}{marker})", self.name, self.warning_spelling)
     }
 }
 
@@ -225,9 +227,9 @@ fn missing_terminal_result_entry(
     Some(MissingRequiredOutput {
         name: "result".to_string(),
         path,
-        // A result path is written by a format string over values the engine
-        // holds, so there is no variable left in it to be outside a namespace.
-        unresolved_template: false,
+        // Asked of the authored relative path, never the root: a fan-out
+        // fragment's path carries the state name verbatim. §FS-rhei-agents.3.2.1
+        unresolved_template: is_unresolved_template(&result_relative_path(&task_id, invocation)),
         warning_spelling: shown.display().to_string(),
     })
 }

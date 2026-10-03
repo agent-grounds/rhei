@@ -73,6 +73,7 @@ mod templates {
         include!("cli/tests_templates_union_artifacts.rs");
         include!("cli/tests_templates_union_hold.rs");
         include!("cli/tests_templates_union_fence.rs");
+        include!("cli/tests_templates_union_flow.rs");
         include!("cli/tests_templates_project.rs");
     }
 }

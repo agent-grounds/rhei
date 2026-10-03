@@ -15,6 +15,9 @@
     struct YamlEntry {
         key: String,
         range: Range<usize>,
+        /// True when the entry's value opens a flow collection on the key's own
+        /// line, as `by_type: { task: host }` does. §FS-rhei-library.7.4
+        flow: bool,
     }
 
     /// One top-level block of a `states.yaml`, located in the source text.
@@ -25,18 +28,22 @@
         body_end: usize,
         /// The indent its entries are written at, so an insertion matches.
         indent: usize,
+        /// True when the block is a flow collection opened on its key's own
+        /// line, which has no end to insert a line at. §FS-rhei-library.7.4
+        flow: bool,
         entries: Vec<YamlEntry>,
     }
 
     /// Every top-level block of `text`, keyed by its YAML key.
     ///
     /// Block style with a consistent indent is what every authored machine in
-    /// this repository uses, and what the writer emits; a flow-style block has
-    /// no entry lines to locate and reports none, which makes an insertion into
-    /// it refuse rather than corrupt the file.
+    /// this repository uses, and what the writer emits. A block or entry whose
+    /// value opens `{` or `[` on its key's own line is marked `flow`: it has no
+    /// end to insert a line at, so the union refuses to extend it rather than
+    /// splice block lines under it. §FS-rhei-library.7.4
     fn yaml_blocks(text: &str) -> IndexMap<String, YamlBlock> {
         let mut blocks: IndexMap<String, YamlBlock> = IndexMap::new();
-        let mut current: Option<(String, usize, usize)> = None; // key, body start, body end
+        let mut current: Option<(String, usize, bool)> = None; // key, body end, flow
         let mut pending: Vec<(usize, usize)> = Vec::new(); // (offset, len) of body lines
         let mut offset = 0usize;
         let mut lines: Vec<(usize, &str)> = Vec::new();
@@ -45,9 +52,9 @@
             offset += line.len();
         }
         let flush = |blocks: &mut IndexMap<String, YamlBlock>,
-                     current: &Option<(String, usize, usize)>,
+                     current: &Option<(String, usize, bool)>,
                      pending: &[(usize, usize)]| {
-            let Some((key, _, body_end)) = current else {
+            let Some((key, body_end, flow)) = current else {
                 return;
             };
             blocks.insert(
@@ -55,6 +62,7 @@
                 YamlBlock {
                     body_end: *body_end,
                     indent: pending.first().map_or(2, |(_, indent)| *indent),
+                    flow: *flow,
                     entries: Vec::new(),
                 },
             );
@@ -72,10 +80,10 @@
                 current = trimmed
                     .split_once(':')
                     .filter(|(key, _)| is_yaml_key(key))
-                    .map(|(key, _)| (key.to_owned(), *start, start + raw.len()));
+                    .map(|(key, value)| (key.to_owned(), start + raw.len(), opens_flow(value)));
                 continue;
             }
-            if let Some((_, _, body_end)) = current.as_mut() {
+            if let Some((_, body_end, _)) = current.as_mut() {
                 *body_end = start + raw.len();
                 pending.push((*start, indent));
             }
@@ -85,6 +93,13 @@
             block.entries = block_entries(&lines, text.len(), key, block.indent);
         }
         blocks
+    }
+
+    /// True when a key's value, as written on the key's own line, opens a flow
+    /// collection. §FS-rhei-library.7.4
+    fn opens_flow(value: &str) -> bool {
+        let value = value.trim_start();
+        value.starts_with('{') || value.starts_with('[')
     }
 
     /// True when `key` is a bare YAML mapping key rather than prose that
@@ -124,17 +139,20 @@
             if let Some(last) = entries.last_mut() {
                 last.range.end = *start;
             }
-            let entry_key = if let Some(item) = trimmed.strip_prefix("- ") {
+            let (entry_key, flow) = if let Some(item) = trimmed.strip_prefix("- ") {
                 let key = sequence_item_key(item, sequence_index);
                 sequence_index += 1;
-                key
+                (key, false)
             } else {
                 match trimmed.split_once(':') {
-                    Some((key, _)) => key.trim().trim_matches('"').trim_matches('\'').to_owned(),
+                    Some((key, value)) => (
+                        key.trim().trim_matches('"').trim_matches('\'').to_owned(),
+                        opens_flow(value),
+                    ),
                     None => continue,
                 }
             };
-            entries.push(YamlEntry { key: entry_key, range: *start..text_len });
+            entries.push(YamlEntry { key: entry_key, range: *start..text_len, flow });
         }
         // The last entry runs to the end of its block, not of the file.
         if let Some(last) = entries.last_mut() {

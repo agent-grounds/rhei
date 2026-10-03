@@ -127,7 +127,13 @@ fn show_json_in_a_copy_reports_held_elsewhere_and_the_holder() {
 
     assert!(!result.status.success(), "a copy's account is damaged, so show exits non-zero");
     let line = raw_stderr(&result);
-    let parsed: serde_json::Value = serde_json::from_str(line.trim()).unwrap_or_else(|error| {
+    // The fixture's `mock` declares no family, so its warning precedes the
+    // error on stderr. §FS-rhei-agents.1.1.2
+    let error_line: String = line
+        .lines()
+        .filter(|line| !line.trim().is_empty() && !line.contains("declares no family"))
+        .collect();
+    let parsed: serde_json::Value = serde_json::from_str(&error_line).unwrap_or_else(|error| {
         panic!("stderr should be the JSON error object ({error}):\n{line}")
     });
     let error = &parsed["error"];

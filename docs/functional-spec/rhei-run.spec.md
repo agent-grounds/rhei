@@ -476,22 +476,9 @@ headless, and JSONL surfaces; no new output record family is introduced.
    runs; the pass loop bounds how long *this* run keeps trying, given what its
    passes achieve.
 
-   A ticket that stalled under step 5 is out of the running for the rest of that
-   pass. A pass that moved *something* — any ticket, any transition — does not
-   release those tickets; it records that the run has made progress since the
-   last release, and the pass loop goes on to the tickets that are still
-   claimable. A pass that ends with a ticket newly stalled and other claimable
-   tickets still untried also continues, since it has not yet asked everything
-   it could ask.
-
-   The release happens at the one moment the run would otherwise stop: a pass
-   that moved nothing and has no untried ticket left. If some earlier pass had
-   made progress, every stalled ticket is released and given another turn, and
-   the run continues; if that turn moves nothing either, the run ends and names
-   every ticket still stalled. So the allowance is not one extra pass per run —
-   it renews every time the run makes progress — and it is not a bound on how
-   often one ticket may be re-spawned. That bound is the attempt budget above,
-   which is per state visit and outlives the run.
+   A ticket that stalled under step 5 is out of the running until the run
+   releases it, and when the run does is §3.5's rule
+   ([§FS-rhei-run.3.6](#36-stall-release)).
 
 ### Who supplies the result on a terminal edge
 
@@ -875,6 +862,55 @@ exit 75, and no `triage@resolved` transition. No relaxed deadline, extra
 timing allowance, skipped waiting assertion, or eventual counter alone
 substitutes for this proof. These are observation requirements for the
 existing scheduling and routing rules, not new runtime semantics.
+
+### 3.6. Stall Release
+
+A ticket that stalled under step 5 is out of the running for the rest of that
+pass. A pass that moved *something* — any ticket, any transition — does not
+release those tickets; it records that the run has made progress since the
+last release, and the pass loop goes on to the tickets that are still
+claimable. A pass that ends with a ticket newly stalled and other claimable
+tickets still untried also continues, since it has not yet asked everything
+it could ask.
+
+The release happens at the one moment the run would otherwise stop: a pass
+that moved nothing and has no untried ticket left. If some earlier pass had
+made progress, every stalled ticket is released and given another turn, and
+the run continues; if that turn moves nothing either, the run ends and names
+every ticket still stalled. So the allowance is not one extra pass per run —
+it renews every time the run makes progress — and it is not a bound on how
+often one ticket may be re-spawned. That bound is the attempt budget of step
+5, which is per state visit and outlives the run.
+
+**A supervisor held for an empty visit is the exception**
+([§FS-rhei-supervision.3.6](rhei-supervision.spec.md#36-empty-visits)). Its stall
+charges no attempt budget, so nothing but this rule bounds how often one run
+spawns it, and the rule has to keep the promise §3.6 makes: within one run, the
+held visit is spawned again only after something advanced **after it was
+held**. Three things that look like progress are not, for this ticket:
+
+1. **The move that woke it.** A supervisor is woken by a descendant that just
+   moved ([§FS-rhei-supervision.2](rhei-supervision.spec.md#2-checkpoints)), so that move always comes in a pass before
+   the visit, and the visit has already judged the world it produced. "Some
+   earlier pass" counts, for the held supervisor, only from the pass that held
+   it.
+2. **A poll's self-loop.** Rescheduling the next attempt applies no transition
+   (step 8), so it is no advance for any ticket's release.
+3. **A deadline sleep.** A run that sleeps until the earliest effective
+   deadline (§5.1) and wakes to find a ticket ready has moved nothing by
+   sleeping, so waking does not release the held supervisor; the attempt the
+   deadline made due releases it only if that attempt advances something. Nor
+   does the held supervisor end the run before the sleep: a stalled ticket
+   beside a pending deadline is no reason to halt, so the run waits the
+   deadline out and halts only once nothing else is left.
+
+So a run whose held supervisor's subtree cannot move spawns the empty visit
+once and halts when nothing else is left, and a run with other work beside it
+spawns the visit again at most once for each advance made after the hold — and
+advances that land between two releases buy one re-spawn between them, not one
+each. The worker pool (§5) keeps the same rule as the sequential loop. Every
+other stall — a missing output, a spent attempt budget, a refused admission
+(§3.4) — keeps the release of the two paragraphs above unchanged.
 
 ## 4. Dry Run
 

@@ -178,6 +178,7 @@ mod summary_tests;
 mod supervised_delivery_tests;
 mod supervision_appended_child_tests;
 mod supervision_barrier_tests;
+mod supervision_empty_visit_release_tests;
 mod supervision_empty_visit_tests;
 mod supervision_gated_finish_tests;
 mod supervision_next_tests;

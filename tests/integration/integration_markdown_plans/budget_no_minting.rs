@@ -51,7 +51,9 @@ fn write_budget_project(
         dir,
         "looping-agent.py",
         &format!(
-            r#"{prologue}root = pathlib.Path(env('RHEI_ROOT'))
+            r#"{prologue}if not env('RHEI_ROOT'):
+    sys.exit('the agent was handed no root, and its working directory is not one')
+root = pathlib.Path(env('RHEI_ROOT'))
 append(root / 'runtime' / 'spawns.log', '{{}}\n'.format(env('RHEI_STATE')))
 write(root / 'runtime' / 'work.md', 'work\n')
 write(root / 'runtime' / 'review.md', 'review\n')
@@ -257,7 +259,9 @@ if not session_dir:
     sys.exit('the agent was spawned without --session-dir')
 write(pathlib.Path(session_dir) / 'session.jsonl', '{"provider":"openai","model":"model"}\n')
 "#,
-        r#""session": { "session_dir_flag": "--session-dir", "layout": { "kind": "FlatById", "ext": "jsonl" } }"#,
+        // The prompt is how the agent learns its root; without it the agent would
+        // write wherever it stands. §REQ-test-isolation.2 §REQ-test-isolation.4
+        r#""stdin_prompt": true, "session": { "session_dir_flag": "--session-dir", "layout": { "kind": "FlatById", "ext": "jsonl" } }"#,
         "target: mock:openai:model",
     );
     (dir, root, plan, machine)

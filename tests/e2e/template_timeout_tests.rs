@@ -14,7 +14,7 @@
 //! §REQ-test-isolation.4
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::templates_tests::run_raw;
 use super::*;
@@ -25,14 +25,16 @@ const PLACEHOLDER: &str = "placeholder";
 
 /// The templates as they ship, read from the tree rather than from a list in
 /// this file — a list would go stale the moment a template is added, which is
-/// the one case this guard exists for.
-fn shipped_templates() -> Vec<String> {
+/// the one case this guard exists for. Each is its name and its source path:
+/// the path is what the commands are given, because a bare name walks every
+/// rhei home above the test and the user tier first. §REQ-test-isolation.4
+fn shipped_templates() -> Vec<(String, PathBuf)> {
     let dir = repo_root().join("crates/rhei-cli/templates");
-    let mut names: Vec<String> = fs::read_dir(&dir)
+    let mut names: Vec<(String, PathBuf)> = fs::read_dir(&dir)
         .unwrap_or_else(|err| panic!("read {}: {err}", dir.display()))
         .map(|entry| entry.expect("template entry"))
         .filter(|entry| entry.path().join("template.yaml").is_file())
-        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .map(|entry| (entry.file_name().to_string_lossy().into_owned(), entry.path()))
         .collect();
     names.sort();
     assert!(!names.is_empty(), "no shipped templates found under {}", dir.display());
@@ -82,12 +84,13 @@ fn every_shipped_template_instantiates_into_a_workspace_validate_accepts() {
     // template, as a developer's home above TMPDIR may hold. §REQ-test-isolation.4
     plant_ancestor_agora(&fixture);
     let dir = fixture.join("work");
-    fs::create_dir_all(dir.join(".agent-grounds/rhei/templates")).expect("create rhei home");
+    fs::create_dir_all(&dir).expect("create the working directory");
 
-    for template in shipped_templates() {
+    for (template, source) in shipped_templates() {
         let output = format!("out-{template}");
-        let mut args = vec!["instantiate".to_string(), template.clone()];
-        args.extend(required_inputs(&dir, &template));
+        let source = source.to_string_lossy().into_owned();
+        let mut args = vec!["instantiate".to_string(), source.clone()];
+        args.extend(required_inputs(&dir, &source));
         args.push("--output".to_string());
         args.push(output.clone());
         let args: Vec<&str> = args.iter().map(String::as_str).collect();

@@ -2,37 +2,32 @@
 // without `assign_id_flag`) — split from tests_snapshot_runtime.rs to stay
 // under the file-size budget. §AR-source-file-size.3
 
-/// RAII guard that removes `HOME` for the duration of the test, sharing
-/// `TEST_HOME_LOCK` with `TempHome` so the two never race over the same
-/// process-global env var.
+/// RAII guard that leaves the test with no home at all, installed for this
+/// thread rather than by removing the process-wide `HOME`. §REQ-test-isolation.5
+/// It still points `XDG_STATE_HOME` at a sandbox under `REGISTRY_GUARD`.
 struct NoHome {
-    previous: Option<std::ffi::OsString>,
+    previous: Option<test_home::TestHome>,
     previous_state: Option<std::ffi::OsString>,
     _state: tempfile::TempDir,
     _state_guard: std::sync::MutexGuard<'static, ()>,
-    _guard: std::sync::MutexGuard<'static, ()>,
 }
 
 impl NoHome {
     fn new() -> Self {
-        let guard = TEST_HOME_LOCK.lock().unwrap_or_else(|err| err.into_inner());
         let state_guard = run_descriptor_tests::REGISTRY_GUARD
             .lock()
             .unwrap_or_else(|err| err.into_inner());
         let state = tempfile::tempdir().expect("state dir");
-        let previous = std::env::var_os("HOME");
         let previous_state = std::env::var_os("XDG_STATE_HOME");
         std::env::set_var("XDG_STATE_HOME", state.path());
-        std::env::remove_var("HOME");
-        NoHome { previous, previous_state, _state: state, _state_guard: state_guard, _guard: guard }
+        let previous = test_home::install(Some(test_home::TestHome::Absent));
+        NoHome { previous, previous_state, _state: state, _state_guard: state_guard }
     }
 }
 
 impl Drop for NoHome {
     fn drop(&mut self) {
-        if let Some(prev) = self.previous.take() {
-            std::env::set_var("HOME", prev);
-        }
+        test_home::install(self.previous.take());
         match self.previous_state.take() {
             Some(prev) => std::env::set_var("XDG_STATE_HOME", prev),
             None => std::env::remove_var("XDG_STATE_HOME"),

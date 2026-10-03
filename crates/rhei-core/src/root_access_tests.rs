@@ -13,13 +13,16 @@ fn operator_root_guard_excludes_an_active_reader() {
 /// The body of the case above; `between` runs on the test thread after its
 /// acquisition and before the writer's, and what it returns lives to the end.
 fn active_reader_excludes_publication<T>(between: impl FnOnce() -> T) {
+    let base = OwnLockBase::new();
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_path_buf();
     let held = RootAccessGuard::shared(&root).unwrap();
     let _between = between();
     let (contended_tx, contended_rx) = mpsc::channel();
     let (acquired_tx, acquired_rx) = mpsc::channel();
+    let writer_base = base.path();
     let writer = std::thread::spawn(move || {
+        lock_base(Some(&writer_base));
         CONTENDED.with(|sender| *sender.borrow_mut() = Some(contended_tx));
         let _guard = RootAccessGuard::exclusive(&root).unwrap();
         acquired_tx.send(()).unwrap();
@@ -40,12 +43,15 @@ fn operator_queued_reader_refuses_newly_published_marker() {
 /// The body of the case above, with the same `between` as
 /// [`active_reader_excludes_publication`].
 fn queued_reader_refuses_newly_published_marker<T>(between: impl FnOnce() -> T) {
+    let base = OwnLockBase::new();
     let dir = tempfile::tempdir().unwrap();
     let held = RootAccessGuard::exclusive(dir.path()).unwrap();
     let _between = between();
     let root = dir.path().to_path_buf();
     let (tx, rx) = mpsc::channel();
+    let reader_base = base.path();
     let reader = std::thread::spawn(move || {
+        lock_base(Some(&reader_base));
         CONTENDED.with(|sender| *sender.borrow_mut() = Some(tx));
         RootAccessGuard::shared(&root).unwrap_err().to_string()
     });
@@ -116,6 +122,7 @@ fn operator_basin_queued_readers_recheck_project_manifest_and_member_access() {
 /// and before the reader, with the same contract as
 /// [`active_reader_excludes_publication`].
 fn basin_queued_readers_recheck_every_entry<T>(mut between: impl FnMut() -> T) {
+    let base = OwnLockBase::new();
     for entry in ["", "index.panta.md", "basin", "basin/work.md", "member", "member/index.rhei.md"]
     {
         let dir = tempfile::tempdir().unwrap();
@@ -132,7 +139,9 @@ fn basin_queued_readers_recheck_every_entry<T>(mut between: impl FnMut() -> T) {
         let _between = between();
         let input = project.join(entry);
         let (tx, rx) = mpsc::channel();
+        let reader_base = base.path();
         let reader = std::thread::spawn(move || {
+            lock_base(Some(&reader_base));
             CONTENDED.with(|sender| *sender.borrow_mut() = Some(tx));
             for_input(&input).unwrap_err().to_string()
         });
@@ -156,21 +165,18 @@ fn basin_queued_readers_recheck_every_entry<T>(mut between: impl FnMut() -> T) {
 /// same binary moves it (agent-grounds/rhei#408): a reader that is never
 /// contended proves nothing about the interlock. §FS-rhei-recover.4
 #[test]
-#[ignore = "fails until agent-grounds/rhei#408 gives the contention cases their own lock base"]
 fn operator_active_reader_survives_a_moved_state_home() {
     active_reader_excludes_publication(moved_state_home);
 }
 
 /// The queued-reader case under the same move. §FS-rhei-recover.4
 #[test]
-#[ignore = "fails until agent-grounds/rhei#408 gives the contention cases their own lock base"]
 fn operator_queued_reader_survives_a_moved_state_home() {
     queued_reader_refuses_newly_published_marker(moved_state_home);
 }
 
 /// The basin case under the same move, for every entry. §FS-rhei-recover.4
 #[test]
-#[ignore = "fails until agent-grounds/rhei#408 gives the contention cases their own lock base"]
 fn operator_basin_queued_readers_survive_a_moved_state_home() {
     basin_queued_readers_recheck_every_entry(moved_state_home);
 }
@@ -225,6 +231,32 @@ fn operator_basin_file_access_retains_all_owners_on_read_only_project() {
 /// process-wide environment every other test reads. §FS-rhei-recover.4.1
 fn lock_base(base: Option<&Path>) {
     LOCK_BASE.with(|slot| *slot.borrow_mut() = base.map(Path::to_path_buf));
+}
+
+/// A per-case account state directory, set as this thread's lock base until the
+/// value drops - even on panic, so it cannot leak into the next case on this
+/// thread. A contention case passes [`OwnLockBase::path`] to each thread it
+/// spawns, which sets it first: the base is per thread, and two threads that
+/// resolve their lock through the process's `XDG_STATE_HOME` can lock different
+/// files and never contend (agent-grounds/rhei#408). §FS-rhei-recover.4
+struct OwnLockBase(tempfile::TempDir);
+
+impl OwnLockBase {
+    fn new() -> Self {
+        let dir = tempfile::tempdir().unwrap();
+        lock_base(Some(dir.path()));
+        Self(dir)
+    }
+
+    fn path(&self) -> PathBuf {
+        self.0.path().to_path_buf()
+    }
+}
+
+impl Drop for OwnLockBase {
+    fn drop(&mut self) {
+        lock_base(None);
+    }
 }
 
 /// An account state directory that cannot hold a guard directory anywhere: its

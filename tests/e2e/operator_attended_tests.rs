@@ -6,7 +6,12 @@ use super::terminal_watch_support::TerminalWatch;
 use super::*;
 use std::io::{Read, Write};
 use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+/// How long the attended harness waits for the prompt, and then for the exit. Both are event
+/// barriers, so a passing run pays nothing for the bound; it covers a cold start on a loaded
+/// Windows runner. §REQ-cross-platform.7
+const ATTENDED_WAIT: Duration = Duration::from_secs(60);
 
 /// Input is sent only after the child's prompt is observed, using a channel barrier.
 /// The harness is test-only; production has no environment authorization. §FS-rhei-recover.1
@@ -31,9 +36,17 @@ pub(super) fn attended(fixture: &ForceFixture, arguments: &[&str], answer: &str)
     let reader = pair.master.try_clone_reader().unwrap();
     let mut writer = pair.master.take_writer().unwrap();
     let watch = TerminalWatch::start(reader, ": type ");
-    if !watch.prompted_within(Duration::from_secs(20)) {
+    let started = Instant::now();
+    if !watch.prompted_within(ATTENDED_WAIT) {
         let _ = killer.kill();
-        panic!("operator prompt missing: {}", watch.transcript_for_failure(Duration::from_secs(5)));
+        // Closing the pseudo-console lets a ConPTY reader end; the report does not rely on it.
+        drop(writer);
+        drop(pair.master);
+        panic!(
+            "operator prompt missing after {:?}: {}",
+            started.elapsed(),
+            watch.transcript_for_failure(Duration::from_secs(5))
+        );
     }
     writer.write_all(answer.as_bytes()).unwrap();
     writer.flush().unwrap();
@@ -41,11 +54,18 @@ pub(super) fn attended(fixture: &ForceFixture, arguments: &[&str], answer: &str)
     std::thread::spawn(move || {
         let _ = exit_tx.send(child.wait());
     });
-    let status = match exit_rx.recv_timeout(Duration::from_secs(20)) {
+    let answered = Instant::now();
+    let status = match exit_rx.recv_timeout(ATTENDED_WAIT) {
         Ok(status) => status.unwrap(),
         Err(err) => {
             let _ = killer.kill();
-            panic!("attended child did not exit: {err}");
+            drop(writer);
+            drop(pair.master);
+            panic!(
+                "attended child did not exit ({err}) {:?} after the answer: {}",
+                answered.elapsed(),
+                watch.transcript_for_failure(Duration::from_secs(5))
+            );
         }
     };
     drop(writer);

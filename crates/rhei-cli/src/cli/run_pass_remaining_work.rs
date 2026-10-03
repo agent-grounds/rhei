@@ -219,6 +219,21 @@ fn earliest_pending_agent_deadline(
     opts: &RunOptions,
     scope: &RheiScope,
 ) -> Option<u64> {
+    agent_deadline_since(rhei, machines, settings, opts, scope, current_unix_secs() + 1)
+}
+
+/// The earliest agent deadline at or after `since`, even one already passed.
+/// A pass that read its ready set at `since` has not tried a poll that fell
+/// due while it ran, so the pass loop must not halt as if nothing were
+/// pending. §FS-rhei-run.3.6 item 3 §FS-rhei-run.5.1
+fn agent_deadline_since(
+    rhei: &rhei_core::ast::Rhei,
+    machines: &rhei_validator::MachineSet,
+    settings: &RheiSettings,
+    opts: &RunOptions,
+    scope: &RheiScope,
+    since: u64,
+) -> Option<u64> {
     let now = current_unix_secs();
     let mut tasks = Vec::new();
     collect_plan_tasks(&rhei.tasks, &mut tasks);
@@ -244,7 +259,7 @@ fn earliest_pending_agent_deadline(
                 .poll
                 .as_ref()
                 .and_then(|_| poll_next_attempt_at(rhei.metadata.as_ref(), &task.id, &state))
-                .filter(|deadline| *deadline > now);
+                .filter(|deadline| *deadline >= since);
             let provider = if state_def.program.is_some() {
                 None
             } else {

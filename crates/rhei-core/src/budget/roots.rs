@@ -7,6 +7,8 @@
 //! two write the index. §FS-rhei-budgets.5.3 §FS-rhei-budgets.5.4.1
 //! §AR-neural-admission.4
 
+#[cfg(test)]
+use super::index_refusals::IndexAccess;
 use super::types::BudgetError;
 use super::Result;
 use std::collections::BTreeMap;
@@ -157,7 +159,7 @@ pub fn witnessed_root(uuid: &str) -> Result<Option<PathBuf>> {
 /// §FS-rhei-budgets.5.3
 pub(crate) fn witnessed_roots() -> Result<BTreeMap<PathBuf, String>> {
     let path = roots_index_path()?;
-    match std::fs::read(&path) {
+    match read_index(&path) {
         Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(BTreeMap::new()),
         Err(error) => Err(BudgetError::unreachable(&path, &error)),
@@ -188,6 +190,26 @@ fn write_roots(index: &BTreeMap<PathBuf, String>) -> Result<()> {
     let pending = path.with_extension(format!("{}.pending", uuid::Uuid::new_v4()));
     std::fs::write(&pending, serde_json::to_vec_pretty(index)?)
         .map_err(|error| BudgetError::unreachable(&pending, &error))?;
-    std::fs::rename(&pending, &path).map_err(|error| BudgetError::unreachable(&path, &error))?;
+    replace_index(&pending, &path).map_err(|error| BudgetError::unreachable(&path, &error))?;
     Ok(())
+}
+
+/// One read of the index by its pathname: the access another process's open
+/// handle can refuse. §AR-agent-orchestrator-workflow.3.3.1.1.1
+fn read_index(path: &Path) -> std::io::Result<Vec<u8>> {
+    #[cfg(test)]
+    if let Some(error) = super::index_refusals::take_index_refusal(IndexAccess::Read) {
+        return Err(error);
+    }
+    std::fs::read(path)
+}
+
+/// One rename of the staged pending file over the index: the replacement
+/// another process's open handle can refuse. §AR-agent-orchestrator-workflow.3.3.1.1.1
+fn replace_index(pending: &Path, path: &Path) -> std::io::Result<()> {
+    #[cfg(test)]
+    if let Some(error) = super::index_refusals::take_index_refusal(IndexAccess::Replace) {
+        return Err(error);
+    }
+    std::fs::rename(pending, path)
 }

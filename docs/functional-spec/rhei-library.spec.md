@@ -760,6 +760,36 @@ it:
 
 `--state-machine` keeps its meaning everywhere else.
 
+### 7.4. A collection the target writes in flow style is refused, not extended
+
+A union adds to the target's `states.yaml` by inserting lines at the end of a
+collection ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project)). A collection written in flow style — `{ … }` or
+`[ … ]` on its key's own line — has no end to insert a line at: an entry can
+only join it by rewriting that line, which breaks the added-lines-only diff
+[§FS-rhei-library.7.1](rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-provenance) promises. So when the union has something to add to a
+collection the target writes in flow style — `states`, `transitions`,
+`profiles`, `models`, `node_policy`, or `node_policy.by_type` — `--into`
+**refuses**, with or without `--dry-run`, before it writes anything and before
+it validates the result. The message:
+
+- names the target's own `states.yaml`, as the user would open it, and never a
+  scratch copy the union validates in;
+- names the collection by its dotted key, such as `node_policy.by_type`;
+- says the remedy: write that collection in block style, one entry per line.
+
+The target is byte-identical afterwards. The refusal is about the collection
+the union extends and nothing else:
+
+- flow-style **entries** inside a block collection — a one-line state, a
+  `{ from: …, to: … }` transition, `allowed: [ … ]` in a profile — are accepted
+  as they are, because the union inserts beside them and never into them;
+- a flow collection the union adds nothing to — every route the template
+  brings is already in a flow `by_type`, say — is not refused, because nothing
+  is written into it.
+
+YAML the union generated is never reported as a syntax error in the user's
+file.
+
 ## 8. Related specifications
 
 - [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification)

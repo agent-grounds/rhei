@@ -3,10 +3,13 @@
 //! so this exact detached-run scenario is Unix-only; the program fixture and
 //! execution-mode rule remain platform-neutral.
 
-// §FS-rhei-run.3 §FS-rhei-run.5.1 §FS-rhei-states.2.4 §FS-rhei-programs.3.2
+// §FS-rhei-run.3.5 §FS-rhei-run.5.1 §FS-rhei-states.2.4 §FS-rhei-programs.3.2
 // §REQ-cross-platform.4
 
 #![cfg(unix)]
+
+#[path = "poll_resume_observation_tests.rs"]
+mod observation_tests;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -148,8 +151,15 @@ sys.exit(75)
     }
 
     fn snapshot(&self) -> PollSnapshot {
+        self.snapshot_with_gap(|| {})
+    }
+
+    // Test-only descheduling seam between the independent file reads.
+    // §FS-rhei-run.3.5
+    fn snapshot_with_gap(&self, gap: impl FnOnce()) -> PollSnapshot {
         let plan_text = fs::read_to_string(&self.plan).expect("read member plan");
         let parsed = rhei_core::parse(&plan_text).expect("parse member plan");
+        gap();
         PollSnapshot {
             attempts: fs::read_to_string(self.project.join("runtime/program-attempts.txt"))
                 .unwrap_or_default()
@@ -204,9 +214,13 @@ fn wait_for(what: &str, mut condition: impl FnMut() -> bool) {
 /// Restarting during a persisted backoff must preserve the deadline, then run
 /// the next real program attempt and route from its exit instead of inventing
 /// an exit-zero completion.
-/// §FS-rhei-run.3
+/// §FS-rhei-run.3.5
 #[test]
 fn a_resumed_program_poll_waits_then_spawns_its_next_attempt() {
+    resumed_poll_scenario(|workspace, _| workspace.snapshot());
+}
+
+fn resumed_poll_scenario(observe: impl Fn(&PollWorkspace, u64) -> PollSnapshot) {
     let workspace = PollWorkspace::new();
     let first_id = workspace.launch();
     wait_for("attempt 1 and its persisted future deadline", || {
@@ -235,12 +249,13 @@ fn a_resumed_program_poll_waits_then_spawns_its_next_attempt() {
         unix_secs() < first_deadline,
         "the resumed run must start before the persisted deadline: {first:#?}"
     );
-    while unix_secs() < first_deadline {
-        let before_deadline = workspace.snapshot();
-        assert_eq!(
-            before_deadline.attempts, 1,
-            "the persisted deadline must still prevent an early spawn: {before_deadline:#?}"
-        );
+    loop {
+        let checked_at = unix_secs();
+        if checked_at >= first_deadline {
+            break;
+        }
+        let before_deadline = observe(&workspace, first_deadline);
+        assert_retry_not_early(&workspace, first_deadline, checked_at, &before_deadline);
         std::thread::sleep(Duration::from_millis(25));
     }
 
@@ -252,6 +267,7 @@ fn a_resumed_program_poll_waits_then_spawns_its_next_attempt() {
                 && observed.deadline.is_some_and(|deadline| deadline > first_deadline))
     });
     let resumed = workspace.snapshot();
+    assert_retry_not_early(&workspace, first_deadline, unix_secs(), &resumed);
     workspace.stop_quietly();
 
     assert!(
@@ -266,4 +282,20 @@ fn a_resumed_program_poll_waits_then_spawns_its_next_attempt() {
          resumed snapshot: {resumed:#?}\nrelevant resumed-run log:\n{}",
         resumed.run_log
     );
+}
+
+// The current count-based oracle is deliberately retained for the red
+// regressions; implement repairs this shared seam. §FS-rhei-run.3.5
+fn assert_retry_not_early(
+    _workspace: &PollWorkspace,
+    first_deadline: u64,
+    checked_at: u64,
+    observed: &PollSnapshot,
+) {
+    if checked_at < first_deadline {
+        assert_eq!(
+            observed.attempts, 1,
+            "the persisted deadline must still prevent an early spawn: {observed:#?}"
+        );
+    }
 }

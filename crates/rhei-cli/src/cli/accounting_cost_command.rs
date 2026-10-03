@@ -21,8 +21,9 @@ fn cost_command(options: CostCommandOptions<'_>) -> MietteResult<()> {
     if let Some(task_id) = options.task {
         refuse_task_outside_scope(&loaded, task_id, &scope)?;
     }
-    let roots = accounting_roots(&loaded, &execution_workspace_root(&input_buf), &scope);
-    let inspection = read_cost_inspection_over(&roots, &scope);
+    let run_root = execution_workspace_root(&input_buf);
+    let roots = accounting_roots(&loaded, &run_root, &scope);
+    let inspection = read_cost_inspection_beside(&roots, &scope, Some(&run_root));
     let selected = inspection.select(&selection);
 
     if options.json {

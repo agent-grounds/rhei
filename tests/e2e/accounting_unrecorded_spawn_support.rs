@@ -209,7 +209,7 @@ impl SpawnWorkspace {
     }
 }
 
-fn json_files(dir: &Path) -> Vec<serde_json::Value> {
+pub fn json_files(dir: &Path) -> Vec<serde_json::Value> {
     let Ok(entries) = fs::read_dir(dir) else { return Vec::new() };
     let mut paths = entries
         .filter_map(Result::ok)
@@ -231,7 +231,40 @@ fn json_files(dir: &Path) -> Vec<serde_json::Value> {
 pub fn spawn_workspace(prefix: &str, plan: &str, machine: &str) -> SpawnWorkspace {
     let dir = unique_temp_dir(prefix);
     let root = dir.to_path_buf();
-    let agent = write_python_agent(&dir, "fake-codex.py", CODEX_USAGE_AGENT);
+    write_profiles(&root);
+    let plan_path = root.join("plan.rhei.md");
+    fs::write(&plan_path, plan).expect("write plan");
+    let machine_path = root.join("states.yaml");
+    fs::write(&machine_path, machine).expect("write machine");
+    SpawnWorkspace { _dir: dir, root, plan: plan_path, machine: machine_path }
+}
+
+/// A Panta project holding one member rhei, `billing`, whose two tickets run
+/// on `priced`. `plan` is the member, so every reading through it is narrowed
+/// to the member; `root` is the project, the run root, where `rhei run` writes
+/// every agent spawn record. §FS-rhei-panta.6.5 §FS-rhei-cost-accounting.6.2.1
+pub fn member_workspace(prefix: &str) -> SpawnWorkspace {
+    let dir = unique_temp_dir(prefix);
+    let root = dir.to_path_buf();
+    write_profiles(&root);
+    fs::write(root.join("index.panta.md"), "# Panta: Billing\n").expect("write project");
+    let member = root.join("billing");
+    fs::create_dir_all(member.join("tasks")).expect("create member tasks");
+    fs::write(member.join("index.rhei.md"), "# Rhei: Billing\n").expect("write member");
+    fs::write(
+        member.join("tasks/work.md"),
+        "### Task 1: First ticket\n**State:** work\n\n### Task 2: Second ticket\n**State:** work\n",
+    )
+    .expect("write member tasks");
+    let machine_path = root.join("states.yaml");
+    fs::write(&machine_path, LOSTWRITE_MACHINE).expect("write machine");
+    SpawnWorkspace { _dir: dir, root, plan: member, machine: machine_path }
+}
+
+/// The two profiles, `cdx` with no family and `priced` with `family: codex`,
+/// over the same fake Codex, in `root`'s settings.
+fn write_profiles(root: &Path) {
+    let agent = write_python_agent(root, "fake-codex.py", CODEX_USAGE_AGENT);
     let command: serde_json::Value =
         serde_json::from_str(&fixture_command(&agent)).expect("fixture command is JSON");
     let profile = |family: Option<&str>| {
@@ -253,12 +286,6 @@ pub fn spawn_workspace(prefix: &str, plan: &str, machine: &str) -> SpawnWorkspac
         "agents": { "cdx": profile(None), "priced": profile(Some("codex")) }
     });
     fs::write(settings_dir.join("settings.json"), settings.to_string()).expect("write settings");
-
-    let plan_path = root.join("plan.rhei.md");
-    fs::write(&plan_path, plan).expect("write plan");
-    let machine_path = root.join("states.yaml");
-    fs::write(&machine_path, machine).expect("write machine");
-    SpawnWorkspace { _dir: dir, root, plan: plan_path, machine: machine_path }
 }
 
 /// The control: a program step before every agent step.

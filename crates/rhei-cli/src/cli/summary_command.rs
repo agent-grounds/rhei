@@ -116,7 +116,7 @@ fn summary_command(
     let resolved = resolve_summary_machine(&input_buf, &loaded, state_machine, &scope)?;
     let run_root = execution_workspace_root(&input_buf);
     let roots = accounting_roots(&loaded, &run_root, &scope);
-    let inspection = read_cost_inspection_over(&roots, &scope);
+    let inspection = read_cost_inspection_beside(&roots, &scope, Some(&run_root));
     let inspection = match alternate.as_ref() {
         Some((run_id, book)) => select_completed_run_for_summary(
             &loaded,

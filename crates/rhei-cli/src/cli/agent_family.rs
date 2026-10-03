@@ -137,7 +137,37 @@ fn warn_unknown_agent_profile_keys(id: &str, raw: &serde_json::Value) {
     }
 }
 
+/// Warn once per profile that a user entry which declares no `family`, under
+/// an id that is not a built-in, binds no extractor: every invocation is
+/// charged the spend reserve as unmeasurable. A warning, not a refusal, for
+/// the reason an unknown key is one — the profile loads and runs today.
+/// A declared family, even an unmeasured one, and a built-in id stay quiet.
+/// It is said once settings have loaded, so an error stays the only thing on
+/// stderr, and never over a completion's candidate list.
+/// §FS-rhei-agents.1.1.2 §FS-rhei-agents.1.1.7 §FS-rhei-templates.1.3
+fn warn_unmeasured_agent_profiles(agents: &BTreeMap<String, CustomAgentProfile>) {
+    if serving_shell_completion() {
+        return;
+    }
+    for (id, profile) in agents {
+        if profile.family.is_some()
+            || BUILT_IN_AGENT_FAMILIES.contains(&id.as_str())
+            || !claim_unknown_agent_key_warning(id, "family")
+        {
+            continue;
+        }
+        let measured = MEASURED_AGENT_FAMILIES.map(|(family, _)| family).join(", ");
+        eprintln!(
+            "warning: agents.{id} declares no family, and '{id}' is not a built-in agent, so its \
+             invocations are not measured: each is charged the spend reserve as unmeasurable. \
+             Declare \"family\" to measure it; the measured families are {measured}."
+        );
+    }
+}
+
 /// Settings are merged many times in one process; the operator is told once.
+/// The key `family` names the no-family warning, which a declared key never
+/// claims because `family` is a field.
 fn claim_unknown_agent_key_warning(id: &str, key: &str) -> bool {
     static SEEN: std::sync::OnceLock<Mutex<BTreeSet<String>>> = std::sync::OnceLock::new();
     SEEN.get_or_init(|| Mutex::new(BTreeSet::new()))

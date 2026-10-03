@@ -204,7 +204,12 @@ fn show_json_reports_the_damaged_account_as_a_machine_readable_error() {
         stdout(&result)
     );
     let line = raw_stderr(&result);
-    let lines: Vec<&str> = line.lines().filter(|line| !line.trim().is_empty()).collect();
+    // The fixture's `mock` declares no family, so its warning precedes the
+    // error on stderr. §FS-rhei-agents.1.1.2
+    let lines: Vec<&str> = line
+        .lines()
+        .filter(|line| !line.trim().is_empty() && !line.contains("declares no family"))
+        .collect();
     assert_eq!(lines.len(), 1, "the error object is one line on stderr; got:\n{line}");
     let parsed: serde_json::Value = serde_json::from_str(lines[0])
         .unwrap_or_else(|error| panic!("stderr should parse as JSON ({error}):\n{line}"));

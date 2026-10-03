@@ -51,7 +51,14 @@ fn the_first_hand_applied_edge_establishes_the_absent_account_and_spends_a_unit(
         first.stdout, "Task plan.1 transitioned: 'work' \u{2192} 'review'\n",
         "the establishing edge's stdout is the move's own line and nothing else"
     );
-    assert_eq!(first.stderr, "", "and its stderr is empty: nothing is printed, nothing warned");
+    // The one line is the fixture's own: `mock` declares no family, so it runs
+    // unmeasured and is told so. §FS-rhei-agents.1.1.2
+    assert!(
+        first.stderr.lines().count() == 1
+            && first.stderr.starts_with("warning: agents.mock declares no family"),
+        "and its stderr says nothing of the budget: nothing is printed, nothing warned\n{}",
+        first.stderr
+    );
 
     let account = account_directory(&dir);
     assert!(

@@ -541,15 +541,19 @@ fn agent_has_accounting_extractor(family: &str) -> bool {
     agent_usage_extractor(family).is_some()
 }
 
+/// The families that bind an extractor, in the order a diagnostic lists them.
+/// The no-family warning names this list, so it cannot drift from what is
+/// measured. §FS-rhei-cost-accounting.4 §FS-rhei-agents.1.1.2
+const MEASURED_AGENT_FAMILIES: [(&str, AgentUsageExtractor); 3] = [
+    ("claude-code", AgentUsageExtractor::Claude),
+    ("codex", AgentUsageExtractor::Codex),
+    ("pi", AgentUsageExtractor::Pi),
+];
+
 /// The extractor a resolved family binds, which for a built-in profile is the
 /// one its own id has always bound. §FS-rhei-cost-accounting.4
 fn agent_usage_extractor(family: &str) -> Option<AgentUsageExtractor> {
-    match family {
-        "codex" => Some(AgentUsageExtractor::Codex),
-        "pi" => Some(AgentUsageExtractor::Pi),
-        "claude-code" => Some(AgentUsageExtractor::Claude),
-        _ => None,
-    }
+    MEASURED_AGENT_FAMILIES.iter().find(|(name, _)| *name == family).map(|(_, extractor)| *extractor)
 }
 
 fn accounting_capture_path_for_spawn(

@@ -88,10 +88,12 @@ impl SpawnRecord {
     /// How the previous attempt ended, as the retry note and the retried
     /// prompt both say it.
     ///
-    /// Exit `0` is the one ending that has to be inferred rather than read: the
-    /// scheduler re-spawns an invocation only when its completion condition is
-    /// still unmet, so an attempt that exited cleanly and is being retried is an
-    /// attempt whose artifacts never answered for it.
+    /// Read from the record, never inferred: the `ending` decides before the
+    /// `code`, so a provider-limited record reads as one whatever its code, and
+    /// a record with no `code` was ended rather than exited and is never
+    /// `exited 0`. Whether the completion condition was met is not the
+    /// record's to say — an attempt that wrote everything is re-spawned too —
+    /// so the sentence says nothing about it (§FS-rhei-agents.3.2.1).
     // §FS-rhei-agents.3.2 §FS-rhei-agents.3.2.1
     fn ending_sentence(&self) -> String {
         match (self.ending.as_str(), self.code) {
@@ -102,12 +104,18 @@ impl SpawnRecord {
                  edge because the visit released nothing"
                     .to_string()
             }
-            (_, Some(0)) | (_, None) => {
-                "exited 0 without meeting this state's completion condition".to_string()
-            }
             ("provider_limited", _) => "was provider-limited".to_string(),
+            (_, None) => "ended without an exit code (a signal ended it)".to_string(),
             (_, Some(code)) => format!("exited {code}"),
         }
+    }
+
+    /// Whether the attempt exited `0` on its own: the one ending after which
+    /// a retry may say the completion condition went unmet, when the owed
+    /// clause beside it names what is unmet (§FS-rhei-memory.4.4).
+    // §FS-rhei-memory.4.4
+    fn exited_zero(&self) -> bool {
+        self.ending == "exited" && self.code == Some(0)
     }
 }
 

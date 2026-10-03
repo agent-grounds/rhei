@@ -134,6 +134,75 @@ fn accounting_capture_env_is_declared_before_spawn() {
     );
 }
 
+/// The capture pair belongs to one invocation, so an agent command never
+/// inherits it: an agent with no extractor spawns with both names removed, and
+/// one with an extractor gets its own path. §FS-rhei-agents.4 §FS-rhei-cost-accounting.4
+#[test]
+fn agent_command_carries_only_its_own_accounting_capture_pair() {
+    let resolved = ResolvedAgent {
+        agent: AgentConfig::from("custom-wrapper"),
+        profile: CustomAgentProfile {
+            command: vec!["custom-wrapper".to_string()],
+            ..Default::default()
+        },
+        mode: None,
+        target: None,
+        model: None,
+        model_provider: None,
+        model_name: None,
+        timeout_secs: Some(60),
+        autonomous_args: Vec::new(),
+    };
+    let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+    let runtime_dir = tempfile::tempdir().expect("tmpdir");
+    let build = |capture_path: Option<&std::path::Path>| {
+        let mut command = build_agent_command(
+            &resolved,
+            "do work",
+            std::path::Path::new("/checkout"),
+            None,
+            None,
+            "nested.1",
+            "work",
+            1,
+            1,
+            &tooling,
+            runtime_dir.path(),
+            &[],
+        );
+        configure_accounting_capture(&mut command, capture_path);
+        command
+            .get_envs()
+            .map(|(key, value)| {
+                (
+                    key.to_string_lossy().into_owned(),
+                    value.map(|value| value.to_string_lossy().into_owned()),
+                )
+            })
+            .collect::<std::collections::BTreeMap<String, Option<String>>>()
+    };
+
+    let without_extractor = build(None);
+    for name in ["RHEI_ACCOUNTING_USAGE_PATH", "RHEI_ACCOUNTING_USAGE_SCHEMA"] {
+        assert_eq!(
+            without_extractor.get(name),
+            Some(&None),
+            "{name} must be removed for an agent with no extractor"
+        );
+    }
+
+    let own = std::path::PathBuf::from("/runtime/accounting/captures/nested.1-work.jsonl");
+    let with_extractor = build(Some(&own));
+    assert_eq!(
+        with_extractor.get("RHEI_ACCOUNTING_USAGE_PATH"),
+        Some(&Some(own.display().to_string()))
+    );
+    assert_eq!(
+        with_extractor.get("RHEI_ACCOUNTING_USAGE_SCHEMA"),
+        Some(&Some(ACCOUNTING_USAGE_EVENT_SCHEMA.to_string()))
+    );
+}
+
 #[test]
 fn accounting_extractor_ignores_arbitrary_json_without_schema() {
     let dir = tempfile::tempdir().expect("tempdir");

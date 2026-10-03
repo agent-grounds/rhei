@@ -104,15 +104,14 @@ with its own duration
 ```
 <!-- /rhei:task-tree sibling -->
 
-The root-state run has one row, the ticket's, and the claim is one of the two
-invocations its `agent×2` counts: the label counts them all and names only the
-driver of the last, the ticket's own agent, so the claim's program has no row
+The root-state run has one row, the ticket's, where `agent+program` names the
+ticket's own agent and the claim's program, once each. The claim has no row
 and no duration of its own:
 
 <!-- rhei:task-tree root-state -->
 ```text
    3 tasks · source order
-  ✓ root-state.1               completed   agent×2  <t> — 2 subtasks: 2 completed
+  ✓ root-state.1               completed   agent+program  <t> — 2 subtasks: 2 completed
 ```
 <!-- /rhei:task-tree root-state -->
 

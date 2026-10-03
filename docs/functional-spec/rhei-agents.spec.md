@@ -1417,20 +1417,34 @@ Under `orchestrator` authority, `rhei run`:
      The engine never prints its internal "no budget applies" sentinel as a
      count. `{ending}` is read from that attempt's spawn record (§8.4) and says
      what actually happened to it — `timed out after 30m`, `was interrupted by
-     a run shutdown`, `exited 3`, or `exited 0 without meeting this state's
-     completion condition`. The engine never reports one ending as another: a
-     run that was Ctrl-C'd and a state that stalled on its outputs are
-     different facts and a retry says which it is retrying.
+     a run shutdown`, `was provider-limited`, `exited 3`, `exited 0`, or `ended
+     without an exit code (a signal ended it)`. The record's `ending` decides
+     before its `code` does, so a `provider_limited` record reads `was
+     provider-limited` whatever its code. A record whose `code` is absent is the
+     one sentence the code cannot supply: the subprocess did not exit, it was
+     ended — on Unix by a signal — and it is never described as `exited 0`.
+     `{ending}` says how the attempt ended and nothing more. It never adds
+     `without meeting this state's completion condition`: an attempt that
+     exited `0` with every artifact on disk is re-spawned too, when no
+     transition matched or the ending was not successful work, and the line
+     cannot back that claim from the record. The engine never reports one
+     ending as another: a run that was Ctrl-C'd, an agent the kernel killed and
+     a state that stalled on its outputs are different facts and a retry says
+     which it is retrying.
    - A retry is only worth spawning if it can do better than the attempt before
      it, so a re-spawned invocation is told it is one. Its prompt names the
-     attempt number, how the previous attempt ended, and **every required
+     attempt number, how the previous attempt ended — the same `{ending}` as the
+     line above — and **every required
      artifact of this invocation still unwritten** when the prompt is composed —
      each by the same `<name> (<path>)` entry as the warning above, the ticket's
      result among them under the name `result`
      ([§FS-rhei-memory.4.4](rhei-memory.spec.md#44-previous-visits)). Without that the retry receives a
      byte-identical prompt and repeats the attempt it is meant to recover from.
      Where nothing is unmet the prompt names no file: the retry is told that it
-     is a retry and nothing more. This warning and that prompt are two readings
+     is a retry and nothing more. It says the completion condition was not met
+     only where that list names something, so a retry is never told the
+     condition went unmet without being told what is unmet
+     (§FS-rhei-memory.4.4). This warning and that prompt are two readings
      of one list, and the prompt is the one a paid attempt reads, so it may not
      name a file the warning did not.
    - The retry is bounded, per state visit, by the **attempt budget** of §3.2.3.

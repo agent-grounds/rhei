@@ -523,7 +523,10 @@ thing an operator can answer, and the answer here has to keep working.
 What bounds the re-spawning instead is the rule that bounds every stalled
 ticket: the empty visit puts `P` out of this run's running
 ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 5), and the run picks it up again only after something
-else advanced. A subtree that cannot move produces no such advance, so a run
+else advanced after the hold ([§FS-rhei-run.3.6](rhei-run.spec.md#36-stall-release)). The move that woke `P` is
+part of the world the visit already judged, a poll rescheduling itself moves
+nothing, and a run that sleeps until a deadline has moved nothing by sleeping,
+so none of the three counts. A subtree that cannot move produces no such advance, so a run
 that has nothing else to do visits `P` exactly once and halts. The invariant of
 §3.1 holds: within one run, `P` is re-visited only when the world it supervises
 changed.

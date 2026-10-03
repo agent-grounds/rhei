@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 from typing import Iterable, Sequence
 
-__version__ = "0.6.0"
-_CRATE_VERSION = "0.6.0"
+__version__ = "0.6.1-dev"
+_CRATE_VERSION = "0.6.1-dev"
 
 
 def _install_root() -> Path:

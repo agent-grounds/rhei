@@ -970,7 +970,14 @@ and then ends the way `rhei run` would on the same state:
 Nothing to schedule. Why each remaining ticket is not moving:
   Task auth.1 (pending): claimed by alice — `rhei release auth.1` to hand it back, …
   Task auth.2 (pending): waiting on Task auth.1 (pending) — finish the prior first
+  Task auth.4 (review): waiting on Task auth.3 (cancelled), a cancelled prior that can never satisfy it — re-point `**Prior:**` (and any `**Consumes:**` naming it) at a completed step, or cancel Task auth.4
 ```
+
+"Finish the prior first" is said only of a prior that can still finish. A
+prior in a cancellation state ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)) never will, so its line says
+so and names the remedies that exist instead, exactly as the run report's
+Attention row does ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)); a ticket blocked by both names
+the cancelled prior.
 
 A ticket the scheduler skips is invisible to the transition scan: it produces
 no `would transition:` line and no `manual-only:` line. Without this report a

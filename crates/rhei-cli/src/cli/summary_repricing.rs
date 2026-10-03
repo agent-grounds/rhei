@@ -96,14 +96,18 @@ fn select_completed_run_for_summary(
         }
     }
 
-    // Reuse the ordinary Run-axis selection so unattributed records and an
-    // unreadable root demote coverage exactly as they do for `rhei cost`.
-    // §FS-rhei-cost-accounting.6.1 §FS-rhei-cost-accounting.6.2
+    // The ordinary Run-axis selection, so unattributed records, an unreadable root and
+    // unrecorded spawns demote coverage as in `rhei cost`. §FS-rhei-cost-accounting.6.1
+    // §FS-rhei-cost-accounting.6.2 §FS-rhei-cost-accounting.6.2.1
     let summary = {
-        let selection = CostSelection::resolve(Some(run_id), None, None)?
-            .apply(inspection.scoped(), inspection.unreadable_root);
-        summarize_records_with_price_book(selection.records.iter().copied(), price_book)
-            .map(|summary| demote_if(summary, selection.is_uncertain()))
+        let selection = CostSelection::resolve(Some(run_id), None, None)?;
+        let selected = inspection.select(&selection);
+        summarize_records_with_price_book(selected.records.iter().copied(), price_book).map(
+            |summary| {
+                let summary = demote_if(summary, selected.is_uncertain());
+                count_unrecorded(summary, selected.unrecorded.len())
+            },
+        )
     };
 
     inspection

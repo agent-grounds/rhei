@@ -109,15 +109,17 @@ impl CostSelection {
             && self.until.as_ref().is_none_or(|until| secs < until.secs)
     }
 
-    /// Apply the selection to every record the reading holds.
+    /// Apply the selection to every record the reading holds, and to the agent
+    /// spawns none of them answers for.
     ///
     /// `roots_unreadable` says that one of the accounting roots existed and
     /// could not be read, so nothing computed here may claim `complete`.
-    // §FS-rhei-cost-accounting.6.2
+    // §FS-rhei-cost-accounting.6.2 §FS-rhei-cost-accounting.6.2.1
     pub(crate) fn apply<'a>(
         &self,
         records: impl IntoIterator<Item = ScopedRecord<'a>>,
         roots_unreadable: bool,
+        spawns: &'a [UnrecordedSpawn],
     ) -> CostSelectionResult<'a> {
         // The window comes first: it decides the *scope* the run filter is then
         // applied to, and it is also the scope run attribution is reported
@@ -135,6 +137,22 @@ impl CostSelection {
                 // Unplaceable, so counted rather than dropped: it demotes the
                 // window's coverage instead. §FS-rhei-cost-accounting.6.2
                 None => undated += 1,
+            }
+        }
+
+        // A spawn names no run, so every run selection keeps it and only the
+        // window places it; one it cannot place is a doubt. §FS-rhei-cost-accounting.6.2.1
+        let mut unrecorded = Vec::new();
+        let mut spawn_undated = false;
+        for spawn in spawns {
+            if !self.selects_window() {
+                unrecorded.push(spawn);
+                continue;
+            }
+            match spawn.started_secs() {
+                Some(secs) if self.window_contains(secs) => unrecorded.push(spawn),
+                Some(_) => {}
+                None => spawn_undated = true,
             }
         }
 
@@ -159,8 +177,9 @@ impl CostSelection {
             // exactly the records it got, so it carries ordinary coverage like
             // any other group. §FS-rhei-cost-accounting.6.2
             selects_named_run: matches!(self.run, Some(RunSelector::Named(_))),
-            window_uncertain: undated > 0,
+            window_uncertain: undated > 0 || spawn_undated,
             undated,
+            unrecorded,
         }
     }
 }
@@ -188,6 +207,9 @@ pub(crate) struct CostSelectionResult<'a> {
     window_uncertain: bool,
     /// How many records the window could not place.
     pub(crate) undated: u64,
+    /// The agent spawns in this selection that no record answers for.
+    /// §FS-rhei-cost-accounting.6.2.1
+    pub(crate) unrecorded: Vec<&'a UnrecordedSpawn>,
 }
 
 impl CostSelectionResult<'_> {
@@ -203,15 +225,34 @@ impl CostSelectionResult<'_> {
             || (self.selects_named_run && self.has_unattributed())
     }
 
-    /// The rollup over the selection, with §6.2's demotion applied.
+    /// The rollup over the selection, with §6.2's demotion applied and its
+    /// unrecorded spawns counted. §FS-rhei-cost-accounting.6.2.1
     pub(crate) fn summary(&self) -> Option<rhei_tui::AccountingRunSummary> {
         let summary = summarize_records(self.records.iter().copied())?;
-        Some(demote_if(summary, self.is_uncertain()))
+        Some(count_unrecorded(demote_if(summary, self.is_uncertain()), self.unrecorded.len()))
     }
 
-    /// The rollup over the records that name no run.
+    /// The rollup over the records that name no run, beside which every
+    /// unrecorded spawn stands, because it names none either.
+    /// §FS-rhei-cost-accounting.6.2.1
     pub(crate) fn unattributed_summary(&self) -> Option<rhei_tui::AccountingRunSummary> {
         summarize_records(self.unattributed.iter().copied())
+            .map(|summary| count_unrecorded(summary, self.unrecorded.len()))
+    }
+
+    /// How many unrecorded spawns the plan-tree axis places at a node, or in
+    /// its subtree. §FS-rhei-cost-accounting.6.2.1
+    pub(crate) fn unrecorded_at(&self, task_id: &str, subtree: bool) -> usize {
+        self.unrecorded
+            .iter()
+            .filter(|spawn| {
+                if subtree {
+                    spawn.in_subtree(task_id)
+                } else {
+                    spawn.task == task_id
+                }
+            })
+            .count()
     }
 
     /// Whether one group of the selection may report `complete`.
@@ -225,15 +266,19 @@ impl CostSelectionResult<'_> {
             || (matches!(by, CostGroup::Run) && !group_is_unattributed && self.has_unattributed())
     }
 
-    /// One group's rollup, with the same demotion rule applied to it.
+    /// One group's rollup, with the same demotion rule applied to it and the
+    /// unrecorded spawns its key places in it counted.
+    /// §FS-rhei-cost-accounting.6.2.1
     pub(crate) fn group_summary(
         &self,
         by: CostGroup,
-        group_is_unattributed: bool,
+        key: &CostGroupKey,
         records: &[ScopedRecord<'_>],
     ) -> Option<rhei_tui::AccountingRunSummary> {
         let summary = summarize_records(records.iter().copied())?;
-        Some(demote_if(summary, self.group_is_uncertain(by, group_is_unattributed)))
+        let summary = demote_if(summary, self.group_is_uncertain(by, key.unattributed));
+        let placed = self.unrecorded.iter().filter(|spawn| spawn.in_group(by, &key.key)).count();
+        Some(count_unrecorded(summary, placed))
     }
 }
 

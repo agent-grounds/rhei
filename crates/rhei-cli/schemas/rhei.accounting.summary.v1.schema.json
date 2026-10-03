@@ -56,7 +56,8 @@
         "pricing_status": { "enum": ["priced", "partial-price", "unpriced", "not-applicable"] },
         "invocation_count": { "type": "integer", "minimum": 0 },
         "measured_invocation_count": { "type": "integer", "minimum": 0 },
-        "missing_invocation_count": { "type": "integer", "minimum": 0 }
+        "missing_invocation_count": { "type": "integer", "minimum": 0 },
+        "unrecorded_agent_invocation_count": { "type": "integer", "minimum": 0 }
       }
     }
   }

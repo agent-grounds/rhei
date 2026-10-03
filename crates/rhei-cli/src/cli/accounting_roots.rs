@@ -161,6 +161,9 @@ struct CostInspection {
     /// was asked for and no aggregate over it reports `complete`.
     // §FS-rhei-cost-accounting.6.2
     unreadable_root: bool,
+    /// The agent spawns under these roots that no record answers for, in
+    /// `started` order. §FS-rhei-cost-accounting.6.2.1
+    unrecorded: Vec<UnrecordedSpawn>,
 }
 
 impl CostInspection {
@@ -169,6 +172,13 @@ impl CostInspection {
         self.invocations
             .iter()
             .map(|held| ScopedRecord { record: &held.record, books: &self.roots[held.root].books })
+    }
+
+    /// Apply a selection to this reading: its records, and the agent spawns
+    /// none of them answers for. Every aggregate is drawn from here.
+    /// §FS-rhei-cost-accounting.6.2 §FS-rhei-cost-accounting.6.2.1
+    fn select(&self, selection: &CostSelection) -> CostSelectionResult<'_> {
+        selection.apply(self.scoped(), self.unreadable_root, &self.unrecorded)
     }
 
     /// The books of the root one held record was read from.
@@ -204,6 +214,7 @@ impl CostInspection {
             errors: Vec::new(),
             identity_conflicts: Vec::new(),
             unreadable_root: false,
+            unrecorded: Vec::new(),
         }
     }
 }
@@ -269,10 +280,19 @@ fn same_stored_record(
 /// legacy visit-level id is eligible for inference.
 // §FS-rhei-cost-accounting.3.7
 fn is_attempt_scoped_invocation_id(id: &str) -> bool {
-    let Some((before_attempt, attempt)) = id.rsplit_once("::attempt-") else { return false };
-    let Some((before_move, moves)) = before_attempt.rsplit_once("::move-") else { return false };
-    let Some((_, run_id)) = before_move.rsplit_once("::run-") else { return false };
-    !run_id.is_empty() && moves.parse::<u64>().is_ok() && attempt.parse::<u64>().is_ok()
+    invocation_attempt_identity(id).is_some()
+}
+
+/// The `(moves, attempt)` an attempt-scoped id names, or nothing for a legacy
+/// visit-level id. §FS-rhei-cost-accounting.3.7
+fn invocation_attempt_identity(id: &str) -> Option<(u64, u64)> {
+    let (before_attempt, attempt) = id.rsplit_once("::attempt-")?;
+    let (before_move, moves) = before_attempt.rsplit_once("::move-")?;
+    let (_, run_id) = before_move.rsplit_once("::run-")?;
+    if run_id.is_empty() {
+        return None;
+    }
+    Some((moves.parse().ok()?, attempt.parse().ok()?))
 }
 
 /// Stable facts carried both beside and inside a legacy visit-level id. A
@@ -335,7 +355,8 @@ fn read_cost_inspection_over(roots: &[AccountingRoot], scope: &RheiScope) -> Cos
     let _guards = match rhei_core::root_access::shared_roots(execution_roots) {
         Ok(guards) => guards,
         Err(err) => return CostInspection { summary: None, invocations: Vec::new(), roots: Vec::new(),
-            errors: vec![err.to_string()], identity_conflicts: Vec::new(), unreadable_root: true },
+            errors: vec![err.to_string()], identity_conflicts: Vec::new(), unreadable_root: true,
+            unrecorded: Vec::new() },
     };
     let mut readings: Vec<AccountingRootReading> = Vec::new();
     let mut invocations: Vec<InspectedRecord> = Vec::new();
@@ -343,12 +364,22 @@ fn read_cost_inspection_over(roots: &[AccountingRoot], scope: &RheiScope) -> Cos
     let mut unreadable_root = false;
     let mut seen: HashMap<String, Vec<usize>> = HashMap::new();
     let mut identity_conflicts: Vec<String> = Vec::new();
+    let mut spawns: Vec<SpawnRecordFacts> = Vec::new();
 
     for root in roots {
         let index = readings.len();
         let (records, mut root_errors, unreadable) = read_accounting_root(&root.path);
         errors.append(&mut root_errors);
         unreadable_root |= unreadable;
+        // The spawns beside a root are scoped exactly as its records are.
+        // §FS-rhei-cost-accounting.6.2.1
+        let (root_spawns, mut spawn_errors) = read_agent_spawns(&root.path);
+        errors.append(&mut spawn_errors);
+        spawns.extend(
+            root_spawns
+                .into_iter()
+                .filter(|spawn| !root.shared || task_in_rhei_scope(scope, &spawn.task)),
+        );
         let mut invocation_count = 0u64;
         for (path, record) in records {
             if root.shared && !task_in_rhei_scope(scope, &record.task_id) {
@@ -404,6 +435,7 @@ fn read_cost_inspection_over(roots: &[AccountingRoot], scope: &RheiScope) -> Cos
             .then_with(|| a.record.invocation_id.cmp(&b.record.invocation_id))
     });
 
+    let unrecorded = unrecorded_agent_spawns(spawns, &invocations);
     let inspection = CostInspection {
         summary: None,
         invocations,
@@ -411,9 +443,12 @@ fn read_cost_inspection_over(roots: &[AccountingRoot], scope: &RheiScope) -> Cos
         errors,
         identity_conflicts,
         unreadable_root,
+        unrecorded,
     };
-    let summary = summarize_records(inspection.scoped())
-        .map(|summary| demote_if(summary, inspection.unreadable_root));
+    let summary = summarize_records(inspection.scoped()).map(|summary| {
+        let summary = demote_if(summary, inspection.unreadable_root);
+        count_unrecorded(summary, inspection.unrecorded.len())
+    });
     CostInspection { summary, ..inspection }
 }
 

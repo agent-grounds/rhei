@@ -631,6 +631,18 @@ way out fired a timeout transition on a ticket the shutdown had promised to
 leave alone, and left the run's own report calling the run interrupted while its
 ledger called the ticket timed out.
 
+**A death the shutdown delivered is an interruption.** An invocation that ends
+on its own, without exiting successfully, once the run's shutdown has begun is
+recorded `interrupted` exactly like one the sequence ended: it fires no
+transition and spends no attempt (§FS-rhei-agents.3.2.3). The usual case is an
+agent dead of its own copy of the signal that stopped the run — systemd's
+default `KillMode=control-group`, a container stop, or a `kill` to a whole
+session delivers it to every process at once, so the agent is gone before the
+run reaches it. The same delivery that stops the run must not cost the ticket
+an attempt that `rhei stop` would not. An invocation that exits `0` at that
+instant keeps its real ending, because it finished its work before the shutdown
+could stop it.
+
 **Interruption.** `SIGINT`, `SIGTERM`, and `SIGHUP` delivered to `rhei run`
 interrupt the run. Ctrl+C under the TUI is the same event, because the TUI
 restores the terminal and re-raises `SIGINT` on the process

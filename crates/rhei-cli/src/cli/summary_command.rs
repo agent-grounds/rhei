@@ -199,7 +199,9 @@ fn render_summary_reading(
 }
 
 /// The lead line after the workflow name: invocation count, distinct models,
-/// and the task tally. §FS-rhei-summary.2.1
+/// and the task tally. The count is the known agent invocations, records and
+/// unrecorded spawns alike, and the gap follows the model count, which still
+/// counts the records' models. §FS-rhei-summary.2.1 §FS-rhei-cost-accounting.6.2.1
 fn summary_lead_tail(
     rhei: &rhei_core::ast::Rhei,
     machine: &rhei_validator::StateMachine,
@@ -207,7 +209,13 @@ fn summary_lead_tail(
     scope: &RheiScope,
     selected_run: Option<&str>,
 ) -> String {
-    let invocations = inspection.invocations.len();
+    let unrecorded = inspection.unrecorded.len();
+    let invocations = inspection.invocations.len() + unrecorded;
+    let gap = if unrecorded > 0 {
+        format!(", {unrecorded} of them with no accounting record")
+    } else {
+        String::new()
+    };
     let models: BTreeSet<&str> = inspection
         .invocations
         .iter()
@@ -220,7 +228,7 @@ fn summary_lead_tail(
         summary_task_tally(rhei, machine, scope)
     };
     format!(
-        "{run}{invocations} agent invocation{} across {} model{}; {tally}.",
+        "{run}{invocations} agent invocation{} across {} model{}{gap}; {tally}.",
         plural_s(invocations),
         models.len(),
         plural_s(models.len()),
@@ -297,38 +305,83 @@ fn tally_states<'a>(
     tally
 }
 
-/// One numbered entry per invocation record. The reading sorts the whole union
-/// of its roots, so the numbering is the `started_at` order the spec asks for
-/// however many roots the scope selected. §FS-rhei-summary.2.2
+/// One numbered entry per invocation record, and one per agent spawn no record
+/// answers for, merged in `started` order. The reading sorts the whole union of
+/// its roots, so the numbering is the `started_at` order the spec asks for
+/// however many roots the scope selected.
+/// §FS-rhei-summary.2.2 §FS-rhei-cost-accounting.6.2.1
 fn summary_steps(inspection: &CostInspection) -> String {
     let mut per_task: BTreeMap<&str, usize> = BTreeMap::new();
     for held in &inspection.invocations {
         *per_task.entry(held.record.task_id.as_str()).or_default() += 1;
     }
     let mut out = String::new();
-    for (index, held) in inspection.invocations.iter().enumerate() {
-        let record = &held.record;
+    for (index, step) in summary_step_order(inspection).iter().enumerate() {
+        let (task_id, state) = match step {
+            SummaryStep::Record(held) => (held.record.task_id.as_str(), held.record.state.as_str()),
+            SummaryStep::Unrecorded(spawn) => (spawn.task.as_str(), spawn.state.as_str()),
+        };
         // A repeated visit and a task with several records both need the visit
-        // spelled out; a one-shot step stays clean. §FS-rhei-summary.2.2
-        let sibling_records = per_task.get(record.task_id.as_str()).copied().unwrap_or(0);
-        let repeated = record.visit > 1 || sibling_records > 1;
-        let visit = if repeated { format!(" (visit {})", record.visit) } else { String::new() };
-        out.push_str(&format!(
-            "{}. `{}` {}{visit} — {}",
-            index + 1,
-            record.task_id,
-            record.state,
-            summary_step_actor(record)
-        ));
-        if let Some(duration) = summary_step_duration(record) {
-            out.push_str(&format!(" — {duration}"));
-        }
-        if let Some(tokens) = summary_step_tokens(record, inspection.books_of(held)) {
-            out.push_str(&format!(" — {tokens}"));
+        // spelled out; a one-shot step stays clean. A spawn record carries no
+        // `visit`, so an unrecorded entry has none to spell. §FS-rhei-summary.2.2
+        let sibling_records = per_task.get(task_id).copied().unwrap_or(0);
+        let visit = match step {
+            SummaryStep::Record(held) if held.record.visit > 1 || sibling_records > 1 => {
+                format!(" (visit {})", held.record.visit)
+            }
+            _ => String::new(),
+        };
+        out.push_str(&format!("{}. `{task_id}` {state}{visit}", index + 1));
+        match step {
+            SummaryStep::Record(held) => {
+                let record = &held.record;
+                out.push_str(&format!(" — {}", summary_step_actor(record)));
+                if let Some(duration) = summary_step_duration(record) {
+                    out.push_str(&format!(" — {duration}"));
+                }
+                if let Some(tokens) = summary_step_tokens(record, inspection.books_of(held)) {
+                    out.push_str(&format!(" — {tokens}"));
+                }
+            }
+            SummaryStep::Unrecorded(spawn) => {
+                out.push_str(&format!(" — {}", spawn.worker));
+                if let Some(elapsed) = spawn.elapsed_ms() {
+                    out.push_str(&format!(" — {}", format_duration_short(elapsed)));
+                }
+                out.push_str(" — no accounting record");
+            }
         }
         out.push('\n');
     }
     out
+}
+
+/// The records in the reading's own order, with each unrecorded spawn merged in
+/// ahead of the first record that started after it. Merged rather than sorted
+/// together, so the records keep the order they always had.
+/// §FS-rhei-summary.2.2 §FS-rhei-cost-accounting.6.2.1
+fn summary_step_order(inspection: &CostInspection) -> Vec<SummaryStep<'_>> {
+    let mut spawns = inspection.unrecorded.iter().peekable();
+    let mut steps = Vec::new();
+    for held in &inspection.invocations {
+        if let Some(at) = record_started_at_secs(&held.record) {
+            while let Some(spawn) =
+                spawns.next_if(|spawn| spawn.started_secs().is_some_and(|started| started < at))
+            {
+                steps.push(SummaryStep::Unrecorded(spawn));
+            }
+        }
+        steps.push(SummaryStep::Record(held));
+    }
+    steps.extend(spawns.map(SummaryStep::Unrecorded));
+    steps
+}
+
+/// One numbered entry of the steps list. §FS-rhei-summary.2.2
+enum SummaryStep<'a> {
+    Record(&'a InspectedRecord),
+    /// An agent spawn no record answers for. §FS-rhei-cost-accounting.6.2.1
+    Unrecorded(&'a UnrecordedSpawn),
 }
 
 /// `<agent>, <provider>/<model>`, dropping whatever the record did not carry.
@@ -412,7 +465,8 @@ fn summary_accounting_reading(
     for (label, value) in AccountingTokenPresentation::new(summary).rows() {
         out.push_str(&format!("| {label} | {value} |\n"));
     }
-    out.push_str(&format!("| coverage | {:?} |\n", summary.coverage));
+    // The gap is named after the word it demoted. §FS-rhei-summary.2.3
+    out.push_str(&format!("| coverage | {} |\n", coverage_label(summary)));
     out
 }
 

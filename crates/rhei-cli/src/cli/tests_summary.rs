@@ -75,6 +75,7 @@ fn accounting_presentation_summary_uses_the_symmetric_cache_dimension_rows() {
             invocation_count: 1,
             measured_invocation_count: 1,
             missing_invocation_count: 0,
+            unrecorded_agent_invocation_count: 0,
         }),
         Vec::new(),
     );

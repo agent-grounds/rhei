@@ -197,6 +197,12 @@ pub struct AccountingRunSummary {
     pub invocation_count: u64,
     pub measured_invocation_count: u64,
     pub missing_invocation_count: u64,
+    /// Agent spawns in the selection that no accounting record answers for.
+    /// Counted beside `invocation_count`, which keeps counting records, and
+    /// defaulted so a summary serialized before the field existed still reads.
+    /// §FS-rhei-cost-accounting.6.2.1
+    #[serde(default)]
+    pub unrecorded_agent_invocation_count: u64,
 }
 
 /// Summarize invocation usage records into the shared run/task accounting shape.
@@ -242,6 +248,9 @@ pub fn summarize_usage_summaries<'a>(
         invocation_count: usages.len() as u64,
         measured_invocation_count,
         missing_invocation_count,
+        // Records alone cannot see a spawn that left none; the reading that
+        // holds the spawn records adds them. §FS-rhei-cost-accounting.6.2.1
+        unrecorded_agent_invocation_count: 0,
     })
 }
 

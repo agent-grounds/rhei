@@ -162,6 +162,7 @@ include!("cli/accounting_reading.rs");
 include!("cli/accounting_session.rs");
 include!("cli/accounting_selection.rs");
 include!("cli/accounting_roots.rs");
+include!("cli/accounting_spawns.rs");
 include!("cli/accounting.rs");
 include!("cli/accounting_claude_display.rs");
 include!("cli/accounting_cost_command.rs");

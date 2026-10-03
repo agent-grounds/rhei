@@ -193,3 +193,86 @@ fn an_unknown_profile_key_is_warned_about_and_the_json_still_parses() {
         serde_json::from_str(&roster.stdout).expect("roster JSON still parses");
     assert_eq!(parsed["agents"][WRAPPED_AGENT]["family"], "codex");
 }
+
+/// The warning every settings-loading command prints, once, for a custom
+/// profile that declares no family. §FS-rhei-agents.1.1.2
+const NO_FAMILY_WARNING: &str = "warning: agents.cld declares no family";
+
+/// The issue's reproducer, `absent` against `declared`: a custom profile with
+/// no `family` runs unmeasured and is charged the reserve, so `validate`,
+/// `roster` and `run` each say so once, naming the agent and the fix. The same
+/// profile declaring `"family": "codex"` is measured, and nothing warns.
+// §FS-rhei-agents.1.1.2 §FS-rhei-budgets.6.2
+#[test]
+fn a_profile_without_a_family_is_warned_about_before_it_runs_unmeasured() {
+    let absent = wrapped_workspace(
+        "family-absent-warned",
+        CODEX_DIALECT_AGENT,
+        serde_json::json!({}),
+        "openai",
+        "gpt-contract",
+    );
+    for (command, args) in no_family_commands() {
+        let output = run_cli(command, &absent.plan, &absent.machine, args);
+        assert_success(&output);
+        let warnings = output.stderr.lines().filter(|line| line.contains(NO_FAMILY_WARNING));
+        let warnings = warnings.collect::<Vec<_>>();
+        assert_eq!(
+            warnings.len(),
+            1,
+            "`rhei {command}` should warn once that cld declares no family\nstderr:\n{}",
+            output.stderr
+        );
+        let warning = warnings[0];
+        for part in ["not measured", "spend reserve", "\"family\"", "claude-code, codex, pi"] {
+            assert!(warning.contains(part), "`rhei {command}` warning lacks {part:?}:\n{warning}");
+        }
+        assert!(!output.stdout.contains(NO_FAMILY_WARNING), "the warning belongs on stderr");
+    }
+    // The warning tells; it changes nothing that is measured or charged.
+    assert!(absent.records().is_empty(), "the absent profile is still unmeasured");
+
+    let declared = wrapped_workspace(
+        "family-declared-quiet",
+        CODEX_DIALECT_AGENT,
+        serde_json::json!({ "family": "codex" }),
+        "openai",
+        "gpt-contract",
+    );
+    for (command, args) in no_family_commands() {
+        let output = run_cli(command, &declared.plan, &declared.machine, args);
+        assert_success(&output);
+        assert!(
+            !output.stderr.contains("declares no family"),
+            "`rhei {command}` must not warn about a declared family:\n{}",
+            output.stderr
+        );
+    }
+    assert_eq!(declared.records().len(), 1, "the declared profile is measured");
+}
+
+/// A family that is declared, even one with no extractor, was chosen, and is
+/// not warned about. §FS-rhei-agents.1.1.2
+#[test]
+fn a_declared_unmeasured_family_is_not_warned_about() {
+    let workspace = wrapped_workspace(
+        "family-gemini-quiet",
+        CODEX_DIALECT_AGENT,
+        serde_json::json!({ "family": "gemini" }),
+        "google",
+        "gemini-contract",
+    );
+    let validate = run_cli("validate", &workspace.plan, &workspace.machine, &[]);
+    assert_success(&validate);
+    assert!(!validate.stderr.contains("declares no family"), "{}", validate.stderr);
+}
+
+/// The commands the operator reads before the reserve is charged, in order.
+fn no_family_commands() -> [(&'static str, &'static [&'static str]); 4] {
+    [
+        ("validate", &[]),
+        ("roster", &[]),
+        ("roster", &["--json"]),
+        ("run", &["--no-tui", "--no-callbacks"]),
+    ]
+}

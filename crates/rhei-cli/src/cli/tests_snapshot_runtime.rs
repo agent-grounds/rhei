@@ -1992,37 +1992,27 @@ transitions:
         .expect("manifest");
     }
 
-    /// RAII helper that temporarily redirects `HOME` to a sandboxed
-    /// directory so tests that interrogate `~/.config/rhei` do not
-    /// touch the real user's home.
-    static TEST_HOME_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
+    /// RAII helper that gives the test a sandboxed home of its own, so tests
+    /// that interrogate `~/.config/rhei` touch neither the real user's home
+    /// nor a sibling's. It installs the home for this thread rather than
+    /// moving the process-wide `HOME`, which every test shares.
+    /// §REQ-test-isolation.5
     struct TempHome {
         dir: tempfile::TempDir,
-        previous: Option<std::ffi::OsString>,
-        _guard: std::sync::MutexGuard<'static, ()>,
+        previous: Option<test_home::TestHome>,
     }
 
     impl TempHome {
         fn new() -> Self {
-            // Poison-tolerant: a test that panics under this guard has already
-            // reported itself, and re-reporting it as `PoisonError` in every
-            // sibling hides which test actually failed.
-            let guard = TEST_HOME_LOCK.lock().unwrap_or_else(|err| err.into_inner());
             let dir = tempfile::tempdir().expect("tmphome");
-            let previous = std::env::var_os("HOME");
-            std::env::set_var("HOME", dir.path());
-            TempHome { dir, previous, _guard: guard }
+            let previous =
+                test_home::install(Some(test_home::TestHome::Dir(dir.path().to_path_buf())));
+            TempHome { dir, previous }
         }
     }
 
     impl Drop for TempHome {
         fn drop(&mut self) {
-            match self.previous.take() {
-                Some(prev) => std::env::set_var("HOME", prev),
-                None => std::env::remove_var("HOME"),
-            }
-            // dir cleans up by drop
-            let _ = &self.dir;
+            test_home::install(self.previous.take());
         }
     }

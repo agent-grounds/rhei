@@ -287,14 +287,57 @@ fn agent_label(agent: &Agent) -> &'static str {
     }
 }
 
-/// Home directory helper.
+/// Home directory helper: the one seam every user-tier read goes through.
+///
+/// The built `rhei` reads `HOME`. A test build never does: it answers the home
+/// the calling test installed through `test_home`, or an empty home of the
+/// calling thread's own, so no test's verdict turns on what `HOME` names.
+/// §REQ-test-isolation.5
 fn home_dir() -> MietteResult<PathBuf> {
-    std::env::var("HOME")
-        .map(PathBuf::from)
-        .map_err(|_| miette!(
-            help = "rhei writes user-level files under $HOME. Set HOME, or install into the project with --local.",
-            "HOME environment variable not set"
-        ))
+    #[cfg(test)]
+    let home = test_home::resolve();
+    #[cfg(not(test))]
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    home.ok_or_else(|| miette!(
+        help = "rhei writes user-level files under $HOME. Set HOME, or install into the project with --local.",
+        "HOME environment variable not set"
+    ))
+}
+
+/// A test's home, kept per thread so that no other test can see it: what
+/// `home_dir` answers in a test build in place of `HOME`. §REQ-test-isolation.5
+#[cfg(test)]
+mod test_home {
+    use std::cell::RefCell;
+    use std::path::PathBuf;
+
+    /// What a test installed: a home directory of its own, or no home at all.
+    #[derive(Clone)]
+    pub(crate) enum TestHome {
+        Dir(PathBuf),
+        Absent,
+    }
+
+    thread_local! {
+        static INSTALLED: RefCell<Option<TestHome>> = const { RefCell::new(None) };
+        // Created on the first read with nothing installed, removed when the
+        // thread - one per test under libtest - ends.
+        static EMPTY: tempfile::TempDir = tempfile::tempdir().expect("empty test home");
+    }
+
+    /// Installs `home` for the calling thread and returns what it replaces, so
+    /// a guard can put that back when it drops.
+    pub(crate) fn install(home: Option<TestHome>) -> Option<TestHome> {
+        INSTALLED.with(|installed| installed.replace(home))
+    }
+
+    pub(super) fn resolve() -> Option<PathBuf> {
+        match INSTALLED.with(|installed| installed.borrow().clone()) {
+            Some(TestHome::Dir(dir)) => Some(dir),
+            Some(TestHome::Absent) => None,
+            None => Some(EMPTY.with(|empty| empty.path().to_path_buf())),
+        }
+    }
 }
 
 /// Install skills for a single agent.

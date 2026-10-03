@@ -98,3 +98,33 @@ either. A call site corrected in place leaves the next caller the same mistake
 to make — which is not hypothetical here: one call site had been corrected by
 hand and named two of the six variables that mattered, and the rest of the suite
 inherited all of them.
+
+## 4. What A Test Resolves Is What Its Fixture Names, Never What Lies Above It
+
+A test's own directory is the whole of what it reads as well as what it writes.
+Where `TMPDIR` points is the developer's choice, and it may lie beneath a rhei
+home, beneath the user tier `~/.agent-grounds/rhei/`, or inside a git work tree
+of any repository. So what the test gates, and where a process it spawns writes,
+are settled by the fixture alone: nothing above the test's directory can stand
+in for the thing under test, and nothing above it can become the place a spawned
+process writes.
+
+Two discoveries walk upwards on purpose, and the suite meets both:
+
+- **A template asked for by bare name** resolves through every ancestor rhei
+  home and the user tier before the built-ins ([§FS-rhei-templates.1](../functional-spec/rhei-templates.spec.md#1-template-discovery)), and an
+  empty template home planted in the fixture does not stop that walk. A test
+  about a particular template - the shipped one, above all - names it by its
+  path, so a same-named template above `TMPDIR` is never the one it gates.
+- **A git work tree** is found from wherever a process stands. A spawned agent
+  that is told its root learns it from what the run hands it, never from its
+  working directory, because inside an enclosing work tree that directory is
+  the repository's root rather than the fixture
+  ([§REQ-test-isolation.2](test-isolation.spec.md#2-where-a-spawned-process-writes-is-chosen-never-derived-from-where-it-stands)). Bounding discovery with `GIT_CEILING_DIRECTORIES`
+  ([§REQ-test-isolation.3](test-isolation.spec.md#3-which-repository-a-spawned-command-acts-on-is-chosen-never-inherited)) hides that symptom but leaves the agent rootless.
+
+The measure is the outcome: a test passes or fails the same way whatever lies
+above its directory. A test exposed to one of these discoveries carries the
+proof itself, by planting inside its own directory - above where its commands
+run - the thing that would otherwise stand in: a same-named template in a rhei
+home, or a git work tree enclosing the project.

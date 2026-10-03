@@ -74,3 +74,25 @@ property of the platform [§REQ-cross-platform.2](cross-platform.md#2-parity). W
 [§REQ-cross-platform.3](cross-platform.md#3-tested-not-assumed) reports is real — the harness is broken on every platform,
 including the one it is green on — and it surfaces on the platform whose clock
 reads the more coarsely, where the name ran out of resolution first.
+
+## 7. A Terminal Harness Reports What It Read, Without Waiting For The End
+
+A test that drives the built binary through a terminal — a native pseudo-terminal
+on Unix, a ConPTY on Windows — waits on what the terminal shows, and every such
+wait is bounded. When one runs out, the failure carries what the harness had
+read from the terminal up to that moment, and how long it waited. It never
+waits for the terminal to end before it can say so.
+
+The platforms do not agree on when a terminal ends. On Unix the reader sees the
+end once every process holding the terminal has gone; on Windows it sees it
+only once the pseudo-console itself is closed, which the harness still holds
+while it reports the failure. A transcript that is assembled only at the end is
+therefore whole on one platform and empty on the other, and the failure that
+most needs it — a prompt that never came, on the platform whose runner is the
+slowest — is the one that reads `operator prompt missing: ` with nothing after
+it. That is a defect of the harness, not of the platform [§REQ-cross-platform.2](cross-platform.md#2-parity),
+and it cannot be diagnosed from the gate that reports it [§REQ-cross-platform.3](cross-platform.md#3-tested-not-assumed).
+
+The measure is a reader that has yielded output and never ends: a wait that
+runs out against it reports that output, on every platform, within the bound
+it was given.

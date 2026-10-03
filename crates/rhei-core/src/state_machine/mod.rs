@@ -30,6 +30,7 @@ include!("validator/transition_sources.rs");
 include!("validator/supervisor_finish.rs");
 include!("validator/state_machine_warnings.rs");
 include!("validator/validator_dependencies.rs");
+include!("validator/validator_prior_states.rs");
 include!("validator/validator_entry.rs");
 include!("validator/validator_tree_coherence.rs");
 include!("validator/validator_links.rs");

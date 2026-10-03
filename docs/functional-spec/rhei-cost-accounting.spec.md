@@ -881,6 +881,66 @@ priced set into a missing-rate set; they continue to affect measurement
 coverage under the existing rules. The aggregate's price-book id and currency
 come from the selected book even when some or all exact rates are absent.
 
+#### 6.2.1. Agent Spawns With No Record
+
+A record is written by the invocation it measures, so a selection made only of
+records cannot see an invocation that left none: a profile that declares no
+family (§FS-rhei-cost-accounting.3.2 permits the omission), a record write that failed, an extractor
+that never ran, a binary older than accounting. Each of those invocations was
+still spawned, and `rhei run` writes a spawn record for every one it spawned
+(§FS-rhei-agents.8.4). `rhei cost` and `rhei summary` therefore reconcile their
+selection against those spawn records before they report coverage.
+
+1. **Which spawns.** The spawn records under `runtime/spawns/` of each root
+   whose accounting the reading covers, scoped exactly as that root's records
+   are (§FS-rhei-panta.6.5): the root decides where it belongs to one in-scope
+   rhei, and the spawn's `task` decides where the root is shared. Only
+   `kind: agent` counts. A program spawn is never counted, because a program
+   writes no invocation record. An absent `runtime/spawns/` holds nothing to
+   reconcile. A spawn record that cannot be parsed is reported the way a
+   malformed accounting artifact is (§FS-rhei-cost-accounting.11) and skipped.
+2. **Matching.** A spawn record answers for the last attempt of one visit. It
+   is **recorded** when a record in the reading names the same `task_id` and
+   `state` and its attempt identity (§FS-rhei-cost-accounting.3.7) names the spawn's `moves` and
+   `attempt`. A legacy record, whose identity carries neither, records a spawn
+   of the same task and state whose `[started, ended]` interval contains its
+   `started_at`. Both are matched as fields, never by counting files or by
+   file-name prefix. A spawn no record matches is **unrecorded**, whatever
+   its profile's family, its `ending`, or its exit code: goal 1 holds for every
+   agent invocation, a failed one included.
+3. **One direction only.** `rhei reset` removes spawn records and keeps
+   accounting, and a spawn record holds only the last attempt of its visit. A
+   record with no spawn therefore proves nothing and is read as before. The
+   reconciliation can find that something is missing, never that nothing is.
+4. **Coverage.** An aggregate whose selection holds an unrecorded spawn never
+   reports `complete`: a `complete` reading becomes `partial`. `partial`,
+   `unpriced` and `none` stand, because each already says less than
+   `complete`. An unrecorded spawn contributes no token, cost or model:
+   nothing is estimated for it.
+5. **The count.** Every aggregate reports how many unrecorded spawns its
+   selection holds, whatever its coverage. `invocation_count` keeps counting
+   records. The **known agent invocations** are those records plus the
+   unrecorded spawns, and a human-read surface states the gap as `N of M agent
+   invocations have no accounting record`, where `N` is the unrecorded spawns
+   and `M` the known agent invocations. In JSON, every
+   `rhei.accounting.summary.v1` object carries `unrecorded_agent_invocation_count`,
+   `0` when nothing is missing. The field is additive within v1 (§FS-rhei-cost-accounting.8.1), and no
+   existing field changes its meaning.
+6. **Selections.** Each axis of §FS-rhei-cost-accounting.6.1 places a spawn by the field it carries:
+   - **Plan tree:** by `task`, for `direct` and `subtree` alike.
+   - **Window:** by `started` in `[since, until)`.
+   - **Run:** a spawn names no run, so an unrecorded spawn is read the way an
+     unattributed record is (§FS-rhei-cost-accounting.6.2). When it falls inside the window the run
+     was asked for within, or when no window was asked for, it demotes a
+     by-run selection and counts in that selection's unrecorded count. The
+     explicit summary reading of `--run` with `--prices` applies the same
+     rule.
+   - **Grouping:** groups are still formed from records. `--by node`,
+     `state`, `agent` and `day` place an unrecorded spawn in the group whose
+     key its `task`, `state`, `worker` or `started` date names. `--by model`
+     and `--by run` cannot place one. A spawn that no group holds is carried
+     by the selection's own aggregate only.
+
 ## 7. Run Events
 
 After the invocation record is written, Rhei emits:
@@ -995,7 +1055,14 @@ them select is [§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary); ev
 those roots hold, as one set.
 
 Default text output shows workspace totals, coverage, and highest-cost nodes by
-subtree cost. `--task <ID>` shows that node's direct and subtree totals plus
+subtree cost. When agent spawns in the selection have no accounting record
+(§FS-rhei-cost-accounting.6.2.1), the totals line's coverage field names the gap and `Invocations`
+still counts records:
+
+```text
+Cost $0.27 | Total 246.0k | In 240.0k | Out 6.0k | Coverage Partial (2 of 4 agent invocations have no accounting record) | Invocations 2
+```
+ `--task <ID>` shows that node's direct and subtree totals plus
 the contributing invocation records. `--json` emits the same data with stable
 field names matching the runtime artifact schema.
 
@@ -1144,7 +1211,9 @@ change: the `(no accounting records found)` line is byte for byte what it was
 and stays the first line of the output, and a line naming the roots follows it.
 A caller matching on that line still matches; a caller matching on the whole of
 stdout sees one more line. Nothing else moves. A reading that **found** records
-prints what it printed before, byte for byte, and over a standalone workspace —
+prints what it printed before, byte for byte, unless an agent spawn in it has
+no accounting record (§FS-rhei-cost-accounting.6.2.1); then the coverage field names the gap. Over a
+standalone workspace —
 whose one root is both the run root and its rhei's, so the union is a single
 read — that is every non-empty reading it has.
 

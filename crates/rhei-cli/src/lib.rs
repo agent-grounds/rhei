@@ -334,6 +334,7 @@ mod tests {
     include!("cli/tests_prompt_memory_results.rs");
     include!("cli/tests_prompt_memory_visits.rs");
     include!("cli/tests_prompt_memory_retry.rs");
+    include!("cli/tests_missing_output_marker.rs");
     include!("cli/tests_prompt_notes.rs");
 }
 

@@ -25,6 +25,9 @@ pub mod metadata;
 /// One rendering of an amount of money, and one reading of one.
 /// §FS-rhei-cost-accounting.5
 pub mod money;
+/// Waiting out an access another process's open handle refuses.
+/// §AR-agent-orchestrator-workflow.3.3.1.1
+pub mod open_handle;
 pub mod parser;
 pub mod platform;
 pub mod source;

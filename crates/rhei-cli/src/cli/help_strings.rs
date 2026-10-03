@@ -162,6 +162,13 @@ fn nothing_claimable_help() -> &'static str {
      rhei list <plan>"
 }
 
+/// Help for a run that halted after a timeout transition failed to apply: its
+/// task is in its working state, not blocked, gated, or assigned. §FS-rhei-run.3
+fn timeout_transition_unfired_help() -> &'static str {
+    "a timeout transition could not be fired; the warning above names the task and why. \
+     Fix the cause, then re-run: rhei run <plan>"
+}
+
 /// Help for a transition callback declared by the state machine.
 fn callback_command_help() -> &'static str {
     "the callback command is declared in the state machine. Fix the command or the \

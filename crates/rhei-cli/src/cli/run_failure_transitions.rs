@@ -14,6 +14,22 @@ enum TimeoutTransitionOutcome {
     Failed,
 }
 
+/// Set once a timeout transition this process selected failed to apply, so the
+/// halt that may follow says why instead of calling its task blocked. §FS-rhei-run.3
+static TIMEOUT_TRANSITION_UNFIRED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// The help a halt with non-terminal tasks remaining ends with: the failed
+/// timeout transition's, when one was warned about, and otherwise the
+/// nothing-claimable one. §FS-rhei-run.3
+fn run_halt_help() -> &'static str {
+    if TIMEOUT_TRANSITION_UNFIRED.load(std::sync::atomic::Ordering::Relaxed) {
+        timeout_transition_unfired_help()
+    } else {
+        nothing_claimable_help()
+    }
+}
+
 fn tooling_trigger_matches(value: &serde_yaml::Value, unavailable: &[String]) -> bool {
     match value {
         serde_yaml::Value::Bool(true) => true,
@@ -182,6 +198,7 @@ fn fire_selected_timeout_transition(
                 "  warning: failed to fire timeout transition for Task {}: {}",
                 task_id_str, err
             );
+            TIMEOUT_TRANSITION_UNFIRED.store(true, std::sync::atomic::Ordering::Relaxed);
             TimeoutTransitionOutcome::Failed
         }
     }

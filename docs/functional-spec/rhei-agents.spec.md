@@ -305,6 +305,30 @@ the stream-json stdin transport below, and which session-report stream a log is
 A profile that declares no `family` resolves to itself, so every built-in and
 every existing custom profile takes the arm it takes today.
 
+**A profile that resolves to no family is told it goes unmeasured.** A user
+`agents.<id>` entry that declares no `family` and whose id is not a built-in id
+resolves to a family Rhei has no extractor for: none of its invocations writes
+a record ([§FS-rhei-cost-accounting.3.2](rhei-cost-accounting.spec.md#32-extraction-status)),
+and each settles at the spend reserve as unmeasurable
+([§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle)). Every
+command that loads settings — `rhei validate`, `rhei roster`, `rhei run` among
+them — says so before anything is charged, with one warning per profile on
+stderr, so `--json` stdout still parses. It is a warning, not a refusal, for the
+reason an unknown key is: the profile loads today, and what it runs, measures
+and charges does not change. The warning names the agent, says its invocations
+are not measured and are charged the reserve, and names `family` as the fix with
+the families that are measured — the same list that selects an extractor
+([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow)):
+
+```text
+warning: agents.cdx declares no family, and 'cdx' is not a built-in agent, so its invocations are not measured: each is charged the spend reserve as unmeasurable. Declare "family" to measure it; the measured families are claude-code, codex, pi.
+```
+
+A profile that declares a family does not warn, even one with no extractor such
+as `gemini`: it chose its family. Neither does a built-in id, used bare or
+replaced by a same-id entry: it is a family, and what is measured for it is
+§FS-rhei-cost-accounting.3.2's to say.
+
 Everything that *names* the agent stays the profile's own id: `RHEI_AGENT`, the
 log header's `agent:` line, spawn records (§FS-rhei-agents.8.4), target slugs, the invocation
 record's `invocation_id` and `agent`, `rhei cost --by agent`, snapshot lock

@@ -397,7 +397,34 @@ the summary prints five stacked groups:
    blocked by that gate, however its own line reads.
    Each names the command that clears it — `rhei release <id>` for a claim,
    `rhei next` then `rhei complete <id>` for manual-only work, finishing the
-   prior for a dependency.
+   prior for a dependency on a prior that can still finish.
+
+   A `**Prior:**` in a **cancellation** state is the one dependency that
+   cannot be finished: under [§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names) it never satisfies a
+   dependent, and it is final, so "finish the prior first" is advice nobody
+   can follow. Classification is the prior's own machine's
+   `role: cancellation` (or the inferred `cancelled`/`canceled`), judged under
+   the rhei that owns the prior ([§FS-rhei-panta.6.1](rhei-panta.spec.md#61-readiness-and-rhei-next)), so a custom
+   abandonment terminal counts and an ordinary terminal named `dropped` does
+   not. Such a row's blocker says the prior is cancelled and can never satisfy
+   the ticket, and its next action names the two remedies that exist —
+   re-point the ticket's `**Prior:**`, and any `**Consumes:**` that names that
+   prior, at a completed step, or cancel the ticket:
+
+   ```text
+   | plan.4 | review | waiting on Task plan.3 (cancelled), a cancelled prior that can never satisfy it | re-point `**Prior:**` (and any `**Consumes:**` naming it) at a completed step, or cancel Task plan.4 |
+   ```
+
+   When a ticket is blocked by both a live prior and a cancelled one, the row
+   names the cancelled one, whatever order `**Prior:**` lists them in: the
+   live prior may yet finish, the cancelled one never will, so it is the
+   permanent cause. The console's `Nothing to schedule` lines ([§FS-rhei-run-report.3](#3-end-of-run-console-summary), and
+   [§FS-rhei-run.4](rhei-run.spec.md#4-dry-run)) give the same reading. A cancelled prior changes no
+   classification rung and no exit status — the ticket is still prior-blocked
+   work a human must act on; only what the row says about it changes. Under
+   the old wording a supervisor that appended a review round behind a round it
+   had cancelled got a run that halted in a tenth of a second, every time, with
+   one line telling it to wait for a task that could never finish.
 
    A ticket the run actually spawned work for is a different kind of halt: its
    problem is the work, not the scheduling. When that work stopped without

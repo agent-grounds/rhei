@@ -14,16 +14,31 @@ enum TimeoutTransitionOutcome {
     Failed,
 }
 
-/// Set once a timeout transition this process selected failed to apply, so the
-/// halt that may follow says why instead of calling its task blocked. §FS-rhei-run.3
-static TIMEOUT_TRANSITION_UNFIRED: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
+/// Each task whose timeout transition this process selected and failed to apply,
+/// with the state it was left in, so the halt that may follow says why instead
+/// of calling that task blocked. §FS-rhei-run.3
+static TIMEOUT_TRANSITIONS_UNFIRED: std::sync::Mutex<Vec<(String, String)>> =
+    std::sync::Mutex::new(Vec::new());
+
+fn timeouts_unfired() -> std::sync::MutexGuard<'static, Vec<(String, String)>> {
+    TIMEOUT_TRANSITIONS_UNFIRED.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
 
 /// The help a halt with non-terminal tasks remaining ends with: the failed
-/// timeout transition's, when one was warned about, and otherwise the
-/// nothing-claimable one. §FS-rhei-run.3
-fn run_halt_help() -> &'static str {
-    if TIMEOUT_TRANSITION_UNFIRED.load(std::sync::atomic::Ordering::Relaxed) {
+/// timeout transition's, when a task one was warned about is still in the state
+/// it failed to leave, and otherwise the nothing-claimable one. Read against the
+/// plan as the halt found it, so a timeout that later fired, or a task that has
+/// since moved, cannot leave the help pointing at a warning whose cause is gone.
+/// §FS-rhei-run.3
+fn run_halt_help(rhei: &rhei_core::ast::Rhei) -> &'static str {
+    let unfired = timeouts_unfired();
+    let mut tasks = Vec::new();
+    collect_plan_tasks(&rhei.tasks, &mut tasks);
+    let stranded = tasks.iter().any(|task| {
+        let id = task.id.to_string();
+        unfired.iter().any(|(task_id, state)| *task_id == id && task.state.as_str() == state)
+    });
+    if stranded {
         timeout_transition_unfired_help()
     } else {
         nothing_claimable_help()
@@ -191,6 +206,7 @@ fn fire_selected_timeout_transition(
                 "  Timeout transition: Task {} '{}' -> '{}' (timeout {})",
                 task_id_str, from_state, effective_to, timeout_label
             );
+            timeouts_unfired().retain(|(task_id, _)| task_id != task_id_str);
             TimeoutTransitionOutcome::Fired
         }
         Err(err) => {
@@ -198,7 +214,9 @@ fn fire_selected_timeout_transition(
                 "  warning: failed to fire timeout transition for Task {}: {}",
                 task_id_str, err
             );
-            TIMEOUT_TRANSITION_UNFIRED.store(true, std::sync::atomic::Ordering::Relaxed);
+            let mut unfired = timeouts_unfired();
+            unfired.retain(|(task_id, _)| task_id != task_id_str);
+            unfired.push((task_id_str.to_string(), from_state.to_string()));
             TimeoutTransitionOutcome::Failed
         }
     }

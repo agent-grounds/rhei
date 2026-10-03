@@ -98,14 +98,13 @@ own
 ```
 <!-- /rhei:task-tree task -->
 
-The state run folds the gate into implement's row, where `program×2` counts
-its two invocations, the build's agent and the gate's program: the label counts
-them all and names only the driver of the last:
+The state run folds the gate into implement's row, where `agent+program` names
+the build's agent and the gate's program, once each:
 
 <!-- rhei:task-tree state -->
 ```text
    2 tasks · source order
-  ✓ state.1                    completed   program×2  <t>
+  ✓ state.1                    completed   agent+program  <t>
   ✓ state.2                    completed   agent  <t>
 ```
 <!-- /rhei:task-tree state -->

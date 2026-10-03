@@ -81,14 +81,13 @@ which of them mattered, and why.
 
 The state run's console task tree has one row for triage
 ([§FS-rhei-run-report.3.2](../../../docs/functional-spec/rhei-run-report.spec.md#32-task-tree)),
-and `agent×2` counts its two invocations, the lookup's program and the
-verdict's agent: the label counts them all and names only the driver of the
-last:
+and `agent+program` names the verdict's agent and the lookup's program, once
+each:
 
 <!-- rhei:task-tree state -->
 ```text
    2 tasks · source order
-  ✓ state.1                    completed   agent×2  <t>
+  ✓ state.1                    completed   agent+program  <t>
   ✓ state.2                    completed   agent  <t>
 ```
 <!-- /rhei:task-tree state -->

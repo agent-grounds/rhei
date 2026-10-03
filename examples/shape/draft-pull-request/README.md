@@ -85,14 +85,13 @@ task's own line could have said.
 
 The state run's console task tree gives the work two rows
 ([§FS-rhei-run-report.3.2](../../../docs/functional-spec/rhei-run-report.spec.md#32-task-tree)),
-the first labelled `program×2` for its two invocations, the commit's agent and
-the opening's program: the label counts them all and names only the driver of
-the last:
+the first labelled `agent+program` for the commit's agent and the opening's
+program, once each:
 
 <!-- rhei:task-tree state -->
 ```text
    2 tasks · source order
-  ✓ state.1                    completed   program×2  <t>
+  ✓ state.1                    completed   agent+program  <t>
   ✓ state.2                    completed   agent  <t>
 ```
 <!-- /rhei:task-tree state -->

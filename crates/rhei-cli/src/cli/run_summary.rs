@@ -8,31 +8,8 @@
 // `HashMap` and `Mutex` are already imported at the crate root (this file is
 // `include!`-ed), so they are referenced unqualified without a local `use`.
 
-/// Per-task activity accumulated from the run event stream. The tree shows the
-/// driver and timing of the work that advanced each task. §FS-rhei-run-report.3.2
-#[derive(Debug, Clone, Default)]
-struct TaskActivity {
-    /// `"agent"` or `"program"` — the driver of the last invocation for the task.
-    driver: Option<&'static str>,
-    /// Number of invocations spawned for the task (fan-out targets count > 1).
-    invocations: u32,
-    /// Duration of the last invocation, milliseconds.
-    last_duration_ms: u64,
-    /// Direct accounting for usage reported against this task during the run.
-    accounting: Option<rhei_tui::AccountingRunSummary>,
-    /// Required artifacts the last worker left unwritten, rendered as
-    /// `name (path)`, paired with the state it left them in. The halt
-    /// classification uses them only while the ticket is still in that state,
-    /// and a fresh spawn clears them, so an old stall never explains a new one.
-    // §FS-rhei-run-report.3.1
-    missing_outputs: Option<(String, Vec<String>)>,
-    /// The code the task's last released invocation exited with, `None` before
-    /// one has been released or when the run has no code for it. Paired with
-    /// `missing_outputs` by the same spawn, which clears both, so a halt row
-    /// never names one attempt's artifacts beside another's exit.
-    // §FS-rhei-run-report.3.1 §FS-rhei-programs.3.2
-    last_exit_code: Option<i32>,
-}
+// Shared task activity and detail rendering. §FS-rhei-run-report.3.2
+include!("run_summary_task_detail.rs");
 
 /// One spawned transition from the run event stream, rendered into the report's
 /// ledger and invocations (agent/program only; callback and terminal-at-start
@@ -215,8 +192,12 @@ impl rhei_tui::EventSink for SummarySink {
             } => {
                 let driver = state.inflight.remove(&slot).unwrap_or("program");
                 let entry = state.tasks.entry(task.clone()).or_default();
-                entry.driver = Some(driver);
-                entry.invocations += 1;
+                // Each kind counts only its own invocations. §FS-rhei-run-report.3.2
+                if driver == "agent" {
+                    entry.agent_invocations += 1;
+                } else {
+                    entry.program_invocations += 1;
+                }
                 entry.last_duration_ms = duration_ms;
                 // The release is the only event carrying the code, and it
                 // follows the missing-artifact event of the same attempt.
@@ -1435,45 +1416,6 @@ fn collect_rows(
             waiting,
             counts,
         );
-    }
-}
-
-/// Build the detail column for a task row: driver + timing when the run spawned
-/// work, otherwise a short reason for halted tasks. §FS-rhei-run-report.3.2
-fn task_detail(
-    id: &str,
-    state: &str,
-    marker: Marker,
-    halt_causes: &HashMap<String, HaltCause>,
-    activity: &HashMap<String, TaskActivity>,
-) -> Option<String> {
-    if let Some(act) = activity.get(id) {
-        let cost = act
-            .accounting
-            .as_ref()
-            .map(|accounting| format!(" · {}", format_summary_cost(accounting)))
-            .unwrap_or_default();
-        if let Some(driver) = act.driver {
-            let label = if act.invocations > 1 {
-                format!("{driver}×{}", act.invocations)
-            } else {
-                driver.to_string()
-            };
-            return Some(format!(
-                "{label}  {}{}",
-                format_duration_short(act.last_duration_ms),
-                cost
-            ));
-        }
-        if !cost.is_empty() {
-            return Some(cost.trim_start_matches(" · ").to_string());
-        }
-    }
-    match marker {
-        Marker::Gate | Marker::Attention => {
-            Some(attention_reason(marker, id, state, halt_causes).0)
-        }
-        _ => None,
     }
 }
 

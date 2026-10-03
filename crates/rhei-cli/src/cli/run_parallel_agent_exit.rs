@@ -465,6 +465,14 @@ fn handle_parallel_agent_exit(
                             );
                         }
                         progress.stalled_tasks.insert(task_id_str.clone());
+                        // Held until something advances after now. §FS-rhei-run.3.6
+                        if empty_visit.is_some() {
+                            progress.empty_visit_holds.hold(
+                                &task_id_str,
+                                workspace_root,
+                                &reloaded.task_roots,
+                            );
+                        }
                     } else {
                         run_warn!(
                             "  warning: agent exited 0 but task {} did not advance from '{}'",

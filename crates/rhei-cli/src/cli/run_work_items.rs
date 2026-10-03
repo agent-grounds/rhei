@@ -22,6 +22,9 @@ struct AgentPassProgress<'a> {
     programs_spawned: &'a mut u32,
     /// Tickets whose worker finished this pass without moving them.
     stalled_tasks: &'a mut HashSet<String>,
+    /// The stalled tickets that are supervisors held for an empty visit.
+    /// §FS-rhei-run.3.6
+    empty_visit_holds: &'a mut EmptyVisitHolds,
     /// Tickets whose prompt would not compose; they must not be rescheduled.
     unpromptable_tasks: &'a mut HashSet<String>,
 }

@@ -458,6 +458,12 @@ fn handle_sequential_agent_completion(
                                 // withheld, so say that, not "did not advance".
                                 Some(warning) => {
                                     run_warn!("{}", warning);
+                                    // Released only by a later advance. §FS-rhei-run.3.6
+                                    progress.empty_visit_holds.hold(
+                                        task_id_str,
+                                        workspace_root,
+                                        &reloaded.task_roots,
+                                    );
                                 }
                                 None => emit_exit_zero_warnings(
                                     workspace_root,

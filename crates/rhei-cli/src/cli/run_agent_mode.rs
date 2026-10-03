@@ -163,6 +163,8 @@ fn run_agent_mode(
     // every claimable ticket advanced or stalled; one that moved something earns
     // the stalled ones another pass. §FS-rhei-run.3
     let mut progress_since_stall_reset = false;
+    // §FS-rhei-run.3.6: the stalls released only by an advance after them.
+    let mut empty_visit_holds = EmptyVisitHolds::default();
     // §FS-rhei-panta.6.1: `--rhei` narrows candidates, not prior resolution.
     let rhei_scope = rhei_scope_set(opts.rhei_scope());
     if rhei_scope.is_some() {
@@ -276,6 +278,8 @@ fn run_agent_mode(
         awaiting_gate_announced = false;
 
         pass += 1;
+        // A poll that falls due after this instant is not in `ready`. §FS-rhei-run.3.6
+        let pass_ready_at = current_unix_secs();
         // A ticket only counts as newly out of the running when it stepped out
         // here: a pass may continue past one, and only when it learned
         // something. §FS-rhei-run.3
@@ -537,6 +541,7 @@ fn run_agent_mode(
                 // Did not move; the rest of the pass must look elsewhere, and
                 // the run's own stall bound ends it. §FS-rhei-run.3
                 stalled_tasks.insert(task_id_str.clone());
+                empty_visit_holds.hold(task_id_str, &workspace_root, &loaded.task_roots);
                 continue;
             }
 
@@ -681,6 +686,7 @@ fn run_agent_mode(
                 agents_spawned: &mut agents_spawned,
                 programs_spawned: &mut programs_spawned,
                 stalled_tasks: &mut stalled_tasks,
+                empty_visit_holds: &mut empty_visit_holds,
                 unpromptable_tasks: &mut unpromptable_tasks,
             };
             run_sequential_program_work_items(
@@ -705,20 +711,22 @@ fn run_agent_mode(
                 // Nothing left that has not already stalled: the pass is over.
                 // If it moved anything at all, the stalled tickets earn a fresh
                 // pass rather than ending the run. §FS-rhei-run.3
-                if progress_since_stall_reset && !stalled_tasks.is_empty() {
-                    stalled_tasks.clear();
+                if progress_since_stall_reset
+                    && empty_visit_holds.release(&mut stalled_tasks, &workspace_root, &loaded.task_roots)
+                {
                     progress_since_stall_reset = false;
                     sink.emit(RunEvent::PassEnded { pass, progressed: false });
                     continue;
                 }
                 // §FS-rhei-run.5.1: the sleep is the continuous mode's.
                 if !opts.until_idle() {
-                    if let Some(deadline) = earliest_pending_agent_deadline(
+                    if let Some(deadline) = agent_deadline_since(
                         &loaded.rhei,
                         &machines.set,
                         settings,
                         opts,
                         &rhei_scope,
+                        pass_ready_at,
                     ) {
                         let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
                         if awaiting_deadline_announced != Some(deadline) {
@@ -728,7 +736,7 @@ fn run_agent_mode(
                             );
                             awaiting_deadline_announced = Some(deadline);
                         }
-                        stalled_tasks.clear();
+                        empty_visit_holds.keep_held(&mut stalled_tasks);
                         progress_since_stall_reset = false;
                         interruptible_sleep(
                             Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),
@@ -898,6 +906,7 @@ fn run_agent_mode(
                 agents_spawned: &mut agents_spawned,
                 programs_spawned: &mut programs_spawned,
                 stalled_tasks: &mut stalled_tasks,
+                empty_visit_holds: &mut empty_visit_holds,
                 unpromptable_tasks: &mut unpromptable_tasks,
             };
             run_sequential_agent_invocation(
@@ -920,6 +929,7 @@ fn run_agent_mode(
                 agents_spawned: &mut agents_spawned,
                 programs_spawned: &mut programs_spawned,
                 stalled_tasks: &mut stalled_tasks,
+                empty_visit_holds: &mut empty_visit_holds,
                 unpromptable_tasks: &mut unpromptable_tasks,
             };
             run_agent_worker_pool(
@@ -967,20 +977,22 @@ fn run_agent_mode(
         // Every claimable ticket has now advanced or stalled. A pass that moved
         // something earns the stalled ones another try; one that moved nothing
         // is where the run ends. §FS-rhei-run.3
-        if progress_since_stall_reset && !stalled_tasks.is_empty() {
-            stalled_tasks.clear();
+        if progress_since_stall_reset
+            && empty_visit_holds.release(&mut stalled_tasks, &workspace_root, &loaded.task_roots)
+        {
             progress_since_stall_reset = false;
             continue;
         }
         let loaded = load_plan(input)?;
         // §FS-rhei-run.5.1: the sleep is the continuous mode's.
         if !opts.until_idle() {
-            if let Some(deadline) = earliest_pending_agent_deadline(
+            if let Some(deadline) = agent_deadline_since(
                 &loaded.rhei,
                 &live.machines.set,
                 &live.settings,
                 opts,
                 &rhei_scope,
+                pass_ready_at,
             ) {
                 let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
                 if awaiting_deadline_announced != Some(deadline) {
@@ -990,7 +1002,7 @@ fn run_agent_mode(
                     );
                     awaiting_deadline_announced = Some(deadline);
                 }
-                stalled_tasks.clear();
+                empty_visit_holds.keep_held(&mut stalled_tasks);
                 progress_since_stall_reset = false;
                 interruptible_sleep(
                     Duration::from_secs(sleep_secs).min(Duration::from_millis(500)),

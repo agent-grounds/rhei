@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 pub const PATIENCE: Duration = Duration::from_secs(2);
 
 /// The pause between two attempts at a refused access.
-pub const PAUSE: Duration = Duration::from_millis(20);
+const PAUSE: Duration = Duration::from_millis(20);
 
 /// Whether a failed access was refused because another handle holds the file,
 /// judged by what the error says rather than by the platform.
@@ -24,7 +24,7 @@ pub const PAUSE: Duration = Duration::from_millis(20);
 /// and 33) read as no `ErrorKind` of their own, so their raw codes count too -
 /// on Windows only, because on Unix those numbers are `EPIPE` and `EDOM`.
 // §AR-agent-orchestrator-workflow.3.3.1.1
-pub fn refused(error: &std::io::Error) -> bool {
+fn refused(error: &std::io::Error) -> bool {
     const ERROR_SHARING_VIOLATION: i32 = 32;
     const ERROR_LOCK_VIOLATION: i32 = 33;
     error.kind() == std::io::ErrorKind::PermissionDenied

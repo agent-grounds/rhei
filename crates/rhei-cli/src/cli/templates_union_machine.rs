@@ -59,24 +59,35 @@
     ///
     /// Nothing about the host is rewritten: every result is the host's text
     /// with lines added, which is what lets `--dry-run` promise a diff of added
-    /// lines and nothing else. §FS-rhei-library.2 §FS-rhei-library.7.1
-    fn union_machine(host_text: &str, part: &PartMachine) -> MietteResult<String> {
+    /// lines and nothing else, and why a flow collection with something to add
+    /// is refused naming `host_machine`, the target's own file.
+    /// §FS-rhei-library.2 §FS-rhei-library.7.1 §FS-rhei-library.7.4
+    fn union_machine(
+        host_text: &str,
+        host_machine: &Path,
+        part: &PartMachine,
+    ) -> MietteResult<String> {
         let host_value: YamlValue = serde_yaml::from_str(host_text).map_err(|err| {
             miette!(help = union_target_help(), "the target's states.yaml does not parse: {err}")
         })?;
         let host_blocks = yaml_blocks(host_text);
         let part_blocks = yaml_blocks(&part.text);
-        let mut insertions: Vec<(usize, String)> = Vec::new();
-        let mut appended = String::new();
+        let mut additions = BlockAdditions {
+            host_machine,
+            host_blocks: &host_blocks,
+            insertions: Vec::new(),
+            appended: String::new(),
+        };
 
         for key in ["states", "profiles"] {
             let added = union_named_block(part, &host_value, &host_blocks, &part_blocks, key)?;
-            push_block_addition(&mut insertions, &mut appended, &host_blocks, key, added);
+            additions.push(key, added)?;
         }
         let added = union_transitions(part, &host_value, &host_blocks, &part_blocks)?;
-        push_block_addition(&mut insertions, &mut appended, &host_blocks, "transitions", added);
+        additions.push("transitions", added)?;
         let added = union_models(&host_value, &part.value, &host_blocks);
-        push_block_addition(&mut insertions, &mut appended, &host_blocks, "models", added);
+        additions.push("models", added)?;
+        let BlockAdditions { mut insertions, appended, .. } = additions;
 
         let mut out = host_text.to_owned();
         insertions.sort_by(|left, right| right.0.cmp(&left.0));
@@ -89,30 +100,54 @@
             }
             out.push_str(&appended);
         }
-        union_node_policy(&mut out, part, &host_value)?;
+        union_node_policy(&mut out, part, &host_value, host_machine)?;
         Ok(out)
     }
 
-    /// Record one block's addition: into the block when the host has it, at the
-    /// end of the file as a whole block when it does not.
-    fn push_block_addition(
-        insertions: &mut Vec<(usize, String)>,
-        appended: &mut String,
-        host_blocks: &IndexMap<String, YamlBlock>,
-        key: &str,
-        added: String,
-    ) {
-        if added.is_empty() {
-            return;
-        }
-        match host_blocks.get(key) {
-            Some(block) => insertions.push((block.body_end, added)),
-            None => {
-                appended.push_str(key);
-                appended.push_str(":\n");
-                appended.push_str(&added);
+    /// What the union adds to the host's top-level blocks, gathered before any
+    /// of it is spliced in.
+    struct BlockAdditions<'a> {
+        host_machine: &'a Path,
+        host_blocks: &'a IndexMap<String, YamlBlock>,
+        insertions: Vec<(usize, String)>,
+        appended: String,
+    }
+
+    impl BlockAdditions<'_> {
+        /// Record one block's addition: into the block when the host has it, at
+        /// the end of the file as a whole block when it does not. A block the
+        /// host writes in flow style is refused rather than extended.
+        /// §FS-rhei-library.2 §FS-rhei-library.7.4
+        fn push(&mut self, key: &str, added: String) -> MietteResult<()> {
+            if added.is_empty() {
+                return Ok(());
             }
+            match self.host_blocks.get(key) {
+                Some(block) if block.flow => {
+                    return Err(flow_collection_refusal(self.host_machine, key));
+                }
+                Some(block) => self.insertions.push((block.body_end, added)),
+                None => {
+                    self.appended.push_str(key);
+                    self.appended.push_str(":\n");
+                    self.appended.push_str(&added);
+                }
+            }
+            Ok(())
         }
+    }
+
+    /// The refusal §FS-rhei-library.7.4 owes: the target's own file as the user
+    /// would open it, never the scratch copy the result is validated in, the
+    /// collection's dotted key, and block style as the remedy.
+    fn flow_collection_refusal(host_machine: &Path, key: &str) -> Report {
+        miette!(
+            help = "write it in block style, one entry per line, and place the template again: \
+                    `--into` only adds lines, and an entry joins a flow collection only by \
+                    rewriting its line.",
+            "{}: `{key}` is written in flow style, which `--into` cannot extend",
+            display_path(host_machine).display()
+        )
     }
 
     /// `states` and `profiles`: a named entry the host already defines must be
@@ -341,6 +376,7 @@
         out: &mut String,
         part: &PartMachine,
         host_value: &YamlValue,
+        host_machine: &Path,
     ) -> MietteResult<()> {
         let part_routes = part.value.get("node_policy").and_then(|policy| policy.get("by_type"));
         let Some(YamlValue::Mapping(part_routes)) = part_routes else {
@@ -368,22 +404,30 @@
         if added.is_empty() {
             return Ok(());
         }
-        insert_into_by_type(out, &added)
+        insert_into_by_type(out, &added, host_machine)
     }
 
     /// Insert routes at the end of `node_policy.by_type`, creating the map when
-    /// the host routes nothing by kind yet. §FS-rhei-library.3.3
-    fn insert_into_by_type(out: &mut String, added: &str) -> MietteResult<()> {
+    /// the host routes nothing by kind yet. Either collection written in flow
+    /// style is refused rather than extended. §FS-rhei-library.3.3
+    /// §FS-rhei-library.7.4
+    fn insert_into_by_type(out: &mut String, added: &str, host_machine: &Path) -> MietteResult<()> {
         let Some(policy) = yaml_blocks(out).get("node_policy").cloned() else {
             out.push_str("node_policy:\n  by_type:\n");
             out.push_str(added);
             return Ok(());
         };
+        if policy.flow {
+            return Err(flow_collection_refusal(host_machine, "node_policy"));
+        }
         let Some(by_type) = policy.entries.iter().find(|entry| entry.key == "by_type") else {
             let at = policy.body_end;
             out.insert_str(at, &format!("  by_type:\n{added}"));
             return Ok(());
         };
+        if by_type.flow {
+            return Err(flow_collection_refusal(host_machine, "node_policy.by_type"));
+        }
         let end = out[by_type.range.clone()]
             .rfind(|c: char| !c.is_whitespace())
             .map_or(by_type.range.end, |offset| {

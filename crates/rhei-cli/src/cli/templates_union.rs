@@ -140,7 +140,7 @@
         let host_machine_text = read_text(&host.machine)?;
         check_artifact_paths(&host_machine_text, &part_machine, sides)?;
         warn_shared_artifact_paths(&part_machine, &tickets);
-        let mut machine = union_machine(&host_machine_text, &part_machine)?;
+        let mut machine = union_machine(&host_machine_text, &host.machine, &part_machine)?;
         if !machine.ends_with('\n') {
             machine.push('\n');
         }

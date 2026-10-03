@@ -59,7 +59,7 @@ node_policy:
                 "  pending:\n    description: Ready for work\n    instructions: |\n      Do the work.\n",
                 "  pending:\n    instructions: |\n      Do the work.\n    description: Quite different prose\n",
             );
-        let unioned = union_machine(HOST, &part("other", &template))
+        let unioned = union_machine(HOST, Path::new("host/states.yaml"), &part("other", &template))
             .expect("a reordered, reworded definition is the same definition");
         assert_eq!(
             unioned.matches("  pending:\n").count(),
@@ -75,7 +75,7 @@ node_policy:
         let template = HOST
             .replace("name: host", "name: other")
             .replace("      Do the work.\n", "      Do something else.\n");
-        let error = union_machine(HOST, &part("other", &template))
+        let error = union_machine(HOST, Path::new("host/states.yaml"), &part("other", &template))
             .expect_err("a differing `instructions` is a refusal")
             .to_string();
         assert!(error.contains("pending"), "the refusal names the state: {error}");
@@ -101,7 +101,7 @@ node_policy:
             .replace("name: host", "name: audit")
             .replace("description: Nothing to change", "description: The audit found nothing")
             .replace("description: Abandoned", "description: Called off");
-        let unioned = union_machine(&host, &part("audit", &template))
+        let unioned = union_machine(&host, Path::new("host/states.yaml"), &part("audit", &template))
             .expect("two terminals with the same role coalesce whatever they are called");
         assert_eq!(
             unioned.matches("  no-change:\n").count(),
@@ -153,7 +153,7 @@ node_policy:
     step: review-loop
 "#;
         let unioned =
-            union_machine(HOST, &part("review-loop", template)).expect("the union holds");
+            union_machine(HOST, Path::new("host/states.yaml"), &part("review-loop", template)).expect("the union holds");
         let machine = rhei_core::state_machine::StateMachine::from_yaml_str(&unioned)
             .expect("the unioned machine is valid");
         let scoped: Vec<&Vec<String>> =
@@ -200,7 +200,7 @@ node_policy:
                 "node_policy:\n  root: host\n  default: host\n  by_type:\n    task: host\n",
                 "node_policy:\n  root: other\n  default: other\n  rhei: other\n  by_type:\n    step: other\n  overrides:\n    - match:\n        level: 2\n      profile: other\n",
             );
-        let unioned = union_machine(HOST, &part("other", &template)).expect("the union holds");
+        let unioned = union_machine(HOST, Path::new("host/states.yaml"), &part("other", &template)).expect("the union holds");
         let policy: YamlValue = serde_yaml::from_str(&unioned).expect("the result parses");
         let policy = policy.get("node_policy").expect("the host keeps its policy");
         assert_eq!(
@@ -242,7 +242,7 @@ node_policy:
                 "profiles:\n  other:\n    initial: pending\n    transition_limit: 3\n    allowed: [pending, completed, cancelled]\n",
             )
             .replace("    task: host\n", "    step: other\n");
-        let unioned = union_machine(HOST, &part("other", &template)).expect("the union holds");
+        let unioned = union_machine(HOST, Path::new("host/states.yaml"), &part("other", &template)).expect("the union holds");
         assert!(
             unioned.contains("    transition_limit: 3\n"),
             "the field is written as its author wrote it; got:\n{unioned}"

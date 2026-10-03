@@ -126,7 +126,11 @@ reaches this stream.
 
 `budget_snapshot` carries the bounds in force before any capacity is spent, so
 a reader that sees only the head of the stream still knows what the run is
-bounded by ([§FS-rhei-budgets.9](rhei-budgets.spec.md#9-visibility)). There is one entry per dimension, spend
+bounded by ([§FS-rhei-budgets.9](rhei-budgets.spec.md#9-visibility)). "Each receipt" means each `start` and `spend`
+receipt the run appends ([§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal)), so the stream's last
+`budget_snapshot` follows the run's last settle and carries the account that
+settle left: a reader of the tail sees what the run spent, not what it had
+reserved when it admitted its last spawn. There is one entry per dimension, spend
 among them; on that entry the amounts are integer micro-units of `currency`
 rather than counts, so a reader never has to parse a rendered `$`
 (§FS-rhei-budgets.5.5). `budget_halt.remedy` is the single remedy that raises

@@ -270,6 +270,21 @@ the summary prints five stacked groups:
    bound there as well as in Attention, so the record answers "what stopped it"
    without the reader reconstructing it from rows.
 
+   The end of the run is the account **after the run's last receipt is
+   durable** — the last invocation's `start` and `spend` receipts
+   (§FS-rhei-budgets.5.2) included —
+   not the account as it stood when the run admitted its last spawn. Reading
+   it at that admission left out exactly the invocation that ended the run: a
+   one-ticket run reported `$0.00` and no mark for a day `rhei budget show`
+   said was charged in full. So the end amounts and their marks are the ones
+   `rhei budget show` reports for the same account once the run has exited,
+   provided nothing else charged it in between. The table carries the
+   outstanding amount in a column of its own, `Outstanding at end`, between
+   `Consumed at end` and `Remaining`, so that every row adds up: consumed plus
+   outstanding plus remaining is the bound. A run whose every settle landed
+   shows `0` (or `$0.00`) there; a reservation still held when the run ended
+   shows as outstanding rather than vanishing from the arithmetic.
+
    A task parked by a recognized provider limit (§FS-rhei-run.3.3) also
    belongs in **Waiting**, never **Attention**. Its row names `provider openai`,
    the reporting task, and the UTC `nextAttemptAt`, with automatic resumption as

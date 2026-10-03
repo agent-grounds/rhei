@@ -99,6 +99,31 @@ pass `--state-machine`.
    legitimate authoring moves. It is therefore a warning, never an error:
    validation must surface the inconsistency without making an existing plan
    unloadable.
+
+   The same holds one step earlier. A ticket that is **not yet terminal**
+   whose `**Prior:**` names an existing ticket in a **cancellation** state
+   ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)) can never become ready: that prior never satisfies
+   it, and it is final. Validation reports it as a **warning**, one per
+   ticket, naming the ticket, each cancelled prior with its state, and the two
+   remedies — re-point the `**Prior:**` (and any `**Consumes:**` naming that
+   prior) at a completed step, or cancel the ticket:
+
+   ```text
+   warning: Task plan.4 waits on Task plan.3 (cancelled), Task plan.2 (cancelled), cancelled priors that can never satisfy it: re-point its **Prior:** (and any **Consumes:** naming them) at a completed step, or cancel Task plan.4.
+   ```
+
+   Cancellation is judged under the machine of the rhei that owns the prior
+   ([§FS-rhei-panta.6.1](rhei-panta.spec.md#61-readiness-and-rhei-next)), so a custom `role: cancellation` state counts and an
+   ordinary terminal named `dropped` does not. A ticket that is itself
+   cancelled is not warned about — it waits on nothing — and neither is one
+   whose prior is merely open, which may yet finish. A ticket already in a
+   successful terminal state keeps the warning above and gets no second one.
+   It is a warning rather than an error for the reason above: a supervisor
+   appending a round behind one it cancelled is a legitimate move that
+   produces a fixable plan, and validation exists to say so while the author
+   is still writing, not to make the plan unloadable. Without it the plan
+   validated clean and the first sign of the dead end was a run that halted
+   at once.
 6. When at least one task in the loaded graph declares `**Consumes:**`, add
    exactly one graph-level warning, regardless of how many tasks or references
    consume exports:

@@ -41,6 +41,7 @@ mod budget_support;
 mod budget_travel_establish_tests;
 mod budget_travel_halt_tests;
 mod budget_window_tests;
+mod cancelled_prior_tests;
 mod changeset_review_equivalence_tests;
 mod complete_result_input_tests;
 mod completions_tests;

@@ -128,7 +128,12 @@ fn roster_selects_current_settings_before_deprecated_fallback() {
     assert_eq!(current_payload["sources"]["project"]["home"], "current");
     assert!(current_payload["agents"].get("current-only").is_some());
     assert!(current_payload["agents"].get("deprecated-only").is_none());
-    assert!(selected.stderr.is_empty(), "the current home is not deprecated");
+    // Only the no-family warning `current-only` earns. §FS-rhei-agents.1.1.2
+    assert!(
+        selected.stderr.lines().all(|line| line.contains("declares no family")),
+        "the current home is not deprecated: {}",
+        selected.stderr
+    );
 
     fs::remove_file(&current).expect("remove current settings to expose fallback");
     let fallback = run_roster(&home, &root, Some(&plan), true);

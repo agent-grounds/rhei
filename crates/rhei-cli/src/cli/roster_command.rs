@@ -399,5 +399,6 @@ fn roster_command(input: Option<PathBuf>, json: bool) -> MietteResult<()> {
     };
     write_roster_stdout(&rendered)?;
     warn_deprecated_roster_source(&root, &roster.sources);
+    warn_unmeasured_agent_profiles(&roster.settings.agents);
     Ok(())
 }

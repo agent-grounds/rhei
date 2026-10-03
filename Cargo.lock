@@ -1338,14 +1338,14 @@ checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
 
 [[package]]
 name = "rhei-agent-core"
-version = "0.6.0"
+version = "0.6.1-dev"
 dependencies = [
  "rhei-plan",
 ]
 
 [[package]]
 name = "rhei-api"
-version = "0.6.0"
+version = "0.6.1-dev"
 dependencies = [
  "napi",
  "napi-build",
@@ -1355,7 +1355,7 @@ dependencies = [
 
 [[package]]
 name = "rhei-cli"
-version = "0.6.0"
+version = "0.6.1-dev"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1389,7 +1389,7 @@ dependencies = [
 
 [[package]]
 name = "rhei-e2e-tests"
-version = "0.6.0"
+version = "0.6.1-dev"
 dependencies = [
  "fs2",
  "jsonschema",
@@ -1407,7 +1407,7 @@ dependencies = [
 
 [[package]]
 name = "rhei-integration-tests"
-version = "0.6.0"
+version = "0.6.1-dev"
 dependencies = [
  "rhei-cli",
  "rhei-plan",
@@ -1417,7 +1417,7 @@ dependencies = [
 
 [[package]]
 name = "rhei-plan"
-version = "0.6.0"
+version = "0.6.1-dev"
 dependencies = [
  "base64",
  "fs2",

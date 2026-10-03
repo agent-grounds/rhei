@@ -22,6 +22,11 @@ transitions:
     to: completed
 "#;
 
+// Positive reset-boundary observations have finite, portable test patience: a slow runner
+// starts a contender late, and the wait must outlast it (rhei#424). Named apart from the
+// claim tests' constant, which shares this test module. §FS-rhei-reset.3
+const RESET_TEST_PATIENCE: Duration = Duration::from_secs(30);
+
 fn reset_exclusion_plan(title: &str, state: &str, assigned: bool) -> String {
     format!(
         "# Rhei: {title}\n\n---\nmetadata:\n  tasks:\n    1:\n      stateVisits:\n        {state}: 1\n---\n\n## Tasks\n\n### Task 1: Work\n**State:** {state}\n{}",
@@ -79,15 +84,15 @@ fn full_reset_excludes_waiters_through_runtime_deletion_and_recreation() {
         set_reset_confirmation(true, || panic!("--yes reset must not prompt"));
         set_reset_before_locks_hook(move || {
             before_locks_tx.send(()).expect("reset reached lock acquisition");
-            acquire_rx.recv_timeout(Duration::from_secs(2)).expect("acquire reset locks");
+            acquire_rx.recv_timeout(RESET_TEST_PATIENCE).expect("acquire reset locks");
         });
         set_reset_after_preview_hook(move |decision| {
             preview_tx.send(reset_decision_view(decision)).expect("reset preview");
-            continue_rx.recv_timeout(Duration::from_secs(2)).expect("continue reset");
+            continue_rx.recv_timeout(RESET_TEST_PATIENCE).expect("continue reset");
         });
         set_reset_before_unlock_hook(move |decision| {
             clean_tx.send(reset_decision_view(decision)).expect("reset cleaned");
-            unlock_rx.recv_timeout(Duration::from_secs(2)).expect("release reset");
+            unlock_rx.recv_timeout(RESET_TEST_PATIENCE).expect("release reset");
         });
         reset_command(&reset_plan, Some(&reset_machine), &[], false, true)
             .map_err(|error| error.to_string())
@@ -96,7 +101,7 @@ fn full_reset_excludes_waiters_through_runtime_deletion_and_recreation() {
     // A writer that commits before acquisition belongs to the authoritative
     // preview rather than the stale plan reset first loaded.
     before_locks_rx
-        .recv_timeout(Duration::from_secs(2))
+        .recv_timeout(RESET_TEST_PATIENCE)
         .expect("reset before lock acquisition");
     transition_command(
         &plan,
@@ -112,7 +117,7 @@ fn full_reset_excludes_waiters_through_runtime_deletion_and_recreation() {
     .expect("transition before reset locks");
     assert!(fs::read_to_string(&plan).expect("transitioned plan").contains("**State:** pending"));
     acquire_tx.send(()).expect("allow reset acquisition");
-    let preview = preview_rx.recv_timeout(Duration::from_secs(2)).expect("reset preview");
+    let preview = preview_rx.recv_timeout(RESET_TEST_PATIENCE).expect("reset preview");
     assert_eq!(preview.scope, None);
     assert_eq!((preview.task_count, preview.descendant_count), (1, 0));
     assert_eq!(preview.moves.len(), 1, "the pre-lock transition must be previewed");
@@ -142,7 +147,7 @@ fn full_reset_excludes_waiters_through_runtime_deletion_and_recreation() {
         result
     });
     assert_eq!(
-        plan_lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition lock attempt"),
+        plan_lock_rx.recv_timeout(RESET_TEST_PATIENCE).expect("transition lock attempt"),
         PlanLockEvent::Contended
     );
 
@@ -162,12 +167,12 @@ fn full_reset_excludes_waiters_through_runtime_deletion_and_recreation() {
         result
     });
     assert_eq!(
-        ledger_lock_rx.recv_timeout(Duration::from_secs(2)).expect("ledger lock attempt"),
+        ledger_lock_rx.recv_timeout(RESET_TEST_PATIENCE).expect("ledger lock attempt"),
         LedgerLockEvent::Contended
     );
 
     continue_tx.send(()).expect("continue reset cleanup");
-    let summary = clean_rx.recv_timeout(Duration::from_secs(2)).expect("reset cleanup boundary");
+    let summary = clean_rx.recv_timeout(RESET_TEST_PATIENCE).expect("reset cleanup boundary");
     assert_eq!(summary, preview, "preview and summary must use one locked decision");
     assert!(!runtime.exists(), "full reset must remove runtime while retaining its locks");
     assert!(
@@ -189,11 +194,11 @@ fn full_reset_excludes_waiters_through_runtime_deletion_and_recreation() {
     transition.join().expect("transition thread").expect("transition succeeds");
 
     assert_eq!(
-        ledger_lock_rx.recv_timeout(Duration::from_secs(2)).expect("ledger acquisition"),
+        ledger_lock_rx.recv_timeout(RESET_TEST_PATIENCE).expect("ledger acquisition"),
         LedgerLockEvent::Acquired
     );
     assert_eq!(
-        plan_lock_rx.recv_timeout(Duration::from_secs(2)).expect("plan acquisition"),
+        plan_lock_rx.recv_timeout(RESET_TEST_PATIENCE).expect("plan acquisition"),
         PlanLockEvent::Acquired
     );
     let final_plan = fs::read_to_string(&plan).expect("final plan");
@@ -245,16 +250,16 @@ fn narrowed_reset_serializes_pruning_with_an_untargeted_transition() {
     let resetter = std::thread::spawn(move || {
         set_reset_after_preview_hook(move |decision| {
             preview_tx.send(reset_decision_view(decision)).expect("reset preview");
-            continue_rx.recv_timeout(Duration::from_secs(2)).expect("continue reset");
+            continue_rx.recv_timeout(RESET_TEST_PATIENCE).expect("continue reset");
         });
         set_reset_before_unlock_hook(move |decision| {
             pruned_tx.send(reset_decision_view(decision)).expect("reset pruned");
-            unlock_rx.recv_timeout(Duration::from_secs(2)).expect("release reset");
+            unlock_rx.recv_timeout(RESET_TEST_PATIENCE).expect("release reset");
         });
         reset_command(&reset_project, None, &["auth".to_string()], false, true)
             .map_err(|error| error.to_string())
     });
-    let preview = preview_rx.recv_timeout(Duration::from_secs(2)).expect("reset preview");
+    let preview = preview_rx.recv_timeout(RESET_TEST_PATIENCE).expect("reset preview");
     assert_eq!(preview.scope, Some(BTreeSet::from(["auth".to_string()])));
     assert_eq!((preview.task_count, preview.descendant_count), (1, 0));
     assert_eq!(preview.moves.len(), 1);
@@ -284,13 +289,13 @@ fn narrowed_reset_serializes_pruning_with_an_untargeted_transition() {
         result
     });
     assert_eq!(
-        ledger_lock_rx.recv_timeout(Duration::from_secs(2)).expect("ledger contention"),
+        ledger_lock_rx.recv_timeout(RESET_TEST_PATIENCE).expect("ledger contention"),
         LedgerLockEvent::Contended,
         "the untargeted transition must reach the production ledger lock"
     );
 
     continue_tx.send(()).expect("continue narrowed reset");
-    let summary = pruned_rx.recv_timeout(Duration::from_secs(2)).expect("prune boundary");
+    let summary = pruned_rx.recv_timeout(RESET_TEST_PATIENCE).expect("prune boundary");
     assert_eq!(summary, preview, "narrowed preview and summary must share one decision");
     assert!(
         matches!(done_rx.recv_timeout(Duration::from_millis(50)), Err(RecvTimeoutError::Timeout)),
@@ -308,7 +313,7 @@ fn narrowed_reset_serializes_pruning_with_an_untargeted_transition() {
     resetter.join().expect("reset thread").expect("narrowed reset succeeds");
     transition.join().expect("transition thread").expect("transition succeeds");
     assert_eq!(
-        ledger_lock_rx.recv_timeout(Duration::from_secs(2)).expect("ledger acquisition"),
+        ledger_lock_rx.recv_timeout(RESET_TEST_PATIENCE).expect("ledger acquisition"),
         LedgerLockEvent::Acquired
     );
 
@@ -351,16 +356,16 @@ fn declined_confirmation_releases_waiting_writer_without_reset_mutation() {
         });
         set_reset_confirmation(true, move || {
             confirm_tx.send(()).expect("confirmation reached");
-            decline_rx.recv_timeout(Duration::from_secs(2)).expect("decline reset");
+            decline_rx.recv_timeout(RESET_TEST_PATIENCE).expect("decline reset");
             false
         });
         reset_command(&reset_plan, Some(&reset_machine), &[], false, false)
             .map_err(|error| error.to_string())
     });
 
-    let preview = preview_rx.recv_timeout(Duration::from_secs(2)).expect("reset preview");
+    let preview = preview_rx.recv_timeout(RESET_TEST_PATIENCE).expect("reset preview");
     assert_eq!(preview.moves.len(), 1);
-    confirm_rx.recv_timeout(Duration::from_secs(2)).expect("confirmation boundary");
+    confirm_rx.recv_timeout(RESET_TEST_PATIENCE).expect("confirmation boundary");
 
     let (plan_lock_tx, plan_lock_rx) = mpsc::channel();
     let transition_plan = plan.clone();
@@ -381,7 +386,7 @@ fn declined_confirmation_releases_waiting_writer_without_reset_mutation() {
         .map_err(|error| error.to_string())
     });
     assert_eq!(
-        plan_lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition contention"),
+        plan_lock_rx.recv_timeout(RESET_TEST_PATIENCE).expect("transition contention"),
         PlanLockEvent::Contended
     );
 
@@ -389,7 +394,7 @@ fn declined_confirmation_releases_waiting_writer_without_reset_mutation() {
     resetter.join().expect("reset thread").expect("declined reset succeeds");
     transition.join().expect("transition thread").expect("waiting transition succeeds");
     assert_eq!(
-        plan_lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition acquisition"),
+        plan_lock_rx.recv_timeout(RESET_TEST_PATIENCE).expect("transition acquisition"),
         PlanLockEvent::Acquired
     );
 
@@ -427,14 +432,14 @@ fn noninteractive_refusal_releases_waiting_writer_without_reset_mutation() {
     let resetter = std::thread::spawn(move || {
         set_reset_after_preview_hook(move |decision| {
             preview_tx.send(reset_decision_view(decision)).expect("reset preview");
-            refuse_rx.recv_timeout(Duration::from_secs(2)).expect("refuse reset");
+            refuse_rx.recv_timeout(RESET_TEST_PATIENCE).expect("refuse reset");
         });
         set_reset_confirmation(false, || panic!("non-interactive reset must not prompt"));
         reset_command(&reset_plan, Some(&reset_machine), &[], false, false)
             .map_err(|error| error.to_string())
     });
 
-    let preview = preview_rx.recv_timeout(Duration::from_secs(2)).expect("reset preview");
+    let preview = preview_rx.recv_timeout(RESET_TEST_PATIENCE).expect("reset preview");
     assert_eq!(preview.moves.len(), 1);
 
     let (plan_lock_tx, plan_lock_rx) = mpsc::channel();
@@ -456,7 +461,7 @@ fn noninteractive_refusal_releases_waiting_writer_without_reset_mutation() {
         .map_err(|error| error.to_string())
     });
     assert_eq!(
-        plan_lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition contention"),
+        plan_lock_rx.recv_timeout(RESET_TEST_PATIENCE).expect("transition contention"),
         PlanLockEvent::Contended
     );
 
@@ -465,7 +470,7 @@ fn noninteractive_refusal_releases_waiting_writer_without_reset_mutation() {
     assert!(error.contains("stdin is not a terminal"), "unexpected refusal: {error}");
     transition.join().expect("transition thread").expect("waiting transition succeeds");
     assert_eq!(
-        plan_lock_rx.recv_timeout(Duration::from_secs(2)).expect("transition acquisition"),
+        plan_lock_rx.recv_timeout(RESET_TEST_PATIENCE).expect("transition acquisition"),
         PlanLockEvent::Acquired
     );
 

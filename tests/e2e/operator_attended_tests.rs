@@ -2,6 +2,7 @@
 //! §FS-rhei-recover.5 §FS-rhei-transition-cmd.6
 
 use super::operator_force_support::*;
+use super::terminal_watch_support::TerminalWatch;
 use super::*;
 use std::io::{Read, Write};
 use std::sync::mpsc;
@@ -27,32 +28,12 @@ pub(super) fn attended(fixture: &ForceFixture, arguments: &[&str], answer: &str)
     let mut child = pair.slave.spawn_command(command).unwrap();
     let mut killer = child.clone_killer();
     drop(pair.slave);
-    let mut reader = pair.master.try_clone_reader().unwrap();
+    let reader = pair.master.try_clone_reader().unwrap();
     let mut writer = pair.master.take_writer().unwrap();
-    let (prompt_tx, prompt_rx) = mpsc::channel();
-    let (output_tx, output_rx) = mpsc::channel();
-    std::thread::spawn(move || {
-        let mut all = Vec::new();
-        let mut buffer = [0; 4096];
-        let mut prompted = false;
-        while let Ok(count) = reader.read(&mut buffer) {
-            if count == 0 {
-                break;
-            }
-            all.extend_from_slice(&buffer[..count]);
-            if !prompted && String::from_utf8_lossy(&all).contains(": type ") {
-                prompted = true;
-                let _ = prompt_tx.send(());
-            }
-        }
-        let _ = output_tx.send(String::from_utf8_lossy(&all).into_owned());
-    });
-    if prompt_rx.recv_timeout(Duration::from_secs(20)).is_err() {
+    let watch = TerminalWatch::start(reader, ": type ");
+    if !watch.prompted_within(Duration::from_secs(20)) {
         let _ = killer.kill();
-        panic!(
-            "operator prompt missing: {}",
-            output_rx.recv_timeout(Duration::from_secs(5)).unwrap_or_default()
-        );
+        panic!("operator prompt missing: {}", watch.transcript_for_failure(Duration::from_secs(5)));
     }
     writer.write_all(answer.as_bytes()).unwrap();
     writer.flush().unwrap();
@@ -69,9 +50,7 @@ pub(super) fn attended(fixture: &ForceFixture, arguments: &[&str], answer: &str)
     };
     drop(writer);
     drop(pair.master);
-    let output =
-        output_rx.recv_timeout(Duration::from_secs(10)).expect("terminal transcript drained");
-    (status.success(), output)
+    (status.success(), watch.transcript(Duration::from_secs(10)))
 }
 
 /// Equivalent success on Linux/macOS/Windows; no Unix-only test gate. §FS-rhei-recover.5
@@ -289,4 +268,49 @@ fn operator_attended_native_terminal_result_round_trip() {
     let ledger = fs::read_to_string(fixture.dir.join("runtime/state-transitions.log")).unwrap();
     assert_eq!(rhei_core::transition_history::parse(&ledger).unwrap().len(), 3);
     assert!(!fixture.dir.join("runtime/transitions.log").exists());
+}
+
+/// A terminal that has printed `first` and then stays open without a prompt,
+/// as a ConPTY does while the harness still holds the pseudo-console.
+struct NeverEndingTerminal {
+    first: Option<&'static [u8]>,
+    open: mpsc::Receiver<()>,
+}
+
+impl Read for NeverEndingTerminal {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        if let Some(first) = self.first.take() {
+            buffer[..first.len()].copy_from_slice(first);
+            return Ok(first.len());
+        }
+        let _ = self.open.recv();
+        Ok(0)
+    }
+}
+
+/// A wait that runs out against a terminal that never ends still reports what
+/// the terminal printed, within its bound. §REQ-cross-platform.7
+#[test]
+fn a_prompt_wait_that_runs_out_reports_what_a_never_ending_terminal_printed() {
+    let (keep_open, open) = mpsc::channel();
+    let watch = TerminalWatch::start(
+        NeverEndingTerminal {
+            first: Some(b"error: printed before the prompt wait ran out\r\n"),
+            open,
+        },
+        ": type ",
+    );
+    assert!(!watch.prompted_within(Duration::from_millis(200)));
+    let started = std::time::Instant::now();
+    let transcript = watch.transcript_for_failure(Duration::from_secs(2));
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "the failure waited {:?}",
+        started.elapsed()
+    );
+    assert!(
+        transcript.contains("printed before the prompt wait ran out"),
+        "the failure transcript lost what the terminal printed: {transcript:?}"
+    );
+    drop(keep_open);
 }

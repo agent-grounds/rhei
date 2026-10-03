@@ -22,6 +22,7 @@ mod agent_family_transport_tests;
 mod agent_grounds_settings_tests;
 mod agent_grounds_support;
 mod agent_grounds_templates_tests;
+mod agent_owed_marker_tests;
 mod agent_prompt_path_tests;
 mod agent_prompt_size_tests;
 mod agent_reentry_completion_tests;

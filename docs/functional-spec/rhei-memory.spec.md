@@ -622,7 +622,9 @@ are never silently omitted here.
    A path is spelled by ([§FS-rhei-agents.4.1](rhei-agents.spec.md#41-paths-in-the-prompt)), the rule the transcript
    path beside it follows, so the two cannot read against different bases. A
    path that still carries an unresolved `{...}` template keeps the warning's
-   own marker, inside the parentheses and after the path:
+   own marker — the one answer the warning prints, decided from the authored
+   relative path and never from its root ([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)) — inside the
+   parentheses and after the path:
 
    ```
    issue (`runtime/triage/{reviewer}.issue.md`, unresolved template)

@@ -1468,6 +1468,13 @@ Under `orchestrator` authority, `rhei run`:
      variable outside the namespace in
      [Variable Namespace](rhei-states.spec.md#41-variable-namespace), which is
      left verbatim by design.
+     The marker is decided once per entry, from the path as authored relative
+     to its root — a declared output's resolved `path:`, or the result's
+     `runtime/results/…` path as [§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result) writes it, a fan-out
+     fragment's state name included verbatim — and never from the root that
+     path is joined to: a checked path under a directory whose name holds a
+     brace is not a template. This warning and the retry prompt
+     ([§FS-rhei-memory.4.4](rhei-memory.spec.md#44-previous-visits)) print that one answer; neither asks again.
    - Otherwise, evaluate forward transitions in normal selection order and
      execute the first match.
 

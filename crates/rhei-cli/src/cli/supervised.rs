@@ -41,6 +41,30 @@ fn next_poll_interval(current: Duration) -> Duration {
     (current * 2).min(SUPERVISED_POLL_MAX)
 }
 
+/// How long a child dead of an interrupting signal waits for the run's own copy
+/// of that signal to raise the stop token before it is classed `exited`.
+/// §FS-rhei-run.3.2
+const SHUTDOWN_DELIVERY_SETTLE: Duration = Duration::from_millis(250);
+
+/// Whether `status` is a death by one of the signals that interrupt a run —
+/// `SIGINT`, `SIGTERM`, `SIGHUP` — either raw or as a shell's `128 + signal`.
+/// Only such a death can be the run's own shutdown arriving a moment early.
+/// §FS-rhei-run.3.2
+fn died_of_an_interrupting_signal(status: std::process::ExitStatus) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt as _;
+        let interrupting = [Signal::SIGINT, Signal::SIGTERM, Signal::SIGHUP].map(|s| s as i32);
+        status.signal().is_some_and(|signum| interrupting.contains(&signum))
+            || status.code().is_some_and(|code| interrupting.contains(&(code - 128)))
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = status;
+        false
+    }
+}
+
 /// Poll interval while waiting out the termination grace.
 const SUPERVISED_GRACE_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
@@ -922,8 +946,17 @@ impl Supervised {
         let mut poll = SUPERVISED_POLL_MIN;
         loop {
             if let Some(status) = self.child.try_wait()? {
+                // A death the shutdown delivered is an interruption. Announced
+                // while the group is still registered, so the notice names it.
+                // §FS-rhei-run.3.2
+                let cause = if !status.success() && self.ended_under_shutdown(status, stop) {
+                    announce_shutdown(stop, notify);
+                    EndCause::Interrupted
+                } else {
+                    EndCause::Exited
+                };
                 self.finish();
-                return Ok(Ended { status, cause: EndCause::Exited });
+                return Ok(Ended { status, cause });
             }
             // Shutdown outranks the deadline: both are true when an agent is
             // seconds from its timeout as the operator hits Ctrl+C, and calling
@@ -954,6 +987,33 @@ impl Supervised {
             };
             return Ok(Ended { status, cause });
         }
+    }
+
+    /// Whether a child that ended on its own, unsuccessfully, ended under this
+    /// run's shutdown, which makes it interrupted rather than exited
+    /// (§FS-rhei-run.3.2).
+    ///
+    /// One delivery that reaches the run and its agent at once — systemd
+    /// stopping a cgroup — does not promise the run's handler runs first: the
+    /// agent can be dead and reaped before the run's own copy of the signal has
+    /// raised the token. A child dead of an interrupting signal therefore gets
+    /// a short, bounded look at the token before it is classed `exited`; any
+    /// other failure is read against the token as it stands.
+    fn ended_under_shutdown(&self, status: std::process::ExitStatus, stop: &StopToken) -> bool {
+        if self.shutdown_requested(stop) {
+            return true;
+        }
+        if !died_of_an_interrupting_signal(status) {
+            return false;
+        }
+        let deadline = Instant::now() + SHUTDOWN_DELIVERY_SETTLE;
+        while Instant::now() < deadline {
+            std::thread::sleep(SUPERVISED_POLL_MIN);
+            if self.shutdown_requested(stop) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Run the shared termination sequence against this invocation's group and

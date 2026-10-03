@@ -8,6 +8,8 @@
 
 #![cfg(unix)]
 
+#[path = "poll_resume_evidence.rs"]
+mod evidence;
 #[path = "poll_resume_observation_tests.rs"]
 mod observation_tests;
 
@@ -158,7 +160,12 @@ sys.exit(75)
     // §FS-rhei-run.3.5
     fn snapshot_with_gap(&self, gap: impl FnOnce()) -> PollSnapshot {
         let plan_text = fs::read_to_string(&self.plan).expect("read member plan");
-        let parsed = rhei_core::parse(&plan_text).expect("parse member plan");
+        self.snapshot_from_plan_with_gap(&plan_text, gap)
+    }
+
+    // A saved plan keeps its capture boundary even if gap() starts after the deadline. §FS-rhei-run.3.5
+    fn snapshot_from_plan_with_gap(&self, plan_text: &str, gap: impl FnOnce()) -> PollSnapshot {
+        let parsed = rhei_core::parse(plan_text).expect("parse member plan");
         gap();
         PollSnapshot {
             attempts: fs::read_to_string(self.project.join("runtime/program-attempts.txt"))
@@ -166,8 +173,8 @@ sys.exit(75)
                 .lines()
                 .count(),
             state: parsed.tasks.first().map(|task| task.state.clone()).unwrap_or_default(),
-            deadline: triage_metadata_value(&plan_text, "pollNextAttemptAt"),
-            visits: triage_metadata_value(&plan_text, "stateVisits"),
+            deadline: triage_metadata_value(plan_text, "pollNextAttemptAt"),
+            visits: triage_metadata_value(plan_text, "stateVisits"),
             run_log: fs::read_to_string(self.project.join("runtime/run.log")).unwrap_or_default(),
             ledger: fs::read_to_string(self.project.join("runtime/state-transitions.log"))
                 .unwrap_or_default(),
@@ -217,10 +224,11 @@ fn wait_for(what: &str, mut condition: impl FnMut() -> bool) {
 /// §FS-rhei-run.3.5
 #[test]
 fn a_resumed_program_poll_waits_then_spawns_its_next_attempt() {
-    resumed_poll_scenario(|workspace, _| workspace.snapshot());
+    resumed_poll_scenario(|workspace, _, _| workspace.snapshot());
 }
 
-fn resumed_poll_scenario(observe: impl Fn(&PollWorkspace, u64) -> PollSnapshot) {
+/// Exercise the restart and actual-exit contract with independently published evidence. §FS-rhei-run.3.5
+fn resumed_poll_scenario(observe: impl Fn(&PollWorkspace, u64, &str) -> PollSnapshot) {
     let workspace = PollWorkspace::new();
     let first_id = workspace.launch();
     wait_for("attempt 1 and its persisted future deadline", || {
@@ -239,23 +247,29 @@ fn resumed_poll_scenario(observe: impl Fn(&PollWorkspace, u64) -> PollSnapshot) 
     );
 
     workspace.stop(&first_id);
+    // Capture while no runner can update the plan; the later pre-deadline restart check bounds this read.
+    // §FS-rhei-run.3.5
+    let captured_plan = fs::read_to_string(&workspace.plan).expect("capture stopped runner's plan");
     assert!(
         unix_secs() < first_deadline,
         "the first run must stop before its persisted deadline: {first:#?}"
     );
 
     let resumed_id = workspace.launch();
+    let restarted_at = unix_secs();
     assert!(
-        unix_secs() < first_deadline,
+        restarted_at < first_deadline,
         "the resumed run must start before the persisted deadline: {first:#?}"
     );
+    eprintln!("BOUNDARY captured_before_restart=true restarted_at={restarted_at} deadline={first_deadline}");
     loop {
         let checked_at = unix_secs();
-        if checked_at >= first_deadline {
+        // Observe at least once, even if descheduled after the successful restart check. §FS-rhei-run.3.5
+        let before_deadline = observe(&workspace, first_deadline, &captured_plan);
+        assert_retry_not_early(&workspace, first_deadline, checked_at, &before_deadline);
+        if unix_secs() >= first_deadline {
             break;
         }
-        let before_deadline = observe(&workspace, first_deadline);
-        assert_retry_not_early(&workspace, first_deadline, checked_at, &before_deadline);
         std::thread::sleep(Duration::from_millis(25));
     }
 
@@ -268,7 +282,16 @@ fn resumed_poll_scenario(observe: impl Fn(&PollWorkspace, u64) -> PollSnapshot) 
     });
     let resumed = workspace.snapshot();
     assert_retry_not_early(&workspace, first_deadline, unix_secs(), &resumed);
+    // Always require completed attempt 2, including when the false exit-zero route supplied no counter.
+    // §FS-rhei-run.3.5
+    evidence::completed_retry_start(&workspace);
     workspace.stop_quietly();
+    assert_eq!(
+        fs::read_to_string(workspace.project.join("runtime/program-attempts.txt"))
+            .expect("read real invocation identities"),
+        "attempt=1\nattempt=2\n",
+        "the isolated stop/restart fixture must execute exactly attempts 1 and 2"
+    );
 
     assert!(
         resumed.attempts == 2
@@ -284,18 +307,20 @@ fn resumed_poll_scenario(observe: impl Fn(&PollWorkspace, u64) -> PollSnapshot) 
     );
 }
 
-// The current count-based oracle is deliberately retained for the red
-// regressions; implement repairs this shared seam. §FS-rhei-run.3.5
+/// Counts observed across the deadline require invocation evidence, regardless
+/// of the observer's earlier clock sample. §FS-rhei-run.3.5
 fn assert_retry_not_early(
-    _workspace: &PollWorkspace,
+    workspace: &PollWorkspace,
     first_deadline: u64,
-    checked_at: u64,
+    _checked_at: u64,
     observed: &PollSnapshot,
 ) {
-    if checked_at < first_deadline {
-        assert_eq!(
-            observed.attempts, 1,
-            "the persisted deadline must still prevent an early spawn: {observed:#?}"
+    assert!(matches!(observed.attempts, 1 | 2), "unexpected invocation count: {observed:#?}");
+    if observed.attempts == 2 {
+        let started = evidence::completed_retry_start(workspace);
+        assert!(
+            started >= first_deadline,
+            "early spawn: attempt 2's pre-creation sample {started} precedes deadline {first_deadline}"
         );
     }
 }

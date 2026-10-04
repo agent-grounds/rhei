@@ -82,6 +82,17 @@ directory it has no way to guarantee is writable. Four outcomes:
   kill the child: a slow start is not a failed one, and the descriptor and
   `rhei runs` will show what became of it.
 
+**An id the launcher prints already resolves.** The child writes its registry
+entry (§2) only after its workspace descriptor, so the handshake can end before
+the entry exists. Before printing an id, under either outcome that prints one,
+the launcher therefore writes the descriptor it just read to the registry
+itself, never replacing an entry already there: `rhei attach <id>`,
+`rhei stop <id>` and `rhei runs` find the run the moment the id is on screen
+wherever the registry is writable. The launcher never waits on the child's own
+write to get there. It warns that the id will not resolve only when the entry
+is still absent after its own attempt, and the warning names why: the state
+directory it tried and the error writing it.
+
 The launcher holds a dedicated **`.rhei/headless-launch.lock`** across the whole
 stretch — pre-check, truncating `runtime/run.log`, spawning, handshake — and
 takes it without waiting. A second launcher on the same workspace fails at once
@@ -170,7 +181,8 @@ Every run also writes a **registry entry** at
 `~/.local/state/rhei/runs/`) holding the same object. The registry is what maps
 a bare id to a workspace, so `rhei attach <id>` works from any directory. A
 failure to write it is a warning, not a silence: the run continues, reachable by
-path rather than by id.
+path rather than by id. For a detached run the launcher gives that warning on
+the operator's terminal, since the child's lands in `runtime/run.log` (§1.1).
 
 **The entry outlives the run.** When the run ends its entry is rewritten with the
 terminal status and exit code rather than deleted, because the question

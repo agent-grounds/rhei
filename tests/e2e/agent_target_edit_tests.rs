@@ -72,6 +72,7 @@ struct Finished {
     dir: TestDir,
     plan: PathBuf,
     machine: PathBuf,
+    entry: Entry,
     spawns_before_edit: usize,
 }
 
@@ -97,7 +98,7 @@ fn finished_then_died(name: &str, before: &str, entry: Entry) -> Finished {
     fs::write(&plan, plan_before).expect("restore the plan: the move was never applied");
     fs::write(dir.join("runtime/state-transitions.log"), ledger_before)
         .expect("restore the ledger: the move was never recorded");
-    Finished { dir, plan, machine, spawns_before_edit }
+    Finished { dir, plan, machine, entry, spawns_before_edit }
 }
 
 impl Finished {
@@ -111,8 +112,15 @@ impl Finished {
         (run, spawned)
     }
 
+    /// The record file name of `slug`'s spawn in the dying run's visit: `work`
+    /// keeps no visit counter, so a re-entry's name carries its entry number.
+    fn record_name(&self, slug: &str) -> String {
+        let number = if self.entry == Entry::Reentry { "-2" } else { "" };
+        format!("task-plan.1-work-{slug}{number}.json")
+    }
+
     fn record(&self, slug: &str) -> PathBuf {
-        self.dir.join("runtime/spawns").join(format!("task-plan.1-work-{slug}.json"))
+        self.dir.join("runtime/spawns").join(self.record_name(slug))
     }
 }
 
@@ -145,7 +153,6 @@ fn target(selector: &str) -> String {
 #[test]
 fn an_in_place_target_edit_keeps_the_visits_finished_work_whatever_the_slug() {
     let old = target("mock:mock:m/x");
-    let old_record = "task-plan.1-work-mock-mock-m-x.json";
     let mut failures = Vec::new();
     for (entry, entry_label) in [(Entry::First, "first"), (Entry::Reentry, "reentry")] {
         for (new, slug_label) in
@@ -164,7 +171,8 @@ fn an_in_place_target_edit_keeps_the_visits_finished_work_whatever_the_slug() {
                 continue;
             }
             if slug_label == "different-slug" {
-                if let Some(missing) = missing_reuse_note(&run, old_record, new) {
+                let old_record = fixture.record_name("mock-mock-m-x");
+                if let Some(missing) = missing_reuse_note(&run, &old_record, new) {
                     failures.push(format!("{cell}: skipped, but {missing}"));
                 }
             } else if !reuse_notes(&run).is_empty() {
@@ -197,7 +205,7 @@ fn editing_one_fanout_member_pairs_its_orphan_and_spawns_nothing() {
         run.stdout
     );
     if let Some(missing) =
-        missing_reuse_note(&run, "task-plan.1-work-mock-mock-m-x.json", "mock:mock:m-y")
+        missing_reuse_note(&run, &fixture.record_name("mock-mock-m-x"), "mock:mock:m-y")
     {
         panic!("fan-out: {missing}");
     }
@@ -257,7 +265,7 @@ fn an_orphan_never_answers_for_an_invocation_whose_own_spawn_failed() {
     spawned.sort();
     spawned.dedup();
     assert_eq!(spawned, ["mock:mock:c", "mock:mock:d"], "an ambiguous edit spawns both");
-    assert!(first.stderr.contains("task-plan.1-work-mock-mock-x.json"), "{}", first.stderr);
+    assert!(first.stderr.contains(&fixture.record_name("mock-mock-x")), "{}", first.stderr);
     let state = || fs::read_to_string(&fixture.plan).expect("plan");
     assert!(state().contains("**State:** work"), "d failed, so the ticket stays in work");
 
@@ -279,7 +287,33 @@ fn a_current_siblings_record_never_excuses_another_sibling() {
     let fanout = r#"all_targets: ["mock:mock:a", "mock:mock:b"]"#;
     let fixture = finished_then_died("agent-target-edit-sibling", fanout, Entry::Reentry);
     fs::remove_file(fixture.record("mock-mock-b")).expect("only a finished this visit");
+    // Its log goes too: a log no record accounts for is refused, not overwritten.
+    let log = fixture.record_name("mock-mock-b").replace(".json", ".log");
+    fs::remove_file(fixture.dir.join("runtime/logs").join(log)).expect("and left no log");
     let (run, spawned) = fixture.edit_and_run(fanout);
     assert_eq!(spawned, ["mock:mock:b"], "a's record is a's own; b must spawn:\n{}", run.stdout);
+    assert!(reuse_notes(&run).is_empty(), "nothing is paired:\n{}", run.stdout);
+}
+
+// §FS-rhei-agents.8.4: a record an invocation reads as its own through the upgrade fallback is no orphan.
+#[test]
+fn a_record_read_through_the_upgrade_fallback_never_excuses_an_unfinished_sibling() {
+    let fanout = r#"all_targets: ["mock:mock:a", "mock:mock:b"]"#;
+    let fixture = finished_then_died("agent-target-edit-upgrade-fallback", fanout, Entry::Reentry);
+    // A runtime from before entry numbers: a's record of this re-entry has no
+    // number, and b never finished, so it left neither record nor log.
+    let spawns = fixture.dir.join("runtime/spawns");
+    fs::rename(fixture.record("mock-mock-a"), spawns.join("task-plan.1-work-mock-mock-a.json"))
+        .expect("a's record under the unnumbered name");
+    fs::remove_file(fixture.record("mock-mock-b")).expect("b did not finish");
+    let log = fixture.record_name("mock-mock-b").replace(".json", ".log");
+    fs::remove_file(fixture.dir.join("runtime/logs").join(log)).expect("and left no log");
+    let (run, spawned) = fixture.edit_and_run(fanout);
+    assert_eq!(
+        spawned,
+        ["mock:mock:b"],
+        "a reads its unnumbered record as its own, so it is no orphan and b must spawn:\n{}",
+        run.stdout
+    );
     assert!(reuse_notes(&run).is_empty(), "nothing is paired:\n{}", run.stdout);
 }

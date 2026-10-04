@@ -38,6 +38,7 @@ mod budget_copied_project_support;
 mod budget_copied_project_tests;
 mod budget_declaration_free_tests;
 mod budget_edge_support;
+mod budget_nested_plan_tests;
 mod budget_path_reuse_quoting_tests;
 mod budget_path_reuse_support;
 mod budget_path_reuse_tests;

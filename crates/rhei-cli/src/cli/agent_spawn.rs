@@ -69,7 +69,8 @@ fn agent_stream_label(stream: rhei_tui::AgentStream) -> &'static str {
 }
 
 /// Keep the thread's independently owned inputs explicit, as in `spawn_and_wait_agent`.
-/// Raw capture is separate from usage parsing and display for provider recognition. §FS-rhei-agents.2.3
+/// Capture raw lines with their stream so provider recognition can interpret stdout
+/// independently of usage parsing and display. §FS-rhei-agents.2.3
 #[allow(clippy::too_many_arguments)]
 fn spawn_agent_output_reader<R>(
     reader: R,
@@ -79,7 +80,7 @@ fn spawn_agent_output_reader<R>(
     slot: rhei_tui::Slot,
     task_id: String,
     usage_capture: Option<AgentUsageCapture>,
-    captured_lines: Arc<Mutex<Vec<String>>>,
+    captured_lines: Arc<Mutex<Vec<(rhei_tui::AgentStream, String)>>>,
 ) -> std::thread::JoinHandle<std::io::Result<()>>
 where
     R: Read + Send + 'static,
@@ -96,7 +97,7 @@ where
 
             let raw_line = output_line(&buf);
             if let Ok(mut captured) = captured_lines.lock() {
-                captured.push(raw_line.clone());
+                captured.push((stream, raw_line.clone()));
             }
             let display_line = display_agent_output_line(usage_capture.as_ref(), stream, &raw_line);
             let is_claude_result = stream == rhei_tui::AgentStream::Stdout
@@ -514,6 +515,8 @@ fn spawn_and_wait_agent(
     let duration = format_duration_human(elapsed.as_secs());
     let ended_wall = std::time::SystemTime::now();
     let provider_limit = captured_lines.lock().ok().and_then(|lines| {
+        // Decode only Claude stdout result text before whole-line recognition. §FS-rhei-agents.2.3
+        let lines = provider_limit_output_lines(resolved.family(), &lines);
         classify_provider_limit(
             resolved,
             status,

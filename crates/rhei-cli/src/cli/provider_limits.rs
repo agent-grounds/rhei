@@ -96,6 +96,29 @@ fn unique_safe_boundary(
     }
 }
 
+/// Expose logical Claude stdout result lines without requiring a usage envelope.
+/// Keep other physical lines and independent signals intact. §FS-rhei-agents.2.3
+fn provider_limit_output_lines(
+    family: &str,
+    captured_lines: &[(rhei_tui::AgentStream, String)],
+) -> Vec<String> {
+    let mut lines = Vec::new();
+    for (stream, raw_line) in captured_lines {
+        if family == "claude-code" && *stream == rhei_tui::AgentStream::Stdout {
+            if let Ok(value) = serde_json::from_str::<serde_json::Value>(raw_line) {
+                if value.get("type").and_then(serde_json::Value::as_str) == Some("result") {
+                    if let Some(text) = value.get("result").and_then(serde_json::Value::as_str) {
+                        lines.extend(text.lines().map(str::to_owned));
+                        continue;
+                    }
+                }
+            }
+        }
+        lines.push(raw_line.clone());
+    }
+    lines
+}
+
 /// Recognize the reset signal of a provider in `RECOGNIZED_PROVIDERS` and turn
 /// its named local minute into the first safe UTC instant after that minute.
 /// §FS-rhei-agents.2.3 §FS-rhei-run.3.3

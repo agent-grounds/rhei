@@ -119,20 +119,16 @@ and writes nothing.
 can be written into and have the rhei run under it. Under
 [§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) clause 1 a rhei's own root is consulted whatever
 its index says, so writing the union into that file is enough — there is
-nothing for `--into` to declare. The three cases:
+nothing for `--into` to declare. The two cases:
 
-- the root file exists — union into that file; no declaration is written or
-  changed, whether the index declares the matching name or declares nothing;
+- the root file exists — union into that file; nothing in the index is written
+  or changed;
 - there is no file in the root — **refused**, printing the one remedy that
   makes the target eligible: `cp <project>/states.yaml <rhei>/states.yaml`,
-  with the note that the rhei then stops following the project default;
-- the index declares a name the root file's `name` does not match —
-  **refused**, naming both. This is a pre-existing load error, not one `--into`
-  introduces, and it survives the deprecation window
-  ([§FS-rhei-states-deprecation.1](rhei-states-deprecation.spec.md#1-the-deprecated-resolution-runs-first)) for as long as the declaration does: during
-  the window a union written into a file the declaration defers would not
-  govern the rhei for a release, which makes the refusal more necessary rather
-  than less.
+  with the note that the rhei then stops following the project default.
+
+A target whose index still carries a `**States:**` line is refused before any
+of this, at parse time ([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)), and nothing is written.
 
 The basin ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)) is never a `--into` target as a rhei: it holds
 unfiled tickets that run under the project default and has no machine of its own
@@ -202,33 +198,14 @@ all follow from the project already existing:
   `index.panta.md` is dropped, as a rhei template's title and description are
   dropped under `--into <rhei>` ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project) item 1): the project's manifest
   describes the project. In particular `--into` **never writes a
-  `**States:**` line**. Laying the default is writing `states.yaml` at the
+  `**States:**` line**: laying the default is writing `states.yaml` at the
   project root, because that file's presence is what makes a machine the
-  project default ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) clause 2), and the declaration is
-  deprecated ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)); the one command whose job is to lay a
-  correct project must not write a line it would warn the author to delete,
-  which is the rule [§FS-rhei-states-deprecation.1](rhei-states-deprecation.spec.md#1-the-deprecated-resolution-runs-first) already holds `rhei new --states`
-  to.
-- **A manifest that declares another machine is refused before anything is
-  written.** For as long as the deprecated declaration exists, a manifest's own
-  `**States:** X` is resolved ahead of the root file and wins
-  ([§FS-rhei-states-deprecation.1](rhei-states-deprecation.spec.md#1-the-deprecated-resolution-runs-first)), so a default laid under a machine whose `name:`
-  is not `X` would govern nothing for a release. The refusal names the manifest
-  and its line, both machine names, and the remedy — delete the deprecated line
-  — and leaves the project byte-identical. This is the third case of
-  [§FS-rhei-library.2.1](rhei-library.spec.md#21-the-machine-the-target-must-have) for the same reason: a write the declaration defers is a
-  write that does not govern. A manifest that declares the laid machine's own
-  name is neither refused nor edited, and one that declares nothing is the
-  ordinary case.
-
-  ```text
-  × 'reports/index.panta.md' declares `**States:** housemachine`, so the
-  │ default this lays, 'laidmachine', would not govern the project until the
-  │ declaration is removed
-  ╰─▶ delete the `**States:**` line from 'reports/index.panta.md' — the
-      declaration is deprecated, and the states.yaml at the project root is
-      the default without it — then run this again.
-  ```
+  project default ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) clause 2), and the line is no
+  longer part of the language ([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)).
+- **A manifest that still carries a `**States:**` line is refused before
+  anything is written**, at parse time ([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)), naming the manifest
+  and its line, with the remedy to delete it; the project is left
+  byte-identical.
 - **Members are laid once and never touched again.** An `includes:` entry whose
   member directory does not exist is laid by the member-laying path. One whose
   directory already exists is **skipped and reported**: not replaced, and not
@@ -344,11 +321,8 @@ not a reason to refuse it. The check reads it as it stands with the bundle the
 rebind lays; when even that cannot load, it has no errors to subtract, so every
 error the replacement leaves is reported, and a project that cannot load under
 the replacement either is refused with what that load reports. A check that
-decided governance itself — "a member with no `states.yaml` of its own runs
-under the default" — would be wrong for as long as the deprecated declaration
-exists: a member whose own `**States:** Y` resolves to a file in another rhei's
-root ([§FS-rhei-states-deprecation.1](rhei-states-deprecation.spec.md#1-the-deprecated-resolution-runs-first)) runs under `Y` whatever the default is,
-so its tickets are not the replacement's to strand, and they are not named.
+decided governance itself would duplicate resolution, which is the one thing
+that decides which tickets the default governs.
 
 "Allow" is the rule that already exists: an authored `**State:**` must appear in
 its node's resolved profile's `allowed` set, and every `node_policy.by_type` key

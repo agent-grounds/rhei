@@ -64,9 +64,16 @@ is an argument.
 | Flag                    | Default              | Description                                                    |
 |-------------------------|----------------------|----------------------------------------------------------------|
 | `--dir`                 | off                  | Create a Directory Workspace rhei, or adopt the prospective workspace §2.1.1 permits |
-| `--states <NAME>`       | project default      | Write a `**States:**` declaration; normal binding resolves it from the created rhei's execution root ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)) |
 | `--max-levels <N>`      | unset                | Write `structure.maxLevels`                                    |
 | `--node-kinds <K,...>`  | unset                | Write `structure.nodeKinds`                                    |
+
+There is no flag that names a state machine, because nothing in a plan does
+([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)): `rhei new "x" --states y` is clap's
+`unexpected argument '--states'`, exit 2. A rhei runs under the `states.yaml` in
+its own execution root, else the project default
+([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)). To give a new rhei a machine of its own, create it
+with `--dir` and put a `states.yaml` in its directory — before the create, which
+§2.1.1 adopts, or after it.
 
 ### 1.3. Options that create a ticket
 
@@ -120,11 +127,10 @@ from real work to `rhei next` and `rhei run`, so the first thing a new project
 would do is dispatch an agent onto a ticket nobody wrote.
 
 With the optional header fields, the order is fixed by the plan language —
-heading, `**States:**`, frontmatter, description, `## Tasks`:
+heading, frontmatter, description, `## Tasks`:
 
 ```markdown
 # Rhei: Billing
-**States:** billing-review
 
 ---
 structure:
@@ -136,19 +142,6 @@ Everything invoice-related, including dunning.
 
 ## Tasks
 ```
-
-`--states` only writes the declaration; it does not create the machine. A rhei
-declaring a machine that no `states.yaml` provides is an error, naming where the
-file is looked for, the machine names the project does provide, and
-`/rhei-state-machine-writer` for authoring the one that is missing
-([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding), §6). The create refuses that fault itself, ahead of the
-validation pass of §5.2, so it never writes a line and in the same breath warns
-the author to delete it ([§FS-rhei-states-deprecation.1](rhei-states-deprecation.spec.md#1-the-deprecated-resolution-runs-first)). Every other flag with a declared set of legal values
-lists that set when the value is wrong, and this one is no exception just
-because its set lives in files rather than in the plan. This is the
-honest order: the machine is authored, and the rhei points at it — so the
-create is rolled back like any other invalid one (§5.2), and writing the rhei
-*before* its machine takes `--keep-on-error`.
 
 ### 2.1. Layout
 
@@ -191,9 +184,10 @@ plan publication, names the obstruction, and tells the author to move or remove
 it.
 
 The allowlist classifies filesystem shape, not machine validity. Once the new
-`index.rhei.md` makes the directory a rhei, the ordinary project load resolves a
-declared `--states <NAME>` from that rhei's execution root and the ordinary
-post-write validation accepts or rejects the authored machine. This is the only
+`index.rhei.md` makes the directory a rhei, the ordinary project load resolves
+its `states.yaml` under clause 1 of §FS-rhei-plan-language.1.3 — nothing is
+declared for it to match — and the ordinary post-write validation accepts or
+rejects the authored machine. This is the only
 resolution path: creation does not search a prospective root before the index
 exists and does not add a second state-machine precedence rule. A successful
 adoption adds `index.rhei.md`, an empty `tasks/`, and establishes or reuses the
@@ -656,7 +650,7 @@ warning. Basin capture is the case that proves it: `--under basin` is the
 operation that has to work while someone is mid-edit somewhere else in the
 project, and a strict load anywhere on this path takes it out.
 
-Two consequences follow from being lenient, and both are part of the rule.
+One consequence follows from being lenient, and it is part of the rule.
 
 A `**Prior:**` or `**Consumes:**` whose leading segment names a *skipped* rhei
 is refused, naming that rhei and the parse error that skipped it. The target
@@ -666,18 +660,6 @@ pre/post diff — the reference resolves against no ticket on either side — an
 the create then reports that the errors are not its own. That is exactly
 backwards. The error that appears the moment the sibling is repaired *is* this
 create's `--prior`, sitting in a file nobody has looked at since.
-
-A rhei whose declared `**States:**` machine cannot be resolved does not fail a
-create anywhere else in the project. A declaration written before its
-`states.yaml` exists is the ordinary half-finished state — it is what
-`--keep-on-error` produces on purpose — and resolving strictly makes one empty
-rhei take out every create in the project, basin capture included, which
-[§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis) says is the one thing that must survive somebody else's
-mid-edit. The rhei being written *to* is different, because the new ticket's
-starting state comes out of its machine, so that one must resolve. The project
-still fails validation for the unresolved machine, identically before and after,
-so the create keeps its write and says the failure is not its own — nothing is
-hidden, it is only not this create's to refuse.
 
 The second rule is the point of running the pass twice. `rhei new` is the
 on-ramp: a project with one broken rhei is exactly the project someone is
@@ -696,7 +678,7 @@ the new index and task directory as well as the authored bundle it never owned.
 
 ### 5.3. Mode confusion is an error
 
-`--dir`, `--states`, `--max-levels`, and `--node-kinds` create a rhei; every
+`--dir`, `--max-levels`, and `--node-kinds` create a rhei; every
 flag in §1.3 creates a ticket. Passing one with the other mode's selector is
 refused, naming both flags. A flag silently ignored because the *other* flag
 decided the mode is the worst outcome available: the command reports success
@@ -743,7 +725,7 @@ necessary containing directories to remain. It gets there by doing the whole cre
 write, both validation passes, the id-set comparison, the reload — and then
 rolling back *unconditionally*, success included. Skipping the write would make
 the preview a report of the flags: every failure worth previewing (a `--prior`
-naming nothing, a `--states` naming no machine, a splice the parser reads
+naming nothing, a splice the parser reads
 differently than the writer did) is visible only once the bytes are on disk and
 the project is reloaded. `--dry-run` is the flag reached for *before* writing,
 so previewing happily and then failing for real is the one answer it must never
@@ -776,8 +758,8 @@ one place a caller cannot notice it.
   not require a template system to exist.
 - It does not create a project. That is `rhei init` ([§FS-rhei-init](rhei-init.spec.md#fs-rhei-init-rhei-init)), and the
   two compose: `rhei init && rhei new "Auth"`.
-- It does not write a `states.yaml`. `--states` declares which machine a rhei
-  runs under; authoring the machine is `rhei-state-machine-writer` territory
+- It does not write a `states.yaml`. Where that file sits decides which machine
+  a rhei runs under; authoring the machine is `rhei-state-machine-writer` territory
   ([§FS-rhei-state-machine-writer](rhei-state-machine-writer.spec.md#fs-rhei-state-machine-writer-rhei-state-machine-writer)).
 - It does not infer `--prior` from `--consumes`, create the producer's
   `**Provides:**`, or repair either side. The normal post-write validation

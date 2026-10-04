@@ -899,8 +899,8 @@ exactly as §FS-rhei-templates.6.1.2 steps 3–5 do:
 - **the default machine**: the rendered `states.yaml` at `<dir>/states.yaml`.
   That file's presence is what makes it the project default
   ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) clause 2), so laying it writes **no `**States:**`
-  line** anywhere — the declaration is deprecated
-  ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)), and a template's manifest should not carry one;
+  line** anywhere — the line is refused
+  ([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)), so a template's manifest cannot carry one;
 - **the bundle**: `prompt_templates/*` and `scripts/*` **copied** beside the
   manifest, never symlinked, so the project is self-contained even when the
   template is a built-in inside the binary and nothing platform-specific enters
@@ -1115,7 +1115,7 @@ All `{{...}}` are resolved during instantiation. All `{...}` remain for runtime.
 | Feature | Interaction |
 |---------|-------------|
 | **Runtime variables** (`{task_id}`, etc.) | Pass through instantiation untouched. Resolved later by `rhei next`. |
-| **State machines** | A template may bundle its own `states.yaml` at the output root. If present, `rhei instantiate`, `rhei validate`, `rhei run`, `rhei next`, and related commands that operate on the instantiated workspace use that sibling/root `states.yaml` by default when `--state-machine` is not supplied; otherwise they fall back to the built-in default. The bundled file is active whatever its `name:`; a rendered plan that also declares `**States:** <name>` carries the deprecated declaration, which resolves ahead of the file for one release and requires the two names to match ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). `--state-machine <path>` overrides the auto-discovered file. If a sibling `prompt_templates/` directory exists next to the active `states.yaml`, its direct `.md` files are loaded with that state machine. Templates that rely on non-default state names should therefore bundle `states.yaml`. |
+| **State machines** | A template may bundle its own `states.yaml` at the output root. If present, `rhei instantiate`, `rhei validate`, `rhei run`, `rhei next`, and related commands that operate on the instantiated workspace use that sibling/root `states.yaml` by default when `--state-machine` is not supplied; otherwise they fall back to the built-in default. The bundled file is active whatever its `name:`; a rendered plan carrying a `**States:**` line is refused ([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)). `--state-machine <path>` overrides the auto-discovered file. If a sibling `prompt_templates/` directory exists next to the active `states.yaml`, its direct `.md` files are loaded with that state machine. Templates that rely on non-default state names should therefore bundle `states.yaml`. |
 | **Directory workspaces** | Templates can produce directory workspaces. The `tasks/` directory and `index.rhei.md` are resolved like any other template file. |
 | **`rhei validate`** | Runs automatically post-instantiation. Template authors can validate their templates with `rhei instantiate --dry-run`. |
 | **Program states** | Program states (`program` field) work in templates. Instantiation variables resolve in `program` strings, `program.command` arrays, `program.env` values, and `program.working_directory`. Runtime variables in those fields pass through to `rhei run`. |

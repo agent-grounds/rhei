@@ -39,8 +39,9 @@ Each task exposes its authored `excludes` as an ordered array of typed entries;
 an absent field renders as an empty array, preserving the unchanged-plan AST
 shape convention used by `provides` and `consumes`.
 
-The top-level `states` field is the machine of the document as authored — for a
-project, the manifest default. A merged project runs **one machine per rhei**
+The top-level `states` field is the machine the document resolves
+([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)) — for a project, the project default: the
+`name:` of the `states.yaml` at the project root, else `rhei`. A merged project runs **one machine per rhei**
 ([§DA-per-rhei-state-machines](../decisions/architectural/per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest)), so that single field cannot tell a consumer what
 a task's state name means: a project holding two instantiated templates emits
 tasks whose states come from three different machines under one `"states"`.
@@ -50,14 +51,16 @@ attributes each rhei to the machine it actually runs:
 ```json
 "states": "rhei",
 "rheis": [
-  { "id": "auth",    "states": "rhei",        "states_declared": false },
-  { "id": "billing", "states": "spec-review", "states_declared": true  }
+  { "id": "auth",    "states": "rhei"        },
+  { "id": "billing", "states": "spec-review" }
 ]
 ```
 
-`states` on an entry is the *effective* machine — the rhei's own declaration,
-or the project default it inherited — and `states_declared` distinguishes the
-two. A consumer resolves any task by taking the first segment of its qualified
+`states` on an entry is the machine the rhei **resolves** — the `name:` of the
+`states.yaml` in its own execution root, else the project default — never a
+name a document declared, since none does
+([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)). An entry carries no `states_declared` field: there is
+no declaration left for it to report. A consumer resolves any task by taking the first segment of its qualified
 id and looking it up here. The key is absent, not empty, for a plan that is not
 a merged project: a single-file plan or a lone Directory Workspace has one
 machine, and the existing `states` field already names it.

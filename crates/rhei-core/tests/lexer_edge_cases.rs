@@ -217,3 +217,12 @@ $ rhei validate plan.rhei.md
         "only the authored task is structure; got {tokens:?}"
     );
 }
+
+/// No token names a state machine: a `**States:**` line is text to the lexer,
+/// and the preamble parsers are what refuse it. §FS-rhei-plan-language.4
+#[test]
+#[ignore = "red until #350 deletes `Token::MetadataStates`"]
+fn a_states_line_is_text() {
+    let tokens: Vec<Token> = tokenize("**States:** rhei\n").collect();
+    assert_eq!(tokens, vec![Token::TextContent]);
+}

@@ -86,7 +86,7 @@
     /// `**States:** X` resolves ahead of the root file, so a default laid under
     /// another name would govern nothing for a release. Refused before anything
     /// is written; a declaration naming the laid machine is left as it is.
-    /// §FS-rhei-library.2.2 §FS-rhei-states-deprecation.1
+    /// §FS-rhei-library.2.2 §FS-rhei-plan-language.1.3
     fn refuse_deferring_declaration(project: &Path, machine: &str) -> MietteResult<()> {
         let path = project.join(workspace::PANTA_INDEX_FILE);
         let raw = read_text(&path)?;

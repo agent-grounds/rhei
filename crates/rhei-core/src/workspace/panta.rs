@@ -50,7 +50,7 @@ pub struct PantaProject {
     /// State-machine name each rhei declared with its own `**States:**` line.
     /// Absent for rheis that declare nothing; what the deprecated declaration
     /// still buys is precedence over the rhei's own root, for one release.
-    // §DA-per-rhei-state-machines §FS-rhei-states-deprecation.1
+    // §DA-per-rhei-state-machines §FS-rhei-plan-language.1.3
     pub rhei_machines: HashMap<String, String>,
     /// Execution root of each rhei, keyed by rhei id — the `states.yaml` here
     /// is that rhei's machine whatever its index says. §AR-rhei-panta.4
@@ -320,7 +320,7 @@ fn load_panta_project_with(
         // says, and the declaration only outranks it for one more release.
         // The basin is built on the manifest machine and declares nothing.
 
-        // §DA-per-rhei-state-machines §FS-rhei-states-deprecation.1
+        // §DA-per-rhei-state-machines §FS-rhei-plan-language.1.3
         if rhei.states_declared && rhei_id != BASIN_RHEI_ID {
             rhei_machines.insert(rhei_id.clone(), rhei.states.trim().to_string());
         }

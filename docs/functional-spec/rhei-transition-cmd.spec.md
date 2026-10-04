@@ -115,9 +115,9 @@ compare-and-swap and every mutable guard before computing any effect.
    unlocked. Hold the sidecar through callbacks, replacement, ledger and result
    writes, terminal finalization, success, or restoration. Where the edge or
    the machine declares a `callback_timeout`, every callback runs under it, so
-   the hold is bounded by the callback runs times that bound (plus, on Linux
-   and macOS, each run's 10-second grace)
-   (§FS-rhei-transitions.4.10).
+   the hold is bounded by the callback runs times that bound (plus, for each
+   run that expires, the short drain window and, on Linux and macOS, the
+   10-second grace) (§FS-rhei-transitions.4.10).
 4. Re-read the task's current state from the current destination pathname under
    the sidecar. If it does not equal `--from`, fail with a compare-and-swap
    conflict error and print the actual current state.

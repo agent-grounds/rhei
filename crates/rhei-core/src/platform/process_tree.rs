@@ -56,8 +56,8 @@ impl ProcessTree {
     /// Stop the whole tree and reap its root.
     ///
     /// On Unix: `SIGTERM` to the group, then up to `grace` for the group to
-    /// empty — the root reaped and no member left — then `SIGKILL` to the group
-    /// regardless, so a descendant that outlived the `SIGTERM` is reached. On
+    /// empty — the root reaped and no member left — then `SIGKILL` to a group
+    /// that did not empty, so a descendant that outlived the `SIGTERM` is reached. On
     /// Windows the job is terminated at once and `grace` is not used.
     // §FS-rhei-transitions.4.10 §REQ-cross-platform.2
     pub fn stop(&mut self, grace: std::time::Duration) -> io::Result<ExitStatus> {
@@ -85,6 +85,7 @@ impl ProcessTree {
         let deadline = Instant::now() + grace;
         let mut status = None;
         let mut failure = None;
+        let mut emptied = false;
         loop {
             if status.is_none() {
                 match self.child.try_wait() {
@@ -100,6 +101,7 @@ impl ProcessTree {
             // The root is reaped first, so a zombie root does not keep the
             // group looking alive for the whole grace.
             if status.is_some() && group_is_empty(pgid) {
+                emptied = true;
                 break;
             }
             if Instant::now() >= deadline {
@@ -107,8 +109,13 @@ impl ProcessTree {
             }
             std::thread::sleep(GRACE_POLL_INTERVAL);
         }
-        let _ = signal_group(pgid, GroupSignal::Kill);
-        // A root that called `setsid` left the group; it is killed by name.
+        // An emptied group with its leader reaped no longer holds `pgid`, so the
+        // id is free and a `SIGKILL` could reach whoever takes it next.
+        if !emptied {
+            let _ = signal_group(pgid, GroupSignal::Kill);
+        }
+        // A root that moved itself to another group with `setpgid` is no longer
+        // reached through `pgid`; it is killed by name.
         if status.is_none() {
             let _ = self.child.kill();
         }

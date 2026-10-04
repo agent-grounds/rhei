@@ -29,7 +29,7 @@ exclude = [
   "**/*.webp",
   "**/*.pdf",
   # An append-only release record has no split to ask for. `docs/changelog.md`
-  # carries `Unreleased` plus the current release, and `docs/changelog/` only
+  # carries the current release, and `docs/changelog/` only
   # grows as the release archives what it displaces (§FS-rhei-distribution.5),
   # so a line budget here would report a finding no edit can answer.
   "docs/changelog.md",

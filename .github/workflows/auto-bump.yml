@@ -8,7 +8,7 @@ on:
 permissions:
   contents: write
   actions: write
-  # Resolving a changelog bullet's commit to its pull request is a forge read.
+  # Mapping a commit to its pull request for the release notes is a forge read.
   # §AR-ci-release.3
   pull-requests: read
 
@@ -54,9 +54,9 @@ jobs:
             echo "::notice::No commits since ${{ steps.versions.outputs.current_tag }}; skipping."
           fi
 
-      # The release script answers, because "last written" is about a section
-      # inside the changelog: it holds, green, while code has merged since
-      # `## Unreleased` was last written. Every later step waits on `ok`. §AR-ci-release.3
+      # The release script answers, because "due" is "the list `prepare` would
+      # write is not empty": it holds, green, while no pull request that changed
+      # code has merged since the tag. Every later step waits on `ok`. §AR-ci-release.3
       - name: Gate - non-doc/CI changes since last tag
         id: gate_substantive
         if: steps.gate_commits.outputs.count != '0'
@@ -99,9 +99,8 @@ jobs:
           next="${{ steps.versions.outputs.next }}"
           python3 scripts/set-release-version.py "$next"
           cargo update --workspace
-          # Before the promotion, so the numbers are resolved from the
-          # commits the bullets were written in. §FS-rhei-distribution.5.2
-          python3 scripts/prepare_changelog_release.py stamp
+          # Generates the notes from the merged pull requests; a forge it
+          # cannot ask fails here, before anything is written. §FS-rhei-distribution.5.2
           python3 scripts/prepare_changelog_release.py prepare "$next"
 
       - name: Commit and push release candidate

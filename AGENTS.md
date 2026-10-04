@@ -27,8 +27,8 @@ cargo build --workspace --all-targets
 cargo test --workspace --all-targets --no-fail-fast
 ```
 
-A change adds no changelog bullet; the changelog is written before a release
-(see `CONTRIBUTING.md`).
+A change never touches `docs/changelog.md`; the release writes it from the
+merged pull requests' titles (see `CONTRIBUTING.md`).
 
 
 <!-- BEGIN GRUND MANAGED BLOCK -->

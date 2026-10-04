@@ -350,6 +350,7 @@ mod operator_recovery_tests {
     include!("cli/tests_operator_transaction.rs");
     include!("cli/tests_operator_basin.rs");
     include!("cli/tests_operator_basin_exclusion.rs");
+    include!("cli/tests_operator_state_home.rs");
     include!("cli/tests_operator_launcher.rs");
     include!("cli/tests_operator_guards.rs");
     include!("cli/tests_operator_consumers.rs");

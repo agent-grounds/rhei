@@ -30,6 +30,8 @@ fn spawn_parallel_agent_work_item(
     workspace_root: &Path,
     runtime_dir: &Path,
     run_id: &str,
+    // §FS-rhei-budgets.7.2: admission uses the owner shared by this run's entire pool.
+    budget_run: &BudgetRun,
     snapshot_override_selection: Option<&SnapshotOverrideRunSelection>,
     sink: &Arc<dyn rhei_tui::EventSink>,
     intervene: Option<&Arc<RunInterveneSink>>,
@@ -120,6 +122,7 @@ fn spawn_parallel_agent_work_item(
         task,
         &item.task_id_str,
         &opts.price_book().currency,
+        budget_run,
     )? {
         // §FS-rhei-budgets.9
         BudgetAdmission::Admitted { bounds, note } => {

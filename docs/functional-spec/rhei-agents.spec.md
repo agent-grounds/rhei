@@ -979,7 +979,7 @@ Recognition requires all of the following:
   case-sensitively. **The resolved agent registry id is not tested**;
 - the invocation exited non-zero and was neither timed out nor interrupted;
 - after stripping terminal-control decoration and trimming surrounding
-  whitespace from each captured stdout and stderr line, exactly one line is
+  whitespace from each captured logical stdout and stderr line, exactly one line is
   `You've hit your <period> limit · resets <h>[:<mm>]<am|pm> (<zone>)`, where
   `<period>` is `session` or `weekly`, matched exactly and case-sensitively,
   `<h>` is `1` through `12`, `<mm>` — when present — is two digits from `00`
@@ -987,6 +987,18 @@ Recognition requires all of the following:
   `<zone>` is an installed IANA time-zone name whose local time is valid and
   unambiguous. Terminal decoration means ANSI escape sequences; removing it must
   not otherwise rewrite the line.
+
+For the resolved `claude-code` family, a stream-json stdout event with
+`type: "result"` and a textual `result` contributes the decoded result text's
+logical lines, rather than the JSON envelope, to recognition. This is the
+human-readable result output of §FS-rhei-cost-accounting.4; recognition does
+not require successful usage extraction. Assistant text echoes, rate-limit
+events, and other JSON events contribute no decoded refusal text. Stderr and
+ordinary non-JSON stdout retain their captured lines; other families do not
+gain Claude stream-json decoding. This interpretation does not search arbitrary
+JSON fields or deduplicate signals: two matching logical lines in one result,
+two matching result events, or a matching result plus an independently emitted
+matching plain line still fail the exactly-one-line requirement.
 
 The match does not search inside prose. An exit of `0`, absent or malformed
 reset information, an absent or invalid zone, a nonexistent or ambiguous local

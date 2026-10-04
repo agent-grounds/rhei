@@ -14,6 +14,7 @@
 /// ticket, unavailable required tooling, or a prompt that would not compose.
 /// The pass tail in `run_agent_mode` decides what that means for the pass.
 // §FS-rhei-run.3
+// §FS-rhei-budgets.7.2: every sequential invocation borrows the same run owner.
 #[allow(clippy::too_many_arguments)]
 fn run_sequential_agent_invocation(
     item: &(String, String, String, ResolvedAgent),
@@ -24,6 +25,7 @@ fn run_sequential_agent_invocation(
     workspace_root: &Path,
     runtime_dir: &Path,
     run_id: &str,
+    budget_run: &BudgetRun,
     snapshot_override_selection: Option<&SnapshotOverrideRunSelection>,
     sink: &Arc<dyn rhei_tui::EventSink>,
     intervene: Option<&Arc<RunInterveneSink>>,
@@ -175,6 +177,7 @@ fn run_sequential_agent_invocation(
         task,
         task_id_str,
         &opts.price_book().currency,
+        budget_run,
     )? {
         // Both counts on screen before any of this visit's capacity is spent.
         // §FS-rhei-budgets.9

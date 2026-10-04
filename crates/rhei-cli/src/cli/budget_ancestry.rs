@@ -53,27 +53,27 @@ impl InheritedAncestry {
     }
 }
 
-/// Whether this run still owes the operator the cross-project note.
+/// One run's entitlement to the cross-project note, shared by its admissions.
 ///
-/// Once per `rhei run` and not once per admission: the descriptor is a property
-/// of the run's environment and does not change while the run lasts, so a plan
-/// of thirty tickets repeats it no more than a plan of one.
+/// Owned by `RunIdentity`, never by a process, thread, account, or project
+/// root. Independent runs cannot reset or spend this entitlement.
 /// §FS-rhei-budgets.7.2
-static CROSS_PROJECT_NOTE_OWED: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(true);
-
-/// Arm the note for a run that is beginning.
-///
-/// A latch cleared at the start of a run rather than a one-shot, because two
-/// runs in one process — which is how the in-process tests reach this — are two
-/// runs and each owes its own note. §FS-rhei-budgets.7.2
-fn begin_budget_run() {
-    CROSS_PROJECT_NOTE_OWED.store(true, std::sync::atomic::Ordering::SeqCst);
+struct BudgetRun {
+    cross_project_note_owed: std::sync::atomic::AtomicBool,
 }
 
-/// Take the note this run owes, if it still owes one.
-fn claim_cross_project_note() -> bool {
-    CROSS_PROJECT_NOTE_OWED.swap(false, std::sync::atomic::Ordering::SeqCst)
+/// Create a fresh entitlement without changing any other run's state.
+/// §FS-rhei-budgets.7.2
+fn begin_budget_run() -> BudgetRun {
+    BudgetRun { cross_project_note_owed: std::sync::atomic::AtomicBool::new(true) }
+}
+
+impl BudgetRun {
+    /// Take this run's note at most once, even through concurrent admissions.
+    /// §FS-rhei-budgets.7.2
+    fn claim_cross_project_note(&self) -> bool {
+        self.cross_project_note_owed.swap(false, std::sync::atomic::Ordering::SeqCst)
+    }
 }
 
 /// How the note names the project a descriptor was minted for: the directory
@@ -91,9 +91,9 @@ fn minting_project_label(account_uuid: &str) -> String {
 /// `None` once this run has already said it. Info rather than a warning:
 /// nothing is wrong, and a warning invites someone to fix what is working. One
 /// line, because a reader greps for it. §FS-rhei-budgets.7.2
-fn cross_project_note(ancestry: &Ancestry, own_label: &str) -> Option<String> {
+fn cross_project_note(run: &BudgetRun, ancestry: &Ancestry, own_label: &str) -> Option<String> {
     let (reservation, account) = ancestry.minted_elsewhere()?;
-    if !claim_cross_project_note() {
+    if !run.claim_cross_project_note() {
         return None;
     }
     Some(format!(

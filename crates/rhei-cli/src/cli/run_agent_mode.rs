@@ -918,6 +918,8 @@ fn run_agent_mode(
                 &workspace_root,
                 &runtime_dir,
                 &run_id,
+                // §FS-rhei-budgets.7.2: all passes and roots borrow this run's owner.
+                &identity.budget,
                 snapshot_override_selection,
                 &sink,
                 intervene.as_ref(),

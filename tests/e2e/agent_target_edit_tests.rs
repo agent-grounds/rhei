@@ -134,7 +134,6 @@ fn target(selector: &str) -> String {
 
 // §FS-rhei-agents.3.2: the slug-collision edit and the different-slug edit both keep the work.
 #[test]
-#[ignore = "red until #450 pairs an orphaned spawn record"]
 fn an_in_place_target_edit_keeps_the_visits_finished_work_whatever_the_slug() {
     let old = target("mock:mock:m/x");
     let old_record = "task-plan.1-work-mock-mock-m-x.json";
@@ -176,7 +175,6 @@ fn an_in_place_target_edit_keeps_the_visits_finished_work_whatever_the_slug() {
 
 // §FS-rhei-agents.3.2: one edited fan-out member pairs with its orphan like a single target.
 #[test]
-#[ignore = "red until #450 pairs an orphaned spawn record"]
 fn editing_one_fanout_member_pairs_its_orphan_and_spawns_nothing() {
     let fixture = finished_then_died(
         "agent-target-edit-fanout-one",
@@ -199,7 +197,6 @@ fn editing_one_fanout_member_pairs_its_orphan_and_spawns_nothing() {
 
 // §FS-rhei-agents.8.4: two orphans and two recordless invocations pair nothing, and say so.
 #[test]
-#[ignore = "red until #450 pairs an orphaned spawn record"]
 fn an_ambiguous_fanout_edit_warns_and_spawns_every_member() {
     let fixture = finished_then_died(
         "agent-target-edit-fanout-ambiguous",

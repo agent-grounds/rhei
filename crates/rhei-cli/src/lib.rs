@@ -135,6 +135,7 @@ include!("cli/agent_spawn_records.rs");
 include!("cli/agent_spawn_plan.rs");
 include!("cli/run_helpers.rs");
 include!("cli/run_completion_condition.rs");
+include!("cli/run_visit_pairing.rs");
 include!("cli/run_prompt_sections.rs");
 include!("cli/run_prompt_handoffs.rs");
 include!("cli/subtree_supervision_prompt.rs");
@@ -286,6 +287,7 @@ mod tests {
     include!("cli/tests_agent_prompt_transport.rs");
     include!("cli/tests_agent_family.rs");
     include!("cli/tests_spawn_records.rs");
+    include!("cli/tests_visit_pairing.rs");
     include!("cli/tests_worker_edit_regions.rs");
     include!("cli/tests_entry_log_numbers.rs");
     include!("cli/tests_session_reports.rs");

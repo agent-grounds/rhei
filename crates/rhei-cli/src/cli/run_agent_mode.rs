@@ -438,6 +438,7 @@ fn run_agent_mode(
                     &current_state,
                     state_def,
                     invocations,
+                    &sink,
                 );
 
                 if pending.is_empty() {

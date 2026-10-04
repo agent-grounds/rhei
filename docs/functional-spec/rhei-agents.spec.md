@@ -2140,7 +2140,8 @@ Which number `{n}` is depends on the state:
 - A **counted** state — one for which [§FS-rhei-transitions.4.3](rhei-transitions.spec.md#43-counted-loops) keeps a
   `stateVisits` counter: it declares `visits:`, `execute_on`, or a self-loop —
   uses `{visit_count}`, exactly as before.
-- A `poll:` state uses no number: its re-spawns are poll attempts, not entries.
+- A `poll:` state is uncounted like any other: its poll self-loop writes no
+  ledger line, so its re-spawns are attempts within one entry, not entries.
 - Every other state is **uncounted**, and uses its entry number: how many times
   the ticket has arrived in that state, read from the transition ledger, plus
   one when the ticket was placed there initially — its first ledger line leaves
@@ -2182,8 +2183,11 @@ run, and the run prints
 refusing to spawn: <path> exists and no spawn record accounts for it
 ```
 
-The remedy is to move the file away or to run `rhei reset --rhei <id>`. A
-record accounts for the path when it is the record this invocation's own name
+and, on the line after it, the remedy: move the file away or run `rhei reset
+--rhei <id>`, naming the ticket's rhei. A spawn whose subprocess never starts —
+its command cannot be found or built, or the run is interrupted first — removes
+the log it created, so only a worker killed after it started leaves one to
+refuse. A record accounts for the path when it is the record this invocation's own name
 spells and its `moves` equals the ticket's current move count — the record of
 §FS-rhei-agents.8.4, trusted exactly as before and never checked against the log's header. A
 runtime written before entry numbers existed may hold the unsuffixed record of

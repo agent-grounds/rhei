@@ -132,6 +132,7 @@ include!("cli/settings_validate_references.rs");
 include!("cli/orchestrator_timeout_validation.rs");
 include!("cli/agent_log_files.rs");
 include!("cli/agent_spawn_records.rs");
+include!("cli/agent_spawn_plan.rs");
 include!("cli/run_helpers.rs");
 include!("cli/run_completion_condition.rs");
 include!("cli/run_prompt_sections.rs");

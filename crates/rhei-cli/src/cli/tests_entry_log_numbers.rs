@@ -155,11 +155,11 @@ transitions:
         .expect("machine should parse")
     }
 
-    /// Counted states keep `{visit_count}`, a poll state takes no number, and
-    /// every other state is numbered by its entries.
+    /// Counted states keep `{visit_count}`, and every other state, a poll state
+    /// included, is numbered by its entries.
     // §FS-rhei-agents.8.1 §FS-rhei-transitions.4.3
     #[test]
-    fn the_policy_picks_visit_count_none_or_the_entry_number() {
+    fn the_policy_picks_visit_count_or_the_entry_number() {
         let machine = policy_machine();
         let dir = tempfile::tempdir().expect("tmpdir");
         ledger_at(dir.path(), "plan.1 plain@counted\nplan.1 counted@plain\n");
@@ -176,7 +176,7 @@ transitions:
         assert_eq!(resolve("counted"), Ok(LogNumber::Visit(4)), "visits:");
         assert_eq!(resolve("looping"), Ok(LogNumber::Visit(4)), "a self-loop");
         assert_eq!(resolve("supervising"), Ok(LogNumber::Visit(4)), "execute_on");
-        assert_eq!(resolve("waiting"), Ok(LogNumber::Unnumbered), "poll:");
+        assert_eq!(resolve("waiting"), Ok(LogNumber::Entry(1)), "poll: numbered by its entries");
         assert_eq!(resolve("plain"), Ok(LogNumber::Entry(2)), "placed, then one arrival");
     }
 
@@ -230,7 +230,8 @@ transitions:
         assert!(retry.record.ends_with("task-plan.1-work-2.json"));
     }
 
-    /// A taken name is refused by the one sentence the spec spells.
+    /// A taken name is refused by the one sentence the spec spells, with the
+    /// remedy naming the ticket's rhei on the line after it.
     // §FS-rhei-agents.8.1
     #[test]
     fn a_taken_log_name_is_refused() {
@@ -238,15 +239,17 @@ transitions:
         let runtime = dir.path().join("runtime");
         let plan =
             plan_spawn_attempt(&runtime, dir.path(), "plan.1", "work", None, LogNumber::Entry(2));
-        assert_eq!(plan.unaccounted_log_refusal(), None);
+        assert_eq!(plan.unaccounted_log_refusal("plan.1"), None);
         fs::create_dir_all(runtime.join("logs")).expect("logs");
         fs::write(&plan.log, "planted").expect("plant");
-        let refusal = plan.unaccounted_log_refusal().expect("refused");
-        assert!(refusal.starts_with("refusing to spawn: "));
+        let refusal = plan.unaccounted_log_refusal("plan.1").expect("refused");
+        let (first, remedy) = refusal.split_once('\n').expect("a remedy line");
+        assert!(first.starts_with("refusing to spawn: "));
         assert!(
-            refusal.ends_with("task-plan.1-work-2.log exists and no spawn record accounts for it")
+            first.ends_with("task-plan.1-work-2.log exists and no spawn record accounts for it")
         );
-        assert_eq!(create_log_exclusively(&plan.log).err(), Some(refusal));
+        assert!(remedy.contains("move that file away, or run `rhei reset --rhei plan`"));
+        assert_eq!(create_log_exclusively(&plan.log, "plan.1").err(), Some(refusal));
         assert_eq!(fs::read_to_string(&plan.log).expect("kept"), "planted");
     }
 }

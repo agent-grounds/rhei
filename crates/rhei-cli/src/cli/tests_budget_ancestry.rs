@@ -20,8 +20,8 @@ fn declined() -> Ancestry {
 /// §FS-rhei-budgets.7.2
 #[test]
 fn the_cross_project_note_is_owed_once_per_run() {
-    begin_budget_run();
-    let first = cross_project_note(&declined(), "this-project")
+    let run = begin_budget_run();
+    let first = cross_project_note(&run, &declined(), "this-project")
         .expect("the first admission of a run owes the note");
     assert!(first.starts_with("note: "), "a note, not a warning: {first}");
     assert!(first.contains("another project"), "{first}");
@@ -30,14 +30,14 @@ fn the_cross_project_note_is_owed_once_per_run() {
     assert_eq!(first.lines().count(), 1, "one line, because a reader greps for it: {first}");
 
     assert_eq!(
-        cross_project_note(&declined(), "this-project"),
+        cross_project_note(&run, &declined(), "this-project"),
         None,
         "a second admission of the same run repeats nothing"
     );
 
-    begin_budget_run();
+    let run = begin_budget_run();
     assert!(
-        cross_project_note(&declined(), "this-project").is_some(),
+        cross_project_note(&run, &declined(), "this-project").is_some(),
         "the next run in this process is owed its own note"
     );
 }
@@ -46,14 +46,14 @@ fn the_cross_project_note_is_owed_once_per_run() {
 /// no note and does not spend the run's one. §FS-rhei-budgets.7.1
 #[test]
 fn an_ancestry_that_was_not_declined_owes_no_note() {
-    begin_budget_run();
+    let run = begin_budget_run();
 
-    assert_eq!(cross_project_note(&Ancestry::Unclaimed, "this-project"), None);
+    assert_eq!(cross_project_note(&run, &Ancestry::Unclaimed, "this-project"), None);
     let placed = Ancestry::Placed { reservation: "reservation:live".into(), envelope: 1 };
-    assert_eq!(cross_project_note(&placed, "this-project"), None);
+    assert_eq!(cross_project_note(&run, &placed, "this-project"), None);
 
     assert!(
-        cross_project_note(&declined(), "this-project").is_some(),
+        cross_project_note(&run, &declined(), "this-project").is_some(),
         "neither of those may have spent the note this run still owed"
     );
 }
@@ -80,17 +80,17 @@ mod cross_project_note_concurrency {
         let (first_tx, first_rx) = mpsc::channel();
         let (ended_tx, ended_rx) = mpsc::channel();
         let a = std::thread::spawn(move || {
-            begin_budget_run();
-            let first = cross_project_note(&declined(), "run-A");
+            let run = begin_budget_run();
+            let first = cross_project_note(&run, &declined(), "run-A");
             first_tx.send(()).unwrap();
             wait_for(&ended_rx);
-            let second = cross_project_note(&declined(), "run-A");
+            let second = cross_project_note(&run, &declined(), "run-A");
             (first, second)
         });
         let b = std::thread::spawn(move || {
             wait_for(&first_rx);
-            // The same reset run_command calls, even before loading a plan.
-            begin_budget_run();
+            // The same owner construction run_command uses through RunIdentity.
+            let _run = begin_budget_run();
         });
         b.join().unwrap();
         ended_tx.send(()).unwrap();
@@ -102,10 +102,10 @@ mod cross_project_note_concurrency {
         let (begun_tx, begun_rx) = mpsc::channel();
         let (peer_tx, peer_rx) = mpsc::channel();
         let a = std::thread::spawn(move || {
-            begin_budget_run();
+            let run = begin_budget_run();
             begun_tx.send(()).unwrap();
             wait_for(&peer_rx);
-            cross_project_note(&declined(), "run-A")
+            cross_project_note(&run, &declined(), "run-A")
         });
         let b = std::thread::spawn(move || {
             wait_for(&begun_rx);
@@ -123,20 +123,20 @@ mod cross_project_note_concurrency {
         let (begun_tx, begun_rx) = mpsc::channel();
         let (second_tx, second_rx) = mpsc::channel();
         let a = std::thread::spawn(move || {
-            begin_budget_run();
-            let first = cross_project_note(&declined(), "run-A");
+            let run = begin_budget_run();
+            let first = cross_project_note(&run, &declined(), "run-A");
             first_tx.send(()).unwrap();
             wait_for(&begun_rx);
-            let second = cross_project_note(&declined(), "run-A");
+            let second = cross_project_note(&run, &declined(), "run-A");
             second_tx.send(()).unwrap();
             (first, second)
         });
         let b = std::thread::spawn(move || {
             wait_for(&first_rx);
-            begin_budget_run();
+            let run = begin_budget_run();
             begun_tx.send(()).unwrap();
             wait_for(&second_rx);
-            cross_project_note(&declined(), "run-B")
+            cross_project_note(&run, &declined(), "run-B")
         });
         let (a_first, a_second) = a.join().unwrap();
         let b_first = b.join().unwrap();

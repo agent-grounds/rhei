@@ -98,9 +98,13 @@ struct RunIdentity {
     started_wall: std::time::SystemTime,
     /// Whether this process is the detached child of a `--headless` launch.
     headless: bool,
+    /// Shared by every admission until this run returns, across execution modes
+    /// and project roots. §FS-rhei-budgets.7.2
+    budget: BudgetRun,
 }
 
 impl RunIdentity {
+    // §FS-rhei-budgets.7.2: the identity owns a fresh entitlement for this run alone.
     fn new() -> Self {
         let started_wall = std::time::SystemTime::now();
         Self {
@@ -108,6 +112,7 @@ impl RunIdentity {
             started: Instant::now(),
             started_wall,
             headless: is_headless_child(),
+            budget: begin_budget_run(),
         }
     }
 }
@@ -236,10 +241,6 @@ fn run_command(
     // SIGINT/SIGTERM/SIGHUP interrupts the run instead of killing the
     // supervisor out from under its subprocesses. §FS-rhei-run.3.2
     install_interrupt_handlers();
-    // A run is what the cross-project note is said once per, so the latch is
-    // armed here rather than once per process: two runs in one process are two
-    // runs. §FS-rhei-budgets.7.2
-    begin_budget_run();
     let input_buf = run_artifact_root(input);
     let input = input_buf.as_path();
     // A headless parent retains shared access while awaiting this child. Take

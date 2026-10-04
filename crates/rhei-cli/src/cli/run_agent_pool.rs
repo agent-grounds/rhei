@@ -101,6 +101,8 @@ fn run_agent_worker_pool(
         workspace_root,
         runtime_dir,
         run_id,
+        // §FS-rhei-budgets.7.2: the initial fill borrows the same owner as later refills.
+        &identity.budget,
         snapshot_override_selection,
         sink,
         intervene,

@@ -312,6 +312,7 @@ fn run_is_gone(execution_root: &str) -> bool {
 /// `currency` is the composed price book's, which fixes an account's own on
 /// its first amount and is refused where the account already holds another.
 /// §FS-rhei-budgets.6.1 §FS-rhei-budgets.5.5 §FS-rhei-run.3.4
+/// All admissions use their run's note entitlement. §FS-rhei-budgets.7.2
 #[allow(clippy::too_many_arguments)]
 fn budget_admit_spawn(
     input: &Path,
@@ -322,6 +323,7 @@ fn budget_admit_spawn(
     task: &rhei_core::ast::Task,
     task_id_str: &str,
     currency: &str,
+    run: &BudgetRun,
 ) -> MietteResult<BudgetAdmission> {
     let project_root = budget_project_root(workspace_root);
     let bounds = resolve_count_bounds(settings, node_transition_limit(machine, Some(task)));
@@ -389,7 +391,7 @@ fn budget_admit_spawn(
             // Said once per run, and only where the ledger actually declined
             // the ancestry rather than where this process merely offered one.
             // §FS-rhei-budgets.7.2
-            let note = cross_project_note(&group.ancestry, &project_label);
+            let note = cross_project_note(run, &group.ancestry, &project_label);
             with_claims(|claims| {
                 let claim = claims.entry(task_id_str.to_string()).or_insert_with(|| HeldClaim {
                     travel: None,

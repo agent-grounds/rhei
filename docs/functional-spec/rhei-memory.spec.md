@@ -334,10 +334,13 @@ it wrote is in `{reverted-text file}`.
   remain but its contents are not read or pasted.
 - `Previous log:` names the log file of the previous visit of this same state
   by the naming rule of [§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming), only if that file exists. The
-  log is not pasted; it is a transcript, and the path is enough.
+  log is not pasted; it is a transcript, and the path is enough. It is keyed
+  to `{visit_count}`, so only a counted state renders it: an uncounted state's
+  re-entry has its own entry-numbered log but renders no `Previous log:` line.
 - The retry paragraph is rendered only when *this visit* has already been
   spawned — when a spawn record for this invocation belongs to this visit
-  ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)). It exists because a re-spawn that is handed the same
+  ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)), found by the name this invocation itself
+  is given, entry number included. It exists because a re-spawn that is handed the same
   prompt as the attempt it is recovering from will do the same thing again: the
   invocation has to be told that it is a retry, what ended the last attempt, and
   which file that attempt was obliged to write and did not.
@@ -578,9 +581,13 @@ are never silently omitted here.
    ran there, whichever attempt of that visit it was — falling back to that
    visit's unsuffixed log file where no record answers, which is what a runtime
    written before records existed has. Emit the `Previous log:` line only when
-   the named file is on disk.
-4. `retry` = the spawn record of `(task, state, identity, visit_count)`, when
-   one exists **and** it belongs to this visit: its `moves` equals the number of
+   the named file is on disk. `prev_log` stays keyed to `visit_count − 1`, never
+   to the entry number, so an uncounted state — `visit_count` 1 on every entry —
+   renders no `Previous log:` line on a re-entry.
+4. `retry` = the spawn record of this invocation's own name, `(task, state,
+   identity, number)`, where `number` is the one §FS-rhei-agents.8.1 gives this
+   spawn — `visit_count` for a counted state, the entry number for an uncounted
+   one — when one exists **and** it belongs to this visit: its `moves` equals the number of
    moves the ticket has made, i.e. the ticket has not left the state since that
    spawn. Render the retry paragraph from it — `attempt` + 1 as `{n}`, its
    `ending` and `code` as `{ending}`, its `log` as `{previous attempt log}`. A

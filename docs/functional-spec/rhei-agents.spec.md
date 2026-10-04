@@ -2115,29 +2115,80 @@ parsing the log body for billing facts. [§FS-rhei-cost-accounting](rhei-cost-ac
 
 ### 8.1. Log File Naming
 
+Every log name is spelled by one grammar:
+
+```text
+runtime/logs/task-{task_id}-{state}[-{identity}][-{n}][-attempt{a}].log
+```
+
+`{identity}` is the target slug or model of a fanned-out or model-specific
+invocation, `{n}` is the **entry number** below, and `{a}` the attempt within
+that entry. A number that is `1` is left out, so a state entered once and run
+once keeps the plain name, and nothing reads a number back out of a file name.
+
 | Scenario | Log file path |
 |----------|---------------|
 | Simple state | `runtime/logs/task-{task_id}-{state}.log` |
 | Counted-loop state | `runtime/logs/task-{task_id}-{state}-{visit_count}.log` |
+| Uncounted state, entry `n` ≥ 2 | `runtime/logs/task-{task_id}-{state}-{n}.log` |
 | Model-specific state | `runtime/logs/task-{task_id}-{state}-{model}.log` |
 | Both visits and model | `runtime/logs/task-{task_id}-{state}-{model}-{visit_count}.log` |
-| Retry within one visit | the name above with `-attempt{n}` appended, `n` counting from 2 |
+| Retry within one entry | the name above with `-attempt{a}` appended, `a` counting from 2 |
 
-`{visit_count}` counts only where [§FS-rhei-transitions.4.3](rhei-transitions.spec.md#43-counted-loops) keeps a counter, so
-it cannot separate one stay in a state from the next: an ordinary state in a
-cycle is `{visit_count}` 1 on every entry. The attempt suffix is therefore keyed
-to a **state visit**, which this specification defines as the span between two
-consecutive moves of the ticket. The first spawn of a visit uses the unsuffixed
-name above; each further spawn *within that same visit* is `-attempt2`,
-`-attempt3`, and so on, and the first spawn after the ticket moves again starts
-over at the unsuffixed name — a fresh entry into a state is not a retry of the
-last one, and must not be named or narrated as one. Without the suffix a retry
-would truncate the one file that says why the attempt before it did not finish,
-which is the file both a human and the retrying agent need most.
+Which number `{n}` is depends on the state:
+
+- A **counted** state — one for which [§FS-rhei-transitions.4.3](rhei-transitions.spec.md#43-counted-loops) keeps a
+  `stateVisits` counter: it declares `visits:`, `execute_on`, or a self-loop —
+  uses `{visit_count}`, exactly as before.
+- A `poll:` state uses no number: its re-spawns are poll attempts, not entries.
+- Every other state is **uncounted**, and uses its entry number: how many times
+  the ticket has arrived in that state, read from the transition ledger, plus
+  one when the ticket was placed there initially — its first ledger line leaves
+  that state, or it has no ledger line yet. It is counted over the same
+  two `runtime/state-transitions.log` files the move count of §FS-rhei-agents.8.4 reads, and
+  the two counts are summed. A forced transition's metadata row and its
+  movement row count as one arrival; a metadata row the reader does not know
+  counts as nothing; a missing ledger means entry 1, and an unreadable one is a
+  diagnostic. A restart that has not moved the ticket stays on the same entry.
+  The entry number is not a frontmatter counter and does not change
+  `{visit_count}` (§FS-rhei-transitions.4.3).
+
+A fanned-out state puts the number after the identity: `-opus-2`.
+
+`{visit_count}` alone cannot separate one stay in an uncounted state from the
+next — it is 1 on every entry — which is why such a state is numbered by its
+entries. The attempt suffix is keyed to a **state visit**, which this
+specification defines as the span between two consecutive moves of the ticket.
+The first spawn of a visit uses the name above without `-attempt`; each further
+spawn *within that same visit* is `-attempt2`, `-attempt3`, and so on, applied
+to that entry's name (`…-2-attempt2.log`). A fresh entry into a state starts
+attempt 1 under its own entry name — it is not a retry of the last one, and
+must not be named or narrated as one. Without the suffix a retry would truncate
+the one file that says why the attempt before it did not finish, which is the
+file both a human and the retrying agent need most; without the entry number a
+re-entry would truncate the previous entry's.
 
 A visit's attempt number is read from the spawn record of §8.4, never inferred
 from which log files happen to exist: a log is opened before its subprocess
-starts, so its presence proves only that a spawn was attempted.
+starts, so its presence proves only that a spawn was attempted. Neither the
+attempt nor the entry ever moves forward because a file exists.
+
+**A log is never overwritten.** The spawn creates its log exclusively. If a
+file is already at the name it is about to use and no spawn record accounts for
+it, the spawn is refused: the file is kept byte for byte, the worker does not
+run, and the run prints
+
+```text
+refusing to spawn: <path> exists and no spawn record accounts for it
+```
+
+The remedy is to move the file away or to run `rhei reset --rhei <id>`. A
+record accounts for the path when it is the record this invocation's own name
+spells and its `moves` equals the ticket's current move count — the record of
+§FS-rhei-agents.8.4, trusted exactly as before and never checked against the log's header. A
+runtime written before entry numbers existed may hold the unsuffixed record of
+an uncounted state at the current `moves`; the same test is applied to that
+record, so its retry continues as `-{n}-attempt2`.
 
 Where something names "the log of a visit" — the `Previous log:` line of a
 prompt ([§FS-rhei-memory.4.4](rhei-memory.spec.md#44-previous-visits)), the evidence behind an engine-written result
@@ -2207,6 +2258,11 @@ missing line means the state declared no entries of that kind.
 ### 8.3. Log Directory
 
 `runtime/logs/` is created automatically by `rhei run` if it does not exist. `rhei reset` removes the entire `runtime/` directory, including logs.
+A narrowed `rhei reset --rhei` removes the in-scope tickets' logs, spawn
+records and session reports (`runtime/reports/task-<ticket-id>-*`) together
+([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)). Either reset removes the ledger lines entry numbers are
+counted from (§FS-rhei-agents.8.1), so a reset ticket's next entry is entry 1 again and takes
+the plain name.
 
 ### 8.4. Spawn Records
 
@@ -2215,12 +2271,18 @@ spawn — *did a worker actually run in this state* and *is the next spawn a ret
 of the same visit* — and neither can be answered from `runtime/logs/`. The log
 file is created and its header written before the subprocess starts, so a
 `command:` naming a binary that does not exist leaves a complete-looking header
-behind; and the log's own name cannot say which visit it belongs to, because
-`{visit_count}` does not count every visit (§8.1).
+behind; and the log's own name cannot say which visit it belongs to.
+
+A file name spells an **allocation**: the name a spawn was given, by the
+grammar of §FS-rhei-agents.8.1, before anything ran. Which entry that is comes from the
+ticket's movement history in the transition ledger, never from the file names
+on disk; and whether a worker actually ran under that name is the record's to
+say, and only the record's.
 
 So `rhei run` writes one **spawn record** per invocation, in
 `runtime/spawns/`, named after the invocation exactly as its log is minus the
-`-attempt{n}` suffix: `task-{task_id}-{state}{suffix}.json`. It is written when
+`-attempt{a}` suffix: `task-{task_id}-{state}[-{identity}][-{n}].json`, so each
+entry of an uncounted state has its own record beside its own log. It is written when
 the subprocess **ends**, never when it is merely opened, and it is rewritten in
 place by each further attempt of the same invocation. It holds:
 

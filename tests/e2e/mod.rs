@@ -66,6 +66,8 @@ mod diagnostic_wrap_tests;
 mod effort_invocation_tests;
 mod effort_state_tests;
 mod effort_support;
+mod entry_log_support;
+mod entry_log_tests;
 mod error_guidance_tests;
 mod examples_tests;
 mod exclusions_context_tests;

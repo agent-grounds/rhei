@@ -4,7 +4,7 @@
 //! current fan-out sibling never answers for another, and an ambiguous edit is
 //! warned about and spawned.
 
-// §FS-rhei-agents.3.2 §FS-rhei-agents.8.4
+// §FS-rhei-agents.3.2 §FS-rhei-agent-visit-pairing
 
 use std::fs;
 use std::path::PathBuf;
@@ -149,7 +149,7 @@ fn target(selector: &str) -> String {
     format!("target: \"{selector}\"")
 }
 
-// §FS-rhei-agents.3.2: the slug-collision edit and the different-slug edit both keep the work.
+// §FS-rhei-agent-visit-pairing: the slug-collision edit and the different-slug edit both keep the work.
 #[test]
 fn an_in_place_target_edit_keeps_the_visits_finished_work_whatever_the_slug() {
     let old = target("mock:mock:m/x");
@@ -190,7 +190,7 @@ fn an_in_place_target_edit_keeps_the_visits_finished_work_whatever_the_slug() {
     );
 }
 
-// §FS-rhei-agents.3.2: one edited fan-out member pairs with its orphan like a single target.
+// §FS-rhei-agent-visit-pairing.3: one edited fan-out member pairs with its orphan like a single target.
 #[test]
 fn editing_one_fanout_member_pairs_its_orphan_and_spawns_nothing() {
     let fixture = finished_then_died(
@@ -212,7 +212,7 @@ fn editing_one_fanout_member_pairs_its_orphan_and_spawns_nothing() {
     assert_eq!(reuse_notes(&run).len(), 1, "only the edited member is paired:\n{}", run.stdout);
 }
 
-// §FS-rhei-agents.8.4: two orphans and two recordless invocations pair nothing, and say so.
+// §FS-rhei-agent-visit-pairing.5: two orphans and two recordless invocations pair nothing, and say so.
 #[test]
 fn an_ambiguous_fanout_edit_warns_and_spawns_every_member() {
     let fixture = finished_then_died(
@@ -247,7 +247,7 @@ fn an_ambiguous_fanout_edit_warns_and_spawns_every_member() {
     assert!(reuse_notes(&run).is_empty(), "nothing is paired:\n{}", run.stdout);
 }
 
-// §FS-rhei-agents.3.2: an invocation whose own record of this visit failed is not recordless.
+// §FS-rhei-agent-visit-pairing.2: an invocation whose own record of this visit failed is not recordless.
 #[test]
 fn an_orphan_never_answers_for_an_invocation_whose_own_spawn_failed() {
     let fixture = finished_then_died(
@@ -281,7 +281,7 @@ fn an_orphan_never_answers_for_an_invocation_whose_own_spawn_failed() {
     assert!(state().contains("**State:** work"), "x's work must not advance the ticket");
 }
 
-// §FS-rhei-agents.8.4: a current sibling's record is never an orphan. A guard: it passes today.
+// §FS-rhei-agent-visit-pairing.1: a current sibling's record is never an orphan. A guard: it passes today.
 #[test]
 fn a_current_siblings_record_never_excuses_another_sibling() {
     let fanout = r#"all_targets: ["mock:mock:a", "mock:mock:b"]"#;
@@ -295,7 +295,7 @@ fn a_current_siblings_record_never_excuses_another_sibling() {
     assert!(reuse_notes(&run).is_empty(), "nothing is paired:\n{}", run.stdout);
 }
 
-// §FS-rhei-agents.8.4: a record an invocation reads as its own through the upgrade fallback is no orphan.
+// §FS-rhei-agent-visit-pairing.1: a record an invocation reads as its own through the upgrade fallback is no orphan.
 #[test]
 fn a_record_read_through_the_upgrade_fallback_never_excuses_an_unfinished_sibling() {
     let fanout = r#"all_targets: ["mock:mock:a", "mock:mock:b"]"#;

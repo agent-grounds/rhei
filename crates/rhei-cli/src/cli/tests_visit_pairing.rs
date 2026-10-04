@@ -4,7 +4,7 @@
 // Its own part because the end-to-end tests reach this through two real runs
 // and an edited plan, where a wrong pairing shows up only as a spawn count.
 
-// §AR-source-file-size.3 §FS-rhei-agents.3.2 §FS-rhei-agents.8.4
+// §AR-source-file-size.3 §FS-rhei-agent-visit-pairing
 
 mod visit_pairing {
     use super::super::*;
@@ -53,7 +53,7 @@ mod visit_pairing {
         pair_orphaned_record(own_names, own_ran, records, TASK, STATE, MOVES)
     }
 
-    // §FS-rhei-agents.8.4: one orphan and one recordless invocation pair.
+    // §FS-rhei-agent-visit-pairing.3: one orphan and one recordless invocation pair.
     #[test]
     fn one_orphan_pairs_with_the_one_recordless_invocation() {
         let pairing = pair(&[names("m-y")], &[false], &[finished("m-x")]);
@@ -62,7 +62,7 @@ mod visit_pairing {
         assert!(pairing.ran_this_visit);
     }
 
-    // §FS-rhei-agents.8.4: two orphans for one invocation is a guess, and is warned about.
+    // §FS-rhei-agent-visit-pairing.5: two orphans for one invocation is a guess, and is warned about.
     #[test]
     fn two_orphans_pair_nothing() {
         let pairing = pair(&[names("c")], &[false], &[finished("a"), finished("b")]);
@@ -70,7 +70,7 @@ mod visit_pairing {
         assert_eq!(pairing.ambiguous, [path("a"), path("b")]);
     }
 
-    // §FS-rhei-agents.8.4: one orphan for two recordless invocations is a guess too.
+    // §FS-rhei-agent-visit-pairing.5: one orphan for two recordless invocations is a guess too.
     #[test]
     fn two_recordless_invocations_pair_nothing() {
         let pairing = pair(&[names("c"), names("d")], &[false, false], &[finished("a")]);
@@ -79,7 +79,7 @@ mod visit_pairing {
         assert_eq!(pairing.unrecorded, [path("c"), path("d")], "the warning names both targets");
     }
 
-    // §FS-rhei-agents.3.2: a removed member's orphan and an added member pass silently.
+    // §FS-rhei-agent-visit-pairing.5: a removed member's orphan and an added member pass silently.
     #[test]
     fn nothing_to_choose_between_is_not_ambiguous() {
         let removed = pair(&[names("a")], &[true], &[finished("a"), finished("b")]);
@@ -88,7 +88,7 @@ mod visit_pairing {
         assert_eq!(added, VisitPairing { ran_this_visit: true, ..VisitPairing::default() });
     }
 
-    // §FS-rhei-agents.8.4: only successful work of the current visit can stand in.
+    // §FS-rhei-agent-visit-pairing.3: only successful work of the current visit can stand in.
     #[test]
     fn a_stale_or_failed_orphan_pairs_nothing() {
         let stale = (path("m-x"), record(STATE, MOVES - 1, "exited", Some(0)));
@@ -102,7 +102,7 @@ mod visit_pairing {
         assert!(pairing.ran_this_visit, "a failed record still says the state ran this visit");
     }
 
-    // §FS-rhei-agents.8.4: `review` never collects `review-fix`'s records by name prefix.
+    // §FS-rhei-agent-visit-pairing.3: `review` never collects `review-fix`'s records by name prefix.
     #[test]
     fn a_record_matching_only_by_file_name_prefix_does_not_count() {
         let dir = tempfile::tempdir().expect("tmpdir");
@@ -130,7 +130,7 @@ mod visit_pairing {
         assert_eq!(pairing, VisitPairing::default());
     }
 
-    // §FS-rhei-agents.3.2: an own record of this visit that failed or still runs decides alone.
+    // §FS-rhei-agent-visit-pairing.2: an own record of this visit that failed or still runs decides alone.
     #[test]
     fn an_own_failed_or_running_record_is_a_record_of_its_own() {
         let dir = tempfile::tempdir().expect("tmpdir");
@@ -158,7 +158,7 @@ mod visit_pairing {
         assert!(!own_record_this_visit(&own, TASK, STATE, MOVES), "an earlier visit is not this one");
     }
 
-    // §FS-rhei-agents.8.4: every name on an own-name list is disowned, not only the one that answered.
+    // §FS-rhei-agent-visit-pairing.1: every name on an own-name list is disowned, not only the one that answered.
     #[test]
     fn a_name_on_an_own_name_list_is_never_an_orphan() {
         let a_names = vec![path("a"), path("a-fallback")];

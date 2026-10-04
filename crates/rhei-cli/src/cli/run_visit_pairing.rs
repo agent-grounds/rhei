@@ -7,7 +7,7 @@
 // record belongs to no current invocation only if *every* current invocation
 // disowns it, and a pairing is safe only if it is the only one possible.
 
-// §AR-source-file-size.3 §FS-rhei-agents.3.2 §FS-rhei-agents.8.4
+// §AR-source-file-size.3 §FS-rhei-agents.3.2 §FS-rhei-agent-visit-pairing
 
 /// The names an invocation reads as its own spawn record, in the order they are
 /// tried: the one its identity and number spell and, for an uncounted re-entry,
@@ -18,7 +18,7 @@
 /// every name on every current invocation's list, not only the one that
 /// answered. A fallback the own-record lookup trusts goes on this list, so a
 /// record it would read as an invocation's own is never taken for an orphan.
-// §FS-rhei-agents.8.1 §FS-rhei-agents.8.4
+// §FS-rhei-agents.8.1 §FS-rhei-agent-visit-pairing.1
 fn own_spawn_record_names(
     runtime_dir: &Path,
     task_id: &str,
@@ -36,7 +36,7 @@ fn own_spawn_record_names(
 
 /// The first record found under an invocation's own names: its own name as it
 /// stands, a fallback name only at the current `moves`, as `current_visit_record`
-/// reads it. §FS-rhei-agents.8.4
+/// reads it. §FS-rhei-agent-visit-pairing.1
 fn own_spawn_record(
     names: &[PathBuf],
     task_id: &str,
@@ -57,7 +57,7 @@ fn own_spawn_record(
 /// state at the current move count, however it ended. One that failed or is
 /// still `running` decides for its invocation, so an orphan never answers for
 /// it: only an invocation with none is without a record of its own.
-// §FS-rhei-agents.3.2 §FS-rhei-agents.8.4
+// §FS-rhei-agent-visit-pairing.2
 fn own_record_this_visit(names: &[PathBuf], task_id: &str, state_name: &str, moves: u64) -> bool {
     names.iter().filter_map(|path| read_spawn_record(path)).any(|record| {
         record.task == task_id && record.state == state_name && record.moves == moves
@@ -66,7 +66,7 @@ fn own_record_this_visit(names: &[PathBuf], task_id: &str, state_name: &str, mov
 
 /// What one visit's records say about the state as a whole, before any one
 /// invocation is asked about.
-// §FS-rhei-agents.3.2 §FS-rhei-agents.8.4
+// §FS-rhei-agent-visit-pairing.3 §FS-rhei-agent-visit-pairing.5 §FS-rhei-agent-visit-pairing.6
 #[derive(Debug, Default, PartialEq)]
 struct VisitPairing {
     /// Whether any record of this task and state, of any identity and however it
@@ -93,7 +93,7 @@ struct VisitPairing {
 /// fan-out member leaves an orphan nothing pairs with, an added one leaves a
 /// recordless invocation no orphan answers for, and both pass silently: only
 /// a choice between several candidates is ambiguous.
-// §FS-rhei-agents.3.2 §FS-rhei-agents.8.4
+// §FS-rhei-agent-visit-pairing.1 §FS-rhei-agent-visit-pairing.3 §FS-rhei-agent-visit-pairing.5
 fn pair_orphaned_record(
     own_names: &[Vec<PathBuf>],
     own_ran: &[bool],
@@ -160,7 +160,7 @@ impl InvocationCompletion<'_> {
     }
 
     /// Whether `own_names` hold a record of this state at the current move
-    /// count, whatever its ending. §FS-rhei-agents.3.2
+    /// count, whatever its ending. §FS-rhei-agent-visit-pairing.2
     fn ran_under(&self, own_names: &[PathBuf]) -> bool {
         own_record_this_visit(own_names, &self.task.id.to_string(), self.state_name, self.moves)
     }
@@ -168,7 +168,7 @@ impl InvocationCompletion<'_> {
     /// The visit's pairing, read once per completion and shared by every
     /// invocation asked about. The directory of every record is read only when
     /// some invocation has no current-visit record of its own: otherwise there
-    /// is nobody an orphan could answer for. §FS-rhei-agents.8.4
+    /// is nobody an orphan could answer for. §FS-rhei-agent-visit-pairing.3
     fn visit_pairing(&self) -> &VisitPairing {
         self.pairing.get_or_init(|| {
             let task_id = self.task.id.to_string();
@@ -195,7 +195,7 @@ impl InvocationCompletion<'_> {
     }
 
     /// Whether the visit's one orphaned record answers for `resolved`.
-    /// §FS-rhei-agents.3.2
+    /// §FS-rhei-agent-visit-pairing.3
     fn paired_with(&self, own_names: &[PathBuf]) -> bool {
         self.visit_pairing()
             .paired
@@ -207,7 +207,7 @@ impl InvocationCompletion<'_> {
     /// spawn: one note for an invocation an orphan answers for and that is not
     /// spawned after all, one warning for an ambiguous edit. Each is said once
     /// per run, however many passes reach the same decision.
-    // §FS-rhei-agents.3.2 §FS-rhei-agents.8.4
+    // §FS-rhei-agent-visit-pairing.4 §FS-rhei-agent-visit-pairing.5
     fn announce_visit_pairing(
         &self,
         sink: &Arc<dyn rhei_tui::EventSink>,
@@ -280,7 +280,7 @@ impl InvocationCompletion<'_> {
 }
 
 /// The target an operator wrote for this invocation, as the note names it: the
-/// selector, else the model, else the agent. §FS-rhei-agents.3.2
+/// selector, else the model, else the agent. §FS-rhei-agent-visit-pairing.4
 fn invocation_target_label(resolved: &ResolvedAgent) -> String {
     resolved
         .target

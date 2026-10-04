@@ -29,8 +29,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_SCRIPT = REPO_ROOT / "scripts" / "prepare_changelog_release.py"
-# The stamp tests' name for it; it goes with them.
-STAMPER = RELEASE_SCRIPT
 PRE_COMMIT_CONFIG = REPO_ROOT / ".pre-commit-config.yaml"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 AUTO_BUMP_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "auto-bump.yml"
@@ -81,14 +79,6 @@ def clean_env(**overrides: str | None) -> dict[str, str]:
         else:
             env[key] = value
     return env
-
-
-def changelog(unreleased: list[str], released: str = "- Something released. (PR #2)") -> str:
-    """A `docs/changelog.md` whose `## Unreleased` holds exactly these bullets."""
-    body = "\n\n".join(unreleased)
-    if body:
-        body += "\n"
-    return f"# Changelog\n\n## Unreleased\n\n{body}\n## 0.5.1 - 2026-09-20\n\n{released}\n"
 
 
 GENERATED_NOTE = (
@@ -203,23 +193,10 @@ if argv[:1] == ["api"]:
     if any(sha.startswith(token) or token.startswith(sha) for token in failing):
         sys.stderr.write("HTTP 502: Bad Gateway (https://api.github.com/repos/agent-grounds/rhei/commits/%s/pulls)\n" % sha)
         sys.exit(1)
-    # An entry is a bare number (what the stamp tests wrote) or a pull request object.
-    entries = pulls.get(sha, pulls.get(sha[:7], []))
-    objects = [
-        entry if isinstance(entry, dict) else {
-            "number": entry,
-            "title": "Change number %d" % entry,
-            "html_url": "https://github.com/agent-grounds/rhei/pull/%d" % entry,
-            "state": "closed",
-            "merged_at": "2026-10-01T00:00:00Z",
-        }
-        for entry in entries
-    ]
     if "--jq" in argv:
-        # Only the stamper's `.[].number` is understood; a reader of the objects reads the JSON.
-        sys.stdout.write("".join("%d\n" % entry["number"] for entry in objects))
-    else:
-        sys.stdout.write(json.dumps(objects) + "\n")
+        sys.stderr.write("gh stub: --jq is not understood; read the JSON\n")
+        sys.exit(1)
+    sys.stdout.write(json.dumps(pulls.get(sha, pulls.get(sha[:7], []))) + "\n")
     sys.exit(0)
 
 sys.stderr.write("gh stub: unsupported invocation %r\n" % (argv,))

@@ -585,10 +585,15 @@ Rules:
 - Timestamps are UTC, RFC 3339, second precision.
 - The event column uses `start@<state>` for `SlotAssigned` and `end@<state>` for `SlotReleased`.
 - Paths are workspace-relative if inside the workspace, otherwise absolute.
-- Trailing metadata is only added on `SlotReleased` events (`exit`, `duration`, `outcome`).
+- Trailing metadata is only added on `SlotReleased` events (`exit`, `duration`, `outcome`, and the keys the rules below add: `provider`, `next_attempt_at`, `reverted`).
 - `outcome` is one of `completed`, `failed`, `waiting`, `provider_limited`, `cancelled`, `timeout`, `interrupted` — the vocabulary [§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records) serializes.
 - A provider-limited release adds `provider` and `next_attempt_at`; its task column is the reporting task. The TUI renders that slot as a calm wait carrying the same provider and deadline, never as failed attention.
 - A released invocation whose selected transition is a poll state's self-loop records `outcome=waiting`, whatever its exit code: the machine declared that exit as "not done yet", so the attempt is neither a failure nor a finished state ([§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics)). The third line above is one — exit `75` matched a declared self-loop, so the attempt reads as the wait it was. The attempt that *leaves* the state, including by the exhaustion edge, keeps the outcome its own exit earns.
+- A released invocation whose edit broke the plan, and whose task region the run restored, adds `reverted=<file>:<line>` — the workspace-relative file and the 1-based line the loader reported (§FS-rhei-run.3.7). Its outcome is `failed`, or `timeout` / `interrupted` when that is what ended it, so the vocabulary does not grow: `reverted` says why a zero exit moved nothing. The attempt that follows is its own pair of lines, under its `-attempt{n}` log.
+
+  ```
+  2026-04-21T14:03:22Z  ws.1  end@cover  runtime/logs/task-ws.1-cover.log  exit=0,duration=4s,outcome=failed,reverted=tasks/01-cover.md:6
+  ```
 - The file is safe to `tail -f` from other shells while `rhei run` is active.
 
 A `SlotAssigned` produces one line; its paired `SlotReleased` produces a second line on the same state (recording exit status and duration). For multi-invocation states (`all_targets`), each invocation is a distinct pair of lines with the target suffix visible in the log path.

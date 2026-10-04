@@ -113,7 +113,12 @@ run-orchestrated logs and captures land there even for tickets owned by a
 subdirectory rhei:
 
 - `runtime/results/<ticket-id>.md`
-- `runtime/logs/task-<ticket-id>-*`
+- `runtime/logs/task-<ticket-id>-*`, and the spawn records beside them in
+  `runtime/spawns/task-<ticket-id>-*`
+- `runtime/reports/task-<ticket-id>-*`, the session reports rendered from those
+  logs ([§FS-rhei-session-reports.1](rhei-session-reports.spec.md#1-report-artifact)), including any renamed aside as
+  `.orphaned-<unix-ts>.md`; a report left behind would sit at the stem the
+  ticket's next entry is about to use (§FS-rhei-agents.8.1)
 - every artifact the resolved state machine declares as an `inputs:`/`outputs:`
   path containing `{task_id}` — a stale output left behind would otherwise
   satisfy a required input on the next run
@@ -122,7 +127,9 @@ subdirectory rhei:
 - `runtime/accounting/captures/<ticket-id>-*` and
   `runtime/accounting/tasks/<ticket-id>.json`
 - the ticket's lines in `runtime/state-transitions.log`, so a reset ticket's
-  recorded history cannot claim a completion its plan no longer holds
+  recorded history cannot claim a completion its plan no longer holds; its
+  entry numbers are counted from those lines, so its next entry into any state
+  is entry 1 again and takes the plain log name (§FS-rhei-agents.8.1)
 
 A narrowed reset removes **no budget receipts**, for the same reason: the
 account is per project, a receipt is not keyed by a ticket id, and a narrowing

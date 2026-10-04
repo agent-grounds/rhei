@@ -258,15 +258,24 @@ Program stdout and stderr are captured using the same log format and naming conv
 |----------|---------------|
 | Simple state | `runtime/logs/task-{task_id}-{state}.log` |
 | Counted-loop state | `runtime/logs/task-{task_id}-{state}-{visit_count}.log` |
-| Retry within one visit | the name above with `-attempt{n}` appended, `n` counting from 2 |
+| Uncounted state, entry `n` ≥ 2 | `runtime/logs/task-{task_id}-{state}-{n}.log` |
+| Retry within one entry | the name above with `-attempt{a}` appended, `a` counting from 2 |
+
+A program state is named by the same grammar as an agent state
+([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)), with no identity part: a counted program state —
+one with `visits:`, `execute_on` or a self-loop — writes visit 2 to `-2`, and an
+uncounted one numbers its entries, so a `measure` program entered three times by
+a loop writes `task-{task_id}-measure.log`, `-2.log` and `-3.log`. Neither ever
+writes a later visit or entry over an earlier one's log.
 
 A program state re-spawns for the same reason an agent state does — it is never
 skipped at scheduling, and a pass that finds its completion condition unmet runs
 it again — so the attempt rule of
 [Agents Specification — Log File Naming](rhei-agents.spec.md#81-log-file-naming)
 applies here in full: the attempt is keyed to the state visit, a fresh entry
-into the state starts over at the unsuffixed name, and a retry never truncates
-the transcript that says why the attempt before it did not finish. A program
+into the state starts attempt 1 under its own entry name, a retry never truncates
+the transcript that says why the attempt before it did not finish, and a log
+path no spawn record accounts for is refused rather than overwritten. A program
 spawn writes the same record as an agent spawn
 ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)), with `kind` `program` and `worker` the resolved command,
 and it spends the same per-visit attempt budget ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)).

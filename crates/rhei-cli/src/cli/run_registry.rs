@@ -28,6 +28,92 @@ pub(crate) fn run_registry_path(id: &str) -> Option<PathBuf> {
     Some(run_registry_dir()?.join(format!("{id}.json")))
 }
 
+/// Make the id of a run the launcher is about to print resolve, by writing
+/// the descriptor it just read to the registry itself, before the child's own
+/// write may have landed. An entry already there is the child's and is left
+/// exactly as it is. One attempt, never a wait. §FS-rhei-run-headless.1.1
+///
+/// The body goes to a temp name only this process uses — not the child's
+/// `<id>.json.tmp`, and not ending in `.json`, which the registry reads as an
+/// entry — and is hard-linked into place, which refuses rather than replaces.
+/// On failure the error names the state directory tried and why it failed.
+pub(crate) fn publish_registry_entry_once(descriptor: &RunDescriptor) -> Result<(), String> {
+    publish_registry_entry_with(descriptor, |temp, entry| fs::hard_link(temp, entry))
+}
+
+/// [`publish_registry_entry_once`] with the link step passed in, so a test can
+/// refuse it the way a state home without hard links does (vfat, exFAT, a
+/// link-less FUSE mount).
+///
+/// Every failed step is followed by a look at the entry: one that stands now
+/// is the child's, and the id resolves, so it is not an error — the warning
+/// fires only when the entry is still absent after this attempt.
+/// §FS-rhei-run-headless.1.1
+///
+/// A link refused for any reason but `AlreadyExists` falls back to writing
+/// the body straight to the entry with `create_new`, which also refuses
+/// rather than replaces. That write is not atomic, and it is safe anyway: a
+/// reader that catches it half-written cannot parse it, the sweep classifies
+/// it as unreadable, and an unreadable entry is never pruned
+/// (§FS-rhei-run-headless.3); the child's later rename replaces it whole.
+fn publish_registry_entry_with(
+    descriptor: &RunDescriptor,
+    link: impl FnOnce(&Path, &Path) -> std::io::Result<()>,
+) -> Result<(), String> {
+    let Some(dir) = run_registry_dir() else {
+        return Err("neither XDG_STATE_HOME nor HOME is set".to_owned());
+    };
+    let entry = dir.join(format!("{}.json", descriptor.id));
+    let failed = |err: std::io::Error| {
+        if entry.is_file() {
+            return Ok(());
+        }
+        Err(format!("could not write it under {}: {err}", dir.display()))
+    };
+    let body = match serde_json::to_string_pretty(descriptor) {
+        Ok(body) => format!("{body}\n"),
+        Err(err) => return failed(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
+    };
+    if let Err(err) = fs::create_dir_all(&dir) {
+        return failed(err);
+    }
+    let temp = dir.join(format!(".{}.launcher-{}.tmp", descriptor.id, std::process::id()));
+    let linked = fs::write(&temp, &body).and_then(|()| link(&temp, &entry));
+    let _ = fs::remove_file(&temp);
+    let refused = match linked {
+        Ok(()) => return Ok(()),
+        // The child got there first; its entry stands. §FS-rhei-run-headless.1.1
+        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
+        Err(err) => err,
+    };
+    if entry.is_file() {
+        return Ok(());
+    }
+    let written = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&entry)
+        .and_then(|mut file| file.write_all(body.as_bytes()));
+    match written {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        Err(err) => failed(std::io::Error::new(err.kind(), format!("{refused}; then {err}"))),
+    }
+}
+
+/// What the launcher tells the operator about an id it printed that will not
+/// resolve: that it will not, why, and how to reach the run instead. The
+/// child's own warning lands in `runtime/run.log`, which nobody is reading yet.
+// §FS-rhei-run-headless.2
+pub(crate) fn unregistered_run_warning(descriptor: &RunDescriptor, why: &str) -> String {
+    format!(
+        "warning: run {} has no registry entry, so its id will not resolve from another \
+         directory.\n  {why}\n  reach it by path instead: rhei attach {}",
+        descriptor.id,
+        shell_quote(&descriptor.workspace.display().to_string())
+    )
+}
+
 /// A registry entry the sweep could not decide about — an unreadable workspace,
 /// a lock it could not probe, an entry a newer `rhei` wrote in a shape this
 /// build does not understand.

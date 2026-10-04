@@ -110,16 +110,19 @@ pub(crate) fn launch_headless_run(
     let pid = child.id();
 
     match await_child_ready(&mut child, pid, &workspace_root) {
-        Ok(LaunchOutcome::Running(descriptor)) => {
-            report_launched(&descriptor, options.json(), options.announces_dashboard());
-            warn_if_unregistered(&descriptor);
-            Ok(())
-        }
-        Ok(LaunchOutcome::FinishedEarly(descriptor)) => {
-            report_finished_early(&descriptor, options.json());
-            warn_if_unregistered(&descriptor);
-            Ok(())
-        }
+        Ok(outcome) => announce_launch(
+            &outcome,
+            options.json(),
+            options.announces_dashboard(),
+            &mut std::io::stdout().lock(),
+            &mut std::io::stderr().lock(),
+        )
+        .map_err(|error| {
+            miette!(
+                help = "the run started regardless: `rhei attach <workspace>` reaches it",
+                "could not write the launch report: {error}"
+            )
+        }),
         // A run that exited `0` did what it was asked; there is simply nothing
         // left to attach to. Reporting that as a startup failure would fail a
         // CI step for a plan that succeeded. §FS-rhei-run-headless.1.1
@@ -217,68 +220,80 @@ fn concurrent_launch_report(workspace_root: &Path) -> miette::Report {
     }
 }
 
-/// Say so when the id the launcher just printed does not resolve.
-///
-/// The child warns about a registry it could not write, but that warning goes
-/// into `runtime/run.log`, which nobody is reading yet. Without this the
-/// operator is handed an id that `rhei attach` will not accept and no reason
-/// why.
-// §FS-rhei-run-headless.2
-fn warn_if_unregistered(descriptor: &RunDescriptor) {
-    let registered =
-        run_registry_path(&descriptor.id).is_some_and(|entry| read_descriptor(&entry).is_some());
-    if registered {
-        return;
-    }
-    eprintln!(
-        "warning: run {} has no registry entry, so its id will not resolve from another \
-         directory.\n  reach it by path instead: rhei attach {}",
-        descriptor.id,
-        shell_quote(&descriptor.workspace.display().to_string())
-    );
+/// Hand the operator the id of a child the handshake found, on `out`, with
+/// any warning about it on `err`. The id resolves before its first byte is
+/// printed, or the warning says why it will not.
+// §FS-rhei-run-headless.1.1
+fn announce_launch(
+    outcome: &LaunchOutcome,
+    json: bool,
+    announce_dashboard: bool,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> std::io::Result<()> {
+    let (LaunchOutcome::Running(descriptor) | LaunchOutcome::FinishedEarly(descriptor)) = outcome;
+    // The child's entry may not have landed yet; publish it before printing. §FS-rhei-run-headless.1.1
+    let unregistered = publish_registry_entry_once(descriptor).err();
+    let reported = match outcome {
+        LaunchOutcome::Running(_) => report_launched(descriptor, json, announce_dashboard, out),
+        LaunchOutcome::FinishedEarly(_) => report_finished_early(descriptor, json, out, err),
+    };
+    // A failed report does not swallow the warning. §FS-rhei-run-headless.2
+    let warned = unregistered.map_or(Ok(()), |why| writeln!(err, "{}", unregistered_run_warning(descriptor, &why)));
+    reported.and(warned)
 }
 
-fn report_launched(descriptor: &RunDescriptor, json: bool, announce_dashboard: bool) {
+fn report_launched(
+    descriptor: &RunDescriptor,
+    json: bool,
+    announce_dashboard: bool,
+    out: &mut dyn Write,
+) -> std::io::Result<()> {
     if json {
-        println!("{}", descriptor_json(descriptor));
-        return;
+        return writeln!(out, "{}", descriptor_json(descriptor));
     }
-    println!("Run {} started headless (pid {}).", descriptor.id, descriptor.pid);
-    println!("  attach:  rhei attach {}", descriptor.id);
-    println!("  stop:    rhei stop {}", descriptor.id);
+    writeln!(out, "Run {} started headless (pid {}).", descriptor.id, descriptor.pid)?;
+    writeln!(out, "  attach:  rhei attach {}", descriptor.id)?;
+    writeln!(out, "  stop:    rhei stop {}", descriptor.id)?;
     if let Some(log) = &descriptor.log {
-        println!("  log:     {}", log.display());
+        writeln!(out, "  log:     {}", log.display())?;
     }
     // Withheld under `--no-dashboard`: the control server is up because an
     // attached surface needs it, but nobody asked to be sent to a browser.
     // §FS-rhei-run-headless.4
     if announce_dashboard {
         if let Some(url) = &descriptor.control_url {
-            println!("  browser: {url}");
+            writeln!(out, "  browser: {url}")?;
         }
     }
+    Ok(())
 }
 
 /// A run short enough to finish inside the handshake window. It started, it
 /// worked, and it ended — the id still resolves, so say so rather than call a
 /// completed plan a failed launch. §FS-rhei-run-headless.1.1
-fn report_finished_early(descriptor: &RunDescriptor, json: bool) {
+fn report_finished_early(
+    descriptor: &RunDescriptor,
+    json: bool,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> std::io::Result<()> {
     if json {
         // The record still carries the id, so the CI shape of §5.3 keeps
         // working; the prose about it belongs on stderr.
-        println!("{}", descriptor_json(descriptor));
-        eprintln!("Run {} finished before the launcher returned.", descriptor.id);
-        return;
+        writeln!(out, "{}", descriptor_json(descriptor))?;
+        return writeln!(err, "Run {} finished before the launcher returned.", descriptor.id);
     }
-    println!("Run {} finished before the launcher returned.", descriptor.id);
+    writeln!(out, "Run {} finished before the launcher returned.", descriptor.id)?;
     match descriptor.exit_code {
-        Some(code) => println!("  It exited {code}."),
-        None => println!("  It recorded no exit status."),
+        Some(code) => writeln!(out, "  It exited {code}.")?,
+        None => writeln!(out, "  It recorded no exit status.")?,
     }
-    println!("  attach:  rhei attach {}", descriptor.id);
+    writeln!(out, "  attach:  rhei attach {}", descriptor.id)?;
     if let Some(log) = &descriptor.log {
-        println!("  log:     {}", log.display());
+        writeln!(out, "  log:     {}", log.display())?;
     }
+    Ok(())
 }
 
 fn descriptor_json(descriptor: &RunDescriptor) -> String {

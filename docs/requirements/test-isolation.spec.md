@@ -157,6 +157,32 @@ anything other than what it named before. What this point governs is the user
 tier read through the home. Where a test's account state goes is not that: with
 `XDG_STATE_HOME` unset, the state directory still falls back to `HOME`, so a
 test that keeps state needs `HOME` or `XDG_STATE_HOME` to name somewhere, and
-this point says nothing about it. This governs the tests only:
+this point says nothing about it; [§REQ-test-isolation.6](test-isolation.spec.md#6-a-tests-state-directory-is-its-own-and-never-anothers) does. This governs the tests only:
 the built `rhei` still takes its user tier from `HOME`, as
 [§REQ-test-isolation.2](test-isolation.spec.md#2-where-a-spawned-process-writes-is-chosen-never-derived-from-where-it-stands) relies on when a test pins it for a spawned binary.
+
+## 6. A Test's State Directory Is Its Own, And Never Another's
+
+The state directory is the account's: the run registry and every root guard's
+lock live beneath it ([§FS-rhei-recover.4](../functional-spec/rhei-recover.spec.md#4-pending-root-interlock)), and it is named by `XDG_STATE_HOME`
+— again one variable for the whole test process. Nearly every test takes a root
+guard without knowing it does, because reading a plan or a source file takes
+one, so a test that moves that variable to keep its registry private moves the
+lock of every guard taken beside it. The sibling then locks under a directory
+it never named: one being created, one being deleted, or one where a test put a
+regular file on purpose to make the registry unwritable. It fails with "cannot
+create root guard lock" on a path that belongs to neither the code under test
+nor the test that met it.
+
+So where a test's root guard locks is fixed for the test, by a means no other
+test can move: a sibling repointing `XDG_STATE_HOME`, removing it, or blocking
+`<state>/rhei` with a file changes nothing about where a guard taken beside it
+resolves. A lock taken by the tests that move the variable does not hold this,
+for the reason [§REQ-test-isolation.5](test-isolation.spec.md#5-a-tests-home-is-its-own-and-never-anothers) gives: it orders only the tests that take
+it, and the tests that take a guard are almost all the others.
+
+The measure is the guard-taking test's verdict. While another test holds
+`XDG_STATE_HOME` pointed at a directory whose `rhei` is a regular file, a forced
+transition and its replay still commit, on every platform the gate runs. This
+governs the tests only: the built `rhei` still resolves its state directory, and
+every lock beneath it, as [§FS-rhei-recover.4](../functional-spec/rhei-recover.spec.md#4-pending-root-interlock) says.

@@ -118,23 +118,31 @@ fn plan_count_bounds_with(settings: &RheiSettings, declared: Option<u64>) -> Cou
     resolve_count_bounds(settings, declared)
 }
 
-/// The project an account belongs to: the Panta project a plan is a member of,
-/// or the plan's own execution root when it is a bare rhei.
+/// The project an account belongs to: the Panta project that discovers the
+/// plan as a member, or the plan's own execution root when it is a bare rhei.
+///
+/// Membership is read as the loader reads it (§FS-rhei-panta.6): an execution
+/// root that is itself a project is its own, and a Directory Workspace or the
+/// `basin/` its parent discovers belongs to that parent. Anything else - a plan
+/// under the project's `runtime/`, in a grouping folder, in a scratch directory
+/// - is a bare rhei however deep inside a project it sits.
 ///
 /// A bare rhei is the single rhei of its implicit project, so it has an account
 /// of its own; a member never does, because a project that could add a rhei to
 /// buy capacity would not be bounded at all.
 /// §FS-rhei-budgets.1 §FS-rhei-budgets.5.1
 fn budget_project_root(workspace_root: &Path) -> PathBuf {
-    let mut candidate = workspace_root;
-    loop {
-        if rhei_core::workspace::is_panta_project(candidate) {
-            return candidate.to_path_buf();
-        }
-        match candidate.parent() {
-            Some(parent) if !parent.as_os_str().is_empty() => candidate = parent,
-            _ => return workspace_root.to_path_buf(),
-        }
+    if rhei_core::workspace::is_panta_project(workspace_root) {
+        return workspace_root.to_path_buf();
+    }
+    // A root spelled `.` names no entry of its own, so ask about where it is.
+    let entry = std::fs::canonicalize(workspace_root).unwrap_or_else(|_| workspace_root.to_path_buf());
+
+    // Only the project that discovers the root charges it; an enclosing one that
+    // does not is no account of this plan's. §FS-rhei-budgets.5.1
+    match rhei_core::workspace::panta_member(&entry) {
+        Some((project, _)) => project,
+        None => workspace_root.to_path_buf(),
     }
 }
 

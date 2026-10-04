@@ -1337,15 +1337,35 @@ that invocation's work is eligible for the current **visit** as well as already
 on disk. A visit is the span during which the ticket's transition-ledger move
 count does not change. The first visit to a canonical state may reuse deliberately
 pre-populated work without a spawn when neither transition history nor an older
-spawn record establishes an earlier visit to that state. Moves through other
+spawn record establishes an earlier visit to that state, and only while no spawn
+record of this task and state, of any identity, exists at the current move count:
+such a record means the state already ran in this visit, so its record decides,
+not the files on disk. Moves through other
 states, including the first move into this state, do not alone establish
 re-entry. A recorded departure from this state (including a self-loop), or
 multiple recorded entries into it, does establish an earlier visit even when
 its spawn record is absent. Counted state suffixes refer to the same canonical
 state. When neither usable history source establishes an earlier visit, the
-legacy first-visit interpretation remains available. After re-entry, each invocation is
-eligible only when its own spawn record (§8.4) proves a successful exit in the
-current visit. A restart or a withheld edge that has not moved the ticket stays
+legacy first-visit interpretation remains available. After re-entry, and at any
+entry once a record of this state exists at the current move count, each
+invocation is eligible only when its own spawn record (§8.4) proves a successful
+exit in the current visit, or, when it has none, when exactly one successful
+current-visit record of this task and state is **orphaned** (§8.4) and this is the
+only current invocation without a successful current-visit record of its own;
+the orphan then answers for it. That is the target edited in place between two
+runs: the visit's work was done by an identity the plan no longer names. Work
+finished in a visit is not undone by an in-place edit of the state's target,
+whether or not the new target's file-name slug equals the old one's, and
+`rhei run` says so on standard output with one line per paired invocation:
+
+```text
+note: task <id> state '<state>': reusing this visit's finished spawn (<record path>) for <target>; `rhei reset` redoes it
+```
+
+`rhei reset` is the redo. An ambiguous edit — two or more orphans, or two or
+more invocations without a record of their own — pairs nothing: the run prints
+a warning on standard error naming every orphaned record, and the invocations
+are spawned. A restart or a withheld edge that has not moved the ticket stays
 in the same visit and may reuse that successful proof.
 
 The pass therefore skips an invocation only when visit eligibility and
@@ -2323,6 +2343,23 @@ Older visits and records ending in failure, timeout, interruption, or provider
 limiting remain useful history but are not successful current-visit proof. The
 existing per-invocation filename keeps fan-out identities independent; this
 rule adds no persisted field or format.
+
+A record that no current invocation reads as its own is **orphaned**. An
+invocation reads as its own every name its own-record lookup consults, in the
+order it tries them — the name its identity spells, and any fallback name that
+lookup also trusts for it — not only the name that answered. An orphaned record
+can stand in for an invocation that has no successful current-visit record of
+its own (§3.2) only when it names the same `task` and canonical `state` as
+fields, its `moves` equals the current move count, and it proves successful work
+by the test above; the pairing is unique — exactly one such orphan and exactly
+one current invocation without a record of its own — and anything else pairs
+nothing, warns naming every orphaned record, and spawns. A record on any current
+invocation's list of own names is never orphaned, so a current fan-out sibling's
+record can never answer for another sibling. Pairing proves only visit
+eligibility: the paired invocation's own declared outputs and required result
+are still checked under its own identity. The orphaned record keeps its name,
+`worker` and `log`, so it still says which identity did the work, and the
+pairing writes nothing; this rule, too, adds no persisted field or format.
 
 `task` and `state` are stored as fields and matched as fields. A reader looking
 for "a worker that ran in state `review`" must not match record *file names* by

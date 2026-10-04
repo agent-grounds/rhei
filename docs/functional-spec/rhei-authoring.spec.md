@@ -373,10 +373,8 @@ Inside a Panta project, where the file sits is what selects the definition. If
 the project-root `states.yaml` defines `surveying → signed-off`, a `billing`
 member with a `states.yaml` of its own defining `drafting → filed` runs under
 its own; delete that file for `billing` to run under the project's instead
-([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)). A `**States:**` line is deprecated and still
-read: for one release it wins wherever it resolves, which is the one case where
-deleting the file is not enough to move a rhei and deleting the line is
-([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)).
+([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)). A `**States:**` line names nothing any more and is refused
+([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)).
 
 ## 6. Common Pitfalls
 

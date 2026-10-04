@@ -2,20 +2,20 @@
 // match across rhei roots still resolve, still win wherever they resolve, and
 // warn where they disagree with the resolution that replaces them.
 
-// §FS-rhei-states-deprecation
+// §FS-rhei-plan-language.1.3
 
 // This file is the whole of the window on the code side, so the removal
 // release deletes it and the two calls into it, and leaves
 // §FS-rhei-plan-language.1.3's three clauses untouched.
 
-// §FS-rhei-states-deprecation.4
+// §FS-rhei-plan-language.1.3
 
 /// Where the deprecated pass found a machine. The window owes a different
 /// message for each disagreement, and silence where there is none.
-/// §FS-rhei-states-deprecation.2
+/// §FS-rhei-plan-language.1.3
 enum DeprecatedSource {
     /// A `states.yaml` in another rhei's execution root — the cross-root
-    /// `name:` match. §FS-rhei-states-deprecation.2.3
+    /// `name:` match. §FS-rhei-plan-language.1.3
     CrossRoot(PathBuf),
     /// The declaring rhei's own root, the project root, the already-resolved
     /// project default, or the built-in machine: anywhere but another rhei's
@@ -25,7 +25,7 @@ enum DeprecatedSource {
 }
 
 /// What the deprecated pass resolved, and from where.
-/// §FS-rhei-states-deprecation.1
+/// §FS-rhei-plan-language.1.3
 struct DeprecatedResolution {
     resolved: ResolvedStateMachine,
     source: DeprecatedSource,
@@ -34,7 +34,7 @@ struct DeprecatedResolution {
 /// Who carries the declaration being resolved. The subject of a warning is the
 /// declaration rather than the lookup, so a manifest declaration five rheis
 /// inherit warns once and names the manifest.
-/// §FS-rhei-states-deprecation.3
+/// §FS-rhei-plan-language.1.3
 enum DeclarationSubject<'a> {
     /// The top-level plan's own declaration, naming the project default: a
     /// project's `index.panta.md`, a Directory Workspace's `index.rhei.md`, or
@@ -48,7 +48,7 @@ impl DeclarationSubject<'_> {
     /// The once-per-process key. It is the declaration that is the subject, so
     /// a rhei's id is part of its key: two single-file members of one project
     /// share an execution root and carry two distinct declarations.
-    /// §FS-rhei-states-deprecation.3
+    /// §FS-rhei-plan-language.1.3
     fn key(&self) -> String {
         match self {
             Self::Manifest { root, .. } => {
@@ -63,7 +63,7 @@ impl DeclarationSubject<'_> {
     /// How the warning names whoever carries the line — the file for a
     /// top-level declaration, because a lone plan and a Directory Workspace
     /// have no `index.panta.md` to be told to edit.
-    /// §FS-rhei-states-deprecation.2
+    /// §FS-rhei-plan-language.1.3
     fn names_itself(&self) -> String {
         match self {
             Self::Manifest { file, .. } => format!("'{}'", file.display()),
@@ -85,7 +85,7 @@ impl DeclarationSubject<'_> {
 /// `index.panta.md` for a project, `index.rhei.md` for a Directory Workspace,
 /// and the plan itself for a lone plan. Naming a file the tree does not hold
 /// tells the reader to delete a line from nowhere.
-// §FS-rhei-states-deprecation.2
+// §FS-rhei-plan-language.1.3
 fn declaring_plan_file(input: &Path) -> PathBuf {
     if let Some(project_dir) = workspace::panta_project_dir(input) {
         return project_dir.join(workspace::PANTA_INDEX_FILE);
@@ -107,7 +107,7 @@ fn declaring_plan_file(input: &Path) -> PathBuf {
 /// raised the missing-definition error here instead, and that error now lives
 /// with the clauses it survives into. Several candidates is still the
 /// ambiguity error, unchanged.
-// §FS-rhei-states-deprecation.1
+// §FS-rhei-plan-language.1.3
 fn resolve_declared_rhei_machine(
     input: &Path,
     loaded: &LoadedPlan,
@@ -171,7 +171,7 @@ fn resolve_declared_rhei_machine(
     }
     let (path, machine) = matches.into_iter().next().expect("single match");
     // The project root is where a default belongs; only another *rhei's* root
-    // is the crossing the window is closing. §FS-rhei-states-deprecation.2.3
+    // is the crossing the window is closing. §FS-rhei-plan-language.1.3
     let crossed = own_root.map_or(true, |root| path != root.join("states.yaml"))
         && path != auto_state_machine_path(input);
     Ok(Some(DeprecatedResolution {
@@ -191,7 +191,7 @@ fn resolve_declared_rhei_machine(
 ///
 /// `Ok(None)` is "found nothing"; the error for a declaration nothing supplies
 /// is raised by the clauses behind this pass, which keep it.
-// §FS-rhei-states-deprecation.1
+// §FS-rhei-plan-language.1.3
 fn resolve_declared_project_default(
     input: &Path,
     loaded: &LoadedPlan,
@@ -251,7 +251,7 @@ fn resolve_declared_project_default(
 ///
 /// It is a function because `rhei viz`'s static mirror resolves the same
 /// declarations off the same tree, and a mirror that enumerates its own set is
-/// a second answer to the same question. §FS-rhei-states-deprecation.1
+/// a second answer to the same question. §FS-rhei-plan-language.1.3
 fn declared_machine_candidates<'a>(
     input: &Path,
     rhei_roots: impl IntoIterator<Item = &'a PathBuf>,
@@ -314,7 +314,7 @@ fn quoted_paths(matches: &[(PathBuf, rhei_validator::StateMachine)]) -> String {
 /// At most one line per declaration: a cross-root match that also leaves a
 /// file unread in the rhei's own root prints the crossing, because that is the
 /// one naming the file which actually resolved.
-// §FS-rhei-states-deprecation.2
+// §FS-rhei-plan-language.1.3
 fn warn_about_deprecated_resolution(
     subject: &DeclarationSubject<'_>,
     declared_name: &str,
@@ -332,7 +332,7 @@ fn warn_about_deprecated_resolution(
 
 /// The declaration resolved nothing and clause 1 read the rhei's own file
 /// instead. The previous release failed this tree.
-/// §FS-rhei-states-deprecation.2.1
+/// §FS-rhei-plan-language.1.3
 fn warn_declaration_nothing_supplies(
     subject: &DeclarationSubject<'_>,
     declared_name: &str,
@@ -340,7 +340,7 @@ fn warn_declaration_nothing_supplies(
     resolved_name: &str,
 ) {
     // "beside it" is true of all three top-level shapes; "at the project root"
-    // was only true of one of them. §FS-rhei-states-deprecation.2
+    // was only true of one of them. §FS-rhei-plan-language.1.3
     let place = match subject {
         DeclarationSubject::Manifest { .. } => "beside it",
         DeclarationSubject::Rhei { .. } => "in its own root",
@@ -359,7 +359,7 @@ fn warn_declaration_nothing_supplies(
 
 /// The declaration still resolves, so the file in the rhei's own root waits a
 /// release. This is how a tree that would otherwise change machines silently
-/// next release says so now. §FS-rhei-states-deprecation.2.2
+/// next release says so now. §FS-rhei-plan-language.1.3
 fn warn_own_root_file_deferred(
     subject: &DeclarationSubject<'_>,
     resolved: &ResolvedStateMachine,
@@ -385,7 +385,7 @@ fn warn_own_root_file_deferred(
 
 /// The declaration resolved from a `states.yaml` in a root that is not its
 /// own. The remedy names where the file belongs instead.
-/// §FS-rhei-states-deprecation.2.3
+/// §FS-rhei-plan-language.1.3
 fn warn_cross_root_match(
     subject: &DeclarationSubject<'_>,
     declared_name: &str,
@@ -420,7 +420,7 @@ fn warn_cross_root_match(
 /// On stderr, once per declaration per process, and never over a candidate
 /// list — §FS-rhei-templates.1.3's contract, through the machinery that
 /// already serves the other deprecation rather than a second copy of it.
-/// §FS-rhei-states-deprecation.3
+/// §FS-rhei-plan-language.1.3
 fn say_once(subject: &DeclarationSubject<'_>, message: String) {
     if !claim_deprecation_warning(&subject.key()) {
         return;
@@ -435,7 +435,7 @@ mod deprecated_pass_tests {
     /// The seam the window turns on: a declaration naming a machine nothing
     /// supplies returns "found nothing" rather than erroring, so clause 1 runs
     /// behind it. The previous release raised the missing-definition error
-    /// here. §FS-rhei-states-deprecation.1
+    /// here. §FS-rhei-plan-language.1.3
     #[test]
     fn a_declaration_nothing_supplies_returns_found_nothing() {
         let temp = tempfile::tempdir().expect("create the fixture");

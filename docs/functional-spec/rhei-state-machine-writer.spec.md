@@ -495,7 +495,7 @@ Rhei finds a state machine only where state-machine resolution looks ([§FS-rhei
 
 The file's `name:` is the machine's name wherever it resolves, and nothing has to be declared for it to agree. No other directory or file name is searched. A machine kept anywhere else loads only when every invocation passes `--state-machine <path>`.
 
-A `**States:**` declaration in an index is deprecated and still read: for one release it resolves ahead of the placements above and wins wherever it resolves, which is the one case where putting the file in the right place is not yet enough ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). That flag replaces resolution for the whole scope, so it works for a plan, a workspace, or a project that runs a single machine. It cannot supply one machine among several.
+A `**States:**` line in an index names nothing and is refused ([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)); the placement is the whole of it. `--state-machine` replaces resolution for the whole scope, so it works for a plan, a workspace, or a project that runs a single machine. It cannot supply one machine among several.
 
 ## Related Specifications
 

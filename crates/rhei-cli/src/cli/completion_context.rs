@@ -390,7 +390,7 @@ impl ExecutionMachines {
 /// one entry per rhei whose machine is not that default.
 ///
 /// Per rhei, the deprecated `**States:**` pass runs first and wins wherever it
-/// resolves (§FS-rhei-states-deprecation.1); where it resolves nothing, clause 1
+/// resolves (§FS-rhei-plan-language.1.3); where it resolves nothing, clause 1
 /// reads the `states.yaml` in the rhei's own execution root whatever the index
 /// says, and a rhei with no file of its own is governed by the default. An
 /// explicit `--state-machine` stays a whole-scope override and errors when a
@@ -457,7 +457,7 @@ fn reject_declarations_the_override_cannot_mean(
 
 /// One rhei's machine, or `None` where the project default governs it.
 ///
-/// The deprecated declaration pass first (§FS-rhei-states-deprecation.1), then
+/// The deprecated declaration pass first (§FS-rhei-plan-language.1.3), then
 /// clause 1 — the `states.yaml` in this rhei's own execution root, whatever
 /// its `name:` and whatever the index says. A declaration neither of them
 /// resolved is still the validation error, never a fall through to the
@@ -588,7 +588,7 @@ fn normalize_workspace_input(input: &Path) -> PathBuf {
 /// rhei with no machine of its own.
 ///
 /// The manifest's own deprecated declaration resolves first and wins wherever
-/// it resolves (§FS-rhei-states-deprecation.1); behind it the `states.yaml` at
+/// it resolves (§FS-rhei-plan-language.1.3); behind it the `states.yaml` at
 /// the project root is the default by its presence, whether or not
 /// `index.panta.md` names it, and the built-in machine is the last word. A
 /// declaration neither pass supplied is still a validation error.

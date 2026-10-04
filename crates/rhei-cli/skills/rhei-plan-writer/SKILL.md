@@ -19,7 +19,7 @@ Default to Single-File unless the user asks for high concurrency or merge-confli
 ### Single-File Plan
 
 - Emit exactly one H1: `# Rhei: <title>`.
-- Do **not** emit a `**States:**` line. Which machine a plan runs under is decided by where `states.yaml` sits — beside a single-file plan, at a Directory Workspace's root, or at the project root for the default — and the declaration is deprecated and removed in the next release ([§FS-rhei-states-deprecation](../../../../docs/functional-spec/rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). Keep an existing one when editing a plan that has it: for this release it still wins over the file beside it, so deleting it can change which machine the plan runs under.
+- Do **not** emit a `**States:**` line. Which machine a plan runs under is decided by where `states.yaml` sits — beside a single-file plan, at a Directory Workspace's root, or at the project root for the default — and the declaration is deprecated and removed in the next release ([§FS-rhei-plan-language.2.2](../../../../docs/functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). Keep an existing one when editing a plan that has it: for this release it still wins over the file beside it, so deleting it can change which machine the plan runs under.
 - Optionally emit a YAML frontmatter block (see *Frontmatter*) directly after the H1, before any H2 section.
 - Emit zero or more contextual H2 sections before tasks, then `## Tasks` as the final H2 section with at least one task.
 
@@ -75,7 +75,7 @@ root either, is still an error rather than a fall through.
 For one release the deprecated `**States:**` declaration is resolved *before*
 those three and wins wherever it resolves, so a project written against the
 previous rules runs under exactly the machine it did
-([§FS-rhei-states-deprecation](../../../../docs/functional-spec/rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). Read the deprecated rows below only where
+([§FS-rhei-plan-language.2.2](../../../../docs/functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). Read the deprecated rows below only where
 the plan you are working on carries that line; the CLI prints one `warning:`
 per declaration where the two disagree.
 

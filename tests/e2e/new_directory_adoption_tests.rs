@@ -309,9 +309,9 @@ fn keep_on_error_retains_new_entries_after_machine_validation_fails() {
 
 /// The restored refusal in its own words, and the property that makes it
 /// correct: it fires ahead of the validation pass, so the create never prints
-/// §FS-rhei-states-deprecation.2.1's "delete the line" warning about a line it
+/// §FS-rhei-plan-language.1.3's "delete the line" warning about a line it
 /// is in the middle of rolling back.
-/// §FS-rhei-new.1.2 §FS-rhei-states-deprecation.1
+/// §FS-rhei-new.1.2 §FS-rhei-plan-language.1.3
 #[test]
 fn an_undeclared_states_name_is_refused_before_any_deprecation_warning() {
     let dir = project("new-adopt-undeclared");
@@ -340,7 +340,7 @@ fn an_undeclared_states_name_is_refused_before_any_deprecation_warning() {
 /// One unreadable `states.yaml` anywhere else in the project does not abandon
 /// that refusal: the file is skipped, named as unread, and the name nothing
 /// declares is still refused.
-/// §FS-rhei-new.1.2 §FS-rhei-states-deprecation.1
+/// §FS-rhei-new.1.2 §FS-rhei-plan-language.1.3
 #[test]
 fn an_unreadable_states_file_elsewhere_does_not_excuse_an_undeclared_name() {
     let dir = project("new-adopt-unreadable-elsewhere");

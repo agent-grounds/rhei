@@ -8,7 +8,7 @@
 //! beside it is the deprecation. A tree in the shape every instantiated template
 //! ships asserts the absence of both.
 
-// §FS-rhei-states-deprecation
+// §FS-rhei-plan-language.1.3
 
 use super::new_tests::{assert_failure, flattened_output};
 use super::state_machine_resolution_support::*;
@@ -18,7 +18,7 @@ use super::*;
 /// own root keeps running under the project default for this release, and is
 /// told that its own file takes over in the next one. The two machines share no
 /// state, so the resolution assertion cannot pass by coincidence.
-/// §FS-rhei-states-deprecation.2.2
+/// §FS-rhei-plan-language.1.3
 #[test]
 fn a_still_resolving_declaration_defers_the_own_root_file() {
     let dir = unique_temp_dir("window-deferred-own-root");
@@ -58,7 +58,7 @@ fn a_still_resolving_declaration_defers_the_own_root_file() {
 /// `rhei`: a declaration that resolves to the built-in machine counts as
 /// resolving. This is `agent-grounds/rhei#244`'s contract, carried through the
 /// window with a warning rather than broken by it.
-/// §FS-rhei-states-deprecation.1 §FS-rhei-states-deprecation.2.2
+/// §FS-rhei-plan-language.1.3 §FS-rhei-plan-language.1.3
 #[test]
 fn restating_the_builtin_default_keeps_the_builtin_for_one_release() {
     let dir = unique_temp_dir("window-restated-builtin");
@@ -92,7 +92,7 @@ fn restating_the_builtin_default_keeps_the_builtin_for_one_release() {
 /// The manifest's own default declaration resolved from a member root still
 /// resolves, and warns once for the whole run however many rheis inherit it —
 /// the subject of the warning is the declaration, not the lookup.
-/// §FS-rhei-states-deprecation.2.3 §FS-rhei-states-deprecation.3
+/// §FS-rhei-plan-language.1.3 §FS-rhei-plan-language.1.3
 #[test]
 fn a_cross_root_match_resolves_the_project_default_and_warns_once() {
     let dir = unique_temp_dir("window-cross-root-default");
@@ -120,7 +120,7 @@ fn a_cross_root_match_resolves_the_project_default_and_warns_once() {
 /// sibling's file still resolves, not the local one. Both the crossing and the
 /// deferral are true of this one declaration and only the crossing is printed,
 /// because it names the file that actually resolved.
-/// §FS-rhei-states-deprecation.2
+/// §FS-rhei-plan-language.1.3
 #[test]
 fn a_member_declaration_resolved_from_another_root_warns_about_the_crossing() {
     let dir = unique_temp_dir("window-cross-root-member");
@@ -154,7 +154,7 @@ fn a_member_declaration_resolved_from_another_root_warns_about_the_crossing() {
 /// fixture the local `mach-y` is stale and `m2`'s `mach-x` is what resolves; a
 /// mirror that stopped at the own root and the project root would quietly
 /// render the stale one, where the previous release refused the tree outright.
-/// §FS-rhei-states-deprecation.2.3
+/// §FS-rhei-plan-language.1.3
 #[test]
 fn viz_renders_the_cross_root_match_that_every_command_resolves() {
     let dir = unique_temp_dir("window-cross-root-viz");
@@ -182,7 +182,7 @@ fn viz_renders_the_cross_root_match_that_every_command_resolves() {
 /// Two single-file members of one project share the project directory as their
 /// execution root and carry two distinct declarations. The subject of a warning
 /// is the declaration, so both are told; a guard keyed on the root alone
-/// swallows the second. §FS-rhei-states-deprecation.3
+/// swallows the second. §FS-rhei-plan-language.1.3
 #[test]
 fn each_single_file_members_declaration_warns_for_itself() {
     let dir = unique_temp_dir("window-two-single-file-members");
@@ -223,7 +223,7 @@ fn each_single_file_members_declaration_warns_for_itself() {
 /// `custom` in its own root, beside a rhei with no file of its own that inherits
 /// the project default — prints no warning on any command. Every laid plan has
 /// this shape, and this is the test that keeps a `warning:` line off all of them.
-/// §FS-rhei-states-deprecation.2
+/// §FS-rhei-plan-language.1.3
 #[test]
 fn the_template_shape_prints_no_warning() {
     let dir = unique_temp_dir("window-template-shape");
@@ -252,7 +252,7 @@ fn the_template_shape_prints_no_warning() {
 /// Several candidate roots holding one custom default's name is still the
 /// ambiguity error, with its candidates and both of its fixes: a stale copy
 /// silently driving tickets is worse than asking once.
-/// §FS-rhei-states-deprecation.1
+/// §FS-rhei-plan-language.1.3
 #[test]
 fn the_cross_root_ambiguity_is_still_an_error() {
     let dir = unique_temp_dir("window-cross-root-ambiguous");
@@ -276,7 +276,7 @@ fn the_cross_root_ambiguity_is_still_an_error() {
 }
 
 /// The warning's contract: a `warning:` line on stderr, so `--json` stdout stays
-/// parseable. §FS-rhei-states-deprecation.3
+/// parseable. §FS-rhei-plan-language.1.3
 #[test]
 fn the_warning_is_on_stderr_and_leaves_json_parseable() {
     let dir = unique_temp_dir("window-json-stdout");
@@ -303,7 +303,7 @@ fn the_warning_is_on_stderr_and_leaves_json_parseable() {
 /// once-per-process guard cannot hold there and the warning is suppressed
 /// instead. The control is the same tree under an ordinary command, so the
 /// silence above is the suppression and not a quiet fixture.
-/// §FS-rhei-states-deprecation.3
+/// §FS-rhei-plan-language.1.3
 #[test]
 fn shell_completion_is_silent_about_the_deprecated_resolution() {
     let dir = unique_temp_dir("window-completion-quiet");
@@ -329,7 +329,7 @@ fn shell_completion_is_silent_about_the_deprecated_resolution() {
 /// declaring the name alongside a rhei root is the ambiguity error there too. A
 /// mirror that resolved from the project root *before* counting rendered the
 /// tree happily, which is a second answer to the same question.
-/// §FS-rhei-states-deprecation.1 §FS-rhei-viz.7.2
+/// §FS-rhei-plan-language.1.3 §FS-rhei-viz.7.2
 #[test]
 fn viz_refuses_the_ambiguity_every_other_command_refuses() {
     let dir = unique_temp_dir("window-ambiguous-viz");

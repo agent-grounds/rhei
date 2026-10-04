@@ -277,7 +277,7 @@ The file's own `name:` is the machine's name. No other directory or file name is
 
 ### The deprecated declaration, for one more release
 
-The `**States:**` declaration in `index.rhei.md` and `index.panta.md`, and resolving such a declaration from a `states.yaml` in **another** rhei's root, are deprecated and removed in the next release ([§FS-rhei-states-deprecation](../../../../docs/functional-spec/rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). Do not write one. Until the removal they are still resolved, and resolved **first**, so for this release:
+The `**States:**` declaration in `index.rhei.md` and `index.panta.md`, and resolving such a declaration from a `states.yaml` in **another** rhei's root, are deprecated and removed in the next release ([§FS-rhei-plan-language.2.2](../../../../docs/functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). Do not write one. Until the removal they are still resolved, and resolved **first**, so for this release:
 
 - a declaration that still resolves wins over the file in the rhei's own root, and `rhei states` prints one `warning:` saying which file takes over next release;
 - a declaration naming a machine nothing supplies falls through to the rhei's own root rather than failing, and warns;

@@ -155,7 +155,9 @@ authority on travel.
 **`**States:**` and machine resolution are not settled by this.** `--into`
 requires the target's effective machine to be the `states.yaml` in its own root,
 and today's resolution does not consult that root for a rhei whose index is
-silent — so `--into` writes the declaration as an interim. Simplifying
-resolution is separate work, and
+silent — so `--into` writes the declaration as an interim. *Amended by
+#350*: resolution now reads that root first and the declaration is gone from the
+language, so `--into` writes no line; the interim is over. Simplifying
+resolution was separate work, and
 [§DA-per-rhei-state-machines](per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest) is untouched here.
 [§FS-rhei-library.2.1](../../functional-spec/rhei-library.spec.md#21-the-machine-the-target-must-have)

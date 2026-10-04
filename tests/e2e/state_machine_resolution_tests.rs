@@ -179,3 +179,49 @@ fn a_machine_at_the_basins_root_does_not_govern_the_basin() {
         "the graph must not give the basin a machine the CLI does not"
     );
 }
+
+/// With no line left to say otherwise, a rhei's own `states.yaml` beats the
+/// project root's: the member runs under its own file, its sibling under the
+/// default. Passes before and after the removal — no tree without the line
+/// resolves differently — and pins that the removal keeps clause 1 first.
+/// §FS-rhei-plan-language.1.3
+#[test]
+fn the_own_root_machine_beats_the_project_root_machine() {
+    let dir = unique_temp_dir("resolution-own-beats-project");
+    let home = dir.join(".home");
+    let root = project(&dir, None);
+    project_machine(&root, &machine("proj-machine", "surveying", "signed-off"));
+    member(&root, "audit", None, "surveying");
+    let rhei = member(&root, "billing", None, "drafting");
+    member_machine(&rhei, &machine("billing-machine", "drafting", "filed"));
+    let project_arg = root.display().to_string();
+
+    assert_validates(&rhei_in(&dir, &home, &["validate", &project_arg]));
+
+    let states = rhei_in(&dir, &home, &["states", &project_arg]);
+    assert_success(&states);
+    assert_source(&states, &rhei_source(&rhei.join("states.yaml"), "billing"));
+    assert_source(&states, &default_source(&root.join("states.yaml")));
+}
+
+/// `--state-machine` governs every rhei in scope whatever its `name:`: no rhei
+/// declares a name, so there is none to mismatch. Passes before and after the
+/// removal. §FS-rhei-plan-language.1.3
+#[test]
+fn the_override_applies_to_every_rhei_whatever_its_name() {
+    let dir = unique_temp_dir("resolution-override-any-name");
+    let home = dir.join(".home");
+    let root = project(&dir, None);
+    project_machine(&root, &machine("proj-machine", "surveying", "signed-off"));
+    let rhei = member(&root, "billing", None, "triaging");
+    member_machine(&rhei, &machine("billing-machine", "drafting", "filed"));
+    member(&root, "audit", None, "triaging");
+    let override_file =
+        write_fixture_file(&dir, "elsewhere.yaml", &machine("any-name", "triaging", "closed"));
+    let project_arg = root.display().to_string();
+    let override_arg = override_file.display().to_string();
+
+    let result =
+        rhei_in(&dir, &home, &["validate", &project_arg, "--state-machine", &override_arg]);
+    assert_validates(&result);
+}

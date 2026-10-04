@@ -159,7 +159,7 @@ fn resolve_project_machines(
     // rhei that declares nothing still has its own root read, behind the
     // deprecated declaration pass that wins for one release.
 
-    // §FS-rhei-plan-language.1.3 §FS-rhei-states-deprecation.1
+    // §FS-rhei-plan-language.1.3 §FS-rhei-plan-language.1.3
     let mut roots: Vec<(&String, &PathBuf)> = loaded.rhei_roots.iter().collect();
     roots.sort();
     for (rhei_id, root) in roots {
@@ -188,7 +188,7 @@ fn resolve_project_machines(
             }
             // One candidate set, enumerated and counted by the pass's own
             // functions: resolving from the project root before counting let a
-            // viz render a tree every command refuses. §FS-rhei-states-deprecation.1
+            // viz render a tree every command refuses. §FS-rhei-plan-language.1.3
             let candidates = crate::declared_machine_candidates(path, loaded.rhei_roots.values());
             let matches = crate::declaring_candidates(&candidates, machine_name, load_machine)?;
             if matches.len() > 1 {
@@ -247,7 +247,7 @@ fn resolve_machine(
     let builtin = StateMachine::builtin_default();
     let declared = rhei.states_declared.then(|| rhei.states.trim()).filter(|name| !name.is_empty());
     // The deprecated declaration pass first, so a tree the previous release
-    // resolved resolves the same way. §FS-rhei-states-deprecation.1
+    // resolved resolves the same way. §FS-rhei-plan-language.1.3
     if let Some(declared) = declared {
         if candidate.is_file() {
             let machine = load_machine(&candidate)?;

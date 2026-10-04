@@ -15,7 +15,7 @@
 // the *placement* alone resolves are in `state_machine_resolution_tests.rs`,
 // and the warnings themselves in `state_machine_deprecation_window_tests.rs`.
 
-// §FS-rhei-state-machine-writer.5 §FS-rhei-states-deprecation.1
+// §FS-rhei-state-machine-writer.5 §FS-rhei-plan-language.1.3
 
 use std::path::{Path, PathBuf};
 
@@ -313,7 +313,7 @@ fn same_name_member_grouping_uses_content_independent_of_source() {
 /// keeps the default where it has no local candidate — and, in the second
 /// iteration, where its own root holds a `beta` that clause 1 would otherwise
 /// take: the window defers that file by a release and says so in a warning
-/// this case does not read. §FS-rhei-states-deprecation.2.2
+/// this case does not read. §FS-rhei-plan-language.1.3
 #[test]
 fn same_name_member_without_a_matching_local_file_uses_the_project_default() {
     for local_machine in [None, Some(machine("beta", "queuing", "settled"))] {
@@ -376,7 +376,7 @@ fn an_invalid_same_name_local_candidate_reports_its_load_error() {
 /// default for the whole project, `audit` included. This resolution is the
 /// previous release's and must not move; it now also prints the cross-root
 /// warning, which this case does not read.
-/// §FS-rhei-states-deprecation.2.3
+/// §FS-rhei-plan-language.1.3
 #[test]
 fn a_restated_default_found_in_the_rheis_own_root_runs_from_there() {
     let dir = unique_temp_dir("placement-adopted-default");
@@ -411,7 +411,7 @@ fn a_restated_default_found_in_the_rheis_own_root_runs_from_there() {
 /// `agent-grounds/rhei#244`'s contract, carried through the window: the
 /// inheriting member remains valid on `pending`, the restating member's
 /// `drafting` is rejected, and `rhei states` reports the built-in source.
-/// §FS-rhei-states-deprecation.1
+/// §FS-rhei-plan-language.1.3
 #[test]
 fn issue_244_contract_builtin_project_default_ignores_a_member_only_rhei_machine() {
     let dir = unique_temp_dir("placement-builtin-project-default");

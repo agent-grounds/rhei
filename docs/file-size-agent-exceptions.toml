@@ -664,3 +664,14 @@ until = "Section 10 (`rhei budget`) (the command surface: show's report and JSON
 reason = """
 The boundary that is missing is a document for the `rhei budget` command surface. Section 10 describes what the operator types and reads — show's text and JSON members, adjust, and forget's case table — and is cited from 26 places in the crates and tests, so lifting it needs its own grund declaration and a re-point of every one of those markers, which is a restructure with its own review. What is edited here is one ticket's specification point (agent-grounds/rhei#411: a copied project is refused at its first charge, a moved one keeps its account), written into sections 5.3 and 5.4 and two new points 5.4.1 and 5.4.2 whose ids the approved proposal named; splitting the document in the same commit would move every section citation alongside a behaviour change, which a spec-first commit must not hide.
 """
+[[exceptions]]
+path = "crates/rhei-core/src/workspace/panta.rs"
+match = "exact"
+rules = ["source"]
+kind = "deferred"
+max_accepted = { value = 600, unit = "lines" }
+until = "#350 deletes the rhei_machines map; split the loader then if it is still over budget, and remove this entry"
+issue = "agent-grounds/rhei#350"
+reason = """
+The rhei_machines map and the declared-name pass that fills it are code #350 deletes; the only edits here before that are citation retargets on code about to go, and a split now would move code that is being removed.
+"""

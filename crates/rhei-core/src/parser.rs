@@ -174,4 +174,6 @@ mod plan_snapshot_prior_tests;
 #[cfg(test)]
 mod plan_tests;
 #[cfg(test)]
+mod states_line_tests;
+#[cfg(test)]
 mod workspace_tests;

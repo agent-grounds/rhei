@@ -197,8 +197,12 @@ scan, parallel refill, or normal stopping decision. This validation runs even
 when the discovered member ids are unchanged, so a task appended inside an
 initialized member cannot enter the ready set under text that a fresh run
 would refuse. An invalid reload stops scheduling through the existing
-validation diagnostic and migration help, without rewriting the plan;
-validation warnings retain the initial report's once-per-run presentation.
+validation diagnostic and migration help, without rewriting the plan, with one
+scoped exception: a break that falls inside the region of a task whose worker
+is in flight or has just exited is that worker's edit, and the run waits for it,
+restores that one region to its text before the attempt, and goes on
+([§3.7](#37-a-workers-edit-that-breaks-the-plan)). Validation warnings retain
+the initial report's once-per-run presentation.
 
 Only after that validation does the run compare discovered member ids with the
 initialized set. The membership delta controls initialization, not whether
@@ -382,6 +386,17 @@ headless, and JSONL surfaces; no new output record family is introduced.
      the workspace unrecoverable rather than merely slow, and within a run the
      ticket is re-visited only after something else advanced
      ([§FS-rhei-supervision.3.6](rhei-supervision.spec.md#36-empty-visits)).
+   - **The worker's edit broke the plan.** The plan, re-read after the exit
+     (step 4), fails to load at a line inside the worker's own task region.
+     **No transition fires**, whatever the exit code and whichever edge it would
+     have selected: the run restores the region to its text before the attempt,
+     keeps what the worker wrote beside the attempt's log, and charges the
+     attempt against the visit's budget
+     ([§3.7](#37-a-workers-edit-that-breaks-the-plan)). The rest is the missing-output path above: the
+     ticket keeps its state, is not spawned again in the pass, and the run
+     **continues with the other claimable tickets** in every mode, with or
+     without `--continue-on-error`. A later pass retries the visit, and a spent
+     budget stalls the ticket and names it in the halt.
 6. For agent invocations, extract measured usage and write the accounting
    invocation record when the resolved agent supports accounting. Accounting
    failures affect cost coverage but do not alter transition selection. [§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)
@@ -911,6 +926,173 @@ advances that land between two releases buy one re-spawn between them, not one
 each. The worker pool (§5) keeps the same rule as the sequential loop. Every
 other stall — a missing output, a spent attempt budget, a refused admission
 (§3.4) — keeps the release of the two paragraphs above unchanged.
+
+### 3.7. A Worker's Edit That Breaks the Plan
+
+A worker may append to its own task body and add child tasks under its own
+task ([§FS-rhei-memory.3.4](rhei-memory.spec.md#34--rhei-commands-additions)), so a worker can leave text that the plan
+no longer loads with — a `#### Notes` heading is a malformed node declaration
+([§FS-rhei-plan-language](rhei-plan-language.spec.md#fs-rhei-plan-language-rhei-plan-language-specification)). The run invites that edit, so it survives a bad one: it
+puts the worker's task text back as it was when the attempt started, keeps what
+the worker wrote in a file beside the attempt's log, charges the attempt, and
+goes on with every other ticket. What a plan file may contain does not change,
+and no partial graph is ever scheduled from
+([§FS-rhei-validate.4.4](rhei-validate.spec.md#44-workspace-task-file-metadata-diagnostics), [§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)): the run repairs the one
+region it can attribute and reloads, or it stops.
+
+#### 3.7.1. The Region
+
+A task's **region** is its text in the file that declares it: from its own node
+heading up to, but not including, the next node heading at the same or a
+shallower depth, or the end of the file. It holds the task's body and every
+child task under it, which is exactly the text the prompt lets the worker edit.
+In a directory workspace the region of a top-level task usually ends at the end
+of its task file; in a single-file plan it ends at the next sibling's heading.
+
+When the run spawns a worker it keeps, with the in-flight slot, a **snapshot**
+of that task's region: the region's text, and the heading line that followed it
+(none when the region ends the file). The snapshot is held in memory for the
+life of the slot and written nowhere. The invocations of one fanned-out state
+share their task's region and one snapshot, and the region is in flight while
+any of them runs.
+
+A region is **in flight** only while a worker process for its task is alive. A
+task at a gate, parked on a provider limit (§3.3), or between two attempts of a
+poll (§5.1) holds no process, so its region is not in flight.
+
+#### 3.7.2. Which Case a Failed Reload Is
+
+Every reload the run makes — the one after a worker exits and before its exit is
+routed (step 4), and every scheduling checkpoint (§3) — goes through one rule.
+When the plan fails to load, the location the loader's error carries, a file and
+a line, decides the case:
+
+1. **The region of the task whose worker just exited**, with no other
+   invocation of that task still running: the run restores it (§3.7.3) and
+   charges the attempt (§3.7.4).
+2. **The region of a task whose worker is still running**: the run waits for it
+   (§3.7.5).
+3. **Anywhere else**, or an error that carries no location: the run stops,
+   attributed (§3.7.6).
+
+The run cannot tell who wrote a line. An operator's hand edit inside a running
+task's region is reverted like the worker's own, and kept in the same file; an
+operator's edit anywhere else stops the run as it did before this rule.
+
+#### 3.7.3. The Restore
+
+The restore takes the plan's stable writer lock, the lock `rhei transition` and
+every engine write hold ([§AR-agent-orchestrator-workflow.3.3.1](../architecture/agent-orchestrator-workflow.spec.md#331-stable-writer-exclusion)). Under it the
+run reads the file again and finds the two boundaries: the task's own heading
+line, and the heading line that followed the region at spawn. Each must be
+found **exactly once**, the second after the first; the end of the file stands
+for a snapshot that had no following heading. The run then writes the text it
+is about to replace to the reverted-text file (§3.7.7), and replaces only the
+text from the task's heading up to the following heading with the snapshot.
+Every other byte of the file is kept, so a sibling's transition written to the
+same file during the visit, or a supervisor's note under its own task, survives
+the restore.
+
+The restore **refuses** rather than guesses. When either boundary is missing or
+found more than once — the worker rewrote its own heading, or a concurrent
+writer moved the text around it — nothing is written and the run stops,
+attributed (§3.7.6), saying the restore was refused and which boundary it could
+not find.
+
+After the restore the run reloads. A plan that still fails to load was broken by
+more than this worker, and the run stops, attributed, at the new location.
+
+#### 3.7.4. The Charge
+
+The broken visit is a **failed attempt**, not a failed task. **No transition
+fires**, whatever the exit code: a zero exit, a non-zero exit, and an exact
+`exit_code:` route are all left unrouted, because the plan they would have moved
+is not the plan the worker was given. The attempt is charged against the
+state's `attempts:` budget ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)) — on a poll state, against
+`poll.max_attempts`, the bound that applies there, without firing the
+exhaustion edge — and the attempt's spawn record
+([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)) keeps the location, the loader's message, and the
+reverted-text path, so a retry composed in a later run is told the same thing.
+
+From there the ticket takes the path of step 5's other unrouted visits: it stays
+in its state, is not spawned again in the pass, and the run continues with the
+other claimable tickets, sequentially as in the worker pool and with or without
+`--continue-on-error`, which governs routed non-zero exits and has nothing to
+say here. A later pass spawns the next attempt with the informed retry line of
+[§FS-rhei-memory.4.4](rhei-memory.spec.md#44-previous-visits). A worker that breaks the plan on every attempt spends its
+own budget and stalls in its state, named in the halt like any other ticket
+that ran out of attempts, and the run's exit code is the one step 9 gives a run
+that ends with tickets unfinished. A retry never gets a fresh budget
+([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-five-levels)).
+
+A worker whose own attempt ended by its **timeout** or by the run's
+**interruption** (§3.2) has its region restored first, by the same rule, and its
+ending then keeps the routing it already has: the timeout routes through the
+state's timeout transition, and the interruption charges nothing.
+
+The attempt's journal record is `end@<state>` with `outcome=failed` — or the
+timeout's and the interruption's own outcome — and one more key,
+`reverted=<file>:<line>` ([§FS-rhei-run-tui.1.7](rhei-run-tui.spec.md#17-journal-format)).
+
+#### 3.7.5. The Wait
+
+When the location falls in the region of a task whose worker is still running —
+at a `--parallel` sibling's post-exit reload, or at a checkpoint — restoring
+under a live writer would race it, so the run **waits**. It starts no new work,
+makes no stopping decision, and holds the completion it was processing, its
+exit not yet routed, until the culprit exits. No in-flight worker is killed for
+the wait.
+
+The wait is bounded by the culprit's own process and nothing else, and it ends
+when the culprit exits **for any reason**: its own exit, its state's timeout,
+which keeps running during the wait, or the operator's Ctrl-C, which keeps its
+ordinary meaning (§3.2). The culprit's exit is processed during the wait, never
+behind it, so its own post-exit reload restores its region (§3.7.3) and charges
+it (§3.7.4). Then the run reloads and processes the held completions in the
+order the workers exited, against the restored plan. A culprit that has gone to
+a gate or parked holds no process and so is never waited on: a break in its
+region is the third case of §3.7.2.
+
+#### 3.7.6. Stopping, Attributed
+
+A break the run cannot attribute to a worker that has exited — anywhere outside
+every in-flight region, or a restore refused or followed by a reload that still
+fails — stops the run as an invalid reload always has: it rewrites nothing
+further, and it exits non-zero. Workers still in flight are interrupted as on
+Ctrl-C and are not charged (§3.2); the worker whose exit found the break is
+recorded the same way, interrupted and uncharged, with its exit unrouted, so a
+fixed plan resumes it as an interruption rather than a completion that never
+moved.
+
+The diagnostic names the task whose region holds the line, if one does, the
+`file:line`, and the loader's message, and its `help:` is about the text that
+broke rather than about task metadata. A `rhei run` started on a plan that a
+crash left broken between a worker's exit and its restore refuses at startup as
+before, with the same attribution.
+
+#### 3.7.7. What the Operator Reads
+
+A restore prints one warning, with the task id as the run prints it elsewhere
+(`Task ws.1`), the file relative to the workspace root as the journal spells
+paths, and the 1-based line the loader reported:
+
+```text
+warning: Task ws.1's edit to its own task body broke the plan at tasks/01-cover.md:6
+         (Malformed node heading: expected '### <Kind> <id>: <title>').
+         Reverted Task ws.1 to its text before this attempt; attempt 1 of 2 spent.
+         The reverted text is runtime/logs/task-ws.1-cover.reverted.md
+  help: write progress as plain paragraphs or lists; a heading inside a task body declares a child task
+```
+
+The **reverted-text file** sits beside the attempt's own log and takes its name:
+the log name of [§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming), `-attempt{n}` suffix included, with
+`.log` replaced by `.reverted.md` — `runtime/logs/task-ws.1-cover.reverted.md`
+for a first attempt, `runtime/logs/task-ws.1-cover-attempt2.reverted.md` for the
+second. It holds the region as the worker left it, which is the text the restore
+replaced, so legitimate child tasks the worker appended in the same attempt are
+kept there, and the retry is told to add them again. The warning, the retry
+line and the spawn record name this one path; the journal's `reverted=` key
+names the location, and its log column the attempt's log beside the file.
 
 ## 4. Dry Run
 

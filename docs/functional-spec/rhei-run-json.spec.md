@@ -72,7 +72,7 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `run_started` | Once, at the head of the stream | `schema`, `run_id`, `workspace`, `parallel`, `total_tasks` |
 | `pass_started` | Each scheduler pass begins | `pass`, `ready` (task ids in source order) |
 | `slot_assigned` | A worker is spawned | `slot`, `task`, `from`, `to`, `agent` (null for programs), `log_path` |
-| `slot_released` | That worker exits | `slot`, `task`, `from`, `to`, `log_path`, `outcome`, `exit_code`, `duration_ms`; a provider-limited release also has `provider` and `next_attempt_at` |
+| `slot_released` | That worker exits | `slot`, `task`, `from`, `to`, `log_path`, `outcome`, `exit_code`, `duration_ms`; a provider-limited release also has `provider` and `next_attempt_at`, and a release whose task region was restored has `reverted` |
 | `pass_ended` | Each scheduler pass ends | `pass`, `progressed` |
 | `tasks_deferred` | Ready tasks yielded a same-state slot | `pass`, `tasks` |
 | `task_outputs_missing` | A worker exited `0` without its required artifacts | `task`, `state`, `entries` |
@@ -91,6 +91,12 @@ self-loop, whatever its exit code — a handled wait, not a failure and not a
 finished state ([§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics)). Paths
 are workspace-relative when inside the workspace and absolute otherwise, as in
 the journal.
+
+`reverted` is the journal's key of the same name (§FS-rhei-run-tui.1.7): the
+string `<file>:<line>` at which the worker's edit broke the plan, present only on
+the release whose region the run restored (§FS-rhei-run.3.7). That release's
+`outcome` is `failed`, or the `timeout` or `interrupted` that ended it. It is an
+addition under §2.2, so `schema` does not move.
 
 `provider_limited` is emitted for the recognized parked result of
 §FS-rhei-run.3.3. The record's `task` identifies the reporter, `provider` is

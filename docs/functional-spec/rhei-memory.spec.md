@@ -316,7 +316,9 @@ Previous log: `runtime/logs/{log file of the previous visit of this state}`
 
 Retrying this visit: attempt {n}. The previous attempt {ending}{unmet}. It did
 not write what this visit still owes: {name} (`{path}`), … . Its transcript is
-`{previous attempt log}`.
+`{previous attempt log}`. Its edit broke the plan at `{file}:{line}` ({message}),
+so the run reverted this task's text to what it was before that attempt; what
+it wrote is in `{reverted-text file}`.
 ```
 
 - The trail is the state sequence of this task's ledger lines, in order — the
@@ -379,7 +381,7 @@ What you write is what the next agent and the human see.
 - `runtime/results/<task-id>.md`: the first line is the one-line summary every later Plan History shows; detail below it.
 - You may append progress paragraphs to your own task body — files touched, commands run, decisions made — and append child tasks under your own task. Do not edit `**State:**` lines or any other task's body.
 - You may leave **one** note for later tickets anywhere in this project: `rhei note "<fact>"`, at most 3 lines, for something the next ticket would otherwise rediscover. A second call replaces it, and spending it on `rhei note --restate <id>` or `--strike <id>` leaves you none of your own. Never edit `runtime/notes.md` by hand.
-- Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` stops the plan from parsing for the whole run.
+- Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` breaks the plan; the run reverts your task body to what it was before this attempt and spends the attempt.
 ```
 
 `Reading the rhei` is the map that makes §1.1 true across rheis: it names
@@ -404,6 +406,10 @@ how completion is detected, which stay with the completion condition
 ([§FS-rhei-agents.3.1](rhei-agents.spec.md#31-completion-authority)). Its note bullet is the one write it permits outside the
 task's own body, and it is permitted only through the verb: the slot, the line
 bound, the duplicate refusal and the lock live there ([§FS-rhei-note](rhei-note.spec.md#fs-rhei-note-rhei-note)).
+Its heading bullet says what a broken edit costs the agent that made it, and
+nothing more: the run reverts that task's body and spends the attempt, and the
+other tasks keep going ([§FS-rhei-run.3.7](rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan)), so the agent is told the
+consequence that is actually its own.
 The map is never filtered by exclusions. A listed path may therefore identify
 an excluded source; `## Exclusions` in the agent prompt states the applicable
 guarantee and prevents the map from being mistaken for permission.
@@ -637,6 +643,21 @@ are never silently omitted here.
    precedent is the clause's own: it was already omitted on a state no terminal
    edge leaves, which is one case of nothing being owed rather than a rule of
    its own.
+7. `reverted` = the revert the `retry` record carries, when the previous
+   attempt's edit broke the plan and the run restored the task's region
+   ([§FS-rhei-run.3.7](rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan)). Render it as the paragraph's last sentence, after the
+   transcript: ` Its edit broke the plan at `{file}:{line}` ({message}), so the
+   run reverted this task's text to what it was before that attempt; what it
+   wrote is in `{reverted-text file}`.` — the location, the loader's message and
+   the file the warning of §FS-rhei-run.3.7 names, read from the record and
+   spelled by (§FS-rhei-agents.4.1) like the transcript path. A retry is told
+   where its predecessor's text went because the revert took legitimate child
+   tasks with it, and the retry is the one that can add them again. Omit the
+   sentence, and the space before it, when the record carries no revert.
+
+   ```
+   The previous attempt exited 0. Its transcript is `runtime/logs/task-ws.1-cover.log`. Its edit broke the plan at `tasks/01-cover.md:6` (Malformed node heading: expected '### <Kind> <id>: <title>'), so the run reverted this task's text to what it was before that attempt; what it wrote is in `runtime/logs/task-ws.1-cover.reverted.md`.
+   ```
 
 ### 4.5. Fencing and Rendering
 

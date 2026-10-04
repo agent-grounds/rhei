@@ -480,7 +480,7 @@ fn newest_spawn_record_for_state(
 /// Matching is on the record's `task` and `state` fields, as in
 /// [`newest_spawn_record_for_state`]: a name-prefix match would hand state
 /// `review` the records of `review-fix`.
-// §FS-rhei-agents.8.4
+// §FS-rhei-agents.8.4 §FS-rhei-agent-visit-pairing.3
 fn spawn_records_for_state(
     runtime_dir: &Path,
     task_id: &str,

@@ -26,7 +26,7 @@
 /// invocation.
 /// `invocations` is every invocation the pass resolved for this state, because
 /// whether a record is orphaned is a question about all of them at once, and
-/// `pairing` is that answer, read on first use. §FS-rhei-agents.8.4
+/// `pairing` is that answer, read on first use. §FS-rhei-agent-visit-pairing.1
 // §FS-rhei-agents.3.2 §FS-rhei-states.3.3 §FS-rhei-panta.6.2
 struct InvocationCompletion<'a> {
     artifact_root: &'a Path,
@@ -53,7 +53,8 @@ impl InvocationCompletion<'_> {
     /// count, and no own record of any visit establishes an earlier one, does an
     /// upgraded workspace retain the legacy first-visit interpretation; moves
     /// through other states do not establish re-entry.
-    // §FS-rhei-agents.3.2 §FS-rhei-agents.8.4 §FS-rhei-transitions.4.3
+    // §FS-rhei-agents.3.2 §FS-rhei-transitions.4.3
+    // §FS-rhei-agent-visit-pairing.2 §FS-rhei-agent-visit-pairing.3 §FS-rhei-agent-visit-pairing.6
     fn work_is_eligible_for_visit(&self, resolved: &ResolvedAgent) -> bool {
         let task_id = self.task.id.to_string();
         // An unreadable ledger is not eligible: the spawn it leads to refuses
@@ -223,7 +224,7 @@ fn task_has_pending_agent_invocations(
 /// A target edited in place keeps the visit's finished work: the note naming
 /// the record that answers for it, or the warning for an edit too ambiguous to
 /// pair, is printed on `sink` here.
-// §FS-rhei-agents.3.2 §FS-rhei-agents.8.4 §FS-rhei-run.3
+// §FS-rhei-agents.3.2 §FS-rhei-agent-visit-pairing.4 §FS-rhei-agent-visit-pairing.5 §FS-rhei-run.3
 #[allow(clippy::too_many_arguments)]
 fn agent_invocations_to_spawn(
     loaded: &LoadedPlan,
@@ -270,7 +271,7 @@ fn agent_invocations_to_spawn(
         .cloned()
         .collect::<Vec<_>>();
     // Said here, where the pass decides, not in the predicate, which is asked
-    // again after every exit. §FS-rhei-agents.3.2
+    // again after every exit. §FS-rhei-agent-visit-pairing.4
     completion.announce_visit_pairing(sink, &pending);
     pending
 }

@@ -37,8 +37,8 @@ project-level rollups share the project `runtime/` (§6).
 
 `index.panta.md` is the Panta manifest. It plays the role `index.rhei.md` plays
 for a workspace: project title and content sections — the default machine is
-the `states.yaml` beside it (§AR-rhei-panta.4), and a `**States:**` line here is the
-deprecated declaration (§FS-rhei-states-deprecation); it contains no authored
+the `states.yaml` beside it (§AR-rhei-panta.4), and a `**States:**` line here is a
+parse error (§FS-rhei-plan-language.2.2); it contains no authored
 nodes. Rhei discovery scans the project
 directory's **immediate children** in deterministic, `/`-normalized order: each
 non-hidden `*.rhei.md` file is a single-file rhei, and each non-hidden
@@ -110,9 +110,8 @@ treated as the single rhei of an **implicit Panta**: the loader synthesizes the
 virtual `panta` root and attaches that one rhei as its sole level-1 child, so the
 in-memory graph has the same shape whether or not an `index.panta.md` exists. The
 implicit Panta has no manifest, so the project default state machine is the
-built-in `rhei` machine and the project directory is the source location from
-which an inherited declaration would resolve; the single rhei still resolves its
-own `**States:**` from its own source (§4).
+built-in `rhei` machine; the single rhei still resolves its machine from the
+`states.yaml` in its own execution root when one is there (§4).
 
 The implicit Panta's one rhei is not anonymous: it has a derived id (§3), and its
 tickets are project-qualified exactly as in a multi-rhei project, so a bare
@@ -231,7 +230,7 @@ file whole and is never unioned into, and the replacement is checked first
 against every ticket resolution sends to the project root, through the same
 resolved machine set validation uses, refusing on any it would strand
 (§FS-rhei-library.2.3). Which tickets those are is resolution's answer above,
-deprecated pass included, and is not recomputed by the writer.
+and is not recomputed by the writer.
 
 Cross-rhei semantics need no shared vocabulary. The one computation where two
 machines meet is readiness: a `**Prior:**` into another rhei is satisfied when
@@ -246,8 +245,9 @@ built-in `rhei` fallback.
 A machine's *definition file* therefore resolves from **one** place per rhei —
 its own execution root — and from the project root for every rhei that has
 none. Where the own-root file is what resolves, its `name:` is the rhei's
-effective machine name; nothing has to be declared twice for the two to agree,
-which is why the second place an author used to say it is going away. An
+effective machine name, and no second place exists to say it, so there is
+nothing for the file to disagree with. A `states.yaml` in another rhei's root
+never resolves for this one, whatever its `name:`. An
 invalid candidate is an error rather than a fallback: it would otherwise
 surface as a misleading "no states file found". Discovery does not recurse
 ([§AR-rhei-panta.1](rhei-panta.spec.md#1-on-disk-layout)), so every rhei is either a directory workspace whose own
@@ -255,33 +255,18 @@ root this reads, or a single-file plan whose execution root *is* the project
 directory — there is no member whose machine file is somewhere only a search
 across roots would find.
 
-For one release the deprecated `**States:**` declaration still resolves ahead
-of this, by the previous release's rules — own root for a custom same-name
-declaration, then the project root, then a unique `name:` match among the
-project's candidate rhei roots — and wins wherever it resolves, with a warning
-where that disagrees with the resolution above
-([§FS-rhei-states-deprecation](../functional-spec/rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). Within that pass the previous release's
-rules hold unchanged, including its refusals: an explicitly declared built-in
-project default `**States:** rhei` is replaced only by a matching project-root
-file and never by a member-root one, a declaration naming a machine no file
-anywhere declares is a validation error, and several candidate roots holding a
-custom default's name is an ambiguity error naming the candidates and the fixes
-(move the definitive file to the project root, or pass `--state-machine`) —
-a stale copy silently driving tickets would be far worse than asking once.
-
 `--state-machine <path>` stays a whole-scope override: it replaces resolution
-for every rhei in scope, and errors when any in-scope rhei declares a machine
-name different from the override file's `name:` — an override that silently
-reinterpreted one rhei's states under another rhei's process would corrupt
-exactly the runs the flag exists to debug.
+for every rhei in scope, and the override file's `name:` is the active machine
+name for each of them. No rhei declares a name, so there is none for the
+override to contradict and no mismatch error.
 
 For a member discovered by a live run, machine resolution is repeated from its
 own source root before admission. The run initializes that
 machine's callback base and validates the refreshed graph and execution
 references with freshly merged settings. Cached bindings for existing members
 may be reused only when equivalent to that refreshed context. A whole-run
-override still governs the new member, and a name mismatch is an admission
-error rather than permission to bind it to another member's machine.
+override still governs the new member; a `states.yaml` in another member's
+root never binds it.
 
 The state-machine profile that previously resolved the level-0 `rhei` root now
 resolves the `panta` root: Panta resolves through `node_policy.root`. A rhei node

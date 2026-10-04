@@ -113,7 +113,7 @@ pub fn assert_source(result: &CliRun, expected: &str) {
 /// Every `warning:` line on stderr. The deprecation warnings are the only
 /// stderr warnings these trees produce, and resolved-budget lines go to stdout,
 /// so counting these counts the deprecation.
-/// §FS-rhei-states-deprecation.3
+/// §FS-rhei-plan-language.1.3
 pub fn warnings(result: &CliRun) -> Vec<&str> {
     result.stderr.lines().filter(|line| line.trim_start().starts_with("warning:")).collect()
 }
@@ -128,7 +128,7 @@ pub fn assert_silent(result: &CliRun, what: &str) {
 
 /// One `warning:` line, carrying every fragment in `names`. A warning that does
 /// not name the file it read and what to do about it sends the reader hunting.
-/// §FS-rhei-states-deprecation.3
+/// §FS-rhei-plan-language.1.3
 pub fn assert_one_warning(result: &CliRun, names: &[&str]) {
     let found = warnings(result);
     assert_eq!(

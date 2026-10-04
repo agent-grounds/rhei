@@ -203,7 +203,7 @@ fn states_declaration_help() -> &'static str {
 /// answer now that it is deprecated: resolution without it reads the rhei's
 /// own root and then the project root, so a rhei reaching this error has
 /// nothing of its own and falls to the project default.
-// §AR-rhei-panta.4 §FS-rhei-new.6 §FS-rhei-states-deprecation
+// §AR-rhei-panta.4 §FS-rhei-new.6 §FS-rhei-plan-language.1.3
 fn missing_state_machine_help() -> &'static str {
     "rename the `**States:**` declaration to one of the names above, delete it to run \
      under the project default, point --state-machine at the file that declares it, or run \

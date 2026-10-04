@@ -88,7 +88,7 @@ fn new_write_failure(
 /// validation pass no longer says it for every such tree — while the
 /// `**States:**` declaration is deprecated, a declaration nothing supplies
 /// falls through to whatever `states.yaml` sits in the rhei's own root
-/// (§FS-rhei-states-deprecation.2.1). That indulgence is for a tree already on
+/// (§FS-rhei-plan-language.1.3). That indulgence is for a tree already on
 /// disk, which a release has been spent warning. Creation is authoring: the
 /// one command whose job is to write a correct index must not write a
 /// `**States:**` line and, in the same breath, warn that the line should be

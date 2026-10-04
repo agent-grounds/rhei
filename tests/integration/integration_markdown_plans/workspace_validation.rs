@@ -358,7 +358,7 @@ fn validate_auto_discovers_workspace_root_state_machine_from_states_declaration(
 /// `states.yaml` beside it: the sibling file resolves whatever its `name:`, and
 /// one `warning:` line says the declaration is deprecated. The previous release
 /// failed this tree, which is what the window turns into a resolution.
-/// §FS-rhei-plan-language.1.3 §FS-rhei-states-deprecation.2.1
+/// §FS-rhei-plan-language.1.3 §FS-rhei-plan-language.1.3
 #[test]
 fn validate_resolves_a_mismatched_auto_discovered_machine_and_warns() {
     let dir = unique_temp_dir("auto-states-mismatch");

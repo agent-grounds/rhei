@@ -317,8 +317,7 @@ release decision:
   ephor's laid plans.~~ Done: resolution reads the rhei's own root, then the
   project root, then the built-in machine
   ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)), with the two deprecated mechanisms resolving
-  ahead of it for one release and warning where they disagree
-  ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)).
+  ahead of it for one release and warning where they disagree.
 - ~~**Step 4 — `--into <project>`** (#348)**.** A member rhei with its own machine, or a
   project's default machine laid and rebound, with the tickets a rebind would
   strand named before anything is replaced.~~ Done: a template carrying
@@ -331,8 +330,10 @@ release decision:
   three ticket templates as templates of their own, make the three including
   templates, and have the library's gate instantiate every template twice —
   standalone and `--into` a scratch rhei. The first real user of `under:`.
-- **The deprecation removal** (#350), for the release after step 3: `**States:**` and
-  the cross-root name match deleted once the warnings have had a release.
+- ~~**The deprecation removal** (#350), for the release after step 3: `**States:**` and
+  the cross-root name match deleted once the warnings have had a release.~~ Done:
+  the line is a parse error ([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)) and a rhei's machine is the
+  `states.yaml` in its own root, else the project's ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)).
 
 Two side-findings of #323's agora are filed against the ground rather than
 against composition: #351, where §FS-rhei-reset.2 gives the opposite of the

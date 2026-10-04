@@ -147,7 +147,7 @@ fn real_path(path: &Path) -> PathBuf {
 ///
 /// The subject rather than the path, because this project has a second
 /// deprecation to serve — the `**States:**` declaration and the cross-root
-/// name match (§FS-rhei-states-deprecation.3) — and two deprecations with two
+/// name match (§FS-rhei-plan-language.1.3) — and two deprecations with two
 /// guards are how they start behaving differently for no reason. Each caller
 /// prefixes its own kind, so two subjects never collide.
 /// §FS-rhei-templates.1.3
@@ -167,7 +167,7 @@ thread_local! {
     /// How many passes over a scratch copy of the user's files are running on
     /// this thread. A warning raised there names a temp path that is gone before
     /// anyone reads it, about a file the pass over the real one already named.
-    /// §FS-rhei-templates.1.3 §FS-rhei-states-deprecation.3
+    /// §FS-rhei-templates.1.3 §FS-rhei-plan-language.1.3
     static SCRATCH_PASSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 

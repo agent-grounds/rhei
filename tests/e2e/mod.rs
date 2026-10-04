@@ -181,6 +181,7 @@ mod state_machine_deprecation_window_tests;
 mod state_machine_placement_tests;
 mod state_machine_resolution_support;
 mod state_machine_resolution_tests;
+mod states_line_refused_tests;
 mod suite_isolation_tests;
 mod summary_repricing_lock_tests;
 mod summary_repricing_support;

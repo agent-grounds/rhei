@@ -44,24 +44,34 @@ uniformity.
 
 The state machine is a property of the **rhei**, defaulted by the project.
 
-1. `index.panta.md`'s `**States:**` declaration is the project **default** —
-   the built-in `rhei` machine when absent. It governs every rhei that
-   declares nothing, the synthetic `basin` rhei, and the Panta root's node
-   policy.
+1. The `states.yaml` at the project root is the project **default** — the
+   built-in `rhei` machine when absent. It governs every rhei with no
+   `states.yaml` of its own, the synthetic `basin` rhei, and the Panta root's
+   node policy.
+   *Amended by #350*: the removal release the #347 amendment deferred to, as
+   the project owner's revision on #323 ruled; the line is now refused
+   ([§FS-rhei-plan-language.2.2](../../functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). This item said `index.panta.md`'s `**States:**`
+   declaration was the default; the file's place is now the whole of it.
 2. A rhei runs under the `states.yaml` in its own execution root when there is
    one, whatever its index says; a rhei with no file of its own inherits the
    already-resolved project machine wholesale. Divergence is not an error; it
    is the normal shape of a project holding more than one instantiated
    template. *Amended by #347*: this item said the `**States:**` declaration
    was what chose, and that omitting the line inherited the project machine
-   with the rhei's own root never consulted. The declaration is deprecated and
-   survives one release ahead of this rule
-   ([§FS-rhei-states-deprecation](../../functional-spec/rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)), which is why this `## Status` is still
-   `accepted` and the removal is its own decision.
+   with the rhei's own root never consulted. #347 deprecated the declaration
+   for one release ahead of this rule.
+   *Amended by #350*: the removal release the #347 amendment deferred to, as
+   the project owner's revision on #323 ruled; the line is now refused
+   ([§FS-rhei-plan-language.2.2](../../functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). Nothing resolves ahead of this rule any more,
+   and the decision itself — the machine is a per-rhei property, defaulted by
+   the project — is unchanged, so this `## Status` stays `accepted`.
 3. The merge **records** machine ownership instead of discarding it: the
-   project model carries, per rhei, the declared machine name (when declared)
-   and the rhei's execution root, and every consumer resolves a ticket's
-   machine through its owning rhei.
+   project model carries, per rhei, the rhei's execution root, and every
+   consumer resolves a ticket's machine through its owning rhei.
+   *Amended by #350*: the removal release the #347 amendment deferred to, as
+   the project owner's revision on #323 ruled; the line is now refused
+   ([§FS-rhei-plan-language.2.2](../../functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). This item also recorded the declared machine name; there is
+   none left to record.
 4. The graph stays one merged, project-qualified task list ([§DA-panta-root](panta-root.md#da-panta-root-panta-is-the-per-project-virtual-root-above-all-rheis) is
    unchanged). Machines are never combined, namespaced, or merged.
 5. Cross-rhei readiness is the one computation where two machines meet: a
@@ -79,10 +89,17 @@ The state machine is a property of the **rhei**, defaulted by the project.
    default. The `## Context` above already argued for the collapse — a field
    whose only legal value is "same as the parent" is a field that wants to be
    an override — so this is the argument carried through rather than reversed.
-   The declaration's own precedence survives one release
-   ([§FS-rhei-states-deprecation](../../functional-spec/rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). [§AR-rhei-panta.4](../../architecture/rhei-panta.spec.md#4-state-machine-binding)
-7. `--state-machine` stays a whole-scope override and errors when any
-   in-scope rhei declares a name different from the override file's.
+   #347 let the declaration's own precedence survive one release.
+   *Amended by #350*: the removal release the #347 amendment deferred to, as
+   the project owner's revision on #323 ruled; the line is now refused
+   ([§FS-rhei-plan-language.2.2](../../functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). That precedence is gone, and a `states.yaml` in another
+   rhei's root never resolves for this one. [§AR-rhei-panta.4](../../architecture/rhei-panta.spec.md#4-state-machine-binding)
+7. `--state-machine` stays a whole-scope override, and the override file's
+   `name:` is the active machine for every rhei in scope.
+   *Amended by #350*: the removal release the #347 amendment deferred to, as
+   the project owner's revision on #323 ruled; the line is now refused
+   ([§FS-rhei-plan-language.2.2](../../functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). This item said the override errors when an in-scope rhei
+   declares a different name; no rhei declares one.
 8. **Silent** machine adoption is removed everywhere it existed —
    `rhei instantiate` no longer writes the machine of a template it lays as a
    *member* into `index.panta.md`, and `rhei init` no longer adopts a
@@ -117,8 +134,6 @@ The state machine is a property of the **rhei**, defaulted by the project.
 - Instantiating any number of templates into one project works; the
   machine-collision refusal and its standalone-workspace escape hatch are
   gone from that path.
-- Projects that already adopted a machine keep loading: their members restate
-  the default, which stays legal.
 - Monitoring surfaces (`rhei states`, list/render/viz) present per-rhei
   machines grouped by rhei; state names are meaningful only relative to an
   owning rhei, and name collisions across machines are permitted.

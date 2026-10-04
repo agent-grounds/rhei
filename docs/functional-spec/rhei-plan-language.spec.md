@@ -121,7 +121,6 @@ The single-file format is a hierarchical structure:
 | Component | Heading Level | Format | Required |
 |-----------|---------------|--------|----------|
 | Rhei Title | H1 (`#`) | `# Rhei: <title>` | Yes |
-| States Declaration | — | `**States:** <state-machine-name>` | No (defaults to `rhei`) |
 | Content Sections | H2 (`##`) | `## <section-name>` | No |
 | Tasks Section | H2 (`##`) | `## Tasks` | Yes |
 | Root Node | H3 (`###`) | `### <kind> <id>: <title>` | No |
@@ -137,11 +136,9 @@ creates ([§FS-rhei-new.2](rhei-new.spec.md#2-creating-a-rhei)). As in a workspa
 emptiness as a **warning** naming the rhei, so a rhei whose tickets were
 accidentally deleted is not silently green.
 
-When present, the `**States:**` field must be the first non-empty line after
-the `# Rhei:` title. Its value is the `name` of the state machine defined in the
-associated states configuration (see [States Specification](rhei-states.spec.md)).
-State-machine resolution is defined in
-[State Machine Resolution](#13-state-machine-resolution).
+A plan names no state machine: the machine it runs under is the `states.yaml`
+its execution root resolves ([State Machine Resolution](#13-state-machine-resolution)), and a `**States:**`
+line in the plan is a parse error ([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)).
 
 When frontmatter omits a `structure` block, the default structure is:
 
@@ -162,7 +159,7 @@ To prevent Git merge conflicts when multiple agents or humans work in parallel a
 
 A Directory Workspace consists of:
 
-1. **`index.rhei.md`**: The root configuration. Contains the `Rhei Title`, `States Declaration`, and any `Content Sections`. It does **not** contain a `## Tasks` section.
+1. **`index.rhei.md`**: The root configuration. Contains the `Rhei Title`, optional frontmatter, and any `Content Sections`. It does **not** contain a `## Tasks` section.
 2. **`tasks/` directory**: A folder containing workspace task `.md` files.
 3. **Workspace Task Files**: Files within `tasks/` that contain one or more
    node definitions (`### <kind> <id>:`), optionally preceded by a
@@ -207,11 +204,10 @@ recommended for Directory Workspaces. Because the grammar requires an
 State-machine resolution is normative for all commands.
 
 `--state-machine <path>` overrides automatic lookup for the whole scope: it
-loads the named YAML file for every plan and rhei in scope. Where the target
-plan or rhei declares `**States:**`, or inherits a Panta default declaration,
-the loaded file's `name` must match that effective value; where the effective
-field is omitted, the loaded file's `name` becomes the active state-machine
-name for this invocation.
+loads the named YAML file for every plan and rhei in scope, and that file's
+`name`, whatever it is, becomes the active state-machine name for this
+invocation. Nothing in a plan names a machine, so there is nothing for the
+override's `name` to disagree with and no mismatch error.
 
 Otherwise a rhei's machine is the first of these that resolves:
 
@@ -233,19 +229,11 @@ searched; a machine kept anywhere else loads only through `--state-machine`. An
 invalid candidate is a load error, never a fallback — it would otherwise
 surface as a misleading "no states file found".
 
-A declared machine still has to exist. While the `**States:**` declaration
-exists at all ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)), a rhei that carries one — its own,
-or the manifest's by inheritance — and for which neither the deprecated
-resolution nor clause 1 found a file is a **validation error**, not a fall
-through to clauses 2 and 3: a declaration naming a machine nothing supplies
-never silently resolves to some other machine. This clause is removed with the
-declaration.
-
-For one release the deprecated `**States:**` declaration is resolved *before*
-clause 1 and wins wherever it resolves, so no plan written against the previous
-rules changes the machine it runs under.
-[§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match) owns that window, the three warnings it prints,
-and the release it ends in.
+The machine a rhei runs under is decided by where its `states.yaml` sits and
+by nothing else. No line in a plan, workspace index or project manifest names
+it, and a `states.yaml` in **another** rhei's execution root never resolves for
+this one, whatever its `name:`. A machine meant for several rheis goes at the
+project root; a machine meant for one goes in that rhei's own root.
 
 ### 1.4. Directory Workspace Metadata
 
@@ -345,8 +333,8 @@ works — a directory is a Panta Project when it contains `index.panta.md`.
 
 A Panta Project consists of:
 
-1. **`index.panta.md`**: the project manifest — `# Panta: <title>`, an optional
-   `States Declaration`, and any `Content Sections`. It contains no `## Tasks`
+1. **`index.panta.md`**: the project manifest — `# Panta: <title>`, optional
+   frontmatter, and any `Content Sections`. It contains no `## Tasks`
    section and no authored nodes.
 2. **Rhei entries**: the rheis live directly in the project directory, beside the
    manifest. Each entry is a direct-child Single-File Plan (`*.rhei.md`) or a
@@ -359,8 +347,8 @@ A Panta Project consists of:
 3. **`basin/` directory** (optional): loose tickets captured without a domain
    rhei. This directory is loaded as a synthetic Directory Workspace rhei with id
    `basin`; its contents are authored as workspace task files. The synthetic
-   basin has no authored `index.rhei.md`, inherits the Panta default state
-   declaration, and stores per-ticket runtime artifacts relative to `basin/`.
+   basin has no authored `index.rhei.md`, runs under the project default
+   machine (§1.3 clause 2), and stores per-ticket runtime artifacts relative to `basin/`.
 
 Each rhei's id is derived from its location in the project directory: the
 filename stem for a Single-File Plan (`auth.rhei.md` -> `auth`) or the directory
@@ -382,25 +370,22 @@ into one graph rooted at Panta. Ticket ids are namespaced by their rhei id and
 (* ============================================== *)
 
 rhei_document   = rhei_header, { blank_line },
-                  [ states_field, { blank_line } ],
                   [ frontmatter, { blank_line } ],
                   { content_section },
                   tasks_section ;
 
 rhei_header     = "# Rhei: ", title, NEWLINE ;
 
-states_field    = "**States:** ", state_machine_name, NEWLINE ;
-
-state_machine_name = title ;
-
 content_section = "## ", section_title, NEWLINE, { markdown_block } ;
+
+(* No production names a state machine. A `**States:**` line where the
+   retired states_field stood is a parse error, not content: section 2.2. *)
 
 (* ============================================== *)
 (* DIRECTORY WORKSPACE STRUCTURE                  *)
 (* ============================================== *)
 
 workspace_index = rhei_header, { blank_line },
-                  [ states_field, { blank_line } ],
                   [ frontmatter, { blank_line } ],
                   { content_section } ;
 
@@ -434,7 +419,6 @@ basin_task_file = [ { blank_line } ], task_level_1, { task_level_1 } ;
    parse as basin_task_file and are loaded as the synthetic `basin` rhei. *)
 
 panta_manifest  = panta_header, { blank_line },
-                  [ states_field, { blank_line } ],
                   [ frontmatter, { blank_line } ],
                   { content_section } ;
 
@@ -762,6 +746,43 @@ $ rhei validate plan.rhei.md
 ### Task real-1: the only task
 **State:** pending
 `````
+
+### 2.2. The Retired `**States:**` Line
+
+A plan once named its state machine on a `**States:** <name>` line after its
+header. The line is no longer part of the language, and it is **refused rather
+than ignored**: a line beginning `**States:**` anywhere in a `rhei_document`, a
+`workspace_index` (`index.rhei.md`) or a `panta_manifest` (`index.panta.md`) is
+a parse error. Dropping it silently would leave a tree that was written to run
+under one machine running under whichever `states.yaml` §1.3 now finds, with
+nothing to say the machine changed; refusing it makes the moment the line is
+deleted the moment the machine moves, and `rhei states` shows where it moved
+to.
+
+The error names the file and the line number, and its remedy is to delete the
+line, never to change it — there is no value it could be changed to:
+
+```text
+error: panta/tool-reports/index.panta.md:2: `**States:**` is no longer part of the
+  plan language — delete this line. A rhei runs under the `states.yaml` in its own
+  directory, else the project's `states.yaml`, else the built-in `rhei` machine;
+  `rhei states` shows which one it resolves.
+```
+
+The refusal is a parse error, so every command that reads the document refuses
+it, the read-only ones included: `rhei list`, `rhei validate`, `rhei states`,
+`rhei render` and `rhei viz` exit non-zero on such a tree exactly as
+`rhei run` does. A shell completion request reading the same tree offers no
+candidates rather than printing the error over the prompt.
+
+Two places are not refused, because the line never meant anything there and no
+machine changes because of it:
+
+- **Inside a fenced code block** (§2.1), where every line is content, so a
+  document can still quote the old syntax.
+- **In a task body or a workspace task file.** The grammar never gave the line
+  a meaning below the header, so it is ordinary task text, like any other bold
+  line past the metadata block.
 
 ## 3. Semantic Constraints
 
@@ -1621,7 +1642,6 @@ For lexer implementation, the following token types are a reasonable minimum:
 | Token | Pattern | Example |
 |-------|---------|---------|
 | `RheiHeader` | `# Rhei: .*` | `# Rhei: My Project` |
-| `MetadataStates` | `\*\*States:\*\* .*` | `**States:** rhei` |
 | `CodeFence` | A line whose first non-whitespace run is three or more backticks or three or more tildes; the token carries that character, the run length, and whether the rest of the line is blank | a backtick run with the info string `console`; a bare `~~~` |
 | `FrontmatterFence` | `^---\s*$` | `---` |
 | `FrontmatterYamlLine` | Any line inside frontmatter that is not `---` | `metadata:` |

@@ -86,12 +86,6 @@ Text output opens with a `Source:` line naming the resolved states file, or
 rules have several outcomes and the rendered machine alone does not distinguish
 them.
 
-A deprecation warning about how a machine resolved is written to **stderr**,
-beside the `Source:` lines rather than inside them, so neither the text block
-nor `--json` stdout carries it
-([§FS-rhei-states-deprecation.3](rhei-states-deprecation.spec.md#3-the-warning-contract)). `rhei states` is where resolution is read, so
-it is where those warnings are most often seen.
-
 ## 4. Text Output
 
 Text output includes:

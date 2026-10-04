@@ -306,9 +306,8 @@ file — or the built-in `rhei` machine when there is none — governs every rhe
 with no file of its own, plus the synthetic `basin` rhei and the Panta root's
 node policy ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution), [§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)). A machine is a
 *process*, and one project holds several processes the moment it holds two
-instantiated templates. A `**States:**` declaration in either index is
-deprecated and resolves ahead of this for one release, winning wherever it
-resolves ([§FS-rhei-states-deprecation](rhei-states-deprecation.spec.md#fs-rhei-states-deprecation-the-deprecated-states-declaration-and-the-cross-root-name-match)). Each ticket validates, transitions,
+instantiated templates. A `**States:**` line in either index is a parse
+error ([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)). Each ticket validates, transitions,
 and completes under its owning rhei's machine; the only place two machines meet
 is a cross-rhei prior, judged under the target's machine (§6.1).
 

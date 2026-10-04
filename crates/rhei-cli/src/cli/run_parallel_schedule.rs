@@ -314,6 +314,7 @@ fn refill_parallel_worker_pool(
         runtime_dir,
         &active_task_ids,
         &active_nonconcurrent_states,
+        sink,
     )?;
     agent_items.retain(|item| !stalled.contains(&item.task_id_str));
     if !agent_deferred.is_empty() {

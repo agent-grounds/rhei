@@ -2352,8 +2352,11 @@ can stand in for an invocation that has no successful current-visit record of
 its own (§3.2) only when it names the same `task` and canonical `state` as
 fields, its `moves` equals the current move count, and it proves successful work
 by the test above; the pairing is unique — exactly one such orphan and exactly
-one current invocation without a record of its own — and anything else pairs
-nothing, warns naming every orphaned record, and spawns. A record on any current
+one current invocation without a record of its own. An ambiguous edit — at least
+one orphan and at least one such invocation, but not exactly one of each — pairs
+nothing, warns naming every orphaned record, and spawns. An orphan with no
+invocation to answer for (a removed fan-out member) or an invocation with no
+orphan (an added one) pairs nothing and passes silently. A record on any current
 invocation's list of own names is never orphaned, so a current fan-out sibling's
 record can never answer for another sibling. Pairing proves only visit
 eligibility: the paired invocation's own declared outputs and required result

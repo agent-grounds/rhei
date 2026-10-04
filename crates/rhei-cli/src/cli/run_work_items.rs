@@ -340,6 +340,7 @@ fn collect_ready_agent_work_items(
     runtime_dir: &Path,
     active_task_ids: &HashSet<String>,
     active_nonconcurrent_states: &HashSet<String>,
+    sink: &Arc<dyn rhei_tui::EventSink>,
 ) -> MietteResult<(Vec<AgentWorkItem>, Vec<String>)> {
     let mut agent_tasks = Vec::new();
     let mut state_claimant: HashMap<String, String> = HashMap::new();
@@ -413,6 +414,7 @@ fn collect_ready_agent_work_items(
             &current_state,
             state_def,
             invocations,
+            sink,
         )
         .into_iter()
         .filter(|resolved| {

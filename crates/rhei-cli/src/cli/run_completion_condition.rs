@@ -24,6 +24,9 @@
 /// `finishes_ticket` is a property of the *edge* the exit would select, not of
 /// the state, which is why it is settled once here rather than re-derived per
 /// invocation.
+/// `invocations` is every invocation the pass resolved for this state, because
+/// whether a record is orphaned is a question about all of them at once, and
+/// `pairing` is that answer, read on first use. §FS-rhei-agents.8.4
 // §FS-rhei-agents.3.2 §FS-rhei-states.3.3 §FS-rhei-panta.6.2
 struct InvocationCompletion<'a> {
     artifact_root: &'a Path,
@@ -37,46 +40,38 @@ struct InvocationCompletion<'a> {
     finishes_ticket: bool,
     visit_count: u64,
     moves: u64,
+    invocations: &'a [ResolvedAgent],
+    pairing: std::cell::OnceCell<VisitPairing>,
 }
 
 impl InvocationCompletion<'_> {
     /// Whether an existing artifact belongs to work eligible for this visit.
     ///
-    /// With neither a record nor evidence of a prior visit to this state, an upgraded
-    /// workspace retains the legacy first-visit interpretation. Moves through
-    /// other states do not establish re-entry. Otherwise only this invocation's
-    /// successful current-visit record can answer.
+    /// The invocation's own successful current-visit record answers first. With
+    /// none, the visit's one orphaned record may answer for it, when the pairing
+    /// is unique. Only when the state has no record at all at the current move
+    /// count, and no own record of any visit establishes an earlier one, does an
+    /// upgraded workspace retain the legacy first-visit interpretation; moves
+    /// through other states do not establish re-entry.
     // §FS-rhei-agents.3.2 §FS-rhei-agents.8.4 §FS-rhei-transitions.4.3
     fn work_is_eligible_for_visit(&self, resolved: &ResolvedAgent) -> bool {
         let task_id = self.task.id.to_string();
-        // The record this invocation's own name spells, entry number included.
         // An unreadable ledger is not eligible: the spawn it leads to refuses
         // on it by name. §FS-rhei-agents.8.1
-        let Ok(number) = resolve_log_number(
-            self.machine,
-            self.state_name,
-            self.visit_count,
-            self.artifact_root,
-            self.runtime_dir,
-            &task_id,
-        ) else {
+        let Some(own_names) = self.own_names(resolved) else {
             return false;
         };
-        let identity = resolved_agent_log_identity(resolved);
-        let record = current_visit_record(
-            self.runtime_dir,
-            &task_id,
-            self.state_name,
-            identity.as_deref(),
-            number,
-            self.moves,
-        );
-        match record {
-            Some(record) => {
-                record.proves_successful_work(&task_id, self.state_name, self.moves)
-            }
-            None => !self.has_prior_state_visit(),
+        let own = own_spawn_record(&own_names, &task_id, self.state_name, self.moves);
+        if own
+            .as_ref()
+            .is_some_and(|record| record.proves_successful_work(&task_id, self.state_name, self.moves))
+        {
+            return true;
         }
+        if self.paired_with(&own_names) {
+            return true;
+        }
+        own.is_none() && !self.visit_pairing().ran_this_visit && !self.has_prior_state_visit()
     }
 
     /// A departure proves a prior visit, including a visit that began before
@@ -201,6 +196,8 @@ fn task_has_pending_agent_invocations(
             machine,
         ),
         moves: ticket_move_count(artifact_root, runtime_dir, &task.id.to_string()),
+        invocations: &invocations,
+        pairing: std::cell::OnceCell::new(),
     };
     Ok(invocations.iter().any(|resolved| completion.invocation_is_pending(resolved)))
 }
@@ -218,7 +215,11 @@ fn task_has_pending_agent_invocations(
 /// file cannot stand in for one: it is shared with every state the ticket has
 /// passed through, so a result written earlier would excuse a state that has not
 /// run at all.
-// §FS-rhei-agents.3.2 §FS-rhei-run.3
+///
+/// A target edited in place keeps the visit's finished work: the note naming
+/// the record that answers for it, or the warning for an edit too ambiguous to
+/// pair, is printed on `sink` here.
+// §FS-rhei-agents.3.2 §FS-rhei-agents.8.4 §FS-rhei-run.3
 #[allow(clippy::too_many_arguments)]
 fn agent_invocations_to_spawn(
     loaded: &LoadedPlan,
@@ -229,6 +230,7 @@ fn agent_invocations_to_spawn(
     state_name: &str,
     state_def: &rhei_validator::StateDef,
     invocations: Vec<ResolvedAgent>,
+    sink: &Arc<dyn rhei_tui::EventSink>,
 ) -> Vec<ResolvedAgent> {
     if state_def.outputs.is_empty() {
         return invocations;
@@ -255,9 +257,16 @@ fn agent_invocations_to_spawn(
             machine,
         ),
         moves: ticket_move_count(&artifact_root, runtime_dir, &task.id.to_string()),
+        invocations: &invocations,
+        pairing: std::cell::OnceCell::new(),
     };
-    invocations
-        .into_iter()
+    let pending = invocations
+        .iter()
         .filter(|resolved| completion.invocation_is_pending(resolved))
-        .collect()
+        .cloned()
+        .collect::<Vec<_>>();
+    // Said here, where the pass decides, not in the predicate, which is asked
+    // again after every exit. §FS-rhei-agents.3.2
+    completion.announce_visit_pairing(sink, &pending);
+    pending
 }

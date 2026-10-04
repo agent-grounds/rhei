@@ -1288,7 +1288,13 @@ The condition is normative and universal for agent states:
    `runtime/results/<task-id>.md` exists and is non-empty — or, on a fanned-out
    state, *this invocation's own* fragment
    `runtime/results/<task-id>/<state>/<visit_count>/<identity>.md` does
-   ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)).
+   ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)), **and**
+4. The plan, as re-read after the exit, loads. A worker may edit its own task
+   body ([§FS-rhei-memory.3.4](rhei-memory.spec.md#34--rhei-commands-additions)), and an edit that leaves the plan unloadable fails
+   this clause whatever the exit code: no transition fires, the task's region is
+   restored to its text before the attempt, and the attempt is charged against
+   the budget of §3.2.3 ([§FS-rhei-run.3.7](rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan)). It is asked before the other
+   three, because they read the plan it re-reads.
 
 Condition (2) resolves declared `outputs:` against the execution root of the
 rhei that owns the ticket ([§FS-rhei-plan-language.3.10](rhei-plan-language.spec.md#310-state-artifact-contracts))
@@ -1298,7 +1304,7 @@ decides whether the invocation can be skipped. In a Panta project this root can
 sit below the run-level workspace root that `rhei run` was pointed at; the two
 must not be conflated.
 
-All three are evaluated after the process exits — and condition (3) selects its
+All four are evaluated after the process exits — and condition (3) selects its
 edge against the plan **as re-read after that exit**, not the copy the pass held
 when it spawned, so a child the invocation appended or cancelled counts toward
 the operands that selection reads ([§FS-rhei-supervision.4.1](rhei-supervision.spec.md#41-the-opendescendants-operand)), while the edge

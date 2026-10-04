@@ -135,6 +135,7 @@ The runtime currently supports:
 - atomically advancing work with `rhei transition`, `rhei complete`, and
   `rhei reset`
 - orchestrating agents and deterministic programs with `rhei run`
+- reverting and retrying a worker whose edit breaks the plan, while the rest of the run carries on ([§FS-rhei-run.3.7](docs/functional-spec/rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan))
 - carrying one fact sideways with `rhei note` — a task spends its single
   slot on what the next ticket would otherwise rediscover, every later
   prompt anywhere in the project carries it, and `rhei reset` clears it

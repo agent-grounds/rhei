@@ -1,0 +1,241 @@
+//! A reverted edit in a task file the culprit shares
+//! with the sibling whose transition lands during the visit, and what an agent
+//! is told about the edit before and after it (agent-grounds/rhei#310).
+//!
+//! `#[ignore]`d until the restore lands, because the commit gate runs the
+//! suite; the change that makes each pass removes its attribute.
+//! §FS-rhei-run.3.7
+
+use std::fs;
+use std::path::Path;
+
+use super::agent_reentry_support::write_settings;
+use super::python_fixture::fixture_command_with_args;
+use super::worker_edit_revert_support::{end_records, meta_value, state_in, Mode, MODES, NOTE};
+use super::*;
+
+/// Tasks 1 and 2 share one task file; Task 3, in a file of its own, keeps the
+/// workspace from being one file, which `--parallel` would run sequentially.
+const SHARED_FILE: &str = "### Task 1: Raise line coverage
+**State:** cover
+
+Raise coverage of `src/report.rs` above 80%.
+
+### Task 2: Unrelated work
+**State:** other
+
+Does something else.
+";
+
+const LATER_FILE: &str = "### Task 3: Later work
+**State:** cover
+**Prior:** Task 2
+
+Runs after Task 2.
+";
+
+/// Task 1 waits, under `--parallel`, until Task 2's transition is written to
+/// the file they share, then puts its note at the end of its own region. Task 3
+/// runs the same state and writes nothing.
+const ONE_FILE_COVER: &str = r#"concurrent = sys.argv[1] == 'concurrent'
+here = pathlib.Path(__file__).parent
+plan = here / 'ws' / 'tasks' / '01-shared.md'
+marker = here / 'noted'
+if env('RHEI_TASK_ID_LOCAL') == '1' and not marker.exists():
+    marker.write_text('x')
+    if concurrent:
+        deadline = time.time() + 15
+        while '**State:** completed' not in plan.read_text(encoding='utf-8') and time.time() < deadline:
+            time.sleep(0.05)
+    text = plan.read_text(encoding='utf-8')
+    at = text.index('### Task 2:')
+    note = '#### Visit 1 (cover)\n\nLatest measurement was report-1.json.\n\n'
+    write(plan, text[:at] + note + text[at:])
+result('Task 1 wrote its note.\n')
+"#;
+
+const ONE_FILE_OTHER: &str = r#"here = pathlib.Path(__file__).parent
+append(here / 'other-runs.txt', 'ran\n')
+result('Task 2 did its unrelated work.\n')
+"#;
+
+fn one_file_machine(cover: &str, other: &str) -> String {
+    format!(
+        r#"name: worker-edit-one-file
+version: 1
+states:
+  cover:
+    description: Writes a note into its own region.
+    program:
+      command: {cover}
+    program_timeout: 30s
+  other:
+    description: Unrelated work.
+    program:
+      command: {other}
+    program_timeout: 30s
+  completed:
+    description: Done.
+    final: true
+transitions:
+  - from: cover
+    to: completed
+    exit_code: 0
+  - from: other
+    to: completed
+    exit_code: 0
+"#
+    )
+}
+
+/// The block of one task in a shared file, heading to next heading.
+fn block<'a>(plan: &'a str, heading: &str) -> &'a str {
+    let start = plan.find(heading).unwrap_or_else(|| panic!("no `{heading}` in:\n{plan}"));
+    let rest = &plan[start + heading.len()..];
+    let end = rest.find("\n### ").map_or(plan.len(), |at| start + heading.len() + at + 1);
+    &plan[start..end]
+}
+
+/// The restore replaces Task 1's region only, so Task 2's transition — written
+/// to the same file while Task 1 ran — is still there, and Task 2 is not run
+/// again because a whole-file snapshot put its old state back.
+// §FS-rhei-run.3.7.3
+#[test]
+#[ignore = "red until #310 restores a worker's region"]
+fn a_siblings_transition_in_the_same_file_survives_the_restore() {
+    for mode in MODES {
+        let dir = unique_temp_dir(&format!("worker-edit-one-file-{mode:?}"));
+        let ws = dir.join("ws");
+        fs::create_dir_all(ws.join("tasks")).expect("create workspace");
+        fs::write(ws.join("index.rhei.md"), "# Rhei: One file\n").expect("write index");
+        let shared = write_fixture_file(&ws.join("tasks"), "01-shared.md", SHARED_FILE);
+        write_fixture_file(&ws.join("tasks"), "02-later.md", LATER_FILE);
+        let cover = write_python_agent(&dir, "cover.py", ONE_FILE_COVER);
+        let other = write_python_agent(&dir, "other.py", ONE_FILE_OTHER);
+        let concurrent = if mode.concurrent() { "concurrent" } else { "alone" };
+        let machine = write_fixture_file(
+            &ws,
+            "states.yaml",
+            &one_file_machine(
+                &fixture_command_with_args(&cover, &[concurrent]),
+                &fixture_command(&other),
+            ),
+        );
+        let mut args = vec!["--no-tui", "--no-callbacks"];
+        args.extend_from_slice(mode.flags());
+        let ran = run_cli("run", &ws, &machine, &args);
+        let output = format!("mode {mode:?}\nstdout:\n{}\nstderr:\n{}", ran.stdout, ran.stderr);
+        assert!(!ran.stderr.contains("Falling back to sequential"), "{output}");
+        let text = fs::read_to_string(&shared).expect("read task file");
+
+        assert!(ran.status.success(), "the run survives the edit\n{output}\nplan:\n{text}");
+        assert_eq!(state_in(block(&text, "### Task 2:")), "completed", "{output}");
+        assert_eq!(state_in(block(&text, "### Task 1:")), "completed", "{output}");
+        assert!(!text.contains("#### Visit"), "the heading left the plan:\n{text}");
+        let runs = fs::read_to_string(dir.join("other-runs.txt")).unwrap_or_default();
+        assert_eq!(runs.lines().count(), 1, "Task 2 ran once\n{output}");
+        let journal = fs::read_to_string(ws.join("runtime/transitions.log")).unwrap_or_default();
+        let ends = end_records(&journal, "ws.1", "cover");
+        assert_eq!(ends.len(), 2, "{journal}");
+        assert!(meta_value(&ends[0], "reverted").is_some(), "{journal}");
+    }
+}
+
+const AGENT_PLAN: &str = "# Rhei: Agent note
+
+## Tasks
+
+### Task 1: Raise line coverage
+**State:** cover
+
+Raise coverage of `src/report.rs` above 80%.
+";
+
+/// The line the note's heading lands on once appended to [`AGENT_PLAN`].
+fn agent_note_line() -> usize {
+    AGENT_PLAN.lines().count() + 2
+}
+
+const AGENT_MACHINE: &str = r#"name: worker-edit-agent
+version: 1
+states:
+  cover:
+    initial: true
+    description: Leaves a note in its own task body
+    attempts: 2
+    agent: mock
+    agent_timeout: 20s
+    instructions: |
+      Cover Task {task_id}: {task_title}.
+  completed:
+    description: Done
+    final: true
+transitions:
+  - { from: cover, to: completed, description: Covered. }
+"#;
+
+/// The mock agent keeps every prompt, and on its first attempt writes the note
+/// the prompt invites under a heading the prompt forbids.
+fn agent_body() -> String {
+    format!(
+        r#"root = pathlib.Path(env('RHEI_ROOT'))
+attempt = env('RHEI_ATTEMPT', 'unknown')
+write(root / 'prompts' / ('attempt-' + attempt + '.md'), agent_prompt())
+if attempt == '1':
+    append(root / 'plan.rhei.md', {NOTE:?})
+result('covered.\n')
+"#
+    )
+}
+
+/// The sentence every agent reads says what a heading costs it: its own task
+/// body reverted and its attempt spent, not the whole run.
+// §FS-rhei-memory.3.4
+const TRAIL_SENTENCE: &str = "- Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` breaks the plan; the run reverts your task body to what it was before this attempt and spends the attempt.";
+
+/// The retry after a reverted edit is told where, why, and where its text went.
+// §FS-rhei-memory.3.4 §FS-rhei-memory.4.4 §FS-rhei-agents.3.2
+#[test]
+#[ignore = "red until #310 restores a worker's region"]
+fn an_agent_is_told_the_cost_of_a_heading_and_its_retry_where_the_text_went() {
+    for mode in [Mode::Sequential, Mode::Parallel] {
+        let dir = unique_temp_dir(&format!("worker-edit-agent-{mode:?}"));
+        let plan = write_fixture_file(&dir, "plan.rhei.md", AGENT_PLAN);
+        let machine = write_fixture_file(&dir, "states.yaml", AGENT_MACHINE);
+        let agent = write_python_agent(&dir, "mock-agent.py", &agent_body());
+        write_settings(&dir, &agent, false);
+        let mut args = vec!["--no-tui", "--no-callbacks"];
+        args.extend_from_slice(mode.flags());
+        // One ticket alone makes no progress on a reverted attempt, so the
+        // retry is the next run's, as for any stalled visit. §FS-rhei-run.3.6
+        let first = run_cli("run", &plan, &machine, &args);
+        let second = run_cli("run", &plan, &machine, &args);
+        let output = format!(
+            "mode {mode:?}\nfirst:\n{}{}\nsecond:\n{}{}",
+            first.stdout, first.stderr, second.stdout, second.stderr
+        );
+
+        let attempt_one = read(&dir.join("prompts/attempt-1.md"), &output);
+        assert!(
+            attempt_one.contains(TRAIL_SENTENCE),
+            "the prompt's trail sentence:\n{attempt_one}"
+        );
+
+        let attempt_two = read(&dir.join("prompts/attempt-2.md"), &output);
+        let retry = attempt_two
+            .lines()
+            .find(|line| line.starts_with("Retrying this visit:"))
+            .unwrap_or_else(|| panic!("no retry paragraph:\n{attempt_two}"));
+        let location = format!("Its edit broke the plan at `plan.rhei.md:{}`", agent_note_line());
+        assert!(retry.contains(&location), "got:\n{retry}");
+        assert!(retry.contains("(Malformed node heading"), "got:\n{retry}");
+        assert!(retry.contains("task-plan.1-cover.reverted.md`."), "got:\n{retry}");
+        assert!(second.status.success(), "{output}");
+        assert!(!fs::read_to_string(&plan).expect("plan").contains("#### Visit"));
+    }
+}
+
+fn read(path: &Path, output: &str) -> String {
+    fs::read_to_string(path)
+        .unwrap_or_else(|_| panic!("{} was not written\n{output}", path.display()))
+}

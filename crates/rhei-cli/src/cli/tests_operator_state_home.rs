@@ -31,7 +31,6 @@ fn block_the_state_home(
 /// Windows honours it ahead of LOCALAPPDATA and the pin means the same there.
 /// §REQ-test-isolation.6 §FS-rhei-recover.4
 #[test]
-#[ignore = "#455: a root guard locks under whatever XDG_STATE_HOME a sibling test set"]
 fn operator_basin_commits_while_another_test_blocks_the_state_home() {
     let (_dir, project, root, machine) = operator_basin_fixture();
     let request = operator_basin_request(&project, &machine);

@@ -345,6 +345,11 @@ mod tests {
 }
 
 #[cfg(test)]
+mod state_dir_pin {
+    include!("cli/tests_state_dir_pin.rs");
+}
+
+#[cfg(test)]
 mod operator_recovery_tests {
     use super::*;
     include!("cli/tests_operator_transaction.rs");

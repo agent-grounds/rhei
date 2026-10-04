@@ -18,8 +18,14 @@ fn executes_on_phrase(execute_on: rhei_validator::ExecuteOn) -> &'static str {
 
 fn render_state_machine_text(machine: &rhei_validator::StateMachine) -> String {
     let mut out = String::new();
+    // §FS-rhei-states-cmd.4: the machine's callback bound sits beside the version.
+    let callback_bound = machine
+        .callback_timeout
+        .as_deref()
+        .map(|bound| format!(", callback_timeout: {bound}"))
+        .unwrap_or_default();
     out.push_str(&format!(
-        "State machine: {} (version: {})\n",
+        "State machine: {} (version: {}{callback_bound})\n",
         machine.name,
         format_version(&machine.version)
     ));
@@ -187,6 +193,10 @@ fn render_state_machine_text(machine: &rhei_validator::StateMachine) -> String {
             }
             if let Some(t) = rule.timeout.as_ref() {
                 annotations.push(format!("timeout={t}"));
+            }
+            // §FS-rhei-states-cmd.4
+            if let Some(bound) = rule.callback_timeout.as_ref() {
+                annotations.push(format!("callback_timeout={bound}"));
             }
             if !annotations.is_empty() {
                 out.push_str(&format!(" ({})", annotations.join(", ")));

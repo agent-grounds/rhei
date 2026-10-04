@@ -512,6 +512,10 @@ pub struct StateMachine {
     // §FS-rhei-metrics.1
     #[serde(default)]
     pub metrics: IndexMap<String, MetricDef>,
+    /// The machine's time bound on each `cli:` callback run, as authored, for
+    /// every edge that declares none of its own. §FS-rhei-transitions.4.10
+    #[serde(default)]
+    pub callback_timeout: Option<String>,
 }
 
 /// The built-in default states YAML shipped with rhei.

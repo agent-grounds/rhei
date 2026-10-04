@@ -28,6 +28,21 @@ base64 = "0.22"
 uuid = { version = "=1.11.0", features = ["v4"] }
 time = { version = "=0.3.36", features = ["parsing"] }
 
+# A bounded callback runs as the root of its own process tree, and expiry stops
+# the whole tree: a process group on Unix, a Job Object on Windows.
+# §FS-rhei-transitions.4.10 §REQ-cross-platform.2
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.29", features = ["signal", "process"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+] }
+
 [dev-dependencies]
 serde_json = "1"
 tempfile = "3.27.0"

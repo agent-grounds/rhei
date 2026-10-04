@@ -387,6 +387,10 @@ pub struct TransitionRule {
     /// Optional tooling-unavailable trigger for required skills. Same shape as `mcp_unavailable`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill_unavailable: Option<serde_yaml::Value>,
+    /// Optional time bound on each `cli:` callback run of this edge, as
+    /// authored (`2m`); wins over the machine's. §FS-rhei-transitions.4.10
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub callback_timeout: Option<String>,
 }
 
 #[cfg(test)]
@@ -517,6 +521,7 @@ mod tests {
             exit_code: None,
             mcp_unavailable: None,
             skill_unavailable: None,
+            callback_timeout: None,
         };
 
         let value = serde_json::to_value(&rule).expect("serialize TransitionRule");
@@ -544,6 +549,7 @@ mod tests {
             exit_code: None,
             mcp_unavailable: None,
             skill_unavailable: None,
+            callback_timeout: None,
         };
 
         let value = serde_json::to_value(&original).expect("serialize TransitionRule");
@@ -608,6 +614,7 @@ mod tests {
             exit_code: None,
             mcp_unavailable: None,
             skill_unavailable: None,
+            callback_timeout: None,
         };
 
         let obj = serde_json::to_value(&rule).expect("serialize TransitionRule");

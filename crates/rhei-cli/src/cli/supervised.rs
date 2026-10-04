@@ -15,6 +15,11 @@
 
 // §FS-rhei-run.3.2 §DA-supervised-process-groups
 
+// The one way rhei signals a process tree on Unix, shared with bounded
+// callbacks. §FS-rhei-transitions.4.10
+#[cfg(unix)]
+use rhei_core::platform::process_tree::{signal_group, GroupSignal};
+
 /// Grace between `SIGTERM` and `SIGKILL` when terminating a group — the same
 /// 10 s whether a deadline or an interruption fired it. §FS-rhei-run.3.2
 #[cfg(not(test))]
@@ -588,7 +593,7 @@ impl TerminationTarget for LiveGroupsTarget {
         for pgid in live_group_ids(self.owner) {
             // A group its own waiter has already asked is not asked twice.
             if claim_group_termination(pgid) {
-                let _ = signal::killpg(Pid::from_raw(pgid), Signal::SIGTERM);
+                let _ = signal_group(pgid, GroupSignal::Terminate);
             }
         }
     }
@@ -599,7 +604,7 @@ impl TerminationTarget for LiveGroupsTarget {
 
     fn kill(&mut self) {
         for pgid in live_group_ids(self.owner) {
-            let _ = signal::killpg(Pid::from_raw(pgid), Signal::SIGKILL);
+            let _ = signal_group(pgid, GroupSignal::Kill);
         }
     }
 }
@@ -1049,7 +1054,7 @@ impl Supervised {
     #[cfg(unix)]
     fn terminate_group(&mut self) {
         if claim_group_termination(self.pgid) {
-            let _ = signal::killpg(Pid::from_raw(self.pgid), Signal::SIGTERM);
+            let _ = signal_group(self.pgid, GroupSignal::Terminate);
         }
     }
 
@@ -1068,7 +1073,7 @@ impl Supervised {
     /// have nothing to wait for but a process nobody signalled.
     #[cfg(unix)]
     fn kill_group(&mut self) {
-        let _ = signal::killpg(Pid::from_raw(self.pgid), Signal::SIGKILL);
+        let _ = signal_group(self.pgid, GroupSignal::Kill);
         let _ = self.child.kill();
     }
 

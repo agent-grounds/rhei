@@ -30,6 +30,7 @@ impl StateMachine {
         self.validate_model_configuration()?;
         self.validate_prompt_templates()?;
         self.validate_program_configuration()?;
+        self.validate_callback_bounds()?;
         self.validate_snapshot_configuration()?;
         self.validate_tooling_configuration()?;
         self.validate_template_conditions()?;

@@ -1422,6 +1422,7 @@ dependencies = [
  "base64",
  "fs2",
  "indexmap",
+ "nix 0.29.0",
  "regex",
  "serde",
  "serde_json",
@@ -1430,6 +1431,7 @@ dependencies = [
  "tempfile",
  "time",
  "uuid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

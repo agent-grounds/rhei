@@ -9,6 +9,8 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+pub mod process_tree;
+
 /// The platform's own shell, holding one command line.
 ///
 /// A string-form command runs under `/bin/sh -c` on Unix and `cmd /c` on

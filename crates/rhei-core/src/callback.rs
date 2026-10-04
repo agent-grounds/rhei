@@ -13,7 +13,10 @@ use crate::platform::{plain_path, system_shell_command};
 use serde_json::Value as JsonValue;
 use std::io::Write;
 use std::path::Path;
-use std::process::Stdio;
+use std::process::{Output, Stdio};
+use std::time::Duration;
+
+mod bounded;
 
 /// Context provided to a callback during a state transition.
 ///
@@ -102,6 +105,17 @@ impl CallbackResult {
     }
 }
 
+/// The time bound one callback run is held to: the resolved
+/// `callback_timeout`, and the value exactly as its author wrote it, so a
+/// failure can name `2m` rather than `120s`. §FS-rhei-transitions.4.10
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CallbackBound {
+    /// How long the run may take.
+    pub limit: Duration,
+    /// The `callback_timeout` as authored.
+    pub authored: String,
+}
+
 /// Error returned when a callback cannot be executed.
 #[derive(Debug)]
 pub enum CallbackError {
@@ -175,7 +189,24 @@ pub trait CallbackExecutor {
 ///   success; the raw stdout is preserved for logging but not interpreted.
 /// - **Non-zero** → rejection with an error synthesized from stderr. This
 ///   matches the spec: "exit code non-zero = callback crashed".
-pub struct ShellCallbackExecutor;
+///
+/// With a [`CallbackBound`], the run is held to it: the callback starts as the
+/// root of its own process tree, and a run that outlasts the bound has the
+/// tree stopped and comes back as an ordinary failed result naming the bound,
+/// never as an error, so it takes the path a non-zero exit takes. Without one
+/// the callback runs unbounded. §FS-rhei-transitions.4.10
+#[derive(Debug, Clone, Default)]
+pub struct ShellCallbackExecutor {
+    bound: Option<CallbackBound>,
+}
+
+impl ShellCallbackExecutor {
+    /// An executor whose runs are held to `bound`, or unbounded with `None`.
+    // §FS-rhei-transitions.4.10
+    pub fn new(bound: Option<CallbackBound>) -> Self {
+        Self { bound }
+    }
+}
 
 impl CallbackExecutor for ShellCallbackExecutor {
     fn execute(
@@ -215,11 +246,32 @@ impl CallbackExecutor for ShellCallbackExecutor {
             cmd.env("RHEI_TRANSITION_LEDGER_STATUS", ledger_status.as_str());
         }
 
+        let payload = context
+            .context_json
+            .map(|ctx_json| serde_json::to_vec(ctx_json).unwrap_or_else(|_| b"{}".to_vec()));
+
+        // §FS-rhei-transitions.4.10: a bound covers stdin, the wait and the drain.
+        if let Some(bound) = &self.bound {
+            return match bounded::run(&mut cmd, payload, bound, command)? {
+                bounded::Outcome::Finished(output) => Ok(interpret_output(output)),
+                bounded::Outcome::Expired { stdout, stderr } => Ok(CallbackResult {
+                    success: false,
+                    error: Some(format!(
+                        "exceeded callback_timeout {}; its process tree was stopped",
+                        bound.authored
+                    )),
+                    next_state: None,
+                    data: None,
+                    stdout: String::from_utf8_lossy(&stdout).into_owned(),
+                    stderr: String::from_utf8_lossy(&stderr).into_owned(),
+                }),
+            };
+        }
+
         let mut child =
             cmd.spawn().map_err(|e| CallbackError::SpawnFailed(command.to_string(), e))?;
 
-        if let Some(ctx_json) = context.context_json {
-            let payload = serde_json::to_vec(ctx_json).unwrap_or_else(|_| b"{}".to_vec());
+        if let Some(payload) = payload {
             if let Some(mut stdin) = child.stdin.take() {
                 match stdin.write_all(&payload) {
                     Ok(()) => {}
@@ -245,31 +297,36 @@ impl CallbackExecutor for ShellCallbackExecutor {
             .wait_with_output()
             .map_err(|e| CallbackError::SpawnFailed(command.to_string(), e))?;
 
-        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-
-        if !output.status.success() {
-            let code = output.status.code();
-            let tail = stderr.trim();
-            let error = match (code, tail.is_empty()) {
-                (Some(c), true) => format!("callback crashed (exit {c})"),
-                (Some(c), false) => format!("callback crashed (exit {c}): {tail}"),
-                (None, true) => "callback terminated by signal".to_string(),
-                (None, false) => format!("callback terminated by signal: {tail}"),
-            };
-            return Ok(CallbackResult {
-                success: false,
-                error: Some(error),
-                next_state: None,
-                data: None,
-                stdout,
-                stderr,
-            });
-        }
-
-        Ok(parse_callback_stdout(&stdout, stderr.clone())
-            .unwrap_or_else(|| CallbackResult::implicit_success(stdout.clone(), stderr)))
+        Ok(interpret_output(output))
     }
+}
+
+/// Read a finished callback's exit status and output as its result.
+fn interpret_output(output: Output) -> CallbackResult {
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+
+    if !output.status.success() {
+        let code = output.status.code();
+        let tail = stderr.trim();
+        let error = match (code, tail.is_empty()) {
+            (Some(c), true) => format!("callback crashed (exit {c})"),
+            (Some(c), false) => format!("callback crashed (exit {c}): {tail}"),
+            (None, true) => "callback terminated by signal".to_string(),
+            (None, false) => format!("callback terminated by signal: {tail}"),
+        };
+        return CallbackResult {
+            success: false,
+            error: Some(error),
+            next_state: None,
+            data: None,
+            stdout,
+            stderr,
+        };
+    }
+
+    parse_callback_stdout(&stdout, stderr.clone())
+        .unwrap_or_else(|| CallbackResult::implicit_success(stdout.clone(), stderr))
 }
 
 /// Parse the stdout of a CLI callback as a `TransitionResult`.
@@ -325,41 +382,8 @@ impl CallbackExecutor for NoopCallbackExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::python;
     use serde_json::json;
-    use std::process::Command;
-
-    /// The interpreter these callbacks are written in.
-    ///
-    /// A callback is a command line for the platform's own shell, and the two
-    /// shells share almost no vocabulary: `printf`, `true`, and `$VAR` are `sh`,
-    /// not `cmd`. Python is on both, so what a callback *does* can be pinned
-    /// once instead of twice. Every command below stays inside one pair of
-    /// double quotes and uses `'…'` for its own strings, which both shells hand
-    /// through unchanged.
-    fn python() -> &'static str {
-        static PYTHON: std::sync::OnceLock<&'static str> = std::sync::OnceLock::new();
-        PYTHON.get_or_init(|| {
-            let candidates =
-                if cfg!(windows) { ["python", "python3"] } else { ["python3", "python"] };
-            for candidate in candidates {
-                let runs = Command::new(candidate)
-                    .arg("-c")
-                    .arg("pass")
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .map(|status| status.success())
-                    .unwrap_or(false);
-                if runs {
-                    return candidate;
-                }
-            }
-            panic!(
-                "these tests run their callbacks under Python: put `python3` or `python` on PATH"
-            )
-        })
-    }
 
     /// `cli:<python> -c "<code>"`.
     fn python_callback(code: &str) -> CallbackRef {
@@ -384,7 +408,7 @@ mod tests {
 
     #[test]
     fn shell_executor_rejects_non_cli_prefix() {
-        let executor = ShellCallbackExecutor;
+        let executor = ShellCallbackExecutor::default();
         let callback = CallbackRef("js:someFunction".to_string());
         let context = ctx(Path::new("plan.rhei.md"), Path::new("."));
 
@@ -395,7 +419,7 @@ mod tests {
 
     #[test]
     fn shell_executor_runs_successful_command_with_empty_stdout() {
-        let executor = ShellCallbackExecutor;
+        let executor = ShellCallbackExecutor::default();
         let callback = python_callback("pass");
         let context = ctx(Path::new("plan.rhei.md"), Path::new("."));
 
@@ -408,7 +432,7 @@ mod tests {
 
     #[test]
     fn shell_executor_treats_nonjson_stdout_as_implicit_success() {
-        let executor = ShellCallbackExecutor;
+        let executor = ShellCallbackExecutor::default();
         let callback = CallbackRef("cli:echo hello".to_string());
         let context = ctx(Path::new("plan.rhei.md"), Path::new("."));
 
@@ -420,7 +444,7 @@ mod tests {
 
     #[test]
     fn shell_executor_reports_failure_on_nonzero_exit() {
-        let executor = ShellCallbackExecutor;
+        let executor = ShellCallbackExecutor::default();
         let callback = CallbackRef("cli:exit 1".to_string());
         let context = ctx(Path::new("plan.rhei.md"), Path::new("."));
 
@@ -432,7 +456,7 @@ mod tests {
 
     #[test]
     fn shell_executor_parses_success_json_result() {
-        let executor = ShellCallbackExecutor;
+        let executor = ShellCallbackExecutor::default();
         let callback = python_callback(
             "import json,sys;sys.stdout.write(json.dumps({'success': True, 'data': {'k': 'v'}}))",
         );
@@ -446,7 +470,7 @@ mod tests {
 
     #[test]
     fn shell_executor_parses_rejection_with_error_message() {
-        let executor = ShellCallbackExecutor;
+        let executor = ShellCallbackExecutor::default();
         let callback = python_callback(
             "import json,sys;sys.stdout.write(json.dumps({'success': False, 'error': 'dep missing'}))",
         );
@@ -460,7 +484,7 @@ mod tests {
 
     #[test]
     fn shell_executor_parses_next_state_redirect() {
-        let executor = ShellCallbackExecutor;
+        let executor = ShellCallbackExecutor::default();
         let callback = python_callback(
             "import json,sys;sys.stdout.write(json.dumps({'success': True, 'nextState': 'rejected'}))",
         );
@@ -473,7 +497,7 @@ mod tests {
 
     #[test]
     fn shell_executor_downgrades_rejection_with_next_state() {
-        let executor = ShellCallbackExecutor;
+        let executor = ShellCallbackExecutor::default();
         let callback = python_callback(
             "import json,sys;sys.stdout.write(json.dumps({'success': False, 'nextState': 'somewhere'}))",
         );
@@ -486,7 +510,7 @@ mod tests {
 
     #[test]
     fn shell_executor_passes_env_vars() {
-        let executor = ShellCallbackExecutor;
+        let executor = ShellCallbackExecutor::default();
         let callback = python_callback(
             "import os;print(os.environ['RHEI_TASK_ID'], os.environ['RHEI_FROM_STATE'], os.environ['RHEI_TO_STATE'])",
         );
@@ -500,7 +524,7 @@ mod tests {
 
     #[test]
     fn shell_executor_delivers_context_json_on_stdin() {
-        let executor = ShellCallbackExecutor;
+        let executor = ShellCallbackExecutor::default();
         let callback =
             python_callback("import json,sys;sys.stdout.write(json.load(sys.stdin)['task']['id'])");
         let payload = json!({

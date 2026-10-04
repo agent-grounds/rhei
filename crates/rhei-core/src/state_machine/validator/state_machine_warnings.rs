@@ -14,6 +14,7 @@ fn validate_state_machine_warnings(machine: &StateMachine, report: &mut Validati
         warn_on_supervising_state(machine, state_name, state, report);
         warn_on_unbounded_self_loop(machine, state_name, state, report);
     }
+    warn_on_idle_callback_bounds(machine, report);
 }
 
 /// Warn about a self-loop nothing terminates.

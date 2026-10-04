@@ -38,44 +38,52 @@ pub(crate) fn run_registry_path(id: &str) -> Option<PathBuf> {
 /// entry — and is hard-linked into place, which refuses rather than replaces.
 /// On failure the error names the state directory tried and why it failed.
 pub(crate) fn publish_registry_entry_once(descriptor: &RunDescriptor) -> Result<(), String> {
-    publish_registry_entry_with(descriptor, |temp, entry| fs::hard_link(temp, entry))
+    publish_registry_entry_with(descriptor, |temp, entry| fs::hard_link(temp, entry), |mut file, body| {
+        file.write_all(body)
+    })
 }
 
-/// [`publish_registry_entry_once`] with the link step passed in, so a test can
-/// refuse it the way a state home without hard links does (vfat, exFAT, a
-/// link-less FUSE mount).
+/// [`publish_registry_entry_once`] with the link and the fallback's write
+/// passed in, so a test can refuse the link the way a state home without hard
+/// links does (vfat, exFAT, a link-less FUSE mount), or fail the write partway
+/// the way a full one does.
 ///
-/// Every failed step is followed by a look at the entry: one that stands now
-/// is the child's, and the id resolves, so it is not an error — the warning
-/// fires only when the entry is still absent after this attempt.
+/// An entry the child already wrote is met by `AlreadyExists`, from the link
+/// or from the fallback's `create_new`, so it is never an error; the link's
+/// only spares an open that would refuse the same way, which is why no test
+/// tells the two apart. No other failed step is followed by a look at the
+/// entry: an open that finds one refuses with `AlreadyExists` first, and a
+/// rename landing after such a look would race it all the same. The launcher
+/// never takes a file it wrote for the child's entry, so it fails, and the
+/// warning fires, only when it found no entry for this run standing.
 /// §FS-rhei-run-headless.1.1
 ///
 /// A link refused for any reason but `AlreadyExists` falls back to writing
 /// the body straight to the entry with `create_new`, which also refuses
-/// rather than replaces. That write is not atomic, and it is safe anyway: a
-/// reader that catches it half-written cannot parse it, the sweep classifies
-/// it as unreadable, and an unreadable entry is never pruned
-/// (§FS-rhei-run-headless.3); the child's later rename replaces it whole.
+/// rather than replaces. That write is not atomic: a reader that catches it
+/// mid-flight sees an unreadable entry, which the sweep never prunes
+/// (§FS-rhei-run-headless.3), and the write either completes or is removed.
+/// When it fails, what stands is kept only if it reads as this run — the
+/// child's, renamed over the launcher's file; anything else is the launcher's
+/// own torn file and is removed. A child rename that lands between that read
+/// and the removal is removed with it, and the warning is then true: the
+/// child's terminal rewrite only replaces an entry that is still there.
 fn publish_registry_entry_with(
     descriptor: &RunDescriptor,
     link: impl FnOnce(&Path, &Path) -> std::io::Result<()>,
+    write: impl FnOnce(fs::File, &[u8]) -> std::io::Result<()>,
 ) -> Result<(), String> {
     let Some(dir) = run_registry_dir() else {
         return Err("neither XDG_STATE_HOME nor HOME is set".to_owned());
     };
+    let failed = |err: &dyn std::fmt::Display| Err(format!("could not write it under {}: {err}", dir.display()));
     let entry = dir.join(format!("{}.json", descriptor.id));
-    let failed = |err: std::io::Error| {
-        if entry.is_file() {
-            return Ok(());
-        }
-        Err(format!("could not write it under {}: {err}", dir.display()))
-    };
     let body = match serde_json::to_string_pretty(descriptor) {
         Ok(body) => format!("{body}\n"),
-        Err(err) => return failed(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
+        Err(err) => return failed(&err),
     };
     if let Err(err) = fs::create_dir_all(&dir) {
-        return failed(err);
+        return failed(&err);
     }
     let temp = dir.join(format!(".{}.launcher-{}.tmp", descriptor.id, std::process::id()));
     let linked = fs::write(&temp, &body).and_then(|()| link(&temp, &entry));
@@ -86,19 +94,20 @@ fn publish_registry_entry_with(
         Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
         Err(err) => err,
     };
-    if entry.is_file() {
+    let file = match fs::OpenOptions::new().write(true).create_new(true).open(&entry) {
+        Ok(file) => file,
+        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
+        Err(err) => return failed(&format!("{refused}; then {err}")),
+    };
+    let Err(err) = write(file, body.as_bytes()) else {
+        return Ok(());
+    };
+    // Only a whole entry for this run resolves; a torn one is ours. §FS-rhei-run-headless.1.1
+    if read_descriptor(&entry).is_some_and(|stands| stands.id == descriptor.id) {
         return Ok(());
     }
-    let written = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&entry)
-        .and_then(|mut file| file.write_all(body.as_bytes()));
-    match written {
-        Ok(()) => Ok(()),
-        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
-        Err(err) => failed(std::io::Error::new(err.kind(), format!("{refused}; then {err}"))),
-    }
+    let _ = fs::remove_file(&entry);
+    failed(&format!("{refused}; then {err}"))
 }
 
 /// What the launcher tells the operator about an id it printed that will not

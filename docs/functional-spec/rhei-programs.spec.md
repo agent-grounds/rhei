@@ -404,6 +404,11 @@ Programs and callbacks are complementary, the same as agents and callbacks:
 2. Exit-code transition evaluation determines the target state.
 3. The selected transition's `on_leave` and `on_enter` callbacks execute as usual.
 
+Those callbacks run under the edge's resolved `callback_timeout`
+(§FS-rhei-transitions.4.10), which is independent of `program_timeout`: the
+program's time is spent once it exits, and a callback that exceeds its own
+bound fails the transition without re-entering the program's timeout path.
+
 ```yaml
 transitions:
   - from: build

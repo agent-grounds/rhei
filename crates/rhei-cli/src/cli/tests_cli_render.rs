@@ -337,6 +337,51 @@ transitions:
         );
     }
 
+    /// Both levels of `callback_timeout` appear as authored where authored and
+    /// are omitted, never `null`, elsewhere. §FS-rhei-states-cmd.5
+    #[test]
+    fn render_state_machine_json_carries_callback_bounds_only_where_authored() {
+        let bounded = r#"
+name: bounded
+version: 1
+callback_timeout: 2m
+states:
+  gate:
+    description: waiting
+    initial: true
+  opening:
+    description: opening
+  done:
+    description: finished
+    final: true
+transitions:
+  - from: gate
+    to: opening
+    on_enter: cli:sync
+    callback_timeout: 20m
+  - from: opening
+    to: done
+    on_enter: cli:sync
+"#;
+        let render = |yaml: &str| -> serde_json::Value {
+            let machine = rhei_validator::StateMachine::from_yaml_str(yaml).expect("load");
+            let rendered = render_state_machine_json(&machine).expect("render JSON");
+            serde_json::from_str(&rendered).expect("parse JSON")
+        };
+
+        let json = render(bounded);
+        assert_eq!(json["callback_timeout"], "2m");
+        assert_eq!(json["transitions"][0]["callback_timeout"], "20m");
+        assert!(json["transitions"][1].get("callback_timeout").is_none());
+
+        let unbounded = bounded.replace("callback_timeout: 2m\n", "");
+        let json = render(&unbounded);
+        assert!(
+            json.get("callback_timeout").is_none(),
+            "a machine without the key carries no member:\n{json}"
+        );
+    }
+
     /// Presence is the meaning, so the field is omitted rather than `null` on a
     /// poll that waits on a machine. §FS-rhei-states-cmd.5
     #[test]

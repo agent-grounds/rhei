@@ -155,6 +155,13 @@ When the field is omitted, JSON omits the member rather than emitting
 `"effort": null`; text likewise adds no empty `Effort:` line. This preserves
 the inspection shape of machines that do not opt in.
 
+A transition carries a `"callback_timeout": "<duration>"` member only when the
+edge authors it, and the top-level object carries `"callback_timeout"` only when
+the machine authors it, each with the bound as authored
+([§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound)). Neither is emitted as
+`null`, so the JSON for a machine authored without the key is byte-for-byte what
+it was.
+
 When JSON output is selected, command errors are rendered as a single JSON
 object on stderr.
 

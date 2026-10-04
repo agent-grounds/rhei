@@ -180,11 +180,9 @@ fn spawn_and_wait_program(
             ))?;
     }
 
-    let log_file = fs::File::create(log_path)
-        .map_err(|e| miette!(
-            help = program_log_help(),
-            "failed to create log file '{}': {e}", log_path.display()
-        ))?;
+    // Never truncated, as an agent's is not. §FS-rhei-programs.5.1
+    let log_file = create_log_exclusively(log_path)
+        .map_err(|message| miette!(help = program_log_help(), "{message}"))?;
     let command_label = match &resolved.program.command {
         ProgramCommand::Shell(command) => resolve_runtime_template_text(command, render_context),
         ProgramCommand::Exec(args) => args

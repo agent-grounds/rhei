@@ -73,16 +73,25 @@ fn spawn_parallel_agent_work_item(
     // Settled before anything is composed or staged, as in the sequential path:
     // a spawn this visit may not have costs nothing to decline.
     // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.1
-    let plan = plan_agent_spawn_attempt(
-        &agent_runtime_dir,
+    let identity = resolved_agent_log_identity(&item.resolved);
+    let (task_id, state) = (item.task_id_str.as_str(), item.current_state.as_str());
+    let (mut plan, log_number) = match plan_named_spawn(
+        machine,
         &task_workspace_root,
-        &item.task_id_str,
-        &item.current_state,
-        resolved_agent_log_suffix(&item.resolved, Some(visit_count)).as_deref(),
-        &item.resolved,
+        &agent_runtime_dir,
+        task_id,
+        state,
         visit_count,
-        run_id,
-    );
+        identity.as_deref(),
+    ) {
+        Ok(planned) => planned,
+        // Refused before it costs anything; `Skipped` is the pool's stall. §FS-rhei-agents.8.1
+        Err(refusal) => {
+            emit_run_message(sink, rhei_tui::MessageLevel::Error, format!("  {refusal}"));
+            return Ok(ParallelAgentSpawnOutcome::Skipped);
+        }
+    };
+    attach_agent_accounting(&mut plan, task_id, state, &item.resolved, visit_count, run_id);
     let budget =
         resolve_attempt_budget(machine.states.get(item.current_state.as_str()), settings);
     if let Some(spent_budget) = plan.budget_spent(budget) {
@@ -359,6 +368,8 @@ fn spawn_parallel_agent_work_item(
     let snapshot_preload_for_thread = snapshot_preload.clone();
     let snapshot_preload_for_result = snapshot_preload.clone();
     let visit_for_result = visit_count;
+    // The number the session's log name carries. §FS-rhei-metrics.4
+    let log_number_for_thread = log_number.shown();
     let resolved_for_result = item.resolved.clone();
     let workspace_root_for_thread = workspace_root.to_path_buf();
     let rhei_root_for_thread = workspace_root.to_path_buf();
@@ -419,7 +430,7 @@ fn spawn_parallel_agent_work_item(
                 &runtime_dir_for_thread,
                 &tid,
                 &sname,
-                visit_for_result,
+                log_number_for_thread,
                 &plan_for_thread,
                 &log_for_thread,
                 result.as_ref().ok(),

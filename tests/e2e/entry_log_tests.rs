@@ -14,7 +14,6 @@ use super::*;
 /// report, and each metric iteration links its own session.
 // §FS-rhei-agents.8.1 §FS-rhei-session-reports.1 §FS-rhei-metrics.3 §FS-rhei-metrics.4
 #[test]
-#[ignore = "pins agent-grounds/rhei#309; remove this attribute with the change"]
 fn an_uncounted_loop_keeps_one_log_and_one_report_per_entry() {
     let (dir, plan, machine) = loop_fixture("entry-log-loop", COVER);
 
@@ -75,7 +74,6 @@ fn an_uncounted_loop_keeps_one_log_and_one_report_per_entry() {
 /// prompt still says it is a retry and names entry 2's first transcript.
 // §FS-rhei-agents.8.1 §FS-rhei-memory.3.3 §FS-rhei-memory.4.4
 #[test]
-#[ignore = "pins agent-grounds/rhei#309; remove this attribute with the change"]
 fn a_retry_inside_a_later_entry_is_numbered_after_that_entry() {
     let fails_once = format!("{COVER}if n == 2:\n    raise SystemExit(1)\n");
     let (dir, plan, machine) = loop_fixture("entry-log-retry", &fails_once);
@@ -131,7 +129,6 @@ transitions:
 /// its second visit instead of overwriting the first.
 // §FS-rhei-programs.5.1
 #[test]
-#[ignore = "pins agent-grounds/rhei#309; remove this attribute with the change"]
 fn a_counted_program_writes_its_second_visit_beside_the_first() {
     let dir = unique_temp_dir("entry-log-counted-program");
     let plan = write_fixture_file(&dir, "plan.rhei.md", ONE_TICKET);
@@ -169,7 +166,6 @@ sys.stdout.write('MEASURE-VISIT-{}\n'.format(n))
 /// behind it, is refused rather than overwritten, and the worker does not run.
 // §FS-rhei-agents.8.1
 #[test]
-#[ignore = "pins agent-grounds/rhei#309; remove this attribute with the change"]
 fn a_spawn_refuses_a_log_path_no_record_accounts_for() {
     let (dir, plan, machine) = gated_fixture("entry-log-refuse");
     assert_success(&run_cli("run", &plan, &machine, &RUN));
@@ -198,7 +194,6 @@ fn a_spawn_refuses_a_log_path_no_record_accounts_for() {
 /// entry starts again at the plain name, and a sibling rhei keeps its files.
 // §FS-rhei-reset.2.1 §FS-rhei-agents.8.3 §FS-rhei-transitions.4.3
 #[test]
-#[ignore = "pins agent-grounds/rhei#309; remove this attribute with the change"]
 fn a_narrowed_reset_restarts_entry_numbering_and_sweeps_the_tickets_reports() {
     let dir = unique_temp_dir("entry-log-reset");
     let project = dir.join("project");
@@ -250,7 +245,6 @@ fn a_narrowed_reset_restarts_entry_numbering_and_sweeps_the_tickets_reports() {
 /// written in its place.
 // §FS-rhei-session-reports.1
 #[test]
-#[ignore = "pins agent-grounds/rhei#309; remove this attribute with the change"]
 fn an_orphan_report_at_a_new_stem_is_renamed_aside() {
     let (dir, plan, machine) = gated_fixture("entry-log-orphan");
     assert_success(&run_cli("run", &plan, &machine, &RUN));

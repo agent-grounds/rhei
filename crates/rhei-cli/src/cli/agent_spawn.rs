@@ -215,13 +215,16 @@ fn spawn_and_wait_agent(
             ))?;
     }
 
+    // Never truncated: the plan refused a taken name, and this is the race-free
+    // half of that refusal. §FS-rhei-agents.8.1
     let log_file = Arc::new(Mutex::new(
-        fs::File::create(log_path)
-            .map_err(|e| miette!(
-                help = agent_log_help(),
-                "failed to create log file '{}': {e}", log_path.display()
-            ))?,
+        create_log_exclusively(log_path)
+            .map_err(|message| miette!(help = agent_log_help(), "{message}"))?,
     ));
+    // §FS-rhei-session-reports.1: a report at this fresh stem is an orphan.
+    if let Some(line) = rename_orphan_session_report(log_path) {
+        diag_warn!("{line}");
+    }
 
     // §FS-rhei-agents.8: Agent log header format.
 

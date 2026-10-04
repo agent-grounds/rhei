@@ -340,8 +340,8 @@ transitions:
     to: done
 "#;
 
-/// Entering a state again is a new visit, so it starts over: the plain log name,
-/// no retry narration, and a fresh `attempts:` budget. This is the seam between
+/// Entering a state again is a new visit, so it starts over: its own entry's log
+/// name, no retry narration, and a fresh `attempts:` budget. This is the seam between
 /// the two bounds — `visits:` ticks here, and an `attempts:` budget that did not
 /// reset with it would make a ticket sent round the loop unrunnable on its
 /// second lap.
@@ -398,8 +398,13 @@ fn re_entering_a_state_is_a_new_visit_with_a_fresh_attempt_budget() {
     );
     assert_eq!(
         log_names(&fixture.dir),
-        vec!["task-plan.1-a.log", "task-plan.1-b.log"],
-        "each visit writes the plain name; `-attempt` is for retries within one visit"
+        vec![
+            "task-plan.1-a-2.log",
+            "task-plan.1-a.log",
+            "task-plan.1-b-2.log",
+            "task-plan.1-b.log",
+        ],
+        "each entry writes its own name; `-attempt` is for retries within one visit"
     );
 }
 

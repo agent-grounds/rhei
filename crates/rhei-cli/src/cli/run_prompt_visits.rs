@@ -69,7 +69,8 @@ fn render_previous_log(render_context: &RuntimeTemplateContext<'_>) -> String {
         return String::new();
     }
     // The previous visit's *last* attempt: where it was retried, that is the
-    // one that ran, and the earlier ones are kept beside it. §FS-rhei-agents.8.1
+    // one that ran, and the earlier ones are kept beside it. Keyed on
+    // `visit_count − 1`, so an uncounted re-entry names none. §FS-rhei-agents.8.1
     let Some(path) = latest_agent_log_path(
         &memory.runtime_dir,
         &render_context.task.id.to_string(),
@@ -167,12 +168,26 @@ fn render_retry_notice(render_context: &RuntimeTemplateContext<'_>, task_root: &
         render_context.current_state_raw,
         render_context.machine,
     );
+    let task_id = render_context.task.id.to_string();
+    // Found by this invocation's own name, entry number included, or a retry
+    // inside entry 2 would read entry 1's record and lose this paragraph. A
+    // ledger the spawn will refuse on reads as entry 1 here. §FS-rhei-memory.3.3
+    let number = resolve_log_number(
+        render_context.machine,
+        render_context.state_name,
+        visit,
+        task_root,
+        &memory.runtime_dir,
+        &task_id,
+    )
+    .unwrap_or(LogNumber::Entry(1));
     let plan = plan_spawn_attempt(
         &memory.runtime_dir,
         task_root,
-        &render_context.task.id.to_string(),
+        &task_id,
         render_context.state_name,
-        agent_log_suffix(render_context.target, render_context.model, Some(visit)).as_deref(),
+        agent_log_identity(render_context.target, render_context.model).as_deref(),
+        number,
     );
     let Some(previous) = plan.previous.as_ref() else { return String::new() };
     let owed = render_owed_clause(render_context, visit);

@@ -15,9 +15,10 @@
 struct MetricPendingSession {
     task: String,
     state: String,
-    /// The visit whose log this is: the number the log name carries, 1 for a
-    /// state without counted visits. Absent from notes written before it was
-    /// recorded. §FS-rhei-agents.8.1 §FS-rhei-metrics.4
+    /// The visit whose log this is: the number the log name carries —
+    /// `{visit_count}` for a counted state, the entry number for an uncounted
+    /// one, 1 where the name carries none. Absent from notes written before it
+    /// was recorded. §FS-rhei-agents.8.1 §FS-rhei-metrics.4
     #[serde(default, skip_serializing_if = "Option::is_none")]
     visit: Option<u64>,
     moves: u64,

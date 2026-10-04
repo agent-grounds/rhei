@@ -222,6 +222,11 @@ transitions:
 "#,
     )
     .expect("rewind task to inherited state");
+    // A rewind outside the ledger is still entry 1, and its log is never overwritten: move it
+    // away, as §FS-rhei-agents.8.1 says to.
+    let logs = dir.join("runtime/logs");
+    fs::rename(logs.join("task-plan.1-review-fake-acme-model-a.log"), logs.join("first-run.log"))
+        .expect("move the first run's review log away");
     let from_snapshot =
         run_cli("run", &plan_path, &machine_path, &["--no-tui", "--from-snapshot", snapshot_ref]);
     assert_success(&from_snapshot);

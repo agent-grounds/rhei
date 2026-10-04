@@ -2,9 +2,9 @@
 //
 // The acceptance clause it serves — exactly one note per `rhei run` — is pinned
 // end to end by `a_cross_project_descriptor_is_reported_once_per_run`. What is
-// left to hold here is the part an end-to-end test cannot reach: that a *second*
-// run in the same process is owed its own note, which is how every in-process
-// caller of the runtime behaves.
+// left to hold here is the part a subprocess end-to-end test cannot reach:
+// sequential and concurrent runs in one process each own their note. Channels
+// force the interfering calls without sleeps or a lock around the latch.
 
 // §FS-rhei-budgets.7.2
 
@@ -64,4 +64,111 @@ fn an_ancestry_that_was_not_declined_owes_no_note() {
 fn an_unwitnessed_account_is_named_by_its_uuid() {
     let stranger = "12121212-3434-4343-8565-787878787878";
     assert_eq!(minting_project_label(stranger), stranger);
+}
+
+mod cross_project_note_concurrency {
+    use super::*;
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    fn wait_for(rx: &mpsc::Receiver<()>) {
+        rx.recv_timeout(Duration::from_secs(10)).expect("the peer reaches the coordinated boundary");
+    }
+
+    /// Observe A's first and second admissions with B starting and ending between them.
+    fn another_run_starts_between_admissions() -> (Option<String>, Option<String>) {
+        let (first_tx, first_rx) = mpsc::channel();
+        let (ended_tx, ended_rx) = mpsc::channel();
+        let a = std::thread::spawn(move || {
+            begin_budget_run();
+            let first = cross_project_note(&declined(), "run-A");
+            first_tx.send(()).unwrap();
+            wait_for(&ended_rx);
+            let second = cross_project_note(&declined(), "run-A");
+            (first, second)
+        });
+        let b = std::thread::spawn(move || {
+            wait_for(&first_rx);
+            // The same reset run_command calls, even before loading a plan.
+            begin_budget_run();
+        });
+        b.join().unwrap();
+        ended_tx.send(()).unwrap();
+        a.join().unwrap()
+    }
+
+    /// Observe A's first admission after the existing peer ancestry test finishes.
+    fn another_caller_admits_first() -> Option<String> {
+        let (begun_tx, begun_rx) = mpsc::channel();
+        let (peer_tx, peer_rx) = mpsc::channel();
+        let a = std::thread::spawn(move || {
+            begin_budget_run();
+            begun_tx.send(()).unwrap();
+            wait_for(&peer_rx);
+            cross_project_note(&declined(), "run-A")
+        });
+        let b = std::thread::spawn(move || {
+            wait_for(&begun_rx);
+            an_ancestry_that_was_not_declined_owes_no_note();
+            peer_tx.send(()).unwrap();
+        });
+        let first = a.join().unwrap();
+        b.join().unwrap();
+        first
+    }
+
+    /// Observe A begins → A first → B begins → A second → B first.
+    fn interleaved_admissions() -> (Option<String>, Option<String>, Option<String>) {
+        let (first_tx, first_rx) = mpsc::channel();
+        let (begun_tx, begun_rx) = mpsc::channel();
+        let (second_tx, second_rx) = mpsc::channel();
+        let a = std::thread::spawn(move || {
+            begin_budget_run();
+            let first = cross_project_note(&declined(), "run-A");
+            first_tx.send(()).unwrap();
+            wait_for(&begun_rx);
+            let second = cross_project_note(&declined(), "run-A");
+            second_tx.send(()).unwrap();
+            (first, second)
+        });
+        let b = std::thread::spawn(move || {
+            wait_for(&first_rx);
+            begin_budget_run();
+            begun_tx.send(()).unwrap();
+            wait_for(&second_rx);
+            cross_project_note(&declined(), "run-B")
+        });
+        let (a_first, a_second) = a.join().unwrap();
+        let b_first = b.join().unwrap();
+        (a_first, a_second, b_first)
+    }
+
+    /// Independent runs cannot re-arm or consume each other's note. Keep all
+    /// three controlled interleavings in one test so their baseline resets do
+    /// not accidentally mask each other's failure under the parallel runner.
+    /// The suite remains parallel; the callers inside each scenario overlap.
+    /// §FS-rhei-budgets.7.2
+    #[test]
+    fn independent_runs_keep_their_cross_project_notes() {
+        // Retain triage's passing controls before exercising interference.
+        the_cross_project_note_is_owed_once_per_run();
+        an_ancestry_that_was_not_declined_owes_no_note();
+        let (reset_first, reset_second) = another_run_starts_between_admissions();
+        let peer_first = another_caller_admits_first();
+        let (a_first, a_second, b_first) = interleaved_admissions();
+        // Check every first note and every second-note suppression together,
+        // so neither B's lost note nor the peer's interference is hidden by
+        // the assertion about A's repetition failing first.
+        assert_eq!(
+            (
+                reset_first.is_some(), reset_second.is_some(), peer_first.is_some(),
+                a_first.is_some(), a_second.is_some(), b_first.is_some(),
+            ),
+            (true, false, true, true, false, true),
+            "first admissions owe notes and second admissions repeat nothing; \
+             reset: A first={reset_first:?}, A second={reset_second:?}; \
+             peer: A first={peer_first:?}; \
+             interleaved: A first={a_first:?}, A second={a_second:?}, B first={b_first:?}"
+        );
+    }
 }

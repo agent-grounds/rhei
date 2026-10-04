@@ -461,7 +461,8 @@ fn execute_transition_with_origin(
     // Execute on_leave callback before the state change.
     if !no_callbacks {
         if let Some(ref cb) = matching_rule.on_leave {
-            let executor = ShellCallbackExecutor;
+            // §FS-rhei-transitions.4.10: each run gets the edge's resolved bound.
+            let executor = ShellCallbackExecutor::new(machine.callback_bound(matching_rule));
             for (model, agent) in callback_contexts {
                 let context_json = build_transition_context_json(
                     plan_for_context.as_ref(),
@@ -888,7 +889,8 @@ fn execute_transition_with_origin(
                 agent: None,
                 context_json: Some(&on_enter_context_json),
             };
-            let executor = ShellCallbackExecutor;
+            // §FS-rhei-transitions.4.10: a redirect resolves from the rule it took.
+            let executor = ShellCallbackExecutor::new(machine.callback_bound(matching_rule));
             let result = match executor.execute(cb, &callback_ctx) {
                 Ok(result) => result,
                 Err(err) if origin.claim => {

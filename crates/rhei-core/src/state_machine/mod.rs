@@ -29,6 +29,7 @@ include!("validator/reserved_names.rs");
 include!("validator/transition_sources.rs");
 include!("validator/supervisor_finish.rs");
 include!("validator/state_machine_warnings.rs");
+include!("validator/callback_bound.rs");
 include!("validator/validator_dependencies.rs");
 include!("validator/validator_prior_states.rs");
 include!("validator/validator_entry.rs");
@@ -49,4 +50,5 @@ mod tests {
     include!("validator/tests_supervision.rs");
     include!("validator/tests_snapshots.rs");
     include!("validator/tests_prompt_templates.rs");
+    include!("validator/tests_callback_bound.rs");
 }

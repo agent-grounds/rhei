@@ -32,6 +32,8 @@ pub mod parser;
 pub mod platform;
 pub mod source;
 pub mod state_machine;
+#[cfg(test)]
+pub(crate) mod test_support;
 pub(crate) mod text;
 pub mod tokens;
 pub mod workspace;

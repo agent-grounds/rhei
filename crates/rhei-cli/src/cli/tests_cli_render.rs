@@ -294,6 +294,49 @@ transitions:
         );
     }
 
+    /// An edge's `callback_timeout` is one of its annotations, and the
+    /// machine's sits in the header beside the version. §FS-rhei-states-cmd.4
+    #[test]
+    fn render_state_machine_text_shows_callback_bounds() {
+        let yaml = r#"
+name: bounded
+version: 1
+callback_timeout: 2m
+states:
+  gate:
+    description: waiting
+    initial: true
+  opening:
+    description: opening
+  done:
+    description: finished
+    final: true
+transitions:
+  - from: gate
+    to: opening
+    on_enter: cli:sync
+    callback_timeout: 20m
+  - from: opening
+    to: done
+    on_enter: cli:sync
+"#;
+        let machine = rhei_validator::StateMachine::from_yaml_str(yaml).expect("load");
+        let rendered = render_state_machine_text(&machine);
+
+        assert!(
+            rendered.contains("State machine: bounded (version: 1, callback_timeout: 2m)"),
+            "missing machine bound in the header:\n{rendered}"
+        );
+        assert!(
+            rendered.contains("gate -> opening (on_enter=cli:sync, callback_timeout=20m)"),
+            "missing edge bound annotation:\n{rendered}"
+        );
+        assert!(
+            rendered.contains("opening -> done (on_enter=cli:sync)\n"),
+            "an edge with no bound of its own carries no annotation:\n{rendered}"
+        );
+    }
+
     /// Presence is the meaning, so the field is omitted rather than `null` on a
     /// poll that waits on a machine. §FS-rhei-states-cmd.5
     #[test]

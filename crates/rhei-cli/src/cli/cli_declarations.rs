@@ -23,8 +23,6 @@ macro_rules! diagnostic {
 use minijinja::{Environment as MiniJinjaEnvironment, UndefinedBehavior};
 #[cfg(unix)]
 use nix::sys::signal::{self, Signal};
-#[cfg(unix)]
-use nix::unistd::Pid;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use regex::Regex;
 use rhei_core::ast::{Metadata, TaskId};

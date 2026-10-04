@@ -7,6 +7,7 @@
     #[cfg(unix)]
     mod supervised_tests {
         use super::*;
+        use nix::unistd::Pid;
         use std::os::unix::process::ExitStatusExt as _;
 
         /// Long enough that nothing under test can outlive the assertion by

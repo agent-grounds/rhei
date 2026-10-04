@@ -659,10 +659,10 @@ path = "docs/functional-spec/rhei-budgets.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1000, unit = "lines" }
+max_accepted = { value = 1100, unit = "lines" }
 until = "Section 10 (`rhei budget`) (the command surface: show's report and JSON members, adjust, forget and its table) is a declaration of its own under docs/functional-spec/, and every FS-rhei-budgets.10 citation in the crates, the tests and the sibling specs has been repointed at it."
 reason = """
-The boundary that is missing is a document for the `rhei budget` command surface. Section 10 describes what the operator types and reads — show's text and JSON members, adjust, and forget's case table — and is cited from 26 places in the crates and tests, so lifting it needs its own grund declaration and a re-point of every one of those markers, which is a restructure with its own review. What is edited here is one ticket's specification point (agent-grounds/rhei#411: a copied project is refused at its first charge, a moved one keeps its account), written into sections 5.3 and 5.4 and two new points 5.4.1 and 5.4.2 whose ids the approved proposal named; splitting the document in the same commit would move every section citation alongside a behaviour change, which a spec-first commit must not hide.
+The boundary that is missing is a document for the `rhei budget` command surface. Section 10 describes what the operator types and reads — show's text and JSON members, adjust, and forget's case table — and is cited from 26 places in the crates and tests, so lifting it needs its own grund declaration and a re-point of every one of those markers, which is a restructure with its own review. What is edited here is one ticket's specification point (agent-grounds/rhei#411: a copied project is refused at its first charge, a moved one keeps its account), written into sections 5.3 and 5.4 and two new points 5.4.1 and 5.4.2 whose ids the approved proposal named; splitting the document in the same commit would move every section citation alongside a behaviour change, which a spec-first commit must not hide. agent-grounds/rhei#447 adds the ownership of the cross-project note to the same document, with the same seam still missing.
 """
 [[exceptions]]
 path = "crates/rhei-core/src/parser/plan.rs"

@@ -893,6 +893,14 @@ reservation, the project the descriptor was minted for, and the account this run
 charges instead, each by the directory a reader would recognize where that is
 known and by uuid where it is not ([§FS-rhei-budgets.8](rhei-budgets.spec.md#8-exhaustion)).
 
+The entitlement to that note belongs to the run. Independent runs in the same
+process each owe their own first note: starting, completing, or failing one run
+must neither re-arm nor consume another run's entitlement. All admissions of
+one run share its entitlement, in sequential and parallel execution and across
+project roots; later admissions repeat nothing. Only a successful admission
+whose ancestry was declined as foreign consumes the entitlement. An admission
+that claims no ancestor or is placed under one consumes none.
+
 This is the case that lets Rhei's own suite, and any `rhei run` of a plan
 outside the ancestor's project, run from inside an agent at all: each resolves a
 state root of its own, so each is a child of an account the descriptor was never

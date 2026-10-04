@@ -96,3 +96,25 @@ and it cannot be diagnosed from the gate that reports it [§REQ-cross-platform.3
 The measure is a reader that has yielded output and never ends: a wait that
 runs out against it reports that output, on every platform, within the bound
 it was given.
+
+### 7.1 A Wait Matches What The Terminal Shows, Not The Bytes It Was Sent
+
+What a wait looks for, it looks for in the text the terminal shows, not in the
+bytes that drew it. A Unix pseudo-terminal passes the child's bytes through, so
+the two are the same there; a ConPTY renders a screen and emits a stream that
+redraws it, and that stream may move the cursor over a blank cell where the
+child wrote a space, or slip a window title into the middle of a line. The
+prompt is whole on the screen and broken in the bytes, so a wait that matches
+the bytes misses it on one platform only, and only when the frame falls that
+way — a flake, not a failure [§REQ-cross-platform.2](cross-platform.md#2-parity).
+
+So a wait reads the stream as a terminal would show it: a cursor-forward over
+blank cells reads as that many spaces, a title or any other non-printing
+control sequence reads as nothing, and a sequence split across two reads is
+matched once it is whole. What a failure reports is still the transcript as it
+was written, escapes and all, because that is what says what the terminal was
+actually sent.
+
+The measure is the stream quoted in agent-grounds/rhei#448 — the prompt's space
+drawn as a cursor-forward and a window title in the line — which signals the
+prompt, as does the same stream with the sequences split across reads.

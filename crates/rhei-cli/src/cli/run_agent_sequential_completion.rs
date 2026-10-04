@@ -111,7 +111,15 @@ fn handle_sequential_agent_completion(
             // A reverted edit spends the attempt and routes nothing. §FS-rhei-run.3.7.4
             if attempt_was_reverted(&spawn_record) && !timed_out {
                 let (task, state) = (task_id_str.as_str(), current_state.as_str());
-                charge_reverted_attempt(&mut release, &reloaded, input, machine, task, state)?;
+                charge_reverted_attempt(
+                    &mut release,
+                    &reloaded,
+                    input,
+                    machine,
+                    task,
+                    state,
+                    &spawn_record,
+                )?;
                 progress.stalled_tasks.insert(task_id_str.clone());
                 return Ok(());
             }

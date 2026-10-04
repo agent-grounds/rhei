@@ -1,6 +1,7 @@
-//! Two shapes of agent-grounds/rhei#310 that one culprit alone does not reach:
-//! two `--parallel` workers that each break their own region, and a poll state
-//! whose worker breaks the plan on every attempt. §FS-rhei-run.3.7
+//! Shapes of agent-grounds/rhei#310 that one culprit alone does not reach: two
+//! `--parallel` workers that each break their own region, three whose held
+//! exits meet a stop, and a poll state whose worker breaks the plan on every
+//! attempt. §FS-rhei-run.3.7
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -157,6 +158,158 @@ fn two_parallel_culprits_each_have_their_own_edit_reverted() {
     }
 }
 
+/// Each task appends a heading to its own task file, and Task 1 to Task 4's as
+/// well, which no worker holds. Task 2 and Task 3 exit while Task 1 runs, so
+/// both are held. Task 3 writes once Task 2 was reaped, so Task 2's completion
+/// is the one whose reload waits on Task 1. Task 1 exits once Task 3 was reaped.
+const HELD_CULPRIT: &str = r#"import json
+n = sys.argv[1]
+here = pathlib.Path(__file__).parent
+spawns = here / 'ws' / 'runtime' / 'spawns'
+
+def wait_for(ready):
+    deadline = time.time() + 15
+    while not ready() and time.time() < deadline:
+        time.sleep(0.02)
+
+def reaped(m):
+    record = spawns / ('task-ws.' + m + '-note' + m + '.json')
+    try:
+        return bool(json.loads(record.read_text())['ending'])
+    except (OSError, ValueError, KeyError):
+        return False
+
+def note(m):
+    append(here / 'ws' / 'tasks' / ('0' + m + '-t.md'), '\n#### Visit 1 (cover)\n\nnote\n')
+
+write(here / ('started-' + n), 'x')
+if n == '1':
+    wait_for(lambda: (here / 'started-2').exists() and (here / 'started-3').exists())
+    note('1')
+    note('4')
+    write(here / 'noted-1', 'x')
+    wait_for(lambda: reaped('3'))
+else:
+    wait_for(lambda: (here / 'noted-1').exists())
+    if n == '3':
+        wait_for(lambda: reaped('2'))
+    note(n)
+result('Task ' + n + ' wrote its note.\n')
+"#;
+
+fn held_culprit_machine(script: &Path) -> String {
+    let command = |n: &str| fixture_command_with_args(script, &[n]);
+    let (one, two, three) = (command("1"), command("2"), command("3"));
+    format!(
+        r#"name: held-culprits
+version: 1
+states:
+  note1:
+    description: Breaks its own task body and Task 4's.
+    program:
+      command: {one}
+    program_timeout: 30s
+  note2:
+    description: Breaks its own task body.
+    program:
+      command: {two}
+    program_timeout: 30s
+  note3:
+    description: Breaks its own task body.
+    program:
+      command: {three}
+    program_timeout: 30s
+  completed:
+    description: Done.
+    final: true
+  failed:
+    description: Failed.
+    final: true
+transitions:
+  - from: note1
+    to: completed
+    exit_code: 0
+  - from: note2
+    to: completed
+    exit_code: 0
+  - from: note3
+    to: completed
+    exit_code: 0
+  - from: "*"
+    to: failed
+"#
+    )
+}
+
+/// A held exit whose region one reload restored on its behalf, before the same
+/// reload stopped the run on a break no worker holds, is a reverted attempt
+/// that ended on its own: failed, charged, and warned about once. The held exit
+/// whose own reload stopped the run is interrupted and uncharged. Which of
+/// Task 2 and Task 3 the main thread reads first is the channel's order, which
+/// no file marks, so the two roles are asserted whichever task took them.
+// §FS-rhei-run.3.7.4 §FS-rhei-run.3.7.6
+#[test]
+fn a_held_exit_restored_for_it_before_a_stop_is_a_failed_reverted_attempt() {
+    let dir = unique_temp_dir("worker-edit-held-then-stop");
+    let script = write_python_agent(&dir, "held.py", HELD_CULPRIT);
+    let text = |n: u8, state: &str| format!("### Task {n}: T{n}\n**State:** {state}\n\nBody.\n");
+    let tasks = [text(1, "note1"), text(2, "note2"), text(3, "note3"), text(4, "completed")];
+    let files = ["01-t.md", "02-t.md", "03-t.md", "04-t.md"];
+    let named: Vec<(&str, &str)> =
+        files.iter().copied().zip(tasks.iter().map(String::as_str)).collect();
+    let (ws, machine) = workspace(&dir, &named, &held_culprit_machine(&script));
+
+    let ran = run_cli("run", &ws, &machine, &["--no-tui", "--no-callbacks", "--parallel", "3"]);
+    let output = portable(&format!("{}{}", ran.stdout, ran.stderr));
+    let journal = journal_in(&ws);
+    let released = slot_released(&ws);
+
+    assert!(!ran.status.success(), "the run stops\n{output}");
+    assert!(output.contains("Task ws.4"), "names the task whose text broke\n{output}");
+    assert!(output.contains("tasks/04-t.md:6"), "names file:line\n{output}");
+    for (task, file) in [("ws.1", "01-t.md"), ("ws.2", "02-t.md"), ("ws.3", "03-t.md")] {
+        let warning =
+            format!("Task {task}'s edit to its own task body broke the plan at tasks/{file}:6");
+        assert_eq!(output.matches(&warning).count(), 1, "{task} is warned once\n{output}");
+        assert!(!task_text(&ws, file).contains("#### Visit"), "{task}'s edit is reverted");
+    }
+    assert!(task_text(&ws, "04-t.md").contains("#### Visit"), "the stop reverts nothing");
+
+    let outcome = |task: &str, state: &str| {
+        let ends = end_records(&journal, task, state);
+        assert_eq!(ends.len(), 1, "{task} is journalled once\n{journal}");
+        (meta_value(&ends[0], "outcome"), meta_value(&ends[0], "reverted"))
+    };
+    let failed = |file: &str| (Some("failed".to_string()), Some(format!("tasks/{file}:6")));
+    assert_eq!(outcome("ws.1", "note1"), failed("01-t.md"), "{journal}");
+    let two = outcome("ws.2", "note2");
+    let behalf: u8 = if two.0.as_deref() == Some("interrupted") { 3 } else { 2 };
+    let own = 5 - behalf;
+    let (behalf_task, behalf_state, behalf_file) =
+        (format!("ws.{behalf}"), format!("note{behalf}"), format!("0{behalf}-t.md"));
+    let interrupted = (Some("interrupted".to_string()), Some(format!("tasks/0{own}-t.md:6")));
+    assert_eq!(outcome(&format!("ws.{own}"), &format!("note{own}")), interrupted, "{journal}");
+    assert_eq!(outcome(&behalf_task, &behalf_state), failed(&behalf_file), "{journal}");
+
+    // The JSON release agrees with the journal. §FS-rhei-run-json.2.1
+    let location = format!("tasks/{behalf_file}:6");
+    assert!(
+        released.iter().any(|record| record["task"] == behalf_task.as_str()
+            && record["outcome"] == "failed"
+            && record["reverted"] == location.as_str()),
+        "{behalf_task}'s release is failed and reverted: {released:#?}"
+    );
+    let record = |n: u8| {
+        let path = ws.join(format!("runtime/spawns/task-ws.{n}-note{n}.json"));
+        let body = fs::read_to_string(&path).expect("read spawn record");
+        serde_json::from_str::<serde_json::Value>(&body).expect("parse spawn record")
+    };
+    assert_eq!(record(behalf)["charged"], 1, "the restored attempt is charged");
+    assert_eq!(record(behalf)["attempt_charged"], true);
+    assert_eq!(record(own)["charged"], 0, "the stopped attempt is not");
+    assert_eq!(record(own)["ending"], "interrupted");
+}
+
 /// Appends a heading to its own task body and asks to be polled again.
 const POLL_CULPRIT: &str = r#"here = pathlib.Path(__file__).parent
 append(here / 'ws' / 'tasks' / '01-t.md', '\n#### Visit (poll)\n\nnote\n')
@@ -175,7 +328,7 @@ states:
       command: {command}
     program_timeout: 30s
     poll:
-      interval: 0s
+      interval: 3s
       max_attempts: 3
   gate:
     gating: true
@@ -201,7 +354,8 @@ transitions:
 
 /// On a poll state the reverted attempts spend `poll.max_attempts`: once they
 /// have, the ticket stalls in its state across runs, the halt names it, and the
-/// exhaustion edge never fires. §FS-rhei-run.3.7.4 §REQ-bounded-neural-work.1
+/// exhaustion edge never fires. No run waits for an attempt that will never
+/// spawn. §FS-rhei-run.3.7.4 §REQ-bounded-neural-work.1
 #[test]
 fn a_poll_worker_that_breaks_the_plan_every_time_stalls_at_max_attempts() {
     let dir = unique_temp_dir("worker-edit-poll-culprit");
@@ -211,10 +365,12 @@ fn a_poll_worker_that_breaks_the_plan_every_time_stalls_at_max_attempts() {
     let (ws, machine) = workspace(&dir, &[("01-t.md", task)], &machine);
 
     let mut output = String::new();
+    let mut stdouts = Vec::new();
     let mut last = None;
     for _ in 0..4 {
         let ran = run_cli("run", &ws, &machine, &["--no-tui", "--no-callbacks"]);
         output.push_str(&portable(&format!("{}{}\n---\n", ran.stdout, ran.stderr)));
+        stdouts.push(ran.stdout.clone());
         last = Some(ran);
     }
     let last = last.expect("ran");
@@ -229,5 +385,16 @@ fn a_poll_worker_that_breaks_the_plan_every_time_stalls_at_max_attempts() {
     assert!(
         last_output.contains("halting Task ws.1 in state 'waiting': 3 attempts spent"),
         "the halt names the culprit\n{output}"
+    );
+    // The sleep and the spawn are both told on stdout, in the order they happen.
+    let mut after_last = stdouts.iter().filter_map(|out| out.split("attempt 3 of 3 (").nth(1));
+    assert!(
+        after_last.all(|rest| !rest.contains("sleeping")),
+        "no run waits once the bound is spent\n{output}"
+    );
+    let halts = output.lines().filter(|line| line.contains("halting Task ws.1"));
+    assert!(
+        halts.into_iter().all(|line| line.contains("does not load with its edit")),
+        "every halt names the reverted edit as what is owed\n{output}"
     );
 }

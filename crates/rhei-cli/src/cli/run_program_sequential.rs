@@ -96,7 +96,7 @@ fn run_sequential_program_work_items(
                     task_id_str,
                     current_state,
                     spent_budget,
-                    &completion_debt_label(&owed)
+                    &plan.spent_budget_owed(&owed)
                 )
             );
             progress.stalled_tasks.insert(task_id_str.clone());
@@ -165,7 +165,15 @@ fn run_sequential_program_work_items(
                 // A reverted edit spends the attempt and routes nothing. §FS-rhei-run.3.7.4
                 if (reverted || attempt_was_reverted(&plan.record)) && !program_outcome.timed_out {
                     let (task, state) = (task_id_str.as_str(), current_state.as_str());
-                    charge_reverted_attempt(&mut release, &reloaded, input, machine, task, state)?;
+                    charge_reverted_attempt(
+                        &mut release,
+                        &reloaded,
+                        input,
+                        machine,
+                        task,
+                        state,
+                        &plan.record,
+                    )?;
                     progress.stalled_tasks.insert(task_id_str.clone());
                     continue;
                 }

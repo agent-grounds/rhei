@@ -90,7 +90,8 @@ fn a_heading_in_its_own_body_reverts_that_task_and_the_sibling_completes() {
 }
 
 /// A worker that breaks the plan on every attempt spends its own budget and
-/// stalls; its sibling still completes, and the halt names the culprit.
+/// stalls; its sibling still completes, and the halt names the culprit and,
+/// in a later run too, the reverted edit as what it owes.
 // §FS-rhei-run.3.7.4 §FS-rhei-agents.3.2.3
 #[test]
 fn a_worker_that_breaks_the_plan_every_time_stalls_alone() {
@@ -119,6 +120,20 @@ fn a_worker_that_breaks_the_plan_every_time_stalls_alone() {
         let ends = end_records(&journal, "ws.1", "cover");
         assert_eq!(ends.len(), 2, "{journal}");
         assert!(ends.iter().all(|line| meta_value(line, "reverted").is_some()), "{journal}");
+
+        // The next run halts the spent visit before spawning, owing the same.
+        let again = case.run();
+        assert_eq!(case.runs_of("cover"), 2, "no third attempt\n{}", again.output());
+        assert!(
+            again.combined().contains("halting Task ws.1 in state 'cover': 2 attempts spent"),
+            "{}",
+            again.output()
+        );
+        assert!(
+            again.combined().contains("does not load with its edit"),
+            "the halt names the reverted edit as what is owed\n{}",
+            again.output()
+        );
     }
 }
 

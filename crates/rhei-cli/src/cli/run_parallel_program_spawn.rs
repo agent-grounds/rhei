@@ -65,7 +65,7 @@ fn spawn_parallel_program_work_item(
                 &item.task_id_str,
                 &item.current_state,
                 spent_budget,
-                &completion_debt_label(&owed),
+                &plan.spent_budget_owed(&owed),
             ),
         );
         return Ok(ParallelProgramSpawnOutcome::Skipped);

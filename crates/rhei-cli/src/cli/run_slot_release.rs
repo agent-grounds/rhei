@@ -124,12 +124,13 @@ impl PendingSlotRelease {
 
 impl Drop for PendingSlotRelease {
     fn drop(&mut self) {
-        let Some(mut release) = self.release.take() else { return };
-        // A held exit the run stopped on is unrouted, however late it is dropped.
-        // §FS-rhei-run.3.7.6
-        if self.held.as_deref().is_some_and(stopped_on_break) {
-            release.outcome = rhei_tui::TaskOutcome::Interrupted;
+        if self.release.is_none() {
+            return;
         }
+        // An exit held when the run stopped is unrouted, however late it is dropped.
+        // §FS-rhei-run.3.7.6
+        self.settle_held(|record| worker_regions().held_at_stop(record));
+        let Some(release) = self.release.take() else { return };
         self.sink.emit(rhei_tui::RunEvent::SlotReleased {
             slot: release.slot,
             task: release.task,

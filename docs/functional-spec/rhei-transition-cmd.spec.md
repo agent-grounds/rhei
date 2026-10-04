@@ -113,7 +113,11 @@ compare-and-swap and every mutable guard before computing any effect.
    [§AR-agent-orchestrator-workflow.3.3.1](../architecture/agent-orchestrator-workflow.spec.md#331-stable-writer-exclusion).
    The sidecar is the sole writer lock; the replaceable plan destination stays
    unlocked. Hold the sidecar through callbacks, replacement, ledger and result
-   writes, terminal finalization, success, or restoration.
+   writes, terminal finalization, success, or restoration. Where the edge or
+   the machine declares a `callback_timeout`, every callback runs under it, so
+   the hold is bounded by the callback runs times that bound (plus, on Linux
+   and macOS, each run's 10-second grace)
+   (§FS-rhei-transitions.4.10).
 4. Re-read the task's current state from the current destination pathname under
    the sidecar. If it does not equal `--from`, fail with a compare-and-swap
    conflict error and print the actual current state.
@@ -155,6 +159,8 @@ compare-and-swap and every mutable guard before computing any effect.
    `on_leave` on the source state, if any, unless `--no-callbacks` is set. All
    callbacks for the attempt share the identity and see its central-ledger
    status as pending ([§FS-rhei-transitions.1.2](rhei-transitions.spec.md#12-firing-identity-and-callback-time-visibility)).
+   The callback runs under its edge's resolved `callback_timeout`, and one
+   that exceeds it rejects the transition (§FS-rhei-transitions.4.10).
 9. Verify that every required `outputs:` artifact declared on the source state
    exists (see [Plan Language Specification — State Artifact
    Contracts](rhei-plan-language.spec.md#310-state-artifact-contracts)). Missing
@@ -182,6 +188,10 @@ compare-and-swap and every mutable guard before computing any effect.
     leaves the file as it was
     (§AR-agent-orchestrator-workflow.3.3.1.1).
 14. Execute the `on_enter` callback on the target state, if any, unless `--no-callbacks` is set. The write comes first so the callback observes the plan already in the state it is entering; the callback still sees the attempt's central-ledger status as pending. A callback that fails rolls the write back to the file's previous contents, and the transition fails. When the rollback itself fails, the error says so — the plan file may then be inconsistent.
+    The callback runs under its edge's resolved `callback_timeout`, and one that
+    exceeds it is a failure like any other: its process tree is stopped, the
+    write is rolled back, and no ledger row is appended
+    (§FS-rhei-transitions.4.10).
 15. Append one state-transition entry to `runtime/state-transitions.log` as
     `<task-id> <from>@<to>`, creating the `runtime/` directory if needed. The
     file is the central, deterministic audit trail for all task state changes.
@@ -333,6 +343,16 @@ With `--no-callbacks`:
 
 ```text
 Task <ID> transitioned: '<from>' -> '<to>' (callbacks skipped)
+```
+
+When a callback exceeds its `callback_timeout`, the command exits non-zero with
+the plan file as it was, no ledger row, and the sidecar released, and the error
+names the callback and the bound as authored
+(§FS-rhei-transitions.4.10):
+
+```text
+Error: on_enter callback '<callback>' failed: exceeded callback_timeout <bound>; its process tree was stopped
+Error: on_leave callback '<callback>' rejected the transition: exceeded callback_timeout <bound>; its process tree was stopped
 ```
 
 ## 6. Operator-forced missing-edge recovery

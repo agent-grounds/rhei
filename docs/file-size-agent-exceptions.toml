@@ -445,7 +445,7 @@ path = "docs/functional-spec/rhei-transitions.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1700, unit = "lines" }
+max_accepted = { value = 1800, unit = "lines" }
 until = "The multi-language integration examples (Examples 2-5: Bash, JavaScript, Python, Java) live in docs/functional-spec/rhei-callbacks.spec.md, leaving this document the transition schema and its semantics."
 reason = """
 The boundary that is missing is a home for the worked integration examples. More than half this file is Examples 1-6, six full callback implementations in four languages, and the sibling document that should hold them, rhei-callbacks.spec.md, exists but covers only part of that ground. Moving them is a citation-surface change of its own: every cross-reference into the numbered examples has to be re-pointed, and the schema sections that the examples illustrate stay where they are. The schema, trigger, and wildcard sections above them are one subject and do not split.

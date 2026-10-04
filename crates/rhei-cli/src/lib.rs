@@ -193,6 +193,7 @@ include!("cli/run_live_admission.rs");
 include!("cli/run_slot_release.rs");
 include!("cli/run_worker_regions.rs");
 include!("cli/run_worker_edits.rs");
+include!("cli/run_worker_edit_charge.rs");
 include!("cli/run_work_items.rs");
 include!("cli/run_empty_visit_holds.rs");
 include!("cli/run_parallel_spawn.rs");

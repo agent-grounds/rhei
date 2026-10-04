@@ -234,6 +234,7 @@ mod validation_source_tests;
 mod waiting_on_person_tests;
 mod worker_capture_precondition_tests;
 mod worker_edit_revert_prompt_tests;
+mod worker_edit_revert_race_tests;
 mod worker_edit_revert_support;
 mod worker_edit_revert_tests;
 mod workspace_task_metadata_tests;

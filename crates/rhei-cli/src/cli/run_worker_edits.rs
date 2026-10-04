@@ -16,6 +16,24 @@ struct InFlightRegion {
     live: usize,
 }
 
+/// A worker whose process is reaped but whose completion the run has not yet
+/// settled, kept with its region and snapshot while a reload it found broken
+/// elsewhere is resolved. A later break in that region is still its own: the
+/// restore is made on its behalf and the completion reads it when it settles.
+// §FS-rhei-run.3.7.2 §FS-rhei-run.3.7.5
+struct HeldExit {
+    task_id: String,
+    state: String,
+    budget: AttemptBudget,
+    region: InFlightRegion,
+    /// The attempt's log, beside which the reverted text is kept. §FS-rhei-run.3.7.7
+    log: PathBuf,
+    /// Attempts the visit had spent before this one.
+    charged: u64,
+    /// The restore made on this completion's behalf, not yet told to its release.
+    revert: Option<WorkerRevert>,
+}
+
 /// What a restore did for one attempt, left for the site that routes its exit.
 // §FS-rhei-run.3.7.4 §FS-rhei-run.3.7.7
 #[derive(Clone)]
@@ -81,6 +99,10 @@ struct WorkerRegions {
     armed: bool,
     root: Option<PathBuf>,
     in_flight: BTreeMap<String, InFlightRegion>,
+    /// Exited workers whose completions are still held, by spawn record.
+    held: BTreeMap<PathBuf, HeldExit>,
+    /// Held exits an attributed stop left unrouted, by spawn record.
+    stopped: std::collections::BTreeSet<PathBuf>,
     refusals: BTreeMap<String, String>,
 }
 
@@ -88,6 +110,8 @@ static WORKER_REGIONS: Mutex<WorkerRegions> = Mutex::new(WorkerRegions {
     armed: false,
     root: None,
     in_flight: BTreeMap::new(),
+    held: BTreeMap::new(),
+    stopped: std::collections::BTreeSet::new(),
     refusals: BTreeMap::new(),
 });
 
@@ -108,6 +132,8 @@ fn arm_worker_regions(input: &Path) {
     regions.armed = true;
     regions.root = Some(execution_workspace_root(input));
     regions.in_flight.clear();
+    regions.held.clear();
+    regions.stopped.clear();
     regions.refusals.clear();
 }
 
@@ -177,6 +203,16 @@ impl WorkerRegions {
             .map_or(BreakClass::Outside, |(task_id, _)| BreakClass::Running(task_id.clone()))
     }
 
+    /// The held exit whose region holds the break and has not been restored
+    /// yet: a case-1 break, whoever's reload found it. §FS-rhei-run.3.7.2
+    fn held_holding(&self, at: Option<&PlanBreak>) -> Option<PathBuf> {
+        self.held
+            .iter()
+            .filter(|(_, held)| held.revert.is_none())
+            .find(|(_, held)| self.classify(Some(&held.region), at) == BreakClass::Own)
+            .map(|(record, _)| record.clone())
+    }
+
     /// One live process of `task_id` is gone; the region itself once it was the last.
     fn leave_flight(&mut self, task_id: &str) -> Option<InFlightRegion> {
         let region = self.in_flight.get_mut(task_id)?;
@@ -185,6 +221,23 @@ impl WorkerRegions {
             return None;
         }
         self.in_flight.remove(task_id)
+    }
+
+    /// Stop the run on a break no exited worker answers for. Every exit still
+    /// held unrouted is recorded the way an interruption is: uncharged, and its
+    /// release journalled interrupted however late it is dropped. §FS-rhei-run.3.7.6
+    fn stop_on(&mut self, at: &PlanBreak) -> Report {
+        let unsettled: Vec<PathBuf> = self
+            .held
+            .iter()
+            .filter(|(_, held)| held.revert.is_none())
+            .map(|(record, _)| record.clone())
+            .collect();
+        for record in unsettled {
+            uncharge_stopped_attempt(&record);
+            self.stopped.insert(record);
+        }
+        self.attributed_stop(at)
     }
 
     /// The break no exited worker answers for, as the run stops on it. §FS-rhei-run.3.7.6
@@ -208,9 +261,12 @@ impl WorkerRegions {
     }
 }
 
-/// Load the plan for `rhei run`. A failure inside a live worker's region waits
-/// for that worker to exit, whose own exit restores it; any other failure stops
-/// the run, attributed. §FS-rhei-run.3.7.2 §FS-rhei-run.3.7.5 §FS-rhei-run.3.7.6
+/// Load the plan for `rhei run`. A failure inside the region of an exited
+/// worker whose completion is still held restores that region on its behalf;
+/// one inside a live worker's region waits for that worker to exit, whose own
+/// exit restores it; any other failure stops the run, attributed. Every held
+/// completion goes through the same loop, however many culprits there are.
+// §FS-rhei-run.3.7.2 §FS-rhei-run.3.7.5 §FS-rhei-run.3.7.6
 fn load_run_plan(input: &Path) -> MietteResult<LoadedPlan> {
     let unlocked = match load_plan(input) {
         Ok(loaded) => return Ok(loaded),
@@ -228,8 +284,17 @@ fn load_run_plan(input: &Path) -> MietteResult<LoadedPlan> {
             Err(err) => err,
         };
         let at = locate_plan_break(input);
+        if let (Some(record), Some(at)) = (regions.held_holding(at.as_ref()), at.as_ref()) {
+            let mut held = regions.held.remove(&record).expect("held exit found above");
+            match restore_exited(&mut regions, &held, &record, at) {
+                Some(revert) => held.revert = Some(revert),
+                None => return Err(regions.stop_on(at)),
+            }
+            regions.held.insert(record, held);
+            continue;
+        }
         if regions.classify(None, at.as_ref()) == BreakClass::Outside {
-            return Err(at.map_or(err, |at| regions.attributed_stop(&at)));
+            return Err(at.map_or(err, |at| regions.stop_on(&at)));
         }
         // Bounded by the culprit's own process: its exit, its timeout, or the
         // operator's interrupt ends it, and its exit leaves flight. §FS-rhei-run.3.7.5
@@ -294,68 +359,83 @@ impl WorkerRegionLease {
     /// The worker's process is reaped and its release read. When it was the
     /// task's last, a reload that fails inside its region restores the region,
     /// and the release and the operator are told; whether it did is returned.
-    // §FS-rhei-run.3.7.2 §FS-rhei-run.3.7.7
+    /// A reload that fails elsewhere holds the exit with its region until its
+    /// completion settles. §FS-rhei-run.3.7.2 §FS-rhei-run.3.7.5 §FS-rhei-run.3.7.7
     fn exited(mut self, attempt: &SpawnPlan, release: &mut PendingSlotRelease) -> bool {
         let Some(task_id) = self.task_id.take() else { return false };
         let mut regions = worker_regions();
         let revert = regions.leave_flight(&task_id).and_then(|region| {
-            let at =
-                locate_plan_break(&self.input).filter(|at| same_file(&at.file, &region.file))?;
-            self.restore(&mut regions, &task_id, &region, &at, attempt)
+            let held = HeldExit {
+                task_id,
+                state: self.state.clone(),
+                budget: self.budget,
+                region,
+                log: attempt.log.clone(),
+                charged: attempt.charged,
+                revert: None,
+            };
+            let at = locate_plan_break(&self.input)?;
+            let revert = same_file(&at.file, &held.region.file)
+                .then(|| restore_exited(&mut regions, &held, &attempt.record, &at))
+                .flatten();
+            if revert.is_none() {
+                regions.held.insert(attempt.record.clone(), held);
+                release.held_for(&attempt.record);
+            }
+            revert
         });
         drop(regions);
         REGION_LEFT_FLIGHT.notify_all();
         revert.map(|revert| announce_worker_revert(&revert, release)).is_some()
     }
+}
 
-    /// Put the region back between its two boundaries, under the stable writer
-    /// lock, keeping the worker's text beside the attempt's log; or record why
-    /// not. §FS-rhei-run.3.7.3
-    fn restore(
-        &self,
-        regions: &mut WorkerRegions,
-        task_id: &str,
-        region: &InFlightRegion,
-        at: &PlanBreak,
-        attempt: &SpawnPlan,
-    ) -> Option<WorkerRevert> {
-        let lock = LockedPlanFile::open(&region.file).ok()?;
-        let text = lock.read_to_string("failed to read task file").ok()?;
-        match region_span(&text, &region.snapshot) {
-            Ok(span) if span.holds_line(at.line) => {}
-            Ok(_) => return None,
-            Err(refusal) => {
-                regions.refusals.insert(task_id.to_string(), refusal.describe(&region.snapshot));
-                return None;
-            }
-        }
-        let (restored, replaced) = restore_region(&text, &region.snapshot).ok()?;
-        let reverted = reverted_text_path(&attempt.log);
-        // The worker's text is kept before its region is overwritten, or not overwritten at all.
-        if fs::write(&reverted, replaced).is_err()
-            || write_file_atomic_locked(&region.file, &restored, Some(&lock)).is_err()
-        {
+/// Put an exited worker's region back between its two boundaries, under the
+/// stable writer lock, keeping the worker's text beside the attempt's log; or
+/// record why not. §FS-rhei-run.3.7.3
+fn restore_exited(
+    regions: &mut WorkerRegions,
+    held: &HeldExit,
+    record: &Path,
+    at: &PlanBreak,
+) -> Option<WorkerRevert> {
+    let region = &held.region;
+    let lock = LockedPlanFile::open(&region.file).ok()?;
+    let text = lock.read_to_string("failed to read task file").ok()?;
+    match region_span(&text, &region.snapshot) {
+        Ok(span) if span.holds_line(at.line) => {}
+        Ok(_) => return None,
+        Err(refusal) => {
+            regions.refusals.insert(held.task_id.clone(), refusal.describe(&region.snapshot));
             return None;
         }
-        drop(lock);
-        let root = regions.root.clone();
-        let edit = RevertedEdit {
-            location: format!("{}:{}", display_in_workspace(root.as_deref(), &at.file), at.line),
-            message: at.message.clone(),
-            text: reverted.clone(),
-        };
-        let charged = record_spawn_revert(&attempt.record, &edit);
-        Some(WorkerRevert {
-            task_id: task_id.to_string(),
-            state: self.state.clone(),
-            location: edit.location,
-            message: edit.message,
-            reverted_display: display_in_workspace(root.as_deref(), &reverted),
-            charged: charged.map_or(attempt.charged + 1, |(charged, _)| charged),
-            attempt_charged: charged.is_none_or(|(_, this)| this),
-            budget: self.budget,
-        })
     }
+    let (restored, replaced) = restore_region(&text, &region.snapshot).ok()?;
+    let reverted = reverted_text_path(&held.log);
+    // The worker's text is kept before its region is overwritten, or not overwritten at all.
+    if fs::write(&reverted, replaced).is_err()
+        || write_file_atomic_locked(&region.file, &restored, Some(&lock)).is_err()
+    {
+        return None;
+    }
+    drop(lock);
+    let root = regions.root.clone();
+    let edit = RevertedEdit {
+        location: format!("{}:{}", display_in_workspace(root.as_deref(), &at.file), at.line),
+        message: at.message.clone(),
+        text: reverted.clone(),
+    };
+    let charged = record_spawn_revert(record, &edit);
+    Some(WorkerRevert {
+        task_id: held.task_id.clone(),
+        state: held.state.clone(),
+        location: edit.location,
+        message: edit.message,
+        reverted_display: display_in_workspace(root.as_deref(), &reverted),
+        charged: charged.map_or(held.charged + 1, |(charged, _)| charged),
+        attempt_charged: charged.is_none_or(|(_, this)| this),
+        budget: held.budget,
+    })
 }
 
 impl Drop for WorkerRegionLease {
@@ -366,84 +446,4 @@ impl Drop for WorkerRegionLease {
         worker_regions().leave_flight(&task_id);
         REGION_LEFT_FLIGHT.notify_all();
     }
-}
-
-/// Keep the revert on the attempt's spawn record, and say what the visit has
-/// spent and whether this attempt was charged. §FS-rhei-run.3.7.4
-fn record_spawn_revert(record: &Path, edit: &RevertedEdit) -> Option<(u64, bool)> {
-    let mut stored = read_spawn_record(record)?;
-    stored.reverted = Some(edit.clone());
-    let body = serde_json::to_string_pretty(&stored).ok()?;
-    fs::write(record, body).ok()?;
-    Some((stored.charged, stored.attempt_charged))
-}
-
-/// Whether the run reverted the edit of the attempt recorded at `record`, read
-/// where an exit is routed on another thread than its restore. §FS-rhei-run.3.7.4
-fn attempt_was_reverted(record: &Path) -> bool {
-    read_spawn_record(record).is_some_and(|stored| stored.reverted.is_some())
-}
-
-/// The worker whose exit found a break the run stops on is recorded the way an
-/// interruption is: uncharged, its exit unrouted. §FS-rhei-run.3.7.6
-fn uncharge_stopped_attempt(record: &Path) {
-    let Some(mut stored) = read_spawn_record(record) else { return };
-    if stored.attempt_charged {
-        stored.charged = stored.charged.saturating_sub(1);
-        stored.attempt_charged = false;
-    }
-    stored.ending = "interrupted".to_string();
-    if let Ok(body) = serde_json::to_string_pretty(&stored) {
-        let _ = fs::write(record, body);
-    }
-}
-
-/// Put a restore's key on the attempt's release and tell the operator, with the
-/// halt when it spent the last attempt. §FS-rhei-run.3.7.4 §FS-rhei-run.3.7.7
-fn announce_worker_revert(revert: &WorkerRevert, release: &mut PendingSlotRelease) {
-    let sink = &release.sink.clone();
-    release.reverted(&revert.location);
-    emit_run_message(sink, rhei_tui::MessageLevel::Warn, revert.warning());
-    if let (true, AttemptBudget::Visit(budget)) = (revert.attempt_charged, revert.budget) {
-        if revert.charged >= budget {
-            let halt = budget_spent_halt_line(
-                &revert.task_id,
-                &revert.state,
-                budget,
-                "the plan, as re-read after the exit, does not load with its edit",
-            );
-            emit_run_message(sink, rhei_tui::MessageLevel::Warn, halt);
-        }
-    }
-}
-
-/// The reload after a worker's exit. When it stops the run, that worker is
-/// recorded interrupted and uncharged rather than half-recorded. §FS-rhei-run.3.7.6
-fn reload_after_worker_exit(
-    input: &Path,
-    release: &mut PendingSlotRelease,
-    spawn_record: &Path,
-) -> MietteResult<LoadedPlan> {
-    load_run_plan(input).inspect_err(|_| {
-        release.interrupted();
-        uncharge_stopped_attempt(spawn_record);
-    })
-}
-
-/// The reverted visit's charge: a failed attempt and no transition; on a poll
-/// state the attempt counts against `poll.max_attempts` as a self-loop's does,
-/// with no exhaustion edge fired here. §FS-rhei-run.3.7.4
-fn charge_reverted_attempt(
-    release: &mut PendingSlotRelease,
-    reloaded: &LoadedPlan,
-    input: &Path,
-    machine: &rhei_validator::StateMachine,
-    task_id: &str,
-    state: &str,
-) -> MietteResult<()> {
-    release.failed("its edit broke the plan and was reverted");
-    let Some(task) = find_task_by_id(&reloaded.rhei.tasks, &parse_task_id(task_id)) else {
-        return Ok(());
-    };
-    record_poll_self_loop_if_needed(reloaded, input, machine, task, state, state).map(|_| ())
 }

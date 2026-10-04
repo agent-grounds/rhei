@@ -3,9 +3,7 @@
 //!
 //! Every case runs sequentially, under `--parallel 2`, and under
 //! `--continue-on-error`, because none of the three may change what a reverted
-//! edit means. The cases are `#[ignore]`d until the restore lands, because the
-//! commit gate runs the suite; the change that makes each pass removes its
-//! attribute. §FS-rhei-run.3.7
+//! edit means. §FS-rhei-run.3.7
 
 use std::fs;
 

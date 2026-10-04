@@ -39,6 +39,8 @@ Raise it.
             armed: true,
             root: None,
             in_flight: BTreeMap::new(),
+            held: BTreeMap::new(),
+            stopped: Default::default(),
             refusals: BTreeMap::new(),
         }
     }

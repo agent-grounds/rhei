@@ -25,15 +25,13 @@ BULLET_RE = re.compile(r"^- ")
 
 PLACEHOLDER = "TBD"
 
-# The token a bullet ends with: the number the release stamped, or the
-# placeholder that stands in for one until it does.
+# The token a bullet ends with, a stamped number or the placeholder, matched over
+# its lines joined by line breaks so a split token is still the bullet's own and
+# its span says where it stands. §FS-rhei-distribution.5.2
 _TRAILING_TOKEN_RE = re.compile(
-    r"(?i)\s*(?:\(\s*(?:PR|pull request)\s*#\s*(?P<parenthesised>[0-9]+|TBD)\s*\)"
-    r"|(?:PR|pull request)\s*#\s*(?P<bare>[0-9]+|TBD))\s*$"
+    r"(?i)(?P<token>\(\s*(?:PR|pull\s+request)\s*#\s*(?P<parenthesised>[0-9]+|TBD)\s*\)"
+    r"|(?:PR|pull\s+request)\s*#\s*(?P<bare>[0-9]+|TBD))\s*$"
 )
-
-_PLACEHOLDER_PARENTHESISED_RE = re.compile(r"(?i)\(\s*(?:PR|pull request)\s*#\s*TBD\s*\)")
-_PLACEHOLDER_BARE_RE = re.compile(r"(?i)\b(?:PR|pull request)\s*#\s*TBD\b")
 
 
 class ChangelogFormatError(Exception):
@@ -60,7 +58,7 @@ class Bullet:
     @property
     def token(self) -> str | None:
         """The trailing pull-request token: a number, `TBD`, or nothing."""
-        match = _TRAILING_TOKEN_RE.search(_collapse(self.raw))
+        match = self._trailing_token()
         if match is None:
             return None
         return match.group("parenthesised") or match.group("bare")
@@ -72,26 +70,52 @@ class Bullet:
         return token is not None and token.upper() != PLACEHOLDER
 
     def stamped(self, number: int) -> list[str]:
-        """This bullet's lines with `number` written onto it.
+        """This bullet's lines with `number` written onto it, as many as it was given.
 
-        A placeholder is replaced where it stands rather than followed by a
-        second token; with no placeholder the number is appended to the end of
-        the bullet's last line. §FS-rhei-distribution.5.2
+        The placeholder the bullet ends with, the token `token` reads, is replaced
+        where it stands and in its own form rather than followed by a second
+        token; a placeholder quoted in the prose is the bullet's text and is left
+        as written. With no trailing placeholder the number is appended to the
+        end of the bullet's last line. §FS-rhei-distribution.5.2
         """
-        replacement = f"(PR #{number})"
         lines = list(self.lines)
-        for index in reversed(range(len(lines))):
-            substituted, count = _PLACEHOLDER_PARENTHESISED_RE.subn(replacement, lines[index])
-            if count == 0:
-                substituted, count = _PLACEHOLDER_BARE_RE.subn(f"PR #{number}", lines[index])
-            if count:
-                lines[index] = substituted
-                return lines
+        match = self._trailing_token()
+        if match is None or (match.group("parenthesised") or match.group("bare")).upper() != PLACEHOLDER:
+            last = len(lines) - 1
+            body, ending = _split_ending(lines[last])
+            lines[last] = f"{body.rstrip()} (PR #{number}){ending}"
+            return lines
 
-        last = len(lines) - 1
-        body, ending = _split_ending(lines[last])
-        lines[last] = f"{body.rstrip()} (PR #{number}){ending}"
+        replacement = f"(PR #{number})" if match.group("parenthesised") else f"PR #{number}"
+        start_line, start_column = self._position(match.start("token"))
+        end_line, end_column = self._position(match.end("token"))
+        if start_line == end_line:
+            body, ending = _split_ending(lines[start_line])
+            lines[start_line] = f"{body[:start_column]}{replacement}{body[end_column:]}{ending}"
+            return lines
+
+        # A token split across lines is written whole on the line it ends on, at
+        # that line's indentation, so the bullet keeps its line count.
+        body, ending = _split_ending(lines[start_line])
+        lines[start_line] = f"{body[:start_column].rstrip()}{ending}"
+        for index in range(start_line + 1, end_line):
+            lines[index] = _split_ending(lines[index])[1]
+        body, ending = _split_ending(lines[end_line])
+        indent = body[: len(body) - len(body.lstrip())]
+        lines[end_line] = f"{indent}{replacement}{body[end_column:]}{ending}"
         return lines
+
+    def _text(self) -> str:
+        return "\n".join(line_text(line) for line in self.lines)
+
+    def _trailing_token(self) -> re.Match[str] | None:
+        return _TRAILING_TOKEN_RE.search(self._text())
+
+    def _position(self, offset: int) -> tuple[int, int]:
+        """The line and column of an offset into `_text`."""
+        before = self._text()[:offset]
+        line = before.count("\n")
+        return line, offset - (before.rfind("\n") + 1)
 
 
 def line_text(line: str) -> str:
@@ -136,10 +160,6 @@ def bullets(lines: Sequence[str]) -> list[Bullet]:
             last_with_text = index
     close()
     return found
-
-
-def _collapse(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip()
 
 
 def _split_ending(line: str) -> tuple[str, str]:

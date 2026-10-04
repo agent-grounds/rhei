@@ -133,6 +133,9 @@ Release automation stamps the pull request number onto each `Unreleased` bullet
 it can resolve, in the form the section already uses, before it promotes the
 section. A bullet that already carries a number is left as written; a
 placeholder is replaced where it stands rather than followed by a second token.
+The placeholder replaced is the token the bullet ends with, even where a line
+break splits it, the same token that counts as no number below; a placeholder
+the bullet quotes in its prose is part of its text and is left as written.
 
 A bullet is resolved through the commits its lines were written in, and only a
 bullet whose every non-blank line resolves to one and the same pull request is

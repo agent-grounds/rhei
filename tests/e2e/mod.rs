@@ -32,6 +32,7 @@ mod agent_reentry_tests;
 #[cfg(unix)]
 mod agent_retry_ending_tests;
 mod agent_retry_notice_tests;
+mod agent_target_edit_tests;
 mod budget_ancestry_project_tests;
 mod budget_ceiling_tests;
 mod budget_copied_project_support;

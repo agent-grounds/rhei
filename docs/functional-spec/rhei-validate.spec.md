@@ -65,6 +65,16 @@ pass `--state-machine`.
    values, task ids, dependencies, node policy, terminal and gating states,
    counted-loop syntax, artifact contracts, and task read exclusions.
    [§FS-rhei-plan-language](rhei-plan-language.spec.md#fs-rhei-plan-language-rhei-plan-language-specification) [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification)
+
+   Machine validation refuses a `callback_timeout` that is not a duration in
+   the `agent_timeout` syntax, or that is zero, at either level it may be
+   written — the machine's root or a transition rule — naming the field, where
+   it was written (the machine, or the edge `<from> -> <to>`), and the value as
+   authored. It warns, without refusing, about a transition rule that declares
+   a `callback_timeout` but neither an `on_leave` nor an `on_enter` for it to
+   bound, naming the edge: such a bound changes nothing at runtime, so it is
+   reported rather than made an error.
+   §FS-rhei-transitions.4.10
 3. Load merged global and project settings, then validate referenced agents,
    models, MCP servers, skills, and snapshot settings used by the state
    machine. For each execution that uses static agent and mode selection,

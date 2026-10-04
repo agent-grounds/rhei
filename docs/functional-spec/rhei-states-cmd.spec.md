@@ -122,6 +122,10 @@ Text output includes:
   poll prints exactly what it printed before.
 - Per-state prompt-template reference when present.
 - Declared transitions and annotations for callbacks, conditions, and timeouts.
+  An edge that declares a `callback_timeout` carries it as
+  `callback_timeout=<bound>` beside its other annotations, and a machine-level
+  `callback_timeout` is printed once in the header beside the name and version
+  (§FS-rhei-transitions.4.10).
 
 ## 5. JSON Output
 

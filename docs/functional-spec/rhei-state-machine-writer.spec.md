@@ -55,7 +55,7 @@ The state machine writer maps teams to workflow elements:
 
 ## 2. Output
 
-The state machine writer produces a single YAML file conforming to the [YAML State Machine Format](rhei-transitions.spec.md#4-yaml-state-machine-format-specification). The file is ready to be referenced by a Rhei plan's `**States:**` declaration.
+The state machine writer produces a single YAML file conforming to the [YAML State Machine Format](rhei-transitions.spec.md#4-yaml-state-machine-format-specification). The file is ready to govern a Rhei plan by being saved as `states.yaml` in the plan's own root or the project root.
 
 ### 2.1. Output Structure
 
@@ -464,7 +464,7 @@ node_policy:
 
 | Role | Relationship |
 |------|-------------|
-| **Plan Writer** | Uses the state machine produced by this role. References it via `**States:** <name>` in the plan header. |
+| **Plan Writer** | Uses the state machine produced by this role, which governs the plan by where its `states.yaml` sits. |
 | **Plan Worker** | Executes tasks using the states and transitions defined by this role. Follows the `instructions` field on each state. |
 | **Reviewer** | Review states in the machine define what the reviewer checks and how they advance work. |
 | **Human Operator** | Gating states designed by this role define where human judgment is required. |

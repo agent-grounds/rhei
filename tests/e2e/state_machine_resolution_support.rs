@@ -1,6 +1,6 @@
-//! Trees for state-machine resolution: a Panta project whose manifest may or
-//! may not declare, holding members that may or may not declare, with machine
-//! files placed where each case is about.
+//! Trees for state-machine resolution: a Panta project holding members, with
+//! machine files placed where each case is about — and, for the refusal cases
+//! only, a manifest or index still carrying the retired `**States:**` line.
 //!
 //! Every machine here uses states the built-in machine lacks, so a plan that
 //! validates can only have loaded the file the case placed, and a plan that
@@ -50,9 +50,9 @@ pub fn assert_validates(result: &CliRun) {
     );
 }
 
-/// A Panta project root. `declares` is the manifest's `**States:**` value, or
-/// `None` for a manifest that declares nothing at all — the shape an agent
-/// runtime's work root has once it stops writing the line.
+/// A Panta project root. `declares` writes the retired `**States:**` line into
+/// the manifest, which every command refuses (§FS-rhei-plan-language.2.2);
+/// `None` is the manifest every other case uses.
 pub fn project(dir: &Path, declares: Option<&str>) -> PathBuf {
     let root = dir.join("project");
     std::fs::create_dir_all(&root).expect("create the project");
@@ -69,8 +69,8 @@ pub fn project_machine(root: &Path, contents: &str) -> PathBuf {
     write_fixture_file(root, "states.yaml", contents)
 }
 
-/// A directory-workspace member rhei with one task. `declares` is its own
-/// `**States:**` value, or `None` for an index that declares nothing.
+/// A directory-workspace member rhei with one task. `declares` writes the
+/// retired `**States:**` line into its index; `None` is the ordinary index.
 pub fn member(root: &Path, id: &str, declares: Option<&str>, task_state: &str) -> PathBuf {
     let rhei = root.join(id);
     std::fs::create_dir_all(rhei.join("tasks")).expect("create the member");
@@ -108,41 +108,4 @@ pub fn assert_source(result: &CliRun, expected: &str) {
         "`rhei states` should list {expected:?}; got:\n{}",
         result.stdout
     );
-}
-
-/// Every `warning:` line on stderr. The deprecation warnings are the only
-/// stderr warnings these trees produce, and resolved-budget lines go to stdout,
-/// so counting these counts the deprecation.
-/// §FS-rhei-plan-language.1.3
-pub fn warnings(result: &CliRun) -> Vec<&str> {
-    result.stderr.lines().filter(|line| line.trim_start().starts_with("warning:")).collect()
-}
-
-pub fn assert_silent(result: &CliRun, what: &str) {
-    assert!(
-        warnings(result).is_empty(),
-        "{what} must print no deprecation warning; stderr was:\n{}",
-        result.stderr
-    );
-}
-
-/// One `warning:` line, carrying every fragment in `names`. A warning that does
-/// not name the file it read and what to do about it sends the reader hunting.
-/// §FS-rhei-plan-language.1.3
-pub fn assert_one_warning(result: &CliRun, names: &[&str]) {
-    let found = warnings(result);
-    assert_eq!(
-        found.len(),
-        1,
-        "exactly one warning per distinct declaration; stderr was:\n{}",
-        result.stderr
-    );
-    let said = result.stderr.replace('\n', " ");
-    for fragment in names {
-        assert!(
-            said.contains(fragment),
-            "the warning should name {fragment:?}; stderr was:\n{}",
-            result.stderr
-        );
-    }
 }

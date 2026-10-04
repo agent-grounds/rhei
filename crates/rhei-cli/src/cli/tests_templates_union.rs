@@ -272,7 +272,7 @@ node_policy:
         std::fs::write(template.join("states.yaml"), HOST).expect("write states");
         std::fs::write(
             template.join("index.rhei.md"),
-            "# Rhei: A template\n**States:** host\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - task\n---\n",
+            "# Rhei: A template\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - task\n---\n",
         )
         .expect("write index");
         std::fs::write(

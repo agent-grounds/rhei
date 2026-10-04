@@ -28,7 +28,7 @@ fn issue_205_direct_member_run_remains_excluded_by_the_project_run() {
     let seed = project.join("seed");
     fs::create_dir_all(seed.join("tasks")).expect("create seed workspace");
     write_fixture_file(&project, "index.panta.md", "# Panta: Lock Exclusion\n");
-    write_fixture_file(&seed, "index.rhei.md", "# Rhei: Seed\n**States:** lock-machine\n");
+    write_fixture_file(&seed, "index.rhei.md", "# Rhei: Seed\n");
     write_fixture_file(
         &seed,
         "tasks/01-hold.md",

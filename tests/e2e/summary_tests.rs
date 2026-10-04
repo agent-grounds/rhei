@@ -8,7 +8,6 @@ use super::*;
 /// Two terminal states with tasks in them and one task still moving, so the
 /// tally has to name both terminals and the in-progress remainder.
 const SUMMARY_PLAN: &str = r#"# Rhei: Ticket Fix
-**States:** integration-test
 
 ## Tasks
 
@@ -340,7 +339,7 @@ fn summary_uses_a_members_machine_when_the_project_has_no_default() {
         .expect("panta manifest should be written");
     let member = dir.join("flow");
     fs::create_dir_all(member.join("tasks")).expect("member tasks directory should be created");
-    fs::write(member.join("index.rhei.md"), "# Rhei: Flow\n**States:** grounded-ticket\n")
+    fs::write(member.join("index.rhei.md"), "# Rhei: Flow\n")
         .expect("member index should be written");
     fs::write(
         member.join("states.yaml"),

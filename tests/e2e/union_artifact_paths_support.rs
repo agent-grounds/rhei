@@ -83,7 +83,7 @@ impl Template<'_> {
             &template,
             "index.rhei.md",
             &format!(
-                "# Rhei: {name}\n**States:** {name}\n\n---\nstructure:\n  maxLevels: 3\n{kinds}---\n\n## Overview\n\nThe {name} part.\n",
+                "# Rhei: {name}\n\n---\nstructure:\n  maxLevels: 3\n{kinds}---\n\n## Overview\n\nThe {name} part.\n",
                 name = self.name
             ),
         );

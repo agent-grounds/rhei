@@ -8,7 +8,7 @@ fn omitted_plan_target_resolves_from_current_directory() {
     // operates on the whole project.
     let project = create_panta_project(
         "panta-cwd-resolve",
-        "# Panta: Cwd\n**States:** workspace-test-machine\n",
+        "# Panta: Cwd\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             (
@@ -194,7 +194,7 @@ fn reset_never_infers_an_omitted_target() {
     // omitted-target resolution even inside a resolvable project.
     let project = create_panta_project(
         "reset-explicit-target",
-        "# Panta: Reset\n**States:** workspace-test-machine\n",
+        "# Panta: Reset\n",
         &[(
             "auth.rhei.md",
             "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** in-progress\n",
@@ -357,7 +357,7 @@ fn empty_project_reset_is_a_noop_success() {
 fn basin_tickets_transition_and_complete() {
     let project = create_panta_project(
         "panta-basin-transition",
-        "# Panta: Basin Work\n**States:** workspace-test-machine\n",
+        "# Panta: Basin Work\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             ("basin/quick.md", "### Task 1: Fix typo\n**State:** pending\n"),
@@ -409,7 +409,7 @@ fn basin_tickets_transition_and_complete() {
 fn reset_dry_run_changes_nothing() {
     let project = create_panta_project(
         "panta-reset-dry-run",
-        "# Panta: Reset\n**States:** workspace-test-machine\n",
+        "# Panta: Reset\n",
         &[(
             "auth.rhei.md",
             "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** completed\n",

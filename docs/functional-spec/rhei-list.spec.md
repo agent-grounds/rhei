@@ -67,8 +67,9 @@ there is no declared set to check it against.
 ## 3. Behavior
 
 1. Load the plan and resolve each rhei's state machine the same way
-   `rhei validate` does (auto-discovery, `**States:**` field,
-   `--state-machine` override). A project resolves one machine per rhei
+   `rhei validate` does (the `states.yaml` in the rhei's own root, then the
+   project root's, then the built-in machine, or the `--state-machine`
+   override). A project resolves one machine per rhei
    ([§AR-rhei-panta.4](../architecture/rhei-panta.spec.md#4-state-machine-binding)), and every state judgment below — normalization,
    terminality, gating — uses the machine of the rhei that owns the ticket.
 2. Walk the task tree in source order, recording each task with its parent id.

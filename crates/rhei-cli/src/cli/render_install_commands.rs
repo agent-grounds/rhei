@@ -20,15 +20,24 @@ fn render_command(
     // resolve still renders — it just renders without the summary.
 
     // §DA-per-rhei-state-machines
-    let terminal_ids = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)
+    let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path);
+    let terminal_ids = resolved
+        .as_ref()
         .map(|resolved| terminal_ticket_ids(&rhei, &resolved.validator_set()))
         .unwrap_or_default();
+    // The JSON document names the machines, so it cannot render past one that
+    // will not resolve; the other formats never print a machine. §FS-rhei-render.3.1
+    let machines = match resolved {
+        Ok(resolved) => rhei_machine_attribution(&loaded, &scope, &resolved),
+        Err(report) if matches!(format, RenderFormat::Json) => return Err(report),
+        Err(_) => RenderedMachines::default(),
+    };
     let rendered = render_rhei(
         input,
         &rhei,
         terminal_ids,
         loaded.is_panta_project(),
-        rhei_machine_attribution(&loaded, &scope),
+        machines,
         format,
         pretty,
         no_color,
@@ -39,33 +48,38 @@ fn render_command(
     Ok(())
 }
 
-/// Each in-scope rhei paired with the machine it actually runs, for the JSON
-/// document's `rheis` array. Empty for a plan that is not a merged project.
-/// §FS-rhei-render.3.1 §DA-per-rhei-state-machines
+/// The machines the JSON document names: the resolved project default for its
+/// top-level `states`, and each in-scope rhei of a merged project paired with
+/// the machine it resolves, for its `rheis` array. §FS-rhei-render.3.1
+#[derive(Default)]
+struct RenderedMachines {
+    states: String,
+    rheis: Vec<rhei_output::RheiMachine>,
+}
+
+/// [`RenderedMachines`] from a resolved machine set. §FS-rhei-render.3.1
 fn rhei_machine_attribution(
     loaded: &LoadedPlan,
     scope: &RheiScope,
-) -> Vec<rhei_output::RheiMachine> {
+    resolved: &ResolvedMachineSet,
+) -> RenderedMachines {
+    let states = resolved.default.machine.name.clone();
     if !loaded.is_panta_project() {
-        return Vec::new();
+        return RenderedMachines { states, rheis: Vec::new() };
     }
-    loaded
+    let rheis = loaded
         .rhei_ids
         .iter()
         .filter(|id| scope.as_ref().is_none_or(|ids| ids.contains(id.as_str())))
-        .map(|id| match loaded.rhei_machines.get(id) {
-            Some(declared) => rhei_output::RheiMachine {
-                id: id.clone(),
-                states: declared.clone(),
-                declared: true,
-            },
-            None => rhei_output::RheiMachine {
-                id: id.clone(),
-                states: loaded.rhei.states.clone(),
-                declared: false,
-            },
+        .map(|id| rhei_output::RheiMachine {
+            id: id.clone(),
+            states: resolved
+                .per_rhei
+                .get(id)
+                .map_or_else(|| states.clone(), |own| own.machine.name.clone()),
         })
-        .collect()
+        .collect();
+    RenderedMachines { states, rheis }
 }
 
 /// Every ticket currently in a terminal state, judged per owning machine, for
@@ -123,7 +137,7 @@ fn render_rhei(
     rhei: &rhei_core::ast::Rhei,
     terminal_ids: BTreeSet<String>,
     is_project: bool,
-    rhei_machines: Vec<rhei_output::RheiMachine>,
+    machines: RenderedMachines,
     format: RenderFormat,
     pretty: bool,
     no_color: bool,
@@ -132,7 +146,7 @@ fn render_rhei(
 ) -> MietteResult<String> {
     match format {
         RenderFormat::Json => {
-            let value = rhei_output::to_json_value_with_rheis(rhei, rhei_machines)
+            let value = rhei_output::to_json_value_with_rheis(rhei, &machines.states, machines.rheis)
                 .map_err(|found| unrepresentable_frontmatter_error(input, &found))?;
             let rendered = if pretty {
                 serde_json::to_string_pretty(&value)

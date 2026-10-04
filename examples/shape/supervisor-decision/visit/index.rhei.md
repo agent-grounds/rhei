@@ -1,5 +1,4 @@
 # Rhei: Fix the crash on a 64-bit literal
-**States:** shape-supervisor-decision
 
 ## Overview
 

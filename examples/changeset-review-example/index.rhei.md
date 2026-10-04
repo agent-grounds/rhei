@@ -1,5 +1,4 @@
 # Rhei: Changeset Review — PR#42
-**States:** changeset-review
 
 ## Overview
 Two-agent changeset review with validation, fix proposals, smart adjudication,

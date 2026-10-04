@@ -155,7 +155,7 @@ fn one_rhei_scoped_artifact_path_claimed_by_two_states_is_refused() {
 #[test]
 fn the_basin_is_never_a_target() {
     let dir = unique_temp_dir("into-basin");
-    write_fixture_file(&dir, "index.panta.md", "# Panta: Work\n**States:** host\n");
+    write_fixture_file(&dir, "index.panta.md", "# Panta: Work\n");
     write_fixture_file(&dir, "states.yaml", HOST_MACHINE);
     std::fs::create_dir_all(dir.join("basin")).expect("create basin");
     write_fixture_file(&dir.join("basin"), "001-loose.md", HOST_TICKET);
@@ -266,7 +266,7 @@ fn write_including_pair(dir: &Path, name: &str, includes: &str) {
     write_fixture_file(
         &template,
         "index.rhei.md",
-        "# Rhei: Including\n**States:** host\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - task\n---\n\n## Overview\n\nAn including template.\n",
+        "# Rhei: Including\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - task\n---\n\n## Overview\n\nAn including template.\n",
     );
     write_fixture_file(
         &template,

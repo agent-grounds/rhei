@@ -17,9 +17,18 @@ fn machine(name: &str, initial: &str, final_state: &str) -> String {
 
 fn project(prefix: &str) -> TestDir {
     let dir = empty_project(prefix);
-    write_fixture_file(&dir, "index.panta.md", "# Panta: Test\n**States:** alpha\n");
+    write_fixture_file(&dir, "index.panta.md", "# Panta: Test\n");
     write_fixture_file(&dir, "states.yaml", &machine("alpha", "surveying", "signed-off"));
     dir
+}
+
+/// A machine that parses but cannot validate: its only way out of `drafting`
+/// leads to a state it never declares.
+fn unsound_machine() -> String {
+    "name: other\nversion: 1\nstates:\n  drafting:\n    initial: true\n    description: Work\n  \
+     filed:\n    final: true\n    description: Done\ntransitions:\n  - from: drafting\n    \
+     to: nowhere\n"
+        .to_string()
 }
 
 fn prospective_billing(dir: &Path, states: &str) {
@@ -37,7 +46,7 @@ fn entry_names(path: &Path) -> Vec<String> {
 }
 
 fn create_billing(dir: &Path, extra: &[&str]) -> CliRun {
-    let mut args = vec!["new", "Billing", "--project", ".", "--dir", "--states", "custom"];
+    let mut args = vec!["new", "Billing", "--project", ".", "--dir"];
     args.extend_from_slice(extra);
     new_run(&args, dir)
 }
@@ -55,7 +64,7 @@ fn adopts_an_authored_machine_and_binds_the_new_rhei_to_it() {
     assert_success(&created);
     assert_eq!(
         fs::read_to_string(dir.join("billing/index.rhei.md")).expect("workspace index"),
-        "# Rhei: Billing\n**States:** custom\n"
+        "# Rhei: Billing\n"
     );
     assert_eq!(entry_names(&dir.join("billing/tasks")), Vec::<String>::new());
     assert_eq!(
@@ -186,7 +195,7 @@ fn single_file_create_does_not_adopt_or_search_the_same_id_directory() {
     let custom = machine("custom", "drafting", "filed");
     prospective_billing(&dir, &custom);
 
-    let result = new_run(&["new", "Billing", "--project", ".", "--states", "custom"], &dir);
+    let result = new_run(&["new", "Billing", "--project", "."], &dir);
     assert!(!result.status.success());
     let said = flattened_output(&result);
     assert!(
@@ -205,7 +214,7 @@ fn single_file_create_does_not_adopt_or_search_the_same_id_directory() {
 fn validation_failure_rolls_back_only_invocation_owned_entries() {
     for (prefix, authored) in [
         ("new-adopt-invalid", "not: [valid yaml\n".to_string()),
-        ("new-adopt-mismatch", machine("other", "drafting", "filed")),
+        ("new-adopt-unsound", unsound_machine()),
     ] {
         let dir = project(prefix);
         prospective_billing(&dir, &authored);
@@ -278,15 +287,16 @@ fn issue_95_dry_run_of_a_new_workspace_retains_only_coordination_state() {
 fn issue_95_failed_workspace_creation_retains_coordination_but_not_plan_data() {
     for extra in [&[][..], &["--dry-run", "--keep-on-error"][..]] {
         let dir = project("new-failed-coordination");
-        let mut args = vec!["new", "Billing", "--project", ".", "--dir", "--states", "missing"];
+        prospective_billing(&dir, "not: [valid yaml\n");
+        let mut args = vec!["new", "Billing", "--project", ".", "--dir"];
         args.extend_from_slice(extra);
 
         let result = new_run(&args, &dir);
-        assert!(!result.status.success(), "missing machine must fail");
+        assert!(!result.status.success(), "an unreadable own machine must fail");
         assert!(!dir.join("billing/index.rhei.md").exists(), "plan data must roll back");
         assert!(!dir.join("billing/tasks").exists(), "owned plan directory must roll back");
         assert!(dir.join("billing/index.rhei.md.lock").is_file(), "sidecar must remain");
-        assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md.lock"]);
+        assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md.lock", "states.yaml"]);
     }
 }
 
@@ -296,64 +306,13 @@ fn issue_95_failed_workspace_creation_retains_coordination_but_not_plan_data() {
 #[test]
 fn keep_on_error_retains_new_entries_after_machine_validation_fails() {
     let dir = project("new-adopt-keep");
-    let mismatched = machine("other", "drafting", "filed");
-    prospective_billing(&dir, &mismatched);
+    let unsound = unsound_machine();
+    prospective_billing(&dir, &unsound);
 
     let result = create_billing(&dir, &["--keep-on-error"]);
     assert!(!result.status.success());
     assert!(!flattened_output(&result).contains("already exists"));
     assert!(dir.join("billing/index.rhei.md").is_file());
     assert!(dir.join("billing/tasks").is_dir());
-    assert_eq!(fs::read(dir.join("billing/states.yaml")).expect("machine"), mismatched.as_bytes());
-}
-
-/// The restored refusal in its own words, and the property that makes it
-/// correct: it fires ahead of the validation pass, so the create never prints
-/// §FS-rhei-plan-language.1.3's "delete the line" warning about a line it
-/// is in the middle of rolling back.
-/// §FS-rhei-new.1.2 §FS-rhei-plan-language.1.3
-#[test]
-fn an_undeclared_states_name_is_refused_before_any_deprecation_warning() {
-    let dir = project("new-adopt-undeclared");
-    prospective_billing(&dir, &machine("other", "drafting", "filed"));
-
-    let result = create_billing(&dir, &[]);
-    assert!(!result.status.success());
-    let said = flattened_output(&result);
-    for fragment in [
-        "--states 'custom'",
-        "no states file declaring it was found",
-        "this project's states files declare:",
-        "alpha",
-        "other",
-    ] {
-        assert!(said.contains(fragment), "missing {fragment:?} from the refusal:\n{said}");
-    }
-    assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md.lock", "states.yaml"]);
-    assert!(
-        !result.stderr.contains("warning:"),
-        "a create that is rolling its write back warned about it:\n{}",
-        result.stderr
-    );
-}
-
-/// One unreadable `states.yaml` anywhere else in the project does not abandon
-/// that refusal: the file is skipped, named as unread, and the name nothing
-/// declares is still refused.
-/// §FS-rhei-new.1.2 §FS-rhei-plan-language.1.3
-#[test]
-fn an_unreadable_states_file_elsewhere_does_not_excuse_an_undeclared_name() {
-    let dir = project("new-adopt-unreadable-elsewhere");
-    prospective_billing(&dir, &machine("other", "drafting", "filed"));
-    // The project root's own file, broken: it is not this create's to report,
-    // and counting it as declaring nothing would be a licence to keep the line.
-    write_fixture_file(&dir, "states.yaml", "not: [valid yaml\n");
-
-    let result = create_billing(&dir, &[]);
-    assert!(!result.status.success());
-    let said = flattened_output(&result);
-    assert!(said.contains("no states file declaring it was found"), "wrong failure:\n{said}");
-    assert!(said.contains("Not read"), "the unreadable file was not named:\n{said}");
-    assert!(said.contains("states.yaml"), "the unreadable file was not named:\n{said}");
-    assert_eq!(entry_names(&dir.join("billing")), ["index.rhei.md.lock", "states.yaml"]);
+    assert_eq!(fs::read(dir.join("billing/states.yaml")).expect("machine"), unsound.as_bytes());
 }

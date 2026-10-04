@@ -408,7 +408,6 @@ The workspace starts small:
 
 ```markdown
 # Rhei: Living Review Loop
-**States:** living-review-loop
 
 ## Overview
 The orchestrator expands this workspace as review artifacts arrive.
@@ -454,7 +453,6 @@ A Rhei plan can model a CI/CD pipeline where each task is a pipeline stage. The 
 
 ```markdown
 # Rhei: Release Pipeline
-**States:** ci-pipeline
 
 ## Tasks
 

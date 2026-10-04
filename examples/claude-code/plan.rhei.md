@@ -1,5 +1,4 @@
 # Rhei: Patch a Service with Claude Code Under Restricted Permissions
-**States:** claude-code-simple
 
 ## Context
 This example keeps the workflow intentionally simple while still modeling a

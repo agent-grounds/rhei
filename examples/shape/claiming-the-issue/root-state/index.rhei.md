@@ -1,5 +1,4 @@
 # Rhei: Work issue 87
-**States:** shape-claiming-the-issue
 
 ## Overview
 

@@ -9,7 +9,6 @@ use std::path::{Path, PathBuf};
 
 use crate::rhei_validator::StateMachine;
 use crate::rhei_viz_model::VizModel;
-use rhei_core::ast::Rhei;
 use rhei_core::{parse, workspace};
 
 use crate::rhei_viz::build_with_history;
@@ -25,8 +24,8 @@ pub type Bundle = BTreeMap<String, VizModel>;
 ///   each standalone `*.rhei.md` (keyed `key::<relative-path>`).
 ///
 /// `machine_override`, when set, resolves every plan against that YAML file;
-/// otherwise each plan resolves the built-in default (`**States:** rhei`) or a
-/// sibling `states.yaml`.
+/// otherwise each plan resolves a sibling `states.yaml`, else the built-in
+/// default.
 pub fn collect_plans(
     path: &Path,
     key: &str,
@@ -88,7 +87,7 @@ pub fn collect_plans(
                 format!("failed to load workspace {}: {}", path.display(), err.message),
             )
         })?;
-        let machine = resolve_machine(path, machine_override, &loaded.rhei)?;
+        let machine = resolve_machine(path, machine_override)?;
         plans.insert(key.to_string(), build_with_history(&loaded.rhei, &machine, path)?);
     }
 
@@ -122,44 +121,26 @@ fn load_plan_file(path: &Path, machine_override: Option<&Path>) -> io::Result<Vi
             )
         })?
         .rhei;
-    let machine = resolve_machine(path, machine_override, &rhei)?;
+    let machine = resolve_machine(path, machine_override)?;
     let workspace_root = path.parent().unwrap_or_else(|| Path::new("."));
     build_with_history(&rhei, &machine, workspace_root)
 }
 
-/// Resolve every machine a project's rheis run under: the manifest default via
-/// [`resolve_machine`], plus each self-declaring rhei's machine from its own
-/// execution root (falling back to the project root). Mirrors CLI resolution.
-// §DA-per-rhei-state-machines §AR-rhei-panta.4
+/// Resolve every machine a project's rheis run under: the project default via
+/// [`resolve_machine`], plus each rhei's machine from the `states.yaml` in its
+/// own execution root. An override is the whole scope's machine. Mirrors CLI
+/// resolution. §FS-rhei-viz.8 §FS-rhei-plan-language.1.3
 fn resolve_project_machines(
     path: &Path,
     machine_override: Option<&Path>,
     loaded: &workspace::PantaProject,
 ) -> io::Result<crate::rhei_validator::MachineSet> {
-    let default = resolve_machine(path, machine_override, &loaded.rhei)?;
+    let default = resolve_machine(path, machine_override)?;
     let mut per_rhei = std::collections::BTreeMap::new();
     if machine_override.is_some() {
-        let mut declared: Vec<(&String, &String)> = loaded.rhei_machines.iter().collect();
-        declared.sort();
-        for (rhei_id, machine_name) in declared {
-            if *machine_name != default.name {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "--states declares '{}', but rhei '{rhei_id}' declares state machine                      '{machine_name}'; the override cannot reinterpret that rhei's states",
-                        default.name
-                    ),
-                ));
-            }
-        }
         return Ok(crate::rhei_validator::MachineSet { default, per_rhei });
     }
 
-    // Static viz mirrors CLI resolution: the roots are what is iterated, so a
-    // rhei that declares nothing still has its own root read, behind the
-    // deprecated declaration pass that wins for one release.
-
-    // §FS-rhei-plan-language.1.3 §FS-rhei-plan-language.1.3
     let mut roots: Vec<(&String, &PathBuf)> = loaded.rhei_roots.iter().collect();
     roots.sort();
     for (rhei_id, root) in roots {
@@ -170,70 +151,20 @@ fn resolve_project_machines(
             continue;
         }
         let candidate = root.join("states.yaml");
-        let declared = loaded.rhei_machines.get(rhei_id);
-        if let Some(machine_name) = declared {
-            let restates_builtin_default = *machine_name == default.name
-                && *machine_name == StateMachine::builtin_default().name;
-            if !restates_builtin_default && candidate.is_file() {
-                // An explicit declaration gives its own candidate first
-                // refusal, including a repeated default name. §AR-rhei-panta.4
-                let machine = load_machine(&candidate)?;
-                if machine.name == *machine_name {
-                    per_rhei.insert(rhei_id.clone(), machine);
-                    continue;
-                }
-            }
-            if *machine_name == default.name {
-                continue;
-            }
-            // One candidate set, enumerated and counted by the pass's own
-            // functions: resolving from the project root before counting let a
-            // viz render a tree every command refuses. §FS-rhei-plan-language.1.3
-            let candidates = crate::declared_machine_candidates(path, loaded.rhei_roots.values());
-            let matches = crate::declaring_candidates(&candidates, machine_name, load_machine)?;
-            if matches.len() > 1 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "rhei '{rhei_id}' declares state machine '{machine_name}', and more \
-                         than one root holds a states file declaring it: {}",
-                        crate::quoted_paths(&matches)
-                    ),
-                ));
-            }
-            if let Some((_, machine)) = matches.into_iter().next() {
-                per_rhei.insert(rhei_id.clone(), machine);
-                continue;
-            }
-            if *machine_name == StateMachine::builtin_default().name {
-                continue;
-            }
-        }
-        // §FS-rhei-plan-language.1.3 clause 1: the rhei's own root, whatever
-        // the file's `name:` and whatever the index says.
         if candidate.is_file() {
             per_rhei.insert(rhei_id.clone(), load_machine(&candidate)?);
-            continue;
-        }
-        if let Some(machine_name) = declared {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "rhei '{rhei_id}' declares state machine '{machine_name}', but no states                      file declaring it was found in its root or the project root"
-                ),
-            ));
         }
     }
     Ok(crate::rhei_validator::MachineSet { default, per_rhei })
 }
 
-/// Resolve the state machine for a plan: an explicit `--states` override wins,
-/// then a matching sibling `states.yaml` next to the plan (or workspace root),
-/// then the built-in default for `**States:** rhei`.
+/// Resolve the state machine for a plan: an explicit `--state-machine`
+/// override wins, then the `states.yaml` beside the plan (or at the workspace
+/// root) whatever its `name:`, then the built-in default.
+/// §FS-rhei-viz.8 §FS-rhei-plan-language.1.3
 fn resolve_machine(
     plan_or_dir: &Path,
     machine_override: Option<&Path>,
-    rhei: &Rhei,
 ) -> io::Result<StateMachine> {
     if let Some(machine_path) = machine_override {
         return load_machine(machine_path);
@@ -244,30 +175,10 @@ fn resolve_machine(
         plan_or_dir.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
     };
     let candidate = dir.join("states.yaml");
-    let builtin = StateMachine::builtin_default();
-    let declared = rhei.states_declared.then(|| rhei.states.trim()).filter(|name| !name.is_empty());
-    // The deprecated declaration pass first, so a tree the previous release
-    // resolved resolves the same way. §FS-rhei-plan-language.1.3
-    if let Some(declared) = declared {
-        if candidate.is_file() {
-            let machine = load_machine(&candidate)?;
-            if machine.name == declared {
-                return Ok(machine);
-            }
-        }
-        if declared == builtin.name {
-            return Ok(builtin);
-        }
-    }
-    // Static viz mirrors CLI resolution: the `states.yaml` beside the plan is
-    // the machine whatever its `name:`. §FS-rhei-viz.8 §FS-rhei-plan-language.1.3
     if candidate.is_file() {
         return load_machine(&candidate);
     }
-    if declared.is_none() {
-        return Ok(builtin);
-    }
-    load_machine(&candidate)
+    Ok(StateMachine::builtin_default())
 }
 
 fn load_machine(machine_path: &Path) -> io::Result<StateMachine> {
@@ -324,11 +235,8 @@ mod tests {
     #[test]
     fn merges_workspace_and_standalone_plans() {
         let temp = TempDir::new("ws");
-        fs::write(
-            temp.path().join("index.rhei.md"),
-            "# Rhei: Workspace\n**States:** rhei\n\n## Overview\nDemo.\n",
-        )
-        .unwrap();
+        fs::write(temp.path().join("index.rhei.md"), "# Rhei: Workspace\n\n## Overview\nDemo.\n")
+            .unwrap();
         fs::create_dir_all(temp.path().join("tasks")).unwrap();
         fs::write(
             temp.path().join("tasks/alpha.rhei.md"),
@@ -337,7 +245,7 @@ mod tests {
         .unwrap();
         fs::write(
             temp.path().join("extra.rhei.md"),
-            "# Rhei: Extra\n**States:** rhei\n\n## Tasks\n\n### Task 1: Extra\n**State:** completed\n",
+            "# Rhei: Extra\n\n## Tasks\n\n### Task 1: Extra\n**State:** completed\n",
         )
         .unwrap();
 
@@ -351,11 +259,8 @@ mod tests {
     fn single_file_resolves_builtin_default() {
         let temp = TempDir::new("file");
         let plan = temp.path().join("plan.rhei.md");
-        fs::write(
-            &plan,
-            "# Rhei: Solo\n**States:** rhei\n\n## Tasks\n\n### Task 1: A\n**State:** in-progress\n",
-        )
-        .unwrap();
+        fs::write(&plan, "# Rhei: Solo\n\n## Tasks\n\n### Task 1: A\n**State:** in-progress\n")
+            .unwrap();
         let plans = collect_plans(&plan, "solo", None).expect("collect");
         assert_eq!(plans.len(), 1);
         assert_eq!(plans["solo"].plan_state.as_deref(), Some("active"));
@@ -366,11 +271,8 @@ mod tests {
     fn history_falls_back_to_legacy_rhei_local_ids() {
         let temp = TempDir::new("legacy-history");
         let plan = temp.path().join("plan.rhei.md");
-        fs::write(
-            &plan,
-            "# Rhei: Legacy\n**States:** rhei\n\n## Tasks\n\n### Task 1: A\n**State:** in-progress\n",
-        )
-        .unwrap();
+        fs::write(&plan, "# Rhei: Legacy\n\n## Tasks\n\n### Task 1: A\n**State:** in-progress\n")
+            .unwrap();
         let runtime = temp.path().join("runtime");
         fs::create_dir_all(&runtime).unwrap();
         // A ledger written before project qualification keys records by the
@@ -401,11 +303,8 @@ mod tests {
     fn sibling_states_named_rhei_overrides_builtin_default() {
         let temp = TempDir::new("local-rhei");
         let plan = temp.path().join("plan.rhei.md");
-        fs::write(
-            &plan,
-            "# Rhei: Local\n**States:** rhei\n\n## Tasks\n\n### Task 1: A\n**State:** local-work\n",
-        )
-        .unwrap();
+        fs::write(&plan, "# Rhei: Local\n\n## Tasks\n\n### Task 1: A\n**State:** local-work\n")
+            .unwrap();
         fs::write(
             temp.path().join("states.yaml"),
             r#"
@@ -434,14 +333,13 @@ transitions:
         assert_eq!(local.instructions.as_deref(), Some("Use the local machine."));
     }
 
-    /// A member row is normalized through its matching local definition even
-    /// when that definition has the project default's name.
+    /// A member row is normalized through its own root's machine even when that
+    /// machine has the project default's name.
     // §FS-rhei-plan-language.1.3
     #[test]
     fn same_name_member_row_uses_its_local_machine() {
         let temp = TempDir::new("same-name-member");
-        fs::write(temp.path().join("index.panta.md"), "# Panta: Billing\n**States:** alpha\n")
-            .unwrap();
+        fs::write(temp.path().join("index.panta.md"), "# Panta: Billing\n").unwrap();
         fs::write(
             temp.path().join("states.yaml"),
             "name: alpha\nversion: 1\nstates:\n  surveying:\n    initial: true\n  signed-off:\n    final: true\ntransitions:\n  - from: surveying\n    to: signed-off\n",
@@ -449,7 +347,7 @@ transitions:
         .unwrap();
         let billing = temp.path().join("billing");
         fs::create_dir_all(billing.join("tasks")).unwrap();
-        fs::write(billing.join("index.rhei.md"), "# Rhei: Billing\n**States:** alpha\n").unwrap();
+        fs::write(billing.join("index.rhei.md"), "# Rhei: Billing\n").unwrap();
         fs::write(
             billing.join("states.yaml"),
             "name: alpha\nversion: 1\nstates:\n  drafting:\n    initial: true\n    visits: 3\n  filed:\n    final: true\ntransitions:\n  - from: drafting\n    to: drafting\n  - from: drafting\n    to: filed\n",

@@ -1,13 +1,12 @@
 //! The resolution rule itself: a rhei's machine is the `states.yaml` in its own
 //! execution root, then the project root's, then the built-in machine.
 //!
-//! Every case here is a tree whose answer the previous rule got differently, or
-//! one whose refusal the new rule must not weaken. The deprecation window that
-//! runs ahead of this rule has its own file.
+//! Every case here is a tree whose answer an earlier rule got differently. No
+//! document names a machine: the retired `**States:**` line has its refusal in
+//! `states_line_refused_tests.rs`.
 
 // §FS-rhei-plan-language.1.3
 
-use super::new_tests::{assert_failure, flattened_output};
 use super::state_machine_resolution_support::*;
 use super::*;
 
@@ -17,36 +16,31 @@ use super::*;
 /// the member inherited the project default wholesale and its own root was never
 /// consulted — so a `cancelled` task the local machine declares final was judged
 /// against the built-in machine and rejected.
-///
-/// The control is the same tree with one line added, `**States:** repro-ticket`,
-/// which passed before this change and still passes: it is what isolates the
-/// declaration as the single cause. §FS-rhei-plan-language.1.3
+/// §FS-rhei-plan-language.1.3
 #[test]
 fn a_members_own_machine_resolves_with_no_declaration_anywhere() {
-    for declaration in [None, Some("repro-ticket")] {
-        let dir = unique_temp_dir("resolution-own-root");
-        let home = dir.join(".home");
-        let root = project(&dir, None);
-        let rhei = member(&root, "a-ticket", declaration, "completed");
-        member_machine(&rhei, &ticket_machine("repro-ticket"));
-        write_fixture_file(
-            &rhei.join("tasks"),
-            "02.md",
-            "### Task 2: Abandoned\n**State:** cancelled\n",
-        );
-        let project_arg = root.display().to_string();
+    let dir = unique_temp_dir("resolution-own-root");
+    let home = dir.join(".home");
+    let root = project(&dir, None);
+    let rhei = member(&root, "a-ticket", None, "completed");
+    member_machine(&rhei, &ticket_machine("repro-ticket"));
+    write_fixture_file(
+        &rhei.join("tasks"),
+        "02.md",
+        "### Task 2: Abandoned\n**State:** cancelled\n",
+    );
+    let project_arg = root.display().to_string();
 
-        assert_validates(&rhei_in(&dir, &home, &["validate", &project_arg]));
+    assert_validates(&rhei_in(&dir, &home, &["validate", &project_arg]));
 
-        let states = rhei_in(&dir, &home, &["states", &project_arg]);
-        assert_success(&states);
-        assert_source(&states, &rhei_source(&rhei.join("states.yaml"), "a-ticket"));
-        assert!(
-            states.stdout.contains("repro-ticket"),
-            "the file's own `name:` is the effective machine name; got:\n{}",
-            states.stdout
-        );
-    }
+    let states = rhei_in(&dir, &home, &["states", &project_arg]);
+    assert_success(&states);
+    assert_source(&states, &rhei_source(&rhei.join("states.yaml"), "a-ticket"));
+    assert!(
+        states.stdout.contains("repro-ticket"),
+        "the file's own `name:` is the effective machine name; got:\n{}",
+        states.stdout
+    );
 }
 
 /// A `states.yaml` at the project root is the project default by its presence,
@@ -77,54 +71,6 @@ fn an_undeclared_project_root_machine_is_the_project_default() {
         !states.stdout.contains("Source: the built-in default state machine"),
         "the file beside the manifest is the default, not the built-in machine; got:\n{}",
         states.stdout
-    );
-}
-
-/// A declaration naming a machine nothing supplies no longer fails where the
-/// rhei's own root holds some other `states.yaml`: the own-root file resolves,
-/// whatever its `name:`. The previous rule exited 1 here.
-/// §FS-rhei-plan-language.1.3
-#[test]
-fn a_declaration_nothing_supplies_falls_through_to_the_own_root_file() {
-    let dir = unique_temp_dir("resolution-unsupplied-declaration");
-    let home = dir.join(".home");
-    let root = project(&dir, None);
-    let rhei = member(&root, "a-ticket", Some("grounded-ticket"), "drafting");
-    member_machine(&rhei, &machine("agora", "drafting", "ruled"));
-    let project_arg = root.display().to_string();
-
-    assert_validates(&rhei_in(&dir, &home, &["validate", &project_arg]));
-
-    let states = rhei_in(&dir, &home, &["states", &project_arg]);
-    assert_success(&states);
-    assert_source(&states, &rhei_source(&rhei.join("states.yaml"), "a-ticket"));
-    assert!(
-        states.stdout.contains("agora"),
-        "the resolved file's own name is the machine's name; got:\n{}",
-        states.stdout
-    );
-}
-
-/// Nothing that errors stops erroring. A declaration naming a machine nothing
-/// supplies, with no file in the rhei's own root at all, is still a validation
-/// error — the project-root file does not rescue it, because a declaration that
-/// names one machine must never silently resolve to another.
-/// §FS-rhei-plan-language.1.3
-#[test]
-fn a_declaration_nothing_supplies_with_no_own_file_is_still_an_error() {
-    let dir = unique_temp_dir("resolution-unsupplied-no-file");
-    let home = dir.join(".home");
-    let root = project(&dir, None);
-    project_machine(&root, &machine("proj-machine", "surveying", "signed-off"));
-    member(&root, "a-ticket", Some("missing-member-machine"), "surveying");
-    let project_arg = root.display().to_string();
-
-    let result = rhei_in(&dir, &home, &["validate", &project_arg]);
-    assert_failure(&result, "missing-member-machine");
-    let said = flattened_output(&result);
-    assert!(
-        said.contains("no states file declaring it was found"),
-        "the missing-definition diagnostic survives the new rule; got:\n{said}"
     );
 }
 

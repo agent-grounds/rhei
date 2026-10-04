@@ -84,7 +84,6 @@ fn new_ticket_write(
         path: placed.path,
         state: Some(state),
         // Only a rhei create writes a declaration. §FS-rhei-new.5.3
-        declared_machine: None,
         contents: placed.contents,
         preview: block,
         dirs: placed.dirs,
@@ -137,38 +136,29 @@ help = "fix that rhei and re-run; `rhei validate` reports it with a code frame. 
 }
 
 /// Resolve the project's state machines the way every command does, except that
-/// a rhei this create is not writing to keeps its unresolvable machine to
-/// itself.
+/// a rhei this create is not writing to keeps its unloadable machine to itself.
 ///
-/// One rhei declaring `**States:** billing-review` with no `states.yaml` to
-/// match is a mid-edit state someone is *in the middle of leaving* — the
-/// declaration is written, the machine is not yet. Resolved strictly, it stops
-/// every create in the project, basin capture included — and basin capture is
-/// the one thing that has to survive somebody else's half-finished work. The
-/// rhei being written to is different: the new ticket's starting state comes
-/// out of its machine, so that one must resolve.
+/// A `states.yaml` someone is in the middle of editing is a mid-edit state.
+/// Resolved strictly, it stops every create in the project, basin capture
+/// included — and basin capture is the one thing that has to survive somebody
+/// else's half-finished work. The rhei being written to is different: the new
+/// ticket's starting state comes out of its machine, so that one must resolve.
 ///
 /// The project still fails validation for it — both passes, identically — so
-/// the create keeps its write and says the failure is not its own. Nothing is
-/// hidden; it is only not this create's to refuse.
-// §FS-rhei-new.5.2 §AR-rhei-panta.4
+/// the create keeps its write and says the failure is not its own.
+// §FS-rhei-new.5.2 §FS-rhei-plan-language.1.3
 fn resolve_state_machines_for_create(
     input: &Path,
     loaded: &LoadedPlan,
     target_rhei: &str,
 ) -> MietteResult<ResolvedMachineSet> {
-    let default = resolve_state_machine_for_loaded_plan(input, loaded, None)?;
+    let default = resolve_state_machine_for_loaded_plan(input, None)?;
     let mut per_rhei = BTreeMap::new();
     let mut roots: Vec<(&String, &PathBuf)> =
         loaded.is_panta_project().then(|| loaded.rhei_roots.iter().collect()).unwrap_or_default();
     roots.sort();
     for (rhei_id, root) in roots {
-        // Creation resolves each rhei the way every command does: its own root
-        // whatever its index says, behind the deprecated declaration pass.
-
-        // §FS-rhei-plan-language.1.3
-        let declared = loaded.rhei_machines.get(rhei_id).map(String::as_str);
-        match resolve_rhei_machine(input, loaded, rhei_id, root, declared, &default) {
+        match resolve_rhei_machine(rhei_id, root) {
             Ok(Some(resolved)) => {
                 per_rhei.insert(rhei_id.clone(), resolved);
             }

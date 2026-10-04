@@ -43,15 +43,15 @@ pub(crate) const CONSUMES_ADVISORY: &str = concat!(
 );
 
 /// The state machines governing one loaded plan: the project default plus the
-/// machine of every rhei that declared its own `**States:**`. A ticket's
+/// machine of every rhei with a `states.yaml` in its own root. A ticket's
 /// machine resolves through its owning rhei — the leading segment of its
 /// project-qualified id.
 // §DA-per-rhei-state-machines §AR-rhei-panta.4
 #[derive(Debug, Clone)]
 pub struct MachineSet {
-    /// The project default: the manifest declaration or the built-in machine.
+    /// The project default: the project-root `states.yaml` or the built-in machine.
     pub default: StateMachine,
-    /// Machines of self-declaring rheis, keyed by rhei id.
+    /// Machines read from a rhei's own root, keyed by rhei id.
     pub per_rhei: BTreeMap<String, StateMachine>,
 }
 

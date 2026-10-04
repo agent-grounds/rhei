@@ -1,5 +1,4 @@
 # Rhei: Deliver subtree supervision
-**States:** supervised-delivery
 
 ## What this workspace does
 

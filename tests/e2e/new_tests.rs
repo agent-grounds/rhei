@@ -118,7 +118,7 @@ fn dir_creates_a_workspace_rhei() {
 }
 
 /// §FS-rhei-new.2: header fields land in plan-language order — heading,
-/// `**States:**`, frontmatter, description, `## Tasks`.
+/// frontmatter, description, `## Tasks`.
 #[test]
 fn writes_header_fields_in_plan_language_order() {
     let dir = empty_project("new-rhei-header");
@@ -131,8 +131,6 @@ fn writes_header_fields_in_plan_language_order() {
         &[
             "new",
             "Billing",
-            "--states",
-            "custom",
             "--max-levels",
             "3",
             "--node-kinds",
@@ -147,7 +145,7 @@ fn writes_header_fields_in_plan_language_order() {
     let plan = fs::read_to_string(dir.join("billing.rhei.md")).expect("rhei file");
     assert_eq!(
         plan,
-        "# Rhei: Billing\n**States:** custom\n\n---\nstructure:\n  maxLevels: 3\n  \
+        "# Rhei: Billing\n\n---\nstructure:\n  maxLevels: 3\n  \
          nodeKinds: [task, bug]\n---\n\nEverything invoice-related.\n\n## Tasks\n"
     );
 }
@@ -340,17 +338,17 @@ fn starts_in_the_owning_rheis_initial_state() {
         "states.yaml",
         "name: custom\nversion: 1\nstates:\n  todo:\n    initial: true\n    description: Todo\n  done:\n    final: true\n    description: Done\ntransitions:\n  - from: todo\n    to: done\n",
     );
-    assert_success(&new_run(&["new", "Reporting", "--states", "custom"], &dir));
+    assert_success(&new_run(&["new", "Reporting"], &dir));
     let result = new_run(&["new", "First report", "--under", "reporting"], &dir);
     assert_success(&result);
     assert!(result.stdout.contains("[todo]"), "got: {}", result.stdout);
 }
 
-/// A project and one explicitly declaring member both name `alpha`, but give
-/// it distinguishable initial states. §FS-rhei-plan-language.1.3
+/// A project and one member each hold a machine named `alpha`, with
+/// distinguishable initial states. §FS-rhei-plan-language.1.3
 fn same_name_creation_project(prefix: &str) -> TestDir {
     let dir = unique_temp_dir(prefix);
-    write_fixture_file(&dir, "index.panta.md", "# Panta: Billing\n**States:** alpha\n");
+    write_fixture_file(&dir, "index.panta.md", "# Panta: Billing\n");
     write_fixture_file(
         &dir,
         "states.yaml",
@@ -358,7 +356,7 @@ fn same_name_creation_project(prefix: &str) -> TestDir {
     );
     let billing = dir.join("billing");
     fs::create_dir_all(billing.join("tasks")).expect("create billing workspace");
-    write_fixture_file(&billing, "index.rhei.md", "# Rhei: Billing\n**States:** alpha\n");
+    write_fixture_file(&billing, "index.rhei.md", "# Rhei: Billing\n");
     write_fixture_file(
         &billing,
         "states.yaml",
@@ -483,7 +481,6 @@ transitions:
 "#;
 
 const BUGS_RHEI: &str = r#"# Rhei: Bugs
-**States:** custom
 
 ---
 structure:

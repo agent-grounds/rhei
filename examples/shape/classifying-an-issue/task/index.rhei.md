@@ -1,5 +1,4 @@
 # Rhei: Triage issue 87
-**States:** shape-classifying-an-issue
 
 ## Overview
 

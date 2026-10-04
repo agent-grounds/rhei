@@ -1,5 +1,4 @@
 # Rhei: Decide the merge policy, then apply it
-**States:** shape-discussion-to-a-ruling
 
 ## Overview
 

@@ -1090,7 +1090,7 @@ transitions:
 fn run_agent_mode_resolves_a_panta_member_input_at_its_own_execution_root() {
     let project = create_panta_project(
         "panta-run-agent-input-root",
-        "# Panta: Agent Run Inputs\n**States:** panta-agent-input-machine\n",
+        "# Panta: Agent Run Inputs\n",
         &[
             ("auth/index.rhei.md", "# Rhei: Auth\n\n"),
             ("auth/tasks/login.md", "### Task 1: Login\n**State:** pending\n"),

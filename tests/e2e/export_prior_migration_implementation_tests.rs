@@ -46,7 +46,7 @@ fn setup(prefix: &str, producer_state: &str) -> (TestDir, PathBuf) {
         &dir,
         "plan.rhei.md",
         &format!(
-            "# Rhei: boundaries\n**States:** migration-boundaries\n\n## Tasks\n\n\
+            "# Rhei: boundaries\n\n## Tasks\n\n\
              ### Task 1: producer\n**State:** {producer_state}\n**Provides:** x\n\n\
              ### Task 2: consumer\n**State:** pending\n**Consumes:** 1:x\n"
         ),
@@ -157,7 +157,6 @@ transitions:
 "#;
 
 const DIAGNOSTIC_PLAN: &str = r#"# Rhei: Migration diagnostics
-**States:** migration-diagnostics
 
 ## Tasks
 

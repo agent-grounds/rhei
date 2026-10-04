@@ -1,10 +1,6 @@
 //! The retired `**States:**` line: refused, with the file, the line and the
 //! remedy, by every command that reads the document — and nowhere it never
 //! meant anything.
-//!
-//! The refusal cases are `#[ignore]`d until the refusal lands: they are the
-//! contract the change is written against, and the commit that makes them pass
-//! removes the attribute.
 
 // §FS-rhei-plan-language.2.2
 
@@ -37,7 +33,6 @@ fn project_with_a_manifest_line(dir: &Path) -> std::path::PathBuf {
 }
 
 #[test]
-#[ignore = "red until #350 refuses the `**States:**` line"]
 fn a_single_file_plan_carrying_the_line_is_refused() {
     let dir = unique_temp_dir("states-line-single-file");
     let home = dir.join(".home");
@@ -55,7 +50,6 @@ fn a_single_file_plan_carrying_the_line_is_refused() {
 /// down was never legal, but its refusal must carry the same remedy.
 /// §FS-rhei-plan-language.2.2
 #[test]
-#[ignore = "red until #350 refuses the `**States:**` line"]
 fn the_line_is_refused_below_the_header_too() {
     let dir = unique_temp_dir("states-line-content-section");
     let home = dir.join(".home");
@@ -71,7 +65,6 @@ fn the_line_is_refused_below_the_header_too() {
 }
 
 #[test]
-#[ignore = "red until #350 refuses the `**States:**` line"]
 fn a_workspace_index_carrying_the_line_is_refused() {
     let dir = unique_temp_dir("states-line-workspace-index");
     let home = dir.join(".home");
@@ -85,7 +78,6 @@ fn a_workspace_index_carrying_the_line_is_refused() {
 }
 
 #[test]
-#[ignore = "red until #350 refuses the `**States:**` line"]
 fn a_project_manifest_carrying_the_line_is_refused() {
     let dir = unique_temp_dir("states-line-manifest");
     let home = dir.join(".home");
@@ -100,7 +92,6 @@ fn a_project_manifest_carrying_the_line_is_refused() {
 /// run under another machine once the line is gone must not look healthy in
 /// `list`, `states` or a rendered export meanwhile. §FS-rhei-plan-language.2.2
 #[test]
-#[ignore = "red until #350 refuses the `**States:**` line"]
 fn read_only_commands_refuse_the_line_too() {
     let dir = unique_temp_dir("states-line-read-only");
     let home = dir.join(".home");
@@ -160,7 +151,6 @@ fn a_line_in_a_task_file_is_text() {
 /// Nothing in a plan names a machine, so `rhei new` has no flag that writes one:
 /// clap's own unknown-argument error, exit 2. §FS-rhei-new.1.2
 #[test]
-#[ignore = "red until #350 deletes `rhei new --states`"]
 fn rhei_new_has_no_states_flag() {
     let dir = unique_temp_dir("states-line-new-flag");
     write_fixture_file(&dir, "index.panta.md", "# Panta: Test\n");
@@ -182,7 +172,6 @@ fn rhei_new_has_no_states_flag() {
 /// default it inherited by declaration, not the file that governs it.
 /// §FS-rhei-render.3.1
 #[test]
-#[ignore = "red until #350 reports the resolved machine in render JSON"]
 fn render_json_reports_each_rheis_resolved_machine() {
     let dir = unique_temp_dir("states-line-render-json");
     let home = dir.join(".home");

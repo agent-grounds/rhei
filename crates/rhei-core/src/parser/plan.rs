@@ -7,7 +7,10 @@ use crate::text::parse_task_id;
 use regex::Regex;
 
 use super::builder::{title_case_kind, unwind_to_level, NodeBuilder};
-use super::{parse_frontmatter, parse_structure, unescape_state, ParseError, Result};
+use super::{
+    is_retired_states_line, parse_frontmatter, parse_structure, retired_states_line,
+    unescape_state, ParseError, Result,
+};
 
 pub fn parse(input: &str) -> Result<Rhei> {
     let re_rhei = Regex::new(r#"^#\s+Rhei:\s+(.*)$"#).unwrap();
@@ -19,7 +22,6 @@ pub fn parse(input: &str) -> Result<Rhei> {
     ))
     .unwrap();
     let re_any_h3_to_h6 = Regex::new(r#"^#{3,6}\s+\S.*$"#).unwrap();
-    let re_states_decl = Regex::new(r#"^\*\*States:\*\*\s+(.+)$"#).unwrap();
     let re_state = Regex::new(r#"^\*\*State:\*\*\s*(.+)$"#).unwrap();
     let re_state_like = Regex::new(r#"^\*\*State\b.*$"#).unwrap();
     // The kind keyword is optional decoration; accepting the bare form lets an
@@ -61,8 +63,6 @@ pub fn parse(input: &str) -> Result<Rhei> {
 
     let mut rhei_title: Option<String> = None;
     let mut rhei_header_seen = false;
-    let mut rhei_states: Option<String> = None;
-    let mut rhei_states_checked = false;
     let mut rhei_metadata: Option<Metadata> = None;
     let mut frontmatter_checked = false;
     let mut in_frontmatter = false;
@@ -140,28 +140,23 @@ pub fn parse(input: &str) -> Result<Rhei> {
 
         if !rhei_header_seen && !in_code_block && line == "---" {
             return Err(ParseError::new(
-                "YAML frontmatter must appear after the `# Rhei:` header (and any `**States:**` declaration). Move the `---` block below the header.",
+                "YAML frontmatter must appear after the `# Rhei:` header. Move the `---` block below the header.",
                 Some(line_number),
             ));
         }
 
         if !in_tasks_section && !in_code_block {
+            if is_retired_states_line(line) {
+                return Err(retired_states_line(line_number));
+            }
+
             if let Some(cap) = re_rhei.captures(line) {
                 rhei_title = Some(cap.get(1).unwrap().as_str().to_string());
                 rhei_header_seen = true;
                 continue;
             }
 
-            if rhei_header_seen && !rhei_states_checked {
-                if let Some(cap) = re_states_decl.captures(line) {
-                    rhei_states = Some(cap.get(1).unwrap().as_str().trim().to_string());
-                    rhei_states_checked = true;
-                    continue;
-                }
-                rhei_states_checked = true;
-            }
-
-            if rhei_header_seen && rhei_states_checked && !frontmatter_checked {
+            if rhei_header_seen && !frontmatter_checked {
                 if line == "---" {
                     in_frontmatter = true;
                     frontmatter_checked = true;
@@ -175,13 +170,6 @@ pub fn parse(input: &str) -> Result<Rhei> {
             if !structure_finalised && frontmatter_checked {
                 // No frontmatter block was opened — apply defaults.
                 structure_finalised = true;
-            }
-
-            if rhei_states_checked && re_states_decl.is_match(line) {
-                return Err(ParseError::new(
-                    "**States:** declaration must be the first non-empty line after the Rhei header",
-                    Some(line_number),
-                ));
             }
 
             let is_top_level_h1 = line.starts_with('#') && !line.starts_with("##");
@@ -1027,22 +1015,13 @@ pub fn parse(input: &str) -> Result<Rhei> {
 
     // §FS-rhei-plan-language.1.1 §FS-rhei-new.2
 
-    let states_declared = rhei_states.is_some();
     // Interior blanks are the author's; the ones trailing a section only
     // separate it from `## Tasks`. §FS-rhei-memory.4.2
     for section in &mut rhei_content {
         let trimmed = section.content.trim_end().to_string();
         section.content = trimmed;
     }
-    Ok(Rhei {
-        title,
-        states: rhei_states.unwrap_or_else(|| "rhei".to_string()),
-        states_declared,
-        structure,
-        metadata: rhei_metadata,
-        content_sections: rhei_content,
-        tasks,
-    })
+    Ok(Rhei { title, structure, metadata: rhei_metadata, content_sections: rhei_content, tasks })
 }
 
 /// Parse and lexically validate one portable path exclusion. Files and

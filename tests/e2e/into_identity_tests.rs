@@ -70,7 +70,7 @@ fn into_refuses_a_template_that_declares_a_budget_identity() {
     write_fixture_file(
         &template,
         "index.rhei.md",
-        "# Rhei: Review {{change_ref}}\n**States:** review-loop\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - step\nmetadata:\n  tasks:\n    coordinate:\n      budgetTicketId: 11111111-2222-3333-4444-555555555555\n---\n\n## Overview\n\nA review loop.\n",
+        "# Rhei: Review {{change_ref}}\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - step\nmetadata:\n  tasks:\n    coordinate:\n      budgetTicketId: 11111111-2222-3333-4444-555555555555\n---\n\n## Overview\n\nA review loop.\n",
     );
     let index_before = read(&root.join("index.rhei.md"));
 
@@ -121,7 +121,7 @@ fn the_identity_refusal_fires_for_output_mode_too() {
     write_fixture_file(
         &template,
         "index.rhei.md",
-        "# Rhei: Review {{change_ref}}\n**States:** review-loop\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - step\nmetadata:\n  tasks:\n    coordinate:\n      budgetTicketId: 11111111-2222-3333-4444-555555555555\n---\n\n## Overview\n\nA review loop.\n",
+        "# Rhei: Review {{change_ref}}\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - step\nmetadata:\n  tasks:\n    coordinate:\n      budgetTicketId: 11111111-2222-3333-4444-555555555555\n---\n\n## Overview\n\nA review loop.\n",
     );
 
     let result =

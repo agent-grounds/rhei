@@ -276,5 +276,5 @@ host directory or anywhere under it ([§FS-rhei-panta.6](rhei-panta.spec.md#6-pr
   ([§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification)).
 - It does not touch git beyond `.gitignore`: no hooks, no commits.
 - It does not write a state machine or a `**States:**` line — the manifest
-  stays bare (§2); each rhei keeps the machine it declares, and the built-in
-  `rhei` machine covers the rest ([§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification)).
+  stays bare (§2); each rhei keeps the `states.yaml` in its own root, and the
+  built-in `rhei` machine covers the rest ([§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification)).

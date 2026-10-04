@@ -1,5 +1,4 @@
 # Rhei: Spec Implementation Discrepancy Audit Example
-**States:** spec-implementation-discrepancy-audit
 
 ## Context
 

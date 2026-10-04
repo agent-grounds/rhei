@@ -1,5 +1,4 @@
 # Rhei: Hourly Human Intervention Sweep
-**States:** hourly-human-intervention
 
 ## Overview
 Run this workspace once per hour to drain `{{label}}` work from

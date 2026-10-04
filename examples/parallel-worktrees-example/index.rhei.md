@@ -1,5 +1,4 @@
 # Rhei: Parallel Worktree Batch Example
-**States:** parallel-worktrees
 
 ## Overview
 

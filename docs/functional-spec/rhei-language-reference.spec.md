@@ -17,7 +17,7 @@ its role, and the spec that owns its grammar and behavior:
 
 | File kind | Role | Owner |
 |-----------|------|-------|
-| `index.panta.md` | Panta project manifest: title, optional default `**States:**`, content; no authored nodes | [§FS-rhei-panta.1](rhei-panta.spec.md#1-what-panta-is), [§FS-rhei-plan-language.1.5](rhei-plan-language.spec.md#15-panta-project) |
+| `index.panta.md` | Panta project manifest: title, content; no authored nodes | [§FS-rhei-panta.1](rhei-panta.spec.md#1-what-panta-is), [§FS-rhei-plan-language.1.5](rhei-plan-language.spec.md#15-panta-project) |
 | rhei entry (in the project dir) | One rhei per entry — a `*.rhei.md` or a Directory Workspace — discovered at project scope | [§FS-rhei-panta.1](rhei-panta.spec.md#1-what-panta-is), [§FS-rhei-plan-language.1.5](rhei-plan-language.spec.md#15-panta-project) |
 | `*.rhei.md` | Single-File Plan: a rhei with its `## Tasks` inline | [§FS-rhei-plan-language.1.1](rhei-plan-language.spec.md#11-single-file-plan-1-agent-or-low-concurrency) |
 | `index.rhei.md` + `tasks/**/*.md` | Directory Workspace rhei: manifest plus merged workspace task files. The index carries the workspace's plan-wide frontmatter and is its only writable metadata document; a task file may open with a metadata-only block for the tasks it defines | [§FS-rhei-plan-language.1.2](rhei-plan-language.spec.md#12-directory-workspace-agent-teams-high-concurrency), §FS-rhei-plan-language.1.4 |

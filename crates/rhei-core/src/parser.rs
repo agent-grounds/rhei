@@ -56,6 +56,24 @@ impl ParseError {
 
 pub type Result<T> = std::result::Result<T, ParseError>;
 
+/// Whether a trimmed line is the retired `**States:**` declaration, which a
+/// plan, workspace index or project manifest refuses anywhere outside a fence.
+/// §FS-rhei-plan-language.2.2
+fn is_retired_states_line(line: &str) -> bool {
+    line.starts_with("**States:**")
+}
+
+/// The refusal of the retired `**States:**` line: its line number, and the one
+/// remedy, which is to delete it. §FS-rhei-plan-language.2.2
+fn retired_states_line(line_number: usize) -> ParseError {
+    ParseError::new(
+        "`**States:**` is no longer part of the plan language — delete this line. A rhei runs \
+         under the `states.yaml` in its own directory, else the project's `states.yaml`, else \
+         the built-in `rhei` machine; `rhei states` shows which one it resolves.",
+        Some(line_number),
+    )
+}
+
 fn parse_structure(metadata: Option<&Metadata>, start_line: usize) -> Result<Structure> {
     let Some(metadata) = metadata else {
         return Ok(Structure::default());
@@ -171,6 +189,8 @@ fn unescape_state(input: &str) -> String {
 mod fence_tests;
 #[cfg(test)]
 mod plan_snapshot_prior_tests;
+#[cfg(test)]
+mod plan_task_metadata_tests;
 #[cfg(test)]
 mod plan_tests;
 #[cfg(test)]

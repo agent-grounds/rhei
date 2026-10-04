@@ -1,5 +1,4 @@
 # Rhei: {{plan_title}}
-**States:** multi-model-analysis
 
 ## Overview
 This workspace runs the same analytical prompt through multiple target-specific

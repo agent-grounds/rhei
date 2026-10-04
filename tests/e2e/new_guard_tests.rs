@@ -496,17 +496,16 @@ fn a_prior_into_an_unreadable_rhei_is_refused() {
     assert_failure(&consumes, "--consumes 'bad.1' points into rhei 'bad'");
 }
 
-/// §FS-rhei-new.5.2: one rhei declaring a machine no `states.yaml` provides is
+/// §FS-rhei-new.5.2: one rhei whose own `states.yaml` does not parse is
 /// somebody else's half-finished edit. It must not stop creates elsewhere —
 /// basin capture least of all — and it still must stop a create into itself.
 #[test]
 fn an_unresolvable_machine_elsewhere_does_not_stop_a_create() {
     let dir = project_with_rhei("new-machine-elsewhere");
-    write_fixture_file(
-        &dir,
-        "billing.rhei.md",
-        "# Rhei: Billing\n**States:** billing-review\n\n## Tasks\n",
-    );
+    let billing = dir.join("billing");
+    fs::create_dir_all(billing.join("tasks")).expect("create billing workspace");
+    write_fixture_file(&billing, "index.rhei.md", "# Rhei: Billing\n");
+    write_fixture_file(&billing, "states.yaml", "not: [valid yaml\n");
 
     assert_success(&new_run(&["new", "Keep going", "--under", "auth"], &dir));
     let captured = new_run(&["new", "Quick thought", "--under", "basin"], &dir);
@@ -517,7 +516,7 @@ fn an_unresolvable_machine_elsewhere_does_not_stop_a_create() {
     // Into the rhei whose machine cannot be resolved, the failure is this
     // create's: the ticket's starting state comes out of that machine.
     let into_it = new_run(&["new", "Nope", "--under", "billing"], &dir);
-    assert_failure(&into_it, "declares state machine 'billing-review'");
+    assert_failure(&into_it, "states.yaml");
 }
 
 /// A create must not swallow a concurrent `rhei complete`.

@@ -1,5 +1,4 @@
 # Rhei: Let users upload an avatar
-**States:** shape-parts-of-a-feature
 
 ## Overview
 

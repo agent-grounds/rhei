@@ -10,7 +10,7 @@ fn builtin() -> StateMachine {
 #[test]
 fn flat_tasks_carry_depth_and_parent() {
     let rhei = parse(
-            "# Rhei: Deep\n**States:** rhei\n---\nstructure:\n  maxLevels: 4\n  nodeKinds: [task, bug]\n---\n\n## Tasks\n\n### Task api: Build API\n**State:** pending\n\n#### Bug api.cache: Cache issue\n**State:** in-progress\n",
+            "# Rhei: Deep\n---\nstructure:\n  maxLevels: 4\n  nodeKinds: [task, bug]\n---\n\n## Tasks\n\n### Task api: Build API\n**State:** pending\n\n#### Bug api.cache: Cache issue\n**State:** in-progress\n",
         )
         .expect("parse");
     let model = build(&rhei, &builtin());
@@ -94,10 +94,8 @@ transitions:
 "#,
     )
     .expect("states load");
-    let rhei = parse(
-        "# Rhei: Visits\n**States:** custom\n\n## Tasks\n\n### Task 1: A\n**State:** review-2\n",
-    )
-    .expect("parse");
+    let rhei =
+        parse("# Rhei: Visits\n\n## Tasks\n\n### Task 1: A\n**State:** review-2\n").expect("parse");
 
     let model = build(&rhei, &machine);
     assert_eq!(model.tasks[0].state, "review");
@@ -132,10 +130,9 @@ transitions:
 "#,
     )
     .expect("states load");
-    let rhei = parse(
-            "# Rhei: Fanout\n**States:** custom\n\n## Tasks\n\n### Task pm: Evaluate\n**State:** product-run\n",
-        )
-        .expect("parse");
+    let rhei =
+        parse("# Rhei: Fanout\n\n## Tasks\n\n### Task pm: Evaluate\n**State:** product-run\n")
+            .expect("parse");
 
     let model = build(&rhei, &machine);
     let product = model.machine.states.iter().find(|s| s.name == "product-run").unwrap();
@@ -159,7 +156,7 @@ transitions:
 #[test]
 fn plan_state_pending_when_only_pending_roots() {
     let rhei = parse(
-            "# Rhei: P\n**States:** rhei\n\n## Tasks\n\n### Task 1: A\n**State:** pending\n\n### Task 2: B\n**State:** pending\n",
+            "# Rhei: P\n\n## Tasks\n\n### Task 1: A\n**State:** pending\n\n### Task 2: B\n**State:** pending\n",
         )
         .expect("parse");
     let model = build(&rhei, &builtin());
@@ -169,7 +166,7 @@ fn plan_state_pending_when_only_pending_roots() {
 #[test]
 fn plan_state_active_when_a_root_is_active_like() {
     let rhei = parse(
-            "# Rhei: A\n**States:** rhei\n\n## Tasks\n\n### Task 1: A\n**State:** in-progress\n\n### Task 2: B\n**State:** pending\n",
+            "# Rhei: A\n\n## Tasks\n\n### Task 1: A\n**State:** in-progress\n\n### Task 2: B\n**State:** pending\n",
         )
         .expect("parse");
     let model = build(&rhei, &builtin());
@@ -179,12 +176,11 @@ fn plan_state_active_when_a_root_is_active_like() {
 #[test]
 fn plan_state_completed_and_archived() {
     let completed =
-        parse("# Rhei: C\n**States:** rhei\n\n## Tasks\n\n### Task 1: A\n**State:** completed\n")
-            .expect("parse");
+        parse("# Rhei: C\n\n## Tasks\n\n### Task 1: A\n**State:** completed\n").expect("parse");
     assert_eq!(build(&completed, &builtin()).plan_state.as_deref(), Some("completed"));
 
     let archived = parse(
-            "# Rhei: C\n**States:** archival\n\n## Tasks\n\n### Task 1: A\n**State:** completed\n\n### Task 2: B\n**State:** archived\n",
+            "# Rhei: C\n\n## Tasks\n\n### Task 1: A\n**State:** completed\n\n### Task 2: B\n**State:** archived\n",
         )
         .expect("parse");
     let machine = StateMachine::from_yaml_str(

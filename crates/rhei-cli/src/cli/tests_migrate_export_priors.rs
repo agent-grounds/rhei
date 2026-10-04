@@ -140,7 +140,6 @@ mod migrate_export_prior_tests {
             task_roots: HashMap::new(),
             content_section_roots: Vec::new(),
             rhei_ids: Vec::new(),
-            rhei_machines: HashMap::new(),
             rhei_roots: HashMap::new(),
             rhei_titles: HashMap::new(),
             rhei_plans: HashMap::new(),
@@ -229,7 +228,7 @@ mod migrate_export_prior_tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let plan = dir.path().join("plan.rhei.md");
         fs::write(dir.path().join("states.yaml"), MACHINE).unwrap();
-        let before = "# Rhei: x\n**States:** migration\n\n## Tasks\n\n### Task 1: first\n**State:** pending\n**Provides:** x\n\n### Task 2: second\n**State:** pending\n**Provides:** x\n\n### Task 3: consumer\n**State:** pending\n**Consumes:** 1:x\n";
+        let before = "# Rhei: x\n\n## Tasks\n\n### Task 1: first\n**State:** pending\n**Provides:** x\n\n### Task 2: second\n**State:** pending\n**Provides:** x\n\n### Task 3: consumer\n**State:** pending\n**Consumes:** 1:x\n";
         fs::write(&plan, before).unwrap();
         let held = LockedPlanFile::open(&plan).expect("hold writer sidecar");
         let (events_tx, events_rx) = mpsc::channel();
@@ -262,7 +261,7 @@ mod migrate_export_prior_tests {
         fs::create_dir_all(consumer.join("tasks")).unwrap();
         fs::write(
             project.join("index.panta.md"),
-            "# Panta: p\n**States:** migration\n",
+            "# Panta: p\n",
         )
         .unwrap();
         fs::write(project.join("states.yaml"), MACHINE).unwrap();
@@ -303,7 +302,7 @@ mod migrate_export_prior_tests {
         fs::create_dir_all(workspace.join("tasks")).unwrap();
         fs::write(
             workspace.join("index.rhei.md"),
-            "# Rhei: work\n**States:** migration\n",
+            "# Rhei: work\n",
         )
         .unwrap();
         fs::write(workspace.join("states.yaml"), MACHINE).unwrap();

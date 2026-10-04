@@ -1,5 +1,4 @@
 # Rhei: Agent Discussion Around a Point
-**States:** agent-discussion
 
 ## Overview
 

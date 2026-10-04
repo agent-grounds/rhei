@@ -1,5 +1,4 @@
 # Rhei: Review pull request 412 against its spec
-**States:** shape-review-against-spec
 
 ## Overview
 

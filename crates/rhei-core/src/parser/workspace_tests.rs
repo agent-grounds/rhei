@@ -8,7 +8,6 @@ fn yaml_key(name: &str) -> YamlValue {
 #[test]
 fn parses_workspace_index_frontmatter_metadata() {
     let input = r#"# Rhei: Workspace
-**States:** custom
 
 ---
 metadata:
@@ -22,7 +21,6 @@ Context
 "#;
 
     let index = parse_workspace_index(input).expect("parse ok");
-    assert_eq!(index.states, "custom");
     let metadata = index.metadata.expect("metadata should be present");
     let metadata_section = metadata
         .get(yaml_key("metadata"))
@@ -39,22 +37,8 @@ Context
 }
 
 #[test]
-fn workspace_index_tracks_whether_states_was_declared() {
-    let explicit = parse_workspace_index("# Rhei: Workspace\n**States:** custom\n")
-        .expect("explicit states parses");
-    assert_eq!(explicit.states, "custom");
-    assert!(explicit.states_declared);
-
-    let omitted = parse_workspace_index("# Rhei: Workspace\n\n## Overview\nContext\n")
-        .expect("omitted states parses");
-    assert_eq!(omitted.states, "rhei");
-    assert!(!omitted.states_declared);
-}
-
-#[test]
-fn parses_panta_manifest_header_and_default_states() {
+fn parses_panta_manifest_header_and_structure() {
     let input = r#"# Panta: Product Suite
-**States:** project-flow
 
 ---
 structure:
@@ -69,8 +53,6 @@ Shared project context.
     let manifest = parse_panta_manifest(input).expect("panta manifest parses");
 
     assert_eq!(manifest.title, "Product Suite");
-    assert_eq!(manifest.states, "project-flow");
-    assert!(manifest.states_declared);
     assert_eq!(manifest.structure.max_levels, 3);
     assert_eq!(manifest.structure.node_kinds, vec!["task", "bug"]);
     assert_eq!(manifest.content_sections[0].title, "Context");
@@ -96,7 +78,6 @@ metadata:
 ---
 
 # Rhei: Workspace
-**States:** custom
 
 ## Overview
 Context

@@ -1,5 +1,4 @@
 # Rhei: {{batch_title}}
-**States:** parallel-worktrees
 
 ## Overview
 

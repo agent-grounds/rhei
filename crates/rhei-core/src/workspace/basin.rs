@@ -24,11 +24,7 @@ use super::{collect_task_sources, nested_parse_error, Workspace, RHEI_INDEX_FILE
 
 pub const BASIN_RHEI_ID: &str = "basin";
 
-pub(super) fn load_basin_rhei(
-    dir: &Path,
-    structure: &Structure,
-    states: &str,
-) -> parser::Result<Workspace> {
+pub(super) fn load_basin_rhei(dir: &Path, structure: &Structure) -> parser::Result<Workspace> {
     let _guards =
         crate::root_access::for_input(dir).map_err(|err| ParseError::new(err.to_string(), None))?;
     let mut tasks = Vec::new();
@@ -65,8 +61,6 @@ pub(super) fn load_basin_rhei(
             .map_err(|err| ParseError::new(err.to_string(), None))?,
         rhei: Rhei {
             title: "Basin".to_string(),
-            states: states.to_string(),
-            states_declared: false,
             structure: structure.clone(),
             metadata: None,
             content_sections: Vec::new(),

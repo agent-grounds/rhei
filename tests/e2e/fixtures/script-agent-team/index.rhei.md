@@ -1,5 +1,4 @@
 # Rhei: Bash Agent Team Workflow
-**States:** script-agent-team
 
 ## Overview
 This directory workspace models a small agent team handoff pipeline that can be

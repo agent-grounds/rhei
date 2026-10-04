@@ -1085,7 +1085,7 @@ fn run_parallel_does_not_warn_for_a_ticket_with_subtasks_in_one_file() {
     // and its subtasks are one schedulable unit, not shared-file concurrency.
     let (_dir, ws, machine_path) = create_workspace(
         "run-parallel-subtasks",
-        "# Rhei: Subtask Layout\n**States:** integration-test\n",
+        "# Rhei: Subtask Layout\n",
         &[
             (
                 "one.md",
@@ -1113,7 +1113,7 @@ fn run_parallel_does_not_warn_for_a_ticket_with_subtasks_in_one_file() {
 fn run_parallel_warns_when_one_of_several_files_owns_two_tickets() {
     let (_dir, ws, machine_path) = create_workspace(
         "run-parallel-shared",
-        "# Rhei: Shared File\n**States:** integration-test\n",
+        "# Rhei: Shared File\n",
         &[
             (
                 "one.md",
@@ -1144,7 +1144,7 @@ fn run_parallel_falls_back_to_sequential_when_all_tickets_share_one_file() {
     // could only schedule same-file tickets — sequential, as for a bare file.
     let (_dir, ws, machine_path) = create_workspace(
         "run-parallel-single-file",
-        "# Rhei: One File\n**States:** integration-test\n",
+        "# Rhei: One File\n",
         &[(
             "one.md",
             "### Task 1: Alpha\n**State:** draft\n\n### Task 2: Beta\n**State:** draft\n",

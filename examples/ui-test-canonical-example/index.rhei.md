@@ -1,5 +1,4 @@
 # Rhei: Rhei UI Canonical Test
-**States:** ui-test-canonical
 
 ---
 structure:

@@ -69,16 +69,32 @@ fn run_sequential_program_work_items(
             tooling: None,
             memory: None,
         };
-        // A program is never skipped at scheduling, so it re-spawns for the
-        // same reason an agent does — and gets the same attempt log and the
-        // same per-visit budget. §FS-rhei-agents.8.1 §FS-rhei-agents.3.2.3
-        let plan = plan_spawn_attempt(
-            &task_runtime_dir,
+        // A program re-spawns as an agent does, with the same attempt log, entry or visit
+        // number, and per-visit budget. §FS-rhei-agents.8.1 §FS-rhei-programs.5.1 §FS-rhei-agents.3.2.3
+        let visit_count = render_visit_count(
+            loaded.rhei.metadata.as_ref(),
+            &task.id,
+            current_state,
+            task.state.as_str(),
+            machine,
+        );
+        let plan = plan_named_spawn(
+            machine,
             &task_workspace_root,
+            &task_runtime_dir,
             task_id_str,
             current_state,
+            visit_count,
             None,
         );
+        let plan = match plan {
+            Ok((plan, _)) => plan,
+            Err(refusal) => {
+                run_error!("  {refusal}");
+                progress.stalled_tasks.insert(task_id_str.clone());
+                continue;
+            }
+        };
         let budget = resolve_attempt_budget(machine.states.get(current_state.as_str()), settings);
         if let Some(spent_budget) = plan.budget_spent(budget) {
             let owed = collect_missing_required_outputs(

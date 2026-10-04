@@ -36,8 +36,11 @@ mod spawn_records {
         });
     }
 
+    /// `implement` as an uncounted state: numbered by its entries. §FS-rhei-agents.8.1
     fn plan_for(root: &std::path::Path) -> SpawnPlan {
-        plan_spawn_attempt(&root.join("runtime"), root, "plan.1", "implement", None)
+        let runtime = root.join("runtime");
+        let entry = ticket_entry_number(root, &runtime, "plan.1", "implement").expect("ledger");
+        plan_spawn_attempt(&runtime, root, "plan.1", "implement", None, LogNumber::Entry(entry))
     }
 
     /// Two spawns with the ticket standing still are two attempts at one visit:
@@ -90,7 +93,7 @@ mod spawn_records {
         let after = plan_for(dir.path());
         assert_eq!(after.attempt, 1, "a fresh entry is not a third attempt at the last one");
         assert!(after.previous.is_none(), "and has nothing to narrate as a retry");
-        assert!(after.log.ends_with("task-plan.1-implement.log"));
+        assert!(after.log.ends_with("task-plan.1-implement-2.log"));
         assert!(
             after.budget_spent(AttemptBudget::Visit(2)).is_none(),
             "the budget came back with the visit"

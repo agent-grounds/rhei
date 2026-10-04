@@ -209,6 +209,9 @@ fn scoped_runtime_targets(
         ScopedTarget::Prefixed { dir: runtime.join("logs"), prefix: format!("task-{task_id}-") },
         // The record of every spawn those logs came from. §FS-rhei-agents.8.4
         ScopedTarget::Prefixed { dir: runtime.join("spawns"), prefix: format!("task-{task_id}-") },
+        // The session reports rendered from those logs, `.orphaned-…` ones
+        // included. §FS-rhei-reset.2.1
+        ScopedTarget::Prefixed { dir: runtime.join("reports"), prefix: format!("task-{task_id}-") },
         // §FS-rhei-snapshots.4: `<id>-<state>-<slug>-<nonce>/` session dirs.
         ScopedTarget::Prefixed {
             dir: runtime.join("snapshot-sessions"),

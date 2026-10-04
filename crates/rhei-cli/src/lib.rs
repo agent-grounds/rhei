@@ -286,6 +286,7 @@ mod tests {
     include!("cli/tests_agent_family.rs");
     include!("cli/tests_spawn_records.rs");
     include!("cli/tests_worker_edit_regions.rs");
+    include!("cli/tests_entry_log_numbers.rs");
     include!("cli/tests_session_reports.rs");
     include!("cli/tests_session_report_streams.rs");
     include!("cli/tests_program_exit_routes.rs");

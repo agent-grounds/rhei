@@ -389,6 +389,11 @@ fn settings_rate_change_keeps_old_record_and_archived_book_reachable() {
     let first_bytes = fs::read(&first_path).expect("first record bytes");
 
     fs::write(&plan, ONE_TASK_PLAN).expect("reset task for the second run");
+    // A rewind outside the ledger is still entry 1, and its log is never overwritten: move it
+    // away, as §FS-rhei-agents.8.1 says to.
+    let logs = dir.join("runtime/logs");
+    fs::rename(logs.join("task-plan.1-work-priced.log"), logs.join("first-run.log"))
+        .expect("move the first run's log away");
     let second_rates = profile_prices("CHF", 8_000_000, "second rate");
     write_settings(
         &dir,

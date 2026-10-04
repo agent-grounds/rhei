@@ -38,23 +38,66 @@ pub(crate) fn run_registry_path(id: &str) -> Option<PathBuf> {
 /// entry — and is hard-linked into place, which refuses rather than replaces.
 /// On failure the error names the state directory tried and why it failed.
 pub(crate) fn publish_registry_entry_once(descriptor: &RunDescriptor) -> Result<(), String> {
+    publish_registry_entry_with(descriptor, |temp, entry| fs::hard_link(temp, entry))
+}
+
+/// [`publish_registry_entry_once`] with the link step passed in, so a test can
+/// refuse it the way a state home without hard links does (vfat, exFAT, a
+/// link-less FUSE mount).
+///
+/// Every failed step is followed by a look at the entry: one that stands now
+/// is the child's, and the id resolves, so it is not an error — the warning
+/// fires only when the entry is still absent after this attempt.
+/// §FS-rhei-run-headless.1.1
+///
+/// A link refused for any reason but `AlreadyExists` falls back to writing
+/// the body straight to the entry with `create_new`, which also refuses
+/// rather than replaces. That write is not atomic, and it is safe anyway: a
+/// reader that catches it half-written cannot parse it, the sweep classifies
+/// it as unreadable, and an unreadable entry is never pruned
+/// (§FS-rhei-run-headless.3); the child's later rename replaces it whole.
+fn publish_registry_entry_with(
+    descriptor: &RunDescriptor,
+    link: impl FnOnce(&Path, &Path) -> std::io::Result<()>,
+) -> Result<(), String> {
     let Some(dir) = run_registry_dir() else {
         return Err("neither XDG_STATE_HOME nor HOME is set".to_owned());
     };
-    let failed = |err: std::io::Error| format!("could not write it under {}: {err}", dir.display());
     let entry = dir.join(format!("{}.json", descriptor.id));
-    let body = serde_json::to_string_pretty(descriptor)
-        .map_err(|err| failed(std::io::Error::new(std::io::ErrorKind::InvalidData, err)))?;
-    fs::create_dir_all(&dir).map_err(failed)?;
+    let failed = |err: std::io::Error| {
+        if entry.is_file() {
+            return Ok(());
+        }
+        Err(format!("could not write it under {}: {err}", dir.display()))
+    };
+    let body = match serde_json::to_string_pretty(descriptor) {
+        Ok(body) => format!("{body}\n"),
+        Err(err) => return failed(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
+    };
+    if let Err(err) = fs::create_dir_all(&dir) {
+        return failed(err);
+    }
     let temp = dir.join(format!(".{}.launcher-{}.tmp", descriptor.id, std::process::id()));
-    fs::write(&temp, format!("{body}\n")).map_err(failed)?;
-    let linked = fs::hard_link(&temp, &entry);
+    let linked = fs::write(&temp, &body).and_then(|()| link(&temp, &entry));
     let _ = fs::remove_file(&temp);
-    match linked {
-        Ok(()) => Ok(()),
+    let refused = match linked {
+        Ok(()) => return Ok(()),
         // The child got there first; its entry stands. §FS-rhei-run-headless.1.1
+        Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
+        Err(err) => err,
+    };
+    if entry.is_file() {
+        return Ok(());
+    }
+    let written = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&entry)
+        .and_then(|mut file| file.write_all(body.as_bytes()));
+    match written {
+        Ok(()) => Ok(()),
         Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
-        Err(err) => Err(failed(err)),
+        Err(err) => failed(std::io::Error::new(err.kind(), format!("{refused}; then {err}"))),
     }
 }
 

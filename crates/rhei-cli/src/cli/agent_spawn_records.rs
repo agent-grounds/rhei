@@ -472,6 +472,33 @@ fn newest_spawn_record_for_state(
     newest.map(|(_, record)| record)
 }
 
+/// Every record a worker left in this state on this ticket, of whatever
+/// identity or visit, beside the path it was read from, in path order.
+///
+/// Asked when an invocation has no successful record of its own and the
+/// visit's finished work may sit under a name the plan no longer spells.
+/// Matching is on the record's `task` and `state` fields, as in
+/// [`newest_spawn_record_for_state`]: a name-prefix match would hand state
+/// `review` the records of `review-fix`.
+// §FS-rhei-agents.8.4
+fn spawn_records_for_state(
+    runtime_dir: &Path,
+    task_id: &str,
+    state_name: &str,
+) -> Vec<(PathBuf, SpawnRecord)> {
+    let Ok(entries) = fs::read_dir(spawn_records_dir(runtime_dir)) else { return Vec::new() };
+    let mut records = entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let record = read_spawn_record(&path)?;
+            (record.task == task_id && record.state == state_name).then_some((path, record))
+        })
+        .collect::<Vec<_>>();
+    records.sort_by(|(left, _), (right, _)| left.cmp(right));
+    records
+}
+
 /// Which rule bounds one visit's spawns, and by how much. `Poll` is never a
 /// second bound alongside the poll's own exhaustion rule: it bounds only the
 /// attempts whose edits were reverted, which that rule never sees.

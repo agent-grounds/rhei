@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Fixtures for the changelog stamper, release-due and shape tests. §FS-rhei-distribution.5
+"""Fixtures for the release-notes generator, release-due and shape tests. §FS-rhei-distribution.5
 
 The tests drive the scripts as subprocesses over a throwaway git repository, so
-what they pin is the contract a contributor and a workflow actually meet: the
+what they pin is the contract a maintainer and a workflow actually meet: the
 command line, the exit code, and the message. Nothing here imports the scripts.
 
 `gh` is answered by a stub on `PATH` rather than by the forge, which is the seam
 the reproducer for agent-grounds/rhei#341 established and the only one the
-stamper can be tested through at all.
+generator can be tested through at all. The stub answers
+`gh api repos/{owner}/{repo}/commits/<sha>/pulls` with the pull request objects
+the forge returns, records every call it is given, and fails for the commits it
+is told to.
 """
 
 from __future__ import annotations
@@ -25,7 +28,7 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-STAMPER = REPO_ROOT / "scripts" / "prepare_changelog_release.py"
+RELEASE_SCRIPT = REPO_ROOT / "scripts" / "prepare_changelog_release.py"
 PRE_COMMIT_CONFIG = REPO_ROOT / ".pre-commit-config.yaml"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 AUTO_BUMP_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "auto-bump.yml"
@@ -78,30 +81,43 @@ def clean_env(**overrides: str | None) -> dict[str, str]:
     return env
 
 
-def changelog(unreleased: list[str], released: str = "- Something released. (PR #2)") -> str:
-    """A `docs/changelog.md` whose `## Unreleased` holds exactly these bullets."""
-    body = "\n\n".join(unreleased)
-    if body:
-        body += "\n"
-    return f"# Changelog\n\n## Unreleased\n\n{body}\n## 0.5.1 - 2026-09-20\n\n{released}\n"
+GENERATED_NOTE = (
+    "*Each release's section is generated from the pull requests merged since the previous "
+    "release; nothing here is written by hand.*"
+)
+
+RELEASED_ENTRIES = (
+    "- [The first release's second change](https://github.com/agent-grounds/rhei/pull/2) (PR #2)",
+    "- [The first release's first change](https://github.com/agent-grounds/rhei/pull/1) (PR #1)",
+)
 
 
-def release_changelog(unreleased: list[str], note: str | None = None) -> str:
-    """A `docs/changelog.md` in the shape `prepare` reads, the note optional.
+def release_changelog(entries: tuple[str, ...] | list[str] = RELEASED_ENTRIES, note: str = GENERATED_NOTE) -> str:
+    """A `docs/changelog.md` in the shape `prepare` reads: no `## Unreleased`.
 
-    `## Unreleased`, then the inline release, then `Older releases`, which is
-    what the release promotes and what the shape test asks of the real file
-    (§FS-rhei-distribution.5.1).
+    The header and its note, the inline 0.1.0 release holding `entries`, then
+    `Older releases`, which is what the release generates into and what the
+    shape test asks of the real file (§FS-rhei-distribution.5.1).
     """
-    lead = f"{note}\n\n" if note is not None else ""
-    body = "\n\n".join(unreleased)
+    body = "\n".join(entries)
     if body:
         body += "\n\n"
     return (
-        f"# Changelog\n\n{lead}## Unreleased\n\n{body}"
-        "## 2. [0.1.0] - 2026-09-20\n\n- The first release. (PR #1)\n\n"
+        f"# Changelog\n\n{note}\n\n"
+        f"## 2. [0.1.0] - 2026-09-20\n\n{body}"
         "## 3. Older releases\n\n- [0.0.9](changelog/0.0.9.md) - 2026-09-01: Before it.\n"
     )
+
+
+def pull(number: int, title: str | None = None, merged: bool = True) -> dict[str, object]:
+    """One pull request as `commits/<sha>/pulls` returns it, trimmed to what the notes read."""
+    return {
+        "number": number,
+        "title": title if title is not None else f"Change number {number}",
+        "html_url": f"https://github.com/agent-grounds/rhei/pull/{number}",
+        "state": "closed" if merged else "open",
+        "merged_at": "2026-10-01T00:00:00Z" if merged else None,
+    }
 
 
 class TempRepo:
@@ -154,6 +170,10 @@ _GH_STUB = r'''
 import json, os, re, sys
 
 argv = sys.argv[1:]
+calls = os.environ.get("GH_STUB_CALLS")
+if calls:
+    with open(calls, "a", encoding="utf-8") as handle:
+        handle.write(json.dumps(argv) + "\n")
 pulls = {}
 path = os.environ.get("GH_STUB_PULLS")
 if path and os.path.exists(path):
@@ -169,11 +189,14 @@ if argv[:1] == ["api"]:
     if sha is None:
         sys.stderr.write("gh stub: no commits/<sha>/pulls path in %r\n" % (argv,))
         sys.exit(1)
-    numbers = pulls.get(sha, pulls.get(sha[:7], []))
+    failing = [token for token in os.environ.get("GH_STUB_FAIL", "").split(",") if token]
+    if any(sha.startswith(token) or token.startswith(sha) for token in failing):
+        sys.stderr.write("HTTP 502: Bad Gateway (https://api.github.com/repos/agent-grounds/rhei/commits/%s/pulls)\n" % sha)
+        sys.exit(1)
     if "--jq" in argv:
-        sys.stdout.write("".join("%d\n" % n for n in numbers))
-    else:
-        sys.stdout.write(json.dumps([{"number": n} for n in numbers]) + "\n")
+        sys.stderr.write("gh stub: --jq is not understood; read the JSON\n")
+        sys.exit(1)
+    sys.stdout.write(json.dumps(pulls.get(sha, pulls.get(sha[:7], []))) + "\n")
     sys.exit(0)
 
 sys.stderr.write("gh stub: unsupported invocation %r\n" % (argv,))
@@ -201,7 +224,7 @@ def _install(directory: Path, name: str, python_source: str) -> None:
             (directory / (name + extension)).write_text(f"@{target} %*\n", encoding="utf-8")
 
 
-def make_bin(directory: Path, pulls: dict[str, list[int]] | None = None) -> Path:
+def make_bin(directory: Path, pulls: dict[str, list[object]] | None = None) -> Path:
     """A directory to put first on `PATH`, holding a stub `gh` and nothing else.
 
     `git` is deliberately not in it. The directory goes *in front of* the ambient
@@ -222,7 +245,7 @@ def path_with_no_gh() -> str:
     without building a `PATH` of our own around a wrapper
     (§REQ-cross-platform.4). Where `gh` shares a directory with `git` - which is
     what a distribution's `/usr/bin` does - this takes `git` with it, and that is
-    sound rather than tolerated: the stamper reports an unreachable `gh` before it
+    sound rather than tolerated: the generator reports an unreachable `gh` before it
     spawns anything, so the path under test never asks for `git`. Do not put a
     `git` back for it.
     """
@@ -252,7 +275,7 @@ class ScriptTestCase(unittest.TestCase):
         root.mkdir(parents=True, exist_ok=True)
         return TempRepo(root, branch=branch)
 
-    def set_pulls(self, pulls: dict[str, list[int]]) -> Path:
+    def set_pulls(self, pulls: dict[str, list[object]]) -> Path:
         path = pulls_file(self.bin)
         path.write_text(json.dumps(pulls), encoding="utf-8")
         return path
@@ -269,6 +292,7 @@ class ScriptTestCase(unittest.TestCase):
         overrides = dict(env)
         overrides["PATH"] = prefix
         overrides.setdefault("GH_STUB_PULLS", str(pulls_file(self.bin)))
+        overrides.setdefault("GH_STUB_CALLS", str(self.calls_file()))
         return subprocess.run(
             [sys.executable, str(script), *args],
             cwd=str(repo.path),
@@ -276,6 +300,16 @@ class ScriptTestCase(unittest.TestCase):
             text=True,
             env=clean_env(**overrides),
         )
+
+    def calls_file(self) -> Path:
+        return self.bin / "calls.jsonl"
+
+    def gh_calls(self) -> list[list[str]]:
+        """Every argv the stub `gh` was given, in order."""
+        path = self.calls_file()
+        if not path.exists():
+            return []
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
     def output(self, result: subprocess.CompletedProcess[str]) -> str:
         """Both streams, for an assertion that should not pin which one is used."""

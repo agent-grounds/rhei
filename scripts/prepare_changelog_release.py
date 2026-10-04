@@ -1,42 +1,41 @@
 #!/usr/bin/env python3
-"""Prepare and read changelog release sections. §FS-rhei-distribution.5
+"""Generate and read changelog release sections. §FS-rhei-distribution.5
 
-`stamp` writes the pull request numbers the contributors did not know onto the
-bullets they left, and runs before `prepare` promotes the section, because the
-numbers are resolved from the commits the bullets were written in
-(§FS-rhei-distribution.5.2).
+`prepare` writes the release's section itself, from the pull requests merged
+since the previous release tag, read from the forge (§FS-rhei-distribution.5.1).
+It builds the whole list before it writes anything, so a forge that cannot
+answer leaves every file as it was (§FS-rhei-distribution.5.2).
 
-`due` is the scheduled release's gate: it holds while code has merged since
-`Unreleased` was last written, so no release ships code its section does not
-describe (§FS-rhei-distribution.5.3).
+`due` is the scheduled release's gate: the release is due when the list
+`prepare` would write is not empty, so it builds that same list
+(§FS-rhei-distribution.5.3).
 """
 
 from __future__ import annotations
 
 import argparse
-import collections
 import datetime as _datetime
+import json
 import re
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
 
-import changelog_bullets
-from changelog_bullets import Bullet
 from tool_lookup import tool
 
 
 VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
-UNRELEASED_RE = re.compile(r"^## Unreleased\s*$")
 RELEASE_RE = re.compile(
     r"^## (?P<number>[0-9]+)\. \[(?P<version>[0-9]+\.[0-9]+\.[0-9]+)\] - (?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2})\s*$"
 )
 OLDER_RE = re.compile(r"^## (?P<number>[0-9]+)\. Older releases\s*$")
 # What a release is not cut for: docs and CI. §FS-rhei-distribution.5.1
 DOCS_AND_CI_RE = re.compile(r"^(?:docs/|\.github/)|\.md$|^(?:LICENSE|lychee\.toml)$")
-BLAME_HEADER_RE = re.compile(r"^(?P<sha>[0-9a-f]{40,64}) [0-9]+ [0-9]+")
-UNCOMMITTED_RE = re.compile(r"^0+$")
+# One generated entry, so an archived section can be summarised by its count. §FS-rhei-distribution.5.1
+ENTRY_RE = re.compile(r"^- \[.*\]\(\S+\) \(PR #[0-9]+\)\s*$")
+TITLE_ESCAPE_RE = re.compile(r"([\\\[\]])")
 
 
 class ChangelogError(Exception):
@@ -44,53 +43,67 @@ class ChangelogError(Exception):
 
 
 def prepare_release(changelog: Path, version: str, release_date: str) -> None:
+    """Generate the numbered section for `version` and archive the one it displaces.
+
+    Every refusal and every forge read comes before the first write, so a release
+    that fails leaves the changelog, the archive and the tree as they were.
+    §FS-rhei-distribution.5.2
+    """
     _validate_version(version)
     _validate_date(release_date)
 
     lines = _read_lines(changelog)
     sections = _find_top_level_sections(lines)
-    unreleased = _find_section(lines, sections, UNRELEASED_RE, "## Unreleased")
-    latest = _next_section_after(sections, unreleased, "latest release")
-    older = _find_section_after(lines, sections, latest, OLDER_RE, "Older releases")
-
+    if not sections:
+        raise ChangelogError("missing the inline release section")
+    latest = sections[0]
     latest_match = RELEASE_RE.match(_line_text(lines[latest]))
     if latest_match is None:
-        raise ChangelogError(f"expected latest release heading after ## Unreleased, got: {_line_text(lines[latest])}")
+        raise ChangelogError(f"expected the inline release heading, got: {_line_text(lines[latest])}")
+    older = _find_section_after(lines, sections, latest, OLDER_RE, "Older releases")
+    older_match = OLDER_RE.match(_line_text(lines[older]))
+    assert older_match is not None
 
     if latest_match.group("version") == version:
         raise ChangelogError(f"docs/changelog.md already has {version} as the inline latest release")
 
-    unreleased_body = _trim_blank_lines(lines[unreleased + 1 : latest])
-    if not _has_bullet(unreleased_body):
-        # A person started this release, so it does not hold; it says what lets it proceed.
-        # §FS-rhei-distribution.5.3
-        raise ChangelogError("## Unreleased has no bullet entries to promote; write the release section first")
-
     previous_version = latest_match.group("version")
     previous_date = latest_match.group("date")
-    previous_body = lines[latest + 1 : older]
-    archived_body = [_rewrite_relative_links_for_archive(line) for line in previous_body]
-    summary = _summary_from(previous_body)
-
     archive_path = changelog.parent / "changelog" / f"{previous_version}.md"
     if archive_path.exists():
         raise ChangelogError(f"archive already exists: {archive_path}")
 
-    archive_lines = [f"# {previous_version} - {previous_date}\n", *archived_body]
-    _write_lines(archive_path, archive_lines)
+    # Before anything is spawned, git included. §FS-rhei-distribution.5.2
+    _require_gh()
+    history = _History(changelog)
+    previous_tag = f"v{previous_version}"
+    tagged = history.tag(previous_tag)
+    if tagged is None:
+        # The range starts at the tag the inline heading names. §FS-rhei-distribution.5.1
+        raise ChangelogError(
+            f"the previous release tag {previous_tag} does not exist; fetch the tags (git fetch --tags)"
+        )
+    pull_requests = _notes_since(history, _Forge(history.cwd), tagged)
+    if not pull_requests:
+        # A person started this release, so it does not hold; it refuses. §FS-rhei-distribution.5.3
+        raise ChangelogError(
+            f"no pull request merged since {previous_tag} changed more than docs and CI; nothing to release"
+        )
 
-    older_body = lines[older + 1 :]
-    older_body = _drop_leading_blank_lines(older_body)
+    previous_body = lines[latest + 1 : older]
+    archived_body = [_rewrite_relative_links_for_archive(line) for line in previous_body]
+    summary = _summary_from(previous_body)
+    _write_lines(archive_path, [f"# {previous_version} - {previous_date}\n", *archived_body])
+
+    older_body = _drop_leading_blank_lines(lines[older + 1 :])
     archive_link = f"- [{previous_version}](changelog/{previous_version}.md) - {previous_date}: {summary}\n"
-
     new_lines = [
-        *lines[: unreleased + 1],
+        *lines[:latest],
+        f"## {latest_match.group('number')}. [{version}] - {release_date}\n",
         "\n",
-        f"## 2. [{version}] - {release_date}\n",
+        *(f"{pull_request.entry()}\n" for pull_request in pull_requests),
         "\n",
-        *unreleased_body,
-        "\n",
-        "## 3. Older releases\n",
+        f"## {older_match.group('number')}. Older releases\n",
         "\n",
         archive_link,
         *older_body,
@@ -98,120 +111,86 @@ def prepare_release(changelog: Path, version: str, release_date: str) -> None:
     _write_lines(changelog, new_lines)
 
 
-def stamp_pull_requests(changelog: Path) -> None:
-    """Write `PR #<n>` onto every Unreleased bullet that resolves to one.
+@dataclass
+class _PullRequest:
+    """One merged pull request, gathered from every commit of the range that belongs to it."""
 
-    It is allowed to achieve nothing. A bullet it cannot resolve to exactly one
-    pull request is left as written and reported, and so is a forge it cannot
-    reach at all: a release that could not be cut over a changelog annotation
-    would cost more than the missing annotation does. One number goes into one
-    bullet at most, so every bullet is resolved before any is written: a number
-    that more than one bullet resolves to belongs to the write-up that wrote
-    them all, and goes into none of them. §FS-rhei-distribution.5.2
+    number: int
+    title: str
+    url: str
+    # Where its newest commit sits on the first-parent line; 0 is the newest. §FS-rhei-distribution.5.1
+    position: int
+    paths: set[str] = field(default_factory=set)
+
+    def changed_code(self) -> bool:
+        return any(not DOCS_AND_CI_RE.search(path) for path in self.paths)
+
+    def entry(self) -> str:
+        """`- [<title>](<url>) (PR #N)`, the title escaped so the link renders. §FS-rhei-distribution.5.1"""
+        title = TITLE_ESCAPE_RE.sub(r"\\\1", " ".join(self.title.split()))
+        return f"- [{title}]({self.url}) (PR #{self.number})"
+
+
+def _notes_since(history: _History, forge: _Forge, tagged: str) -> list[_PullRequest]:
+    """Every merged pull request since `tagged` that changed more than docs and CI, newest first.
+
+    One forge read per commit; any one that fails fails the whole list, because a
+    list missing a pull request looks exactly like a correct one.
+    §FS-rhei-distribution.5.1 §FS-rhei-distribution.5.2
     """
-    lines = _read_lines(changelog)
-    try:
-        unstamped = [bullet for bullet in changelog_bullets.bullets(lines) if not bullet.is_stamped]
-    except changelog_bullets.ChangelogFormatError as exc:
-        raise ChangelogError(str(exc)) from exc
-
-    if not unstamped:
-        return
-    if tool("gh") is None:
-        _warn("`gh` is not on PATH, so no pull request could be resolved; nothing stamped")
-        return
-
-    forge = _Forge(changelog)
-    resolved = [(bullet, *forge.pull_request_for(bullet)) for bullet in unstamped]
-    # Only the unstamped are counted: a bullet already ending in its number is not written.
-    claims = collections.Counter(number for _, number, _ in resolved if number is not None)
-    stamped = False
-    for bullet, number, reason in resolved:
-        if number is not None and claims[number] > 1:
-            reason = f"PR #{number} would go into {claims[number]} bullets; write each its own (PR #{number})"
-            number = None
-        if number is None:
-            _warn(
-                f"docs/changelog.md ## Unreleased: bullet at line {bullet.first + 1} "
-                f"left unstamped ({reason})"
-            )
+    found: dict[int, _PullRequest] = {}
+    for sha, position in history.commits_since(tagged):
+        paths = history.paths(sha)
+        merged = [pull for pull in forge.pulls(sha) if pull.get("merged_at")]
+        if not merged:
+            if any(not DOCS_AND_CI_RE.search(path) for path in paths):
+                _warn(f"commit {sha[:7]} changed code but belongs to no pull request; it is not in the notes")
             continue
-        # Stamping never changes a bullet's line count, so the ranges the
-        # remaining bullets carry stay valid as this writes through them.
-        lines[bullet.first : bullet.last + 1] = bullet.stamped(number)
-        stamped = True
-
-    if stamped:
-        _write_lines(changelog, lines)
+        for pull in merged:
+            number = int(pull["number"])
+            if number not in found:
+                found[number] = _PullRequest(number, str(pull.get("title", "")), str(pull.get("html_url", "")), position)
+            pull_request = found[number]
+            # A rebase-merged pull request is many commits and one entry. §FS-rhei-distribution.5.1
+            pull_request.position = min(pull_request.position, position)
+            pull_request.paths |= paths
+    listed = [pull_request for pull_request in found.values() if pull_request.changed_code()]
+    return sorted(listed, key=lambda pull_request: (pull_request.position, -pull_request.number))
 
 
 class _Forge:
-    """Which pull request a bullet's lines were written in, asked of git and gh."""
+    """The merged pull requests a commit belongs to, asked of `gh`. §FS-rhei-distribution.5.2"""
 
-    def __init__(self, changelog: Path) -> None:
-        resolved = changelog.resolve()
-        self.cwd = resolved.parent if resolved.parent.is_dir() else Path.cwd()
-        self.name = resolved.name
-        self._cache: dict[str, set[int] | None] = {}
+    def __init__(self, cwd: Path) -> None:
+        self.cwd = cwd
 
-    def pull_request_for(self, bullet: Bullet) -> tuple[int | None, str]:
-        shas = self._blame(bullet.first + 1, bullet.last + 1)
-        if shas is None:
-            return None, "git blame could not read its lines"
-        if not shas:
-            return None, "it has no committed lines to resolve"
-        if any(UNCOMMITTED_RE.match(sha) for sha in shas):
-            return None, "one of its lines is not committed yet"
-
-        numbers: set[int] = set()
-        for sha in shas:
-            resolved = self._pulls(sha)
-            if resolved is None:
-                return None, f"the forge could not be asked about commit {sha[:7]}"
-            if not resolved:
-                return None, f"commit {sha[:7]} belongs to no pull request"
-            numbers |= resolved
-        if len(numbers) != 1:
-            named = ", ".join(f"#{number}" for number in sorted(numbers))
-            return None, f"its lines belong to more than one pull request ({named})"
-        return numbers.pop(), ""
-
-    def _blame(self, first: int, last: int) -> list[str] | None:
-        result = _spawn(self.cwd, "git", "blame", "--line-porcelain", "-L", f"{first},{last}", "--", self.name)
-        if result is None or result.returncode != 0:
-            return None
-        shas: list[str] = []
-        sha = None
-        for line in result.stdout.splitlines():
-            header = BLAME_HEADER_RE.match(line)
-            if header:
-                sha = header.group("sha")
-            elif line.startswith("\t") and line[1:].strip() and sha is not None:
-                shas.append(sha)
-        return list(dict.fromkeys(shas))
-
-    def _pulls(self, sha: str) -> set[int] | None:
-        if sha not in self._cache:
-            self._cache[sha] = self._ask(sha)
-        return self._cache[sha]
-
-    def _ask(self, sha: str) -> set[int] | None:
-        result = _spawn(
-            self.cwd, "gh", "api", f"repos/{{owner}}/{{repo}}/commits/{sha}/pulls", "--jq", ".[].number"
-        )
-        if result is None or result.returncode != 0:
-            return None
-        return {int(token) for token in result.stdout.split() if token.isdigit()}
+    def pulls(self, sha: str) -> list[dict[str, object]]:
+        # The objects rather than a `--jq` projection: the notes read the title,
+        # the URL and whether it merged.
+        result = _spawn(self.cwd, "gh", "api", f"repos/{{owner}}/{{repo}}/commits/{sha}/pulls")
+        if result is None:
+            raise ChangelogError(f"could not ask the forge about commit {sha[:7]}: gh could not be started")
+        if result.returncode != 0:
+            raise ChangelogError(f"could not ask the forge about commit {sha[:7]}: {_first_line(result.stderr)}")
+        try:
+            answer = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            answer = None
+        if not isinstance(answer, list) or not all(isinstance(pull, dict) for pull in answer):
+            raise ChangelogError(
+                f"could not ask the forge about commit {sha[:7]}: unreadable answer {_first_line(result.stdout)!r}"
+            )
+        return answer
 
 
 def release_due(changelog: Path, tag: str, output: Path) -> None:
     """Answer `Auto bump`'s gate step: is a release due since `tag`?
 
-    `ok=true` goes to `output` only when code has merged since the tag and
-    `Unreleased` was last written after all of it. Otherwise the step holds with
-    a notice that says why, and a hold exits 0 like a release does: it is the
-    expected answer between a merge and its write-up, and only an error fails
-    the run. §FS-rhei-distribution.5.3
+    `ok=true` goes to `output` exactly when the list `prepare` would write is not
+    empty. Paths are read with git first, so a week of docs and CI alone asks the
+    forge nothing. A hold exits 0 with a notice saying why; a forge that cannot
+    answer fails the run, because a list it could not build is not an empty one.
+    §FS-rhei-distribution.5.3
     """
     history = _History(changelog)
     tagged = history.commit(tag)
@@ -219,68 +198,58 @@ def release_due(changelog: Path, tag: str, output: Path) -> None:
     if not history.code_changed_since(tagged):
         print(f"::notice::Only docs/CI changes since {tag}; skipping.")
     else:
-        # The tag sits on the release commit, which empties the section, so
-        # with no write since, the tag is the last write.
-        written = history.last_write_after(tagged) or tagged
-        waiting = history.code_changed_since(written)
-        if waiting:
-            print(
-                f"::notice::Changes merged since ## Unreleased was last written ({written[:7]}) "
-                "wait for their release section; skipping."
-            )
-            for path in waiting:
-                print(f"  {path}")
-        else:
+        _require_gh()
+        if _notes_since(history, _Forge(history.cwd), tagged):
             due = True
+        else:
+            # The version advance after every release is code outside any pull request.
+            print(f"::notice::No pull request that changed code merged since {tag}; skipping.")
     with output.open("a", encoding="utf-8") as handle:
         handle.write(f"ok={'true' if due else 'false'}\n")
 
 
 class _History:
-    """What changed since a commit, and when `Unreleased` was last written, asked of git."""
+    """The commits and paths since a release tag, asked of git."""
 
     def __init__(self, changelog: Path) -> None:
         resolved = changelog.resolve()
         self.cwd = resolved.parent if resolved.parent.is_dir() else Path.cwd()
-        self.name = resolved.name
-        self._bullets: dict[str, tuple[str, ...]] = {}
 
     def commit(self, ref: str) -> str:
         return self._git("rev-parse", "--verify", f"{ref}^{{commit}}").strip()
+
+    def tag(self, name: str) -> str | None:
+        """The commit tag `name` points at, or `None` where there is no such tag."""
+        result = _spawn(self.cwd, "git", "rev-parse", "--verify", "--quiet", f"refs/tags/{name}^{{commit}}")
+        if result is None:
+            raise ChangelogError("`git` is not on PATH")
+        return result.stdout.strip() if result.returncode == 0 else None
 
     def code_changed_since(self, commit: str) -> list[str]:
         """The paths outside docs and CI that differ between `commit` and `HEAD`."""
         paths = self._git("diff", "--name-only", "-z", commit, "HEAD").split("\0")
         return [path for path in paths if path and not DOCS_AND_CI_RE.search(path)]
 
-    def last_write_after(self, commit: str) -> str | None:
-        """The newest first-parent commit after `commit` that changed `Unreleased`'s bullets.
+    def commits_since(self, commit: str) -> list[tuple[str, int]]:
+        """Each commit after `commit`, with its place on the first-parent line, newest first.
 
-        A bullet is read as §FS-rhei-distribution.5.1 reads it, so an edit to the
-        note above the section, or to the blank lines between bullets, is not a
-        write. §FS-rhei-distribution.5.3
+        A commit a merge brought in takes the place of that merge, so the order
+        comes from git and not from timestamps. §FS-rhei-distribution.5.1
         """
-        for line in self._git("rev-list", "--first-parent", "--parents", f"{commit}..HEAD").splitlines():
+        placed: list[tuple[str, int]] = []
+        first_parent = self._git("rev-list", "--first-parent", "--parents", f"{commit}..HEAD").splitlines()
+        for position, line in enumerate(first_parent):
             child, *parents = line.split()
-            before = self._unreleased(parents[0]) if parents else ()
-            if self._unreleased(child) != before:
-                return child
-        return None
+            placed.append((child, position))
+            if len(parents) > 1:
+                side = self._git("rev-list", child, f"^{parents[0]}", f"^{commit}").split()
+                placed.extend((sha, position) for sha in side if sha != child)
+        return placed
 
-    def _unreleased(self, commit: str) -> tuple[str, ...]:
-        """The bullets of `Unreleased` at `commit`; none where it has no such section."""
-        if commit not in self._bullets:
-            # `./` makes the path relative to `cwd`, which is the changelog's own directory.
-            result = _spawn(self.cwd, "git", "show", f"{commit}:./{self.name}")
-            if result is None:
-                raise ChangelogError("`git` is not on PATH")
-            lines = result.stdout.splitlines(keepends=True) if result.returncode == 0 else []
-            try:
-                found = changelog_bullets.bullets(lines)
-            except changelog_bullets.ChangelogFormatError:
-                found = []
-            self._bullets[commit] = tuple(bullet.raw for bullet in found)
-        return self._bullets[commit]
+    def paths(self, sha: str) -> set[str]:
+        """The paths `sha` changed; a merge contributes none, its side commits do."""
+        output = self._git("diff-tree", "--no-commit-id", "-r", "--name-only", "-z", sha)
+        return {path for path in output.split("\0") if path}
 
     def _git(self, *args: str) -> str:
         result = _spawn(self.cwd, "git", *args)
@@ -289,6 +258,12 @@ class _History:
         if result.returncode != 0:
             raise ChangelogError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
         return result.stdout
+
+
+def _require_gh() -> None:
+    if tool("gh") is None:
+        # §FS-rhei-distribution.5.2
+        raise ChangelogError("gh is not on PATH; a release's notes are read from the forge")
 
 
 def _spawn(cwd: Path, *args: str) -> subprocess.CompletedProcess[str] | None:
@@ -302,6 +277,10 @@ def _spawn(cwd: Path, *args: str) -> subprocess.CompletedProcess[str] | None:
         return subprocess.run([executable, *args[1:]], cwd=str(cwd), check=False, capture_output=True, text=True)
     except FileNotFoundError:
         return None
+
+
+def _first_line(text: str) -> str:
+    return next((line.strip() for line in text.splitlines() if line.strip()), "no message")
 
 
 def _warn(message: str) -> None:
@@ -331,13 +310,6 @@ def _find_top_level_sections(lines: Sequence[str]) -> list[int]:
     return [index for index, line in enumerate(lines) if line.startswith("## ") and not line.startswith("### ")]
 
 
-def _find_section(lines: Sequence[str], sections: Sequence[int], pattern: re.Pattern[str], name: str) -> int:
-    for section in sections:
-        if pattern.match(_line_text(lines[section])):
-            return section
-    raise ChangelogError(f"missing {name} section")
-
-
 def _find_section_after(
     lines: Sequence[str], sections: Sequence[int], after: int, pattern: re.Pattern[str], name: str
 ) -> int:
@@ -347,13 +319,6 @@ def _find_section_after(
         if pattern.match(_line_text(lines[section])):
             return section
     raise ChangelogError(f"missing {name} section")
-
-
-def _next_section_after(sections: Sequence[int], after: int, name: str) -> int:
-    for section in sections:
-        if section > after:
-            return section
-    raise ChangelogError(f"missing {name}")
 
 
 def _read_lines(path: Path) -> list[str]:
@@ -390,11 +355,17 @@ def _drop_leading_blank_lines(lines: Sequence[str]) -> list[str]:
     return trimmed
 
 
-def _has_bullet(lines: Sequence[str]) -> bool:
-    return any(line.lstrip().startswith("- ") for line in lines)
-
-
 def _summary_from(lines: Sequence[str]) -> str:
+    """The archive line's summary of a section: its count, where it was generated.
+
+    A generated section is a list of entries, so it reads `<N> pull requests.`;
+    a hand-written one, from before the release generated its notes, keeps its
+    first sentence. §FS-rhei-distribution.5.1
+    """
+    written = [line for line in lines if line.strip()]
+    if written and all(ENTRY_RE.match(_line_text(line)) for line in written):
+        return f"{len(written)} pull request{'' if len(written) == 1 else 's'}."
+
     paragraph: list[str] = []
     for line in lines:
         stripped = line.strip()
@@ -448,11 +419,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--changelog", type=Path, default=Path("docs/changelog.md"))
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    prepare = subparsers.add_parser("prepare", help="promote Unreleased into a numbered release")
+    prepare = subparsers.add_parser("prepare", help="generate the numbered release from the merged pull requests")
     prepare.add_argument("version")
     prepare.add_argument("--date", default=_datetime.date.today().isoformat())
-
-    subparsers.add_parser("stamp", help="write resolved pull request numbers onto Unreleased bullets")
 
     due = subparsers.add_parser("due", help="say whether the scheduled release is due, as a step output")
     due.add_argument("tag")
@@ -466,8 +435,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "prepare":
             prepare_release(args.changelog, args.version, args.date)
-        elif args.command == "stamp":
-            stamp_pull_requests(args.changelog)
         elif args.command == "due":
             release_due(args.changelog, args.tag, args.output)
         elif args.command == "notes":

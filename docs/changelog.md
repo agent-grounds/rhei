@@ -1,11 +1,7 @@
 # Changelog
 
-*No pull request adds a bullet here. Whoever cuts a release writes
-`## Unreleased` first, one bullet per pull request merged since the last
-release, each ending in its own `(PR #N)`. See
-[CONTRIBUTING.md](../CONTRIBUTING.md).*
-
-## Unreleased
+*Each release's section is generated from the pull requests merged since the
+previous release; nothing here is written by hand.*
 
 ## 2. [0.6.0] - 2026-10-03
 

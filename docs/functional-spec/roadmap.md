@@ -38,9 +38,9 @@ gh workflow run pre-release-checks.yml
 Use `scripts/set-release-version.py <version>` to keep the workspace version,
 internal crate dependency requirements, npm package versions, and PyPI package
 versions aligned. `scripts/prepare_changelog_release.py prepare <version>`
-promotes `docs/changelog.md` `Unreleased` into the release section, which is
-written from the pull requests merged since the previous release before either
-release helper runs [§FS-rhei-distribution.5.1](rhei-distribution.spec.md#51-who-writes-unreleased-and-when).
+generates the release section of `docs/changelog.md` from the pull requests
+merged since the previous release, read from the forge, so nobody writes it
+first [§FS-rhei-distribution.5.1](rhei-distribution.spec.md#51-what-a-releases-notes-list).
 
 Patch and minor release helpers perform those steps automatically after a green
 `CI` run on `main`, dry-run the release workflow from a candidate branch, then

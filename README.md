@@ -349,8 +349,8 @@ The rest — `grund config validate`, `lychee`, and the two checks for
 AI-attribution boilerplate — are in
 [`.pre-commit-config.yaml`](.pre-commit-config.yaml), which is the list itself.
 
-A change adds no changelog bullet; the changelog is written before a release —
-see [CONTRIBUTING.md](CONTRIBUTING.md).
+The release writes the changelog from the merged pull requests' titles — see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Library usage
 

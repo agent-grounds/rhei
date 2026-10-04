@@ -1,8 +1,8 @@
 # Changelog
 
 Rhei's changelog is [docs/changelog.md](docs/changelog.md). It carries the
-`Unreleased` section and the latest release inline; the release promotes one
-into the other and archives the release it displaces under `docs/changelog/`
+latest release inline; the release generates the next one from the merged pull
+requests and archives the release it displaces under `docs/changelog/`
 (§FS-rhei-distribution.5).
 
 Nothing below is maintained by the release. The `0.1.0` notes are kept here

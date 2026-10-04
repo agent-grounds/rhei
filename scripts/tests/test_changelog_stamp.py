@@ -48,6 +48,88 @@ class ChangelogStampTests(ScriptTestCase):
         self.assertEqual(result.returncode, 0, self.report(result))
         self.assertIn("- The change this branch made. (PR #339)", repo.read_changelog())
 
+    # --- which placeholder is the bullet's own -----------------------------
+
+    QUOTING = (
+        "- `stamp` now writes the number by replacing a `(PR #TBD)` placeholder where it\n"
+        "  stands, and appends one to a bullet that has none."
+    )
+
+    def test_a_placeholder_quoted_in_the_prose_is_left_as_written(self):
+        """The quoted placeholder is text; the number goes on the end. §FS-rhei-distribution.5.2"""
+        repo, _ = self.repo_with([self.QUOTING])
+
+        result = self.stamp(repo)
+        self.assertEqual(result.returncode, 0, self.report(result))
+        after = repo.read_changelog()
+        self.assertIn(
+            "- `stamp` now writes the number by replacing a `(PR #TBD)` placeholder where it\n"
+            "  stands, and appends one to a bullet that has none. (PR #339)\n",
+            after,
+            "the prose keeps its quoted placeholder and the bullet's end carries the number",
+        )
+        self.assertNotIn("`(PR #339)`", after, "the quoted placeholder is not the bullet's own")
+
+    def test_only_the_trailing_placeholder_is_replaced(self):
+        """A quoted and a trailing placeholder on one line: the trailing one is the bullet's.
+
+        §FS-rhei-distribution.5.2
+        """
+        repo, _ = self.repo_with(["- Replace a `(PR #TBD)` where it stands. (PR #TBD)"])
+
+        result = self.stamp(repo)
+        self.assertEqual(result.returncode, 0, self.report(result))
+        self.assertIn("- Replace a `(PR #TBD)` where it stands. (PR #339)\n", repo.read_changelog())
+
+    def test_a_bare_trailing_placeholder_stays_bare(self):
+        """`PR #TBD` at the end becomes `PR #N` there, and a quoted one stays. §FS-rhei-distribution.5.2"""
+        repo, _ = self.repo_with(["- Write `PR #TBD` onto a bullet's end, as in PR #TBD"])
+
+        result = self.stamp(repo)
+        self.assertEqual(result.returncode, 0, self.report(result))
+        after = repo.read_changelog()
+        self.assertIn("- Write `PR #TBD` onto a bullet's end, as in PR #339\n", after)
+        self.assertNotIn("(PR #339)", after, "no second token follows the replaced one")
+
+    def test_a_trailing_placeholder_split_across_lines_is_replaced(self):
+        """A line break inside the bullet's own placeholder does not hide it. §FS-rhei-distribution.5.2
+
+        The point reads the bullet's ending token over its collapsed text, so a
+        `(PR` / `#TBD)` split is still the bullet's own placeholder: it is
+        replaced, never followed by a second token, and the prose is unchanged.
+        Where the replaced token sits across the lines is not pinned.
+        """
+        repo, _ = self.repo_with(["- The change this branch made, described at length (PR\n  #TBD)"])
+
+        result = self.stamp(repo)
+        self.assertEqual(result.returncode, 0, self.report(result))
+        after = repo.read_changelog()
+        self.assertNotIn("TBD", after, "the split placeholder is replaced")
+        unreleased = after.split("## Unreleased", 1)[1].split("\n## ", 1)[0]
+        self.assertEqual(
+            " ".join(unreleased.split()),
+            "- The change this branch made, described at length (PR #339)",
+            "the bullet ends with exactly one token and its prose is unchanged",
+        )
+
+    def test_a_stamped_quoting_bullet_is_not_stamped_again(self):
+        """After one stamp the bullet ends in its number, so a second run has nothing to do.
+
+        §FS-rhei-distribution.5.2
+        """
+        repo, written = self.repo_with([self.QUOTING])
+        result = self.stamp(repo)
+        self.assertEqual(result.returncode, 0, self.report(result))
+        # A line no commit wrote resolves to nothing, so commit the first stamp.
+        stamped = repo.commit("stamp the bullet")
+        self.set_pulls({written: [339], stamped: [339]})
+
+        once = repo.read_changelog()
+        result = self.stamp(repo)
+        self.assertEqual(result.returncode, 0, self.report(result))
+        self.assertEqual(repo.read_changelog(), once, "a bullet ending in its number is left as written")
+        self.assertNotIn("left unstamped", self.output(result))
+
     def test_it_leaves_a_bullet_that_already_carries_a_number(self):
         repo, _ = self.repo_with(["- An earlier change. (PR #12)"])
 

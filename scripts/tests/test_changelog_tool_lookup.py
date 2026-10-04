@@ -3,9 +3,10 @@
 
 What the resolution buys only shows on Windows, where `CreateProcess` appends
 `.exe` and nothing else, so a `gh` installed as a `.bat` - which is how a shim is
-written, and how these tests' own stub is written - is unreachable. The stamp
-tests are the behavioural proof and they run on that platform in CI
-(§AR-ci-release.1); this reads the source instead, so that dropping the
+written, and how these tests' own stub is written - is unreachable, and the
+release's notes could not be generated at all (§FS-rhei-distribution.5.2). The
+generator and due tests are the behavioural proof and they run on that platform
+in CI (§AR-ci-release.1); this reads the source instead, so that dropping the
 resolution fails on every platform rather than on the one leg.
 """
 
@@ -15,7 +16,7 @@ import ast
 import unittest
 from pathlib import Path
 
-from scripts.tests.changelog_test_support import STAMPER
+from scripts.tests.changelog_test_support import RELEASE_SCRIPT
 
 # The tools the script spawns, and the only two whose lookup is at stake.
 SPAWNED = ("git", "gh")
@@ -56,8 +57,9 @@ class ToolLookupTests(unittest.TestCase):
             self.assertTrue(node.args, f"{script.name}:{node.lineno} spawns with no argv")
             yield node.args[0]
 
-    def test_the_stamper_resolves_what_it_spawns(self):
-        self.assert_no_bare_name_is_spawned(STAMPER)
+    def test_the_release_script_resolves_what_it_spawns(self):
+        """The generator's forge read and git walk go through the same lookup."""
+        self.assert_no_bare_name_is_spawned(RELEASE_SCRIPT)
 
 
 if __name__ == "__main__":

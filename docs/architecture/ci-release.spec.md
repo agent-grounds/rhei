@@ -44,8 +44,10 @@ tests on every contributor's machine
 them a behaviour the cross-platform requirement covers: proving them on Linux
 alone would leave two of the three platforms they run on unproven
 ([§REQ-cross-platform.3](../requirements/cross-platform.md#3-tested-not-assumed)). One of them reads the repository's own
-`docs/changelog.md` and checks the shape the release reads
-([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-who-writes-unreleased-and-when)), so a malformed write-up fails on its own
+`docs/changelog.md` and checks the shape the release reads - the header, one
+inline release section, `Older releases`, and no `## Unreleased`
+([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-what-a-releases-notes-list)) - with the release script's own heading
+patterns, so a changelog the release could not generate into fails on its own
 pull request rather than on the scheduled release.
 
 Subprocess-driving E2E and integration harnesses must ask Cargo to verify and,
@@ -73,7 +75,7 @@ files with the cargo hooks skipped — `test` has just run them on three
 platforms, and running the suite a second time on one of them bought nothing —
 so the remaining hook contract (fissile, lychee, attribution boilerplate) is
 enforced remotely. It runs no changelog step, because no pull request is checked
-for a bullet ([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-who-writes-unreleased-and-when)), and so it checks out the
+for a bullet ([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-what-a-releases-notes-list)), and so it checks out the
 single commit a checkout takes by default: nothing in the job needs the pull
 request's base. The job keeps its name,
 `repository gates (grund, fissile, lychee, changelog, attribution)`, because
@@ -107,14 +109,19 @@ workflow: they require a green `CI` run on `main`, create a version bump commit,
 dry-run the release workflow from the candidate branch, then fast-forward
 `main` and dispatch the publishing release.
 
-Both helpers stamp the changelog's pull request numbers
-([§FS-rhei-distribution.5.2](../functional-spec/rhei-distribution.spec.md#52-what-the-release-stamps)) in the same step
-that bumps the versions, and before the section is promoted: the numbers are
-resolved from the commits the bullets were written in, so they have to be read
-where their authors left them. The stamped changelog rides the version bump
+Both helpers generate the release's notes
+([§FS-rhei-distribution.5.1](../functional-spec/rhei-distribution.spec.md#51-what-a-releases-notes-list)) in the same step
+that bumps the versions: `prepare_changelog_release.py prepare <version>` lists
+the commits since the previous tag with git, maps each to its pull requests
+with one forge read per commit, and writes the numbered section, the archive and
+the `Older releases` line only once the whole list is built. A forge it cannot
+ask fails the step before anything is written
+([§FS-rhei-distribution.5.2](../functional-spec/rhei-distribution.spec.md#52-when-the-forge-cannot-answer)), so a dispatch
+again is the whole recovery. The generated changelog rides the version bump
 commit, so no bot commit and no branch-protection bypass is added. Resolving a
 commit to its pull request is a forge read, which is the one permission the
-stamping adds to these workflows.
+notes add to these workflows. Neither helper writes, stamps or edits the
+changelog in any other step.
 
 `Auto bump` first asks the release script whether a release is due
 ([§FS-rhei-distribution.5.3](../functional-spec/rhei-distribution.spec.md#53-when-the-scheduled-release-waits)). Its step
@@ -124,14 +131,15 @@ the step's `ok` output and the notice the run leaves when it holds. The step
 keeps its id, so every later step keeps the condition it already carries, the
 advance to the next `-dev` version included, and that advance holds with the
 release. The answer lives in the script rather than in the workflow's shell,
-because "last written" is about a section inside a file and needs the parser
-`stamp` and `prepare` read the section with, and because a script is tested on
-all three platforms where a workflow's shell is tested on none. The script
-carries the docs-and-CI filter the step used to run inline, unchanged.
+because "due" is "the list `prepare` would write is not empty", so `due` builds
+that same list rather than a second approximation of it, and because a script is
+tested on all three platforms where a workflow's shell is tested on none. It
+reads paths with git first, with the docs-and-CI filter the step used to run
+inline, so a week of docs alone asks the forge nothing.
 
 `Release minor` does not ask: a person started it, and starting it is the
-decision. `prepare` refuses an empty section on its behalf, and the wording of
-that refusal is the only change `Release minor` sees.
+decision. `prepare` refuses an empty list on its behalf, before any version is
+committed.
 
 ## 4. PGO Boundary
 

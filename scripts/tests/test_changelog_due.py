@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""When the scheduled release is due, and what a release refuses. §FS-rhei-distribution.5.3
+"""When the scheduled release is due. §FS-rhei-distribution.5.3
 
 `prepare_changelog_release.py due <tag>` is `Auto bump`'s gate step
-(§AR-ci-release.3). It answers on the step's `ok` output and it holds - green,
-with a notice - while code has merged since `## Unreleased` was last written,
-because no change adds a bullet of its own any more and a release cut before
-the write-up would ship code the section does not describe. Every history is a
-`TempRepo` under the test's own temporary directory (§REQ-test-isolation.1),
-with every inherited `GIT_*` variable stripped (§REQ-test-isolation.3), so the
-tests run unchanged on all three platforms (§REQ-cross-platform.3).
+(§AR-ci-release.3). It answers on the step's `ok` output, and the release is due
+exactly when the list `prepare` would write is not empty: a pull request that
+changed more than docs and CI has merged since the tag. It holds - green, with a
+notice - otherwise, and fails only when the forge cannot answer. Every history
+is a `TempRepo` under the test's own temporary directory
+(§REQ-test-isolation.1), with every inherited `GIT_*` variable stripped
+(§REQ-test-isolation.3), so the tests run unchanged on all three platforms
+(§REQ-cross-platform.3).
 """
 
 from __future__ import annotations
@@ -19,8 +20,9 @@ import unittest
 from scripts.tests.changelog_test_support import (
     AUTO_BUMP_WORKFLOW,
     RELEASE_MINOR_WORKFLOW,
-    STAMPER as RELEASE_SCRIPT,
+    RELEASE_SCRIPT,
     ScriptTestCase,
+    pull,
     release_changelog,
     workflow_steps,
 )
@@ -29,40 +31,40 @@ TAG = "v0.1.0"
 SOURCE = "crates/rhei-cli/src/main.rs"
 EARLIER_SOURCE = "crates/rhei-cli/src/lib.rs"
 
-NOTE = "*Every pull request adds a bullet under `## Unreleased`.*"
-REWORDED_NOTE = "*`## Unreleased` is written before a release; see CONTRIBUTING.md.*"
-
-
-def hold_notice(last_written: str) -> str:
-    return (
-        f"::notice::Changes merged since ## Unreleased was last written ({last_written[:7]}) "
-        "wait for their release section; skipping."
-    )
-
-
 DOCS_NOTICE = f"::notice::Only docs/CI changes since {TAG}; skipping."
+NO_PULL_NOTICE = f"::notice::No pull request that changed code merged since {TAG}; skipping."
 
 
 class DueTests(ScriptTestCase):
-    """The five histories of the proposal, each read by `due` as the workflow would."""
+    """Each history read by `due` as the workflow would."""
 
     def setUp(self) -> None:
         super().setUp()
         self.github_output = self.tmp / "github_output"
         self.github_output.write_text("", encoding="utf-8")
+        self.pulls: dict[str, list[object]] = {}
 
-    def released(self, note: str | None = None):
-        """A repo whose tag sits on its release commit, which empties `Unreleased`."""
+    def released(self):
+        """A repo whose tag sits on its release commit."""
         repo = self.repo()
-        repo.write_changelog(release_changelog([], note=note))
+        repo.write_changelog(release_changelog())
         repo.write("Cargo.toml", 'version = "0.1.0"\n')
         repo.write(EARLIER_SOURCE, "released\n")
         tagged = repo.commit("Release v0.1.0")
         repo.git("tag", TAG)
         return repo, tagged
 
-    def due(self, repo):
-        return self.run_script(RELEASE_SCRIPT, ["due", TAG, "--output", str(self.github_output)], repo)
+    def land(self, repo, pr, *paths: str) -> str:
+        """One commit changing `paths`, belonging to `pr` (or to no pull request)."""
+        for path in paths:
+            repo.write(path)
+        sha = repo.commit(f"a commit of {pr and pr['number']}")
+        self.pulls[sha] = [pr] if pr is not None else []
+        return sha
+
+    def due(self, repo, **env: str | None):
+        self.set_pulls(self.pulls)
+        return self.run_script(RELEASE_SCRIPT, ["due", TAG, "--output", str(self.github_output)], repo, **env)
 
     def ok(self) -> list[str]:
         """Every `ok=` line `due` wrote for the step, which should be exactly one."""
@@ -72,73 +74,75 @@ class DueTests(ScriptTestCase):
     def notices(self, result) -> list[str]:
         return [line for line in result.stdout.splitlines() if line.startswith("::notice::")]
 
-    def test_code_then_its_write_up_is_due(self):
+    def test_a_merged_pull_request_that_changed_code_is_due(self):
+        """The ticket's case: today it holds until somebody writes `## Unreleased`."""
         repo, _ = self.released()
-        repo.write(SOURCE)
-        repo.commit("the change itself")
-        repo.write_changelog(release_changelog(["- The change itself. (PR #7)"]))
-        repo.commit("Write the release section")
+        self.land(repo, None, "Cargo.toml")
+        self.land(repo, pull(7, "Fix the runner"), SOURCE)
 
         result = self.due(repo)
         self.assertEqual(result.returncode, 0, self.report(result))
         self.assertEqual(self.ok(), ["ok=true"], self.report(result))
-        self.assertNotIn("wait for their release section", result.stdout)
+        self.assertEqual(self.notices(result), [], self.report(result))
 
-    def test_code_merged_after_the_write_up_holds(self):
-        """The ticket's case: the workflow would release code no bullet describes."""
+    def test_the_dev_advance_alone_holds_because_it_belongs_to_no_pull_request(self):
         repo, _ = self.released()
-        repo.write(EARLIER_SOURCE)
-        repo.commit("an earlier change")
-        repo.write_changelog(release_changelog(["- An earlier change. (PR #7)"]))
-        written = repo.commit("Write the release section")
-        repo.write(SOURCE)
-        repo.commit("a change merged after the write-up")
+        self.land(repo, None, "Cargo.toml")
 
         result = self.due(repo)
         self.assertEqual(result.returncode, 0, f"a hold ends green\n{self.report(result)}")
         self.assertEqual(self.ok(), ["ok=false"], self.report(result))
-        self.assertIn(hold_notice(written), self.notices(result), self.report(result))
-        self.assertIn(SOURCE, result.stdout, "the notice lists what is waiting")
-        self.assertNotIn(EARLIER_SOURCE, result.stdout, "only what merged after the write-up waits")
+        self.assertEqual(self.notices(result), [NO_PULL_NOTICE], self.report(result))
 
-    def test_the_dev_advance_after_a_release_holds(self):
-        """Today this reaches `prepare` with nothing pending and the run goes red."""
-        repo, tagged = self.released()
-        repo.write("Cargo.toml", 'version = "0.1.1-dev"\n')
-        repo.commit("Open 0.1.1-dev for development")
+    def test_a_docs_only_pull_request_and_the_dev_advance_hold(self):
+        repo, _ = self.released()
+        self.land(repo, None, "Cargo.toml")
+        self.land(repo, pull(7, "Reword the guide"), "docs/guide.md")
 
         result = self.due(repo)
         self.assertEqual(result.returncode, 0, self.report(result))
         self.assertEqual(self.ok(), ["ok=false"], self.report(result))
-        self.assertIn(hold_notice(tagged), self.notices(result), "the tag counts as the last write")
-        self.assertIn("Cargo.toml", result.stdout)
+        self.assertEqual(self.notices(result), [NO_PULL_NOTICE], self.report(result))
 
-    def test_only_docs_and_ci_since_the_tag_is_not_due(self):
-        """The filter the workflow ran inline, moved into the script unchanged."""
+    def test_only_docs_and_ci_since_the_tag_holds_without_asking_the_forge(self):
+        """Passes today, and must keep passing: a docs-only week costs no forge call."""
         repo, _ = self.released()
-        for path in ("docs/guide.md", ".github/workflows/ci.yml", "README.md", "crates/rhei-cli/README.md",
-                     "LICENSE", "lychee.toml"):
-            repo.write(path)
-        repo.commit("docs and CI only")
+        self.land(
+            repo,
+            pull(7, "Docs and CI"),
+            "docs/guide.md", ".github/workflows/ci.yml", "README.md", "crates/rhei-cli/README.md",
+            "LICENSE", "lychee.toml",
+        )
 
         result = self.due(repo)
         self.assertEqual(result.returncode, 0, self.report(result))
         self.assertEqual(self.ok(), ["ok=false"], self.report(result))
         self.assertIn(DOCS_NOTICE, self.notices(result), self.report(result))
-        self.assertNotIn("wait for their release section", result.stdout)
+        self.assertEqual(self.gh_calls(), [], "the paths alone answered; the forge was not asked")
 
-    def test_an_edit_to_the_note_above_the_section_is_not_a_write(self):
-        repo, tagged = self.released(note=NOTE)
-        repo.write(SOURCE)
-        repo.commit("the change itself")
-        repo.write_changelog(release_changelog([], note=REWORDED_NOTE))
-        repo.commit("Reword the changelog's note")
+    def test_a_forge_that_cannot_answer_fails_the_run(self):
+        """A list `due` could not build is not an empty one. §FS-rhei-distribution.5.2"""
+        repo, _ = self.released()
+        unanswered = self.land(repo, pull(7, "Fix the runner"), SOURCE)
+
+        result = self.due(repo, GH_STUB_FAIL=unanswered)
+        self.assertEqual(result.returncode, 1, self.report(result))
+        self.assertIn(
+            f"error: could not ask the forge about commit {unanswered[:7]}: HTTP 502: Bad Gateway",
+            result.stderr,
+            self.report(result),
+        )
+        self.assertNotIn("ok=true", self.ok())
+
+    def test_due_never_speaks_of_a_last_write(self):
+        """The "last written" hold is gone with `## Unreleased`."""
+        repo, _ = self.released()
+        self.land(repo, pull(7, "Fix the runner"), SOURCE)
+        self.land(repo, pull(8, "Fix the runner again"), EARLIER_SOURCE)
 
         result = self.due(repo)
-        self.assertEqual(result.returncode, 0, self.report(result))
-        self.assertEqual(self.ok(), ["ok=false"], self.report(result))
-        self.assertIn(hold_notice(tagged), self.notices(result), self.report(result))
-        self.assertIn(SOURCE, result.stdout)
+        self.assertNotIn("last written", self.output(result), self.report(result))
+        self.assertEqual(self.ok(), ["ok=true"], self.report(result))
 
 
 class AutoBumpGateStepTests(unittest.TestCase):
@@ -181,23 +185,16 @@ class AutoBumpGateStepTests(unittest.TestCase):
         self.assertNotRegex(text, r"prepare_changelog_release\.py\s+due\b")
 
 
-class PrepareRefusalTests(ScriptTestCase):
-    """What `Release minor` meets when nobody wrote the section. §FS-rhei-distribution.5.3"""
+class NoStampStepTests(unittest.TestCase):
+    """Neither release helper stamps; both generate the notes in `prepare`. §AR-ci-release.3"""
 
-    def test_prepare_refuses_an_empty_section_and_says_to_write_it(self):
-        repo = self.repo()
-        repo.write_changelog(release_changelog([]))
-        repo.commit("Release v0.1.0")
-        before = repo.read_changelog()
-
-        result = self.run_script(RELEASE_SCRIPT, ["prepare", "0.1.1", "--date", "2026-10-05"], repo)
-        self.assertEqual(result.returncode, 1, self.report(result))
-        self.assertIn(
-            "## Unreleased has no bullet entries to promote; write the release section first",
-            result.stderr,
-        )
-        self.assertEqual(repo.read_changelog(), before, "a refusal writes nothing")
-        self.assertFalse((repo.path / "docs" / "changelog" / "0.1.0.md").exists(), "nor archives anything")
+    def test_neither_helper_calls_stamp(self):
+        for workflow in (AUTO_BUMP_WORKFLOW, RELEASE_MINOR_WORKFLOW):
+            text = workflow.read_text(encoding="utf-8")
+            stamp = re.search(r"prepare_changelog_release\.py\s+stamp\b", text)
+            self.assertIsNone(stamp, f"{workflow.name} still calls `stamp`")
+            prepare = re.search(r"prepare_changelog_release\.py\s+prepare\b", text)
+            self.assertIsNotNone(prepare, f"{workflow.name} no longer calls `prepare`")
 
 
 if __name__ == "__main__":

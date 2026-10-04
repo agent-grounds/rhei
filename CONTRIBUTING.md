@@ -21,7 +21,7 @@ what changed, so nothing checks a branch for a bullet.
 
 The changelog is written before a release instead, by whoever cuts it, in one
 pull request of its own that lands before either release helper runs
-([§FS-rhei-distribution.5.1](docs/functional-spec/rhei-distribution.spec.md#51-who-writes-unreleased-and-when)):
+([§FS-rhei-distribution.5.1](docs/functional-spec/rhei-distribution.spec.md#51-what-a-releases-notes-list)):
 
 - The list is every pull request merged since the previous release tag that
   changed more than docs and CI. Docs and CI are the paths under `docs/` and

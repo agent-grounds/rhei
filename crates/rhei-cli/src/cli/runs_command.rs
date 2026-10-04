@@ -386,6 +386,8 @@ fn signal_run(descriptor: &RunDescriptor, what: &str) -> MietteResult<()> {
 
 #[cfg(all(unix, not(target_os = "linux")))]
 fn signal_run(descriptor: &RunDescriptor, what: &str) -> MietteResult<()> {
+    use nix::unistd::Pid;
+
     let pid = Pid::from_raw(descriptor.pid as i32);
     signal::kill(pid, Signal::SIGINT).map_err(|err| {
         miette!(

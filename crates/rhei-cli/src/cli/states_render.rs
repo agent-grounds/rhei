@@ -260,7 +260,7 @@ fn render_state_machine_json(machine: &rhei_validator::StateMachine) -> Result<S
     let version =
         serde_json::to_value(&machine.version).context("serialize state machine version")?;
 
-    let payload = serde_json::json!({
+    let mut payload = serde_json::json!({
         "name": machine.name,
         "models": &machine.models,
         "prompt_templates": &machine.prompt_templates,
@@ -270,6 +270,13 @@ fn render_state_machine_json(machine: &rhei_validator::StateMachine) -> Result<S
         "states": states,
         "transitions": transitions,
     });
+    // The machine's bound as authored, omitted rather than null. §FS-rhei-states-cmd.5
+    if let Some(bound) = machine.callback_timeout.as_deref() {
+        payload
+            .as_object_mut()
+            .expect("machine JSON is an object")
+            .insert("callback_timeout".to_string(), serde_json::json!(bound));
+    }
 
     serde_json::to_string_pretty(&payload).context("render state machine as JSON")
 }

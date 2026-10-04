@@ -189,11 +189,30 @@ fn check_marker(root: &Path) -> io::Result<()> {
     )))
 }
 
+// Unset in every `rhei` binary: only a test binary's in-process code pins it, at
+// startup, so no sibling moving `XDG_STATE_HOME` can move a guard. §REQ-test-isolation.6
+static PINNED_STATE_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Pin, for the rest of this process, the state directory every root guard and
+/// the budget authority resolve under, in place of the account's. This is a hook
+/// for test binaries in dependent crates: compiling it in changes nothing until a
+/// test calls it, so a built `rhei` still resolves its state directory as
+/// §FS-rhei-recover.4 and §FS-rhei-budgets.5.3 say. The first pin wins; a later
+/// one returns `false` and moves nothing. §REQ-test-isolation.6
+#[doc(hidden)]
+pub fn pin_state_dir_for_tests(dir: PathBuf) -> bool {
+    crate::budget::pin_authority_base(dir.clone());
+    PINNED_STATE_DIR.set(dir).is_ok()
+}
+
 /// Lock storage belongs to the account, never to a read-only project. §FS-rhei-recover.4
 fn lock_path(root: &Path) -> io::Result<PathBuf> {
     #[cfg(test)]
     if let Some(base) = LOCK_BASE.with(|base| base.borrow().clone()) {
         return Ok(guard_lock(&base, root));
+    }
+    if let Some(base) = PINNED_STATE_DIR.get() {
+        return Ok(guard_lock(base, root));
     }
     let base = std::env::var_os("XDG_STATE_HOME")
         .map(PathBuf::from)

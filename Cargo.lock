@@ -1365,6 +1365,7 @@ dependencies = [
  "clap_lex 1.0.0",
  "crossbeam-channel",
  "crossterm",
+ "ctor",
  "fs2",
  "include_dir",
  "indexmap",

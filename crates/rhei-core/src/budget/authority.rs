@@ -229,7 +229,6 @@ pub(crate) fn write_durable(path: &Path, bytes: &[u8]) -> Result<()> {
 /// variable set is a condition of the moment, and caching it would refuse every
 /// later admission of the process on the strength of one.
 pub(super) fn authority_base() -> Result<PathBuf> {
-    static BASE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
     if let Some(base) = BASE.get() {
         return Ok(base.clone());
     }
@@ -247,6 +246,14 @@ pub(super) fn authority_base() -> Result<PathBuf> {
             )
         })?;
     Ok(BASE.get_or_init(|| resolved).clone())
+}
+
+static BASE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// A test binary settles the base before any admission, so no test moving
+/// `XDG_STATE_HOME` decides where a sibling's witness lives. §REQ-test-isolation.6
+pub(crate) fn pin_base(base: PathBuf) {
+    let _ = BASE.set(base);
 }
 
 /// Resolve the longest existing prefix of `base` and re-attach the rest.

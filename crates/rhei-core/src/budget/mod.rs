@@ -62,6 +62,7 @@ mod window_tests;
 pub use account::{Account, Retirement, ACCOUNT_DIR};
 pub use admission::{AdmissionRequest, AppliedEdge, Arm, EffectiveBounds, ReservationGroup};
 pub use ancestry::{Ancestry, AncestryDescriptor};
+pub(crate) use authority::pin_base as pin_authority_base;
 pub use bounds::{halt_text, Bound, BoundSource, BoundUnit, Remedy};
 pub use diagnosis::{Damage, Diagnosis, Foreign, History, Inspection, Retired};
 pub use events::{BudgetEvent, BudgetLine};

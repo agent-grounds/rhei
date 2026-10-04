@@ -166,4 +166,53 @@ mod headless_launch_registry_tests {
         let warned = String::from_utf8_lossy(&err).into_owned();
         assert!(!warned.contains(UNREGISTERED), "a false registry warning:\n{warned}");
     }
+
+    /// A state home without hard links (vfat, exFAT, a link-less FUSE mount)
+    /// refuses the link, never with `AlreadyExists`.
+    fn refused_link(_: &Path, _: &Path) -> std::io::Result<()> {
+        Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
+    }
+
+    /// Where the link is refused, an entry the child already wrote is still
+    /// the entry the id resolves through: no warning, and no change to it.
+    // §FS-rhei-run-headless.1.1
+    #[test]
+    fn a_refused_link_beside_the_childs_entry_is_not_a_failure() {
+        let _registry = IsolatedRegistry::new();
+        let workspace = workspace();
+        let running = descriptor("a436f5", &workspace.path, "2026-10-04T02:41:00Z");
+        let entry = run_registry_path("a436f5").expect("an isolated state home");
+        write_descriptor(&entry, &running).expect("the child's own entry");
+        let before = fs::read(&entry).expect("read the entry");
+
+        let published = publish_registry_entry_with(&running, refused_link);
+
+        assert_eq!(published, Ok(()), "a warning for an id that resolves");
+        assert_eq!(fs::read(&entry).expect("read the entry"), before, "the child's entry was replaced");
+    }
+
+    /// Where the link is refused and the child has not written yet, the
+    /// launcher still makes the id resolve before printing it, and leaves no
+    /// temp behind.
+    // §FS-rhei-run-headless.1.1
+    #[test]
+    fn a_refused_link_still_publishes_the_entry() {
+        let _registry = IsolatedRegistry::new();
+        let workspace = workspace();
+        let (running, _held) = running_before_its_entry("a436f6", &workspace.path);
+
+        let published = publish_registry_entry_with(&running, refused_link);
+
+        assert_eq!(published, Ok(()), "the entry was not published");
+        let resolved = resolve_run(Some("a436f6"))
+            .unwrap_or_else(|error| panic!("the printed id does not resolve: {error:?}"));
+        assert_eq!(resolved.id, "a436f6");
+        let dir = run_registry_dir().expect("an isolated state home");
+        let leftovers: Vec<_> = fs::read_dir(&dir)
+            .expect("read the registry")
+            .filter_map(|item| item.ok())
+            .filter(|item| item.file_name().to_string_lossy().contains(".launcher-"))
+            .collect();
+        assert!(leftovers.is_empty(), "a launcher temp was left behind: {leftovers:?}");
+    }
 }

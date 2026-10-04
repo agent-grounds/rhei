@@ -212,7 +212,7 @@ fn try_auto_advance_task(
     // see `emit_snapshots_after_transition_selection` for the call site.
 
     // §FS-rhei-run.3: Select, emit, then apply transitions.
-    let loaded = load_plan(input)?;
+    let loaded = load_run_plan(input)?;
     let target_id = parse_task_id(task_id_str);
     let Some(task) = find_task_by_id(&loaded.rhei.tasks, &target_id) else {
         return Ok(None);

@@ -31,6 +31,8 @@ fn handle_parallel_program_completion(
         mut release,
         result,
         slot: _,
+        reverted,
+        spawn_record,
     } = completion;
     // The completed item's owning rhei supplies its machine and callback base.
     // §DA-per-rhei-state-machines
@@ -51,7 +53,15 @@ fn handle_parallel_program_completion(
         Ok(program_outcome) => {
             let mut advanced = false;
             let target_id = parse_task_id(&task_id_str);
-            let mut reloaded = load_plan(input)?;
+            let mut reloaded = reload_after_worker_exit(input, &mut release, &spawn_record)?;
+            // A reverted edit spends the attempt and routes nothing. §FS-rhei-run.3.7.4
+            if reverted && !program_outcome.timed_out {
+                let (task, state) = (task_id_str.as_str(), state_name.as_str());
+                charge_reverted_attempt(&mut release, &reloaded, input, machine, task, state)?;
+                let effect =
+                    ParallelProgramCompletionEffect { advanced: false, program_spawned: true };
+                return Ok(effect);
+            }
             let task_after = find_task_by_id(&reloaded.rhei.tasks, &target_id);
             let mut state_after =
                 task_after.map(|task| task.state.as_str()).unwrap_or("unknown").to_string();
@@ -95,7 +105,7 @@ fn handle_parallel_program_completion(
                     }
                     TimeoutTransitionOutcome::Failed => {}
                 }
-                reloaded = load_plan(input)?;
+                reloaded = load_run_plan(input)?;
                 state_after = reloaded
                     .rhei
                     .tasks

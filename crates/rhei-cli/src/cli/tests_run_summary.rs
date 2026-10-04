@@ -524,6 +524,7 @@ transitions:
             wall_clock: std::time::SystemTime::now(),
             exit_code: Some(0),
             duration_ms: 1_200,
+            reverted: None,
         });
         s
     }

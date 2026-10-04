@@ -299,7 +299,7 @@ fn refill_parallel_worker_pool(
         return Ok(program_outcome);
     }
 
-    let reloaded = load_plan(input)?;
+    let reloaded = load_run_plan(input)?;
     let active_task_ids = active_invocation_counts.keys().cloned().collect::<HashSet<_>>();
     let active_nonconcurrent_states = active_state_counts.keys().cloned().collect::<HashSet<_>>();
     let (mut agent_items, agent_deferred) = collect_ready_agent_work_items(

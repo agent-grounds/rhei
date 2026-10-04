@@ -30,7 +30,7 @@ fn run_agent_mode(
     let command = current_command_line();
 
     let (initial_total_tasks, initial_states) = {
-        let loaded = load_plan(input)?;
+        let loaded = load_run_plan(input)?;
         (
             total_task_count(&loaded.rhei),
             collect_initial_states(&loaded.rhei, &live.machines.set),
@@ -117,7 +117,7 @@ fn run_agent_mode(
         };
     }
 
-    let loaded = load_plan(input)?;
+    let loaded = load_run_plan(input)?;
     let initial_terminal_count = terminal_task_count(&loaded.rhei, &live.machines.set);
     run_info!(
         "Running {} '{}' with {} task(s) ({} terminal at start).",
@@ -482,7 +482,7 @@ fn run_agent_mode(
 
         // Handle callback-only tasks first (fast, synchronous).
         for (task_id_str, current_state_raw, current_state, judge_release) in &callback_tasks {
-            let loaded = load_plan(input)?;
+            let loaded = load_run_plan(input)?;
             let target_id = parse_task_id(task_id_str);
             let machine = machines.for_task_str(task_id_str);
             let callback_paths = machines.callbacks_for_str(task_id_str);
@@ -588,7 +588,7 @@ fn run_agent_mode(
                     );
                     advanced_any = true;
                     callback_transitions_made += 1;
-                    let reloaded = load_plan(input)?;
+                    let reloaded = load_run_plan(input)?;
                     let discovered = newly_discovered_tasks(&task_ids_before, &reloaded.rhei.tasks);
                     if !discovered.is_empty() {
                         run_info!(
@@ -651,7 +651,7 @@ fn run_agent_mode(
         if !program_tasks.is_empty() && !run_programs_in_worker_pool {
             if opts.dry_run() {
                 for (task_id_str, current_state_raw, current_state, resolved) in &program_tasks {
-                    let loaded = load_plan(input)?;
+                    let loaded = load_run_plan(input)?;
                     let target_id = parse_task_id(task_id_str);
                     let machine = machines.for_task_str(task_id_str);
                     if let Some(task) = find_task_by_id(&loaded.rhei.tasks, &target_id) {
@@ -819,7 +819,7 @@ fn run_agent_mode(
         if opts.dry_run() {
             if run_programs_in_worker_pool {
                 for (task_id_str, current_state_raw, current_state, resolved) in &program_tasks {
-                    let loaded = load_plan(input)?;
+                    let loaded = load_run_plan(input)?;
                     let target_id = parse_task_id(task_id_str);
                     let machine = machines.for_task_str(task_id_str);
                     if let Some(task) = find_task_by_id(&loaded.rhei.tasks, &target_id) {
@@ -847,7 +847,7 @@ fn run_agent_mode(
                 }
             }
             for (task_id_str, current_state_raw, _, resolved) in &batch {
-                let loaded = load_plan(input)?;
+                let loaded = load_run_plan(input)?;
                 let target_id = parse_task_id(task_id_str);
                 let machine = machines.for_task_str(task_id_str);
                 if let Some(task) = find_task_by_id(&loaded.rhei.tasks, &target_id) {
@@ -983,7 +983,7 @@ fn run_agent_mode(
             progress_since_stall_reset = false;
             continue;
         }
-        let loaded = load_plan(input)?;
+        let loaded = load_run_plan(input)?;
         // §FS-rhei-run.5.1: the sleep is the continuous mode's.
         if !opts.until_idle() {
             if let Some(deadline) = agent_deadline_since(
@@ -1033,7 +1033,7 @@ fn run_agent_mode(
 
     // §FS-rhei-run.4: a preview predicts it only when its own scan found
     // nothing schedulable, which is `pass` never leaving zero.
-    let stopped = opts.until_idle().then(|| load_plan(input)).transpose()?;
+    let stopped = opts.until_idle().then(|| load_run_plan(input)).transpose()?;
     let idle = stopped
         .as_ref()
         .filter(|_| !interrupted_run && (!opts.dry_run() || pass == 0))
@@ -1076,14 +1076,14 @@ fn run_agent_mode(
         (terminal_count, total_tasks)
     } else if agents_spawned == 0 && programs_spawned == 0 {
         if callback_transitions_made == 0 {
-            let loaded = load_plan(input)?;
+            let loaded = load_run_plan(input)?;
             run_info!(
                 "{}",
                 no_advancement_summary(&loaded.rhei, &live.machines.set, &rhei_scope)
             );
             (0usize, 0usize)
         } else {
-            let loaded = load_plan(input)?;
+            let loaded = load_run_plan(input)?;
             let terminal_count = terminal_task_count(&loaded.rhei, &live.machines.set);
             let total_tasks = total_task_count(&loaded.rhei);
             // An interrupted run did not complete; saying so twice — once as
@@ -1113,7 +1113,7 @@ fn run_agent_mode(
             (terminal_count, total_tasks)
         }
     } else {
-        let loaded = load_plan(input)?;
+        let loaded = load_run_plan(input)?;
         let terminal_count = terminal_task_count(&loaded.rhei, &live.machines.set);
         let total_tasks = total_task_count(&loaded.rhei);
         // §FS-rhei-run.3.2: the run stopped; it did not complete.
@@ -1161,7 +1161,7 @@ fn run_agent_mode(
         None
     } else {
         // §FS-rhei-cost-accounting.7: RunFinished carries available run totals.
-        match load_plan(input) {
+        match load_run_plan(input) {
             Ok(loaded) => match regenerate_accounting_indexes(&workspace_root, &loaded.rhei) {
                 Ok(summary) => summary,
                 Err(err) => {
@@ -1234,7 +1234,7 @@ fn run_agent_mode(
     }
 
     if !opts.dry_run() {
-        let loaded = load_plan(input)?;
+        let loaded = load_run_plan(input)?;
         // §FS-rhei-panta.6.1: a narrowed run halts on in-scope work only —
         // out-of-scope tickets left non-terminal are not a failure.
         if scoped_unfinished_task_exists(&loaded.rhei, &live.machines.set, &rhei_scope)

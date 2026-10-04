@@ -53,7 +53,7 @@ fn handle_parallel_agent_exit(
     budget_record_start(workspace_root, &task_id_str, true, sink);
     *progress.agents_spawned += 1;
     let target_id = parse_task_id(&task_id_str);
-    let reloaded = load_plan(input)?;
+    let reloaded = reload_after_worker_exit(input, &mut release, &spawn_record)?;
     // §FS-rhei-agents.3.2 condition (2): declared `outputs:` and the terminal
     // result resolve against the owning rhei's root, not the run-level one.
     let task_root = reloaded.task_root(&task_id_str, workspace_root);
@@ -66,6 +66,16 @@ fn handle_parallel_agent_exit(
                 err
             );
         }
+    }
+    // A reverted edit spends the attempt and routes nothing; no edge, so the
+    // travel unit goes back. §FS-rhei-run.3.7.4 §FS-rhei-budgets.4.1
+    if attempt_was_reverted(&spawn_record) && !timed_out {
+        let (task, state) = (task_id_str.as_str(), state_name.as_str());
+        charge_reverted_attempt(&mut release, &reloaded, input, machine, task, state)?;
+        progress.stalled_tasks.insert(task_id_str.clone());
+        drop(release);
+        budget_settle_visit(workspace_root, &task_id_str, sink);
+        return Ok(());
     }
     let task_after = find_task_by_id(&reloaded.rhei.tasks, &target_id);
     let stayed_in_state = task_after.is_some_and(|task| {

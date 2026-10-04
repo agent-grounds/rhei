@@ -120,7 +120,7 @@ fn run_agent_worker_pool(
         // unrelated worker to exit. Re-read in bounded slices, as the outer
         // sleep does, so persisted deadline edits also wake us. §FS-rhei-run.3.3
         let provider_wait = active_invocation_counts.len() < task_limit
-            && has_pending_provider_wait(&load_plan(input)?.rhei, &live.machines.set);
+            && has_pending_provider_wait(&load_run_plan(input)?.rhei, &live.machines.set);
         let message = if provider_wait {
             rx.recv_timeout(Duration::from_secs(1))
         } else {
@@ -324,7 +324,7 @@ fn run_agent_worker_pool(
                 // above. §FS-rhei-run-tui.1.7
                 drop(release);
                 if accounting_recorded {
-                    let reloaded = load_plan(input)?;
+                    let reloaded = load_run_plan(input)?;
                     if let Err(rollup_err) =
                         regenerate_accounting_indexes(workspace_root, &reloaded.rhei)
                     {

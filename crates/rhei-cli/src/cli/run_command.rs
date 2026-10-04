@@ -247,7 +247,10 @@ fn run_command(
     let startup_locks = if is_headless_child() && !opts.dry_run() {
         Some(headless_startup_run_locks(input)?)
     } else { None };
-    let mut loaded = load_plan_for_run(input, &opts, state_machine_path)?;
+    // §FS-rhei-run.3.7: armed before the first load, which is attributed like a reload.
+    arm_worker_regions(input);
+    let mut loaded = load_plan_for_run(input, &opts, state_machine_path)
+        .map_err(|err| attribute_startup_break(input, err))?;
     let workspace_root = run_execution_root(input);
     // §FS-rhei-recover.4: never wait for a run lock while retaining shared root access.
     let lock_roots = run_lock_roots(&loaded, &workspace_root);
@@ -260,7 +263,8 @@ fn run_command(
     } else {
         drop(loaded);
         let locks = acquire_run_locks(&lock_roots, &opts)?;
-        loaded = load_plan_for_run(input, &opts, state_machine_path)?;
+        loaded = load_plan_for_run(input, &opts, state_machine_path)
+            .map_err(|err| attribute_startup_break(input, err))?;
         if run_lock_roots(&loaded, &workspace_root) != lock_roots {
             return Err(diagnostic!("execution roots changed while acquiring run locks; retry the run"));
         }

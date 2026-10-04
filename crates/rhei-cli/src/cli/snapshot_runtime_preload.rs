@@ -269,7 +269,7 @@ fn preload_snapshot_inherit_before_spawn_with_prior_sources(
                 "internal error: snapshot override selected without a reference"
             )
         })?;
-        let loaded = load_plan(input)?;
+        let loaded = load_run_plan(input)?;
         let ctx = SnapshotCommandContext {
             workspace_root: roots.project.to_path_buf(),
             plan_path: input.to_path_buf(),

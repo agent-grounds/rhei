@@ -191,6 +191,8 @@ include!("cli/new_verify.rs");
 include!("cli/run_command.rs");
 include!("cli/run_live_admission.rs");
 include!("cli/run_slot_release.rs");
+include!("cli/run_worker_regions.rs");
+include!("cli/run_worker_edits.rs");
 include!("cli/run_work_items.rs");
 include!("cli/run_empty_visit_holds.rs");
 include!("cli/run_parallel_spawn.rs");
@@ -282,6 +284,7 @@ mod tests {
     include!("cli/tests_agent_prompt_transport.rs");
     include!("cli/tests_agent_family.rs");
     include!("cli/tests_spawn_records.rs");
+    include!("cli/tests_worker_edit_regions.rs");
     include!("cli/tests_session_reports.rs");
     include!("cli/tests_session_report_streams.rs");
     include!("cli/tests_program_exit_routes.rs");

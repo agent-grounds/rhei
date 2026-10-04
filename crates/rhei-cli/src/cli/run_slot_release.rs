@@ -49,11 +49,13 @@ struct PendingSlotRelease {
     sink: Arc<dyn rhei_tui::EventSink>,
     /// `None` only once [`Drop`] has taken it to emit.
     release: Option<SlotRelease>,
+    /// Where the worker's edit broke the plan, when the run reverted it. §FS-rhei-run.3.7.7
+    reverted: Option<String>,
 }
 
 impl PendingSlotRelease {
     fn hold(sink: Arc<dyn rhei_tui::EventSink>, release: SlotRelease) -> Self {
-        Self { sink, release: Some(release) }
+        Self { sink, release: Some(release), reverted: None }
     }
 
     /// The engine selected this state's poll self-loop and scheduled the next
@@ -78,6 +80,28 @@ impl PendingSlotRelease {
     }
 }
 
+impl PendingSlotRelease {
+    /// The worker's edit broke the plan at `location` and was reverted. §FS-rhei-run.3.7.7
+    fn reverted(&mut self, location: &str) {
+        self.reverted = Some(location.to_string());
+    }
+
+    /// The attempt is spent without a transition, whatever its exit read as. §FS-rhei-run.3.7.4
+    fn failed(&mut self, reason: &str) {
+        if let Some(release) = self.release.as_mut() {
+            release.outcome = rhei_tui::TaskOutcome::Failed(reason.to_string());
+        }
+    }
+
+    /// The run stopped before routing this exit, as it does a worker it
+    /// interrupts. §FS-rhei-run.3.7.6
+    fn interrupted(&mut self) {
+        if let Some(release) = self.release.as_mut() {
+            release.outcome = rhei_tui::TaskOutcome::Interrupted;
+        }
+    }
+}
+
 impl Drop for PendingSlotRelease {
     fn drop(&mut self) {
         let Some(release) = self.release.take() else { return };
@@ -92,6 +116,7 @@ impl Drop for PendingSlotRelease {
             wall_clock: release.wall_clock,
             exit_code: release.exit_code,
             duration_ms: release.duration_ms,
+            reverted: self.reverted.take(),
         });
     }
 }

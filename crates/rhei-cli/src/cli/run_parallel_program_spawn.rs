@@ -23,7 +23,7 @@ fn spawn_parallel_program_work_item(
     if interrupt_requested() {
         return Ok(ParallelProgramSpawnOutcome::Skipped);
     }
-    let loaded = load_plan(input)?;
+    let loaded = load_run_plan(input)?;
     let target_id = parse_task_id(&item.task_id_str);
     // The item's owning rhei supplies its machine and callback base.
     // §DA-per-rhei-state-machines
@@ -102,6 +102,8 @@ fn spawn_parallel_program_work_item(
     // Read before the plan moves into the worker: only here are the plan and
     // the resolved budget both in hand. §FS-rhei-agents.3.2.1
     let outlook_for_result = plan.retry_outlook(budget);
+    // Taken here, before the worker exists to edit anything. §FS-rhei-run.3.7.1
+    let lease = begin_worker_region(&loaded, input, &item.task_id_str, &item.current_state, budget);
     let plan_for_thread = plan;
     let resolved_for_thread = item.resolved.clone();
     let workspace_root_for_thread = workspace_root.to_path_buf();
@@ -162,14 +164,14 @@ fn spawn_parallel_program_work_item(
             // Read here, where the process was reaped, and emitted by the main
             // thread once it knows whether this attempt was a poll state's
             // handled wait. §FS-rhei-states.2.2
-            let release = PendingSlotRelease::hold(
-                sink_for_thread,
+            let mut release = PendingSlotRelease::hold(
+                sink_for_thread.clone(),
                 SlotRelease {
                     slot,
                     task: task_id_for_result.clone(),
                     from: from_state,
                     to: state_name_for_result.clone(),
-                    log_path: log_for_thread,
+                    log_path: log_for_thread.clone(),
                     outcome,
                     finished_at: std::time::Instant::now(),
                     wall_clock: std::time::SystemTime::now(),
@@ -177,6 +179,7 @@ fn spawn_parallel_program_work_item(
                     duration_ms,
                 },
             );
+            let reverted = lease.exited(&plan_for_thread, &mut release);
             ParallelAgentThreadMessage::ProgramCompleted(ParallelProgramCompletion {
                 task_id_str: task_id_for_result,
                 state_name: state_name_for_result,
@@ -184,6 +187,8 @@ fn spawn_parallel_program_work_item(
                 release,
                 result,
                 slot,
+                reverted,
+                spawn_record: plan_for_thread.record.clone(),
             })
         }));
         let message = thread_result.unwrap_or(ParallelAgentThreadMessage::Panicked {

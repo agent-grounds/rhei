@@ -37,7 +37,7 @@ fn run_sequential_program_work_items(
         if interrupt_requested() {
             break;
         }
-        let loaded = load_plan(input)?;
+        let loaded = load_run_plan(input)?;
         let target_id = parse_task_id(task_id_str);
         let machine = machines.for_task_str(task_id_str);
         let callback_paths = machines.callbacks_for_str(task_id_str);
@@ -125,6 +125,7 @@ fn run_sequential_program_work_items(
             wall_clock: started_wall,
         });
 
+        let lease = begin_worker_region(&loaded, input, task_id_str, current_state, budget);
         let spawn_result =
             spawn_and_wait_program(resolved, &render_context, &log, &plan, sink);
         let duration_ms = started_at.elapsed().as_millis() as u64;
@@ -147,6 +148,7 @@ fn run_sequential_program_work_items(
                 duration_ms,
             },
         );
+        let reverted = lease.exited(&plan, &mut release);
 
         match spawn_result {
             // §FS-rhei-run.3.2: interrupted, so no transition fires.
@@ -159,7 +161,14 @@ fn run_sequential_program_work_items(
             }
             Ok(program_outcome) => {
                 *progress.programs_spawned += 1;
-                let mut reloaded = load_plan(input)?;
+                let mut reloaded = reload_after_worker_exit(input, &mut release, &plan.record)?;
+                // A reverted edit spends the attempt and routes nothing. §FS-rhei-run.3.7.4
+                if reverted && !program_outcome.timed_out {
+                    let (task, state) = (task_id_str.as_str(), current_state.as_str());
+                    charge_reverted_attempt(&mut release, &reloaded, input, machine, task, state)?;
+                    progress.stalled_tasks.insert(task_id_str.clone());
+                    continue;
+                }
                 let task_after = find_task_by_id(&reloaded.rhei.tasks, &target_id);
                 let mut state_after =
                     task_after.map(|t| t.state.as_str()).unwrap_or("unknown").to_string();
@@ -196,7 +205,7 @@ fn run_sequential_program_work_items(
                         }
                         TimeoutTransitionOutcome::Failed => {}
                     }
-                    reloaded = load_plan(input)?;
+                    reloaded = load_run_plan(input)?;
                     state_after = reloaded
                         .rhei
                         .tasks

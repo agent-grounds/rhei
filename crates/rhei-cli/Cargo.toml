@@ -74,6 +74,11 @@ windows-sys = { version = "0.61.2", features = [
 
 # Only the pty-based interruption e2e needs this, and only on Unix — Windows is
 # in the CI matrix and `nix` does not build there. §FS-rhei-run-tui.1.5.7
+[dev-dependencies]
+# Pins the lib test binary's state directory before any test runs, so no
+# test moving `XDG_STATE_HOME` moves a sibling's guard or witness. §REQ-test-isolation.6
+ctor = "=0.2.9"
+
 [target.'cfg(unix)'.dev-dependencies]
 # `fs` is what gates `nix::fcntl`, which the hung-up-terminal e2e needs to keep
 # the pty out of the child it spawns. §FS-rhei-run.3.2

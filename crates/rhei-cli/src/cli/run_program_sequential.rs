@@ -163,7 +163,7 @@ fn run_sequential_program_work_items(
                 *progress.programs_spawned += 1;
                 let mut reloaded = reload_after_worker_exit(input, &mut release, &plan.record)?;
                 // A reverted edit spends the attempt and routes nothing. §FS-rhei-run.3.7.4
-                if reverted && !program_outcome.timed_out {
+                if (reverted || attempt_was_reverted(&plan.record)) && !program_outcome.timed_out {
                     let (task, state) = (task_id_str.as_str(), current_state.as_str());
                     charge_reverted_attempt(&mut release, &reloaded, input, machine, task, state)?;
                     progress.stalled_tasks.insert(task_id_str.clone());

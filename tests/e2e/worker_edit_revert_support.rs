@@ -171,8 +171,9 @@ impl Ran {
         format!("mode {:?}\nstdout:\n{}\nstderr:\n{}", self.mode, self.run.stdout, self.run.stderr)
     }
 
+    /// Both streams, with Windows path separators read as `/`.
     pub fn combined(&self) -> String {
-        format!("{}{}", self.run.stdout, self.run.stderr)
+        portable(&format!("{}{}", self.run.stdout, self.run.stderr))
     }
 }
 
@@ -224,12 +225,23 @@ impl Scenario {
     }
 
     pub fn journal(&self) -> String {
-        fs::read_to_string(self.ws.join("runtime/transitions.log")).unwrap_or_default()
+        journal_in(&self.ws)
     }
 
     pub fn runtime_file(&self, relative: &str) -> PathBuf {
         self.ws.join(relative)
     }
+}
+
+/// `text` with Windows path separators read as `/`: the run spells a path the
+/// way the platform does, and the scenarios name them one way.
+pub fn portable(text: &str) -> String {
+    text.replace('\\', "/")
+}
+
+/// The run's journal in `ws`, separators read as `/`. §FS-rhei-run-tui.1.7
+pub fn journal_in(ws: &Path) -> String {
+    portable(&fs::read_to_string(ws.join("runtime/transitions.log")).unwrap_or_default())
 }
 
 /// The first `**State:**` in a task file's text.
@@ -276,5 +288,11 @@ pub fn slot_released(ws: &Path) -> Vec<serde_json::Value> {
         .lines()
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
         .filter(|record| record["event"] == "slot_released")
+        .map(|mut record| {
+            if let Some(reverted) = record["reverted"].as_str().map(portable) {
+                record["reverted"] = serde_json::Value::String(reverted);
+            }
+            record
+        })
         .collect()
 }

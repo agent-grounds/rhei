@@ -2,8 +2,6 @@
 //! with the sibling whose transition lands during the visit, and what an agent
 //! is told about the edit before and after it (agent-grounds/rhei#310).
 //!
-//! `#[ignore]`d until the restore lands, because the commit gate runs the
-//! suite; the change that makes each pass removes its attribute.
 //! §FS-rhei-run.3.7
 
 use std::fs;
@@ -150,9 +148,16 @@ const AGENT_PLAN: &str = "# Rhei: Agent note
 Raise coverage of `src/report.rs` above 80%.
 ";
 
-/// The line the note's heading lands on once appended to [`AGENT_PLAN`].
-fn agent_note_line() -> usize {
-    AGENT_PLAN.lines().count() + 2
+/// The line the note's heading landed on in the plan on disk: where the task's
+/// heading sits there, plus the heading's offset in the text the run reverted.
+/// Rhei writes its own front matter into the plan before the agent spawns, so
+/// the authored [`AGENT_PLAN`] does not say where that is.
+fn agent_note_line(plan: &Path, reverted: &str) -> usize {
+    let text = fs::read_to_string(plan).expect("plan");
+    let heading = reverted.lines().next().expect("the reverted region opens with its heading");
+    let task_line = text.lines().position(|line| line == heading).expect("task heading on disk");
+    let offset = reverted.lines().position(|line| line.starts_with("#### Visit")).expect("note");
+    task_line + offset + 1
 }
 
 const AGENT_MACHINE: &str = r#"name: worker-edit-agent
@@ -195,7 +200,6 @@ const TRAIL_SENTENCE: &str = "- Write progress as plain paragraphs or lists, nev
 /// The retry after a reverted edit is told where, why, and where its text went.
 // §FS-rhei-memory.3.4 §FS-rhei-memory.4.4 §FS-rhei-agents.3.2
 #[test]
-#[ignore = "red: worker_edit_revert_prompt_tests.rs:228 `retry.contains(&location)` expects plan.rhei.md:10; the run reports :17"]
 fn an_agent_is_told_the_cost_of_a_heading_and_its_retry_where_the_text_went() {
     for mode in [Mode::Sequential, Mode::Parallel] {
         let dir = unique_temp_dir(&format!("worker-edit-agent-{mode:?}"));
@@ -225,7 +229,9 @@ fn an_agent_is_told_the_cost_of_a_heading_and_its_retry_where_the_text_went() {
             .lines()
             .find(|line| line.starts_with("Retrying this visit:"))
             .unwrap_or_else(|| panic!("no retry paragraph:\n{attempt_two}"));
-        let location = format!("Its edit broke the plan at `plan.rhei.md:{}`", agent_note_line());
+        let reverted = read(&dir.join("runtime/logs/task-plan.1-cover.reverted.md"), &output);
+        let line = agent_note_line(&plan, &reverted);
+        let location = format!("Its edit broke the plan at `plan.rhei.md:{line}`");
         assert!(retry.contains(&location), "got:\n{retry}");
         assert!(retry.contains("(Malformed node heading"), "got:\n{retry}");
         assert!(retry.contains("task-plan.1-cover.reverted.md`."), "got:\n{retry}");

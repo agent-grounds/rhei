@@ -36,15 +36,33 @@ fn spawn_parallel_program_work_item(
     let task_workspace_root = loaded.task_root(&item.task_id_str, workspace_root);
     // §AR-rhei-panta.5: program transcripts and spawn records share the member runtime.
     let task_runtime_dir = task_workspace_root.join("runtime");
-    // Same attempt log and same per-visit budget as an agent: a program state
-    // is never skipped at scheduling either. §FS-rhei-agents.8.1
-    let plan = plan_spawn_attempt(
-        &task_runtime_dir,
+    // Same attempt log, entry or visit number, and per-visit budget as an
+    // agent: a program state is never skipped at scheduling either.
+    // §FS-rhei-agents.8.1 §FS-rhei-programs.5.1
+    let visit_count = render_visit_count(
+        loaded.rhei.metadata.as_ref(),
+        &task.id,
+        &item.current_state,
+        task.state.as_str(),
+        machine,
+    );
+    let plan = plan_named_spawn(
+        machine,
         &task_workspace_root,
+        &task_runtime_dir,
         &item.task_id_str,
         &item.current_state,
+        visit_count,
         None,
     );
+    // Refused before it runs; `Skipped` is the pool's stall. §FS-rhei-agents.8.1
+    let plan = match plan {
+        Ok((plan, _)) => plan,
+        Err(refusal) => {
+            emit_run_message(sink, rhei_tui::MessageLevel::Error, format!("  {refusal}"));
+            return Ok(ParallelProgramSpawnOutcome::Skipped);
+        }
+    };
     let budget =
         resolve_attempt_budget(machine.states.get(item.current_state.as_str()), settings);
     if let Some(spent_budget) = plan.budget_spent(budget) {

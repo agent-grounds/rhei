@@ -4,10 +4,9 @@
 //
 // Its own part because none of that is derivable from `runtime/logs/`. A log is
 // opened before its subprocess starts, so its existence proves only that a
-// spawn was attempted; and its name carries `{visit_count}`, which is pinned at
-// 1 for every ordinary state in a cycle, so it cannot tell one stay in a state
-// from the next. Both questions used to be answered by pattern-matching file
-// names, and both answers were wrong.
+// spawn was attempted; and its name spells an allocation — which entry it is
+// comes from the movement history, not from the name. Both questions used to be
+// answered by pattern-matching file names, and both answers were wrong.
 
 // §AR-source-file-size.3 §FS-rhei-agents.8.4 §FS-rhei-run.3
 
@@ -425,21 +424,27 @@ impl RetryOutlook {
 /// budget, and prompt composition asks it to tell the invocation it is a retry.
 /// Answering it twice, differently, is how the log names and the run's narration
 /// came apart in the first place.
+///
+/// `identity` and `number` are the two parts of the name the grammar puts
+/// between the state and the attempt; the attempt is this function's to decide.
 // §FS-rhei-agents.8.1 §FS-rhei-agents.8.4 §FS-rhei-memory.4.4
 fn plan_spawn_attempt(
     runtime_dir: &Path,
     task_root: &Path,
     task_id: &str,
     state_name: &str,
-    suffix: Option<&str>,
+    identity: Option<&str>,
+    number: LogNumber,
 ) -> SpawnPlan {
-    let record_path = spawn_record_path(runtime_dir, task_id, state_name, suffix);
+    let suffix = log_suffix(identity, number.value());
+    let record_path = spawn_record_path(runtime_dir, task_id, state_name, suffix.as_deref());
     let moves = ticket_move_count(task_root, runtime_dir, task_id);
-    let previous = read_spawn_record(&record_path).filter(|record| record.moves == moves);
+    let previous = current_visit_record(runtime_dir, task_id, state_name, identity, number, moves)
+        .filter(|record| record.moves == moves);
     let attempt = previous.as_ref().map(|record| record.attempt + 1).unwrap_or(1);
     let charged = previous.as_ref().map(|record| record.charged).unwrap_or(0);
     SpawnPlan {
-        log: agent_log_attempt_path(runtime_dir, task_id, state_name, suffix, attempt),
+        log: agent_log_attempt_path(runtime_dir, task_id, state_name, suffix.as_deref(), attempt),
         record: record_path,
         moves,
         attempt,
@@ -449,21 +454,90 @@ fn plan_spawn_attempt(
     }
 }
 
-/// Plan an agent process and create its accounting identity before it can be
-/// spawned. Programs use [`plan_spawn_attempt`] directly because they do not
-/// produce agent-accounting records. §FS-rhei-cost-accounting.3.7
-#[allow(clippy::too_many_arguments)]
-fn plan_agent_spawn_attempt(
+/// The spawn record this invocation's own name spells — or, for an uncounted
+/// re-entry with none, the unsuffixed record a runtime written before entry
+/// numbers existed left at the current `moves`, so its retry continues as
+/// `-{n}-attempt2` rather than starting over.
+///
+/// Records are trusted exactly as before: the same name-and-`moves` test,
+/// never checked against the log's header (V-D01).
+// §FS-rhei-agents.8.1 §FS-rhei-agents.8.4
+fn current_visit_record(
     runtime_dir: &Path,
-    task_root: &Path,
     task_id: &str,
     state_name: &str,
-    suffix: Option<&str>,
+    identity: Option<&str>,
+    number: LogNumber,
+    moves: u64,
+) -> Option<SpawnRecord> {
+    let suffix = log_suffix(identity, number.value());
+    let own_path = spawn_record_path(runtime_dir, task_id, state_name, suffix.as_deref());
+    let own = read_spawn_record(&own_path);
+    if own.is_some() {
+        return own;
+    }
+    let LogNumber::Entry(entry) = number else { return None };
+    if entry <= 1 {
+        return None;
+    }
+    read_spawn_record(&spawn_record_path(runtime_dir, task_id, state_name, identity)).filter(
+        |record| record.task == task_id && record.state == state_name && record.moves == moves,
+    )
+}
+
+impl SpawnPlan {
+    /// The refusal of a spawn whose log name is already taken.
+    ///
+    /// The attempt is derived from the records, so a name they account for is
+    /// always behind the one planned: a file *at* the planned name is one no
+    /// record accounts for — a planted file, a stale report-less leftover, or
+    /// the log of a spawn killed before it could record itself. It is kept, and
+    /// neither the attempt nor the entry moves forward because it exists.
+    // §FS-rhei-agents.8.1
+    fn unaccounted_log_refusal(&self) -> Option<String> {
+        self.log.exists().then(|| unaccounted_log_message(&self.log))
+    }
+}
+
+/// The one sentence a taken, unaccounted log name is refused with. §FS-rhei-agents.8.1
+fn unaccounted_log_message(log: &Path) -> String {
+    format!("refusing to spawn: {} exists and no spawn record accounts for it", log.display())
+}
+
+/// Plan the next spawn of one invocation under the name §FS-rhei-agents.8.1 gives it, or
+/// say why it may not happen: the ledger that numbers it cannot be read, or the
+/// name is taken by a file no record accounts for. Both are refusals the
+/// caller prints before anything is composed, staged, or paid for.
+// §FS-rhei-agents.8.1 §FS-rhei-programs.5.1
+fn plan_named_spawn(
+    machine: &rhei_validator::StateMachine,
+    task_root: &Path,
+    runtime_dir: &Path,
+    task_id: &str,
+    state_name: &str,
+    visit_count: u64,
+    identity: Option<&str>,
+) -> Result<(SpawnPlan, LogNumber), String> {
+    let number =
+        resolve_log_number(machine, state_name, visit_count, task_root, runtime_dir, task_id)?;
+    let plan = plan_spawn_attempt(runtime_dir, task_root, task_id, state_name, identity, number);
+    match plan.unaccounted_log_refusal() {
+        Some(refusal) => Err(refusal),
+        None => Ok((plan, number)),
+    }
+}
+
+/// Give an agent process's plan its accounting identity before it can be
+/// spawned. Programs skip this because they do not produce agent-accounting
+/// records. §FS-rhei-cost-accounting.3.7
+fn attach_agent_accounting(
+    plan: &mut SpawnPlan,
+    task_id: &str,
+    state_name: &str,
     resolved: &ResolvedAgent,
     visit: u64,
     run_id: &str,
-) -> SpawnPlan {
-    let mut plan = plan_spawn_attempt(runtime_dir, task_root, task_id, state_name, suffix);
+) {
     // §FS-rhei-cost-accounting.3.7: the caller's run identity survives descriptor publication failure.
     plan.accounting = Some(AccountingAttemptIdentity {
         invocation_id: accounting_attempt_invocation_id(
@@ -477,7 +551,6 @@ fn plan_agent_spawn_attempt(
         ),
         run_id: Some(run_id.to_string()),
     });
-    plan
 }
 
 /// The most recent worker that actually ran in this state on this ticket, of

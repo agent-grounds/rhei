@@ -129,16 +129,26 @@ fn run_sequential_agent_invocation(
     // Settled before anything is composed or staged: a spawn this visit may not
     // have costs nothing to decline, and every step below it costs something.
     // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.1
-    let plan = plan_agent_spawn_attempt(
-        &agent_runtime_dir,
+    let plan = plan_named_spawn(
+        machine,
         &task_workspace_root,
+        &agent_runtime_dir,
         task_id_str,
         current_state,
-        resolved_agent_log_suffix(resolved, Some(visit_count)).as_deref(),
-        resolved,
         visit_count,
-        run_id,
+        resolved_agent_log_identity(resolved).as_deref(),
     );
+    // A name the spawn cannot have is refused before it costs anything, and the
+    // ticket keeps its state. §FS-rhei-agents.8.1
+    let (mut plan, log_number) = match plan {
+        Ok(planned) => planned,
+        Err(refusal) => {
+            run_error!("  {refusal}");
+            progress.stalled_tasks.insert(task_id_str.clone());
+            return Ok(());
+        }
+    };
+    attach_agent_accounting(&mut plan, task_id_str, current_state, resolved, visit_count, run_id);
     let budget = resolve_attempt_budget(machine.states.get(current_state), settings);
     if let Some(spent_budget) = plan.budget_spent(budget) {
         // The same stall step 5 gives any unmet completion condition: the ticket
@@ -364,7 +374,8 @@ fn run_sequential_agent_invocation(
         &agent_runtime_dir,
         task_id_str,
         current_state,
-        visit_count,
+        // The number the session's log name carries. §FS-rhei-metrics.4
+        log_number.shown(),
         &plan,
         &log,
         spawn_result.as_ref().ok(),

@@ -49,13 +49,28 @@ impl InvocationCompletion<'_> {
     // §FS-rhei-agents.3.2 §FS-rhei-agents.8.4 §FS-rhei-transitions.4.3
     fn work_is_eligible_for_visit(&self, resolved: &ResolvedAgent) -> bool {
         let task_id = self.task.id.to_string();
-        let suffix = resolved_agent_log_suffix(resolved, Some(self.visit_count));
-        let record = read_spawn_record(&spawn_record_path(
+        // The record this invocation's own name spells, entry number included.
+        // An unreadable ledger is not eligible: the spawn it leads to refuses
+        // on it by name. §FS-rhei-agents.8.1
+        let Ok(number) = resolve_log_number(
+            self.machine,
+            self.state_name,
+            self.visit_count,
+            self.artifact_root,
+            self.runtime_dir,
+            &task_id,
+        ) else {
+            return false;
+        };
+        let identity = resolved_agent_log_identity(resolved);
+        let record = current_visit_record(
             self.runtime_dir,
             &task_id,
             self.state_name,
-            suffix.as_deref(),
-        ));
+            identity.as_deref(),
+            number,
+            self.moves,
+        );
         match record {
             Some(record) => {
                 record.proves_successful_work(&task_id, self.state_name, self.moves)

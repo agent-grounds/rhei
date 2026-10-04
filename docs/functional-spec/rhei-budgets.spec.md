@@ -35,7 +35,7 @@ template that declares one ([§FS-rhei-library.5](rhei-library.spec.md#5-placeme
 **Invocations** are the neural starts a project may be admitted. They are a
 property of the **project** — one durable account shared by every rhei of the
 project, every member added later, every concurrent `rhei run`, and every nested
-runtime. A bare rhei is the single rhei of its implicit project ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
+runtime of the project. A bare rhei is the single rhei of its implicit project ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
 
 **Spend** is the measured cost a project may be charged during one UTC day.
 Like invocations it is a property of the **project**, and the same one durable
@@ -337,8 +337,18 @@ edges taken by callbacks still spend travel.
   journal.jsonl.lock
 ```
 
-For a bare rhei, `<project-root>` is its execution root. The directory is
-deliberately **outside `runtime/`**, so that [§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior)'s wholesale
+`<project-root>` is the Panta project that discovers the plan as a member
+([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)): a
+`*.rhei.md` or a Directory Workspace among its immediate children, or its
+`basin/`. For a bare rhei it is the execution root. Membership is read as the
+loader reads it, never from where the plan's directory sits: a plan below a
+project directory that the project does not discover — under its `runtime/`, in
+a grouping folder or a reproducer's scratch directory — is a bare rhei with an
+account of its own, and nothing it does is charged to, or appended to the
+journal of, the enclosing project. Run from inside one of that project's agents,
+it is the case of §FS-rhei-budgets.7.2: admitted unparented and noted once.
+
+The directory is deliberately **outside `runtime/`**, so that [§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior)'s wholesale
 deletion of `runtime/` cannot reach it. It is machine state rather than authored
 content, and `rhei init` seeds `budgets/` into the project's own `.gitignore`
 ([§FS-rhei-init.3](rhei-init.spec.md#3-ignore-rules)).

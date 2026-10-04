@@ -173,8 +173,35 @@ mod headless_launch_registry_tests {
         Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
     }
 
+    /// The fallback's write on a healthy state home.
+    fn whole_write(mut file: fs::File, body: &[u8]) -> std::io::Result<()> {
+        file.write_all(body)
+    }
+
+    /// What a full state home says (`ErrorKind::StorageFull` is not stable
+    /// on this toolchain).
+    const OUT_OF_SPACE: &str = "no space left on device";
+
+    /// A full state home: `create_new` got its inode, and the write runs out
+    /// of space partway, leaving the launcher's own file torn.
+    fn torn_write(mut file: fs::File, body: &[u8]) -> std::io::Result<()> {
+        file.write_all(&body[..16])?;
+        Err(std::io::Error::other(OUT_OF_SPACE))
+    }
+
+    fn launcher_temps(dir: &Path) -> Vec<String> {
+        fs::read_dir(dir)
+            .expect("read the registry")
+            .filter_map(|item| item.ok())
+            .map(|item| item.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.contains(".launcher-"))
+            .collect()
+    }
+
     /// Where the link is refused, an entry the child already wrote is still
-    /// the entry the id resolves through: no warning, and no change to it.
+    /// the entry the id resolves through: the fallback's `create_new` refuses
+    /// it with `AlreadyExists`, which is what accepts it — no warning, and no
+    /// change to it.
     // §FS-rhei-run-headless.1.1
     #[test]
     fn a_refused_link_beside_the_childs_entry_is_not_a_failure() {
@@ -185,7 +212,7 @@ mod headless_launch_registry_tests {
         write_descriptor(&entry, &running).expect("the child's own entry");
         let before = fs::read(&entry).expect("read the entry");
 
-        let published = publish_registry_entry_with(&running, refused_link);
+        let published = publish_registry_entry_with(&running, refused_link, whole_write);
 
         assert_eq!(published, Ok(()), "a warning for an id that resolves");
         assert_eq!(fs::read(&entry).expect("read the entry"), before, "the child's entry was replaced");
@@ -201,18 +228,73 @@ mod headless_launch_registry_tests {
         let workspace = workspace();
         let (running, _held) = running_before_its_entry("a436f6", &workspace.path);
 
-        let published = publish_registry_entry_with(&running, refused_link);
+        let published = publish_registry_entry_with(&running, refused_link, whole_write);
 
         assert_eq!(published, Ok(()), "the entry was not published");
         let resolved = resolve_run(Some("a436f6"))
             .unwrap_or_else(|error| panic!("the printed id does not resolve: {error:?}"));
         assert_eq!(resolved.id, "a436f6");
-        let dir = run_registry_dir().expect("an isolated state home");
-        let leftovers: Vec<_> = fs::read_dir(&dir)
-            .expect("read the registry")
-            .filter_map(|item| item.ok())
-            .filter(|item| item.file_name().to_string_lossy().contains(".launcher-"))
-            .collect();
+        let leftovers = launcher_temps(&run_registry_dir().expect("an isolated state home"));
         assert!(leftovers.is_empty(), "a launcher temp was left behind: {leftovers:?}");
+    }
+
+    /// Where the fallback's write fails partway, the file standing at the
+    /// entry is the launcher's own torn one, which no id resolves through: it
+    /// is removed, and the publish fails naming the state directory and both
+    /// errors, so the operator is warned rather than handed a dead id.
+    // §FS-rhei-run-headless.1.1
+    #[test]
+    fn a_torn_fallback_write_is_removed_and_warned_about() {
+        let _registry = IsolatedRegistry::new();
+        let workspace = workspace();
+        let (running, _held) = running_before_its_entry("a436f7", &workspace.path);
+        let dir = run_registry_dir().expect("an isolated state home");
+
+        let published = publish_registry_entry_with(&running, refused_link, torn_write);
+
+        let why = published.expect_err("a torn entry was taken for the child's");
+        assert!(why.contains(&dir.display().to_string()), "the state directory is not named: {why}");
+        let refused = std::io::Error::from(std::io::ErrorKind::PermissionDenied).to_string();
+        assert!(why.contains(&refused), "the link's error is not named: {why}");
+        assert!(why.contains(OUT_OF_SPACE), "the write's error is not named: {why}");
+        let entry = run_registry_path("a436f7").expect("an isolated state home");
+        assert!(!entry.exists(), "the launcher's torn entry was left behind");
+        let leftovers = launcher_temps(&dir);
+        assert!(leftovers.is_empty(), "a launcher temp was left behind: {leftovers:?}");
+        assert!(unregistered_run_warning(&running, &why).contains(UNREGISTERED));
+    }
+
+    /// The child's rename may land over the launcher's file while the
+    /// fallback writes it. The entry standing then is the child's and whole,
+    /// so the id resolves: it is kept exactly as the child wrote it, and the
+    /// failed write is not an error. It guards that removing the launcher's
+    /// torn file never takes the child's entry with it, so it passed before
+    /// that removal existed too.
+    // §FS-rhei-run-headless.1.1
+    #[test]
+    fn the_childs_entry_renamed_over_a_failed_fallback_write_stands() {
+        let _registry = IsolatedRegistry::new();
+        let workspace = workspace();
+        let (running, _held) = running_before_its_entry("a436f8", &workspace.path);
+        let entry = run_registry_path("a436f8").expect("an isolated state home");
+        // Its terminal rewrite, so its bytes differ from the launcher's body.
+        let mut ended = running.clone();
+        ended.status = RunStatus::Finished;
+        ended.exit_code = Some(0);
+        let mut childs = Vec::new();
+        let childs_rename_lands = |mut file: fs::File, body: &[u8]| {
+            file.write_all(&body[..16])?;
+            // Closed first, so the rename also lands where an open file cannot be replaced.
+            drop(file);
+            write_descriptor(&entry, &ended)?;
+            childs = fs::read(&entry)?;
+            Err(std::io::Error::other(OUT_OF_SPACE))
+        };
+
+        let published = publish_registry_entry_with(&running, refused_link, childs_rename_lands);
+
+        assert_eq!(published, Ok(()), "a warning for an id that resolves");
+        assert!(!childs.is_empty(), "the child's rename never landed");
+        assert_eq!(fs::read(&entry).expect("read the entry"), childs, "the child's entry was not kept");
     }
 }

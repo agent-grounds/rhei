@@ -45,28 +45,24 @@ fn a_literal_space_prompts() {
 }
 
 #[test]
-#[ignore = "#448: TerminalWatch matches raw bytes, not what the terminal shows"]
 fn the_quoted_implement_stream_prompts() {
     let stream = format!("{HEAD}\x1b[1C{TITLE}force plan.1 implement -> completed\r");
     assert!(prompts(&[&stream]), "prompt not signalled for {stream:?}");
 }
 
 #[test]
-#[ignore = "#448: TerminalWatch matches raw bytes, not what the terminal shows"]
 fn the_quoted_human_gate_stream_prompts() {
     let stream = format!("{HEAD}\x1b[1C{TITLE}force plan.1 human-gate -> implement\r");
     assert!(prompts(&[&stream]), "prompt not signalled for {stream:?}");
 }
 
 #[test]
-#[ignore = "#448: TerminalWatch matches raw bytes, not what the terminal shows"]
 fn a_wider_cursor_forward_reads_as_that_many_spaces() {
     let stream = format!("{HEAD}\x1b[3C{TITLE}force plan.1 implement -> completed\r");
     assert!(prompts(&[&stream]), "prompt not signalled for {stream:?}");
 }
 
 #[test]
-#[ignore = "#448: TerminalWatch matches raw bytes, not what the terminal shows"]
 fn a_title_split_across_reads_prompts() {
     let first = format!("{HEAD}\x1b[1C\x1b]0;D:\\a\\rhei");
     let second =
@@ -75,7 +71,6 @@ fn a_title_split_across_reads_prompts() {
 }
 
 #[test]
-#[ignore = "#448: TerminalWatch matches raw bytes, not what the terminal shows"]
 fn a_cursor_forward_split_across_reads_prompts() {
     let first = format!("{HEAD}\x1b[");
     let second = format!("1C{TITLE}force plan.1 human-gate -> implement\r");

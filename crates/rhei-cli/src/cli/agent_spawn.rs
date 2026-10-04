@@ -217,10 +217,12 @@ fn spawn_and_wait_agent(
 
     // Never truncated: the plan refused a taken name, and this is the race-free
     // half of that refusal. §FS-rhei-agents.8.1
+    let mut unstarted = UnstartedLog::new(log_path);
     let log_file = Arc::new(Mutex::new(
-        create_log_exclusively(log_path)
+        create_log_exclusively(log_path, task_id)
             .map_err(|message| miette!(help = agent_log_help(), "{message}"))?,
     ));
+    unstarted.created();
     // §FS-rhei-session-reports.1: a report at this fresh stem is an orphan.
     if let Some(line) = rename_orphan_session_report(log_path) {
         diag_warn!("{line}");
@@ -355,20 +357,14 @@ fn spawn_and_wait_agent(
     // §FS-rhei-run.3.2
     let spawned = Supervised::spawn(&mut cmd, &format!("{task_id}@{state_name}"));
     let mut supervised = match spawned {
-        Ok(supervised) => supervised,
+        Ok(supervised) => {
+            unstarted.started();
+            supervised
+        }
         // Interrupted between the scheduler's check and the spawn. Nothing
-        // started, so there is no verdict on the ticket and no transition
-        // fires. §FS-rhei-run.3.2 §FS-rhei-agents.8
+        // started, so there is no verdict on the ticket, no transition fires,
+        // and the log goes with `unstarted`. §FS-rhei-run.3.2 §FS-rhei-agents.8.1
         Err(err) if spawn_was_interrupted(&err) => {
-            let _ = with_agent_log(&log_file, |f| {
-                writeln!(f, "\nagent not started: the run was interrupted first")?;
-                writeln!(f, "\n=== exit ===")?;
-                writeln!(f, "code: -")?;
-                writeln!(f, "ended: {}", format_iso8601_utc(std::time::SystemTime::now()))?;
-                writeln!(f, "interrupted: true")?;
-                writeln!(f, "===")?;
-                f.flush()
-            });
             return Ok(AgentSpawnOutcome {
                 status: never_started_status(),
                 timed_out: false,

@@ -180,9 +180,12 @@ fn spawn_and_wait_program(
             ))?;
     }
 
-    // Never truncated, as an agent's is not. §FS-rhei-programs.5.1
-    let log_file = create_log_exclusively(log_path)
+    // Never truncated, as an agent's is not, and removed if the command never
+    // starts. §FS-rhei-programs.5.1 §FS-rhei-agents.8.1
+    let mut unstarted = UnstartedLog::new(log_path);
+    let log_file = create_log_exclusively(log_path, &render_context.task.id.to_string())
         .map_err(|message| miette!(help = program_log_help(), "{message}"))?;
+    unstarted.created();
     let command_label = match &resolved.program.command {
         ProgramCommand::Shell(command) => resolve_runtime_template_text(command, render_context),
         ProgramCommand::Exec(args) => args
@@ -224,18 +227,14 @@ fn spawn_and_wait_program(
     let supervised_label =
         format!("{}@{}", render_context.task.id, render_context.state_name);
     let mut supervised = match Supervised::spawn(&mut cmd, &supervised_label) {
-        Ok(supervised) => supervised,
+        Ok(supervised) => {
+            unstarted.started();
+            supervised
+        }
         // As for agents: the run was interrupted before this program started,
-        // so it never ran and the ticket keeps its state.
-        // §FS-rhei-run.3.2 §FS-rhei-agents.8
+        // so it never ran, the ticket keeps its state, and the log goes with
+        // `unstarted`. §FS-rhei-run.3.2 §FS-rhei-agents.8.1
         Err(err) if spawn_was_interrupted(&err) => {
-            use std::io::Write as _;
-            let mut f = &log_file;
-            let _ = writeln!(f, "\nprogram not started: the run was interrupted first");
-            let _ = writeln!(f, "\n=== exit ===");
-            let _ = writeln!(f, "code: -");
-            let _ = writeln!(f, "interrupted: true");
-            let _ = writeln!(f, "===");
             return Ok(ProgramSpawnOutcome {
                 status: never_started_status(),
                 timed_out: false,

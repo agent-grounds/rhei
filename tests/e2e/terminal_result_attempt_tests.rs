@@ -468,11 +468,10 @@ fn the_worker_pool_respawns_and_bounds_the_same_way_the_sequential_path_does() {
     assert_eq!(spawn_count(&dir, "attempts-plan.2.txt"), 2);
 }
 
-/// A spawn that never started leaves a complete-looking log header behind — the
-/// engine writes it before the subprocess exists. Crediting that log to a worker
-/// is the mirror of the bug this whole change fixes, so the evidence is the
-/// spawn record, which only a subprocess that ran can produce.
-// §FS-rhei-agents.8.4 §FS-rhei-run.3
+/// A spawn that never started is not evidence that a worker ran: the evidence
+/// is the spawn record, which only a subprocess that ran can produce, and the
+/// log header the engine wrote before the spawn is removed with it.
+// §FS-rhei-agents.8.4 §FS-rhei-agents.8.1 §FS-rhei-run.3
 #[test]
 fn a_spawn_that_never_started_is_not_evidence_that_a_worker_ran() {
     let dir = unique_temp_dir("attempts-unspawnable");
@@ -514,8 +513,8 @@ transitions:
     let failed = run_cli("run", &plan_path, &machine_path, &["--no-tui", "--no-callbacks"]);
     assert!(!failed.status.success(), "the agent command does not exist");
     assert!(
-        dir.join("runtime/logs/task-plan.1-implement.log").exists(),
-        "the header was written before the spawn was attempted, which is the trap"
+        !dir.join("runtime/logs/task-plan.1-implement.log").exists(),
+        "a spawn that never started leaves no log for a later run to trip on"
     );
 
     let advanced =

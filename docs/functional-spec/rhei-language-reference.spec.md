@@ -139,6 +139,11 @@ Language changes must preserve a single discoverable entry point:
   the machine and project settings tiers only, but unlike it the key bounds
   nothing: it is the default value of `rhei run --prices`
   ([§FS-rhei-run.2](rhei-run.spec.md#2-options)), which still wins when given.
+- The time bound on transition callbacks, `callback_timeout`, is authored on a
+  transition rule or at the machine's root of `states.yaml`; its precedence,
+  what it bounds, and what expiry does on each platform are owned by
+  §FS-rhei-transitions.4.10, and what `rhei validate` refuses about it by
+  §FS-rhei-validate.4.
 - New execution references that appear in authored files must identify their
   owner spec from this page.
 - Which construct a unit of work becomes — a state, a task, a child task, a

@@ -53,6 +53,17 @@ fn own_spawn_record(
     })
 }
 
+/// Whether any of an invocation's own names holds a record of this task and
+/// state at the current move count, however it ended. One that failed or is
+/// still `running` decides for its invocation, so an orphan never answers for
+/// it: only an invocation with none is without a record of its own.
+// §FS-rhei-agents.3.2 §FS-rhei-agents.8.4
+fn own_record_this_visit(names: &[PathBuf], task_id: &str, state_name: &str, moves: u64) -> bool {
+    names.iter().filter_map(|path| read_spawn_record(path)).any(|record| {
+        record.task == task_id && record.state == state_name && record.moves == moves
+    })
+}
+
 /// What one visit's records say about the state as a whole, before any one
 /// invocation is asked about.
 // §FS-rhei-agents.3.2 §FS-rhei-agents.8.4
@@ -65,16 +76,19 @@ struct VisitPairing {
     /// The one recordless invocation, by the first of its own names, and the
     /// one orphaned record that answers for it.
     paired: Option<(PathBuf, PathBuf)>,
-    /// The orphans an ambiguous edit leaves unpaired. Empty unless there is at
-    /// least one orphan and one recordless invocation, and not one of each.
+    /// The orphans an ambiguous edit leaves unpaired, and the recordless
+    /// invocations, by the first of their own names, they could have answered
+    /// for. Both empty unless there is at least one orphan and one recordless
+    /// invocation, and not one of each.
     ambiguous: Vec<PathBuf>,
+    unrecorded: Vec<PathBuf>,
 }
 
 /// Pair at most one orphaned record with at most one invocation that has no
-/// successful current-visit record of its own.
+/// current-visit record of its own, however such a record ended.
 ///
-/// `own_names[i]` is invocation `i`'s list of own names and `own_proven[i]`
-/// whether the record under them proves its successful work this visit;
+/// `own_names[i]` is invocation `i`'s list of own names and `own_ran[i]`
+/// whether a record under them is of the current visit;
 /// `records` are this task's and state's records, matched by field. A removed
 /// fan-out member leaves an orphan nothing pairs with, an added one leaves a
 /// recordless invocation no orphan answers for, and both pass silently: only
@@ -82,7 +96,7 @@ struct VisitPairing {
 // §FS-rhei-agents.3.2 §FS-rhei-agents.8.4
 fn pair_orphaned_record(
     own_names: &[Vec<PathBuf>],
-    own_proven: &[bool],
+    own_ran: &[bool],
     records: &[(PathBuf, SpawnRecord)],
     task_id: &str,
     state_name: &str,
@@ -101,18 +115,18 @@ fn pair_orphaned_record(
         .collect::<Vec<_>>();
     let recordless = own_names
         .iter()
-        .zip(own_proven)
-        .filter(|(_, proven)| !**proven)
+        .zip(own_ran)
+        .filter(|(_, ran)| !**ran)
         .filter_map(|(names, _)| names.first().cloned())
         .collect::<Vec<_>>();
     match (orphans.as_slice(), recordless.as_slice()) {
         ([orphan], [invocation]) => VisitPairing {
             ran_this_visit,
             paired: Some((invocation.clone(), orphan.clone())),
-            ambiguous: Vec::new(),
+            ..VisitPairing::default()
         },
         ([], _) | (_, []) => VisitPairing { ran_this_visit, ..VisitPairing::default() },
-        _ => VisitPairing { ran_this_visit, paired: None, ambiguous: orphans },
+        _ => VisitPairing { ran_this_visit, paired: None, ambiguous: orphans, unrecorded: recordless },
     }
 }
 
@@ -145,8 +159,16 @@ impl InvocationCompletion<'_> {
         self.own_names(resolved).and_then(|names| names.into_iter().next())
     }
 
+    /// Whether `own_names` hold a record of this state at the current move
+    /// count, whatever its ending. §FS-rhei-agents.3.2
+    fn ran_under(&self, own_names: &[PathBuf]) -> bool {
+        own_record_this_visit(own_names, &self.task.id.to_string(), self.state_name, self.moves)
+    }
+
     /// The visit's pairing, read once per completion and shared by every
-    /// invocation asked about. §FS-rhei-agents.8.4
+    /// invocation asked about. The directory of every record is read only when
+    /// some invocation has no current-visit record of its own: otherwise there
+    /// is nobody an orphan could answer for. §FS-rhei-agents.8.4
     fn visit_pairing(&self) -> &VisitPairing {
         self.pairing.get_or_init(|| {
             let task_id = self.task.id.to_string();
@@ -155,18 +177,15 @@ impl InvocationCompletion<'_> {
                 .iter()
                 .map(|resolved| self.own_names(resolved).unwrap_or_default())
                 .collect::<Vec<_>>();
-            let own_proven = own_names
-                .iter()
-                .map(|names| {
-                    own_spawn_record(names, &task_id, self.state_name, self.moves).is_some_and(|record| {
-                        record.proves_successful_work(&task_id, self.state_name, self.moves)
-                    })
-                })
-                .collect::<Vec<_>>();
+            let own_ran = own_names.iter().map(|names| self.ran_under(names)).collect::<Vec<_>>();
+            if own_ran.iter().all(|ran| *ran) {
+                let ran_this_visit = !own_ran.is_empty();
+                return VisitPairing { ran_this_visit, ..VisitPairing::default() };
+            }
             let records = spawn_records_for_state(self.runtime_dir, &task_id, self.state_name);
             pair_orphaned_record(
                 &own_names,
-                &own_proven,
+                &own_ran,
                 &records,
                 &task_id,
                 self.state_name,
@@ -217,11 +236,27 @@ impl InvocationCompletion<'_> {
         if !pairing.ambiguous.is_empty() {
             let orphans =
                 pairing.ambiguous.iter().map(|path| path.display().to_string()).collect::<Vec<_>>();
+            let targets = pairing
+                .unrecorded
+                .iter()
+                .filter_map(|first| {
+                    self.invocations
+                        .iter()
+                        .find(|resolved| self.first_own_name(resolved).as_ref() == Some(first))
+                })
+                .map(invocation_target_label)
+                .collect::<Vec<_>>();
+            let lack = if targets.len() == 1 {
+                "has no spawn record of its own"
+            } else {
+                "have no spawn record of their own"
+            };
             let text = format!(
                 "warning: task {task_id} state '{state}': this visit's finished spawns ({}) \
-                 belong to no current invocation, and more than one could stand for the \
-                 invocations without their own, so none is reused and each is spawned",
-                orphans.join(", ")
+                 belong to no current target, and {} {lack} this visit, so which did the \
+                 work is ambiguous: none is reused and each is spawned",
+                orphans.join(", "),
+                targets.join(", ")
             );
             self.announce_once(sink, rhei_tui::MessageLevel::Warn, text);
         }

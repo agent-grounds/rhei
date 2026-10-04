@@ -47,9 +47,9 @@ struct InvocationCompletion<'a> {
 impl InvocationCompletion<'_> {
     /// Whether an existing artifact belongs to work eligible for this visit.
     ///
-    /// The invocation's own successful current-visit record answers first. With
-    /// none, the visit's one orphaned record may answer for it, when the pairing
-    /// is unique. Only when the state has no record at all at the current move
+    /// The invocation's own current-visit record answers first, whatever its
+    /// ending. With none, the visit's one orphaned record may answer for it,
+    /// when the pairing is unique. Only when the state has no record at all at the current move
     /// count, and no own record of any visit establishes an earlier one, does an
     /// upgraded workspace retain the legacy first-visit interpretation; moves
     /// through other states do not establish re-entry.
@@ -67,6 +67,10 @@ impl InvocationCompletion<'_> {
             .is_some_and(|record| record.proves_successful_work(&task_id, self.state_name, self.moves))
         {
             return true;
+        }
+        // Its own failed or still-running record of this visit decides; no orphan answers for it.
+        if self.ran_under(&own_names) {
+            return false;
         }
         if self.paired_with(&own_names) {
             return true;

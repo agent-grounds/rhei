@@ -23,30 +23,27 @@
 enum LogNumber {
     /// A counted state's `{visit_count}`.
     Visit(u64),
-    /// An uncounted state's entry number.
+    /// An uncounted state's entry number, a `poll:` state's included: its
+    /// poll attempts write no ledger line, so they stay inside one entry.
     Entry(u64),
-    /// A `poll:` state: its re-spawns are poll attempts, not entries.
-    Unnumbered,
 }
 
 impl LogNumber {
-    /// The number the name spells, where it spells one.
+    /// The number the name spells; a 1 is left out of it.
     fn value(self) -> Option<u64> {
         match self {
             LogNumber::Visit(n) | LogNumber::Entry(n) => Some(n),
-            LogNumber::Unnumbered => None,
         }
     }
 
-    /// The number a session is reported under: the one its name carries, 1
-    /// where it carries none. §FS-rhei-metrics.4
+    /// The number a session is reported under. §FS-rhei-metrics.4
     fn shown(self) -> u64 {
         self.value().unwrap_or(1).max(1)
     }
 }
 
 /// Which number names this invocation's log: a counted state's `{visit_count}`,
-/// none for a `poll:` state, and otherwise the entry number, read from the
+/// and otherwise — a `poll:` state too — the entry number, read from the
 /// ledger. An `Err` is the diagnostic an unreadable ledger is, already worded as
 /// the refusal a spawn prints.
 // §FS-rhei-agents.8.1 §FS-rhei-transitions.4.3
@@ -60,9 +57,6 @@ fn resolve_log_number(
 ) -> Result<LogNumber, String> {
     if state_counts_visits(machine, state_name) {
         return Ok(LogNumber::Visit(visit_count));
-    }
-    if machine.states.get(state_name).is_some_and(|def| def.poll.is_some()) {
-        return Ok(LogNumber::Unnumbered);
     }
     ticket_entry_number(task_root, runtime_dir, task_id, state_name).map(LogNumber::Entry)
 }
@@ -213,14 +207,52 @@ fn latest_agent_log_path(
 /// overwritten. A name already taken is the refusal of §FS-rhei-agents.8.1, said in its
 /// own words even when another writer took the name since the plan checked it.
 // §FS-rhei-agents.8.1 §FS-rhei-programs.5.1
-fn create_log_exclusively(log_path: &Path) -> Result<fs::File, String> {
+fn create_log_exclusively(log_path: &Path, task_id: &str) -> Result<fs::File, String> {
     fs::OpenOptions::new().write(true).create_new(true).open(log_path).map_err(|err| {
         if err.kind() == std::io::ErrorKind::AlreadyExists {
-            unaccounted_log_message(log_path)
+            unaccounted_log_message(log_path, task_id)
         } else {
             format!("failed to create log file '{}': {err}", log_path.display())
         }
     })
+}
+
+/// The log a spawn created, removed again unless its subprocess starts.
+///
+/// A spawn that never starts — its command cannot be found or built, its
+/// header cannot be written, or the run is interrupted first — writes no spawn
+/// record, so a log left behind would be refused by every later run as one no
+/// record accounts for. The file is this spawn's by construction: it is armed
+/// only once `create_new` has succeeded. Declare it before the file handles so
+/// they close first.
+// §FS-rhei-agents.8.1 §FS-rhei-agents.8.4
+struct UnstartedLog<'a> {
+    path: &'a Path,
+    armed: bool,
+}
+
+impl<'a> UnstartedLog<'a> {
+    fn new(path: &'a Path) -> Self {
+        Self { path, armed: false }
+    }
+
+    /// This spawn created the file.
+    fn created(&mut self) {
+        self.armed = true;
+    }
+
+    /// The subprocess started: the file is its transcript now, and stays.
+    fn started(&mut self) {
+        self.armed = false;
+    }
+}
+
+impl Drop for UnstartedLog<'_> {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = fs::remove_file(self.path);
+        }
+    }
 }
 
 /// Move aside a session report already at the stem of a log just created

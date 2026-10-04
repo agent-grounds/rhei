@@ -163,7 +163,8 @@ sys.stdout.write('MEASURE-VISIT-{}\n'.format(n))
 }
 
 /// A file already at the name the next entry would use, with no spawn record
-/// behind it, is refused rather than overwritten, and the worker does not run.
+/// behind it, is refused rather than overwritten, the worker does not run, and
+/// the refusal says what to do about it.
 // §FS-rhei-agents.8.1
 #[test]
 fn a_spawn_refuses_a_log_path_no_record_accounts_for() {
@@ -182,6 +183,10 @@ fn a_spawn_refuses_a_log_path_no_record_accounts_for() {
                 .contains("task-plan.1-work-2.log exists and no spawn record accounts for it"),
         "an unaccounted log path is refused by name; logs={:?}\n{combined}",
         names_in(&dir, "runtime/logs")
+    );
+    assert!(
+        combined.contains("move that file away, or run `rhei reset --rhei plan`"),
+        "the refusal carries its remedy, naming the ticket's rhei:\n{combined}"
     );
     assert_eq!(fs::read_to_string(&planted).expect("planted log"), "PLANTED, not rhei's\n");
     let first = read(&dir, "runtime/logs/task-plan.1-work.log");

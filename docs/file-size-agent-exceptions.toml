@@ -575,16 +575,6 @@ reason = """
 Rust requires these sibling e2e modules to be declared at the test crate root so their existing super::* imports, shared private helpers, and stable test paths resolve in one namespace. Moving declarations into a nested registry would change that namespace rather than extract a cohesive source responsibility; an include-only registry would merely hide the same indivisible manifest behind another file.
 """
 [[exceptions]]
-path = "crates/rhei-cli/src/cli/agent_spawn_records.rs"
-match = "exact"
-rules = ["source"]
-kind = "deferred"
-max_accepted = { value = 600, unit = "lines" }
-until = "Spawn-record reads and writes are exposed through one internal persistence API consumed by attempt planning and completion checks."
-reason = """
-Spawn-record persistence and spawn-attempt planning still share private record and budget types; a persistence query boundary must exist before either responsibility can move without duplicating their visit semantics.
-"""
-[[exceptions]]
 path = "crates/rhei-cli/src/cli/run_agent_sequential_completion.rs"
 match = "exact"
 rules = ["source"]

@@ -82,7 +82,7 @@ fn fire_tooling_unavailable_transition(
         return TimeoutTransitionOutcome::NoRule;
     };
 
-    let loaded = match load_plan(input) {
+    let loaded = match load_run_plan(input) {
         Ok(l) => l,
         Err(_) => return TimeoutTransitionOutcome::Failed,
     };
@@ -173,7 +173,7 @@ fn fire_selected_timeout_transition(
     // §DA-per-rhei-state-machines
     let machine = machines.for_task_str(task_id_str);
     let callback_paths = machines.callbacks_for_str(task_id_str);
-    let loaded = match load_plan(input) {
+    let loaded = match load_run_plan(input) {
         Ok(l) => l,
         Err(_) => return TimeoutTransitionOutcome::Failed,
     };
@@ -240,7 +240,7 @@ fn fire_agent_exit_transition(
     // §DA-per-rhei-state-machines
     let machine = machines.for_task_str(task_id_str);
     let callback_paths = machines.callbacks_for_str(task_id_str);
-    let loaded = match load_plan(input) {
+    let loaded = match load_run_plan(input) {
         Ok(l) => l,
         Err(_) => return TimeoutTransitionOutcome::Failed,
     };

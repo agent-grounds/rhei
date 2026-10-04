@@ -19,7 +19,6 @@ const METADATA_HELP: &str = "**State:**, **Prior:**";
 /// second attempt, and the operator is told which task broke what, where.
 // §FS-rhei-run.3.7.3 §FS-rhei-run.3.7.4 §FS-rhei-run.3.7.7 §FS-rhei-run-tui.1.7
 #[test]
-#[ignore = "red until #310 restores a worker's region"]
 fn a_heading_in_its_own_body_reverts_that_task_and_the_sibling_completes() {
     for mode in MODES {
         let case = Scenario::new("ticket", mode, Edit::Once, false, false);
@@ -96,7 +95,6 @@ fn a_heading_in_its_own_body_reverts_that_task_and_the_sibling_completes() {
 /// stalls; its sibling still completes, and the halt names the culprit.
 // §FS-rhei-run.3.7.4 §FS-rhei-agents.3.2.3
 #[test]
-#[ignore = "red until #310 restores a worker's region"]
 fn a_worker_that_breaks_the_plan_every_time_stalls_alone() {
     for mode in MODES {
         let case = Scenario::new("always", mode, Edit::Always, false, false);
@@ -130,7 +128,6 @@ fn a_worker_that_breaks_the_plan_every_time_stalls_alone() {
 /// and is kept in the reverted-text file for the retry to add again.
 // §FS-rhei-run.3.7.7
 #[test]
-#[ignore = "red until #310 restores a worker's region"]
 fn a_valid_child_appended_beside_the_heading_is_reverted_and_kept() {
     for mode in MODES {
         let case = Scenario::new("child", mode, Edit::ChildAndNote, false, false);
@@ -159,7 +156,6 @@ fn a_valid_child_appended_beside_the_heading_is_reverted_and_kept() {
 /// break are both recorded as interrupted.
 // §FS-rhei-run.3.7.2 §FS-rhei-run.3.7.6 §FS-rhei-run.3.2
 #[test]
-#[ignore = "red until #310 restores a worker's region"]
 fn an_edit_to_another_tasks_body_stops_the_run_attributed() {
     for mode in MODES {
         let case = Scenario::new("other-task", mode, Edit::OtherTask, true, false);
@@ -194,7 +190,6 @@ fn an_edit_to_another_tasks_body_stops_the_run_attributed() {
 /// once it exits, and the sibling is processed, not killed.
 // §FS-rhei-run.3.7.5
 #[test]
-#[ignore = "red until #310 restores a worker's region"]
 fn a_sibling_that_exits_during_the_break_waits_for_the_writer() {
     let mode = Mode::Parallel;
     let case = Scenario::new("lingering", mode, Edit::Once, false, true);

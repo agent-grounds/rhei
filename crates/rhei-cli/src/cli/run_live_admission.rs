@@ -46,7 +46,7 @@ impl LiveRunContext {
         opts: &RunOptions,
         identity: &RunIdentity,
     ) -> MietteResult<(LoadedPlan, Vec<String>)> {
-        let loaded = load_plan(input)?;
+        let loaded = load_run_plan(input)?;
         let current: BTreeSet<String> = loaded.rhei_ids.iter().cloned().collect();
         let admitted: Vec<String> = current.difference(&self.initialized_rheis).cloned().collect();
 

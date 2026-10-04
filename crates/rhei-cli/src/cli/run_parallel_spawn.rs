@@ -44,7 +44,7 @@ fn spawn_parallel_agent_work_item(
     if interrupt_requested() {
         return Ok(ParallelAgentSpawnOutcome::Skipped);
     }
-    let loaded = load_plan(input)?;
+    let loaded = load_run_plan(input)?;
     let target_id = parse_task_id(&item.task_id_str);
     // The item's owning rhei supplies its machine and callback base.
     // §DA-per-rhei-state-machines
@@ -376,6 +376,7 @@ fn spawn_parallel_agent_work_item(
     // thread, so a crash between here and the process can never refund the
     // invocation. §FS-rhei-budgets.6.2
     budget_record_start(workspace_root, &item.task_id_str, false, sink);
+    let lease = begin_worker_region(&loaded, input, &item.task_id_str, &item.current_state, budget);
     let handle = std::thread::spawn(move || {
         inherit_run_owner(run_owner);
         let thread_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -423,7 +424,7 @@ fn spawn_parallel_agent_work_item(
             // Read here, where the process was reaped, and emitted by the main
             // thread once it knows whether this attempt was a poll state's
             // handled wait. §FS-rhei-states.2.2
-            let release = PendingSlotRelease::hold(
+            let mut release = PendingSlotRelease::hold(
                 sink_for_thread.clone(),
                 SlotRelease {
                     slot,
@@ -438,6 +439,7 @@ fn spawn_parallel_agent_work_item(
                     duration_ms,
                 },
             );
+            lease.exited(&plan_for_thread, &mut release);
             let usage_capture_path =
                 result.as_ref().ok().and_then(|outcome| outcome.usage_capture_path.as_ref());
             let accounting_result = record_agent_accounting_attempt(

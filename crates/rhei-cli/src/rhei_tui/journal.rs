@@ -96,6 +96,7 @@ impl EventSink for JournalSink {
                 wall_clock,
                 exit_code,
                 duration_ms,
+                reverted,
                 ..
             } => {
                 let ts = format_rfc3339(wall_clock);
@@ -122,6 +123,9 @@ impl EventSink for JournalSink {
                 if let TaskOutcome::ProviderLimited { provider, next_attempt_at } = &outcome {
                     meta_parts.push(format!("provider={provider}"));
                     meta_parts.push(format!("next_attempt_at={next_attempt_at}"));
+                }
+                if let Some(location) = reverted {
+                    meta_parts.push(format!("reverted={location}"));
                 }
                 let meta = meta_parts.join(",");
                 let move_str =
@@ -241,6 +245,7 @@ mod tests {
             wall_clock: fixed_time() + Duration::from_millis(3_490),
             exit_code: Some(0),
             duration_ms: 3_490,
+            reverted: None,
         });
 
         let contents = std::fs::read_to_string(sink.path()).unwrap();
@@ -308,6 +313,7 @@ mod tests {
             wall_clock: fixed_time(),
             exit_code: Some(1),
             duration_ms: 10,
+            reverted: None,
         });
 
         let contents = std::fs::read_to_string(sink.path()).unwrap();

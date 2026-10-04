@@ -82,6 +82,7 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
             outcome,
             exit_code,
             duration_ms,
+            reverted,
             ..
         } => {
             put("event", json!("slot_released"));
@@ -100,6 +101,10 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
             }
             put("exit_code", json!(exit_code));
             put("duration_ms", json!(duration_ms));
+            // §FS-rhei-run-json.2.1
+            if let Some(location) = reverted {
+                put("reverted", json!(location));
+            }
         }
         RunEvent::PassEnded { pass, progressed } => {
             put("event", json!("pass_ended"));
@@ -416,6 +421,7 @@ fn decode_event(kind: &str, v: &Value, wall_clock: SystemTime) -> Option<RunEven
             wall_clock,
             exit_code: v.get("exit_code").and_then(Value::as_i64).map(|code| code as i32),
             duration_ms: num("duration_ms"),
+            reverted: opt_text("reverted"),
         },
         "pass_ended" => RunEvent::PassEnded {
             pass: num("pass") as u32,

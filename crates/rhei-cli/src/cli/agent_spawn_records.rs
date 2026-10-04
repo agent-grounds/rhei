@@ -57,6 +57,10 @@ struct SpawnRecord {
     /// reports the ending it is retrying, and these are different rules.
     // §FS-rhei-agents.3.2.1
     ending: String,
+    /// The edit the run reverted after this attempt, when its edit broke the plan.
+    // §FS-rhei-run.3.7.4 §FS-rhei-memory.4.4
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reverted: Option<RevertedEdit>,
 }
 
 fn default_attempt_charged() -> bool {
@@ -321,6 +325,7 @@ impl SpawnPlan {
             duration: ended.duration.to_string(),
             code: ended.code,
             ending: ended.ending.to_string(),
+            reverted: None,
         };
         if let Ok(body) = serde_json::to_string_pretty(&record) {
             let _ = fs::write(&self.record, body);

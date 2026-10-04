@@ -296,13 +296,29 @@ fn record_poll_self_loop_if_needed(
     current_state: &str,
     to_state: &str,
 ) -> MietteResult<bool> {
+    record_poll_self_loop(loaded, input, machine, task, current_state, to_state, None)
+}
+
+/// A poll self-loop's bookkeeping: the attempt is counted, and the next one is
+/// due after the state's interval, or after `due_in` seconds when the caller
+/// already knows no attempt waits on it. §FS-rhei-states.2.2 §FS-rhei-run.3.7.4
+fn record_poll_self_loop(
+    loaded: &LoadedPlan,
+    input: &Path,
+    machine: &rhei_validator::StateMachine,
+    task: &rhei_core::ast::Task,
+    current_state: &str,
+    to_state: &str,
+    due_in: Option<u64>,
+) -> MietteResult<bool> {
     if current_state != to_state {
         return Ok(false);
     }
     let Some(poll) = machine.states.get(current_state).and_then(|def| def.poll.as_ref()) else {
         return Ok(false);
     };
-    let interval = rhei_validator::parse_duration_secs(&poll.interval).unwrap_or(0);
+    let interval = due_in
+        .unwrap_or_else(|| rhei_validator::parse_duration_secs(&poll.interval).unwrap_or(0));
     // The attempt count reads from the merged graph (qualified keys).
     let next_attempt_count = current_state_visit_count(
         loaded.rhei.metadata.as_ref(),

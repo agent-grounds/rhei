@@ -57,7 +57,15 @@ fn handle_parallel_program_completion(
             // A reverted edit spends the attempt and routes nothing. §FS-rhei-run.3.7.4
             if (reverted || attempt_was_reverted(&spawn_record)) && !program_outcome.timed_out {
                 let (task, state) = (task_id_str.as_str(), state_name.as_str());
-                charge_reverted_attempt(&mut release, &reloaded, input, machine, task, state)?;
+                charge_reverted_attempt(
+                    &mut release,
+                    &reloaded,
+                    input,
+                    machine,
+                    task,
+                    state,
+                    &spawn_record,
+                )?;
                 let effect =
                     ParallelProgramCompletionEffect { advanced: false, program_spawned: true };
                 return Ok(effect);

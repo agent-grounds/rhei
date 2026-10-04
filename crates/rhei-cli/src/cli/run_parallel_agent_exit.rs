@@ -71,7 +71,15 @@ fn handle_parallel_agent_exit(
     // travel unit goes back. §FS-rhei-run.3.7.4 §FS-rhei-budgets.4.1
     if attempt_was_reverted(&spawn_record) && !timed_out {
         let (task, state) = (task_id_str.as_str(), state_name.as_str());
-        charge_reverted_attempt(&mut release, &reloaded, input, machine, task, state)?;
+        charge_reverted_attempt(
+            &mut release,
+            &reloaded,
+            input,
+            machine,
+            task,
+            state,
+            &spawn_record,
+        )?;
         progress.stalled_tasks.insert(task_id_str.clone());
         drop(release);
         budget_settle_visit(workspace_root, &task_id_str, sink);

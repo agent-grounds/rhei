@@ -8,10 +8,31 @@
 
 // §AR-source-file-size.3 §FS-rhei-run.3.7.4
 
-/// Whether an attributed stop left the held exit recorded at `record` unrouted.
-/// §FS-rhei-run.3.7.6
-fn stopped_on_break(record: &Path) -> bool {
-    worker_regions().stopped.contains(record)
+impl WorkerRegions {
+    /// How the exit held at `record` settles when the run stopped before
+    /// routing it: `None` while the run goes on, or once its own completion
+    /// settled it; otherwise the restore made on its behalf, which makes it a
+    /// reverted attempt that ended on its own, or none, which makes it an
+    /// interrupted one. §FS-rhei-run.3.7.4 §FS-rhei-run.3.7.6
+    fn held_at_stop(&mut self, record: &Path) -> Option<Option<WorkerRevert>> {
+        if !self.stopped {
+            return None;
+        }
+        self.held.remove(record).map(|held| held.revert)
+    }
+}
+
+impl PendingSlotRelease {
+    /// Settle an exit held when the run stopped, as `settled` reads its record:
+    /// unrouted however late, failed and announced when its region was
+    /// restored, interrupted when not. §FS-rhei-run.3.7.4 §FS-rhei-run.3.7.6
+    fn settle_held(&mut self, settled: impl FnOnce(&Path) -> Option<Option<WorkerRevert>>) {
+        match self.held.take().as_deref().and_then(settled) {
+            Some(Some(revert)) => announce_worker_revert(&revert, self),
+            Some(None) => self.interrupted(),
+            None => {}
+        }
+    }
 }
 
 /// Keep the revert on the attempt's spawn record, and say what the visit has
@@ -44,6 +65,22 @@ fn uncharge_stopped_attempt(record: &Path) {
     }
 }
 
+/// What a budget spent on a reverted last attempt is still owed, as its halt
+/// says it wherever the halt is printed. §FS-rhei-run.3.7.4
+const REVERTED_EDIT_OWED: &str = "the plan, as re-read after the exit, does not load with its edit";
+
+impl SpawnPlan {
+    /// What the halt of a spent budget names as still owed: the reverted edit
+    /// when the last attempt's was reverted, else the completion condition's
+    /// debt. §FS-rhei-run.3.7.4 §FS-rhei-agents.3.2.1
+    fn spent_budget_owed(&self, owed: &[String]) -> String {
+        if self.previous.as_ref().is_some_and(|prev| prev.reverted.is_some()) {
+            return REVERTED_EDIT_OWED.to_string();
+        }
+        completion_debt_label(owed)
+    }
+}
+
 /// Put a restore's key on the attempt's release and tell the operator, with the
 /// halt when it spent the last attempt. §FS-rhei-run.3.7.4 §FS-rhei-run.3.7.7
 fn announce_worker_revert(revert: &WorkerRevert, release: &mut PendingSlotRelease) {
@@ -55,12 +92,8 @@ fn announce_worker_revert(revert: &WorkerRevert, release: &mut PendingSlotReleas
         AttemptBudget::Poll { max_attempts } => max_attempts,
     };
     if revert.attempt_charged && revert.charged >= budget {
-        let halt = budget_spent_halt_line(
-            &revert.task_id,
-            &revert.state,
-            budget,
-            "the plan, as re-read after the exit, does not load with its edit",
-        );
+        let halt =
+            budget_spent_halt_line(&revert.task_id, &revert.state, budget, REVERTED_EDIT_OWED);
         emit_run_message(sink, rhei_tui::MessageLevel::Warn, halt);
     }
 }
@@ -87,7 +120,9 @@ fn reload_after_worker_exit(
 
 /// The reverted visit's charge: a failed attempt and no transition; on a poll
 /// state the attempt counts against `poll.max_attempts` as a self-loop's does,
-/// with no exhaustion edge fired here. §FS-rhei-run.3.7.4
+/// with no exhaustion edge fired here. A poll whose bound this attempt spent is
+/// stalled rather than scheduled: no attempt follows it, so none is waited for,
+/// as none is for a stalled ticket on any other state. §FS-rhei-run.3.7.4
 fn charge_reverted_attempt(
     release: &mut PendingSlotRelease,
     reloaded: &LoadedPlan,
@@ -95,10 +130,16 @@ fn charge_reverted_attempt(
     machine: &rhei_validator::StateMachine,
     task_id: &str,
     state: &str,
+    spawn_record: &Path,
 ) -> MietteResult<()> {
     release.failed("its edit broke the plan and was reverted");
     let Some(task) = find_task_by_id(&reloaded.rhei.tasks, &parse_task_id(task_id)) else {
         return Ok(());
     };
-    record_poll_self_loop_if_needed(reloaded, input, machine, task, state, state).map(|_| ())
+    let bound = machine.states.get(state).and_then(|def| def.poll.as_ref());
+    let spent = bound.zip(read_spawn_record(spawn_record)).is_some_and(|(poll, stored)| {
+        stored.reverted.is_some() && stored.charged >= u64::from(poll.max_attempts)
+    });
+    record_poll_self_loop(reloaded, input, machine, task, state, state, spent.then_some(0))
+        .map(|_| ())
 }

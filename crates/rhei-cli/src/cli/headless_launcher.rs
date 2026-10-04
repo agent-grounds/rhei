@@ -119,7 +119,7 @@ pub(crate) fn launch_headless_run(
         )
         .map_err(|error| {
             miette!(
-                help = "the run is up regardless: find it with `rhei runs`",
+                help = "the run started regardless: `rhei attach <workspace>` reaches it",
                 "could not write the launch report: {error}"
             )
         }),
@@ -234,15 +234,13 @@ fn announce_launch(
     let (LaunchOutcome::Running(descriptor) | LaunchOutcome::FinishedEarly(descriptor)) = outcome;
     // The child's entry may not have landed yet; publish it before printing. §FS-rhei-run-headless.1.1
     let unregistered = publish_registry_entry_once(descriptor).err();
-    match outcome {
-        LaunchOutcome::Running(_) => report_launched(descriptor, json, announce_dashboard, out)?,
-        LaunchOutcome::FinishedEarly(_) => report_finished_early(descriptor, json, out, err)?,
-    }
-    // §FS-rhei-run-headless.2
-    match unregistered {
-        Some(why) => writeln!(err, "{}", unregistered_run_warning(descriptor, &why)),
-        None => Ok(()),
-    }
+    let reported = match outcome {
+        LaunchOutcome::Running(_) => report_launched(descriptor, json, announce_dashboard, out),
+        LaunchOutcome::FinishedEarly(_) => report_finished_early(descriptor, json, out, err),
+    };
+    // A failed report does not swallow the warning. §FS-rhei-run-headless.2
+    let warned = unregistered.map_or(Ok(()), |why| writeln!(err, "{}", unregistered_run_warning(descriptor, &why)));
+    reported.and(warned)
 }
 
 fn report_launched(

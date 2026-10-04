@@ -157,7 +157,7 @@ fn run_sequential_agent_invocation(
                 task_id_str,
                 current_state,
                 spent_budget,
-                &completion_debt_label(&owed)
+                &plan.spent_budget_owed(&owed)
             )
         );
         progress.stalled_tasks.insert(task_id_str.clone());

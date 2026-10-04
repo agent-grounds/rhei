@@ -1,6 +1,7 @@
 // What a worker's region is, how a restore finds it again, and which of the
 // three cases a reload's failure falls in — as text, below the run, so a wrong
-// boundary shows up here rather than as a wrong revert three layers away.
+// boundary shows up here rather than as a wrong revert three layers away. And
+// the orders a stop and a worker's exit can meet in, which no run can force.
 
 // §AR-source-file-size.3 §FS-rhei-run.3.7
 
@@ -155,6 +156,150 @@ Raise it.
         assert_eq!(task_owning_line(&plan, 9).as_deref(), Some("plan.1.1"));
         assert_eq!(task_owning_line(&plan, 12).as_deref(), Some("plan.2"));
         assert_eq!(task_owning_line(&plan, 1), None);
+    }
+
+    /// The outcomes a release reported, in order.
+    #[derive(Default)]
+    struct Released(std::sync::Mutex<Vec<rhei_tui::TaskOutcome>>);
+
+    impl rhei_tui::EventSink for Released {
+        fn emit(&self, event: rhei_tui::RunEvent) {
+            if let rhei_tui::RunEvent::SlotReleased { outcome, .. } = event {
+                self.0.lock().expect("released lock").push(outcome);
+            }
+        }
+    }
+
+    /// A worker whose exit 0 broke nothing of its own while another task's
+    /// text breaks the plan, as in the parallel run CI lost: Task 1 in flight,
+    /// Task 3's file broken, and a registry of the test's own, so no run in
+    /// this process can reach it.
+    struct StopRace {
+        _dir: tempfile::TempDir,
+        ws: PathBuf,
+        regions: WorkerRegions,
+        attempt: SpawnPlan,
+        sink: Arc<Released>,
+    }
+
+    impl StopRace {
+        fn new() -> Self {
+            let dir = tempfile::tempdir().expect("tmpdir");
+            let ws = dir.path().join("ws");
+            fs::create_dir_all(ws.join("tasks")).expect("tasks dir");
+            fs::create_dir_all(ws.join("runtime/logs")).expect("logs dir");
+            fs::write(ws.join("index.rhei.md"), "# Rhei: Stop race\n").expect("index");
+            fs::write(ws.join("tasks/01-t.md"), TASK_FILE).expect("Task 1");
+            let broken = "### Task 3: Later\n**State:** todo\n\nBody.\n\n#### Visit 1 (cover)\n";
+            fs::write(ws.join("tasks/03-t.md"), broken).expect("Task 3");
+            let attempt = spawn_plan_for_test(&ws.join("runtime/logs/task-ws.1-cover.log"));
+            let stored = SpawnRecord {
+                task: "ws.1".into(),
+                state: "cover".into(),
+                moves: 0,
+                attempt: 1,
+                charged: 1,
+                attempt_charged: true,
+                kind: "program".into(),
+                worker: "note".into(),
+                log: attempt.log.clone(),
+                started: String::new(),
+                ended: String::new(),
+                duration: String::new(),
+                code: Some(0),
+                ending: "exited".into(),
+                reverted: None,
+            };
+            let body = serde_json::to_string_pretty(&stored).expect("record");
+            fs::write(&attempt.record, body).expect("spawn record");
+            let mut regions = empty_registry();
+            regions.root = Some(ws.clone());
+            let file = ws.join("tasks/01-t.md");
+            regions.in_flight.insert("ws.1".into(), region(&file, TASK_FILE, "1", 1));
+            Self { _dir: dir, ws, regions, attempt, sink: Arc::default() }
+        }
+
+        fn lease(&self) -> WorkerRegionLease {
+            WorkerRegionLease {
+                task_id: Some("ws.1".into()),
+                state: "cover".into(),
+                input: self.ws.clone(),
+                budget: AttemptBudget::Visit(2),
+            }
+        }
+
+        /// The release the worker thread builds from its reaped exit 0.
+        fn release(&self) -> PendingSlotRelease {
+            let release = SlotRelease {
+                slot: 0,
+                task: "ws.1".into(),
+                from: "cover".into(),
+                to: "cover".into(),
+                log_path: self.attempt.log.clone(),
+                outcome: rhei_tui::TaskOutcome::Completed,
+                finished_at: std::time::Instant::now(),
+                wall_clock: std::time::SystemTime::now(),
+                exit_code: Some(0),
+                duration_ms: 1,
+            };
+            PendingSlotRelease::hold(self.sink.clone(), release)
+        }
+
+        /// The checkpoint's stop on Task 3's break.
+        fn stop(&mut self) {
+            let at = locate_plan_break(&self.ws).expect("Task 3's text breaks the plan");
+            assert!(at.file.ends_with("tasks/03-t.md"), "{}", at.file.display());
+            let _ = self.regions.stop_on(&at);
+        }
+
+        /// The release dropped as the abandoned channel drops it.
+        fn drop_release(&mut self, mut release: PendingSlotRelease) {
+            release.settle_held(|record| self.regions.held_at_stop(record));
+            drop(release);
+        }
+
+        fn assert_interrupted_and_uncharged(&self) {
+            let outcomes = self.sink.0.lock().expect("released lock").clone();
+            assert_eq!(outcomes, vec![rhei_tui::TaskOutcome::Interrupted]);
+            let stored = read_spawn_record(&self.attempt.record).expect("spawn record");
+            assert_eq!((stored.charged, stored.attempt_charged), (0, false));
+            assert_eq!(stored.ending, "interrupted");
+            assert!(self.regions.held.is_empty(), "nothing is left held");
+        }
+    }
+
+    /// The order CI lost: the worker is reaped, the checkpoint stops the run
+    /// before the worker reaches the registry, and only then does it. It was in
+    /// flight at the stop, so it is interrupted and uncharged, never completed.
+    // §FS-rhei-run.3.7.6
+    #[test]
+    fn a_worker_reaped_before_the_stop_but_marked_after_it_is_interrupted() {
+        let mut race = StopRace::new();
+        let lease = race.lease();
+        let mut release = race.release();
+
+        race.stop();
+        assert!(lease.exited_in(&mut race.regions, &race.attempt, &mut release).is_none());
+        assert!(race.regions.held.is_empty(), "an exit after the stop is never held");
+        race.drop_release(release);
+
+        race.assert_interrupted_and_uncharged();
+    }
+
+    /// The opposite order: the worker reaches the registry first, its exit is
+    /// held on the break, and the stop then leaves it unrouted. §FS-rhei-run.3.7.6
+    #[test]
+    fn a_worker_held_before_the_stop_is_interrupted() {
+        let mut race = StopRace::new();
+        let lease = race.lease();
+        let mut release = race.release();
+
+        assert!(lease.exited_in(&mut race.regions, &race.attempt, &mut release).is_none());
+        assert!(race.regions.held.contains_key(&race.attempt.record), "held on the break");
+        race.stop();
+        race.drop_release(release);
+
+        race.assert_interrupted_and_uncharged();
     }
 
     /// The reverted text sits beside the attempt's log and takes its name.

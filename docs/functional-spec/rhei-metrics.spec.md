@@ -91,10 +91,17 @@ measurement is confirmed — the same durability model as
    {"state": "api-cover", "visit": 2, "driver": true,
     "log": "runtime/logs/task-x.y-api-cover-model-2.log"},
    {"state": "api-fix", "visit": 1, "driver": false,
-    "log": "runtime/logs/task-x.y-api-fix-model-1.log"}
+    "log": "runtime/logs/task-x.y-api-fix-model.log"}
  ],
  "recorded": "2026-08-23T23:44:43Z"}
 ```
+
+A session's `log` is the log that session wrote, by the naming rule of
+§FS-rhei-agents.8.1: a number that is 1 is left out of the name, and every
+entry into a state has its own log, so two iterations whose windows hold two
+entries of the same state link two different logs and two different reports —
+whether or not the state declares `visits:`. Rows recorded before entry
+numbers existed are not rewritten.
 
 This file is the single source of truth for session-to-metric binding. Every
 presentation surface reads it; none re-derives the binding from transition
@@ -108,7 +115,11 @@ Presentation never renames sessions and never collapses shared credit:
 
 - **Sessions keep their visit identity.** A session is `api-fix #1` because its
   log is the visit-1 log ([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)); the iteration it belongs to
-  is worn as a tag, not substituted for its number. Visit and iteration
+  is worn as a tag, not substituted for its number. A session's `visit` is
+  the number its log name carries — `{visit_count}` for a counted state, the
+  entry number for an uncounted one, and 1 where the name carries none — so
+  the second entry of an uncounted `cover` is `cover #2`, linked to
+  `…-cover-2.log`. Visit and iteration
   counters drift apart exactly when repairs intervene, and both must stay
   legible.
 - **The delta belongs to the window.** When one session fills a window, the

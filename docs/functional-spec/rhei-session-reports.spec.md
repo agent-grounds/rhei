@@ -19,9 +19,22 @@ invocation do".
 
 For every agent session log `runtime/logs/<name>.log` the renderer writes
 `runtime/reports/<name>.md`. The report file name mirrors the log file name
-exactly, including visit and attempt suffixes ([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)), so the
-one-session-one-log invariant extends to reports: one session, one log, one
-report, all three sharing a stem.
+exactly, including visit, entry and attempt suffixes ([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)), so
+the one-session-one-log invariant extends to reports: one session, one log, one
+report, all three sharing a stem. Because every entry into a state gets its own
+log, a state the ticket re-enters gets one report per entry rather than one
+report rewritten by the latest session.
+
+A report already at the stem of a log a spawn has **just created** cannot
+belong to that log — the log did not exist a moment before. Right after the
+spawn creates its log, if `runtime/reports/<stem>.md` exists, the run renames
+it to `runtime/reports/<stem>.orphaned-<unix-ts>.md` without editing its
+contents, prints one line naming both paths, and continues; the new session's
+report is then written at `<stem>.md`. The orphan may be the only remaining
+account of an earlier session, so it is set aside rather than overwritten, and
+a narrowed reset sweeps it with the ticket's other reports
+(§FS-rhei-reset.2.1). `rhei report` still overwrites a report it regenerates
+from an existing log.
 
 Program-state logs ([§FS-rhei-programs](rhei-programs.spec.md#fs-rhei-programs-rhei-program-states-specification)) are not rendered: they are already
 plain stdout/stderr and carry no event stream. A run whose workspace declares

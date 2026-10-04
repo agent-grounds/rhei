@@ -836,6 +836,14 @@ Rules:
   `visits:` field or suffixed authored state. The transition-ledger move count,
   rather than the optional displayed visit suffix, distinguishes that entry
   from a restart which has not moved the ticket (§FS-rhei-agents.3.2).
+- A state this section keeps no counter for still numbers its entries for log
+  naming: the **entry number** of §FS-rhei-agents.8.1 counts the ticket's
+  arrivals in the state from the transition ledger, never from a frontmatter
+  counter, and writes nothing to `stateVisits`. It names logs, spawn records
+  and session reports only; `{visit_count}` keeps its meaning everywhere it is
+  read — prompts, `RHEI_VISIT_COUNT`, `visitCount`, and declared `inputs:`/
+  `outputs:` paths — so on the second entry of an uncounted state a declared
+  `report-{visit_count}.json` is still `report-1.json` while its log is `-2`.
 - The task's active `**State:**` value mirrors that count by writing `<state>-<n>` for visits greater than `1`; visit `1` stays as the bare state name.
 - When evaluating transitions from a counted-loop state, runtimes should expose:
   - `visitCount`: the current value of `metadata.tasks.<id>.stateVisits.<state-name>`

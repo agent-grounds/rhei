@@ -698,6 +698,7 @@ This section defines the formal structure of YAML state machine configuration fi
 | `transitions` | array | Yes | List of allowed state transitions |
 | `callbacks` | object | No | Platform-specific callback mappings |
 | `error_handling` | object | No | Error handling and recovery configuration |
+| `callback_timeout` | string | No | The machine's time bound on each `cli:` callback run, for every edge that declares none of its own (e.g., `2m`). Absent, callbacks run unbounded. See §4.10. |
 
 ### 4.2. State Definition
 
@@ -909,6 +910,7 @@ transitions:
     skill_unavailable: <bool|[<id>, ...]>  # Optional: Fires when a required skill is unavailable
     max_retries: <integer>  # Optional: Maximum retry attempts for this transition
     retry_delay: <duration> # Optional: Delay between retry attempts
+    callback_timeout: <duration>  # Optional: Time bound on each callback run of this edge
 ```
 
 | Field | Type | Required | Description |
@@ -926,6 +928,7 @@ transitions:
 | `skill_unavailable` | boolean or string array | No | Same shape as `mcp_unavailable`, for skills. |
 | `max_retries` | integer | No | Maximum automatic retry attempts |
 | `retry_delay` | string | No | Delay between retries (e.g., `30s`, `5m`) |
+| `callback_timeout` | string | No | Time bound on each `cli:` callback run of this edge (e.g., `2m`). Wins over the machine's top-level `callback_timeout`. See §4.10. |
 
 **Several rules may share one `(from, to)` pair.** Nothing forbids two
 transitions with the same source and target: they differ in their `exit_code:`,
@@ -1095,6 +1098,10 @@ do not receive them. Additive JSON fields can break consumers that reject
 unknown properties; callback decoders must permit fields added by a compatible
 Rhei release.
 
+A `cli:` callback runs under the time bound its edge resolves
+([§FS-rhei-transitions.4.10](#410-callback-time-bound)); where the edge and the
+machine declare none, it runs unbounded, as it always has.
+
 ### 4.8. Callback Mappings
 
 Platform-specific callback mappings allow the same logical callback name to resolve to different implementations:
@@ -1120,6 +1127,107 @@ error_handling:
   on_leave_rejection:
     - <action>              # Actions to take when on_leave callback rejects
 ```
+
+A callback that exceeds its `callback_timeout`
+([§FS-rhei-transitions.4.10](#410-callback-time-bound)) is an `on_enter`
+failure or an `on_leave` rejection like any other, so whatever these actions do
+for one applies to it unchanged. Today the only action executed is the claim
+path's `transition_to` (§FS-rhei-next.3.1).
+
+### 4.10. Callback Time Bound
+
+A machine author bounds how long one callback may hold a transition with
+`callback_timeout`. Callbacks are the one subprocess on the transition path
+that has no bound of its own otherwise, and `rhei transition` holds the plan's
+writer lock through them (§FS-rhei-transition-cmd.3), so an unbounded callback
+whose network call hangs holds every other writer on the plan for as long as it
+hangs. The bound serves the requirement above that failed transitions be
+reportable and recoverable: a hung callback becomes an ordinary, named failure.
+
+```yaml
+callback_timeout: 2m              # the machine's bound, for every edge without one
+
+transitions:
+  - from: human-gate
+    to: opening
+    description: Approved; open the pull request
+    on_enter: "cli:bash scripts/lifecycle-sync.sh"
+  - from: opening
+    to: reviewing
+    description: The pull request is open
+    on_enter: "cli:bash scripts/slow-but-fine.sh"
+    callback_timeout: 20m         # this edge's own bound wins over the machine's
+```
+
+**Where it is declared.** `callback_timeout` is a duration in the syntax
+`agent_timeout` and `program_timeout` accept (`30s`, `5m`, `1h`, `2h30m`), and
+it may be written at two levels: on a transition rule (§4.4) and at the
+machine's root (§4.1). The bound a callback runs under is resolved as the
+firing edge's `callback_timeout`, then the machine's, then **no bound** — which
+is the behaviour of a machine that declares neither. A redirected rule
+(`nextState`) resolves its own callbacks' bound from that rule, then from the
+machine. There is no per-state key, no `settings.json` default, no CLI flag,
+and no built-in default: a callback is the machine author's code, and a number
+nobody authored would bound it at a value nobody chose
+(§REQ-bounded-neural-work.2). A zero bound is refused, at either level, by
+validation (§FS-rhei-validate.4).
+
+**What it bounds.** The bound applies to each callback run separately: the
+edge's `on_leave` gets the full bound, its `on_enter` gets the full bound, and
+an `on_leave` that fans out once per model gets it once per model. It covers
+the whole run — writing the transition context to the callback's stdin, waiting
+for it to exit, and reading its stdout and stderr to their end — so a callback
+that never reads a large payload, or that exits while a background child still
+holds its output open, is bounded as well. After the process tree is stopped,
+rhei waits a short drain window for the output pipes and then abandons them
+with what they hold, so a descendant that escaped the tree and keeps a pipe
+open cannot turn the bound back into a hang.
+
+**How expiry stops the callback.** The callback is started as the root of its
+own process tree, and expiry stops the whole tree, so the network client a
+script started (`gh` under `bash`) goes with the script:
+
+- On Linux and macOS the callback leads its own process group. Expiry sends
+  `SIGTERM` to the group, waits a 10-second grace for it to exit, then sends
+  `SIGKILL` to the group — the sequence `program_timeout` and `agent_timeout`
+  use (§FS-rhei-agents.7.3). A callback that traps `SIGTERM` can clean up in
+  the grace.
+- On Windows the callback is assigned to a Job Object when it starts, and expiry
+  terminates the job, which ends every process in it at once. Windows has no
+  `SIGTERM` to ask with, so there is **no grace** there. This is the one
+  platform difference in this behaviour, declared here as §REQ-cross-platform.2
+  requires.
+
+**What expiry reports.** A timed-out callback is an ordinary failed callback
+result, never an executor error, so it takes exactly the path a callback that
+exits non-zero takes: an `on_enter` timeout rolls the state write back and
+appends no ledger row (§FS-rhei-transitions.1.2), an `on_leave` timeout rejects
+the transition before the state write, and `error_handling` applies as for any
+other failure (§4.9). The reason inside the existing frames names the bound as
+authored:
+
+```text
+on_enter callback '<callback>' failed: exceeded callback_timeout <bound>; its process tree was stopped
+on_leave callback '<callback>' rejected the transition: exceeded callback_timeout <bound>; its process tree was stopped
+```
+
+`<callback>` is the callback as declared (`cli:bash scripts/lifecycle-sync.sh`)
+and `<bound>` the resolved `callback_timeout` exactly as written (`2m`).
+
+**Which callbacks it reaches.** Only callbacks rhei runs as subprocesses, which
+today are `cli:` callbacks. `js:`, `py:` and `java:` callbacks run inside their
+host process, which rhei cannot stop, so the bound does not apply to them. With
+`--no-callbacks` no callback runs and the bound never applies.
+
+**What it is independent of.** `callback_timeout` is not `program_timeout`:
+the callbacks of a program's exit-code edge run under `callback_timeout`, not
+under the program's remaining time, and an expiry there fails the transition
+without re-entering the program's own timeout path
+(§FS-rhei-programs.7.2). Nor is it the edge's `timeout:`, which decides *when*
+the engine fires an edge; `callback_timeout` bounds the callbacks of that
+firing like any other. An engine-fired transition whose callback times out
+fails the way one whose callback exits non-zero fails there: the task stays in
+its source state and the run's log carries the message.
 
 ---
 

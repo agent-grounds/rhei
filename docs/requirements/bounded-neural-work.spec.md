@@ -98,8 +98,8 @@ consumes the one travel unit of the ticket's one applied edge.
 unit per admitted start, including every retry, every neural poll attempt, and
 each arm of a fanout. There is exactly **one durable account per project**,
 shared by every rhei of the project, every descendant added later, every
-concurrent process, and every nested runtime; every admission from any of them
-serializes against it.
+concurrent process, and every nested runtime of the project; every admission
+from any of them serializes against it.
 
 That account holds one of two named contracts at a time, bounding different
 quantities, and the specification never describes one as the other:

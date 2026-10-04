@@ -2,13 +2,13 @@
 // how liveness is decided.
 // §FS-rhei-run-headless.2 §FS-rhei-run-headless.3
 
-mod run_descriptor_tests {
+pub(super) mod run_descriptor_tests {
     use super::super::*;
 
     /// The registry is machine-wide, so tests must not use the real one. Each
     /// test gets its own `XDG_STATE_HOME`; the env is process-global, so they
     /// are serialized through one mutex.
-    pub(super) static REGISTRY_GUARD: Mutex<()> = Mutex::new(());
+    pub(crate) static REGISTRY_GUARD: Mutex<()> = Mutex::new(());
 
     pub(super) struct IsolatedRegistry {
         _dir: tempfile::TempDir,

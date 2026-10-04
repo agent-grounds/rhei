@@ -232,11 +232,19 @@ struct SpawnPlan {
 
 impl SpawnPlan {
     /// The budget spent, if this visit's is already gone and the spawn must
-    /// not happen at all. A poll state's own bound never spends here — its
-    /// exhaustion is `poll.max_attempts`, checked elsewhere. §FS-rhei-agents.3.2.3
+    /// not happen at all. A poll state's ordinary exhaustion is its own edge,
+    /// checked elsewhere; only an attempt whose edit the run reverted, which
+    /// fires no edge, can leave `poll.max_attempts` spent here.
+    // §FS-rhei-agents.3.2.3 §FS-rhei-run.3.7.4
     fn budget_spent(&self, budget: AttemptBudget) -> Option<u64> {
+        let last_reverted = self.previous.as_ref().is_some_and(|prev| prev.reverted.is_some());
         match budget {
             AttemptBudget::Visit(budget) if self.charged >= budget => Some(budget),
+            AttemptBudget::Poll { max_attempts }
+                if last_reverted && self.charged >= max_attempts =>
+            {
+                Some(max_attempts)
+            }
             AttemptBudget::Visit(_) | AttemptBudget::Poll { .. } => None,
         }
     }
@@ -500,9 +508,9 @@ fn newest_spawn_record_for_state(
     newest.map(|(_, record)| record)
 }
 
-/// Which rule bounds one visit's spawns, and by how much. `Poll` is carried
-/// only to be named in the respawn note, never as a second bound alongside
-/// the poll's own exhaustion rule.
+/// Which rule bounds one visit's spawns, and by how much. `Poll` is never a
+/// second bound alongside the poll's own exhaustion rule: it bounds only the
+/// attempts whose edits were reverted, which that rule never sees.
 // §FS-rhei-agents.3.2.1 §FS-rhei-agents.3.2.3
 #[derive(Clone, Copy)]
 enum AttemptBudget {
@@ -510,8 +518,10 @@ enum AttemptBudget {
     /// `SpawnPlan::budget_spent` and `SpawnPlan::retry_outlook` bound spawns
     /// at this count.
     Visit(u64),
-    /// A poll state's `poll.max_attempts`. Never bounds a spawn — the poll's
-    /// own exhaustion path (`ready_auto_advance.rs`) does that.
+    /// A poll state's `poll.max_attempts`. The poll's own exhaustion path
+    /// (`ready_auto_advance.rs`) bounds its ordinary attempts; a visit whose
+    /// last attempt was reverted stalls here once it reaches the bound.
+    // §FS-rhei-run.3.7.4
     Poll { max_attempts: u64 },
 }
 

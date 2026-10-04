@@ -55,7 +55,7 @@ fn handle_parallel_program_completion(
             let target_id = parse_task_id(&task_id_str);
             let mut reloaded = reload_after_worker_exit(input, &mut release, &spawn_record)?;
             // A reverted edit spends the attempt and routes nothing. §FS-rhei-run.3.7.4
-            if reverted && !program_outcome.timed_out {
+            if (reverted || attempt_was_reverted(&spawn_record)) && !program_outcome.timed_out {
                 let (task, state) = (task_id_str.as_str(), state_name.as_str());
                 charge_reverted_attempt(&mut release, &reloaded, input, machine, task, state)?;
                 let effect =

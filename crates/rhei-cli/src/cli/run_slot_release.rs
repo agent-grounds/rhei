@@ -51,11 +51,13 @@ struct PendingSlotRelease {
     release: Option<SlotRelease>,
     /// Where the worker's edit broke the plan, when the run reverted it. §FS-rhei-run.3.7.7
     reverted: Option<String>,
+    /// The spawn record of an exit held while its reload waited. §FS-rhei-run.3.7.5
+    held: Option<std::path::PathBuf>,
 }
 
 impl PendingSlotRelease {
     fn hold(sink: Arc<dyn rhei_tui::EventSink>, release: SlotRelease) -> Self {
-        Self { sink, release: Some(release), reverted: None }
+        Self { sink, release: Some(release), reverted: None, held: None }
     }
 
     /// The engine selected this state's poll self-loop and scheduled the next
@@ -81,9 +83,20 @@ impl PendingSlotRelease {
 }
 
 impl PendingSlotRelease {
-    /// The worker's edit broke the plan at `location` and was reverted. §FS-rhei-run.3.7.7
+    /// The worker's edit broke the plan at `location` and was reverted: the
+    /// attempt is failed unless its timeout or the run's interruption ended it,
+    /// even when the run stops before routing it. §FS-rhei-run.3.7.4 §FS-rhei-run.3.7.7
     fn reverted(&mut self, location: &str) {
         self.reverted = Some(location.to_string());
+        if let Some(release) = self.release.as_mut() {
+            if !matches!(
+                release.outcome,
+                rhei_tui::TaskOutcome::TimedOut | rhei_tui::TaskOutcome::Interrupted
+            ) {
+                let reason = "its edit broke the plan and was reverted".to_string();
+                release.outcome = rhei_tui::TaskOutcome::Failed(reason);
+            }
+        }
     }
 
     /// The attempt is spent without a transition, whatever its exit read as. §FS-rhei-run.3.7.4
@@ -91,6 +104,13 @@ impl PendingSlotRelease {
         if let Some(release) = self.release.as_mut() {
             release.outcome = rhei_tui::TaskOutcome::Failed(reason.to_string());
         }
+    }
+
+    /// This exit's reload found a break outside its own region, so it is held
+    /// with the attempt recorded at `record` until that reload settles.
+    // §FS-rhei-run.3.7.5
+    fn held_for(&mut self, record: &std::path::Path) {
+        self.held = Some(record.to_path_buf());
     }
 
     /// The run stopped before routing this exit, as it does a worker it
@@ -104,7 +124,12 @@ impl PendingSlotRelease {
 
 impl Drop for PendingSlotRelease {
     fn drop(&mut self) {
-        let Some(release) = self.release.take() else { return };
+        let Some(mut release) = self.release.take() else { return };
+        // A held exit the run stopped on is unrouted, however late it is dropped.
+        // §FS-rhei-run.3.7.6
+        if self.held.as_deref().is_some_and(stopped_on_break) {
+            release.outcome = rhei_tui::TaskOutcome::Interrupted;
+        }
         self.sink.emit(rhei_tui::RunEvent::SlotReleased {
             slot: release.slot,
             task: release.task,

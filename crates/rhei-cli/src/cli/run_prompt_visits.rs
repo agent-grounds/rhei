@@ -182,9 +182,19 @@ fn render_retry_notice(render_context: &RuntimeTemplateContext<'_>, task_root: &
     } else {
         ""
     };
+    // The revert's own sentence ends the paragraph, after the transcript. §FS-rhei-memory.4.4
+    let reverted = previous.reverted.as_ref().map_or(String::new(), |edit| {
+        format!(
+            " Its edit broke the plan at `{}` ({}), so the run reverted this task's text to what it \
+             was before that attempt; what it wrote is in `{}`.",
+            edit.location,
+            edit.message,
+            memory_path(render_context, &edit.text)
+        )
+    });
     format!(
         "\nRetrying this visit: attempt {}. The previous attempt {}{unmet}.{owed} Its transcript \
-         is `{}`.\n",
+         is `{}`.{reverted}\n",
         plan.attempt,
         previous.ending_sentence(),
         memory_path(render_context, &previous.log)

@@ -42,7 +42,7 @@ fn run_sequential_agent_invocation(
         return Ok(());
     }
     let (task_id_str, _current_state_raw, current_state, resolved) = item;
-    let loaded = load_plan(input)?;
+    let loaded = load_run_plan(input)?;
     let target_id = parse_task_id(task_id_str);
     let machine = machines.for_task_str(task_id_str);
     let callback_paths = machines.callbacks_for_str(task_id_str);
@@ -314,6 +314,7 @@ fn run_sequential_agent_invocation(
     // Ambiguity is recorded *before* the capability is transferred: a crash
     // from here on can never refund the invocation. §FS-rhei-budgets.6.2
     budget_record_start(workspace_root, task_id_str, false, sink);
+    let lease = begin_worker_region(&loaded, input, task_id_str, current_state, budget);
     let spawn_result = spawn_and_wait_agent(
         &spawn_resolved,
         opts.price_book(),
@@ -368,7 +369,7 @@ fn run_sequential_agent_invocation(
     // Held rather than emitted: whether this attempt was a handled wait is
     // known only once the completion below selects its transition.
     // §FS-rhei-states.2.2
-    let release = PendingSlotRelease::hold(
+    let mut release = PendingSlotRelease::hold(
         sink.clone(),
         SlotRelease {
             slot: 0,
@@ -383,6 +384,7 @@ fn run_sequential_agent_invocation(
             duration_ms,
         },
     );
+    lease.exited(&plan, &mut release);
     // §FS-rhei-cost-accounting.4: Extraction happens after agent exit.
     match record_agent_accounting_attempt(
         AgentAccountingInvocation {

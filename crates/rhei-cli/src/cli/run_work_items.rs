@@ -150,6 +150,9 @@ struct ParallelProgramCompletion {
     release: PendingSlotRelease,
     result: MietteResult<ProgramSpawnOutcome>,
     slot: rhei_tui::Slot,
+    /// The run reverted this attempt's edit, which spends it. §FS-rhei-run.3.7.4
+    reverted: bool,
+    spawn_record: PathBuf,
 }
 
 enum ParallelAgentThreadMessage {
@@ -195,7 +198,7 @@ fn select_snapshot_override_run_invocation(
         return Ok(None);
     }
 
-    let loaded = load_plan(input)?;
+    let loaded = load_run_plan(input)?;
     let explicit_task = opts.snapshot_task_selector();
     let mut candidates = Vec::new();
     for (task_id, _raw_state, current_state, resolved) in invocations {

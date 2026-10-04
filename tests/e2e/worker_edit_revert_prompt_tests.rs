@@ -101,7 +101,6 @@ fn block<'a>(plan: &'a str, heading: &str) -> &'a str {
 /// again because a whole-file snapshot put its old state back.
 // §FS-rhei-run.3.7.3
 #[test]
-#[ignore = "red until #310 restores a worker's region"]
 fn a_siblings_transition_in_the_same_file_survives_the_restore() {
     for mode in MODES {
         let dir = unique_temp_dir(&format!("worker-edit-one-file-{mode:?}"));
@@ -196,7 +195,7 @@ const TRAIL_SENTENCE: &str = "- Write progress as plain paragraphs or lists, nev
 /// The retry after a reverted edit is told where, why, and where its text went.
 // §FS-rhei-memory.3.4 §FS-rhei-memory.4.4 §FS-rhei-agents.3.2
 #[test]
-#[ignore = "red until #310 restores a worker's region"]
+#[ignore = "red: worker_edit_revert_prompt_tests.rs:228 `retry.contains(&location)` expects plan.rhei.md:10; the run reports :17"]
 fn an_agent_is_told_the_cost_of_a_heading_and_its_retry_where_the_text_went() {
     for mode in [Mode::Sequential, Mode::Parallel] {
         let dir = unique_temp_dir(&format!("worker-edit-agent-{mode:?}"));

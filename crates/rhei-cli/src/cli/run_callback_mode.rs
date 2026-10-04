@@ -22,7 +22,7 @@ fn run_callback_mode(
     let run_started_wall = identity.started_wall;
     let run_id = identity.id.clone();
     let command = current_command_line();
-    let initial = load_plan(input)?;
+    let initial = load_run_plan(input)?;
     let initial_total_tasks = total_task_count(&initial.rhei);
     let initial_states = collect_initial_states(&initial.rhei, &live.machines.set);
     // §FS-rhei-run-report.1: declared before the frontend so it drops after the
@@ -344,7 +344,7 @@ fn run_callback_mode(
                     } else {
                         run_info!("  Result: now in '{}'.", effective_to);
                     }
-                    let reloaded = load_plan(input)?;
+                    let reloaded = load_run_plan(input)?;
                     let discovered = newly_discovered_tasks(&task_ids_before, &reloaded.rhei.tasks);
                     if !discovered.is_empty() {
                         run_info!(
@@ -386,7 +386,7 @@ fn run_callback_mode(
     // The stopping decision, read once and shared by every surface of this
     // run; a preview predicts it only when its own scan found nothing
     // schedulable. §FS-rhei-run.3 §FS-rhei-run.4
-    let stopped = opts.until_idle().then(|| load_plan(input)).transpose()?;
+    let stopped = opts.until_idle().then(|| load_run_plan(input)).transpose()?;
     let idle = stopped
         .as_ref()
         .filter(|_| !interrupted_run && (!opts.dry_run() || pass == 0))
@@ -436,14 +436,14 @@ fn run_callback_mode(
         }
         (terminal_count, total_tasks)
     } else if transitions_made == 0 {
-        let loaded = load_plan(input)?;
+        let loaded = load_run_plan(input)?;
         run_info!(
             "{}",
             no_advancement_summary(&loaded.rhei, &live.machines.set, &rhei_scope)
         );
         (0usize, 0usize)
     } else {
-        let loaded = load_plan(input)?;
+        let loaded = load_run_plan(input)?;
         let terminal_count = terminal_task_count(&loaded.rhei, &live.machines.set);
         let total_tasks = total_task_count(&loaded.rhei);
         // §FS-rhei-run.3.2: the run stopped; it did not complete.
@@ -527,7 +527,7 @@ fn run_callback_mode(
     }
 
     if !opts.dry_run() {
-        let loaded = load_plan(input)?;
+        let loaded = load_run_plan(input)?;
         // §FS-rhei-panta.6.1: a narrowed run halts on in-scope work only —
         // out-of-scope tickets left non-terminal are not a failure.
         if scoped_unfinished_task_exists(&loaded.rhei, &live.machines.set, &rhei_scope)

@@ -299,6 +299,7 @@ fn slot_release_clears_live_marker() {
         wall_clock: SystemTime::now(),
         exit_code: Some(0),
         duration_ms: 1200,
+        reverted: None,
     });
     assert!(!state.is_live("1"));
 }
@@ -322,6 +323,7 @@ fn provider_limit_release_is_a_calm_visible_wait() {
         wall_clock: SystemTime::now(),
         exit_code: Some(1),
         duration_ms: 1200,
+        reverted: None,
     });
 
     let entry = state.journal.back().expect("release journal entry");

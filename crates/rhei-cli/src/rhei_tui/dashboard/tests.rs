@@ -417,6 +417,7 @@ fn snapshot_does_not_mark_released_slot_active() {
         wall_clock: SystemTime::now(),
         exit_code: Some(0),
         duration_ms: 10,
+        reverted: None,
     });
 
     let snapshot = fetch_snapshot_json(&dashboard);

@@ -80,4 +80,4 @@ Available transitions from `pending`:
 What you write is what the next agent and the human see.
 - `runtime/results/<task-id>.md`: the first line is the one-line summary every later Plan History shows; detail below it.
 - You may append progress paragraphs to your own task body — files touched, commands run, decisions made — and append child tasks under your own task. Do not edit `**State:**` lines or any other task's body.
-- Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` stops the plan from parsing for the whole run.
+- Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` breaks the plan; the run reverts your task body to what it was before this attempt and spends the attempt.

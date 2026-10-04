@@ -107,7 +107,14 @@ fn handle_sequential_agent_completion(
             // §FS-rhei-agents.3.2: the completion condition is exit 0 +
             // declared outputs + the terminal result when the edge this
             // exit selects lands on a `final: true` state.
-            let reloaded = load_plan(input)?;
+            let reloaded = reload_after_worker_exit(input, &mut release, &spawn_record)?;
+            // A reverted edit spends the attempt and routes nothing. §FS-rhei-run.3.7.4
+            if attempt_was_reverted(&spawn_record) && !timed_out {
+                let (task, state) = (task_id_str.as_str(), current_state.as_str());
+                charge_reverted_attempt(&mut release, &reloaded, input, machine, task, state)?;
+                progress.stalled_tasks.insert(task_id_str.clone());
+                return Ok(());
+            }
             let task_after = find_task_by_id(&reloaded.rhei.tasks, &target_id);
             let stayed_in_state = task_after.is_some_and(|task| {
                 normalized_state_name(task.state.as_str(), machine)

@@ -46,6 +46,7 @@ fn every_variant() -> Vec<RunEvent> {
             wall_clock: at(),
             exit_code: Some(0),
             duration_ms: 3_490,
+            reverted: None,
         },
         RunEvent::PassEnded { pass: 1, progressed: true },
         RunEvent::TasksDeferred { pass: 1, tasks: vec!["auth.2".to_string()] },
@@ -136,6 +137,7 @@ fn a_failed_outcome_carries_its_reason() {
         wall_clock: at(),
         exit_code: Some(2),
         duration_ms: 1,
+        reverted: None,
     };
     let record = encode(Some(1), &event, at(), None);
     assert_eq!(record["outcome"], "failed");
@@ -184,6 +186,7 @@ fn a_waiting_outcome_round_trips_and_carries_no_reason() {
         wall_clock: at(),
         exit_code: Some(75),
         duration_ms: 1,
+        reverted: None,
     };
     let record = encode(Some(1), &event, at(), None);
     assert_eq!(record["outcome"], "waiting");
@@ -214,6 +217,7 @@ fn a_provider_limited_outcome_round_trips_with_its_deadline() {
         wall_clock: at(),
         exit_code: Some(1),
         duration_ms: 1,
+        reverted: None,
     };
     let record = encode(Some(1), &event, at(), None);
     assert_eq!(record["outcome"], "provider_limited");

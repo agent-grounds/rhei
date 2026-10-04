@@ -117,7 +117,12 @@ pub(crate) fn launch_headless_run(
             &mut std::io::stdout().lock(),
             &mut std::io::stderr().lock(),
         )
-        .map_err(|error| miette!("could not write the launch report: {error}")),
+        .map_err(|error| {
+            miette!(
+                help = "the run is up regardless: find it with `rhei runs`",
+                "could not write the launch report: {error}"
+            )
+        }),
         // A run that exited `0` did what it was asked; there is simply nothing
         // left to attach to. Reporting that as a startup failure would fail a
         // CI step for a plan that succeeded. §FS-rhei-run-headless.1.1
@@ -216,7 +221,8 @@ fn concurrent_launch_report(workspace_root: &Path) -> miette::Report {
 }
 
 /// Hand the operator the id of a child the handshake found, on `out`, with
-/// any warning about it on `err`.
+/// any warning about it on `err`. The id resolves before its first byte is
+/// printed, or the warning says why it will not.
 // §FS-rhei-run-headless.1.1
 fn announce_launch(
     outcome: &LaunchOutcome,
@@ -225,38 +231,18 @@ fn announce_launch(
     out: &mut dyn Write,
     err: &mut dyn Write,
 ) -> std::io::Result<()> {
+    let (LaunchOutcome::Running(descriptor) | LaunchOutcome::FinishedEarly(descriptor)) = outcome;
+    // The child's entry may not have landed yet; publish it before printing. §FS-rhei-run-headless.1.1
+    let unregistered = publish_registry_entry_once(descriptor).err();
     match outcome {
-        LaunchOutcome::Running(descriptor) => {
-            report_launched(descriptor, json, announce_dashboard, out)?;
-            warn_if_unregistered(descriptor, err)
-        }
-        LaunchOutcome::FinishedEarly(descriptor) => {
-            report_finished_early(descriptor, json, out, err)?;
-            warn_if_unregistered(descriptor, err)
-        }
+        LaunchOutcome::Running(_) => report_launched(descriptor, json, announce_dashboard, out)?,
+        LaunchOutcome::FinishedEarly(_) => report_finished_early(descriptor, json, out, err)?,
     }
-}
-
-/// Say so when the id the launcher just printed does not resolve.
-///
-/// The child warns about a registry it could not write, but that warning goes
-/// into `runtime/run.log`, which nobody is reading yet. Without this the
-/// operator is handed an id that `rhei attach` will not accept and no reason
-/// why.
-// §FS-rhei-run-headless.2
-fn warn_if_unregistered(descriptor: &RunDescriptor, err: &mut dyn Write) -> std::io::Result<()> {
-    let registered =
-        run_registry_path(&descriptor.id).is_some_and(|entry| read_descriptor(&entry).is_some());
-    if registered {
-        return Ok(());
+    // §FS-rhei-run-headless.2
+    match unregistered {
+        Some(why) => writeln!(err, "{}", unregistered_run_warning(descriptor, &why)),
+        None => Ok(()),
     }
-    writeln!(
-        err,
-        "warning: run {} has no registry entry, so its id will not resolve from another \
-         directory.\n  reach it by path instead: rhei attach {}",
-        descriptor.id,
-        shell_quote(&descriptor.workspace.display().to_string())
-    )
 }
 
 fn report_launched(

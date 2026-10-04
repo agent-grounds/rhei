@@ -229,7 +229,7 @@ transitions:
     to: done
 "#,
     );
-    write_fixture_file(&template_dir, "index.rhei.md", "# Rhei: audit\n**States:** audit\n");
+    write_fixture_file(&template_dir, "index.rhei.md", "# Rhei: audit\n");
     write_fixture_file(
         &template_dir,
         "tasks/01-review.md",
@@ -290,7 +290,7 @@ transitions:
     to: done
 "#,
     );
-    write_fixture_file(&template_dir, "index.rhei.md", "# Rhei: audit\n**States:** audit\n");
+    write_fixture_file(&template_dir, "index.rhei.md", "# Rhei: audit\n");
     write_fixture_file(
         &template_dir,
         "tasks/01-review.md",

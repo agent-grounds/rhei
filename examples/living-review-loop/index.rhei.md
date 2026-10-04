@@ -1,5 +1,4 @@
 # Rhei: Living Review Loop with Orchestrated Expansion
-**States:** living-review-loop
 
 ## Overview
 This directory workspace models a living Rhei where the orchestrator is

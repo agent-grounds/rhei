@@ -230,18 +230,3 @@ fn completion_target_node_kinds(plan: &Path, loaded: &LoadedPlan) -> Vec<String>
         Err(_) => merged(),
     }
 }
-
-/// Complete `--states` from the machine names this project actually provides.
-///
-/// Every other id-ish flag completes; this one used to be the exception, which
-/// left the name of a machine something to remember rather than something to
-/// discover.
-// §FS-rhei-new.1.2 §AR-rhei-panta.4
-fn complete_new_states_name(current: &OsStr) -> Vec<CompletionCandidate> {
-    let prefix = current.to_string_lossy();
-    discoverable_state_machine_names(completion_plan_path().as_deref())
-        .into_iter()
-        .filter(|name| name.starts_with(prefix.as_ref()))
-        .map(CompletionCandidate::new)
-        .collect()
-}

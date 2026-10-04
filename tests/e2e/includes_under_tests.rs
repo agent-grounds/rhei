@@ -68,7 +68,7 @@ node_policy:
     write_fixture_file(
         &template,
         "index.rhei.md",
-        "# Rhei: Grounded {{change_ref}}\n**States:** host\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - task\n---\n\n## Overview\n\nA ticket with a review loop under it.\n",
+        "# Rhei: Grounded {{change_ref}}\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - task\n---\n\n## Overview\n\nA ticket with a review loop under it.\n",
     );
     write_fixture_file(
         &template,
@@ -276,7 +276,7 @@ fn a_placement_past_depth_four_is_refused_naming_the_id() {
     write_fixture_file(
         &root,
         "index.rhei.md",
-        "# Rhei: Release\n**States:** host\n\n---\nstructure:\n  maxLevels: 4\n  nodeKinds:\n  - task\n---\n\n## Overview\n\nA deep host.\n",
+        "# Rhei: Release\n\n---\nstructure:\n  maxLevels: 4\n  nodeKinds:\n  - task\n---\n\n## Overview\n\nA deep host.\n",
     );
     let index_before = read(&root.join("index.rhei.md"));
 

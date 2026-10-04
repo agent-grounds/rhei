@@ -60,7 +60,7 @@ fn list_indents_and_reports_depth_rhei_locally_despite_qualified_ids() {
 fn viz_renders_a_panta_project_as_one_graph_and_narrows_to_a_member() {
     let project = create_panta_project(
         "panta-viz-merged",
-        "# Panta: Viz\n**States:** workspace-test-machine\n",
+        "# Panta: Viz\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             (
@@ -106,7 +106,7 @@ fn viz_renders_a_panta_project_as_one_graph_and_narrows_to_a_member() {
 fn scope_report_prints_project_wide_line_and_stays_quiet_for_bare_rhei() {
     let project = create_panta_project(
         "panta-scope-line",
-        "# Panta: Scope\n**States:** workspace-test-machine\n",
+        "# Panta: Scope\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             (
@@ -158,7 +158,7 @@ fn scope_report_prints_project_wide_line_and_stays_quiet_for_bare_rhei() {
 fn project_render_groups_tickets_under_their_rhei() {
     let project = create_panta_project(
         "panta-render-groups",
-        "# Panta: Store\n**States:** workspace-test-machine\n",
+        "# Panta: Store\n",
         &[
             (
                 "auth.rhei.md",

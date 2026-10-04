@@ -54,7 +54,6 @@ node_policy:
 "#;
 
 pub const HOST_INDEX: &str = r#"# Rhei: Release
-**States:** host
 
 ---
 structure:
@@ -93,7 +92,7 @@ pub fn host_single_file(prefix: &str) -> (TestDir, PathBuf) {
     write_fixture_file(
         &dir,
         "release.rhei.md",
-        "# Rhei: Release\n**States:** host\n\n## Tasks\n\n### Task ticket: Ship it\n**State:** pending\n",
+        "# Rhei: Release\n\n## Tasks\n\n### Task ticket: Ship it\n**State:** pending\n",
     );
     write_fixture_file(&dir, "states.yaml", HOST_MACHINE);
     let root = dir.to_path_buf();
@@ -155,7 +154,7 @@ pub fn write_review_template(dir: &Path) -> PathBuf {
     write_fixture_file(
         &template,
         "index.rhei.md",
-        "# Rhei: Review {{change_ref}}\n**States:** review-loop\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - step\n---\n\n## Overview\n\nA review loop.\n",
+        "# Rhei: Review {{change_ref}}\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - step\n---\n\n## Overview\n\nA review loop.\n",
     );
     write_fixture_file(
         &template,
@@ -218,7 +217,7 @@ pub fn write_borrowed_agent_template(dir: &Path) -> PathBuf {
     write_fixture_file(
         &template,
         "index.rhei.md",
-        "# Rhei: Polish\n**States:** polish\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - polish\n---\n\n## Overview\n\nA polish step.\n",
+        "# Rhei: Polish\n\n---\nstructure:\n  maxLevels: 2\n  nodeKinds:\n  - polish\n---\n\n## Overview\n\nA polish step.\n",
     );
     template
 }

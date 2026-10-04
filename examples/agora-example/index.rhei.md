@@ -1,5 +1,4 @@
 # Rhei: Agora Example
-**States:** agora
 
 ## Overview
 

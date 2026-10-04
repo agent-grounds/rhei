@@ -275,14 +275,8 @@ Rhei finds a machine only where state-machine resolution looks, and only in a fi
 
 The file's own `name:` is the machine's name. No other directory or file name is searched. A machine kept anywhere else loads only when every invocation passes `--state-machine <path>`, and that flag replaces resolution for the whole scope: it works for a plan, a workspace, or a project that runs a single machine, but it cannot supply one machine among several.
 
-### The deprecated declaration, for one more release
+### No declaration names the machine
 
-The `**States:**` declaration in `index.rhei.md` and `index.panta.md`, and resolving such a declaration from a `states.yaml` in **another** rhei's root, are deprecated and removed in the next release ([§FS-rhei-plan-language.2.2](../../../../docs/functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). Do not write one. Until the removal they are still resolved, and resolved **first**, so for this release:
+A plan, `index.rhei.md` or `index.panta.md` names no machine: the `**States:**` line is no longer part of the plan language, and every command refuses a document that carries one, naming the line to delete ([§FS-rhei-plan-language.2.2](../../../../docs/functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). Another rhei's root never supplies a machine. So the place you write the file is the whole binding.
 
-- a declaration that still resolves wins over the file in the rhei's own root, and `rhei states` prints one `warning:` saying which file takes over next release;
-- a declaration naming a machine nothing supplies falls through to the rhei's own root rather than failing, and warns;
-- a declaration resolved from another rhei's root still resolves, and warns; several roots declaring the one name is still the ambiguity error.
-
-So when a project you are writing a machine for already carries the line, keep the YAML's `name` equal to it: while the declaration resolves, a mismatch is what defers your file by a release ([§AR-rhei-panta.4](../../../../docs/architecture/rhei-panta.spec.md#4-state-machine-binding)).
-
-Write the machine before anything points at it. In a Panta project a rhei binds to one with `rhei new "<title>" --states <name>`, and that create resolves the name at create time: with no `states.yaml` declaring it, the create is refused and rolled back, and `--keep-on-error` is what writes the declaration anyway. The order is machine first, rhei second — a rhei points at a machine, never the other way round.
+Write the machine before anything runs under it. In a Panta project, a rhei that needs a machine of its own is a Directory Workspace: create it with `rhei new "<title>" --dir` and write the `states.yaml` into its directory, or write the file into an empty directory first and let `rhei new --dir` adopt it.

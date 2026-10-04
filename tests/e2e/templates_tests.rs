@@ -625,7 +625,6 @@ description: Template that immediately executes
         &template_dir,
         "plan.rhei.md",
         r#"# Rhei: Execute Template
-**States:** execute-template
 
 ## Tasks
 
@@ -1083,7 +1082,6 @@ transitions:
         "index.rhei.md",
         &format!(
             r#"# Rhei: {name}
-**States:** {name}
 "#
         ),
     );

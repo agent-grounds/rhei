@@ -176,11 +176,7 @@ fn run_cwd_dashed_panta_project(prefix: &str) -> (TestDir, PathBuf, CliRun) {
     .expect("write settings");
 
     write_fixture_file(&project, "index.panta.md", "# Panta: Continue Roots\n");
-    write_fixture_file(
-        &rhei_root,
-        "index.rhei.md",
-        "# Rhei: Continue Roots\n\n**States:** snapshot-cwd-dashed-roots\n",
-    );
+    write_fixture_file(&rhei_root, "index.rhei.md", "# Rhei: Continue Roots\n\n");
     write_fixture_file(
         &rhei_root,
         "states.yaml",

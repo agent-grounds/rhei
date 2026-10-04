@@ -261,9 +261,11 @@ fn a_create_that_adds_an_error_rolls_back_and_reports_only_that_error() {
 #[test]
 fn rolling_back_a_dir_rhei_retains_only_its_coordination_identity() {
     let dir = empty_project("new-write-dir-rollback");
-    let result = new_run(&["new", "Billing", "--dir", "--states", "nowhere"], &dir);
+    fs::create_dir_all(dir.join("billing")).expect("create the prospective workspace");
+    write_fixture_file(&dir.join("billing"), "states.yaml", "not: [valid yaml\n");
+    let result = new_run(&["new", "Billing", "--dir"], &dir);
 
-    assert_says(&result, "no states file declaring it was found");
+    assert!(!result.status.success(), "an unreadable own machine must fail the create");
     assert!(!dir.join("billing/tasks").exists(), "tasks/ must be removed");
     assert!(!dir.join("billing/index.rhei.md").exists(), "plan data must be removed");
     assert!(dir.join("billing/index.rhei.md.lock").is_file(), "sidecar must remain");

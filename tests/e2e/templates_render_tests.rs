@@ -58,7 +58,6 @@ transitions:
         &template_dir,
         "plan.rhei.md",
         r#"# Rhei: Rounds
-**States:** rounds-template
 
 ## Tasks
 {% for k in range(1, review_rounds + 1) %}

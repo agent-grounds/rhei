@@ -11,7 +11,6 @@ use super::*;
 /// ticket is `completed`, so the ready-set gate refuses it and it is reachable
 /// today only by rendering the whole plan. §FS-rhei-show.2
 pub const SHOW_PLAN: &str = r#"# Rhei: Probe
-**States:** integration-test
 
 ## Tasks
 
@@ -71,7 +70,7 @@ pub fn ambiguous_fixture(prefix: &str) -> (TestDir, PathBuf) {
             &project,
             &format!("{name}.rhei.md"),
             &format!(
-                "# Rhei: {title}\n**States:** integration-test\n\n## Tasks\n\n\
+                "# Rhei: {title}\n\n## Tasks\n\n\
                  ### Task 7: The {name} seven\n**State:** draft\n\nBody of {name} seven.\n"
             ),
         );

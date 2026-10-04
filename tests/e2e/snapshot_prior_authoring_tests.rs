@@ -12,7 +12,7 @@ fn snapshot_prior_new_authors_task_inheritance_and_render_normalizes_it() {
     let dir = project_with_rhei("new-ticket-inherits");
     let agent = write_fake_snapshot_agent(&dir);
     write_fake_snapshot_settings(&dir, &agent);
-    write_fixture_file(&dir, "index.panta.md", "# Panta: Test\n**States:** authoring\n");
+    write_fixture_file(&dir, "index.panta.md", "# Panta: Test\n");
     write_fixture_file(
         &dir,
         "states.yaml",

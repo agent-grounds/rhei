@@ -57,7 +57,7 @@ fn single_task_fixture(
 // §FS-rhei-next.3 §FS-rhei-next.3.1 §FS-rhei-plan-language.3.10
 #[test]
 fn issue_286_explicit_passive_directory_claim_advances_owns_and_cannot_be_reclaimed() {
-    let index = "# Rhei: Flat passive bridge\n**States:** flat\n";
+    let index = "# Rhei: Flat passive bridge\n";
     let task = "### Task job: Claim after passive bridge\n**State:** bridge\n";
     let dir = unique_temp_dir("next-explicit-passive-directory");
     let workspace = dir.join("workspace");

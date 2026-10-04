@@ -12,7 +12,6 @@ pub const SELECTED_RUN: &str = "abc123";
 pub const OTHER_RUN: &str = "def456";
 
 const PLAN: &str = r#"# Rhei: Reprice History
-**States:** integration-test
 
 ## Tasks
 

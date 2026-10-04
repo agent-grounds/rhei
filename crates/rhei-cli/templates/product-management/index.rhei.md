@@ -1,5 +1,4 @@
 # Rhei: {{plan_title}}
-**States:** product-management
 
 ## Overview
 

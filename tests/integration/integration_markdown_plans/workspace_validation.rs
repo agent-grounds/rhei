@@ -97,7 +97,7 @@ fn diagnostics_never_break_a_file_path_across_lines() {
 fn empty_workspace_rhei_does_not_break_the_project_and_is_warned_about() {
     let project = create_panta_project(
         "panta-empty-rhei",
-        "# Panta: Product Suite\n**States:** workspace-test-machine\n",
+        "# Panta: Product Suite\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             ("growth/index.rhei.md", "# Rhei: Growth\n"),
@@ -138,7 +138,7 @@ fn empty_workspace_rhei_does_not_break_the_project_and_is_warned_about() {
 fn duplicate_rhei_id_is_reported_even_when_one_side_is_empty() {
     let project = create_panta_project(
         "panta-dup-empty",
-        "# Panta: Product Suite\n**States:** workspace-test-machine\n",
+        "# Panta: Product Suite\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             ("auth/index.rhei.md", "# Rhei: Auth Dir\n"),
@@ -324,14 +324,14 @@ fn workspace_discovers_task_files_recursively_and_skips_hidden_paths() {
 }
 
 #[test]
-fn validate_auto_discovers_workspace_root_state_machine_from_states_declaration() {
+fn validate_auto_discovers_the_workspace_root_state_machine() {
     let dir = unique_temp_dir("ws-auto-states");
     let ws = dir.join("workspace");
     let tasks_dir = ws.join("tasks");
     fs::create_dir_all(&tasks_dir).expect("create workspace dirs");
     fs::write(
         ws.join("index.rhei.md"),
-        "# Rhei: Workspace Auto States\n**States:** workspace-test-machine\n",
+        "# Rhei: Workspace Auto States\n",
     )
     .expect("write index");
     fs::write(tasks_dir.join("alpha.md"), "### Task 1: Alpha\n**State:** pending\n")
@@ -354,18 +354,16 @@ fn validate_auto_discovers_workspace_root_state_machine_from_states_declaration(
     assert!(stdout.contains("Validation succeeded"));
 }
 
-/// A lone plan declaring a machine nothing supplies, with a differently named
-/// `states.yaml` beside it: the sibling file resolves whatever its `name:`, and
-/// one `warning:` line says the declaration is deprecated. The previous release
-/// failed this tree, which is what the window turns into a resolution.
-/// §FS-rhei-plan-language.1.3 §FS-rhei-plan-language.1.3
+/// A lone plan with a `states.yaml` beside it: the sibling file resolves
+/// whatever its `name:`, and nothing warns — no line names a machine to compare.
+/// §FS-rhei-plan-language.1.3
 #[test]
-fn validate_resolves_a_mismatched_auto_discovered_machine_and_warns() {
-    let dir = unique_temp_dir("auto-states-mismatch");
+fn validate_resolves_a_sibling_machine_whatever_its_name() {
+    let dir = unique_temp_dir("auto-states-any-name");
     let plan_path = write_fixture_file(
         &dir,
         "plan.rhei.md",
-        "# Rhei: Auto States Mismatch\n**States:** custom-review\n\n## Tasks\n\n### Task 1: Review docs\n**State:** draft\n",
+        "# Rhei: Auto States\n\n## Tasks\n\n### Task 1: Review docs\n**State:** draft\n",
     );
     write_fixture_file(
         &dir,
@@ -381,24 +379,7 @@ fn validate_resolves_a_mismatched_auto_discovered_machine_and_warns() {
         output.status.success() && stdout.contains("Validation succeeded"),
         "the own-root file resolves whatever its name\nstdout: {stdout}\nstderr: {stderr}"
     );
-
-    let warnings: Vec<&str> =
-        stderr.lines().filter(|line| line.trim_start().starts_with("warning:")).collect();
-    assert_eq!(warnings.len(), 1, "one warning per declaration; stderr was:\n{stderr}");
-    let said = warnings[0];
-    // It names the file that carries the line — the plan, since this tree has
-    // no `index.panta.md` to be told to edit.
-    for fragment in [
-        format!("'{}'", plan_path.display()),
-        "custom-review".to_owned(),
-        "which no states file declares".to_owned(),
-        "wrong-machine".to_owned(),
-        "beside it".to_owned(),
-        "delete the line".to_owned(),
-    ] {
-        assert!(said.contains(&fragment), "the warning should name {fragment:?}; got:\n{said}");
-    }
-    assert!(!said.contains("index.panta.md"), "no manifest in this tree; got:\n{said}");
+    assert!(!stderr.contains("warning:"), "nothing to warn about; stderr was:\n{stderr}");
 }
 
 #[test]

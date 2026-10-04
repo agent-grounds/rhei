@@ -5,7 +5,6 @@ use super::*;
 #[test]
 fn next_auto_discovers_sibling_state_machine_from_states_declaration() {
     let plan = r#"# Rhei: Auto-discovered Machine
-**States:** custom-review
 
 ## Tasks
 

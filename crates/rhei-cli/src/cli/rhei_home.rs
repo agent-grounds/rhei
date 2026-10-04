@@ -145,12 +145,10 @@ fn real_path(path: &Path) -> PathBuf {
 /// settings and state machines are all resolved repeatedly inside one
 /// `rhei run`, and a per-lookup warning would bury the run's own output.
 ///
-/// The subject rather than the path, because this project has a second
-/// deprecation to serve — the `**States:**` declaration and the cross-root
-/// name match (§FS-rhei-plan-language.1.3) — and two deprecations with two
-/// guards are how they start behaving differently for no reason. Each caller
-/// prefixes its own kind, so two subjects never collide.
-/// §FS-rhei-templates.1.3
+/// The subject rather than the path, so a deprecation that warns about
+/// something other than a file can share the one guard rather than grow a
+/// second that behaves differently for no reason. Each caller prefixes its own
+/// kind, so two subjects never collide. §FS-rhei-templates.1.3
 fn claim_deprecation_warning(subject: &str) -> bool {
     if serving_shell_completion() || SCRATCH_PASSES.with(std::cell::Cell::get) > 0 {
         return false;
@@ -167,7 +165,7 @@ thread_local! {
     /// How many passes over a scratch copy of the user's files are running on
     /// this thread. A warning raised there names a temp path that is gone before
     /// anyone reads it, about a file the pass over the real one already named.
-    /// §FS-rhei-templates.1.3 §FS-rhei-plan-language.1.3
+    /// §FS-rhei-templates.1.3
     static SCRATCH_PASSES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 

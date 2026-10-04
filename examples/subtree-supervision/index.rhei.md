@@ -1,5 +1,4 @@
 # Rhei: Harden the parser
-**States:** subtree-supervision
 
 ## Overview
 

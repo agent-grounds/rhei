@@ -42,15 +42,11 @@ is for. Validate the project; the diagnostics name their own rhei.
 
 Validation uses the state-machine resolution order defined in the
 [Plan Language Specification](rhei-plan-language.spec.md#13-state-machine-resolution):
-explicit `--state-machine <PATH>` first, rhei-local `**States:**` declarations,
-Panta default inheritance for rheis that omit `**States:**`, omitted effective
-declarations as the built-in `rhei` machine, declared `**States:** rhei` with
-built-in fallback, and declared custom names only when a matching
-auto-discovered file is available.
-
-If a plan declares a non-default state machine name and no matching
-auto-discovered file is available, validation fails and directs the caller to
-pass `--state-machine`.
+explicit `--state-machine <PATH>` first, then the `states.yaml` in each rhei's
+own execution root, then the project root's `states.yaml`, then the built-in
+`rhei` machine. No document names a machine: a `**States:**` line is a parse
+error naming its line
+([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)).
 
 ## 4. Behavior
 

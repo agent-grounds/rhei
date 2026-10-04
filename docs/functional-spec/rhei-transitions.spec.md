@@ -1864,12 +1864,12 @@ public class Main {
 
 ### Example 6: Rhei File Using State Transitions
 
-A rhei file that would work with the state machine definitions above:
+A rhei file that would work with the state machine definitions above, saved as
+`states.yaml` beside it:
 
 **ci-pipeline.rhei.md:**
 ```markdown
 # Rhei: Feature Branch CI Pipeline
-**States:** ci-pipeline-states
 
 ## Overview
 Automated CI pipeline for feature branch validation and deployment.

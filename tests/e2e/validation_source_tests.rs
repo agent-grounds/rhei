@@ -18,18 +18,10 @@ fn machine(name: &str) -> String {
     )
 }
 
-fn write_member(
-    project: &Path,
-    id: &str,
-    declared_machine: Option<&str>,
-    machine_yaml: Option<&str>,
-    state: &str,
-) {
+fn write_member(project: &Path, id: &str, machine_yaml: Option<&str>, state: &str) {
     let root = project.join(id);
     fs::create_dir_all(root.join("tasks")).expect("create rhei directories");
-    let declaration =
-        declared_machine.map(|name| format!("\n**States:** {name}")).unwrap_or_default();
-    write_fixture_file(&root, "index.rhei.md", &format!("# Rhei: {id}{declaration}\n"));
+    write_fixture_file(&root, "index.rhei.md", &format!("# Rhei: {id}\n"));
     if let Some(machine_yaml) = machine_yaml {
         write_fixture_file(&root, "states.yaml", machine_yaml);
     }
@@ -45,11 +37,7 @@ fn write_member(
 fn historical_project(dir: &Path) -> PathBuf {
     let project = dir.join("project");
     fs::create_dir_all(&project).expect("create project");
-    write_fixture_file(
-        &project,
-        "index.panta.md",
-        "# Panta: Validation Source Fixture\n**States:** alpha\n",
-    );
+    write_fixture_file(&project, "index.panta.md", "# Panta: Validation Source Fixture\n");
     write_fixture_file(
         &project,
         "states.yaml",
@@ -57,9 +45,9 @@ fn historical_project(dir: &Path) -> PathBuf {
          surveyed\n    initial: true\n  signed-off:\n    description: Ticket is signed \
          off\n    final: true\ntransitions:\n  - from: surveying\n    to: signed-off\n",
     );
-    write_member(&project, "audit", None, None, "surveying");
+    write_member(&project, "audit", None, "surveying");
     let custom = machine("custom");
-    write_member(&project, "billing", Some("custom"), Some(&custom), "surveying");
+    write_member(&project, "billing", Some(&custom), "surveying");
     project
 }
 
@@ -119,7 +107,7 @@ fn validation_sources_are_ordered_and_default_owners_are_grouped() {
     let dir = unique_temp_dir("validate-source-order");
     let project = dir.join("project");
     fs::create_dir_all(&project).expect("create project");
-    write_fixture_file(&project, "index.panta.md", "# Panta: Ordered Sources\n**States:** alpha\n");
+    write_fixture_file(&project, "index.panta.md", "# Panta: Ordered Sources\n");
     write_fixture_file(
         &project,
         "states.yaml",
@@ -127,12 +115,12 @@ fn validation_sources_are_ordered_and_default_owners_are_grouped() {
          initial: true\n  signed-off:\n    description: Signed off\n    final: true\ntransitions:\n  \
          - from: surveying\n    to: signed-off\n",
     );
-    write_member(&project, "zeta", None, None, "surveying");
-    write_member(&project, "audit", None, None, "surveying");
+    write_member(&project, "zeta", None, "surveying");
+    write_member(&project, "audit", None, "surveying");
     let ledger_machine = machine("ledger-flow");
-    write_member(&project, "ledger", Some("ledger-flow"), Some(&ledger_machine), "drafting");
+    write_member(&project, "ledger", Some(&ledger_machine), "drafting");
     let billing_machine = machine("billing-flow");
-    write_member(&project, "billing", Some("billing-flow"), Some(&billing_machine), "surveying");
+    write_member(&project, "billing", Some(&billing_machine), "surveying");
 
     let result = run_in(&dir, &["validate", &project.display().to_string()]);
     let said = assert_billing_state_error(&result);
@@ -158,8 +146,8 @@ fn identical_machine_files_remain_separate_sources() {
     fs::create_dir_all(&project).expect("create project");
     write_fixture_file(&project, "index.panta.md", "# Panta: Separate Sources\n");
     let custom = machine("custom");
-    write_member(&project, "billing", Some("custom"), Some(&custom), "surveying");
-    write_member(&project, "treasury", Some("custom"), Some(&custom), "drafting");
+    write_member(&project, "billing", Some(&custom), "surveying");
+    write_member(&project, "treasury", Some(&custom), "drafting");
 
     let result = run_in(&dir, &["validate", &project.display().to_string()]);
     let said = assert_billing_state_error(&result);
@@ -185,9 +173,9 @@ fn builtin_default_source_names_its_inheriting_rhei_without_a_path() {
     let project = dir.join("project");
     fs::create_dir_all(&project).expect("create project");
     write_fixture_file(&project, "index.panta.md", "# Panta: Built-in Source\n");
-    write_member(&project, "audit", None, None, "pending");
+    write_member(&project, "audit", None, "pending");
     let custom = machine("custom");
-    write_member(&project, "billing", Some("custom"), Some(&custom), "surveying");
+    write_member(&project, "billing", Some(&custom), "surveying");
 
     let result = run_in(&dir, &["validate", &project.display().to_string()]);
     let said = assert_billing_state_error(&result);
@@ -242,7 +230,7 @@ fn instantiate_failure_keeps_its_single_source_presentation() {
         "template.yaml",
         "name: invalid-source\nversion: 1.0.0\ndescription: Invalid source fixture\n",
     );
-    write_fixture_file(&template, "index.rhei.md", "# Rhei: Invalid Source\n**States:** custom\n");
+    write_fixture_file(&template, "index.rhei.md", "# Rhei: Invalid Source\n");
     write_fixture_file(&template, "states.yaml", &machine("custom"));
     write_fixture_file(
         &template.join("tasks"),

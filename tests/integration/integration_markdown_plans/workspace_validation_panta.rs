@@ -77,7 +77,7 @@ transitions:
 fn panta_project_loads_qualifies_and_validates_cross_rhei_priors() {
     let project = create_panta_project(
         "panta-valid",
-        "# Panta: Product Suite\n**States:** workspace-test-machine\n",
+        "# Panta: Product Suite\n",
         &[
             (
                 "auth.rhei.md",
@@ -135,7 +135,7 @@ fn panta_project_loads_qualifies_and_validates_cross_rhei_priors() {
 fn panta_discovery_skips_runtime_artifact_trees() {
     let project = create_panta_project(
         "panta-skip-runtime",
-        "# Panta: Runtime Artifacts\n**States:** workspace-test-machine\n",
+        "# Panta: Runtime Artifacts\n",
         &[
             (
                 "auth.rhei.md",
@@ -160,7 +160,7 @@ fn panta_discovery_skips_runtime_artifact_trees() {
 fn panta_preserves_ambiguous_local_priors_before_cross_rhei_resolution() {
     let project = create_panta_project(
         "panta-local-prior",
-        "# Panta: Ambiguous Local Prior\n**States:** workspace-test-machine\n",
+        "# Panta: Ambiguous Local Prior\n",
         &[(
             "auth.rhei.md",
             "# Rhei: Auth\n\n## Tasks\n\n### Task auth: Auth root\n**State:** completed\n\n#### Task auth.1: Local setup\n**State:** completed\n\n### Task 2: Depends locally\n**State:** pending\n**Prior:** Task auth.1\n",
@@ -189,7 +189,7 @@ fn panta_preserves_ambiguous_local_priors_before_cross_rhei_resolution() {
 fn panta_next_peek_resolves_inputs_from_owning_rhei_root() {
     let project = create_panta_project(
         "panta-peek-input-root",
-        "# Panta: Peek Inputs\n**States:** panta-input-machine\n",
+        "# Panta: Peek Inputs\n",
         &[
             ("auth/index.rhei.md", "# Rhei: Auth\n\n"),
             ("auth/tasks/login.md", "### Task 1: Login\n**State:** pending\n"),
@@ -228,7 +228,7 @@ fn panta_next_peek_resolves_inputs_from_owning_rhei_root() {
 fn panta_run_dry_run_resolves_inputs_from_owning_rhei_root() {
     let project = create_panta_project(
         "panta-run-input-root",
-        "# Panta: Run Inputs\n**States:** panta-input-machine\n",
+        "# Panta: Run Inputs\n",
         &[
             ("auth/index.rhei.md", "# Rhei: Auth\n\n"),
             ("auth/tasks/login.md", "### Task 1: Login\n**State:** pending\n"),
@@ -286,7 +286,7 @@ fn panta_run_dry_run_resolves_inputs_from_owning_rhei_root() {
 fn panta_validates_task_links_from_owning_rhei_root() {
     let project = create_panta_project(
         "panta-link-root",
-        "# Panta: Link Root\n**States:** workspace-test-machine\n",
+        "# Panta: Link Root\n",
         &[
             (
                 "auth.rhei.md",
@@ -314,7 +314,7 @@ fn panta_validates_task_links_from_owning_rhei_root() {
 fn panta_validates_child_rhei_content_links() {
     let project = create_panta_project(
         "panta-child-content-link",
-        "# Panta: Child Content Links\n**States:** workspace-test-machine\n",
+        "# Panta: Child Content Links\n",
         &[
             (
                 "auth/index.rhei.md",
@@ -343,7 +343,7 @@ fn panta_validates_child_rhei_content_links() {
 fn panta_explicit_max_levels_one_is_not_raised_to_default() {
     let project = create_panta_project(
         "panta-max-levels",
-        "# Panta: Max Levels\n**States:** panta-level-two-machine\n\n---\nstructure:\n  maxLevels: 1\n  nodeKinds: [task]\n---\n",
+        "# Panta: Max Levels\n\n---\nstructure:\n  maxLevels: 1\n  nodeKinds: [task]\n---\n",
         &[(
             "auth.rhei.md",
             "# Rhei: Auth\n\n---\nstructure:\n  maxLevels: 1\n  nodeKinds: [task]\n---\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n",
@@ -370,10 +370,10 @@ fn panta_explicit_max_levels_one_is_not_raised_to_default() {
 fn panta_rhei_may_restate_the_project_state_machine() {
     let project = create_panta_project(
         "panta-rhei-states-match",
-        "# Panta: Product Suite\n**States:** workspace-test-machine\n",
+        "# Panta: Product Suite\n",
         &[(
             "auth.rhei.md",
-            "# Rhei: Auth\n**States:** workspace-test-machine\n\n## Tasks\n\n\
+            "# Rhei: Auth\n\n## Tasks\n\n\
              ### Task 1: Login\n**State:** pending\n",
         )],
         WORKSPACE_STATE_MACHINE,
@@ -387,7 +387,7 @@ fn panta_rhei_may_restate_the_project_state_machine() {
 fn panta_basin_loads_as_reserved_last_rhei() {
     let project = create_panta_project(
         "panta-basin",
-        "# Panta: Captures\n**States:** workspace-test-machine\n",
+        "# Panta: Captures\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             ("basin/loose.md", "### Task 3: Triage later\n**State:** pending\n"),
@@ -409,7 +409,7 @@ fn panta_basin_loads_as_reserved_last_rhei() {
 fn panta_basin_index_file_is_a_load_error_not_a_silent_skip() {
     let project = create_panta_project(
         "panta-basin-index",
-        "# Panta: Captures\n**States:** workspace-test-machine\n",
+        "# Panta: Captures\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             (
@@ -448,7 +448,7 @@ fn panta_basin_index_file_is_a_load_error_not_a_silent_skip() {
 fn panta_basin_ignores_runtime_markdown_artifacts() {
     let project = create_panta_project(
         "panta-basin-runtime",
-        "# Panta: Captures\n**States:** workspace-test-machine\n",
+        "# Panta: Captures\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             ("basin/loose.md", "### Task 3: Triage later\n**State:** pending\n"),
@@ -498,16 +498,17 @@ fn panta_rejects_domain_rhei_named_basin() {
     );
 }
 
-/// §FS-rhei-plan-language.1.3: a member rhei's own `**States:**` declaration
-/// overrides the project default; the two machines govern side by side.
+/// §FS-rhei-plan-language.1.3: the `states.yaml` in a member rhei's own root
+/// governs it in place of the project default; the two machines govern side by
+/// side.
 #[test]
 fn panta_child_rhei_state_machine_override_loads_and_validates() {
     let project = create_panta_project(
         "panta-child-states",
-        "# Panta: Mixed Machines\n**States:** workspace-test-machine\n",
+        "# Panta: Mixed Machines\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
-            ("payments/index.rhei.md", "# Rhei: Payments\n**States:** child-flow\n"),
+            ("payments/index.rhei.md", "# Rhei: Payments\n"),
             ("payments/tasks/one.md", "### Task 1: Charge\n**State:** open\n"),
             ("payments/states.yaml", CHILD_FLOW_STATE_MACHINE),
         ],
@@ -515,8 +516,7 @@ fn panta_child_rhei_state_machine_override_loads_and_validates() {
     );
 
     let loaded = workspace::load_panta_project(&project).expect("mixed machines load");
-    assert_eq!(loaded.rhei_machines.get("payments").map(String::as_str), Some("child-flow"));
-    assert!(!loaded.rhei_machines.contains_key("auth"), "a silent rhei stays on the default");
+    assert!(loaded.rhei_roots["payments"].join("states.yaml").is_file());
 
     // `pending` exists only in the default machine and `open` only in
     // child-flow, so a green validate proves per-ticket dispatch.
@@ -537,7 +537,7 @@ fn panta_child_rhei_state_machine_override_loads_and_validates() {
 fn panta_profile_resolution_uses_rhei_local_task_depth() {
     let project = create_panta_project(
         "panta-profile-depth",
-        "# Panta: Profile Depth\n**States:** panta-profile-machine\n",
+        "# Panta: Profile Depth\n",
         &[("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n")],
         PANTA_PROFILE_STATE_MACHINE,
     );
@@ -559,7 +559,7 @@ fn panta_profile_resolution_uses_rhei_local_task_depth() {
 fn panta_transition_routes_rewrite_to_owning_rhei_file() {
     let project = create_panta_project(
         "panta-mutate",
-        "# Panta: Mutable\n**States:** workspace-test-machine\n",
+        "# Panta: Mutable\n",
         &[("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n")],
         WORKSPACE_STATE_MACHINE,
     );
@@ -605,7 +605,7 @@ fn panta_transition_routes_rewrite_to_owning_rhei_file() {
 fn panta_next_peek_reads_and_claim_writes_owning_rhei() {
     let project = create_panta_project(
         "panta-next-peek",
-        "# Panta: Peek\n**States:** workspace-test-machine\n",
+        "# Panta: Peek\n",
         &[("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n")],
         WORKSPACE_STATE_MACHINE,
     );
@@ -652,7 +652,7 @@ fn panta_next_peek_reads_and_claim_writes_owning_rhei() {
 fn panta_rhei_narrowing_scopes_candidates_and_spares_other_rhei_runtime() {
     let project = create_panta_project(
         "panta-narrow",
-        "# Panta: Narrow\n**States:** workspace-test-machine\n",
+        "# Panta: Narrow\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             (
@@ -771,7 +771,7 @@ fn panta_rhei_narrowing_scopes_candidates_and_spares_other_rhei_runtime() {
 fn panta_narrowed_reset_clears_ticket_owned_artifacts_without_touching_siblings() {
     let project = create_panta_project(
         "panta-narrow-artifacts",
-        "# Panta: Narrow Artifacts\n**States:** workspace-test-machine\n",
+        "# Panta: Narrow Artifacts\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             (
@@ -851,7 +851,7 @@ fn panta_narrowed_reset_clears_ticket_owned_artifacts_without_touching_siblings(
 fn panta_narrowed_next_explains_a_prior_outside_the_scope() {
     let project = create_panta_project(
         "panta-narrow-blocked",
-        "# Panta: Narrow Blocked\n**States:** workspace-test-machine\n",
+        "# Panta: Narrow Blocked\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             (
@@ -883,7 +883,7 @@ fn panta_narrowed_next_explains_a_prior_outside_the_scope() {
 fn panta_run_rhei_narrowing_skips_out_of_scope_work_in_agent_mode() {
     let project = create_panta_project(
         "panta-run-narrow",
-        "# Panta: Narrow Run\n**States:** workspace-test-machine\n",
+        "# Panta: Narrow Run\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             (
@@ -956,7 +956,7 @@ fn panta_narrowed_reset_clears_workspace_index_metadata_and_legacy_records() {
     // whose every rhei is in scope.
     let project = create_panta_project(
         "panta-narrow-metadata",
-        "# Panta: Narrow Metadata\n**States:** workspace-test-machine\n",
+        "# Panta: Narrow Metadata\n",
         &[
             (
                 "auth/index.rhei.md",
@@ -1023,7 +1023,7 @@ fn panta_run_locks_every_member_rhei_execution_root() {
     // the project run contend on the same lock.
     let project = create_panta_project(
         "panta-run-locks",
-        "# Panta: Run Locks\n**States:** workspace-test-machine\n",
+        "# Panta: Run Locks\n",
         &[
             ("auth/index.rhei.md", "# Rhei: Auth\n"),
             ("auth/tasks/one.md", "### Task 1: Login\n**State:** pending\n"),

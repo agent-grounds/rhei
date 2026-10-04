@@ -1,5 +1,4 @@
 # Rhei: {{audit_title}}
-**States:** spec-implementation-discrepancy-audit
 
 ## Context
 

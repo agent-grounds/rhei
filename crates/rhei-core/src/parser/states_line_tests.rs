@@ -7,7 +7,6 @@ use super::*;
 /// The retired line is a parse error carrying its line and the one remedy,
 /// wherever it sits outside a fence. §FS-rhei-plan-language.2.2
 #[test]
-#[ignore = "red until #350 refuses the `**States:**` line"]
 fn refuses_the_retired_states_line_with_its_line_number() {
     for (input, line) in [
         ("# Rhei: Example\n**States:** custom\n## Tasks\n\n### Task 1: Alpha\n**State:** pending\n", 2),
@@ -30,7 +29,6 @@ fn a_states_line_in_a_task_body_is_text() {
 /// The workspace index and the project manifest refuse the retired line like a
 /// single-file plan does, naming its line. §FS-rhei-plan-language.2.2
 #[test]
-#[ignore = "red until #350 refuses the `**States:**` line"]
 fn index_and_manifest_refuse_the_retired_states_line() {
     let index = parse_workspace_index("# Rhei: Workspace\n**States:** custom\n").unwrap_err();
     assert_eq!(index.line, Some(2));

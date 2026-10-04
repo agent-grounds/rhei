@@ -700,7 +700,7 @@ transitions:
             &rhei,
             BTreeSet::new(),
             false,
-            Vec::new(),
+            RenderedMachines::default(),
             RenderFormat::Json,
             true,
             false,

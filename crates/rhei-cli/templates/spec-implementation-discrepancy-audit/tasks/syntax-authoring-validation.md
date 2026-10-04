@@ -15,5 +15,5 @@ Implementation roots:
 {%- endfor %}
 
 Focus on markdown grammar, directory workspace semantics, task hierarchy rules,
-metadata fields, `**States:**` lookup, prior dependency semantics, terminal child
+metadata fields, `states.yaml` resolution, prior dependency semantics, terminal child
 coherence, artifact contract validation, and diagnostics promised by the specs.

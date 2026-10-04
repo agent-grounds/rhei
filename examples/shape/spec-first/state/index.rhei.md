@@ -1,5 +1,4 @@
 # Rhei: Stream the CSV export
-**States:** shape-spec-first
 
 ## Overview
 

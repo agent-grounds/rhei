@@ -119,11 +119,7 @@ result('follow-on task completed\n')
         "template.yaml",
         "name: follow-on\nversion: 1.0.0\ndescription: Follow-on work\n",
     );
-    write_fixture_file(
-        &template,
-        "index.rhei.md",
-        "# Rhei: Follow On\n**States:** follow-on-machine\n",
-    );
+    write_fixture_file(&template, "index.rhei.md", "# Rhei: Follow On\n");
     write_fixture_file(
         &template,
         "states.yaml",
@@ -248,7 +244,7 @@ result('published the follow-on member\n')
             project.to_str().expect("project path is UTF-8"),
         ],
     );
-    write_fixture_file(&seed, "index.rhei.md", "# Rhei: Seed\n**States:** seed-machine\n");
+    write_fixture_file(&seed, "index.rhei.md", "# Rhei: Seed\n");
     write_fixture_file(
         &seed,
         "states.yaml",

@@ -1,5 +1,4 @@
 # Rhei: Two-Pass Review Artifact Followed by Fix
-**States:** review-fix-visits
 
 ## Overview
 This workspace demonstrates a counted review/fix loop that writes one review

@@ -231,7 +231,6 @@ node_policy:
     fn enforces_profile_allowed_on_task_state() {
         let sm = StateMachine::from_yaml_str(profiles_machine_yaml()).expect("load ok");
         let input = r#"# Rhei: profile-check
-**States:** profiled
 ---
 structure:
   nodeKinds: [task, bug]
@@ -273,7 +272,7 @@ node_policy:
   default: default
 "#;
         let sm = StateMachine::from_yaml_str(yaml).expect("load ok");
-        let input = "# Rhei: restricted-check\n**States:** restricted\n\n## Tasks\n\n### Task 1: First\n**State:** review\n";
+        let input = "# Rhei: restricted-check\n\n## Tasks\n\n### Task 1: First\n**State:** review\n";
         let rhei = parse(input).expect("parse ok");
         let report = validate_with_machine(&rhei, &sm);
         assert!(

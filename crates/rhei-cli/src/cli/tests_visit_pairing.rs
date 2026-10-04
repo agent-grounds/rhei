@@ -47,10 +47,10 @@ mod visit_pairing {
 
     fn pair(
         own_names: &[Vec<PathBuf>],
-        own_proven: &[bool],
+        own_ran: &[bool],
         records: &[(PathBuf, SpawnRecord)],
     ) -> VisitPairing {
-        pair_orphaned_record(own_names, own_proven, records, TASK, STATE, MOVES)
+        pair_orphaned_record(own_names, own_ran, records, TASK, STATE, MOVES)
     }
 
     // §FS-rhei-agents.8.4: one orphan and one recordless invocation pair.
@@ -76,6 +76,7 @@ mod visit_pairing {
         let pairing = pair(&[names("c"), names("d")], &[false, false], &[finished("a")]);
         assert_eq!(pairing.paired, None);
         assert_eq!(pairing.ambiguous, [path("a")]);
+        assert_eq!(pairing.unrecorded, [path("c"), path("d")], "the warning names both targets");
     }
 
     // §FS-rhei-agents.3.2: a removed member's orphan and an added member pass silently.
@@ -127,6 +128,34 @@ mod visit_pairing {
             MOVES,
         );
         assert_eq!(pairing, VisitPairing::default());
+    }
+
+    // §FS-rhei-agents.3.2: an own record of this visit that failed or still runs decides alone.
+    #[test]
+    fn an_own_failed_or_running_record_is_a_record_of_its_own() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let runtime = dir.path().join("runtime");
+        fs::create_dir_all(spawn_records_dir(&runtime)).expect("spawns dir");
+        let write = |slug: &str, record: &SpawnRecord| {
+            let path = spawn_record_path(&runtime, TASK, STATE, Some(slug));
+            fs::write(&path, serde_json::to_string(record).expect("json")).expect("write record");
+            path
+        };
+        write("mock-mock-x", &record(STATE, MOVES, "exited", Some(0)));
+        for (ending, code) in [("exited", Some(1)), ("running", None)] {
+            let own = vec![write("mock-mock-d", &record(STATE, MOVES, ending, code))];
+            let ran = own_record_this_visit(&own, TASK, STATE, MOVES);
+            assert!(ran, "d's own {ending} record is of this visit");
+            let records = spawn_records_for_state(&runtime, TASK, STATE);
+            let pairing = pair_orphaned_record(&[own], &[ran], &records, TASK, STATE, MOVES);
+            assert_eq!(
+                pairing,
+                VisitPairing { ran_this_visit: true, ..VisitPairing::default() },
+                "x's orphan must not answer for d, whose own record {ending}"
+            );
+        }
+        let own = vec![write("mock-mock-d", &record(STATE, MOVES - 1, "exited", Some(1)))];
+        assert!(!own_record_this_visit(&own, TASK, STATE, MOVES), "an earlier visit is not this one");
     }
 
     // §FS-rhei-agents.8.4: every name on an own-name list is disowned, not only the one that answered.

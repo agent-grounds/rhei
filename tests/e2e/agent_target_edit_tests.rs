@@ -20,6 +20,15 @@ append(root / 'runtime' / 'spawn-count.log', os.environ.get('RHEI_TARGET', '?') 
 write(root / 'runtime' / 'digest.md', 'written by an invocation\n')
 "#;
 
+/// [`TARGET_AGENT`], except that the invocation for `mock:mock:d` exits 1.
+const D_FAILS_AGENT: &str = r#"root = pathlib.Path(env('RHEI_ROOT'))
+target = os.environ.get('RHEI_TARGET', '?')
+append(root / 'runtime' / 'spawn-count.log', target + '\n')
+write(root / 'runtime' / 'digest.md', 'written by an invocation\n')
+if target == 'mock:mock:d':
+    sys.exit(1)
+"#;
+
 const NOTE_PREFIX: &str = "note: task plan.1 state 'work': reusing this visit's finished spawn (";
 
 /// `binding` is the state's `target:` or `all_targets:` line.
@@ -222,7 +231,46 @@ fn an_ambiguous_fanout_edit_warns_and_spawns_every_member() {
             run.stderr
         );
     }
+    assert!(
+        warning.contains("mock:mock:c, mock:mock:d have no spawn record of their own"),
+        "the warning on stderr must name what the new targets lack; stderr:\n{}",
+        run.stderr
+    );
     assert!(reuse_notes(&run).is_empty(), "nothing is paired:\n{}", run.stdout);
+}
+
+// §FS-rhei-agents.3.2: an invocation whose own record of this visit failed is not recordless.
+#[test]
+fn an_orphan_never_answers_for_an_invocation_whose_own_spawn_failed() {
+    let fixture = finished_then_died(
+        "agent-target-edit-own-failed",
+        r#"all_targets: ["mock:mock:x"]"#,
+        Entry::Reentry,
+    );
+    let agent = write_python_agent(&fixture.dir, "mock-agent.py", D_FAILS_AGENT);
+    write_settings(&fixture.dir, &agent, false);
+    fs::write(&fixture.machine, machine(r#"all_targets: ["mock:mock:c", "mock:mock:d"]"#))
+        .expect("edit the target in place");
+    let args = ["--no-tui", "--no-callbacks"];
+    let first = run_cli("run", &fixture.plan, &fixture.machine, &args);
+    let mut spawned = spawn_lines(&fixture.dir).split_off(fixture.spawns_before_edit);
+    spawned.sort();
+    spawned.dedup();
+    assert_eq!(spawned, ["mock:mock:c", "mock:mock:d"], "an ambiguous edit spawns both");
+    assert!(first.stderr.contains("task-plan.1-work-mock-mock-x.json"), "{}", first.stderr);
+    let state = || fs::read_to_string(&fixture.plan).expect("plan");
+    assert!(state().contains("**State:** work"), "d failed, so the ticket stays in work");
+
+    let before_second = spawn_lines(&fixture.dir).len();
+    let second = run_cli("run", &fixture.plan, &fixture.machine, &args);
+    let respawned = spawn_lines(&fixture.dir).split_off(before_second);
+    assert!(
+        respawned.iter().any(|target| target == "mock:mock:d"),
+        "d's own failed record decides, so d spawns again; spawned={respawned:?}\nstdout:\n{}",
+        second.stdout
+    );
+    assert!(reuse_notes(&second).is_empty(), "x must not answer for d:\n{}", second.stdout);
+    assert!(state().contains("**State:** work"), "x's work must not advance the ticket");
 }
 
 // §FS-rhei-agents.8.4: a current sibling's record is never an orphan. A guard: it passes today.

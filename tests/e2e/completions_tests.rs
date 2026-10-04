@@ -111,7 +111,6 @@ fn write_completion_plan(dir: &Path) -> std::path::PathBuf {
         dir,
         "plan.rhei.md",
         r#"# Rhei: Completion Plan
-**States:** integration-test
 
 ## Tasks
 
@@ -514,7 +513,6 @@ fn dynamic_completion_completes_list_filters() {
         &dir,
         "plan.rhei.md",
         r#"# Rhei: Completion List
-**States:** integration-test
 
 ## Tasks
 

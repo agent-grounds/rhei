@@ -10,9 +10,6 @@ pub enum Token {
     /// Top-level rhei header marker (e.g., "# Rhei: ...").
     RheiHeader,
 
-    /// States declaration: `**States:** <name>`.
-    MetadataStates { name: String },
-
     /// Marker for the "## Tasks" section start.
     TasksSection,
 

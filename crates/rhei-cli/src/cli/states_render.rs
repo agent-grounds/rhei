@@ -395,9 +395,6 @@ struct LoadedPlan {
     content_section_roots: Vec<PathBuf>,
     /// For Panta projects: rhei ids in load order (`basin` last when present).
     rhei_ids: Vec<String>,
-    /// Machine name each rhei declared with its own `**States:**`, when it
-    /// did. §DA-per-rhei-state-machines
-    rhei_machines: HashMap<String, String>,
     /// Execution root of each rhei, keyed by rhei id. §AR-rhei-panta.4
     rhei_roots: HashMap<String, PathBuf>,
     /// Title of each rhei, keyed by rhei id. §FS-rhei-memory.3.1
@@ -981,7 +978,6 @@ fn implicit_loaded_plan(
         task_roots: project.task_roots,
         content_section_roots: project.content_section_roots,
         rhei_ids: project.rhei_ids,
-        rhei_machines: project.rhei_machines,
         rhei_roots: project.rhei_roots,
         rhei_titles: project.rhei_titles,
         rhei_plans: project.rhei_plans,
@@ -998,7 +994,6 @@ fn panta_loaded_plan(project: rhei_core::workspace::PantaProject) -> LoadedPlan 
         task_roots: project.task_roots,
         content_section_roots: project.content_section_roots,
         rhei_ids: project.rhei_ids,
-        rhei_machines: project.rhei_machines,
         rhei_roots: project.rhei_roots,
         rhei_titles: project.rhei_titles,
         rhei_plans: project.rhei_plans,
@@ -1139,8 +1134,6 @@ fn load_workspace_for_validation(ws_dir: &Path) -> MietteResult<LoadedPlan> {
         root_guards: rhei_core::root_access::for_input(ws_dir).map_err(|err| diagnostic!("{err}"))?,
         rhei: rhei_core::ast::Rhei {
             title: index.title,
-            states: index.states,
-            states_declared: index.states_declared,
             structure: index.structure,
             metadata,
             content_sections: index.content_sections,

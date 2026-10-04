@@ -371,11 +371,7 @@ pub(super) fn run_panta_snapshot_project(
     fs::create_dir_all(rhei_root.join("tasks")).expect("create rhei tasks dir");
     write_fake_snapshot_settings(&project, &fake_agent);
     write_fixture_file(&project, "index.panta.md", "# Panta: Snapshot Roots\n");
-    write_fixture_file(
-        &rhei_root,
-        "index.rhei.md",
-        "# Rhei: Snapshot Roots\n\n**States:** snapshot-panta-roots\n",
-    );
+    write_fixture_file(&rhei_root, "index.rhei.md", "# Rhei: Snapshot Roots\n\n");
     write_fixture_file(&rhei_root, "states.yaml", PANTA_SNAPSHOT_MACHINE);
     // Two tickets, because `--parallel 2` only reaches the worker pool when a
     // pass has more than one ticket to schedule; with one it runs sequentially

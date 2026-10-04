@@ -83,11 +83,7 @@ fn write_gated_template(dir: &Path) -> PathBuf {
         "name: gated-supervisor\nversion: 1.0.0\ndescription: A supervisor that finishes \
          through a gate.\n",
     );
-    write_fixture_file(
-        &template_dir,
-        "index.rhei.md",
-        "# Rhei: Gated supervisor\n**States:** gated-supervisor\n",
-    );
+    write_fixture_file(&template_dir, "index.rhei.md", "# Rhei: Gated supervisor\n");
     write_fixture_file(&template_dir, "states.yaml", GATED_SUPERVISOR);
     write_fixture_file(
         &template_dir.join("tasks"),

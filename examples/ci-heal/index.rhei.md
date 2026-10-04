@@ -1,5 +1,4 @@
 # Rhei: CI Watch and Heal
-**States:** ci-watch-and-heal
 
 ---
 metadata:

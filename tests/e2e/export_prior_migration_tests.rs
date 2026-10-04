@@ -29,7 +29,6 @@ result('consumed migrated export\n')
 "#;
 
 const OLD_SHAPE_PLAN: &str = r#"# Rhei: Export-prior recovery
-**States:** migrate
 
 ## Tasks
 
@@ -152,7 +151,6 @@ fn dry_run_then_migration_releases_the_open_consumer_without_manual_edits() {
 #[test]
 fn rewrite_is_minimal_ordered_kind_preserving_and_idempotent() {
     let plan_text = r#"# Rhei: Rewrite shape
-**States:** migrate
 ---
 structure:
   nodeKinds: [task, review]
@@ -216,7 +214,7 @@ Keep this prose byte-for-byte.
 fn directory_workspace_rewrites_only_the_consumer_owning_file() {
     let (dir, workspace, _) = create_workspace(
         "export-prior-directory",
-        "# Rhei: Directory migration\n**States:** migrate\n",
+        "# Rhei: Directory migration\n",
         &[
             (
                 "01-producer.md",
@@ -259,11 +257,7 @@ fn panta_member_target_widens_and_preserves_local_vs_qualified_references() {
     let dir = unique_temp_dir("export-prior-panta");
     let project = dir.join("project");
     fs::create_dir_all(&project).expect("project");
-    write_fixture_file(
-        &project,
-        "index.panta.md",
-        "# Panta: Migration scope\n**States:** migrate\n",
-    );
+    write_fixture_file(&project, "index.panta.md", "# Panta: Migration scope\n");
     write_fixture_file(&project, "states.yaml", MACHINE);
     let agent = write_python_agent(&project, "panta-agent.py", AGENT);
     write_mock_agent_settings(&project, &agent);

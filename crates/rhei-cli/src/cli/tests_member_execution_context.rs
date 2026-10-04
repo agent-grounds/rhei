@@ -14,18 +14,16 @@ mod member_execution_context_tests {
     }
 
     #[test]
-    fn issue_205_member_plan_paths_preserve_inherited_and_declared_callback_bases() {
+    fn issue_205_member_plan_paths_preserve_inherited_and_own_callback_bases() {
         let dir = tempfile::tempdir().unwrap();
         let project = dir.path();
-        fs::write(project.join("index.panta.md"), "# Panta: Routing\n**States:** inherited\n")
-            .unwrap();
+        fs::write(project.join("index.panta.md"), "# Panta: Routing\n").unwrap();
         let machine = "name: inherited\nversion: 1\nstates:\n  ready:\n    initial: true\n  done:\n    final: true\ntransitions:\n  - from: ready\n    to: done\n";
         fs::write(project.join("states.yaml"), machine).unwrap();
-        for (name, declaration) in [("inherited", ""), ("own", "**States:** own\n")] {
+        for name in ["inherited", "own"] {
             let member = project.join(name);
             fs::create_dir_all(member.join("tasks")).unwrap();
-            fs::write(member.join("index.rhei.md"), format!("# Rhei: Member\n{declaration}"))
-                .unwrap();
+            fs::write(member.join("index.rhei.md"), "# Rhei: Member\n").unwrap();
             fs::write(member.join("tasks/01-work.md"), "### Task 1: Work\n**State:** ready\n")
                 .unwrap();
         }

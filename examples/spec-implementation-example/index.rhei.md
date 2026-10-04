@@ -1,5 +1,4 @@
 # Rhei: Spec Implementation Example (current-branch spec diff)
-**States:** spec-implementation
 
 ## What this workspace does
 

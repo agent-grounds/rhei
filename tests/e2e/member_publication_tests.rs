@@ -24,11 +24,7 @@ fn write_member_template(project: &Path, name: &str, task_state: &str) {
         "template.yaml",
         &format!("name: {name}\nversion: 1.0.0\ndescription: Member publication fixture\n"),
     );
-    write_fixture_file(
-        &template,
-        "index.rhei.md",
-        &format!("# Rhei: {name}\n**States:** publication-machine\n"),
-    );
+    write_fixture_file(&template, "index.rhei.md", &format!("# Rhei: {name}\n"));
     write_fixture_file(
         &template,
         "states.yaml",

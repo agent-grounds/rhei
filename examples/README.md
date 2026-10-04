@@ -44,7 +44,7 @@ Use this table when you know the job you want to model:
   - numeric and named task identifiers
   - `**Prior:**` dependencies across numeric and named tasks
   - fenced code block content inside a subtask
-  - the built-in `rhei` states (the plan declares no `**States:**`)
+  - the built-in `rhei` states (no `states.yaml` sits beside the plan)
 
 - `human-review-loop.rhei.md`
   Valid example using:
@@ -74,8 +74,7 @@ Use this table when you know the job you want to model:
 - `claude-code/`
   Valid example directory using:
   - `plan.rhei.md`
-  - `states.yaml`
-  - `**States:** claude-code-simple`
+  - `states.yaml` beside the plan, which names the `claude-code-simple` machine
   - a Claude Code least-privilege workflow with only simple states
 
 - `living-review-loop/`

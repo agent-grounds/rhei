@@ -1,5 +1,4 @@
 # Rhei: Apply approved fix
-**States:** fix
 
 ## Overview
 

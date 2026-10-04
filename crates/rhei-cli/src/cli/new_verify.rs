@@ -47,12 +47,6 @@ fn new_write_failure(
     if let Some(failure) = vanished_ids_failure(target, before) {
         return Some(failure);
     }
-    // Before the pass, because the pass no longer refuses every tree this
-    // fault produces, and because a create whose own flag is wrong should not
-    // first be told about the project it momentarily broke. §FS-rhei-new.1.2
-    if let Some(failure) = undeclared_created_machine_failure(target, write) {
-        return Some(failure);
-    }
     match validation_pass(target, None) {
         Ok(pass) => {
             let introduced = errors_introduced_over(inherited, pass.errors);
@@ -77,107 +71,6 @@ fn new_write_failure(
         }
     }
     verify_created_id(target, write).err()
-}
-
-/// Refuse a create whose `--states` names a machine no `states.yaml` in the
-/// project declares.
-///
-/// The rule is §FS-rhei-new.1.2's and the fault is this create's: `--states`
-/// writes the declaration and does not author the machine, so a name nothing
-/// declares is a fault in the flag. It needs saying here because the project's
-/// validation pass no longer says it for every such tree — while the
-/// `**States:**` declaration is deprecated, a declaration nothing supplies
-/// falls through to whatever `states.yaml` sits in the rhei's own root
-/// (§FS-rhei-plan-language.1.3). That indulgence is for a tree already on
-/// disk, which a release has been spent warning. Creation is authoring: the
-/// one command whose job is to write a correct index must not write a
-/// `**States:**` line and, in the same breath, warn that the line should be
-/// deleted.
-///
-/// A check on the *name*, not a second precedence rule: which file the created
-/// rhei runs under is still the one resolution path §FS-rhei-new.2.1.1 names.
-///
-/// Exactly one candidate is read strictly: the `states.yaml` in the prospective
-/// root this create is adopting. Its parse error is genuinely this create's
-/// business, so it is raised as the parse error it is — the same
-/// `state_machine_load_report` the validation pass behind this check would
-/// have shown — rather than counted as declaring nothing and reported as a
-/// missing machine. Raising it here rather than leaving it to the pass is what
-/// keeps a project already failing in the same way from swallowing it.
-///
-/// Every other source the lookup touches — the project root's file, which
-/// predates the create, another rhei's, or the project plan itself — is skipped
-/// and *remembered* when it will not read. A file broken elsewhere in the
-/// project is not a licence to keep a `**States:**` line nothing declares, and
-/// abandoning the whole check on one unreadable candidate is how the command
-/// comes to write a line the next one tells the author to delete.
-// §FS-rhei-new.1.2 §FS-rhei-new.2.1.1 §FS-rhei-new.5.2
-fn undeclared_created_machine_failure(
-    target: &Path,
-    write: &NewWrite,
-) -> Option<CreateFailure> {
-    let declared = write.declared_machine.as_deref()?.trim();
-    if declared.is_empty() {
-        return None;
-    }
-    let project_candidate = auto_state_machine_path(target);
-    let own_candidate = write.path.parent().unwrap_or_else(|| Path::new(".")).join("states.yaml");
-    // The one strict read, and only where the create is adopting a root of its
-    // own: a project-root file equal to it was there before this invocation.
-    if own_candidate != project_candidate && own_candidate.is_file() {
-        if let Err(report) = load_state_machine(Some(&own_candidate)) {
-            return Some(CreateFailure {
-                report,
-                reason: "the state machine in its own root could not be read",
-            });
-        }
-    }
-    let mut unread: Vec<String> = Vec::new();
-    let mut candidates = vec![own_candidate, project_candidate];
-    match load_plan_leniently(target) {
-        Ok(loaded) => candidates
-            .extend(sorted_rhei_roots(&loaded).into_iter().map(|root| root.join("states.yaml"))),
-        // The plan is a candidate source like any other, and a project that
-        // will not load is one whose other rhei roots could not be listed —
-        // remembered, not read as "nothing else declares it".
-        Err(_) => unread.push(format!("the project at '{}', which does not load", target.display())),
-    }
-    let mut names = vec![rhei_validator::StateMachine::builtin_default().name];
-    let mut seen: BTreeSet<PathBuf> = BTreeSet::new();
-    for candidate in candidates {
-        if !seen.insert(candidate.clone()) || !candidate.is_file() {
-            continue;
-        }
-        match load_state_machine(Some(&candidate)) {
-            Ok(machine) => names.push(machine.name),
-            Err(_) => unread.push(format!("'{}'", candidate.display())),
-        }
-    }
-    if names.iter().any(|name| name == declared) {
-        return None;
-    }
-    names.sort();
-    names.dedup();
-    let unread = if unread.is_empty() {
-        String::new()
-    } else {
-        format!(" Not read, so what they declare is unknown: {}.", unread.join(", "))
-    };
-    Some(CreateFailure {
-        report: miette!(
-            help = format!(
-                "this project's states files declare: {}.{unread} Author the machine first — \
-                 `/rhei-state-machine-writer` writes one — then re-run, or pass a `--states` \
-                 naming one of those.",
-                names.join(", ")
-            ),
-            "--states '{declared}' writes `**States:** {declared}`, but no states file \
-             declaring it was found in the new rhei's root, the project root, or any other \
-             rhei root. `--states` only writes the declaration; it does not create the \
-             state machine, so the rhei would point at nothing."
-        ),
-        reason: "its `--states` names a machine no states file declares",
-    })
 }
 
 /// Every id the project holds right now: its rheis, and every ticket in them.

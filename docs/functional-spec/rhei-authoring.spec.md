@@ -329,19 +329,12 @@ the project manifest (§FS-rhei-panta.2).
 
 ## 5. Using a Custom State Machine
 
-To reuse one state machine across plans, declare it on the line directly
-after the `# Rhei:` title:
-
-```markdown
-# Rhei: Content Refresh
-**States:** content-workflow
-```
-
-The `name` field in the resolved YAML file must match this value. By
-default, Rhei resolves that file automatically from `states.yaml` next to
-the plan (single-file plans) or at the workspace root (directory
-workspaces). Pass `--state-machine <path>` only when you want to override
-that automatic lookup:
+A plan runs under the machine whose `states.yaml` sits where it does: next to
+the plan (single-file plans) or at the workspace root (directory workspaces),
+else at the project root beside `index.panta.md`, else the built-in `rhei`
+machine. To reuse one state machine across plans, put its `states.yaml` at the
+project root. Nothing in the plan names the machine. Pass
+`--state-machine <path>` only when you want to override that automatic lookup:
 
 ```bash
 rhei validate plans/content-refresh.rhei.md

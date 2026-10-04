@@ -93,8 +93,6 @@ transitions:
 
         let rhei = Rhei {
             title: "Project".to_string(),
-            states: default_machine.name.clone(),
-            states_declared: true,
             structure: Default::default(),
             metadata: None,
             content_sections: Vec::new(),

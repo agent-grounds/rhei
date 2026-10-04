@@ -1817,7 +1817,7 @@ transitions:
         let dir = SnapshotWorkspace { _tmp: tmp, root };
         fs::write(
             dir.path().join("index.rhei.md"),
-            "# Rhei: Snapshot Test\n**States:** snapshot-test\n\n## Notes\n",
+            "# Rhei: Snapshot Test\n\n## Notes\n",
         )
         .expect("write index");
         fs::create_dir_all(dir.path().join("tasks")).expect("tasks dir");

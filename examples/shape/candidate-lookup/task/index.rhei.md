@@ -1,5 +1,4 @@
 # Rhei: Triage and fix issue 87
-**States:** shape-candidate-lookup
 
 ## Overview
 

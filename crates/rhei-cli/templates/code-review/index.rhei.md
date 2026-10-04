@@ -1,5 +1,4 @@
 # Rhei: Code review — {{change_ref}}
-**States:** code-review
 
 ## Overview
 

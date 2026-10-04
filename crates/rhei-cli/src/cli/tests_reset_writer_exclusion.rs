@@ -224,7 +224,7 @@ fn narrowed_reset_serializes_pruning_with_an_untargeted_transition() {
     let machine = project.join("states.yaml");
     fs::write(
         project.join("index.panta.md"),
-        "# Panta: Reset Exclusion\n**States:** reset-writer-exclusion\n",
+        "# Panta: Reset Exclusion\n",
     )
     .expect("manifest");
     fs::write(&auth, reset_exclusion_plan("Auth", "pending", true)).expect("auth plan");

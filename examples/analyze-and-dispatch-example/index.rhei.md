@@ -1,5 +1,4 @@
 # Rhei: Analyze & Dispatch Example
-**States:** analyze-and-dispatch
 
 ## Overview
 

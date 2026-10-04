@@ -8,22 +8,18 @@
 /// Header fields shared by a single-file rhei and a workspace index.
 struct RheiHeader<'a> {
     title: &'a str,
-    states: Option<&'a str>,
     max_levels: Option<u8>,
     node_kinds: &'a [String],
     description: Option<&'a str>,
 }
 
 /// Render a rhei's header in the order the plan language fixes: heading,
-/// `**States:**`, frontmatter, description. `with_tasks_section` appends the
+/// frontmatter, description. `with_tasks_section` appends the
 /// `## Tasks` heading a single-file rhei requires and a workspace index must
 /// not have.
 // §FS-rhei-plan-language.1.1 §FS-rhei-plan-language.1.2
 fn render_rhei_file(header: &RheiHeader<'_>, with_tasks_section: bool) -> String {
     let mut out = format!("# Rhei: {}\n", header.title.trim());
-    if let Some(states) = header.states {
-        out.push_str(&format!("**States:** {}\n", states.trim()));
-    }
     if header.max_levels.is_some() || !header.node_kinds.is_empty() {
         out.push_str("\n---\nstructure:\n");
         if let Some(max_levels) = header.max_levels {

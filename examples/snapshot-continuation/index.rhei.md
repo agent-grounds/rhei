@@ -1,5 +1,4 @@
 # Rhei: Snapshot Continuation Example
-**States:** snapshot-continuation
 
 ## Overview
 

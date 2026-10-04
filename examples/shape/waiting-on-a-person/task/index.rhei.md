@@ -1,5 +1,4 @@
 # Rhei: Stream the CSV export
-**States:** shape-waiting-on-a-person
 
 ## Overview
 

@@ -266,53 +266,27 @@
         plans
     }
 
-    /// The three cases of §FS-rhei-library.2.1, decided before anything is
-    /// rendered.
+    /// The cases of §FS-rhei-library.2.1, decided before anything is rendered.
     ///
-    /// Under §FS-rhei-plan-language.1.3 clause 1 the target's own root is
-    /// consulted whatever its index says, so writing the union into the root
-    /// file is the whole of it and `--into` has nothing left to declare. What
-    /// survives is the pair of refusals: no file in the root, and an index
-    /// naming a machine that file is not.
+    /// Under §FS-rhei-plan-language.1.3 clause 1 the target's own root is its
+    /// machine, so writing the union into the root file is the whole of it and
+    /// `--into` has nothing to declare. What survives is one refusal — no file
+    /// in the root — behind the parse that refuses an index still carrying the
+    /// retired `**States:**` line before anything is written.
+    /// §FS-rhei-plan-language.2.2
     fn resolve_host_machine(host: &UnionHost) -> MietteResult<()> {
         let index = fs::read_to_string(&host.index)
             .map_err(|err| file_io_report(&host.index, "failed to read the target's index", err))?;
-        let declared = index
-            .lines()
-            .find_map(|line| line.trim().strip_prefix("**States:**"))
-            .map(|name| name.trim().to_owned());
+        let parsed = if host.single_file {
+            rhei_core::parse(&index).map(drop)
+        } else {
+            rhei_core::parser::parse_workspace_index(&index).map(drop)
+        };
+        parsed.map_err(|err| parse_report(&host.index, &index, &err))?;
         if !host.machine.is_file() {
             return Err(no_machine_of_its_own(host));
         }
-        let text = fs::read_to_string(&host.machine).map_err(|err| {
-            file_io_report(&host.machine, "failed to read the target's states", err)
-        })?;
-        let name = serde_yaml::from_str::<YamlValue>(&text)
-            .ok()
-            .and_then(|value| value.get("name").and_then(YamlValue::as_str).map(str::to_owned))
-            .ok_or_else(|| {
-                miette!(
-                    help = "a state machine names itself with a top-level `name:`.",
-                    "'{}' declares no machine name",
-                    display_slash(&host.machine)
-                )
-            })?;
-        match declared {
-            Some(declared) if declared == name => Ok(()),
-            Some(declared) => Err(miette!(
-                help = format!(
-                    "make them agree: either declare `**States:** {name}` in the index, or \
-                     rename the machine in {}.",
-                    display_slash(&host.machine)
-                ),
-                "'{}' declares `**States:** {declared}`, but '{}' is named '{name}'",
-                display_slash(&host.index),
-                display_slash(&host.machine)
-            )),
-            // A silent index is now the ordinary case: clause 1 reads the file
-            // the union lands in, so the target already runs under it.
-            None => Ok(()),
-        }
+        Ok(())
     }
 
     /// The refusal for a rhei with no machine of its own, with the **one**

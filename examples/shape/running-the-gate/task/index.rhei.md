@@ -1,5 +1,4 @@
 # Rhei: Fix the integer-literal overflow
-**States:** shape-running-the-gate
 
 ## Overview
 

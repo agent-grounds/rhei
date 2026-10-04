@@ -1,5 +1,4 @@
 # Rhei: Changeset Review — {{change_ref}}
-**States:** changeset-review
 
 ## Overview
 Two-agent changeset review with validation, fix proposals, smart adjudication,

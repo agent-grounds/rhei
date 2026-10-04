@@ -20,8 +20,8 @@ Rhei is the only agent runtime that combines all of:
   `structure.nodeKinds: [task, subtask, bug, spike]` to author `#### Subtask
   1.1: …`, `### Bug 3: …`, or `### Spike 4: …`. The list *replaces* the
   default, so keep `task` in it — and add `subtask` if you want that spelling
-  for children. The frontmatter block goes **below** the `# Rhei:` heading (and
-  below `**States:**`), not at the top of the file:
+  for children. The frontmatter block goes **below** the `# Rhei:` heading, not at
+  the top of the file:
 
   ```markdown
   # Rhei: Beta

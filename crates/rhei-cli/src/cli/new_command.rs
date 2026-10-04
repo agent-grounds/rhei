@@ -18,10 +18,6 @@ struct NewWrite {
     path: PathBuf,
     /// The new ticket's state; `None` for a rhei, which has none.
     state: Option<String>,
-    /// The `**States:**` name a rhei create is writing, from `--states`;
-    /// `None` for a ticket, and for a rhei created without the flag.
-    /// §FS-rhei-new.2.1.1
-    declared_machine: Option<String>,
     /// Full contents to write to `path`.
     contents: String,
     /// What a reader cares to see: a whole new file, or just the inserted
@@ -176,7 +172,6 @@ help = "keep the title to one line and put the rest in --description, which is w
 fn reject_mode_confusion(options: &NewOptions) -> MietteResult<()> {
     let rhei_flags = [
         ("--dir", options.dir),
-        ("--states", options.states.is_some()),
         ("--max-levels", options.max_levels.is_some()),
         ("--node-kinds", !options.node_kinds.is_empty()),
     ];
@@ -365,8 +360,7 @@ fn roll_back_new_write(path: &Path, previous: Option<&str>, created_dirs: &[Path
 /// including its failure, when it would have had one.
 ///
 /// A preview that skipped the write could only report the flags back: every
-/// failure worth previewing (a `**Prior:**` naming nothing, a `--states` naming
-/// no machine, a splice the parser reads differently than the writer did) is
+/// failure worth previewing (a `**Prior:**` naming nothing, a splice the parser reads differently than the writer did) is
 /// visible only *after* the bytes are on disk and the project is reloaded. A
 /// `--dry-run` that says "would create" and is then refused for real is the one
 /// answer the flag must never give, because it is the flag reached for before

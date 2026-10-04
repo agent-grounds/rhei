@@ -177,7 +177,6 @@ mod snapshot_prior_fix_tests;
 mod snapshot_prior_inheritance_tests;
 mod snapshot_prior_selection_tests;
 mod snapshot_tests;
-mod state_machine_deprecation_window_tests;
 mod state_machine_placement_tests;
 mod state_machine_resolution_support;
 mod state_machine_resolution_tests;

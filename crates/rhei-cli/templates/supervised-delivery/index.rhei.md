@@ -1,5 +1,4 @@
 # Rhei: {{title}}
-**States:** supervised-delivery
 
 ## What this workspace does
 

@@ -988,7 +988,6 @@ Write findings to `{review_notes_path}`.
 
 ```markdown
 # Rhei: Code Review — {{target}}
-**States:** code-review
 
 ## Overview
 Automated {{review_passes}}-pass review of `{{target}}` using {{model}}.
@@ -1090,7 +1089,6 @@ rhei instantiate code-review src/auth/ --execute
 ```markdown
 # index.rhei.md
 # Rhei: Code Review — src/auth/
-**States:** code-review
 
 ## Overview
 Automated 3-pass review of `src/auth/` using claude.
@@ -1131,8 +1129,8 @@ sees `{{...}}` or `includes:`.
 
 No changes to the Rhei plan grammar are required **by composition**. `--into`
 and `includes:` add none: the union ends in the ordinary flat files the parser
-already reads ([§FS-rhei-library.1](rhei-library.spec.md#1-composition-by-graph-union)). Changes to the `**States:**` declaration
-itself are a plan-language question and are owned by
+already reads ([§FS-rhei-library.1](rhei-library.spec.md#1-composition-by-graph-union)). Which machine a rhei runs under is a
+plan-language question and is owned by
 [§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution), not by this section.
 
 ## 9. Manifest Fields

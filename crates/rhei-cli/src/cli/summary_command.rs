@@ -45,7 +45,7 @@ fn resolve_summary_machine(
     // An explicit override retains the existing whole-scope behavior. A
     // non-Panta plan has one effective machine by construction.
     if state_machine_path.is_some() || !loaded.is_panta_project() {
-        return resolve_state_machine_for_loaded_plan(input, loaded, state_machine_path);
+        return resolve_state_machine_for_loaded_plan(input, state_machine_path);
     }
 
     let machines = resolve_state_machines_for_loaded_plan(input, loaded, None)?;

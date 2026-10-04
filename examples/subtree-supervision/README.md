@@ -29,7 +29,7 @@ cp -r examples/subtree-supervision /tmp/ss
 rhei run /tmp/ss --no-tui
 ```
 
-`index.rhei.md` names its machine with `**States:** subtree-supervision`, so no
+The `states.yaml` in the rhei's own directory is its machine, so no
 `--state-machine` flag is needed.
 
 ## What you should see

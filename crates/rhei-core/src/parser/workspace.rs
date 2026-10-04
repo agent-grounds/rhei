@@ -2,13 +2,14 @@ use crate::ast::{ContentSection, Metadata, Structure, Task};
 use crate::fence::FenceTracker;
 use regex::Regex;
 
-use super::{parse, parse_collect, parse_frontmatter, parse_structure, ParseError, Result};
+use super::{
+    is_retired_states_line, parse, parse_collect, parse_frontmatter, parse_structure,
+    retired_states_line, ParseError, Result,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceIndex {
     pub title: String,
-    pub states: String,
-    pub states_declared: bool,
     pub structure: Structure,
     pub metadata: Option<Metadata>,
     pub content_sections: Vec<ContentSection>,
@@ -17,8 +18,6 @@ pub struct WorkspaceIndex {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PantaManifest {
     pub title: String,
-    pub states: String,
-    pub states_declared: bool,
     pub structure: Structure,
     pub metadata: Option<Metadata>,
     pub content_sections: Vec<ContentSection>,
@@ -29,8 +28,6 @@ pub fn parse_workspace_index(input: &str) -> Result<WorkspaceIndex> {
     let parsed = parse_manifest(input, "Rhei", "workspace index")?;
     Ok(WorkspaceIndex {
         title: parsed.title,
-        states: parsed.states,
-        states_declared: parsed.states_declared,
         structure: parsed.structure,
         metadata: parsed.metadata,
         content_sections: parsed.content_sections,
@@ -42,8 +39,6 @@ pub fn parse_panta_manifest(input: &str) -> Result<PantaManifest> {
     let parsed = parse_manifest(input, "Panta", "Panta manifest")?;
     Ok(PantaManifest {
         title: parsed.title,
-        states: parsed.states,
-        states_declared: parsed.states_declared,
         structure: parsed.structure,
         metadata: parsed.metadata,
         content_sections: parsed.content_sections,
@@ -53,8 +48,6 @@ pub fn parse_panta_manifest(input: &str) -> Result<PantaManifest> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ManifestParts {
     title: String,
-    states: String,
-    states_declared: bool,
     structure: Structure,
     metadata: Option<Metadata>,
     content_sections: Vec<ContentSection>,
@@ -63,13 +56,10 @@ struct ManifestParts {
 fn parse_manifest(input: &str, header_name: &str, frontmatter_kind: &str) -> Result<ManifestParts> {
     let re_header =
         Regex::new(&format!(r#"^#\s+{}:\s+(.*)$"#, regex::escape(header_name))).unwrap();
-    let re_states_decl = Regex::new(r#"^\*\*States:\*\*\s+(.+)$"#).unwrap();
     let re_tasks = Regex::new(r#"^##\s+Tasks\s*$"#).unwrap();
     let re_section_header = Regex::new(r#"^##\s+(.+)$"#).unwrap();
 
     let mut title: Option<String> = None;
-    let mut states: Option<String> = None;
-    let mut states_checked = false;
     let mut metadata: Option<Metadata> = None;
     let mut structure: Structure = Structure::default();
     let mut frontmatter_checked = false;
@@ -124,10 +114,14 @@ fn parse_manifest(input: &str, header_name: &str, frontmatter_kind: &str) -> Res
             continue;
         }
 
+        if is_retired_states_line(line) {
+            return Err(retired_states_line(line_number));
+        }
+
         if !header_seen && line == "---" {
             return Err(ParseError::new(
                 format!(
-                    "YAML frontmatter must appear after the `# {header_name}:` header (and any `**States:**` declaration). Move the `---` block below the header."
+                    "YAML frontmatter must appear after the `# {header_name}:` header. Move the `---` block below the header."
                 ),
                 Some(line_number),
             ));
@@ -149,16 +143,7 @@ fn parse_manifest(input: &str, header_name: &str, frontmatter_kind: &str) -> Res
             continue;
         }
 
-        if !states_checked {
-            if let Some(cap) = re_states_decl.captures(line) {
-                states = Some(cap.get(1).unwrap().as_str().trim().to_string());
-                states_checked = true;
-                continue;
-            }
-            states_checked = true;
-        }
-
-        if states_checked && !frontmatter_checked {
+        if !frontmatter_checked {
             if line == "---" {
                 in_frontmatter = true;
                 frontmatter_checked = true;
@@ -207,21 +192,13 @@ fn parse_manifest(input: &str, header_name: &str, frontmatter_kind: &str) -> Res
         ParseError::new(format!("Missing '# {header_name}: <title>' header"), None)
     })?;
 
-    let states_declared = states.is_some();
     // Interior blanks are the author's; the ones trailing a section only
     // separate it from the next heading. §FS-rhei-memory.4.2
     for section in &mut content {
         let trimmed = section.content.trim_end().to_string();
         section.content = trimmed;
     }
-    Ok(ManifestParts {
-        title,
-        states: states.unwrap_or_else(|| "rhei".to_string()),
-        states_declared,
-        structure,
-        metadata,
-        content_sections: content,
-    })
+    Ok(ManifestParts { title, structure, metadata, content_sections: content })
 }
 
 /// A parsed bare task file: the nodes it defines, and the authored

@@ -136,7 +136,7 @@ transcript, and cost overlays are empty. This is exactly [§FS-rhei-viz](../func
 ```
 plan.rhei.md (+ workspace index, + states.yaml/override)
   → rhei-core::parse / workspace          (parse tasks)
-  → rhei-validator resolve machine        (override | matching sibling | built-in rhei)
+  → rhei-validator resolve machine        (override | own root | project root | built-in rhei)
   → rhei-viz::build(plan, machine)         (VizModel: flatten machine, derive state, classify)
   → rhei-viz-model::render_static(model)   (inline JSON into the one asset)
   → self-contained .html

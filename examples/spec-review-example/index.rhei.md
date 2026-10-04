@@ -1,5 +1,4 @@
 # Rhei: Spec Review — specs/template-review-fixture.spec.md
-**States:** spec-review
 
 ## Overview
 Two-pass review-fix loop for `specs/template-review-fixture.spec.md`.

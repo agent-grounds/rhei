@@ -57,16 +57,6 @@ struct NewOptions {
     /// optional `prompt_templates/` is adopted
     #[arg(long, help_heading = "Creating a rhei")]
     dir: bool,
-    /// Bind the new rhei to a state machine by name. The machine has to
-    /// resolve at create time, so author it first with
-    /// `/rhei-state-machine-writer`; `--keep-on-error` writes the rhei anyway
-    #[arg(
-        long,
-        value_name = "NAME",
-        help_heading = "Creating a rhei",
-        add = ArgValueCompleter::new(complete_new_states_name)
-    )]
-    states: Option<String>,
     /// Write `structure.maxLevels` for the new rhei
     #[arg(long, value_name = "N", help_heading = "Creating a rhei")]
     max_levels: Option<u8>,

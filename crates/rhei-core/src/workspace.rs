@@ -22,16 +22,19 @@
 // §AR-rhei-panta
 
 mod basin;
+mod implicit;
 mod panta;
 mod qualify;
 mod task_metadata;
 
 pub use basin::BASIN_RHEI_ID;
+pub use implicit::{
+    implicit_panta_from_file_rhei, load_implicit_panta, wrap_rhei_as_implicit_panta,
+};
 pub use panta::{
-    discover_rhei_entries, implicit_panta_from_file_rhei, is_panta_project, load_implicit_panta,
-    load_panta_project, load_panta_project_lenient, load_panta_project_with_member, panta_member,
-    panta_project_dir, rhei_id_for_path, rhei_plan_file, wrap_rhei_as_implicit_panta, PantaProject,
-    PANTA_INDEX_FILE,
+    discover_rhei_entries, is_panta_project, load_panta_project, load_panta_project_lenient,
+    load_panta_project_with_member, panta_member, panta_project_dir, rhei_id_for_path,
+    rhei_plan_file, PantaProject, PANTA_INDEX_FILE,
 };
 pub use task_metadata::{merge_authored_task_metadata, AuthoredTaskMetadata};
 
@@ -246,8 +249,6 @@ pub fn load_workspace(dir: &Path) -> parser::Result<Workspace> {
         root_guards,
         rhei: Rhei {
             title: index.title,
-            states: index.states,
-            states_declared: index.states_declared,
             structure: index.structure,
             metadata,
             content_sections: index.content_sections,

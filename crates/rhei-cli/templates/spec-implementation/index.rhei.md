@@ -1,5 +1,4 @@
 # Rhei: {{spec_title}}
-**States:** spec-implementation
 
 ## What this workspace does
 

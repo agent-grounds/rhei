@@ -256,11 +256,7 @@ fn snapshot_prior_cross_rhei_edge_uses_the_source_identity_and_owning_machine() 
     fs::create_dir_all(consumer.join("tasks")).expect("consumer workspace");
     write_fake_snapshot_settings(&project, &agent);
     write_fixture_file(&project, "index.panta.md", "# Panta: Cross Rhei\n");
-    write_fixture_file(
-        &producer,
-        "index.rhei.md",
-        "# Rhei: Producer\n**States:** producer-machine\n",
-    );
+    write_fixture_file(&producer, "index.rhei.md", "# Rhei: Producer\n");
     write_fixture_file(
         &producer,
         "states.yaml",
@@ -282,11 +278,7 @@ transitions:
 "#,
     );
     write_fixture_file(&producer, "tasks/01-source.md", "### Task 1: Source\n**State:** source\n");
-    write_fixture_file(
-        &consumer,
-        "index.rhei.md",
-        "# Rhei: Consumer\n**States:** consumer-machine\n",
-    );
+    write_fixture_file(&consumer, "index.rhei.md", "# Rhei: Consumer\n");
     write_fixture_file(
         &consumer,
         "states.yaml",

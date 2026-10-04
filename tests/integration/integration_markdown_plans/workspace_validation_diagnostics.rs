@@ -110,7 +110,7 @@ fn missing_input_artifact_error_names_pre_qualification_file() {
     let dir = unique_temp_dir("legacy-artifact-hint");
     fs::write(
         dir.join("plan.rhei.md"),
-        "# Rhei: Legacy\n**States:** panta-input-machine\n\n## Tasks\n\n### Task 1: Alpha\n**State:** pending\n",
+        "# Rhei: Legacy\n\n## Tasks\n\n### Task 1: Alpha\n**State:** pending\n",
     )
     .expect("write plan");
     fs::write(dir.join("states.yaml"), PANTA_INPUT_STATE_MACHINE).expect("write machine");
@@ -141,7 +141,7 @@ fn missing_input_artifact_error_names_pre_qualification_file() {
 fn ambiguous_rhei_local_shorthand_names_qualified_candidates() {
     let project = create_panta_project(
         "panta-ambiguous-shorthand",
-        "# Panta: Ambiguous\n**States:** workspace-test-machine\n",
+        "# Panta: Ambiguous\n",
         &[
             ("auth.rhei.md", "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n"),
             (
@@ -194,7 +194,7 @@ fn ambiguous_rhei_local_shorthand_names_qualified_candidates() {
 fn project_parse_errors_keep_their_line_and_code_frame() {
     let project = create_panta_project(
         "panta-parse-frame",
-        "# Panta: Broken\n**States:** workspace-test-machine\n",
+        "# Panta: Broken\n",
         &[("broken.rhei.md", "# Onboarding\n\n## Tasks\n\n### Task 1: One\n**State:** pending\n")],
         WORKSPACE_STATE_MACHINE,
     );
@@ -225,7 +225,7 @@ fn project_scoped_parse_errors_match_file_scoped_ones() {
                 ### Task 2: two\n\n**State:** pending\n";
     let project = create_panta_project(
         "panta-parse-parity",
-        "# Panta: Parity\n**States:** workspace-test-machine\n",
+        "# Panta: Parity\n",
         &[("c.rhei.md", plan)],
         WORKSPACE_STATE_MACHINE,
     );
@@ -267,7 +267,7 @@ fn project_scoped_parse_errors_match_file_scoped_ones() {
 fn missing_prior_names_the_unknown_rhei_and_suggests_the_near_miss() {
     let project = create_panta_project(
         "panta-prior-typo",
-        "# Panta: Typo\n**States:** workspace-test-machine\n",
+        "# Panta: Typo\n",
         &[
             (
                 "onboarding.rhei.md",
@@ -319,7 +319,7 @@ fn missing_prior_names_the_unknown_rhei_and_suggests_the_near_miss() {
 fn missing_prior_never_suggests_the_citing_task_as_its_own_prior() {
     let project = create_panta_project(
         "panta-prior-self-suggest",
-        "# Panta: Short\n**States:** workspace-test-machine\n",
+        "# Panta: Short\n",
         &[
             ("b.rhei.md", "# Rhei: B\n\n## Tasks\n\n### Task 1: Other\n**State:** pending\n"),
             (

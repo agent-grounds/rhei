@@ -11,7 +11,6 @@
     /// §FS-rhei-library.2.2
     fn lay_project_into(lay: &ProjectLay<'_>, project: &Path) -> MietteResult<()> {
         let rendered = render_project(lay)?;
-        refuse_deferring_declaration(project, &rendered.machine)?;
         // Held from before the first read through the last write, as every
         // `--into` is; `--dry-run` writes nothing, not even the sidecar.
         // §FS-rhei-library.2 §FS-rhei-new.4
@@ -80,34 +79,6 @@
         summary.shared_inputs = shared_inputs;
         summary.print(project, lay.dry_run);
         Ok(())
-    }
-
-    /// For as long as the deprecated declaration exists a manifest's own
-    /// `**States:** X` resolves ahead of the root file, so a default laid under
-    /// another name would govern nothing for a release. Refused before anything
-    /// is written; a declaration naming the laid machine is left as it is.
-    /// §FS-rhei-library.2.2 §FS-rhei-plan-language.1.3
-    fn refuse_deferring_declaration(project: &Path, machine: &str) -> MietteResult<()> {
-        let path = project.join(workspace::PANTA_INDEX_FILE);
-        let raw = read_text(&path)?;
-        let Ok(manifest) = rhei_core::parser::parse_panta_manifest(&raw) else {
-            // Loading the project reports a malformed manifest better.
-            return Ok(());
-        };
-        if !manifest.states_declared || manifest.states == machine {
-            return Ok(());
-        }
-        let shown = display_slash(&path);
-        Err(miette!(
-            help = format!(
-                "delete the `**States:**` line from '{shown}' — the declaration is deprecated, \
-                 and the states.yaml at the project root is the default without it — then run \
-                 this again."
-            ),
-            "'{shown}' declares `**States:** {}`, so the default this lays, '{machine}', would \
-             not govern the project until the declaration is removed",
-            manifest.states
-        ))
     }
 
     /// The tickets the replacement default would govern, counted for the

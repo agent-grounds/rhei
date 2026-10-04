@@ -1,5 +1,4 @@
 # Rhei: Can a crash lose a committed write?
-**States:** shape-module-questions
 
 ## Overview
 

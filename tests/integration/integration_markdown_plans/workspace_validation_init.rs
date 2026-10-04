@@ -172,12 +172,12 @@ fn init_leaves_the_manifest_bare_over_rhei_declared_machines() {
     fs::write(dir.join("states.yaml"), WORKSPACE_STATE_MACHINE).expect("write machine");
     fs::write(
         dir.join("auth.rhei.md"),
-        "# Rhei: Auth\n**States:** workspace-test-machine\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n",
+        "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n",
     )
     .expect("write auth");
     fs::write(
         dir.join("billing.rhei.md"),
-        "# Rhei: Billing\n**States:** workspace-test-machine\n\n## Tasks\n\n### Task 1: Invoice\n**State:** pending\n",
+        "# Rhei: Billing\n\n## Tasks\n\n### Task 1: Invoice\n**State:** pending\n",
     )
     .expect("write billing");
 
@@ -291,7 +291,7 @@ fn init_loads_a_mixed_declared_and_silent_machine_set_cleanly() {
     fs::write(dir.join("states.yaml"), WORKSPACE_STATE_MACHINE).expect("write machine");
     fs::write(
         dir.join("auth.rhei.md"),
-        "# Rhei: Auth\n**States:** workspace-test-machine\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n",
+        "# Rhei: Auth\n\n## Tasks\n\n### Task 1: Login\n**State:** pending\n",
     )
     .expect("write auth");
     fs::write(

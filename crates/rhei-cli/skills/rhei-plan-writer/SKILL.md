@@ -19,7 +19,7 @@ Default to Single-File unless the user asks for high concurrency or merge-confli
 ### Single-File Plan
 
 - Emit exactly one H1: `# Rhei: <title>`.
-- Do **not** emit a `**States:**` line. Which machine a plan runs under is decided by where `states.yaml` sits — beside a single-file plan, at a Directory Workspace's root, or at the project root for the default — and the declaration is deprecated and removed in the next release ([§FS-rhei-plan-language.2.2](../../../../docs/functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). Keep an existing one when editing a plan that has it: for this release it still wins over the file beside it, so deleting it can change which machine the plan runs under.
+- Do **not** emit a `**States:**` line: it is no longer part of the plan language, and every command refuses a plan that carries one ([§FS-rhei-plan-language.2.2](../../../../docs/functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). Which machine a plan runs under is decided by where `states.yaml` sits — beside a single-file plan, at a Directory Workspace's root, or at the project root for the default. When editing a plan that still has the line, delete it; `rhei states` then shows which machine the plan resolves.
 - Optionally emit a YAML frontmatter block (see *Frontmatter*) directly after the H1, before any H2 section.
 - Emit zero or more contextual H2 sections before tasks, then `## Tasks` as the final H2 section with at least one task.
 
@@ -69,37 +69,10 @@ first of three places that has a `states.yaml`
 3. otherwise the built-in `rhei` machine in
    [default-states.md](references/default-states.md).
 
-A declaration naming a machine no file supplies, with no file in the rhei's own
-root either, is still an error rather than a fall through.
-
-For one release the deprecated `**States:**` declaration is resolved *before*
-those three and wins wherever it resolves, so a project written against the
-previous rules runs under exactly the machine it did
-([§FS-rhei-plan-language.2.2](../../../../docs/functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)). Read the deprecated rows below only where
-the plan you are working on carries that line; the CLI prints one `warning:`
-per declaration where the two disagree.
-
-| Invocation scope | Effective `**States:**` | Matching file available | Resolution |
-|---|---|---|---|
-| Any rhei, by placement | none | `states.yaml` in the rhei's own execution root | own-root file, whatever its `name:` |
-| Any rhei, by placement | none | project-root `states.yaml` only | project-root file, whatever its `name:` |
-| Any rhei, by placement | none | none in either place | built-in `rhei` |
-| Standalone single-file plan | `rhei` | sibling `states.yaml` | sibling file |
-| Standalone Directory Workspace | `rhei` | workspace-root `states.yaml` | workspace-root file |
-| Panta project default (inherited or restated) | `rhei` | project-root `states.yaml` | project-root file |
-| Panta project default (inherited or restated) | `rhei` | member-root `states.yaml` only | built-in `rhei` |
-| Panta custom project default | non-`rhei` | one matching member-root `states.yaml` | unique member-root file |
-| Panta custom project default | `rhei` (member's own, differing) | none found anywhere | built-in `rhei` |
-| Panta custom project default, restated by the member's own declaration | non-`rhei` (equal to the default) | matching own-execution-root `states.yaml` | own-root file |
-| Panta custom project default, restated by the member's own declaration | non-`rhei` (equal to the default) | own-root file absent, or names another machine | already-resolved project default |
-
-The last eight rows are the deprecated declaration's and go in the next
-release; the first three are the rule that remains. Where a declaration still
-resolves, an unrelated `states.yaml` sitting in the rhei's own root does not
-take over until then — which is what the CLI's warning says. Multiple rhei
-roots declaring one name is an ambiguity error, an unreadable candidate is a
-load error, and no directory or file name other than `states.yaml` in those
-places is ever searched.
+No other directory, and no file name other than `states.yaml` in those places,
+is ever searched: another rhei's root never supplies a machine. To give a rhei
+a machine of its own, make it a Directory Workspace (`rhei new "<title>" --dir`)
+and put a `states.yaml` in its directory.
 
 Each node's initial state comes from the machine's `profiles.<name>.initial` via `node_policy` — **not** from a state-level `initial: true` flag. In the built-in `rhei` machine the initial state is `pending`, so every task in a new plan under that machine starts in `pending`.
 
@@ -165,7 +138,7 @@ structure:
 Validate every response against all checks:
 
 - One H1 matching `# Rhei: <title>` (Single-File Plan) or an `index.rhei.md` (Directory Workspace).
-- No `**States:**` line is authored; a pre-existing one is left where it was, as the first non-empty line after the H1, with any YAML frontmatter between it and the first H2.
+- No `**States:**` line anywhere outside a fenced block; any YAML frontmatter sits directly after the H1, before the first H2.
 - `## Tasks` is present and last in Single-File Plans; omitted entirely from `index.rhei.md`.
 - Every root task is `### <Kind> <id>: <title>` and every child is `#### <Kind> <parent>.<child>: <title>` (deeper at H5/H6 when `structure.maxLevels` permits).
 - Every task (root or child) has `**State:**` with an allowed value from the resolved profile; `**Prior:**` appears only after `**State:**`; no `**Assignee:**` or `> **Result:**` is authored; no other metadata fields appear.
@@ -206,7 +179,7 @@ Rules worth knowing before reaching for it:
 - **`--description` / `--description-file`** write the body. `--description-file -` reads standard input, which is how an issue body gets in. Prose only: a heading, a `**Field:**` line, a bare `---`, or an unbalanced ``` fence would author plan structure instead of describing the ticket, and each is refused with the offending line named.
 - **`--assignee` is a claim, not a label.** An assigned ticket is skipped by `rhei next` and `rhei run` until `rhei release <id>`, so do not assign work up front unless you mean it.
 - **`--dry-run` tells the truth.** It performs the write and the validation and then always rolls back, so a create that would fail fails in the preview too. Use it before a bulk create; add `--json` for a machine-readable object.
-- **`--states <name>` requires the machine to exist.** Author it with `rhei-state-machine-writer` first; the rhei points at a machine, never the other way round.
+- **A rhei with its own machine is a Directory Workspace.** Create it with `--dir`, then put the `states.yaml` that `rhei-state-machine-writer` authors in its directory; there is no flag that names a machine.
 - **Do not create a project or run an orchestrator.** `rhei init` is the human's call, and `rhei run` is always human-initiated.
 
 `rhei new` only ever creates. Re-titling, re-parenting, moving, and deleting remain plan edits, and state changes remain `rhei transition` / `rhei complete`.

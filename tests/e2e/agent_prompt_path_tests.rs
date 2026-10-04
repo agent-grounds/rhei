@@ -80,7 +80,6 @@ result('## Result\n\nWorker finished at the path the prompt named.\n')
     fs::write(
         workspace.join("index.rhei.md"),
         r#"# Rhei: Prompt Path Base
-**States:** prompt-path-base
 
 ## Overview
 
@@ -238,7 +237,7 @@ result('## Result\n\nWorker finished under the name it was given.\n')
     .expect("write settings");
     fs::write(
         workspace.join("index.rhei.md"),
-        "# Rhei: Symlinked Root\n**States:** symlinked-root\n\n## Overview\n\nOne task, so the \
+        "# Rhei: Symlinked Root\n\n## Overview\n\nOne task, so the \
          spelling of the paths is the whole subject.\n",
     )
     .expect("write index");

@@ -9,7 +9,7 @@ use crate::rhei_output::PlanOutputGenerator;
 /// §FS-rhei-render.3.1.1
 type JsonResult<T> = Result<T, Vec<UnrepresentableValue>>;
 
-/// The state machine one rhei of a merged project runs under.
+/// The state machine one rhei of a merged project resolves.
 ///
 /// A merged project flattens every rhei's tickets into one qualified task list
 /// while the machine stays a per-rhei property, so the top-level `states` field
@@ -19,25 +19,36 @@ type JsonResult<T> = Result<T, Vec<UnrepresentableValue>>;
 pub struct RheiMachine {
     /// Rhei id — the first segment of every ticket id it owns.
     pub id: String,
-    /// Effective machine name: the rhei's own declaration, or the project
-    /// default when it declares none.
+    /// The `name:` of the machine the rhei resolves: its own root's
+    /// `states.yaml`, else the project default.
     pub states: String,
-    /// Whether the rhei declared the machine itself rather than inheriting it.
-    pub declared: bool,
 }
 
-#[derive(Default)]
 pub struct JsonOutput {
     pub pretty: bool,
+    /// The resolved project default's name, for the top-level `states` field.
+    /// §FS-rhei-render.3.1
+    pub states: String,
     /// Per-rhei machine attribution, in presentation order. Empty for a plan
     /// that is not a merged project, whose one `states` field already says
     /// everything.
     pub rheis: Vec<RheiMachine>,
 }
 
+impl Default for JsonOutput {
+    /// A document no machine was resolved for names the built-in machine.
+    fn default() -> Self {
+        Self { pretty: false, states: BUILTIN_MACHINE.to_string(), rheis: Vec::new() }
+    }
+}
+
+/// The built-in machine's name, which a plan with no `states.yaml` runs under.
+/// §FS-rhei-plan-language.1.3
+const BUILTIN_MACHINE: &str = "rhei";
+
 impl PlanOutputGenerator for JsonOutput {
     fn generate_rhei(&self, rhei: &rhei_core::ast::Rhei) -> JsonResult<serde_json::Value> {
-        rhei_json(rhei, &self.rheis)
+        rhei_json(rhei, &self.states, &self.rheis)
     }
 }
 
@@ -46,26 +57,28 @@ pub fn to_json_value(rhei: &rhei_core::ast::Rhei) -> JsonResult<serde_json::Valu
     JsonOutput::default().generate_rhei(rhei)
 }
 
-/// [`to_json_value`] for a merged project, carrying each rhei's machine.
-/// §FS-rhei-render.3.1
+/// [`to_json_value`] carrying the resolved project default and, for a merged
+/// project, each rhei's machine. §FS-rhei-render.3.1
 pub fn to_json_value_with_rheis(
     rhei: &rhei_core::ast::Rhei,
+    states: &str,
     rheis: Vec<RheiMachine>,
 ) -> JsonResult<serde_json::Value> {
-    JsonOutput { pretty: false, rheis }.generate_rhei(rhei)
+    JsonOutput { pretty: false, states: states.to_string(), rheis }.generate_rhei(rhei)
 }
 
 /// Convert a parsed Rhei into a pretty-printed JSON string.
 pub fn to_json_string_pretty(rhei: &rhei_core::ast::Rhei) -> JsonResult<String> {
-    to_json_string_pretty_with_rheis(rhei, Vec::new())
+    to_json_string_pretty_with_rheis(rhei, BUILTIN_MACHINE, Vec::new())
 }
 
-/// [`to_json_string_pretty`] for a merged project. §FS-rhei-render.3.1
+/// [`to_json_string_pretty`] for a resolved plan. §FS-rhei-render.3.1
 pub fn to_json_string_pretty_with_rheis(
     rhei: &rhei_core::ast::Rhei,
+    states: &str,
     rheis: Vec<RheiMachine>,
 ) -> JsonResult<String> {
-    let v = to_json_value_with_rheis(rhei, rheis)?;
+    let v = to_json_value_with_rheis(rhei, states, rheis)?;
     Ok(serde_json::to_string_pretty(&v).expect("pretty JSON serialization"))
 }
 
@@ -141,7 +154,7 @@ fn task_json(t: &Task) -> Value {
     Value::Object(obj)
 }
 
-fn rhei_json(rhei: &Rhei, rheis: &[RheiMachine]) -> JsonResult<Value> {
+fn rhei_json(rhei: &Rhei, states: &str, rheis: &[RheiMachine]) -> JsonResult<Value> {
     let content_sections = rhei
         .content_sections
         .iter()
@@ -157,7 +170,7 @@ fn rhei_json(rhei: &Rhei, rheis: &[RheiMachine]) -> JsonResult<Value> {
 
     let mut obj = Map::new();
     obj.insert("title".to_string(), Value::String(rhei.title.clone()));
-    obj.insert("states".to_string(), Value::String(rhei.states.clone()));
+    obj.insert("states".to_string(), Value::String(states.to_string()));
     // One machine per rhei: the `states` field above is only the project
     // default. Resolve a task through the first segment of its id.
     // §FS-rhei-render.3.1
@@ -171,7 +184,6 @@ fn rhei_json(rhei: &Rhei, rheis: &[RheiMachine]) -> JsonResult<Value> {
                         json!({
                             "id": entry.id,
                             "states": entry.states,
-                            "states_declared": entry.declared,
                         })
                     })
                     .collect(),

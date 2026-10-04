@@ -189,27 +189,6 @@ fn open_descendants_operand_help() -> &'static str {
      with: rhei list <plan> --non-terminal"
 }
 
-/// Help for a plan whose `**States:**` name disagrees with the states file.
-fn states_declaration_help() -> &'static str {
-    "the plan's `**States:**` declaration must match the name inside the states \
-     file. Rename one of them, or point --state-machine at the matching file."
-}
-
-/// Help for a `**States:**` naming a machine nothing declares.
-///
-/// The declaration is authored before the machine exists as often as after, so
-/// "write the machine" is a real answer here and not just a diagnosis, and the
-/// spec already names who writes one. Deleting the line is the other real
-/// answer now that it is deprecated: resolution without it reads the rhei's
-/// own root and then the project root, so a rhei reaching this error has
-/// nothing of its own and falls to the project default.
-// §AR-rhei-panta.4 §FS-rhei-new.6 §FS-rhei-plan-language.1.3
-fn missing_state_machine_help() -> &'static str {
-    "rename the `**States:**` declaration to one of the names above, delete it to run \
-     under the project default, point --state-machine at the file that declares it, or run \
-     `/rhei-state-machine-writer` to author the machine that is missing."
-}
-
 /// Why a rhei that loaded holds no tickets, named in the layout it uses.
 ///
 /// The basin has no authored index and no `tasks/` directory — its task files

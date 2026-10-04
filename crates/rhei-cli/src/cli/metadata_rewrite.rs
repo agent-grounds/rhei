@@ -37,12 +37,6 @@ fn rewrite_frontmatter(raw: &str, metadata: &Metadata) -> MietteResult<String> {
     while idx < lines.len() && lines[idx].trim().is_empty() {
         idx += 1;
     }
-    if idx < lines.len() && lines[idx].trim_start().starts_with("**States:**") {
-        idx += 1;
-    }
-    while idx < lines.len() && lines[idx].trim().is_empty() {
-        idx += 1;
-    }
 
     let start = idx;
     let mut end = idx;

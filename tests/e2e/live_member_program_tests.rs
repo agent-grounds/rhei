@@ -71,11 +71,7 @@ result('admitted program completed\n')
         "template.yaml",
         "name: program-follow-on\nversion: 1.0.0\ndescription: Admitted program\n",
     );
-    write_fixture_file(
-        &template,
-        "index.rhei.md",
-        "# Rhei: Follow\n**States:** follow-program-machine\n",
-    );
+    write_fixture_file(&template, "index.rhei.md", "# Rhei: Follow\n");
     write_fixture_file(
         &template,
         "states.yaml",
@@ -130,7 +126,7 @@ else:
         &producer,
         &[rhei_binary().to_str().unwrap(), template.to_str().unwrap(), project.to_str().unwrap()],
     );
-    write_fixture_file(&seed, "index.rhei.md", "# Rhei: Seed\n**States:** seed-machine\n");
+    write_fixture_file(&seed, "index.rhei.md", "# Rhei: Seed\n");
     write_fixture_file(&seed, "states.yaml", &program_machine("seed-machine", "publish", &command));
     for task in 1..=if parallel { 2 } else { 1 } {
         write_fixture_file(

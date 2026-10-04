@@ -20,7 +20,6 @@ pub struct Tokenizer<'a> {
     re_prior_ref: Regex,
     re_consumes_ref: Regex,
     re_inherits: Regex,
-    re_states: Regex,
     re_state: Regex,
     re_assignee: Regex,
     re_model: Regex,
@@ -62,9 +61,6 @@ impl<'a> Tokenizer<'a> {
         )
         .unwrap();
 
-        // For "**States:** name" (must be checked before re_state)
-        let re_states = Regex::new(r#"^\*\*States:\*\*\s+(.+)$"#).unwrap();
-
         // For "**State:** value"
         let re_state = Regex::new(r#"^\*\*State:\*\*\s*(.+)$"#).unwrap();
 
@@ -85,7 +81,6 @@ impl<'a> Tokenizer<'a> {
             re_prior_ref,
             re_consumes_ref,
             re_inherits,
-            re_states,
             re_state,
             re_assignee,
             re_model,
@@ -156,12 +151,6 @@ impl<'a> Iterator for Tokenizer<'a> {
                 }
                 // Malformed id — fall through to text content.
                 return Some(Token::TextContent);
-            }
-
-            // Metadata: States declaration (must be checked before State)
-            if let Some(caps) = self.re_states.captures(line) {
-                let name = caps.get(1).map(|m| m.as_str().trim()).unwrap_or_default();
-                return Some(Token::MetadataStates { name: name.to_string() });
             }
 
             // Metadata: State (with unescaping or backtick stripping)

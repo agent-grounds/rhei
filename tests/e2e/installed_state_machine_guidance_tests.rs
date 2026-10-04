@@ -1,6 +1,6 @@
 // The plan-writer skill is an executable part of authoring: when the CLI is
-// unavailable, its bounded decision table must select the same state-machine
-// source as the resolver. Exercise both source routes promised by
+// unavailable, its no-CLI guidance must select the same state-machine source as
+// the resolver. Exercise both source routes promised by
 // install-skills instead of reading the checkout file directly.
 
 // §FS-rhei-plan-language.1.3 §FS-rhei-install-skills.4.3
@@ -10,37 +10,11 @@ use std::path::{Path, PathBuf};
 
 use super::*;
 
-const TABLE_HEADING: &str = "#### No-CLI state-machine resolution";
-const TABLE_COLUMNS: [&str; 4] =
-    ["Invocation scope", "Effective `**States:**`", "Matching file available", "Resolution"];
+const SECTION_HEADING: &str = "#### No-CLI state-machine resolution";
 
-const EXPECTED_ROWS: [[&str; 4]; 5] = [
-    [
-        "Panta project default (inherited or restated)",
-        "`rhei`",
-        "project-root `states.yaml`",
-        "project-root file",
-    ],
-    [
-        "Panta project default (inherited or restated)",
-        "`rhei`",
-        "member-root `states.yaml` only",
-        "built-in `rhei`",
-    ],
-    ["Standalone single-file plan", "`rhei`", "sibling `states.yaml`", "sibling file"],
-    [
-        "Standalone Directory Workspace",
-        "`rhei`",
-        "workspace-root `states.yaml`",
-        "workspace-root file",
-    ],
-    [
-        "Panta custom project default",
-        "non-`rhei`",
-        "one matching member-root `states.yaml`",
-        "unique member-root file",
-    ],
-];
+/// The three clauses, in the order resolution tries them.
+const CLAUSES: [&str; 3] =
+    ["**own execution root**", "**project root**", "built-in `rhei` machine"];
 
 fn install_plan_writer(bin: &Path, cwd: &Path, prefix: &str) -> String {
     let home = unique_temp_dir(prefix);
@@ -69,45 +43,40 @@ fn allowed_states_section(skill: &str) -> &str {
         .0
 }
 
-fn resolution_rows(skill: &str) -> Vec<Vec<&str>> {
+fn no_cli_section(skill: &str) -> &str {
     let allowed = allowed_states_section(skill);
-    let table = allowed
-        .split_once(&format!("{TABLE_HEADING}\n"))
+    allowed
+        .split_once(&format!("{SECTION_HEADING}\n"))
         .unwrap_or_else(|| {
             panic!(
-                "installed plan-writer is missing `{TABLE_HEADING}` and its bounded decision \
-                 table; expected the Panta `rhei` default with only a member-root match to \
-                 resolve to built-in `rhei`. Actual installed Allowed States guidance:\n{allowed}"
+                "installed plan-writer is missing `{SECTION_HEADING}`; actual installed Allowed \
+                 States guidance:\n{allowed}"
             )
         })
         .1
         .split("\n#### ")
         .next()
-        .expect("the no-CLI subsection should exist");
-
-    let mut lines = table.lines().filter(|line| line.trim().starts_with('|'));
-    let columns = table_cells(lines.next().expect("the decision table should have a header"));
-    assert_eq!(columns, TABLE_COLUMNS, "unexpected no-CLI decision-table columns");
-    let separator = table_cells(lines.next().expect("the decision table should have a separator"));
-    assert!(
-        separator.iter().all(|cell| cell.chars().all(|ch| ch == '-' || ch == ':')),
-        "invalid no-CLI decision-table separator: {separator:?}"
-    );
-    lines.map(table_cells).collect()
-}
-
-fn table_cells(line: &str) -> Vec<&str> {
-    line.trim().trim_matches('|').split('|').map(str::trim).collect()
+        .expect("the no-CLI subsection should exist")
 }
 
 fn assert_resolution_contract(skill: &str) {
-    let rows = resolution_rows(skill);
-    for expected in EXPECTED_ROWS {
-        assert!(
-            rows.iter().any(|row| row == &expected),
-            "installed no-CLI decision table is missing the resolution {expected:?}; rows: {rows:#?}"
-        );
+    let section = no_cli_section(skill);
+    let mut previous = 0;
+    for clause in CLAUSES {
+        let at = section
+            .find(clause)
+            .unwrap_or_else(|| panic!("no-CLI guidance is missing {clause:?}:\n{section}"));
+        assert!(at >= previous, "no-CLI guidance lists {clause:?} out of order:\n{section}");
+        previous = at;
     }
+    assert!(
+        section.contains("another rhei's root never supplies a machine"),
+        "no-CLI guidance must rule out the cross-root match:\n{section}"
+    );
+    assert!(
+        !section.contains("**States:**"),
+        "no-CLI guidance must not teach the retired line:\n{section}"
+    );
 }
 
 fn binary_outside_checkout(dir: &Path) -> PathBuf {

@@ -9,7 +9,7 @@
 //! This component counts, and it reads one amount it did not produce. It
 //! still does not price, broker, confine, or qualify anything: pricing belongs
 //! to cost accounting §FS-rhei-cost-accounting, and the rest to the
-//! provider-spend obligation on `agent-grounds/rhei#107`. The reason is
+//! provider-spend obligation on `agent-grounds/rhei#460`. The reason is
 //! unchanged for the counts — importing that evidence here would make a count
 //! depend on evidence a count does not need — and it is why the spend
 //! dimension consumes a record written elsewhere rather than measuring

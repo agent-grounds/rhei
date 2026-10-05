@@ -10,7 +10,7 @@ ones someone remembered to route through it. It realizes [§REQ-bounded-neural-w
 This component counts, and it reads one amount it did not produce. It still
 does not price, broker, confine, or qualify anything: pricing belongs to cost
 accounting [§FS-rhei-cost-accounting](../functional-spec/rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting), and brokering, confinement and qualification
-belong to the provider-spend obligation on `agent-grounds/rhei#107`. The reason
+belong to the provider-spend obligation on `agent-grounds/rhei#460`. The reason
 is unchanged for the counts — importing that evidence here would make a count
 depend on evidence a count does not need — and it is why the spend dimension of
 §FS-rhei-budgets.1 consumes a record written elsewhere rather than measuring

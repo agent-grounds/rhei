@@ -189,7 +189,7 @@ is spent, not only after it is exhausted. [§FS-rhei-budgets.9](../functional-sp
 
 A program or a callback that calls a provider directly is outside the
 invocation count. Rhei did not start that request and cannot see it; only the
-confinement boundary of `agent-grounds/rhei#107` closes that gap, and this
+confinement boundary of `agent-grounds/rhei#460` closes that gap, and this
 requirement does not claim otherwise.
 
 Ancestry is the one door through which anything a program does *is* counted: a
@@ -202,7 +202,7 @@ Provider-billed spend is the fifth bound and it **is** here, in the one grade
 the evidence this engine already holds can carry: **measured** spend, charged
 from the cost accounting record §FS-rhei-cost-accounting writes for a completed
 invocation. That is the owner's ruling of 2026-09-25 on
-`agent-grounds/rhei#107`. What stays on that issue is the stricter grade —
+`agent-grounds/rhei#107`. The stricter grade is now `agent-grounds/rhei#460` —
 spend as the provider bills it, which needs a request broker, credential,
 egress and process-tree confinement, and the qualification of a real transport,
 none of which a count needs. The stricter grade is a later obligation and not a

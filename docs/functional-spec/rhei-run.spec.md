@@ -993,6 +993,16 @@ Every other byte of the file is kept, so a sibling's transition written to the
 same file during the visit, or a supervisor's note under its own task, survives
 the restore.
 
+In the shared-file preservation scenario, a sibling that completes during the
+culprit's visit keeps both its completed state and its finalized result link.
+It runs exactly once. A later task in another file keeps its dependency on that
+sibling and can complete after it. The culprit's malformed body is restored,
+its bad attempt is charged without a transition (§3.7.4), and its successful
+retry leaves the reverted text available (§3.7.7). This scenario uses a complete
+current file image for the worker's edit: publishing the edit must not discard
+the sibling's intervening finalization. It exercises scoped preservation; it
+does not extend recovery to arbitrary external truncate-mode rewrites.
+
 The restore **refuses** rather than guesses. When either boundary is missing or
 found more than once — the worker rewrote its own heading, or a concurrent
 writer moved the text around it — nothing is written and the run stops,

@@ -32,29 +32,42 @@ pub(super) const LATER_FILE: &str = "### Task 3: Later work
 Runs after Task 2.
 ";
 
-/// Task 1 waits, under `--parallel`, until Task 2's transition is written to
-/// the file they share, then puts its note at the end of its own region. Task 3
-/// runs the same state and writes nothing.
-pub(super) const ONE_FILE_COVER: &str = r#"concurrent = sys.argv[1] == 'concurrent'
+/// Task 1 waits, under `--parallel`, until Task 2's transition is visible, then
+/// takes the engine's stable sidecar before reading the current image. The
+/// sibling holds that lock through result-link finalization, so the staged
+/// replacement preserves its completed state and result. §FS-rhei-run.3.7.3
+/// §AR-agent-orchestrator-workflow.3.3.1 §AR-agent-orchestrator-workflow.3.3.1.1
+/// Task 1 still puts a malformed note at the end of its own region, requiring
+/// a real restore and charged retry with retained text. §FS-rhei-run.3.7.4 §FS-rhei-run.3.7.7
+/// Task 3 runs the same state and writes nothing.
+pub(super) const ONE_FILE_COVER: &str = concat!(
+    include_str!("fixtures/worker_edit_shared_writer.py"),
+    r#"concurrent = sys.argv[1] == 'concurrent'
 here = pathlib.Path(__file__).parent
 plan = here / 'ws' / 'tasks' / '01-shared.md'
 marker = here / 'noted'
 if env('RHEI_TASK_ID_LOCAL') == '1' and not marker.exists():
     marker.write_text('x')
     if concurrent:
-        deadline = time.time() + 15
-        while '**State:** completed' not in plan.read_text(encoding='utf-8') and time.time() < deadline:
+        deadline = time.monotonic() + 15
+        while True:
+            sibling = plan.read_text(encoding='utf-8').split('### Task 2:', 1)[1]
+            if '**State:** completed' in sibling:
+                break
+            if time.monotonic() >= deadline:
+                raise RuntimeError(f'Task 2 transition timed out in {plan}:\n{sibling}')
             time.sleep(0.05)
     # Optional test timing seam, before the authoritative read/edit operation.
-    # The normal fixture has no observer and takes exactly its original path.
     if '_before_shared_edit' in globals():
         _before_shared_edit()
-    text = plan.read_text(encoding='utf-8')
-    at = text.index('### Task 2:')
-    note = '#### Visit 1 (cover)\n\nLatest measurement was report-1.json.\n\n'
-    write(plan, text[:at] + note + text[at:])
+    with _shared_writer(plan):
+        text = plan.read_text(encoding='utf-8')
+        at = text.index('### Task 2:')
+        note = '#### Visit 1 (cover)\n\nLatest measurement was report-1.json.\n\n'
+        _publish_shared_image(plan, text[:at] + note + text[at:])
 result('Task 1 wrote its note.\n')
-"#;
+"#
+);
 
 pub(super) const ONE_FILE_OTHER: &str = r#"here = pathlib.Path(__file__).parent
 append(here / 'other-runs.txt', 'ran\n')

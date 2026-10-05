@@ -13,7 +13,7 @@ The spend bounded here is **measured** spend, read from the cost accounting
 record a completed invocation already produces §FS-rhei-cost-accounting.
 Nothing in this specification qualifies a transport, brokers a request,
 confines a process, or settles money: spend as a provider bills it is the
-stricter grade and remains an obligation on `agent-grounds/rhei#107`. What is
+stricter grade and remains an obligation on `agent-grounds/rhei#460`. What is
 added here is a ceiling over what this engine's own records say was spent
 §REQ-bounded-neural-work.6.
 

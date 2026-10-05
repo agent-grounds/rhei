@@ -239,6 +239,10 @@ mod validate_retry_cache_tests;
 mod validation_source_tests;
 mod waiting_on_person_tests;
 mod worker_capture_precondition_tests;
+mod worker_edit_one_file_support;
+// The controlled read observer uses Linux /proc and ELF interposition only.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+mod worker_edit_publication_tests;
 mod worker_edit_revert_prompt_tests;
 mod worker_edit_revert_race_tests;
 mod worker_edit_revert_support;

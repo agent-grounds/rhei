@@ -24,7 +24,7 @@ fn runtime_evidence(
             return Ok(());
         }
         Ok(meta) if meta.file_type().is_symlink() => {
-            assessment.history.push(("unsafe".into(), format!("{} is a symlink", display_path(&runtime))));
+            assessment.unsafe_path(format!("{} is a symlink", display_path(&runtime)));
             return Ok(());
         }
         Ok(_) => {}
@@ -52,12 +52,9 @@ fn runtime_evidence(
                         continue;
                     }
                     if prefix_is_ambiguous(&name, &prefix, id, others) {
-                        assessment.history.push((
-                            "unsafe".into(),
-                            format!(
-                                "{} may belong to another ticket",
-                                relative_to(root, &entry.path())
-                            ),
+                        assessment.unsafe_path(format!(
+                            "{} may belong to another ticket",
+                            relative_to(root, &entry.path())
                         ));
                         continue;
                     }
@@ -91,11 +88,11 @@ fn classify_owned_path(root: &Path, path: &Path, id: &str, assessment: &mut Remo
     };
     let shown = relative_to(root, path);
     if meta.file_type().is_symlink() {
-        assessment.history.push(("unsafe".into(), format!("{shown} is a symlink")));
+        assessment.unsafe_path(format!("{shown} is a symlink"));
         return;
     }
     if !path_stays_under(root, path) {
-        assessment.history.push(("unsafe".into(), format!("{shown} escapes the execution root")));
+        assessment.unsafe_path(format!("{shown} escapes the execution root"));
         return;
     }
     let kind = path

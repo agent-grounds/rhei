@@ -97,6 +97,7 @@ Execution:
 
 Authoring:
   new         Create a rhei under Panta, or a ticket inside one with --under
+  remove      Take back an untouched ticket and retire its id
   migrate     Rewrite an older authored plan into a current valid shape
 
 Setup:

@@ -779,6 +779,28 @@ enum Commands {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Take back a ticket nothing has acted on: delete its section and empty
+    /// residue, and retire its id so no later create reissues it
+    // §FS-rhei-remove.1
+    Remove {
+        /// Path to a states YAML file (uses built-in default when omitted)
+        #[arg(long, value_name = "PATH", add = ArgValueCompleter::new(complete_yaml_path))]
+        state_machine: Option<PathBuf>,
+        /// Ticket id to remove (`auth.2`, `2`), or a path to the plan,
+        /// workspace or project whose ticket `--task` names
+        #[arg(value_name = "TICKET_OR_PLAN", add = ArgValueCompleter::new(complete_rhei_plan_path))]
+        input: Option<PathBuf>,
+        /// Ticket to remove; alternative to naming it positionally
+        #[arg(long, add = ArgValueCompleter::new(complete_task_id))]
+        task: Option<String>,
+        /// The rhei a local ticket id resolves in; the whole project is still
+        /// loaded and checked
+        #[arg(long = "rhei", value_name = "RHEI_ID", add = ArgValueCompleter::new(complete_rhei_id))]
+        rhei: Vec<String>,
+        /// Check and print what would be removed and retired, changing nothing
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Return every ticket in a rhei or project to the state it was authored
     /// in and remove runtime output
     Reset {

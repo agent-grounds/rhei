@@ -133,6 +133,7 @@
         let placed: Vec<String> = tickets.iter().flat_map(|file| file.ids.clone()).collect();
         check_depth(&placed)?;
         check_id_collisions(&placed, host_files)?;
+        check_retired_ids(host, &placed)?;
         if let Some(parent) = host.parent.as_deref() {
             check_parent_exists(parent, host_files)?;
         }

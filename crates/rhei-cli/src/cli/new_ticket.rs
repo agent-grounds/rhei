@@ -36,8 +36,21 @@ fn new_ticket_write(
     let entry = resolve_rhei_entry(target, &loaded, &placement.rhei_id)?;
     let structure = rhei_entry_structure(&entry, target)?;
 
-    let segment =
-        resolve_new_ticket_segment(options.id.as_deref(), &placement.siblings, &placement.label)?;
+    // Read under the create lock, which is the retirement document's own.
+    // §FS-rhei-new.4 §FS-rhei-remove.5.1
+    let retired = rhei_core::retired::retired_tickets(loaded.rhei.metadata.as_ref())
+        .map_err(|err| miette!(help = "fix or remove the malformed retirement record.", "{err}"))?;
+    let retired = rhei_core::retired::retired_sibling_segments(
+        &retired,
+        &placement.rhei_id,
+        placement.parent_local.as_deref(),
+    );
+    let segment = resolve_new_ticket_segment(
+        options.id.as_deref(),
+        &placement.siblings,
+        &retired,
+        &placement.label,
+    )?;
     let local_id = match &placement.parent_local {
         Some(parent_local) => format!("{parent_local}.{segment}"),
         None => segment,

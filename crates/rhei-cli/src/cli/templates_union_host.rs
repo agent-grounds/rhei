@@ -434,3 +434,36 @@
         }
         destinations
     }
+
+    /// Refuse to place a ticket under an id `rhei remove` retired: placement
+    /// never brings a removed id back. Read from the project's one retirement
+    /// document — the manifest, or the lone rhei's own. §FS-rhei-library.4
+    /// §FS-rhei-remove.5.2
+    fn check_retired_ids(host: &UnionHost, placed: &[String]) -> MietteResult<()> {
+        let document = match &host.project {
+            Some(project) => project.join(workspace::PANTA_INDEX_FILE),
+            None => host.index.clone(),
+        };
+        if !document.is_file() {
+            return Ok(());
+        }
+        let raw = read_text(&document)?;
+        let metadata = rhei_core::metadata::parse_metadata_file(&document, &raw)
+            .map_err(|err| parse_report(&document, &raw, &err.error))?;
+        let retired = rhei_core::retired::retired_tickets(metadata.as_ref())
+            .map_err(|err| miette!(help = "fix or remove the malformed retirement record.", "{err}"))?;
+        if retired.is_empty() {
+            return Ok(());
+        }
+        let entry = if host.single_file { &host.index } else { &host.root };
+        let rhei_id = workspace::rhei_id_for_path(entry).map_err(|err| rhei_identity_report(&err))?;
+        let Some(clash) = placed.iter().find(|id| retired.contains_key(&format!("{rhei_id}.{id}")))
+        else {
+            return Ok(());
+        };
+        Err(miette!(
+            help = "a removed ticket's id is never reissued; place the template under another \
+                    task.",
+            "cannot place ticket '{clash}': {rhei_id}.{clash} is retired (metadata.retiredTickets)"
+        ))
+    }

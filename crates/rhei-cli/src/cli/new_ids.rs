@@ -134,14 +134,18 @@ fn next_sibling_number(siblings: &[String]) -> u32 {
 }
 
 /// The rhei-local ticket id to write, from `--id` or the sibling numbering,
-/// refusing an illegal segment or a collision. §FS-rhei-new.4
+/// refusing an illegal segment, a collision, or a retired id: `retired` holds
+/// the segments `rhei remove` retired under the same parent, which numbering
+/// counts as taken. §FS-rhei-new.4 §FS-rhei-remove.5.2
 fn resolve_new_ticket_segment(
     explicit: Option<&str>,
     siblings: &[String],
+    retired: &[String],
     parent_label: &str,
 ) -> MietteResult<String> {
     let Some(explicit) = explicit else {
-        return Ok(next_sibling_number(siblings).to_string());
+        let taken: Vec<String> = siblings.iter().chain(retired).cloned().collect();
+        return Ok(next_sibling_number(&taken).to_string());
     };
     let id = explicit.trim();
     if !is_legal_ticket_segment(id) {
@@ -157,6 +161,14 @@ help = "a ticket id segment is a number, or a name starting with a letter (`fix-
 help = "pick a free id with --id, or omit --id and let the next number be chosen.",
 
             "{parent_label} already holds a ticket with id '{id}'"
+        ));
+    }
+    if retired.iter().any(|segment| segment == id) {
+        return Err(miette!(
+            help = "a removed ticket's id is never reissued; pick another id with --id, or omit \
+                    --id and let the next number be chosen.",
+            "id '{id}' under {parent_label} is retired: it was removed with `rhei remove` and is \
+             recorded in metadata.retiredTickets"
         ));
     }
     Ok(id.to_string())

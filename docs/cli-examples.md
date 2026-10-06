@@ -90,6 +90,36 @@ Every ordinary prompt composed afterwards, anywhere in the project and in any
 rhei, carries the live entries under `### Project Notes` inside `## Position`.
 See [§FS-rhei-note](functional-spec/rhei-note.spec.md#fs-rhei-note-rhei-note).
 
+Take back a ticket filed by mistake, before anything has acted on it. Run from
+inside the project; `--dry-run` checks and previews without changing a byte:
+
+```console
+$ rhei remove auth.2 --dry-run
+Would remove auth.2; would retire auth.2
+  would rewrite index.panta.md
+  would rewrite auth.rhei.md
+  would delete runtime/exports/auth.2
+
+Dry run — nothing was changed.
+
+$ rhei remove auth.2
+removed auth.2; id retired
+  deleted runtime/exports/auth.2
+```
+
+The id is retired rather than freed, so the next `rhei new --under auth` creates
+`auth.3`. A ticket something names, or one that has history — a transition, a
+claim, a result, a log — is refused with the whole list and changes nothing;
+move it to its machine's cancellation state instead:
+
+```console
+$ rhei remove auth.1
+  × auth.1 cannot be removed: auth.2 names it in **Prior:**
+  help: change or remove what names it first, then remove it.
+```
+
+See [§FS-rhei-remove](functional-spec/rhei-remove.spec.md#fs-rhei-remove-rhei-remove).
+
 Render a plan as GitHub-style markdown without metadata or subtask body text:
 
 ```bash

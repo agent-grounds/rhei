@@ -153,6 +153,8 @@ mod provider_limit_scheduling_tests;
 mod provider_limit_stream_json_tests;
 mod provider_limit_support;
 mod registry_location_tests;
+mod remove_resolution_tests;
+mod remove_retirement_tests;
 mod remove_tests;
 mod rendered_stderr;
 mod roster_behavior_tests;

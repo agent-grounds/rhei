@@ -64,6 +64,38 @@ impl BoundsSection {
             .unwrap_or_default()
     }
 
+    /// The ceiling rows and the policy row of §FS-rhei-budgets.2.3, once per
+    /// report, where the machine delegated a count ceiling; travel first, as
+    /// every other view lists the keys. §FS-rhei-run-report.3.1
+    fn delegation_rows(&self) -> Vec<String> {
+        let mut ceilings: Vec<&rhei_tui::BoundCeiling> =
+            self.last.values().filter_map(|bound| bound.ceiling.as_ref()).collect();
+        ceilings.sort_by_key(|ceiling| ceiling.key != "transition_limit");
+        let Some(first) = ceilings.first() else { return Vec::new() };
+        let named = |path: &Option<String>, role: &str| {
+            path.clone().unwrap_or_else(|| format!("the {role} settings file"))
+        };
+        let keys: Vec<&str> = ceilings.iter().map(|ceiling| ceiling.key.as_str()).collect();
+        let policy = format!(
+            "count ceiling policy: delegated {} by {}=false in {}",
+            keys.join(", "),
+            rhei_core::budget::CLAMP_PROJECTS,
+            named(&first.delegated_by, "machine")
+        );
+        ceilings
+            .iter()
+            .map(|ceiling| {
+                format!(
+                    "{} ceiling: {} (project, {})",
+                    ceiling.key,
+                    ceiling.value,
+                    named(&ceiling.path, "project")
+                )
+            })
+            .chain(std::iter::once(policy))
+            .collect()
+    }
+
     fn render_markdown(&self) -> String {
         if self.is_empty() {
             return String::new();
@@ -94,6 +126,13 @@ impl BoundsSection {
             ));
         }
         out.push('\n');
+        let delegation = self.delegation_rows();
+        for row in &delegation {
+            out.push_str(&format!("- {row}\n"));
+        }
+        if !delegation.is_empty() {
+            out.push('\n');
+        }
         for (task, bound, renews_at, remedy) in &self.halts {
             out.push_str(&format!(
                 "- `{}` was stopped by its {} bound of {}; {}\n",

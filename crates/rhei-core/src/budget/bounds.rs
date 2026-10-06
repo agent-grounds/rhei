@@ -7,8 +7,14 @@
 //! three copies of it would drift.
 //! §FS-rhei-budgets.2.3 §FS-rhei-budgets.8
 
+use std::path::PathBuf;
+
 use super::types::{Contract, Dimension, Exhaustion, SpendMarks};
 use crate::money;
+
+/// The settings key a machine delegates the count ceilings with, as every
+/// row that reports a delegation names it. §FS-rhei-budgets.2.1
+pub const CLAMP_PROJECTS: &str = "defaults.clamp_projects";
 
 /// Who set the requested value. `plan` covers anything the plan's own state
 /// machine declares, because from the operator's side the plan is what asked.
@@ -63,7 +69,52 @@ impl BoundUnit {
     }
 }
 
-/// One bound in force: what it is, who asked for it, and whether the machine
+/// Whose number a bound is clamped to: the machine's by default, or the
+/// project's where the machine delegated that dimension's ceiling to it.
+/// §FS-rhei-budgets.2 §FS-rhei-budgets.2.3
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Limiter {
+    #[default]
+    Machine,
+    Project,
+}
+
+impl Limiter {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Machine => "machine",
+            Self::Project => "project",
+        }
+    }
+}
+
+/// The two settings files a bound's sentences can send a reader to, by the
+/// paths rhei actually read: the machine file as the loader opens it, and the
+/// project file the loader chose between the current and the deprecated home.
+/// `None` where no path is known, which falls back to naming the file by role.
+/// §FS-rhei-budgets.8
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SettingsFiles {
+    pub machine: Option<PathBuf>,
+    pub project: Option<PathBuf>,
+}
+
+impl SettingsFiles {
+    /// The file a settings remedy names: its path where known, its role
+    /// otherwise. §FS-rhei-budgets.8
+    pub fn name(&self, holder: Limiter) -> String {
+        let path = match holder {
+            Limiter::Machine => &self.machine,
+            Limiter::Project => &self.project,
+        };
+        match path {
+            Some(path) => path.display().to_string(),
+            None => format!("the {} settings file", holder.as_str()),
+        }
+    }
+}
+
+/// One bound in force: what it is, who asked for it, and whose ceiling
 /// lowered it.
 ///
 /// The two sources are kept apart because they answer different questions and
@@ -74,12 +125,20 @@ pub struct Bound {
     pub key: &'static str,
     pub effective: u64,
     pub source: BoundSource,
-    /// The higher value an inner tier asked for, present only when the machine
-    /// clamped it. §FS-rhei-budgets.2
+    /// The higher value an inner tier asked for, present only when the active
+    /// ceiling clamped it. §FS-rhei-budgets.2
     pub requested: Option<u64>,
     /// Whether this number is a count or an amount of money.
     /// §FS-rhei-budgets.2.1
     pub unit: BoundUnit,
+    /// The active ceiling's value: the machine's or the built-in, or the
+    /// project's where the machine delegated it. §FS-rhei-budgets.2
+    pub ceiling: u64,
+    /// Who holds the active ceiling, and therefore who a clamp is reported as
+    /// limited by and which file a remedy names. §FS-rhei-budgets.2.3
+    pub limiter: Limiter,
+    /// The files the phrases, rows and remedy name. §FS-rhei-budgets.8
+    pub files: SettingsFiles,
 }
 
 impl Bound {
@@ -111,6 +170,29 @@ impl Bound {
         Self::resolve_in(BoundUnit::Money, key, built_in, machine, requested)
     }
 
+    /// Resolve a count dimension whose ceiling the machine delegated to the
+    /// project: the project's declared value takes the machine's place as the
+    /// ceiling, whether it is higher or lower, and a plan or profile may lower
+    /// it but never raise it. Only the caller knows the delegation applies —
+    /// the two count keys, the machine's switch, a project declaration — so it
+    /// passes the project's number here rather than the machine's.
+    /// §FS-rhei-budgets.2 §FS-rhei-budgets.2.2
+    pub fn resolve_delegated(
+        key: &'static str,
+        project: u64,
+        requested: Option<(u64, BoundSource)>,
+    ) -> Self {
+        let fallback = (project, BoundSource::Project);
+        Self::clamp(BoundUnit::Count, key, project, Limiter::Project, fallback, requested)
+    }
+
+    /// The same bound, naming the files its phrases and remedy send a reader
+    /// to by the paths rhei read. §FS-rhei-budgets.8
+    pub fn with_files(mut self, files: SettingsFiles) -> Self {
+        self.files = files;
+        self
+    }
+
     fn resolve_in(
         unit: BoundUnit,
         key: &'static str,
@@ -118,23 +200,49 @@ impl Bound {
         machine: Option<u64>,
         requested: Option<(u64, BoundSource)>,
     ) -> Self {
-        let ceiling = machine.unwrap_or(built_in);
-        let (value, source) = requested.unwrap_or(match machine {
+        let fallback = match machine {
             Some(value) => (value, BoundSource::Machine),
             None => (built_in, BoundSource::BuiltIn),
-        });
-        if value > ceiling {
-            return Self { key, effective: ceiling, source, requested: Some(value), unit };
-        }
-        Self { key, effective: value, source, requested: None, unit }
+        };
+        let ceiling = machine.unwrap_or(built_in);
+        Self::clamp(unit, key, ceiling, Limiter::Machine, fallback, requested)
     }
 
-    /// Whether the machine's ceiling, rather than the requester, is what
-    /// decides this value — and therefore what a remedy has to name.
+    /// `effective bound = min(resolved value, active ceiling)`, whoever holds
+    /// the ceiling. §FS-rhei-budgets.2
+    fn clamp(
+        unit: BoundUnit,
+        key: &'static str,
+        ceiling: u64,
+        limiter: Limiter,
+        fallback: (u64, BoundSource),
+        requested: Option<(u64, BoundSource)>,
+    ) -> Self {
+        let (value, source) = requested.unwrap_or(fallback);
+        let (effective, requested) =
+            if value > ceiling { (ceiling, Some(value)) } else { (value, None) };
+        let files = SettingsFiles::default();
+        Self { key, effective, source, requested, unit, ceiling, limiter, files }
+    }
+
+    /// Whether the active ceiling, rather than the requester, is what decides
+    /// this value — and therefore what a remedy has to name. A delegated
+    /// project value is its own ceiling, so it limits when it is the source.
     /// §FS-rhei-budgets.8
-    pub fn limited_by_machine(&self) -> bool {
+    pub fn limited_by_ceiling(&self) -> bool {
         self.requested.is_some()
-            || matches!(self.source, BoundSource::Machine | BoundSource::BuiltIn)
+            || match self.limiter {
+                Limiter::Machine => {
+                    matches!(self.source, BoundSource::Machine | BoundSource::BuiltIn)
+                }
+                Limiter::Project => self.source == BoundSource::Project,
+            }
+    }
+
+    /// Whether the machine handed this dimension's ceiling to the project.
+    /// §FS-rhei-budgets.2
+    pub fn delegated(&self) -> bool {
+        self.limiter == Limiter::Project
     }
 
     /// `80 (built_in)`, or the clamped form naming requester and limiter.
@@ -153,10 +261,11 @@ impl Bound {
     fn phrase(&self, write: impl Fn(u64) -> String) -> String {
         match self.requested {
             Some(asked) => format!(
-                "{} (requested {} by the {}, limited by machine settings)",
+                "{} (requested {} by the {}, limited by {} settings)",
                 write(self.effective),
                 write(asked),
-                self.source.as_str()
+                self.source.as_str(),
+                self.limiter.as_str()
             ),
             None => format!("{} ({})", write(self.effective), self.source.as_str()),
         }
@@ -168,21 +277,62 @@ impl Bound {
         format!("{}: {}", self.key, self.value_phrase())
     }
 
-    /// The single remedy: the one thing that raises the limiter that actually
-    /// stopped the work. It never offers an inner value the ceiling would
-    /// clamp, because sending an operator to a field that cannot take effect
-    /// sends them to the wrong file. §FS-rhei-budgets.8
-    pub fn remedy(&self) -> String {
-        if self.limited_by_machine() {
-            return format!("set `defaults.{}` in the machine settings file", self.key);
-        }
-        match self.source {
-            BoundSource::Project => {
-                format!("set `defaults.{}` in the project settings file", self.key)
-            }
-            _ => format!("set `{}` on the node's profile in the state machine", self.key),
-        }
+    /// `transition_limit ceiling: 40 (project, <P>)`, present only where the
+    /// machine delegated this dimension's ceiling. §FS-rhei-budgets.2.3
+    pub fn ceiling_line(&self) -> Option<String> {
+        self.delegated().then(|| {
+            format!(
+                "{} ceiling: {} (project, {})",
+                self.key,
+                self.unit.bare(self.ceiling),
+                self.files.name(Limiter::Project)
+            )
+        })
     }
+
+    /// The halt's `ceiling:` value, naming the project file that holds it and
+    /// the machine file that delegated it; absent where nothing was delegated.
+    /// §FS-rhei-budgets.8
+    pub fn ceiling_halt_phrase(&self, currency: Option<&str>) -> Option<String> {
+        self.delegated().then(|| {
+            format!(
+                "{} (project, {}; delegated by {CLAMP_PROJECTS}=false in {})",
+                self.unit.amount(self.ceiling, currency),
+                self.files.name(Limiter::Project),
+                self.files.name(Limiter::Machine)
+            )
+        })
+    }
+
+    /// The single remedy: the one thing that raises the limiter that actually
+    /// stopped the work, naming the settings file by the path rhei read. It
+    /// never offers an inner value the ceiling would clamp, because sending an
+    /// operator to a field that cannot take effect sends them to the wrong
+    /// file. §FS-rhei-budgets.8
+    pub fn remedy(&self) -> String {
+        let holder = if self.limited_by_ceiling() {
+            self.limiter
+        } else if self.source == BoundSource::Project {
+            Limiter::Project
+        } else {
+            return format!("set `{}` on the node's profile in the state machine", self.key);
+        };
+        format!("set `defaults.{}` in {}", self.key, self.files.name(holder))
+    }
+}
+
+/// `count ceiling policy: delegated <keys> by defaults.clamp_projects=false in
+/// <M>`, listing only the keys actually delegated; absent where none was.
+/// §FS-rhei-budgets.2.3
+pub fn ceiling_policy_line<'a>(bounds: impl IntoIterator<Item = &'a Bound>) -> Option<String> {
+    let delegated: Vec<&Bound> = bounds.into_iter().filter(|bound| bound.delegated()).collect();
+    let first = delegated.first()?;
+    let keys: Vec<&str> = delegated.iter().map(|bound| bound.key).collect();
+    Some(format!(
+        "count ceiling policy: delegated {} by {CLAMP_PROJECTS}=false in {}",
+        keys.join(", "),
+        first.files.name(Limiter::Machine)
+    ))
 }
 
 /// The one thing a halt tells an operator to do, chosen by which limiter
@@ -254,16 +404,21 @@ pub fn halt_text(spent: &Exhaustion, bound: &Bound, remedy: &Remedy, marks: &Spe
         headline,
         row("dimension:", spent.dimension.label()),
         row("bound:", &bound.amount_phrase(currency)),
-        row(
-            "consumed:",
-            &format!(
-                "{}  outstanding: {}  remaining: {}",
-                amount(spent.counter.consumed),
-                amount(spent.counter.reserved),
-                amount(spent.counter.remaining(spent.bound).unwrap_or(0))
-            ),
-        ),
     ];
+    // Directly after `bound:`, and only where the machine delegated this
+    // dimension's ceiling to the project. §FS-rhei-budgets.8
+    if let Some(ceiling) = bound.ceiling_halt_phrase(currency) {
+        lines.push(row("ceiling:", &ceiling));
+    }
+    lines.push(row(
+        "consumed:",
+        &format!(
+            "{}  outstanding: {}  remaining: {}",
+            amount(spent.counter.consumed),
+            amount(spent.counter.reserved),
+            amount(spent.counter.remaining(spent.bound).unwrap_or(0))
+        ),
+    ));
     // Between `consumed:` and `mode:`, because it qualifies the numbers above
     // it rather than the contract below. §FS-rhei-budgets.8
     if let Some(estimated) = marks.row(super::built_in::SPEND_RESERVE, currency) {

@@ -17,9 +17,17 @@ impl StateMachine {
     /// point, without validating. Both loaders funnel through here so a new
     /// check cannot be added to one and silently skipped by the other.
     pub fn parse_fragment(yaml: &str) -> Result<Self, StateMachineLoadError> {
+        Self::parse_fragment_at(yaml, None)
+    }
+
+    /// [`Self::parse_fragment`] for a machine read from `source`, so a refusal
+    /// that names where a key was found can name the file.
+    fn parse_fragment_at(yaml: &str, source: Option<&Path>) -> Result<Self, StateMachineLoadError> {
         // One raw parse feeds every check that has to see the YAML as written
         // rather than as serde collapsed it.
         let raw: serde_yaml::Value = serde_yaml::from_str(yaml)?;
+        // Before deserialization, which would drop the key unseen. §FS-rhei-agents.1.1.1
+        reject_clamp_projects(&raw, source)?;
         reject_explicit_empty_all_targets(&raw)?;
         reject_inline_prompt_templates(&raw)?;
         Ok(serde_yaml::from_str(yaml)?)
@@ -107,7 +115,7 @@ impl StateMachine {
     pub fn from_yaml_file<P: AsRef<Path>>(path: P) -> Result<Self, StateMachineLoadError> {
         let path = path.as_ref();
         let text = std::fs::read_to_string(path)?;
-        let mut sm = Self::parse_fragment(&text)?;
+        let mut sm = Self::parse_fragment_at(&text, Some(path))?;
         reject_legacy_prompt_templates_file(path)?;
         sm.prompt_templates = load_prompt_templates_dir(&prompt_templates_dir(path))?;
         sm.validate()

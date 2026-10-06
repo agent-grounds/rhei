@@ -14,9 +14,10 @@ use rhei_core::budget::{halt_text, AppliedEdge, Contract, Dimension, Remedy, Spe
 /// Render a refusal as the halt of §FS-rhei-budgets.8, or as itself when what
 /// refused was the account rather than a bound.
 ///
-/// The remedy is chosen by which limiter actually stopped the work: the machine
-/// settings key when the ceiling limits, the audited command when an explicit
-/// lifetime allowance does, and the renewal instant when the window does —
+/// The remedy is chosen by which limiter actually stopped the work: the settings
+/// key in the file holding the active ceiling when the ceiling limits, the
+/// audited command when an explicit lifetime allowance does, and the renewal
+/// instant when the window does —
 /// because nothing an operator does is needed for a wait, and sending them to a
 /// settings file for one is the wrong instruction even though it would work.
 /// §FS-rhei-budgets.8
@@ -228,7 +229,7 @@ fn budget_reports(
             dimension: Dimension::Invocations.label().into(),
             effective: invocation_bound,
             value_source: bounds.per_day.source.as_str().into(),
-            limiting_source: bounds.per_day.requested.map(|_| "machine".into()),
+            limiting_source: bounds.per_day.requested.map(|_| bounds.per_day.limiter.as_str().into()),
             consumed: snapshot.invocations.consumed,
             outstanding: snapshot.invocations.reserved,
             remaining: snapshot.invocations.remaining(invocation_bound)?,
@@ -236,6 +237,7 @@ fn budget_reports(
             window: matches!(snapshot.contract, Contract::Window).then(|| snapshot.day.clone()),
             currency: None,
             marks: None,
+            ceiling: rhei_tui::BoundCeiling::of(&bounds.per_day),
         },
         // Amounts in micro-units and the currency beside them, so a frontend
         // renders `$25.00` rather than a bare number whose unit the reader has
@@ -244,7 +246,7 @@ fn budget_reports(
             dimension: Dimension::Spend.label().into(),
             effective: bounds.spend.effective,
             value_source: bounds.spend.source.as_str().into(),
-            limiting_source: bounds.spend.requested.map(|_| "machine".into()),
+            limiting_source: bounds.spend.requested.map(|_| bounds.spend.limiter.as_str().into()),
             consumed: snapshot.spend.consumed,
             outstanding: snapshot.spend.reserved,
             remaining: snapshot.spend.remaining(bounds.spend.effective)?,
@@ -252,12 +254,13 @@ fn budget_reports(
             window: Some(snapshot.day.clone()),
             currency: snapshot.currency.clone(),
             marks: Some(marks),
+            ceiling: None,
         },
         rhei_tui::BoundReport {
             dimension: Dimension::Travel.label().into(),
             effective: bounds.travel.effective,
             value_source: bounds.travel.source.as_str().into(),
-            limiting_source: bounds.travel.requested.map(|_| "machine".into()),
+            limiting_source: bounds.travel.requested.map(|_| bounds.travel.limiter.as_str().into()),
             consumed: travel.consumed,
             outstanding: travel.reserved,
             remaining: travel.remaining(bounds.travel.effective)?,
@@ -265,6 +268,7 @@ fn budget_reports(
             window: None,
             currency: None,
             marks: None,
+            ceiling: rhei_tui::BoundCeiling::of(&bounds.travel),
         },
     ])
 }
@@ -301,7 +305,7 @@ fn budget_halt_event(
             dimension: spent.dimension.label().into(),
             effective: spent.bound,
             value_source: bound.source.as_str().into(),
-            limiting_source: bound.requested.map(|_| "machine".into()),
+            limiting_source: bound.requested.map(|_| bound.limiter.as_str().into()),
             consumed: spent.counter.consumed,
             outstanding: spent.counter.reserved,
             remaining: spent.counter.remaining(spent.bound).unwrap_or(0),
@@ -324,6 +328,9 @@ fn budget_halt_event(
                 .dimension
                 .is_money()
                 .then(|| budget_spend_marks(journal)),
+            // The same delegated ceiling the halt's `ceiling:` row prints.
+            // §FS-rhei-run-json.2.1
+            ceiling: rhei_tui::BoundCeiling::of(bound),
         },
         // Never an inner value the machine ceiling would clamp: telling an
         // operator to raise a field that cannot take effect sends them to the

@@ -35,6 +35,8 @@ mod adjust_tests;
 #[cfg(test)]
 mod ancestry_tests;
 #[cfg(test)]
+mod bounds_tests;
+#[cfg(test)]
 mod foreign_tail_tests;
 #[cfg(test)]
 mod identity_tests;
@@ -63,7 +65,10 @@ pub use account::{Account, Retirement, ACCOUNT_DIR};
 pub use admission::{AdmissionRequest, AppliedEdge, Arm, EffectiveBounds, ReservationGroup};
 pub use ancestry::{Ancestry, AncestryDescriptor};
 pub(crate) use authority::pin_base as pin_authority_base;
-pub use bounds::{halt_text, Bound, BoundSource, BoundUnit, Remedy};
+pub use bounds::{
+    ceiling_policy_line, halt_text, Bound, BoundSource, BoundUnit, Limiter, Remedy, SettingsFiles,
+    CLAMP_PROJECTS,
+};
 pub use diagnosis::{Damage, Diagnosis, Foreign, History, Inspection, Retired};
 pub use events::{BudgetEvent, BudgetLine};
 pub use identity::IdentityMove;

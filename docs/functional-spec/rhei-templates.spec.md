@@ -610,6 +610,27 @@ settings are restored. With `--keep-on-error`, if the requested path cannot be
 used safely, keep the rendered tree and reconciled settings in hidden staging
 and report that location for inspection; otherwise remove staging as usual.
 
+**Dry-run project validation.** For a prospective project member, `--dry-run`
+performs step 7 in scratch using the requested destination's enclosing project,
+intended final member id, and reconciled project settings. It performs the same
+strict project parse and validation as a real write, including existing sibling
+plans; a malformed sibling remains an error even when the new member does not
+depend on it. Publication alone is omitted. The output-path existence exception
+in step 6 remains: previewing an existing destination never alters it.
+On success or refusal, dry run leaves the requested output and all existing
+project files and settings unchanged, discards scratch output, and retains
+nothing even with `--keep-on-error`.
+
+**Existing sibling refusal.** If an existing sibling's parse blocks project
+validation, both modes identify it as an existing sibling blocking project
+validation, preserve its parser source context, and give the shell-safe remedy
+`rhei validate <actual-sibling-path>`. The path must identify the inspectable
+sibling from the invocation's working directory, never scratch or the new
+output ([§FS-rhei-errors.4](rhei-errors.spec.md#4-paths-in-errors)). The diagnostic distinguishes the sibling from the
+instantiated output. It may say the instantiated output itself validated only
+after that validation has actually completed; a sibling parse failure alone
+does not establish that claim.
+
 For a template that declares `includes:`, step 5 is followed by one union per
 entry, in list order, as
 [§FS-rhei-library](rhei-library.spec.md#fs-rhei-library-composition-by-graph-union)
@@ -786,12 +807,13 @@ instead, naming the deprecated file, stating that the merged file supersedes it
 and that it can be deleted. Rhei does not delete it — rhei wrote the workspace
 copy it removes above, and it did not write this one.
 
-**A discarded instantiation leaves no hoist behind.** Validation runs after the
-hoist, so output that fails it has already written the project's settings file.
-Discarding the output undoes the hoist: a project with no file at the current
-home has the written one and its new directories removed, and one that had a
-file gets its pre-merge content back. A command that failed must not change
-which file the project reads. `--keep-on-error` keeps the hoist with the output.
+**A discarded instantiation leaves no hoist behind.** Settings are reconciled
+in staging for validation and committed with publication
+([§FS-rhei-templates.6.1.2](rhei-templates.spec.md#612-behavior)). Discarding output leaves prior project settings
+and directories unchanged; a failed publication restores them. A command that
+failed must not change which file the project reads. On a real write,
+`--keep-on-error` keeps the hoist with the output. A dry run never commits or
+retains the hoist, including with `--keep-on-error`.
 
 **Standalone output inside a git repository.** A standalone workspace — what
 `--output` outside any project produces — lands outside any project, so
@@ -810,6 +832,10 @@ repository, or a member of a project.
 that is the only context in which its machine and settings resolve. Validating
 the workspace in isolation is what let `rhei instantiate` print
 "Validation succeeded" for output that made every project-scoped command fail.
+This applies equally to a real write and a dry run, including a plan template
+laid by `--into <project>` ([§FS-rhei-templates.6.1.2](rhei-templates.spec.md#612-behavior)). Dry run reconciles bundled
+settings in scratch with existing project values winning, just as the real
+write does, and never commits the merge.
 
 **Publication is the handoff boundary.** A project member is rendered and
 validated in a hidden same-parent staging directory under its intended final

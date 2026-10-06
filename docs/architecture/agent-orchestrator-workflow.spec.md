@@ -321,7 +321,10 @@ missing destination parents, and takes or reuses the destination sidecar before
 the authoritative admission or absence check and first publication. Callback
 redirects and terminal finalization reuse the locks already held; configured
 recovery releases the ledger and plan sidecars before it invokes a separate
-ordinary transition. Every lock remains held through the command's existing
+ordinary transition. Removal takes force's order with every acquisition
+nonblocking — run locks, exclusive owner guards, then the retirement document,
+metadata, task-file and ledger sidecars — and refuses rather than waits on any
+of them (§FS-rhei-remove.6.1). Every lock remains held through the command's existing
 commitment or restoration boundary, including callbacks, rollback,
 bookkeeping, results, redirects, and terminal finalization.
 

@@ -182,6 +182,13 @@ relationship before rewriting consumer-owned files; a member cannot select a
 partial graph for mutation. A bare single-file plan or Directory Workspace is
 still its complete one-rhei project. [§FS-rhei-migrate.1](rhei-migrate.spec.md#1-export-prior-migration)
 
+`rhei remove` loads and validates the whole project whatever its target, and
+`--rhei` narrows only which rhei a local ticket id resolves in: a dependent
+that would keep a removed ticket alive may live in any rhei, so removal may
+not reason about fewer of them than validation does (§FS-rhei-remove.1.2).
+Its retirement record is project bookkeeping and lives in the manifest
+(§FS-rhei-remove.5.1).
+
 `rhei cost` and `rhei summary` load through the project like every other
 command — they read the plan for its tickets and its state machine, and a
 member's cross-rhei `**Prior:**` has to resolve for that reading to be right.

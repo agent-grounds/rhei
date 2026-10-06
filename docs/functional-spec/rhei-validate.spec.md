@@ -71,6 +71,15 @@ error naming its line
    bound, naming the edge: such a bound changes nothing at runtime, so it is
    reported rather than made an error.
    §FS-rhei-transitions.4.10
+
+   Validation reads the project's retirement record, `metadata.retiredTickets`
+   (§FS-rhei-remove.5.1), and refuses three things about it, each naming the
+   key: a value that is not a retirement map — the key is reserved, so a
+   pre-existing author value under it is an error rather than a record; a live
+   ticket whose project-qualified id is retired, which is how a hand-written
+   section that resurrects a removed ticket is caught; and a live ticket whose
+   `budgetTicketId` is the one a retired record kept, which would rebind a
+   retired budget identity (§FS-rhei-budgets.5.2.1). §FS-rhei-remove.5.2
 3. Load merged global and project settings, then validate referenced agents,
    models, MCP servers, skills, and snapshot settings used by the state
    machine. For each execution that uses static agent and mode selection,
@@ -208,7 +217,11 @@ length every id is within one edit of every other, so a near miss carries no
 signal.
 
 A prior under a *known* rhei is an ordinary missing ticket and is reported
-without further explanation.
+without further explanation — unless the project retired that id. A
+`**Prior:**` naming a retired ticket (§FS-rhei-remove.5.1) is reported as a
+dependency on a **retired** ticket, naming `metadata.retiredTickets`, not as a
+missing one: the id was real and was removed on purpose, so the remedy is to
+drop or re-point the dependency, never to look for a typo.
 
 ### 4.2. Diagnostic parity across scopes
 
@@ -254,7 +267,8 @@ One authored mistake produces one primary error for a consumed reference. A
 missing producer already reported through the same unresolved `**Prior:**` is
 not reported again through `**Consumes:**`. A missing producer named only by
 `**Consumes:**` gets one missing-producer error and no derivative missing-edge
-error. Self- or ancestor-consumption gets its specific error without pairing or
+error. A producer the project retired is reported as a retired producer under
+the same suppression rules, in the words of §4.1. Self- or ancestor-consumption gets its specific error without pairing or
 direct-edge follow-ons. These suppressions do not hide independent errors on
 other references.
 

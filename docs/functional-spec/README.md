@@ -38,6 +38,7 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover) | Explicit recovery of an interrupted operator-forced transition |
 | [§FS-rhei-complete](rhei-complete.spec.md#fs-rhei-complete-rhei-complete) | `rhei complete` command behavior |
 | [§FS-rhei-release](rhei-release.spec.md#fs-rhei-release-rhei-release) | `rhei release` command behavior |
+| [§FS-rhei-remove](rhei-remove.spec.md#fs-rhei-remove-rhei-remove) | `rhei remove` command behavior: taking back an untouched ticket and retiring its id |
 | [§FS-rhei-reset](rhei-reset.spec.md#fs-rhei-reset-rhei-reset) | `rhei reset` command behavior |
 | [§FS-rhei-list](rhei-list.spec.md#fs-rhei-list-rhei-list) | `rhei list` command behavior |
 | [§FS-rhei-show](rhei-show.spec.md#fs-rhei-show-rhei-show) | `rhei show` command behavior |

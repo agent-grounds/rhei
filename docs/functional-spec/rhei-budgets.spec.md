@@ -476,6 +476,12 @@ ticket of a rhei and a binding matched on the path alone would hand one ticket's
 travel to its sibling — and the key may only move to a display id the document
 no longer claims the identity under §FS-rhei-budgets.5.2.1.
 
+`rhei remove` leaves the journal exactly as it is: no receipt is appended,
+rewritten or dropped, and no binding is released. A ticket with any receipt is
+not untouched and cannot be removed at all (§FS-rhei-remove.2); one with a
+binding alone keeps it, its `budgetTicketId` moving unchanged into the
+retirement record (§FS-rhei-remove.5.1).
+
 #### 5.2.1. One identity, one live ticket
 
 A binding counts one uuid's travel against one display id, and that display id
@@ -568,6 +574,12 @@ bound of six, the capacity this point exists to deny. Between two documents that
 cannot be told apart, the bound is what is kept. That is why the refusal names
 both claimants and the display id the account counts the history against, and
 leaves **which of the two earned it** to the person, who can tell.
+
+A **retired** identity has no live claimant, and that does not free it: the
+display id it was bound to is retired (§FS-rhei-remove.5.2), and a live ticket
+presenting the identity under any other display id is refused with the shape
+above, naming the retirement record as the holder. Retirement is the end of an
+identity, never a way to hand its bound to a new ticket.
 
 ### 5.3. The witness
 
@@ -1303,6 +1315,7 @@ a sound account and why a damaged report puts restore first.
 | `agent_timeout`, `attempts:`, `visits:`, `poll.max_attempts` | untouched, and not clamped |
 | `rhei reset` | still deletes `runtime/` and restores authored state; the account is not under `runtime/` and survives, and so does the ticket's budget identity ([§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior)) |
 | `rhei reset --rhei` | removes what is keyed by an in-scope ticket id and **no receipts**: a narrowed reset that dropped a ticket's travel would make `--rhei` the faucet ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)) |
+| `rhei remove` | deletes an untouched ticket's definition and residue and retires its id; it appends, rewrites and refunds nothing in the account, and a retired identity is never rebound (§FS-rhei-remove.5.2) |
 | `rhei run --rhei` | narrows candidates only. One account, one balance, whatever the selection ([§FS-rhei-run.2.5](rhei-run.spec.md#25-project-scope---rhei)) |
 | `rhei run --dry-run` | reports the bounds and what the pass would cost, and spends nothing |
 | detached and concurrent runs | the same account, serialized by the same lock ([§FS-rhei-run-headless](rhei-run-headless.spec.md#fs-rhei-run-headless-detached-runs)) |

@@ -458,6 +458,15 @@ than a sentence repeated at each of the five points above.
 `pollNextAttemptAt`, which is one state's own scheduling and is cleared by that
 state's exit instead ([§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics)).
 
+One key rhei writes sits outside every task's map and so outside this
+register's rows: `metadata.retiredTickets`, the project's record of the ids
+`rhei remove` retired (§FS-rhei-remove.5.1). It is project bookkeeping, not
+author task metadata; no author-metadata surface publishes it, `rhei render
+--format json` may show it with the rest of the stored metadata, and
+`rhei reset` never clears it. Unlike the task keys above, it **is** reserved: a
+value there that is not a retirement map is a validation error, because
+overwriting it would silently retire or revive ids.
+
 The register reserves nothing. A plan may author a key it names and still
 validate; the key keeps its runtime meaning, stays out of the author view, and
 raises no diagnostic. Turning a collision into a `rhei validate` error is a

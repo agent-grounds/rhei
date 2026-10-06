@@ -154,6 +154,11 @@ pub fn check_pending(root: &Path) -> io::Result<()> {
 }
 
 fn check_marker(root: &Path) -> io::Result<()> {
+    check_forced_marker(root)?;
+    removal::check_removal_marker(root)
+}
+
+fn check_forced_marker(root: &Path) -> io::Result<()> {
     let marker = root.join(MARKER);
     // An unsearchable parent cannot establish marker presence or absence. §FS-rhei-run-headless.3
     match fs::symlink_metadata(&marker) {
@@ -356,3 +361,7 @@ mod tests;
 mod discovery;
 use discovery::pending_roots;
 pub use discovery::{for_file, for_input, input_roots, shared_roots};
+
+#[path = "root_access_removal.rs"]
+mod removal;
+pub use removal::{own_pending_removal, pending_removal_ticket, OwnedRemoval, REMOVAL_MARKER};

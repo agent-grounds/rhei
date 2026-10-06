@@ -114,12 +114,17 @@ fn validate_dependency_integrity(
     report: &mut ValidationReport,
 ) {
     let rhei_ids = project_rhei_ids(rhei);
+    // A malformed record is reported by `validate_retired_tickets`; here it
+    // only stops the retired wording. §FS-rhei-validate.4.1
+    let retired = crate::retired::retired_tickets(rhei.metadata.as_ref()).unwrap_or_default();
 
+    #[allow(clippy::too_many_arguments)]
     fn recurse(
         task: &Task,
         ancestors: &mut Vec<TaskId>,
         index: &HashMap<TaskId, &Task>,
         rhei_ids: &[String],
+        retired: &crate::retired::RetiredTickets,
         structure: &Structure,
         report: &mut ValidationReport,
     ) {
@@ -169,6 +174,14 @@ fn validate_dependency_integrity(
                         task.id, dep
                     ));
                 }
+                // A removed ticket is not a typo to hunt for. §FS-rhei-validate.4.1
+                (None, _) if retired.contains_key(&dep.to_string()) => {
+                    report.help.push(retired_dependency_help());
+                    report.errors.push(format!(
+                        "Task {} depends on retired Task {} (metadata.retiredTickets)",
+                        task.id, dep
+                    ));
+                }
                 (None, _) => {
                     let (tail, guidance) = missing_prior_hint(&task.id, dep, index, rhei_ids);
                     if let Some(guidance) = guidance {
@@ -209,7 +222,17 @@ fn validate_dependency_integrity(
                 // The ordinary Prior diagnostic already names this producer.
                 // One authored bad reference gets one primary error.
                 // §FS-rhei-validate.4.3
-                if !task.prior.iter().any(|prior| prior == producer) {
+                let named_in_prior = task.prior.iter().any(|prior| prior == producer);
+                if named_in_prior {
+                    // Already reported once, through **Prior:**.
+                } else if retired.contains_key(&producer.to_string()) {
+                    report.help.push(retired_dependency_help());
+                    report.errors.push(format!(
+                        "Task {} consumes export '{}' from retired producer Task {} \
+                         (metadata.retiredTickets)",
+                        task.id, relationship.export, producer
+                    ));
+                } else {
                     let (tail, guidance) =
                         missing_prior_hint(&task.id, producer, index, rhei_ids);
                     if let Some(guidance) = guidance {
@@ -260,14 +283,14 @@ fn validate_dependency_integrity(
         }
         ancestors.push(task.id.clone());
         for child in &task.children {
-            recurse(child, ancestors, index, rhei_ids, structure, report);
+            recurse(child, ancestors, index, rhei_ids, retired, structure, report);
         }
         ancestors.pop();
     }
 
     let mut ancestors = Vec::new();
     for task in &rhei.tasks {
-        recurse(task, &mut ancestors, index, &rhei_ids, &rhei.structure, report);
+        recurse(task, &mut ancestors, index, &rhei_ids, &retired, &rhei.structure, report);
     }
 }
 
@@ -333,6 +356,14 @@ fn project_rhei_ids(rhei: &Rhei) -> Vec<String> {
 /// still ambiguous — a typo'd rhei name or a typo'd local hierarchical id — so
 /// the hint rules out both readings and only offers a correction that resolves.
 // §FS-rhei-validate.4.1: an unresolved prior is reported as the author wrote it.
+/// The remedy for a reference to a removed ticket: it is gone on purpose and its
+/// id is never live again. §FS-rhei-validate.4.1 §FS-rhei-remove.5.2
+fn retired_dependency_help() -> String {
+    "that ticket was removed with `rhei remove` and its id is retired; drop the reference or \
+     re-point it at a live ticket"
+        .to_string()
+}
+
 fn missing_prior_hint(
     task: &TaskId,
     dep: &TaskId,

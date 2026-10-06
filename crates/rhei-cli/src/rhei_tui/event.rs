@@ -1,6 +1,8 @@
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::{Instant, SystemTime};
+
+pub use super::event_bounds::{bound_journal_line, BoundCeiling, BoundReport};
+pub use super::event_sink::{EventSink, NullSink, Tee};
 
 /// Slot index assigned to a running task invocation.
 ///
@@ -495,93 +497,4 @@ pub enum RunEvent {
         /// work — never an inner value the machine ceiling would clamp.
         remedy: String,
     },
-}
-
-/// One count dimension as every surface reports it: what it is, what bounds it,
-/// who set that bound, who lowered it, and where it stands.
-///
-/// The two sources stay apart because they answer different questions: "the
-/// machine set this" and "the machine lowered this" send a reader to different
-/// files. §FS-rhei-budgets.2.3 §FS-rhei-budgets.9
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BoundReport {
-    pub dimension: String,
-    pub effective: u64,
-    pub value_source: String,
-    /// `Some("machine")` exactly when a higher request was clamped.
-    pub limiting_source: Option<String>,
-    pub consumed: u64,
-    pub outstanding: u64,
-    pub remaining: u64,
-    /// `per ticket identity`, `window`, or `lifetime`.
-    pub mode: String,
-    /// The UTC day key, under the window contract only.
-    pub window: Option<String>,
-    /// The account's currency, present exactly on the dimension whose
-    /// amounts are money in micro-units rather than counts.
-    /// §FS-rhei-budgets.5.5 §FS-rhei-run-tui.1.1
-    pub currency: Option<String>,
-    /// How much of this dimension was charged at the worst case rather than
-    /// measured, present on the spend dimension and zeroed rather than absent
-    /// where nothing was. §FS-rhei-budgets.6.2
-    pub marks: Option<rhei_core::budget::SpendMarks>,
-}
-
-/// One dimension on a terminal surface: the bound with its provenance, and
-/// where it stands. §FS-rhei-budgets.9
-pub fn bound_journal_line(bound: &BoundReport) -> String {
-    let source = match &bound.limiting_source {
-        Some(limiter) => format!("{} limited by {limiter}", bound.value_source),
-        None => bound.value_source.clone(),
-    };
-    // Money carries its currency; a count is written as itself.
-    // §FS-rhei-run-tui.1.1
-    let write = |value: u64| match &bound.currency {
-        Some(currency) => rhei_core::money::format_micro(value, Some(currency)),
-        None if bound.marks.is_some() => rhei_core::money::format_micro(value, None),
-        None => value.to_string(),
-    };
-    format!(
-        "{}: {} consumed + {} outstanding / {} ({source}); {} remaining [{}]",
-        bound.dimension,
-        write(bound.consumed),
-        write(bound.outstanding),
-        write(bound.effective),
-        write(bound.remaining),
-        bound.window.as_deref().unwrap_or(&bound.mode)
-    )
-}
-
-/// Sink that consumes `RunEvent`s. Implementations must be cheap to clone and
-/// safe to share across threads (the engine spawns parallel workers).
-pub trait EventSink: Send + Sync {
-    fn emit(&self, event: RunEvent);
-}
-
-/// Composite sink that forwards every event to each inner sink in order.
-#[derive(Clone)]
-pub struct Tee {
-    inners: Arc<Vec<Arc<dyn EventSink>>>,
-}
-
-impl Tee {
-    pub fn new(sinks: Vec<Arc<dyn EventSink>>) -> Self {
-        Self { inners: Arc::new(sinks) }
-    }
-}
-
-impl EventSink for Tee {
-    fn emit(&self, event: RunEvent) {
-        for sink in self.inners.iter() {
-            sink.emit(event.clone());
-        }
-    }
-}
-
-/// Sink that discards every event. Useful as the default frontend when the
-/// engine is responsible for producing stdout (backward-compatible mode).
-pub struct NullSink;
-
-impl EventSink for NullSink {
-    fn emit(&self, _event: RunEvent) {}
 }

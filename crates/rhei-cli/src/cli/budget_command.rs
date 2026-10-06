@@ -119,7 +119,7 @@ fn budget_show_command(
     let narrowed = (!rhei.is_empty()).then(|| rhei.join(", "));
     match format {
         BudgetFormat::Json => {
-            let report = serde_json::json!({
+            let mut report = serde_json::json!({
                 "project_id": snapshot.project_id,
                 "project_root": project_root,
                 "account": account.directory(),
@@ -142,6 +142,11 @@ fn budget_show_command(
                 },
                 "narrowed_to": narrowed,
             });
+            // Absent where nothing was delegated, so a machine that never set
+            // the switch reads the report it always did. §FS-rhei-budgets.10
+            if let Some(policy) = budget_ceiling_policy_json(bounds.counts()) {
+                report["ceiling_policy"] = policy;
+            }
             println!("{}", serde_json::to_string_pretty(&report).expect("report serializes"));
         }
         BudgetFormat::Text => {
@@ -171,13 +176,49 @@ fn budget_show_command(
     Ok(())
 }
 
+/// One bound's entry: `limited_by` names whoever holds the ceiling that
+/// clamped it, and a delegated key also carries that ceiling.
+/// §FS-rhei-budgets.10
 fn budget_bound_json(bound: &Bound) -> serde_json::Value {
-    serde_json::json!({
+    let mut entry = serde_json::json!({
         "effective": bound.effective,
         "source": bound.source.as_str(),
         "requested": bound.requested,
-        "limited_by": bound.requested.map(|_| "machine"),
+        "limited_by": bound.requested.map(|_| bound.limiter.as_str()),
+    });
+    if let Some(ceiling) = budget_ceiling_json(bound) {
+        entry["ceiling"] = ceiling;
+    }
+    entry
+}
+
+/// `{ "value", "source": "project", "path" }` for a delegated key, naming the
+/// project settings file read; `None` for any other. §FS-rhei-budgets.10
+/// §FS-rhei-run-json.2.1
+fn budget_ceiling_json(bound: &Bound) -> Option<serde_json::Value> {
+    bound.delegated().then(|| {
+        serde_json::json!({
+            "value": bound.ceiling,
+            "source": bound.limiter.as_str(),
+            "path": bound.files.project,
+        })
     })
+}
+
+/// `{ "delegated": [<keys>], "setting": "defaults.clamp_projects", "path" }`,
+/// listing only the keys actually delegated; `None` where none was.
+/// §FS-rhei-budgets.10 §FS-rhei-run-json.2.1
+fn budget_ceiling_policy_json<'a>(
+    bounds: impl IntoIterator<Item = &'a Bound>,
+) -> Option<serde_json::Value> {
+    let delegated: Vec<&Bound> = bounds.into_iter().filter(|bound| bound.delegated()).collect();
+    let machine = delegated.first()?.files.machine.clone();
+    let keys: Vec<&str> = delegated.iter().map(|bound| bound.key).collect();
+    Some(serde_json::json!({
+        "delegated": keys,
+        "setting": rhei_core::budget::CLAMP_PROJECTS,
+        "path": machine,
+    }))
 }
 
 /// The spend dimension, with its currency and how much of the day was

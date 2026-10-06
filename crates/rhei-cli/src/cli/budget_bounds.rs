@@ -24,15 +24,26 @@ struct CountBounds {
 }
 
 impl CountBounds {
-    /// The lines `rhei validate` reports and the run's bounds section renders,
-    /// in dimension order. §FS-rhei-validate.4
+    /// The lines `rhei validate` and `rhei budget show` report, in dimension
+    /// order, followed where the machine delegated a count ceiling by one
+    /// ceiling line per delegated key and the policy line.
+    /// §FS-rhei-validate.4 §FS-rhei-budgets.2.3
     fn report_lines(&self) -> Vec<String> {
-        vec![
+        let mut lines = vec![
             self.travel.report_line(),
             self.per_day.report_line(),
             self.lifetime_max.report_line(),
             self.spend.report_line(),
-        ]
+        ];
+        lines.extend(self.counts().filter_map(Bound::ceiling_line));
+        lines.extend(rhei_core::budget::ceiling_policy_line(self.counts()));
+        lines
+    }
+
+    /// The two count dimensions, the only ones a machine can delegate.
+    /// §FS-rhei-budgets.2
+    fn counts(&self) -> impl Iterator<Item = &Bound> {
+        [&self.travel, &self.per_day].into_iter()
     }
 
     fn effective(&self) -> rhei_core::budget::EffectiveBounds {
@@ -53,32 +64,45 @@ impl CountBounds {
 fn resolve_count_bounds(settings: &RheiSettings, profile_limit: Option<u64>) -> CountBounds {
     let machine = settings.machine_bounds;
     let project = settings.project_bounds;
+    let policy = &settings.ceiling_policy;
     let requested = |plan: Option<u64>, project: Option<u64>| {
         plan.map(|value| (value, BoundSource::Plan))
             .or_else(|| project.map(|value| (value, BoundSource::Project)))
     };
+    // The project's ceiling where the machine delegated and the project declares
+    // the key, one key at a time; spend and lifetime never reach here. §FS-rhei-budgets.2
+    let count = |key, built_in, machine: Option<u64>, plan: Option<u64>, declared: Option<u64>| {
+        let bound = match declared.filter(|_| policy.delegated) {
+            Some(ceiling) => Bound::resolve_delegated(key, ceiling, requested(plan, declared)),
+            None => Bound::resolve(key, built_in, machine, requested(plan, declared)),
+        };
+        bound.with_files(policy.files.clone())
+    };
     CountBounds {
-        travel: Bound::resolve(
+        travel: count(
             "transition_limit",
             built_in::TRANSITION_LIMIT,
             machine.transition_limit,
-            requested(profile_limit, project.transition_limit),
+            profile_limit,
+            project.transition_limit,
         ),
         // Neither is declarable on a plan: a plan that could raise the day's
         // starts would be raising the cap of whichever machine ran it.
         // §FS-rhei-budgets.2.1
-        per_day: Bound::resolve(
+        per_day: count(
             "invocations_per_day",
             built_in::INVOCATIONS_PER_DAY,
             machine.invocations_per_day,
-            requested(None, project.invocations_per_day),
+            None,
+            project.invocations_per_day,
         ),
         lifetime_max: Bound::resolve(
             "invocation_lifetime_max",
             built_in::INVOCATION_LIFETIME_MAX,
             machine.invocation_lifetime_max,
             requested(None, project.invocation_lifetime_max),
-        ),
+        )
+        .with_files(policy.files.clone()),
         // Machine and project tiers only: a plan that could raise a day's
         // spend would be raising the cap of whichever machine paid for it.
         // §FS-rhei-budgets.2.1
@@ -87,7 +111,8 @@ fn resolve_count_bounds(settings: &RheiSettings, profile_limit: Option<u64>) -> 
             built_in::SPEND_PER_DAY,
             machine.spend_per_day,
             requested(None, project.spend_per_day),
-        ),
+        )
+        .with_files(policy.files.clone()),
     }
 }
 

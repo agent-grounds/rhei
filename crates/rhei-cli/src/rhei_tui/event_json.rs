@@ -18,8 +18,8 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use serde_json::{json, Map, Value};
 
 use crate::rhei_tui::event::{
-    AccountingRunSummary, AgentStream, BoundReport, MessageLevel, RunEvent, RunSummary,
-    TaskOutcome, UsageReport, UsageSummary,
+    AccountingRunSummary, AgentStream, BoundCeiling, BoundReport, MessageLevel, RunEvent,
+    RunSummary, TaskOutcome, UsageReport, UsageSummary,
 };
 use crate::rhei_tui::run_stop::RunStop;
 
@@ -158,6 +158,10 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
         RunEvent::BudgetSnapshot { bounds } => {
             put("event", json!("budget_snapshot"));
             put("bounds", Value::Array(bounds.iter().map(bound_value).collect()));
+            // Absent where nothing was delegated. §FS-rhei-run-json.2.1
+            if let Some(policy) = ceiling_policy_value(bounds) {
+                put("ceiling_policy", policy);
+            }
         }
         RunEvent::BudgetHalt { task, reason_code, bound, renews_at, remedy } => {
             put("event", json!("budget_halt"));
@@ -166,6 +170,9 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
             let Value::Object(fields) = bound_value(bound) else { unreachable!("object") };
             for (key, value) in fields {
                 put(&key, value);
+            }
+            if let Some(policy) = ceiling_policy_value(std::slice::from_ref(bound)) {
+                put("ceiling_policy", policy);
             }
             put("renews_at", json!(renews_at));
             put("remedy", json!(remedy));
@@ -177,7 +184,7 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
 /// One count dimension's fields, shared by the snapshot record and the halt so
 /// the two cannot drift apart. §FS-rhei-run-json.2.1
 fn bound_value(bound: &BoundReport) -> Value {
-    json!({
+    let mut value = json!({
         "dimension": bound.dimension,
         "effective": bound.effective,
         "value_source": bound.value_source,
@@ -193,11 +200,57 @@ fn bound_value(bound: &BoundReport) -> Value {
         "unpriced": bound.marks.map(|marks| marks.unpriced),
         "unmeasurable": bound.marks.map(|marks| marks.unmeasurable),
         "unsettled": bound.marks.map(|marks| marks.unsettled),
+    });
+    // Only on a delegated entry, so a machine that never set the switch emits
+    // the records it always did. §FS-rhei-run-json.2.1
+    if let Some(ceiling) = &bound.ceiling {
+        value["ceiling"] = json!({
+            "value": ceiling.value,
+            "source": "project",
+            "path": ceiling.path,
+        });
+    }
+    value
+}
+
+/// `{ "delegated": [<keys>], "setting": "defaults.clamp_projects", "path" }`
+/// over the delegated entries among `bounds`; `None` where there are none.
+/// §FS-rhei-run-json.2.1
+fn ceiling_policy_value(bounds: &[BoundReport]) -> Option<Value> {
+    let delegated: Vec<&BoundCeiling> =
+        bounds.iter().filter_map(|bound| bound.ceiling.as_ref()).collect();
+    let first = delegated.first()?;
+    Some(json!({
+        "delegated": delegated.iter().map(|ceiling| ceiling.key.as_str()).collect::<Vec<_>>(),
+        "setting": rhei_core::budget::CLAMP_PROJECTS,
+        "path": first.delegated_by,
+    }))
+}
+
+/// Read a delegated entry's `ceiling` back, taking the key from its dimension
+/// and the delegating file from the record's `ceiling_policy`.
+/// §FS-rhei-run-json.2.1
+fn bound_ceiling(entry: &Value, policy: Option<&Value>) -> Option<BoundCeiling> {
+    let ceiling = entry.get("ceiling")?;
+    let dimension = entry.get("dimension")?.as_str()?;
+    let key = [rhei_core::budget::Dimension::Travel, rhei_core::budget::Dimension::Invocations]
+        .into_iter()
+        .find(|known| known.label() == dimension)?
+        .settings_key();
+    Some(BoundCeiling {
+        key: key.to_string(),
+        value: ceiling.get("value").and_then(Value::as_u64).unwrap_or_default(),
+        path: ceiling.get("path").and_then(Value::as_str).map(str::to_owned),
+        delegated_by: policy
+            .and_then(|policy| policy.get("path"))
+            .and_then(Value::as_str)
+            .map(str::to_owned),
     })
 }
 
-fn bound_report(v: &Value) -> Option<BoundReport> {
+fn bound_report(v: &Value, policy: Option<&Value>) -> Option<BoundReport> {
     Some(BoundReport {
+        ceiling: bound_ceiling(v, policy),
         dimension: v.get("dimension")?.as_str()?.to_owned(),
         effective: v.get("effective").and_then(Value::as_u64).unwrap_or_default(),
         value_source: v.get("value_source").and_then(Value::as_str).unwrap_or("").to_owned(),
@@ -451,13 +504,16 @@ fn decode_event(kind: &str, v: &Value, wall_clock: SystemTime) -> Option<RunEven
             bounds: v
                 .get("bounds")
                 .and_then(Value::as_array)
-                .map(|bounds| bounds.iter().filter_map(bound_report).collect())
+                .map(|bounds| {
+                    let policy = v.get("ceiling_policy");
+                    bounds.iter().filter_map(|bound| bound_report(bound, policy)).collect()
+                })
                 .unwrap_or_default(),
         },
         "budget_halt" => RunEvent::BudgetHalt {
             task: text("task"),
             reason_code: text("reason_code"),
-            bound: bound_report(v)?,
+            bound: bound_report(v, v.get("ceiling_policy"))?,
             renews_at: v.get("renews_at").and_then(Value::as_str).map(str::to_owned),
             remedy: text("remedy"),
         },

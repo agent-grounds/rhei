@@ -65,6 +65,10 @@ struct RheiSettings {
     /// reader to different files. §FS-rhei-budgets.2.3
     #[serde(skip)]
     project_bounds: CountBoundTier,
+    /// Whether the machine delegated the count ceilings, and the files a
+    /// bound names. §FS-rhei-budgets.2
+    #[serde(skip)]
+    ceiling_policy: CountCeilingPolicy,
     /// What `defaults.prices` points at, once the merge has fixed it.
     ///
     /// Carried beside the merged `defaults` rather than inside it because

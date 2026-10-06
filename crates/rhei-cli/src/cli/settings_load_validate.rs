@@ -215,10 +215,16 @@ fn load_merged_roster(
     plan_root: &Path,
     warn_before_project_load: bool,
 ) -> MietteResult<MergedRoster> {
-    let global_document = match home_dir() {
-        Ok(home) => load_settings_document(&home.join(".config/rhei/settings.json"))?,
-        Err(_) => empty_settings_document(),
+    let machine_file = machine_settings_file();
+    let global_document = match &machine_file {
+        Some(path) => load_settings_document(path)?,
+        None => empty_settings_document(),
     };
+    // Read from the machine document alone, never merged. §FS-rhei-agents.1.1.1
+    let delegated = machine_delegates_count_ceilings(
+        &global_document.raw,
+        machine_file.as_deref().unwrap_or(Path::new("~/.config/rhei/settings.json")),
+    )?;
 
     // §FS-rhei-agents.1.1: project settings live in rhei's project-local home.
     let project_settings = project_settings_home(plan_root);
@@ -235,6 +241,20 @@ fn load_merged_roster(
         project_settings.warn_if_deprecated();
     }
     let project_document = load_settings_document(project_settings.path())?;
+    // On the raw document, before the merge can drop it. §FS-rhei-agents.1.1.1
+    refuse_clamp_projects_in_project(
+        &project_document.raw,
+        project_settings.path(),
+        machine_file.as_deref(),
+    )?;
+    // The files every bound names by the paths read. §FS-rhei-budgets.8
+    let ceiling_policy = CountCeilingPolicy {
+        delegated,
+        files: rhei_core::budget::SettingsFiles {
+            machine: machine_file.clone(),
+            project: project_document.source_path.as_deref().map(settings_file_as_read),
+        },
+    };
     let sources = RosterSources {
         global: global_document.source_path.clone(),
         project: project_document
@@ -517,6 +537,7 @@ fn load_merged_roster(
         defaults,
         machine_bounds,
         project_bounds,
+        ceiling_policy,
         prices,
         agents,
         models,

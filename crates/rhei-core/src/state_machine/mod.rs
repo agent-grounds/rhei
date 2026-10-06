@@ -20,6 +20,7 @@ include!("validator/state_defs.rs");
 include!("validator/metrics_decl.rs");
 include!("validator/state_machine_impl.rs");
 include!("validator/state_machine_prompt_templates.rs");
+include!("validator/state_machine_machine_only.rs");
 include!("validator/state_machine_snapshots.rs");
 include!("validator/state_machine_runtime_validation.rs");
 include!("validator/state_machine_profiles.rs");
@@ -45,6 +46,7 @@ mod tests {
     include!("validator/tests_links_tooling.rs");
     include!("validator/tests_links_fences.rs");
     include!("validator/tests_profiles.rs");
+    include!("validator/tests_machine_only.rs");
     include!("validator/tests_dead_end_states.rs");
     include!("validator/tests_poll.rs");
     include!("validator/tests_supervision.rs");

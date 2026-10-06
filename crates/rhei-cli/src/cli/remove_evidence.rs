@@ -6,6 +6,9 @@
 
 // §FS-rhei-remove.2 §FS-rhei-remove.3
 
+/// The prefix of a blocker naming a path removal will not touch.
+const UNSAFE_PATH: &str = "unsafe path: ";
+
 /// What one read of the project found about a ticket. §FS-rhei-remove.2
 struct RemovalAssessment {
     /// Dependents, children and node-kind refusals, one line each.
@@ -17,6 +20,12 @@ struct RemovalAssessment {
 }
 
 impl RemovalAssessment {
+    /// A path removal may not decide about is refused, not cleaned, and is not
+    /// history either. §FS-rhei-remove.4.2
+    fn unsafe_path(&mut self, what: String) {
+        self.blockers.push(format!("{UNSAFE_PATH}{what}"));
+    }
+
     fn refused(&self) -> bool {
         !self.blockers.is_empty() || !self.history.is_empty()
     }
@@ -35,13 +44,17 @@ impl RemovalAssessment {
         for (what, place) in &self.history {
             message.push_str(&format!("\n  {what}: {place}"));
         }
-        let help = if self.history.is_empty() {
-            "change or remove what names it first, then remove it.".to_string()
-        } else {
+        let help = if !self.history.is_empty() {
             format!(
                 "instead: move it to its machine's cancellation state with \
                  `rhei transition {id} <state>`"
             )
+        } else if self.blockers.iter().any(|line| line.starts_with(UNSAFE_PATH)) {
+            "removal never follows a symlink or cleans a path it cannot prove is the ticket's \
+             own; move that path aside by hand, then remove again."
+                .to_string()
+        } else {
+            "change or remove what names it first, then remove it.".to_string()
         };
         miette!(help = help, "{message}")
     }

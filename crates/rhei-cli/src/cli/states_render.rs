@@ -552,7 +552,14 @@ fn resolve_plan_path(input: Option<PathBuf>) -> MietteResult<PathBuf> {
         // discovery counts it — resolves in the invocation directory only;
         // ancestors are adopted solely through explicit manifests.
         if current == cwd {
-            let mut plans = workspace::discover_rhei_entries(current).unwrap_or_default();
+            let mut plans = match workspace::discover_rhei_entries(current) {
+                Ok(plans) => plans,
+                // An unfinished operation's marker is not "no plan here". §FS-rhei-remove.6.2
+                Err(err) if rhei_core::root_access::for_input(current).is_err() => {
+                    return Err(diagnostic!("{}", err.message));
+                }
+                Err(_) => Vec::new(),
+            };
             match plans.len() {
                 0 => {}
                 1 => return Ok(plans.remove(0)),

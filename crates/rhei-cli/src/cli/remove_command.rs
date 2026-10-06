@@ -23,7 +23,9 @@ fn remove_command(
         ));
     };
     let target = resolve_plan_target(plan)?;
+    // Absolute, so a bare `plan.rhei.md` still has a directory to write beside.
     let input_buf = normalize_workspace_input(target.path());
+    let input_buf = std::path::absolute(&input_buf).unwrap_or(input_buf);
     let input = input_buf.as_path();
     let project_root = execution_workspace_root(input);
 
@@ -147,16 +149,21 @@ fn resolve_removal_target(
     let retired = rhei_core::retired::retired_tickets(loaded.rhei.metadata.as_ref())
         .map_err(|err| miette!(help = "fix or remove the malformed retirement record.", "{err}"))?;
     let in_scope = |rhei_id: &String| scope.as_ref().is_none_or(|scope| scope.contains(rhei_id));
+    let qualified: Vec<String> = loaded
+        .rhei_ids
+        .iter()
+        .filter(|rhei_id| in_scope(rhei_id))
+        .map(|rhei_id| format!("{rhei_id}.{ticket}"))
+        .collect();
+    // A retired id is no longer a ticket, so it only answers a local id nothing
+    // live matches: the repeat that exits 0. §FS-rhei-remove.1.2
+    let live_matches: Vec<String> = qualified.iter().filter(|q| live(q)).cloned().collect();
     let candidates: Vec<String> = if live(ticket) || retired.contains_key(ticket) {
         vec![ticket.to_string()]
+    } else if !live_matches.is_empty() {
+        live_matches
     } else {
-        loaded
-            .rhei_ids
-            .iter()
-            .filter(|rhei_id| in_scope(rhei_id))
-            .map(|rhei_id| format!("{rhei_id}.{ticket}"))
-            .filter(|qualified| live(qualified) || retired.contains_key(qualified))
-            .collect()
+        qualified.into_iter().filter(|q| retired.contains_key(q)).collect()
     };
     if candidates.len() > 1 {
         return Err(miette!(

@@ -136,6 +136,7 @@ impl Validator {
         }
         validate_sibling_uniqueness(rhei, &mut report);
         validate_dependency_integrity(rhei, &index, &mut report);
+        validate_retired_tickets(rhei, &index, &mut report);
         validate_prior_order_coherence(rhei, &index, &self.machines, &mut report);
         validate_cancelled_priors(rhei, &index, &self.machines, &mut report);
         validate_state_consistency(rhei, &self.machines, &mut report);

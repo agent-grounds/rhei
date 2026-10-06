@@ -30,6 +30,9 @@ pub mod money;
 pub mod open_handle;
 pub mod parser;
 pub mod platform;
+/// The project's record of removed, never-reissued ticket ids.
+/// §FS-rhei-remove.5
+pub mod retired;
 pub mod source;
 pub mod state_machine;
 #[cfg(test)]

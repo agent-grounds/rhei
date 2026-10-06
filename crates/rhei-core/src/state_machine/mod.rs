@@ -32,6 +32,7 @@ include!("validator/supervisor_finish.rs");
 include!("validator/state_machine_warnings.rs");
 include!("validator/callback_bound.rs");
 include!("validator/validator_dependencies.rs");
+include!("validator/validator_retired.rs");
 include!("validator/validator_prior_states.rs");
 include!("validator/validator_entry.rs");
 include!("validator/validator_tree_coherence.rs");
@@ -42,6 +43,7 @@ mod tests {
     include!("validator/tests_state_machine.rs");
     include!("validator/tests_plan_validation.rs");
     include!("validator/tests_cancelled_prior.rs");
+    include!("validator/tests_retired.rs");
     include!("validator/tests_task_exports.rs");
     include!("validator/tests_links_tooling.rs");
     include!("validator/tests_links_fences.rs");

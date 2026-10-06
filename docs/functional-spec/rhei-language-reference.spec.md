@@ -127,7 +127,11 @@ Language changes must preserve a single discoverable entry point:
   `defaults.spend_per_day` is the one of the four with no `profiles`
   counterpart: it is authored on the machine and the project settings tiers
   only, never on a plan or a profile
-  ([§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys)).
+  ([§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys)). `defaults.clamp_projects` is the one key here that bounds
+  nothing: it is authored in the machine settings file alone, where `false`
+  makes the project's declared `transition_limit` and `invocations_per_day` the
+  ceiling in place of the machine's, and it is refused in project settings, a
+  plan and a profile (§FS-rhei-budgets.2, §FS-rhei-agents.1.1.1).
 - The price book a machine or a project names once — the `defaults.prices`
   settings key — is owned by
   [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection), which says what a selected book

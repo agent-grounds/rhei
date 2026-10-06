@@ -268,7 +268,10 @@ the summary prints five stacked groups:
    §FS-rhei-budgets.6.2 — a report that showed only the total would say a day
    was spent without saying how much of it was estimated. A run that halted on a bound names that
    bound there as well as in Attention, so the record answers "what stopped it"
-   without the reader reconstructing it from rows.
+   without the reader reconstructing it from rows. Where the machine delegated
+   a count ceiling to the project (§FS-rhei-budgets.2), the ceiling and policy
+   rows of §FS-rhei-budgets.2.3 follow the bounds table, once, and a clamped
+   row's limiting source reads `limited by project settings`.
 
    The end of the run is the account **after the run's last receipt is
    durable** — the last invocation's `start` and `spend` receipts

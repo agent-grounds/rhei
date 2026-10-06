@@ -176,9 +176,18 @@ choosing one.
 | `transition_limit` | integer or null | No | Applied transitions one ticket may make over the lifetime of its identity. Built-in `80`. [§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys) |
 | `invocations_per_day` | integer or null | No | Neural starts a project may be admitted per UTC day under the window contract. Built-in `200`. [§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys) |
 | `invocation_lifetime_max` | integer or null | No | Ceiling on an explicit lifetime invocation allowance; clamps `rhei budget init` and every `adjust`. Built-in `6000`. [§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys) |
+| `clamp_projects` | boolean | No | **Machine settings only.** `false` makes a `transition_limit` or `invocations_per_day` the project declares the ceiling in place of the machine's, one key at a time; omission means `true`. Never reaches `spend_per_day` or `invocation_lifetime_max`. [§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from) |
 | `prices` | string or null | No | Path to a `rhei.accounting.prices.v1` price book, supplying the default value of `rhei run --prices` and nothing else. It is a path from the moment settings merge and a file only when a run prices, so a path that names nothing still merges and still prints. `null` clears an inherited book. [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection) |
 | `mcp_servers` | array | No | Default MCP server entries applied to every agent state. Entries are ids or inline definitions. See [MCP Servers](#114-mcp_servers). |
 | `skills` | array | No | Default skill entries applied to every agent state. Entries are ids or inline definitions. See [Skills](#115-skills). |
+
+**Some keys are machine-only.** A key the table marks *machine settings only*
+is read from the machine settings document alone, and every other place it
+could be written refuses it; `clamp_projects` is the one such key today.
+
+`defaults.clamp_projects` is a boolean permitted only in the machine settings document; omission means `true`, and `false` delegates exactly the two count ceilings where the project declares them. A declaration in project settings, a plan, or a profile is refused regardless of its value, including `true` and `null`; a forbidden declaration must be detected before merging or deserialization can erase it. The error names the key, the offending source file or field, and the machine settings file where it is permitted. Non-boolean values, including `null`, are refused in the legal machine location.
+
+Where the refusal applies and how it reads are in [§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys).
 
 #### 1.1.2. `agents`
 

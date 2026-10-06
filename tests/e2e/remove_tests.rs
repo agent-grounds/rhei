@@ -1,10 +1,6 @@
 //! `rhei remove` — taking back a ticket nothing has acted on, and retiring its
 //! id so no later create reissues it.
 //! §FS-rhei-remove
-//!
-//! Every test here is committed red and `#[ignore]`d, so the spec commit passes
-//! the full-suite pre-commit gate; `cargo test -- --ignored remove_tests` shows
-//! them failing. The implementation removes every `#[ignore]` in this file.
 
 use std::fs;
 
@@ -46,7 +42,6 @@ fn snapshot(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
 /// in one command, its section and its empty residue go, its sibling stays,
 /// and the next create skips its number rather than reissuing it.
 #[test]
-#[ignore = "red until `rhei remove` exists (§FS-rhei-remove); implement removes this"]
 fn removes_a_mistaken_ticket_and_never_reissues_its_id() {
     let dir = project_with_rhei("remove-mistaken");
     assert_success(&new_run(&["new", "First", "--under", "auth"], &dir));
@@ -92,7 +87,6 @@ fn removes_a_mistaken_ticket_and_never_reissues_its_id() {
 /// §FS-rhei-remove.1.2, §FS-rhei-remove.5.1: the same, in a Directory Workspace
 /// rhei and in the basin, whose retirement is the project's too.
 #[test]
-#[ignore = "red until `rhei remove` exists (§FS-rhei-remove); implement removes this"]
 fn removes_and_retires_in_workspace_and_basin_rheis() {
     let dir = empty_project("remove-layouts");
     assert_success(&new_run(&["new", "Billing", "--dir"], &dir));
@@ -124,7 +118,6 @@ fn removes_and_retires_in_workspace_and_basin_rheis() {
 
 /// §FS-rhei-remove.5.2, §FS-rhei-new.4: `--id` cannot bring a retired id back.
 #[test]
-#[ignore = "red until `rhei remove` exists (§FS-rhei-remove); implement removes this"]
 fn refuses_to_recreate_a_retired_id_explicitly() {
     let dir = project_with_rhei("remove-resurrect");
     assert_success(&new_run(&["new", "Mistake", "--under", "auth"], &dir));
@@ -138,7 +131,6 @@ fn refuses_to_recreate_a_retired_id_explicitly() {
 /// their authored state and leaves the retirement record alone, so the id is
 /// still not reissued afterwards.
 #[test]
-#[ignore = "red until `rhei remove` exists (§FS-rhei-remove); implement removes this"]
 fn retirement_survives_a_reset() {
     let dir = project_with_rhei("remove-reset");
     assert_success(&new_run(&["new", "First", "--under", "auth"], &dir));
@@ -154,7 +146,6 @@ fn retirement_survives_a_reset() {
 
 /// §FS-rhei-remove.7: a dry run checks and previews, and writes nothing.
 #[test]
-#[ignore = "red until `rhei remove` exists (§FS-rhei-remove); implement removes this"]
 fn a_dry_run_previews_and_changes_nothing() {
     let dir = project_with_rhei("remove-dry-run");
     assert_success(&new_run(&["new", "Mistake", "--under", "auth"], &dir));
@@ -177,7 +168,6 @@ fn a_dry_run_previews_and_changes_nothing() {
 /// §FS-rhei-remove.3.1: a ticket another ticket's `**Prior:**` names is
 /// refused, naming the dependent and the field, and nothing changes.
 #[test]
-#[ignore = "red until `rhei remove` exists (§FS-rhei-remove); implement removes this"]
 fn refuses_a_ticket_another_names_in_prior() {
     let dir = project_with_rhei("remove-prior");
     assert_success(&new_run(&["new", "First", "--under", "auth"], &dir));
@@ -197,7 +187,6 @@ fn refuses_a_ticket_another_names_in_prior() {
 /// §FS-rhei-remove.2, §FS-rhei-remove.3.4: a terminal ticket with a recorded
 /// transition and a result has history, and history is kept.
 #[test]
-#[ignore = "red until `rhei remove` exists (§FS-rhei-remove); implement removes this"]
 fn refuses_a_ticket_that_has_been_acted_on() {
     let dir = project_with_rhei("remove-acted-on");
     assert_success(&new_run(&["new", "Done already", "--under", "auth"], &dir));
@@ -218,7 +207,6 @@ fn refuses_a_ticket_that_has_been_acted_on() {
 /// §FS-rhei-remove.2: a claimed ticket has been acted on even though it has
 /// not moved — its `**Assignee:**` is the evidence.
 #[test]
-#[ignore = "red until `rhei remove` exists (§FS-rhei-remove); implement removes this"]
 fn refuses_a_claimed_ticket() {
     let dir = project_with_rhei("remove-claimed");
     assert_success(&new_run(&["new", "Claimed", "--under", "auth"], &dir));
@@ -236,7 +224,6 @@ fn refuses_a_claimed_ticket() {
 
 /// §FS-rhei-remove.3.2: a ticket with children is refused, naming them.
 #[test]
-#[ignore = "red until `rhei remove` exists (§FS-rhei-remove); implement removes this"]
 fn refuses_a_ticket_with_children() {
     let dir = project_with_rhei("remove-children");
     assert_success(&new_run(&["new", "Parent", "--under", "auth"], &dir));

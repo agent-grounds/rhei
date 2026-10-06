@@ -328,7 +328,8 @@ default install paths, and system-wide installation.
 ## CLI usage
 
 See [CLI examples](docs/cli-examples.md) for validation, rendering, execution,
-completion and reset commands. Run examples from the repository root.
+completion and reset commands, and for `rhei remove`, which takes back a ticket
+nothing has acted on and retires its id. Run examples from the repository root.
 
 ## Development hooks
 

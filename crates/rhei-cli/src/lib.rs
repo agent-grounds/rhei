@@ -372,3 +372,9 @@ mod operator_recovery_tests {
     include!("cli/tests_operator_init.rs");
     include!("cli/tests_operator_registry.rs");
 }
+
+#[cfg(test)]
+mod remove_tests {
+    use super::*;
+    include!("cli/tests_remove.rs");
+}

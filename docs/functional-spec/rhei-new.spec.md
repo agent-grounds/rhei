@@ -18,7 +18,8 @@ author write on a new ticket has a flag, so `rhei new` is never the thing that
 gets you started and then abandons you to an editor for `**Prior:**`. What it
 does not do is *change* anything — it only creates. Editing an existing ticket
 stays a file edit, and changing state stays `rhei transition`
-([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)).
+([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)). Its one inverse is `rhei remove`, which takes back
+a ticket nothing has acted on and retires its id (§FS-rhei-remove).
 
 ## 1. Usage
 
@@ -467,7 +468,9 @@ non-letter dropped — `"Authentication"` → `authentication`, `"Billing & Dunn
 `--id`.
 
 A ticket id is the next free number among its siblings: one more than the
-highest numeric sibling, starting at 1. Named ids are not derived — a title
+highest numeric sibling, starting at 1. A **retired** sibling counts: an id
+`rhei remove` retired (§FS-rhei-remove.5.1) is as taken as a live one, so
+removing the highest-numbered ticket never frees its number. Named ids are not derived — a title
 never becomes a named ticket id, because ticket ids are referenced by hand in
 every `**Prior:**` and a generated name is a worse identifier than a number.
 `--id fix-cache` writes one explicitly.
@@ -480,6 +483,9 @@ The following ids are refused outright:
 - one that **collides** with an existing rhei or sibling ticket, naming the
   holder and pointing at `--id`; a same-id `*.rhei.md` or a directory containing
   `index.rhei.md` is an existing rhei in either requested create layout;
+- a ticket id **retired** in the project, naming its record in
+  `metadata.retiredTickets`: a retired id is never live again
+  (§FS-rhei-remove.5.2);
 - `basin` as a *rhei* id, which is permanently reserved for the synthetic
   basin rhei ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)) — the refusal is at create time rather than at
   the next load, where it would arrive as a broken project;
@@ -751,7 +757,8 @@ one place a caller cannot notice it.
   permits creating workspace-owned entries inside one narrowly admissible
   directory, but its existing machine bundle remains authored content. There is
   otherwise no re-titling, re-parenting, or state change — `rhei transition` and
-  `rhei complete` own state, and everything else is a file edit.
+  `rhei complete` own state, and `rhei remove` owns taking back an untouched
+  ticket (§FS-rhei-remove). Everything else is a file edit.
 - It does not scaffold from a template. `rhei instantiate` writes a rhei
   complete with its tickets and its own state machine ([§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification));
   `rhei new` writes an empty one. They are separate because a blank rhei should

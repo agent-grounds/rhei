@@ -83,6 +83,12 @@ Reset does **not**:
 - Touch the project's budget account. It lives at
   `.agent-grounds/rhei/budgets/`, which is outside `runtime/` and outside every
   deletion step 3 and step 4 enumerate ([§FS-rhei-budgets.5.1](rhei-budgets.spec.md#51-where-it-lives)).
+- Delete the project's retirement record, `metadata.retiredTickets`
+  (§FS-rhei-remove.5.1). A reset returns live tickets to their authored state;
+  a retired id has no live ticket to return, and clearing the record would let
+  the next `rhei new` reissue it. Reset is also refused while a removal is
+  pending (`.rhei/pending-removal.json`), and its diagnostic prints the
+  `rhei remove` invocation that resumes it (§FS-rhei-remove.6.2).
 - Delete the ticket's `metadata.tasks.<id>.budgetTicketId`. Which of rhei's own
   metadata keys reset deletes is the register's `Cleared by rhei reset` column
   ([§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes)), not a
@@ -145,6 +151,11 @@ Artifact paths that still carry unresolved placeholders after `{task_id}` is
 substituted (`{state}`, `{visit_count}`, `{model}`, …) are matched by the
 literal prefix up to the first remaining placeholder, so `auth.1` never matches
 `auth.10`.
+
+Reset is not the only command that deletes ticket-owned runtime files:
+`rhei remove` does too, but only empty residue of a ticket that has no history
+(§FS-rhei-remove.4.2). The two never overlap — reset prunes history and keeps
+the definition, removal keeps every byte of history and deletes the definition.
 
 Run-scoped output is **not** ticket-owned — the run report, the dashboard, and
 the accounting rollups describe a run, not a ticket — so a narrowed reset keeps

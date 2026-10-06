@@ -83,8 +83,10 @@ pub(super) fn machine_file(root: &Path) -> PathBuf {
     home_for(root).join(".config/rhei/settings.json")
 }
 
+/// The project settings file as the loader opens it: the home joined one
+/// component at a time, so Windows prints it with its own separator throughout.
 pub(super) fn project_file(root: &Path, home: &str) -> PathBuf {
-    root.join(home).join("settings.json")
+    home.split('/').fold(root.to_path_buf(), |path, part| path.join(part)).join("settings.json")
 }
 
 /// Both spellings a temporary path may be printed in: as the test wrote it,

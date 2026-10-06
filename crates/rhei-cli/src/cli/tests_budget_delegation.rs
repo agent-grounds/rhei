@@ -17,7 +17,9 @@ type Delegation = (Result<RheiSettings, miette::Report>, PathBuf, PathBuf, tempf
 fn merged_delegation(machine: &str, home: &str, project: Option<&str>) -> Delegation {
     let dir = tempfile::tempdir().expect("tmpdir");
     let plan_root = dir.path().join("plan");
-    let project_file = plan_root.join(home).join("settings.json");
+    // One component at a time, as the loader joins it, so Windows paths compare equal.
+    let project_file =
+        home.split('/').fold(plan_root.clone(), |path, part| path.join(part)).join("settings.json");
     std::fs::create_dir_all(project_file.parent().expect("home dir")).expect("project home");
     if let Some(project) = project {
         std::fs::write(&project_file, project).expect("write project");

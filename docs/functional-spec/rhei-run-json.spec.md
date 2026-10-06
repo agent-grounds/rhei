@@ -80,8 +80,8 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `message` | Engine diagnostics | `level` (`info`/`warn`/`error`), `text` |
 | `link` | The run produced a URL or file link | `label`, `url` |
 | `agent_output` | A live agent output line (§2.3) | `slot`, `task`, `stream`, `line` |
-| `budget_snapshot` | Once before scheduling, and again after each receipt is durable | `bounds` (one entry per dimension: `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, and `currency` on the spend entry) |
-| `budget_halt` | An admission was refused | `task`, `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `renews_at`, `remedy`, `reason_code`, and on a spend halt `currency`, `unpriced`, `unmeasurable`, `unsettled` |
+| `budget_snapshot` | Once before scheduling, and again after each receipt is durable | `bounds` (one entry per dimension: `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `currency` on the spend entry, and `ceiling` on a delegated entry), and `ceiling_policy` where any ceiling was delegated |
+| `budget_halt` | An admission was refused | `task`, `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `renews_at`, `remedy`, `reason_code`, `ceiling` and `ceiling_policy` where the dimension's ceiling was delegated, and on a spend halt `currency`, `unpriced`, `unmeasurable`, `unsettled` |
 | `run_finished` | Once, when the run loop ends (§2.4) | `summary` |
 
 `outcome` is one of `completed`, `failed`, `waiting`, `provider_limited`,
@@ -91,6 +91,17 @@ self-loop, whatever its exit code — a handled wait, not a failure and not a
 finished state ([§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics)). Paths
 are workspace-relative when inside the workspace and absolute otherwise, as in
 the journal.
+
+`limiting_source` is `"machine"`, `"project"` or null: `"project"` only where
+the machine delegated that dimension's ceiling (`defaults.clamp_projects:
+false`) and the project's value clamped the request. A delegated entry's
+`ceiling` is `{ "value", "source": "project", "path" }`, naming the project
+settings file read, and `ceiling_policy` is `{ "delegated": [<keys>], "setting":
+"defaults.clamp_projects", "path": <machine settings file> }`, listing only the
+keys actually delegated ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued)). Both are absent where nothing was delegated, so a
+machine that never set the switch emits the records it always did; they are
+additions under §2.2, so `schema` does not move. `remedy` names the settings file
+by its path (§FS-rhei-budgets.8).
 
 `reverted` is the journal's key of the same name (§FS-rhei-run-tui.1.7): the
 string `<file>:<line>` at which the worker's edit broke the plan, present only on

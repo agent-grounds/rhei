@@ -244,8 +244,13 @@ records, and the plain/headless frontend writes them to stderr. Reusing this
 event path preserves the wording and frequency of existing validation warnings.
 
 `BudgetSnapshot` carries every bound in force — for each dimension the
-effective bound, its value source, the machine as limiting source where it
-clamped, and the consumed, outstanding and remaining amounts. The spend
+effective bound, its value source, the limiting source where its ceiling
+clamped — the machine, or the project where the machine delegated the ceiling
+to it — and the consumed, outstanding and remaining amounts. Where the
+dimension's ceiling was delegated, the entry also carries that ceiling with the
+project file holding it, and the snapshot carries the policy that delegated it,
+so the shared chrome can show whose ceiling is in force
+([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued)). The spend
 dimension is one of them, and it carries the account's currency so a frontend
 renders `$25.00` or `25.00 EUR` rather than a bare number whose unit the reader
 has to guess (§FS-rhei-budgets.5.5). It is emitted once after `RunStarted` and

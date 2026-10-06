@@ -142,8 +142,8 @@ error naming its line
    resolution, readiness, or the filesystem a worker can read
    (§FS-rhei-plan-language.3.12).
 7. Report each bound in force as a **warning**, one line per dimension, with
-   its effective value, its value source, and — when the machine clamped a
-   higher request — the machine as the limiting source
+   its effective value, its value source, and — when the active ceiling
+   clamped a higher request — the machine or the project as the limiting source
    ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued)). Every plan resolves all four settings
    keys — the three bounds in force plus the `invocation_lifetime_max` ceiling
    nothing consumes — so every successful validation reports all four lines; a
@@ -154,6 +154,11 @@ error naming its line
    (§FS-rhei-budgets.2.1). Asking for more than the machine allows is **never**
    an error here — the report says the plan asked and the machine limited, and
    validation still succeeds ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)).
+
+   Where the machine delegated a count ceiling to the project
+   (`defaults.clamp_projects: false`), the four lines are followed by one
+   ceiling line per delegated key and one policy line, in the words of
+   §FS-rhei-budgets.2.3. A machine that delegated nothing prints neither.
 
    Validation resolves and reports these bounds; it never locks, appends, or
    debits the account ([§FS-rhei-budgets.6.3](rhei-budgets.spec.md#63-what-never-debits)).
@@ -355,6 +360,20 @@ A clamped bound names both sources on its own line:
 
 ```text
 warning: transition_limit: 100 (requested 500 by the plan, limited by machine settings)
+```
+
+On a machine that delegated both count ceilings to a project declaring 1000 and
+500, the delegation lines follow the four bound lines:
+
+```text
+Validation succeeded
+warning: transition_limit: 1000 (project)
+warning: invocations_per_day: 500 (project)
+warning: invocation_lifetime_max: 6000 (built_in)
+warning: spend_per_day: 400.00 (built_in)
+warning: transition_limit ceiling: 1000 (project, /work/forge/.agent-grounds/rhei/settings.json)
+warning: invocations_per_day ceiling: 500 (project, /work/forge/.agent-grounds/rhei/settings.json)
+warning: count ceiling policy: delegated transition_limit, invocations_per_day by defaults.clamp_projects=false in /home/me/.config/rhei/settings.json
 ```
 
 These lines are unconditional, because every plan resolves all four of those

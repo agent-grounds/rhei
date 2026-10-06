@@ -424,11 +424,11 @@ path = "docs/functional-spec/rhei-agents.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1990, unit = "lines" }
+max_accepted = { value = 1999, unit = "lines" }
 until = "The agent specification is split at its own top-level boundaries — the profile registry and built-in catalogue apart from prompt composition, and the run loop apart from timeouts and log capture — each half carrying its own declaration, with every `§FS-rhei-agents.<n>` citation repointed."
 issue = "agent-grounds/rhei#179"
 reason = """
-Three subjects share this declaration: what an agent profile is, what rhei composes when it spawns one, and what the run loop does around it. The split is real and is not this change's to make. What is edited here is one ticket's specification point — `agents.<id>.family`, the built-in a wrapped profile belongs to, written into the field table, the merge rule, the roster's provenance, the wholesale-replacement rule it is the counterpart to, and the log header that carries it — and splitting the document in the same commit would move every section citation alongside a behaviour change, which is precisely what a spec-first commit must not hide.
+Three subjects share this declaration: what an agent profile is, what rhei composes when it spawns one, and what the run loop does around it. The split is real and is not this change's to make. What is edited here is one ticket's specification point — `agents.<id>.family`, the built-in a wrapped profile belongs to, written into the field table, the merge rule, the roster's provenance, the wholesale-replacement rule it is the counterpart to, and the log header that carries it — and splitting the document in the same commit would move every section citation alongside a behaviour change, which is precisely what a spec-first commit must not hide. agent-grounds/rhei#462 adds the first machine-only settings key, `defaults.clamp_projects`, to the defaults table with its agreed rule, and keeps where it is refused and how in §FS-rhei-budgets.2.1 so this document stays under its hard limit.
 """
 [[exceptions]]
 path = "crates/rhei-cli/src/cli/agent_spawn.rs"
@@ -639,20 +639,20 @@ path = "README.md"
 match = "exact"
 rules = ["entrypoint-doc"]
 kind = "deferred"
-max_accepted = { value = 300, unit = "lines" }
+max_accepted = { value = 400, unit = "lines" }
 until = "The Agent runtime capability list is replaced by a link to the command surface table, which already names every verb once."
 reason = """
-Two lines over the accepted shape before this change, and this touch added two more: a bullet for rhei show beside the rhei next one, because the list is what tells a reader which verbs exist. The boundary that is missing is that this list is a second hand-maintained copy of the command surface the functional spec already carries per verb, so every new verb is written twice and the README grows by the same bullet twice. Nothing here can shorten until the list is a link to that table and the orientation above it is what stays; deleting the bullet instead would leave the README naming rhei next and not the verb that reads what rhei next refuses.
+Two lines over the accepted shape before this change, and this touch added two more: a bullet for rhei show beside the rhei next one, because the list is what tells a reader which verbs exist. The boundary that is missing is that this list is a second hand-maintained copy of the command surface the functional spec already carries per verb, so every new verb is written twice and the README grows by the same bullet twice. Nothing here can shorten until the list is a link to that table and the orientation above it is what stays; deleting the bullet instead would leave the README naming rhei next and not the verb that reads what rhei next refuses. agent-grounds/rhei#462 adds the one sentence the approved proposal asked for under What bounds a run, naming `defaults.clamp_projects`, with the same boundary still missing.
 """
 [[exceptions]]
 path = "docs/functional-spec/rhei-budgets.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 1100, unit = "lines" }
+max_accepted = { value = 1200, unit = "lines" }
 until = "Section 10 (`rhei budget`) (the command surface: show's report and JSON members, adjust, forget and its table) is a declaration of its own under docs/functional-spec/, and every FS-rhei-budgets.10 citation in the crates, the tests and the sibling specs has been repointed at it."
 reason = """
-The boundary that is missing is a document for the `rhei budget` command surface. Section 10 describes what the operator types and reads — show's text and JSON members, adjust, and forget's case table — and is cited from 26 places in the crates and tests, so lifting it needs its own grund declaration and a re-point of every one of those markers, which is a restructure with its own review. What is edited here is one ticket's specification point (agent-grounds/rhei#411: a copied project is refused at its first charge, a moved one keeps its account), written into sections 5.3 and 5.4 and two new points 5.4.1 and 5.4.2 whose ids the approved proposal named; splitting the document in the same commit would move every section citation alongside a behaviour change, which a spec-first commit must not hide. agent-grounds/rhei#447 adds the ownership of the cross-project note to the same document, with the same seam still missing.
+The boundary that is missing is a document for the `rhei budget` command surface. Section 10 describes what the operator types and reads — show's text and JSON members, adjust, and forget's case table — and is cited from 26 places in the crates and tests, so lifting it needs its own grund declaration and a re-point of every one of those markers, which is a restructure with its own review. What is edited here is one ticket's specification point (agent-grounds/rhei#411: a copied project is refused at its first charge, a moved one keeps its account), written into sections 5.3 and 5.4 and two new points 5.4.1 and 5.4.2 whose ids the approved proposal named; splitting the document in the same commit would move every section citation alongside a behaviour change, which a spec-first commit must not hide. agent-grounds/rhei#447 adds the ownership of the cross-project note to the same document, with the same seam still missing. agent-grounds/rhei#462 adds the machine's delegation of the two count ceilings to the project (`defaults.clamp_projects: false`) to sections 2 to 2.3, 8, 9 and 10, with the same seam still missing.
 """
 [[exceptions]]
 path = "crates/rhei-core/src/parser/plan.rs"

@@ -11,6 +11,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use super::budget_delegated_support::assert_remedy_names_machine_file;
 use super::budget_edge_support::*;
 use super::budget_support::*;
 use super::*;
@@ -99,7 +100,7 @@ fn the_first_hand_applied_edge_establishes_the_absent_account_and_spends_a_unit(
     assert_halt_mentions(&refused, "2 (machine)");
     assert_halt_mentions(&refused, "consumed:    2  outstanding: 0  remaining: 0");
     assert_halt_mentions(&refused, "per ticket identity");
-    assert_halt_mentions(&refused, "set `defaults.transition_limit` in the machine settings file");
+    assert_remedy_names_machine_file(&refused, &dir, "transition_limit");
     assert_task_state(&plan, &machine, "1", "work");
 }
 

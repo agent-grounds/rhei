@@ -10,6 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use super::budget_delegated_support::assert_remedy_names_machine_file;
 use super::budget_edge_support::*;
 use super::budget_support::*;
 use super::*;
@@ -64,7 +65,7 @@ fn the_halted_ticket_keeps_its_state_its_artifacts_and_its_silence() {
 // §FS-rhei-budgets.8
 #[test]
 fn the_halt_names_the_dimension_the_numbers_the_mode_and_one_remedy() {
-    let (_dir, plan, machine) = setup("budget-travel-message", PING_PONG_MACHINE, FOUR_MOVES);
+    let (dir, plan, machine) = setup("budget-travel-message", PING_PONG_MACHINE, FOUR_MOVES);
 
     let result = run_plan(&plan, &machine, None);
 
@@ -72,7 +73,7 @@ fn the_halt_names_the_dimension_the_numbers_the_mode_and_one_remedy() {
     assert_halt_mentions(&result, "4 (machine)");
     assert_halt_mentions(&result, "consumed:    4  outstanding: 0  remaining: 0");
     assert_halt_mentions(&result, "per ticket identity");
-    assert_halt_mentions(&result, "set `defaults.transition_limit` in the machine settings file");
+    assert_remedy_names_machine_file(&result, &dir, "transition_limit");
 }
 
 /// Travel outlives the run, and it outlives `rhei reset`. "Once per run,

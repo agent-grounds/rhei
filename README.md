@@ -187,7 +187,10 @@ invocation already produces. Raise any of them for the whole machine with
 `defaults.transition_limit`, `defaults.invocations_per_day` or
 `defaults.spend_per_day` in `~/.config/rhei/settings.json`; a project may ask
 for less of any, a plan only of a ticket's travel, and more is reported rather
-than refused. A ticket's travel bound is per *identity*, so a copied task
+than refused. A machine that trusts the repositories it runs may set
+`defaults.clamp_projects: false` there, so that a project's own
+`transition_limit` and `invocations_per_day` become the ceiling on that machine.
+A ticket's travel bound is per *identity*, so a copied task
 definition is refused rather than handed the history of the ticket it was copied
 from. `rhei budget show <plan-or-project>` says where a project stands,
 and [Bounded ticket travel, project invocations, and a day's spend](docs/functional-spec/rhei-budgets.spec.md)

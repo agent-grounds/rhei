@@ -70,10 +70,15 @@ setting resolves ([§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults)):
 plan or profile  >  project settings  >  machine-global settings  >  built-in
 ```
 
-The machine's value is then applied as a **ceiling**:
+The resolved value is then clamped to the **active ceiling**, which is the
+machine's value unless the machine has delegated that dimension to the project:
 
 ```text
-effective bound = min(resolved value, machine value)
+active ceiling  = the project's value      if the machine sets clamp_projects: false,
+                                              the key is transition_limit or invocations_per_day,
+                                              and the project declares it
+                = machine value or built-in, otherwise
+effective bound = min(resolved value, active ceiling)
 ```
 
 Where machine-global settings configure no value for a dimension, the built-in
@@ -87,6 +92,27 @@ reports the bound says so. Refusing it would make a template invalid on the
 machine that did not write it; honoring it would let a template raise the cap of
 the machine that pays for it.
 
+Only the paying machine may hand the ceiling to the project, by setting
+`defaults.clamp_projects: false` in its own settings file, and only for
+`transition_limit` and `invocations_per_day`
+([§REQ-bounded-neural-work.2](../requirements/bounded-neural-work.spec.md#2-bounded-by-default-refusing-nothing-that-runs-today), §DF-delegated-count-ceiling). Each key is decided on its own: where
+the project declares the key, its value replaces the machine's as the ceiling,
+whether it is higher or lower; where it does not, the machine's value or the
+built-in stays the ceiling, exactly as on a machine that never set the switch.
+The resolution order does not change. Under delegation the project's value is
+the ceiling **and** the most specific settings value, so a plan or profile may
+lower it but never raise it:
+
+```text
+machine 80, project 40, profile 60   ->  40 (requested 60 by the plan, limited by project settings)
+machine 80, project 1000, no profile ->  1000 (project)
+machine 80, project 1000, profile 300 -> 300 (plan)
+```
+
+On a machine that does not delegate, the first of those resolves to 60, as it
+always has. `spend_per_day` and `invocation_lifetime_max` are never delegated:
+whatever the switch says, the machine stays their ceiling.
+
 The clamp is enumerated to exactly the two count dimensions and the spend
 dimension. `agent_timeout`, `attempts:`, `visits:`, `poll.max_attempts`, and
 every other setting keep their existing resolution and are not clamped by
@@ -98,7 +124,8 @@ The first term of the chain above is not open to every dimension:
 
 ### 2.1. The settings keys
 
-Four keys in the `defaults` block of global or project settings
+Four keys in the `defaults` block of global or project settings, and one that
+only the machine's settings may carry
 ([§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults)):
 
 | Key | Type | Built-in | Bounds |
@@ -107,6 +134,24 @@ Four keys in the `defaults` block of global or project settings
 | `invocations_per_day` | positive integer | `200` | admitted neural starts per project per UTC day, in the window contract |
 | `invocation_lifetime_max` | positive integer | `6000` | the ceiling on an explicit lifetime allowance |
 | `spend_per_day` | positive number | `400.00` | measured spend per project per UTC day |
+| `clamp_projects` | boolean, machine settings only | `true` | `false` makes a declared project `transition_limit` or `invocations_per_day` the ceiling in place of the machine's |
+
+`clamp_projects` is not a bound but the machine's choice of whose value the two
+count bounds are clamped to (§FS-rhei-budgets.2). It does not reach
+`invocation_lifetime_max` or `spend_per_day`, and it is refused by its presence,
+whatever its value, anywhere but the machine settings file
+([§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults)).
+Those places are either project settings home (`.agent-grounds/rhei/settings.json`
+and the deprecated `.agents/rhei/settings.json`) and a state machine — at its
+root, in its root `defaults`, or on or under any profile. In a state machine
+`found in:` names the file and the field, such as
+`states.yaml (profiles.reviewed.defaults.clamp_projects)`:
+
+```text
+error: `defaults.clamp_projects` may only be set in the machine settings file
+       found in:  /work/forge/.agent-grounds/rhei/settings.json
+       set it in: /home/me/.config/rhei/settings.json
+```
 
 The four built-in values are measured rather than chosen, and the measurement —
 the definition of a healthy history, the observed maxima, the multiplier, and
@@ -151,8 +196,10 @@ profiles:
 The field is **optional**. A profile that declares none resolves the settings
 chain above, so a machine that has never been configured still bounds every node
 of every profile. A declared value is an inner value like any other: honored
-when it is at or below the machine's ceiling, clamped and reported when it is
-above.
+when it is at or below the active ceiling, clamped and reported when it is
+above. The active ceiling is the machine's, or the project's where the machine
+delegated `transition_limit` to it (§FS-rhei-budgets.2), so under delegation a
+profile asking above the project's value gets the project's value.
 
 Every node resolves a profile and therefore a travel bound, including the
 virtual project root.
@@ -161,12 +208,14 @@ virtual project root.
 
 A reported bound carries two facts, because they answer different questions: the
 **value source** is whoever set the requested value, and the **limiting source**
-is the machine, named only when the machine clamped it.
+is whoever holds the active ceiling — the machine, or the project where the
+machine delegated the ceiling to it — named only when that ceiling clamped it.
 
 ```text
 transition_limit: 80 (built_in)
 transition_limit: 40 (plan)
 transition_limit: 100 (requested 500 by the plan, limited by machine settings)
+transition_limit: 40 (requested 60 by the plan, limited by project settings)
 ```
 
 The value sources are `built_in`, `machine`, `project`, and `plan` — `plan`
@@ -181,7 +230,26 @@ same sentence on every surface that reports a bound:
 
 ```text
 <key>: <effective> (requested <N> by the <value source>, limited by machine settings)
+<key>: <effective> (requested <N> by the <value source>, limited by project settings)
 ```
+
+Where the machine delegated, the view also says whose ceiling is in force, with
+one ceiling row per delegated key and one policy row naming the delegated keys
+and the machine file that delegated them. `<P>` and `<M>` stand for the project
+and machine settings files actually read:
+
+```text
+transition_limit: 20 (plan)
+transition_limit ceiling: 40 (project, <P>)
+invocations_per_day ceiling: 500 (project, <P>)
+count ceiling policy: delegated transition_limit, invocations_per_day by defaults.clamp_projects=false in <M>
+```
+
+The policy row lists only the keys actually delegated: a project that declares
+`transition_limit` alone gets one ceiling row, and the policy row names
+`transition_limit` alone. A key the project does not declare keeps the machine's
+ceiling and gets no row. A machine that does not delegate gets neither row, so
+its views read exactly as before.
 
 ## 3. The invocation contracts
 
@@ -917,17 +985,29 @@ pass makes no progress, naming every halted ticket.
 The halt names, in one place:
 
 - the **dimension** — ticket travel, project invocations, or project spend;
-- the **effective bound** and its **value source**, plus the machine as the
-  **limiting source** when the value was clamped ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued));
+- the **effective bound** and its **value source**, plus the **limiting
+  source** when the value was clamped — the machine, or the project where the
+  machine delegated the ceiling to it ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued));
+- where the machine delegated the dimension's ceiling, a **ceiling** row naming
+  the project file that holds it and the machine file that delegated it;
 - **consumed**, **outstanding**, and **remaining**;
 - the **accounting mode** — window, with its day key, or lifetime;
 - exactly **one remedy**, the one that raises the limiter that actually stopped
-  the work: the machine-global settings key when the ceiling limits, the audited
+  the work: the settings key in the file that holds the active ceiling when the
+  ceiling limits, named by its path, the audited
   `rhei budget adjust` when an explicit lifetime allowance limits, and the
   **renewal instant** when the window limits.
 
 It never offers an inner value the ceiling would clamp: telling an operator to
 raise a plan field that cannot take effect sends them to the wrong file.
+
+Every settings remedy names the file by the path rhei actually read, on every
+machine: the machine settings file as the loader opens it, expanded
+(`~/.config/rhei/settings.json`), or the project settings file the loader chose —
+the deprecated `.agents/rhei/settings.json` where that is the one it read, not
+the current home. A remedy that named a file by its role would leave the reader
+to work out which of two project homes is meant, and that is the question the
+remedy exists to answer.
 
 The labels are fixed, so that one halt reads the same on every surface:
 
@@ -937,7 +1017,7 @@ error: ticket 'plan.1' has spent its travel bound
        bound:       4 (machine)
        consumed:    4  outstanding: 0  remaining: 0
        mode:        per ticket identity
-       to raise it: set `defaults.transition_limit` in the machine settings file
+       to raise it: set `defaults.transition_limit` in /home/me/.config/rhei/settings.json
 ```
 
 A clamped bound carries the requester as well, in the one line of
@@ -946,8 +1026,32 @@ requester:
 
 ```text
        bound:       100 (requested 500 by the plan, limited by machine settings)
-       to raise it: set `defaults.transition_limit` in the machine settings file
+       to raise it: set `defaults.transition_limit` in /home/me/.config/rhei/settings.json
 ```
+
+Where the machine delegated the dimension's ceiling to the project
+(§FS-rhei-budgets.2), the halt gains one row, `ceiling:`, directly after
+`bound:`, and the remedy names the project's file. `<P>` and `<M>` stand for
+the project and machine settings files actually read:
+
+```text
+       bound:       20 (plan)
+       ceiling:     40 (project, <P>; delegated by defaults.clamp_projects=false in <M>)
+       consumed:    20  outstanding: 0  remaining: 0
+```
+
+```text
+error: ticket 'forge.3' has spent its travel bound
+       dimension:   ticket travel
+       bound:       1000 (project)
+       ceiling:     1000 (project, /work/forge/.agent-grounds/rhei/settings.json; delegated by defaults.clamp_projects=false in /home/me/.config/rhei/settings.json)
+       consumed:    1000  outstanding: 0  remaining: 0
+       mode:        per ticket identity
+       to raise it: set `defaults.transition_limit` in /work/forge/.agent-grounds/rhei/settings.json
+```
+
+A dimension the machine did not delegate has no `ceiling:` row, so a halt on a
+machine that never set `clamp_projects` has exactly the rows above.
 
 A window-limited halt replaces the remedy with the instant the window renews,
 because nothing an operator does is needed and saying otherwise would send them
@@ -1005,6 +1109,12 @@ is spent, on every surface that already shows autonomous work:
 - **`rhei validate`** reports each bound in force with its value and provenance,
   on the warning channel and in the report order of [§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior). It
   never fails a plan for asking above the ceiling.
+
+Wherever a view lists the bounds — `rhei validate`, `rhei budget show`, the run's
+text summary and the run report — it follows them, where the machine delegated a
+ceiling, with the ceiling and policy rows of §FS-rhei-budgets.2.3, once per view
+and never per spawn. The run's JSON and TUI records carry the same facts as
+fields ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)).
 - **`rhei run`** text and TUI show each bound with consumed, outstanding, and
   remaining amounts, updating as receipts are written rather than only at
   exhaustion ([§FS-rhei-run-tui.1.1](rhei-run-tui.spec.md#11-event-surface)).
@@ -1052,6 +1162,17 @@ remaining, the contract in force, the window day key where one applies, the
 account's health, and the project identity. For spend it reports the amounts in
 the account's currency and additionally how much of the day was charged at the
 fallback rather than measured, by the three marks of §FS-rhei-budgets.6.2.
+Where the machine delegated a ceiling, the text report follows its bound lines
+with the ceiling and policy rows of §FS-rhei-budgets.2.3.
+
+Under `--format json` each entry of `bounds` carries `effective`, `source`,
+`requested`, and `limited_by`, which is `"machine"` or `"project"` — whoever
+holds the ceiling that clamped it — and `null` where nothing clamped. A delegated
+key's entry also carries `ceiling`, `{ "value", "source": "project", "path" }`,
+and the report carries `ceiling_policy`, `{ "delegated": [<keys>], "setting":
+"defaults.clamp_projects", "path": <M> }`. Both are absent where the machine
+delegated nothing, so a machine that never set the switch reads the same report
+as before.
 
 The marks go on their own line beneath the spend line, in the words the halt
 uses, and the line is absent where the whole day was measured:

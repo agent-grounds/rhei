@@ -58,12 +58,8 @@ settings configure no value for a count dimension, the built-in default *is* the
 machine's value and therefore the machine's ceiling: there is no configured
 state, and no unconfigured state, in which a count dimension has no bound.
 
-The machine's value is a **ceiling**, not merely a default. A project setting, a
-plan, or a profile may declare a lower value and is honored; one that declares a
-higher value is accepted, clamped to the machine's value, and reported as
-clamped. Asking for more than the machine allows is never a validation refusal —
-otherwise a template written on one machine would either be invalid on another
-or would raise the cap of the machine that pays for it. [§FS-rhei-budgets.2](../functional-spec/rhei-budgets.spec.md#2-where-a-bound-comes-from)
+The machine's configured value, or the built-in value where none is configured, is the ceiling by default. Only the paying machine may explicitly delegate the ceiling to the project's settings, by setting `defaults.clamp_projects: false` in its own settings file, and only for `transition_limit` and `invocations_per_day`. Where it does, each declared project value replaces the machine's ceiling for that dimension, whether higher or lower; an undeclared dimension retains the machine's ceiling. A plan or profile may lower the active ceiling but cannot raise it. Requests above the active ceiling are accepted, clamped and reported with their requesting and limiting sources, rather than refused. Thus a template remains valid across machines without gaining authority to raise a ceiling through a plan or profile; any project settings it ships can replace the two named ceilings only under that machine's explicit delegation. Spend and the lifetime-allowance ceiling are not delegated.
+[§FS-rhei-budgets.2](../functional-spec/rhei-budgets.spec.md#2-where-a-bound-comes-from)
 
 **Level 1 is the exception, and it is recorded here rather than resolved away.**
 Everything above is scoped to the count dimensions — levels 3 to 5 — which is
@@ -133,17 +129,11 @@ where it is least watched. §FS-rhei-budgets.6.2
 
 ## 4. Nothing creates capacity
 
-Neither count is ever created by an operation that is not one of its two lawful
-sources. `rhei reset`, a fresh `rhei run`, `--rhei` selection, snapshots,
-appended work, live member admission, a restart, a copy or a move of a plan
-file, and a nested runtime create no travel and no invocation capacity, and in
-window mode none of them advances the window.
+`rhei reset`, a fresh `rhei run`, `--rhei` selection, snapshots, appended work, live member admission, a restart, a copy or a move of a plan file, and a nested runtime refund no consumed travel or invocation count, discard no outstanding reservation, and in window mode do not advance the window.
 
-Fresh invocation capacity has exactly two lawful sources: the passage of the
-window, and an audited `init` or `adjust` under the machine's ceiling.
+Invocation headroom — a bound less what is charged against it — rises in exactly three ways. The first is the passage of the UTC window under the window contract. The second is a raise of the effective `invocations_per_day` by a settings change that §REQ-bounded-neural-work.2 permits: a project raise below an unchanged machine ceiling, a raise of a project ceiling the machine delegated, or a raise of the machine's own value. Such a raise is in force when the changed settings are next read, and it is measured against the same day's consumed and outstanding counts. The third is an audited `init` or `adjust` that establishes or changes a lifetime allowance under the resolved `defaults.invocation_lifetime_max`, which remains subject to the machine's ceiling and is not delegated. A changed bound changes the measure, never the record: it rewrites no receipt, forgives no consumption, grants or changes no lifetime allowance, and enlarges, revives or extends no existing ancestor reservation. A lowered bound takes effect at the same boundary and removes headroom without erasing consumption or cancelling already admitted work.
 
-Fresh travel has exactly one lawful source: a genuinely new ticket identity,
-which is a ticket whose id this project's account has never bound. A ticket
+Fresh travel history has exactly one lawful source: a genuinely new ticket identity, whose id this project's account has never bound. A raise of the effective `transition_limit` that §REQ-bounded-neural-work.2 permits may add remaining travel against an existing identity, but preserves all travel already consumed or outstanding against it. A ticket
 that is copied, moved, or re-instantiated under an id the account has already
 bound keeps its history, so reset-and-rerun converges on the travel bound
 rather than escaping it. No operation may assert a ticket identity the account
@@ -177,8 +167,10 @@ exits non-zero once a pass makes no progress, naming every halted ticket.
 A halt is only useful if it says what to do, so it names the dimension, the
 effective bound, the consumed, outstanding and remaining amounts, the accounting
 mode, the source that set the value, the machine as the limiting source when the
-value was clamped, and **exactly the one remedy that raises the active limiter** —
-the machine-global settings key when the ceiling limits, the audited `adjust`
+value was clamped — or the project's settings file, by its path, where the machine
+delegated the ceiling to it and that ceiling clamped the value — and **exactly the
+one remedy that raises the active limiter** — the settings key in the file that
+holds the active ceiling when the ceiling limits, the audited `adjust`
 when an explicit allowance limits, and the renewal instant when the window
 limits. It never names an inner value the ceiling would clamp.
 

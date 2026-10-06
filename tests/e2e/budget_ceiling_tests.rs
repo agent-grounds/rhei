@@ -10,6 +10,7 @@
 
 use std::path::PathBuf;
 
+use super::budget_delegated_support::assert_remedy_names_machine_file;
 use super::budget_support::*;
 use super::*;
 
@@ -106,7 +107,7 @@ fn the_run_uses_the_machines_value_and_reports_that_it_limited_the_plans() {
     );
     assert!(!result.status.success(), "the ticket is halted at the ceiling");
     assert_halt_mentions(&result, "4 (requested 500 by the plan, limited by machine settings)");
-    assert_halt_mentions(&result, "set `defaults.transition_limit` in the machine settings file");
+    assert_remedy_names_machine_file(&result, &dir, "transition_limit");
 }
 
 /// A lower inner value is honored, because the ceiling is a maximum and not a

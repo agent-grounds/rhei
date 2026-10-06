@@ -212,6 +212,16 @@ recorded task and hop and exactly one command:
 rhei recover <execution-root>
 ```
 
+A pending removal is the same interlock under a second marker,
+`.rhei/pending-removal.json` at the project execution root
+(§FS-rhei-remove.6.2). While it exists every entry point other than the
+`rhei remove` invocation that resumes it refuses in the same place and the same
+way, naming the pending ticket and printing exactly one command:
+
+```text
+rhei remove <qualified-id>
+```
+
 No loader automatically rolls forward or back. With no marker, acquisition
 and release of the shared guard are the only added behavior and existing
 command bytes and effects remain unchanged. Older binaries cannot enforce this

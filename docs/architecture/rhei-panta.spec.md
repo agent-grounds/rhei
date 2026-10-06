@@ -104,6 +104,12 @@ keeps keying by node rather than by metadata key. A `basin/` ticket file admits
 no such block at all: the basin's metadata document is the project manifest
 (§FS-rhei-panta.2).
 
+One key of the project metadata is never rhei-local: `metadata.retiredTickets`
+(§FS-rhei-remove.5.1) is keyed by project-qualified id already, lives in the
+manifest of a Panta project and in the lone rhei's metadata document otherwise,
+and is read from there as written. A member rhei's own copy of the key is not
+merged, so a retirement survives the replacement of the rhei it came from.
+
 Every load path yields a Panta-rooted graph. A bare rhei loaded directly — a
 `.rhei.md` file or a Directory Workspace with no enclosing `index.panta.md` — is
 treated as the single rhei of an **implicit Panta**: the loader synthesizes the

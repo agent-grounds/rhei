@@ -269,6 +269,10 @@ does not silently drift from the current CLI surface.
 | `transition --force` | `--to` | Valid profile target states missing both an exact and ordinarily matching wildcard edge from `--from` |
 | `recover` | `EXECUTION_ROOT` | Directory path completion |
 | `reset` | `RHEI_PLAN` | Rhei plan/workspace path completion |
+| `remove` | `TICKET_OR_PLAN` | Rhei plan/workspace path completion |
+| `remove` | `--task` | Task ids from the selected plan/workspace |
+| `remove` | `--rhei` | Rhei ids from the selected project |
+| `remove` | `--dry-run` | Static flag completion |
 | `install-skills` | `--agent` | `claude-code`, `cursor`, `windsurf`, `copilot`, `kilocode`, `pi`, `codex`, `antigravity`, `all` |
 | `install-skills` | `--local`, `--link`, `--uninstall`, `--dry-run` | Static flag completion |
 | `install-skills` | `--skills` | Comma-aware skill name completion |

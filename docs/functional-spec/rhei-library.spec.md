@@ -459,6 +459,8 @@ before anything is written:
 cannot place ticket '<placed-id>': task id already exists in target
 ```
 
+A retired id (§FS-rhei-remove.5.2) is refused the same way, naming
+`metadata.retiredTickets`: placement never brings back an id removal retired.
 A template with tickets can therefore be placed once per parent. Two rounds of
 one workflow are not two placements: they are one set of states and two ticket
 sets the host authors in them. A template may ship states and no tickets for

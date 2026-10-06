@@ -274,6 +274,14 @@ honest answer for a cause the user cannot have created is §1.2's bug report.
 Recurring categories share one wording so that improving a remedy improves
 every site that reaches it.
 
+`rhei remove` refusals are covered like every other: each opens
+`<qualified-id> cannot be removed: <reason>`, names every blocker with the
+path, task or run it was found in, and ends with the remedy that applies — for
+a ticket with history, its machine's cancellation through `rhei transition`
+(§FS-rhei-remove.3.4); for a dependent or a child, the ticket to change first.
+A pending removal that blocks another entry point prints the one `rhei remove`
+invocation that resumes it (§FS-rhei-recover.4).
+
 ## 7. A Spawn Failure the Command Line's Size Explains
 
 An agent that carries its prompt in `argv`

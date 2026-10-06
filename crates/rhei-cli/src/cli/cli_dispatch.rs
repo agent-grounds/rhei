@@ -400,6 +400,13 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
                 dry_run,
             )
         }
+        Commands::Remove { input, task, rhei, dry_run, state_machine } => remove_command(
+            input,
+            task,
+            &rhei,
+            dry_run,
+            state_machine.or(before_subcommand).as_deref(),
+        ),
         Commands::Reset { input, rhei, dry_run, yes, state_machine } => {
             // §FS-rhei-panta.6: reset destroys runtime state, so it is the one
             // plan-taking command that never infers an omitted target.

@@ -56,7 +56,7 @@ fn the_switch_in_either_project_settings_home_is_refused_whatever_its_value() {
                 home,
                 &format!(r#"{{ "defaults": {{ "clamp_projects": {value} }} }}"#),
             );
-            let found = format!("{home}/settings.json");
+            let found = project_file(Path::new(""), home).display().to_string();
             assert_refused_outside_the_machine(
                 &dir,
                 &plan,

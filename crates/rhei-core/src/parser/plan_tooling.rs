@@ -3,14 +3,11 @@
 //! grammar's ordering rules for them live in one place.
 //! §FS-rhei-plan-language.2 §FS-rhei-task-tooling.1
 
-use crate::task_tooling::{parse_tooling_value, MCP_SERVERS_FIELD, SKILLS_FIELD};
+use crate::task_tooling::{parse_tooling_value, MCP_SERVERS_FIELD, SKILLS_FIELD, TOOLING_FIELDS};
 use crate::tokens::TASK_METADATA_FIELDS;
 
 use super::builder::NodeBuilder;
 use super::{ParseError, Result};
-
-/// The tooling fields, which the grammar places last in the metadata block.
-const TOOLING_FIELDS: [&str; 2] = [MCP_SERVERS_FIELD, SKILLS_FIELD];
 
 /// Every metadata marker the grammar places before the tooling fields: the
 /// closed block's other fields, read from the one copy of the set rather than

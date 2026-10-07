@@ -981,71 +981,78 @@ states that use this agent. See
 
 ### 2.3. Recognized Provider Refusals
 
-Rhei recognizes one provider refusal in addition to a normal process result.
+Rhei recognizes a provider refusal in addition to a normal process result.
 Recognition requires all of the following:
 
 - the resolved provider is one of `openai` or `anthropic`, matched exactly and
   case-sensitively. **The resolved agent registry id is not tested**;
 - the invocation exited non-zero and was neither timed out nor interrupted;
 - after stripping terminal-control decoration and trimming surrounding
-  whitespace from each captured logical stdout and stderr line, exactly one line is
-  `You've hit your <period> limit · resets <h>[:<mm>]<am|pm> (<zone>)`, where
-  `<period>` is `session` or `weekly`, matched exactly and case-sensitively,
-  `<h>` is `1` through `12`, `<mm>` — when present — is two digits from `00`
-  through `59` and an absent `:<mm>` means `00`, the meridiem is lowercase, and
-  `<zone>` is an installed IANA time-zone name whose local time is valid and
-  unambiguous. Terminal decoration means ANSI escape sequences; removing it must
-  not otherwise rewrite the line.
+  whitespace from each captured logical stdout and stderr line, exactly one line
+  matches one of the two whole-line, case-sensitive grammars below. Terminal
+  decoration means ANSI escape sequences; removing it must not otherwise
+  rewrite the line.
+
+The time-of-day grammar is
+`You've hit your <period> limit · resets <h>[:<mm>]<am|pm> (<zone>)`, where
+`<period>` is `session` or `weekly`, matched exactly and case-sensitively,
+`<h>` is `1` through `12`, `<mm>` — when present — is two digits from `00`
+through `59` and an absent `:<mm>` means `00`, the meridiem is lowercase, and
+`<zone>` is an installed IANA time-zone name whose local time is valid and
+unambiguous.
+
+The absolute-date Codex grammar is exactly:
+
+```text
+You've hit your usage limit. Visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at <Mon> <d><ordinal>, <yyyy> <h>:<mm> <AM|PM>.
+```
+
+`<Mon>` is an English month abbreviation from `Jan` through `Dec`; `<d>` is
+an unpadded day from `1` through `31`; `<yyyy>` is exactly four digits from
+`0001` through `9999`; `<h>` is an unpadded hour from `1` through `12`;
+`<mm>` is exactly two digits from `00` through `59`; and the meridiem is
+uppercase `AM` or `PM`. The ordinal suffix must agree with the day: `11`–`13`
+use `th`, otherwise a final digit of `1`, `2`, or `3` uses `st`, `nd`, or `rd`,
+respectively, and all others use `th`. The calendar date must exist, including
+the leap-year rule. The full date has no printed zone and uses OS-local
+timezone rules, with the unique, future safe boundary of §FS-rhei-run.3.3.
 
 For the resolved `claude-code` family, a stream-json stdout event with
 `type: "result"` and a textual `result` contributes the decoded result text's
 logical lines, rather than the JSON envelope, to recognition. This is the
 human-readable result output of §FS-rhei-cost-accounting.4; recognition does
 not require successful usage extraction. Assistant text echoes, rate-limit
-events, and other JSON events contribute no decoded refusal text. Stderr and
-ordinary non-JSON stdout retain their captured lines; other families do not
-gain Claude stream-json decoding. This interpretation does not search arbitrary
-JSON fields or deduplicate signals: two matching logical lines in one result,
-two matching result events, or a matching result plus an independently emitted
-matching plain line still fail the exactly-one-line requirement.
+events, and other JSON events contribute no decoded refusal text.
+
+For the resolved `codex` family, a stdout JSON event with `type: "error"` and
+a textual `message` contributes that decoded text's logical lines instead of
+the JSON envelope. `turn.failed`, assistant echoes, and arbitrary fields
+contribute no decoded refusal text. Family selection uses the resolved family,
+not the registry id; neither family gains the other's event decoding. Stderr
+and ordinary non-JSON stdout retain their captured lines.
+
+Count whole-line signals across both grammars and all plain and decoded lines
+before resolving any date or timezone. Do not deduplicate: two matching lines
+in one decoded text, two matching events, mixed grammars, or a decoded signal
+plus an independently emitted matching plain line remain an ordinary process
+result even if one signal's date cannot be resolved.
 
 The match does not search inside prose. An exit of `0`, absent or malformed
-reset information, an absent or invalid zone, a nonexistent or ambiguous local
-time, or a second matching line is an ordinary process result. Timeout and
+reset information, an absent or invalid required zone, an invalid calendar
+date or ordinal, a nonexistent or ambiguous local time, unavailable local
+resolution, or a second matching line is an ordinary process result. Timeout and
 interruption are classified first, so their output can never turn them into a
 provider limit (§FS-rhei-agents.7.3, §FS-rhei-run.3.2). The recognized result is
 the provider-limited ending of §FS-rhei-run.3.3, whose durable record carries
 the resolved agent registry id alongside the provider.
 
-**The provider set is closed**: `openai` and `anthropic` are the whole of it,
-and a provider joins it by a change to this specification rather than to a
-project's configuration. The set is what carries the claim being made — that
-this line names a reset instant worth sleeping on. A registry id cannot carry
-that claim, because an entry may be named anything and wrap anything
-(§FS-rhei-agents.2.1); an entry named `cld1` resolving `anthropic` is therefore
-recognized, and one named `codex` resolving `acme` is not.
-
-**The period vocabulary is closed on the same terms, and the reset names a time
-of day only.** `session` and `weekly` are the whole of the vocabulary, and a
-third period word joins it by a change to this specification rather than by a
-project's configuration — the rule the provider set is already held to. An open
-token slot would rest recognition on the provider set and a sentence shape
-alone, so a recognized provider printing `You've hit your disk limit · resets
-6am (Europe/Zurich)` would park. A **dated** reset — `resets Oct 1, 5:59am`, the
-form a reset further than a day out takes — is deliberately not recognized
-either, because §FS-rhei-run.3.3 resolves the reported local minute against the
-observation's own date precisely since this grammar carries none, and a dated
-reset would have to infer a year the line does not print. Both stay ordinary
-process results, and both are decisions rather than oversights.
-
-Two cases stay ordinary process results whatever the invocation printed. A
-resolved provider **outside the set**, including one differing only in case: a
-profile written `"provider": "Anthropic"` does not park. And a state that
-resolves an agent but **no provider at all** — a bare `agent:` with no model
-profile and no `<provider>` in its target (§FS-rhei-agents.1.4). Recognition
-keys on the resolved provider, so there is nothing to match and no execution
-identity to key a wait on, and the invocation is routed as the agent failure it
-appears to be. Program states resolve no agent and never park.
+The provider set and time-of-day period vocabulary are closed; extending them
+requires a specification change. Neither grammar is configurable through
+project settings. Unknown period words and yearless Claude dated resets such
+as `resets Oct 1, 5:59am` remain ordinary process results. Unknown, wrong-case,
+or absent providers never park; program states resolve no agent and never
+park. The rationale and examples for these boundaries are in
+[§FS-rhei-provider-refusal-rationale](rhei-provider-refusal-rationale.spec.md#fs-rhei-provider-refusal-rationale-why-provider-refusal-recognition-is-closed).
 
 ## 3. Prompt Composition
 

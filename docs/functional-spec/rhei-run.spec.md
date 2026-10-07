@@ -742,13 +742,27 @@ emitted, and the invocation does not spend the state visit's `attempts:`
 budget. Its log, spawn record, and any reported usage remain available.
 
 The observation instant is the subprocess-completion wall clock captured before
-classification. Rhei resolves the reported reset against that instant's local
-date in the named zone. The safe boundary is the first instant of the minute following the
-reported minute. If that boundary is not strictly later than the observation,
-Rhei resolves the same local minute on the next local date. Both the reported
-minute and its following-minute boundary must resolve uniquely; Rhei does not
-guess through a daylight-saving overlap or gap. The resulting
-`nextAttemptAt` is stored as an RFC 3339 UTC instant. A later valid deadline
+classification. The safe boundary is the first instant of the minute following
+the reported minute, including a date or year rollover.
+
+For the session/weekly time-of-day grammar, Rhei resolves the reported reset
+against the observation's local date in the printed IANA zone. If that boundary
+is not strictly later than the observation, Rhei resolves the same local minute
+on the next local date. This named-zone policy is unchanged.
+
+For the absolute-date Codex grammar, Rhei resolves the printed date and minute
+with the machine's OS-local timezone rules. Both the reported minute and its
+following-minute boundary must resolve uniquely. Invalid calendar dates,
+daylight-saving gaps or overlaps in either minute, unavailable local resolution,
+and a safe boundary at or before observation remain ordinary process results.
+Rhei never rolls an absolute date forward and never substitutes UTC for an
+unavailable local zone. Codex and Rhei must use the same local timezone; a
+remote wrapper configured differently can report a different instant.
+
+Both grammars require unique resolution of the reported minute and boundary;
+Rhei does not guess through a daylight-saving overlap or gap. The resulting
+`nextAttemptAt` is stored as an RFC 3339 UTC instant, in the existing schema.
+A later valid deadline
 for the same task, state, and identity replaces an earlier one; an earlier or
 equal deadline does not shorten an active wait.
 

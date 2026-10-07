@@ -149,6 +149,7 @@ mod parallel_target_override_tests;
 mod poll_resume_program_tests;
 mod poll_wait_outcome_tests;
 mod provider_limit_cleanup_tests;
+mod provider_limit_codex_tests;
 mod provider_limit_compatibility_tests;
 mod provider_limit_parking_tests;
 mod provider_limit_poll_tests;

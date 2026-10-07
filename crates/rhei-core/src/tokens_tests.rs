@@ -77,10 +77,20 @@ macro_rules! field {
 /// The marker a metadata token is read from, and `None` for every other token.
 ///
 /// There is no wildcard arm, so a variant added to [`Token`] does not compile
-/// until it is placed here. Each metadata arm names its marker through `field!`,
-/// which fails the test build, naming the marker, while [`TASK_METADATA_FIELDS`]
-/// does not hold it: whether or not [`FIELD_LINES`] has a line for it, and
-/// under `cargo build --all-targets` as well as `cargo test`.
+/// until it is placed here. Two checks then hold its marker to
+/// [`TASK_METADATA_FIELDS`]:
+///
+/// - An arm written through `field!` fails the test build, naming the marker,
+///   while the set does not hold it: whether or not [`FIELD_LINES`] has a line
+///   for it, and under `cargo build --all-targets` as well as `cargo test`.
+/// - The forward test fails at runtime for every line of [`FIELD_LINES`] the
+///   lexer reads as metadata with a marker the set lacks, however its arm is
+///   written.
+///
+/// Nothing makes an arm use `field!`: Rust 1.82 cannot force the macro. So an
+/// arm written as a plain `Some(..)` with no line in [`FIELD_LINES`] is caught
+/// by neither check, and a variant placed in the `None` group below is not
+/// checked at all.
 fn field_of(token: &Token) -> Option<&'static str> {
     match token {
         Token::MetadataState { .. } => field!("**State:**"),
@@ -109,15 +119,24 @@ fn token_of(line: &str) -> Token {
 }
 
 /// Reader to set: each line the lexer reads as metadata opens with the marker
-/// [`field_of`] names for its token, which the set holds or this would not
-/// compile, and each field the tooling reader matches is in the set — so the
-/// description guard that reads the set refuses a line opening with it.
+/// [`field_of`] names for its token, and the set holds that marker; each field
+/// the tooling reader matches is in the set too — so the description guard that
+/// reads the set refuses a line opening with it.
+///
+/// The membership check runs here, at runtime, for every line of [`FIELD_LINES`]
+/// the lexer reads as metadata, whichever way its arm names the marker. That is
+/// what holds an arm written as a plain `Some(..)`, which `field!` does not.
 #[test]
 fn every_field_read_as_metadata_is_in_the_set() {
     for line in FIELD_LINES {
-        if let Some(field) = field_of(&token_of(line)) {
-            assert!(line.starts_with(field), "{line:?} lexed as {field}");
-        }
+        let Some(field) = field_of(&token_of(line)) else {
+            continue;
+        };
+        assert!(line.starts_with(field), "{line:?} lexed as {field}");
+        assert!(
+            TASK_METADATA_FIELDS.contains(&field),
+            "the lexer reads {field} as task metadata, but TASK_METADATA_FIELDS does not hold it"
+        );
     }
     for field in TOOLING_FIELDS {
         assert!(

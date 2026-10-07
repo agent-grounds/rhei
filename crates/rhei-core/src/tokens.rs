@@ -28,10 +28,15 @@ const TOKEN_FIELDS: [&str; 9] = [
 /// line opening with any of them (§FS-rhei-new.3.4.2).
 ///
 /// A tooling field is in the set by construction. A token's marker is kept by
-/// hand in the list above, and the test build holds it to the lexer: the module
-/// beside [`Token`] places every variant with no wildcard arm, and a variant
-/// placed as metadata fails to compile, naming its marker, until this set holds
-/// that marker. The lexer stands in for the parser there, whose own field
+/// hand in the list above, and the test module beside [`Token`] holds it to the
+/// lexer. That module places every variant with no wildcard arm, then checks
+/// each metadata arm two ways: one written through its `field!` macro fails the
+/// test build, naming its marker, until this set holds that marker, and a test
+/// fails at runtime for every line of its field table the lexer reads as
+/// metadata with a marker this set lacks. Neither check catches an arm written
+/// without `field!` that has no line in that table, since Rust 1.82 cannot force
+/// the macro, and a variant placed among the arms that name no marker is not
+/// checked at all. The lexer stands in for the parser there, whose own field
 /// branches match the same markers without calling it.
 pub const TASK_METADATA_FIELDS: [&str; TOKEN_FIELDS.len() + TOOLING_FIELDS.len()] = {
     let mut fields = [""; TOKEN_FIELDS.len() + TOOLING_FIELDS.len()];

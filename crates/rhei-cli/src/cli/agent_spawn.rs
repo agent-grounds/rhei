@@ -514,7 +514,7 @@ fn spawn_and_wait_agent(
     let duration = format_duration_human(elapsed.as_secs());
     let ended_wall = std::time::SystemTime::now();
     let provider_limit = captured_lines.lock().ok().and_then(|lines| {
-        // Decode only Claude stdout result text before whole-line recognition. §FS-rhei-agents.2.3
+        // Decode Claude stdout result or Codex error.message before whole-line recognition. §FS-rhei-agents.2.3
         let lines = provider_limit_output_lines(resolved.family(), &lines);
         classify_provider_limit(
             resolved,

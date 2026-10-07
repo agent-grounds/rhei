@@ -93,10 +93,8 @@ fn workspace_sibling_remedy_validates_owning_workspace() {
 
 /// A `basin/` file is a task fragment the project owns, so the remedy that
 /// reproduces its parse error validates the project, not the bare fragment.
-/// Committed red and ignored so the full-suite gate stays green; implement
-/// removes the ignore. §FS-rhei-templates.6.1.2
+/// §FS-rhei-templates.6.1.2
 #[test]
-#[ignore = "red until a basin sibling's remedy names the project (§FS-rhei-templates.6.1.2); implement removes this"]
 fn basin_sibling_remedy_validates_owning_project() {
     let scenario = Scenario::new();
     scenario.clean_control();

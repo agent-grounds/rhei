@@ -61,14 +61,28 @@ fn a_child_does_not_inherit_its_parents_tooling() {
     assert!(plan.tasks[0].children[0].tooling.is_empty());
 }
 
-/// Past the blank line that closes the block, the line is task content.
+/// A blank line leaves the block open, as for every recognized field; after
+/// task content the field is refused. §FS-rhei-task-tooling.1
 #[test]
-fn a_tooling_line_after_the_block_is_content() {
+fn a_tooling_line_is_metadata_after_a_blank_line_and_refused_after_content() {
     let plan = parse(
         "# Rhei: Tooling\n## Tasks\n\n### Task 1: Mail\n**State:** pending\n\n\
          **MCP servers:** grafana\n",
     )
     .expect("parse");
-    assert!(plan.tasks[0].tooling.is_empty());
-    assert!(plan.tasks[0].content.contains("**MCP servers:** grafana"));
+    assert_eq!(plan.tasks[0].tooling.mcp_servers, entries(&[("grafana", false)]));
+    assert!(!plan.tasks[0].content.contains("**MCP servers:**"));
+
+    let error = parse(
+        "# Rhei: Tooling\n## Tasks\n\n### Task 1: Mail\n**State:** pending\n\
+         Some content.\n**MCP servers:** grafana\n",
+    )
+    .expect_err("a tooling field after content");
+    assert!(
+        error.message.contains(
+            "Metadata fields must appear immediately after the task heading before task content"
+        ),
+        "unexpected diagnostic: {}",
+        error.message
+    );
 }

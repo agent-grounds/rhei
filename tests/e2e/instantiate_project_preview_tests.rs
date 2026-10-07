@@ -82,7 +82,8 @@ fn workspace_sibling_remedy_validates_owning_workspace() {
         assert_eq!(snapshot(&scenario.project), before);
         assert_eq!(refused.status.code(), Some(1));
         assert!(refused.stderr.contains("existing sibling"), "{}", refused.stderr);
-        assert!(refused.stderr.contains("tasks/001-only.md"), "{}", refused.stderr);
+        let fragment = Path::new("tasks").join("001-only.md");
+        assert!(refused.stderr.contains(&*fragment.to_string_lossy()), "{}", refused.stderr);
         assert!(refused.stderr.contains("## Appendix"), "{}", refused.stderr);
         let targets = [workspace.clone(), Path::new("..").join("project's home").join("old")];
         let target = targets

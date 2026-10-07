@@ -27,7 +27,6 @@ fn write_registry(dir: &Path) {
 /// were given, and an entry keeps its ` (optional)` marker.
 // §FS-rhei-task-tooling.8
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn new_writes_task_tooling_last_in_the_order_given() {
     let dir = project_with_rhei("new-task-tooling");
     write_registry(&dir);
@@ -66,7 +65,6 @@ fn new_writes_task_tooling_last_in_the_order_given() {
 /// is touched.
 // §FS-rhei-task-tooling.8
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn new_refuses_an_unknown_task_server_before_writing_anything() {
     let dir = project_with_rhei("new-task-tooling-unknown");
     write_registry(&dir);
@@ -84,7 +82,6 @@ fn new_refuses_an_unknown_task_server_before_writing_anything() {
 /// refused like every other metadata marker.
 // §FS-rhei-task-tooling.8 §FS-rhei-new.3.4
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn new_refuses_a_description_line_opening_with_a_task_tooling_field() {
     let dir = project_with_rhei("new-task-tooling-description");
     write_registry(&dir);
@@ -115,7 +112,6 @@ const TOOLED_PLAN: &str = "# Rhei: Inbox
 /// GitHub form keeps the lines, and `--no-metadata` drops them.
 // §FS-rhei-task-tooling.7
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn render_carries_each_tasks_tooling_and_no_metadata_hides_it() {
     let dir = unique_temp_dir("render-task-tooling");
     let plan = write_fixture_file(&dir, "plan.rhei.md", TOOLED_PLAN);
@@ -176,7 +172,6 @@ transitions:
 /// member a state without the field does not carry.
 // §FS-rhei-task-tooling.7
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn states_shows_a_withholding_state_and_leaves_the_others_unchanged() {
     let dir = unique_temp_dir("states-task-tooling");
     let plan = write_fixture_file(&dir, "plan.rhei.md", "# Rhei: Inbox\n\n## Tasks\n");

@@ -158,7 +158,6 @@ fn assert_no_agent_log(case: &Case, task: &str, state: &str) {
 /// the state, is a valid plan.
 // §FS-rhei-task-tooling.1
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn the_issue_plan_validates() {
     let case = Case::new("task-tooling-issue-plan", INBOX_MACHINE, ISSUE_PLAN);
 
@@ -177,7 +176,6 @@ fn the_issue_plan_validates() {
 /// and its log, and Task 2's agent is handed nothing at all.
 // §FS-rhei-task-tooling.2
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn a_server_one_task_names_reaches_only_that_task() {
     let case = Case::new("task-tooling-one-task", INBOX_MACHINE, ISSUE_PLAN);
 
@@ -285,7 +283,6 @@ fn a_withholding_state_runs_the_task_without_its_servers() {
 /// naming the task, the field and the id.
 // §FS-rhei-task-tooling.6
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn an_unknown_task_server_is_refused_by_validation() {
     let plan = MAIL_TASK_PLAN.replace("thunderbird-mail", "thunderbird-mial");
     let case = Case::new("task-tooling-unknown-id", INBOX_MACHINE, &plan);
@@ -342,7 +339,6 @@ const SKILL_TASK_PLAN: &str = "# Rhei: Release
 /// different id does not.
 // §FS-rhei-task-tooling.5
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn a_required_task_skill_that_cannot_attach_fires_skill_unavailable() {
     let any = Case::new("task-tooling-skill-any", &skill_machine("true"), SKILL_TASK_PLAN);
     let run = any.run();

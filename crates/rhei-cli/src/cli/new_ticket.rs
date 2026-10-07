@@ -26,6 +26,7 @@ fn new_ticket_write(
     decision: NewDecision,
 ) -> MietteResult<NewWrite> {
     reject_malformed_export_flags(options)?;
+    reject_task_tooling_flags(options, target)?;
     // Leniently, so that one unreadable rhei does not take out creates into
     // every other one — `--under basin` most of all. Only the rhei being
     // written to has to load, which is the next check. §FS-rhei-new.5.2
@@ -78,6 +79,8 @@ fn new_ticket_write(
         assignee: options.assignee.as_deref(),
         model: options.model.as_deref(),
         target: options.target.as_deref(),
+        mcp_servers: &options.mcp_servers,
+        skills: &options.skills,
         description,
     });
 

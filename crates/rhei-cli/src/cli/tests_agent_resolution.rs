@@ -209,7 +209,7 @@
             timeout_secs: Some(60),
             autonomous_args: Vec::new(),
         };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+        let tooling = ResolvedTooling::default();
         let runtime_dir = tempfile::tempdir().expect("tmpdir");
         let command = build_agent_command(
             &resolved,
@@ -264,7 +264,7 @@
             timeout_secs: Some(60),
             autonomous_args: Vec::new(),
         };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+        let tooling = ResolvedTooling::default();
         let runtime_dir = tempfile::tempdir().expect("tmpdir");
         let command = build_agent_command(
             &resolved,
@@ -321,7 +321,7 @@
             timeout_secs: Some(60),
             autonomous_args: Vec::new(),
         };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+        let tooling = ResolvedTooling::default();
         let runtime_dir = tempfile::tempdir().expect("tmpdir");
         let command = build_agent_command(
             &resolved,
@@ -371,7 +371,7 @@
             timeout_secs: Some(60),
             autonomous_args: Vec::new(),
         };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+        let tooling = ResolvedTooling::default();
         let runtime_dir = tempfile::tempdir().expect("tmpdir");
         let command = build_agent_command(
             &resolved,
@@ -419,7 +419,7 @@
             timeout_secs: Some(60),
             autonomous_args: Vec::new(),
         };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+        let tooling = ResolvedTooling::default();
         let runtime_dir = tempfile::tempdir().expect("tmpdir");
         let command = build_agent_command(
             &resolved,
@@ -508,7 +508,7 @@
             timeout_secs: Some(1800),
             autonomous_args: Vec::new(),
         };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+        let tooling = ResolvedTooling::default();
 
         spawn_and_wait_agent(
             &resolved,
@@ -568,7 +568,7 @@
             timeout_secs: Some(60),
             autonomous_args: Vec::new(),
         };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+        let tooling = ResolvedTooling::default();
         let runtime_dir = tempfile::tempdir().expect("tmpdir");
         let command = build_agent_command(
             &resolved,

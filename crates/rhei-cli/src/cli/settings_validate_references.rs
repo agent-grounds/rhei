@@ -434,6 +434,7 @@ fn validate_plan_settings_references(
         validate_effective_state_efforts(machine, settings, &tasks, &mut errors);
     }
     errors.extend(validate_task_execution_override_settings_references(rhei, settings));
+    errors.extend(validate_task_tooling_settings_references(rhei, settings));
     errors
 }
 

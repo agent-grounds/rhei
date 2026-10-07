@@ -78,7 +78,7 @@ subprocess.Popen(
             timeout_secs: Some(10),
             autonomous_args: Vec::new(),
         };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+        let tooling = ResolvedTooling::default();
 
         let start = Instant::now();
         let status = spawn_and_wait_agent(

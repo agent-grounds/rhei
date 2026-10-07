@@ -1,4 +1,5 @@
 use rhei_core::ast::Task;
+use rhei_core::task_tooling::{MCP_SERVERS_FIELD, SKILLS_FIELD};
 
 use crate::rhei_output::common::{fmt_prior_list, rhei_groups, title_case_kind, RheiGroup};
 
@@ -136,6 +137,16 @@ impl GithubIssuesOutput {
                 out.push_str("- Assignee: ");
                 out.push_str(assignee);
                 out.push('\n');
+            }
+            // The task's own tooling, in grammar order. §FS-rhei-task-tooling.7
+            for (field, entries) in [
+                (MCP_SERVERS_FIELD, &task.tooling.mcp_servers),
+                (SKILLS_FIELD, &task.tooling.skills),
+            ] {
+                if !entries.is_empty() {
+                    let authored = entries.iter().map(|entry| entry.authored()).collect::<Vec<_>>();
+                    out.push_str(&format!("{field} {}\n", authored.join(", ")));
+                }
             }
         }
 

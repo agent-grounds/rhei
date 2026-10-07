@@ -51,7 +51,7 @@ fn run_sequential_agent_invocation(
     let task = find_task_by_id(&loaded.rhei.tasks, &target_id);
     let Some(task) = task else { return Ok(()) };
 
-    let tooling = resolve_tooling(machine, current_state, settings);
+    let tooling = resolve_tooling(machine, current_state, &task.tooling, settings);
     let gate = gate_tooling_for_agent(resolved, &tooling);
     for warning in &gate.warnings {
         run_warn!("{warning}");

@@ -160,7 +160,7 @@ fn spawn_parallel_agent_work_item(
     };
     let workspace_root = task_workspace_root.as_path();
 
-    let tooling = resolve_tooling(machine, &item.current_state, settings);
+    let tooling = resolve_tooling(machine, &item.current_state, &task.tooling, settings);
     let gate = gate_tooling_for_agent(&item.resolved, &tooling);
     for warning in &gate.warnings {
         emit_run_message(sink, rhei_tui::MessageLevel::Warn, warning.clone());

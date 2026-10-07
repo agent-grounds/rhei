@@ -155,6 +155,18 @@ struct NewOptions {
         help_heading = "Creating a ticket"
     )]
     target: Option<String>,
+    /// MCP server this ticket's own agent needs, as a registry id, optionally
+    /// followed by ` (optional)` (repeatable, one entry per value; quote an
+    /// optional entry). Added to its state's servers in every agent state
+    // §FS-rhei-task-tooling.8 §FS-rhei-new.1.3
+    #[arg(long = "mcp-server", value_name = "ENTRY", help_heading = "Creating a ticket")]
+    mcp_servers: Vec<String>,
+    /// Skill this ticket's own agent needs, as a registry id, optionally
+    /// followed by ` (optional)` (repeatable, one entry per value; quote an
+    /// optional entry). Added to its state's skills in every agent state
+    // §FS-rhei-task-tooling.8 §FS-rhei-new.1.3
+    #[arg(long = "skill", value_name = "ENTRY", help_heading = "Creating a ticket")]
+    skills: Vec<String>,
     /// Preview the create: plan data is written, validated, and always rolled
     /// back; permanent `.lock` sidecars and necessary parent directories remain
     // §FS-rhei-new.1.1 §FS-rhei-new.5.4

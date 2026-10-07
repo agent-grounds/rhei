@@ -123,6 +123,7 @@ mod agent_prompt_transport_tests {
                     description: None,
                 }),
             }],
+            ..Default::default()
         };
         let snapshot_args = vec!["--session-dir".to_string(), "sessions".to_string()];
         let claude = resolved(builtin("claude-code"), "claude-code", None);

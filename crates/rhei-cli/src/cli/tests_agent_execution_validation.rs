@@ -17,7 +17,7 @@
             timeout_secs: Some(10),
             autonomous_args: Vec::new(),
         };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+        let tooling = ResolvedTooling::default();
         let status = spawn_and_wait_agent(
             &resolved,
             &builtin_price_book(),
@@ -174,7 +174,7 @@ for line in sys.stdin:
             timeout_secs: Some(1),
             autonomous_args: Vec::new(),
         };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+        let tooling = ResolvedTooling::default();
         let intervene = Arc::new(RunInterveneSink::new(dir.path().join("runtime")));
 
         let start = Instant::now();
@@ -249,7 +249,7 @@ for line in sys.stdin:
             timeout_secs: Some(1),
             autonomous_args: Vec::new(),
         };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+        let tooling = ResolvedTooling::default();
 
         let status = spawn_and_wait_agent(
             &resolved,
@@ -412,7 +412,7 @@ for line in sys.stdin:
 
         let errs = validate_machine_settings_references(&machine, &settings);
         assert!(errs.is_empty(), "known optional unavailable tooling is a runtime status: {errs:?}");
-        let tooling = resolve_tooling(&machine, "pending", &settings);
+        let tooling = resolve_tooling(&machine, "pending", &TaskTooling::default(), &settings);
         assert_eq!(tooling.skills.len(), 1);
         assert!(tooling.skills[0].definition.is_none());
         assert!(tooling.skills[0].optional);
@@ -686,6 +686,7 @@ for line in sys.stdin:
                 },
             ],
             skills: Vec::new(),
+            ..Default::default()
         };
         let runtime_dir = tempfile::tempdir().expect("tmpdir");
         let command = build_agent_command(

@@ -153,7 +153,7 @@ fn agent_command_carries_only_its_own_accounting_capture_pair() {
         timeout_secs: Some(60),
         autonomous_args: Vec::new(),
     };
-    let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+    let tooling = ResolvedTooling::default();
     let runtime_dir = tempfile::tempdir().expect("tmpdir");
     let build = |capture_path: Option<&std::path::Path>| {
         let mut command = build_agent_command(

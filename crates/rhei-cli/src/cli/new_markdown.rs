@@ -59,6 +59,8 @@ struct TicketFields<'a> {
     assignee: Option<&'a str>,
     model: Option<&'a str>,
     target: Option<&'a str>,
+    mcp_servers: &'a [String],
+    skills: &'a [String],
     description: Option<&'a str>,
 }
 
@@ -100,6 +102,13 @@ fn render_ticket(fields: &TicketFields<'_>) -> String {
     {
         if let Some(value) = value {
             out.push_str(&format!("**{label}:** {}\n", value.trim()));
+        }
+    }
+    // Last in the block, one line per field in flag order. §FS-rhei-task-tooling.8
+    for (field, entries) in [(MCP_SERVERS_FIELD, fields.mcp_servers), (SKILLS_FIELD, fields.skills)] {
+        if !entries.is_empty() {
+            let entries = entries.iter().map(|entry| entry.trim()).collect::<Vec<_>>();
+            out.push_str(&format!("{field} {}\n", entries.join(", ")));
         }
     }
     if let Some(description) = description_body(fields.description) {

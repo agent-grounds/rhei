@@ -101,7 +101,6 @@ fn read_handed_file(copy: &Path) -> serde_json::Value {
 /// expanded, and a remote one as a `url` with a `type`.
 // §FS-rhei-mcp-config-file.1
 #[test]
-#[ignore = "red until #476 writes the --mcp-config file in the agent's schema"]
 fn a_claude_code_agent_is_handed_each_declared_server_in_the_mcp_config_schema() {
     let (_, handed) = run_on_claude_code(
         "mcp-config-schema",
@@ -140,7 +139,6 @@ fn a_claude_code_agent_is_handed_each_declared_server_in_the_mcp_config_schema()
 /// the server start somewhere its entry did not ask for.
 // §FS-rhei-mcp-config-file.2
 #[test]
-#[ignore = "red until #476 writes the --mcp-config file in the agent's schema"]
 fn a_working_directory_the_mcp_config_file_cannot_carry_is_warned_about() {
     let (run, handed) = run_on_claude_code(
         "mcp-config-working-directory",

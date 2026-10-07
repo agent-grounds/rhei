@@ -155,6 +155,7 @@ include!("cli/run_diag.rs");
 include!("cli/run_git_consistency.rs");
 include!("cli/supervised.rs");
 include!("cli/agent_command.rs");
+include!("cli/mcp_config_file.rs");
 include!("cli/agent_spawn.rs");
 include!("cli/intervene.rs");
 include!("cli/accounting_price_book.rs");

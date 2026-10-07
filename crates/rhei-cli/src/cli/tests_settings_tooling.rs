@@ -3,7 +3,6 @@
     /// a `url` with no `type` as `url_missing_type`. agent-grounds/rhei#476
     // §FS-rhei-mcp-config-file.1 §FS-rhei-mcp-config-file.2
     #[test]
-    #[ignore = "red until #476 writes the --mcp-config file in the agent's schema"]
     fn appends_mcp_config_flag_with_temp_file() {
         std::env::set_var("RHEI_TEST_MCP_CONFIG_TOKEN", "expanded-token");
         let profile = built_in_agents().remove("claude-code").expect("claude-code");

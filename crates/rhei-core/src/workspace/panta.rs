@@ -147,7 +147,10 @@ pub fn load_panta_project(dir: &Path) -> parser::Result<PantaProject> {
 
 /// Load a project as if `entry` were already published under `rhei_id`.
 /// Template instantiation uses this overlay while the bytes remain in a hidden
-/// same-parent staging directory. §AR-rhei-panta.2 §AR-rhei-panta.4
+/// same-parent staging directory or dry-run scratch. Scratch replaces precisely
+/// the destination directory's source; other entries, including single-file
+/// plans with the same id, still participate in strict validation.
+/// §FS-rhei-templates.6.1.2 §AR-rhei-panta.2 §AR-rhei-panta.4
 pub fn load_panta_project_with_member(
     dir: &Path,
     rhei_id: &str,
@@ -193,6 +196,9 @@ fn load_panta_project_with(
     let mut entries: Vec<(PathBuf, Option<String>)> =
         discover_rhei_entries(dir)?.into_iter().map(|entry| (entry, None)).collect();
     if let Some((id, entry)) = prospective {
+        // Preview replaces only this destination, never other entries with its id. §FS-rhei-templates.6.1.2
+        let destination = dir.join(id);
+        entries.retain(|(path, _)| *path != destination);
         entries.push((entry.to_path_buf(), Some(id.to_string())));
     }
     // The prospective entry occupies its final id's canonical position even

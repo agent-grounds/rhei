@@ -25,8 +25,9 @@ use minijinja::{Environment as MiniJinjaEnvironment, UndefinedBehavior};
 use nix::sys::signal::{self, Signal};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use regex::Regex;
-use rhei_core::ast::{Metadata, TaskId};
+use rhei_core::ast::{Metadata, TaskId, TaskTooling, TaskToolingEntry};
 use rhei_core::callback::{CallbackContext, CallbackExecutor, ShellCallbackExecutor};
+use rhei_core::task_tooling::{parse_tooling_entries, MCP_SERVERS_FIELD, SKILLS_FIELD};
 use rhei_core::metadata::{
     author_task_metadata, frontmatter_to_json, keys_cleared_by_reset, MetadataForm,
     UnrepresentableValue,
@@ -34,7 +35,7 @@ use rhei_core::metadata::{
 use rhei_core::workspace;
 use rhei_validator::{
     parse_execution_target, AgentConfig, CustomAgentProfile, ExecutionTarget, McpServerProfile,
-    SkillProfile, StateMcpEntry, StateMcpEntryObject, StateSkillEntry,
+    SkillProfile, StateMcpEntry, StateMcpEntryObject, StateSkillEntry, StateSkillEntryObject,
 };
 use serde::Deserialize;
 use serde_yaml::{Mapping as YamlMapping, Value as YamlValue};

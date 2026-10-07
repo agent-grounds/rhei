@@ -268,17 +268,8 @@ fn spawn_and_wait_agent(
         if let Some(path) = worktree_root {
             writeln!(f, "worktree_root: {}", path.display())?;
         }
-        let mcp_line = format_tooling_log_line(&tooling.mcp_servers, |e| {
-            (e.id.as_str(), e.optional, e.definition.is_some())
-        });
-        if let Some(line) = mcp_line {
-            writeln!(f, "mcp_servers: {line}")?;
-        }
-        let skill_line = format_tooling_log_line(&tooling.skills, |e| {
-            (e.id.as_str(), e.optional, e.definition.is_some())
-        });
-        if let Some(line) = skill_line {
-            writeln!(f, "skills: {line}")?;
+        for line in tooling_log_header_lines(tooling) {
+            writeln!(f, "{line}")?;
         }
         writeln!(f, "===\n")?;
         f.flush()

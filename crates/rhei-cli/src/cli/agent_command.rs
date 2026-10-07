@@ -359,6 +359,9 @@ fn gate_tooling_for_agent(
     tooling: &ResolvedTooling,
 ) -> ToolingGateResult {
     let mut result = ToolingGateResult::default();
+    // What a withholding state held back is not gated, only logged. §FS-rhei-task-tooling.7
+    result.tooling.mcp_withheld = tooling.mcp_withheld.clone();
+    result.tooling.skills_withheld = tooling.skills_withheld.clone();
     let agent_id = resolved.agent.id();
     let mcp_supported =
         resolved.profile.mcp_flag.is_some() || resolved.profile.mcp_config_flag.is_some();
@@ -519,6 +522,28 @@ where
         })
         .collect();
     Some(rendered.join(","))
+}
+
+/// The tooling lines of the agent log header: each kind's set, followed by
+/// the task ids a withholding state held back, each line only when non-empty.
+/// The log format stays `v1`. §FS-rhei-task-tooling.7 §FS-rhei-agents.8.2
+fn tooling_log_header_lines(tooling: &ResolvedTooling) -> Vec<String> {
+    let mcp = format_tooling_log_line(&tooling.mcp_servers, |e| {
+        (e.id.as_str(), e.optional, e.definition.is_some())
+    });
+    let skills = format_tooling_log_line(&tooling.skills, |e| {
+        (e.id.as_str(), e.optional, e.definition.is_some())
+    });
+    let withheld = |ids: &[String]| (!ids.is_empty()).then(|| ids.join(","));
+    [
+        ("mcp_servers", mcp),
+        ("mcp_servers_withheld", withheld(&tooling.mcp_withheld)),
+        ("skills", skills),
+        ("skills_withheld", withheld(&tooling.skills_withheld)),
+    ]
+    .into_iter()
+    .filter_map(|(key, value)| value.map(|value| format!("{key}: {value}")))
+    .collect()
 }
 
 /// Set `RHEI_MCP_*` and `RHEI_SKILL_*` env vars on the agent command.

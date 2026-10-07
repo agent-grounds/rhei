@@ -186,6 +186,8 @@ fn reject_mode_confusion(options: &NewOptions) -> MietteResult<()> {
         ("--assignee", options.assignee.is_some()),
         ("--model", options.model.is_some()),
         ("--target", options.target.is_some()),
+        ("--mcp-server", !options.mcp_servers.is_empty()),
+        ("--skill", !options.skills.is_empty()),
     ];
 
     if options.under.is_some() {

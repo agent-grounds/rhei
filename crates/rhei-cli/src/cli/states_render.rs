@@ -143,6 +143,10 @@ fn render_state_machine_text(machine: &rhei_validator::StateMachine) -> String {
                 let ids = skills.iter().map(|entry| entry.id()).collect::<Vec<_>>();
                 out.push_str(&format!("      Skills: {}\n", ids.join(", ")));
             }
+            // Only an authored `true` changes what a task's agent gets. §FS-rhei-states-cmd.4
+            if def.withhold_task_tooling == Some(true) {
+                out.push_str("      Task tooling: withheld\n");
+            }
             if def.snapshot.is_some() {
                 out.push_str("      Snapshot: configured\n");
             }
@@ -250,6 +254,13 @@ fn render_state_machine_json(machine: &rhei_validator::StateMachine) -> Result<S
                     .as_object_mut()
                     .expect("state JSON is an object")
                     .insert("effort".to_string(), serde_json::json!(effort.as_str()));
+            }
+            // As authored, `false` included; absent when not. §FS-rhei-states-cmd.5
+            if let Some(withhold) = def.withhold_task_tooling {
+                rendered
+                    .as_object_mut()
+                    .expect("state JSON is an object")
+                    .insert("withhold_task_tooling".to_string(), serde_json::json!(withhold));
             }
             rendered
         })

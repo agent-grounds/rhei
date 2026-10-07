@@ -138,6 +138,14 @@ fn task_json(t: &Task) -> Value {
         })
         .collect();
     obj.insert("excludes".to_string(), Value::Array(exclusions));
+    // Always both arrays, empty when the field is absent. §FS-rhei-task-tooling.7
+    let tooling = |entries: &[rhei_core::ast::TaskToolingEntry]| {
+        let entries =
+            entries.iter().map(|entry| json!({ "id": entry.id, "optional": entry.optional }));
+        Value::Array(entries.collect())
+    };
+    obj.insert("mcp_servers".to_string(), tooling(&t.tooling.mcp_servers));
+    obj.insert("skills".to_string(), tooling(&t.tooling.skills));
     if let Some(ref assignee) = t.assignee {
         obj.insert("assignee".to_string(), Value::String(assignee.clone()));
     }

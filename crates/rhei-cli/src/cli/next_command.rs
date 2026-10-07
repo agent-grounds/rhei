@@ -447,7 +447,7 @@ fn next_command(
             assignee,
         )?;
     }
-    let tooling = resolve_tooling(machine, &final_state, &settings);
+    let tooling = resolve_tooling(machine, &final_state, &task.tooling, &settings);
     // A manual worker is handed the same memory `rhei run` composes; nothing of
     // a run is in flight here. §FS-rhei-memory.5
     let checkout_root = resolve_agent_checkout_root(&task_workspace_root, &task_id_str)?;

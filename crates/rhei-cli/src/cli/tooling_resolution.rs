@@ -34,6 +34,10 @@ struct ResolvedSkillEntry {
 struct ResolvedTooling {
     mcp_servers: Vec<ResolvedMcpEntry>,
     skills: Vec<ResolvedSkillEntry>,
+    /// Task-named ids a withholding state left out of the set; an id the
+    /// state or the defaults supply is never here. §FS-rhei-task-tooling.4
+    mcp_withheld: Vec<String>,
+    skills_withheld: Vec<String>,
 }
 
 impl ResolvedTooling {
@@ -92,34 +96,100 @@ fn slugify_target_value(value: &str) -> String {
     slug.trim_matches('-').to_string()
 }
 
-/// Compute the effective tooling set for a state given the merged settings.
+/// Compute one invocation's effective tooling: the defaults, then the state's
+/// list, then the task's own entries unless the state withholds them.
+/// §FS-rhei-task-tooling.3 §FS-rhei-task-tooling.4
 fn resolve_tooling(
     machine: &rhei_validator::StateMachine,
     state_name: &str,
+    task: &TaskTooling,
     settings: &RheiSettings,
 ) -> ResolvedTooling {
     let state_def = machine.states.get(state_name);
+    let withhold = state_def.and_then(|d| d.withhold_task_tooling) == Some(true);
 
     // MCP: start from defaults (if any), then override/extend with state-level.
     let mcp_entries = effective_mcp_entries(
         settings.defaults.mcp_servers.as_deref().unwrap_or(&[]),
         state_def.and_then(|d| d.mcp_servers.as_deref()),
     );
-    let mcp_servers: Vec<ResolvedMcpEntry> = mcp_entries
+    let mut mcp_servers: Vec<ResolvedMcpEntry> = mcp_entries
         .into_iter()
         .map(|entry| resolve_mcp_entry(&entry, &settings.mcp_servers))
         .collect();
+    let mcp_withheld = add_task_entries(&mut mcp_servers, &task.mcp_servers, withhold, |entry| {
+        let object = StateMcpEntryObject {
+            id: entry.id.clone(),
+            optional: entry.optional,
+            ..Default::default()
+        };
+        resolve_mcp_entry(&StateMcpEntry::Object(object), &settings.mcp_servers)
+    });
 
     let skill_entries = effective_skill_entries(
         settings.defaults.skills.as_deref().unwrap_or(&[]),
         state_def.and_then(|d| d.skills.as_deref()),
     );
-    let skills: Vec<ResolvedSkillEntry> = skill_entries
+    let mut skills: Vec<ResolvedSkillEntry> = skill_entries
         .into_iter()
         .map(|entry| resolve_skill_entry(&entry, &settings.skills))
         .collect();
+    let skills_withheld = add_task_entries(&mut skills, &task.skills, withhold, |entry| {
+        let object = StateSkillEntryObject {
+            id: entry.id.clone(),
+            optional: entry.optional,
+            ..Default::default()
+        };
+        resolve_skill_entry(&StateSkillEntry::Object(object), &settings.skills)
+    });
 
-    ResolvedTooling { mcp_servers, skills }
+    ResolvedTooling { mcp_servers, skills, mcp_withheld, skills_withheld }
+}
+
+/// A resolved entry a task's entry can meet in the set it is added to.
+trait TaskAddedEntry {
+    fn id(&self) -> &str;
+    fn optional_mut(&mut self) -> &mut bool;
+}
+
+impl TaskAddedEntry for ResolvedMcpEntry {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn optional_mut(&mut self) -> &mut bool {
+        &mut self.optional
+    }
+}
+
+impl TaskAddedEntry for ResolvedSkillEntry {
+    fn id(&self) -> &str {
+        &self.id
+    }
+    fn optional_mut(&mut self) -> &mut bool {
+        &mut self.optional
+    }
+}
+
+/// Adds a task's entries last and returns the ids a withholding state left
+/// out. An id already in the set keeps its definition, and stays optional only
+/// if the task's entry is optional too. §FS-rhei-task-tooling.3
+fn add_task_entries<E: TaskAddedEntry>(
+    set: &mut Vec<E>,
+    task: &[TaskToolingEntry],
+    withhold: bool,
+    resolve: impl Fn(&TaskToolingEntry) -> E,
+) -> Vec<String> {
+    let mut withheld = Vec::new();
+    for entry in task {
+        match set.iter_mut().find(|held| held.id() == entry.id) {
+            // The state's own entry resolves as if the task named nothing.
+            Some(_) if withhold => {}
+            Some(held) => *held.optional_mut() &= entry.optional,
+            None if withhold => withheld.push(entry.id.clone()),
+            None => set.push(resolve(entry)),
+        }
+    }
+    withheld
 }
 
 /// Union `defaults.mcp_servers` with a state's `mcp_servers`, deduped by id.

@@ -60,6 +60,7 @@
                 ),
             ],
             skills: Vec::new(),
+            ..Default::default()
         };
         let runtime_dir = tempfile::tempdir().expect("tmpdir");
         let command = build_agent_command(
@@ -116,7 +117,7 @@
             timeout_secs: Some(60),
             autonomous_args: vec!["--auto-flag".to_string(), "value".to_string()],
         };
-        let tooling = ResolvedTooling { mcp_servers: Vec::new(), skills: Vec::new() };
+        let tooling = ResolvedTooling::default();
         let runtime_dir = tempfile::tempdir().expect("tmpdir");
         let command = build_agent_command(
             &resolved,
@@ -226,6 +227,7 @@
                     description: None,
                 }),
             }],
+            ..Default::default()
         };
         let warnings = collect_unsupported_tooling_warnings(&resolved, &tooling);
         assert_eq!(warnings.len(), 2);
@@ -1014,6 +1016,7 @@ transitions: []
                     description: None,
                 }),
             }],
+            ..Default::default()
         };
 
         let gate = gate_tooling_for_agent(&resolved, &tooling);
@@ -1079,6 +1082,7 @@ transitions:
                 optional: true,
                 definition: None,
             }],
+            ..Default::default()
         };
         let resolved = ResolvedAgent {
             agent: AgentConfig::from("codex"),

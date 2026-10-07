@@ -397,7 +397,7 @@ kind = "deferred"
 max_accepted = { value = 900, unit = "lines" }
 until = "The tooling-resolution tests move to a fragment of their own beside tooling_resolution.rs, the watch/validation tests join the plan-watch code they exercise, the dashboard-gate tests move beside the dashboard code and the ledger tests beside transition_ledger.rs. Satisfying that retunes this entry to 550 rather than retiring it: the four moves take 896 non-blank lines to 527, and the complete and reset rewrites left behind are still over the 500-line budget on their own."
 reason = """
-Over budget before this change; the touch that surfaced it added one line to a claim-context literal. Four unrelated suites share this fragment because none of them has a home yet: tooling resolution is tested here and in tests_settings_tooling.rs with no single owner, plan-watch predicates are tested here while their code lives in the watch commands, the dashboard-gate tests sit nowhere near the dashboard, and only the complete and reset rewrites belong to the file's own name. tests_settings_tooling.rs cannot take the tooling suite either, being 1110 lines with 90 to its own accepted ceiling against a 155-line suite, so the boundary has to exist before the split does.
+Over budget before this change; the touch that surfaced it added one line to a claim-context literal. Four unrelated suites share this fragment because none of them has a home yet: tooling resolution is tested here and in tests_settings_tooling.rs with no single owner, plan-watch predicates are tested here while their code lives in the watch commands, the dashboard-gate tests sit nowhere near the dashboard, and only the complete and reset rewrites belong to the file's own name. tests_settings_tooling.rs cannot take the tooling suite either, being 1110 lines with 90 to its own accepted ceiling against a 155-line suite, so the boundary has to exist before the split does. The tooling half cannot move until machine_with_tooling and settings_with move with it, and settings_with builds a RheiSettings the complete/reset half also reads, so naming that shared builder and giving it a home is the first step.
 """
 [[exceptions]]
 path = "crates/rhei-cli/src/cli/accounting.rs"
@@ -489,16 +489,6 @@ max_accepted = { value = 600, unit = "lines" }
 until = "The machine-loading cases are split by the block they validate — models and targets, artifacts, template conditions — each beside the validator part that owns that block."
 reason = """
 The validator's rules are already split into parts by block; its tests are not, so this file grows with every one of them. The split follows the parts that exist, but sample_machine and its neighbours here are shared across blocks and have no home yet; giving them one is the step before any case can move.
-"""
-[[exceptions]]
-path = "crates/rhei-cli/src/cli/tests_complete_reset_tooling.rs"
-match = "exact"
-rules = ["source"]
-kind = "deferred"
-max_accepted = { value = 900, unit = "lines" }
-until = "The MCP and skills resolution cases below the divider at line 849 are an include-part of their own beside this one, with the machine and settings builders they need."
-reason = """
-Over budget before this change, which added no line to it. The file already carries its own seam - a divider separating the complete/reset plan-rewriting cases from the tooling resolution cases - but the second half cannot move until machine_with_tooling and settings_with move with it, and settings_with builds a RheiSettings the complete/reset half also reads. Naming that shared builder and giving it a home is the step before either half can leave.
 """
 [[exceptions]]
 path = "crates/rhei-cli/src/rhei_tui/dashboard/tests.rs"

@@ -96,6 +96,7 @@ mod install_skills_tests;
 mod installed_state_machine_guidance_tests;
 mod instantiate_output_default_tests;
 mod instantiate_output_spelling_tests;
+mod instantiate_project_preview_tests;
 mod instantiate_project_validation_support;
 mod instantiate_project_validation_tests;
 mod into_flow_style_tests;

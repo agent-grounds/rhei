@@ -66,7 +66,7 @@ fn validate_staged_project_member(
 
 /// Attribute a project parse refusal to an existing sibling when its source
 /// lies outside the staged member and the project manifest. Preserve the
-/// parser's source context, replace its generic remedy with the actual file,
+/// parser's source context, replace its generic remedy with the owning entry,
 /// and make no claim about validation that the interrupted load did not finish.
 /// §FS-rhei-templates.6.1.2 §FS-rhei-errors.4
 pub(super) fn project_member_parse_report(
@@ -82,10 +82,15 @@ pub(super) fn project_member_parse_report(
     }) else {
         return report;
     };
+    // A task fragment is inspected here but validated through its workspace. §FS-rhei-templates.6.1.2
+    let workspace = sibling.strip_prefix(project).ok()
+        .and_then(|relative| relative.components().next())
+        .and_then(|component| workspace::workspace_dir(&project.join(component)));
+    let repair_target = crate::display_path(workspace.as_deref().unwrap_or(sibling));
     let sibling = crate::display_path(sibling);
     miette!(
         help = format!("repair the existing sibling, then re-run: {}",
-            shell_command(["rhei", "validate", sibling.as_str()])),
+            shell_command(["rhei", "validate", repair_target.as_str()])),
         "an existing sibling plan at '{}' blocks project validation of the instantiated output.\n\n{}",
         sibling,
         report

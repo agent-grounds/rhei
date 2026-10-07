@@ -1,0 +1,9 @@
+{
+  "defaults": { "agent_timeout": "42m" },
+  "agents": {
+    "codex": {
+      "command": ["codex", "exec"],
+      "modes": { "xhigh": ["--effort", "xhigh"] }
+    }
+  }
+}

@@ -706,6 +706,18 @@ settings root ([§FS-rhei-agents.1.1](rhei-agents.spec.md#11-global-and-project-
 therefore resolves the enclosing project before writing, and reconciles with
 it.
 
+**Output spelling does not change membership.** From a project root,
+`--output new`, `--output ./new`, and an absolute path to that same `new/`
+directory all create the member rhei `new`. A bare relative output's empty
+immediate parent denotes the working directory. All three spellings receive
+the same project-scoped validation, publication, and project settings ownership:
+a malformed sibling plan refuses the instantiation before publication, leaving
+no requested output or persistent settings change; a successful instantiation
+merges bundled settings into the project root, preserving existing values and
+leaving no workspace settings copy. Membership still depends only on the
+immediate parent containing `index.panta.md`; discovery does not recurse, and
+the existing output defaults and flags retain their meanings.
+
 **Default output.** Run inside a project, a template's default output is
 `<project>/<template-name>/` — the project is the default home for a new rhei
 ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)), the same place the empty-project message points at.

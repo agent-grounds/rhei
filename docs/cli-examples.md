@@ -70,9 +70,12 @@ rhei note --strike auth.1
 ```
 
 A task holds one slot, so the restate and the strike each spend the writer's
-own. The writing task comes from `RHEI_TASK_ID`, which `rhei run` exports to
-every agent it spawns; name it with `--task <ticket-id>` outside a run. Both
-refusals happen before anything is appended, and neither leaves a file behind:
+own. These run where `RHEI_TASK_ID` names the writing task: a program state, a
+`cli:` callback, or `rhei snapshot continue`. An agent `rhei run` spawns has no
+such variable, and neither does a manual worker, so either passes the writing
+task as `--task <ticket-id>`, the qualified id in its prompt's task heading.
+The agent's prompt prints that command with the id already in it. Both refusals
+happen before anything is appended, and neither leaves a file behind:
 
 ```console
 $ rhei note "$(printf 'one\ntwo\nthree\nfour')"

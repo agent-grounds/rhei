@@ -136,6 +136,7 @@ mod next_explicit_passive_atomicity_tests;
 mod next_explicit_passive_claim_tests;
 mod next_node_kinds_tests;
 mod next_tests;
+mod note_agent_tests;
 mod note_command_tests;
 mod note_reset_tests;
 mod note_store_support;

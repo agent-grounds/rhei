@@ -34,16 +34,28 @@ rhei note --strike  <TASK_ID>   # take an entry out of composition
 |----------------------|----------|----------------------------------------------------------------------|
 | `--restate <TASK_ID>`| No       | Move the named task's live entry to this record's position.           |
 | `--strike <TASK_ID>` | No       | Remove the named task's live entry from composition.                  |
-| `--task <ID>`        | No       | Name the writing task. Defaults to `RHEI_TASK_ID`.                    |
+| `--task <ID>`        | No       | Name the writing task. Defaults to `RHEI_TASK_ID` where rhei sets it. |
 
 Exactly one of the text positional, `--restate`, and `--strike` is given. Two
 of them together, or none of them, is a usage error ([§FS-rhei-note.4](rhei-note.spec.md#4-refusals)).
 
-The writing task is the value of `RHEI_TASK_ID`, which `rhei run` exports to
-every agent it spawns ([§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables)). A manual worker driving `rhei next`
-has no such environment, and names the task with `--task <ID>`; `--task` wins
-over the environment where both are set. Task-id arguments complete from the
-plan like every other ([§FS-rhei-completions](rhei-completions.spec.md#fs-rhei-completions-rhei-completion-ux-specification)).
+The writing task is `--task <ID>` when it is given, and otherwise the value of
+`RHEI_TASK_ID` where rhei itself sets that variable: in a program state's
+subprocess ([§FS-rhei-programs.2](rhei-programs.spec.md#2-environment-variables)), in a `cli:` transition callback, `on_leave` or
+`on_enter` ([§FS-rhei-transitions.4.7](rhei-transitions.spec.md#47-callback-declaration)), and in the session
+`rhei snapshot continue` opens ([§FS-rhei-snapshot-operations.1.5](rhei-snapshot-operations.spec.md#15-rhei-snapshot-continue-ref)). `--task` wins
+over the environment where both are set.
+
+An agent `rhei run` spawns has no `RHEI_TASK_ID`: the run removes it before the
+spawn, because the prompt is the authoritative source of the task identity
+([§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables)). An agent therefore passes `--task` with the qualified id in
+its prompt's task heading, and the prompt's trail line prints that command with
+the id already in it ([§FS-rhei-memory.3.4](rhei-memory.spec.md#34--rhei-commands-additions)). A manual worker driving `rhei next`
+has no such environment either, and names the task the same way. With neither
+`--task` nor the variable the verb exits `2` ([§FS-rhei-note.5](rhei-note.spec.md#5-output-and-exit-codes)), and its message names
+`--task` and where the id is found. It never tells the caller to run under
+`rhei run`, because an agent is already there. Task-id arguments complete from
+the plan like every other ([§FS-rhei-completions](rhei-completions.spec.md#fs-rhei-completions-rhei-completion-ux-specification)).
 
 `rhei note` resolves the project from the working directory, the way
 `rhei complete` resolves a bare ticket id ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)). It takes no plan

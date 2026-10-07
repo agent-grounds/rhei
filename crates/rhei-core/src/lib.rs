@@ -35,6 +35,9 @@ pub mod platform;
 pub mod retired;
 pub mod source;
 pub mod state_machine;
+/// The MCP servers and skills one task names for its own agent invocations.
+/// §FS-rhei-task-tooling
+pub mod task_tooling;
 #[cfg(test)]
 pub(crate) mod test_support;
 pub(crate) mod text;

@@ -27,7 +27,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #475 lets a task name its own MCP servers and skills"]
     fn withhold_task_tooling_must_be_a_boolean() {
         for value in ["\"yes\"", "1", "[thunderbird-mail]"] {
             let yaml = withholding_machine("    agent: claude-code\n", value);
@@ -38,7 +37,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #475 lets a task name its own MCP servers and skills"]
     fn withhold_task_tooling_rejected_on_program_state() {
         let yaml = withholding_machine("    program: \"make review\"\n", "true");
         let err = StateMachine::from_yaml_str(&yaml).expect_err("program excludes withholding");
@@ -50,7 +48,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #475 lets a task name its own MCP servers and skills"]
     fn withhold_task_tooling_rejected_on_gating_state() {
         let yaml = withholding_machine("    gating: true\n", "true");
         let err = StateMachine::from_yaml_str(&yaml).expect_err("gating excludes withholding");
@@ -62,7 +59,6 @@ transitions:
     }
 
     #[test]
-    #[ignore = "red until #475 lets a task name its own MCP servers and skills"]
     fn withhold_task_tooling_rejected_on_final_state() {
         let yaml = r#"
 name: withhold-final

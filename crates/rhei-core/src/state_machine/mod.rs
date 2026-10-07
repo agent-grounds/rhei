@@ -47,6 +47,7 @@ mod tests {
     include!("validator/tests_task_exports.rs");
     include!("validator/tests_links_tooling.rs");
     include!("validator/tests_task_tooling.rs");
+    include!("validator/tests_withhold_task_tooling.rs");
     include!("validator/tests_links_fences.rs");
     include!("validator/tests_profiles.rs");
     include!("validator/tests_machine_only.rs");

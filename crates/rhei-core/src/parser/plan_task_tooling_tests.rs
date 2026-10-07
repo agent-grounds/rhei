@@ -21,7 +21,6 @@ fn refusal(metadata: &str) -> String {
 /// Both fields are the last metadata, after the execution override, and an
 /// entry may carry ` (optional)`.
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn task_tooling_fields_are_accepted_last_in_the_block() {
     for metadata in [
         "**MCP servers:** thunderbird-mail\n",
@@ -38,7 +37,6 @@ fn task_tooling_fields_are_accepted_last_in_the_block() {
 
 /// The closed block lists every field it accepts, the two new ones included.
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn unknown_metadata_error_lists_the_task_tooling_fields() {
     let message = refusal("**MCP server:** thunderbird-mail\n");
     assert!(message.contains("Unknown metadata field '**MCP server:**'"), "{message}");
@@ -49,7 +47,6 @@ fn unknown_metadata_error_lists_the_task_tooling_fields() {
 }
 
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn a_task_tooling_field_twice_is_refused() {
     let message = refusal("**MCP servers:** thunderbird-mail\n**MCP servers:** grafana\n");
     assert!(message.contains("Duplicate **MCP servers:**"), "{message}");
@@ -58,7 +55,6 @@ fn a_task_tooling_field_twice_is_refused() {
 }
 
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn an_empty_task_tooling_value_or_entry_is_refused() {
     for value in ["", "   ", ",grafana", "thunderbird-mail,, grafana", "grafana,"] {
         let message = refusal(&format!("**MCP servers:** {value}\n"));
@@ -70,7 +66,6 @@ fn an_empty_task_tooling_value_or_entry_is_refused() {
 
 /// The same id twice in one field is refused, whatever its optional marker.
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn a_duplicate_task_tooling_id_is_refused() {
     let message = refusal("**MCP servers:** grafana, thunderbird-mail, grafana (optional)\n");
     assert!(
@@ -83,7 +78,6 @@ fn a_duplicate_task_tooling_id_is_refused() {
 
 /// Only an id, optionally followed by exactly ` (optional)`, is an entry.
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn a_malformed_task_tooling_entry_is_refused_naming_it() {
     for entry in ["grafana (optinal)", "grafana(optional)", "thunderbird mail", "(optional)"] {
         let message = refusal(&format!("**MCP servers:** {entry}\n"));
@@ -102,7 +96,6 @@ fn a_malformed_task_tooling_entry_is_refused_naming_it() {
 /// Grammar order: `**State:**` first, the execution override before the
 /// tooling, and `**MCP servers:**` before `**Skills:**`.
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn a_task_tooling_field_out_of_order_is_refused() {
     let before_state =
         "# Rhei: Tooling\n## Tasks\n\n### Task 1: Mail\n**MCP servers:** grafana\n**State:** pending\n";

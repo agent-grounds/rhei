@@ -179,6 +179,7 @@ impl StateMachine {
         for (state_name, state) in &self.states {
             validate_state_mcp_entries(state_name, state)?;
             validate_state_skill_entries(state_name, state)?;
+            validate_state_withhold_task_tooling(state_name, state)?;
         }
 
         for transition in &self.transitions {
@@ -208,4 +209,25 @@ impl StateMachine {
 
         Ok(())
     }
+}
+
+/// `withhold_task_tooling` belongs to a state that runs an agent, so any
+/// authored value is refused where none runs. §FS-rhei-states.1.3
+fn validate_state_withhold_task_tooling(
+    state_name: &str,
+    state: &StateDef,
+) -> Result<(), StateMachineLoadError> {
+    if state.withhold_task_tooling.is_none() {
+        return Ok(());
+    }
+    let reason = if state.gating {
+        "is gating and cannot declare 'withhold_task_tooling' (gating states are human-only)"
+    } else if state.program.is_some() {
+        "declares 'program' and cannot declare 'withhold_task_tooling' (programs run no agent)"
+    } else if state.terminal {
+        "is final and cannot declare 'withhold_task_tooling' (terminal states have no work)"
+    } else {
+        return Ok(());
+    };
+    Err(StateMachineLoadError::Invalid(format!("state '{state_name}' {reason}")))
 }

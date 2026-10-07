@@ -1,4 +1,4 @@
-use crate::ast::{ConsumedExport, Task, TaskExclusion, TaskId, TaskSnapshotInherit};
+use crate::ast::{ConsumedExport, Task, TaskExclusion, TaskId, TaskSnapshotInherit, TaskTooling};
 
 use super::{ParseError, Result};
 
@@ -17,6 +17,7 @@ pub(super) struct NodeBuilder {
     pub(super) assignee: Option<String>,
     pub(super) model: Option<String>,
     pub(super) target: Option<String>,
+    pub(super) tooling: TaskTooling,
     pub(super) content: String,
     pub(super) children: Vec<Task>,
     /// Once non-metadata content appears, further metadata fields become
@@ -29,6 +30,34 @@ pub(super) struct NodeBuilder {
     pub(super) blank_line_seen: bool,
     /// Line number of the heading (for error reporting).
     pub(super) heading_line: usize,
+}
+
+impl NodeBuilder {
+    /// A node whose heading was just read, with no metadata or content yet.
+    pub(super) fn new(id: TaskId, kind: String, title: String, level: u8, line: usize) -> Self {
+        NodeBuilder {
+            id,
+            kind,
+            title,
+            level,
+            state: None,
+            prior: Vec::new(),
+            prior_kinds: Vec::new(),
+            inherits: None,
+            provides: Vec::new(),
+            consumes: Vec::new(),
+            excludes: Vec::new(),
+            assignee: None,
+            model: None,
+            target: None,
+            tooling: TaskTooling::default(),
+            content: String::new(),
+            children: Vec::new(),
+            metadata_closed: false,
+            blank_line_seen: false,
+            heading_line: line,
+        }
+    }
 }
 
 fn finalize_builder(b: NodeBuilder) -> Result<Task> {
@@ -57,6 +86,7 @@ fn finalize_builder(b: NodeBuilder) -> Result<Task> {
         assignee: b.assignee,
         model: b.model,
         target: b.target,
+        tooling: b.tooling,
         content: b.content,
         children: b.children,
     })

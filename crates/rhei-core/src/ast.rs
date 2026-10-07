@@ -12,6 +12,7 @@
 
 // §FS-rhei-plan-language.5: AST data model.
 
+pub use crate::task_tooling::{TaskTooling, TaskToolingEntry};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -296,6 +297,10 @@ pub struct Task {
     /// Per-task full execution identity override from `**Target:**`, if present.
     // §FS-rhei-plan-language.3.11: Task-level target override.
     pub target: Option<String>,
+    /// Registry ids from `**MCP servers:**` and `**Skills:**`, added to this
+    /// task's own agent invocations in every agent state it runs in.
+    // §FS-rhei-task-tooling.1 §FS-rhei-task-tooling.2
+    pub tooling: TaskTooling,
     /// Free-form content accumulated from lines between the metadata and the
     /// first child heading (or the next sibling / end of file).
     pub content: String,

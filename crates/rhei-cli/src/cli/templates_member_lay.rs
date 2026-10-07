@@ -60,7 +60,9 @@
         Ok(laid)
     }
 
-    /// [`lay_member_rhei`] rendering into `scratch` under `--dry-run`.
+    /// [`lay_member_rhei`] rendering into `scratch` under `--dry-run`, with the
+    /// destination's project validation and settings in both modes.
+    /// §FS-rhei-templates.6.1.2 §FS-rhei-templates.6.2
     fn lay_member_rhei_at(lay: &MemberLay<'_>, scratch: Option<&Path>) -> MietteResult<LaidRhei> {
         let prospective_member = !lay.dry_run
             && lay.layout == TemplateLayout::Workspace
@@ -98,10 +100,11 @@
             })
             .inspect_err(|_| discard(&target_dir))?;
 
-        // What happens to a failed lay: retained for inspection at the
-        // requested path when the caller asked, removed otherwise.
+        // Dry runs always discard scratch; real failures obey retention. §FS-rhei-templates.6.1.2
         let fail = |settings: Option<&PreparedProjectSettings>, err: Report| -> Report {
-            if lay.keep_on_error && prospective_member {
+            if lay.dry_run {
+                let _ = remove_path(&target_dir, false);
+            } else if lay.keep_on_error && prospective_member {
                 if let Err(published) =
                     publish_staged_member(&target_dir, lay.output_dir, settings, true)
                 {
@@ -119,20 +122,17 @@
         let placement = plan_project_placement(lay.output_dir, &materialized.output_dir)
             .map_err(|err| fail(None, err))?;
 
-        let mut settings = None;
-        if !lay.dry_run {
-            if let Some(project) = placement.project() {
-                settings = prepare_workspace_settings_for_project(&materialized.output_dir, project)
-                    .map_err(|err| fail(None, err))?;
-            }
-        }
+        // Reconcile only the staged copy in either mode. §FS-rhei-templates.6.2
+        let settings = match placement.project() {
+            Some(project) => prepare_workspace_settings_for_project(&materialized.output_dir, project)
+                .map_err(|err| fail(None, err))?,
+            None => None,
+        };
 
-        // A member rhei is only correct in the project's terms — its machine and
-        // settings resolve there — so that is what gets validated. Validating
-        // the workspace in isolation is what let a project-breaking result be
-        // reported as "Validation succeeded".
+        // Both modes validate the intended member in its project, including siblings.
+        // §FS-rhei-templates.6.1.2
         let validation = match placement.project() {
-            Some(project) if !lay.dry_run => validate_staged_project_member(
+            Some(project) => validate_staged_project_member(
                 project,
                 lay.output_dir,
                 &materialized.output_dir,

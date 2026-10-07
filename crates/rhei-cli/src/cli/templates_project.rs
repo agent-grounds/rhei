@@ -66,8 +66,15 @@
     /// The project that would *discover* `output_dir`, which is only ever its
     /// immediate parent: discovery reads the entries sitting directly next to
     /// `index.panta.md` and never recurses. §AR-rhei-panta.1
+    ///
+    /// A bare `new` has the empty path as its parent, which names the working
+    /// directory exactly as `./new` does, so it is checked as `.`: how the
+    /// output is spelled never changes its membership. §FS-rhei-templates.6.2
     fn owning_project_of(output_dir: &Path) -> Option<PathBuf> {
-        let parent = output_dir.parent()?;
+        let parent = match output_dir.parent()? {
+            parent if parent.as_os_str().is_empty() => Path::new("."),
+            parent => parent,
+        };
         workspace::is_panta_project(parent).then(|| parent.to_path_buf())
     }
 

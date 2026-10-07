@@ -82,11 +82,16 @@ pub(super) fn project_member_parse_report(
     }) else {
         return report;
     };
-    // A task fragment is inspected here but validated through its workspace. §FS-rhei-templates.6.1.2
-    let workspace = sibling.strip_prefix(project).ok()
+    // A task fragment is inspected here but validated through its workspace; a basin
+    // fragment has no index of its own, so through the project. §FS-rhei-templates.6.1.2
+    let owner = sibling.strip_prefix(project).ok()
         .and_then(|relative| relative.components().next())
-        .and_then(|component| workspace::workspace_dir(&project.join(component)));
-    let repair_target = crate::display_path(workspace.as_deref().unwrap_or(sibling));
+        .and_then(|component| if component.as_os_str() == workspace::BASIN_RHEI_ID {
+            Some(project.to_path_buf())
+        } else {
+            workspace::workspace_dir(&project.join(component))
+        });
+    let repair_target = crate::display_path(owner.as_deref().unwrap_or(sibling));
     let sibling = crate::display_path(sibling);
     miette!(
         help = format!("repair the existing sibling, then re-run: {}",

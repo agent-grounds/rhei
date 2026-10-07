@@ -1367,6 +1367,7 @@ dependencies = [
  "crossterm",
  "ctor",
  "fs2",
+ "iana-time-zone",
  "include_dir",
  "indexmap",
  "miette",
@@ -1383,6 +1384,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "textwrap",
+ "tz-rs",
  "unicode-segmentation",
  "uuid",
  "windows-sys 0.61.2",
@@ -1855,6 +1857,12 @@ name = "typenum"
 version = "1.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40ce102ab67701b8526c123c1bab5cbe42d7040ccfd0f64af1a385808d2f43de"
+
+[[package]]
+name = "tz-rs"
+version = "0.6.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33851b15c848fad2cf4b105c6bb66eb9512b6f6c44a4b13f57c53c73c707e2b4"
 
 [[package]]
 name = "unicode-bidi"

@@ -175,7 +175,7 @@ fn provider_limit_output_lines(
 
 /// Recognize the reset signal of a provider in `RECOGNIZED_PROVIDERS` and turn
 /// its local minute into the first safe UTC instant after that minute. Dated
-/// Codex signals use Chrono's OS-local resolver and reject non-unique results.
+/// Codex signals retain one native resolver and reject non-unique results.
 /// §FS-rhei-agents.2.3 §FS-rhei-run.3.3
 fn classify_provider_limit(
     resolved: &ResolvedAgent,
@@ -185,6 +185,7 @@ fn classify_provider_limit(
     captured_lines: &[String],
     observed: std::time::SystemTime,
 ) -> Option<ProviderLimit> {
+    let local_zone = std::sync::OnceLock::new();
     classify_provider_limit_with_local_resolver(
         resolved,
         status,
@@ -193,10 +194,7 @@ fn classify_provider_limit(
         captured_lines,
         observed,
         &|minute| {
-            chrono::Local
-                .from_local_datetime(minute)
-                .single()
-                .map(|value| value.with_timezone(&Utc))
+            local_zone.get_or_init(provider_local_time::load).as_ref()?.resolve(minute)
         },
     )
 }
@@ -232,7 +230,8 @@ fn classify_provider_limit_with_local_resolver(
         .collect::<Vec<_>>();
     let [signal] = matching.as_slice() else { return None };
     let observed_utc: DateTime<Utc> = observed.into();
-    let deadline = if provider_signal_regex().is_match(signal) {
+    let named = provider_signal_regex().is_match(signal);
+    let deadline = if named {
         named_provider_deadline(signal, observed_utc)?
     } else {
         unique_safe_boundary_with_resolver(codex_provider_reset_minute(signal)?, resolve_local)?
@@ -241,12 +240,17 @@ fn classify_provider_limit_with_local_resolver(
         return None;
     }
 
-    Some(ProviderLimit {
+    let limit = ProviderLimit {
         identity,
         signal: signal.clone(),
         observed_at: observed_utc.to_rfc3339_opts(SecondsFormat::Secs, true),
         next_attempt_at: deadline.to_rfc3339_opts(SecondsFormat::Secs, true),
-    })
+    };
+    // A wait must survive the existing scheduling reader unchanged. §FS-rhei-run.3.3
+    if !named && limit.deadline_epoch()? != u64::try_from(deadline.timestamp()).ok()? {
+        return None;
+    }
+    Some(limit)
 }
 
 /// Preserve time-of-day reset resolution on today's or tomorrow's date in the

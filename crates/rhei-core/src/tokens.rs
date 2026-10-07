@@ -4,6 +4,28 @@
 //! specification. Fielded variants mirror the specification exactly.
 
 use crate::ast::{ConsumedExport, TaskId, TaskSnapshotInherit};
+use crate::task_tooling::{MCP_SERVERS_FIELD, SKILLS_FIELD};
+
+/// The fields of the closed task metadata block, in the order the grammar
+/// places them: the marker of each `Metadata*` [`Token`], then the two tooling
+/// fields the parser reads through [`crate::task_tooling`]. The one copy of the
+/// set, cited from §FS-rhei-plan-language.2: the parser orders the tooling
+/// fields by it, and `rhei new` refuses a description line opening with any of
+/// them (§FS-rhei-new.3.4.2), so a field the grammar adds is added here or the
+/// drift test beside [`Token`] fails.
+pub const TASK_METADATA_FIELDS: [&str; 11] = [
+    "**State:**",
+    "**Prior:**",
+    "**Inherits:**",
+    "**Provides:**",
+    "**Consumes:**",
+    "**Excludes:**",
+    "**Assignee:**",
+    "**Model:**",
+    "**Target:**",
+    MCP_SERVERS_FIELD,
+    SKILLS_FIELD,
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
@@ -58,3 +80,7 @@ pub enum Token {
     /// Any non-heading, non-metadata text content.
     TextContent,
 }
+
+#[cfg(test)]
+#[path = "tokens_tests.rs"]
+mod tests;

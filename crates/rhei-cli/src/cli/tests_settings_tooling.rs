@@ -1,5 +1,11 @@
+    /// The file is written in the schema `--mcp-config` reads, not copied from
+    /// the registry: Claude Code skips a `command` array as `invalid_config` and
+    /// a `url` with no `type` as `url_missing_type`. agent-grounds/rhei#476
+    // §FS-rhei-mcp-config-file.1 §FS-rhei-mcp-config-file.2
     #[test]
+    #[ignore = "red until #476 writes the --mcp-config file in the agent's schema"]
     fn appends_mcp_config_flag_with_temp_file() {
+        std::env::set_var("RHEI_TEST_MCP_CONFIG_TOKEN", "expanded-token");
         let profile = built_in_agents().remove("claude-code").expect("claude-code");
         let resolved = ResolvedAgent {
             agent: AgentConfig::from("claude-code"),
@@ -12,15 +18,48 @@
             timeout_secs: Some(60),
             autonomous_args: Vec::new(),
         };
+        let server = |id: &str, definition: McpServerProfile| ResolvedMcpEntry {
+            id: id.to_string(),
+            optional: false,
+            definition: Some(definition),
+        };
+        let words = |words: &[&str]| words.iter().map(|w| w.to_string()).collect::<Vec<_>>();
         let tooling = ResolvedTooling {
-            mcp_servers: vec![ResolvedMcpEntry {
-                id: "linear".to_string(),
-                optional: false,
-                definition: Some(McpServerProfile {
-                    command: Some(vec!["mcp-linear".to_string()]),
-                    ..Default::default()
-                }),
-            }],
+            mcp_servers: vec![
+                server(
+                    "linear",
+                    McpServerProfile { command: Some(words(&["mcp-linear"])), ..Default::default() },
+                ),
+                server(
+                    "build",
+                    McpServerProfile {
+                        command: Some(words(&["/opt/mcp/build-server", "--stdio", "--verbose"])),
+                        env: BTreeMap::from([
+                            ("MODE".to_string(), "ci".to_string()),
+                            ("TOKEN".to_string(), "${RHEI_TEST_MCP_CONFIG_TOKEN}".to_string()),
+                        ]),
+                        working_directory: Some("/srv/build".to_string()),
+                        startup_timeout: Some("30s".to_string()),
+                        ..Default::default()
+                    },
+                ),
+                server(
+                    "events",
+                    McpServerProfile {
+                        url: Some("http://127.0.0.1:9/sse".to_string()),
+                        transport: Some("sse".to_string()),
+                        ..Default::default()
+                    },
+                ),
+                server(
+                    "stream",
+                    McpServerProfile {
+                        url: Some("ws://127.0.0.1:9/ws".to_string()),
+                        transport: Some("websocket".to_string()),
+                        ..Default::default()
+                    },
+                ),
+            ],
             skills: Vec::new(),
         };
         let runtime_dir = tempfile::tempdir().expect("tmpdir");
@@ -43,9 +82,25 @@
         let idx = args.iter().position(|a| a == "--mcp-config").expect("--mcp-config emitted");
         let path = PathBuf::from(&args[idx + 1]);
         assert!(path.exists(), "mcp config file '{}' written", path.display());
-        let body = fs::read_to_string(&path).expect("read config");
-        assert!(body.contains("\"mcpServers\""));
-        assert!(body.contains("\"linear\""));
+        let body: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).expect("read config"))
+                .expect("config is JSON");
+        assert_eq!(
+            body,
+            serde_json::json!({
+                "mcpServers": {
+                    "linear": { "command": "mcp-linear", "args": [] },
+                    "build": {
+                        "command": "/opt/mcp/build-server",
+                        "args": ["--stdio", "--verbose"],
+                        "env": { "MODE": "ci", "TOKEN": "expanded-token" }
+                    },
+                    "events": { "url": "http://127.0.0.1:9/sse", "type": "sse" },
+                    "stream": { "url": "ws://127.0.0.1:9/ws", "type": "ws" }
+                }
+            }),
+            "each entry is in the --mcp-config schema"
+        );
     }
 
     #[test]

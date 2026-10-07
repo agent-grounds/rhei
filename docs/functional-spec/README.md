@@ -18,6 +18,7 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-agents](rhei-agents.spec.md#fs-rhei-agents-rhei-agents-specification) | Agent configuration, execution, and timeout behavior |
 | [§FS-rhei-provider-refusal-rationale](rhei-provider-refusal-rationale.spec.md#fs-rhei-provider-refusal-rationale-why-provider-refusal-recognition-is-closed) | Explanation and examples for closed provider-refusal recognition |
 | [§FS-rhei-agent-visit-pairing](rhei-agent-visit-pairing.spec.md#fs-rhei-agent-visit-pairing-finished-work-across-an-in-place-target-edit) | Finished agent work kept across an in-place target edit: orphaned spawn records and their pairing |
+| [§FS-rhei-mcp-config-file](rhei-mcp-config-file.spec.md#fs-rhei-mcp-config-file-the-mcp-config-file-an-agent-is-handed) | The MCP config file an `mcp_config_flag` agent is handed: each registry entry in the agent's schema |
 | [§FS-rhei-programs](rhei-programs.spec.md#fs-rhei-programs-rhei-program-states-specification) | Deterministic program states |
 | [§FS-rhei-supervision](rhei-supervision.spec.md#fs-rhei-supervision-subtree-supervision-specification) | Subtree supervision: a parent woken at task or state checkpoints of its descendants |
 | [§FS-rhei-memory](rhei-memory.spec.md#fs-rhei-memory-mid-term-memory) | Mid-term memory: how an invocation reads what the project did before it, by a fixed algorithm |

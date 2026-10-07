@@ -240,7 +240,6 @@ const MAIL_TASK_PLAN: &str = "# Rhei: Inbox
 /// was held back.
 // §FS-rhei-task-tooling.4
 #[test]
-#[ignore = "red until #475 lets a task name its own MCP servers and skills"]
 fn a_withholding_state_runs_the_task_without_its_servers() {
     let case = Case::new("task-tooling-withheld", WITHHOLDING_MACHINE, MAIL_TASK_PLAN);
 

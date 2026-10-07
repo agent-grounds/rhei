@@ -206,7 +206,7 @@ agent's `command`, flags, and modes are declared.
 | `intervene_stdin` | boolean | No | When `true`, `rhei run --dashboard` keeps the child stdin pipe open after the initial prompt so live dashboard interventions can be written to it. Use only for agents that start work without waiting for stdin EOF. Default: `false`. |
 | `timeout` | string | No | Default timeout for this agent (e.g., `30m`). Overridden by state-level `agent_timeout`. |
 | `mcp_flag` | string | No | Flag used to attach one MCP server per occurrence. `rhei run` emits the flag once per resolved server with a launch spec as its value. Mutually exclusive with `mcp_config_flag`. |
-| `mcp_config_flag` | string | No | Flag used to attach a generated MCP config file. `rhei run` writes the resolved set to a temporary JSON file and passes it with this flag once. Mutually exclusive with `mcp_flag`. |
+| `mcp_config_flag` | string | No | Flag used to attach a generated MCP config file. `rhei run` writes the resolved set to a temporary JSON file, in the shape §FS-rhei-mcp-config-file gives, and passes it with this flag once. Mutually exclusive with `mcp_flag`. |
 | `skill_flag` | string | No | Flag used to enable one skill per occurrence. `rhei run` emits the flag once per resolved skill id. Omit to declare the agent does not support skills. |
 | `deny_read` | object | No | Optional read-denial adapter. In v1 its only field is required `path_flag`: a non-empty string repeated once per resolved excluded absolute path before the profile separator. |
 | `modes` | object | No | Named flag sets, keyed by mode name. Values are ordered string arrays appended to the command at spawn time. See [Modes](#22-modes). |
@@ -463,7 +463,7 @@ so it can be attached to an agent subprocess.
 | `url` | string | One of `command` / `url` | URL of a remote MCP server. Requires `transport`. |
 | `transport` | string | No | Transport for remote servers. Supported values: `sse`, `websocket`. Ignored for `command`-based servers. |
 | `env` | object | No | Environment variables for the server process. Values may reference host environment with `${VAR}` syntax. Only meaningful for `command`-based servers. |
-| `working_directory` | string | No | Working directory for the server process. Only meaningful for `command`-based servers. |
+| `working_directory` | string | No | Working directory for the server process. Only meaningful for `command`-based servers. An `mcp_config_flag` file cannot carry it, and the spawn warns instead (§FS-rhei-mcp-config-file.2). |
 | `startup_timeout` | string | No | Maximum time to wait for the server to complete its MCP handshake after launch. Duration format (`30s`, `10s`, …). Default: `10s`. |
 
 `command` and `url` are mutually exclusive. An entry must declare exactly one.
@@ -824,7 +824,7 @@ historically the agent's default.
 
 | Agent ID | Binary | Prompt Delivery | Model Flag | MCP Wiring | Skill Wiring | `yolo` Mode Flags |
 |----------|--------|-----------------|------------|------------|--------------|-------------------|
-| `claude-code` | `claude` | stdin, under a bare `-p`, with `--output-format stream-json --verbose`; with `intervene_stdin`, stream-json stdin as well | `--model <m>` | `--mcp-config <path>` | `--skill <id>` | `--permission-mode bypassPermissions` |
+| `claude-code` | `claude` | stdin, under a bare `-p`, with `--output-format stream-json --verbose`; with `intervene_stdin`, stream-json stdin as well | `--model <m>` | `--mcp-config <path>`, a file shaped as §FS-rhei-mcp-config-file gives | `--skill <id>` | `--permission-mode bypassPermissions` |
 | `codex` | `codex exec` | `--` (stdin) | `--model <m>` | `--mcp <spec>` (per server) | unsupported | `--sandbox danger-full-access --skip-git-repo-check -c approval_policy="never"` |
 | `gemini` | `gemini` | `--prompt <prompt>` | `--model <m>` | unsupported | unsupported | `--approval-mode yolo` |
 | `cursor` | `cursor-agent` | `--print <prompt>` | `--model <m>` | unsupported | unsupported | `--force` |

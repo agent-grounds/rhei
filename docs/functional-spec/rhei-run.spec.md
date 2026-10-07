@@ -755,6 +755,8 @@ with the machine's OS-local timezone rules. Both the reported minute and its
 following-minute boundary must resolve uniquely. Invalid calendar dates,
 daylight-saving gaps or overlaps in either minute, unavailable local resolution,
 and a safe boundary at or before observation remain ordinary process results.
+At an offset transition, the missing or repeated civil-time interval includes
+its first instant and excludes its end; the first minute after it is unique.
 Rhei never rolls an absolute date forward and never substitutes UTC for an
 unavailable local zone. Codex and Rhei must use the same local timezone; a
 remote wrapper configured differently can report a different instant.

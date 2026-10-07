@@ -2,6 +2,10 @@
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 
+#[cfg(any(windows, test))]
+#[path = "provider_windows_time.rs"]
+pub(crate) mod windows;
+
 #[cfg(unix)]
 pub(super) struct LocalZone(tz::TimeZone);
 
@@ -65,26 +69,13 @@ impl LocalZone {
     }
 }
 
+// Keep Windows native selection separate from portable transition arithmetic. §FS-rhei-run.3.3
 #[cfg(windows)]
-pub(super) struct LocalZone;
-
-/// Windows keeps Chrono's native, fallible per-year query backend; it never
-/// uses tz-rs's non-Unix UTC fallback. §FS-rhei-run.3.3
-#[cfg(windows)]
-pub(super) fn load() -> Option<LocalZone> {
-    Some(LocalZone)
-}
-
-#[cfg(windows)]
-impl LocalZone {
-    pub(super) fn resolve(&self, minute: &NaiveDateTime) -> Option<DateTime<Utc>> {
-        use chrono::TimeZone;
-        resolve_native_query(minute, &|minute| chrono::Local.offset_from_local_datetime(minute))
-    }
-}
+pub(super) use windows::native::load;
 
 /// Preserve native-query failure and ambiguity rather than choosing an offset.
-/// The injected query is the same boundary Windows production uses. §FS-rhei-run.3.3
+/// Windows supplies offsets computed from its fallible native year rules.
+/// §FS-rhei-run.3.3
 #[cfg(any(windows, test))]
 pub(super) fn resolve_native_query(
     minute: &NaiveDateTime,

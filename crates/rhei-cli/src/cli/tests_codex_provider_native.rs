@@ -106,4 +106,14 @@ mod provider_limit_codex_native {
         include!("tests_codex_provider_unix_sources.rs");
         include!("tests_codex_provider_unix_dates.rs");
     }
+
+    mod windows {
+        use super::*;
+        use provider_local_time::windows::{resolve_query, TransitionDate, YearRules};
+
+        include!("tests_codex_provider_windows_edges.rs");
+        include!("tests_codex_provider_windows_rules.rs");
+        #[cfg(windows)]
+        include!("tests_codex_provider_windows_os.rs");
+    }
 }

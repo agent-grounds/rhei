@@ -4,22 +4,20 @@
 //! §FS-rhei-plan-language.2 §FS-rhei-task-tooling.1
 
 use crate::task_tooling::{parse_tooling_value, MCP_SERVERS_FIELD, SKILLS_FIELD};
+use crate::tokens::TASK_METADATA_FIELDS;
 
 use super::builder::NodeBuilder;
 use super::{ParseError, Result};
 
-/// Every metadata marker the grammar places before the tooling fields.
-const EARLIER_FIELDS: [&str; 9] = [
-    "**State:**",
-    "**Prior:**",
-    "**Inherits:**",
-    "**Provides:**",
-    "**Consumes:**",
-    "**Excludes:**",
-    "**Assignee:**",
-    "**Model:**",
-    "**Target:**",
-];
+/// The tooling fields, which the grammar places last in the metadata block.
+const TOOLING_FIELDS: [&str; 2] = [MCP_SERVERS_FIELD, SKILLS_FIELD];
+
+/// Every metadata marker the grammar places before the tooling fields: the
+/// closed block's other fields, read from the one copy of the set rather than
+/// kept here. §FS-rhei-plan-language.2
+fn earlier_fields() -> impl Iterator<Item = &'static str> {
+    TASK_METADATA_FIELDS.into_iter().filter(|field| !TOOLING_FIELDS.contains(field))
+}
 
 /// Reads `line` when it is a task tooling field, and refuses an earlier field
 /// authored after one. Returns whether the line was consumed; anything else is
@@ -29,7 +27,7 @@ pub(super) fn read_line(
     line: &str,
     line_number: usize,
 ) -> Result<bool> {
-    let field = [MCP_SERVERS_FIELD, SKILLS_FIELD].into_iter().find(|f| line.starts_with(f));
+    let field = TOOLING_FIELDS.into_iter().find(|f| line.starts_with(f));
     let Some(top) = top else {
         return match field {
             Some(_) => {
@@ -85,7 +83,7 @@ fn refuse_field_after_tooling(top: &NodeBuilder, line: &str, line_number: usize)
     } else {
         return Ok(());
     };
-    match EARLIER_FIELDS.iter().find(|marker| line.starts_with(*marker)) {
+    match earlier_fields().find(|marker| line.starts_with(marker)) {
         Some(marker) => Err(ParseError::new(
             format!("{marker} must appear before {tooling} for Task {}", top.id),
             Some(line_number),

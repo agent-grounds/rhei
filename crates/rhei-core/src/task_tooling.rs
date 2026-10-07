@@ -8,6 +8,13 @@ pub const MCP_SERVERS_FIELD: &str = "**MCP servers:**";
 /// The metadata marker naming the skills a task's agent needs.
 pub const SKILLS_FIELD: &str = "**Skills:**";
 
+/// The tooling fields, in the order the grammar places them last in the
+/// metadata block: the one list the parser's tooling reader matches a line
+/// against, and the tail of [`crate::tokens::TASK_METADATA_FIELDS`], so a field
+/// added here is refused from a `rhei new` description by the same edit.
+/// §FS-rhei-plan-language.2 §FS-rhei-new.3.4.2
+pub const TOOLING_FIELDS: [&str; 2] = [MCP_SERVERS_FIELD, SKILLS_FIELD];
+
 /// The one spelling that marks an entry optional; any other suffix is refused.
 const OPTIONAL_SUFFIX: &str = " (optional)";
 

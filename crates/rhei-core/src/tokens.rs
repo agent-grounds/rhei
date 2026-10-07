@@ -4,16 +4,11 @@
 //! specification. Fielded variants mirror the specification exactly.
 
 use crate::ast::{ConsumedExport, TaskId, TaskSnapshotInherit};
-use crate::task_tooling::{MCP_SERVERS_FIELD, SKILLS_FIELD};
+use crate::task_tooling::TOOLING_FIELDS;
 
-/// The fields of the closed task metadata block, in the order the grammar
-/// places them: the marker of each `Metadata*` [`Token`], then the two tooling
-/// fields the parser reads through [`crate::task_tooling`]. The one copy of the
-/// set, cited from §FS-rhei-plan-language.2: the parser orders the tooling
-/// fields by it, and `rhei new` refuses a description line opening with any of
-/// them (§FS-rhei-new.3.4.2), so a field the grammar adds is added here or the
-/// drift test beside [`Token`] fails.
-pub const TASK_METADATA_FIELDS: [&str; 11] = [
+/// The marker of each `Metadata*` [`Token`], in the order the grammar places
+/// them.
+const TOKEN_FIELDS: [&str; 9] = [
     "**State:**",
     "**Prior:**",
     "**Inherits:**",
@@ -23,9 +18,34 @@ pub const TASK_METADATA_FIELDS: [&str; 11] = [
     "**Assignee:**",
     "**Model:**",
     "**Target:**",
-    MCP_SERVERS_FIELD,
-    SKILLS_FIELD,
 ];
+
+/// The fields of the closed task metadata block, in the order the grammar
+/// places them: the marker of each `Metadata*` [`Token`], then
+/// [`TOOLING_FIELDS`], the list the parser's tooling reader matches. The one
+/// copy of the set, cited from §FS-rhei-plan-language.2: the parser orders the
+/// tooling fields after the others by it, and `rhei new` refuses a description
+/// line opening with any of them (§FS-rhei-new.3.4.2).
+///
+/// A tooling field is in the set by construction. A token's marker is kept by
+/// hand in the list above, and the test build holds it to the lexer: the module
+/// beside [`Token`] places every variant with no wildcard arm, and a variant
+/// placed as metadata fails to compile, naming its marker, until this set holds
+/// that marker. The lexer stands in for the parser there, whose own field
+/// branches match the same markers without calling it.
+pub const TASK_METADATA_FIELDS: [&str; TOKEN_FIELDS.len() + TOOLING_FIELDS.len()] = {
+    let mut fields = [""; TOKEN_FIELDS.len() + TOOLING_FIELDS.len()];
+    let mut at = 0;
+    while at < TOKEN_FIELDS.len() {
+        fields[at] = TOKEN_FIELDS[at];
+        at += 1;
+    }
+    while at < fields.len() {
+        fields[at] = TOOLING_FIELDS[at - TOKEN_FIELDS.len()];
+        at += 1;
+    }
+    fields
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {

@@ -1,5 +1,5 @@
-//! Existing-destination previews and workspace sibling remedies retain strict
-//! prospective project validation. §FS-rhei-templates.6.1.2
+//! Existing-destination previews and workspace and basin sibling remedies
+//! retain strict prospective project validation. §FS-rhei-templates.6.1.2
 
 use std::fs;
 use std::path::Path;
@@ -86,35 +86,38 @@ fn workspace_sibling_remedy_validates_owning_workspace() {
         assert!(refused.stderr.contains(&*fragment.to_string_lossy()), "{}", refused.stderr);
         assert!(refused.stderr.contains("## Appendix"), "{}", refused.stderr);
         let targets = [workspace.clone(), Path::new("..").join("project's home").join("old")];
-        let target = targets
-            .iter()
-            .find(|target| {
-                refused
-                    .stderr
-                    .contains(&format!("rhei validate {}", shell_quote(&target.to_string_lossy())))
-            })
-            .expect("remedy names the owning workspace with shell-safe quoting");
-        let home = unique_temp_dir("workspace-remedy-home");
-        let output = rhei_command(&home)
-            .current_dir(&scenario.cwd)
-            .arg("validate")
-            .arg(target)
-            .output()
-            .expect("run the remedy's target from the invocation directory");
-        let validation = CliRun::from(&output);
-        assert_eq!(validation.status.code(), Some(1));
-        assert!(
-            validation.stderr.contains("Tasks section must be the final"),
-            "{}",
-            validation.stderr
-        );
-        assert!(validation.stderr.contains("## Appendix"), "{}", validation.stderr);
-        assert!(!validation.stderr.contains("Missing '# Rhei:"), "{}", validation.stderr);
-        assert!(
-            !validation.stderr.contains("Metadata field appears outside a task"),
-            "{}",
-            validation.stderr
-        );
+        assert_remedy_reproduces(&scenario, &refused, &targets);
+        assert_eq!(snapshot(&scenario.project), before, "the suggested remedy changes no bytes");
+    }
+}
+
+/// A `basin/` file is a task fragment the project owns, so the remedy that
+/// reproduces its parse error validates the project, not the bare fragment.
+/// Committed red and ignored so the full-suite gate stays green; implement
+/// removes the ignore. §FS-rhei-templates.6.1.2
+#[test]
+#[ignore = "red until a basin sibling's remedy names the project (§FS-rhei-templates.6.1.2); implement removes this"]
+fn basin_sibling_remedy_validates_owning_project() {
+    let scenario = Scenario::new();
+    scenario.clean_control();
+    fs::create_dir(scenario.project.join("basin")).unwrap();
+    write_fixture_file(
+        &scenario.project,
+        "basin/001-only.md",
+        "### Task 1: Only\n**State:** todo\n## Appendix\n",
+    );
+    let before = snapshot(&scenario.project);
+    for flags in [&["--dry-run"][..], &["--dry-run", "--keep-on-error"][..], &[][..]] {
+        let refused = scenario.output_run(flags);
+        assert_eq!(snapshot(&scenario.project), before);
+        assert_eq!(refused.status.code(), Some(1), "{}", refused.stderr);
+        assert!(refused.stderr.contains("existing sibling"), "{}", refused.stderr);
+        let fragment = Path::new("basin").join("001-only.md");
+        assert!(refused.stderr.contains(&*fragment.to_string_lossy()), "{}", refused.stderr);
+        assert!(refused.stderr.contains("Tasks section must be the final"), "{}", refused.stderr);
+        assert!(refused.stderr.contains("## Appendix"), "{}", refused.stderr);
+        let targets = [scenario.project.clone(), Path::new("..").join("project")];
+        assert_remedy_reproduces(&scenario, &refused, &targets);
         assert_eq!(snapshot(&scenario.project), before, "the suggested remedy changes no bytes");
     }
 }

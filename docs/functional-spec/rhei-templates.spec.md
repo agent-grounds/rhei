@@ -623,10 +623,15 @@ nothing even with `--keep-on-error`.
 
 **Existing sibling refusal.** If an existing sibling's parse blocks project
 validation, both modes identify it as an existing sibling blocking project
-validation, preserve its parser source context, and give the shell-safe remedy
-`rhei validate <actual-sibling-path>`. The path must identify the inspectable
-sibling from the invocation's working directory, never scratch or the new
-output ([§FS-rhei-errors.4](rhei-errors.spec.md#4-paths-in-errors)). The diagnostic distinguishes the sibling from the
+validation, name the actual sibling file as the source, and preserve its parser
+source context. The shell-safe remedy is `rhei validate <target>`, where the
+target is the one that reproduces the sibling's parse error: the plan itself for
+a standalone sibling plan, the owning workspace for a task fragment of an
+authored workspace, and the project for a task file under the project's
+`basin/`, which is parsed only as part of the project
+([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)). Paths must identify the inspectable sibling and target from the
+invocation's working directory, never scratch or the new output
+([§FS-rhei-errors.4](rhei-errors.spec.md#4-paths-in-errors)). The diagnostic distinguishes the sibling from the
 instantiated output. It may say the instantiated output itself validated only
 after that validation has actually completed; a sibling parse failure alone
 does not establish that claim.

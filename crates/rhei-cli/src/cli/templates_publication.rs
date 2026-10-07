@@ -64,6 +64,34 @@ fn validate_staged_project_member(
     Ok(())
 }
 
+/// Attribute a project parse refusal to an existing sibling when its source
+/// lies outside the staged member and the project manifest. Preserve the
+/// parser's source context, replace its generic remedy with the actual file,
+/// and make no claim about validation that the interrupted load did not finish.
+/// §FS-rhei-templates.6.1.2 §FS-rhei-errors.4
+pub(super) fn project_member_parse_report(
+    err: &rhei_core::parser::ParseError,
+    project: &Path,
+    staged: &Path,
+) -> Report {
+    let report = nested_parse_report(err);
+    let Some(sibling) = err.file.as_deref().filter(|path| {
+        path.starts_with(project)
+            && !path.starts_with(staged)
+            && *path != project.join(workspace::PANTA_INDEX_FILE)
+    }) else {
+        return report;
+    };
+    let sibling = crate::display_path(sibling);
+    miette!(
+        help = format!("repair the existing sibling, then re-run: {}",
+            shell_command(["rhei", "validate", sibling.as_str()])),
+        "an existing sibling plan at '{}' blocks project validation of the instantiated output.\n\n{}",
+        sibling,
+        report
+    )
+}
+
 /// A report that names a hidden staging directory, respelled to name the path
 /// it is published at. The two are siblings and the staging name is unique to
 /// this process, so swapping that one segment respells the path however the

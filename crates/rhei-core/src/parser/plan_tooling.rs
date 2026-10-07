@@ -41,11 +41,15 @@ pub(super) fn read_line(
     let Some(field) = field else {
         return refuse_field_after_tooling(top, line, line_number).map(|()| false);
     };
-    // Past the blank line that closes the block, the line is task content.
-    if top.metadata_closed || top.blank_line_seen {
-        return Ok(false);
-    }
+    // A blank line leaves the block open, as for every recognized field; only
+    // task content closes it, and a field after content is refused. §FS-rhei-task-tooling.1
     let refuse = |message: String| Err(ParseError::new(message, Some(line_number)));
+    if top.metadata_closed {
+        return refuse(
+            "Metadata fields must appear immediately after the task heading before task content"
+                .to_string(),
+        );
+    }
     if top.state.is_none() {
         return refuse(format!("**State:** must appear before {field} for Task {}", top.id));
     }

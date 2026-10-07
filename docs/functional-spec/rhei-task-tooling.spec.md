@@ -59,8 +59,8 @@ These lines are parse errors, and each one names the field:
 - either field before `**State:**`, `**Skills:**` before `**MCP servers:**`, or
   any other metadata field after either of them.
 
-Past the blank line that closes the metadata block, a `**MCP servers:**` line
-is ordinary task content, as any other field's line is.
+As for any recognized field, a blank line does not close the metadata block
+for these fields, and either field after task content is a parse error.
 
 ## 2. Where They Apply
 

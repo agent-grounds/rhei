@@ -350,7 +350,7 @@ pub fn parse(input: &str) -> Result<Rhei> {
             ));
         }
 
-        // The task tooling fields close the metadata block. §FS-rhei-task-tooling.1
+        // The task tooling fields come last in the metadata block. §FS-rhei-task-tooling.1
         if plan_tooling::read_line(node_stack.last_mut(), line, line_number)? {
             continue;
         }

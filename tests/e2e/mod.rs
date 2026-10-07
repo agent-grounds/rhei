@@ -95,6 +95,7 @@ mod includes_under_tests;
 mod install_skills_tests;
 mod installed_state_machine_guidance_tests;
 mod instantiate_output_default_tests;
+mod instantiate_output_spelling_tests;
 mod into_flow_style_tests;
 mod into_identity_tests;
 mod into_placement_tests;

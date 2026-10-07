@@ -290,6 +290,7 @@ mod tests {
     include!("cli/tests_agent_resolution.rs");
     include!("cli/tests_cli_target_overrides.rs");
     include!("cli/tests_provider_limits.rs");
+    include!("cli/tests_codex_provider_local.rs");
     include!("cli/tests_agent_prompt_transport.rs");
     include!("cli/tests_agent_family.rs");
     include!("cli/tests_spawn_records.rs");

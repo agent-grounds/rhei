@@ -327,6 +327,41 @@ diagnostic rather than a silent drop (§FS-rhei-validate.4.4):
 Under `basin/` there is no such block: an unfiled ticket's metadata belongs to
 the project manifest (§FS-rhei-panta.2).
 
+### 4.7. Tooling One Task Needs
+
+When one ticket needs an MCP server or a skill that its siblings must not get,
+name it on that ticket rather than on the state they share:
+
+```markdown
+### Task 1: Summarise this week's release thread from the mail
+**State:** pending
+**MCP servers:** thunderbird-mail, grafana (optional)
+
+### Task 2: Tidy the changelog
+**State:** pending
+```
+
+Task 1's agent gets `thunderbird-mail` in every agent state it passes through;
+Task 2's gets neither server. Each entry is a registry id from settings, and
+` (optional)` lets the agent start without it when it fails. Leave the marker
+off a server the work cannot be done without: a required entry that fails
+blocks the spawn and goes through the state's `mcp_unavailable` handler.
+`**Skills:**` follows on the next line in the same form.
+
+A state that must never see what a ticket brings, such as a review that may not
+read the author's mail, says so once in the machine:
+
+```yaml
+  review:
+    agent: claude-code
+    withhold_task_tooling: true
+```
+
+Task 1 still passes through `review`; its agent there runs without the mail
+server, and the run log says what was held back. `mcp_servers: []` is not the
+same thing: it only stops the state inheriting `defaults`. See
+§FS-rhei-task-tooling.
+
 ## 5. Using a Custom State Machine
 
 A plan runs under the machine whose `states.yaml` sits where it does: next to

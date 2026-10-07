@@ -108,6 +108,7 @@ can start in different states within the same state machine.
 | `handoff` | object | No | Prompt-context inheritance for same-task state handoffs. See [State Handoffs](#32-state-handoffs). |
 | `mcp_servers` | array | No | MCP servers attached to the agent subprocess for this state. Entries are ids from the `mcp_servers` settings registry or inline server definitions. Individual entries may be marked `optional: true`. See [MCP Servers and Skills](#7-mcp-servers-and-skills). |
 | `skills` | array | No | Agent skills enabled for this state. Entries are ids from the `skills` settings registry or inline skill definitions. Individual entries may be marked `optional: true`. See [MCP Servers and Skills](#7-mcp-servers-and-skills). |
+| `withhold_task_tooling` | boolean | No | When `true`, this state's invocations run without the MCP servers and skills a task names with `**MCP servers:**` and `**Skills:**`, both kinds together; the state's own lists and the `defaults` resolve unchanged, and the plan is never rejected. Defaults to `false`. See [§FS-rhei-task-tooling.4](rhei-task-tooling.spec.md#4-a-state-that-withholds). |
 
 There is deliberately no field for "this terminal state requires a written
 result". Every `final: true` state requires one, always, and the contract is
@@ -208,7 +209,8 @@ implicit rather than declared: see [Terminal Result](#33-terminal-result).
 - An `mcp_servers` or `skills` entry may declare `optional: true` (default `false`). When `optional: true`, a failure to start the server or locate the skill at spawn time does not block the agent; when `false`, it does. See [Agents Specification — Missing Tooling](rhei-agents.spec.md#6-missing-tooling).
 - `state.mcp_servers` and `state.skills` on a `gating: true` state are a validation error (gating states are human-only; the agent will never be invoked).
 - `state.mcp_servers` and `state.skills` on a state with `program:` set are a validation error (programs execute deterministically and do not consume tool surfaces).
-- `state.mcp_servers: []` and `state.skills: []` are valid and mean "clear the inherited `defaults` tooling for this state" — not "ignore the field".
+- `state.mcp_servers: []` and `state.skills: []` are valid and mean "clear the inherited `defaults` tooling for this state" — not "ignore the field". They do not refuse what a task adds; `withhold_task_tooling` does.
+- `state.withhold_task_tooling`, when present, must be a boolean. Like `mcp_servers`, it is a validation error on a `gating: true`, `program:`, or `final: true` state, none of which runs an agent for a task to add tooling to. A task's entries a withholding state drops are not a validation error or warning. See [§FS-rhei-task-tooling.4](rhei-task-tooling.spec.md#4-a-state-that-withholds).
 - `state.poll`, when present, must be an object with `interval` (a valid duration string, e.g. `30s`, `5m`, `1h`) and `max_attempts` (an integer ≥ `1`).
 - `state.poll.waiting_on`, when present, must be a string that is not empty after trimming. It is optional; a blank value is a validation error rather than an absent field, because a poll that says it waits on someone must say on whom.
 - `state.poll` on a `final: true` state is a validation error (terminal states have no work to execute).
@@ -1144,6 +1146,11 @@ The `mcp_servers` and `skills` fields are lists. Each entry is either a
 [`skills`](rhei-agents.spec.md#115-skills) settings registry) or an **inline
 object** for one-offs that shouldn't pollute global settings.
 
+A task may add registry entries for its own invocations with `**MCP servers:**`
+and `**Skills:**`, in every agent state it passes through, and a state may
+withhold them with `withhold_task_tooling`. See
+[§FS-rhei-task-tooling](rhei-task-tooling.spec.md#fs-rhei-task-tooling-tooling-one-task-needs).
+
 ### 7.1. Entry forms
 
 ```yaml
@@ -1173,11 +1180,15 @@ with `optional: false`.
 
 ### 7.2. Effective set
 
-The **effective set** for a state is `defaults.<kind>` ∪ `state.<kind>`,
-deduplicated by id. State-level entries override identically-ided defaults.
-Passing `mcp_servers: []` or `skills: []` on a state clears the inherited
-`defaults` tooling for that state — leaving the field out inherits the
-defaults unchanged. See
+The **effective set** for one task's invocation in a state is
+`defaults.<kind>` ∪ `state.<kind>` ∪ `task.<kind>`, deduplicated by id.
+State-level entries override identically-ided defaults. Passing
+`mcp_servers: []` or `skills: []` on a state clears the inherited `defaults`
+tooling for that state — leaving the field out inherits the defaults
+unchanged — and leaves the task's entries in place. The task term is dropped
+where the state sets `withhold_task_tooling: true`, and an id the task shares
+with the state or the defaults keeps their definition
+([§FS-rhei-task-tooling.3](rhei-task-tooling.spec.md#3-the-effective-set)). See
 [Agents Specification — Resolution Order](rhei-agents.spec.md#14-resolution-order)
 for the full algorithm.
 

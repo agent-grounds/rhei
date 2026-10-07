@@ -89,6 +89,12 @@ error naming its line
    reject a shadowed settings fallback or speculate about a mode when no agent
    is effective. [§FS-rhei-agents.1.4.1](rhei-agents.spec.md#141-mode-resolution-order) [§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification)
 
+   Each task's `**MCP servers:**` and `**Skills:**` ids are resolved against
+   the same merged registries, once per task and whatever states it passes
+   through. An id with no entry is an error naming the task, the field and the
+   id. A state that will withhold the entry changes nothing here.
+   [§FS-rhei-task-tooling.6](rhei-task-tooling.spec.md#6-validation)
+
    Validation also resolves each non-gating, non-final state's effective agent
    invocations and rejects one that resolves to no finite `agent_timeout`
    through the four-level chain, naming the state and the agent

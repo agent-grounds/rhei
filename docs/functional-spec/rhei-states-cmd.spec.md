@@ -109,6 +109,8 @@ Text output includes:
   which moves under the task bring it back, and the bare value answers that
   only to someone who already knows the grammar. `--json` keeps the value
   itself, `"execute_on": "<scope>-<event>"`.
+- A state that authors `withhold_task_tooling: true` prints `Task tooling:
+  withheld` ([§FS-rhei-task-tooling.4](rhei-task-tooling.spec.md#4-a-state-that-withholds)); no other state prints the line.
 - A polling state's `Poll:` line carries its cadence and, when the state
   declares one, the person it waits on: `Poll: interval=10m,
   max_attempts=60, waiting_on=author`. The label is appended only when
@@ -148,6 +150,10 @@ Each state that authors `effort` includes an `"effort": "<value>"` member.
 When the field is omitted, JSON omits the member rather than emitting
 `"effort": null`; text likewise adds no empty `Effort:` line. This preserves
 the inspection shape of machines that do not opt in.
+
+A state that authors `withhold_task_tooling` includes a
+`"withhold_task_tooling": <bool>` member with the authored value, and a state
+that does not omits it ([§FS-rhei-task-tooling.7](rhei-task-tooling.spec.md#7-what-a-reader-sees)), for the same reason.
 
 A transition carries a `"callback_timeout": "<duration>"` member only when the
 edge authors it, and the top-level object carries `"callback_timeout"` only when

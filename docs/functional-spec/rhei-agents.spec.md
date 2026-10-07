@@ -757,23 +757,23 @@ declares no modes.
 performs the static validation pass first, so an invalid static selection is
 refused before scheduling or spawn.
 
-When `rhei run` composes the tool surface for a state, it resolves the
-effective MCP server and skill sets:
+When `rhei run` composes the tool surface for a task in a state, it resolves
+the effective MCP server and skill sets:
 
 1. Start from `defaults.mcp_servers` (and `defaults.skills`) as resolved by the
    merged settings.
 2. Union with the state's `mcp_servers` (and `skills`) list, if any. An empty
    list on the state clears the defaults for that state.
-3. Deduplicate by id. Within a single effective set, later entries for the same
-   id override earlier ones — a state-level override wins over a defaults
-   entry.
-4. Resolve each id against the merged `mcp_servers` / `skills` registry. Inline
-   object entries on the state (or in `defaults`) do not require a registry
-   entry; they are used as-is.
+3. Deduplicate by id; a state-level entry wins over a defaults entry. Then add
+   the task's `**MCP servers:**` / `**Skills:**` entries unless the state
+   withholds them; an id already in the set keeps its definition
+   (§FS-rhei-task-tooling.3, §FS-rhei-task-tooling.4).
+4. Resolve each id against the merged `mcp_servers` / `skills` registry. An
+   inline entry on the state (or in `defaults`) needs none and is used as-is.
 5. An id with no registry match and no inline definition is a validation
    error.
 
-The resolved sets are distinct per state and per invocation. Changing the
+The resolved sets are distinct per task, state and invocation. Changing the
 current state or restarting `rhei run` recomputes them.
 
 ### 1.5. Partial Overrides
@@ -1923,8 +1923,8 @@ An MCP server or skill is considered **available** when:
 ### 6.1. Required vs optional entries
 
 Per-state `mcp_servers` and `skills` entries may be declared required (the
-default) or `optional: true`. The `defaults` lists in `settings.json` follow
-the same rules.
+default) or `optional: true`. The `defaults` lists in `settings.json` and a
+task's entries follow the same rules (§FS-rhei-task-tooling.5).
 
 - **Required (default):** if the entry fails its availability check,
   `rhei run` does not spawn the agent. The engine looks for an
@@ -2271,9 +2271,9 @@ whose absence means something is the shape `mcp_servers:` and `skills:` already
 have.
 
 Each entry in `mcp_servers:` and `skills:` is the resolved id; an entry
-suffixed with `?` was declared `optional: true` and failed its availability
-check — it was dropped before spawn and is recorded for diagnostics. A
-missing line means the state declared no entries of that kind.
+suffixed with `?` was optional and failed its availability check — dropped
+before spawn, recorded for diagnostics. A missing line means the invocation
+got none of that kind; withheld task entries: §FS-rhei-task-tooling.7.
 
 ### 8.3. Log Directory
 

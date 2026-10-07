@@ -626,15 +626,19 @@ See [Agents Specification — Timeout Handling](rhei-agents.spec.md#7-timeout-ha
 
 ### 3.7. Tooling-Unavailable Trigger (`triggeredBy: 'system'`)
 
-When `rhei run` is about to spawn an agent for a state that declares required
+When `rhei run` is about to spawn an agent whose effective set holds required
 MCP servers or skills (`optional: false`, the default), the engine first
-checks availability. If any required entry fails its availability check:
+checks availability. The set includes a required entry the task added with
+`**MCP servers:**` or `**Skills:**`, which is checked and routed like one the
+state declares ([§FS-rhei-task-tooling.5](rhei-task-tooling.spec.md#5-a-required-task-entry-that-fails)).
+If any required entry fails its availability check:
 
 1. The engine does not spawn the agent.
 2. It collects the ids of the failed required entries.
 3. It evaluates transitions from the current state whose `mcp_unavailable`
    or `skill_unavailable` field matches. `true` matches any failure of that
-   kind; an explicit id list matches only when one of the listed ids failed.
+   kind, a task-added id included; an explicit id list matches only when one of
+   the listed ids failed.
 4. If a matching transition exists, it fires with `triggeredBy: 'system'`.
 5. The transition's `on_leave` and `on_enter` callbacks execute normally.
 6. If no matching transition exists, the task remains in its current state
@@ -734,6 +738,7 @@ states:
     program_timeout: <duration> # Optional: max time a program may run in this state (e.g., "10m")
     mcp_servers: [<string|object>]  # Optional: MCP servers attached to the agent for this state
     skills: [<string|object>]       # Optional: agent skills enabled for this state
+    withhold_task_tooling: <boolean> # Optional: run without the tooling a task adds
 ```
 
 | Field | Type | Required | Description |
@@ -759,6 +764,7 @@ states:
 | `outputs` | artifact array | No | Required file artifacts that must exist before leaving this state |
 | `mcp_servers` | array | No | MCP server entries (ids or inline definitions) attached to the agent subprocess. Individual entries may be marked `optional: true`. Mutually exclusive with `gating: true` and `program:`. See [States Specification — MCP Servers and Skills](rhei-states.spec.md#7-mcp-servers-and-skills). |
 | `skills` | array | No | Skill entries enabled for the agent in this state. Same shape and exclusions as `mcp_servers`. |
+| `withhold_task_tooling` | boolean | No | When `true`, the state's invocations run without the MCP servers and skills a task names; the state's own lists and the defaults are unchanged and the plan is not rejected. Same exclusions as `mcp_servers`. See [§FS-rhei-task-tooling.4](rhei-task-tooling.spec.md#4-a-state-that-withholds). |
 
 Model selection rules:
 - The machine-level `models` list is optional. When omitted, states are not model-constrained.

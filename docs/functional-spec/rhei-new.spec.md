@@ -91,11 +91,16 @@ with `--dir` and put a `states.yaml` in its directory — before the create, whi
 | `--assignee <WHO>`         | none               | `**Assignee:**`, which is a claim: `rhei next` and `rhei run` skip an assigned ticket until `rhei release <id>`, and the create says so (§5.4) |
 | `--model <MODEL>`          | none               | `**Model:**`; mutually exclusive with `--target` ([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)) |
 | `--target <TARGET>`        | none               | `**Target:**`; mutually exclusive with `--model`, which the identity already carries ([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)) |
+| `--mcp-server <ENTRY>`     | none               | `**MCP servers:**` entry; repeatable. Each value is one entry, a registry id or `'<id> (optional)'` ([§FS-rhei-task-tooling.8](rhei-task-tooling.spec.md#8-writing-the-fields-with-rhei-new)) |
+| `--skill <ENTRY>`          | none               | `**Skills:**` entry; repeatable, in the same form as `--mcp-server` ([§FS-rhei-task-tooling.8](rhei-task-tooling.spec.md#8-writing-the-fields-with-rhei-new)) |
 
 Repeatable fields are written in the order given, comma-separated, on one line.
 `--excludes` preserves the authored entry order and writes its line after
 `**Consumes:**` and before `**Assignee:**`; create-time validation applies the
 same graph and path rules as `rhei validate`.
+`--mcp-server` and `--skill` write their lines last, after `**Model:**` or
+`**Target:**`, and an id the merged registry does not hold is refused before
+any file is written (§FS-rhei-task-tooling.6).
 A `--prior` value is written through unchanged, so both authored forms work:
 `--prior "Task 1"` keeps the node-kind keyword the plan language allows, and
 `--prior auth.1` writes the bare cross-rhei reference. `rhei new` deliberately

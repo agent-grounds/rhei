@@ -16,6 +16,7 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-transitions](rhei-transitions.spec.md#fs-rhei-transitions-rhei-transitions-specification) | Transition system, callbacks, and YAML schema |
 | [§FS-rhei-callbacks](rhei-callbacks.spec.md#fs-rhei-callbacks-transition-callback-examples) | Transition callback examples |
 | [§FS-rhei-agents](rhei-agents.spec.md#fs-rhei-agents-rhei-agents-specification) | Agent configuration, execution, and timeout behavior |
+| [§FS-rhei-provider-refusal-rationale](rhei-provider-refusal-rationale.spec.md#fs-rhei-provider-refusal-rationale-why-provider-refusal-recognition-is-closed) | Explanation and examples for closed provider-refusal recognition |
 | [§FS-rhei-agent-visit-pairing](rhei-agent-visit-pairing.spec.md#fs-rhei-agent-visit-pairing-finished-work-across-an-in-place-target-edit) | Finished agent work kept across an in-place target edit: orphaned spawn records and their pairing |
 | [§FS-rhei-programs](rhei-programs.spec.md#fs-rhei-programs-rhei-program-states-specification) | Deterministic program states |
 | [§FS-rhei-supervision](rhei-supervision.spec.md#fs-rhei-supervision-subtree-supervision-specification) | Subtree supervision: a parent woken at task or state checkpoints of its descendants |

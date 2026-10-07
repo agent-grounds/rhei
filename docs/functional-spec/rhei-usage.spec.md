@@ -129,6 +129,19 @@ its authored state, and a later `rhei run` resumes from the persisted deadline.
 `rhei reset` deliberately discards that wait with the rest of the task's
 runtime state. §FS-rhei-run.3.3
 
+Codex's full `You've hit your usage limit. Visit
+https://chatgpt.com/codex/settings/usage to purchase more credits or try again at
+Oct 9th, 2026 11:19 PM.` refusal is recognized as plain output or as the textual
+`message` of a Codex stdout JSON `error` event (§FS-rhei-agents.2.3). Its date
+uses the machine's OS-local timezone, so Codex and Rhei must share that zone.
+On Europe/Zurich, this example parks until `2026-10-09T21:20:00Z`, the first
+instant after the reported minute. Invalid, ambiguous, or expired absolute
+deadlines remain ordinary failures. Parking preserves the state and records
+`ending=provider_limited`, `charged=0`, and `attempt_charged=false`;
+`--until-idle` exits with waiting status `3`, and repeated runs before the
+deadline spawn no further work with the same agent/provider identity. The
+persisted wait survives restart (§FS-rhei-run.3.3).
+
 Ticket ids in command output are project-qualified — `<rhei-id>.<task-id>`, e.g. `plan.1` for a single-file `plan.rhei.md` — and `rhei list` accepts the same `--rhei <id>` narrowing as `run`, `next`, and `reset` ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
 
 #### Naming a ticket

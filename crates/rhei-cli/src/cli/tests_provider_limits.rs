@@ -1,3 +1,5 @@
+include!("tests_codex_provider_limits.rs");
+
 mod provider_limits {
     use super::*;
 

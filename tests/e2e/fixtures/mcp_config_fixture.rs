@@ -14,6 +14,15 @@ const COPY_TO: &str = "RHEI_E2E_MCP_CONFIG_COPY";
 /// invocation, named `<task-id>-<state>.json` like the run log beside it.
 const COPY_INTO: &str = "RHEI_E2E_MCP_CONFIG_COPY_DIR";
 
+/// The task id from the prompt's task heading, `# <Kind> <id>: <title>`. Rhei
+/// strips `RHEI_TASK_ID` from every agent, and a state no transition finishes
+/// the task from has no `## Result` in its prompt, so the heading is the one
+/// place every prompt names the task. §FS-rhei-agents.4
+fn task_id(prompt: &str) -> Option<&str> {
+    let heading = prompt.lines().next()?.strip_prefix("# ")?;
+    Some(heading.split_once(' ')?.1.split_once(':')?.0)
+}
+
 fn result_path(prompt: &str) -> Option<PathBuf> {
     let result = prompt.split_once("\n## Result\n")?.1;
     result
@@ -41,9 +50,7 @@ fn main() {
     // No copy at all says rhei passed no file, which the test reports as such.
     let copy = match env::var_os(COPY_INTO) {
         Some(dir) => {
-            let task = result_path(&prompt)
-                .and_then(|path| path.file_stem().map(|stem| stem.to_string_lossy().into_owned()))
-                .expect("a result path naming the task in the prompt");
+            let task = task_id(&prompt).expect("a task heading naming the task in the prompt");
             let state = env::var("RHEI_STATE").expect("RHEI_STATE");
             PathBuf::from(dir).join(format!("{task}-{state}.json"))
         }

@@ -27,7 +27,7 @@ struct NoteOptions {
     /// Take that task's live entry out of composition, instead of leaving one
     #[arg(long, value_name = "TASK_ID", add = ArgValueCompleter::new(complete_task_id))]
     strike: Option<String>,
-    /// Name the writing task; defaults to `RHEI_TASK_ID`, which `rhei run` exports
+    /// Name the writing task; defaults to `RHEI_TASK_ID` where rhei sets it
     #[arg(long, value_name = "ID", add = ArgValueCompleter::new(complete_task_id))]
     task: Option<String>,
 }

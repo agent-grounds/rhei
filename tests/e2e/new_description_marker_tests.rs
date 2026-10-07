@@ -12,7 +12,9 @@ use super::*;
 
 /// A value the parser would accept after each marker, keyed by the marker. A
 /// field the grammar adds has no row here until someone writes one, and
-/// [`task_metadata_lines`] fails rather than leave that field untested.
+/// [`task_metadata_lines`] fails rather than leave that field untested. It fails
+/// too for a row whose marker the set no longer holds, so the table is a list of
+/// its own: `**Excludes:**` is pinned here, not only through the set under test.
 // §FS-rhei-new.3.4.2
 const SAMPLE_VALUES: [(&str, &str); 12] = [
     ("**State:**", "completed"),
@@ -33,9 +35,15 @@ const SAMPLE_VALUES: [(&str, &str); 12] = [
 /// and the retired `**States:**`, each followed by its sample value.
 // §FS-rhei-new.3.4.2 §FS-rhei-plan-language.2
 fn task_metadata_lines() -> Vec<String> {
-    TASK_METADATA_FIELDS
+    let markers: Vec<&str> = TASK_METADATA_FIELDS.into_iter().chain(["**States:**"]).collect();
+    for (sampled, _) in SAMPLE_VALUES {
+        assert!(
+            markers.contains(&sampled),
+            "{sampled} has a row in SAMPLE_VALUES, but TASK_METADATA_FIELDS does not hold it"
+        );
+    }
+    markers
         .into_iter()
-        .chain(["**States:**"])
         .map(|marker| {
             let value = SAMPLE_VALUES
                 .iter()

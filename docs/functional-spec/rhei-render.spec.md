@@ -38,6 +38,9 @@ its project narrowed to that rhei.
 Each task exposes its authored `excludes` as an ordered array of typed entries;
 an absent field renders as an empty array, preserving the unchanged-plan AST
 shape convention used by `provides` and `consumes`.
+Each task likewise exposes `mcp_servers` and `skills` as ordered arrays of
+`{ "id", "optional" }`, empty when the field is absent
+([§FS-rhei-task-tooling.7](rhei-task-tooling.spec.md#7-what-a-reader-sees)).
 
 The top-level `states` field is the machine the document resolves
 ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)) — for a project, the project default: the

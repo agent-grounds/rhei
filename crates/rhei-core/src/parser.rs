@@ -192,6 +192,8 @@ mod plan_snapshot_prior_tests;
 #[cfg(test)]
 mod plan_task_metadata_tests;
 #[cfg(test)]
+mod plan_task_tooling_tests;
+#[cfg(test)]
 mod plan_tests;
 #[cfg(test)]
 mod states_line_tests;

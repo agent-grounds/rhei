@@ -219,6 +219,8 @@ mod supervisor_validation_tests;
 mod task_export_consumer_tests;
 mod task_export_producer_tests;
 mod task_export_validation_tests;
+mod task_tooling_surface_tests;
+mod task_tooling_tests;
 mod template_ancestor_discovery_tests;
 mod template_example_sync_tests;
 mod template_timeout_tests;

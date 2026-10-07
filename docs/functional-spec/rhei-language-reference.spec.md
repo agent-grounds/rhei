@@ -98,6 +98,11 @@ Language changes must preserve a single discoverable entry point:
 - Task read boundaries are authored with `**Excludes:**`; their syntax and
   validation are owned by [§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions), while prompt and process enforcement are owned by
   [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition).
+- The tooling one task needs is authored with `**MCP servers:**` and
+  `**Skills:**`, and a state refuses it with `withhold_task_tooling`; their
+  grammar is §FS-rhei-plan-language.2, and what they mean, how they combine
+  with a state's tooling and what validation refuses are owned by
+  §FS-rhei-task-tooling.
 - Adding, removing, or renaming a user-authored project or rhei file kind or
   directory must update the file-kind map in §1 in the same change as the
   owning spec edit.

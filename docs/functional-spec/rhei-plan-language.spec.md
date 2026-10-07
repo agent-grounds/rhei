@@ -485,7 +485,8 @@ task_id_segment = NUMBER | IDENTIFIER ;
    section 3.11. *)
 (* The metadata block is closed: `**State:**`, `**Prior:**`, `**Inherits:**`,
    `**Provides:**`, `**Consumes:**`, `**Excludes:**`, `**Assignee:**`,
-   `**Model:**`, and `**Target:**` are the only fields. A `**<name>:**` line
+   `**Model:**`, `**Target:**`, `**MCP servers:**`, and `**Skills:**` are the
+   only fields. A `**<name>:**` line
    with any other name, appearing in the block before a blank line has
    separated it from the heading, is a parse error naming the unknown field.
    Accepting it as content silently discards it, and the field authors most
@@ -496,7 +497,8 @@ task_id_segment = NUMBER | IDENTIFIER ;
 metadata        = state_field, [ prior_field ], [ inherits_field ],
                   [ provides_field ], [ consumes_field ], [ excludes_field ],
                   [ assignee_field ],
-                  [ execution_override ] ;
+                  [ execution_override ],
+                  [ mcp_servers_field ], [ skills_field ] ;
 
 assignee_field  = "**Assignee:** ", title, NEWLINE ;
 
@@ -514,6 +516,22 @@ target_field    = "**Target:** ", target_selector, NEWLINE ;
 model_id        = { ANY_CHAR - NEWLINE }+ ;
 
 target_selector = { ANY_CHAR - NEWLINE }+ ;
+
+(* Task tooling: registry ids this task's own agent invocations add to each
+   state's set, last in the block. Ids only, never inline definitions; a
+   trailing ` (optional)` marks an entry optional. Meaning, precedence and
+   validation: §FS-rhei-task-tooling. *)
+mcp_servers_field = "**MCP servers:** ", tooling_list, NEWLINE ;
+
+skills_field    = "**Skills:** ", tooling_list, NEWLINE ;
+
+tooling_list    = tooling_entry, { ", ", tooling_entry } ;
+
+tooling_entry   = tooling_id, [ " (optional)" ] ;
+
+tooling_id      = tooling_char, { tooling_char } ;
+
+tooling_char    = ? any Unicode character except whitespace, ",", "(", and ")" ? ;
 
 (* Result block links a terminal task to its runtime result/audit file.
    It is inserted by the `complete` command after task content and before child

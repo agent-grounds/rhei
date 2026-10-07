@@ -25,17 +25,25 @@ const READING_THE_RHEI_COMMANDS: &str = "\
 /// What the next agent and the human will see, and what this one may edit.
 ///
 /// It describes artifacts and permitted edits and says nothing about when to
-/// stop: completion stays with the completion condition.
+/// stop: completion stays with the completion condition. The note bullet prints
+/// the whole command with this task's qualified id, the one the task heading
+/// carries, because an agent has no `RHEI_TASK_ID` for the verb to default to
+/// (§FS-rhei-agents.4, §FS-rhei-note.1).
 // §FS-rhei-memory.3.4 §FS-rhei-agents.3.1
-const LEAVING_A_TRAIL: &str = "\
+fn render_leaving_a_trail(render_context: &RuntimeTemplateContext<'_>) -> String {
+    let task_id = &render_context.task.id;
+    format!(
+        "\
 ### Leaving a trail
 
 What you write is what the next agent and the human see.
 - `runtime/results/<task-id>.md`: the first line is the one-line summary every later Plan History shows; detail below it.
 - You may append progress paragraphs to your own task body \u{2014} files touched, commands run, decisions made \u{2014} and append child tasks under your own task. Do not edit `**State:**` lines or any other task's body.
-- You may leave **one** note for later tickets anywhere in this project: `rhei note \"<fact>\"`, at most 3 lines, for something the next ticket would otherwise rediscover. A second call replaces it, and spending it on `rhei note --restate <id>` or `--strike <id>` leaves you none of your own. Never edit `runtime/notes.md` by hand.
+- You may leave **one** note for later tickets anywhere in this project: `rhei note --task {task_id} \"<fact>\"`, at most 3 lines, for something the next ticket would otherwise rediscover. A second call replaces it, and spending it on `--restate <id>` or `--strike <id>` in place of the fact leaves you none of your own. Never edit `runtime/notes.md` by hand.
 - Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` breaks the plan; the run reverts your task body to what it was before this attempt and spends the attempt.
-";
+"
+    )
+}
 
 /// `### Reading the rhei` — the map that makes §FS-rhei-memory.1.1 true across
 /// rheis: every execution root in the project, named, so the results of a rhei
@@ -100,5 +108,5 @@ fn render_rhei_navigation(render_context: &RuntimeTemplateContext<'_>) -> String
     if reading.is_empty() {
         return String::new();
     }
-    format!("{reading}\n{LEAVING_A_TRAIL}")
+    format!("{reading}\n{}", render_leaving_a_trail(render_context))
 }

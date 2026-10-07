@@ -258,7 +258,6 @@ fn assert_only_the_agreed_additions(root: &Path, task: &str, prompt: &str) {
 /// command rather than as commands of their own. §FS-rhei-memory.3.4
 /// §FS-rhei-note.1
 #[test]
-#[ignore = "red until #480 prints the writing task in the trail line; implement removes this"]
 fn the_trail_line_names_the_writing_task() {
     let (_dir, root) = note_fixture("note-trail-task", None);
     assert_success(&run_note_fixture(&root));

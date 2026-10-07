@@ -5,9 +5,6 @@
 // Its own part beside `note_command_tests.rs`: those call the verb directly with
 // `RHEI_TASK_ID` set by hand, the environment a program state gives it. No agent
 // has that variable, so none of them can say whether an agent's note lands.
-//
-// Both cases are committed red and `#[ignore]`d, so the spec commit passes with
-// them failing under `--ignored`. The fix for #480 removes both `#[ignore]`s.
 
 // §FS-rhei-note.1
 
@@ -142,7 +139,6 @@ fn run_agent_fixture(prefix: &str) -> (TestDir, serde_json::Value) {
 /// task-id variable in its environment, because §FS-rhei-agents.4 still removes
 /// both. Exporting `RHEI_TASK_ID` to the agent again is not a way to pass this.
 #[test]
-#[ignore = "red until #480 prints the writing task in the trail line; implement removes this"]
 fn the_note_command_an_agents_prompt_prints_records_its_note() {
     let (dir, evidence) = run_agent_fixture("note-agent-trail");
 
@@ -174,7 +170,6 @@ fn the_note_command_an_agents_prompt_prints_records_its_note() {
 /// says `rhei run` exports the variable, since the agent is under `rhei run`
 /// already. The message and the `--task` help send it to `--task` instead.
 #[test]
-#[ignore = "red until #480 stops promising RHEI_TASK_ID to agents; implement removes this"]
 fn a_bare_note_inside_an_agent_is_refused_without_promising_the_variable() {
     let (dir, evidence) = run_agent_fixture("note-agent-bare");
 

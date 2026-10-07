@@ -30,9 +30,13 @@ fn note_usage_error(message: String) -> ! {
     command.error(ErrorKind::MissingRequiredArgument, message).exit()
 }
 
-/// The task whose slot is being spent: `--task` first, then `RHEI_TASK_ID`,
-/// which `rhei run` exports to every agent it spawns. With neither, the verb
-/// cannot know whose entry this is, and that is usage rather than a refusal.
+/// The task whose slot is being spent: `--task` first, then `RHEI_TASK_ID` where
+/// rhei sets it — a program state, a `cli:` callback, `rhei snapshot continue`.
+/// An agent `rhei run` spawns has no such variable (§FS-rhei-agents.4), so it
+/// passes `--task` with the qualified id in its prompt's task heading. With
+/// neither, the verb cannot know whose entry this is, and that is usage rather
+/// than a refusal; the message says where the id is, never to run under
+/// `rhei run`, where an agent already is.
 // §FS-rhei-note.1 §FS-rhei-note.5
 fn note_writing_task(options: &NoteOptions) -> String {
     if let Some(task) = options.task.as_deref().map(str::trim).filter(|id| !id.is_empty()) {
@@ -42,7 +46,7 @@ fn note_writing_task(options: &NoteOptions) -> String {
         Ok(task) if !task.trim().is_empty() => task.trim().to_string(),
         _ => note_usage_error(
             "no writing task: `rhei note` spends one task's slot, so name it with \
-             `--task <ticket-id>` or run under `rhei run`, which exports RHEI_TASK_ID."
+             `--task <ticket-id>`, the qualified id in your prompt's task heading."
                 .to_string(),
         ),
     }

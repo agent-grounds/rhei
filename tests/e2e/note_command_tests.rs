@@ -3,6 +3,11 @@
 //
 // Its own part beside `memory_note_store_tests.rs`: those read what a prompt
 // composes, these read what the verb writes and what it refuses to write.
+//
+// Most cases set `RHEI_TASK_ID` by hand. That is the environment a program
+// state, a `cli:` callback or `rhei snapshot continue` gives the verb, and these
+// cases pin that default. No agent has the variable: `note_agent_tests.rs` runs
+// the verb from inside one.
 
 // §FS-rhei-note.1 §FS-rhei-note.2 §FS-rhei-note.4 §FS-rhei-note.5
 

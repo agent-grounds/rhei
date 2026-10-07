@@ -383,7 +383,7 @@ Two fixed sub-sections follow the existing authority text and transition list.
 What you write is what the next agent and the human see.
 - `runtime/results/<task-id>.md`: the first line is the one-line summary every later Plan History shows; detail below it.
 - You may append progress paragraphs to your own task body — files touched, commands run, decisions made — and append child tasks under your own task. Do not edit `**State:**` lines or any other task's body.
-- You may leave **one** note for later tickets anywhere in this project: `rhei note "<fact>"`, at most 3 lines, for something the next ticket would otherwise rediscover. A second call replaces it, and spending it on `rhei note --restate <id>` or `--strike <id>` leaves you none of your own. Never edit `runtime/notes.md` by hand.
+- You may leave **one** note for later tickets anywhere in this project: `rhei note --task {qualified task id} "<fact>"`, at most 3 lines, for something the next ticket would otherwise rediscover. A second call replaces it, and spending it on `--restate <id>` or `--strike <id>` in place of the fact leaves you none of your own. Never edit `runtime/notes.md` by hand.
 - Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` breaks the plan; the run reverts your task body to what it was before this attempt and spends the attempt.
 ```
 
@@ -409,6 +409,12 @@ how completion is detected, which stay with the completion condition
 ([§FS-rhei-agents.3.1](rhei-agents.spec.md#31-completion-authority)). Its note bullet is the one write it permits outside the
 task's own body, and it is permitted only through the verb: the slot, the line
 bound, the duplicate refusal and the lock live there ([§FS-rhei-note](rhei-note.spec.md#fs-rhei-note-rhei-note)).
+The bullet prints the whole command with `{qualified task id}` filled in: the id
+`## Position` and the task heading carry. An agent has no `RHEI_TASK_ID` for the
+verb to default to ([§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables)), so the bare `rhei note "<fact>"` would
+exit `2` inside it ([§FS-rhei-note.1](rhei-note.spec.md#1-usage)). `--restate` and `--strike` take the
+fact's place in that same command, `--task` included, which is why the bullet
+names them as flags rather than as commands of their own.
 Its heading bullet says what a broken edit costs the agent that made it, and
 nothing more: the run reverts that task's body and spends the attempt, and the
 other tasks keep going ([§FS-rhei-run.3.7](rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan)), so the agent is told the

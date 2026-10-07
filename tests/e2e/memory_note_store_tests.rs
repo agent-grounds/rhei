@@ -247,6 +247,30 @@ fn assert_only_the_agreed_additions(root: &Path, task: &str, prompt: &str) {
         "{task} must be told where the store is"
     );
     let trail = trail_line.unwrap_or_default();
-    assert!(trail.contains("`rhei note \"<fact>\"`"), "{task} got:\n{trail}");
+    // Which command the line prints is `the_trail_line_names_the_writing_task`'s to pin.
     assert!(trail.contains("Never edit `runtime/notes.md` by hand."), "{task} got:\n{trail}");
+}
+
+/// The trail line prints the note command with the writing task's qualified id
+/// in it, for a ticket in any rhei and at any depth. An agent has no
+/// `RHEI_TASK_ID` to default to (§FS-rhei-agents.4), so the bare form would
+/// exit 2 inside it; `--restate` and `--strike` are named as flags of that same
+/// command rather than as commands of their own. §FS-rhei-memory.3.4
+/// §FS-rhei-note.1
+#[test]
+#[ignore = "red until #480 prints the writing task in the trail line; implement removes this"]
+fn the_trail_line_names_the_writing_task() {
+    let (_dir, root) = note_fixture("note-trail-task", None);
+    assert_success(&run_note_fixture(&root));
+
+    for task in ["auth.3", "billing.1", "mentor.1.2", "reporting.1"] {
+        let prompt = note_prompt(&root, task);
+        let (_, trail) =
+            without_line_starting(&prompt, "- You may leave **one** note for later tickets");
+        let trail = trail.unwrap_or_else(|| panic!("{task} has no trail line:\n{prompt}"));
+        let command = format!("`rhei note --task {task} \"<fact>\"`");
+        assert!(trail.contains(&command), "{task} must be told {command}; got:\n{trail}");
+        assert!(!trail.contains("`rhei note \""), "{task} got:\n{trail}");
+        assert!(!trail.contains("`rhei note --restate"), "{task} got:\n{trail}");
+    }
 }

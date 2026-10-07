@@ -318,7 +318,11 @@ pub fn without_project_notes(prompt: &str) -> (String, Option<String>) {
     (kept, Some(block))
 }
 
-/// `rhei note`, run from a directory inside the project, as an agent runs it.
+/// `rhei note`, run from a directory inside the project.
+///
+/// `task` is set as `RHEI_TASK_ID`, the environment a program state gives the
+/// verb (§FS-rhei-programs.2). An agent never has that variable
+/// (§FS-rhei-agents.4) and passes `--task` instead (§FS-rhei-note.1).
 pub fn run_note(root: &Path, cwd: &Path, task: Option<&str>, args: &[&str]) -> CliRun {
     let mut cmd: Command = isolated_command(root);
     cmd.current_dir(cwd);

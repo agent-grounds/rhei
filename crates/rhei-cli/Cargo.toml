@@ -52,6 +52,13 @@ nix = { version = "0.29", features = ["signal", "process"] }
 # bare `cargo install`, with no `share/` layout to install alongside it.
 include_dir = { version = "0.7.4", default-features = false }
 
+# Fallible OS-local selection and exact civil-time boundaries for Codex dates.
+# Pin the Unix parser to its Rust 1.82-compatible edition; no const helpers.
+# §FS-rhei-run.3.3
+[target.'cfg(unix)'.dependencies]
+tz-rs = { version = "=0.6.14", default-features = false, features = ["std"] }
+iana-time-zone = "=0.1.65"
+
 # Linux stop opens a pidfd before proving run-lock ownership, so pid reuse
 # cannot redirect the signal after that proof. §FS-rhei-run-headless.7
 [target.'cfg(target_os = "linux")'.dependencies]

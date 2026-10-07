@@ -169,3 +169,75 @@ fn codex_old_wording_control_parks_parallel_across_three_runs() {
 fn codex_json_refusal_uses_child_non_utc_local_zone() {
     assert_parks("json", false, Some("Europe/Zurich"));
 }
+
+/// Exercise native selection in actual child processes, beyond injected-zone
+/// classification. Only the child receives TZ. §FS-rhei-run.3.3
+#[cfg(unix)]
+fn assert_native_date(text: &str, zone: &str, deadline: Option<&str>) {
+    let fixture = fixture("codex-native-edge", "json", false);
+    let signal = format!(
+        "You've hit your usage limit. Visit https://chatgpt.com/codex/settings/usage to purchase more credits or try again at {text}."
+    );
+    fs::create_dir_all(fixture.root.join("runtime")).unwrap();
+    fs::write(
+        fixture.root.join("runtime/expected.json"),
+        serde_json::json!({
+            "signal": signal, "deadline": deadline,
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let mut baseline = None;
+    for name in ["first", "restart", "third"] {
+        let mut run = start(&fixture, name, Some(zone), false);
+        let status = run.wait_for_exit("native Codex date classification").code();
+        let records = refusal_records(&fixture);
+        let meta = metadata(&fixture.root);
+        let wait = &meta["metadata"]["tasks"]["1"]["providerLimits"]["working"];
+        let record = records.last().expect("native refusal spawned");
+        if let Some(deadline) = deadline {
+            assert_eq!(status, Some(3), "{text}: {}", run.output());
+            assert_eq!(records.len(), 1);
+            assert_eq!(record["ending"], "provider_limited");
+            assert_eq!(record["charged"], 0);
+            assert_eq!(record["attempt_charged"], false);
+            assert_eq!(wait["nextAttemptAt"], deadline);
+            let snapshot = (records, meta);
+            if let Some(baseline) = &baseline {
+                assert_eq!(&snapshot, baseline);
+            } else {
+                baseline = Some(snapshot);
+            }
+            assert_eq!(fs::read_to_string(fixture.root.join("runtime/starts.txt")).unwrap(), "1\n");
+        } else {
+            assert_eq!(status, Some(1), "{text}: {}", run.output());
+            assert_eq!(record["ending"], "exited", "{text}: {record:#}");
+            assert!(record["charged"].as_u64().unwrap() > 0);
+            assert_eq!(record["attempt_charged"], true);
+            assert_eq!(record["code"], 1);
+            assert!(wait.is_null(), "ordinary result must not persist a wait: {wait:#}");
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn codex_native_spring_gap_in_either_minute_remains_ordinary() {
+    for text in ["Mar 28th, 2032 1:59 AM", "Mar 28th, 2032 2:00 AM"] {
+        assert_native_date(text, "Europe/Zurich", None);
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn codex_native_autumn_first_unique_minute_parks_across_restarts() {
+    assert_native_date("Oct 31st, 2032 3:00 AM", "Europe/Zurich", Some("2032-10-31T02:01:00Z"));
+}
+
+#[cfg(unix)]
+#[test]
+fn codex_native_upper_year_rejects_unreadable_waits_and_retains_valid_waits() {
+    assert_native_date("Dec 31st, 9999 11:59 PM", "UTC0", None);
+    assert_native_date("Dec 31st, 9999 6:59 PM", "XST5", None);
+    assert_native_date("Dec 31st, 9999 11:58 PM", "UTC0", Some("9999-12-31T23:59:00Z"));
+}

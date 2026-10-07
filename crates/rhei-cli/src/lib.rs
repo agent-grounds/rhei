@@ -82,6 +82,8 @@ include!("cli/states_render.rs");
 include!("cli/loop_budget.rs");
 include!("cli/metadata_conditions.rs");
 include!("cli/metadata_rewrite.rs");
+#[path = "cli/provider_local_time.rs"]
+mod provider_local_time;
 include!("cli/provider_limits.rs");
 include!("cli/subtree_supervision.rs");
 include!("cli/subtree_supervision_owner.rs");
@@ -291,6 +293,7 @@ mod tests {
     include!("cli/tests_cli_target_overrides.rs");
     include!("cli/tests_provider_limits.rs");
     include!("cli/tests_codex_provider_local.rs");
+    include!("cli/tests_codex_provider_native.rs");
     include!("cli/tests_agent_prompt_transport.rs");
     include!("cli/tests_agent_family.rs");
     include!("cli/tests_spawn_records.rs");

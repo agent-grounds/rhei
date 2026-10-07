@@ -762,6 +762,9 @@ remote wrapper configured differently can report a different instant.
 Both grammars require unique resolution of the reported minute and boundary;
 Rhei does not guess through a daylight-saving overlap or gap. The resulting
 `nextAttemptAt` is stored as an RFC 3339 UTC instant, in the existing schema.
+A final UTC boundary that cannot round-trip through the existing deadline
+reader is unavailable conversion and remains an ordinary process result;
+Rhei does not clamp it or widen the persisted format.
 A later valid deadline
 for the same task, state, and identity replaces an earlier one; an earlier or
 equal deadline does not shorten an active wait.

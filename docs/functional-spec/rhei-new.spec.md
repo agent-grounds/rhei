@@ -320,8 +320,8 @@ anything is written — as an argument error naming the offending line, not as a
 parse error with a line number in a file the author never opened.
 
 Three shapes are refused: an ATX heading at any level (`#` through `######`), a
-line opening with a `**Field:**` metadata marker, and a line that is exactly
-`---`. An `### Task 9: Injected` line in a description is not a formatting
+line opening with a `**Field:**` metadata marker (§3.4.2 says which), and a line
+that is exactly `---`. An `### Task 9: Injected` line in a description is not a formatting
 mistake, it is a second ticket: the parser reads it as one, so a create could
 report a single new id while writing two — the second one carrying whatever
 `**State:**` the text supplied, including a terminal one that makes `rhei next`
@@ -434,6 +434,32 @@ keeps the parser's message as well.
 Every other option taking free prose keeps what it prints today; the table of
 options and their advice is one row per option so that adding one later is a
 row rather than a redesign.
+
+#### 3.4.2. Every metadata field is a `**Field:**` marker
+
+The `**Field:**` shape of §3.4 is not a sample of the fields; it is all of them.
+A line is refused when, trimmed the way the plan lexer trims it, it opens with
+any field of the closed task metadata block
+([§FS-rhei-plan-language.2](rhei-plan-language.spec.md#2-grammar-ebnf)):
+`**State:**`, `**Prior:**`, `**Inherits:**`, `**Provides:**`, `**Consumes:**`,
+`**Excludes:**`, `**Assignee:**`, `**Model:**`, `**Target:**`,
+`**MCP servers:**` and `**Skills:**` — and the retired `**States:**`, which the
+parser refuses outright
+([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)).
+No field is exempt, and a field the grammar adds to that block is refused from
+the release that adds it: the set is the plan language's own, not a copy of it
+kept beside the guard, which can fall behind the grammar unnoticed.
+
+The refusal is the same for every field and wherever the line sits — the
+description's first line or one after prose, through `--description` or
+`--description-file` alike: the argument error `**Prior:**` gets, naming the
+line, with nothing written. A field missing from the set would fail the author
+both ways at once. As the first line it is read as a live field of the new
+ticket and the create exits 0, so an issue body that quotes
+`**Excludes:** checkout=secret.md` withholds `secret.md` from the ticket's agent
+with nothing saying so. After a prose line it reaches the parser as metadata
+following content, and the author gets the rolled-back parse error, with a line
+number in a plan they never opened, that §3.4 exists to replace.
 
 ### 3.5. The basin needs a project
 

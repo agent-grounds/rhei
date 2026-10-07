@@ -126,6 +126,7 @@ mod memory_map_tests;
 mod memory_note_store_tests;
 mod memory_prompt_tests;
 mod memory_supervisor_prompt_tests;
+mod new_description_marker_tests;
 mod new_directory_adoption_tests;
 mod new_guard_tests;
 mod new_tests;

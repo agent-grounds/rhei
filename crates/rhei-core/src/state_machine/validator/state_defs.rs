@@ -130,6 +130,9 @@ pub struct StateDef {
     /// Agent skills enabled for this state. Same tri-state semantics as `mcp_servers`.
     #[serde(default)]
     pub skills: Option<Vec<StateSkillEntry>>,
+    /// As authored; `Some(true)` drops what a task adds. §FS-rhei-task-tooling.4
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub withhold_task_tooling: Option<bool>,
 }
 
 /// The portable reasoning-effort vocabulary accepted in `states.yaml`.

@@ -396,6 +396,7 @@ transitions:
             assignee: None,
             model: None,
             target: None,
+            tooling: Default::default(),
             content: String::new(),
             children: Vec::new(),
         };

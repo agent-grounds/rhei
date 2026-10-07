@@ -11,6 +11,7 @@
 
 mod builder;
 mod plan;
+mod plan_tooling;
 mod recovery;
 mod workspace;
 
@@ -191,6 +192,8 @@ mod fence_tests;
 mod plan_snapshot_prior_tests;
 #[cfg(test)]
 mod plan_task_metadata_tests;
+#[cfg(test)]
+mod plan_task_tooling_ast_tests;
 #[cfg(test)]
 mod plan_task_tooling_tests;
 #[cfg(test)]

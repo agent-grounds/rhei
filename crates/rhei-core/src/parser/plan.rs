@@ -7,6 +7,7 @@ use crate::text::parse_task_id;
 use regex::Regex;
 
 use super::builder::{title_case_kind, unwind_to_level, NodeBuilder};
+use super::plan_tooling;
 use super::{
     is_retired_states_line, parse_frontmatter, parse_structure, retired_states_line,
     unescape_state, ParseError, Result,
@@ -338,27 +339,7 @@ pub fn parse(input: &str) -> Result<Rhei> {
                 }
             }
 
-            node_stack.push(NodeBuilder {
-                id,
-                kind: kind_canonical,
-                title,
-                level,
-                state: None,
-                prior: Vec::new(),
-                prior_kinds: Vec::new(),
-                inherits: None,
-                provides: Vec::new(),
-                consumes: Vec::new(),
-                excludes: Vec::new(),
-                assignee: None,
-                model: None,
-                target: None,
-                content: String::new(),
-                children: Vec::new(),
-                metadata_closed: false,
-                blank_line_seen: false,
-                heading_line: line_number,
-            });
+            node_stack.push(NodeBuilder::new(id, kind_canonical, title, level, line_number));
             continue;
         }
 
@@ -367,6 +348,11 @@ pub fn parse(input: &str) -> Result<Rhei> {
                 "Malformed node heading: expected '### <Kind> <id>: <title>' (for example `### Task 1: Title`)",
                 Some(line_number),
             ));
+        }
+
+        // The task tooling fields close the metadata block. §FS-rhei-task-tooling.1
+        if plan_tooling::read_line(node_stack.last_mut(), line, line_number)? {
+            continue;
         }
 
         // **State:** metadata
@@ -956,8 +942,8 @@ pub fn parse(input: &str) -> Result<Rhei> {
                             "Unknown metadata field '**{field}:**' for Task {}. Task metadata \
                              is one of **State:**, **Prior:**, **Inherits:**, **Provides:**, \
                              **Consumes:**, **Excludes:**, **Assignee:**, **Model:**, \
-                             **Target:**. Leave a blank line before \
-                             this line to keep it as task content.",
+                             **Target:**, **MCP servers:**, **Skills:**. Leave a blank line \
+                             before this line to keep it as task content.",
                             top.id
                         ),
                         Some(line_number),

@@ -250,74 +250,6 @@ fn build_agent_command(
     cmd
 }
 
-/// Materialize a `mcp_config_flag`-style MCP config file under
-/// `runtime_dir/tmp/`. The file uses the Anthropic-flavoured `mcpServers`
-/// envelope (`{ "mcpServers": { id: { command|url, ... } } }`) so a single
-/// path can be passed to agents like `claude-code --mcp-config <path>`. The
-/// file is overwritten on every spawn so stale entries do not linger.
-fn write_mcp_config_file(
-    runtime_dir: &Path,
-    task_id: &str,
-    state_name: &str,
-    agent_id: &str,
-    entries: &[&ResolvedMcpEntry],
-) -> Option<PathBuf> {
-    let tmp_dir = runtime_dir.join("tmp");
-    if let Err(err) = fs::create_dir_all(&tmp_dir) {
-        diag_warn!("warning: failed to create MCP config tmp dir '{}': {err}", tmp_dir.display());
-        return None;
-    }
-    let safe_agent = env_id_segment(agent_id).to_lowercase();
-    let path = tmp_dir.join(format!("mcp-{task_id}-{state_name}-{safe_agent}.json"));
-
-    let mut servers = serde_json::Map::new();
-    for entry in entries {
-        let Some(def) = entry.definition.as_ref() else {
-            continue;
-        };
-        let mut obj = serde_json::Map::new();
-        if let Some(command) = &def.command {
-            obj.insert(
-                "command".to_string(),
-                serde_json::Value::Array(
-                    command.iter().map(|s| serde_json::Value::String(s.clone())).collect(),
-                ),
-            );
-        }
-        if let Some(url) = &def.url {
-            obj.insert("url".to_string(), serde_json::Value::String(url.clone()));
-        }
-        if let Some(transport) = &def.transport {
-            obj.insert("transport".to_string(), serde_json::Value::String(transport.clone()));
-        }
-        if !def.env.is_empty() {
-            let mut env_map = serde_json::Map::new();
-            for (k, v) in &def.env {
-                env_map.insert(k.clone(), serde_json::Value::String(expand_env_vars(v)));
-            }
-            obj.insert("env".to_string(), serde_json::Value::Object(env_map));
-        }
-        if let Some(wd) = &def.working_directory {
-            obj.insert("workingDirectory".to_string(), serde_json::Value::String(wd.clone()));
-        }
-        servers.insert(entry.id.clone(), serde_json::Value::Object(obj));
-    }
-    let envelope = serde_json::json!({ "mcpServers": serde_json::Value::Object(servers) });
-    match serde_json::to_string_pretty(&envelope) {
-        Ok(text) => match fs::write(&path, text) {
-            Ok(()) => Some(path),
-            Err(err) => {
-                diag_warn!("warning: failed to write MCP config '{}': {err}", path.display());
-                None
-            }
-        },
-        Err(err) => {
-            diag_warn!("warning: failed to serialize MCP config: {err}");
-            None
-        }
-    }
-}
-
 /// Expand `${VAR}` references in a string against the current process
 /// environment. Unknown variables expand to the empty string, matching the
 /// §FS-rhei-agents.1.1.4: Expand MCP profile environment references.
@@ -347,8 +279,10 @@ fn expand_env_vars(input: &str) -> String {
 /// Skills resolve only when the agent declares `skill_flag`; MCP entries
 /// resolve only when the agent declares `mcp_flag` or `mcp_config_flag`.
 /// State-declared entries that the agent cannot wire are reported here so
-/// operators can see why no flags were emitted. Required-entry escalation to
-/// error is part of the availability subsystem and is not driven from here.
+/// operators can see why no flags were emitted, and so is a `working_directory`
+/// an `mcp_config_flag` file cannot carry (§FS-rhei-mcp-config-file.2).
+/// Required-entry escalation to error is part of the availability subsystem and
+/// is not driven from here.
 // §FS-rhei-agents.1.1.5 §FS-rhei-agents.6: Unsupported tooling diagnostics.
 fn collect_unsupported_tooling_warnings(
     resolved: &ResolvedAgent,
@@ -387,6 +321,7 @@ fn collect_unsupported_tooling_warnings(
             ids.join(", ")
         ));
     }
+    warnings.extend(mcp_config_working_directory_warnings(resolved, tooling));
     warnings
 }
 

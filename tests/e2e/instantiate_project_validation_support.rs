@@ -139,3 +139,40 @@ pub fn assert_sibling_remedy(scenario: &Scenario, run: &CliRun) {
     );
     assert!(!run.stderr.contains("rhei validate <plan>"), "{}", run.stderr);
 }
+
+/// Whether `stderr` names `rhei validate <target>` as a whole command, so a
+/// project target is not matched by the prefix of a path inside it.
+fn names_command(stderr: &str, target: &Path) -> bool {
+    let command = format!("rhei validate {}", shell_quote(&target.to_string_lossy()));
+    stderr
+        .match_indices(&command)
+        .any(|(at, _)| stderr[at + command.len()..].chars().next().is_none_or(char::is_whitespace))
+}
+
+/// Find which of `targets` the refusal's remedy names as a whole command, run that exact
+/// `rhei validate` from the invocation directory, and require it to report the
+/// refusal's own parse error rather than a standalone parse of a fragment.
+/// §FS-rhei-templates.6.1.2
+pub fn assert_remedy_reproduces(scenario: &Scenario, run: &CliRun, targets: &[PathBuf]) {
+    let target =
+        targets.iter().find(|target| names_command(&run.stderr, target)).unwrap_or_else(|| {
+            panic!("remedy must name one of {targets:?} with shell-safe quoting:\n{}", run.stderr)
+        });
+    let home = unique_temp_dir("sibling-remedy-home");
+    let output = rhei_command(&home)
+        .current_dir(&scenario.cwd)
+        .arg("validate")
+        .arg(target)
+        .output()
+        .expect("run the remedy's target from the invocation directory");
+    let validation = CliRun::from(&output);
+    assert_eq!(validation.status.code(), Some(1), "{}", validation.stderr);
+    assert!(validation.stderr.contains("Tasks section must be the final"), "{}", validation.stderr);
+    assert!(validation.stderr.contains("## Appendix"), "{}", validation.stderr);
+    assert!(!validation.stderr.contains("Missing '# Rhei:"), "{}", validation.stderr);
+    assert!(
+        !validation.stderr.contains("Metadata field appears outside a task"),
+        "{}",
+        validation.stderr
+    );
+}

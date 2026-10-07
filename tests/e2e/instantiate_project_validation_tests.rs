@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::Path;
 
 use super::instantiate_project_validation_support::*;
 use super::*;
@@ -49,6 +50,9 @@ fn real_write_refusal_names_existing_sibling_and_repair_command() {
     let real = scenario.output_run(&[]);
     assert_eq!(snapshot(&scenario.project), before);
     assert_sibling_remedy(&scenario, &real);
+    let sibling = scenario.project.join("broken-sibling.rhei.md");
+    let targets = [sibling, Path::new("..").join("project").join("broken-sibling.rhei.md")];
+    assert_remedy_reproduces(&scenario, &real, &targets);
 }
 
 /// A clean preview uses both the project's registry and the template's new

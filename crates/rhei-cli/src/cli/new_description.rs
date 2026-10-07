@@ -4,27 +4,30 @@
 // a flag, a file, or standard input, and refusing text the plan language would
 // read as structure rather than as prose.
 
-// §FS-rhei-new.1.1 §FS-rhei-new.3.4 §FS-rhei-new.3.4.1
+// §FS-rhei-new.1.1 §FS-rhei-new.3.4 §FS-rhei-new.3.4.1 §FS-rhei-new.3.4.2
 
-/// The metadata markers the plan language recognizes at the start of a line.
+use rhei_core::tokens::TASK_METADATA_FIELDS;
+
+/// The metadata markers the plan language recognizes at the start of a line:
+/// every field of the closed task metadata block, then the retired
+/// `**States:**`, which the parser refuses outright.
 ///
 /// A description line opening with one of these stops being description: the
 /// parser reads it as a field of the surrounding node, which is either an error
-/// about metadata the author never wrote or a silently applied field.
-// §FS-rhei-plan-language.2
-const PLAN_METADATA_MARKERS: [&str; 11] = [
-    "**State:**",
-    "**States:**",
-    "**Prior:**",
-    "**Inherits:**",
-    "**Provides:**",
-    "**Consumes:**",
-    "**Assignee:**",
-    "**Model:**",
-    "**Target:**",
-    MCP_SERVERS_FIELD,
-    SKILLS_FIELD,
-];
+/// about metadata the author never wrote or a silently applied field. The
+/// fields are rhei-core's own set rather than a copy kept here, so a field the
+/// grammar adds is refused from the release that adds it.
+// §FS-rhei-new.3.4.2 §FS-rhei-plan-language.2 §FS-rhei-plan-language.2.2
+const PLAN_METADATA_MARKERS: [&str; TASK_METADATA_FIELDS.len() + 1] = {
+    // Every slot but the last takes a field; the last keeps `**States:**`.
+    let mut markers = ["**States:**"; TASK_METADATA_FIELDS.len() + 1];
+    let mut at = 0;
+    while at < TASK_METADATA_FIELDS.len() {
+        markers[at] = TASK_METADATA_FIELDS[at];
+        at += 1;
+    }
+    markers
+};
 
 /// The description body, from `--description` or `--description-file` (`-`
 /// reads standard input), checked before it can reach a file.
@@ -149,7 +152,7 @@ fn structural_description_help() -> &'static str {
 
 /// Name what the plan language would make of `line`, or `None` when it is
 /// ordinary prose. Matched against the trimmed line, because that is what the
-/// plan lexer matches against. §FS-rhei-plan-language.2
+/// plan lexer matches against. §FS-rhei-plan-language.2 §FS-rhei-new.3.4.2
 fn structural_description_line(line: &str) -> Option<&'static str> {
     let line = line.trim();
     let hashes = line.bytes().take_while(|byte| *byte == b'#').count();

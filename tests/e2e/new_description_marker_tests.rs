@@ -5,27 +5,48 @@
 
 use std::fs;
 
+use rhei_core::tokens::TASK_METADATA_FIELDS;
+
 use super::new_tests::{flattened_output, project_with_rhei};
 use super::*;
 
-/// Every field of the closed task metadata block, and the retired `**States:**`,
-/// each with a value the parser would accept. Spelled out until rhei-core
-/// exposes the set the guard reads; then this list is that set.
-// §FS-rhei-new.3.4.2 §FS-rhei-plan-language.2
-const TASK_METADATA_LINES: [&str; 12] = [
-    "**State:** completed",
-    "**States:** default",
-    "**Prior:** Task 1",
-    "**Inherits:** reviewed from prior",
-    "**Provides:** api-contract",
-    "**Consumes:** 1:api-contract",
-    "**Excludes:** checkout=secret.md",
-    "**Assignee:** agent-1",
-    "**Model:** claude-opus-4-7",
-    "**Target:** cld",
-    "**MCP servers:** github",
-    "**Skills:** review",
+/// A value the parser would accept after each marker, keyed by the marker. A
+/// field the grammar adds has no row here until someone writes one, and
+/// [`task_metadata_lines`] fails rather than leave that field untested.
+// §FS-rhei-new.3.4.2
+const SAMPLE_VALUES: [(&str, &str); 12] = [
+    ("**State:**", "completed"),
+    ("**States:**", "default"),
+    ("**Prior:**", "Task 1"),
+    ("**Inherits:**", "reviewed from prior"),
+    ("**Provides:**", "api-contract"),
+    ("**Consumes:**", "1:api-contract"),
+    ("**Excludes:**", "checkout=secret.md"),
+    ("**Assignee:**", "agent-1"),
+    ("**Model:**", "claude-opus-4-7"),
+    ("**Target:**", "cld"),
+    ("**MCP servers:**", "github"),
+    ("**Skills:**", "review"),
 ];
+
+/// Every field of the closed task metadata block, as rhei-core names the set,
+/// and the retired `**States:**`, each followed by its sample value.
+// §FS-rhei-new.3.4.2 §FS-rhei-plan-language.2
+fn task_metadata_lines() -> Vec<String> {
+    TASK_METADATA_FIELDS
+        .into_iter()
+        .chain(["**States:**"])
+        .map(|marker| {
+            let value = SAMPLE_VALUES
+                .iter()
+                .find_map(|(sampled, value)| (*sampled == marker).then_some(*value))
+                .unwrap_or_else(|| {
+                    panic!("{marker} has no row in SAMPLE_VALUES; add a value the parser accepts")
+                });
+            format!("{marker} {value}")
+        })
+        .collect()
+}
 
 /// The refusal `**Prior:**` gets today, which every field must get too.
 const REFUSAL: &str = "would be read as plan structure rather than as description";
@@ -88,9 +109,9 @@ fn creates_not_refused(prefix: &str, line: usize, body_for: impl Fn(&str) -> Str
     let plan = dir.join("auth.rhei.md");
     let before = fs::read_to_string(&plan).expect("rhei file");
     let mut missed = Vec::new();
-    for field in TASK_METADATA_LINES {
+    for field in task_metadata_lines() {
         for channel in [Channel::Flag, Channel::Stdin] {
-            let result = new_run_description(&dir, "Second", channel, &body_for(field));
+            let result = new_run_description(&dir, "Second", channel, &body_for(&field));
             let said = flattened_output(&result);
             let named = format!("line {line} of {}", channel.flag());
             let changed = fs::read_to_string(&plan).expect("rhei file") != before;
@@ -121,7 +142,6 @@ fn creates_not_refused(prefix: &str, line: usize, body_for: impl Fn(&str) -> Str
 /// field is refused. Unrefused, it is a live field of the new ticket and the
 /// create exits 0 — an `**Excludes:**` withholds a file from its agent unseen.
 #[test]
-#[ignore = "red until #479 refuses **Excludes:** in a description"]
 fn every_metadata_field_opening_a_description_is_refused() {
     let missed = creates_not_refused("new-desc-every-field", 1, |field| format!("{field}\nbody\n"));
     assert!(
@@ -135,7 +155,6 @@ fn every_metadata_field_opening_a_description_is_refused() {
 /// argument error, not by the rolled-back parse error with a line number in a
 /// plan the author never opened.
 #[test]
-#[ignore = "red until #479 refuses **Excludes:** in a description"]
 fn a_metadata_field_after_prose_is_refused_as_an_argument() {
     let missed = creates_not_refused("new-desc-field-after-prose", 2, |field| {
         format!("prose first\n{field}\n")

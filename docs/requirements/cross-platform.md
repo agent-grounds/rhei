@@ -118,3 +118,53 @@ actually sent.
 The measure is the stream quoted in agent-grounds/rhei#448 — the prompt's space
 drawn as a cursor-forward and a window title in the line — which signals the
 prompt, as does the same stream with the sequences split across reads.
+
+## 8. A Margin Outlasts A Stalled Runner
+
+A test that runs a fixture [§REQ-cross-platform.4](cross-platform.md#4-portable-fixtures) bounds it: an agent or program
+timeout, a ceiling on how long the spawn took. Most of those bounds are not what
+the test is about. They are there so that a broken run ends rather than hangs,
+and a correct run never reaches them. Such a bound is a *margin*, and it is
+sized for the slowest runner the gate [§REQ-cross-platform.3](cross-platform.md#3-tested-not-assumed) runs on at its
+worst, not for what a warm interpreter takes. A shared runner can stall every
+interpreter it starts for tens of seconds, and a margin a stall can cross fails
+a test whose behaviour held. agent-grounds/rhei#483 is that failure: for about
+40 s a `windows-latest` runner started no Python that reached its first line,
+and five tests whose 5 s and 10 s margins fell inside that window failed
+together, each reporting the timeout of an agent that had done nothing wrong.
+
+So a test binary's margins are one value, named once in its test support, and
+no margin is written shorter beside it. The size is then decided in one place,
+against the stall rather than the warm start, and a green run still pays
+nothing for it: a passing test never waits a margin out.
+
+The measure is a runner that delays every fixture's interpreter by more than
+the bounds the margin replaced and by less than the margin: the binary fails
+only the tests whose bound is the behaviour [§REQ-cross-platform.8.1](cross-platform.md#81-a-bound-that-is-the-behaviour-stays-as-tight-as-the-behaviour).
+
+### 8.1 A Bound That Is The Behaviour Stays As Tight As The Behaviour
+
+Some bounds are what the test is about: a timeout the test means to fire, or the
+value a spawn is meant to report back. Such a bound stays as tight as the
+behaviour needs, and it is named as behaviour where the margins are checked, so
+that loosening it is a decision rather than a sweep. Where the behaviour also
+needs the fixture to act before the bound — a line printed before the timeout
+fires — a stalled start can still cross it. Making that test outlast a stall
+takes a longer bound and a longer fixture together, which every run pays for, so
+it is decided test by test rather than by the margin.
+
+A bound around something no fixture does — a value no spawn reads, a wait that
+is the code's own — is neither, and is named as such where the margins are
+checked.
+
+### 8.2 An Absence Is Pinned Outside The Margin
+
+A test that pins an absence — the spawn did not wait for a pipe the agent's
+grandchild still holds, the agent was never started — keeps what it waits on
+outside its margin. Inside it, the absence the test asserts is one a stalled
+runner produces on its own: an agent killed before its first line leaves no
+trace of having been spawned, and a hold that ends before the margin lets a
+spawn that waited for it pass for one that did not. The pin then passes against
+the defect it is there to catch. So the fixture holds for longer than the
+margin, or until the test releases it, and the test observes the absence itself
+rather than reading it off how long the spawn took.

@@ -9,6 +9,16 @@
 // `[python, script]`. No shebang, no `chmod`, and nothing for `cmd.exe` to
 // fail to understand.
 
+/// How long a test lets a fixture run when the bound is not what the test is
+/// about: the lib binary's one margin (§REQ-cross-platform.8).
+///
+/// Sized against a runner that stalls every interpreter it starts, not against a
+/// warm start: agent-grounds/rhei#483 saw a `windows-latest` runner start no
+/// Python for about 40 s, and this clears that by half again. A passing test never
+/// waits it out, so its length costs a green run nothing. `pub(crate)` because the
+/// snapshot redactor's test-build timeout is a margin too.
+pub(crate) const FIXTURE_MARGIN: Duration = Duration::from_secs(60);
+
 /// `python3`, or `python` where that is the only name.
 ///
 /// Probed once: a probe per fixture would spend a process per test. `python`

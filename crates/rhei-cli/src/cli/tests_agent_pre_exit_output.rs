@@ -164,7 +164,6 @@ raise SystemExit(1)
     /// (§FS-rhei-agents.2.3), and both were written before the exit, so the
     /// drain grace may not drop the second (§FS-rhei-agent-output-drain.1).
     #[test]
-    #[ignore = "red until #484 reads all of the output an agent wrote before it exited"]
     fn result_and_plain_signal_on_stdout_stay_ordinary_when_the_reader_lags() {
         let sink = LaggingReaderSink::new(rhei_tui::AgentStream::Stdout);
         let stdout = format!("{}\n{LAGGING_LIMIT_SIGNAL}\n", lagging_limit_result_event());
@@ -189,7 +188,6 @@ raise SystemExit(1)
     /// The `result-and-stderr` shape: the plain signal is on stderr, behind an
     /// earlier stderr line its reader is still busy with at the exit.
     #[test]
-    #[ignore = "red until #484 reads all of the output an agent wrote before it exited"]
     fn result_on_stdout_and_plain_signal_on_stderr_stay_ordinary_when_the_reader_lags() {
         let sink = LaggingReaderSink::new(rhei_tui::AgentStream::Stderr);
         let stdout = format!("{}\n", lagging_limit_result_event());
@@ -215,7 +213,6 @@ raise SystemExit(1)
     /// stream's `system` init event. It must park, uncharged, and its usage must
     /// be in the capture the completion path reads (§FS-rhei-agent-output-drain.1).
     #[test]
-    #[ignore = "red until #484 reads all of the output an agent wrote before it exited"]
     fn single_refusal_behind_an_earlier_line_parks_when_the_reader_lags() {
         let sink = LaggingReaderSink::new(rhei_tui::AgentStream::Stdout);
         let init = serde_json::json!({
@@ -343,7 +340,6 @@ subprocess.Popen(
     /// as a line, ahead of the exit footer - even while a grandchild holds the
     /// pipe and could still extend it (§FS-rhei-agent-output-drain.1).
     #[test]
-    #[ignore = "red until #484 reads all of the output an agent wrote before it exited"]
     fn unterminated_last_line_is_logged_ahead_of_the_exit_footer() {
         let (_, _, log) = spawn_with_unterminated_last_line();
         let before_footer = log.split("=== exit ===").next().unwrap_or_default();

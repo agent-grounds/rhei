@@ -172,7 +172,7 @@ renderer exists.
 
 **Decision (§10.3): the live terminal renders the full durable transcript, not the
 `SLOT_TRAFFIC_LIMIT` ring.** Agent stdout/stderr already flow through
-`spawn_agent_output_reader` (`agent_spawn.rs`) to (a) the durable per-task log
+`spawn_agent_output_reader` (`agent_output_reader.rs`) to (a) the durable per-task log
 (`agent_log_path` / `program_log_path`, `run_agent_mode.rs`) and (b) the
 `DashboardSlot.traffic` ring (capped at `SLOT_TRAFFIC_LIMIT`,
 `dashboard/state.rs`). The ring is fine for an at-a-glance chip preview but cannot

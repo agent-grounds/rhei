@@ -58,6 +58,10 @@ include_dir = { version = "0.7.4", default-features = false }
 [target.'cfg(unix)'.dependencies]
 tz-rs = { version = "=0.6.14", default-features = false, features = ["std"] }
 iana-time-zone = "=0.1.65"
+# An agent's output reader polls its pipe and counts what it holds unread, so
+# it can stop at the agent's exit without a read the exit cannot interrupt.
+# §FS-rhei-agent-output-drain.1
+rustix = { version = "1.1.4", features = ["event"] }
 
 # Linux stop opens a pidfd before proving run-lock ownership, so pid reuse
 # cannot redirect the signal after that proof. §FS-rhei-run-headless.7
@@ -77,6 +81,7 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_System_Memory",
+    "Win32_System_Pipes",
     "Win32_System_Time",
 ] }
 

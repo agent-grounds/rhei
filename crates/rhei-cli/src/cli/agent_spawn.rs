@@ -23,14 +23,6 @@ struct AgentSpawnOutcome {
     provider_limit: Option<ProviderLimit>,
 }
 
-/// How long each captured stream may keep draining once the direct agent has
-/// exited, before its reader is detached (§FS-rhei-agents.3.2.1). The test
-/// build waits less.
-#[cfg(not(test))]
-const AGENT_OUTPUT_DRAIN_GRACE: Duration = Duration::from_millis(100);
-#[cfg(test)]
-const AGENT_OUTPUT_DRAIN_GRACE: Duration = Duration::from_millis(20);
-
 impl InvocationOutcome for AgentSpawnOutcome {
     fn was_interrupted(&self) -> bool {
         self.interrupted
@@ -55,118 +47,10 @@ fn with_agent_log<T>(
     write(&mut guard)
 }
 
-fn output_line(buf: &[u8]) -> String {
-    let line = buf.strip_suffix(b"\n").unwrap_or(buf);
-    let line = line.strip_suffix(b"\r").unwrap_or(line);
-    String::from_utf8_lossy(line).into_owned()
-}
-
 fn agent_stream_label(stream: rhei_tui::AgentStream) -> &'static str {
     match stream {
         rhei_tui::AgentStream::Stdout => "stdout",
         rhei_tui::AgentStream::Stderr => "stderr",
-    }
-}
-
-/// Keep the thread's independently owned inputs explicit, as in `spawn_and_wait_agent`.
-/// Capture raw lines with their stream so provider recognition can interpret stdout
-/// independently of usage parsing and display. §FS-rhei-agents.2.3
-#[allow(clippy::too_many_arguments)]
-fn spawn_agent_output_reader<R>(
-    reader: R,
-    stream: rhei_tui::AgentStream,
-    log_file: Arc<Mutex<fs::File>>,
-    sink: Arc<dyn rhei_tui::EventSink>,
-    slot: rhei_tui::Slot,
-    task_id: String,
-    usage_capture: Option<AgentUsageCapture>,
-    captured_lines: Arc<Mutex<Vec<(rhei_tui::AgentStream, String)>>>,
-) -> std::thread::JoinHandle<std::io::Result<()>>
-where
-    R: Read + Send + 'static,
-{
-    std::thread::spawn(move || {
-        let mut reader = BufReader::new(reader);
-        let mut buf = Vec::new();
-        loop {
-            buf.clear();
-            let read = reader.read_until(b'\n', &mut buf)?;
-            if read == 0 {
-                break;
-            }
-
-            let raw_line = output_line(&buf);
-            if let Ok(mut captured) = captured_lines.lock() {
-                captured.push((stream, raw_line.clone()));
-            }
-            let display_line = display_agent_output_line(usage_capture.as_ref(), stream, &raw_line);
-            let is_claude_result = stream == rhei_tui::AgentStream::Stdout
-                && usage_capture
-                    .as_ref()
-                    .is_some_and(|capture| capture.extractor == AgentUsageExtractor::Claude)
-                && matches!(parse_claude_result_line(&raw_line), ClaudeResultLine::Result(_));
-            with_agent_log(&log_file, |f| {
-                if is_claude_result {
-                    if let Some(line) = display_line.as_deref() {
-                        f.write_all(line.as_bytes())?;
-                        if buf.ends_with(b"\n") && !line.ends_with('\n') {
-                            f.write_all(b"\n")?;
-                        }
-                    }
-                } else {
-                    f.write_all(&buf)?;
-                }
-                f.flush()
-            })?;
-
-            capture_agent_output_usage(usage_capture.as_ref(), stream, &raw_line, &sink);
-            if let Some(line) = display_line {
-                for line in agent_output_lines(line, is_claude_result) {
-                    sink.emit(rhei_tui::RunEvent::AgentOutput {
-                        slot,
-                        task: task_id.clone(),
-                        stream,
-                        line,
-                        wall_clock: std::time::SystemTime::now(),
-                    });
-                }
-            }
-        }
-        Ok(())
-    })
-}
-
-/// Join a stream's reader after the direct agent has exited, waiting at most
-/// `AGENT_OUTPUT_DRAIN_GRACE`: a descendant that still holds the inherited
-/// pipe does not delay completion (§FS-rhei-agents.3.2.1).
-fn drain_agent_output_reader(
-    handle: std::thread::JoinHandle<std::io::Result<()>>,
-    stream: rhei_tui::AgentStream,
-) -> MietteResult<()> {
-    let deadline = Instant::now() + AGENT_OUTPUT_DRAIN_GRACE;
-    while !handle.is_finished() {
-        if Instant::now() >= deadline {
-            // A descendant may still hold the inherited pipe open after the
-            // direct agent process exits. Detach the reader instead of
-            // blocking run completion forever; future bytes may still be
-            // captured best-effort until process exit.
-            return Ok(());
-        }
-        std::thread::sleep(Duration::from_millis(1));
-    }
-
-    match handle.join() {
-        Ok(Ok(())) => Ok(()),
-        Ok(Err(err)) => {
-            Err(miette!(
-                help = agent_command_help(),
-                "failed to capture agent {}: {err}", agent_stream_label(stream)
-            ))
-        }
-        Err(_) => Err(miette!(
-            help = internal_error_help(),
-            "agent {} capture thread panicked", agent_stream_label(stream)
-        )),
     }
 }
 
@@ -373,7 +257,7 @@ fn spawn_and_wait_agent(
     let child = &mut supervised.child;
 
     let captured_lines = Arc::new(Mutex::new(Vec::new()));
-    let stdout_handle = child.stdout.take().map(|stdout| {
+    let stdout_reader = child.stdout.take().map(|stdout| {
         spawn_agent_output_reader(
             stdout,
             rhei_tui::AgentStream::Stdout,
@@ -385,7 +269,7 @@ fn spawn_and_wait_agent(
             captured_lines.clone(),
         )
     });
-    let stderr_handle = child.stderr.take().map(|stderr| {
+    let stderr_reader = child.stderr.take().map(|stderr| {
         spawn_agent_output_reader(
             stderr,
             rhei_tui::AgentStream::Stderr,
@@ -487,11 +371,13 @@ fn spawn_and_wait_agent(
         }
     }
 
-    if let Some(handle) = stdout_handle {
-        drain_agent_output_reader(handle, rhei_tui::AgentStream::Stdout)?;
+    // Everything the agent wrote before it exited is read before anything
+    // below reads the capture. §FS-rhei-agent-output-drain.1
+    if let Some(reader) = stdout_reader {
+        drain_agent_output_reader(reader, rhei_tui::AgentStream::Stdout)?;
     }
-    if let Some(handle) = stderr_handle {
-        drain_agent_output_reader(handle, rhei_tui::AgentStream::Stderr)?;
+    if let Some(reader) = stderr_reader {
+        drain_agent_output_reader(reader, rhei_tui::AgentStream::Stderr)?;
     }
 
     // Write log footer. The `ended:` ISO timestamp and human-readable

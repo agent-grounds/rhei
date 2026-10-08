@@ -115,9 +115,11 @@ under `crates/rhei-cli/src/cli/`:
   metadata, artifact contracts, and transition application.
 - `run_options`, `settings_types`, `settings_load_validate`,
   `tooling_resolution`, `agent_resolution`, `agent_model_resolution`,
-  `agent_command`, `agent_spawn`, and `programs` contain run configuration,
-  settings merge/validation, tooling resolution, agent command construction,
-  agent spawning, and program-state execution.
+  `agent_command`, `agent_spawn`, `agent_output_reader`, and `programs` contain
+  run configuration, settings merge/validation, tooling resolution, agent
+  command construction, agent spawning, the reader threads that capture an
+  agent's output streams and their drain at its exit, and program-state
+  execution.
 - `snapshot_pointer`, `snapshot_records`, `snapshot_list_show`,
   `snapshot_refs_gc`, `snapshot_continue_lock`, `snapshot_runtime_emit`, and
   `snapshot_runtime_preload` contain the `current`-pointer reader and writers

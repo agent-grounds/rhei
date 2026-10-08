@@ -214,9 +214,12 @@ agent's `command`, flags, and modes are declared.
 | `session` | object | No | Optional `CustomAgentProfile.session` block describing snapshot resume, fork, interactive continuation, and transcript layout capabilities. The authoritative schema is [Snapshots Specification — CustomAgentProfile.session](rhei-snapshots.spec.md#91-customagentprofilesession). |
 
 Strict MCP configuration is a launch behavior of the resolved `claude-code`
-family, with no new profile field: Rhei emits `--strict-mcp-config` for the
-shipped built-in, custom `family: claude-code` wrappers, and wholesale same-id
-replacements that resolve to this family. Explicit `mcp_flag` or
+family for every agent `rhei run` spawns for a state, with no new profile field:
+Rhei emits `--strict-mcp-config` for the shipped built-in, custom
+`family: claude-code` wrappers, and wholesale same-id replacements that resolve
+to this family. The operator-driven `rhei snapshot continue` builds its own
+launch and keeps the client's own MCP configuration
+([§FS-rhei-snapshot-operations.1.5](rhei-snapshot-operations.spec.md#15-rhei-snapshot-continue-ref)). Explicit `mcp_flag` or
 `mcp_config_flag` overrides, including clearing attachment support, do not
 disable it. Wrappers must forward the option. A client rejecting it fails at
 startup without retrying additively. Other resolved families retain their
@@ -726,8 +729,10 @@ fields are rejected and auto-emit is skipped.
 
 For the resolved `claude-code` family, the resolved MCP selection is exclusive:
 native user/project/plugin registrations and connectors add nothing. The
-existing defaults/state union, same-id precedence and explicit-empty clearing
-determine this selection. Required unavailability still blocks spawn; optional
+defaults ∪ state ∪ task union below determines this selection, with its same-id
+precedence, a state's `[]` clearing only the defaults, and a state's
+`withhold_task_tooling` dropping the task's entries
+([§FS-rhei-task-tooling.3](rhei-task-tooling.spec.md#3-the-effective-set), [§FS-rhei-task-tooling.4](rhei-task-tooling.spec.md#4-a-state-that-withholds)). Required unavailability still blocks spawn; optional
 drops and attachment/config-write warnings do not allow native servers to
 substitute for unattached entries. Empty selections attach no config file and
 admit no native servers ([§FS-rhei-states.7.2](rhei-states.spec.md#72-effective-set), [§FS-rhei-states.7.3](rhei-states.spec.md#73-runtime-semantics)).

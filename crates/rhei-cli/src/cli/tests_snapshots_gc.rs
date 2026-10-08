@@ -55,8 +55,9 @@ spawns.mkdir(parents=True, exist_ok=True)
         fs::write(
             &states,
             format!(
-                "name: missing-outputs\nversion: 1\nstates:\n  pending:\n    description: pending\n{}    agent_timeout: 5s\n    outputs:\n      - name: required-report\n        path: runtime/required-report.md\n  done:\n    description: done\n    final: true\ntransitions:\n  - from: pending\n    to: done\n",
-                state_invocation
+                "name: missing-outputs\nversion: 1\nstates:\n  pending:\n    description: pending\n{}    agent_timeout: {margin}s\n    outputs:\n      - name: required-report\n        path: runtime/required-report.md\n  done:\n    description: done\n    final: true\ntransitions:\n  - from: pending\n    to: done\n",
+                state_invocation,
+                margin = FIXTURE_MARGIN.as_secs()
             ),
         )
         .expect("states");

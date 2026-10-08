@@ -47,7 +47,7 @@
             model: None,
             model_provider: None,
             model_name: None,
-            timeout_secs: Some(10),
+            timeout_secs: Some(FIXTURE_MARGIN.as_secs()),
             autonomous_args: Vec::new(),
         }
     }

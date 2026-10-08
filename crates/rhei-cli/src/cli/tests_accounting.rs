@@ -275,7 +275,7 @@ print(json.dumps({
         model: Some("impl-fast".to_string()),
         model_provider: Some("anthropic".to_string()),
         model_name: Some("claude-sonnet-4-6".to_string()),
-        timeout_secs: Some(10),
+        timeout_secs: Some(FIXTURE_MARGIN.as_secs()),
         autonomous_args: Vec::new(),
     };
     let plan = rhei_core::parse(
@@ -386,7 +386,7 @@ print(json.dumps({
         model: Some("impl-fast".to_string()),
         model_provider: Some("anthropic".to_string()),
         model_name: Some("claude-sonnet-4-6".to_string()),
-        timeout_secs: Some(10),
+        timeout_secs: Some(FIXTURE_MARGIN.as_secs()),
         autonomous_args: Vec::new(),
     };
     let plan = rhei_core::parse(

@@ -14,7 +14,7 @@
             model: None,
             model_provider: None,
             model_name: None,
-            timeout_secs: Some(10),
+            timeout_secs: Some(FIXTURE_MARGIN.as_secs()),
             autonomous_args: Vec::new(),
         };
         let tooling = ResolvedTooling::default();
@@ -171,13 +171,12 @@ for line in sys.stdin:
             model: None,
             model_provider: None,
             model_name: None,
-            timeout_secs: Some(1),
+            timeout_secs: Some(FIXTURE_MARGIN.as_secs()),
             autonomous_args: Vec::new(),
         };
         let tooling = ResolvedTooling::default();
         let intervene = Arc::new(RunInterveneSink::new(dir.path().join("runtime")));
 
-        let start = Instant::now();
         let status = spawn_and_wait_agent(
             &resolved,
             &builtin_price_book(),
@@ -202,8 +201,13 @@ for line in sys.stdin:
         )
         .expect("fake stdin agent runs");
 
+        // The absence of a hang, observed as such rather than timed (§REQ-cross-platform.8.2).
+        assert!(
+            !status.timed_out,
+            "the agent ran to its {FIXTURE_MARGIN:?} timeout: one that reads its prompt to EOF \
+             hangs there when its stdin is not closed"
+        );
         assert!(status.status.success());
-        assert!(start.elapsed() < std::time::Duration::from_secs(1));
         let log = fs::read_to_string(&log_path).expect("read log");
         assert!(log.contains("stdin:hello codex"));
     }

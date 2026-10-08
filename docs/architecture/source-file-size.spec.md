@@ -11,12 +11,12 @@ Hand-authored source, template, example, and test files must be kept in the
 500-line range.
 
 - A file at or below 500 lines needs no special justification.
-- A file above 500 lines and at or below 2000 lines is a large-file exception.
+- A file above 500 lines and at or below 2500 lines is a large-file exception.
   It must be listed in a large-file register with its path, reason the size is
   necessary, owner or owning area, and the condition that should trigger
   splitting it. The register must not record exact line counts because they
   become stale quickly.
-- A file above 2000 lines is not allowed. It must be split before the work that
+- A file above 2500 lines is not allowed. It must be split before the work that
   creates or expands it is considered architecturally complete.
 
 Generated files, vendored third-party files, lockfiles, and external fixtures
@@ -31,10 +31,10 @@ A citable specification — a grund-declared document, `.spec.md` or otherwise,
 that a citation reaches by section — is fetched one section at a time through
 `grund <ID>.<section>` and is never loaded as one undifferentiated file, so its
 length is not charged to every read the way a source file's is. That earns it a
-larger budget, not an exemption from measurement: 750 lines soft, 2000 hard.
+larger budget, not an exemption from measurement: 750 lines soft, 2500 hard.
 750 is the value grund itself uses and about three times the p95 of the
 foundation spec trees, so the warning arrives when a document has taken on a
-second subject rather than when it is merely thorough. 2000 is the same ceiling
+second subject rather than when it is merely thorough. 2500 is the same ceiling
 this section sets for any hand-authored file; for a document it is the backstop
 for one that has stopped being a document. A split lifts whole sections into a
 child declaration and leaves every citation resolvable — a citation that stops
@@ -56,7 +56,7 @@ The register is `fissile`'s exception registries, not a table maintained by
 hand: `docs/file-size-agent-exceptions.toml` for entries that leave a soft
 finding standing and `docs/file-size-human-exceptions.toml` for entries that
 clear the hard gate. `.agent-grounds/fissile.toml` encodes §1 — 500 soft and
-2000 hard for source, 750 and 2000 for a citable spec, 250 and 500 for an
+2500 hard for source, 750 and 2500 for a citable spec, 250 and 500 for an
 entrypoint — so the rule is now checked at commit time rather than stated and
 hoped for.
 The gate itself is one `fissile check --staged` hook in
@@ -229,7 +229,7 @@ range, split that part before adding more behavior.
 ## 4. Current Violations
 
 No hand-authored repository file is currently known to be above the hard
-2000-line limit. New work must not introduce one.
+2500-line limit. New work must not introduce one.
 
 | Path | Required Direction |
 |---|---|

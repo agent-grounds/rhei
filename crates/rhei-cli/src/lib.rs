@@ -310,6 +310,7 @@ mod tests {
     include!("cli/tests_program_exit_routes.rs");
     include!("cli/tests_agent_execution_validation.rs");
     include!("cli/tests_agent_inherited_pipe.rs");
+    include!("cli/tests_agent_pre_exit_output.rs");
     include!("cli/tests_effective_static_mode_validation.rs");
     include!("cli/tests_orchestrator_timeout_validation.rs");
     include!("cli/tests_mode_selection.rs");

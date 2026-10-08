@@ -209,10 +209,13 @@ The simplest way to use Rhei. No callbacks, no `workflow.sh`, no glue code.
 
 Rhei spawns the configured agent for each task, composing a prompt from the state machine instructions and the task content. The agent does the work for the current state, writes any required artifacts, and exits. `rhei run` then writes any configured session snapshot side effects and performs the state transition. No scaffolding required.
 
-**Claude Code MCP compatibility.** Rhei launches every resolved `claude-code`
-family agent with strict MCP configuration: native user/project/plugin
-registrations and connectors no longer add tools to a state. To withhold MCP
-tools, including inherited Rhei defaults:
+**Claude Code MCP compatibility.** `rhei run` launches every resolved
+`claude-code` family agent it spawns for a state with strict MCP configuration:
+native user/project/plugin registrations and connectors no longer add tools to a
+state. The operator-driven `rhei snapshot continue` builds its own launch and
+keeps the client's own MCP configuration
+([§FS-rhei-snapshot-operations.1.5](rhei-snapshot-operations.spec.md#15-rhei-snapshot-continue-ref)). To clear the inherited Rhei
+defaults, so that the state's agent gets only what its task names:
 
 ```yaml
 states:
@@ -222,10 +225,13 @@ states:
     instructions: Read the issue and summarise it.
 ```
 
-Omitting `mcp_servers` with no Rhei defaults also gives no MCP servers. Users
-who relied on native registrations must declare needed servers in Rhei's
-settings registry and select them in `defaults.mcp_servers` or a state's
-`mcp_servers`. Wrappers declaring `family: claude-code` must forward the added
+Add `withhold_task_tooling: true` to drop a task's `**MCP servers:**` entries as
+well; with both, the state's agent has no MCP tools ([§FS-rhei-task-tooling.3](rhei-task-tooling.spec.md#3-the-effective-set),
+[§FS-rhei-task-tooling.4](rhei-task-tooling.spec.md#4-a-state-that-withholds)). Omitting `mcp_servers` with no Rhei defaults and no task
+entries also gives no MCP servers. Users who relied on native registrations must
+declare needed servers in Rhei's settings registry and select them in
+`defaults.mcp_servers`, a state's `mcp_servers` or a task's `**MCP servers:**`.
+Wrappers declaring `family: claude-code` must forward the added
 `--strict-mcp-config` option. Older clients rejecting the option fail at startup
 without an additive fallback. This preserves enterprise managed MCP policy;
 it does not bypass a client's refusal of strict configuration.

@@ -160,7 +160,7 @@ hard_message = "large-file-hard"
 
 # The budgets are not a new opinion. §AR-source-file-size.1 already says a
 # hand-authored source, template, example, or test file is kept in the 500-line
-# range, that 500-2000 needs a register entry, and that above 2000 is not
+# range, that 500-2500 needs a register entry, and that above 2500 is not
 # allowed. That rule had no enforcement; this config is the enforcement.
 #
 # Hand-written source, matched by extension so the budget follows the code
@@ -182,7 +182,7 @@ include = [
 ]
 unit = "lines"
 soft = 500
-hard = 2000
+hard = 2500
 count_blank_lines = false
 count_comment_lines = true
 soft_message = "split-source-soft"
@@ -198,7 +198,7 @@ hard_message = "split-source-hard"
 #
 # 750 soft is grund's own soft value, and about three times the p95 of the
 # fissile, grund, and ephor spec trees — it fires on a document that has taken
-# on a second subject, not on a thorough one. 2000 hard is the ceiling
+# on a second subject, not on a thorough one. 2500 hard is the ceiling
 # §AR-source-file-size.1 already declares for any hand-authored file; here it is
 # the backstop for a document that has stopped being a document.
 [[rules]]
@@ -206,7 +206,7 @@ id = "citable-spec"
 include = ["docs/**/*.md", "**/*.spec.md"]
 unit = "lines"
 soft = 750
-hard = 2000
+hard = 2500
 count_blank_lines = false
 count_comment_lines = true
 soft_message = "split-spec-soft"

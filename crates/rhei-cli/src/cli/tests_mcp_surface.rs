@@ -3,6 +3,7 @@
 
 mod mcp_surface {
     use super::super::*;
+    use super::FIXTURE_MARGIN;
     use serde_json::json;
 
     fn profile(id: &str, entry: serde_json::Value) -> CustomAgentProfile {
@@ -26,7 +27,7 @@ mod mcp_surface {
             model: None,
             model_provider: None,
             model_name: None,
-            timeout_secs: Some(5),
+            timeout_secs: Some(FIXTURE_MARGIN.as_secs()),
             autonomous_args: Vec::new(),
         }
     }

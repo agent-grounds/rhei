@@ -213,6 +213,15 @@ agent's `command`, flags, and modes are declared.
 | `effort` | object | No | Native reasoning-effort mapping. Contains `values`, `args`, and optional `conflicts` as defined below. Omission means this profile ignores valid state effort. |
 | `session` | object | No | Optional `CustomAgentProfile.session` block describing snapshot resume, fork, interactive continuation, and transcript layout capabilities. The authoritative schema is [Snapshots Specification — CustomAgentProfile.session](rhei-snapshots.spec.md#91-customagentprofilesession). |
 
+Strict MCP configuration is a launch behavior of the resolved `claude-code`
+family, with no new profile field: Rhei emits `--strict-mcp-config` for the
+shipped built-in, custom `family: claude-code` wrappers, and wholesale same-id
+replacements that resolve to this family. Explicit `mcp_flag` or
+`mcp_config_flag` overrides, including clearing attachment support, do not
+disable it. Wrappers must forward the option. A client rejecting it fails at
+startup without retrying additively. Other resolved families retain their
+existing behavior ([§FS-rhei-states.7.3](rhei-states.spec.md#73-runtime-semantics)).
+
 An `effort` mapping has this shape:
 
 ```json
@@ -715,6 +724,14 @@ execution must resolve an effective target tuple `(agent, mode?, provider,
 model)` before snapshot emit or inherit can run; otherwise explicit snapshot
 fields are rejected and auto-emit is skipped.
 
+For the resolved `claude-code` family, the resolved MCP selection is exclusive:
+native user/project/plugin registrations and connectors add nothing. The
+existing defaults/state union, same-id precedence and explicit-empty clearing
+determine this selection. Required unavailability still blocks spawn; optional
+drops and attachment/config-write warnings do not allow native servers to
+substitute for unattached entries. Empty selections attach no config file and
+admit no native servers ([§FS-rhei-states.7.2](rhei-states.spec.md#72-effective-set), [§FS-rhei-states.7.3](rhei-states.spec.md#73-runtime-semantics)).
+
 #### 1.4.1. Mode Resolution Order
 
 When the resolved agent declares `modes`, Rhei selects one in this order:
@@ -824,7 +841,7 @@ historically the agent's default.
 
 | Agent ID | Binary | Prompt Delivery | Model Flag | MCP Wiring | Skill Wiring | `yolo` Mode Flags |
 |----------|--------|-----------------|------------|------------|--------------|-------------------|
-| `claude-code` | `claude` | stdin, under a bare `-p`, with `--output-format stream-json --verbose`; with `intervene_stdin`, stream-json stdin as well | `--model <m>` | `--mcp-config <path>`, a file shaped as §FS-rhei-mcp-config-file gives | `--skill <id>` | `--permission-mode bypassPermissions` |
+| `claude-code` | `claude` | stdin, under a bare `-p`, with `--output-format stream-json --verbose`; with `intervene_stdin`, stream-json stdin as well | `--model <m>` | Always `--strict-mcp-config`; `--mcp-config <path>`, a file shaped as §FS-rhei-mcp-config-file gives, only for a nonempty available selection | `--skill <id>` | `--permission-mode bypassPermissions` |
 | `codex` | `codex exec` | `--` (stdin) | `--model <m>` | `--mcp <spec>` (per server) | unsupported | `--sandbox danger-full-access --skip-git-repo-check -c approval_policy="never"` |
 | `gemini` | `gemini` | `--prompt <prompt>` | `--model <m>` | unsupported | unsupported | `--approval-mode yolo` |
 | `cursor` | `cursor-agent` | `--print <prompt>` | `--model <m>` | unsupported | unsupported | `--force` |
@@ -944,7 +961,7 @@ agent, the resolved mode's flags are appended right after the base
   <prompt_flag> <prompt>?
   <model_flag> <model>?
   <snapshot strategy flags...>
-  <mcp flags...> <skill flags...>
+  <strict MCP option?> <mcp flags...> <skill flags...>
   --
 ```
 
@@ -959,6 +976,11 @@ separator is not an error the agent reports: it is read as prompt text and
 ignored, so a state that declared an MCP server would run without it and nothing
 would say so. The stdin pipe is then closed to provide EOF for non-interactive
 agents unless `intervene_stdin` is set for a genuinely streaming stdin transport.
+
+For every resolved `claude-code` family spawn, `--strict-mcp-config` occupies
+the tooling slot after snapshot flags and before MCP attachment and skill flags,
+and before the final separator. It is independent of the selected mode and of
+whether any MCP servers can be attached ([§FS-rhei-states.7.3](rhei-states.spec.md#73-runtime-semantics)).
 
 When state effort is explicit, Rhei first removes every complete argument span
 matching the profile's declared effort conflicts from the base command

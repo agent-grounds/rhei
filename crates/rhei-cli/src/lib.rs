@@ -328,6 +328,7 @@ mod tests {
     include!("cli/tests_summary.rs");
     include!("cli/tests_summary_repricing.rs");
     include!("cli/tests_settings_tooling.rs");
+    include!("cli/tests_mcp_surface.rs");
     include!("cli/tests_budget_spend.rs");
     include!("cli/tests_budget_delegation.rs");
     include!("cli/tests_budget_ancestry.rs");

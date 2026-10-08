@@ -172,7 +172,9 @@ mod agent_prompt_transport_tests {
 
     /// Live intervention is reached by a different arm and keeps its own flags;
     /// what it gains is the trailing separator the profile now asks for, which
-    /// Claude Code accepts with nothing after it. §FS-rhei-agents.1.1.2
+    /// Claude Code accepts with nothing after it. §FS-rhei-agents.1.1.2 The
+    /// strict MCP option every Claude Code spawn carries sits ahead of it.
+    /// §FS-rhei-agents.2.2
     #[test]
     fn builtin_claude_code_intervention_keeps_stream_json_and_ends_at_the_separator() {
         let mut profile = builtin("claude-code");
@@ -191,9 +193,10 @@ mod agent_prompt_transport_tests {
                 "--verbose",
                 "--model",
                 "claude-sonnet-4-6",
+                "--strict-mcp-config",
                 "--",
             ],
-            "the stream-json command line gains the separator and nothing else: {argv:?}"
+            "the stream-json command line gains strict MCP and the separator, nothing else: {argv:?}"
         );
     }
 

@@ -5,7 +5,7 @@
 // plain limit line read as one refusal on a loaded Windows runner.
 //
 // Its own part beside the inherited-pipe test: the two are the two halves of
-// one rule, and the second half's fixture borrows the first's hold.
+// one rule, and the second half's fixture borrows the first's grandchild.
 
 // §AR-source-file-size.3 §FS-rhei-agent-output-drain §FS-rhei-agents.2.3
 
@@ -119,7 +119,7 @@ raise SystemExit(1)
             model: None,
             model_provider: Some("anthropic".to_string()),
             model_name: None,
-            timeout_secs: Some(30),
+            timeout_secs: Some(FIXTURE_MARGIN.as_secs()),
             autonomous_args: Vec::new(),
         };
         let log_path = dir.path().join("agent.log");
@@ -242,39 +242,29 @@ raise SystemExit(1)
         );
     }
 
+    /// What a spawn under an unterminated last line left, read before its
+    /// grandchild is released.
+    struct UnterminatedTailSpawn {
+        outcome: AgentSpawnOutcome,
+        elapsed: Duration,
+        /// Whether the grandchild had let go of the pipe when the spawn returned.
+        let_go: bool,
+        /// The log as the spawn left it.
+        log: String,
+    }
+
     /// An agent that writes a terminated line and then an unterminated one,
-    /// hands both streams to a grandchild that holds them for
-    /// [`INHERITED_PIPE_HOLD`], and exits 0. Returns how long the spawn took
-    /// and its log as the spawn left it, and releases the grandchild.
-    fn spawn_with_unterminated_last_line() -> (AgentSpawnOutcome, Duration, String) {
+    /// hands both streams to the inherited-pipe test's grandchild, and exits 0.
+    /// Returns what the spawn left, and releases the grandchild.
+    fn spawn_with_unterminated_last_line() -> UnterminatedTailSpawn {
         let dir = tempfile::tempdir().expect("tmpdir");
         let command = python_fixture_command(
             dir.path(),
             "unterminated-agent",
             &format!(
-                r#"import os
-import subprocess
-
-HOLDER = '''import os, sys, time
-deadline = time.monotonic() + {hold}
-while os.path.exists(sys.argv[1]) and time.monotonic() < deadline:
-    time.sleep(0.05)
-'''
-
-sys.stdout.write('stdout:terminated\nstdout:unterminated-tail')
-sys.stdout.flush()
-hold = os.path.join(os.path.dirname(os.path.abspath(__file__)), '{hold_file}')
-open(hold, 'w').close()
-subprocess.Popen(
-    [sys.executable, '-c', HOLDER, hold],
-    stdin=subprocess.DEVNULL,
-    stdout=sys.stdout,
-    stderr=sys.stderr,
-    cwd=os.path.dirname(sys.executable),
-)
-"#,
-                hold = INHERITED_PIPE_HOLD.as_secs(),
-                hold_file = INHERITED_PIPE_HOLD_FILE,
+                "sys.stdout.write('stdout:terminated\\nstdout:unterminated-tail')\n\
+                 sys.stdout.flush()\n{}",
+                inherited_pipe_handoff()
             ),
         );
         let log_path = dir.path().join("agent.log");
@@ -286,7 +276,7 @@ subprocess.Popen(
             model: None,
             model_provider: None,
             model_name: None,
-            timeout_secs: Some(10),
+            timeout_secs: Some(FIXTURE_MARGIN.as_secs()),
             autonomous_args: Vec::new(),
         };
         let start = Instant::now();
@@ -313,26 +303,29 @@ subprocess.Popen(
             None,
         );
         let elapsed = start.elapsed();
+        let let_go = inherited_pipe_let_go(dir.path());
         let log = fs::read_to_string(&log_path).unwrap_or_default();
         // Release the grandchild now; had the spawn failed, dropping `dir` would.
-        let _ = fs::remove_file(dir.path().join(INHERITED_PIPE_HOLD_FILE));
+        release_inherited_pipe(dir.path());
         let outcome = outcome.expect("the agent completes without its grandchild's EOF");
-        (outcome, elapsed, log)
+        UnterminatedTailSpawn { outcome, elapsed, let_go, log }
     }
 
     /// Guard: waiting for the whole of the pre-exit output must not become
     /// waiting for a newline. The last line has none and a grandchild still
     /// holds the pipe, so a reader that waits for the line's end waits for the
     /// grandchild; completion must still arrive at the direct agent's exit
-    /// (§FS-rhei-agent-output-drain.2). The bound is the inherited-pipe test's.
+    /// (§FS-rhei-agent-output-drain.2). Observed as the inherited-pipe test
+    /// observes it, by whether the grandchild had let go (§REQ-cross-platform.8.2).
     #[test]
     fn unterminated_last_line_does_not_hold_completion_for_a_descendant() {
-        let (outcome, elapsed, _) = spawn_with_unterminated_last_line();
+        let UnterminatedTailSpawn { outcome, elapsed, let_go, .. } =
+            spawn_with_unterminated_last_line();
         assert!(outcome.status.success(), "agent failed after {elapsed:?}: {:?}", outcome.status);
         assert!(
-            elapsed < Duration::from_secs(10),
-            "spawn returned after {elapsed:?}; the grandchild holds the pipe \
-             {INHERITED_PIPE_HOLD:?}, so a return near that is a wait for the line's end"
+            !let_go,
+            "spawn returned after {elapsed:?}, once the grandchild had let go of the pipe it \
+             holds for up to {INHERITED_PIPE_HOLD:?}, so the return was a wait for the line's end"
         );
     }
 
@@ -341,7 +334,7 @@ subprocess.Popen(
     /// pipe and could still extend it (§FS-rhei-agent-output-drain.1).
     #[test]
     fn unterminated_last_line_is_logged_ahead_of_the_exit_footer() {
-        let (_, _, log) = spawn_with_unterminated_last_line();
+        let log = spawn_with_unterminated_last_line().log;
         let before_footer = log.split("=== exit ===").next().unwrap_or_default();
         assert!(before_footer.contains("stdout:terminated"), "{log}");
         assert!(

@@ -1092,7 +1092,7 @@ transitions:
             model: None,
             model_provider: None,
             model_name: None,
-            timeout_secs: Some(60),
+            timeout_secs: Some(FIXTURE_MARGIN.as_secs()),
             autonomous_args: Vec::new(),
         };
         let gate = gate_tooling_for_agent(&resolved, &tooling);
@@ -1221,15 +1221,18 @@ transitions:
 "#,
         )
         .expect("plan");
+        // An absence pin: a timeout a stalled runner crosses would kill a wrongly
+        // spawned agent before it touched `spawned` (§REQ-cross-platform.8.2).
         fs::write(
             &states,
-            r#"name: missing-skill
+            format!(
+                r#"name: missing-skill
 version: 1
 states:
   pending:
     description: pending
     agent: fake
-    agent_timeout: 1s
+    agent_timeout: {margin}s
     skills:
       - missing
   done:
@@ -1239,6 +1242,8 @@ transitions:
   - from: pending
     to: done
 "#,
+                margin = FIXTURE_MARGIN.as_secs()
+            ),
         )
         .expect("states");
         fs::write(

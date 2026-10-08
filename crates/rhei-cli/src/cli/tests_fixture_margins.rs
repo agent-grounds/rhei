@@ -137,7 +137,6 @@
     /// is read, so a 5 s margin added tomorrow fails here by name, and a listed
     /// exception that no longer matches a short bound fails as stale.
     #[test]
-    #[ignore = "red until #483 gives every fixture margin FIXTURE_MARGIN; implement removes this"]
     fn no_fixture_bound_is_shorter_than_the_margin_unless_it_is_the_behaviour() {
         let bounds = written_bounds();
         assert!(bounds.len() > 10, "the scan read only {} bounds; has the pattern changed?", bounds.len());
@@ -180,7 +179,6 @@
     /// grandchild holds it for longer than the margin. A hold the margin outlasts
     /// ends before a spawn that waited for it can be told from one that did not.
     #[test]
-    #[ignore = "red until #483 holds the inherited pipe past FIXTURE_MARGIN; implement removes this"]
     fn the_inherited_pipe_is_held_past_the_margin() {
         assert!(
             INHERITED_PIPE_HOLD > FIXTURE_MARGIN,
@@ -193,7 +191,6 @@
     /// Python fixture's start like any agent timeout, and no test means it to
     /// fire, so it is the margin.
     #[test]
-    #[ignore = "red until #483 makes the test-build redactor timeout FIXTURE_MARGIN; implement removes this"]
     fn the_test_build_snapshot_redactor_timeout_is_the_margin() {
         assert_eq!(
             SNAPSHOT_REDACTOR_TIMEOUT, FIXTURE_MARGIN,

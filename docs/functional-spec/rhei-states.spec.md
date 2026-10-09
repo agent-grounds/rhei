@@ -1192,7 +1192,28 @@ with the state or the defaults keeps their definition
 [Agents Specification — Resolution Order](rhei-agents.spec.md#14-resolution-order)
 for the full algorithm.
 
+For the resolved `claude-code` family, this selection is the whole MCP surface
+after the existing availability and attachment handling. Leaving `mcp_servers`
+absent with no defaults, or writing `mcp_servers: []` even with defaults, admits
+no MCP servers from the client's native configuration. User/project/plugin
+registrations and connectors cannot enlarge it ([§FS-rhei-states.7.3](rhei-states.spec.md#73-runtime-semantics)).
+
 ### 7.3. Runtime semantics
+
+For a resolved `claude-code` family agent, the effective MCP selection in
+[§FS-rhei-states.7.2](rhei-states.spec.md#72-effective-set) is exclusive: user, project and plugin registrations and
+connectors in the client cannot add servers. Every spawn requests
+`--strict-mcp-config` as an agent option before the final `--`, regardless of
+mode, effective-set size or explicit attachment overrides. An empty selection
+needs no generated MCP config file; a nonempty available selection retains the
+profile's existing attachment mechanism ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)).
+
+The availability rules below, attachment-support errors/warnings and config-write
+warnings remain in force. If optional filtering, unsupported attachment or a
+config-write warning leaves no attached servers, native registrations cannot
+become a fallback. Wrappers must forward the strict option; clients rejecting
+it fail at startup without an additive retry. Other resolved families retain
+their existing launch behavior.
 
 - Entries are resolved and availability-checked by `rhei run` at agent spawn
   time — not at `rhei next`.

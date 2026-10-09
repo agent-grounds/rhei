@@ -1,5 +1,8 @@
 # Rhei
 
+Claude Code family agents that `rhei run` spawns use strict MCP configuration.
+If you relied on native MCP registrations, see the [compatibility and migration guidance](docs/functional-spec/rhei-usage.spec.md#31-pattern-0-zero-config-agent-execution).
+
 Rhei is an agent runtime for governed work. It turns Markdown workflows into
 predictable agent and program execution with explicit state, dependencies,
 artifacts, monitoring, snapshots, and reusable templates. The runtime can be

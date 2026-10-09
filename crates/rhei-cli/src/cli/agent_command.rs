@@ -67,7 +67,7 @@ fn remove_outer_rhei_identity(cmd: &mut std::process::Command) {
 /// Flag order:
 /// `<command...> <mode flags...> <autonomous_args...> <effort args...> <accounting flags...>
 ///  <prompt_flag> <prompt>? <model_flag> <model>? <snapshot_args...>
-///  <mcp/skill flags...> --?`
+///  <strict MCP option?> <mcp/skill flags...> --?`
 /// `--` is appended last when `stdin_prompt` is `true`, to match
 /// `codex exec --`-style invocations that expect stdin: past a separator a flag
 /// is prompt text, so everything rhei has to say to the agent — the snapshot,
@@ -88,6 +88,10 @@ fn remove_outer_rhei_identity(cmd: &mut std::process::Command) {
 /// `runtime_dir` is used to materialize an MCP config file for agents that
 /// declare `mcp_config_flag` (e.g. `claude-code --mcp-config <path>`). The
 /// file is written under `runtime_dir/tmp/` and overwritten on every spawn.
+///
+/// Every spawn whose resolved family is `claude-code` carries
+/// `--strict-mcp-config`, so the resolved selection is the agent's whole MCP
+/// surface and an empty one attaches nothing at all (§FS-rhei-states.7.3).
 #[allow(clippy::too_many_arguments)]
 fn build_agent_command(
     resolved: &ResolvedAgent,
@@ -178,6 +182,14 @@ fn build_agent_command(
     // §FS-rhei-snapshots.10.1
     for arg in snapshot_args {
         cmd.arg(arg);
+    }
+
+    // Rhei's selection is the whole MCP surface whatever the mode, set size or
+    // attachment override: native registrations add nothing. §FS-rhei-states.7.3
+    // The family decides, so wrappers and same-id replacements get it. §FS-rhei-agents.1.1.2
+    if resolved.family() == "claude-code" {
+        // The first tooling flag: ahead of attachment, skills and `--`. §FS-rhei-agents.2.2
+        cmd.arg("--strict-mcp-config");
     }
 
     // Append MCP and skill flags. Only entries whose definition resolved

@@ -1597,6 +1597,15 @@ The budget can be set at two levels, resolved the way a timeout is (§7.1):
 
 Resolution: state-level > settings defaults > the built-in **2**.
 
+An exhausted non-poll, non-terminal visit can receive one more configured
+budget through the attended `rhei retry` command (§FS-rhei-retry.2). Its
+effective budget is the configured `attempts:` plus the sum of that visit's
+audited grants (§FS-rhei-agents.8.4). The grant changes neither the visit key nor attempt/log
+numbering, state, move ledger, `stateVisits`, supervision phase, or checkpoints.
+It creates no travel, visit, or invocation headroom: each admitted neural
+attempt still costs an invocation (§FS-rhei-budgets.4.2). Grants cannot be
+stockpiled while attempts remain and cannot be issued by a spawned worker.
+
 Two is the initial invocation plus one informed retry. It is deliberate. A
 retry that is told nothing repeats its predecessor exactly and buys nothing, so
 the one retry is worth spending only because §3.2.1 makes it an informed one; a
@@ -1621,8 +1630,8 @@ condition; [§FS-rhei-supervision.3.6](rhei-supervision.spec.md#36-empty-visits)
 the worker failing to earn it, so the attempt charged for it is given back and
 the spawn record says the edge was withheld. The reasoning is the
 interruption's — the engine ended the visit, not the worker — with one thing
-more: a held supervisor bars its whole subtree, so a budget spent there would
-not halt one ticket but leave the workspace recoverable only by `rhei reset`.
+more: a held supervisor bars its whole subtree, so spending its budget would
+require attended recovery (§FS-rhei-retry.2) for the entire held subtree.
 
 A budget below `1` is raised to `1`: every visit gets at least the invocation
 that makes it a visit.
@@ -1835,6 +1844,13 @@ rhei run <RHEI_PLAN> [--dry-run] [--no-callbacks] [--no-agent] [--no-program]
 ### 5.2. Execution Loop
 
 #### 5.2.1. Sequential Mode (default, `--parallel 1`)
+
+An exhausted visit's halt preserves the ending `The ticket stays in
+'{state}'.` exactly and appends recovery advice (§FS-rhei-retry.3). Ordinary
+states name `rhei retry {id}` and the configured budget it grants. Supervising
+states also name the held subtree, the unread checkpoint count, and warn that
+their self-loop releases it instead (§FS-rhei-supervision.3.5). Poll behavior
+is unchanged: poll states do not receive this visit-budget recovery advice.
 
 1. Load plan and state machine. Validate.
 2. Find the next claimable task (same eligibility as `rhei next`).
@@ -2342,6 +2358,16 @@ place by each further attempt of the same invocation. It holds:
 | `started`, `ended`, `duration`, `code` | when it ran, for how long, and how it exited |
 | `ending` | `exited`, `timed out`, `interrupted`, `provider_limited`, or `withheld` — why it stopped or remained in its state |
 | `attempt_charged` | whether this invocation consumed the state visit's `attempts:` budget |
+| `grants` | attended grants for this visit: `[{at, os_user, attempts}]`, recording timestamp, operating-system user and the configured budget granted |
+
+Older spawn records without `grants` read as no grants. Further attempts of
+the same visit preserve its grants; a new visit has none. Grant persistence
+must write a temporary file and rename it into place while holding the same
+record lock used by attempt charging. Both operations re-read the record under
+that lock and preserve each other's updates. A concurrent run sees either no
+grant or the entire grant, never a partial record or a lost grant
+(§FS-rhei-retry.2). `rhei reset` removes the grants with `runtime/spawns/`
+and refunds no capacity.
 
 A provider-limited record keeps the subprocess's real non-zero `code`, uses
 `ending: provider_limited`, and sets `attempt_charged: false`. Its log, timing,

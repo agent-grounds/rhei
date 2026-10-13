@@ -40,6 +40,7 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next) | `rhei next` command behavior |
 | [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition) | `rhei transition` command behavior |
 | [§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover) | Explicit recovery of an interrupted operator-forced transition |
+| [§FS-rhei-retry](rhei-retry.spec.md#fs-rhei-retry-rhei-retry) | Grant an exhausted current visit another attempt budget without moving it |
 | [§FS-rhei-complete](rhei-complete.spec.md#fs-rhei-complete-rhei-complete) | `rhei complete` command behavior |
 | [§FS-rhei-release](rhei-release.spec.md#fs-rhei-release-rhei-release) | `rhei release` command behavior |
 | [§FS-rhei-remove](rhei-remove.spec.md#fs-rhei-remove-rhei-remove) | `rhei remove` command behavior: taking back an untouched ticket and retiring its id |

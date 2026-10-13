@@ -75,6 +75,16 @@ plain and reusable unsupervised.
 
 ## Consequences
 
+A spent supervising visit must recover without releasing its hold or losing
+the checkpoints it has yet to read. `rhei retry` grants an audited attempt
+budget to that same visit (§FS-rhei-retry.2), and the halt names it. A manual
+self-loop with unread checkpoints requires the explicit `--release-subtree`
+request (§FS-rhei-transition-cmd.2), because release deliberately discards
+those events. The engine's release remains its own decision. This raises only
+the attended level-2 bound, preserving the composed limits and useful recovery
+guidance of §REQ-bounded-neural-work.1, §REQ-bounded-neural-work.4 and
+§REQ-bounded-neural-work.5.
+
 - All four triggers fall out of one rule; the `*-transition` values are the
   expensive setting — they serialize the subtree at every hop and spend one
   supervisor invocation per hop — and the spec says so. Scope narrows what

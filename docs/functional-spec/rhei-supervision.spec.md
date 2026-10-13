@@ -267,6 +267,11 @@ A task `P` in a supervising state is a barrier over its subtree. Its
    The visit is over, so the self-loop also drops `P`'s `**Assignee:**`: the
    worker that took the visit no longer holds the ticket, and `P` is claimed
    afresh by whoever answers its next checkpoint (§3.4).
+   An explicit CLI `rhei transition` self-loop with pending checkpoints is
+   refused without mutation unless the caller supplies `--release-subtree`
+   (§FS-rhei-transition-cmd.2). The engine's own self-loop and withheld-edge
+   rule (§FS-rhei-supervision.3.6) are unchanged. With no pending checkpoints the plain self-loop
+   still releases; the flag is accepted there as a no-op.
 3. **A checkpoint holds again.** When a checkpoint event is delivered to `P`
    (§2), the phase becomes `held` and the event is recorded (§3.3). Nothing
    new beneath `P` is dispatched. Descendants already in flight run to their
@@ -366,7 +371,9 @@ metadata:
 - `supervision.checkpoints` accumulates delivered events in delivery order.
   `task` is the rhei-local id of the transitioning descendant, `from` and `to`
   its bare state names, `visit` the `to` state's visit number. The list is
-  cleared on the self-loop exit, after the visit that consumed it.
+  cleared on the self-loop exit, after the visit that consumed it, or after
+  an operator explicitly requested release with `--release-subtree`. A plain
+  manual self-loop must not silently discard pending checkpoints (§FS-rhei-supervision.3.1).
 - The block is removed when the task leaves the supervising state by any
   other edge, when a task that is *not* in a supervising state but still
   carries a block moves at all — the human moving a gate-parked supervisor on —
@@ -396,7 +403,9 @@ without special casing:
   brief paths (§5.1), the barrier sentence, the qualified `## Result` rule, and
   the one command that ends the visit: the state's own self-loop, spelled out
   with this invocation's plan path and machine, because that edge is what
-  releases the subtree and drops the claim. Under `--json` each is a field,
+  releases the subtree and drops the claim. The rendered command includes
+  `--release-subtree`: the manual worker has read the checkpoints and is
+  explicitly releasing them. Under `--json` each is a field,
   present only when the section is. A plan with no supervising state produces
   the output it always did. It never claims a descendant of a held supervisor;
   such descendants are reported as `Task <id> held by supervisor Task <P>
@@ -413,7 +422,7 @@ without special casing:
   open, so the "workable" set that feeds them excludes it, and a row that
   stopped at "everything is held" would leave the worker with nowhere to go.
 - The worker releases the subtree with the self-loop,
-  `rhei transition <P> --from <state> --to <state>`, and finishes it with the
+  `rhei transition <P> --from <state> --to <state> --release-subtree`, and finishes it with the
   terminal edge once `openDescendants` is `0`. That self-loop ends the visit
   and with it the worker's claim: `rhei transition` drops `P`'s
   `**Assignee:**` on this one edge, the way a terminal entry does
@@ -449,7 +458,14 @@ visit is not progress: `--continue-on-error` governs it
 delivered before the failure, and `stateVisits.<state>` is not incremented —
 the visit is not spent. The task is still ready under §3.2, so a later pass,
 or a rerun of `rhei run`, spawns the same visit again with the same pending
-checkpoints (§5.1).
+checkpoints (§5.1), while its attempt budget has capacity. When that budget is
+spent, a rerun still halts. The halt keeps `The ticket stays in '{state}'.`
+and then names the held subtree, unread checkpoint count, and
+`rhei retry <P>` as recovery, warning that the self-loop releases instead.
+The attended grant (§FS-rhei-retry.2) adds exactly one configured attempt
+budget to this same visit without releasing the subtree or losing its
+checkpoints. The next `rhei run` resumes with monotonic attempt/log numbers
+and the unread checkpoints still in its prompt.
 
 ### 3.6. Empty Visits
 

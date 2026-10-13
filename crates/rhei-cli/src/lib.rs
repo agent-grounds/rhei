@@ -312,6 +312,7 @@ mod tests {
     include!("cli/tests_retry_contract.rs");
     include!("cli/tests_retry_operations.rs");
     include!("cli/tests_retry_handlers.rs");
+    include!("cli/tests_retry_discovery.rs");
     include!("cli/tests_retry_supervision.rs");
     include!("cli/tests_visit_pairing.rs");
     include!("cli/tests_worker_edit_regions.rs");

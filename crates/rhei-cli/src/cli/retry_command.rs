@@ -116,11 +116,13 @@ fn retry_command_with_worker(
     else {
         unreachable!("poll refused")
     };
-    // §FS-rhei-retry.1: a live-admitted member can have local records even when
-    // this fresh command loads it as an initial project member.
-    let mut runtimes = vec![root.join("runtime"), route.execution_root.join("runtime")];
-    runtimes.sort();
-    runtimes.dedup();
+    // §FS-rhei-retry.2: match the next fresh run, whose agents are initial members;
+    // programs always use their owning root. Dormant duplicates cannot grant capacity.
+    let runtime = if definition.program.is_some() {
+        route.execution_root.join("runtime")
+    } else {
+        root.join("runtime")
+    };
     let records = retry_active_records(
         &loaded,
         machine,
@@ -128,7 +130,7 @@ fn retry_command_with_worker(
         &state,
         &settings,
         &route.execution_root,
-        &runtimes,
+        &runtime,
     )?;
     let exhausted = records
         .iter()

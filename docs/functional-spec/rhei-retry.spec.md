@@ -24,6 +24,14 @@ The effective allowance is configured attempts plus all grants for that visit.
 Keep the same move-count visit key, monotonic attempt/log numbering, state,
 move ledger, `stateVisits`, supervision phase and pending checkpoints.
 
+Select records from the runtime the next run of the same plan or project
+consumes: initial project-member agents use the project runtime, while member
+programs use the owning member runtime. Within that runtime, use the run's own
+record name before its current-visit legacy fallback. A newer duplicate in a
+different runtime is dormant for that run: it neither receives a grant nor
+determines exhaustion or remaining allowance. Do not combine its history with
+the active record. A missing active current record is still a refusal.
+
 For a fan-out state, resolve the active invocations and grant each exhausted
 invocation of the current visit its own configured-size grant. An invocation
 with attempts remaining receives no grant; it must not prevent recovery of an
@@ -64,6 +72,8 @@ Task plan.1 'supervising': granted 2 more attempts to this visit (4 in total); t
 Fan-out success names each invocation actually granted, with its own effective
 total and next attempt number; it does not claim to refill or spawn a sibling
 that still has capacity or whose finished work is reusable.
+The effective total and next attempt number come from the selected active
+record, so a dormant duplicate cannot change the promised next spawn.
 
 Retain the halt ending `The ticket stays in '{state}'.` exactly. Append these
 clauses, using the configured budget and singular/plural checkpoint spelling:

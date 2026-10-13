@@ -75,7 +75,8 @@ markdown to get there.
   Dolt-backed agent issue tracker
 - [hmans/beans](https://github.com/hmans/beans) — markdown-native alternative to
   beads
-- [opencode `todo.ts`](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/tool/todo.ts),
+- [opencode `todo.ts`](https://github.com/anomalyco/opencode/blob/d4155f290680506d80b76dc7cda5e24820956d3b/packages/opencode/src/tool/todo.ts)
+  (removed upstream in July 2026; linked at the last commit that has it),
   [opencode Modes](https://open-code.ai/en/docs/modes)
 - [Claude Code Todo Tracking](https://code.claude.com/docs/en/agent-sdk/todo-tracking)
 - [Cline Deep Planning](https://docs.cline.bot/features/slash-commands/deep-planning)

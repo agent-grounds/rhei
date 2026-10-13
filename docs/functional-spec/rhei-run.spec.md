@@ -352,7 +352,7 @@ headless, and JSONL surfaces; no new output record family is introduced.
 
      Running the state again is bounded. One visit to a state — the span
      between two consecutive moves of the ticket — may be spawned at most
-     `attempts` times ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)), a budget that is persisted with
+     `attempts` plus attended grants times ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)), a budget that is persisted with
      the visit and therefore survives the end of a run: a fresh `rhei run` does
      not buy the ticket a fresh allowance, because "once per run, forever" is
      exactly the unbounded case the budget exists for. Entering the state again
@@ -364,6 +364,10 @@ headless, and JSONL surfaces; no new output record family is introduced.
      unfinished. No transition fires on an exhausted budget — an error edge, a
      timeout edge, or a move to `cancelled` would record a verdict on work the
      engine never saw.
+     The halt preserves `The ticket stays in '{state}'.` and appends
+     `rhei retry <ID>` recovery advice (§FS-rhei-retry.3). For a supervising
+     visit it also names the held subtree and unread checkpoint count and
+     warns that its self-loop releases instead. Poll behavior is unchanged.
    - **The subprocess exited `0` in a supervising state and the visit released
      nothing.** The completion condition held, but the edge it selects is the
      supervisor's own self-loop and the visit neither moved the subtree nor
@@ -382,8 +386,8 @@ headless, and JSONL surfaces; no new output record family is introduced.
      answered, and the engine withheld its edge, so the attempt is given back
      and a fresh `rhei run` does visit the state again. "Once per run, forever"
      is accepted here because the alternative is worse than unbounded: a
-     supervisor bars its subtree while it is held, so a spent budget would make
-     the workspace unrecoverable rather than merely slow, and within a run the
+     supervisor bars its subtree while it is held, so a spent budget requires
+     attended recovery (§FS-rhei-retry.2), and within a run the
      ticket is re-visited only after something else advanced
      ([§FS-rhei-supervision.3.6](rhei-supervision.spec.md#36-empty-visits)).
    - **The worker's edit broke the plan.** The plan, re-read after the exit

@@ -304,6 +304,7 @@ mod tests {
     include!("cli/tests_agent_prompt_transport.rs");
     include!("cli/tests_agent_family.rs");
     include!("cli/tests_spawn_records.rs");
+    include!("cli/tests_retry_contract.rs");
     include!("cli/tests_visit_pairing.rs");
     include!("cli/tests_worker_edit_regions.rs");
     include!("cli/tests_entry_log_numbers.rs");

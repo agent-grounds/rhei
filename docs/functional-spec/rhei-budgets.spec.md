@@ -379,6 +379,10 @@ missing arms before the ticket advances.
 A retry costs **zero travel and one invocation**. A fresh visit refreshes
 `attempts:` and never the project account.
 
+An attended `rhei retry` grant (§FS-rhei-retry.2) creates no travel, visit or
+invocation headroom; every admitted granted attempt costs one invocation like
+any other retry, and is refused when that account is exhausted.
+
 The four non-spend exceptions of [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget) — run interruption, a
 withheld supervisor release edge, the poll-state exemption, and a recognized
 provider-limited invocation — are exceptions to the **inner** attempt counter

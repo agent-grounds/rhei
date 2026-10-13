@@ -34,6 +34,21 @@ The ticket must be named one way or the other.
 | `--no-callbacks` | No       | false   | Skip execution of `on_leave` / `on_enter` callbacks registered on the edge  |
 | `--force`        | No       | false   | Attended operator recovery across an edge the active machine does not declare (§6) |
 | `--reason <WHY>` | With `--force` | | Fresh non-whitespace explanation recorded in the exceptional audit row |
+| `--release-subtree` | When a supervising self-loop has pending checkpoints | false | Explicitly release the subtree and discard the unread checkpoints |
+
+`--release-subtree` is accepted only on an explicit supervising self-loop,
+including one with no pending checkpoints, where it adds no requirement or
+effect. It is refused on every other edge and with `--force`. This flag does
+not guard the engine's own release or withheld-edge handling
+(§FS-rhei-supervision.3.6).
+
+A plain manual supervising self-loop with pending checkpoints is refused
+before any mutation: plan bytes, supervision state, result files and the move
+ledger remain unchanged. The refusal names the release consequence, the
+unread checkpoint count and every checkpoint's task/from/to; it gives both
+`rhei retry <ID>` to keep the hold and the explicit
+`rhei transition <ID> --from <state> --to <state> --release-subtree` command.
+With no pending checkpoints the plain self-loop still succeeds.
 
 `--result` is accepted on any transition, not only terminal ones: a message
 passed on a non-terminal hop is appended to the same result file and creates it
@@ -332,6 +347,14 @@ Error: Task <ID> is in state '<actual>', not '<from>'.
 Losers are expected to re-read the plan and either re-select with `rhei next` or retry against the new state.
 
 ## 5. Output
+
+An explicitly requested supervising release preserves the existing release
+semantics (§FS-rhei-supervision.3.1) and adds this line, with the actual count
+and singular/plural spelling:
+
+```text
+released the subtree of Task <ID>; dropped <N> unread checkpoint(s)
+```
 
 On success:
 

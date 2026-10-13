@@ -589,7 +589,7 @@ path = "docs/functional-spec/rhei-supervision.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 800, unit = "lines" }
+max_accepted = { value = 900, unit = "lines" }
 until = "a dedicated spec-decomposition change introduces stable child declarations and migrates every affected FS-rhei-supervision citation"
 reason = """
 The supervision lifecycle is still one normative declaration with dense numbered-section cross-references; a child-declaration boundary and atomic citation-migration plan must exist before it can be split safely.

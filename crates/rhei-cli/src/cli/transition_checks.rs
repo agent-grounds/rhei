@@ -231,6 +231,7 @@ fn ensure_state_outputs_exist(
 /// `from`, validates the transition against the state machine, rewrites the
 /// `**State:**` line, and writes the file atomically (temp + rename).
 #[allow(clippy::too_many_arguments)]
+#[cfg(test)]
 fn transition_command(
     input: &Path,
     rhei_scope: &[String],
@@ -241,6 +242,17 @@ fn transition_command(
     result_msg: Option<&str>,
     supervisor: Option<&str>,
     no_callbacks: bool,
+) -> MietteResult<()> {
+    transition_command_with_release(input, rhei_scope, state_machine_path, task_id_str, from, to, result_msg, supervisor, no_callbacks, false)
+}
+
+/// Explicit CLI moves carry release intent into the locked preflight; autonomous
+/// transitions never opt into this guard. §FS-rhei-transition-cmd.2
+#[allow(clippy::too_many_arguments)]
+fn transition_command_with_release(
+    input: &Path, rhei_scope: &[String], state_machine_path: Option<&Path>,
+    task_id_str: &str, from: &str, to: &str, result_msg: Option<&str>,
+    supervisor: Option<&str>, no_callbacks: bool, release_subtree: bool,
 ) -> MietteResult<()> {
     let input_buf = normalize_workspace_input(input);
     let input = input_buf.as_path();
@@ -258,6 +270,7 @@ fn transition_command(
     // §DA-per-rhei-state-machines
     let machine = machines.for_task_str(task_id_str);
     let callback_paths = machines.callbacks_for_str(task_id_str);
+    release_flag_preflight(release_subtree, false, machine, from, to)?;
 
     // §FS-rhei-transition-cmd.2: accepting `--result ""` while ignoring it
     // would hide the exact thing §FS-rhei-states.3.3 refuses.
@@ -274,6 +287,7 @@ fn transition_command(
         to,
         no_callbacks,
         TransitionOrigin {
+            manual_release: Some(release_subtree),
             result_message: result_msg.map(str::to_string),
             supervisor,
             ..TransitionOrigin::default()

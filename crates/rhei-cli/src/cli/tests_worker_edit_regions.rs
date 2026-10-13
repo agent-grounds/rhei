@@ -199,6 +199,7 @@ Raise it.
                 moves: 0,
                 attempt: 1,
                 charged: 1,
+                grants: Vec::new(),
                 attempt_charged: true,
                 kind: "program".into(),
                 worker: "note".into(),
@@ -225,6 +226,7 @@ Raise it.
                 state: "cover".into(),
                 input: self.ws.clone(),
                 budget: AttemptBudget::Visit(2),
+                recovery: HaltRecovery::Visit { configured: 2, checkpoints: None },
             }
         }
 

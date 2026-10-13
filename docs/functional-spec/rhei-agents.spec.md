@@ -2369,6 +2369,15 @@ grant or the entire grant, never a partial record or a lost grant
 (§FS-rhei-retry.2). `rhei reset` removes the grants with `runtime/spawns/`
 and refunds no capacity.
 
+If the prior record contains malformed JSON, it supplies no previous-attempt
+proof or grants. A worker that runs without such proof still publishes its
+completed charge: under the shared record lock, charging replaces the malformed
+contents with its valid record through the same atomic write. The next run
+therefore reads the completed attempt and continues its numbering rather than
+refusing the completed worker's log as unaccounted. Granting remains strict:
+malformed contents cannot authorize a retry grant. Valid records still merge
+their current-visit charges and grants under the lock.
+
 A provider-limited record keeps the subprocess's real non-zero `code`, uses
 `ending: provider_limited`, and sets `attempt_charged: false`. Its log, timing,
 resolved worker identity, and any usage the worker reported remain ordinary

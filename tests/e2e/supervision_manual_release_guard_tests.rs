@@ -5,7 +5,6 @@ use super::*;
 const EDGE: &[&str] = &["--from", "supervising", "--to", "supervising", "--no-callbacks"];
 
 #[test]
-#[ignore = "red until #489 refuses a manual self-loop over unread checkpoints; implement removes this"]
 fn plain_manual_self_loop_refuses_instead_of_silently_dropping_unread_checkpoint() {
     let (dir, plan, _) = fixture();
     exhaust(&dir, &plan);
@@ -39,7 +38,6 @@ fn plain_manual_self_loop_refuses_instead_of_silently_dropping_unread_checkpoint
 }
 
 #[test]
-#[ignore = "red until #489 adds transition --release-subtree, which reports the dropped checkpoints; implement removes this"]
 fn explicit_manual_release_drops_checkpoint_and_reports_the_loss() {
     let (dir, plan, _) = fixture();
     exhaust(&dir, &plan);
@@ -66,7 +64,6 @@ fn zero_pending_plain_self_loop_still_releases() {
 }
 
 #[test]
-#[ignore = "red until #489 adds transition --release-subtree; implement removes this"]
 fn zero_pending_explicit_release_is_accepted_as_a_no_op_flag() {
     let (dir, plan, _) = fixture();
     let mut args = EDGE.to_vec();
@@ -78,7 +75,6 @@ fn zero_pending_explicit_release_is_accepted_as_a_no_op_flag() {
 
 // §FS-rhei-supervision.3.4
 #[test]
-#[ignore = "red until #489 puts --release-subtree in the manual worker's self-loop command; implement removes this"]
 fn manual_worker_release_command_explicitly_names_release_subtree() {
     let (dir, _, _) = fixture();
     let output = cli(&dir, "next", "plan.rhei.md", &["--task", "plan.1", "--peek"], false);

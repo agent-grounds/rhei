@@ -110,11 +110,12 @@ fn spawn_parallel_agent_work_item(
         emit_run_message(
             sink,
             rhei_tui::MessageLevel::Warn,
-            budget_spent_halt_line(
+            render_spent_visit_halt(
                 &item.task_id_str,
                 &item.current_state,
                 spent_budget,
                 &plan.spent_budget_owed(&owed),
+                visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task),
             ),
         );
         return Ok(ParallelAgentSpawnOutcome::Skipped);
@@ -356,7 +357,8 @@ fn spawn_parallel_agent_work_item(
     let runtime_dir_for_thread = agent_runtime_dir;
     // Read before the plan moves into the worker: only here are the plan and
     // the resolved budget both in hand. §FS-rhei-agents.3.2.1
-    let outlook_for_result = plan.retry_outlook(budget);
+    let recovery = visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task);
+    let outlook_for_result = plan.retry_outlook(budget).with_recovery(recovery);
     // §FS-rhei-supervision.3.6: what the visit is about to be judged against,
     // read from the same pre-spawn plan the sequential path reads it from.
     let subtree_before =
@@ -390,7 +392,7 @@ fn spawn_parallel_agent_work_item(
     // thread, so a crash between here and the process can never refund the
     // invocation. §FS-rhei-budgets.6.2
     budget_record_start(workspace_root, &item.task_id_str, false, sink);
-    let lease = begin_worker_region(&loaded, input, &item.task_id_str, &item.current_state, budget);
+    let lease = begin_worker_region(&loaded, input, &item.task_id_str, &item.current_state, plan_for_thread.effective_budget(budget)).with_recovery(recovery);
     let handle = std::thread::spawn(move || {
         inherit_run_owner(run_owner);
         let thread_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

@@ -232,7 +232,14 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             note_command(target.path(), &target.scope_with(&[]), &options)
         }
         Commands::Recover { execution_root } => recover_command(&execution_root),
+        // §FS-rhei-retry.1: use the same ticket-or-plan resolution as transition.
+        Commands::Retry { input, task, state_machine } => {
+            let (input, task) = split_transition_ticket_target(input, task)?;
+            let target = resolve_plan_target(input)?;
+            retry_command(target.path(), &target.scope_with(&[]), state_machine.or(before_subcommand).as_deref(), &task)
+        }
         Commands::Transition {
+            release_subtree,
             force,
             reason,
             input,
@@ -246,6 +253,10 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
         } => {
             let (input, task) = split_transition_ticket_target(input, task)?;
             let target = resolve_plan_target(input)?;
+            // §FS-rhei-transition-cmd.2: reject before the forced-recovery ceremony.
+            if force && release_subtree {
+                return Err(diagnostic!("--release-subtree cannot be combined with --force"));
+            }
             if force {
                 validate_force_options(reason.as_deref(), supervisor.as_deref(), no_callbacks)?;
                 return force_transition_command(target.path(), &target.scope_with(&[]),
@@ -255,7 +266,7 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             if reason.is_some() {
                 return Err(diagnostic!("--reason is only valid with --force"));
             }
-            transition_command(
+            transition_command_with_release(
                 target.path(),
                 &target.scope_with(&[]),
                 state_machine.or(before_subcommand).as_deref(),
@@ -265,6 +276,7 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
                 result.as_deref(),
                 supervisor.as_deref(),
                 no_callbacks,
+                release_subtree,
             )
         }
         command @ Commands::Run { .. } => dispatch_target_command(command, before_subcommand),

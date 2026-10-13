@@ -3,7 +3,6 @@ use super::supervision_retry_support::*;
 use super::*;
 
 #[test]
-#[ignore = "red until #489 names rhei retry and the held subtree in the spent-visit halt; implement removes this"]
 fn spent_supervising_visit_halt_names_recovery_that_keeps_the_hold() {
     let (dir, plan, _) = fixture();
     let output = text(&exhaust(&dir, &plan));
@@ -16,7 +15,6 @@ fn spent_supervising_visit_halt_names_recovery_that_keeps_the_hold() {
 }
 
 #[test]
-#[ignore = "red until #489 adds rhei retry, which grants the held visit more attempts; implement removes this"]
 fn retry_recovers_as_attempt_three_of_the_same_held_visit_with_its_checkpoint() {
     let (dir, plan, machine) = fixture();
     exhaust(&dir, &plan);

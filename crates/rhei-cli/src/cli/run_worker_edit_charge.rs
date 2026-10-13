@@ -38,10 +38,12 @@ impl PendingSlotRelease {
 /// Keep the revert on the attempt's spawn record, and say what the visit has
 /// spent and whether this attempt was charged. §FS-rhei-run.3.7.4
 fn record_spawn_revert(record: &Path, edit: &RevertedEdit) -> Option<(u64, bool)> {
-    let mut stored = read_spawn_record(record)?;
-    stored.reverted = Some(edit.clone());
-    let body = serde_json::to_string_pretty(&stored).ok()?;
-    fs::write(record, body).ok()?;
+    // §FS-rhei-agents.8.4: every record mutation preserves a simultaneous grant.
+    let stored = update_spawn_record(record, |stored| {
+        let Some(mut stored) = stored else { return Ok(None) };
+        stored.reverted = Some(edit.clone());
+        Ok(Some(stored))
+    }).ok()??;
     Some((stored.charged, stored.attempt_charged))
 }
 
@@ -54,15 +56,16 @@ fn attempt_was_reverted(record: &Path) -> bool {
 /// The worker whose exit found a break the run stops on is recorded the way an
 /// interruption is: uncharged, its exit unrouted. §FS-rhei-run.3.7.6
 fn uncharge_stopped_attempt(record: &Path) {
-    let Some(mut stored) = read_spawn_record(record) else { return };
-    if stored.attempt_charged {
-        stored.charged = stored.charged.saturating_sub(1);
-        stored.attempt_charged = false;
-    }
-    stored.ending = "interrupted".to_string();
-    if let Ok(body) = serde_json::to_string_pretty(&stored) {
-        let _ = fs::write(record, body);
-    }
+    // §FS-rhei-agents.8.4: interruption changes charges, not audited allowances.
+    let _ = update_spawn_record(record, |stored| {
+        let Some(mut stored) = stored else { return Ok(None) };
+        if stored.attempt_charged {
+            stored.charged = stored.charged.saturating_sub(1);
+            stored.attempt_charged = false;
+        }
+        stored.ending = "interrupted".to_string();
+        Ok(Some(stored))
+    });
 }
 
 /// What a budget spent on a reverted last attempt is still owed, as its halt
@@ -93,7 +96,7 @@ fn announce_worker_revert(revert: &WorkerRevert, release: &mut PendingSlotReleas
     };
     if revert.attempt_charged && revert.charged >= budget {
         let halt =
-            budget_spent_halt_line(&revert.task_id, &revert.state, budget, REVERTED_EDIT_OWED);
+            render_spent_visit_halt(&revert.task_id, &revert.state, budget, REVERTED_EDIT_OWED, revert.recovery);
         emit_run_message(sink, rhei_tui::MessageLevel::Warn, halt);
     }
 }

@@ -1,5 +1,14 @@
 # CLI examples
 
+When a visit has exhausted its attempts, grant it another configured budget
+without moving it. A supervisor keeps its held subtree and unread checkpoints
+(§FS-rhei-retry.2); the grant takes effect on the next run:
+
+```bash
+rhei retry plan.1
+rhei run plan.rhei.md
+```
+
 Validate a plan with the built-in default states definition:
 
 ```bash

@@ -79,11 +79,12 @@ fn spawn_parallel_program_work_item(
         emit_run_message(
             sink,
             rhei_tui::MessageLevel::Warn,
-            budget_spent_halt_line(
+            render_spent_visit_halt(
                 &item.task_id_str,
                 &item.current_state,
                 spent_budget,
                 &plan.spent_budget_owed(&owed),
+                visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task),
             ),
         );
         return Ok(ParallelProgramSpawnOutcome::Skipped);
@@ -119,9 +120,10 @@ fn spawn_parallel_program_work_item(
 
     // Read before the plan moves into the worker: only here are the plan and
     // the resolved budget both in hand. §FS-rhei-agents.3.2.1
-    let outlook_for_result = plan.retry_outlook(budget);
+    let recovery = visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task);
+    let outlook_for_result = plan.retry_outlook(budget).with_recovery(recovery);
     // Taken here, before the worker exists to edit anything. §FS-rhei-run.3.7.1
-    let lease = begin_worker_region(&loaded, input, &item.task_id_str, &item.current_state, budget);
+    let lease = begin_worker_region(&loaded, input, &item.task_id_str, &item.current_state, plan.effective_budget(budget)).with_recovery(recovery);
     let plan_for_thread = plan;
     let resolved_for_thread = item.resolved.clone();
     let workspace_root_for_thread = workspace_root.to_path_buf();

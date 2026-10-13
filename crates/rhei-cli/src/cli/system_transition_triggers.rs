@@ -5,6 +5,8 @@
 /// duration that triggered the rule).
 #[derive(Debug, Default, Clone)]
 struct TransitionOrigin {
+    /// Only explicit CLI transition sets this release intent. §FS-rhei-transition-cmd.2
+    manual_release: Option<bool>,
     /// `rhei next` is taking ownership while it applies this edge. The shared
     /// executor then treats state, ownership, and bookkeeping as one claim.
     /// No other transition caller opts into this behavior. §FS-rhei-next.3.1
@@ -240,6 +242,7 @@ fn execute_system_timeout_transition(
         to,
         opts.no_callbacks(),
         TransitionOrigin {
+            manual_release: None,
             claim: false,
             triggered_by: Some("system"),
             seed_data: Some(serde_json::Value::Object(data)),
@@ -292,6 +295,7 @@ fn execute_system_tooling_transition(
         to,
         no_callbacks,
         TransitionOrigin {
+            manual_release: None,
             claim: false,
             triggered_by: Some("system"),
             seed_data: Some(serde_json::Value::Object(data)),
@@ -341,6 +345,7 @@ fn execute_system_program_exit_transition(
         to,
         no_callbacks,
         TransitionOrigin {
+            manual_release: None,
             claim: false,
             triggered_by: Some("system"),
             seed_data: Some(serde_json::Value::Object(data)),

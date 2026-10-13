@@ -79,6 +79,7 @@ Templates:
   instantiate Instantiate a template into a concrete plan or workspace
 
 Execution:
+  retry       Grant an exhausted current visit another attempt budget without moving it
   transition  Atomically transition a task from one state to another (compare-and-swap)
   recover     Resolve an interrupted forced transition with fresh operator confirmation
   run         Execute a plan by advancing tasks through the state machine in dependency order
@@ -352,8 +353,22 @@ enum Commands {
         #[arg(value_name = "EXECUTION_ROOT", value_hint = clap::ValueHint::DirPath)]
         execution_root: PathBuf,
     },
+    /// Grant an exhausted visit another configured attempt budget without moving it
+    // §FS-rhei-retry.1
+    Retry {
+        #[arg(value_name = "TICKET_OR_PLAN", add = ArgValueCompleter::new(complete_rhei_plan_path))]
+        input: Option<PathBuf>,
+        #[arg(long, add = ArgValueCompleter::new(complete_task_id))]
+        task: Option<String>,
+        #[arg(long, value_name = "PATH", add = ArgValueCompleter::new(complete_yaml_path))]
+        state_machine: Option<PathBuf>,
+    },
     /// Atomically transition a task from one state to another (compare-and-swap)
     Transition {
+        /// Intentionally release a supervising self-loop and discard its unread checkpoints
+        // §FS-rhei-transition-cmd.2
+        #[arg(long)]
+        release_subtree: bool,
         /// Operator-only missing-edge recovery; requires an interactive terminal and typed hop.
         /// This ceremony attributes an OS account; a same-account PTY cannot prove human identity.
         // §FS-rhei-transition-cmd.6

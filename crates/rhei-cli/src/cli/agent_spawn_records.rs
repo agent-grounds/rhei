@@ -37,6 +37,9 @@ struct SpawnRecord {
     // §FS-rhei-run.3.2 §FS-rhei-agents.3.2.3
     #[serde(default)]
     charged: u64,
+    /// Audited operator allowances for this visit. §FS-rhei-agents.8.4
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    grants: Vec<AttemptGrant>,
     /// Whether this invocation itself spent the visit budget. Kept beside the
     /// cumulative counter so old records still drive retries correctly.
     // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.4
@@ -138,12 +141,13 @@ impl SpawnRecord {
 /// the run depends on.
 // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.4 §FS-rhei-supervision.3.6
 fn uncharge_withheld_visit(record: &Path) {
-    let Some(mut stored) = read_spawn_record(record) else { return };
-    stored.charged = stored.charged.saturating_sub(1);
-    stored.ending = WITHHELD_ENDING.to_string();
-    if let Ok(body) = serde_json::to_string_pretty(&stored) {
-        let _ = fs::write(record, body);
-    }
+    // §FS-rhei-agents.8.4: giving back an attempt preserves a concurrent grant.
+    let _ = update_spawn_record(record, |stored| {
+        let Some(mut stored) = stored else { return Ok(None) };
+        stored.charged = stored.charged.saturating_sub(1);
+        stored.ending = WITHHELD_ENDING.to_string();
+        Ok(Some(stored))
+    });
 }
 
 /// `runtime/spawns/` — beside `runtime/logs/`, and swept with it by `rhei
@@ -236,6 +240,7 @@ impl SpawnPlan {
     /// fires no edge, can leave `poll.max_attempts` spent here.
     // §FS-rhei-agents.3.2.3 §FS-rhei-run.3.7.4
     fn budget_spent(&self, budget: AttemptBudget) -> Option<u64> {
+        let budget = self.effective_budget(budget);
         let last_reverted = self.previous.as_ref().is_some_and(|prev| prev.reverted.is_some());
         match budget {
             AttemptBudget::Visit(budget) if self.charged >= budget => Some(budget),
@@ -270,7 +275,7 @@ impl SpawnPlan {
             ));
         }
         let budget = match budget {
-            AttemptBudget::Visit(budget) => budget.to_string(),
+            AttemptBudget::Visit(budget) => self.effective_allowance(budget).to_string(),
             AttemptBudget::Poll { max_attempts } => format!("{max_attempts} (poll.max_attempts)"),
         };
         Some(format!(
@@ -294,63 +299,19 @@ impl SpawnPlan {
         let AttemptBudget::Visit(budget) = budget else {
             return RetryOutlook::AttemptsLeft;
         };
+        let configured = budget;
+        let budget = self.effective_allowance(budget);
         if self.charged.saturating_add(1) < budget {
             RetryOutlook::AttemptsLeft
-        } else {
+        } else if configured == budget {
             RetryOutlook::BudgetSpent { budget }
-        }
-    }
-
-    /// Record this spawn, now that it has ended.
-    ///
-    /// Called from the two places a subprocess is waited on, after the footer
-    /// its log gets, and from nowhere a spawn can fail to start — the record's
-    /// whole value is that its presence proves a worker ran.
-    // §FS-rhei-agents.8.4
-    fn record_spawn(&self, ended: SpawnEnding<'_>) {
-        if let Some(parent) = self.record.parent() {
-            if fs::create_dir_all(parent).is_err() {
-                return;
+        } else {
+            RetryOutlook::BudgetSpentWithRecovery {
+                budget,
+                recovery: HaltRecovery::Visit { configured, checkpoints: None },
             }
         }
-        let attempt_charged = !matches!(ended.ending, "interrupted" | "provider_limited");
-        let record = SpawnRecord {
-            task: ended.task_id.to_string(),
-            state: ended.state_name.to_string(),
-            moves: self.moves,
-            attempt: self.attempt,
-            // An interrupted invocation is not an attempt the ticket spent: the
-            // run ended it and the next one re-executes it. It keeps its
-            // attempt log all the same. §FS-rhei-run.3.2 §FS-rhei-agents.3.2.3
-            charged: self.charged + u64::from(attempt_charged),
-            attempt_charged,
-            kind: ended.kind.to_string(),
-            worker: ended.worker.to_string(),
-            log: self.log.clone(),
-            started: ended.started.to_string(),
-            ended: ended.ended.to_string(),
-            duration: ended.duration.to_string(),
-            code: ended.code,
-            ending: ended.ending.to_string(),
-            reverted: None,
-        };
-        if let Ok(body) = serde_json::to_string_pretty(&record) {
-            let _ = fs::write(&self.record, body);
-        }
     }
-}
-
-/// The facts a finished spawn records about itself. §FS-rhei-agents.8.4
-struct SpawnEnding<'a> {
-    task_id: &'a str,
-    state_name: &'a str,
-    kind: &'a str,
-    worker: &'a str,
-    started: &'a str,
-    ended: &'a str,
-    duration: &'a str,
-    code: Option<i32>,
-    ending: &'a str,
 }
 
 /// What the completion condition still owes, as the halt line names it.
@@ -369,54 +330,6 @@ fn completion_debt_label(missing: &[String]) -> String {
     }
 }
 
-/// The halt an exhausted budget prints, wherever it is printed from.
-///
-/// Two moments reach it: the pass that declines to spawn because the budget is
-/// gone, and the attempt that spent the last of it, which knows one run earlier
-/// that no later pass will run the state again. One function so the operator
-/// reads one sentence rather than two that disagree about what happens next.
-// §FS-rhei-agents.3.2.1 §FS-rhei-agents.3.2.3
-fn budget_spent_halt_line(task_id: &str, state_name: &str, budget: u64, owed: &str) -> String {
-    format!(
-        "  halting Task {task_id} in state '{state_name}': {budget} attempts spent on this \
-         visit and the completion condition is still unmet: {owed}. The ticket stays in \
-         '{state_name}'."
-    )
-}
-
-/// What the run will do about a ticket whose attempt just stalled.
-///
-/// The stall message predicts engine behaviour, so it has to be conditioned on
-/// the thing that decides that behaviour. Conditioning it on the completion
-/// condition alone made the run promise a retry it had already ruled out — the
-/// same class of untruth as the result stub that said no agent had run.
-// §FS-rhei-agents.3.2.1
-#[derive(Clone, Copy)]
-enum RetryOutlook {
-    /// A later pass will spawn this invocation again.
-    AttemptsLeft,
-    /// The attempt that just finished was the last one this visit gets.
-    BudgetSpent { budget: u64 },
-}
-
-impl RetryOutlook {
-    /// The halt line for this outlook, given what the completion condition is
-    /// still owed. §FS-rhei-agents.3.2.1
-    fn halt_line(self, task_id: &str, state_name: &str, missing: &[String]) -> String {
-        match self {
-            RetryOutlook::AttemptsLeft => format!(
-                "  halting Task {task_id} in state '{state_name}': the completion condition is \
-                 not met, so no transition fires; a later pass runs the state again."
-            ),
-            RetryOutlook::BudgetSpent { budget } => budget_spent_halt_line(
-                task_id,
-                state_name,
-                budget,
-                &completion_debt_label(missing),
-            ),
-        }
-    }
-}
 
 /// Give an agent process's plan its accounting identity before it can be
 /// spawned. Programs skip this because they do not produce agent-accounting
@@ -459,6 +372,8 @@ fn newest_spawn_record_for_state(
 ) -> Option<SpawnRecord> {
     let mut newest: Option<(String, SpawnRecord)> = None;
     for entry in fs::read_dir(spawn_records_dir(runtime_dir)).ok()?.flatten() {
+        // §FS-rhei-agents.8.4: staging files are not published records.
+        if entry.path().extension() != Some(OsStr::new("json")) { continue; }
         // One unreadable or half-written record must not discard the matches
         // already found; it is one file, not an answer about the state.
         let Some(record) = read_spawn_record(&entry.path()) else { continue };
@@ -491,6 +406,8 @@ fn spawn_records_for_state(
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
+            // §FS-rhei-agents.8.4: ignore a complete but unpublished atomic-write staging file.
+            if path.extension() != Some(OsStr::new("json")) { return None; }
             let record = read_spawn_record(&path)?;
             (record.task == task_id && record.state == state_name).then_some((path, record))
         })

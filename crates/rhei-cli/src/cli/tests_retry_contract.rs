@@ -27,7 +27,6 @@ mod retry_contract {
     }
 
     #[test]
-    #[ignore = "red until #489 counts an audited rhei retry grant in the visit's attempt budget; implement removes this"]
     fn granted_budget_is_read_from_record_without_changing_attempt_or_visit() {
         let dir = tempfile::tempdir().unwrap();
         charge(&plan_for(dir.path()));
@@ -48,7 +47,6 @@ mod retry_contract {
     /// real grant API/lock seam must replace injection when it exists.
     // §FS-rhei-retry.2 §FS-rhei-agents.8.4
     #[test]
-    #[ignore = "red until #489 keeps a retry grant across an attempt charge; implement removes this"]
     fn interleaved_grant_and_charge_preserve_both_in_a_readable_record() {
         let dir = tempfile::tempdir().unwrap();
         charge(&plan_for(dir.path()));
@@ -70,7 +68,6 @@ mod retry_contract {
     }
 
     #[test]
-    #[ignore = "red until #489 counts an audited rhei retry grant in the visit's attempt budget; implement removes this"]
     fn grant_allows_exactly_one_more_configured_budget() {
         let dir = tempfile::tempdir().unwrap();
         charge(&plan_for(dir.path()));
@@ -105,7 +102,6 @@ mod retry_contract {
 
     // §FS-rhei-retry.3 §FS-rhei-agents.5.2.1
     #[test]
-    #[ignore = "red until #489 appends the rhei retry command to the spent-visit halt; implement removes this"]
     fn ordinary_halt_preserves_existing_ending_and_appends_retry_command() {
         let line = budget_spent_halt_line("plan.1", "work", 2, "result missing");
         assert!(line.contains("The ticket stays in 'work'."));

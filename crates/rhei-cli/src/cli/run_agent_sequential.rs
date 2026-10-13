@@ -165,11 +165,12 @@ fn run_sequential_agent_invocation(
         );
         run_warn!(
             "{}",
-            budget_spent_halt_line(
+            render_spent_visit_halt(
                 task_id_str,
                 current_state,
                 spent_budget,
-                &plan.spent_budget_owed(&owed)
+                &plan.spent_budget_owed(&owed),
+                visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task)
             )
         );
         progress.stalled_tasks.insert(task_id_str.clone());
@@ -327,7 +328,8 @@ fn run_sequential_agent_invocation(
     // Ambiguity is recorded *before* the capability is transferred: a crash
     // from here on can never refund the invocation. §FS-rhei-budgets.6.2
     budget_record_start(workspace_root, task_id_str, false, sink);
-    let lease = begin_worker_region(&loaded, input, task_id_str, current_state, budget);
+    let recovery = visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task);
+    let lease = begin_worker_region(&loaded, input, task_id_str, current_state, plan.effective_budget(budget)).with_recovery(recovery);
     let spawn_result = spawn_and_wait_agent(
         &spawn_resolved,
         opts.price_book(),
@@ -460,7 +462,7 @@ fn run_sequential_agent_invocation(
             log,
             snapshot_preload,
             visit_count,
-            retry_outlook: plan.retry_outlook(budget),
+            retry_outlook: plan.retry_outlook(budget).with_recovery(recovery),
             // §FS-rhei-supervision.3.6: what the visit is about to be judged
             // against, read before it can change anything.
             subtree_before: subtree_shape_before_visit(task, &machines.set, current_state),

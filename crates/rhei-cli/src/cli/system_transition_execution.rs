@@ -261,6 +261,12 @@ fn execute_transition_with_origin(
         manifest.and_then(|index| index.metadata)
     };
 
+    // §FS-rhei-transition-cmd.2: inspect unread events under the writer lock,
+    // before any callback, result, ledger or accounting side effect.
+    let discarded_checkpoints = origin.manual_release.map(|release| {
+        manual_release_preflight(machine, metadata.as_ref(), &metadata_key, files.artifact_id, from, to, release)
+    }).transpose()?;
+
     // Compare-and-swap: verify the task's current state matches `from`.
     // This runs before the transition-legality check so a wrong `--from`
     // produces the actionable "task is in state X" error instead of the
@@ -1002,7 +1008,12 @@ fn execute_transition_with_origin(
         task_handle.release();
     }
     metadata_handle.release();
+
     record?;
+    // §FS-rhei-transition-cmd.5: intentional release names its actual loss.
+    if origin.manual_release == Some(true) && from == to {
+        println!("released the subtree of Task {}; dropped {} unread checkpoint{}", files.artifact_id, discarded_checkpoints.unwrap_or(0), if discarded_checkpoints == Some(1) { "" } else { "s" });
+    }
     Ok(to.to_string())
 }
 

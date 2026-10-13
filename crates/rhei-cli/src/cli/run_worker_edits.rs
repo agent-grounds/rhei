@@ -26,6 +26,8 @@ struct HeldExit {
     task_id: String,
     state: String,
     budget: AttemptBudget,
+    /// Recovery captured from the loaded supervising plan. §FS-rhei-retry.3
+    recovery: HaltRecovery,
     region: InFlightRegion,
     /// The attempt's log, beside which the reverted text is kept. §FS-rhei-run.3.7.7
     log: PathBuf,
@@ -50,6 +52,8 @@ struct WorkerRevert {
     charged: u64,
     attempt_charged: bool,
     budget: AttemptBudget,
+    /// Configured refill and preserved unread event count. §FS-rhei-retry.3
+    recovery: HaltRecovery,
 }
 
 impl WorkerRevert {
@@ -339,6 +343,8 @@ struct WorkerRegionLease {
     state: String,
     input: PathBuf,
     budget: AttemptBudget,
+    /// Recovery is separate from the allowance, which may include grants. §FS-rhei-retry.3
+    recovery: HaltRecovery,
 }
 
 /// Snapshot `task_id`'s region and put it in flight, or join the snapshot its
@@ -355,6 +361,10 @@ fn begin_worker_region(
         state: state.to_string(),
         input: input.to_path_buf(),
         budget,
+        recovery: match budget {
+            AttemptBudget::Visit(configured) => HaltRecovery::Visit { configured, checkpoints: None },
+            AttemptBudget::Poll { .. } => HaltRecovery::Poll,
+        },
     };
     let mut regions = worker_regions();
     if !regions.armed {
@@ -374,6 +384,11 @@ fn begin_worker_region(
 }
 
 impl WorkerRegionLease {
+    /// Keep supervising halt context through a reverted edit. §FS-rhei-agents.5.2.1
+    fn with_recovery(mut self, recovery: HaltRecovery) -> Self {
+        self.recovery = recovery;
+        self
+    }
     /// The worker's process is reaped and its release read. When it was the
     /// task's last, a reload that fails inside its region restores the region,
     /// and the release and the operator are told; whether it did is returned.
@@ -408,6 +423,7 @@ impl WorkerRegionLease {
             task_id,
             state: self.state.clone(),
             budget: self.budget,
+            recovery: self.recovery,
             region,
             log: attempt.log.clone(),
             charged: attempt.charged,
@@ -470,6 +486,7 @@ fn restore_exited(
         charged: charged.map_or(held.charged + 1, |(charged, _)| charged),
         attempt_charged: charged.is_none_or(|(_, this)| this),
         budget: held.budget,
+        recovery: held.recovery,
     })
 }
 

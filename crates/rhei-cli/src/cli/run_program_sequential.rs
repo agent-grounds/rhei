@@ -108,11 +108,12 @@ fn run_sequential_program_work_items(
             );
             run_warn!(
                 "{}",
-                budget_spent_halt_line(
+                render_spent_visit_halt(
                     task_id_str,
                     current_state,
                     spent_budget,
-                    &plan.spent_budget_owed(&owed)
+                    &plan.spent_budget_owed(&owed),
+                    visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task)
                 )
             );
             progress.stalled_tasks.insert(task_id_str.clone());
@@ -141,7 +142,8 @@ fn run_sequential_program_work_items(
             wall_clock: started_wall,
         });
 
-        let lease = begin_worker_region(&loaded, input, task_id_str, current_state, budget);
+        let recovery = visit_halt_recovery(budget, machine, loaded.rhei.metadata.as_ref(), task);
+        let lease = begin_worker_region(&loaded, input, task_id_str, current_state, plan.effective_budget(budget)).with_recovery(recovery);
         let spawn_result =
             spawn_and_wait_program(resolved, &render_context, &log, &plan, sink);
         let duration_ms = started_at.elapsed().as_millis() as u64;
@@ -288,7 +290,7 @@ fn run_sequential_program_work_items(
                             current_state,
                             exit_code,
                             &missing_required_outputs,
-                            plan.retry_outlook(budget),
+                            plan.retry_outlook(budget).with_recovery(recovery),
                             sink,
                         );
                         progress.stalled_tasks.insert(task_id_str.clone());

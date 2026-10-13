@@ -524,14 +524,7 @@ fn next_command(
     let exclusions = memory.exclusions.render(false);
     // What `rhei run` carries in `## Rhei Commands` and `## Result`, neither of
     // which `rhei next` renders. §FS-rhei-supervision.3.4
-    let release_command = format!(
-        "rhei{} transition {} --task {} --from {} --to {}",
-        state_machine_flag(state_machine_path),
-        shell_quote(&input.display().to_string()),
-        task.id,
-        shell_quote(&final_state),
-        shell_quote(&final_state)
-    );
+    let release_command = manual_supervisor_release_command(input, state_machine_path, &task.id.to_string(), &final_state);
     let supervising = render_supervisor_visit_notes(&render_context, &release_command);
 
     print_next_output(NextOutput {

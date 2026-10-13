@@ -254,7 +254,13 @@ structure:
         &machine_path,
         &["--task", "1.1", "--result", "fixed"],
     ));
-    assert_success(&run_transition(&plan_path, &machine_path, "1", "supervising", "supervising"));
+    // Deliberately discard the completed child's unread checkpoint. §FS-rhei-supervision.3.4
+    assert_success(&run_cli(
+        "transition",
+        &plan_path,
+        &machine_path,
+        &["--task", "1", "--from", "supervising", "--to", "supervising", "--release-subtree"],
+    ));
     let ready = run_cli("list", &plan_path, &machine_path, &["--ready"]);
     assert_success(&ready);
     assert!(!ready.stdout.contains("Task plan.1:"), "got:\n{}", ready.stdout);

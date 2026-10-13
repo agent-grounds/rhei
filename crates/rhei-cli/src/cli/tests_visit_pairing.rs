@@ -28,6 +28,7 @@ mod visit_pairing {
             moves,
             attempt: 1,
             charged: 1,
+            grants: Vec::new(),
             attempt_charged: true,
             kind: "agent".into(),
             worker: "mock".into(),

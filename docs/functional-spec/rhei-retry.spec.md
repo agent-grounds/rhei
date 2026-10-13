@@ -24,6 +24,14 @@ The effective allowance is configured attempts plus all grants for that visit.
 Keep the same move-count visit key, monotonic attempt/log numbering, state,
 move ledger, `stateVisits`, supervision phase and pending checkpoints.
 
+For a fan-out state, resolve the active invocations and grant each exhausted
+invocation of the current visit its own configured-size grant. An invocation
+with attempts remaining receives no grant; it must not prevent recovery of an
+exhausted sibling. Invocations whose work the next run can reuse, removed
+targets and older visits receive no grant. Refuse without writes when none of
+the active invocations has an exhausted current record: report remaining
+attempts when any still has capacity, otherwise the missing current record.
+
 Write the record through a temporary file and rename under the same lock used
 by attempt charging. Re-read under that lock; an interleaved charge and grant
 must both survive in a complete readable record. A concurrent reader sees
@@ -52,6 +60,10 @@ reports that the subtree remains held and the pending checkpoint count:
 ```text
 Task plan.1 'supervising': granted 2 more attempts to this visit (4 in total); the next `rhei run` spawns it as attempt 3. Subtree still held, 1 checkpoint pending.
 ```
+
+Fan-out success names each invocation actually granted, with its own effective
+total and next attempt number; it does not claim to refill or spawn a sibling
+that still has capacity or whose finished work is reusable.
 
 Retain the halt ending `The ticket stays in '{state}'.` exactly. Append these
 clauses, using the configured budget and singular/plural checkpoint spelling:

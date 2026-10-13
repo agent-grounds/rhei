@@ -167,6 +167,7 @@ mod remove_retirement_tests;
 mod remove_tests;
 mod rendered_stderr;
 mod retry_fanout_tests;
+mod retry_runtime_precedence_tests;
 mod roster_behavior_tests;
 mod roster_json_tests;
 mod roster_scope_tests;

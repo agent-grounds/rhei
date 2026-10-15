@@ -18,6 +18,7 @@ section_separator = "."
 section_heading_levels = "strict" # strict | warn | loose
 number_pattern = "\\d+"
 slug_pattern = "[a-z0-9][a-z0-9-]*"
+named_sections = true
 
 [[kinds]]
 kind = "GND"

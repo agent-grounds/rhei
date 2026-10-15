@@ -73,9 +73,7 @@ jobs:
     name: repository gates (grund, fissile, lychee, changelog, attribution)
     runs-on: ubuntu-latest
     env:
-      GRUND_VERSION: 0.13.2-dev
-      GRUND_REVISION: 89d7a65232868f1ce1033a0678298dade40fb9d5
-      GRUND_REPOSITORY: https://github.com/agent-grounds/grund.git
+      GRUND_VERSION: 0.18.0
       LYCHEE_VERSION: 0.23.0
       FISSILE_VERSION: 0.8.3
       TOOLS_ROOT: ${{ github.workspace }}/.ci-tools
@@ -99,7 +97,7 @@ jobs:
         continue-on-error: true
         with:
           path: ${{ env.TOOLS_ROOT }}
-          key: ${{ runner.os }}-gate-tools-grund-${{ env.GRUND_VERSION }}-${{ env.GRUND_REVISION }}-lychee-${{ env.LYCHEE_VERSION }}-fissile-${{ env.FISSILE_VERSION }}
+          key: ${{ runner.os }}-gate-tools-grund-${{ env.GRUND_VERSION }}-lychee-${{ env.LYCHEE_VERSION }}-fissile-${{ env.FISSILE_VERSION }}
 
       - name: Install gate tools
         shell: bash
@@ -109,8 +107,6 @@ jobs:
             local name="$1" version="$2"
             if [ -x "$TOOLS_ROOT/bin/$name" ]; then
               echo "$name $version: cached"
-            elif [ "$name" = grund ]; then
-              cargo +stable install "$name" --git "$GRUND_REPOSITORY" --rev "$GRUND_REVISION" --locked --root "$TOOLS_ROOT"
             else
               cargo +stable install "$name" --version "$version" --locked --root "$TOOLS_ROOT"
             fi

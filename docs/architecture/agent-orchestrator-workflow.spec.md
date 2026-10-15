@@ -256,7 +256,7 @@ The orchestrator manages workflow execution through state transitions:
 #### 3.3.1. Stable Writer Exclusion
 
 Before file-sidecar acquisition, ordinary writers retain the complete sorted
-shared owner guards of §FS-rhei-recover.4. A basin's project manifest is a
+shared owner guards of [§FS-rhei-recover.4](../functional-spec/rhei-recover.spec.md#4-pending-root-interlock). A basin's project manifest is a
 shared owner: its writer checks the reserved basin marker without parsing the
 manifest and holds both owners across dependent reads and writes. Force and
 explicit replay derive identical affected owners from the canonical root and
@@ -265,7 +265,7 @@ exclusive owner guards in that order, then canonical sorted image sidecars and
 the basin ledger lock. They revalidate mutable inputs under those locks. An
 existing manifest writer completes before capture; no writer can slip between
 capture and recovery. Only the basin ledger pair is a commit witness.
-§FS-rhei-recover.3 §FS-rhei-transition-cmd.6.1
+[§FS-rhei-recover.3](../functional-spec/rhei-recover.spec.md#3-recovery-decision) [§FS-rhei-transition-cmd.6.1](../functional-spec/rhei-transition-cmd.spec.md#61-durable-transaction-and-audit-pair)
 
 Every command that rewrites plan or metadata Markdown locks a persistent
 sidecar beside the destination before it reads the authoritative pathname. The
@@ -324,7 +324,7 @@ recovery releases the ledger and plan sidecars before it invokes a separate
 ordinary transition. Removal takes force's order with every acquisition
 nonblocking — run locks, exclusive owner guards, then the retirement document,
 metadata, task-file and ledger sidecars — and refuses rather than waits on any
-of them (§FS-rhei-remove.6.1). Every lock remains held through the command's existing
+of them ([§FS-rhei-remove.6.1](../functional-spec/rhei-remove.spec.md#61-lock-order)). Every lock remains held through the command's existing
 commitment or restoration boundary, including callbacks, rollback,
 bookkeeping, results, redirects, and terminal finalization.
 
@@ -364,18 +364,18 @@ takes a shared guard keyed by canonical execution root in rhei's platform state
 directory and holds it through its derived reads/writes; force and explicit
 recovery take it exclusively. Where the account's state directory cannot hold
 the lock, shared access proceeds unguarded with the marker checks intact
-(§FS-rhei-recover.4.1). Readers check the durable marker on both sides
+([§FS-rhei-recover.4.1](../functional-spec/rhei-recover.spec.md#41-when-the-account-cannot-hold-a-lock)). Readers check the durable marker on both sides
 of acquisition, closing the race between a load and marker publication without
 requiring write permission inside the project. Multi-root operations acquire
 all run locks first, then all root guards, each set sorted by canonical root;
 stable metadata, task, and ledger locks follow in their existing order.
-§FS-rhei-transition-cmd.6.1 §FS-rhei-recover.4
+[§FS-rhei-transition-cmd.6.1](../functional-spec/rhei-transition-cmd.spec.md#61-durable-transaction-and-audit-pair) [§FS-rhei-recover.4](../functional-spec/rhei-recover.spec.md#4-pending-root-interlock)
 
 The versioned marker contains complete before/after file images and the exact
 ledger pair. It is published and directory-synced before any effect; the
 synced adjacent audit pair is the commit witness. Only `rhei recover` may
 restore the before-images before that witness or install after-images after it.
-No ordinary loader performs recovery. §FS-rhei-recover
+No ordinary loader performs recovery. [§FS-rhei-recover](../functional-spec/rhei-recover.spec.md#fs-rhei-recover-rhei-recover)
 
 ##### 3.3.1.1. A Replacement Refused by an Open Handle
 
@@ -404,12 +404,12 @@ at once, after a single attempt.
 Only a refusal that outlasts the bound is reported, as the I/O failure it is:
 the last error unchanged and the destination's previous bytes intact.
 Exclusion is never dropped, and the destination never locked, to make the
-rename possible. §REQ-cross-platform.2 §FS-rhei-transition-cmd.3
+rename possible. [§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity) [§FS-rhei-transition-cmd.3](../functional-spec/rhei-transition-cmd.spec.md#3-behavior)
 
 ###### 3.3.1.1.1. The Budget Witness Index
 
 The budget witness index, `rhei/budget-authority/roots.json` under the state
-directory (§FS-rhei-budgets.5.3), is one file every rhei on the machine shares.
+directory ([§FS-rhei-budgets.5.3](../functional-spec/rhei-budgets.spec.md#53-the-witness)), is one file every rhei on the machine shares.
 Every account a process establishes, locates, or retires reads it; establishing
 and retiring replace it; the ancestry note reads it to name a project. So any
 other rhei's read handle on it is exactly the open handle above, and the same
@@ -427,7 +427,7 @@ Only a refusal that outlasts the bound is reported, and it is reported as
 before: the budget path could not be reached, naming the index. A charge that
 needed the index is then refused, with the account and its journal untouched.
 The pending file a replacement stages has a fresh name no other process opens,
-so its write is not retried. §FS-rhei-budgets.5.4 §REQ-cross-platform.2
+so its write is not retried. [§FS-rhei-budgets.5.4](../functional-spec/rhei-budgets.spec.md#54-absent-damaged-adopted) [§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity)
 
 ### 3.4. Durable State and Git Boundary
 

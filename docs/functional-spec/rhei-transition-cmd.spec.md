@@ -4,7 +4,7 @@ Atomically advance a task's state using compare-and-swap semantics. `rhei
 transition` is the coordination primitive for manual workers and concurrent
 agents: only the caller whose expected `--from` matches the task's actual
 current state wins the race. Ordinary transitions are validated against the
-active state machine before any write; §6 defines the one attended operator
+active state machine before any write; [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery) defines the one attended operator
 exception for a missing edge.
 
 ## 1. Usage
@@ -26,13 +26,13 @@ The ticket must be named one way or the other.
 
 | Flag             | Required | Default | Description                                                                 |
 |------------------|----------|---------|-----------------------------------------------------------------------------|
-| `--task <ID>`    | Unless named positionally | | Ticket identifier: project-qualified (`auth.1`) or rhei-local (`1`). See §2.1. |
+| `--task <ID>`    | Unless named positionally | | Ticket identifier: project-qualified (`auth.1`) or rhei-local (`1`). See [§FS-rhei-transition-cmd.2.1](rhei-transition-cmd.spec.md#21-ticket-targets). |
 | `--from <STATE>` | Yes      |         | Expected current state (compare-and-swap guard)                             |
 | `--to <STATE>`   | Yes      |         | Target state                                                                |
-| `--result <MSG>` | Only when `--to` is a `final: true` state and the ticket has no result yet | | Result message appended to `runtime/results/<task-id>.md`. See §3.2. |
+| `--result <MSG>` | Only when `--to` is a `final: true` state and the ticket has no result yet | | Result message appended to `runtime/results/<task-id>.md`. See [§FS-rhei-transition-cmd.3.2](rhei-transition-cmd.spec.md#32-terminal-result-on-entry). |
 | `--supervisor <TASK_ID>` | No |  | The move's nearest in-scope supervising ancestor. Suppresses the checkpoint the move would otherwise deliver to it. |
 | `--no-callbacks` | No       | false   | Skip execution of `on_leave` / `on_enter` callbacks registered on the edge  |
-| `--force`        | No       | false   | Attended operator recovery across an edge the active machine does not declare (§6) |
+| `--force`        | No       | false   | Attended operator recovery across an edge the active machine does not declare ([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)) |
 | `--reason <WHY>` | With `--force` | | Fresh non-whitespace explanation recorded in the exceptional audit row |
 | `--release-subtree` | When a supervising self-loop has pending checkpoints | false | Explicitly release the subtree and discard the unread checkpoints |
 
@@ -40,7 +40,7 @@ The ticket must be named one way or the other.
 including one with no pending checkpoints, where it adds no requirement or
 effect. It is refused on every other edge and with `--force`. This flag does
 not guard the engine's own release or withheld-edge handling
-(§FS-rhei-supervision.3.6).
+([§FS-rhei-supervision.3.6](rhei-supervision.spec.md#36-empty-visits)).
 
 A plain manual supervising self-loop with pending checkpoints is refused
 before any mutation: plan bytes, supervision state, result files and the move
@@ -55,7 +55,7 @@ passed on a non-terminal hop is appended to the same result file and creates it
 if absent, which is one of the two ways the terminal-result obligation can
 already be satisfied by the time the ticket reaches a `final: true` state. A
 `--result` whose message is empty or whitespace-only is rejected — an empty
-result is the exact thing §3.2 refuses, and accepting the flag while ignoring
+result is the exact thing [§FS-rhei-transition-cmd.3.2](rhei-transition-cmd.spec.md#32-terminal-result-on-entry) refuses, and accepting the flag while ignoring
 its value would hide that.
 
 `--supervisor` grants no authority. The hold a supervisor places on its subtree
@@ -65,7 +65,7 @@ lands on a held descendant with or without the flag; its one effect is that the
 checkpoint the move would otherwise deliver to the named supervisor is not
 recorded ([§FS-rhei-supervision.2.1](rhei-supervision.spec.md#21-checkpoint-events)),
 so a supervisor acting on its own held descendant is not woken by its own doing.
-The value is an ordinary ticket target (§2.1), so a value naming no task is
+The value is an ordinary ticket target ([§FS-rhei-transition-cmd.2.1](rhei-transition-cmd.spec.md#21-ticket-targets)), so a value naming no task is
 rejected before anything is applied. Every value that resolves to a real task
 must equal the transitioning task's nearest in-scope supervising ancestor under
 the scope-first ownership rule
@@ -116,7 +116,7 @@ Without `--force`, the numbered sequence below is unchanged. With `--force`,
 the command performs flag validation, load, task/target existence, profile
 legality, and declared-versus-missing edge classification as read-only
 preflight before step 3; a stable refusal therefore never prompts. It then
-collects the §6 confirmation, acquires the run locks and root guards followed
+collects the [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery) confirmation, acquires the run locks and root guards followed
 by the step-3 file locks, and resumes at step 4. Under those locks it re-reads
 compare-and-swap and every mutable guard before computing any effect.
 
@@ -132,13 +132,13 @@ compare-and-swap and every mutable guard before computing any effect.
    the machine declares a `callback_timeout`, every callback runs under it, so
    the hold is bounded by the callback runs times that bound (plus, for each
    run that expires, the short drain window and, on Linux and macOS, the
-   10-second grace) (§FS-rhei-transitions.4.10).
+   10-second grace) ([§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound)).
 4. Re-read the task's current state from the current destination pathname under
    the sidecar. If it does not equal `--from`, fail with a compare-and-swap
    conflict error and print the actual current state.
 5. If `--supervisor` was supplied and resolved, validate under the lock that it
    equals the re-read task's nearest in-scope supervising ancestor as defined
-   in §2. Refuse a mismatch or the absence of such an ancestor with the §2
+   in [§FS-rhei-transition-cmd.2](rhei-transition-cmd.spec.md#2-options). Refuse a mismatch or the absence of such an ancestor with the [§FS-rhei-transition-cmd.2](rhei-transition-cmd.spec.md#2-options)
    diagnostic. A stale `--from` therefore retains precedence over this check.
    Once compare-and-swap succeeds, supervisor validation precedes target-profile,
    edge and condition evaluation, callbacks and redirects, artifact checks,
@@ -147,7 +147,7 @@ compare-and-swap and every mutable guard before computing any effect.
 6. Validate that a declared transition exists from `--from` to `--to` in the
    active state machine. Without `--force`, reject if the edge is unlisted.
    With `--force`, classify the edge and route only a genuinely missing edge to
-   §6; a declared edge never enters the exceptional path. Then evaluate the
+   [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery); a declared edge never enters the exceptional path. Then evaluate the
    selected edge's `condition:`, if it declares one, and reject when it is
    unmet, naming which transitions from `--from` *are* currently applicable.
    *Selected* means the **first declared exact** edge from `--from` to `--to`,
@@ -163,7 +163,7 @@ compare-and-swap and every mutable guard before computing any effect.
    the target just refused; where another rule for that same pair is applicable,
    the refusal says which edge governs, so the reason and the list cannot read as
    contradicting each other.
-7. Apply the descendants-first guard (§3.1). Reject before any callback runs
+7. Apply the descendants-first guard ([§FS-rhei-transition-cmd.3.1](rhei-transition-cmd.spec.md#31-descendants-first-on-terminal-entry)). Reject before any callback runs
    when `--to` is a `final: true` state and the task still has a non-terminal
    descendant. The guard runs after the edge is confirmed declared and
    currently applicable, so a move the machine never offered — unlisted or
@@ -175,7 +175,7 @@ compare-and-swap and every mutable guard before computing any effect.
    callbacks for the attempt share the identity and see its central-ledger
    status as pending ([§FS-rhei-transitions.1.2](rhei-transitions.spec.md#12-firing-identity-and-callback-time-visibility)).
    The callback runs under its edge's resolved `callback_timeout`, and one
-   that exceeds it rejects the transition (§FS-rhei-transitions.4.10).
+   that exceeds it rejects the transition ([§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound)).
 9. Verify that every required `outputs:` artifact declared on the source state
    exists (see [Plan Language Specification — State Artifact
    Contracts](rhei-plan-language.spec.md#310-state-artifact-contracts)). Missing
@@ -187,10 +187,10 @@ compare-and-swap and every mutable guard before computing any effect.
    cancel into `cancelled` still needs `--result` or a result on disk.
 10. When the effective target is `final: true` and is not the reserved
     `cancelled` state, verify every export declared by the task's
-    `**Provides:**` as specified in §3.3. Missing or blank exports abort the
+    `**Provides:**` as specified in [§FS-rhei-transition-cmd.3.3](rhei-transition-cmd.spec.md#33-declared-exports-on-terminal-entry). Missing or blank exports abort the
     transition before any target-side or persistence effect.
 11. Resolve the target state's `inputs:` artifacts. Missing required inputs abort the transition before the state write; optional inputs are resolved but do not block entry.
-12. Apply the terminal-result obligation (§3.2) against the same effective
+12. Apply the terminal-result obligation ([§FS-rhei-transition-cmd.3.2](rhei-transition-cmd.spec.md#32-terminal-result-on-entry)) against the same effective
     target, before the state write: when the target is `final: true`, either
     `runtime/results/<task-id>.md` already has content or `--result` carried a
     message. Neither, and the transition is refused with the plan untouched.
@@ -201,12 +201,12 @@ compare-and-swap and every mutable guard before computing any effect.
     the rename is retried for a bounded time under the held sidecar, and only a
     refusal that outlasts the bound fails the transition, as an I/O error that
     leaves the file as it was
-    (§AR-agent-orchestrator-workflow.3.3.1.1).
+    ([§AR-agent-orchestrator-workflow.3.3.1.1](../architecture/agent-orchestrator-workflow.spec.md#3311-a-replacement-refused-by-an-open-handle)).
 14. Execute the `on_enter` callback on the target state, if any, unless `--no-callbacks` is set. The write comes first so the callback observes the plan already in the state it is entering; the callback still sees the attempt's central-ledger status as pending. A callback that fails rolls the write back to the file's previous contents, and the transition fails. When the rollback itself fails, the error says so — the plan file may then be inconsistent.
     The callback runs under its edge's resolved `callback_timeout`, and one that
     exceeds it is a failure like any other: its process tree is stopped, the
     write is rolled back, and no ledger row is appended
-    (§FS-rhei-transitions.4.10).
+    ([§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound)).
 15. Append one state-transition entry to `runtime/state-transitions.log` as
     `<task-id> <from>@<to>`, creating the `runtime/` directory if needed. The
     file is the central, deterministic audit trail for all task state changes.
@@ -277,7 +277,7 @@ selection is not permission — a machine author has no way to take a terminal
 edge past an open descendant. The engine must guard it.
 
 The guard is deliberately **not** symmetric with `**Prior:**` readiness, which
-`rhei transition` skips as the human escape hatch (§3). The line between the
+`rhei transition` skips as the human escape hatch ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)). The line between the
 two is the one `rhei validate` already draws: a terminal parent with an open
 descendant is an **error**, an out-of-order prior is a **warning**
 ([§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior)). `rhei transition` may deliberately produce a warning; it
@@ -297,7 +297,7 @@ move. A forced entry is stricter: that invocation must carry its own fresh,
 non-whitespace `--result`; an old result file does not satisfy it. The
 obligation belongs to the state, not to the command: it is specified once in
 [§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result) and enforced here, on the same shared path as
-compare-and-swap, the descendants-first guard (§3.1), and `inputs:` /
+compare-and-swap, the descendants-first guard ([§FS-rhei-transition-cmd.3.1](rhei-transition-cmd.spec.md#31-descendants-first-on-terminal-entry)), and `inputs:` /
 `outputs:` resolution.
 
 Consequently `rhei complete`, `rhei transition --result`, `rhei run`'s
@@ -349,7 +349,7 @@ Losers are expected to re-read the plan and either re-select with `rhei next` or
 ## 5. Output
 
 An explicitly requested supervising release preserves the existing release
-semantics (§FS-rhei-supervision.3.1) and adds this line, with the actual count
+semantics ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule)) and adds this line, with the actual count
 and singular/plural spelling:
 
 ```text
@@ -371,7 +371,7 @@ Task <ID> transitioned: '<from>' -> '<to>' (callbacks skipped)
 When a callback exceeds its `callback_timeout`, the command exits non-zero with
 the plan file as it was, no ledger row, and the sidecar released, and the error
 names the callback and the bound as authored
-(§FS-rhei-transitions.4.10):
+([§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound)):
 
 ```text
 Error: on_enter callback '<callback>' failed: exceeded callback_timeout <bound>; its process tree was stopped
@@ -405,13 +405,13 @@ to drop it. A declared but blocked edge gives its ordinary diagnostic followed
 by `--force does not bypass safeguards on declared edges`. An unknown target,
 a target excluded by the resolved profile, or an invalid machine is never
 forceable. Exact rules from final source states are invalid under
-§FS-rhei-states.1.3, so every exit from a final state in a valid machine is a
+[§FS-rhei-states.1.3](rhei-states.spec.md#13-validation-rules), so every exit from a final state in a valid machine is a
 missing edge and requires this path.
 
 For a genuinely missing edge, every task- or state-owned rule on the ordinary
 shared path remains in force: compare-and-swap, source `outputs:` with the
 existing cancellation waiver, target `inputs:`, descendants-first final entry,
-fresh forced-final result (§3.2), target/profile legality, the task and
+fresh forced-final result ([§FS-rhei-transition-cmd.3.2](rhei-transition-cmd.spec.md#32-terminal-result-on-entry)), target/profile legality, the task and
 ancestor claim checks below, visit-budget refusal and ordinary visit suffix and
 counter update, ordinary `**Prior:**` omission, terminal finalization, and
 supervision checkpoint delivery. A forced move from a gating state is allowed.
@@ -430,12 +430,12 @@ link.
 
 For a basin task, affected owners include its execution root and the immediate
 parent project whose `index.panta.md` owns qualified visit/checkpoint metadata.
-Derive the same owner set for preparation and replay under §FS-rhei-recover.2
-and §FS-rhei-recover.3, without moving or omitting that metadata.
+Derive the same owner set for preparation and replay under [§FS-rhei-recover.2](rhei-recover.spec.md#2-marker-format)
+and [§FS-rhei-recover.3](rhei-recover.spec.md#3-recovery-decision), without moving or omitting that metadata.
 
 After confirmation, the command acquires each affected owner's run
 lock non-blocking and refuses with its recorded owner when held. It then takes
-the exclusive root-access guards of §FS-rhei-recover.4 and the stable metadata,
+the exclusive root-access guards of [§FS-rhei-recover.4](rhei-recover.spec.md#4-pending-root-interlock) and the stable metadata,
 task, and ledger locks. It refuses while a claim exists on the task, any
 descendant, or the nearest in-scope supervising ancestor; claim release is a
 separate operator action. Under the locks it re-reads `--from` and revalidates
@@ -448,7 +448,7 @@ unchanged.
 
 Once the locked revalidation accepts, the command computes complete before and
 after images for the task/metadata/checkpoint/result files and the exact audit
-pair, publishes the versioned marker of §FS-rhei-recover.2 durably, then
+pair, publishes the versioned marker of [§FS-rhei-recover.2](rhei-recover.spec.md#2-marker-format) durably, then
 installs after-images. The marker records absence distinctly and covers the
 state and assignee rewrite, visits and suffix, supervision checkpoint, result
 append, and result-link addition or removal. It also records the original
@@ -456,7 +456,7 @@ ledger byte offset and prefix digest. No effect precedes durable marker
 publication. Basin transactions use version 2's typed project-metadata image,
 including the complete manifest before/after bytes; the single marker and sole
 ledger commit witness remain under the basin execution root. Version 1 remains
-compatible for root-contained transactions. §FS-rhei-recover.2
+compatible for root-contained transactions. [§FS-rhei-recover.2](rhei-recover.spec.md#2-marker-format)
 
 Under the central ledger lock, the command appends these two adjacent lines as
 one logical record:
@@ -480,7 +480,7 @@ the commit point. It then ensures every after-image is durable and durably
 removes the marker. An interruption at any boundary leaves the marker for the
 operator-only `rhei recover` path; no ordinary loader resolves it. Recovery
 uses the recovery id to make replay idempotent, so there is exactly one pair,
-result entry, checkpoint, and visit update. §FS-rhei-recover
+result entry, checkpoint, and visit update. [§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover)
 
 Pair-aware readers validate duplicated task/from/to values and adjacency, skip
 unknown `!` metadata rows safely, and expose one movement per valid pair.
@@ -488,7 +488,7 @@ Narrowed reset removes both task-keyed lines together and authored-state
 reconstruction reads movement rows only. A metadata row without its exact next
 movement, or a movement that contradicts its metadata, is corrupt history and
 is never presented as a forced hop. `runtime/transitions.log` receives no row:
-a manual recovery owns no run slot. §FS-rhei-complete.3.1
+a manual recovery owns no run slot. [§FS-rhei-complete.3.1](rhei-complete.spec.md#31-state-transition-ledger)
 
 ## Relationship to Other Commands
 
@@ -496,7 +496,7 @@ a manual recovery owns no run slot. §FS-rhei-complete.3.1
 |--------------------|---------------------------------------------------------------------------------|
 | `rhei next`        | Claims the next ready task (assigns without transitioning), prints instructions |
 | `rhei next --peek` | Read-only: prints the next claimable task without claiming it                   |
-| `rhei transition`  | Atomically changes a task's state; `--result` appends to the result file, and carries the message a terminal entry requires (§3.2) |
+| `rhei transition`  | Atomically changes a task's state; `--result` appends to the result file, and carries the message a terminal entry requires ([§FS-rhei-transition-cmd.3.2](rhei-transition-cmd.spec.md#32-terminal-result-on-entry)) |
 | `rhei complete`    | Infers the one-hop terminal target and runs the same transition with `--result` |
 | `rhei reset`       | Returns each task to the state it was authored in ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)), removes `runtime/`; narrowed with `--rhei <id>` it removes only the in-scope tickets' keyed output ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)) |
 

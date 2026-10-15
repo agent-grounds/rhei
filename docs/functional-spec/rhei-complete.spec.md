@@ -3,9 +3,9 @@
 Atomically complete a task: transition to a terminal state, write the result to a file, link it from the task body, and remove the `**Assignee:**` line. This is the single command an agent calls when it is done with a task.
 
 `rhei complete` is sugar. It owns exactly one thing no other verb does —
-inferring the one-hop non-cancelled terminal target (§4.1) — and reaches it
+inferring the one-hop non-cancelled terminal target ([§FS-rhei-complete.4.1](rhei-complete.spec.md#41-completion-target-selection)) — and reaches it
 through the same shared transition path as every other verb, carrying the
-message selected by `--result` or `--result-file` (§2.2, §4). The result file,
+message selected by `--result` or `--result-file` ([§FS-rhei-complete.2.2](rhei-complete.spec.md#22-result-sources), [§FS-rhei-complete.4](rhei-complete.spec.md#4-behavior)). The result file,
 its link, the dropped assignee, the ledger
 line, and the refusal of a terminal entry with no result are all properties of
 entering a `final: true` state ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)), not of this command.
@@ -22,16 +22,16 @@ rhei complete [RHEI_PLAN] --task <TASK_ID> --result-file <PATH>
 The first form is the everyday one: every other ticket surface (`rhei list`,
 `rhei next`, error messages) prints bare ticket ids, so the id is what an agent
 or human has in hand when finishing work — `rhei complete auth.1 --result "…"`
-must work as pasted. The positional argument is disambiguated in §2.1; the
+must work as pasted. The positional argument is disambiguated in [§FS-rhei-complete.2.1](rhei-complete.spec.md#21-ticket-targets); the
 `--task` form stays for scripts that pass an explicit plan path.
 
 ## 2. Options
 
 | Flag                   | Required | Default | Description                                       |
 |------------------------|----------|---------|---------------------------------------------------|
-| `--task <ID>`          | No       |         | Ticket identifier: project-qualified (`auth.1`) or rhei-local (`1`). Alternative to the positional ticket id; exactly one of the two must name the ticket. See §2.1. |
+| `--task <ID>`          | No       |         | Ticket identifier: project-qualified (`auth.1`) or rhei-local (`1`). Alternative to the positional ticket id; exactly one of the two must name the ticket. See [§FS-rhei-complete.2.1](rhei-complete.spec.md#21-ticket-targets). |
 | `--result <MSG>`       | One of   |         | Literal result message for the task. Rejected when empty or whitespace-only. |
-| `--result-file <PATH>` | One of   |         | Read the result message from a UTF-8 file, or from stdin when `PATH` is exactly `-`. See §2.2. |
+| `--result-file <PATH>` | One of   |         | Read the result message from a UTF-8 file, or from stdin when `PATH` is exactly `-`. See [§FS-rhei-complete.2.2](rhei-complete.spec.md#22-result-sources). |
 | `--no-callbacks`       | No       | false   | Skip execution of `on_leave`/`on_enter` callbacks |
 
 ### 2.1. Ticket Targets
@@ -72,7 +72,7 @@ literally named `-` can be selected as `./-` or by another non-sentinel path.
 Relative paths resolve from the invocation's working directory, including
 when the selected Single-File Plan or Directory Workspace is elsewhere;
 absolute paths are used as given. This input-path rule is independent of the
-fixed output-artifact routing in §4.2–4.3.
+fixed output-artifact routing in [§FS-rhei-complete.4.2](rhei-complete.spec.md#42-single-file-plans)–4.3.
 
 The selected message must contain something other than whitespace. Rhei may
 trim only to make that test; it does not trim or otherwise rewrite accepted
@@ -116,16 +116,16 @@ obligation.
 **Terminal finalization** is the work that runs once a transition into a
 `final: true` state succeeds, identically on every path:
 
-1. Append `<task-id> <from>@<to>` to `runtime/state-transitions.log` (§3.1).
+1. Append `<task-id> <from>@<to>` to `runtime/state-transitions.log` ([§FS-rhei-complete.3.1](rhei-complete.spec.md#31-state-transition-ledger)).
 2. Append the caller's message, when one was carried, to
-   `runtime/results/<task-id>.md` in the entry format of §3.2.
+   `runtime/results/<task-id>.md` in the entry format of [§FS-rhei-complete.3.2](rhei-complete.spec.md#32-result-file-format).
 3. Ensure `runtime/results/<task-id>.md` exists, so the link below never points
    at a missing file.
 4. Remove the `**Assignee:**` line from the task (no-op if absent).
 5. Add the `> **Result:**` link to the task body if it is not already there.
 
 The operator-forced path computes those same effects into the durable images
-of §FS-rhei-transition-cmd.6.1. A forced exit from a terminal state performs
+of [§FS-rhei-transition-cmd.6.1](rhei-transition-cmd.spec.md#61-durable-transaction-and-audit-pair). A forced exit from a terminal state performs
 the inverse link operation—remove the task-body result link—without deleting
 or rewriting the result file. A later forced final re-entry runs terminal
 finalization again and appends its mandatory fresh result.
@@ -160,7 +160,7 @@ movement; legacy readers safely skip the `!force-v1` row because its second
 token contains no `@`, and continue to see the ordinary movement. A lone,
 reversed, mismatching, or non-adjacent pair is corrupt history rather than a
 forced transition. The payload and commit rules are
-§FS-rhei-transition-cmd.6.1.
+[§FS-rhei-transition-cmd.6.1](rhei-transition-cmd.spec.md#61-durable-transaction-and-audit-pair).
 
 This file is the source of truth for task state history across `rhei
 transition`, `rhei complete`, `rhei run`, callbacks, system transitions, and
@@ -224,7 +224,7 @@ Added avatar_url column and migration 0042
 `rhei complete <ticket>` with either result source is exactly:
 
 > the readiness checks a scheduling verb owns (points 4–6) + the inferred
-> one-hop terminal target (§4.1) + `rhei transition <ticket> --from <current>
+> one-hop terminal target ([§FS-rhei-complete.4.1](rhei-complete.spec.md#41-completion-target-selection)) + `rhei transition <ticket> --from <current>
 > --to <inferred> --result <selected-message>` on the shared transition path.
 
 1. Select exactly one result source, read file or stdin input when selected,
@@ -233,7 +233,7 @@ Added avatar_url column and migration 0042
    input checks, not plan checks, so their diagnostic takes precedence even
    when the plan path or ticket is also invalid. Any failure in this phase
    leaves the plan state, result artifacts, and transition ledger unchanged.
-   The accepted message itself is not normalized (§2.2).
+   The accepted message itself is not normalized ([§FS-rhei-complete.2.2](rhei-complete.spec.md#22-result-sources)).
 2. Load the state machine and plan (single file or directory workspace). Validate.
 3. Locate the task by ID. Fail if the task does not exist.
 4. Reject if the task is already in a terminal state.
@@ -248,7 +248,7 @@ Added avatar_url column and migration 0042
    A deliberate out-of-order move stays available through the explicit
    human-initiated `rhei transition` ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)), the same
    escape hatch a gating state uses in point 5.
-7. Find the completion target: the first non-cancelled terminal state reachable via a declared transition from the current state. Fail if none exists (e.g., from `agent-review-fix` there is no direct path to a terminal state — the agent must transition to `agent-review` first). Any state with cancellation role (§FS-rhei-states.1.4), explicit or inferred from `cancelled`/`canceled`, is excluded from successful completion. The order of transitions in the YAML `transitions` list is significant when selecting the target; editors and formatters should preserve declaration order.
+7. Find the completion target: the first non-cancelled terminal state reachable via a declared transition from the current state. Fail if none exists (e.g., from `agent-review-fix` there is no direct path to a terminal state — the agent must transition to `agent-review` first). Any state with cancellation role ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)), explicit or inferred from `cancelled`/`canceled`, is excluded from successful completion. The order of transitions in the YAML `transitions` list is significant when selecting the target; editors and formatters should preserve declaration order.
 8. Run the shared transition ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)) from the current state
    to that target, carrying the selected message as `--result` does:
    compare-and-swap under the shared
@@ -256,7 +256,7 @@ Added avatar_url column and migration 0042
    the descendants-first guard ([§FS-rhei-transition-cmd.3.1](rhei-transition-cmd.spec.md#31-descendants-first-on-terminal-entry)), `on_leave`,
    source `outputs:`, target `inputs:`, the terminal-result obligation
    ([§FS-rhei-transition-cmd.3.2](rhei-transition-cmd.spec.md#32-terminal-result-on-entry)), the atomic state write, `on_enter`, the
-   ledger line, and the terminal finalization of §3 — in the artifact order
+   ledger line, and the terminal finalization of [§FS-rhei-complete.3](rhei-complete.spec.md#3-result-file) — in the artifact order
    defined in [Plan Language Specification — State Artifact Contracts](rhei-plan-language.spec.md#310-state-artifact-contracts).
    `rhei complete` does not re-implement any of it and appends exactly one
    result entry per invocation.
@@ -306,7 +306,7 @@ verb drove the terminal edge.
 
 ### 4.1. Completion Target Selection
 
-The command scans declared transitions for a non-cancelled terminal state reachable in one hop from the task's current state. If multiple terminal states are reachable, the first non-cancelled one wins. If only cancellation-role terminals are reachable, the command fails (§FS-rhei-states.1.4).
+The command scans declared transitions for a non-cancelled terminal state reachable in one hop from the task's current state. If multiple terminal states are reachable, the first non-cancelled one wins. If only cancellation-role terminals are reachable, the command fails ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)).
 
 ### 4.2. Single-File Plans
 

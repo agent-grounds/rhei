@@ -34,7 +34,7 @@ estimates: a fact that was not recorded is omitted, not guessed.
 `--run` and `--prices` are one opt-in operation and must be supplied together;
 either flag alone is a usage error. `--run` names one exact durable run id, not
 a prefix, and `--prices` names a local `rhei.accounting.prices.v1` book under
-the validation rules of §FS-rhei-cost-accounting.5.1. The positional and
+the validation rules of [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection). The positional and
 repeatable `--rhei` options resolve the accounting roots first; the run
 selection stays inside them.
 
@@ -67,7 +67,7 @@ distinct models, and the task tally:
   scope selects ([§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary)); the model count is the distinct `model`
   values among them.
 - When agent spawns in that scope have no accounting record
-  (§FS-rhei-cost-accounting.6.2.1), the invocation count is the known agent
+  ([§FS-rhei-cost-accounting.6.2.1](rhei-cost-accounting.spec.md#621-agent-spawns-with-no-record)), the invocation count is the known agent
   invocations rather than the records, and the gap follows the model count,
   which still counts the records' models:
   `` `mixed-agents` workflow: 4 agent invocations across 1 model, 2 of them with no accounting record; 2 tasks completed. ``
@@ -104,12 +104,12 @@ One numbered entry per invocation record, ordered by `started_at`:
   distinguishable and one-shot steps stay clean.
 - Duration is `ended_at - started_at`, humanized (`18m04s`); omitted when
   either timestamp is missing.
-- An agent spawn with no accounting record (§FS-rhei-cost-accounting.6.2.1)
+- An agent spawn with no accounting record ([§FS-rhei-cost-accounting.6.2.1](rhei-cost-accounting.spec.md#621-agent-spawns-with-no-record))
   is an entry too, placed by its `started`. It carries the task id, the state,
   the spawn's `worker`, its duration from `started` and `ended`, and the words
   `no accounting record` in place of a model and token counts, which the spawn
   does not know. It carries no `(visit N)`: a spawn record names no visit, and
-  its file name is never matched to find one (§FS-rhei-agents.8.4):
+  its file name is never matched to find one ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)):
   `` 3. `plan.1` implement — cdx — 1s — no accounting record ``
 - With explicit `--run`/`--prices`, entries come only from that exact run after
   accounting-root filtering and record-identity deduplication. The same
@@ -136,7 +136,7 @@ Pricing and coverage semantics are the accounting spec's
 ([§FS-rhei-cost-accounting.5](rhei-cost-accounting.spec.md#5-pricing)); this command adds no pricing of its own.
 
 When agent spawns in scope have no accounting record, the coverage row says
-how many, after the coverage word that §FS-rhei-cost-accounting.6.2.1 demoted:
+how many, after the coverage word that [§FS-rhei-cost-accounting.6.2.1](rhei-cost-accounting.spec.md#621-agent-spawns-with-no-record) demoted:
 
 ```text
 | coverage | Partial (2 of 4 agent invocations have no accounting record) |
@@ -155,7 +155,7 @@ An explicit alternate-book reading adds these rows before its token rows:
 When pricing is `priced`, the ordinary `cost` row follows. When it is
 `partial-price`, the money row is instead `priced cost (lower bound)`. When it
 is `unpriced`, no money row appears: missing replacement rates are not a zero
-cost and never fall back to a stored amount. §FS-rhei-cost-accounting.6.2
+cost and never fall back to a stored amount. [§FS-rhei-cost-accounting.6.2](rhei-cost-accounting.spec.md#62-coverage-of-a-selection)
 
 ## 3. `--details`
 
@@ -175,7 +175,7 @@ renders the Markdown within:
 ```
 
 The wrapper is unchanged for explicit `--run`/`--prices`: its inner lead,
-steps, provenance, and accounting are the selected-run reading from §2.
+steps, provenance, and accounting are the selected-run reading from [§FS-rhei-summary.2](rhei-summary.spec.md#2-output).
 
 ## 4. What the summary never contains
 
@@ -183,7 +183,7 @@ steps, provenance, and accounting are the selected-run reading from §2.
    home-relative paths; the output must be publishable verbatim. This is why
    `rhei summary` gains `cost`'s scope and its `--rhei` flag but **never** its
    roots line ([§FS-rhei-cost-accounting.8](rhei-cost-accounting.spec.md#8-cli-inspection)): that line names directories, and
-   this output goes into a pull request body. An empty summary stays §5's. The
+   this output goes into a pull request body. An empty summary stays [§FS-rhei-summary.5](rhei-summary.spec.md#5-empty-and-error-cases)'s. The
    caller-supplied price-book path is a local filesystem path too; only the
    validated book id and currency may appear in successful stdout.
 2. Task content — no briefs, no export bodies, no result text. Task ids and
@@ -212,6 +212,6 @@ steps, provenance, and accounting are the selected-run reading from §2.
      matching history report exists.
 4. The book is loaded and validated before any Markdown is emitted. Missing,
    unreadable, malformed, wrong-schema, duplicate-entry, and otherwise invalid
-   books use §FS-rhei-cost-accounting.5.1's diagnostic that names the supplied
+   books use [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection)'s diagnostic that names the supplied
    path. Missing exact rates inside a valid book are accounting outcomes under
-   §2.3, not input errors.
+   [§FS-rhei-summary.2.3](rhei-summary.spec.md#23-the-accounting), not input errors.

@@ -132,8 +132,8 @@ Task files do not redeclare structure locally; loaders and validators parse
 them using the workspace index structure. A task file's own frontmatter is
 metadata-only and carries nothing plan-wide: `structure` written there is a
 validation error naming `index.rhei.md` as where it belongs
-(§FS-rhei-plan-language.1.4, §FS-rhei-validate.4.4). What a task file's
-frontmatter *may* carry is §4.6.
+([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata), [§FS-rhei-validate.4.4](rhei-validate.spec.md#44-workspace-task-file-metadata-diagnostics)). What a task file's
+frontmatter *may* carry is [§FS-rhei-authoring.4.6](rhei-authoring.spec.md#46-a-tasks-own-metadata-in-a-directory-workspace).
 
 ## 4. Metadata
 
@@ -271,15 +271,15 @@ start inside the implementer's reasoning. Omission preserves the state rule;
 `none` is the explicit cold opt-out. Inheritance is a continuity tool, not a
 guaranteed cost saving: a large inherited prefix is read again on every later
 turn. Durable facts still belong in `**Provides:**` / `**Consumes:**` and state
-artifacts. See §FS-rhei-plan-language.3.14 and §FS-rhei-snapshots.4.
+artifacts. See [§FS-rhei-plan-language.3.14](rhei-plan-language.spec.md#314-task-snapshot-inheritance-overrides) and [§FS-rhei-snapshots.4](rhei-snapshots.spec.md#4-state-machine-yaml-grammar).
 
 ### 4.6. A task's own metadata, in a directory workspace
 
 Custom per-task metadata lives under `metadata.tasks.<id>` in YAML frontmatter
-(§FS-rhei-transitions.2.2), and in a directory workspace a task file may open
+([§FS-rhei-transitions.2.2](rhei-transitions.spec.md#22-metadata-storage-example)), and in a directory workspace a task file may open
 with a metadata-only block of its own so that a task's custom field sits beside
 that task's `**State:**` rather than in a file every other run also writes
-(§FS-rhei-plan-language.1.4).
+([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)).
 
 Two tasks in two files, each needing one field — which context it belongs to:
 
@@ -311,10 +311,10 @@ metadata:
 
 `index.rhei.md` needs no metadata at all, and `{meta.context}` resolves per
 task exactly as it would had both fields been written there
-(§FS-rhei-states.4.1). Four things the block may not do, each of them a named
-diagnostic rather than a silent drop (§FS-rhei-validate.4.4):
+([§FS-rhei-states.4.1](rhei-states.spec.md#41-variable-namespace)). Four things the block may not do, each of them a named
+diagnostic rather than a silent drop ([§FS-rhei-validate.4.4](rhei-validate.spec.md#44-workspace-task-file-metadata-diagnostics)):
 
-- carry any top-level key but `metadata` — `structure` included (§3.3);
+- carry any top-level key but `metadata` — `structure` included ([§FS-rhei-authoring.3.3](rhei-authoring.spec.md#33-depth-and-node-kinds));
 - carry `metadata.tasks.<id>` for a task some *other* file defines;
 - set a key that `index.rhei.md` already sets for the same task. The two are
   disjoint by key: the index may hold `priority` for `first` while
@@ -325,7 +325,7 @@ diagnostic rather than a silent drop (§FS-rhei-validate.4.4):
   Rhei runs — `rhei reset` included — rewrites an authored block.
 
 Under `basin/` there is no such block: an unfiled ticket's metadata belongs to
-the project manifest (§FS-rhei-panta.2).
+the project manifest ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)).
 
 ### 4.7. Tooling One Task Needs
 
@@ -360,7 +360,7 @@ read the author's mail, says so once in the machine:
 Task 1 still passes through `review`; its agent there runs without the mail
 server, and the run log says what was held back. `mcp_servers: []` is not the
 same thing: it only stops the state inheriting `defaults`. See
-§FS-rhei-task-tooling.
+[§FS-rhei-task-tooling](rhei-task-tooling.spec.md#fs-rhei-task-tooling-tooling-one-task-needs).
 
 ## 5. Using a Custom State Machine
 

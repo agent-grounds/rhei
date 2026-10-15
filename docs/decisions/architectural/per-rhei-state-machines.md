@@ -109,16 +109,16 @@ The state machine is a property of the **rhei**, defaulted by the project.
    for that.
 
    Laying a project's default machine **outright** is a different act and is
-   admitted. A project template (§FS-rhei-templates.2) carries
+   admitted. A project template ([§FS-rhei-templates.2](../../functional-spec/rhei-templates.spec.md#2-directory-layout)) carries
    `index.panta.md` and a machine and nothing else: naming the project's
    default is the whole of what it does, so writing it — the `states.yaml` at
-   the project root, never a `**States:**` line (§FS-rhei-templates.6.4) — is
+   the project root, never a `**States:**` line ([§FS-rhei-templates.6.4](../../functional-spec/rhei-templates.spec.md#64-laying-a-panta-project)) — is
    the command the caller ran rather than a side effect of another one.
    Re-governing later silent rheis is then the intended meaning of "project
    default" — a rhei with no machine of its own runs under whatever the
    project's default is, whenever it was written — and the protection a replacement owes is
    a pre-write refusal naming every ticket it would strand
-   (§FS-rhei-library.2.3).
+   ([§FS-rhei-library.2.3](../../functional-spec/rhei-library.spec.md#23-the-default-machine-is-replaced-never-unioned-into)).
 
    The first-session failure in Context stands unchanged and is still refused:
    it happened because laying *one unrelated template as a member* re-governed

@@ -19,7 +19,7 @@ State transitions will be defined declaratively in YAML and executed through pla
 ### Requirements
 - State transitions must be explicitly declared; unlisted transitions are
   forbidden to ordinary callers. The only exception is the attended,
-  operator-only missing-edge recovery in §FS-rhei-transition-cmd.6.
+  operator-only missing-edge recovery in [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery).
 - Transitions trigger callbacks/functions that receive context about the task
 - Callbacks can reject transitions by returning an error (for conditional logic)
 - Failed transitions should be reportable and recoverable
@@ -460,7 +460,7 @@ state's exit instead ([§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics)).
 
 One key rhei writes sits outside every task's map and so outside this
 register's rows: `metadata.retiredTickets`, the project's record of the ids
-`rhei remove` retired (§FS-rhei-remove.5.1). It is project bookkeeping, not
+`rhei remove` retired ([§FS-rhei-remove.5.1](rhei-remove.spec.md#51-where-it-is-recorded)). It is project bookkeeping, not
 author task metadata; no author-metadata surface publishes it, `rhei render
 --format json` may show it with the rest of the stored metadata, and
 `rhei reset` never clears it. Unlike the task keys above, it **is** reserved: a
@@ -556,7 +556,7 @@ When a program state's subprocess exits and has not already advanced the task (v
 5. The transition steps 2–4 selected fires with `triggeredBy: 'system'` — that
    rule, not merely its target state. The engine does not resolve the edge again
    from `from` and `to`, so a different rule declared for the same pair neither
-   fires nor refuses this move (§FS-rhei-transitions.4.4).
+   fires nor refuses this move ([§FS-rhei-transitions.4.4](rhei-transitions.spec.md#44-transition-definition)).
 6. That rule's own `on_leave` and `on_enter` callbacks execute normally.
 
 ```yaml
@@ -711,7 +711,7 @@ This section defines the formal structure of YAML state machine configuration fi
 | `transitions` | array | Yes | List of allowed state transitions |
 | `callbacks` | object | No | Platform-specific callback mappings |
 | `error_handling` | object | No | Error handling and recovery configuration |
-| `callback_timeout` | string | No | The machine's time bound on each `cli:` callback run, for every edge that declares none of its own (e.g., `2m`). Absent, callbacks run unbounded. See §4.10. |
+| `callback_timeout` | string | No | The machine's time bound on each `cli:` callback run, for every edge that declares none of its own (e.g., `2m`). Absent, callbacks run unbounded. See [§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound). |
 
 ### 4.2. State Definition
 
@@ -850,9 +850,9 @@ Rules:
   completion, including manual and automatic loop-backs and states without a
   `visits:` field or suffixed authored state. The transition-ledger move count,
   rather than the optional displayed visit suffix, distinguishes that entry
-  from a restart which has not moved the ticket (§FS-rhei-agents.3.2).
+  from a restart which has not moved the ticket ([§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition)).
 - A state this section keeps no counter for still numbers its entries for log
-  naming: the **entry number** of §FS-rhei-agents.8.1 counts the ticket's
+  naming: the **entry number** of [§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming) counts the ticket's
   arrivals in the state from the transition ledger, never from a frontmatter
   counter, and writes nothing to `stateVisits`. It names logs, spawn records
   and session reports only; `{visit_count}` keeps its meaning everywhere it is
@@ -939,19 +939,19 @@ transitions:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `from` | string | Yes | Source state name, or `"*"` for wildcard (matches any non-final state) |
-| `sources` | string array | No | Explicit source set for `from: "*"`; absent means every state. See §4.6. |
+| `sources` | string array | No | Explicit source set for `from: "*"`; absent means every state. See [§FS-rhei-transitions.4.6](rhei-transitions.spec.md#46-wildcard-semantics). |
 | `to` | string | Yes | Target state name |
 | `description` | string | Yes | Human-readable explanation of the transition's purpose and when it occurs |
 | `on_leave` | string | No | Callback function identifier invoked before leaving the source state |
 | `on_enter` | string | No | Callback function identifier invoked after entering the target state |
-| `condition` | string | No | Expression evaluated for system-triggered transitions. Operands are integer literals, `visitCount` and `visits` (§4.3), `pollAttempts` and `pollMaxAttempts` on poll states ([§FS-rhei-states.2.3](rhei-states.spec.md#23-variables-for-transition-conditions)), and `openDescendants`, the number of non-terminal descendants of the task ([§FS-rhei-supervision.4.1](rhei-supervision.spec.md#41-the-opendescendants-operand)). |
+| `condition` | string | No | Expression evaluated for system-triggered transitions. Operands are integer literals, `visitCount` and `visits` ([§FS-rhei-transitions.4.3](rhei-transitions.spec.md#43-counted-loops)), `pollAttempts` and `pollMaxAttempts` on poll states ([§FS-rhei-states.2.3](rhei-states.spec.md#23-variables-for-transition-conditions)), and `openDescendants`, the number of non-terminal descendants of the task ([§FS-rhei-supervision.4.1](rhei-supervision.spec.md#41-the-opendescendants-operand)). |
 | `timeout` | string | No | Duration (e.g., `24h`, `30m`) after which system triggers this transition |
 | `exit_code` | integer, integer array, or `"nonzero"` | No | Exit-code condition for transitions from program states. Only evaluated when a program exits without calling `rhei transition`. See [Program States Specification](rhei-programs.spec.md#3-exit-code-transitions). |
 | `mcp_unavailable` | boolean or string array | No | When `true`, fires when any required MCP server on the source state fails its availability check. When an array, fires only when one of the listed ids failed. Only valid on transitions from agent states. See [Tooling-Unavailable Trigger](#37-tooling-unavailable-trigger-triggeredby-system). |
 | `skill_unavailable` | boolean or string array | No | Same shape as `mcp_unavailable`, for skills. |
 | `max_retries` | integer | No | Maximum automatic retry attempts |
 | `retry_delay` | string | No | Delay between retries (e.g., `30s`, `5m`) |
-| `callback_timeout` | string | No | Time bound on each `cli:` callback run of this edge (e.g., `2m`). Wins over the machine's top-level `callback_timeout`. See §4.10. |
+| `callback_timeout` | string | No | Time bound on each `cli:` callback run of this edge (e.g., `2m`). Wins over the machine's top-level `callback_timeout`. See [§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound). |
 
 **Several rules may share one `(from, to)` pair.** Nothing forbids two
 transitions with the same source and target: they differ in their `exit_code:`,
@@ -964,7 +964,7 @@ declaration order:
 
 - A trigger that **selects a rule** fires the rule it selected, with that rule's
   own `on_leave` and `on_enter`. The program exit-code trigger
-  (§FS-rhei-transitions.3.5) is one: its
+  ([§FS-rhei-transitions.3.5](rhei-transitions.spec.md#35-program-exit-code-trigger-triggeredby-system)) is one: its
   algorithm evaluates each candidate's `condition:` while choosing, so the rule
   it chose is the rule applied, and a rule it never collected as a candidate
   cannot refuse the move
@@ -977,7 +977,7 @@ declaration order:
 - A caller that **names only a state pair** takes the **first declared exact**
   rule for the pair — and a wildcard-source rule to that target only where the
   pair declares no exact rule at all
-  ([§FS-rhei-transitions.4.6](#46-wildcard-semantics)) — and that rule's `condition:`
+  ([§FS-rhei-transitions.4.6](rhei-transitions.spec.md#46-wildcard-semantics)) — and that rule's `condition:`
   governs. `rhei transition --from/--to`
   ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)),
   `rhei complete`, and an `on_leave` callback's `nextState` redirect are all of
@@ -1010,7 +1010,7 @@ State artifact contracts (see [States Specification — Artifact Contracts](rhei
    ordering defined in the main plan-language spec.
 4. In v1, enforcement is file-existence only. Content validation is out of
    scope. Orchestrated pre-spawn completion additionally requires the
-   current-visit eligibility defined by §FS-rhei-agents.3.2: an artifact left
+   current-visit eligibility defined by [§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition): an artifact left
    by an earlier visit remains on disk and available to the next worker, but
    its existence alone cannot authorize advancement after re-entry. Rhei does
    not delete it or compare timestamps, hashes, or bytes.
@@ -1025,8 +1025,8 @@ The special value `"*"` in the `from` field matches any state with these rules:
 - Specific transitions take precedence over wildcard transitions
 - A declared transition from a final state is always forbidden, even with
   wildcards. A valid machine cannot declare an exact final-source rule
-  (§FS-rhei-states.1.3); leaving a final state is therefore possible only as an
-  operator-forced missing-edge recovery (§FS-rhei-transition-cmd.6).
+  ([§FS-rhei-states.1.3](rhei-states.spec.md#13-validation-rules)); leaving a final state is therefore possible only as an
+  operator-forced missing-edge recovery ([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)).
 
 Optional `sources: [work, review]` restricts a `from: "*"` rule to exactly the
 listed declared state names. An absent set means all states; an empty set
@@ -1111,7 +1111,7 @@ callbacks:
 Both models are valid. They must not be mixed within a single transition (a callback value is either prefixed or logical, not both). When both a prefix and a `callbacks:` mapping exist for the same name, the prefix takes precedence.
 
 Every callback platform receives the firing identity and ledger status defined
-by [§FS-rhei-transitions.1.2](#12-firing-identity-and-callback-time-visibility).
+by [§FS-rhei-transitions.1.2](rhei-transitions.spec.md#12-firing-identity-and-callback-time-visibility).
 The canonical JSON payload is delivered on stdin to a shipped `cli:` callback.
 Its environment additionally contains `RHEI_TRANSITION_FIRING_ID` with the
 same value as `transition.firingId` and
@@ -1122,7 +1122,7 @@ unknown properties; callback decoders must permit fields added by a compatible
 Rhei release.
 
 A `cli:` callback runs under the time bound its edge resolves
-([§FS-rhei-transitions.4.10](#410-callback-time-bound)); where the edge and the
+([§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound)); where the edge and the
 machine declare none, it runs unbounded, as it always has.
 
 ### 4.8. Callback Mappings
@@ -1152,17 +1152,17 @@ error_handling:
 ```
 
 A callback that exceeds its `callback_timeout`
-([§FS-rhei-transitions.4.10](#410-callback-time-bound)) is an `on_enter`
+([§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound)) is an `on_enter`
 failure or an `on_leave` rejection like any other, so whatever these actions do
 for one applies to it unchanged. Today the only action executed is the claim
-path's `transition_to` (§FS-rhei-next.3.1).
+path's `transition_to` ([§FS-rhei-next.3.1](rhei-next.spec.md#31-behavior)).
 
 ### 4.10. Callback Time Bound
 
 A machine author bounds how long one callback may hold a transition with
 `callback_timeout`. Callbacks are the one subprocess on the transition path
 that has no bound of its own otherwise, and `rhei transition` holds the plan's
-writer lock through them (§FS-rhei-transition-cmd.3), so an unbounded callback
+writer lock through them ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)), so an unbounded callback
 whose network call hangs holds every other writer on the plan for as long as it
 hangs. The bound serves the requirement above that failed transitions be
 reportable and recoverable: a hung callback becomes an ordinary, named failure.
@@ -1184,16 +1184,16 @@ transitions:
 
 **Where it is declared.** `callback_timeout` is a duration in the syntax
 `agent_timeout` and `program_timeout` accept (`30s`, `5m`, `1h`, `2h30m`), and
-it may be written at two levels: on a transition rule (§4.4) and at the
-machine's root (§4.1). The bound a callback runs under is resolved as the
+it may be written at two levels: on a transition rule ([§FS-rhei-transitions.4.4](rhei-transitions.spec.md#44-transition-definition)) and at the
+machine's root ([§FS-rhei-transitions.4.1](rhei-transitions.spec.md#41-root-level-fields)). The bound a callback runs under is resolved as the
 firing edge's `callback_timeout`, then the machine's, then **no bound** — which
 is the behaviour of a machine that declares neither. A redirected rule
 (`nextState`) resolves its own callbacks' bound from that rule, then from the
 machine. There is no per-state key, no `settings.json` default, no CLI flag,
 and no built-in default: a callback is the machine author's code, and a number
 nobody authored would bound it at a value nobody chose
-(§REQ-bounded-neural-work.2). A zero bound is refused, at either level, by
-validation (§FS-rhei-validate.4).
+([§REQ-bounded-neural-work.2](../requirements/bounded-neural-work.spec.md#2-bounded-by-default-refusing-nothing-that-runs-today)). A zero bound is refused, at either level, by
+validation ([§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior)).
 
 **What it bounds.** The bound applies to each callback run separately: the
 edge's `on_leave` gets the full bound, its `on_enter` gets the full bound, and
@@ -1213,20 +1213,20 @@ script started (`gh` under `bash`) goes with the script:
 - On Linux and macOS the callback leads its own process group. Expiry sends
   `SIGTERM` to the group, waits a 10-second grace for it to exit, then sends
   `SIGKILL` to the group — the sequence `program_timeout` and `agent_timeout`
-  use (§FS-rhei-agents.7.3). A callback that traps `SIGTERM` can clean up in
+  use ([§FS-rhei-agents.7.3](rhei-agents.spec.md#73-timeout-behavior)). A callback that traps `SIGTERM` can clean up in
   the grace.
 - On Windows the callback is assigned to a Job Object when it starts, and expiry
   terminates the job, which ends every process in it at once. Windows has no
   `SIGTERM` to ask with, so there is **no grace** there. This is the one
-  platform difference in this behaviour, declared here as §REQ-cross-platform.2
+  platform difference in this behaviour, declared here as [§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity)
   requires.
 
 **What expiry reports.** A timed-out callback is an ordinary failed callback
 result, never an executor error, so it takes exactly the path a callback that
 exits non-zero takes: an `on_enter` timeout rolls the state write back and
-appends no ledger row (§FS-rhei-transitions.1.2), an `on_leave` timeout rejects
+appends no ledger row ([§FS-rhei-transitions.1.2](rhei-transitions.spec.md#12-firing-identity-and-callback-time-visibility)), an `on_leave` timeout rejects
 the transition before the state write, and `error_handling` applies as for any
-other failure (§4.9). The reason inside the existing frames names the bound as
+other failure ([§FS-rhei-transitions.4.9](rhei-transitions.spec.md#49-error-handling-configuration)). The reason inside the existing frames names the bound as
 authored:
 
 ```text
@@ -1246,7 +1246,7 @@ host process, which rhei cannot stop, so the bound does not apply to them. With
 the callbacks of a program's exit-code edge run under `callback_timeout`, not
 under the program's remaining time, and an expiry there fails the transition
 without re-entering the program's own timeout path
-(§FS-rhei-programs.7.2). Nor is it the edge's `timeout:`, which decides *when*
+([§FS-rhei-programs.7.2](rhei-programs.spec.md#72-callbacks)). Nor is it the edge's `timeout:`, which decides *when*
 the engine fires an edge; `callback_timeout` bounds the callbacks of that
 firing like any other. An engine-fired transition whose callback times out
 fails the way one whose callback exits non-zero fails there: the task stays in

@@ -93,9 +93,9 @@ the version it releases, archives the previous inline section under
 
 Nobody writes the changelog. No pull request adds a bullet, none is refused for
 leaving the changelog alone, and nobody writes anything before a release: the
-release lists the pull requests merged since the previous one (§5.1), read from
-the forge, and fails rather than writes an incomplete list (§5.2). The scheduled
-release is due whenever that list is not empty (§5.3).
+release lists the pull requests merged since the previous one ([§FS-rhei-distribution.5.1](rhei-distribution.spec.md#51-what-a-releases-notes-list)), read from
+the forge, and fails rather than writes an incomplete list ([§FS-rhei-distribution.5.2](rhei-distribution.spec.md#52-when-the-forge-cannot-answer)). The scheduled
+release is due whenever that list is not empty ([§FS-rhei-distribution.5.3](rhei-distribution.spec.md#53-when-the-scheduled-release-waits)).
 
 ### 5.1. What a release's notes list
 
@@ -157,7 +157,7 @@ first step is where the reason is clearest.
 
 ### 5.3. When the scheduled release waits
 
-The scheduled release is due when the list of §5.1 is not empty, and asks the
+The scheduled release is due when the list of [§FS-rhei-distribution.5.1](rhei-distribution.spec.md#51-what-a-releases-notes-list) is not empty, and asks the
 same question the release answers. Before it cuts anything:
 
 - Nothing changed outside docs and CI since the previous release tag: it does
@@ -170,11 +170,11 @@ same question the release answers. Before it cuts anything:
 
 Otherwise the release is due. A run that holds ends green: holding is the
 expected answer while nothing has merged, not a failure. A forge that cannot
-answer (§5.2) fails the run, because a list it could not build is not an empty
+answer ([§FS-rhei-distribution.5.2](rhei-distribution.spec.md#52-when-the-forge-cannot-answer)) fails the run, because a list it could not build is not an empty
 one.
 
 A release a person starts does not hold: starting it is the decision that a
-release is due. It refuses an empty list instead, with the refusal of §5.2.
+release is due. It refuses an empty list instead, with the refusal of [§FS-rhei-distribution.5.2](rhei-distribution.spec.md#52-when-the-forge-cannot-answer).
 
 ## 6. Local Gates
 
@@ -184,7 +184,7 @@ release PGO build is intentionally excluded from local commit hooks.
 
 The pre-commit configuration also runs the release scripts' own tests with
 `python -m unittest discover -s scripts/tests -t .`, so the shape check and the
-generated notes of §5.1, the failures of §5.2 and the due gate of §5.3 are
+generated notes of [§FS-rhei-distribution.5.1](rhei-distribution.spec.md#51-what-a-releases-notes-list), the failures of [§FS-rhei-distribution.5.2](rhei-distribution.spec.md#52-when-the-forge-cannot-answer) and the due gate of [§FS-rhei-distribution.5.3](rhei-distribution.spec.md#53-when-the-scheduled-release-waits) are
 proven on the contributor's own platform before a commit, and no hook checks a
 branch for a changelog bullet.
 
@@ -192,5 +192,5 @@ branch for a changelog bullet.
 
 Which platforms Rhei supports, and what support means, is a project-wide
 requirement rather than a property of the release process:
-[§REQ-cross-platform](../requirements/cross-platform.md#req-cross-platform-one-tool-on-linux-macos-and-windows). The release's part is §1 of it — a release ships binaries
-for every supported platform (§4) — and the PGO matrix is the list.
+[§REQ-cross-platform](../requirements/cross-platform.md#req-cross-platform-one-tool-on-linux-macos-and-windows). The release's part is [§FS-rhei-distribution.1](rhei-distribution.spec.md#1-release-targets) of it — a release ships binaries
+for every supported platform ([§FS-rhei-distribution.4](rhei-distribution.spec.md#4-pgo-binary-builds)) — and the PGO matrix is the list.

@@ -32,7 +32,7 @@ exists; a test is never gated because porting it is work.
 Test fixtures that stand in for agents, programs, callbacks, and redactors are
 written in a form every supported platform runs — never a shell script, except
 inside a test gated to one platform for semantics only that platform's shell
-exposes (signal traps, job control), where the gate's reason (§3) covers the
+exposes (signal traps, job control), where the gate's reason ([§REQ-cross-platform.3](cross-platform.md#3-tested-not-assumed)) covers the
 fixture too.
 
 A fixture never puts a shell in front of a real tool either, however thin the
@@ -41,7 +41,7 @@ its own escape character, so a `.bat` forwarding `%*` hands git `main{commit}`
 where the caller wrote `main^{commit}`, and `rev-parse --verify --quiet` reports
 that as an ordinary unresolvable ref. The tool then reads as broken on the one
 platform whose shell differs, for a reason that lives entirely in the harness
-(§2). A test that needs a tool to be absent therefore takes that tool's
+([§REQ-cross-platform.2](cross-platform.md#2-parity)). A test that needs a tool to be absent therefore takes that tool's
 directories out of `PATH` and leaves the rest of it alone, rather than rebuilding
 `PATH` around a wrapper.
 

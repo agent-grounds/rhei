@@ -25,7 +25,7 @@ substitutes for another:
 | 2. One visit | how many times a single state entry may be spawned | `attempts:` [§FS-rhei-agents.3.2.3](../functional-spec/rhei-agents.spec.md#323-attempt-budget) |
 | 3. One ticket | how many moves a ticket may make in its whole life | `transition_limit` [§FS-rhei-budgets.2](../functional-spec/rhei-budgets.spec.md#2-where-a-bound-comes-from) |
 | 4. One project | how many neural starts a project may be admitted | the invocation contract [§FS-rhei-budgets.3](../functional-spec/rhei-budgets.spec.md#3-the-invocation-contracts) |
-| 5. One project-day | how much measured spend a project may be charged | `spend_per_day` §FS-rhei-budgets.3.4 |
+| 5. One project-day | how much measured spend a project may be charged | `spend_per_day` [§FS-rhei-budgets.3.4](../functional-spec/rhei-budgets.spec.md#34-the-spend-window) |
 
 Levels 1 and 2 are the ground as it stood before this requirement. Levels 3, 4
 and 5 are what it adds. Levels 3 and 4 are **counts** — not time, and not
@@ -67,7 +67,7 @@ what lets it promise no new refusal: each of them has a built-in value, so none
 of them can be unbound. Level 1, how long one orchestrated agent round may run,
 has no built-in default. It is the one bound that must still be authored, and a
 state that resolves none is refused rather than defaulted — by `rhei validate`,
-by `rhei run --dry-run` and by `rhei run` alike (§FS-rhei-agents.3.2.2).
+by `rhei run --dry-run` and by `rhei run` alike ([§FS-rhei-agents.3.2.2](../functional-spec/rhei-agents.spec.md#322-timeout-requirement)).
 
 That is a real strain against the lead of this requirement, which wants a bound
 *without anyone declaring anything*, precisely because an authored bound is
@@ -115,7 +115,7 @@ never meets a project that is working.
 **Project spend** is the measured cost a project may be charged in one UTC day.
 It is not a third count. No unit of it is tallied at admission; its amount
 comes from the cost accounting record a completed invocation already produces
-§FS-rhei-cost-accounting, and the project-day is its whole unit. It holds no
+[§FS-rhei-cost-accounting](../functional-spec/rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting), and the project-day is its whole unit. It holds no
 lifetime contract, for the reason the paragraph above gives: a lifetime total
 of money stops every healthy long-lived project in the end, and money renews on
 the same window an invocation count does.
@@ -125,15 +125,15 @@ against the day, and once the invocation's measured cost is known the reserve
 is replaced by that amount. An invocation whose cost cannot be measured is
 charged the worst case and never nothing, because a dimension that reads zero
 for every transport it cannot price is a bound that is silently absent exactly
-where it is least watched. §FS-rhei-budgets.6.2
+where it is least watched. [§FS-rhei-budgets.6.2](../functional-spec/rhei-budgets.spec.md#62-reserve-then-settle)
 
 ## 4. Nothing creates capacity
 
 `rhei reset`, a fresh `rhei run`, `--rhei` selection, snapshots, appended work, live member admission, a restart, a copy or a move of a plan file, and a nested runtime refund no consumed travel or invocation count, discard no outstanding reservation, and in window mode do not advance the window.
 
-Invocation headroom — a bound less what is charged against it — rises in exactly three ways. The first is the passage of the UTC window under the window contract. The second is a raise of the effective `invocations_per_day` by a settings change that §REQ-bounded-neural-work.2 permits: a project raise below an unchanged machine ceiling, a raise of a project ceiling the machine delegated, or a raise of the machine's own value. Such a raise is in force when the changed settings are next read, and it is measured against the same day's consumed and outstanding counts. The third is an audited `init` or `adjust` that establishes or changes a lifetime allowance under the resolved `defaults.invocation_lifetime_max`, which remains subject to the machine's ceiling and is not delegated. A changed bound changes the measure, never the record: it rewrites no receipt, forgives no consumption, grants or changes no lifetime allowance, and enlarges, revives or extends no existing ancestor reservation. A lowered bound takes effect at the same boundary and removes headroom without erasing consumption or cancelling already admitted work.
+Invocation headroom — a bound less what is charged against it — rises in exactly three ways. The first is the passage of the UTC window under the window contract. The second is a raise of the effective `invocations_per_day` by a settings change that [§REQ-bounded-neural-work.2](bounded-neural-work.spec.md#2-bounded-by-default-refusing-nothing-that-runs-today) permits: a project raise below an unchanged machine ceiling, a raise of a project ceiling the machine delegated, or a raise of the machine's own value. Such a raise is in force when the changed settings are next read, and it is measured against the same day's consumed and outstanding counts. The third is an audited `init` or `adjust` that establishes or changes a lifetime allowance under the resolved `defaults.invocation_lifetime_max`, which remains subject to the machine's ceiling and is not delegated. A changed bound changes the measure, never the record: it rewrites no receipt, forgives no consumption, grants or changes no lifetime allowance, and enlarges, revives or extends no existing ancestor reservation. A lowered bound takes effect at the same boundary and removes headroom without erasing consumption or cancelling already admitted work.
 
-Fresh travel history has exactly one lawful source: a genuinely new ticket identity, whose id this project's account has never bound. A raise of the effective `transition_limit` that §REQ-bounded-neural-work.2 permits may add remaining travel against an existing identity, but preserves all travel already consumed or outstanding against it. A ticket
+Fresh travel history has exactly one lawful source: a genuinely new ticket identity, whose id this project's account has never bound. A raise of the effective `transition_limit` that [§REQ-bounded-neural-work.2](bounded-neural-work.spec.md#2-bounded-by-default-refusing-nothing-that-runs-today) permits may add remaining travel against an existing identity, but preserves all travel already consumed or outstanding against it. A ticket
 that is copied, moved, or re-instantiated under an id the account has already
 bound keeps its history, so reset-and-rerun converges on the travel bound
 rather than escaping it. No operation may assert a ticket identity the account
@@ -192,7 +192,7 @@ outlive nor outspend its ancestor. [§FS-rhei-budgets.7](../functional-spec/rhei
 
 Provider-billed spend is the fifth bound and it **is** here, in the one grade
 the evidence this engine already holds can carry: **measured** spend, charged
-from the cost accounting record §FS-rhei-cost-accounting writes for a completed
+from the cost accounting record [§FS-rhei-cost-accounting](../functional-spec/rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting) writes for a completed
 invocation. That is the owner's ruling of 2026-09-25 on
 `agent-grounds/rhei#107`. The stricter grade is now `agent-grounds/rhei#460` —
 spend as the provider bills it, which needs a request broker, credential,
@@ -293,20 +293,20 @@ numbers above are worth:
    over spawn records and transition logs, and they say nothing about what a
    project spends. The spend default of level 5 rests on a different corpus, a
    smaller one, and a restated definition of healthy, which is why
-   §REQ-bounded-neural-work.7.5 states it separately rather than adding a row
-   to §REQ-bounded-neural-work.7.2's table.
+   [§REQ-bounded-neural-work.7.5](bounded-neural-work.spec.md#75-the-spend-default-and-the-four-things-it-could-not-see) states it separately rather than adding a row
+   to [§REQ-bounded-neural-work.7.2](bounded-neural-work.spec.md#72-what-the-healthy-histories-reached)'s table.
 
 ### 7.5. The spend default, and the four things it could not see
 
 `defaults.spend_per_day` is **400.00** in the account's currency, and it is
 measured rather than chosen — but over a different corpus and under a restated
 definition of healthy, so it is stated here rather than added to
-§REQ-bounded-neural-work.7.2's table as though it came from the same evidence.
+[§REQ-bounded-neural-work.7.2](bounded-neural-work.spec.md#72-what-the-healthy-histories-reached)'s table as though it came from the same evidence.
 
 The corpus is every `rhei.accounting.invocation.v1` record this workspace holds
 under `~/ag/*/panta/`, with the synthetic
 `tests/e2e/fixtures/accounting-archive/*.json` excluded for the reason
-§REQ-bounded-neural-work.7 already gives. The unit is the **project-day**,
+[§REQ-bounded-neural-work.7](bounded-neural-work.spec.md#7-the-defaults-are-measured-not-chosen) already gives. The unit is the **project-day**,
 because that is what the bound bounds.
 
 | dimension | n | median | max |
@@ -316,30 +316,30 @@ because that is what the bound bounds.
 
 `defaults.spend_per_day` is 4 × $96.37, rounded to a legible number:
 **400.00**. The multiplier and the reason for it are
-§REQ-bounded-neural-work.7.3's, unchanged.
+[§REQ-bounded-neural-work.7.3](bounded-neural-work.spec.md#73-the-multiplier-and-the-three-numbers)'s, unchanged.
 
 The **fallback reserve is 20.00**, the largest single invocation rounded up,
 and it deliberately carries **no multiplier**. The ×4 of
-§REQ-bounded-neural-work.7.3 is a margin on a *bound*; a reserve is an estimate
+[§REQ-bounded-neural-work.7.3](bounded-neural-work.spec.md#73-the-multiplier-and-the-three-numbers) is a margin on a *bound*; a reserve is an estimate
 of one request, and the margin is already carried by the ceiling that estimate
 is checked against. Multiplying here would charge the margin twice, and it
 would charge it hardest against the invocations that cannot be measured at
 all — the ones already paying the worst case
 [§FS-rhei-budgets.6.2](../functional-spec/rhei-budgets.spec.md#62-reserve-then-settle).
 
-Four things this measurement could not see. §REQ-bounded-neural-work.7.1 is
+Four things this measurement could not see. [§REQ-bounded-neural-work.7.1](bounded-neural-work.spec.md#71-healthy-defined-first) is
 explicit that a measurement which does not say what it measured supersedes
 nothing, so these are stated as plainly as the number itself:
 
 1. **n = 8.** Eight project-days, against the 21 behind
    `defaults.invocations_per_day`. It is the smallest corpus any default here
    rests on.
-2. **Healthy had to be restated.** §REQ-bounded-neural-work.7.1 defines a
+2. **Healthy had to be restated.** [§REQ-bounded-neural-work.7.1](bounded-neural-work.spec.md#71-healthy-defined-first) defines a
    healthy sample as a ticket history ending in a terminal state, and an
    accounting record is not a ticket history — it belongs to one invocation.
    Here healthy is *every invocation record whose run is not the run that
    halted*. That is a weaker filter and a different one; it is not
-   §REQ-bounded-neural-work.7.1's definition applied to a new corpus, and a
+   [§REQ-bounded-neural-work.7.1](bounded-neural-work.spec.md#71-healthy-defined-first)'s definition applied to a new corpus, and a
    re-measurement that wants to supersede this number has to say which of the
    two it used.
 3. **Only 80 of 165 records carry an amount.** The rest were written by a

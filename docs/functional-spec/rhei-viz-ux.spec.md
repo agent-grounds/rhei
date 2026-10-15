@@ -110,7 +110,7 @@ without bolding or coloring for hierarchy.
 Chrome is grayscale plus a single restrained accent. The dashboard exposes these
 as CSS custom properties; the TUI maps the same roles to terminal colors. Values
 are the normative direction and may be nudged to meet the contrast targets in
-§3.3.
+[§FS-rhei-viz-ux.3.3](rhei-viz-ux.spec.md#33-adaptive-theme-and-contrast).
 
 ```css
 --bg:        #0e1116;  /* base surface, near-black neutral (not pure black) */
@@ -175,7 +175,7 @@ of `--accent`, not a rainbow.
   pill text is checked against its own fill; pills auto-pick a dark or light
   label per fill luminance.
 - **Color is never the only signal.** Every state pill carries its text label,
-  and severity carries a glyph (§6), so the surface remains readable under
+  and severity carries a glyph ([§FS-rhei-viz-ux.6](rhei-viz-ux.spec.md#6-continuity-with-the-terminal)), so the surface remains readable under
   `prefers-contrast: more` and for color-vision deficiency.
 
 ## 4. Motion and liveness
@@ -242,7 +242,7 @@ The "cool from the UI" is structure, delivered calmly.
 ## 8. Accessibility and resilience
 
 - Honor `prefers-color-scheme`, `prefers-reduced-motion`, and `prefers-contrast`.
-- Meet the contrast targets of §3.3 and never encode meaning in color alone.
+- Meet the contrast targets of [§FS-rhei-viz-ux.3.3](rhei-viz-ux.spec.md#33-adaptive-theme-and-contrast) and never encode meaning in color alone.
 - Stay self-contained: no external fonts, scripts, styles, or network assets, so
   the surface loads instantly and works offline (restated from [§FS-rhei-viz](rhei-viz.spec.md#fs-rhei-viz-flow-visualization)).
 - Degrade without drama: the TUI already collapses to a compact list on small

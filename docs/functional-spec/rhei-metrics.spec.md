@@ -62,7 +62,7 @@ the measure run anchors the record and clocks are never consulted.
 - After a `measured_by` state's run completes, the engine checks whether the
   `artifact` path for the next unclaimed iteration now exists. If it does, the
   measurement succeeded: the engine resolves the value and appends the
-  iteration record (§3). If it does not, the measurement failed: the iteration
+  iteration record ([§FS-rhei-metrics.3](rhei-metrics.spec.md#3-iteration-record)). If it does not, the measurement failed: the iteration
   counter does not advance, and the failed run is a recorded fact, not a gap.
   Artifact existence is the sole success criterion — Rhei does not interpret
   the measure state's exit codes, whose meaning belongs to the workspace.
@@ -97,7 +97,7 @@ measurement is confirmed — the same durability model as
 ```
 
 A session's `log` is the log that session wrote, by the naming rule of
-§FS-rhei-agents.8.1: a number that is 1 is left out of the name, and every
+[§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming): a number that is 1 is left out of the name, and every
 entry into a state has its own log, so two iterations whose windows hold two
 entries of the same state link two different logs and two different reports —
 whether or not the state declares `visits:`. Rows recorded before entry

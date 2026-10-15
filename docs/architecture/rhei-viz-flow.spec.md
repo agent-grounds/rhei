@@ -10,13 +10,13 @@ read-only with respect to plan state. [§FS-rhei-run-tui](../functional-spec/rhe
 ## 1. Context: two renderers, one design
 
 The Flow design exists today in two places that share an intent but no code, and
-the spec's parity requirement ([§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §7, §8) is the instruction to
+the spec's parity requirement ([§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.7](rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary), [§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth)) is the instruction to
 collapse them onto one model and one renderer.
 
 | | Static (the Flow prototype) | Dynamic (the legacy dashboard) |
 |---|---|---|
 | Code | `xtask/src/viz.rs` + `xtask/assets/viz-template.html` | `crates/rhei-tui/src/dashboard.rs`, `dashboard/state.rs`, `dashboard/html.rs` |
-| Model | `Plan { plan_title, plan_state, about, tasks, machine }` — matches §8 | `SnapshotPayload { slots, recent, accounting, plan_state, tasks: TaskRow[], … }` — **no `machine`, no `about`** |
+| Model | `Plan { plan_title, plan_state, about, tasks, machine }` — matches [§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth) | `SnapshotPayload { slots, recent, accounting, plan_state, tasks: TaskRow[], … }` — **no `machine`, no `about`** |
 | UI | Flow design (List/Graph + surroundings + machine graphs) | Tab strip: Running / Tasks / Accounting / Links / Logs |
 | Runs | offline, from a plan file | live, on the loopback server during `rhei run` |
 
@@ -30,7 +30,7 @@ A second fact constrains the design: **`rhei-tui` depends on neither `rhei-core`
 nor `rhei-validator` today.** It receives plan data through a `PlanLoader` closure
 and a `StateArtifactContracts` map handed in by the host
 (`DashboardSink::start_with_plan_and_artifacts`, `rhei-tui/src/dashboard.rs`).
-Preserving that decoupling is a recorded decision (§10).
+Preserving that decoupling is a recorded decision ([§AR-rhei-viz-flow.10](rhei-viz-flow.spec.md#10-decisions-recorded)).
 
 ## 2. Target: one model, one renderer, two hosts
 
@@ -70,20 +70,20 @@ The architecture rests on three "exactly once" invariants:
 - **One asset.** A single self-contained HTML/CSS/JS string is the *only* renderer.
   The static path inlines the model into it and writes a file; the live path
   serves the same string at `/` and lets its JS re-render from `/snapshot`.
-  A byte-identical *asset* ([§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §7) is guaranteed by construction, not by
+  A byte-identical *asset* ([§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.7](rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary)) is guaranteed by construction, not by
   keeping two templates in sync; rendered output then differs only by the runtime
-  overlay (§4). The current `dashboard/html.rs` is retired.
-- **One model.** Both surfaces consume the §8 `VizModel`; the live payload is a
-  superset (§4).
+  overlay ([§AR-rhei-viz-flow.4](rhei-viz-flow.spec.md#4-the-data-contract-static-base--runtime-overlay)). The current `dashboard/html.rs` is retired.
+- **One model.** Both surfaces consume the [§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth) `VizModel`; the live payload is a
+  superset ([§AR-rhei-viz-flow.4](rhei-viz-flow.spec.md#4-the-data-contract-static-base--runtime-overlay)).
 - **One derivation.** Category classification, plan-state derivation, and machine
-  flattening exist once in `rhei-viz` and are called by both paths (§8).
+  flattening exist once in `rhei-viz` and are called by both paths ([§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth)).
 
 ## 3. Crate layering
 
 | Crate | Role | Dependencies |
 |---|---|---|
-| `rhei-viz-model` (new) | §8 serde structs, the HTML/CSS/JS asset, `render_static` | none (pure) |
-| `rhei-viz` (new) | builder from `(plan, resolved machine)`; flattening; derivation (§8/§9/§1.1) | `rhei-core`, `rhei-validator`, `rhei-viz-model` |
+| `rhei-viz-model` (new) | [§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth) serde structs, the HTML/CSS/JS asset, `render_static` | none (pure) |
+| `rhei-viz` (new) | builder from `(plan, resolved machine)`; flattening; derivation ([§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth)/[§AR-rhei-viz-flow.9](rhei-viz-flow.spec.md#9-convergence-plan-ordered-low-risk)/§1.1) | `rhei-core`, `rhei-validator`, `rhei-viz-model` |
 | `rhei-tui` | serves the asset at `/`; builds the superset `/snapshot`; renders the terminal TUI from the same model plus runtime events; owns `/open`, `/log`, `/intervene`, and gate/intervene sinks | `rhei-viz-model` only |
 | `rhei-cli` | `rhei viz` static command; wires the resolved machine + plan loader into the dashboard | `rhei-viz`, `rhei-tui` |
 | `xtask` | dogfood static renderer (thin wrapper over `rhei-viz`) | `rhei-viz` |
@@ -102,7 +102,7 @@ renderers. [§FS-rhei-run-tui.1.5](../functional-spec/rhei-run-tui.spec.md#15-tu
 
 ## 4. The data contract: static base + runtime overlay
 
-[§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §8 states it: *the live `/snapshot` payload is a superset of the
+[§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth) states it: *the live `/snapshot` payload is a superset of the
 embedded static bundle.*
 
 ```
@@ -119,13 +119,13 @@ the migration:
 |---|---|---|
 | `title` | `plan_title` | `plan_title` |
 | `state` | `plan_state` | `plan_state` |
-| `tasks[].subtasks[]` (**nested**) | `tasks: TaskRow[]` (**flat**, `parent`/`depth`) | **flat `TaskRow[]`** (§8) |
+| `tasks[].subtasks[]` (**nested**) | `tasks: TaskRow[]` (**flat**, `parent`/`depth`) | **flat `TaskRow[]`** ([§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth)) |
 | — | `machine`, `about` | **add to the live payload** |
 | — | `slots`, `accounting`, `recent` | present live, absent static |
 
 **Graceful degradation by field-presence** is what lets one renderer serve both
 modes. The JS keys behavior off whether a field is present, never off a mode flag:
-when the runtime overlay is absent (static), the running-now panel hides (§5), the
+when the runtime overlay is absent (static), the running-now panel hides ([§AR-rhei-viz-flow.5](rhei-viz-flow.spec.md#5-data-flow)), the
 intervene composer is shown disabled, the agent terminal shows a representative
 transcript, and cost overlays are empty. This is exactly [§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §7.2.
 
@@ -195,7 +195,7 @@ the full ANSI scrollback comes from `/log`. In the static surface there is no
 ## 7. Intervene: the single mutation boundary
 
 The surface is read-only with respect to plan state, with **exactly one hole**:
-[§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §5 lets the operator message a running agent. This is the only
+[§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.5](rhei-viz-flow.spec.md#5-data-flow) lets the operator message a running agent. This is the only
 inbound, state-changing-adjacent path, and it is the focal point of any security
 review.
 
@@ -239,7 +239,7 @@ answers `reachable(task, slot)` from the same per-slot map `deliver` consults, a
 the dashboard carries that answer in the snapshot as `task_runtime[id].intervene`.
 The Flow composer renders only when it is true, so an operator learns an agent
 can't be messaged *before* typing rather than after a failed send ([§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization)
-§5). Because the gate and delivery share one registry, they cannot disagree: no
+[§AR-rhei-viz-flow.5](rhei-viz-flow.spec.md#5-data-flow)). Because the gate and delivery share one registry, they cannot disagree: no
 built-in profile enables `intervene_stdin` by default, so the composer stays
 hidden until a profile opts in.
 
@@ -261,15 +261,15 @@ and the live dashboard. They are the logic normatively defined in the spec:
 - **State→category classification** — [§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §1.1, evaluated top-to-bottom,
   first match wins, with `active` as the persisted-state catch-all; `live` is
   reserved for the runtime slot overlay.
-- **Plan-state derivation** — [§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §9, with active-like tied to the `idle`
+- **Plan-state derivation** — [§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.9](rhei-viz-flow.spec.md#9-convergence-plan-ordered-low-risk), with active-like tied to the `idle`
   category so a plan of `pending` tasks derives `pending`, not `active`, under any
   profile.
-- **Machine flattening** — [§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §8: per-state explicit transitions plus
+- **Machine flattening** — [§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth): per-state explicit transitions plus
   applicable `from: "*"` wildcard edges (marked `wildcard`); `initial` is the
   **union over profiles** (true when a state is the entry of at least one
   profile), since initiality is per-profile ([§FS-rhei-states](../functional-spec/rhei-states.spec.md#fs-rhei-states-rhei-states-specification)), not a single
   machine-wide value.
-- **Template context derivation** — [§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §8: counted task visits, authored
+- **Template context derivation** — [§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth): counted task visits, authored
   target/model selectors, and multi-target/model fanout variants are flattened
   into the model so the renderer can instantiate prompts and artifact links
   without hard-coded demo values.
@@ -287,14 +287,14 @@ behavior lands last.
    (confirmed canonical source, §10.4); `xtask` becomes a thin caller.
 2. Move classification, plan-state derivation, and machine flattening into
    `rhei-viz`; have both `xtask` and the dashboard call them.
-3. Flatten the static task model to `TaskRow[]`; reconcile the field names in §4.
+3. Flatten the static task model to `TaskRow[]`; reconcile the field names in [§AR-rhei-viz-flow.4](rhei-viz-flow.spec.md#4-the-data-contract-static-base--runtime-overlay).
 4. Add `machine` + `about` to the live `/snapshot`; serve the `rhei-viz-model`
    asset at `/` instead of `dashboard/html.rs`.
 5. Fold the legacy tabs into the asset as the §12 *supplementary* surfaces
    (Tasks / Slots / Cost / Journal / Links / Gantt / Cube / Sankey); the Flow view
    becomes primary. Retire `dashboard/html.rs`.
-6. Add the durable-log terminal endpoint `/log` (§6) and the run-end freeze (§5.3).
-7. Add the `/intervene` channel with its stdin registry and audit log (§7), and
+6. Add the durable-log terminal endpoint `/log` ([§AR-rhei-viz-flow.6](rhei-viz-flow.spec.md#6-live-agent-terminal-full-durable-log)) and the run-end freeze ([§AR-rhei-viz-flow.5.3](rhei-viz-flow.spec.md#53-run-end-freeze-correct-by-construction)).
+7. Add the `/intervene` channel with its stdin registry and audit log ([§AR-rhei-viz-flow.7](rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary)), and
    the `rhei viz` subcommand (`rhei-cli` → `rhei-viz-model::render_static`).
 
 ## 10. Decisions recorded
@@ -302,14 +302,14 @@ behavior lands last.
 1. **Intervene is the one mutation boundary, and it is logged.** `/intervene`
    delivers bytes to a single agent's stdin and nothing else; no server path
    reaches plan state. Every intervention (and every delivery failure) is written
-   to `runtime/interventions.log` and mirrored into the task transcript (§7).
+   to `runtime/interventions.log` and mirrored into the task transcript ([§AR-rhei-viz-flow.7](rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary)).
 2. **Keep the model/builder split.** `rhei-viz-model` (pure) vs. `rhei-viz`
    (builder, depends on core+validator) keeps `rhei-tui` free of `rhei-core` and
-   `rhei-validator` (§3).
+   `rhei-validator` ([§AR-rhei-viz-flow.3](rhei-viz-flow.spec.md#3-crate-layering)).
 3. **The live terminal sources the full durable log**, via a dedicated `/log`
-   endpoint, not the `SLOT_TRAFFIC_LIMIT` ring (§6).
+   endpoint, not the `SLOT_TRAFFIC_LIMIT` ring ([§AR-rhei-viz-flow.6](rhei-viz-flow.spec.md#6-live-agent-terminal-full-durable-log)).
 4. **The `xtask` prototype is the canonical renderer source** and is promoted into
-   `rhei-viz-model`; `dashboard/html.rs` is retired, not extended (§1, §9).
+   `rhei-viz-model`; `dashboard/html.rs` is retired, not extended ([§AR-rhei-viz-flow.1](rhei-viz-flow.spec.md#1-context-two-renderers-one-design), [§AR-rhei-viz-flow.9](rhei-viz-flow.spec.md#9-convergence-plan-ordered-low-risk)).
 
 ## Related Specifications
 

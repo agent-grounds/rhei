@@ -48,20 +48,20 @@ A task has children when the parent **steers** them, **integrates** them, or
 
 | The work | Construct | Because |
 |---|---|---|
-| a counted `review → fix` loop where only the final code is read | **states** of one task | every round's output reaches only the next round §2 |
-| a reproducer, a contract or a gate's verdict a later step consumes by name | **task** | named from outside its own state chain, and an outcome of its own §2 |
-| claiming the work before anything is spent on it | **task** beside the root | a person checks who holds it, and it is no other task's outcome §2 |
-| a reading several checks are each owed to | **subtasks** under the reading | the parent speaks for the verdict and the children start inside it §3.2 |
-| one child per item, where the item count is unknown when the plan is authored | **subtasks** appended by the parent | the parent steers what it cannot enumerate §3.2 |
-| the parts of one feature — schema, endpoint, UI | **flat tasks** with `**Prior:**` | nothing is owed above them §3.1 |
-| the same parts, plus an integration somebody reads | **subtasks** under the integrator | the parent's deliverable is made out of theirs §3.2 |
-| a wait for something outside the plan | **state** | a wait makes nothing; an answer it brings back is the waiting task's own outcome, kept in its export §2 |
-| opening the pull request for a change a task committed | **program state** of that task | the URL is the task's own outcome, kept in its export and on the forge §2 |
-| classifying an issue that carries no kind | **agent state**, then **program state**, of the task that triages it | the kind is the task's own outcome, and the label keeps it §2 |
-| a lookup that must happen before a verdict | **program state** | its product is read by the verdict, in the same task §2 |
-| a supervisor's own decision between two steps | **no new node** | it is the parent's work, in the parent's body and brief §3.2 |
-| a discussion with participants, rounds and a ruling | **its own rhei** | participants and a ruling are a plan, not a state §1 |
-| a checklist one session finishes, nothing kept between items | **body prose** | nothing is memory, so nothing needs an identity §2 |
+| a counted `review → fix` loop where only the final code is read | **states** of one task | every round's output reaches only the next round [§FS-rhei-shape.2](../../../../../docs/functional-spec/rhei-shape.spec.md#2-the-memory-test) |
+| a reproducer, a contract or a gate's verdict a later step consumes by name | **task** | named from outside its own state chain, and an outcome of its own [§FS-rhei-shape.2](../../../../../docs/functional-spec/rhei-shape.spec.md#2-the-memory-test) |
+| claiming the work before anything is spent on it | **task** beside the root | a person checks who holds it, and it is no other task's outcome [§FS-rhei-shape.2](../../../../../docs/functional-spec/rhei-shape.spec.md#2-the-memory-test) |
+| a reading several checks are each owed to | **subtasks** under the reading | the parent speaks for the verdict and the children start inside it [§FS-rhei-shape.3.2](../../../../../docs/functional-spec/rhei-shape.spec.md#32-the-three-reasons-a-task-has-children) |
+| one child per item, where the item count is unknown when the plan is authored | **subtasks** appended by the parent | the parent steers what it cannot enumerate [§FS-rhei-shape.3.2](../../../../../docs/functional-spec/rhei-shape.spec.md#32-the-three-reasons-a-task-has-children) |
+| the parts of one feature — schema, endpoint, UI | **flat tasks** with `**Prior:**` | nothing is owed above them [§FS-rhei-shape.3.1](../../../../../docs/functional-spec/rhei-shape.spec.md#31-the-default-is-flat) |
+| the same parts, plus an integration somebody reads | **subtasks** under the integrator | the parent's deliverable is made out of theirs [§FS-rhei-shape.3.2](../../../../../docs/functional-spec/rhei-shape.spec.md#32-the-three-reasons-a-task-has-children) |
+| a wait for something outside the plan | **state** | a wait makes nothing; an answer it brings back is the waiting task's own outcome, kept in its export [§FS-rhei-shape.2](../../../../../docs/functional-spec/rhei-shape.spec.md#2-the-memory-test) |
+| opening the pull request for a change a task committed | **program state** of that task | the URL is the task's own outcome, kept in its export and on the forge [§FS-rhei-shape.2](../../../../../docs/functional-spec/rhei-shape.spec.md#2-the-memory-test) |
+| classifying an issue that carries no kind | **agent state**, then **program state**, of the task that triages it | the kind is the task's own outcome, and the label keeps it [§FS-rhei-shape.2](../../../../../docs/functional-spec/rhei-shape.spec.md#2-the-memory-test) |
+| a lookup that must happen before a verdict | **program state** | its product is read by the verdict, in the same task [§FS-rhei-shape.2](../../../../../docs/functional-spec/rhei-shape.spec.md#2-the-memory-test) |
+| a supervisor's own decision between two steps | **no new node** | it is the parent's work, in the parent's body and brief [§FS-rhei-shape.3.2](../../../../../docs/functional-spec/rhei-shape.spec.md#32-the-three-reasons-a-task-has-children) |
+| a discussion with participants, rounds and a ruling | **its own rhei** | participants and a ruling are a plan, not a state [§FS-rhei-shape.1](../../../../../docs/functional-spec/rhei-shape.spec.md#1-the-constructs) |
+| a checklist one session finishes, nothing kept between items | **body prose** | nothing is memory, so nothing needs an identity [§FS-rhei-shape.2](../../../../../docs/functional-spec/rhei-shape.spec.md#2-the-memory-test) |
 
 ## The paired examples
 

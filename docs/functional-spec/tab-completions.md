@@ -12,7 +12,7 @@ The generated completions are dynamic. Shells call back into the installed
 can offer the nearest copy of each template name for `rhei instantiate <TAB>`.
 Discovery checks `.agent-grounds/rhei/templates/` and then deprecated
 `.agents/rhei/templates/` at every ancestor before user templates and the
-built-in library (§FS-rhei-templates.1.2).
+built-in library ([§FS-rhei-templates.1.2](rhei-templates.spec.md#12-the-ancestor-walk-checks-both-names-at-each-level)).
 
 ## Install for the Current User
 

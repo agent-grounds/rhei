@@ -36,12 +36,12 @@ count bound the project declares — `transition_limit`, `invocations_per_day`, 
 key at a time — the ceiling in place of its own, whether higher or lower. A plan
 or profile may still lower that ceiling and still cannot raise it, and is
 reported as `limited by project settings` when it asks for more
-([§FS-rhei-budgets.2](../../functional-spec/rhei-budgets.spec.md#2-where-a-bound-comes-from), §FS-rhei-budgets.2.3).
+([§FS-rhei-budgets.2](../../functional-spec/rhei-budgets.spec.md#2-where-a-bound-comes-from), [§FS-rhei-budgets.2.3](../../functional-spec/rhei-budgets.spec.md#23-provenance-is-two-valued)).
 
 The default does not move. A machine that does not set the key bounds every
 project exactly as before, and `clamp_projects` anywhere but the machine file is
 refused, so a repository cannot opt itself out
-(§FS-rhei-agents.1.1.1). `spend_per_day` and `invocation_lifetime_max` are never
+([§FS-rhei-agents.1.1.1](../../functional-spec/rhei-agents.spec.md#111-defaults)). `spend_per_day` and `invocation_lifetime_max` are never
 delegated.
 
 ```text
@@ -53,7 +53,7 @@ machine 80, project 1000, no profile ->  80 (requested 1000 by the project, limi
 **Rejected.**
 
 - *The project wins by default.* It reverses the who-pays rationale of
-  §REQ-bounded-neural-work.2 for every machine at once, and makes a pulled
+  [§REQ-bounded-neural-work.2](../../requirements/bounded-neural-work.spec.md#2-bounded-by-default-refusing-nothing-that-runs-today) for every machine at once, and makes a pulled
   commit a source of invocation capacity on machines that never chose it.
 - *Per-key switches* such as `clamp_projects: ["transition_limit"]`. The
   project's own declarations already say which keys it wants.
@@ -61,7 +61,7 @@ machine 80, project 1000, no profile ->  80 (requested 1000 by the project, limi
   no day limit, so it would need a new journal fact, and a raise would then
   behave differently from a lowering. A delegated raise is measured against the
   same day's consumption, exactly as a machine-file edit is
-  (§REQ-bounded-neural-work.4).
+  ([§REQ-bounded-neural-work.4](../../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)).
 - *`deny_unknown_fields` on settings and profiles* as the refusal. It would
   refuse every unknown key in every existing file, a far wider break than one
   key.
@@ -76,4 +76,4 @@ bound says whose ceiling it is and which machine file delegated it.
 
 Every settings remedy in a halt now names the file by its path, on every
 machine, because "the project settings file" no longer says which of two homes
-holds the ceiling (§FS-rhei-budgets.8).
+holds the ceiling ([§FS-rhei-budgets.8](../../functional-spec/rhei-budgets.spec.md#8-exhaustion)).

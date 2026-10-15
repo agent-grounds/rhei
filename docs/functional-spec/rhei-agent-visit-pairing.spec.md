@@ -3,9 +3,9 @@
 An operator may edit an agent state's target between two runs without the
 ticket moving: the run that spawned the old target exited, and the next run
 reads a plan that names a different identity for the same state. This point
-says what the pre-spawn completion check (§FS-rhei-agents.3.2) does with the
+says what the pre-spawn completion check ([§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition)) does with the
 work the old target finished in that visit. It extends the spawn-record trust
-rule of §FS-rhei-agents.8.4 and changes neither the record nor its file name.
+rule of [§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records) and changes neither the record nor its file name.
 
 Work finished in a visit is not undone by an in-place edit of the state's
 target, whether or not the new target's file-name slug equals the old one's.
@@ -34,13 +34,13 @@ decides for it alone, and no orphan answers for it.
 
 An orphaned record can stand in for a recordless invocation only when it names
 the same `task` and canonical `state` as fields, its `moves` equals the current
-move count, and it proves successful work by the test of §FS-rhei-agents.8.4.
+move count, and it proves successful work by the test of [§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records).
 The pairing is unique: exactly one such orphan and exactly one recordless
 invocation. The orphan then answers for that invocation's visit eligibility.
 
 Pairing proves only visit eligibility: the paired invocation's own declared
 outputs and required result are still checked under its own identity
-(§FS-rhei-agents.3.2).
+([§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition)).
 
 ## 4. What a Pairing Prints
 
@@ -63,11 +63,11 @@ invocation with no orphan (an added one) pairs nothing and passes silently.
 
 ## 6. The Legacy First-Visit Branch
 
-The legacy first-visit interpretation of §FS-rhei-agents.3.2, which may reuse
+The legacy first-visit interpretation of [§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition), which may reuse
 pre-populated work without a spawn, applies only while no spawn record of this
 task and state, of any identity, exists at the current move count. Such a record
 means the state already ran in this visit, so the records decide, by
-§FS-rhei-agents.8.4 and this point, not the files on disk.
+[§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records) and this point, not the files on disk.
 
 ## 7. Nothing Persisted
 

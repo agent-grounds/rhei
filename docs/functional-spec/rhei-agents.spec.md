@@ -41,7 +41,7 @@ Both files use the same schema. Project settings compose with global settings by
 key rather than replacing the whole file.
 
 The effective agent/model roster and the exact files selected for this merge
-are inspectable with `rhei roster`; its output contract is §1.1.7.
+are inspectable with `rhei roster`; its output contract is [§FS-rhei-agents.1.1.7](rhei-agents.spec.md#117-inspecting-the-effective-roster).
 
 **The project settings file is resolved by first match, and the two project
 paths are never merged.** `.agent-grounds/rhei/settings.json` is read when it
@@ -54,8 +54,8 @@ above.
 `.agents/rhei/` is the deprecated home for rhei's project-local material and
 reading from it prints a deprecation warning naming both paths; the warning's
 contract — stderr, once per distinct path per process, silent when only
-`.agent-grounds/rhei/` is present — is §FS-rhei-templates.1.3, and the reason
-the directory moved is §FS-rhei-templates.1.1. Rhei writes only
+`.agent-grounds/rhei/` is present — is [§FS-rhei-templates.1.3](rhei-templates.spec.md#13-the-deprecation-warning), and the reason
+the directory moved is [§FS-rhei-templates.1.1](rhei-templates.spec.md#11-rheis-project-local-home-and-its-deprecated-predecessor). Rhei writes only
 `.agent-grounds/rhei/settings.json`.
 
 **A message that names the project settings file names the one being read.**
@@ -206,7 +206,7 @@ agent's `command`, flags, and modes are declared.
 | `intervene_stdin` | boolean | No | When `true`, `rhei run --dashboard` keeps the child stdin pipe open after the initial prompt so live dashboard interventions can be written to it. Use only for agents that start work without waiting for stdin EOF. Default: `false`. |
 | `timeout` | string | No | Default timeout for this agent (e.g., `30m`). Overridden by state-level `agent_timeout`. |
 | `mcp_flag` | string | No | Flag used to attach one MCP server per occurrence. `rhei run` emits the flag once per resolved server with a launch spec as its value. Mutually exclusive with `mcp_config_flag`. |
-| `mcp_config_flag` | string | No | Flag used to attach a generated MCP config file. `rhei run` writes the resolved set to a temporary JSON file, in the shape §FS-rhei-mcp-config-file gives, and passes it with this flag once. Mutually exclusive with `mcp_flag`. |
+| `mcp_config_flag` | string | No | Flag used to attach a generated MCP config file. `rhei run` writes the resolved set to a temporary JSON file, in the shape [§FS-rhei-mcp-config-file](rhei-mcp-config-file.spec.md#fs-rhei-mcp-config-file-the-mcp-config-file-an-agent-is-handed) gives, and passes it with this flag once. Mutually exclusive with `mcp_flag`. |
 | `skill_flag` | string | No | Flag used to enable one skill per occurrence. `rhei run` emits the flag once per resolved skill id. Omit to declare the agent does not support skills. |
 | `deny_read` | object | No | Optional read-denial adapter. In v1 its only field is required `path_flag`: a non-empty string repeated once per resolved excluded absolute path before the profile separator. |
 | `modes` | object | No | Named flag sets, keyed by mode name. Values are ordered string arrays appended to the command at spawn time. See [Modes](#22-modes). |
@@ -348,10 +348,10 @@ warning: agents.cdx declares no family, and 'cdx' is not a built-in agent, so it
 A profile that declares a family does not warn, even one with no extractor such
 as `gemini`: it chose its family. Neither does a built-in id, used bare or
 replaced by a same-id entry: it is a family, and what is measured for it is
-§FS-rhei-cost-accounting.3.2's to say.
+[§FS-rhei-cost-accounting.3.2](rhei-cost-accounting.spec.md#32-extraction-status)'s to say.
 
 Everything that *names* the agent stays the profile's own id: `RHEI_AGENT`, the
-log header's `agent:` line, spawn records (§FS-rhei-agents.8.4), target slugs, the invocation
+log header's `agent:` line, spawn records ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)), target slugs, the invocation
 record's `invocation_id` and `agent`, `rhei cost --by agent`, snapshot lock
 selectors, and every diagnostic. A family is what a profile is, not what it is
 called. `models.<id>.agents.<agent-id>` bindings are keyed on the profile's own
@@ -368,7 +368,7 @@ that home restates `session` instead of inheriting it. `claude-code` declares no
 
 **Enabling live intervention.** No built-in agent enables `intervene_stdin`: the
 known coding agents read their prompt and then run autonomously without consuming
-more stdin, so the Flow composer ([§FS-rhei-viz](rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §5) and `rhei intervene` are hidden
+more stdin, so the Flow composer ([§FS-rhei-viz](rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§FS-rhei-agents.5](rhei-agents.spec.md#5-rhei-run--agent-mode)) and `rhei intervene` are hidden
 for them. To make a live agent messageable, register an agent whose transport
 keeps reading stdin after it starts, and set both `stdin_prompt` and
 `intervene_stdin`:
@@ -475,7 +475,7 @@ so it can be attached to an agent subprocess.
 | `url` | string | One of `command` / `url` | URL of a remote MCP server. Requires `transport`. |
 | `transport` | string | No | Transport for remote servers. Supported values: `sse`, `websocket`. Ignored for `command`-based servers. |
 | `env` | object | No | Environment variables for the server process. Values may reference host environment with `${VAR}` syntax. Only meaningful for `command`-based servers. |
-| `working_directory` | string | No | Working directory for the server process. Only meaningful for `command`-based servers. An `mcp_config_flag` file cannot carry it, and the spawn warns instead (§FS-rhei-mcp-config-file.2). |
+| `working_directory` | string | No | Working directory for the server process. Only meaningful for `command`-based servers. An `mcp_config_flag` file cannot carry it, and the spawn warns instead ([§FS-rhei-mcp-config-file.2](rhei-mcp-config-file.spec.md#2-a-working-directory-the-file-cannot-carry)). |
 | `startup_timeout` | string | No | Maximum time to wait for the server to complete its MCP handshake after launch. Duration format (`30s`, `10s`, …). Default: `10s`. |
 
 `command` and `url` are mutually exclusive. An entry must declare exactly one.
@@ -532,9 +532,9 @@ exactly these stable top-level fields:
 | `schema_version` | Integer `1` |
 | `project_root` | Resolved path of the root whose settings were merged |
 | `sources` | The built-in, global, and project source metadata below |
-| `agents` | Effective agent profiles keyed by agent id, using the fields in §1.1.2 |
-| `models` | Effective model profiles and bindings keyed by id, using the fields in §1.1.3 |
-| `defaults` | Effective canonical nested defaults, using the fields in §1.1.1 |
+| `agents` | Effective agent profiles keyed by agent id, using the fields in [§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents) |
+| `models` | Effective model profiles and bindings keyed by id, using the fields in [§FS-rhei-agents.1.1.3](rhei-agents.spec.md#113-models) |
+| `defaults` | Effective canonical nested defaults, using the fields in [§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults) |
 | `provenance` | Origins for the independently merged values below |
 
 `sources` always contains all three keys. `sources.built_in` is an object with
@@ -551,7 +551,7 @@ Every provenance leaf is one of the source keys `built_in`, `global`, or
 `project`:
 
 - `provenance.agents.<id>` is one origin for the whole agent profile: the
-  source that declared the entry. A profile that declares `family` (§FS-rhei-agents.1.1.2) is
+  source that declared the entry. A profile that declares `family` ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)) is
   reported **resolved** — its written and its inherited fields together, with
   `family` among them — under that same single origin, because the entry is
   still what a layer replaced. Family inheritance adds no provenance leaf, so
@@ -565,7 +565,7 @@ Every provenance leaf is one of the source keys `built_in`, `global`, or
   default.
 
 The settings loader records these origins in the same decisions that perform
-the merge in §1.3. The roster renderer consumes that merged result and must not
+the merge in [§FS-rhei-agents.1.3](rhei-agents.spec.md#13-merge-semantics). The roster renderer consumes that merged result and must not
 re-read settings documents or perform a second merge. Existing execution
 callers receive unchanged effective settings. A mixed model or binding reports
 the origin of each inherited and overriding field rather than assigning one
@@ -614,7 +614,7 @@ settings compose over the result:
 - `agents` merge by agent id. A user entry with the same id as a built-in or a
   global entry **replaces that entry wholesale** — there is no field-level
   merge within a single agent entry. To tweak just one mode of a built-in
-  agent, redeclare the whole entry, or declare `family` (§FS-rhei-agents.1.1.2) and write only
+  agent, redeclare the whole entry, or declare `family` ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)) and write only
   the fields that differ. Family inheritance is one fallback applied once after
   this merge has produced the effective registry, over the set of keys each
   entry actually wrote, so everything downstream — execution, `rhei roster`,
@@ -634,7 +634,7 @@ settings compose over the result:
   never against the working directory the command ran in. Resolving it reads no
   filesystem entry, so settings whose book is missing or misspelled still merge
   and the authored string is still what inspection prints
-  ([§FS-rhei-agents.1.1.7](#117-inspecting-the-effective-roster)). What the book
+  ([§FS-rhei-agents.1.1.7](rhei-agents.spec.md#117-inspecting-the-effective-roster)). What the book
   at that path does is owned by [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection).
 - `mcp_servers` merge by server id.
 - `skills` merge by skill id.
@@ -755,7 +755,7 @@ When the resolved agent declares `modes`, Rhei selects one in this order:
 An explicit state `target` or `all_targets` selector, or a task
 `**Target:**`, carries its own optional mode and bypasses this legacy
 resolution order. A state-level mode shadows both settings defaults. Selection
-of the effective agent still follows §1.4, including state, merged settings,
+of the effective agent still follows [§FS-rhei-agents.1.4](rhei-agents.spec.md#14-resolution-order), including state, merged settings,
 and model-default agents.
 
 State effort follows that effective selection without modifying it. A task
@@ -789,7 +789,7 @@ the effective MCP server and skill sets:
 3. Deduplicate by id; a state-level entry wins over a defaults entry. Then add
    the task's `**MCP servers:**` / `**Skills:**` entries unless the state
    withholds them; an id already in the set keeps its definition
-   (§FS-rhei-task-tooling.3, §FS-rhei-task-tooling.4).
+   ([§FS-rhei-task-tooling.3](rhei-task-tooling.spec.md#3-the-effective-set), [§FS-rhei-task-tooling.4](rhei-task-tooling.spec.md#4-a-state-that-withholds)).
 4. Resolve each id against the merged `mcp_servers` / `skills` registry. An
    inline entry on the state (or in `defaults`) needs none and is used as-is.
 5. An id with no registry match and no inline definition is a validation
@@ -846,7 +846,7 @@ historically the agent's default.
 
 | Agent ID | Binary | Prompt Delivery | Model Flag | MCP Wiring | Skill Wiring | `yolo` Mode Flags |
 |----------|--------|-----------------|------------|------------|--------------|-------------------|
-| `claude-code` | `claude` | stdin, under a bare `-p`, with `--output-format stream-json --verbose`; with `intervene_stdin`, stream-json stdin as well | `--model <m>` | Always `--strict-mcp-config`; `--mcp-config <path>`, a file shaped as §FS-rhei-mcp-config-file gives, only for a nonempty available selection | `--skill <id>` | `--permission-mode bypassPermissions` |
+| `claude-code` | `claude` | stdin, under a bare `-p`, with `--output-format stream-json --verbose`; with `intervene_stdin`, stream-json stdin as well | `--model <m>` | Always `--strict-mcp-config`; `--mcp-config <path>`, a file shaped as [§FS-rhei-mcp-config-file](rhei-mcp-config-file.spec.md#fs-rhei-mcp-config-file-the-mcp-config-file-an-agent-is-handed) gives, only for a nonempty available selection | `--skill <id>` | `--permission-mode bypassPermissions` |
 | `codex` | `codex exec` | `--` (stdin) | `--model <m>` | `--mcp <spec>` (per server) | unsupported | `--sandbox danger-full-access --skip-git-repo-check -c approval_policy="never"` |
 | `gemini` | `gemini` | `--prompt <prompt>` | `--model <m>` | unsupported | unsupported | `--approval-mode yolo` |
 | `cursor` | `cursor-agent` | `--print <prompt>` | `--model <m>` | unsupported | unsupported | `--force` |
@@ -881,7 +881,7 @@ warning to an error.
 
 A user-written entry for one of these ids in `settings.json` replaces the
 built-in entry wholesale (see [Merge Semantics](#13-merge-semantics)).
-`family` (§FS-rhei-agents.1.1.2) is the partial counterpart to that rule and the two are read
+`family` ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)) is the partial counterpart to that rule and the two are read
 together: an entry that reuses a built-in id and writes no `family` still
 replaces it wholesale, while an entry that writes `family` replaces only the
 fields it writes. That includes an entry whose id is the same built-in it names
@@ -937,7 +937,7 @@ states:
 
 When the agent is one of the built-ins behind a wrapper rather than a new
 agent, declare the family instead of restating the transport, and write only
-what the wrapper changes (§FS-rhei-agents.1.1.2):
+what the wrapper changes ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)):
 
 ```json
 {
@@ -1042,12 +1042,12 @@ uppercase `AM` or `PM`. The ordinal suffix must agree with the day: `11`–`13`
 use `th`, otherwise a final digit of `1`, `2`, or `3` uses `st`, `nd`, or `rd`,
 respectively, and all others use `th`. The calendar date must exist, including
 the leap-year rule. The full date has no printed zone and uses OS-local
-timezone rules, with the unique, future safe boundary of §FS-rhei-run.3.3.
+timezone rules, with the unique, future safe boundary of [§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking).
 
 For the resolved `claude-code` family, a stream-json stdout event with
 `type: "result"` and a textual `result` contributes the decoded result text's
 logical lines, rather than the JSON envelope, to recognition. This is the
-human-readable result output of §FS-rhei-cost-accounting.4; recognition does
+human-readable result output of [§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow); recognition does
 not require successful usage extraction. Assistant text echoes, rate-limit
 events, and other JSON events contribute no decoded refusal text.
 
@@ -1069,8 +1069,8 @@ reset information, an absent or invalid required zone, an invalid calendar
 date or ordinal, a nonexistent or ambiguous local time, unavailable local
 resolution, or a second matching line is an ordinary process result. Timeout and
 interruption are classified first, so their output can never turn them into a
-provider limit (§FS-rhei-agents.7.3, §FS-rhei-run.3.2). The recognized result is
-the provider-limited ending of §FS-rhei-run.3.3, whose durable record carries
+provider limit ([§FS-rhei-agents.7.3](rhei-agents.spec.md#73-timeout-behavior), [§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)). The recognized result is
+the provider-limited ending of [§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking), whose durable record carries
 the resolved agent registry id alongside the provider.
 
 The provider set and time-of-day period vocabulary are closed; extending them
@@ -1221,7 +1221,7 @@ configured in `states.yaml`.
 Task exports are resolved from the current task's `**Consumes:**` and
 `**Provides:**` metadata ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)). Each consumed export
 is injected under `## Consumed Exports` in `**Consumes:**` order only after the
-preflight in §3.3 accepts all of them. Each declared `**Provides:**` entry is
+preflight in [§FS-rhei-agents.3.3](rhei-agents.spec.md#33-consumed-export-preflight) accepts all of them. Each declared `**Provides:**` entry is
 listed under `## Exports to Publish` with the path the agent must write. Like
 prior task results, this is graph-level context and is not configured in
 `states.yaml`.
@@ -1231,7 +1231,7 @@ selection and must not imply isolation: undeclared sibling exports under
 `runtime/exports/` remain readable. Scheduling participants concurrently and
 briefing them not to inspect sibling exports can reduce accidental
 cross-reading, but neither enforces blindness once an export exists
-(§FS-rhei-plan-language.3.12).
+([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)).
 
 The `## Result` section is emitted when — and only when — some transition
 declared **from this state by name** lands on a `final: true` state, so it
@@ -1248,7 +1248,7 @@ state, this invocation's own fragment
 ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)), which is also the path the orchestrator validates for that
 invocation — rendered relative to the artifact root, or absolute when the
 checkout root differs from it, on the same rule `{output.<name>.path}` follows
-(§4). Under `orchestrator` authority a
+([§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables)). Under `orchestrator` authority a
 subprocess never calls `rhei complete`, so without this section the one
 artifact a terminal state requires would be the only one the agent was never
 shown. The section names the fact and the path and stops there: "write it, then
@@ -1348,7 +1348,7 @@ The condition is normative and universal for agent states:
    body ([§FS-rhei-memory.3.4](rhei-memory.spec.md#34--rhei-commands-additions)), and an edit that leaves the plan unloadable fails
    this clause whatever the exit code: no transition fires, the task's region is
    restored to its text before the attempt, and the attempt is charged against
-   the budget of §3.2.3 ([§FS-rhei-run.3.7](rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan)). It is asked before the other
+   the budget of [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget) ([§FS-rhei-run.3.7](rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan)). It is asked before the other
    three, because they read the plan it re-reads.
 
 Condition (2) resolves declared `outputs:` against the execution root of the
@@ -1388,7 +1388,7 @@ absent. Counted state suffixes refer to the same canonical state. When neither
 usable history source establishes an earlier visit and the state has no record at
 the current move count, the legacy first-visit interpretation remains available.
 Otherwise each invocation is eligible only when a spawn record proves successful
-work for it in the current visit (§8.4). A restart or a withheld edge that has not
+work for it in the current visit ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)). A restart or a withheld edge that has not
 moved the ticket stays in the same visit and may reuse that successful proof.
 
 The pass therefore skips an invocation only when visit eligibility and
@@ -1430,7 +1430,7 @@ Under `orchestrator` authority, `rhei run`:
    The exit that ends the wait is the direct subprocess's: a descendant that
    still holds the stdout or stderr it inherited does not delay completion.
    Output written before that exit is captured whole, and what a descendant
-   writes after it only best-effort (§FS-rhei-agent-output-drain).
+   writes after it only best-effort ([§FS-rhei-agent-output-drain](rhei-agent-output-drain.spec.md#fs-rhei-agent-output-drain-agent-output-at-exit)).
 2. On timeout, sends `SIGTERM` to the subprocess, 10 s grace, then `SIGKILL`.
    Timeout transitions fire per [Timeout Handling](#7-timeout-handling). Agents
    that fork long-running descendants should install their own cleanup; the
@@ -1448,13 +1448,13 @@ Under `orchestrator` authority, `rhei run`:
      {id} in state '{state}': <name1> (<path1>), <name2> (<path2>)` — with
      `program` in place of `agent` when a program state stalls the same way —
      followed by a halt line that says what the run will do next. That line is
-     a **prediction**, so it is conditioned on the attempt budget of §3.2.3 and
+     a **prediction**, so it is conditioned on the attempt budget of [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget) and
      not on the completion condition alone. While the visit has an attempt left
      it reads `halting Task {id} in state '{state}': the completion condition is
      not met, so no transition fires; a later pass runs the state again.` When
      the attempt that just finished was the *last* one this visit gets, that
      sentence would be false — no later pass will run the state again — and the
-     exhaustion line of §3.2.3 is printed in its place, word for word, at the
+     exhaustion line of [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget) is printed in its place, word for word, at the
      moment it becomes true rather than one run later. An operator must never
      read a promise of a retry from the run that spent the last attempt and the
      denial of one from the run after it.
@@ -1465,7 +1465,7 @@ Under `orchestrator` authority, `rhei run`:
      claimable tickets ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 5).
    - A later pass that reaches the same ticket spawns the state again, because
      the invocation still fails the completion condition it is scheduled
-     against (§3.2). The spawn says so as it happens, beside the `Log:` line:
+     against ([§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition)). The spawn says so as it happens, beside the `Log:` line:
      `Re-spawning Task {id} in state '{state}': attempt {n} of {budget}; the
      previous attempt {ending} (previous log: {path})` — one line, naming the
      attempt being spent, the budget it comes out of, and the transcript it is
@@ -1473,9 +1473,9 @@ Under `orchestrator` authority, `rhei run`:
      time. On a poll state ([§FS-rhei-states.2](rhei-states.spec.md#2-polling-states)) the budget named is the state's
      own `poll.max_attempts`, and the line says which mechanism it is:
      `attempt {n} of {max_attempts} (poll.max_attempts)` — that is the bound
-     that actually applies, since §3.2.3 exempts a poll state from `attempts:`.
+     that actually applies, since [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget) exempts a poll state from `attempts:`.
      The engine never prints its internal "no budget applies" sentinel as a
-     count. `{ending}` is read from that attempt's spawn record (§8.4) and says
+     count. `{ending}` is read from that attempt's spawn record ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)) and says
      what actually happened to it — `timed out after 30m`, `was interrupted by
      a run shutdown`, `was provider-limited`, `exited 3`, `exited 0`, or `ended
      without an exit code (a signal ended it)`. The record's `ending` decides
@@ -1504,10 +1504,10 @@ Under `orchestrator` authority, `rhei run`:
      is a retry and nothing more. It says the completion condition was not met
      only where that list names something, so a retry is never told the
      condition went unmet without being told what is unmet
-     (§FS-rhei-memory.4.4). This warning and that prompt are two readings
+     ([§FS-rhei-memory.4.4](rhei-memory.spec.md#44-previous-visits)). This warning and that prompt are two readings
      of one list, and the prompt is the one a paid attempt reads, so it may not
      name a file the warning did not.
-   - The retry is bounded, per state visit, by the **attempt budget** of §3.2.3.
+   - The retry is bounded, per state visit, by the **attempt budget** of [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget).
      Spawn number `{budget} + 1` of a visit does not happen: the ticket stays
      where it is, is not scheduled again for the rest of the run, and the engine
      logs `halting Task {id} in state '{state}': {budget} attempts spent on this
@@ -1558,14 +1558,14 @@ no agent at all is not this error but whatever diagnostic its own binding earns.
 
 `rhei validate`, `rhei run --dry-run` and `rhei run` all refuse such a plan with
 the same sentence, naming the same state and agent, and the same non-zero exit.
-Validation is where the refusal is decided (§FS-rhei-validate.4 step 3), so a
+Validation is where the refusal is decided ([§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior) step 3), so a
 plan `rhei validate` accepts is one whose every orchestrator-driven agent state
 is bounded; the spawn path keeps the same guard at the boundary it protects.
 `rhei run --no-agent` resolves no agent invocation and is exempt, as it is from
 every other check about an effective agent binding. This point is about
 `agent_timeout` alone: the wider rule a state machine writer is held to — a
 finite `agent_timeout` **or** `program_timeout` — is
-§FS-rhei-state-machine-writer.4 step 9, whose program half is not engine-checked.
+[§FS-rhei-state-machine-writer.4](rhei-state-machine-writer.spec.md#4-workflow) step 9, whose program half is not engine-checked.
 
 This closes the one remaining non-determinism in the completion contract: an
 agent that hangs without producing outputs is bounded by the timeout and
@@ -1575,13 +1575,13 @@ when no timeout transition is declared).
 #### 3.2.3. Attempt Budget
 
 One state **visit** — the span between two consecutive moves of the ticket
-(§8.1) — may be spawned a bounded number of times. This is not `visits:`:
+([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)) — may be spawned a bounded number of times. This is not `visits:`:
 `visits:` counts how many times a ticket may **enter** the state; `attempts:`
 counts how many times a single entry may be **spawned** before the run halts.
 Entering the state again is a new visit, and a new visit brings a fresh
 `attempts:` budget.
 
-The budget can be set at two levels, resolved the way a timeout is (§7.1):
+The budget can be set at two levels, resolved the way a timeout is ([§FS-rhei-agents.7.1](rhei-agents.spec.md#71-configuration)):
 
 1. **Per-state** — `attempts` field on a state definition:
    ```yaml
@@ -1598,22 +1598,22 @@ The budget can be set at two levels, resolved the way a timeout is (§7.1):
 Resolution: state-level > settings defaults > the built-in **2**.
 
 An exhausted non-poll, non-terminal visit can receive one more configured
-budget through the attended `rhei retry` command (§FS-rhei-retry.2). Its
+budget through the attended `rhei retry` command ([§FS-rhei-retry.2](rhei-retry.spec.md#2-grant-and-refusals)). Its
 effective budget is the configured `attempts:` plus the sum of that visit's
-audited grants (§FS-rhei-agents.8.4). The grant changes neither the visit key nor attempt/log
+audited grants ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)). The grant changes neither the visit key nor attempt/log
 numbering, state, move ledger, `stateVisits`, supervision phase, or checkpoints.
 It creates no travel, visit, or invocation headroom: each admitted neural
-attempt still costs an invocation (§FS-rhei-budgets.4.2). Grants cannot be
+attempt still costs an invocation ([§FS-rhei-budgets.4.2](rhei-budgets.spec.md#42-invocations)). Grants cannot be
 stockpiled while attempts remain and cannot be issued by a spawned worker.
 
 Two is the initial invocation plus one informed retry. It is deliberate. A
 retry that is told nothing repeats its predecessor exactly and buys nothing, so
-the one retry is worth spending only because §3.2.1 makes it an informed one; a
+the one retry is worth spending only because [§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics) makes it an informed one; a
 third attempt that has learned nothing new since the second is spend without a
 mechanism for converging. A machine whose recovery genuinely needs more sets
 `attempts:` and says so where a reader will find it.
 
-The budget is **persisted with the visit**, in the spawn record of §8.4, so it
+The budget is **persisted with the visit**, in the spawn record of [§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records), so it
 holds across separate `rhei run` invocations. A budget that reset when the
 operator ran `rhei run` again would bound nothing: the runaway case this exists
 for is a state re-spawned once per run, forever.
@@ -1631,7 +1631,7 @@ the worker failing to earn it, so the attempt charged for it is given back and
 the spawn record says the edge was withheld. The reasoning is the
 interruption's — the engine ended the visit, not the worker — with one thing
 more: a held supervisor bars its whole subtree, so spending its budget would
-require attended recovery (§FS-rhei-retry.2) for the entire held subtree.
+require attended recovery ([§FS-rhei-retry.2](rhei-retry.spec.md#2-grant-and-refusals)) for the entire held subtree.
 
 A budget below `1` is raised to `1`: every visit gets at least the invocation
 that makes it a visit.
@@ -1649,10 +1649,10 @@ A **poll state** ([§FS-rhei-states.2](rhei-states.spec.md#2-polling-states)) is
 without moving is what a poll state is for, and it already declares its own
 bound in `poll.max_attempts`; a second bound over the same spawns would end the
 loop earlier than the machine's author said it should. The re-spawn note of
-§3.2.1 still names a budget on a poll state — `poll.max_attempts` itself, not
+[§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics) still names a budget on a poll state — `poll.max_attempts` itself, not
 this exemption's internal encoding of "no budget applies here".
 
-A recognized provider-limited invocation (§FS-rhei-run.3.3) also does not
+A recognized provider-limited invocation ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)) also does not
 spend the state visit's budget. It is a completed spawn with a retained log and
 spawn record, but the provider refused to begin the requested work; repeated
 recognized refusals therefore cannot exhaust `attempts:`. Poll counters and
@@ -1688,10 +1688,10 @@ seven variables even when its own parent environment contains them:
 | `RHEI_RESULT_PATH` | `## Result`, on an invocation whose state can finish the task |
 | `RHEI_TASK_ID` | The qualified task identity in `## Position` and the task heading |
 | `RHEI_TASK_ID_LOCAL` | The task heading in the named rhei |
-| `RHEI_ACCOUNTING_USAGE_PATH` | Set again only for an agent whose usage extractor declares it, to that invocation's own capture file (§FS-rhei-cost-accounting.4) |
+| `RHEI_ACCOUNTING_USAGE_PATH` | Set again only for an agent whose usage extractor declares it, to that invocation's own capture file ([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow)) |
 | `RHEI_ACCOUNTING_USAGE_SCHEMA` | Set again together with `RHEI_ACCOUNTING_USAGE_PATH` |
 
-The composed prompt (§3) is authoritative for the five identity values. A
+The composed prompt ([§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition)) is authoritative for the five identity values. A
 custom agent wrapper must read the prompt instead of these legacy variables.
 Because an agent's commands inherit its environment, removal also keeps an
 independently launched nested Rhei from adopting the outer plan, task, artifact
@@ -1704,7 +1704,7 @@ agent of a nested run that inherited it would append its own usage to the
 outer invocation's capture file, and Rhei would sum those tokens into the outer
 record. Clearing the pair prevents a nested run from overwriting the running
 task's accounting files, as `rhei snapshot continue` already does for the same
-pair (§FS-rhei-snapshot-operations.1.5).
+pair ([§FS-rhei-snapshot-operations.1.5](rhei-snapshot-operations.spec.md#15-rhei-snapshot-continue-ref)).
 
 This isolation applies only to autonomous agent workers. Program states keep
 their explicit environment contract ([§FS-rhei-programs.2](rhei-programs.spec.md#2-environment-variables)), and transition callbacks keep their own
@@ -1849,7 +1849,7 @@ An exhausted visit's halt preserves the ending `The ticket stays in
 '{state}'.` exactly and appends recovery advice (§FS-rhei-retry.3). Ordinary
 states name `rhei retry {id}` and the configured budget it grants. Supervising
 states also name the held subtree, the unread checkpoint count, and warn that
-their self-loop releases it instead (§FS-rhei-supervision.3.5). Poll behavior
+their self-loop releases it instead ([§FS-rhei-supervision.3.5](rhei-supervision.spec.md#35-failed-visits)). Poll behavior
 is unchanged: poll states do not receive this visit-budget recovery advice.
 
 1. Load plan and state machine. Validate.
@@ -1876,7 +1876,7 @@ is unchanged: poll states do not receive this visit-budget recovery advice.
     governs non-zero exits and does not enter into it.
 12. If the agent exited non-zero:
     - If the result is a recognized provider limit, park it under
-      §FS-rhei-run.3.3 and continue the scheduling loop. This path fires no
+      [§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking) and continue the scheduling loop. This path fires no
       transition or callback and is the same with or without
       `--continue-on-error`.
     - Without `--continue-on-error`: log the error and stop.
@@ -1966,7 +1966,7 @@ An MCP server or skill is considered **available** when:
 
 Per-state `mcp_servers` and `skills` entries may be declared required (the
 default) or `optional: true`. The `defaults` lists in `settings.json` and a
-task's entries follow the same rules (§FS-rhei-task-tooling.5).
+task's entries follow the same rules ([§FS-rhei-task-tooling.5](rhei-task-tooling.spec.md#5-a-required-task-entry-that-fails)).
 
 - **Required (default):** if the entry fails its availability check,
   `rhei run` does not spawn the agent. The engine looks for an
@@ -2044,7 +2044,7 @@ Under `orchestrator` [Completion Authority](#31-completion-authority), a timeout
 must resolve to a finite value at some level of the chain; missing timeouts on
 orchestrator-driven states are a validation error — raised by validation over
 this same chain and this same resolution, not only where the chain is consumed
-at spawn time (§FS-rhei-agents.3.2.2). Under `worker` authority
+at spawn time ([§FS-rhei-agents.3.2.2](rhei-agents.spec.md#322-timeout-requirement)). Under `worker` authority
 the resolution is optional and the engine does not impose a timeout on manual
 work.
 
@@ -2157,14 +2157,14 @@ transitions:
 The callback receives a `TransitionContext` with `triggeredBy: 'system'` and the timeout duration in `transitionData.timeout`.
 
 In serial and parallel runs, `on_leave` retains the timed-out agent's effective identity,
-including independent CLI overrides (§FS-rhei-agents.1.4, §FS-rhei-agents.1.5).
+including independent CLI overrides ([§FS-rhei-agents.1.4](rhei-agents.spec.md#14-resolution-order), [§FS-rhei-agents.1.5](rhei-agents.spec.md#15-partial-overrides)).
 
 ## 8. Log Capture
 
 All agent stdout and stderr are captured to log files in the `runtime/logs/` directory relative to the workspace or plan root.
 The one exception is output a descendant writes after the agent itself has
 exited and its drain grace has run out: that is captured best-effort
-(§FS-rhei-agent-output-drain.2).
+([§FS-rhei-agent-output-drain.2](rhei-agent-output-drain.spec.md#2-output-written-after-the-exit-is-best-effort)).
 
 Token and cost accounting is captured separately under `runtime/accounting/`.
 Agent logs remain human-readable transcripts; accounting extractors must use
@@ -2204,13 +2204,13 @@ Which number `{n}` is depends on the state:
   the ticket has arrived in that state, read from the transition ledger, plus
   one when the ticket was placed there initially — its first ledger line leaves
   that state, or it has no ledger line yet. It is counted over the same
-  two `runtime/state-transitions.log` files the move count of §FS-rhei-agents.8.4 reads, and
+  two `runtime/state-transitions.log` files the move count of [§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records) reads, and
   the two counts are summed. A forced transition's metadata row and its
   movement row count as one arrival; a metadata row the reader does not know
   counts as nothing; a missing ledger means entry 1, and an unreadable one is a
   diagnostic. A restart that has not moved the ticket stays on the same entry.
   The entry number is not a frontmatter counter and does not change
-  `{visit_count}` (§FS-rhei-transitions.4.3).
+  `{visit_count}` ([§FS-rhei-transitions.4.3](rhei-transitions.spec.md#43-counted-loops)).
 
 A fanned-out state puts the number after the identity: `-opus-2`.
 
@@ -2227,7 +2227,7 @@ the one file that says why the attempt before it did not finish, which is the
 file both a human and the retrying agent need most; without the entry number a
 re-entry would truncate the previous entry's.
 
-A visit's attempt number is read from the spawn record of §8.4, never inferred
+A visit's attempt number is read from the spawn record of [§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records), never inferred
 from which log files happen to exist: a log is opened before its subprocess
 starts, so its presence proves only that a spawn was attempted. Neither the
 attempt nor the entry ever moves forward because a file exists.
@@ -2247,7 +2247,7 @@ its command cannot be found or built, or the run is interrupted first — remove
 the log it created, so only a worker killed after it started leaves one to
 refuse. A record accounts for the path when it is the record this invocation's own name
 spells and its `moves` equals the ticket's current move count — the record of
-§FS-rhei-agents.8.4, trusted exactly as before and never checked against the log's header. A
+[§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records), trusted exactly as before and never checked against the log's header. A
 runtime written before entry numbers existed may hold the unsuffixed record of
 an uncounted state at the current `moves`; the same test is applied to that
 record, so its retry continues as `-{n}-attempt2`.
@@ -2294,16 +2294,16 @@ and again as a machine-readable flag inside it:
 
 | Ending | Line above `=== exit ===` | Flag inside `=== exit ===` |
 | --- | --- | --- |
-| Timeout (§7.3) | `agent timed out after {duration}` | `timed_out: true` |
+| Timeout ([§FS-rhei-agents.7.3](rhei-agents.spec.md#73-timeout-behavior)) | `agent timed out after {duration}` | `timed_out: true` |
 | Run interrupted ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) | `agent interrupted by run shutdown after {duration}` | `interrupted: true` |
-| Provider limited (§FS-rhei-run.3.3) | `agent provider-limited until {nextAttemptAt}` | `provider_limited: true` |
+| Provider limited ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)) | `agent provider-limited until {nextAttemptAt}` | `provider_limited: true` |
 
 A program log (`=== rhei program log v1 ===`) carries the same two lines with
 `program` in place of `agent`. Neither flag appears on a normal exit, so a
 reader — and a script — can tell an agent that finished from one the engine
 stopped without inferring it from the exit code.
 
-`family:` is the resolved family of the profile that ran (§FS-rhei-agents.1.1.2), and is
+`family:` is the resolved family of the profile that ran ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)), and is
 written **only when it differs from `agent:`** — its absence means the profile
 declared no family and is its own, which is why every log written before
 families existed reads exactly as it did. It is the line a reader of an
@@ -2315,7 +2315,7 @@ have.
 Each entry in `mcp_servers:` and `skills:` is the resolved id; an entry
 suffixed with `?` was optional and failed its availability check — dropped
 before spawn, recorded for diagnostics. A missing line means the invocation
-got none of that kind; withheld task entries: §FS-rhei-task-tooling.7.
+got none of that kind; withheld task entries: [§FS-rhei-task-tooling.7](rhei-task-tooling.spec.md#7-what-a-reader-sees).
 
 ### 8.3. Log Directory
 
@@ -2323,7 +2323,7 @@ got none of that kind; withheld task entries: §FS-rhei-task-tooling.7.
 A narrowed `rhei reset --rhei` removes the in-scope tickets' logs, spawn
 records and session reports (`runtime/reports/task-<ticket-id>-*`) together
 ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)). Either reset removes the ledger lines entry numbers are
-counted from (§FS-rhei-agents.8.1), so a reset ticket's next entry is entry 1 again and takes
+counted from ([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)), so a reset ticket's next entry is entry 1 again and takes
 the plain name.
 
 ### 8.4. Spawn Records
@@ -2336,7 +2336,7 @@ file is created and its header written before the subprocess starts, so a
 behind; and the log's own name cannot say which visit it belongs to.
 
 A file name spells an **allocation**: the name a spawn was given, by the
-grammar of §FS-rhei-agents.8.1, before anything ran. Which entry that is comes from the
+grammar of [§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming), before anything ran. Which entry that is comes from the
 ticket's movement history in the transition ledger, never from the file names
 on disk; and whether a worker actually ran under that name is the record's to
 say, and only the record's.
@@ -2351,7 +2351,7 @@ place by each further attempt of the same invocation. It holds:
 | Field | Meaning |
 |-------|---------|
 | `task`, `state` | the invocation this record answers for, spelled out |
-| `moves` | how many times the ticket had moved when this spawn started — the visit key of §8.1 |
+| `moves` | how many times the ticket had moved when this spawn started — the visit key of [§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming) |
 | `attempt` | which attempt of that visit this was, counting from 1 |
 | `kind`, `worker` | `agent` or `program`, and the resolved agent id or command |
 | `log` | the transcript this spawn wrote |
@@ -2366,7 +2366,7 @@ must write a temporary file and rename it into place while holding the same
 record lock used by attempt charging. Both operations re-read the record under
 that lock and preserve each other's updates. A concurrent run sees either no
 grant or the entire grant, never a partial record or a lost grant
-(§FS-rhei-retry.2). `rhei reset` removes the grants with `runtime/spawns/`
+([§FS-rhei-retry.2](rhei-retry.spec.md#2-grant-and-refusals)). `rhei reset` removes the grants with `runtime/spawns/`
 and refunds no capacity.
 
 If the prior record contains malformed JSON, it supplies no previous-attempt
@@ -2386,13 +2386,13 @@ auditable spawn evidence.
 The engine changes a successful `exited` record to `ending: withheld` only when
 the subprocess exited with code `0`, the invocation met its completion condition,
 and the engine withheld its release edge without moving the ticket
-(§FS-rhei-supervision.3.6). The record retains code `0` and the same visit and
+([§FS-rhei-supervision.3.6](rhei-supervision.spec.md#36-empty-visits)). The record retains code `0` and the same visit and
 invocation identity. This ending cannot turn an unsuccessful invocation into
 successful work.
 
-For the pre-spawn completion check (§3.2), a record proves successful work for
+For the pre-spawn completion check ([§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition)), a record proves successful work for
 one invocation only when its `task`, canonical `state`, and invocation-specific
-filename identify that invocation (or §FS-rhei-agent-visit-pairing pairs it with
+filename identify that invocation (or [§FS-rhei-agent-visit-pairing](rhei-agent-visit-pairing.spec.md#fs-rhei-agent-visit-pairing-finished-work-across-an-in-place-target-edit) pairs it with
 one), its `moves` equals the ticket's current transition-ledger move count, its
 `ending` is `exited` or `withheld`, and its `code` is `0`. A withheld record
 supplies proof only for that same visit and invocation; it cannot excuse work

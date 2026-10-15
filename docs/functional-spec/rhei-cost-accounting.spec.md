@@ -27,7 +27,7 @@ For visual dashboard behavior see [Flow Visualization](rhei-viz.spec.md).
   tokenizers when measured usage exists.
 - Deciding admission. Nothing in this specification resolves a ceiling, refuses
   a spawn, or halts a run. What is measured here does have one consumer that
-  acts on it — the project spend dimension of §FS-rhei-budgets.1 charges a UTC
+  acts on it — the project spend dimension of [§FS-rhei-budgets.1](rhei-budgets.spec.md#1-the-two-counts-and-the-days-spend) charges a UTC
   day's consumption from these records and halts where the ticket stands when
   the ceiling is reached — and that consumer owns the ceiling, its resolution
   and its halt. This specification still only measures, prices and rolls up.
@@ -71,7 +71,7 @@ rhei's. A Panta project has **several**: one per participating rhei execution
 root ([§AR-rhei-panta.5](../architecture/rhei-panta.spec.md#5-execution-root-and-per-rhei-runtime)), plus the run root, and single-file rheis share
 the project directory so two of those can be the same directory. A run writes
 each invocation record to the accounting root of the rhei that owns the ticket
-and its capture streams to the run root's, and §5.1 already requires a price
+and its capture streams to the run root's, and [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection) already requires a price
 book in every participating root. Which roots a *reading* covers is the reading
 command's scope ([§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary)); nothing here says one root holds a
 project's whole history.
@@ -84,7 +84,7 @@ invocation records and the current plan tree.
 
 `invocation_id` is the logical identity inside the JSON record. New records
 identify one spawned process — one attempt — rather than only its state visit;
-§3.7 defines the spelling and the compatibility identity of older records.
+[§FS-rhei-cost-accounting.3.7](rhei-cost-accounting.spec.md#37-attempt-identity) defines the spelling and the compatibility identity of older records.
 File names use `invocation_file_id`, which is an opaque, path-safe UUID/ULID,
 encoded id, or hash. Raw `invocation_id` text must not be used as the file
 name.
@@ -197,7 +197,7 @@ ratio only while the two are nested.
 Providers do not agree on this. OpenAI reports a whole-prompt `input_tokens`
 with `cached_input_tokens` inside it; Anthropic and Pi report an input count
 that excludes their cache dimensions. The extractor converts the provider's
-shape into this one at the point of extraction (§4). A
+shape into this one at the point of extraction ([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow)). A
 `rhei.accounting.usage.v1` capture event is Rhei's own schema, already states
 its dimensions in this convention, and is taken as written.
 
@@ -267,7 +267,7 @@ does not expose finer-grained usage.
 
 `duration_ms` is the elapsed wall-clock time between `started_at` and
 `ended_at`, rounded down to whole milliseconds. New records always carry it;
-readers must accept older v1 records where it is absent, and §3.4.1 says what
+readers must accept older v1 records where it is absent, and [§FS-rhei-cost-accounting.3.4.1](rhei-cost-accounting.spec.md#341-deriving-the-elapsed-time-on-read) says what
 they report about one.
 
 When structured agent output exposes a native session identity, the invocation
@@ -282,24 +282,24 @@ usage events.
 
 #### 3.4.1. Deriving the Elapsed Time on Read
 
-`duration_ms` is **optional** and stays optional (§8.1), so a record written
+`duration_ms` is **optional** and stays optional ([§FS-rhei-cost-accounting.8.1](rhei-cost-accounting.spec.md#81-published-accounting-schemas)), so a record written
 before the field existed carries none. That elapsed time is not unknown: it is
 defined above as the difference between `started_at` and `ended_at`, and every
 v1 record carries both. A reader holding the two endpoints holds the number.
 
 | Where | Required behavior |
 | --- | --- |
-| Writing | Every record Rhei writes carries `duration_ms`. A record already on disk without it is never rewritten to add one (§5.1). |
+| Writing | Every record Rhei writes carries `duration_ms`. A record already on disk without it is never rewritten to add one ([§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection)). |
 | Reading | A record with no `duration_ms` parses, and the parsed record still has none. The field is not filled in on the way past. |
 | Reporting | A surface that reports an invocation's elapsed time derives it from `ended_at - started_at` when the stored field is absent, and reports nothing only when an endpoint is missing or unparseable, or when the two do not form a forward interval. |
 
 The derivation belongs where a reading is published, not on the record it read:
-a reading recomputes what it reports and never rewrites what it read (§5.1),
-the same way a restated token count is (§5.2).
+a reading recomputes what it reports and never rewrites what it read ([§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection)),
+the same way a restated token count is ([§FS-rhei-cost-accounting.5.2](rhei-cost-accounting.spec.md#52-recomputing-a-stored-record)).
 
 This is already what `rhei summary` does with these records
 ([§FS-rhei-summary.2.2](rhei-summary.spec.md#22-the-steps)), and what the
-`invocations` array of `rhei cost --json --task` publishes (§8). Reporting
+`invocations` array of `rhei cost --json --task` publishes ([§FS-rhei-cost-accounting.8](rhei-cost-accounting.spec.md#8-cli-inspection)). Reporting
 nothing instead is not reporting an unknown: a consumer reading no elapsed time
 counts the invocation as instantaneous, so a surface that omits it hands back a
 zero that was never true.
@@ -318,8 +318,8 @@ Such a record is **unattributed**.
 | Where | Required behavior |
 | --- | --- |
 | Writing | Every record written for an agent spawned inside `rhei run` carries `run_id`. |
-| Reading | A record with no `run_id` parses, remains a candidate in §3.7's legacy identity inference, and counts toward every whole-workspace total. |
-| Aggregating | An unattributed record is never dropped and never folded into a named run. Selection and grouping by run give it an explicit place of its own (§6.1). |
+| Reading | A record with no `run_id` parses, remains a candidate in [§FS-rhei-cost-accounting.3.7](rhei-cost-accounting.spec.md#37-attempt-identity)'s legacy identity inference, and counts toward every whole-workspace total. |
+| Aggregating | An unattributed record is never dropped and never folded into a named run. Selection and grouping by run give it an explicit place of its own ([§FS-rhei-cost-accounting.6.1](rhei-cost-accounting.spec.md#61-selections)). |
 
 Unattributed records are not an error condition: they are the history a
 workspace held before the field existed, and an aggregate that quietly omits
@@ -328,18 +328,18 @@ them under-reports that history.
 ### 3.6. Token Convention of a Record
 
 `token_convention` names the convention a record's token dimensions follow.
-Rhei writes one value, `input-total-includes-cache`, which is §3.1.
+Rhei writes one value, `input-total-includes-cache`, which is [§FS-rhei-cost-accounting.3.1](rhei-cost-accounting.spec.md#31-token-dimensions).
 
 The field is **optional** and the schema string stays
-`rhei.accounting.invocation.v1`, exactly as `run_id` is (§3.5). A record written
+`rhei.accounting.invocation.v1`, exactly as `run_id` is ([§FS-rhei-cost-accounting.3.5](rhei-cost-accounting.spec.md#35-run-attribution)). A record written
 before the field existed still parses, is never dropped, and is never read at
 face value.
 
 | Where | Required behavior |
 | --- | --- |
-| Writing | Every record Rhei writes carries `token_convention`, and its dimensions satisfy §3.1. |
+| Writing | Every record Rhei writes carries `token_convention`, and its dimensions satisfy [§FS-rhei-cost-accounting.3.1](rhei-cost-accounting.spec.md#31-token-dimensions). |
 | Reading | A record carrying the field is read under it. A record without it is read under the convention its own `agent` implies, below. |
-| Rewriting | Never. A stored record's tokens and amounts are what was computed when it was written and stay as written (§5.1). What the inference changes is what a recomputation over stored records produces (§5.2). |
+| Rewriting | Never. A stored record's tokens and amounts are what was computed when it was written and stay as written ([§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection)). What the inference changes is what a recomputation over stored records produces ([§FS-rhei-cost-accounting.5.2](rhei-cost-accounting.spec.md#52-recomputing-a-stored-record)). |
 
 The convention an `agent` implies, and the evidence for it:
 
@@ -351,7 +351,7 @@ The convention an `agent` implies, and the evidence for it:
 
 An agent this table does not name has no known convention. Its record is read
 as stored, because nothing about it is known to be wrong, and no aggregate
-holding it reports `complete` (§6.2).
+holding it reports `complete` ([§FS-rhei-cost-accounting.6.2](rhei-cost-accounting.spec.md#62-coverage-of-a-selection)).
 
 ### 3.7. Attempt Identity
 
@@ -387,10 +387,10 @@ Exact record copies have one identity and count once, including when copied
 between accounting roots. Records with the same legacy id are separate
 attempts when their base facts agree and either their run ids differ or their
 well-formed intervals distinguish them. A missing `run_id` leaves a record
-unattributed under §3.5; it does not remove that record from whole-workspace
+unattributed under [§FS-rhei-cost-accounting.3.5](rhei-cost-accounting.spec.md#35-run-attribution); it does not remove that record from whole-workspace
 history. Equal identity evidence with unequal record contents, timing that is
 missing or malformed and leaves identity ambiguous, or disagreement in the
-base facts is an identity conflict under §11. Readers do not rewrite or
+base facts is an identity conflict under [§FS-rhei-cost-accounting.11](rhei-cost-accounting.spec.md#11-failure-modes). Readers do not rewrite or
 migrate any of these records.
 
 ## 4. Extraction Flow
@@ -401,13 +401,13 @@ accounting for `claude-code`, `codex`, or `pi`. [§FS-rhei-snapshots](rhei-snaps
 
 For each agent invocation:
 
-1. Before spawn, Rhei creates the attempt identity under §3.7 and the
+1. Before spawn, Rhei creates the attempt identity under [§FS-rhei-cost-accounting.3.7](rhei-cost-accounting.spec.md#37-attempt-identity) and the
    extractor declares any extra arguments, environment variables, or capture
    paths needed for structured usage. Rhei's built-in capture contract sets
    `RHEI_ACCOUNTING_USAGE_PATH` and
    `RHEI_ACCOUNTING_USAGE_SCHEMA=rhei.accounting.usage.v1`. An agent with no
    extractor receives no capture pair, even when Rhei's own environment carries
-   one: that pair names another invocation's capture file (§FS-rhei-agents.4).
+   one: that pair names another invocation's capture file ([§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables)).
 2. `rhei run` spawns the agent normally.
 3. The extractor observes structured usage as it is produced and appends
    normalized usage events to `runtime/accounting/captures/*.jsonl`.
@@ -427,7 +427,7 @@ and to every profile that declares it as its family. Rhei appends the row's
 required launch arguments itself, from the resolved extractor, so a profile that
 declares a family is launched with them whether or not the operator wrote
 anything; a wrapper that discards the arguments it is handed emits no structured
-usage and its record reads `no-usage-emitted` (§FS-rhei-cost-accounting.3.2).
+usage and its record reads `no-usage-emitted` ([§FS-rhei-cost-accounting.3.2](rhei-cost-accounting.spec.md#32-extraction-status)).
 
 | Family | Requirement |
 | --- | --- |
@@ -435,7 +435,7 @@ usage and its record reads `no-usage-emitted` (§FS-rhei-cost-accounting.3.2).
 | `codex` | Run `codex exec --json`; extract `turn.completed.usage` from JSONL stdout and normalize it into `runtime/accounting/captures/*.jsonl`. Do not depend on Codex snapshot support. |
 | `pi` | Run `pi --mode json`; extract each assistant `message_end.message.usage` event and normalize it into `runtime/accounting/captures/*.jsonl`. Ignore the duplicate message usage carried by `turn_end` and `agent_end`. Do not depend on Pi snapshot session data. |
 
-Each built-in extractor converts its provider's shape into §3.1's convention as
+Each built-in extractor converts its provider's shape into [§FS-rhei-cost-accounting.3.1](rhei-cost-accounting.spec.md#31-token-dimensions)'s convention as
 it normalizes, so the capture stream and the record are already in it. `codex`
 reports the inclusive figure and is copied through; `claude-code` and `pi`
 report an input count that excludes their cache dimensions, and those
@@ -605,7 +605,7 @@ unless durable identity and currency validation succeeds for every
 participating root. Caller-owned books continue to be copied only to
 `prices.json`; this contract does not archive them, and a book named by
 `defaults.prices` is caller-owned in exactly that sense — copied, never
-archived, so reachability (§FS-rhei-cost-accounting.5.2) keeps the cases it
+archived, so reachability ([§FS-rhei-cost-accounting.5.2](rhei-cost-accounting.spec.md#52-recomputing-a-stored-record)) keeps the cases it
 already has.
 
 Every currency-bearing durable invocation record in a participating accounting
@@ -657,7 +657,7 @@ cost = ( uncached_input     * input_total_micro
 ```
 
 The full input rate applies to the remainder, not to `input.total`, because the
-two cache dimensions are parts of `input.total` (§3.1) and each already carries
+two cache dimensions are parts of `input.total` ([§FS-rhei-cost-accounting.3.1](rhei-cost-accounting.spec.md#31-token-dimensions)) and each already carries
 its own rate. Charging `input.total` at the full rate *and* the cache
 dimensions at theirs charges every cached token twice. An unavailable dimension
 contributes nothing and subtracts nothing, and the subtraction saturates at
@@ -687,7 +687,7 @@ but never writes `amount_micro`. `amount_micro` is written only when status is
 `rhei summary --run <ID> --prices <PATH>` is the one post-run exception to
 the run-time selection boundary above. It validates the same caller-owned v1
 book, then makes that book authoritative for an in-memory reading of the exact
-completed-run selection defined by §FS-rhei-summary.1. It uses the book's id,
+completed-run selection defined by [§FS-rhei-summary.1](rhei-summary.spec.md#1-usage). It uses the book's id,
 currency, exact provider/model match, integer arithmetic, cache semantics, and
 formula exactly as a run-time selection does. `effective_at` remains required
 but neither selects nor rejects an entry: the caller explicitly selected the
@@ -702,18 +702,18 @@ changes the book or pricing ordinary accounting reads use.
 
 ### 5.2. Recomputing a Stored Record
 
-Every rollup, report, and inspection surface computes from stored records (§6),
-so a record written before §3.1 was stated has to be read into §3.1's
+Every rollup, report, and inspection surface computes from stored records ([§FS-rhei-cost-accounting.6](rhei-cost-accounting.spec.md#6-rollups)),
+so a record written before [§FS-rhei-cost-accounting.3.1](rhei-cost-accounting.spec.md#31-token-dimensions) was stated has to be read into [§FS-rhei-cost-accounting.3.1](rhei-cost-accounting.spec.md#31-token-dimensions)'s
 convention on the way out. Nothing on disk changes: `tokens`, `amount_micro`,
 and `priced_amount_micro` are the record of what was computed and stay as
-written (§5.1). What changes is what a recomputation over them produces.
+written ([§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection)). What changes is what a recomputation over them produces.
 
-Take the record's convention from §3.6, then:
+Take the record's convention from [§FS-rhei-cost-accounting.3.6](rhei-cost-accounting.spec.md#36-token-convention-of-a-record), then:
 
 | The record's convention | Its tokens | Its money |
 | --- | --- | --- |
-| `input-total-includes-cache` | Already §3.1. Read as stored. | Must be recomputed. The stored amount charged `input.total` at the full input rate *and* the cache dimensions at theirs, so it over-charges every cached token by the full input rate. |
-| `input-total-excludes-cache` | `input.total` becomes `input.total + cached_read + cache_write`; `total` becomes the restated `input.total + output.total`. | Read as stored. It is already right: the dimensions were disjoint and were priced as disjoint, which is exactly what §5's formula computes on the restated tokens. |
+| `input-total-includes-cache` | Already [§FS-rhei-cost-accounting.3.1](rhei-cost-accounting.spec.md#31-token-dimensions). Read as stored. | Must be recomputed. The stored amount charged `input.total` at the full input rate *and* the cache dimensions at theirs, so it over-charges every cached token by the full input rate. |
+| `input-total-excludes-cache` | `input.total` becomes `input.total + cached_read + cache_write`; `total` becomes the restated `input.total + output.total`. | Read as stored. It is already right: the dimensions were disjoint and were priced as disjoint, which is exactly what [§FS-rhei-cost-accounting.5](rhei-cost-accounting.spec.md#5-pricing)'s formula computes on the restated tokens. |
 
 Restating tokens needs no price book. Recomputing money needs one, and only one
 number out of it: the full input rate for the record's provider and model. A
@@ -723,7 +723,7 @@ read from, or the id of a valid generated
 `price-books/<price_book_id>.json` archive beside it. Archive lookup accepts
 only a generated `profiles-sha256-…` id, requires the file's id and canonical
 content digest to match the requested id, and never searches another root.
-Selection never fetches a book over the network (§5.1), so any other book named
+Selection never fetches a book over the network ([§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection)), so any other book named
 by id alone and absent from the current `prices.json` is unreachable.
 
 A later run may replace `prices.json` and create a new generated archive after
@@ -738,9 +738,9 @@ When a record's money must be recomputed and its book is unreachable, the
 record is read as `unpriced`: its measured tokens still count, and it
 contributes no amount. The stored amount is not carried forward. It is known to
 be an over-charge, and it cannot be reported as `priced_amount_micro` either,
-which is a lower bound (§5) — an over-charge is an upper one. The aggregate
+which is a lower bound ([§FS-rhei-cost-accounting.5](rhei-cost-accounting.spec.md#5-pricing)) — an over-charge is an upper one. The aggregate
 then follows the ordinary rules for a selection holding an unpriced record
-(§6.2), which is how the doubt reaches a reader.
+([§FS-rhei-cost-accounting.6.2](rhei-cost-accounting.spec.md#62-coverage-of-a-selection)), which is how the doubt reaches a reader.
 
 A record whose cache dimensions are zero or unavailable needs no correction at
 all: the recomputation and the stored amount agree, and it stays priced whether
@@ -749,7 +749,7 @@ or not its book is reachable.
 An explicit alternate-book reading first restates every selected record's
 tokens through the convention table above, then discards the stored monetary
 result for this reading and prices the restated dimensions with the explicitly
-selected book under §5.1. Thus an old `input-total-excludes-cache` record has
+selected book under [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection). Thus an old `input-total-excludes-cache` record has
 its cache dimensions joined into `input.total` before the replacement formula
 subtracts and prices those parts, while an `input-total-includes-cache` record
 uses its dimensions as stored. Neither token restatement nor replacement
@@ -818,15 +818,15 @@ happens before aggregation. Three axes select, and they compose:
 
 | Axis | Selects |
 | --- | --- |
-| Run | Records whose `run_id` equals the given id. The reserved id `unattributed` selects the records that name no run (§3.5). |
+| Run | Records whose `run_id` equals the given id. The reserved id `unattributed` selects the records that name no run ([§FS-rhei-cost-accounting.3.5](rhei-cost-accounting.spec.md#35-run-attribution)). |
 | Window | Records whose `started_at` lies in the half-open interval `[since, until)`. A record with no `run_id` is selected by a window like any other. |
 | Plan tree | Records whose `task_id` is a node or a descendant of it — `direct` and `subtree` above. |
 
 The explicit summary selection adds a completed-run eligibility check around
-the Run axis. It accepts one exact id only after §FS-rhei-summary.1 establishes
-completion inside the roots selected by §FS-rhei-panta.6.5. Selection still
+the Run axis. It accepts one exact id only after [§FS-rhei-summary.1](rhei-summary.spec.md#1-usage) establishes
+completion inside the roots selected by [§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary). Selection still
 happens before aggregation. One project run may contribute records from
-several selected roots, and ordinary attempt identity (§3.7) deduplicates exact
+several selected roots, and ordinary attempt identity ([§FS-rhei-cost-accounting.3.7](rhei-cost-accounting.spec.md#37-attempt-identity)) deduplicates exact
 copies across them before any token or price total is calculated.
 
 A grouping partitions the selection. Grouping by run keys on `run_id` and gives
@@ -854,16 +854,16 @@ incomplete in a way no single record's status shows.
   not see rather than summing what is left. [§FS-rhei-run-headless.6](rhei-run-headless.spec.md#6-rhei-runs)
 - An accounting root that **exists but cannot be read** is one of those
   boundaries. The reading names it and reads the rest, and no aggregate over it
-  reports `complete`. A reading over several roots (§FS-rhei-panta.6.5) is
+  reports `complete`. A reading over several roots ([§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary)) is
   where this bites: with one root an unreadable directory printed
   `(no accounting records found)` and the emptiness was the report, while with
   several it would silently shrink a total that still claimed to be whole. A
   malformed *record* is not this case — it is reported and skipped without
-  demoting anything (§11), because the records around it were read.
-- A record read under an inferred convention (§3.6) is not itself a doubt: the
+  demoting anything ([§FS-rhei-cost-accounting.11](rhei-cost-accounting.spec.md#11-failure-modes)), because the records around it were read.
+- A record read under an inferred convention ([§FS-rhei-cost-accounting.3.6](rhei-cost-accounting.spec.md#36-token-convention-of-a-record)) is not itself a doubt: the
   inference is exact for the three built-in agents. A record from an agent that
   table does not name is, and no aggregate holding one reports `complete`. A
-  record whose money could not be recomputed (§5.2) is unpriced, and demotes the
+  record whose money could not be recomputed ([§FS-rhei-cost-accounting.5.2](rhei-cost-accounting.spec.md#52-recomputing-a-stored-record)) is unpriced, and demotes the
   aggregate the way any unpriced record does.
 
 For an explicit alternate-book reading, pricing status describes exact-rate
@@ -885,15 +885,15 @@ come from the selected book even when some or all exact rates are absent.
 
 A record is written by the invocation it measures, so a selection made only of
 records cannot see an invocation that left none: a profile that declares no
-family (§FS-rhei-cost-accounting.3.2 permits the omission), a record write that failed, an extractor
+family ([§FS-rhei-cost-accounting.3.2](rhei-cost-accounting.spec.md#32-extraction-status) permits the omission), a record write that failed, an extractor
 that never ran, a binary older than accounting. Each of those invocations was
 still spawned, and `rhei run` writes a spawn record for every one it spawned
-(§FS-rhei-agents.8.4). `rhei cost` and `rhei summary` therefore reconcile their
+([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)). `rhei cost` and `rhei summary` therefore reconcile their
 selection against those spawn records before they report coverage.
 
 1. **Which spawns.** The spawn records under `runtime/spawns/` of each root
    whose accounting the reading covers, scoped exactly as that root's records
-   are (§FS-rhei-panta.6.5): the root decides where it belongs to one in-scope
+   are ([§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary)): the root decides where it belongs to one in-scope
    rhei, and the spawn's `task` decides where the root is shared. The run
    root's `runtime/spawns/` is read too, even when the reading is narrowed to
    members and does not read the run root's accounting: `rhei run` writes an
@@ -903,10 +903,10 @@ selection against those spawn records before they report coverage.
    already one of the reading's roots is read once. Only `kind: agent` counts. A program spawn is never counted, because a program
    writes no invocation record. An absent `runtime/spawns/` holds nothing to
    reconcile. A spawn record that cannot be parsed is reported the way a
-   malformed accounting artifact is (§FS-rhei-cost-accounting.11) and skipped.
+   malformed accounting artifact is ([§FS-rhei-cost-accounting.11](rhei-cost-accounting.spec.md#11-failure-modes)) and skipped.
 2. **Matching.** A spawn record answers for the last attempt of one visit. It
    is **recorded** when a record in the reading names the same `task_id` and
-   `state` and its attempt identity (§FS-rhei-cost-accounting.3.7) names the spawn's `moves` and
+   `state` and its attempt identity ([§FS-rhei-cost-accounting.3.7](rhei-cost-accounting.spec.md#37-attempt-identity)) names the spawn's `moves` and
    `attempt`. A legacy record, whose identity carries neither, records a spawn
    of the same task and state whose `[started, ended]` interval contains its
    `started_at`. A spawn record's times are whole seconds, so the instant is
@@ -932,13 +932,13 @@ selection against those spawn records before they report coverage.
    invocations have no accounting record`, where `N` is the unrecorded spawns
    and `M` the known agent invocations. In JSON, every
    `rhei.accounting.summary.v1` object carries `unrecorded_agent_invocation_count`,
-   `0` when nothing is missing. The field is additive within v1 (§FS-rhei-cost-accounting.8.1), and no
+   `0` when nothing is missing. The field is additive within v1 ([§FS-rhei-cost-accounting.8.1](rhei-cost-accounting.spec.md#81-published-accounting-schemas)), and no
    existing field changes its meaning.
-6. **Selections.** Each axis of §FS-rhei-cost-accounting.6.1 places a spawn by the field it carries:
+6. **Selections.** Each axis of [§FS-rhei-cost-accounting.6.1](rhei-cost-accounting.spec.md#61-selections) places a spawn by the field it carries:
    - **Plan tree:** by `task`, for `direct` and `subtree` alike.
    - **Window:** by `started` in `[since, until)`.
    - **Run:** a spawn names no run, so an unrecorded spawn is read the way an
-     unattributed record is (§FS-rhei-cost-accounting.6.2). When it falls inside the window the run
+     unattributed record is ([§FS-rhei-cost-accounting.6.2](rhei-cost-accounting.spec.md#62-coverage-of-a-selection)). When it falls inside the window the run
      was asked for within, or when no window was asked for, it demotes a
      by-run selection and counts in that selection's unrecorded count. The
      explicit summary reading of `--run` with `--prices` applies the same
@@ -1005,7 +1005,7 @@ accounting records were produced.
 ### 7.1. Line-Oriented Frontends
 
 One attempt may emit several `UsageReported` events, and `report` is what tells
-them apart. Every report for that attempt carries the id §3.7 assigned before
+them apart. Every report for that attempt carries the id [§FS-rhei-cost-accounting.3.7](rhei-cost-accounting.spec.md#37-attempt-identity) assigned before
 spawn, including the final report derived from the durable record.
 
 A **streamed** report is emitted while the agent is still running, once for each
@@ -1020,7 +1020,7 @@ that record says the invocation cost. Exactly one final report exists for each
 invocation that reaches a durable record, and an invocation that ends before its
 record is written emits none.
 
-A frontend that keys a view by invocation id upserts both kinds, as §7 requires,
+A frontend that keys a view by invocation id upserts both kinds, as [§FS-rhei-cost-accounting.7](rhei-cost-accounting.spec.md#7-run-events) requires,
 and so shows spend rising while work is running.
 
 A frontend that **appends lines** instead cannot upsert, because a line once
@@ -1064,7 +1064,7 @@ those roots hold, as one set.
 
 Default text output shows workspace totals, coverage, and highest-cost nodes by
 subtree cost. When agent spawns in the selection have no accounting record
-(§FS-rhei-cost-accounting.6.2.1), the totals line's coverage field names the gap and `Invocations`
+([§FS-rhei-cost-accounting.6.2.1](rhei-cost-accounting.spec.md#621-agent-spawns-with-no-record)), the totals line's coverage field names the gap and `Invocations`
 still counts records:
 
 ```text
@@ -1089,8 +1089,8 @@ invocation line and gains no diagnostic line.
 
 The two halves of a `--task` payload are not read the same way. Its
 `invocations` are the durable records themselves, emitted as stored and never
-rewritten (§5.1), while the `direct` and `subtree` rollups beside them have
-already been read under §3.6's inference. On a record that carries no
+rewritten ([§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection)), while the `direct` and `subtree` rollups beside them have
+already been read under [§FS-rhei-cost-accounting.3.6](rhei-cost-accounting.spec.md#36-token-convention-of-a-record)'s inference. On a record that carries no
 `token_convention` the two therefore disagree, and the payload names the
 difference only by that field's absence. A consumer summing `invocations` to
 compare the sum against a rollup must apply the inference table first.
@@ -1118,8 +1118,8 @@ looked in, and that is the one thing the reader needs in order to tell a zero
 from a miss. One root is named inline; several are counted, then listed one per
 line, indented two spaces, in the order the roots were enumerated
 ([§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary)). Roots print as the command resolved them, the same path
-text the malformed-artifact warnings use (§11). A reading that found records
-prints no such tail — `--json` carries the roots either way (§8.4).
+text the malformed-artifact warnings use ([§FS-rhei-cost-accounting.11](rhei-cost-accounting.spec.md#11-failure-modes)). A reading that found records
+prints no such tail — `--json` carries the roots either way ([§FS-rhei-cost-accounting.8.4](rhei-cost-accounting.spec.md#84-compatibility)).
 
 `rhei summary` reads the same artifacts for the other question — not what the
 run cost but what it did, one numbered line per invocation, as Markdown short
@@ -1154,13 +1154,13 @@ Within those same v1 ids, the usage schema defines the optional string
 nested invocation definition in the cost schema define optional
 `extraction_diagnostics` as an array of unique, non-empty, single-line strings
 of at most 240 characters. Newly written artifacts satisfy the stronger
-requirements in §3 and §4; optionality in the schemas preserves historical v1
+requirements in [§FS-rhei-cost-accounting.3](rhei-cost-accounting.spec.md#3-invocation-record) and [§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow); optionality in the schemas preserves historical v1
 artifacts.
 
 Attempt-scoped `invocation_id` values remain
 `rhei.accounting.invocation.v1`. The field is still a string identifying one
 spawned process; no field or one-process meaning changed, only the opaque value
-new writers choose. New readers accept historical v1 spellings under §3.7
+new writers choose. New readers accept historical v1 spellings under [§FS-rhei-cost-accounting.3.7](rhei-cost-accounting.spec.md#37-attempt-identity)
 without migration. Schema-conforming older readers accept the new strings and,
 because attempts no longer share them, count each attempt correctly; parsing
 the example spelling is not a published contract.
@@ -1168,11 +1168,11 @@ the example spelling is not a published contract.
 ### 8.2. Selecting Records
 
 `--run`, `--since`, and `--until` narrow the set of records everything else is
-computed from (§6.1). They compose.
+computed from ([§FS-rhei-cost-accounting.6.1](rhei-cost-accounting.spec.md#61-selections)). They compose.
 
 | Flag | Selects |
 | --- | --- |
-| `--run <ID>` | Records whose `run_id` is `<ID>`. `--run unattributed` selects the records that name no run (§3.5). |
+| `--run <ID>` | Records whose `run_id` is `<ID>`. `--run unattributed` selects the records that name no run ([§FS-rhei-cost-accounting.3.5](rhei-cost-accounting.spec.md#35-run-attribution)). |
 | `--since <TIME>` | Records with `started_at >= TIME`. |
 | `--until <TIME>` | Records with `started_at < TIME`. |
 
@@ -1192,7 +1192,7 @@ searched 3 accounting roots under <project>:
   <root>
 ```
 
-The tail is the one §8 defines, rendered identically, so the distinction
+The tail is the one [§FS-rhei-cost-accounting.8](rhei-cost-accounting.spec.md#8-cli-inspection) defines, rendered identically, so the distinction
 between a workspace that holds nothing and a selection that matched nothing
 stays where it already was — in the first line, and only there.
 
@@ -1204,29 +1204,29 @@ stays the default.
 `--by run` keys each group on `run_id`, and emits the group keyed
 `(unattributed)` whenever the selection holds a record that names no run — that
 group is never omitted and its records are never folded into a named run
-(§3.5). `--by day` keys each group on the UTC calendar date of `started_at`,
-formatted `YYYY-MM-DD`. Every group carries its own coverage (§6.2).
+([§FS-rhei-cost-accounting.3.5](rhei-cost-accounting.spec.md#35-run-attribution)). `--by day` keys each group on the UTC calendar date of `started_at`,
+formatted `YYYY-MM-DD`. Every group carries its own coverage ([§FS-rhei-cost-accounting.6.2](rhei-cost-accounting.spec.md#62-coverage-of-a-selection)).
 
 ### 8.4. Compatibility
 
-`rhei cost <RHEI_PLAN_OR_WORKSPACE>` with none of the flags in §8.2 and no
+`rhei cost <RHEI_PLAN_OR_WORKSPACE>` with none of the flags in [§FS-rhei-cost-accounting.8.2](rhei-cost-accounting.spec.md#82-selecting-records) and no
 `--by` prints exactly what it printed before those flags existed, with the same
 exit behavior and the same `(no accounting records found)` line. The selection
 surface is additive; the unselected reading does not move.
 
-The roots tail (§8) is the one exception, and it is an addition rather than a
+The roots tail ([§FS-rhei-cost-accounting.8](rhei-cost-accounting.spec.md#8-cli-inspection)) is the one exception, and it is an addition rather than a
 change: the `(no accounting records found)` line is byte for byte what it was
 and stays the first line of the output, and a line naming the roots follows it.
 A caller matching on that line still matches; a caller matching on the whole of
 stdout sees one more line. Nothing else moves. A reading that **found** records
 prints what it printed before, byte for byte, unless an agent spawn in it has
-no accounting record (§FS-rhei-cost-accounting.6.2.1); then the coverage field names the gap. Over a
+no accounting record ([§FS-rhei-cost-accounting.6.2.1](rhei-cost-accounting.spec.md#621-agent-spawns-with-no-record)); then the coverage field names the gap. Over a
 standalone workspace —
 whose one root is both the run root and its rhei's, so the union is a single
 read — that is every non-empty reading it has.
 
 There is one narrow exception for extraction diagnostics: `rhei cost --task`
-adds the indented lines specified in §8 beneath a contributing
+adds the indented lines specified in [§FS-rhei-cost-accounting.8](rhei-cost-accounting.spec.md#8-cli-inspection) beneath a contributing
 `extractor-failed` invocation when that record carries diagnostics. Successful
 invocations and historical failed invocations without diagnostics keep their
 previous text byte for byte. Default cost output and every other text surface
@@ -1262,13 +1262,13 @@ order ([§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary)): its `path
 and the `invocation_count` it contributed. It is present on every reading, not
 only an empty one, so a consumer can tell a total over one root from a total
 over nine without parsing text. Adding it is additive within
-`rhei.accounting.cost.v1` (§8.1) and needs no new schema id.
+`rhei.accounting.cost.v1` ([§FS-rhei-cost-accounting.8.1](rhei-cost-accounting.spec.md#81-published-accounting-schemas)) and needs no new schema id.
 
 `run_attribution` counts over the set the run filter was applied to — the
 window's scope, after `--since` and `--until` and before `--run` — and
 `run_attribution.unattributed` rolls up the records in it that name no run.
 Counting after `--run` would report zero unattributed records whenever a run was
-asked for, which is exactly when the doubt §6.2 demotes for has to be visible. A
+asked for, which is exactly when the doubt [§FS-rhei-cost-accounting.6.2](rhei-cost-accounting.spec.md#62-coverage-of-a-selection) demotes for has to be visible. A
 caller reading `summary` alone therefore cannot mistake an unattributed history
 for an attributed one.
 
@@ -1297,9 +1297,9 @@ UI.
 
 The end-of-run console summary and the durable run report include a run-level
 accounting strip. It reports **the run that just ended** — the records that name
-it (§6.1) — and never the workspace's lifetime total in its place. A run that
+it ([§FS-rhei-cost-accounting.6.1](rhei-cost-accounting.spec.md#61-selections)) — and never the workspace's lifetime total in its place. A run that
 spawned no agent reports zero, because zero is what it spent. `workspace_total`
-(§6) is still shown, on a labelled row of its own, so naming the two apart loses
+([§FS-rhei-cost-accounting.6](rhei-cost-accounting.spec.md#6-rollups)) is still shown, on a labelled row of its own, so naming the two apart loses
 nothing. What the strip contains, and how its two possible sources are told
 apart, is in [§FS-rhei-run-report.2.1](rhei-run-report.spec.md#21-accounting-strip). Task rows may show a compact direct task cost only; the direct
 task cost is the sum of usage reported for all agent states spawned for that
@@ -1360,12 +1360,12 @@ Invocation details are served from a separate loopback endpoint such as
 
 | Failure | Required behavior |
 | --- | --- |
-| Extractor failure | Write an invocation record with `extractor-failed` and the non-empty reasons required by §3 and §4, expose those reasons in task inspection, emit `UsageReported`, and continue normal completion and transition handling. |
+| Extractor failure | Write an invocation record with `extractor-failed` and the non-empty reasons required by [§FS-rhei-cost-accounting.3](rhei-cost-accounting.spec.md#3-invocation-record) and [§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow), expose those reasons in task inspection, emit `UsageReported`, and continue normal completion and transition handling. |
 | Missing price | Record measured tokens with `unpriced` or `partial-price`. |
 | Accounting write failure | Warn in the run journal and mark run accounting coverage partial. Do not hide the agent log or transition outcome. |
 | Malformed accounting artifact | `rhei cost` reports the bad path and continues reading other valid records. With `--json`, it returns a structured error. |
 | Accounting identity conflict | Inspection retains the first valid record, reports the conflicting record and both paths, and continues read-only. Run preflight checks the complete in-scope root union, using the root selection and shared-root task filtering in [§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary), before per-root currency checks. A conflict within or across those roots refuses before mutation or spawn with an accounting-identity diagnostic naming both paths; it must not describe the conflict as a selected-currency failure. |
-| Unreadable accounting root | Name the root, read every other root in scope, and do not report `complete` (§6.2). With `--json`, a structured error naming the root, and its `roots` entry carries the count it could contribute. |
+| Unreadable accounting root | Name the root, read every other root in scope, and do not report `complete` ([§FS-rhei-cost-accounting.6.2](rhei-cost-accounting.spec.md#62-coverage-of-a-selection)). With `--json`, a structured error naming the root, and its `roots` entry carries the count it could contribute. |
 | Concurrent writes | Write to a unique staging path, then atomically rename to `<invocation_file_id>.json`. Rollup files may be regenerated after pass writes complete. |
 
 ## Related Specifications

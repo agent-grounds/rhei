@@ -22,9 +22,9 @@ rhei reset <RHEI_PLAN_OR_WORKSPACE> [--rhei <RHEI_ID>] [--dry-run] [--yes]
 
 | Flag               | Default | Description                                                                    |
 |--------------------|---------|--------------------------------------------------------------------------------|
-| `--rhei <RHEI_ID>` | all     | Narrow the reset to the named rheis (repeatable). See §2.1. [§FS-rhei-panta.6.4](rhei-panta.spec.md#64-reset-validate-list-viz) |
+| `--rhei <RHEI_ID>` | all     | Narrow the reset to the named rheis (repeatable). See [§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei). [§FS-rhei-panta.6.4](rhei-panta.spec.md#64-reset-validate-list-viz) |
 | `--dry-run`        | false   | Report what would be reset and deleted, then exit without changing anything    |
-| `--yes`, `-y`      | false   | Confirm without prompting; required when stdin is not a terminal. See §1.2     |
+| `--yes`, `-y`      | false   | Confirm without prompting; required when stdin is not a terminal. See [§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation)     |
 
 An id that names no rhei in the project is an error listing the available rhei
 ids.
@@ -60,7 +60,7 @@ Deliberate automation states the intent once with `--yes`.
    held, and retain the complete stack through preview, confirmation,
    restoration, scoped pruning or full cleanup, and the success summary.
 3. For every task node in the merged task graph (including all descendants):
-   - Recover the task's authored state (§2.2) and rewrite the task's
+   - Recover the task's authored state ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)) and rewrite the task's
      `**State:**` line to it. A task that never moved is already in that state,
      so the line keeps its state name — but it is still rewritten in normalized
      form, because the counted-visit suffix below is runtime state and is
@@ -70,7 +70,7 @@ Deliberate automation states the intent once with `--yes`.
    - Clear any counted-visit suffix; `stateVisits` entries and provider-limit
      waits for the task in frontmatter `metadata.tasks.<id>.stateVisits` and
      `metadata.tasks.<id>.providerLimits` are deleted, together with the task's
-     `supervision` block ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)). A `metadata.tasks.<id>` entry left empty by those deletions is removed as well, and so are `metadata.tasks` and `metadata` when nothing else remains in them: an empty entry is a record of nothing, and the next reader would have to decide whether it meant something. Both the deletions and that pruning are confined to the plan's **writable** metadata document — `index.rhei.md` for a Directory Workspace (§FS-rhei-plan-language.1.4). A workspace task file's own metadata block is authored, holds none of the runtime keys named above, and is neither read nor rewritten by reset: it survives byte-identical.
+     `supervision` block ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)). A `metadata.tasks.<id>` entry left empty by those deletions is removed as well, and so are `metadata.tasks` and `metadata` when nothing else remains in them: an empty entry is a record of nothing, and the next reader would have to decide whether it meant something. Both the deletions and that pruning are confined to the plan's **writable** metadata document — `index.rhei.md` for a Directory Workspace ([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)). A workspace task file's own metadata block is authored, holds none of the runtime keys named above, and is neither read nor rewritten by reset: it survives byte-identical.
 4. After every plan file is rewritten — the ledger step 3 reads lives there — for a directory workspace, delete the `runtime/` directory at the workspace root if it exists. For a single-file plan, delete the `runtime/` directory next to the plan file if it exists. This removes result files, findings, logs, and journaled transition records.
 5. Write each modified task file atomically (temp file + rename). Release the
    sidecar stack in reverse order.
@@ -84,11 +84,11 @@ Reset does **not**:
   `.agent-grounds/rhei/budgets/`, which is outside `runtime/` and outside every
   deletion step 3 and step 4 enumerate ([§FS-rhei-budgets.5.1](rhei-budgets.spec.md#51-where-it-lives)).
 - Delete the project's retirement record, `metadata.retiredTickets`
-  (§FS-rhei-remove.5.1). A reset returns live tickets to their authored state;
+  ([§FS-rhei-remove.5.1](rhei-remove.spec.md#51-where-it-is-recorded)). A reset returns live tickets to their authored state;
   a retired id has no live ticket to return, and clearing the record would let
   the next `rhei new` reissue it. Reset is also refused while a removal is
   pending (`.rhei/pending-removal.json`), and its diagnostic prints the
-  `rhei remove` invocation that resumes it (§FS-rhei-remove.6.2).
+  `rhei remove` invocation that resumes it ([§FS-rhei-remove.6.2](rhei-remove.spec.md#62-pending-removal)).
 - Delete the ticket's `metadata.tasks.<id>.budgetTicketId`. Which of rhei's own
   metadata keys reset deletes is the register's `Cleared by rhei reset` column
   ([§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes)), not a
@@ -124,7 +124,7 @@ subdirectory rhei:
 - `runtime/reports/task-<ticket-id>-*`, the session reports rendered from those
   logs ([§FS-rhei-session-reports.1](rhei-session-reports.spec.md#1-report-artifact)), including any renamed aside as
   `.orphaned-<unix-ts>.md`; a report left behind would sit at the stem the
-  ticket's next entry is about to use (§FS-rhei-agents.8.1)
+  ticket's next entry is about to use ([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming))
 - every artifact the resolved state machine declares as an `inputs:`/`outputs:`
   path containing `{task_id}` — a stale output left behind would otherwise
   satisfy a required input on the next run
@@ -135,7 +135,7 @@ subdirectory rhei:
 - the ticket's lines in `runtime/state-transitions.log`, so a reset ticket's
   recorded history cannot claim a completion its plan no longer holds; its
   entry numbers are counted from those lines, so its next entry into any state
-  is entry 1 again and takes the plain log name (§FS-rhei-agents.8.1)
+  is entry 1 again and takes the plain log name ([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming))
 
 A narrowed reset removes **no budget receipts**, for the same reason: the
 account is per project, a receipt is not keyed by a ticket id, and a narrowing
@@ -143,7 +143,7 @@ that could drop a ticket's travel would make `--rhei` the faucet
 ([§FS-rhei-budgets.11](rhei-budgets.spec.md#11-what-does-not-change)).
 
 A forced transition's `!force-v1` metadata row and immediately adjacent
-movement row are one task-keyed record (§FS-rhei-complete.3.1). Narrowed reset
+movement row are one task-keyed record ([§FS-rhei-complete.3.1](rhei-complete.spec.md#31-state-transition-ledger)). Narrowed reset
 validates the pair and removes both rows together; it never leaves exceptional
 metadata orphaned or prunes only the movement.
 
@@ -154,7 +154,7 @@ literal prefix up to the first remaining placeholder, so `auth.1` never matches
 
 Reset is not the only command that deletes ticket-owned runtime files:
 `rhei remove` does too, but only empty residue of a ticket that has no history
-(§FS-rhei-remove.4.2). The two never overlap — reset prunes history and keeps
+([§FS-rhei-remove.4.2](rhei-remove.spec.md#42-residue)). The two never overlap — reset prunes history and keeps
 the definition, removal keeps every byte of history and deletes the definition.
 
 Run-scoped output is **not** ticket-owned — the run report, the dashboard, and
@@ -197,7 +197,7 @@ The record it recovers from is the central transition ledger,
 `runtime/state-transitions.log` — the one place every verb that moves a ticket
 appends to ([§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector)). Ordinary movement rows are
 `<task-id> <from>@<to>`; forced metadata rows are paired as specified by
-§FS-rhei-complete.3.1. Authored-state reconstruction ignores metadata rows and
+[§FS-rhei-complete.3.1](rhei-complete.spec.md#31-state-transition-ledger). Authored-state reconstruction ignores metadata rows and
 reads each validated pair's movement exactly once, so the **first `from`
 recorded for a task is the state that task started in**. Reset reads the ledger
 before it deletes it, and for each in-scope task:
@@ -215,7 +215,7 @@ before it deletes it, and for each in-scope task:
   only some rheis ran must not treat the others as having stood still.
 
   Reset then **names the tasks it left outside their profile's `initial`
-  state** (§4), which is the only recourse it can offer: with nothing recording
+  state** ([§FS-rhei-reset.4](rhei-reset.spec.md#4-output)), which is the only recourse it can offer: with nothing recording
   where they came from, only the operator knows. It names only tasks a run
   plausibly touched — those whose execution root still holds runtime output, or
   that carry a claim, a result link, or a counted-visit suffix. A pre-authored
@@ -240,14 +240,14 @@ before it deletes it, and for each in-scope task:
 - **The recorded state is one the machine no longer declares** — it was renamed
   since the run. Writing it back would leave a plan that no longer validates,
   and the ledger that explained it is deleted moments later, so reset keeps the
-  task where it stands and says which state it could not restore (§4).
+  task where it stands and says which state it could not restore ([§FS-rhei-reset.4](rhei-reset.spec.md#4-output)).
 
 Reset therefore never invents a state a task did not hold. It moves a task only
 where the ledger says that task has been.
 
 ## 3. Safety
 
-Reset is destructive with respect to runtime state: it deletes results, exports, logs, and the transition ledger. It is not destructive with respect to authored plan content — §2.2 moves a task only to a state that task's own history records, so a reset can never invent a state and can never be worse for the plan than not running it. `--dry-run` previews both halves (§1.1) and confirmation gates the rest (§1.2).
+Reset is destructive with respect to runtime state: it deletes results, exports, logs, and the transition ledger. It is not destructive with respect to authored plan content — [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state) moves a task only to a state that task's own history records, so a reset can never invent a state and can never be worse for the plan than not running it. `--dry-run` previews both halves ([§FS-rhei-reset.1.1](rhei-reset.spec.md#11-options)) and confirmation gates the rest ([§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation)).
 
 Because reset holds its whole selected-scope sidecar stack over the decision
 snapshot, it is safe against concurrent `rhei next` / `rhei transition` /
@@ -257,7 +257,7 @@ or refused reset releases without mutation. Persistent plan and ledger
 sidecars, and the directories required to preserve their pathname identities,
 survive scoped pruning and full runtime cleanup.
 
-Reset first obeys the root-access interlock of §FS-rhei-recover.4. A pending
+Reset first obeys the root-access interlock of [§FS-rhei-recover.4](rhei-recover.spec.md#4-pending-root-interlock). A pending
 forced-recovery marker refuses both preview and mutation and prints the one
 recovery invocation; reset never repairs or deletes it. With no marker, reset
 holds shared root guards and its ordinary stable file locks, so concurrent
@@ -313,7 +313,7 @@ Reset <N> task(s) (and <M> descendant task(s)) to their authored states.
 The last line is `No runtime output was present.` when the `runtime/`
 directory did not exist.
 
-`--dry-run` and the pre-confirmation preview (§1.2) print the same move list
+`--dry-run` and the pre-confirmation preview ([§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation)) print the same move list
 under `Would move <K> task(s) back:`, so what the preview promises and what the
 reset reports are the same text.
 
@@ -337,7 +337,7 @@ Kept run-scoped output not owned by any ticket (run report, dashboard, accountin
 
 ## Relationship to Other Commands
 
-`rhei reset` inverts the forward commands (`next`, `transition`, `complete`, `run`): it returns every task to the state it was authored in (§2.2) and removes the `runtime/` directory.
+`rhei reset` inverts the forward commands (`next`, `transition`, `complete`, `run`): it returns every task to the state it was authored in ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)) and removes the `runtime/` directory.
 
 See [How Rhei Is Used — Command Surface](rhei-usage.spec.md#22-command-surface) for the full table comparing all five coordination commands.
 
@@ -345,7 +345,7 @@ See [How Rhei Is Used — Command Surface](rhei-usage.spec.md#22-command-surface
 
 - [Plan Language Specification](rhei-plan-language.spec.md) — plan formats and semantic constraints
 - [States Specification](rhei-states.spec.md) — profile resolution and `initial` state rules
-- [Supervision Specification](rhei-supervision.spec.md) — the pre-authored chain §2.2 exists to preserve
-- [Visualization Specification](rhei-viz.spec.md) — the transition ledger §2.2 recovers authored states from
+- [Supervision Specification](rhei-supervision.spec.md) — the pre-authored chain [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state) exists to preserve
+- [Visualization Specification](rhei-viz.spec.md) — the transition ledger [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state) recovers authored states from
 - [Next Command](rhei-next.spec.md), [Complete Command](rhei-complete.spec.md), [Transition Command](rhei-transition-cmd.spec.md) — forward commands that reset inverts
 - [Release Command](rhei-release.spec.md) — drops one claim without destroying runtime output

@@ -55,8 +55,8 @@ error naming its line
    users can fix related issues in one pass. Workspace index parse errors remain
    fail-fast because later task-file diagnostics may depend on index structure.
    A workspace task file's metadata-only frontmatter block
-   (§FS-rhei-plan-language.1.4) is checked in this same pass; its diagnostics
-   are §4.4.
+   ([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)) is checked in this same pass; its diagnostics
+   are [§FS-rhei-validate.4.4](rhei-validate.spec.md#44-workspace-task-file-metadata-diagnostics).
 2. Resolve the state machine and validate plan semantics, including state
    values, task ids, dependencies, node policy, terminal and gating states,
    counted-loop syntax, artifact contracts, and task read exclusions.
@@ -70,16 +70,16 @@ error naming its line
    a `callback_timeout` but neither an `on_leave` nor an `on_enter` for it to
    bound, naming the edge: such a bound changes nothing at runtime, so it is
    reported rather than made an error.
-   §FS-rhei-transitions.4.10
+   [§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound)
 
    Validation reads the project's retirement record, `metadata.retiredTickets`
-   (§FS-rhei-remove.5.1), and refuses three things about it, each naming the
+   ([§FS-rhei-remove.5.1](rhei-remove.spec.md#51-where-it-is-recorded)), and refuses three things about it, each naming the
    key: a value that is not a retirement map — the key is reserved, so a
    pre-existing author value under it is an error rather than a record; a live
    ticket whose project-qualified id is retired, which is how a hand-written
    section that resurrects a removed ticket is caught; and a live ticket whose
    `budgetTicketId` is the one a retired record kept, which would rebind a
-   retired budget identity (§FS-rhei-budgets.5.2.1). §FS-rhei-remove.5.2
+   retired budget identity ([§FS-rhei-budgets.5.2.1](rhei-budgets.spec.md#521-one-identity-one-live-ticket)). [§FS-rhei-remove.5.2](rhei-remove.spec.md#52-what-a-retired-id-forbids)
 3. Load merged global and project settings, then validate referenced agents,
    models, MCP servers, skills, and snapshot settings used by the state
    machine. For each execution that uses static agent and mode selection,
@@ -98,7 +98,7 @@ error naming its line
    Validation also resolves each non-gating, non-final state's effective agent
    invocations and rejects one that resolves to no finite `agent_timeout`
    through the four-level chain, naming the state and the agent
-   (§FS-rhei-agents.3.2.2). It resolves through the same function execution
+   ([§FS-rhei-agents.3.2.2](rhei-agents.spec.md#322-timeout-requirement)). It resolves through the same function execution
    spawns through, per task identity, so a `**Target:**` override is judged as
    it would be spawned and a fan-out is judged member by member; and it honors
    execution's own exemption, so `rhei run --no-agent`, which resolves no agent
@@ -155,7 +155,7 @@ error naming its line
 
    The warning is advisory: it does not change plan validity, export
    resolution, readiness, or the filesystem a worker can read
-   (§FS-rhei-plan-language.3.12).
+   ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)).
 7. Report each bound in force as a **warning**, one line per dimension, with
    its effective value, its value source, and — when the active ceiling
    clamped a higher request — the machine or the project as the limiting source
@@ -166,14 +166,14 @@ error naming its line
    counted here is the lines reported, not the dimensions in force
    ([§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys)). The spend bound is reported like the
    three counts, as the bare number its settings key takes
-   (§FS-rhei-budgets.2.1). Asking for more than the machine allows is **never**
+   ([§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys)). Asking for more than the machine allows is **never**
    an error here — the report says the plan asked and the machine limited, and
    validation still succeeds ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)).
 
    Where the machine delegated a count ceiling to the project
    (`defaults.clamp_projects: false`), the four lines are followed by one
    ceiling line per delegated key and one policy line, in the words of
-   §FS-rhei-budgets.2.3. A machine that delegated nothing prints neither.
+   [§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued). A machine that delegated nothing prints neither.
 
    Validation resolves and reports these bounds; it never locks, appends, or
    debits the account ([§FS-rhei-budgets.6.3](rhei-budgets.spec.md#63-what-never-debits)).
@@ -224,7 +224,7 @@ signal.
 
 A prior under a *known* rhei is an ordinary missing ticket and is reported
 without further explanation — unless the project retired that id. A
-`**Prior:**` naming a retired ticket (§FS-rhei-remove.5.1) is reported as a
+`**Prior:**` naming a retired ticket ([§FS-rhei-remove.5.1](rhei-remove.spec.md#51-where-it-is-recorded)) is reported as a
 dependency on a **retired** ticket, naming `metadata.retiredTickets`, not as a
 missing one: the id was real and was removed on purpose, so the remedy is to
 drop or re-point the dependency, never to look for a typo.
@@ -274,21 +274,21 @@ missing producer already reported through the same unresolved `**Prior:**` is
 not reported again through `**Consumes:**`. A missing producer named only by
 `**Consumes:**` gets one missing-producer error and no derivative missing-edge
 error. A producer the project retired is reported as a retired producer under
-the same suppression rules, in the words of §4.1. Self- or ancestor-consumption gets its specific error without pairing or
+the same suppression rules, in the words of [§FS-rhei-validate.4.1](rhei-validate.spec.md#41-unresolved-prior-references). Self- or ancestor-consumption gets its specific error without pairing or
 direct-edge follow-ons. These suppressions do not hide independent errors on
 other references.
 
 Unused `**Provides:**` entries produce no diagnostic. Duplicate provided names
 and duplicate consumed references remain parse errors. The successful-terminal
-consumer warning in §4 remains the sole coherence warning when a direct
+consumer warning in [§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior) remains the sole coherence warning when a direct
 producer is non-terminal; export validation does not add a second warning for
 the same ordering contradiction. The graph-level `**Consumes:**` visibility
-advisory in §4 remains present independently of export-integrity diagnostics.
+advisory in [§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior) remains present independently of export-integrity diagnostics.
 
 ### 4.4. Workspace task-file metadata diagnostics
 
 A workspace task file may open with a metadata-only frontmatter block
-(§FS-rhei-plan-language.1.4). Six things can be wrong with one, and each is
+([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)). Six things can be wrong with one, and each is
 reported by name rather than passed over: before that format was specified the
 block was accepted and then discarded, which is the one outcome none of these
 messages may return to. The first four are detectable inside a single file and
@@ -299,12 +299,12 @@ errors.
 
 | # | What is wrong | Class | What the message names |
 |---|---------------|-------|------------------------|
-| 1 | `structure` as a top-level key | parse | that `structure` is a plan-wide setting and belongs in `index.rhei.md`, which carries it for every task file (§FS-rhei-authoring.3.3) |
+| 1 | `structure` as a top-level key | parse | that `structure` is a plan-wide setting and belongs in `index.rhei.md`, which carries it for every task file ([§FS-rhei-authoring.3.3](rhei-authoring.spec.md#33-depth-and-node-kinds)) |
 | 2 | any other top-level key, or a key under `metadata` other than `tasks` | parse | the key at the depth it was written, and that a task file's frontmatter carries only `metadata.tasks.<id>` for the tasks it defines |
 | 3 | a `metadata.tasks` key that does not stand for exactly one task this file defines: an id it does not define, or one id spelled twice | parse | the id, and for a foreign id both places the entry may go — the file that defines that task, or `index.rhei.md`; for a repeated id, that two spellings of it are one task |
 | 4 | malformed YAML inside the block | parse | the task file's own line |
 | 5 | the same key set for one task in both `index.rhei.md` and a task file | load | **both** files and the key, and that a task file's metadata and the index's entry for one task are disjoint by key, so the fix is to keep that key in one of them |
-| 6 | a frontmatter block in a `basin/` ticket file | load | the file, and `index.panta.md` as where basin ticket metadata lives (§FS-rhei-panta.2) |
+| 6 | a frontmatter block in a `basin/` ticket file | load | the file, and `index.panta.md` as where basin ticket metadata lives ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)) |
 
 Rows 1 and 2 are one check with two messages: `structure` is a top-level key
 like any other and earns its own wording only because it is the one plan-wide
@@ -316,11 +316,11 @@ necessity — a parser reading one file does not know which file defines the id
 that entry names — and it reads each key by the text the file spells rather
 than by the scalar that text resolves to, so `1.10` names task `1.10` and a key
 no id can be read out of at all, such as `true`, names no task rather than
-being stepped past (§FS-rhei-plan-language.1.4).
+being stepped past ([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)).
 
 Both classes fail the load, so `validate`, `render`, `next`, `run`,
 `transition`, `complete` and `reset` all refuse and report; a partial graph
-cannot decide readiness (§FS-rhei-panta.6). `rhei list` remains the one
+cannot decide readiness ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)). `rhei list` remains the one
 exception it already is — it skips what it cannot load, warns naming the file
 and the error, and lists every other rhei — so a mistake here stops a run, and
 the answer to "what can I still see" is the answer a malformed heading already
@@ -361,11 +361,11 @@ warning: <diagnostic>
 ```
 
 For a graph with `**Consumes:**`, successful output is the success line followed
-by the exact advisory from [§FS-rhei-validate.4](#4-behavior) with the normal `warning: ` prefix.
+by the exact advisory from [§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior) with the normal `warning: ` prefix.
 Existing warnings retain their wording and occur once at their existing trigger
 frequency.
 
-Successful output always carries the four bound lines of §4 step 7, in
+Successful output always carries the four bound lines of [§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior) step 7, in
 dimension order, after the success line and before any conditional warning:
 
 ```text

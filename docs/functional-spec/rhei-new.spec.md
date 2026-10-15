@@ -19,7 +19,7 @@ gets you started and then abandons you to an editor for `**Prior:**`. What it
 does not do is *change* anything — it only creates. Editing an existing ticket
 stays a file edit, and changing state stays `rhei transition`
 ([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)). Its one inverse is `rhei remove`, which takes back
-a ticket nothing has acted on and retires its id (§FS-rhei-remove).
+a ticket nothing has acted on and retires its id ([§FS-rhei-remove](rhei-remove.spec.md#fs-rhei-remove-rhei-remove)).
 
 ## 1. Usage
 
@@ -28,22 +28,22 @@ rhei new <TITLE> [--under <PARENT>] [options]
 ```
 
 `TITLE` is the human-readable title. With no `--under`, `rhei new` creates a
-**rhei** under Panta (§2). With `--under`, it creates a **ticket** inside the
-named rhei or under the named ticket (§3). The presence of `--under` is what
+**rhei** under Panta ([§FS-rhei-new.2](rhei-new.spec.md#2-creating-a-rhei)). With `--under`, it creates a **ticket** inside the
+named rhei or under the named ticket ([§FS-rhei-new.3](rhei-new.spec.md#3-creating-a-ticket)). The presence of `--under` is what
 selects the mode, and flags belonging to the other mode are a hard error
-rather than a silent no-op (§5.3).
+rather than a silent no-op ([§FS-rhei-new.5.3](rhei-new.spec.md#53-mode-confusion-is-an-error)).
 
 ### 1.1. Shared options
 
 | Flag                  | Default          | Description                                                       |
 |-----------------------|------------------|-------------------------------------------------------------------|
 | `--project <PATH>`    | inferred         | The project or plan to write into, resolved exactly as every other command resolves one: omitted, the enclosing project, workspace, or lone plan; named, a member rhei widens to the project it belongs to ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)) |
-| `--id <ID>`           | derived          | Explicit id: for a rhei, the one otherwise derived from the title; for a ticket, the segment otherwise taken from the sibling numbering — a name works there too, so `--id review --under plat` writes `plat.review` (§4) |
-| `--description <TEXT>`| empty            | Body content — the ticket's description, or the rhei's lead paragraph (§3.4) |
-| `--description-file <PATH>` | —          | Read the description from a file; `-` reads standard input (§3.4) |
-| `--dry-run`           | off              | Preview the create: plan data is written, validated, and always rolled back; permanent coordination artifacts may remain (§5.4) |
+| `--id <ID>`           | derived          | Explicit id: for a rhei, the one otherwise derived from the title; for a ticket, the segment otherwise taken from the sibling numbering — a name works there too, so `--id review --under plat` writes `plat.review` ([§FS-rhei-new.4](rhei-new.spec.md#4-ids)) |
+| `--description <TEXT>`| empty            | Body content — the ticket's description, or the rhei's lead paragraph ([§FS-rhei-new.3.4](rhei-new.spec.md#34-what-a-description-may-contain)) |
+| `--description-file <PATH>` | —          | Read the description from a file; `-` reads standard input ([§FS-rhei-new.3.4](rhei-new.spec.md#34-what-a-description-may-contain)) |
+| `--dry-run`           | off              | Preview the create: plan data is written, validated, and always rolled back; permanent coordination artifacts may remain ([§FS-rhei-new.5.4](rhei-new.spec.md#54-what-it-prints)) |
 | `--json`              | off              | Emit the created id, kind, path, and state as JSON                |
-| `--keep-on-error`     | off              | Keep the write when validation fails, instead of rolling it back (§5.2) |
+| `--keep-on-error`     | off              | Keep the write when validation fails, instead of rolling it back ([§FS-rhei-new.5.2](rhei-new.spec.md#52-a-create-answers-for-the-errors-it-introduced)) |
 
 `TITLE` occupies the positional slot that every other command gives to a plan
 path, which is why the plan is named with `--project` here. Creating something
@@ -51,7 +51,7 @@ is the one operation whose subject is a name rather than a file, and taking the
 title positionally is what makes `rhei new "Authentication"` read as one
 thought.
 
-`TITLE` is checked as an argument, for the same reason a description is (§3.4).
+`TITLE` is checked as an argument, for the same reason a description is ([§FS-rhei-new.3.4](rhei-new.spec.md#34-what-a-description-may-contain)).
 It becomes the rest of a `# Rhei:` or `### Task 4:` heading line, so an empty or
 whitespace-only title writes a heading with nothing after the colon and a title
 carrying a newline writes a second line the parser reads as plan content. Both
@@ -64,7 +64,7 @@ is an argument.
 
 | Flag                    | Default              | Description                                                    |
 |-------------------------|----------------------|----------------------------------------------------------------|
-| `--dir`                 | off                  | Create a Directory Workspace rhei, or adopt the prospective workspace §2.1.1 permits |
+| `--dir`                 | off                  | Create a Directory Workspace rhei, or adopt the prospective workspace [§FS-rhei-new.2.1.1](rhei-new.spec.md#211-prospective-directory-workspace-adoption) permits |
 | `--max-levels <N>`      | unset                | Write `structure.maxLevels`                                    |
 | `--node-kinds <K,...>`  | unset                | Write `structure.nodeKinds`                                    |
 
@@ -74,7 +74,7 @@ There is no flag that names a state machine, because nothing in a plan does
 its own execution root, else the project default
 ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)). To give a new rhei a machine of its own, create it
 with `--dir` and put a `states.yaml` in its directory — before the create, which
-§2.1.1 adopts, or after it.
+[§FS-rhei-new.2.1.1](rhei-new.spec.md#211-prospective-directory-workspace-adoption) adopts, or after it.
 
 ### 1.3. Options that create a ticket
 
@@ -82,13 +82,13 @@ with `--dir` and put a `states.yaml` in its directory — before the create, whi
 |----------------------------|--------------------|----------------------------------------------------------|
 | `--under <PARENT>`         | —                  | Owning rhei id (`auth`, `basin`) for a top-level ticket, or ticket id (`auth.1`) for a subtask |
 | `--kind <KIND>`            | `task`             | Heading keyword, checked against `structure.nodeKinds` ([§FS-rhei-plan-language.3.7](rhei-plan-language.spec.md#37-node-kind-validity)) |
-| `--state <STATE>`          | the machine's initial | `**State:**`, checked against the owning rhei's machine (§3.2) |
+| `--state <STATE>`          | the machine's initial | `**State:**`, checked against the owning rhei's machine ([§FS-rhei-new.3.2](rhei-new.spec.md#32-state)) |
 | `--prior <ID>`             | none               | `**Prior:**` entry; repeatable, and a comma-separated list is accepted |
 | `--inherits <RULE>`        | none               | `**Inherits:**`; accepts `none` or `'<name> from <self|ancestor|prior>'` ([§FS-rhei-plan-language.3.14](rhei-plan-language.spec.md#314-task-snapshot-inheritance-overrides)) |
 | `--provides <NAME>`        | none               | `**Provides:**` entry; repeatable ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)) |
 | `--consumes <ID:NAME>`     | none               | `**Consumes:**` entry; repeatable. Selects prompt injection, not filesystem visibility. Undeclared sibling exports remain readable; pair every producer with `--prior <ID>` or validation rejects the created ticket ([§FS-rhei-plan-language.3.12.1](rhei-plan-language.spec.md#3121-declaration-integrity)) |
 | `--excludes <ENTRY>`       | none               | `**Excludes:**` entry; repeatable. Each value is one `checkout=<path>`, `artifact=<path>`, or export reference ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)) |
-| `--assignee <WHO>`         | none               | `**Assignee:**`, which is a claim: `rhei next` and `rhei run` skip an assigned ticket until `rhei release <id>`, and the create says so (§5.4) |
+| `--assignee <WHO>`         | none               | `**Assignee:**`, which is a claim: `rhei next` and `rhei run` skip an assigned ticket until `rhei release <id>`, and the create says so ([§FS-rhei-new.5.4](rhei-new.spec.md#54-what-it-prints)) |
 | `--model <MODEL>`          | none               | `**Model:**`; mutually exclusive with `--target` ([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)) |
 | `--target <TARGET>`        | none               | `**Target:**`; mutually exclusive with `--model`, which the identity already carries ([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)) |
 | `--mcp-server <ENTRY>`     | none               | `**MCP servers:**` entry; repeatable. Each value is one entry, a registry id or `'<id> (optional)'` ([§FS-rhei-task-tooling.8](rhei-task-tooling.spec.md#8-writing-the-fields-with-rhei-new)) |
@@ -100,7 +100,7 @@ Repeatable fields are written in the order given, comma-separated, on one line.
 same graph and path rules as `rhei validate`.
 `--mcp-server` and `--skill` write their lines last, after `**Model:**` or
 `**Target:**`, and an id the merged registry does not hold is refused before
-any file is written (§FS-rhei-task-tooling.6).
+any file is written ([§FS-rhei-task-tooling.6](rhei-task-tooling.spec.md#6-validation)).
 A `--prior` value is written through unchanged, so both authored forms work:
 `--prior "Task 1"` keeps the node-kind keyword the plan language allows, and
 `--prior auth.1` writes the bare cross-rhei reference. `rhei new` deliberately
@@ -116,7 +116,7 @@ state-level inheritance.
 
 ## 2. Creating a rhei
 
-`rhei new "Authentication"` derives the id `authentication` from the title (§4)
+`rhei new "Authentication"` derives the id `authentication` from the title ([§FS-rhei-new.4](rhei-new.spec.md#4-ids))
 and writes `authentication.rhei.md` next to `index.panta.md`:
 
 ```markdown
@@ -191,7 +191,7 @@ it.
 
 The allowlist classifies filesystem shape, not machine validity. Once the new
 `index.rhei.md` makes the directory a rhei, the ordinary project load resolves
-its `states.yaml` under clause 1 of §FS-rhei-plan-language.1.3 — nothing is
+its `states.yaml` under clause 1 of [§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) — nothing is
 declared for it to match — and the ordinary post-write validation accepts or
 rejects the authored machine. This is the only
 resolution path: creation does not search a prospective root before the index
@@ -221,7 +221,7 @@ read as a ticket id and the new ticket becomes its child. A value that is
 neither is an error listing the rhei ids in the project.
 
 `--under basin` is how a ticket gets captured without choosing a domain rhei
-first ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)), inside a Panta project and nowhere else (§3.5).
+first ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)), inside a Panta project and nowhere else ([§FS-rhei-new.3.5](rhei-new.spec.md#35-the-basin-needs-a-project)).
 The basin directory is created on demand together with the permanent sidecar
 for the chosen task destination; no authored basin manifest is generated,
 because the basin's manifest is synthetic by design
@@ -309,7 +309,7 @@ that includes the two reference fields: `--consumes` takes
 reporting it back as a parse error with a line number is the failure this
 section exists to prevent — the user typed a flag, so the message is about the
 flag. Whether the reference *resolves* is a different question, and nothing
-answers it yet (§6).
+answers it yet ([§FS-rhei-new.6](rhei-new.spec.md#6-what-rhei-new-does-not-do)).
 
 ### 3.4. What a description may contain
 
@@ -320,7 +320,7 @@ anything is written — as an argument error naming the offending line, not as a
 parse error with a line number in a file the author never opened.
 
 Three shapes are refused: an ATX heading at any level (`#` through `######`), a
-line opening with a `**Field:**` metadata marker (§3.4.2 says which), and a line
+line opening with a `**Field:**` metadata marker ([§FS-rhei-new.3.4.2](rhei-new.spec.md#342-every-metadata-field-is-a-field-marker) says which), and a line
 that is exactly `---`. An `### Task 9: Injected` line in a description is not a formatting
 mistake, it is a second ticket: the parser reads it as one, so a create could
 report a single new id while writing two — the second one carrying whatever
@@ -342,7 +342,7 @@ description can carry: it is written verbatim, and every ticket *after* the
 insertion point then reads as fenced text rather than as a plan node. An odd
 number of fences is the ordinary shape of a pasted issue body that was cut
 short, so the refusal is an argument error about the fence rather than the
-whole-file guard in §5.1 catching the wreckage afterwards.
+whole-file guard in [§FS-rhei-new.5.1](rhei-new.spec.md#51-a-create-is-verified-not-assumed) catching the wreckage afterwards.
 
 The refusal names the three ways to keep an offending line — escape the marker,
 fence it, or make it bold text — and `rhei new` applies none of them itself.
@@ -353,7 +353,7 @@ mean a create that edits its input behind the author's back, and a description
 carrying someone's issue body has to come out the way they wrote it.
 
 Everything above is about text that *arrived*. A value the argument parser
-refused never reaches any of these checks, and §3.4.1 says what happens to it.
+refused never reaches any of these checks, and [§FS-rhei-new.3.4.1](rhei-new.spec.md#341-a-value-the-argument-parser-refused) says what happens to it.
 
 #### 3.4.1. A value the argument parser refused
 
@@ -381,11 +381,11 @@ spelling that keeps the value: the attached
 standard input. For a hyphen-leading *path* it is the attached
 `--description-file=<path>` form, since a bare `-` there already means standard
 input. Both are runnable as printed and neither echoes the caller's own text
-back (§FS-rhei-errors.2), so the message needs no per-platform quoting and is
-the same everywhere (§REQ-cross-platform). The caller recovers from the failure
+back ([§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety)), so the message needs no per-platform quoting and is
+the same everywhere ([§REQ-cross-platform](../requirements/cross-platform.md#req-cross-platform-one-tool-on-linux-macos-and-windows)). The caller recovers from the failure
 they are standing in rather than from an instruction they were supposed to have
-read first (§FS-rhei-errors.6), and the value is answered for where it was
-supplied (§FS-rhei-errors.3).
+read first ([§FS-rhei-errors.6](rhei-errors.spec.md#6-coverage)), and the value is answered for where it was
+supplied ([§FS-rhei-errors.3](rhei-errors.spec.md#3-failing-at-the-input-boundary)).
 
 The new tip is keyed to the *option*, not to the message: a hyphen-leading
 `TITLE` renders byte-identically today — the parser reports `-` plus the
@@ -437,7 +437,7 @@ row rather than a redesign.
 
 #### 3.4.2. Every metadata field is a `**Field:**` marker
 
-The `**Field:**` shape of §3.4 is not a sample of the fields; it is all of them.
+The `**Field:**` shape of [§FS-rhei-new.3.4](rhei-new.spec.md#34-what-a-description-may-contain) is not a sample of the fields; it is all of them.
 A line is refused when, trimmed the way the plan lexer trims it, it opens with
 any field of the closed task metadata block
 ([§FS-rhei-plan-language.2](rhei-plan-language.spec.md#2-grammar-ebnf)):
@@ -459,12 +459,12 @@ ticket and the create exits 0, so an issue body that quotes
 `**Excludes:** checkout=secret.md` withholds `secret.md` from the ticket's agent
 with nothing saying so. After a prose line it reaches the parser as metadata
 following content, and the author gets the rolled-back parse error, with a line
-number in a plan they never opened, that §3.4 exists to replace.
+number in a plan they never opened, that [§FS-rhei-new.3.4](rhei-new.spec.md#34-what-a-description-may-contain) exists to replace.
 
 ### 3.5. The basin needs a project
 
 `--under basin` requires a Panta project, exactly as creating a rhei does
-(§2.1). Outside one there is no project directory to hold `basin/`, and the plan
+([§FS-rhei-new.2.1](rhei-new.spec.md#21-layout)). Outside one there is no project directory to hold `basin/`, and the plan
 the command resolved is itself the only rhei there is
 ([§AR-rhei-panta.2](../architecture/rhei-panta.spec.md#2-load-model)) — so there is no unfiled inbox to file into, and
 none the command could create on demand. Against a lone plan or a bare
@@ -482,7 +482,7 @@ subtask. `basin` is the one value a lone plan cannot answer for, which is why
 the refusal names the plan rather than listing ids that were never the problem.
 
 The refusal is the whole of the command's part in it. `rhei new` does not create
-the project (§6), so the help line is advice to whoever ran it and not a step
+the project ([§FS-rhei-new.6](rhei-new.spec.md#6-what-rhei-new-does-not-do)), so the help line is advice to whoever ran it and not a step
 the command will take on its own. That matters most for a caller who may not
 take it either — an agent whose instructions reserve creating a project for a
 human has no capture path here at all. Any document that prescribes `--under
@@ -500,7 +500,7 @@ non-letter dropped — `"Authentication"` → `authentication`, `"Billing & Dunn
 
 A ticket id is the next free number among its siblings: one more than the
 highest numeric sibling, starting at 1. A **retired** sibling counts: an id
-`rhei remove` retired (§FS-rhei-remove.5.1) is as taken as a live one, so
+`rhei remove` retired ([§FS-rhei-remove.5.1](rhei-remove.spec.md#51-where-it-is-recorded)) is as taken as a live one, so
 removing the highest-numbered ticket never frees its number. Named ids are not derived — a title
 never becomes a named ticket id, because ticket ids are referenced by hand in
 every `**Prior:**` and a generated name is a worse identifier than a number.
@@ -516,7 +516,7 @@ The following ids are refused outright:
   `index.rhei.md` is an existing rhei in either requested create layout;
 - a ticket id **retired** in the project, naming its record in
   `metadata.retiredTickets`: a retired id is never live again
-  (§FS-rhei-remove.5.2);
+  ([§FS-rhei-remove.5.2](rhei-remove.spec.md#52-what-a-retired-id-forbids));
 - `basin` as a *rhei* id, which is permanently reserved for the synthetic
   basin rhei ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis)) — the refusal is at create time rather than at
   the next load, where it would arrive as a broken project;
@@ -529,7 +529,7 @@ The following ids are refused outright:
 
 A same-id directory that has no `index.rhei.md` is not an existing-rhei
 collision. For `--dir` it is either the prospective workspace admitted by
-§2.1.1 or an occupied destination; for the default single-file layout it is a
+[§FS-rhei-new.2.1.1](rhei-new.spec.md#211-prospective-directory-workspace-adoption) or an occupied destination; for the default single-file layout it is a
 layout conflict. These refusals describe the filesystem conflict truthfully and
 leave both the existing directory and the selected output path untouched.
 
@@ -542,7 +542,7 @@ The **scope sidecar** comes first and is held for the whole invocation — befor
 the first load or selection, through the write, both validation passes, success
 or rollback — beside the project manifest (`index.panta.md`) for a project, or
 beside the plan file for a lone plan or bare workspace. Holding it project-wide
-is what the pre/post validation diff (§5.2) needs.
+is what the pre/post validation diff ([§FS-rhei-new.5.2](rhei-new.spec.md#52-a-create-answers-for-the-errors-it-introduced)) needs.
 
 The **destination sidecar** comes second, beside the plan file the create
 actually writes. That is the identity `rhei complete`, `rhei transition`,
@@ -590,7 +590,7 @@ upgrade is complete; live mixed-version writing is unsupported.
 `rhei new` never writes over a file that is already there. The destination of a
 new task file is derived from the id and the title, so a file already sitting
 at that name holds someone else's work — the refusal names the path and points
-at `--id`, before anything is written. Creating is not editing (§6), and an
+at `--id`, before anything is written. Creating is not editing ([§FS-rhei-new.6](rhei-new.spec.md#6-what-rhei-new-does-not-do)), and an
 unconditional write is editing with the diff thrown away.
 
 Adopting a prospective Directory Workspace does not make its existing root or
@@ -619,7 +619,7 @@ back the *new* id, so every narrower check passes while three tickets quietly
 stop existing. Checking the whole set does not need to know which bug produced
 the loss, which is the reason to have it rather than a check per known fault.
 That specific fault is refused one step earlier, as an argument error about the
-unbalanced fence (§3.4), because "your fence is unclosed" is something the
+unbalanced fence ([§FS-rhei-new.3.4](rhei-new.spec.md#34-what-a-description-may-contain)), because "your fence is unclosed" is something the
 author can act on and "ids disappeared" is only the last line of defence.
 
 The reload of the created id covers the opposite miss: a block spliced where the
@@ -627,7 +627,7 @@ parser ends a section earlier than the writer assumed leaves the project valid
 and the ticket absent — and reported as success, that is a file the author has
 to debug by hand, one id short and with the next create about to reuse the
 number. When the id does not come back from the file it was written to, the
-create has failed like any other, names the file, and is rolled back (§5.2).
+create has failed like any other, names the file, and is rolled back ([§FS-rhei-new.5.2](rhei-new.spec.md#52-a-create-answers-for-the-errors-it-introduced)).
 
 The id-set comparison runs first, because it is the only one of the three that
 does not need the project to load under its state machines: a write that deleted
@@ -643,7 +643,7 @@ a temp file in the same directory and renamed into place, keeping the file's own
 permissions. A create interrupted halfway can then leave the plan untouched but
 never leave it truncated — an appended ticket is not worth the file it was
 appended to. A file that does not exist yet is written directly: there is no
-previous content to lose, and a failed create removes it whole (§5.2).
+previous content to lose, and a failed create removes it whole ([§FS-rhei-new.5.2](rhei-new.spec.md#52-a-create-answers-for-the-errors-it-introduced)).
 
 ### 5.2. A create answers for the errors it introduced
 
@@ -716,7 +716,7 @@ the new index and task directory as well as the authored bundle it never owned.
 ### 5.3. Mode confusion is an error
 
 `--dir`, `--max-levels`, and `--node-kinds` create a rhei; every
-flag in §1.3 creates a ticket. Passing one with the other mode's selector is
+flag in [§FS-rhei-new.1.3](rhei-new.spec.md#13-options-that-create-a-ticket) creates a ticket. Passing one with the other mode's selector is
 refused, naming both flags. A flag silently ignored because the *other* flag
 decided the mode is the worst outcome available: the command reports success
 and the field the user asked for is not there.
@@ -779,17 +779,17 @@ Together, `--dry-run --json` emits that same object with `"dry_run": true` and
 the block under `"markdown"`, so a script can preview a bulk create the same
 way it reads a real one. A flag that selects the output format has to keep
 working under a flag that only selects whether the write happens: silently
-handing prose to a caller that asked for JSON is the §5.3 failure again, in the
+handing prose to a caller that asked for JSON is the [§FS-rhei-new.5.3](rhei-new.spec.md#53-mode-confusion-is-an-error) failure again, in the
 one place a caller cannot notice it.
 
 ## 6. What `rhei new` does not do
 
-- It does not edit or move anything that already exists. With `--dir`, §2.1.1
+- It does not edit or move anything that already exists. With `--dir`, [§FS-rhei-new.2.1.1](rhei-new.spec.md#211-prospective-directory-workspace-adoption)
   permits creating workspace-owned entries inside one narrowly admissible
   directory, but its existing machine bundle remains authored content. There is
   otherwise no re-titling, re-parenting, or state change — `rhei transition` and
   `rhei complete` own state, and `rhei remove` owns taking back an untouched
-  ticket (§FS-rhei-remove). Everything else is a file edit.
+  ticket ([§FS-rhei-remove](rhei-remove.spec.md#fs-rhei-remove-rhei-remove)). Everything else is a file edit.
 - It does not scaffold from a template. `rhei instantiate` writes a rhei
   complete with its tickets and its own state machine ([§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification));
   `rhei new` writes an empty one. They are separate because a blank rhei should

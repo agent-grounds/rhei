@@ -105,7 +105,7 @@ author-chosen names must match `^[a-z][a-z0-9-]*$`. Auto-emit fires with
 snapshots exist solely so `rhei snapshot continue` can reach any past state
 for analysis; they are *not* candidates for authored `snapshot.inherit:`
 resolution. The one exception is the fully determined, implicit previous-visit
-lookup performed by `session: continue` (§4.7); that path does not use the
+lookup performed by `session: continue` ([§FS-rhei-snapshots.4.7](rhei-snapshots.spec.md#47-state-local-continuation)); that path does not use the
 named-inheritance grammar.
 
 A *named* snapshot is produced when a state declares `snapshot.emit:`. The
@@ -224,7 +224,7 @@ The state rule is overlaid with task metadata before selection. Omitted
 the state has no rule, it supplies no selectors and defaults to native,
 optional inheritance. `**Inherits:** none` removes the effective rule for the
 task without changing emission or artifact behavior
-(§FS-rhei-plan-language.3.14).
+([§FS-rhei-plan-language.3.14](rhei-plan-language.spec.md#314-task-snapshot-inheritance-overrides)).
 
 ### 4.3. Lineage Resolution
 
@@ -310,7 +310,7 @@ Snapshot preload happens immediately before the state invocation that declares
 3. If the resulting effective rule declares `snapshot.inherit:`, the
    orchestrator resolves its named source; otherwise, if the state declares
    `session: continue`, the orchestrator resolves the implicit source from
-   §4.7. A resolved source is preloaded before spawning the agent; `none`
+   [§FS-rhei-snapshots.4.7](rhei-snapshots.spec.md#47-state-local-continuation). A resolved source is preloaded before spawning the agent; `none`
    means no effective rule and a cold spawn, not a failed lookup.
 4. The agent runs the state work.
 5. After the agent exits and the Completion Condition is evaluated, the same
@@ -352,7 +352,7 @@ and artifacts, so the plan records which branch was taken and why.
 
 `session: continue` has the same single-fallback rule: every unavailable or
 unusable implicit source runs the invocation cold. It never searches an older
-visit, another target, or another generation (§4.7).
+visit, another target, or another generation ([§FS-rhei-snapshots.4.7](rhei-snapshots.spec.md#47-state-local-continuation)).
 
 ### 4.7. State-Local Continuation
 
@@ -381,7 +381,7 @@ orchestrator selects exactly this identity:
 
 Here `current generation` means the live `current` pointer written by the
 orchestrator for that `_state` identity. Operator generations do not advance
-that pointer (§7), so they do not replace the source. The selection never
+that pointer ([§FS-rhei-snapshots.7](rhei-snapshots.spec.md#7-storage-layout)), so they do not replace the source. The selection never
 searches visit `N-2`, another target slug, or an older generation when the
 exact candidate is absent or unusable. A retry of visit `N` still selects
 visit `N-1`; an earlier attempt within visit `N` is not a completed preceding
@@ -408,7 +408,7 @@ unsupported profile still executes every visit and still receives the normal
 prompt.
 
 When the source is usable, the existing native compatibility predicate and
-resume/fork strategy (§5 and §10.1) stage it before spawn. Both the following
+resume/fork strategy ([§FS-rhei-snapshots.5](rhei-snapshots.spec.md#5-compatibility-predicates) and [§FS-rhei-snapshots.10.1](rhei-snapshots.spec.md#101-spawn-time-preload)) stage it before spawn. Both the following
 auto emission and any separately authored named emission record the selected
 `_state` identity in `parent_ref`. When selection or preload falls back cold,
 both record `parent_ref: null`. Continuation itself writes only the ordinary
@@ -427,7 +427,7 @@ cross-state and ancestor behavior, and selector semantics remain unchanged.
 
 Snapshot preload does not change prompt composition. Checkpoints, previous
 visits, supervisor briefs, preparation notes, and every other memory section
-are composed unconditionally under §FS-rhei-memory.1.2, whether continuation
+are composed unconditionally under [§FS-rhei-memory.1.2](rhei-memory.spec.md#12-composition-is-algorithmic), whether continuation
 is warm or cold.
 
 ## 5. Compatibility Predicates
@@ -600,7 +600,7 @@ Which one a writer uses is the platform's decision and never the plan's:
   user account does not hold.
 
 Both spellings are written the same way — into `current.tmp-<nonce>` beside it,
-then renamed over `current` (§7.2) — so no reader ever sees a half-written
+then renamed over `current` ([§FS-rhei-snapshots.7.2](rhei-snapshots.spec.md#72-atomic-writes)) — so no reader ever sees a half-written
 pointer, and a failed write leaves the previous generation current rather than
 no generation at all.
 
@@ -622,7 +622,7 @@ would leave an inheriting state reading a cache nothing ever wrote to, and it
 would run cold without failing.
 
 What the execution root does hold is the snapshot **session** directory,
-`runtime/snapshot-sessions/` (§9.1): a session is one ticket's live agent
+`runtime/snapshot-sessions/` ([§FS-rhei-snapshots.9.1](rhei-snapshots.spec.md#91-customagentprofilesession)): a session is one ticket's live agent
 transcript, not a stored generation, so it belongs to the rhei that ran the
 ticket and a narrowed `rhei reset` sweeps it with that ticket's other runtime
 artifacts ([§FS-rhei-panta.6.4](rhei-panta.spec.md#64-reset-validate-list-viz)).
@@ -640,7 +640,7 @@ roots, and one value cannot stand for both:
   project root the command was given is where the cache lives, not the
   session;
 - the fixed-location `dir_template` and the locator that reads it back
-  (§9.1, §10.1) resolve against the directory the continuation's own agent
+  ([§FS-rhei-snapshots.9.1](rhei-snapshots.spec.md#91-customagentprofilesession), [§FS-rhei-snapshots.10.1](rhei-snapshots.spec.md#101-spawn-time-preload)) resolve against the directory the continuation's own agent
   process runs in, which is the project root the command was given.
   `{cwd_dashed}` names the directory that child observes and the locator
   confirms a candidate's recorded working directory against that same
@@ -697,7 +697,7 @@ A snapshot generation is written by this procedure:
    when the target does not exist.
 7. For orchestrator-produced generations only, update the `current` pointer:
    write `current.tmp-<nonce>` naming `g<N>` — as a symlink, or as a one-line
-   file where the platform has no unprivileged symlinks (§7) — then rename it
+   file where the platform has no unprivileged symlinks ([§FS-rhei-snapshots.7](rhei-snapshots.spec.md#7-storage-layout)) — then rename it
    to `current` atomically. Operator-produced generations do not advance
    `current`.
 
@@ -922,7 +922,7 @@ shared fixed directory predates this invocation and is not its session, and
 finding no matching file is the honest `unsupported-snapshot-session` outcome
 rather than a fallback to a stale one. `session_dir_flag` stays preferable
 where available — it turns emit into a scan of an empty, invocation-private
-directory instead of a shared one — but it is an optimization: §9.2's emit
+directory instead of a shared one — but it is an optimization: [§FS-rhei-snapshots.9.2](rhei-snapshots.spec.md#92-built-in-profiles)'s emit
 requirement is a `SessionLayout` alone.
 
 `interactive.command`, when a profile declares one, replaces the profile's
@@ -1074,7 +1074,7 @@ transport, and not before. Two have. Pi has a complete native surface — an
 interactive TTY mode, `--fork <path>`, `--session-dir <dir>`, and a flat JSONL
 transcript layout. Codex reaches the same place by a different route: no
 `--session-dir` analogue at all, but a fixed transcript root the locator keys
-of §9.1.1 can search and confirm, and `resume` as a positional `codex exec`
+of [§FS-rhei-snapshots.9.1.1](rhei-snapshots.spec.md#911-optional-flatbyid-locator-keys) can search and confirm, and `resume` as a positional `codex exec`
 subcommand ([Codex](#934-codex)). Its `fork` cell is `none` deliberately, and
 that section says why. The rest remain usable through custom
 session-capable profiles.
@@ -1082,7 +1082,7 @@ session-capable profiles.
 Emit and preload have independent profile requirements:
 
 - *Emit* requires only a `SessionLayout` (rhei needs to know where the agent
-  wrote its session file; see §9.1 for how it locates the transcript when
+  wrote its session file; see [§FS-rhei-snapshots.9.1](rhei-snapshots.spec.md#91-customagentprofilesession) for how it locates the transcript when
   `session_dir_flag` is absent). An agent with `ResumeStrategy::None` but a valid
   `SessionLayout` can still emit snapshots; those snapshots become preload
   sources only if the profile also declares a `ForkStrategy`.
@@ -1171,7 +1171,7 @@ rollout under `~/.codex/sessions`, partitioned by calendar date, at
 is a `session_meta` carrying `session_id`, `cwd`, `originator`, and
 `model_provider`; the model is not there, and first appears in the following
 `turn_context` record. That is one file per session — `FlatById` — reached
-through all three locator keys of §9.1.1. `nested`, because the file sits three
+through all three locator keys of [§FS-rhei-snapshots.9.1.1](rhei-snapshots.spec.md#911-optional-flatbyid-locator-keys). `nested`, because the file sits three
 directories below the root and no `dir_template` placeholder can name a
 calendar date in advance. `id_from_stem: TrailingUuid`, because the stem is
 `rollout-<timestamp>-<uuid>` while it is the bare `<uuid>` that `codex exec
@@ -1207,17 +1207,17 @@ authentication.
 **Codex forks, but not in a shape rhei can declare yet.** `codex exec fork
 <SESSION_ID> [PROMPT]` exists and takes the same UUID `resume` does. Rhei's
 `ForkStrategy::Native { flag }` cannot express it: that variant means *hand the
-agent the source snapshot's transcript path* (§9.1), which is pi's
+agent the source snapshot's transcript path* ([§FS-rhei-snapshots.9.1](rhei-snapshots.spec.md#91-customagentprofilesession)), which is pi's
 `--fork <path>`, and step 7 of [Spawn-Time Preload](#101-spawn-time-preload)
 prefers fork over resume whenever a profile declares both. A codex profile
 declaring `fork` would therefore emit `fork <…/transcript.jsonl>`, which
 codex-cli 0.149.0 answers with `Error: Session not found`, and the resume this
 section delivers would never be reached. Declaring fork for codex needs a
 strategy that says *which argument it takes* — a session id or a path — and
-that is a change to the profile contract in §9.1 rather than to this profile.
+that is a change to the profile contract in [§FS-rhei-snapshots.9.1](rhei-snapshots.spec.md#91-customagentprofilesession) rather than to this profile.
 It is left open and is not part of this section's answer.
 
-The built-in codex profile therefore declares a session block (§9.2): `resume`
+The built-in codex profile therefore declares a session block ([§FS-rhei-snapshots.9.2](rhei-snapshots.spec.md#92-built-in-profiles)): `resume`
 as the subcommand name and **no `fork`**, `--ephemeral` as `no_session_flag`,
 no `session_dir_flag` and no `assign_id_flag`, an `interactive` command of
 `codex`, and a `FlatById` layout over `~/.codex/sessions` carrying the three
@@ -1227,7 +1227,7 @@ from that block; nothing in the code branches on the agent being codex.
 **`rhei snapshot continue` no longer requires a `session_dir_flag`.**
 Capture-enabled continuation used to refuse any profile without one, because
 staging the transcript into a directory rhei owns was the only way it knew to
-find it again. That is no longer true: the fixed-location locator §9.1 defines
+find it again. That is no longer true: the fixed-location locator [§FS-rhei-snapshots.9.1](rhei-snapshots.spec.md#91-customagentprofilesession) defines
 for emit — the layout's `dir_template`, the newest file written at or after the
 spawn, confirmed through `confirm_cwd_path` where the profile declares one —
 finds a continuation's transcript exactly as it finds a run's. So a
@@ -1245,13 +1245,13 @@ for `--no-capture` to continue a codex session.
 Before every spawn of an agent whose profile has a supported `SessionLayout`,
 independent of whether the state declares `snapshot.inherit:`, the
 orchestrator resolves how it will later locate the transcript for emit
-(§9.1): if `session_dir_flag` is set, it creates a fresh invocation-private
+([§FS-rhei-snapshots.9.1](rhei-snapshots.spec.md#91-customagentprofilesession)): if `session_dir_flag` is set, it creates a fresh invocation-private
 directory and appends the flag; otherwise, if the layout carries
 `dir_template`, it resolves that fixed directory — expanding a leading `~/`
 against the home directory and a `{cwd_dashed}` placeholder against this
 spawn's own working directory, in that order — and, when `assign_id_flag` is
 set, generates a session id and appends the flag. The layout's optional locator
-keys (§9.1.1) are resolved with it: `nested` and `id_from_stem` decide how the
+keys ([§FS-rhei-snapshots.9.1.1](rhei-snapshots.spec.md#911-optional-flatbyid-locator-keys)) are resolved with it: `nested` and `id_from_stem` decide how the
 later scan searches and what it reads back as the session id, and
 `confirm_cwd_path` is paired with this spawn's own canonicalized working
 directory, which is the value a candidate's header has to name. Neither step touches the
@@ -1266,7 +1266,7 @@ fixed-location tracking rather than failing the spawn: this invocation loses
 emit/preload for that agent, not the run. The numbered steps below apply to
 authored `snapshot.inherit:`. State-local continuation uses the same
 compatibility, strategy, staging, and flag-order steps after selecting its
-exact implicit source under §FS-rhei-snapshots.4.7; its failures always take
+exact implicit source under [§FS-rhei-snapshots.4.7](rhei-snapshots.spec.md#47-state-local-continuation); its failures always take
 the optional cold path.
 
 For each spawn with an effective state/task inheritance rule:
@@ -1344,7 +1344,7 @@ After every agent-state subprocess exits, the orchestrator:
    `unsupported-snapshot-session`; `snapshot.emit:` is an explicit author
    contract, not a best-effort hint.
 
-   Both writes locate the native transcript the way §10.1 and §9.1 set up at
+   Both writes locate the native transcript the way [§FS-rhei-snapshots.10.1](rhei-snapshots.spec.md#101-spawn-time-preload) and [§FS-rhei-snapshots.9.1](rhei-snapshots.spec.md#91-customagentprofilesession) set up at
    spawn: the redirected `session_dir` when `session_dir_flag` was used;
    otherwise the resolved `dir_template` directory, read at the exact
    `<dir>/<assigned-id>.<ext>` path when `assign_id_flag` was used, or by
@@ -1554,7 +1554,7 @@ following rules. Violations are errors unless marked otherwise.
 - Manifest validation requires `completion` to be `success`, `failure`, or
   `timeout` when `produced_by: orchestrator`, and only `success` or `failure`
   when `produced_by: operator`.
-- `**Inherits:**` obeys §FS-rhei-plan-language.3.14. A task value overlays only
+- `**Inherits:**` obeys [§FS-rhei-plan-language.3.14](rhei-plan-language.spec.md#314-task-snapshot-inheritance-overrides). A task value overlays only
   state `name` and `from`; `none` removes the effective rule. The resulting
   rule is validated against every autonomous state the task may enter,
   including polling, fanout, target, required/compatibility, and source-shape

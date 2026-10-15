@@ -23,7 +23,7 @@ directory. Listing is project-wide: filters apply across every rhei, and
 | Flag                     | Description                                                                       |
 |--------------------------|-----------------------------------------------------------------------------------|
 | `--rhei <RHEI_ID>`       | Only tickets in the named rheis. Repeatable. An id that names no rhei in the project is an error listing the available ids. [§FS-rhei-panta.6.4](rhei-panta.spec.md#64-reset-validate-list-viz) |
-| `--state <STATE>`        | Filter by state. Repeatable; comma-separated also accepted. Aliases are normalized per owning machine. A state no loaded machine declares is an error (§2.1). |
+| `--state <STATE>`        | Filter by state. Repeatable; comma-separated also accepted. Aliases are normalized per owning machine. A state no loaded machine declares is an error ([§FS-rhei-list.2.1](rhei-list.spec.md#21-filter-values-that-name-nothing)). |
 | `--assignee <ASSIGNEE>`  | Exact `**Assignee:**` match. Mutually exclusive with `--no-assignee`.            |
 | `--no-assignee`          | Only tasks with no `**Assignee:**` field.                                         |
 | `--kind <KIND>`          | Filter by node kind (e.g. `task`, `bug`, `spec`). Case-insensitive.               |
@@ -33,8 +33,8 @@ directory. Listing is project-wide: filters apply across every rhei, and
 | `--contains <TEXT>`      | Case-insensitive substring match against task title and content body.             |
 | `--terminal`             | Only tasks whose state is terminal in the resolved state machine.                 |
 | `--non-terminal`         | Only tasks whose state is non-terminal. Mutually exclusive with `--terminal`.     |
-| `--ready`                | Only tasks the ready set holds — descendants all terminal, `**Prior:**` set satisfied, state declared by the machine and neither terminal nor gating, the state's required `inputs:` on disk, and no `poll:` deadline still ahead (§3.1). Mutually exclusive with `--blocked`. |
-| `--blocked`              | Only non-terminal tasks that are not ready — the complement of `--ready` (§3.1).  |
+| `--ready`                | Only tasks the ready set holds — descendants all terminal, `**Prior:**` set satisfied, state declared by the machine and neither terminal nor gating, the state's required `inputs:` on disk, and no `poll:` deadline still ahead ([§FS-rhei-list.3.1](rhei-list.spec.md#31-what---ready-means)). Mutually exclusive with `--blocked`. |
+| `--blocked`              | Only non-terminal tasks that are not ready — the complement of `--ready` ([§FS-rhei-list.3.1](rhei-list.spec.md#31-what---ready-means)).  |
 | `--limit <N>`            | Cap the number of printed tasks. `0` means no limit (default).                    |
 | `--json`                 | Emit a JSON array instead of human-readable text.                                 |
 
@@ -75,7 +75,7 @@ there is no declared set to check it against.
 2. Walk the task tree in source order, recording each task with its parent id.
 3. Apply filters in order; normalize `--state` values and the task's own state
    through that ticket's machine so aliases match.
-4. For `--ready` / `--blocked`, ask the ready set (§3.1) rather than
+4. For `--ready` / `--blocked`, ask the ready set ([§FS-rhei-list.3.1](rhei-list.spec.md#31-what---ready-means)) rather than
    re-deriving readiness; the other filters narrow the answer, they never
    change it.
 5. Apply `--limit` after filtering.

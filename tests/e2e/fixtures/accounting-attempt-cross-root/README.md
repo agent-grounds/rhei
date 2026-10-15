@@ -6,4 +6,4 @@ The first record belongs under the project root; the second belongs under
 `alpha`. They give the same legacy identity evidence with contradictory
 usage and cost. The regression constructs a fresh project with `alpha.1` in
 `work`, because the review run already advanced its original task.
-§FS-rhei-cost-accounting.11 §FS-rhei-panta.6.5
+[§FS-rhei-cost-accounting.11](../../../../docs/functional-spec/rhei-cost-accounting.spec.md#11-failure-modes) [§FS-rhei-panta.6.5](../../../../docs/functional-spec/rhei-panta.spec.md#65-cost-and-summary)

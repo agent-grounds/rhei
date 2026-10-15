@@ -8,7 +8,7 @@ emitted it, and **nothing else is ever written to stdout**. A tool that reads
 surface. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
 
 The same records are what `rhei run` writes durably to `runtime/events.jsonl`
-(§3) and what `rhei attach --json` replays from a detached run
+([§FS-rhei-run-json.3](rhei-run-json.spec.md#3-durable-event-log)) and what `rhei attach --json` replays from a detached run
 ([§FS-rhei-run-headless.5.3](rhei-run-headless.spec.md#53---json)), so one contract covers live output, the durable log,
 and attachment.
 
@@ -20,12 +20,12 @@ and attachment.
 
 `--json` conflicts with `--tui`: a run cannot both own the terminal and be a
 clean byte stream. `--json --dry-run` emits the dry-run preview as JSON
-(§4). Human-oriented engine prose that the plain frontend prints is carried in
+([§FS-rhei-run-json.4](rhei-run-json.spec.md#4-dry-runs)). Human-oriented engine prose that the plain frontend prints is carried in
 `message` records rather than dropped, so a JSON consumer sees the same
 diagnostics an operator does. That includes every warning from the initial
 validation report: each follows `run_started`, precedes scheduling, and appears
 once as a `message` record with `level: "warn"`, while stderr remains reserved
-for failures that do not enter the stream (§FS-rhei-run.3).
+for failures that do not enter the stream ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)).
 
 **Errors do not enter the stream.** A run that fails before or during
 execution writes the `{ "error": { "message", "help" } }` envelope of
@@ -41,14 +41,14 @@ Every line is a JSON object carrying at least:
 |-------|------|-------------|
 | `seq` | integer | 1-based, gap-free, monotonically increasing within one run. **Structural records only** |
 | `ts` | string | UTC RFC 3339, second precision, when the engine emitted the record |
-| `event` | string | The record kind (§2.1) |
+| `event` | string | The record kind ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)) |
 
 `seq` is the cursor: `rhei attach --json --since <seq>` resumes exactly after
 it, and a consumer that reconnects never has to deduplicate by content. It
 restarts at `1` for every run, because `runtime/events.jsonl` is truncated at
 run start — one file is one run.
 
-**`agent_output` carries no `seq`** (§2.3). It is not a cursor point: it never
+**`agent_output` carries no `seq`** ([§FS-rhei-run-json.2.3](rhei-run-json.spec.md#23-agent-output)). It is not a cursor point: it never
 reaches `runtime/events.jsonl`, so numbering it would give the stdout stream and
 the durable log two different sequences for the same run, and `--since` on one
 would silently skip records of the other. Leaving it out is what keeps the
@@ -63,7 +63,7 @@ replay instant.
 Unknown fields may be **added** to any record in a future version. A consumer
 must ignore fields it does not know and must not assume field order. Removing
 or repurposing a field named here is a breaking change and moves `schema`
-(§2.2).
+([§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version)).
 
 ### 2.1. Records
 
@@ -79,10 +79,10 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `usage_reported` | A turn was measured, and again once the accounting record was durably written | `task`, `invocation_id`, `slot`, `report` (`streamed`/`final`), `usage` |
 | `message` | Engine diagnostics | `level` (`info`/`warn`/`error`), `text` |
 | `link` | The run produced a URL or file link | `label`, `url` |
-| `agent_output` | A live agent output line (§2.3) | `slot`, `task`, `stream`, `line` |
+| `agent_output` | A live agent output line ([§FS-rhei-run-json.2.3](rhei-run-json.spec.md#23-agent-output)) | `slot`, `task`, `stream`, `line` |
 | `budget_snapshot` | Once before scheduling, and again after each receipt is durable | `bounds` (one entry per dimension: `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `currency` on the spend entry, and `ceiling` on a delegated entry), and `ceiling_policy` where any ceiling was delegated |
 | `budget_halt` | An admission was refused | `task`, `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `renews_at`, `remedy`, `reason_code`, `ceiling` and `ceiling_policy` where the dimension's ceiling was delegated, and on a spend halt `currency`, `unpriced`, `unmeasurable`, `unsettled` |
-| `run_finished` | Once, when the run loop ends (§2.4) | `summary` |
+| `run_finished` | Once, when the run loop ends ([§FS-rhei-run-json.2.4](rhei-run-json.spec.md#24-where-run_finished-sits)) | `summary` |
 
 `outcome` is one of `completed`, `failed`, `waiting`, `provider_limited`,
 `cancelled`, `timeout`, `interrupted`, matching the journal vocabulary of [§FS-rhei-run-tui.1.7](rhei-run-tui.spec.md#17-journal-format).
@@ -100,17 +100,17 @@ settings file read, and `ceiling_policy` is `{ "delegated": [<keys>], "setting":
 "defaults.clamp_projects", "path": <machine settings file> }`, listing only the
 keys actually delegated ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued)). Both are absent where nothing was delegated, so a
 machine that never set the switch emits the records it always did; they are
-additions under §2.2, so `schema` does not move. `remedy` names the settings file
-by its path (§FS-rhei-budgets.8).
+additions under [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version), so `schema` does not move. `remedy` names the settings file
+by its path ([§FS-rhei-budgets.8](rhei-budgets.spec.md#8-exhaustion)).
 
-`reverted` is the journal's key of the same name (§FS-rhei-run-tui.1.7): the
+`reverted` is the journal's key of the same name ([§FS-rhei-run-tui.1.7](rhei-run-tui.spec.md#17-journal-format)): the
 string `<file>:<line>` at which the worker's edit broke the plan, present only on
-the release whose region the run restored (§FS-rhei-run.3.7). That release's
+the release whose region the run restored ([§FS-rhei-run.3.7](rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan)). That release's
 `outcome` is `failed`, or the `timeout` or `interrupted` that ended it. It is an
-addition under §2.2, so `schema` does not move.
+addition under [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version), so `schema` does not move.
 
 `provider_limited` is emitted for the recognized parked result of
-§FS-rhei-run.3.3. The record's `task` identifies the reporter, `provider` is
+[§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking). The record's `task` identifies the reporter, `provider` is
 `openai`, and `next_attempt_at` is its RFC 3339 UTC safe deadline. It is not a
 `failed` outcome. The stream remains open while the ordinary run loop waits;
 `run_finished` is emitted only when that loop later finishes or halts.
@@ -132,11 +132,11 @@ mixed`, present and null when `reason` is not `idle`. `next_attempt_at` is an
 RFC 3339 UTC instant, the same spelling and format as the `next_attempt_at` on
 `slot_released`, and is present and null when no task contributes one
 ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)) — never omitted and never a synthesized placeholder.
-`exit_code` is the integer the process exits with (§5). The values are
+`exit_code` is the integer the process exits with ([§FS-rhei-run-json.5](rhei-run-json.spec.md#5-exit-codes)). The values are
 snake_case because the stream's sibling enumeration, `outcome`, already is, and
 they are one object rather than four loose keys because `summary` is a counts
 rollup and four more keys would read as more counts. This is an addition under
-§2.2, so `schema` does not move, and no new record kind is introduced —
+[§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version), so `schema` does not move, and no new record kind is introduced —
 including for the informational stderr notice a line frontend may print when
 the option suppresses a TUI that detection would have chosen, which never
 reaches this stream.
@@ -150,23 +150,23 @@ settle left: a reader of the tail sees what the run spent, not what it had
 reserved when it admitted its last spawn. There is one entry per dimension, spend
 among them; on that entry the amounts are integer micro-units of `currency`
 rather than counts, so a reader never has to parse a rendered `$`
-(§FS-rhei-budgets.5.5). `budget_halt.remedy` is the single remedy that raises
+([§FS-rhei-budgets.5.5](rhei-budgets.spec.md#55-one-currency-per-account)). `budget_halt.remedy` is the single remedy that raises
 the limiter that actually stopped the work, and `budget_halt.renews_at` is
 present exactly when the window contract limited — which, for a spend halt, is
-always (§FS-rhei-budgets.3.4). The three mark counts are present on a spend
+always ([§FS-rhei-budgets.3.4](rhei-budgets.spec.md#34-the-spend-window)). The three mark counts are present on a spend
 halt and are `0` where nothing was charged at the fallback, because a reader
 distinguishing "none" from "not reported" should not have to infer it from an
-absent key (§FS-rhei-budgets.6.2).
+absent key ([§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle)).
 `reason_code` is stable and machine-readable; the human text of the same halt is
 a `message` record at `error` level. Adding these records does not move the
-schema version ([§FS-rhei-run-json.2.2](#22-schema-version)): a reader that does not know them skips
+schema version ([§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version)): a reader that does not know them skips
 them like any other unrecognized `event`.
 
 `usage_reported.report` is `streamed` for a running total observed
 mid-invocation and `final` for the one report that follows the durable record;
 exactly one `final` record exists per invocation that reaches a record
 [§FS-rhei-cost-accounting.7.1](rhei-cost-accounting.spec.md#71-line-oriented-frontends). Adding the field does not move the schema version
-(§2.2), and a record written before it decodes as `final`.
+([§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version)), and a record written before it decodes as `final`.
 
 A stream that ends without `run_finished` says the run did not reach its own
 end: it was interrupted, it failed, or the process died. That is information,
@@ -179,12 +179,12 @@ letting it read as a run that was interrupted.
 ### 2.2. Schema Version
 
 `run_started.schema` is an integer, currently `1`. It increases only when a
-field named in §2.1 is removed or changes meaning. Adding a record kind or a
+field named in [§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records) is removed or changes meaning. Adding a record kind or a
 field does not move it, so a consumer pinned to `schema: 1` keeps working
 across additive releases. A consumer that does not recognize the value should
 say so and stop rather than guess.
 
-Adding a **value** to an enumerated field of §2.1 does not move `schema` either
+Adding a **value** to an enumerated field of [§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records) does not move `schema` either
 — and here the reading rule is deliberately the opposite of the one above. A
 consumer that meets an `outcome` it does not know **carries it through**: prints
 it, stores it, passes it on, and keeps reading. The two unknowns are not the same
@@ -241,7 +241,7 @@ with `tail -f`, the other for a program with a JSON parser.
 by `run_started` and `run_finished`, and exits with the status [§FS-rhei-run.4](rhei-run.spec.md#4-dry-run)
 defines. A dry run writes no `runtime/events.jsonl` and publishes no run
 descriptor, because it is side-effect-free — but the frontend the caller asked
-for is still the frontend it gets, so §1's "nothing else is ever written to
+for is still the frontend it gets, so [§FS-rhei-run-json.1](rhei-run-json.spec.md#1-selecting-the-format)'s "nothing else is ever written to
 stdout" holds for a preview exactly as it does for a run. Initial validation
 warnings use the same `message` records and startup ordering as a real run.
 
@@ -255,7 +255,7 @@ does:
 | `0` | Every in-scope task is terminal — **or** the run halted with work remaining that is only deliberately waiting ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)), which without `--until-idle` is the same `0` |
 | `1` | Work remains that needs a person or a repair, or the run itself errored |
 | `2` | A usage refusal, including `--until-idle` alongside `--tui` or `--headless` ([§FS-rhei-run-tui.1.4](rhei-run-tui.spec.md#14-frontend-selection)) |
-| `3` | **Idle** — produced only when `--until-idle` is selected (§2.1) |
+| `3` | **Idle** — produced only when `--until-idle` is selected ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)) |
 | `101` | A panic |
 | `128 + n` | A signal ended it ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) |
 

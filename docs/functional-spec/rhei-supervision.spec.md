@@ -87,7 +87,7 @@ their snapshot rules require. Other profiles without a supported layout must
 omit the block or provide a custom session-capable profile; explicit snapshot
 use otherwise fails with `unsupported-snapshot-session`. A supervisor without
 snapshot support still supervises: it runs each visit cold, carried by its
-checkpoints and briefs (§6).
+checkpoints and briefs ([§FS-rhei-supervision.6](rhei-supervision.spec.md#6-interaction-with-other-features)).
 
 The value is a *scope* and an *event*, in that order, and exactly four are
 legal:
@@ -113,7 +113,7 @@ supervisor of its own, nested beneath this one. `child-transition` watches a
 child's own hops — its `review ↔ fix` loop — without hearing the grandchildren
 that child dispatches. Narrowing the scope needs no new way to say "the subtree
 is done": because a non-leaf child cannot be terminal while anything under it
-is open, `openDescendants` (§4.1) is zero exactly when no child is open, so
+is open, `openDescendants` ([§FS-rhei-supervision.4.1](rhei-supervision.spec.md#41-the-opendescendants-operand)) is zero exactly when no child is open, so
 `openDescendants < 1` stays the edge every supervisor finishes on, whatever its
 scope.
 
@@ -121,7 +121,7 @@ scope.
 while it is in a supervising state and stops when it leaves one. A leaf task
 in a supervising state behaves as an ordinary agent state — it has no
 descendants, so it is woken once and finishes on its `openDescendants < 1`
-edge (§4.1).
+edge ([§FS-rhei-supervision.4.1](rhei-supervision.spec.md#41-the-opendescendants-operand)).
 
 Omitting `execute_on` leaves the state with today's behavior: a non-leaf task
 in it is worked once, after its whole subtree is terminal
@@ -140,11 +140,11 @@ in it is worked once, after its whole subtree is terminal
 - `execute_on` combined with `all_targets` or `all_models` is a validation
   error in v1: a supervisor is one continued session, not a fanout.
 - A supervising state must declare a self-loop transition
-  (`from: <state>, to: <state>`). The self-loop is the *release* edge (§3.1);
+  (`from: <state>, to: <state>`). The self-loop is the *release* edge ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule));
   without it the supervisor would run once and never wait for its subtree.
   This mirrors the self-loop rule for polling states ([§FS-rhei-states.1.3](rhei-states.spec.md#13-validation-rules)).
 - `rhei validate` warns when no transition from a supervising state that uses
-  `openDescendants` (§4.1) leads to a final state the supervisor can finish in:
+  `openDescendants` ([§FS-rhei-supervision.4.1](rhei-supervision.spec.md#41-the-opendescendants-operand)) leads to a final state the supervisor can finish in:
   the supervisor would have no way to finish. *Leads to* is a path, not a
   single edge. The walk starts at the target of the `openDescendants` edge and
   follows the edges that count as a way out of a state
@@ -198,7 +198,7 @@ to a task that has a supervising ancestor:
 - under a `*-transition` value, on every applied transition, terminal ones
   included.
 
-The event decides *which* moves are news; the scope decides *whose* (§2.2).
+The event decides *which* moves are news; the scope decides *whose* ([§FS-rhei-supervision.2.2](rhei-supervision.spec.md#22-nearest-in-scope-supervising-ancestor)).
 
 A polling state's self-loop attempt ([§FS-rhei-states.2](rhei-states.spec.md#2-polling-states)) is a retry, not
 progress, and never produces a checkpoint. A fanout state's per-invocation
@@ -206,7 +206,7 @@ exits are not transitions; the one transition selected once every invocation
 has landed is ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)).
 
 A transition applied to a descendant while its nearest supervisor is itself
-in flight — a cancel the supervisor issues during its own visit (§5.1) — is
+in flight — a cancel the supervisor issues during its own visit ([§FS-rhei-supervision.5.1](rhei-supervision.spec.md#51-the-supervisors-prompt)) — is
 not a checkpoint: the supervisor already knows. The shared path recognizes
 that visit from the supervisor's `**Assignee:**` claim or from execution
 context scoped to an explicit operation on the outer plan — which on the
@@ -245,7 +245,7 @@ reaches it, and its exit into any other state is a `*-transition` one.
 ### 2.3. Timing
 
 Checkpoints are **post-transition**. The descendant has already moved to its
-new state and is held there (§3); the supervisor judges what happened and
+new state and is held there ([§FS-rhei-supervision.3](rhei-supervision.spec.md#3-hold-and-release)); the supervisor judges what happened and
 steers what comes next. Vetoing or redirecting a transition before it is
 applied remains the job of `on_leave` callbacks ([§FS-rhei-transitions.3.2](rhei-transitions.spec.md#32-callback-trigger-triggeredby-callback));
 supervision does not add a second approval path.
@@ -255,7 +255,7 @@ supervision does not add a second approval path.
 ### 3.1. The Rule
 
 A task `P` in a supervising state is a barrier over its subtree. Its
-*supervision phase* is either **held** or **released** (§3.3):
+*supervision phase* is either **held** or **released** ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)):
 
 1. **Entry holds.** When `P` enters a supervising state — by any verb, or by
    being authored in it — the phase is `held`: no descendant of `P` is
@@ -266,14 +266,14 @@ A task `P` in a supervising state is a barrier over its subtree. Its
    `concurrent`, `--parallel` — exactly as if `P` had no supervising state.
    The visit is over, so the self-loop also drops `P`'s `**Assignee:**`: the
    worker that took the visit no longer holds the ticket, and `P` is claimed
-   afresh by whoever answers its next checkpoint (§3.4).
+   afresh by whoever answers its next checkpoint ([§FS-rhei-supervision.3.4](rhei-supervision.spec.md#34-manual-workers)).
    An explicit CLI `rhei transition` self-loop with pending checkpoints is
    refused without mutation unless the caller supplies `--release-subtree`
-   (§FS-rhei-transition-cmd.2). The engine's own self-loop and withheld-edge
-   rule (§FS-rhei-supervision.3.6) are unchanged. With no pending checkpoints the plain self-loop
+   ([§FS-rhei-transition-cmd.2](rhei-transition-cmd.spec.md#2-options)). The engine's own self-loop and withheld-edge
+   rule ([§FS-rhei-supervision.3.6](rhei-supervision.spec.md#36-empty-visits)) are unchanged. With no pending checkpoints the plain self-loop
    still releases; the flag is accepted there as a no-op.
 3. **A checkpoint holds again.** When a checkpoint event is delivered to `P`
-   (§2), the phase becomes `held` and the event is recorded (§3.3). Nothing
+   ([§FS-rhei-supervision.2](rhei-supervision.spec.md#2-checkpoints)), the phase becomes `held` and the event is recorded ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)). Nothing
    new beneath `P` is dispatched. Descendants already in flight run to their
    exit, and their exits may deliver further checkpoints, which accumulate.
    Once no descendant of `P` is in flight, `P` is ready.
@@ -281,7 +281,7 @@ A task `P` in a supervising state is a barrier over its subtree. Its
    `P` exits the supervising state by any edge other than its self-loop, the
    phase is cleared and its descendants follow the ordinary rules — *unless*
    the target state is `gating: true`, in which case the block is **kept** with
-   phase `held`. The `supervision` block, not the state, is the hold (§3.2):
+   phase `held`. The `supervision` block, not the state, is the hold ([§FS-rhei-supervision.3.2](rhei-supervision.spec.md#32-readiness)):
    the one edge a supervisor takes without deciding anything is its exhaustion
    edge, and letting that silently un-supervise the subtree is the opposite of
    what a budget is for. A supervisor parked at a gate therefore keeps its
@@ -291,7 +291,7 @@ A task `P` in a supervising state is a barrier over its subtree. Its
    own naming the subtree it still holds ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)). An exit
    into a `final: true` state is subject to the descendants-first guard like
    any other terminal entry ([§FS-rhei-transition-cmd.3.1](rhei-transition-cmd.spec.md#31-descendants-first-on-terminal-entry)); a machine expresses
-   "finish once the subtree is done" with `openDescendants < 1` (§4.1).
+   "finish once the subtree is done" with `openDescendants < 1` ([§FS-rhei-supervision.4.1](rhei-supervision.spec.md#41-the-opendescendants-operand)).
 
 Two invariants follow, and they are the point:
 
@@ -303,7 +303,7 @@ Two invariants follow, and they are the point:
 - **A supervisor that changes nothing changes nothing.** Its self-loop
   releases the subtree and the subtree proceeds — *when there is a subtree that
   can proceed*. A visit that neither moved the subtree nor left it able to move
-  releases nothing, and its self-loop is withheld (§3.6). Supervision never
+  releases nothing, and its self-loop is withheld ([§FS-rhei-supervision.3.6](rhei-supervision.spec.md#36-empty-visits)). Supervision never
   spins: `P` is not ready again until a descendant produces a checkpoint, and a
   withheld self-loop re-spawns `P` only within the attempt budget of the visit
   it did not spend.
@@ -336,7 +336,7 @@ descendant is terminal" requirement for the tasks it concerns:
   rules. A supervising ancestor that is `held`, or in flight, holds the whole
   subtree beneath it, nested supervisors included. *Ancestor* here means any
   ancestor carrying a `supervision` block with phase `held` — the block is the
-  hold, whatever state the task is now in (§3.1 rule 4) — plus a task in a
+  hold, whatever state the task is now in ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule) rule 4) — plus a task in a
   supervising state with no block at all, the authored-initial case.
 
 A task is *in flight* when a run has spawned it and it has not exited, or when
@@ -365,7 +365,7 @@ metadata:
 
 - `supervision.phase` is written on the shared transition path: `held` on
   entry into a supervising state, on every delivered checkpoint, and on an exit
-  into a `gating: true` state (§3.1 rule 4); `released` on the self-loop exit.
+  into a `gating: true` state ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule) rule 4); `released` on the self-loop exit.
   A task in a supervising state with no
   `supervision` block is `held` — the authored-initial-state case.
 - `supervision.checkpoints` accumulates delivered events in delivery order.
@@ -373,7 +373,7 @@ metadata:
   its bare state names, `visit` the `to` state's visit number. The list is
   cleared on the self-loop exit, after the visit that consumed it, or after
   an operator explicitly requested release with `--release-subtree`. A plain
-  manual self-loop must not silently discard pending checkpoints (§FS-rhei-supervision.3.1).
+  manual self-loop must not silently discard pending checkpoints ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule)).
 - The block is removed when the task leaves the supervising state by any
   other edge, when a task that is *not* in a supervising state but still
   carries a block moves at all — the human moving a gate-parked supervisor on —
@@ -384,7 +384,7 @@ Nothing here is authored by hand in normal workflows: `supervision` is rhei's ow
 key, registered as one
 ([§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes)). The block exists so
 that a run stopped between a checkpoint and the supervisor's visit resumes
-exactly where it was, and so that a manual worker (§3.4) sees the same state
+exactly where it was, and so that a manual worker ([§FS-rhei-supervision.3.4](rhei-supervision.spec.md#34-manual-workers)) sees the same state
 `rhei run` would.
 
 ### 3.4. Manual Workers
@@ -392,15 +392,15 @@ exactly where it was, and so that a manual worker (§3.4) sees the same state
 Supervision is defined on the shared path, so the manual-worker loop sees it
 without special casing:
 
-- `rhei next` claims a held supervisor under §3.2 and renders its prompt with
-  the checkpoints (§5.1). Claim mode and `--peek` render the same two
+- `rhei next` claims a held supervisor under [§FS-rhei-supervision.3.2](rhei-supervision.spec.md#32-readiness) and renders its prompt with
+  the checkpoints ([§FS-rhei-supervision.5.1](rhei-supervision.spec.md#51-the-supervisors-prompt)). Claim mode and `--peek` render the same two
   supervision sections `rhei run` composes, from the same renderers and in the
   same order relative to the instructions: `## Checkpoints` for a ticket in a
   supervising state that is owed any, and `## Supervisor Brief` for a ticket a
-  supervising ancestor wrote one for (§5.2). A ticket in a supervising state
+  supervising ancestor wrote one for ([§FS-rhei-supervision.5.2](rhei-supervision.spec.md#52-the-brief)). A ticket in a supervising state
   also gets `## Supervising This Subtree`, which carries what `rhei run` puts in
   `## Rhei Commands` and `## Result` — sections `rhei next` does not render: the
-  brief paths (§5.1), the barrier sentence, the qualified `## Result` rule, and
+  brief paths ([§FS-rhei-supervision.5.1](rhei-supervision.spec.md#51-the-supervisors-prompt)), the barrier sentence, the qualified `## Result` rule, and
   the one command that ends the visit: the state's own self-loop, spelled out
   with this invocation's plan path and machine, because that edge is what
   releases the subtree and drops the claim. The rendered command includes
@@ -414,7 +414,7 @@ without special casing:
   not a stall but someone else's turn: it names the supervisor as the ticket to
   work and gives the command that claims it, or — when a worker already holds
   that visit — names the holder and the `rhei release` that hands it back, or —
-  when the supervisor is parked at a human gate (§3.1 rule 4) — names the
+  when the supervisor is parked at a human gate ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule) rule 4) — names the
   transition a human takes to release the subtree. The same three answers reach
   `rhei next --task <descendant>`, whose refusal is the same fact asked about
   one ticket. The
@@ -429,7 +429,7 @@ without special casing:
   ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)). A claim that outlived the visit would be read
   as "the supervisor is working right now" — every later descendant exit
   would be taken for the supervisor's own doing and deliver no checkpoint
-  (§2.1), and `P` itself would never be scheduled again.
+  ([§FS-rhei-supervision.2.1](rhei-supervision.spec.md#21-checkpoint-events)), and `P` itself would never be scheduled again.
 - `rhei run --dry-run` names the barrier per pass — `N ticket(s) held by
   supervisor Task <P>`, one line per supervisor — and renders the release
   self-loop as `<state> -> <state> (release)`. A dry run is what an author reads
@@ -437,7 +437,7 @@ without special casing:
   it: most of the plan simply never appears as ready, and the one edge that
   decides whether it ever does reads as a no-op.
 - `rhei list --ready` excludes a held descendant, by the same rule the ready
-  set applies (§3.2), so the listing never offers a ticket `rhei run` would
+  set applies ([§FS-rhei-supervision.3.2](rhei-supervision.spec.md#32-readiness)), so the listing never offers a ticket `rhei run` would
   refuse to schedule; and the run report names the reason on the ticket it
   halted on, under a **Waiting** group rather than Attention — a held ticket is
   someone else's turn, not a human's, and it is counted in no halt tally
@@ -449,20 +449,20 @@ without special casing:
 ### 3.5. Failed Visits
 
 A visit's subprocess exiting non-zero fires no transition unless the state
-declares a matching `exit_code` rule (§FS-rhei-programs.3.2), and a
+declares a matching `exit_code` rule ([§FS-rhei-programs.3.2](rhei-programs.spec.md#32-evaluation-order)), and a
 supervising state never does — `exit_code` requires `program:`
-(§FS-rhei-programs.3.1), and a supervisor is an agent state. So a failed
+([§FS-rhei-programs.3.1](rhei-programs.spec.md#31-exit_code-field)), and a supervisor is an agent state. So a failed
 visit is not progress: `--continue-on-error` governs it
-(§FS-rhei-agents.5.2.1 step 12) and the release self-loop does not fire.
+([§FS-rhei-agents.5.2.1](rhei-agents.spec.md#521-sequential-mode-default---parallel-1) step 12) and the release self-loop does not fire.
 `supervision.phase` stays `held`, `supervision.checkpoints` keeps every entry
 delivered before the failure, and `stateVisits.<state>` is not incremented —
-the visit is not spent. The task is still ready under §3.2, so a later pass,
+the visit is not spent. The task is still ready under [§FS-rhei-supervision.3.2](rhei-supervision.spec.md#32-readiness), so a later pass,
 or a rerun of `rhei run`, spawns the same visit again with the same pending
-checkpoints (§5.1), while its attempt budget has capacity. When that budget is
+checkpoints ([§FS-rhei-supervision.5.1](rhei-supervision.spec.md#51-the-supervisors-prompt)), while its attempt budget has capacity. When that budget is
 spent, a rerun still halts. The halt keeps `The ticket stays in '{state}'.`
 and then names the held subtree, unread checkpoint count, and
 `rhei retry <P>` as recovery, warning that the self-loop releases instead.
-The attended grant (§FS-rhei-retry.2) adds exactly one configured attempt
+The attended grant ([§FS-rhei-retry.2](rhei-retry.spec.md#2-grant-and-refusals)) adds exactly one configured attempt
 budget to this same visit without releasing the subtree or losing its
 checkpoints. The next `rhei run` resumes with monotonic attempt/log numbers
 and the unread checkpoints still in its prompt.
@@ -471,7 +471,7 @@ and the unread checkpoints still in its prompt.
 
 A visit that exits `0` and meets its completion condition has still to have
 *done* something before its self-loop may fire. The self-loop is the release
-edge (§3.1 rule 2), and the release is the one thing a run cannot take back:
+edge ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule) rule 2), and the release is the one thing a run cannot take back:
 `P` is `released` until a descendant delivers a checkpoint, and a subtree that
 cannot move delivers none. A visit that neither moved the subtree nor left it
 able to move would therefore spend the only edge that could ever wake `P`
@@ -480,12 +480,12 @@ again — and the run would not be stalled but beyond the reach of a rerun, with
 
 So the self-loop fires only for a visit that **released** something. A visit
 released something when at least one of these holds, judged against the plan
-as re-read after the subprocess exits (§4.1):
+as re-read after the subprocess exits ([§FS-rhei-supervision.4.1](rhei-supervision.spec.md#41-the-opendescendants-operand)):
 
 1. **There is no subtree to release.** `P` has no non-terminal descendant.
    Nothing is being held, and finishing `P` is the machine's own business —
-   its `openDescendants` edge (§4.1), or the halt that names the missing one
-   (§1.2).
+   its `openDescendants` edge ([§FS-rhei-supervision.4.1](rhei-supervision.spec.md#41-the-opendescendants-operand)), or the halt that names the missing one
+   ([§FS-rhei-supervision.1.2](rhei-supervision.spec.md#12-validation-rules)).
 2. **The visit moved the subtree.** Some descendant's state differs from what
    it was when the visit was spawned, or the visit appended or removed one. A
    cancel, a hand `rhei transition`, an appended-and-moved step: the supervisor
@@ -498,7 +498,7 @@ as re-read after the subprocess exits (§4.1):
    Every other descendant answers it when **both** hold: its `**Prior:**`s do
    not block it — an unsatisfied prior naming a non-terminal task **outside**
    `P`'s subtree is other work's to finish and does not block — **and** its
-   state's declared `inputs:` exist (§3.2, reading `P` as released).
+   state's declared `inputs:` exist ([§FS-rhei-supervision.3.2](rhei-supervision.spec.md#32-readiness), reading `P` as released).
 
    A `poll:` state is no clause of its own. Time and other work decide *when*
    a descendant is scheduled and neither puts a file on disk, so a poll that
@@ -507,15 +507,15 @@ as re-read after the subprocess exits (§4.1):
    when; the same priors-and-inputs test says whether.
 
 When none of them holds the visit is **empty**, and it is treated exactly as a
-failed visit (§3.5): **no transition fires**, and the plan file is not
+failed visit ([§FS-rhei-supervision.3.5](rhei-supervision.spec.md#35-failed-visits)): **no transition fires**, and the plan file is not
 rewritten. `supervision.phase` stays `held`, `supervision.checkpoints` keeps
 every entry delivered before the visit, `stateVisits.<state>` is not
 incremented — the visit is not spent — and no other edit the release self-loop
-makes happens either. Not its `**Assignee:**` drop (§3.4), though: a claimed
-ticket anywhere in `P`'s subtree stops the visit being scheduled at all (§3.2),
+makes happens either. Not its `**Assignee:**` drop ([§FS-rhei-supervision.3.4](rhei-supervision.spec.md#34-manual-workers)), though: a claimed
+ticket anywhere in `P`'s subtree stops the visit being scheduled at all ([§FS-rhei-supervision.3.2](rhei-supervision.spec.md#32-readiness)),
 so no visit judged by this rule has one to drop.
 The task is still ready under
-§3.2, so a later pass, or a rerun of `rhei run`, spawns the same visit again.
+[§FS-rhei-supervision.3.2](rhei-supervision.spec.md#32-readiness), so a later pass, or a rerun of `rhei run`, spawns the same visit again.
 The engine warns where it withheld, naming `P`, its state, every descendant it
 left with nowhere to go **with the reason that one is stuck** — the file it is
 waiting for, or the `**Prior:**` that has not landed — and the one action that
@@ -528,10 +528,10 @@ An empty visit does **not** spend the visit's attempt budget
 itself, and this worker did: it exited `0` and met its completion condition,
 and the engine took the edge away. So the attempt it was charged is given
 back when the edge is withheld, and every later `rhei run` visits `P` again —
-the §3.5 rerun shape, with no ceiling that a run can leave behind it.
+the [§FS-rhei-supervision.3.5](rhei-supervision.spec.md#35-failed-visits) rerun shape, with no ceiling that a run can leave behind it.
 
 That ceiling would be the strand in another form. A held `P` still bars its
-whole subtree (§3.2), so a budget that ran out would leave `P` unspawnable and
+whole subtree ([§FS-rhei-supervision.3.2](rhei-supervision.spec.md#32-readiness)), so a budget that ran out would leave `P` unspawnable and
 its descendants barred: writing the very file the warning named would start
 nothing, and `rhei reset` would again be the only remedy. A halt has to be a
 thing an operator can answer, and the answer here has to keep working.
@@ -544,7 +544,7 @@ part of the world the visit already judged, a poll rescheduling itself moves
 nothing, and a run that sleeps until a deadline has moved nothing by sleeping,
 so none of the three counts. A subtree that cannot move produces no such advance, so a run
 that has nothing else to do visits `P` exactly once and halts. The invariant of
-§3.1 holds: within one run, `P` is re-visited only when the world it supervises
+[§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule) holds: within one run, `P` is re-visited only when the world it supervises
 changed.
 
 A supervisor that is *already* `released` over a subtree where nothing can
@@ -571,8 +571,8 @@ and reports the edge as withheld, because a run that will not take an edge must
 not say it would ([§FS-rhei-run.4](rhei-run.spec.md#4-dry-run)).
 
 What is exempt is what has no visit to judge, not what carries a flag: with
-`--no-agent` the run intends no visit at any state and applies §3.1 unchanged,
-and a supervising state is never a `program:` state (§1.2). A conditioned exit
+`--no-agent` the run intends no visit at any state and applies [§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule) unchanged,
+and a supervising state is never a `program:` state ([§FS-rhei-supervision.1.2](rhei-supervision.spec.md#12-validation-rules)). A conditioned exit
 — `visitCount >= visits`, `openDescendants < 1` — is untouched: the rule
 reaches only the edge that releases, which is the self-loop.
 
@@ -640,7 +640,7 @@ transitions:
     description: The ruling is recorded
 ```
 
-This shape finishes, so §1.2 does not warn about it: the walk from
+This shape finishes, so [§FS-rhei-supervision.1.2](rhei-supervision.spec.md#12-validation-rules) does not warn about it: the walk from
 `human-judgment`, the target of the `openDescendants` edge, reaches
 `completed`. The three shapes above are one-hop only because they are the
 simplest, not because a supervisor's finishing edge must point at a final
@@ -654,9 +654,9 @@ any other re-entry ([§FS-rhei-transitions.4.3](rhei-transitions.spec.md#43-coun
 declared, emits and inherits snapshots per visit ([§FS-rhei-snapshots.10.3](rhei-snapshots.spec.md#103-counted-loops-fanout-and-polling)),
 and re-evaluates the state's `inputs:` on re-entry. The engine selects it on
 the same rules as any other edge. On a supervising state it is the release
-edge (§3.1), withheld from a visit that released nothing — which is the one
+edge ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule)), withheld from a visit that released nothing — which is the one
 case where a selected self-loop does not fire and `stateVisits.<state>` does
-not move (§3.6); on any other agent state it simply means "run this state
+not move ([§FS-rhei-supervision.3.6](rhei-supervision.spec.md#36-empty-visits)); on any other agent state it simply means "run this state
 again".
 
 The counter is therefore kept for **every** non-poll state the machine
@@ -714,13 +714,13 @@ reason, and so do `## Prior Task Results`, `## Consumed Exports`, and the
 handoff sections ([§FS-rhei-memory.4.5](rhei-memory.spec.md#45-fencing-and-rendering)).
 
 `## Child Tasks` is the map and is rendered on every visit. `## Checkpoints`
-renders the recorded `supervision.checkpoints` (§3.3) and is omitted on a
+renders the recorded `supervision.checkpoints` ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)) and is omitted on a
 visit with none — the first visit, where the supervisor's job is to brief the
 first step.
 
 Both sections spell a descendant the one way the supervisor can act on it: the
 **qualified** id, the same one `rhei transition` accepts. `supervision.checkpoints`
-stores the rhei-local id (§3.3), and the renderer resolves it to exactly one
+stores the rhei-local id ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)), and the renderer resolves it to exactly one
 descendant — the recorded id under the supervisor's own qualification — never
 to a deeper node whose id happens to end the same way.
 
@@ -739,28 +739,28 @@ sees what the subtree produced.
 
 The `## Rhei Commands` section of a supervisor's prompt names the lever the
 supervisor steers with before the ones it destroys with: one sentence giving
-both brief paths (§5.2) with the execution root resolved to an absolute path,
+both brief paths ([§FS-rhei-supervision.5.2](rhei-supervision.spec.md#52-the-brief)) with the execution root resolved to an absolute path,
 because the supervisor's working directory is not something the prompt can
 promise. It says in one clause which moves bring this supervisor back — the
 state's `execute_on` in words: *woken after every finished child*, *after every
 transition one of your children makes*, *after every finished descendant*, or
-*after every transition any descendant makes* (§1.1) — because an agent that
+*after every transition any descendant makes* ([§FS-rhei-supervision.1.1](rhei-supervision.spec.md#11-the-execute_on-field)) — because an agent that
 does not know what wakes it cannot tell waiting from being finished with a
 step, and it does not read the machine. It also states the barrier in one
 sentence — while this invocation
 runs nothing beneath it runs, and when the invocation ends the subtree is
-released (§3.1) — because everything a supervisor is tempted to do wrong
+released ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule)) — because everything a supervisor is tempted to do wrong
 follows from not knowing it: waiting for a child that cannot start, or treating
 this visit as the last one. It additionally states
 that the agent **may** run `rhei transition` against *held descendants* — to
 cancel a step the checkpoint made unnecessary, typically, passing
-`--result "<why>"` because a cancelled ticket still has to say why (§6) and
+`--result "<why>"` because a cancelled ticket still has to say why ([§FS-rhei-supervision.6](rhei-supervision.spec.md#6-interaction-with-other-features)) and
 `--supervisor <this task's id>` because the move is this supervisor's own — and
 may append descendants under its own task in its task file, as any agent
 editing its own file may. The prompt says what that flag is for rather than
 only that it is passed: it does not permit the move, which the
-dispatch-and-claim hold already allows (§3.1), it keeps the move from returning
-as a checkpoint (§2.1) and waking the supervisor with news it already has. A
+dispatch-and-claim hold already allows ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule)), it keeps the move from returning
+as a checkpoint ([§FS-rhei-supervision.2.1](rhei-supervision.spec.md#21-checkpoint-events)) and waking the supervisor with news it already has. A
 supervisor told only to type the flag reads it as the permission, and a
 supervisor is the reader most likely to write that reading down somewhere
 else. It still must not transition its own task: the orchestrator owns
@@ -816,12 +816,12 @@ engine; a supervisor that wants a fresh one overwrites it.
   or leave it to the human; under a `*-terminal` one it is not, and the subtree
   waits on the human as it would unsupervised. A gate below a `child-*`
   supervisor's own children is invisible to it either way.
-- **Polling descendants.** Poll self-loops are not checkpoints (§2.1); a
+- **Polling descendants.** Poll self-loops are not checkpoints ([§FS-rhei-supervision.2.1](rhei-supervision.spec.md#21-checkpoint-events)); a
   polling descendant between attempts is not in flight.
 - **Appending and cancelling.** The supervisor appends descendants by editing
   its task file and cancels them with `rhei transition`, both during its
   visit; the orchestrator re-reads the plan when the visit ends, so
-  `openDescendants` (§4.1) and the released subtree reflect the edits. A cancel
+  `openDescendants` ([§FS-rhei-supervision.4.1](rhei-supervision.spec.md#41-the-opendescendants-operand)) and the released subtree reflect the edits. A cancel
   does not have to satisfy the cancelled step's own `outputs:` — cancellation
   abandons the work, so that contract is moot ([§FS-rhei-transitions.4.5](rhei-transitions.spec.md#45-artifact-enforcement)) — but
   it does have to say why: the terminal-result obligation stands, so every
@@ -838,7 +838,7 @@ engine; a supervisor that wants a fresh one overwrites it.
   supervision makes visible rather than causes; it is a roadmap item, and until
   it is settled a supervisor should read a checkpoint as "this ticket moved",
   not as "this work happened".
-- **Fanout.** Not supported on a supervising state in v1 (§1.2).
+- **Fanout.** Not supported on a supervising state in v1 ([§FS-rhei-supervision.1.2](rhei-supervision.spec.md#12-validation-rules)).
   Descendants may fan out freely; their merged transition is the checkpoint.
 
 ## 7. Example

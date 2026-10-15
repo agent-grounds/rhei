@@ -51,7 +51,7 @@ rhei new "Rotate keys" --under auth        # a ticket inside rhei auth
 ```
 
 There is no `--under` for a *rhei*, because there is nowhere for it to point.
-The hierarchy is exactly Panta -> rhei -> ticket (§1), a rhei id is a single
+The hierarchy is exactly Panta -> rhei -> ticket ([§FS-rhei-panta.1](rhei-panta.spec.md#1-what-panta-is)), a rhei id is a single
 segment, and discovery never descends past the project directory's immediate
 children ([§AR-rhei-panta.1](../architecture/rhei-panta.spec.md#1-on-disk-layout)): a rhei nested inside another rhei would not be
 found. `--under` therefore names where a *ticket* goes — the sense in which
@@ -84,7 +84,7 @@ The basin is therefore a reader of the project default whose author never chose
 it, and replacing that default checks the basin's tickets with every member that
 runs under it: `rhei instantiate --into <project>` refuses, naming a basin ticket
 whose state the new default does not allow, before it writes anything
-(§FS-rhei-library.2.3).
+([§FS-rhei-library.2.3](rhei-library.spec.md#23-the-default-machine-is-replaced-never-unioned-into)).
 
 ## 3. One unified view
 
@@ -185,18 +185,18 @@ still its complete one-rhei project. [§FS-rhei-migrate.1](rhei-migrate.spec.md#
 `rhei remove` loads and validates the whole project whatever its target, and
 `--rhei` narrows only which rhei a local ticket id resolves in: a dependent
 that would keep a removed ticket alive may live in any rhei, so removal may
-not reason about fewer of them than validation does (§FS-rhei-remove.1.2).
+not reason about fewer of them than validation does ([§FS-rhei-remove.1.2](rhei-remove.spec.md#12-resolution)).
 Its retirement record is project bookkeeping and lives in the manifest
-(§FS-rhei-remove.5.1).
+([§FS-rhei-remove.5.1](rhei-remove.spec.md#51-where-it-is-recorded)).
 
 `rhei cost` and `rhei summary` load through the project like every other
 command — they read the plan for its tickets and its state machine, and a
 member's cross-rhei `**Prior:**` has to resolve for that reading to be right.
 What does not widen with the load is the **accounting root**: pointed at a
-member, they read that member's accounting, not the project's (§6.5). The two
+member, they read that member's accounting, not the project's ([§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary)). The two
 were once written here as commands that "stay on the path they were given",
 which described neither half correctly — the load always widened, and the
-accounting root widened with it, which is the defect §6.5 exists to settle.
+accounting root widened with it, which is the defect [§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary) exists to settle.
 
 `rhei roster` uses the same explicit and omitted target discovery, but widens
 every member target to its project root because settings are project-wide. It
@@ -264,7 +264,7 @@ error says what was searched for and how to point the command at a plan, not
 merely that a required argument is missing.
 
 `rhei reset` is excluded from omitted-target resolution: it destroys runtime
-state across its whole scope (§6.4), so an inferred target would turn a
+state across its whole scope ([§FS-rhei-panta.6.4](rhei-panta.spec.md#64-reset-validate-list-viz)), so an inferred target would turn a
 mistyped or misplaced invocation into irreversible data loss. Invoked with no
 target it fails, explaining that reset takes an explicit plan or project.
 
@@ -316,7 +316,7 @@ node policy ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-m
 instantiated templates. A `**States:**` line in either index is a parse
 error ([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)). Each ticket validates, transitions,
 and completes under its owning rhei's machine; the only place two machines meet
-is a cross-rhei prior, judged under the target's machine (§6.1).
+is a cross-rhei prior, judged under the target's machine ([§FS-rhei-panta.6.1](rhei-panta.spec.md#61-readiness-and-rhei-next)).
 
 ### 6.1. Readiness and `rhei next`
 
@@ -345,7 +345,7 @@ through the source map ([§AR-rhei-panta.2](../architecture/rhei-panta.spec.md#2
 writes.
 
 Snapshot `from: prior` follows these same project-qualified edges without
-changing readiness (§FS-rhei-snapshots.4.3). Candidate snapshots are read from
+changing readiness ([§FS-rhei-snapshots.4.3](rhei-snapshots.spec.md#43-lineage-resolution)). Candidate snapshots are read from
 each prior's owning rhei root and interpreted under that prior's owning state
 machine. A pending or cancelled prior still blocks scheduling; optional
 snapshot fallback cannot make the consumer runnable. Once the task is ready,
@@ -379,7 +379,7 @@ run. Consequently an unrestricted run may execute more work and last longer
 than the membership visible when it began.
 
 Before spawning, `rhei run` reports the resolved scope and the rheis it will
-touch (§6). A bare rhei runs as the single rhei of its implicit Panta, so the
+touch ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)). A bare rhei runs as the single rhei of its implicit Panta, so the
 project-wide loop is the only execution path.
 
 ### 6.3. Completion and rollup
@@ -419,7 +419,7 @@ roadmap.
 ### 6.4. Reset, validate, list, viz
 
 - `rhei reset` is project-wide by default; because it destroys runtime state
-  across every in-scope rhei, it always takes an explicit target (§6) and
+  across every in-scope rhei, it always takes an explicit target ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)) and
   surfaces the scope and the affected rheis before
   acting. `--rhei` narrows it. A narrowed reset removes only the runtime
   artifacts owned by in-scope tickets rather than whole `runtime/` trees:
@@ -445,7 +445,7 @@ roadmap.
   qualified ids ([§FS-rhei-list.4.1](rhei-list.spec.md#41-text-default)); existing filters
   (`--ready`, `--state`, `--assignee`, kind) apply across the project, and
   `--rhei` filters to a rhei. The `basin` rhei's tickets are ordered last in
-  default output; visual de-emphasis is deferred (§4).
+  default output; visual de-emphasis is deferred ([§FS-rhei-panta.4](rhei-panta.spec.md#4-invisibility)).
 - `rhei viz` renders the merged project graph in the same id space the CLI
   uses, so its tickets carry their qualified ids (`auth.1`): every rhei's
   tickets in one graph, cross-rhei dependency edges drawn, and Directory
@@ -453,16 +453,16 @@ roadmap.
   keeping the one-hop neighbours its priors point at ([§FS-rhei-viz.7.3](rhei-viz.spec.md#73-panta-projects-render-as-one-graph)). Panta
   is the implicit canvas, never a drawn root box. Rheis as *visually grouped*
   top-level bands, and a `basin` group placed last and de-emphasized, remain
-  presentation work tracked on the roadmap (§4).
+  presentation work tracked on the roadmap ([§FS-rhei-panta.4](rhei-panta.spec.md#4-invisibility)).
 
 ### 6.5. Cost and summary
 
 `rhei cost` and `rhei summary` read accounting artifacts. Every other command
-in §6.4 acts on tickets, and a ticket belongs to exactly one rhei; a record
+in [§FS-rhei-panta.6.4](rhei-panta.spec.md#64-reset-validate-list-viz) acts on tickets, and a ticket belongs to exactly one rhei; a record
 belongs to an **accounting root**, and a project has several. What each
 spelling means is therefore a question those commands alone have to answer.
 
-Both take a positional and resolve it exactly as §6 says, and both take
+Both take a positional and resolve it exactly as [§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior) says, and both take
 `--rhei <id>` (repeatable), spelled and behaved as `rhei list`'s: an id the
 project does not hold is an error naming the available ids, and an explicit
 `--rhei` wins over the id the path implies. From that the invocation has a
@@ -483,13 +483,13 @@ enumeration is not one-to-one in either direction:
 
 1. **Roots are deduplicated by canonicalized path, never by spelling**
    ([§REQ-cross-platform.5](../requirements/cross-platform.md#5-paths-are-data)). Single-file rheis share the project directory as
-   their execution root (§AR-rhei-panta.5), so the same root is reached
+   their execution root ([§AR-rhei-panta.5](../architecture/rhei-panta.spec.md#5-execution-root-and-per-rhei-runtime)), so the same root is reached
    several times and a root reached twice would count its records twice.
 2. **The root decides when it belongs to one in-scope rhei; a record's
    `task_id` decides only where one root is shared.** Under `--rhei` naming a
    single-file rhei, the shared project root is read and its records filtered
    to that rhei's tickets. Filtering by `task_id` everywhere would drop the
-   records written before tickets were project-qualified (§6.3); deciding by
+   records written before tickets were project-qualified ([§FS-rhei-panta.6.3](rhei-panta.spec.md#63-completion-and-rollup)); deciding by
    root everywhere would report every single-file rhei under a `--rhei` naming
    one of them.
 
@@ -505,7 +505,7 @@ A root that holds no accounting directory, or an empty one, contributes
 nothing and is not an error — a member that has never been run is an ordinary
 member.
 
-`rhei cost --task <id>` is bounded by that same scope, exactly as §6.1 bounds
+`rhei cost --task <id>` is bounded by that same scope, exactly as [§FS-rhei-panta.6.1](rhei-panta.spec.md#61-readiness-and-rhei-next) bounds
 `rhei next --task`. A ticket named with `--task` must itself be in scope,
 however the scope was reached — `--rhei`, or the member the positional named —
 and naming one outside it is an **error** that gives the scope and the rhei the
@@ -529,7 +529,7 @@ inspect the rest of the already resolved project only to distinguish an exact
 id that is outside the selected member scope from an absent id; it does not
 search parent projects or arbitrary paths. Completion evidence and active
 descriptor or run-lock evidence are evaluated at the execution roots selected
-for the reading. §FS-rhei-summary.1
+for the reading. [§FS-rhei-summary.1](rhei-summary.spec.md#1-usage)
 
 A project-wide run may have records under several member execution roots. The
 run filter applies inside their deduplicated union, and shared-root task
@@ -539,7 +539,7 @@ run's lead, steps, or accounting.
 
 ### 6.6. Pending forced recovery
 
-Every root access is subject to §FS-rhei-recover.4 before ordinary strict or
+Every root access is subject to [§FS-rhei-recover.4](rhei-recover.spec.md#4-pending-root-interlock) before ordinary strict or
 lenient loading. Commands check the root marker before and after taking their
 shared root-access guard and hold the guard until every read or write derived
 from that load finishes. Project loads acquire every member/project guard in
@@ -551,8 +551,8 @@ Project/manifest and member access checks the reserved basin marker; basin
 access retains the parent project guard as well. Direct shared-manifest writers
 use this same complete sorted boundary, so an active writer finishes before
 force captures its manifest image and subsequent access refuses while marked.
-The manifest's qualified basin metadata ownership in §6 is unchanged; the
-versioned typed image in §FS-rhei-recover.2 represents it without relocation.
+The manifest's qualified basin metadata ownership in [§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior) is unchanged; the
+versioned typed image in [§FS-rhei-recover.2](rhei-recover.spec.md#2-marker-format) represents it without relocation.
 
 A pending marker makes even lenient `rhei list` refuse that root. Lenience can
 skip malformed authored input, but an in-doubt transaction means the bytes it

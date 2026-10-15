@@ -33,7 +33,7 @@ contents, prints one line naming both paths, and continues; the new session's
 report is then written at `<stem>.md`. The orphan may be the only remaining
 account of an earlier session, so it is set aside rather than overwritten, and
 a narrowed reset sweeps it with the ticket's other reports
-(§FS-rhei-reset.2.1). `rhei report` still overwrites a report it regenerates
+([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)). `rhei report` still overwrites a report it regenerates
 from an existing log.
 
 Program-state logs ([§FS-rhei-programs](rhei-programs.spec.md#fs-rhei-programs-rhei-program-states-specification)) are not rendered: they are already
@@ -130,9 +130,9 @@ Code's `system` init event, and Codex's `thread.`/`turn.`/`item.` events.
 Each body is folded through the detected stream's collectors alone, so one
 stream's generic event names never leak into another's report. A body that
 is mostly JSON events but carries no marker is read as the family the log
-header records (§FS-rhei-session-reports.6.2); when even that reading collects nothing, the log is reported
+header records ([§FS-rhei-session-reports.6.2](rhei-session-reports.spec.md#62-claude-code-stream)); when even that reading collects nothing, the log is reported
 as unsupported, never rendered as a confidently empty report. A body that is
-mostly prose is plain output ([§6.4](#64-logs-without-an-event-stream)), even
+mostly prose is plain output ([§FS-rhei-session-reports.6.4](rhei-session-reports.spec.md#64-logs-without-an-event-stream)), even
 when it quotes the odd JSON line.
 
 ### 6.2 Claude Code Stream
@@ -141,7 +141,7 @@ Every launch of the `claude-code` family requests the `stream-json` event stream
 ([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow)), so its session log carries this stream.
 A wrapped Claude Code that declares `family: claude-code`
 ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)) is launched the same
-way and its log is this stream too, so header-fallback detection (§FS-rhei-session-reports.6.1) reads the
+way and its log is this stream too, so header-fallback detection ([§FS-rhei-session-reports.6.1](rhei-session-reports.spec.md#61-stream-detection)) reads the
 **family** — the log header's `family:` line, and its `agent:` line when there is
 none ([§FS-rhei-agents.8.2](rhei-agents.spec.md#82-log-format)). Which families
 are recognized is unchanged, so a log written before families existed detects
@@ -181,7 +181,7 @@ A body with no event stream is not an unknown stream: it is the agent's
 plain output, exactly as captured — an ordinary Claude Code session whose
 result was logged as text, or a historical log written before structured
 output. Such a body renders verbatim as a "Session output" section, truncated
-like a tool output ([§3](#3-truncation)), instead of an empty report. Body
+like a tool output ([§FS-rhei-session-reports.3](rhei-session-reports.spec.md#3-truncation)), instead of an empty report. Body
 text that quotes rhei's own log markers stays body text: the exit footer is
 the log's last well-formed footer block, and output a still-running
 descendant appended after it is body again, in log order.

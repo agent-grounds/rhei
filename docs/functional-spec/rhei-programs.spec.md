@@ -90,7 +90,7 @@ Additional variables declared in `program.env` are merged on top of this base se
 `RHEI_ROOT` is not part of this program contract. A program locates its plan
 through `RHEI_PLAN_PATH` and resolves relative files from its working directory.
 In particular, it must not acquire an enclosing autonomous worker's artifact
-root merely because that worker launched this Rhei (§FS-rhei-agents.4).
+root merely because that worker launched this Rhei ([§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables)).
 
 The working directory defaults to the workspace root (for directory workspaces) or the plan file's parent directory (for single-file plans), unless overridden by `program.working_directory`.
 
@@ -170,7 +170,7 @@ When a program exits and has not already advanced the task (via `rhei transition
 
 On a `poll:` state whose attempt budget is spent, step 1 does not govern the
 exhaustion edge: the engine selects the first matching non-self-loop
-transition regardless of `exit_code` (§FS-rhei-run.5.1).
+transition regardless of `exit_code` ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)).
 
 **The rule these steps selected is the rule that fires.** Steps 1–5 choose a
 transition *rule*, not merely a target state, and the engine fires that rule
@@ -200,7 +200,7 @@ an exit that falls through to `"nonzero"` is an ordinary failure.
 
 The route is the only account of the outcome the engine has, so a declared
 route into a `final: true` state leaves the ticket's result to the program.
-That is what `RHEI_RESULT_PATH` is for (§2), and a program that leaves it empty
+That is what `RHEI_RESULT_PATH` is for ([§FS-rhei-programs.2](rhei-programs.spec.md#2-environment-variables)), and a program that leaves it empty
 stalls the ticket rather than advancing it on a sentence the engine wrote in
 its place ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)).
 
@@ -414,7 +414,7 @@ Programs and callbacks are complementary, the same as agents and callbacks:
 3. The selected transition's `on_leave` and `on_enter` callbacks execute as usual.
 
 Those callbacks run under the edge's resolved `callback_timeout`
-(§FS-rhei-transitions.4.10), which is independent of `program_timeout`: the
+([§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound)), which is independent of `program_timeout`: the
 program's time is spent once it exits, and a callback that exceeds its own
 bound fails the transition without re-entering the program's timeout path.
 

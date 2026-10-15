@@ -200,6 +200,41 @@ fn write_mock_agent_settings(workspace: &Path, agent_script: &Path) {
     .expect("write mock settings");
 }
 
+/// The effective profile bound and its fallback both protect healthy mock starts.
+/// §REQ-cross-platform.8; profile precedence is §FS-rhei-agents.7.1.
+#[test]
+#[ignore = "red until #497 gives the mock example settings the 60s fixture margin; implement removes this"]
+fn mock_example_settings_use_the_fixture_margin_at_both_timeout_levels() {
+    let dir = unique_scratchpad_dir("example-settings-margin");
+    let agent = write_mock_example_agent(&dir);
+    write_mock_agent_settings(&dir, &agent);
+    let settings: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(dir.join(".agent-grounds/rhei/settings.json"))
+            .expect("read generated mock settings"),
+    )
+    .expect("parse generated mock settings");
+    let profiles = settings["agents"].as_object().expect("generated agent profiles");
+    assert!(!profiles.is_empty(), "the helper must generate mock agent profiles");
+
+    let mut bounds =
+        vec![("defaults.agent_timeout".to_owned(), &settings["defaults"]["agent_timeout"])];
+    bounds.extend(
+        profiles
+            .iter()
+            .map(|(name, profile)| (format!("agents.{name}.timeout"), &profile["timeout"])),
+    );
+    let wrong: Vec<_> = bounds
+        .into_iter()
+        .filter(|(_, bound)| bound.as_str() != Some("60s"))
+        .map(|(path, bound)| format!("{path}: expected 60s fixture margin, got {bound}"))
+        .collect();
+    assert!(
+        wrong.is_empty(),
+        "shared mock-example settings leave healthy fixture starts outside the margin:\n{}",
+        wrong.join("\n")
+    );
+}
+
 fn run_example_with_mock_agents(
     prefix: &str,
     example_path: &str,

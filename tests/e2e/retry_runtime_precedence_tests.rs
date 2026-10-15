@@ -168,6 +168,7 @@ fn assert_recovery(parallel: bool) {
     assert_eq!(dormant["attempt"], 2);
     assert_eq!(dormant["charged"], 2);
     assert_eq!(dormant["grants"].as_array().unwrap().len(), 1);
+    // Prove active-runtime precedence against a strictly later dormant ended (§FS-rhei-retry.2).
     assert!(dormant["ended"].as_str().unwrap() > active["ended"].as_str().unwrap());
     let plan_path = member.join("index.rhei.md");
     let task_path = member.join("tasks/01-work.md");
@@ -178,6 +179,7 @@ fn assert_recovery(parallel: bool) {
     let output = text(&granted);
     assert!(output.contains("granted 1 more attempts"), "{output}");
     assert!(output.contains("(2 in total)"), "{output}");
+    // The active record supplies the promised next attempt (§FS-rhei-retry.3).
     assert!(output.contains("attempt 2"), "{output}");
     assert!(!output.contains("attempt 3"), "{output}");
     let selected = record(&active_path);

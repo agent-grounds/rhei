@@ -30,7 +30,9 @@ programs use the owning member runtime. Within that runtime, use the run's own
 record name before its current-visit legacy fallback. A newer duplicate in a
 different runtime is dormant for that run: it neither receives a grant nor
 determines exhaustion or remaining allowance. Do not combine its history with
-the active record. A missing active current record is still a refusal.
+the active record. This precedence holds even when the dormant record's `ended`
+timestamp is strictly later than the active record's; leave the dormant record
+unchanged. A missing active current record is still a refusal.
 
 For a fan-out state, resolve the active invocations and grant each exhausted
 invocation of the current visit its own configured-size grant. An invocation

@@ -194,7 +194,7 @@ attribution array ([§FS-rhei-render.3.1](rhei-render.spec.md#31-json)).
 `rhei render` does not acquire task locks, run callbacks, spawn agents, spawn
 programs, write runtime files, or rewrite plan files.
 
-## Related Specifications
+## 5. Related Specifications
 
 - [Plan Language Specification](rhei-plan-language.spec.md) - source syntax and AST shape
 - [List Command](rhei-list.spec.md) - filtered task inspection

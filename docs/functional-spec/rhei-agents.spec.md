@@ -5,7 +5,7 @@ This document specifies how Rhei integrates with coding agents — the CLI tools
 For the state machine format see [States Specification](rhei-states.spec.md). For transition callbacks see [Transitions Specification](rhei-transitions.spec.md).
 For token and cost accounting see [Cost Accounting Specification](rhei-cost-accounting.spec.md).
 
-## Overview
+**Overview**
 
 Rhei can spawn coding agents directly from `rhei run`. Instead of requiring hand-written `workflow.sh` callback scripts, the run command resolves an agent for each task, composes a prompt from the state machine instructions, and spawns the agent as a subprocess. The spawned agent does the work for the current state, writes any required artifacts, and exits. `rhei run` remains the transition authority: after the subprocess exits, the engine evaluates the declared forward transitions and performs the state change itself. Callbacks still fire on transitions — agents and callbacks are complementary.
 
@@ -2445,7 +2445,7 @@ separator. Dry run does not ask the wrapper to enforce them.
 
 When `--no-agent` is passed, `rhei run` reverts to pre-agent behavior: it advances tasks through the state machine using transition callbacks only, without spawning any agent processes. This is the existing behavior for backward compatibility.
 
-## Related Specifications
+## 11. Related Specifications
 
 - [States Specification](rhei-states.spec.md) — state machine format, `model`/`agent` fields, template variables
 - [Program States Specification](rhei-programs.spec.md) — deterministic program execution (the algorithmic complement to agent states)

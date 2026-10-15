@@ -7,7 +7,7 @@ pub fn normalize_state(raw_state: &str, machine: &StateMachine) -> String {
 }
 
 /// The set of states that are the entry of at least one profile, unioned with
-/// any state flagged `initial: true` directly. §FS-rhei-viz §8, §FS-rhei-states
+/// any state flagged `initial: true` directly. §FS-rhei-viz.8, §FS-rhei-states
 fn initial_states(machine: &StateMachine) -> HashSet<String> {
     let mut set: HashSet<String> = machine
         .states

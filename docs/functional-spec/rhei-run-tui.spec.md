@@ -4,14 +4,14 @@ This document specifies a live visualization layer for parallel agent execution 
 
 For the surrounding `rhei run` behavior see [Rhei Usage](rhei-usage.spec.md) and [Agents Specification](rhei-agents.spec.md).
 
-## Goals
+**Goals**
 
 1. **Navigate the whole plan, lead with live work.** When `rhei run` is running in an interactive terminal, the user sees the whole plan as a navigable list and can select any task — running or not — to inspect its surroundings, while live work is foregrounded. Each live task shows its current state, elapsed time, captured agent output, and cost. The terminal surface mirrors the browser Flow view ([§FS-rhei-viz](rhei-viz.spec.md#fs-rhei-viz-flow-visualization)) under one visual language ([§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux)).
 2. **Keep a light run-event log.** Each task slot assignment/release produces one line in a persistent journal. State-transition history is centralized separately in `runtime/state-transitions.log` and is surfaced in the Flow surroundings inspector. [§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector)
 3. **Remain CI-friendly.** When stdout is not a TTY (piped, redirected, CI runners), `rhei run` produces the same line-oriented output as today. The journal is written identically in both modes.
 4. **Be reusable.** Any future parallel `rhei` subcommand reuses the same event surface and frontend.
 
-## Non-Goals
+**Non-Goals**
 
 - Replacing the current plain-stdout mode. The TUI is an additional view, not a replacement.
 - Streaming agent stdout to a central log aggregator. Agents continue to write per-task log files; the TUI tails those files.
@@ -684,7 +684,7 @@ The new `rhei-tui` crate adds:
 
 All three are pure Rust with no C dependencies. `notify` is already a workspace dependency and is reused for log tailing.
 
-## Related Specifications
+## 6. Related Specifications
 
 - [Console-First Visualization UX](rhei-viz-ux.spec.md) — the shared look-and-feel
   this TUI and the browser dashboard both follow. [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux)

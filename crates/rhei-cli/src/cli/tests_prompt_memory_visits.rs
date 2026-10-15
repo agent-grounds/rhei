@@ -168,7 +168,7 @@
         assert!(visits.contains("Imported verdict."), "got:\n{visits}");
     }
 
-    /// §FS-rhei-memory.3.1 and §4.4.1: a ledger line carrying the `-<visit>`
+    /// §FS-rhei-memory.3.1 and step 1 of §FS-rhei-memory.4.4: a ledger line carrying the `-<visit>`
     /// suffix names the state the machine declares. Left raw it spelled one
     /// state three ways and appended this visit instead of annotating it.
     #[test]

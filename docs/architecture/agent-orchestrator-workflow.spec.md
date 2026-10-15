@@ -577,7 +577,7 @@ The orchestrator responds to different trigger sources:
 
 ---
 
-## Summary
+## 7. Summary
 
 1. **Agent Creates Plan**: User-directed agent generates a `.rhei.md` file with hierarchical tasks
 2. **Validation Loop**: Rhei lexer/parser and validator check syntax and semantics; agent fixes any errors
@@ -589,7 +589,7 @@ The orchestrator responds to different trigger sources:
    callback fan-out, and is not a ledger ordinal.
 5. **Completion**: Workflow finishes when all tasks reach final states (`completed`, `cancelled`, etc.)
 
-## Related Documentation
+## 8. Related Documentation
 
 - [Plan Language Specification](../functional-spec/rhei-plan-language.spec.md) — Formal EBNF grammar
 - [States Specification](../functional-spec/rhei-states.spec.md) — State machine format and default states

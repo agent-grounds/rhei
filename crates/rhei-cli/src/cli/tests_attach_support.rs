@@ -149,7 +149,7 @@ mod attach_support_tests {
     /// goes when the run command returns, the stamp comes from the process
     /// exit path behind it. A wait that reads the descriptor in that gap finds
     /// nothing on it, and reported a run that exited 0 as one that "did not
-    /// end on its own" — the CI failure §5.3 exists to prevent.
+    /// end on its own" — the CI failure §FS-rhei-run-headless.5.3 exists to prevent.
     // §FS-rhei-run-headless.5.3
     #[test]
     fn the_wait_gives_a_late_exit_stamp_time_to_land() {

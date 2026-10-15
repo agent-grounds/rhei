@@ -229,7 +229,7 @@ fn cost_since_and_until_bound_the_window() {
 }
 
 /// The promise to everyone already calling this: with none of the new flags,
-/// nothing moves — save the one addition §8.4 now states, a line naming the
+/// nothing moves — save the one addition §FS-rhei-cost-accounting.8.4 now states, a line naming the
 /// roots the empty answer searched, which a standalone workspace gets too.
 // §FS-rhei-cost-accounting.8.4
 #[test]
@@ -292,7 +292,7 @@ fn cost_refuses_a_duration_too_large_to_hold_rather_than_wrapping_it() {
 /// A `<TIME>` is arbitrary text, and the parser is the first thing it meets.
 /// Reading it by byte index crashes on any value whose last character is
 /// multi-byte — a pasted trailing non-breaking space is the ordinary way to get
-/// one — and a raw panic is neither the refusal §8.2 requires nor a message
+/// one — and a raw panic is neither the refusal §FS-rhei-cost-accounting.8.2 requires nor a message
 /// anyone can act on. Both ends of the window are held to it.
 // §FS-rhei-cost-accounting.8.2
 #[test]

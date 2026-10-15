@@ -279,14 +279,14 @@ filters this command already has; `--contains` matches title and body and not
 metadata. Filtering on an author's field is a question of its own and is not
 answered here.
 
-## Relationship to Other Commands
+## 5. Relationship to Other Commands
 
 - `rhei list --ready` lists *all* currently ready tasks; `rhei next --peek`
   selects the *single* task that would be claimed next.
 - `rhei list` never mutates plan state; for state changes use `rhei transition`,
   `rhei next`, or `rhei complete`.
 
-## Related Specifications
+## 6. Related Specifications
 
 - [Plan Language Specification](rhei-plan-language.spec.md) — grammar and semantic constraints
 - [States Specification](rhei-states.spec.md) — state machine format and terminal/gating semantics

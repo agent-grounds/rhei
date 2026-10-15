@@ -96,7 +96,7 @@ fn create_plan_ids(target: &Path) -> Option<BTreeSet<String>> {
 
 /// Refuse a create that made an id the project already held stop existing.
 ///
-/// The general guard behind §5.1's reload: checking that the *new* id reads
+/// The general guard behind §FS-rhei-new.5.1's reload: checking that the *new* id reads
 /// back says nothing about the ones that were already there, and the ways a
 /// splice can delete them are open-ended — an unclosed ``` fence in a
 /// description swallows every node after the insertion point, and the project

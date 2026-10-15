@@ -144,7 +144,7 @@ persisted wait survives restart ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provide
 
 Ticket ids in command output are project-qualified — `<rhei-id>.<task-id>`, e.g. `plan.1` for a single-file `plan.rhei.md` — and `rhei list` accepts the same `--rhei <id>` narrowing as `run`, `next`, and `reset` ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
 
-#### Naming a ticket
+#### 2.2.1 Naming a ticket
 
 Every command that acts on one ticket accepts it the same two ways: as the
 first positional argument (`rhei complete auth.1`, `rhei release auth.1`,
@@ -162,7 +162,7 @@ way to guess that `rhei release auth.1` is a path error rather than the same
 gesture. `rhei next` is the exception that proves the rule: it *selects* a
 ticket rather than being given one, so it has no ticket argument at all.
 
-#### Output streams
+#### 2.2.2 Output streams
 
 Human-readable output, machine formats (`--json`, `--format json`), and the
 rendered documents all go to stdout; diagnostics and warnings go to stderr, so
@@ -562,7 +562,7 @@ The central design principle: **the plan file is the single source of truth**. A
   ([§FS-rhei-memory](rhei-memory.spec.md#fs-rhei-memory-mid-term-memory)).
 - **Composability.** Different agents (writer, worker, reviewer) interact with the same file through well-defined, non-overlapping edits. The state machine prevents conflicts by making illegal transitions impossible.
 
-## Related Specifications
+## 5. Related Specifications
 
 - [Plan Language Specification](rhei-plan-language.spec.md) — formal grammar and semantic constraints
 - [Plan Language Usage Guide](rhei-authoring.spec.md) — authoring patterns and walkthroughs

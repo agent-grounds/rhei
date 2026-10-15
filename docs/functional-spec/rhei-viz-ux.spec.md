@@ -14,7 +14,7 @@ monitoring that is useful and pretty enough to read at a glance
 The principle in one line: **keep the calm of the command line, add the
 structure of a UI, and add nothing else.**
 
-## Goals
+**Goals**
 
 1. **No startle on open.** First paint is unremarkable. A user who runs `rhei
    run` and opens the printed dashboard URL should feel the terminal simply
@@ -38,7 +38,7 @@ structure of a UI, and add nothing else.**
    what it can move to next. Walking from a node to a neighbor and back costs a
    keystroke, never a tab hunt or a rebuilt mental model [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals).
 
-## Non-Goals
+**Non-Goals**
 
 - Not a redefinition of dashboard tabs, charts, or TUI tiles — that is
   [§FS-rhei-viz](rhei-viz.spec.md#fs-rhei-viz-flow-visualization) and [§FS-rhei-run-tui](rhei-run-tui.spec.md#fs-rhei-run-tui-rhei-run-tui-and-run-event-journal). This spec is purely presentational.
@@ -261,7 +261,7 @@ These are explicitly forbidden, in any surface, so reviewers have a shared bar:
 - SaaS-style stacked rounded cards, oversized hero headers, or brand logos.
 - More than one accent color in the chrome, or saturated color on non-state UI.
 
-## Related Specifications
+## 10. Related Specifications
 
 - [Flow Visualization](rhei-viz.spec.md) — which views exist and what data they
   render.
@@ -270,7 +270,7 @@ These are explicitly forbidden, in any surface, so reviewers have a shared bar:
 - [Cost Accounting](rhei-cost-accounting.spec.md) — the accounting data the Cost
   view and cost heatmaps present.
 
-## Future Work
+## 11. Future Work
 
 - User-selectable terminal palette presets (e.g. solarized, gruvbox) layered on
   the adaptive default.

@@ -83,12 +83,12 @@ The architecture rests on three "exactly once" invariants:
 | Crate | Role | Dependencies |
 |---|---|---|
 | `rhei-viz-model` (new) | [§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth) serde structs, the HTML/CSS/JS asset, `render_static` | none (pure) |
-| `rhei-viz` (new) | builder from `(plan, resolved machine)`; flattening; derivation ([§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth)/[§AR-rhei-viz-flow.9](rhei-viz-flow.spec.md#9-convergence-plan-ordered-low-risk)/§1.1) | `rhei-core`, `rhei-validator`, `rhei-viz-model` |
+| `rhei-viz` (new) | builder from `(plan, resolved machine)`; flattening; derivation ([§AR-rhei-viz-flow.8](rhei-viz-flow.spec.md#8-shared-derivation-a-single-source-of-truth)/[§AR-rhei-viz-flow.9](rhei-viz-flow.spec.md#9-convergence-plan-ordered-low-risk)/[§FS-rhei-viz.1.1](../functional-spec/rhei-viz.spec.md#11-state-category-and-glyph)) | `rhei-core`, `rhei-validator`, `rhei-viz-model` |
 | `rhei-tui` | serves the asset at `/`; builds the superset `/snapshot`; renders the terminal TUI from the same model plus runtime events; owns `/open`, `/log`, `/intervene`, and gate/intervene sinks | `rhei-viz-model` only |
 | `rhei-cli` | `rhei viz` static command; wires the resolved machine + plan loader into the dashboard | `rhei-viz`, `rhei-tui` |
 | `xtask` | dogfood static renderer (thin wrapper over `rhei-viz`) | `rhei-viz` |
 
-The model/builder split is deliberate (decision §10.2): `rhei-tui` gains only the
+The model/builder split is deliberate (decision 2 of [§AR-rhei-viz-flow.10](rhei-viz-flow.spec.md#10-decisions-recorded)): `rhei-tui` gains only the
 pure-struct dependency it needs to serialize the payload and serve the asset, and
 the host (`rhei-cli`) still builds the model and feeds it through the existing
 closure pattern. `rhei-tui` never learns to parse plans or resolve state
@@ -127,7 +127,7 @@ the migration:
 modes. The JS keys behavior off whether a field is present, never off a mode flag:
 when the runtime overlay is absent (static), the running-now panel hides ([§AR-rhei-viz-flow.5](rhei-viz-flow.spec.md#5-data-flow)), the
 intervene composer is shown disabled, the agent terminal shows a representative
-transcript, and cost overlays are empty. This is exactly [§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §7.2.
+transcript, and cost overlays are empty. This is exactly [§FS-rhei-viz.7.2](../functional-spec/rhei-viz.spec.md#72-static-offline-or-frozen).
 
 ## 5. Data flow
 
@@ -161,7 +161,7 @@ contracts; the dashboard includes the flattened machine in `/snapshot`.
 
 ### 5.3. Run-end freeze (correct by construction)
 
-When the run finishes and the loopback server exits ([§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §7.1), the host
+When the run finishes and the loopback server exits ([§FS-rhei-viz.7.1](../functional-spec/rhei-viz.spec.md#71-dynamic-live-during-rhei-run)), the host
 captures the final superset payload and calls the *same*
 `rhei-viz-model::render_static`, writing a frozen self-contained HTML under
 `runtime/`. Because the freeze reuses the static path, the frozen page is
@@ -170,7 +170,7 @@ renderer exists.
 
 ## 6. Live agent terminal: full durable log
 
-**Decision (§10.3): the live terminal renders the full durable transcript, not the
+**Decision (item 3 of [§AR-rhei-viz-flow.10](rhei-viz-flow.spec.md#10-decisions-recorded)): the live terminal renders the full durable transcript, not the
 `SLOT_TRAFFIC_LIMIT` ring.** Agent stdout/stderr already flow through
 `spawn_agent_output_reader` (`agent_output_reader.rs`) to (a) the durable per-task log
 (`agent_log_path` / `program_log_path`, `run_agent_mode.rs`) and (b) the
@@ -243,7 +243,7 @@ can't be messaged *before* typing rather than after a failed send ([§FS-rhei-vi
 built-in profile enables `intervene_stdin` by default, so the composer stays
 hidden until a profile opts in.
 
-**Decision (§10.1): every intervention is logged.** Each delivered message is
+**Decision (item 1 of [§AR-rhei-viz-flow.10](rhei-viz-flow.spec.md#10-decisions-recorded)): every intervention is logged.** Each delivered message is
 appended to a durable audit trail at `runtime/interventions.log` — timestamp,
 slot, task id, current state, byte length, and the message — and is echoed into
 the task's durable agent log so it appears inline in the transcript and the live
@@ -258,7 +258,7 @@ The rules that classify and derive state must produce identical results in both
 modes, so they live once in `rhei-viz` and are called by both the static builder
 and the live dashboard. They are the logic normatively defined in the spec:
 
-- **State→category classification** — [§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) §1.1, evaluated top-to-bottom,
+- **State→category classification** — [§FS-rhei-viz.1.1](../functional-spec/rhei-viz.spec.md#11-state-category-and-glyph), evaluated top-to-bottom,
   first match wins, with `active` as the persisted-state catch-all; `live` is
   reserved for the runtime slot overlay.
 - **Plan-state derivation** — [§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§AR-rhei-viz-flow.9](rhei-viz-flow.spec.md#9-convergence-plan-ordered-low-risk), with active-like tied to the `idle`
@@ -284,13 +284,13 @@ Each step leaves both surfaces working; the user-visible flip is steps 4–5; ne
 behavior lands last.
 
 1. Extract the canonical model + asset from `xtask` into `rhei-viz-model`
-   (confirmed canonical source, §10.4); `xtask` becomes a thin caller.
+   (confirmed canonical source, item 4 of [§AR-rhei-viz-flow.10](rhei-viz-flow.spec.md#10-decisions-recorded)); `xtask` becomes a thin caller.
 2. Move classification, plan-state derivation, and machine flattening into
    `rhei-viz`; have both `xtask` and the dashboard call them.
 3. Flatten the static task model to `TaskRow[]`; reconcile the field names in [§AR-rhei-viz-flow.4](rhei-viz-flow.spec.md#4-the-data-contract-static-base--runtime-overlay).
 4. Add `machine` + `about` to the live `/snapshot`; serve the `rhei-viz-model`
    asset at `/` instead of `dashboard/html.rs`.
-5. Fold the legacy tabs into the asset as the §12 *supplementary* surfaces
+5. Fold the legacy tabs into the asset as the [§FS-rhei-viz.12](../functional-spec/rhei-viz.spec.md#12-supplementary-dense-views) *supplementary* surfaces
    (Tasks / Slots / Cost / Journal / Links / Gantt / Cube / Sankey); the Flow view
    becomes primary. Retire `dashboard/html.rs`.
 6. Add the durable-log terminal endpoint `/log` ([§AR-rhei-viz-flow.6](rhei-viz-flow.spec.md#6-live-agent-terminal-full-durable-log)) and the run-end freeze ([§AR-rhei-viz-flow.5.3](rhei-viz-flow.spec.md#53-run-end-freeze-correct-by-construction)).
@@ -311,7 +311,7 @@ behavior lands last.
 4. **The `xtask` prototype is the canonical renderer source** and is promoted into
    `rhei-viz-model`; `dashboard/html.rs` is retired, not extended ([§AR-rhei-viz-flow.1](rhei-viz-flow.spec.md#1-context-two-renderers-one-design), [§AR-rhei-viz-flow.9](rhei-viz-flow.spec.md#9-convergence-plan-ordered-low-risk)).
 
-## Related Specifications
+## 11. Related Specifications
 
 - [Flow Visualization](../functional-spec/rhei-viz.spec.md) — the views and the
   data they show. [§FS-rhei-viz](../functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization)

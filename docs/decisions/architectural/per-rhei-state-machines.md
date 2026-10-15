@@ -1,10 +1,10 @@
 # DA-per-rhei-state-machines: The state machine is a per-rhei property, defaulted by the manifest
 
-## Status
+## 1. Status
 
 accepted
 
-## Context
+## 2. Context
 
 Panta shipped with a deliberate limit: one state machine governed a whole
 project. The `index.panta.md` declaration (or the built-in `rhei` machine) was
@@ -40,7 +40,7 @@ be an override. The plan language even said so already:
 "a declaration in the rhei itself wins" — the Panta layer clamped it back to
 uniformity.
 
-## Decision
+## 3. Decision
 
 The state machine is a property of the **rhei**, defaulted by the project.
 
@@ -129,7 +129,7 @@ The state machine is a property of the **rhei**, defaulted by the project.
    pre-write stranding refusal is the protection a rebind owes."
    `https://github.com/agent-grounds/rhei/issues/348#issuecomment-5928025863`
 
-## Consequences
+## 4. Consequences
 
 - Instantiating any number of templates into one project works; the
   machine-collision refusal and its standalone-workspace escape hatch are

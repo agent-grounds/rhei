@@ -130,7 +130,7 @@ A positional that names an existing plan and no ticket is an error asking for
 the ticket, in the form that works when pasted: `rhei show <ticket-id>`, or
 `rhei show <plan> --task <ticket-id>`.
 
-## Related Specifications
+## 6. Related Specifications
 
 - [List Command](rhei-list.spec.md) — which tickets exist, and their fields
 - [Render Command](rhei-render.spec.md) — the whole plan as a document

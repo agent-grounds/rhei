@@ -275,7 +275,7 @@ The stream and the exit code are two answers to different questions and a
 consumer should read both — with one caution for a new caller: a script that
 passes `--until-idle` and reads "non-zero means trouble" will misread `3`.
 
-## Related Specifications
+## 6. Related Specifications
 
 - [Run Command](rhei-run.spec.md) — the execution loop, flags, and exit codes
 - [Run TUI Specification](rhei-run-tui.spec.md) — the event surface and frontend selection

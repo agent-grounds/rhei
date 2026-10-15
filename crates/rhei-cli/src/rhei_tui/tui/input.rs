@@ -21,7 +21,7 @@ pub(super) fn handle_key_event(
     code: KeyCode,
     modifiers: KeyModifiers,
 ) -> InputAction {
-    // Ctrl+C restores the terminal and re-raises SIGINT (§1.8) — unless this
+    // Ctrl+C restores the terminal and re-raises SIGINT (§FS-rhei-run-tui.1.8) — unless this
     // surface is only attached, in which case it disconnects and the run never
     // hears about it. §FS-rhei-run-headless.5.1
     if code == KeyCode::Char('c') && modifiers.contains(KeyModifiers::CONTROL) {
@@ -53,7 +53,7 @@ pub(super) fn handle_key_event(
         KeyCode::Char('?') => state.help = true,
         KeyCode::Char('q') => {
             // Quit only once the run has finished; during a live run the
-            // operator stops with Ctrl+C (§1.5.2). An attached surface detaches
+            // operator stops with Ctrl+C (§FS-rhei-run-tui.1.5.2). An attached surface detaches
             // whenever it likes: it is not the thing the run is waiting on.
 
             // §FS-rhei-run-headless.5.1
@@ -201,8 +201,8 @@ fn expand_folded(state: &mut UiState) -> bool {
 fn handle_enter(state: &mut UiState) {
     match state.view {
         View::Flow if state.flow_focus == FlowFocus::Outline => {
-            // Enter on a folded parent expands it in place (§1.5.3); on a gating
-            // task it opens the human-gate chooser (§1.5.5). No gate is ever folded.
+            // Enter on a folded parent expands it in place (§FS-rhei-run-tui.1.5.3); on a gating
+            // task it opens the human-gate chooser (§FS-rhei-run-tui.1.5.5). No gate is ever folded.
             if !expand_folded(state) {
                 open_gate(state);
             }

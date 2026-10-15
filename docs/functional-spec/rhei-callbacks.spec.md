@@ -2,7 +2,7 @@
 
 This document provides practical examples of state transition callbacks across all supported languages (TypeScript, Python, Java, and CLI/Bash). Each example demonstrates a specific use-case with the `TransitionContext` data structure.
 
-## Table of Contents
+**Table of Contents**
 
 1. [Basic Transition Approval](#1-basic-transition-approval)
 2. [Dependency Validation](#2-dependency-validation)
@@ -806,7 +806,7 @@ changes remain compatible.
 
 ---
 
-## Related Documentation
+## 8. Related Documentation
 
 - [Transitions Specification](rhei-transitions.spec.md) - TransitionContext, TransitionResult, YAML schema, and execution semantics
 - [States Specification](rhei-states.spec.md) - State machine format and default states

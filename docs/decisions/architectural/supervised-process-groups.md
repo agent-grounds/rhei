@@ -1,10 +1,10 @@
 # DA-supervised-process-groups: Subprocesses are supervised process groups with one termination path
 
-## Status
+## 1. Status
 
 accepted
 
-## Context
+## 2. Context
 
 `rhei run` promised a subprocess lifetime it did not own. The spec described
 exactly one way an agent dies early — its timeout, `SIGTERM` then a 10-second
@@ -35,7 +35,7 @@ handler at all, and the only kill path was the timeout watchdog signalling the
 The bug is not three bugs. It is one missing concept: nothing named the unit
 `rhei run` is responsible for, and nothing gave that unit a single way to end.
 
-## Decision
+## 3. Decision
 
 Every subprocess `rhei run` starts **itself to do a ticket's work** is a
 **supervised process group** with exactly one early-termination path and three
@@ -175,7 +175,7 @@ backstop is Linux-only, per-thread, and delivered after a race window the child
 closes by re-checking its parent. The handled paths above are the contract;
 this is insurance, and it insures less than they cover.
 
-## Alternatives considered
+## 4. Alternatives considered
 
 **Detached-and-adoptable** (issue #53's option (b)): record each live agent's
 pid, task, and state in `.rhei/run.lock`, and have the next `rhei run` adopt or
@@ -215,7 +215,7 @@ assume, and Job Objects solve only the Windows half. Windows keeps
 mechanism); revisiting it is a separate decision, not a prerequisite for
 fixing the orphan.
 
-## Consequences
+## 5. Consequences
 
 - A timeout now kills the agent's whole tree, not just the agent. Any state
   machine that relied on an MCP server surviving its agent's timeout will see

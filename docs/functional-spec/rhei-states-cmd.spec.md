@@ -165,7 +165,7 @@ it was.
 When JSON output is selected, command errors are rendered as a single JSON
 object on stderr.
 
-## Related Specifications
+## 6. Related Specifications
 
 - [States Specification](rhei-states.spec.md) - state machine schema and defaults
 - [Transitions Specification](rhei-transitions.spec.md) - transition schema and callbacks

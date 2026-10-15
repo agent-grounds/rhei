@@ -84,7 +84,7 @@ fn run_agent_mode(
     let summary_sink = frontend.summary.clone();
     report_guard.summary = Some(summary_sink.clone());
     let dashboard_enabled = frontend.dashboard.is_some();
-    // AR §7: present only when the dashboard is live; each spawned agent's stdin
+    // §AR-rhei-viz-flow.7: present only when the dashboard is live; each spawned agent's stdin
     // is registered here so `/intervene` can stream messages to it.
     let intervene = frontend.intervene.clone();
     sink.emit(RunEvent::RunStarted {
@@ -1197,9 +1197,9 @@ fn run_agent_mode(
     drop(sink);
     drop(frontend);
 
-    // §FS-rhei-run-report.1/.3: write the durable report (skipped under --dry-run,
-    // §3.5), print the console summary or `Report:` pointer (§3.4), then disarm the
-    // guard so its fallback only fires on an early error.
+    // §FS-rhei-run-report.1/.3: write the durable report (skipped under --dry-run, §FS-rhei-run-report.3.5),
+    // print the console summary or `Report:` pointer (§FS-rhei-run-report.3.4), then disarm the guard so its
+    // fallback only fires on an early error.
     emit_run_report(
         input,
         &live.machines.set,

@@ -499,7 +499,7 @@ headless, and JSONL surfaces; no new output record family is introduced.
    releases it, and when the run does is [§FS-rhei-run.3.5](rhei-run.spec.md#35-resumed-program-poll-deadline-regression)'s rule
    ([§FS-rhei-run.3.6](rhei-run.spec.md#36-stall-release)).
 
-### Who supplies the result on a terminal edge
+**Who supplies the result on a terminal edge**
 
 `rhei run` never invents one. Each route says who does:
 
@@ -1321,13 +1321,13 @@ The [`concurrent`](rhei-states.spec.md#12-per-state-fields) flag on a `StateDef`
 
 The flag does not change state entry/exit semantics or transitions, and it does not affect within-task fanout (`all_targets` / `all_models`): every resolved invocation for a single scheduled task is still spawned together.
 
-## Relationship to Other Commands
+## 6. Relationship to Other Commands
 
 `rhei run` drives the full plan forward under orchestrator authority. It is mutually exclusive per execution with the manual-worker flow (`next` / `transition` / `complete`) — they never overlap on the same task because `rhei run` holds transition responsibility for the states it drives.
 
 See [How Rhei Is Used — Command Surface](rhei-usage.spec.md#22-command-surface) for the full table comparing all five coordination commands.
 
-## Related Specifications
+## 7. Related Specifications
 
 - [Agents Specification](rhei-agents.spec.md) — completion authority, completion condition, timeout handling, environment variables
 - [Program States Specification](rhei-programs.spec.md) — exit-code transitions and program-specific semantics

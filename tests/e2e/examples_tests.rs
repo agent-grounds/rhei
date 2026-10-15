@@ -240,7 +240,7 @@ fn example_agent_discussion_runs_with_mock_agents() {
     assert!(workspace.join("runtime/discussion/applied.md").exists());
 }
 
-/// The supervision example runs the whole §7 chain with its own committed mock.
+/// The supervision example runs the whole §FS-rhei-supervision.7 chain with its own committed mock.
 ///
 /// Unlike the other examples here it is *not* handed the shared mock agent: the
 /// point of the fixture is that a reader can copy the directory and run it, so

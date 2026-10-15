@@ -189,7 +189,7 @@ fn preload_snapshot_inherit_before_spawn_with_prior_sources(
             .and_then(|layout| snapshot_layout_dir_template(layout).map(|t| (layout, t)))
         {
             // §FS-rhei-snapshots.9.1 §FS-rhei-snapshots.10.1: Fixed-location emit,
-            // with the §9.1.1 locator keys. Read-only after exit; a resolution
+            // with the §FS-rhei-snapshots.9.1.1 locator keys. Read-only after exit; a resolution
             // failure degrades to no tracking rather than failing the spawn.
             match resolve_snapshot_dir_template(&template, spawn_working_dir) {
                 Ok(dir) => match resolve_snapshot_session_locator(layout, spawn_working_dir) {

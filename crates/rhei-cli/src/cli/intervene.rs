@@ -1,7 +1,8 @@
-// AR §7: the host side of the one mutation boundary. `RunInterveneSink` keeps a
-// per-slot registry of open agent-stdin writers, delivers `/intervene` messages
-// to selected stdin handles and nothing else, and records every delivery (and
-// every failure reason) to a durable audit trail at `runtime/interventions.log`,
+// §AR-rhei-viz-flow.7: the host side of the one mutation boundary.
+
+// `RunInterveneSink` keeps a per-slot registry of open agent-stdin writers, delivers
+// `/intervene` messages to selected stdin handles and nothing else, and records every
+// delivery (and every failure reason) to a durable audit trail at `runtime/interventions.log`,
 // mirroring successful messages into the task's agent transcript.
 //
 // There is no path from here to plan-state mutation: a delivery resolves a task,
@@ -207,7 +208,7 @@ impl rhei_tui::InterveneSink for RunInterveneSink {
             }
 
             // Mirror into the durable transcript so the message appears inline
-            // in the agent log and the live terminal (§FS-rhei-viz §5, AR §10.1).
+            // in the agent log and the live terminal (§FS-rhei-viz.5, item 1 of §AR-rhei-viz-flow.10).
             let _ = with_agent_log(&log_file, |f| {
                 writeln!(
                     f,

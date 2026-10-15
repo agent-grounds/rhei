@@ -1350,7 +1350,7 @@ effect:
 And one thing stops being true: `rhei reset` no longer returns a ticket to a
 state from which it can consume without limit.
 
-## Related Specifications
+## 12. Related Specifications
 
 - [Requirements — Bounded Neural Work](../requirements/bounded-neural-work.spec.md) — why the bounds exist and where the defaults came from
 - [Neural Admission Architecture](../architecture/neural-admission.spec.md) — the boundary, the lock order, and the receipt chain

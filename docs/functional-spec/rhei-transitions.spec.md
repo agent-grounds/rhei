@@ -8,7 +8,7 @@ State transitions will be defined declaratively in YAML and executed through pla
 - **Python**: Native callbacks via PyO3 bindings to python functions
 - **Java**: Calls to Java functions with JNI
 
-### Goals
+**Goals**
 
 1. Define state transition rules in YAML that specify valid `from -> to` state changes
 2. Associate each transition with a function identifier that gets invoked:
@@ -16,7 +16,7 @@ State transitions will be defined declaratively in YAML and executed through pla
   2. leaving the state has another call that returns what is the next state
 3. Provide a consistent API across CLI, JavaScript, Python, and Java
 
-### Requirements
+**Requirements**
 - State transitions must be explicitly declared; unlisted transitions are
   forbidden to ordinary callers. The only exception is the attended,
   operator-only missing-edge recovery in [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery).
@@ -1254,7 +1254,7 @@ its source state and the run's log carries the message.
 
 ---
 
-## Examples
+## 5. Examples
 
 > The examples in this section focus on state definitions, transitions, and
 > callback wiring. For readability they omit the top-level `profiles` and
@@ -1263,7 +1263,7 @@ its source state and the run's log carries the message.
 > profile and node-policy model and the
 > [reference machine](states.yaml) for a complete example.
 
-### Example 1: YAML State Machine Definition with Transitions
+### 5.1 Example 1: YAML State Machine Definition with Transitions
 
 This extends the existing [`states.yaml`](states.yaml) format to include formal transitions and callbacks:
 
@@ -1364,7 +1364,7 @@ transitions:
 
 ---
 
-### Example 2: CLI Integration with Bash Functions
+### 5.2 Example 2: CLI Integration with Bash Functions
 
 When using the CLI, callbacks map to bash functions that receive task context as JSON on stdin:
 
@@ -1471,7 +1471,7 @@ rhei-cli run examples/release-automation.rhei.md \
 
 ---
 
-### Example 3: JavaScript Integration via NAPI
+### 5.3 Example 3: JavaScript Integration via NAPI
 
 JavaScript callbacks are registered as native functions and called synchronously during transitions:
 
@@ -1588,7 +1588,7 @@ await rhei.run();
 
 ---
 
-### Example 4: Python Integration via PyO3
+### 5.4 Example 4: Python Integration via PyO3
 
 Python callbacks use decorators to register handlers:
 
@@ -1739,7 +1739,7 @@ if __name__ == "__main__":
 
 ---
 
-### Example 5: Java Integration via JNI
+### 5.5 Example 5: Java Integration via JNI
 
 Java callbacks are resolved from fully qualified static method names declared by the state machine:
 
@@ -1885,7 +1885,7 @@ public class Main {
 
 ---
 
-### Example 6: Rhei File Using State Transitions
+### 5.6 Example 6: Rhei File Using State Transitions
 
 A rhei file that would work with the state machine definitions above, saved as
 `states.yaml` beside it:
@@ -1967,7 +1967,7 @@ Run smoke test suite against staging.
 
 ---
 
-### Example 7: Error Handling and Recovery
+### 5.7 Example 7: Error Handling and Recovery
 
 Demonstrating how transitions handle errors and recovery:
 
@@ -2056,7 +2056,7 @@ error_handling:
 
 ---
 
-### Example 8: Transition Validation Flow
+### 5.8 Example 8: Transition Validation Flow
 
 ```mermaid
 sequenceDiagram
@@ -2125,7 +2125,7 @@ sequenceDiagram
 
 ---
 
-### Example 9: Multi-Language Callback Registration
+### 5.9 Example 9: Multi-Language Callback Registration
 
 Showing how the same state machine can work across platforms:
 
@@ -2206,7 +2206,7 @@ callbacks:
 
 ---
 
-## Related Documentation
+## 6. Related Documentation
 
 - [Plan Language Specification](rhei-plan-language.spec.md) — formal grammar and semantic constraints
 - [States Specification](rhei-states.spec.md) — state machine format and default states

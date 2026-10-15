@@ -4,7 +4,7 @@ Drop a ticket's `**Assignee:**` so work that was claimed but never finished can
 be picked up again. Release changes nothing else: not the ticket's state, not
 its result artifacts, not the transition ledger. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
-## Motivation
+**Motivation**
 
 `rhei next` claims a ticket by writing `**Assignee:**`, and refuses to hand out
 work while claims are outstanding — that is what stops two workers taking the
@@ -104,7 +104,7 @@ The note is **not** printed for two tickets it would be wrong about:
 - `rhei reset` returns tickets to the initial state and deletes runtime output
   across its whole scope. Release touches one field on the tickets it names.
 
-## Related Specifications
+## 5. Related Specifications
 
 - [Next Command](rhei-next.spec.md) — claim semantics and the assignee marker
 - [Complete Command](rhei-complete.spec.md) — the finishing path

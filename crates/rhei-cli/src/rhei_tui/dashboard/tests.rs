@@ -187,7 +187,7 @@ impl GateTransitionSink for StubGateTransition {
     }
 }
 
-// §FS-rhei-viz §11: only workspace-relative paths may be opened.
+// §FS-rhei-viz.11: only workspace-relative paths may be opened.
 #[test]
 fn resolve_within_workspace_rejects_escapes() {
     assert_eq!(
@@ -210,7 +210,7 @@ fn percent_decode_and_query_param() {
     assert_eq!(query_param("n=1", "path"), None);
 }
 
-// §FS-rhei-viz §11: the open route rejects missing and escaping paths with 400.
+// §FS-rhei-viz.11: the open route rejects missing and escaping paths with 400.
 // Valid paths are not exercised here because they would launch a real editor.
 #[test]
 fn open_route_rejects_invalid_paths() {
@@ -221,7 +221,7 @@ fn open_route_rejects_invalid_paths() {
     assert!(fetch_status_line(&dashboard, "/open?path=%2Fetc%2Fpasswd").contains("400"));
 }
 
-// AR §2: the dashboard serves the one self-contained Flow asset at `/`, which
+// §AR-rhei-viz-flow.2: the dashboard serves the one self-contained Flow asset at `/`, which
 // polls `/snapshot` (its boot payload is left `null`).
 #[test]
 fn root_serves_the_self_contained_flow_asset() {
@@ -293,7 +293,7 @@ fn url_path_encodes_unsafe_bytes_and_preserves_slashes() {
 
 /// `/snapshot` is the superset: the `VizModel` base (flat `tasks`, `machine`,
 /// `about`) plus the runtime overlay (`task_runtime`, slots, deferred).
-/// AR §4, §FS-rhei-viz §8.
+/// §AR-rhei-viz-flow.4, §FS-rhei-viz.8.
 #[test]
 fn snapshot_endpoint_exposes_base_model_and_runtime_overlay() {
     let loader: PlanLoader = Arc::new(|| {
@@ -425,7 +425,7 @@ fn snapshot_does_not_mark_released_slot_active() {
     assert!(snapshot["task_runtime"].get("1").is_none(), "released task has no runtime overlay");
 }
 
-// AR §6: /log tails the running task's durable log from a byte offset and
+// §AR-rhei-viz-flow.6: /log tails the running task's durable log from a byte offset and
 // returns the new bytes plus the next offset.
 #[test]
 fn log_endpoint_tails_running_task_log_from_offset() {
@@ -467,7 +467,7 @@ fn log_endpoint_tails_running_task_log_from_offset() {
     assert_eq!(none["data"], "");
 }
 
-// AR §7: POST /intervene delivers the message to the host sink and reports the
+// §AR-rhei-viz-flow.7: POST /intervene delivers the message to the host sink and reports the
 // outcome; it never touches plan state.
 #[test]
 fn intervene_delivers_to_sink_and_reports_outcome() {
@@ -618,7 +618,7 @@ fn gate_transition_reports_unavailable_without_sink() {
     assert_eq!(snapshot["capabilities"]["gate_transition"], false);
 }
 
-// AR §7: the dashboard publishes its loopback URL to runtime/dashboard.json so a
+// §AR-rhei-viz-flow.7: the dashboard publishes its loopback URL to runtime/dashboard.json so a
 // separate `rhei intervene` process can discover and message the live run, and
 // removes the file when the run ends.
 #[test]
@@ -637,7 +637,7 @@ fn dashboard_publishes_and_cleans_up_discovery_file() {
     assert!(!addr_file.exists(), "discovery file removed on shutdown");
 }
 
-// §FS-rhei-viz §5: the snapshot surfaces per-slot intervene capability so the
+// §FS-rhei-viz.5: the snapshot surfaces per-slot intervene capability so the
 // Flow composer is gated on what the agent can actually take. A slot whose agent
 // holds stdin open reports `intervene: true`; a one-shot agent reports `false`.
 #[test]
@@ -768,7 +768,7 @@ fn dashboard_mixed_priced_and_unpriced_rollup_is_partial() {
 }
 
 /// `/snapshot` carries the compact per-task accounting rollups (direct +
-/// subtree) in the runtime overlay. §FS-rhei-cost-accounting §6, §10.
+/// subtree) in the runtime overlay. §FS-rhei-cost-accounting.6, §FS-rhei-cost-accounting.10.
 #[test]
 fn snapshot_task_runtime_carries_accounting_rollups() {
     let loader: PlanLoader = Arc::new(|| {
@@ -803,8 +803,8 @@ fn snapshot_task_runtime_carries_accounting_rollups() {
 }
 
 /// Dashboard-enabled runs leave an inspectable static artifact behind after the
-/// loopback server exits — produced by the *same* static renderer. §FS-rhei-viz
-/// §7.1, AR §5.3.
+/// loopback server exits — produced by the *same* static renderer.
+/// §FS-rhei-viz.7.1, §AR-rhei-viz-flow.5.3.
 #[test]
 fn frozen_dashboard_writes_self_contained_final_artifact() {
     let temp = tempfile::tempdir().expect("tempdir");
@@ -835,8 +835,8 @@ fn frozen_dashboard_writes_self_contained_final_artifact() {
     assert!(!html.contains("<script src="));
 }
 
-/// Temporary plan reload failures keep serving the last good model. §FS-rhei-viz
-/// §7.1.
+/// Temporary plan reload failures keep serving the last good model.
+/// §FS-rhei-viz.7.1.
 #[test]
 fn snapshot_keeps_last_good_model() {
     let calls = Arc::new(AtomicUsize::new(0));

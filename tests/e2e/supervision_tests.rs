@@ -377,16 +377,16 @@ fn the_specs_own_example_validates_as_printed() {
     let section = spec
         .split("## 7. Example")
         .nth(1)
-        .expect("the spec has a §7")
-        .split("## Related Specifications")
+        .expect("the spec has a §FS-rhei-supervision.7")
+        .split("## 8. Related Specifications")
         .next()
-        .expect("§7 ends before Related Specifications");
+        .expect("§FS-rhei-supervision.7 ends before Related Specifications");
 
     let block = |fence: &str| -> String {
         let opened = section
             .split(&format!("```{fence}\n"))
             .nth(1)
-            .unwrap_or_else(|| panic!("§7 has a ```{fence} block"));
+            .unwrap_or_else(|| panic!("§FS-rhei-supervision.7 has a ```{fence} block"));
         opened.split("```").next().expect("the block is closed").to_string()
     };
 

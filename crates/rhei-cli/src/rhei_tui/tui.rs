@@ -119,7 +119,7 @@ impl TuiSink {
         let screen_restored = Arc::new(AtomicBool::new(false));
 
         // Panic hook: if the engine panics, restore the terminal before the
-        // default handler prints its message, so the user sees the panic. §1.8
+        // default handler prints its message, so the user sees the panic. §FS-rhei-run-tui.1.8
         let prev_hook = std::panic::take_hook();
         let panic_restored = Arc::clone(&screen_restored);
         std::panic::set_hook(Box::new(move |info| {
@@ -193,7 +193,7 @@ impl EventSink for TuiSink {
         if matches!(event, RunEvent::AgentOutput { .. }) {
             // Agent output is best-effort because the durable per-task log has
             // the full transcript. Dropping here keeps output bursts from
-            // filling the shared channel indefinitely. §1.2
+            // filling the shared channel indefinitely. §FS-rhei-run-tui.1.2
             let _ = self.tx.try_send(Msg::Event(Box::new(event)));
         } else {
             // Lifecycle events define slot state. Preserve them even during
@@ -262,7 +262,7 @@ fn leave_finished_screen(stop_requested: bool, poll: &io::Result<bool>) -> bool 
 }
 
 /// After the run finishes, keep redrawing and accepting navigation keys until
-/// the operator presses `q`. The live actions are already disabled (§1.5.7).
+/// the operator presses `q`. The live actions are already disabled (§FS-rhei-run-tui.1.5.7).
 ///
 /// An interrupt that arrives while the screen is parked here leaves it too:
 /// without that check the only way out of a finished-and-signalled run was
@@ -330,10 +330,11 @@ fn drain_input(
             Err(_) => {
                 // The terminal is gone (pty closed, session hung up): there is
                 // nothing to draw to and no key can arrive, so end the render
-                // thread rather than redraw into the void. The engine keeps
-                // going headless — a `SIGHUP` interrupts it on its own account,
-                // and from here its warnings and errors go to stderr while
-                // every other event is dropped by the closed channel (§1.8).
+                // thread rather than redraw into the void.
+
+                // The engine keeps going headless — a `SIGHUP` interrupts it on its own account, and from
+                // here its warnings and errors go to stderr while every other event is dropped by the
+                // closed channel (§FS-rhei-run-tui.1.8).
                 break_out_ref(terminal, screen_restored);
                 return true;
             }

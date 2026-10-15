@@ -399,7 +399,7 @@ is an approximation of what the operating system counts ([§FS-rhei-errors.7.1](
 line rhei measures as fitting is left to speak for itself: nothing is added, and
 the `PATH` remedy stands alone.
 
-## Related
+## 8. Related
 
 - [Templates Specification](rhei-templates.spec.md) [§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification) —
   instantiation inputs and `--list-inputs`

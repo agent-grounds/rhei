@@ -487,7 +487,7 @@ fn run_callback_mode(
     drop(sink);
     drop(frontend);
 
-    // §FS-rhei-run-report.1/.3: durable report (skipped under --dry-run, §3.5) +
+    // §FS-rhei-run-report.1/.3: durable report (skipped under --dry-run, §FS-rhei-run-report.3.5) +
     // console summary. Callback mode spawns no agents/programs; its advances are
     // callback-only. Disarm the guard so its fallback only fires on early error.
     emit_run_report(

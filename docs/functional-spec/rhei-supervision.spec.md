@@ -35,7 +35,7 @@ The decision behind this shape — a barrier woken after the fact, steering
 through the levers that already exist — is recorded in
 [§DF-subtree-supervision](../decisions/functional/subtree-supervision.md#df-subtree-supervision-a-supervisor-is-a-barrier-over-its-subtree-woken-after-the-fact).
 
-## Overview
+**Overview**
 
 Without supervision a parent task runs exactly once, after every descendant
 is terminal, and sees only what its children left on disk. A review/fix chain
@@ -928,7 +928,7 @@ Change it to `child-terminal` and the supervisor hears only its four children
 finishing — a child that decomposes further runs its own subtree unwatched, or
 supervises it itself.
 
-## Related Specifications
+## 8. Related Specifications
 
 - [Plan Language — Semantic Constraints](rhei-plan-language.spec.md#3-semantic-constraints)
 - [Run — Execution Loop](rhei-run.spec.md#3-execution-loop)

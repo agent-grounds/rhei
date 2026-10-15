@@ -14,7 +14,7 @@ pub const FLOW_ASSET: &str = include_str!("../../assets/flow.html");
 /// The JavaScript literal the renderer replaces with the inlined plan bundle.
 const BOOT_PLACEHOLDER: &str = "/*__BOOT__*/null";
 
-/// The §8 static base model: one plan's title, derived state, overview prose,
+/// The §FS-rhei-viz.8 static base model: one plan's title, derived state, overview prose,
 /// the flattened state machine, and the flat task list. The live `/snapshot`
 /// payload is a superset of these fields (it adds the runtime overlay), so the
 /// one asset renders both.
@@ -22,7 +22,7 @@ const BOOT_PLACEHOLDER: &str = "/*__BOOT__*/null";
 pub struct VizModel {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plan_title: Option<String>,
-    /// Derived plan state (§FS-rhei-viz §9). Carried for the supplementary
+    /// Derived plan state (§FS-rhei-viz.9). Carried for the supplementary
     /// surfaces; the Flow view itself reads per-task state.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plan_state: Option<String>,
@@ -31,9 +31,9 @@ pub struct VizModel {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub about: Option<String>,
     /// The flat task list: each top-level task and every descendant, carrying
-    /// its `parent`/`depth` rather than nesting. §FS-rhei-viz §8
+    /// its `parent`/`depth` rather than nesting. §FS-rhei-viz.8
     pub tasks: Vec<TaskRow>,
-    /// The resolved state machine, flattened for the surface. §FS-rhei-viz §8
+    /// The resolved state machine, flattened for the surface. §FS-rhei-viz.8
     pub machine: Machine,
 }
 
@@ -228,7 +228,7 @@ pub fn render_static_one(key: &str, model: &VizModel) -> String {
 
 /// The asset string for the **live** surface: served verbatim at `/`, with the
 /// `BOOT` placeholder left as `null` so the JS polls `/snapshot` instead of
-/// reading an inlined bundle. AR §2, §5.2.
+/// reading an inlined bundle. §AR-rhei-viz-flow.2, §AR-rhei-viz-flow.5.2.
 pub fn live_asset() -> &'static str {
     FLOW_ASSET
 }

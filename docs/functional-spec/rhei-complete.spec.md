@@ -322,7 +322,7 @@ The result file is written relative to the workspace root. The state change, ass
 Task <ID> completed: '<from>' -> '<to>' (runtime/results/<ID>.md)
 ```
 
-## Examples
+## 6. Examples
 
 ```bash
 # Agent finishes work on task 3 of the `plan` rhei
@@ -348,13 +348,13 @@ rhei complete ./my-workspace --task review-seed \
 # Task body: > **Result:** [my-workspace.review-seed](runtime/results/my-workspace.review-seed.md)
 ```
 
-## Relationship to Other Commands
+## 7. Relationship to Other Commands
 
 `rhei complete` is the terminal step of the manual-worker loop: `next` (claim) → work → `transition` (advance as needed) → `complete` (finish, record result, release). It transitions the task to a terminal state, appends a result entry, and releases the claim.
 
 See [How Rhei Is Used — Command Surface](rhei-usage.spec.md#22-command-surface) for the full table comparing all five coordination commands.
 
-## Related Specifications
+## 8. Related Specifications
 
 - [Plan Language Specification](rhei-plan-language.spec.md) — grammar including `assignee_field` and `result_block`
 - [How Rhei Is Used](rhei-usage.spec.md) — roles and coordination patterns

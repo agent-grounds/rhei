@@ -2,7 +2,7 @@
 
 This document specifies the grammar and semantics of the Rhei Plan language — a structured subset of Markdown for hierarchical task management shared by humans and AI agents.
 
-## Overview
+**Overview**
 
 The Rhei Plan language is a **context-sensitive subset of Markdown** designed for:
 
@@ -10,9 +10,9 @@ The Rhei Plan language is a **context-sensitive subset of Markdown** designed fo
 - AI agent coordination
 - Human oversight of work progress
 
-## Quick Start
+**Quick Start**
 
-### Write a plan
+**Write a plan**
 
 Create a `.rhei.md` file. At minimum, a plan needs a title, a `## Tasks` section, and at least one task with a `**State:**` field:
 
@@ -70,7 +70,7 @@ structure:
 **State:** pending
 ```
 
-### Validate the plan
+**Validate the plan**
 
 ```bash
 rhei validate plan.rhei.md
@@ -81,7 +81,7 @@ When the active state machine declares artifact contracts, runtime commands also
 enforce required state inputs and outputs as described in the states and
 transitions specifications.
 
-### Have an agent execute it
+**Have an agent execute it**
 
 Tell an agent with the `rhei-plan-worker` skill to work the plan:
 
@@ -883,7 +883,7 @@ Neither `panta` nor `rhei` may appear in `structure.nodeKinds`. `panta` must
 never be authored; a level-2-or-deeper node must never use the `panta` or `rhei`
 kind.
 
-### Plan Root Model
+**Plan Root Model**
 
 The level-0 root node is **Panta**, the project root ([§FS-rhei-panta](rhei-panta.spec.md#fs-rhei-panta-panta-the-project-root-above-all-rheis)). Panta is
 virtual: it is not authored in markdown, has no `**State:**`, `**Prior:**`,
@@ -1774,7 +1774,7 @@ The `rhei` CLI help currently organizes its subcommands into five groups:
 behavior surface ([§FS-rhei-viz](rhei-viz.spec.md#fs-rhei-viz-flow-visualization)) as a self-contained HTML page from a plan or
 workspace; it appears in the generated help under that group.
 
-## Related Specifications
+## 9. Related Specifications
 
 - [Rhei Language Reference](rhei-language-reference.spec.md) - Entry point for the complete user-authored language surface
 - [How Rhei Is Used](rhei-usage.spec.md) - Roles, coordination patterns, and agent workflows

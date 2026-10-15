@@ -2,11 +2,11 @@
 
 This document specifies **Rhei Templates** — parameterized, reusable plan+state-machine bundles that can be instantiated with concrete inputs to produce ready-to-execute workspaces.
 
-## Motivation
+**Motivation**
 
 Rhei plans and state machines today are authored from scratch or copied manually. Common patterns — code review loops, release checklists, onboarding workflows — are recreated each time. Templates let users capture a proven workflow once and instantiate it with project-specific inputs, removing boilerplate and enforcing consistency.
 
-## Concepts
+**Concepts**
 
 A **template** is a directory containing:
 
@@ -980,9 +980,9 @@ the whole of what a project template is for, so writing it is the command the
 caller ran rather than a side effect of laying something else
 ([§DA-per-rhei-state-machines](../decisions/architectural/per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest) item 8).
 
-## Example
+**Example**
 
-### Template: `code-review`
+**Template: `code-review`**
 
 ```
 ~/.agent-grounds/rhei/templates/code-review/
@@ -996,7 +996,7 @@ caller ran rather than a side effect of laying something else
 └── workflow.sh
 ```
 
-#### `template.yaml`
+**`template.yaml`**
 
 ```yaml
 name: code-review
@@ -1019,7 +1019,7 @@ inputs:
     default: claude
 ```
 
-#### `prompt_templates/review.md`
+**`prompt_templates/review.md`**
 
 ```markdown
 Review pass {visit_count} of {visits} for Task {task_id}: {task_title}.
@@ -1027,7 +1027,7 @@ Focus on `{{target}}`.
 Write findings to `{review_notes_path}`.
 ```
 
-#### `index.rhei.md`
+**`index.rhei.md`**
 
 ```markdown
 # Rhei: Code Review — {{target}}
@@ -1036,7 +1036,7 @@ Write findings to `{review_notes_path}`.
 Automated {{review_passes}}-pass review of `{{target}}` using {{model}}.
 ```
 
-#### `tasks/01-review.md`
+**`tasks/01-review.md`**
 
 ```markdown
 ### Task review: Review {{target}}
@@ -1046,7 +1046,7 @@ Review `{{target}}` for correctness, style, and security issues.
 Write findings to `{output.review-notes.path}`.
 ```
 
-#### `states.yaml`
+**`states.yaml`**
 
 ```yaml
 name: code-review
@@ -1116,7 +1116,7 @@ node_policy:
   default: default
 ```
 
-### Instantiation
+**Instantiation**
 
 ```bash
 rhei instantiate code-review src/auth/ \
@@ -1127,7 +1127,7 @@ rhei instantiate code-review src/auth/ \
 rhei instantiate code-review src/auth/ --execute
 ```
 
-### Resulting Output (`./reviews/auth-review/`)
+**Resulting Output (`./reviews/auth-review/`)**
 
 ```markdown
 # index.rhei.md
@@ -1205,7 +1205,7 @@ Each `inputs[]` entry is a YAML mapping with these fields:
 
 Template manifest files use the `.yaml` extension. Template plan entry points are exactly `plan.rhei.md` or `index.rhei.md`. In directory-workspace templates, files under `tasks/` may use `.md` consistent with standard Rhei workspaces.
 
-## Related Specifications
+## 11. Related Specifications
 
 - [Plan Language Specification](rhei-plan-language.spec.md) — Grammar and semantics of the output format
 - [States Specification](rhei-states.spec.md) — State machine format (bundled in templates)

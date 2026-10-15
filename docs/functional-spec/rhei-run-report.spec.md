@@ -352,7 +352,7 @@ the summary prints five stacked groups:
 
    A parent held open **only** by its own subtree is therefore not halted work
    and takes **no Attention row**: it is counted in neither the `N gated ·
-   M blocked` header, nor `could not advance` (§2), nor the Transition Ledger
+   M blocked` header, nor `could not advance` (§FS-rhei-run-report.2), nor the Transition Ledger
    ([§FS-rhei-run-report.4](rhei-run-report.spec.md#4-transition-ledger)). The open descendant is the halted work and is already counted there.
    Counting the parent as well multiplied one gated leaf by the height of the
    tree above it — three ancestors made four Attention rows, `4 gated`, and
@@ -881,7 +881,7 @@ is an end-of-run explanation with artifact and blocker context. [§FS-rhei-run-t
   contract.
 - No attempt to summarize complete agent transcripts; the report links to logs.
 
-## Related Specifications
+## 10. Related Specifications
 
 - [Rhei Run](rhei-run.spec.md) - scheduler, transition, and completion behavior
 - [Run TUI](rhei-run-tui.spec.md) - live event surface and transition journal

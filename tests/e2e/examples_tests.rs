@@ -160,6 +160,7 @@ elif state in ('review', 'fix'):
     )
 "#;
 
+/// Both timeout levels use the shared execution margin. §REQ-cross-platform.8
 fn write_mock_agent_settings(workspace: &Path, agent_script: &Path) {
     let settings_dir = workspace.join(".agent-grounds/rhei");
     fs::create_dir_all(&settings_dir).expect("create .agent-grounds/rhei");
@@ -168,7 +169,7 @@ fn write_mock_agent_settings(workspace: &Path, agent_script: &Path) {
       "command": {},
       "prompt_flag": "--prompt",
       "model_flag": "--model",
-      "timeout": "5s",
+      "timeout": "{FIXTURE_MARGIN}",
       "modes": {{ "yolo": [] }}
     }}"#,
         fixture_command(agent_script)
@@ -179,7 +180,7 @@ fn write_mock_agent_settings(workspace: &Path, agent_script: &Path) {
             r#"{{
   "defaults": {{
     "agent": "mock",
-    "agent_timeout": "5s"
+    "agent_timeout": "{FIXTURE_MARGIN}"
   }},
   "agents": {{
     "mock": {profile},
@@ -203,7 +204,6 @@ fn write_mock_agent_settings(workspace: &Path, agent_script: &Path) {
 /// The effective profile bound and its fallback both protect healthy mock starts.
 /// §REQ-cross-platform.8; profile precedence is §FS-rhei-agents.7.1.
 #[test]
-#[ignore = "red until #497 gives the mock example settings the 60s fixture margin; implement removes this"]
 fn mock_example_settings_use_the_fixture_margin_at_both_timeout_levels() {
     let dir = unique_scratchpad_dir("example-settings-margin");
     let agent = write_mock_example_agent(&dir);

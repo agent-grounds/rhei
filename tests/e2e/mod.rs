@@ -324,6 +324,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+/// Execution margin for healthy fixture starts on stalled runners. §REQ-cross-platform.8
+const FIXTURE_MARGIN: &str = "60s";
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

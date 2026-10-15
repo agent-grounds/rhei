@@ -13,6 +13,13 @@ pre-commit install --install-hooks
 That installs the pre-commit, pre-push and commit-msg hooks the repository
 declares. Never get past a hook with `--no-verify`.
 
+The hooks run the tools on your `PATH`, so install the release the gate pins
+([§AR-ci-release.1](docs/architecture/ci-release.spec.md#1-development-ci)) — for grund that is 0.18.0:
+
+```bash
+cargo install grund --version 0.18.0 --locked
+```
+
 ## The changelog
 
 A pull request never touches [`docs/changelog.md`](docs/changelog.md). The

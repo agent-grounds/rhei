@@ -84,6 +84,9 @@ renamed job is a check no pull request can satisfy until a person edits the
 ruleset. The gate binaries (`grund`, `lychee`, `fissile`) are installed from
 source only on a cache miss: they live under a root of their own keyed by their
 pinned versions, so a version bump rebuilds exactly that tool and nothing else.
+Each is pinned to a released crates.io version, never to a git revision, so the
+gate runs exactly what a contributor gets from `cargo install <tool> --version
+<pin>` and the contributor setup can name that same version.
 
 Both jobs stay inside the one `CI` workflow because the release helpers (§3)
 look the green run up by workflow name.

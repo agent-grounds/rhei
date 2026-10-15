@@ -1,10 +1,10 @@
 # DA-panta-root: Panta is the per-project virtual root above all rheis
 
-## Status
+**Status**
 
 proposed
 
-## Context
+**Context**
 
 Rhei has no entity above an individual rhei. A plan is loaded by path, executed,
 and rendered in isolation; there is no default home for a newly created rhei, no
@@ -20,7 +20,7 @@ established pattern — a derived, non-authored root that owns rollups and is
 excluded from claim/transition/complete — is exactly what a cross-rhei container
 needs, one level higher.
 
-## Decision
+**Decision**
 
 Introduce **Panta**: a single, per-project, *virtual* root node that sits above
 all rheis and their tickets. It is the default place rheis are added and the
@@ -74,7 +74,7 @@ to hide: default listings, claim selection, and monitoring present rheis as the
 top level. Tooling exposes the root only behind an explicit opt-in
 (e.g. `--show-root`). Its status is always derived from its rheis, never stored.
 
-## Alternatives considered
+## 5. Alternatives considered
 
 - **Registry by reference.** A singleton index that lists independent plan files
   and caches a per-plan rollup, leaving each plan a self-contained isolated tree.
@@ -88,7 +88,7 @@ top level. Tooling exposes the root only behind an explicit opt-in
   the language already relies on ([§FS-rhei-plan-language.3](../../functional-spec/rhei-plan-language.spec.md#3-semantic-constraints)), and would force the
   root to carry state it should only ever roll up.
 
-## Consequences
+## 6. Consequences
 
 - **Clean break, no migration.** Promoting the top authored level from task to
   rhei reinterprets existing plans. Backward compatibility is explicitly out of

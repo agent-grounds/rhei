@@ -48,7 +48,7 @@ line naming the **command or file** that holds the rest, so the specification
 had already decided that a command is an acceptable holder of what the prompt
 leaves out — [§FS-rhei-memory.1.1](rhei-memory.spec.md#11-everything-before-is-reachable) and [§FS-rhei-memory.1.3](rhei-memory.spec.md#13-bounded-and-progressive) simply did not agree. The 40-line cap made the
 earlier clause false whenever a decomposed parent pushed the list past it
-(§4.3.4), so the amendment widens an exception the spec admits rather than
+(step 4 of [§FS-rhei-memory.4.3](rhei-memory.spec.md#43-plan-history)), so the amendment widens an exception the spec admits rather than
 opening a new one. A folded line ([§FS-rhei-memory.3.2](rhei-memory.spec.md#32--plan-history)) is therefore not an omission: it counts
 every descendant it stands for and names the command that lists the next rung
 down, which reaches the whole subtree one rung at a time ([§FS-rhei-memory.1.3](rhei-memory.spec.md#13-bounded-and-progressive)).
@@ -65,7 +65,7 @@ The prompt is a **pure function** of: the merged project graph, the `runtime/`
 tree of every execution root, the resolved state machines, the resolved
 settings, the invocation identity (task, state, visit count, execution
 identity), the invocation's resolved exclusions, and the set of invocations of the current `rhei run` still in flight
-when the prompt is composed (§4.3.5). Composition performs no summarization,
+when the prompt is composed (step 5 of [§FS-rhei-memory.4.3](rhei-memory.spec.md#43-plan-history)). Composition performs no summarization,
 ranking, or selection beyond the rules written in [§FS-rhei-memory.4](rhei-memory.spec.md#4-composition-algorithm): a summary is a fixed
 slice of a file, an order is a stated order, a cap is a stated number, and a
 truncation leaves a stated overflow line. The same inputs produce the same
@@ -323,7 +323,7 @@ it wrote is in `{reverted-text file}`.
 
 - The trail is the state sequence of this task's ledger lines, in order — the
   first line's `from`, then every line's `to` — with the state being entered
-  marked as this visit (§4.4.1). The engine has already written the line that
+  marked as this visit (step 1 of [§FS-rhei-memory.4.4](rhei-memory.spec.md#44-previous-visits)). The engine has already written the line that
   moved the task here, so that state is annotated in place rather than
   repeated.
 - The result file is pasted because it is where every earlier verdict on this
@@ -393,7 +393,7 @@ not list are one path away. A rhei whose execution root holds no plan document
 — the synthetic `basin`, whose manifest is never authored ([§FS-rhei-panta.4](rhei-panta.spec.md#4-invisibility)) —
 omits the `— plan …` clause and names this task's file alone. `Agent transcripts`
 names the resolved `runtime/logs/` directory of this run — the one `Previous
-log:` resolves against (§3.3) — because that tree belongs to the run and not to
+log:` resolves against (§FS-rhei-memory.3.3) — because that tree belongs to the run and not to
 a rhei ([§FS-rhei-memory.2](rhei-memory.spec.md#2-the-store)). Paths are rendered relative to the execution root named in the
 prompt, or absolute when `RHEI_CHECKOUT_ROOT` differs from it, by the same rule
 `{output.<name>.path}` follows ([§FS-rhei-states.4](rhei-states.spec.md#4-template-variables-in-instructions-and-personality)). `rhei next`, which exports
@@ -580,7 +580,7 @@ are never silently omitted here.
 2. If the current result source is excluded, keep its path but do not open it;
    otherwise paste `runtime/results/<task>.md`, fenced; cap 100 lines, keeping the
    **last** 100 with the overflow line `… earlier entries omitted; read <path>`
-   first. The legacy fallback of §4.3.3 applies here too, and `<path>` names
+   first. The legacy fallback of step 3 of [§FS-rhei-memory.4.3](rhei-memory.spec.md#43-plan-history) applies here too, and `<path>` names
    whichever file was read.
 3. `prev_log` = the log named by the spawn record ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)) of
    `(task, state, identity, visit_count − 1)` — the last thing that actually

@@ -32,7 +32,7 @@ structure:
 **State:** fix
 "#;
 
-/// §FS-rhei-supervision.2.1 and §6: a supervisor cancels a step during its own
+/// §FS-rhei-supervision.2.1 and §FS-rhei-supervision.6: a supervisor cancels a step during its own
 /// visit; that move is its own doing, so it is not a checkpoint, and the plan
 /// it left behind is what `openDescendants` reads on the way out.
 #[test]

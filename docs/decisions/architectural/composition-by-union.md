@@ -1,10 +1,10 @@
 # DA-composition-by-union: Composition is graph union over names as their authors wrote them
 
-## Status
+## 1. Status
 
 accepted
 
-## Context
+## 2. Context
 
 Rhei shipped a block compiler to make workflow reusable. A template declared
 `ports`, `data`, `expose`, `use`, `bind`, `seams` and `compatibility`;
@@ -40,7 +40,7 @@ There was also no way to add a piece of workflow to a plan that already exists.
 meant opening its `states.yaml` and pasting eight states, eight edges and a
 profile by hand.
 
-## Decision
+## 3. Decision
 
 **Composition is graph union over names as their authors wrote them.** A
 template's states, transitions, profiles, node kinds, `node_policy.by_type`
@@ -94,7 +94,7 @@ Two mechanisms for one job is the cost the readable one exists to avoid, and
 nothing in the workspace passes `--mount`, `--seam` or `--pass` or reads a
 `composition.lock.json`.
 
-### Alternatives rejected
+### 3.1 Alternatives rejected
 
 **Auto-prefix a template's names on collision** — the compiler's own answer, and
 what makes its output unreadable. Refusing is worse ergonomics for one
@@ -114,7 +114,7 @@ the duplication this decision exists to remove.
 compiler's own code survive it, and a citation that stops resolving fails the
 gate. It is rewritten in place as the union architecture.
 
-## Consequences
+## 4. Consequences
 
 **A reviewer can read a composed machine, and a prompt can name a state.** This
 is the point. `changeset-review`'s instruction to look up compiled state names

@@ -165,7 +165,7 @@ enum Commands {
     /// With no --under, writes a new rhei next to index.panta.md. With
     /// --under, writes a ticket into the named rhei (`--under auth`) or under
     /// the named ticket (`--under auth.3`).
-    // §FS-rhei-new.1: the flag groups below are the spec's own §1.1/§1.2/§1.3.
+    // §FS-rhei-new.1: the flag groups below are the spec's own §FS-rhei-new.1.1/§FS-rhei-new.1.2/§FS-rhei-new.1.3.
     #[command(after_help = NEW_COMMAND_EXAMPLES)]
     New {
         #[command(flatten)]

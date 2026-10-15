@@ -74,7 +74,7 @@ pub fn narrow_bundle(bundle: Bundle, rhei_ids: &[String]) -> Bundle {
         .collect()
 }
 
-/// Coarse status category a persisted state reduces to (§FS-rhei-viz §1.1). The
+/// Coarse status category a persisted state reduces to (§FS-rhei-viz.1.1). The
 /// rows are evaluated top to bottom, first match wins, so `Active` is the
 /// catch-all. The live dashboard overlays runtime slot assignment separately.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

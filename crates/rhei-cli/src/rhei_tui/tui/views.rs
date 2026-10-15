@@ -1,4 +1,4 @@
-//! The five terminal views (§FS-rhei-run-tui.1.5.3, §1.5.4) and the surroundings
+//! The five terminal views (§FS-rhei-run-tui.1.5.3, §FS-rhei-run-tui.1.5.4) and the surroundings
 //! inspector. Each renders the one shared run model under the console language;
 //! view *content* is defined in §FS-rhei-viz and realized here for the terminal.
 

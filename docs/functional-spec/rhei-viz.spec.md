@@ -25,7 +25,7 @@ The surface ships as the `rhei viz` command ([§FS-rhei-viz.7.2](rhei-viz.spec.m
 (`cargo xtask examples viz <name>`) dogfoods it against the canonical design
 fixtures `examples/inflight-dashboard` and `examples/disjoint-tracks`.
 
-## Goals
+**Goals**
 
 1. **One page, the whole plan.** The resting view shows the plan, every task, and
    every subtask, each marked with its current state — done, active, live,
@@ -52,7 +52,7 @@ fixtures `examples/inflight-dashboard` and `examples/disjoint-tracks`.
    with no external scripts, stylesheets, fonts, or network assets, and it obeys
    the console-first language of [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux).
 
-## Non-Goals
+**Non-Goals**
 
 - No general plan editing, mutation, transitioning, or diff mode from the
   surface. It is read-only with respect to plan state except for the narrow live
@@ -127,7 +127,7 @@ fill of graph nodes, so the eye reads status at a glance. During a dynamic run,
 the single place motion is allowed: a spinner on list rows and marching-ants on
 graph nodes, both stilled to a static dot under `prefers-reduced-motion`, per
 [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) [§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector). State pills always carry the exact state text and its shared
-calm color from [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) §3.2; color is never the only signal.
+calm color from [§FS-rhei-viz-ux.3.2](rhei-viz-ux.spec.md#32-state-color-is-shared-calm-and-meaning-bearing); color is never the only signal.
 
 During a dynamic run, `task_runtime[id].in_slot` is an overlay on top of the
 state-derived category: any task assigned to a live slot is shown as `live`, even
@@ -535,7 +535,7 @@ archived
 Custom non-terminal states not in the built-in color map get a stable
 name-derived color, desaturated to the same level as the calm palette so a
 project-specific state never out-shouts a built-in attention state and is still
-distinguishable from terminal work, per [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) §3.2.
+distinguishable from terminal work, per [§FS-rhei-viz-ux.3.2](rhei-viz-ux.spec.md#32-state-color-is-shared-calm-and-meaning-bearing).
 
 ## 11. Open-in-Editor Route
 
@@ -573,7 +573,7 @@ surface:
 Plans without descendants render a useful monochrome empty state rather than a
 blank chart, per [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) [§FS-rhei-viz.7](rhei-viz.spec.md#7-dynamic-and-static-rendering).
 
-## Related Specifications
+## 13. Related Specifications
 
 - [Console-First Visualization UX](rhei-viz-ux.spec.md) — the shared look-and-feel
   every surface follows. [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux)
@@ -585,7 +585,7 @@ blank chart, per [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-f
 - [States Specification](rhei-states.spec.md) — the state machine, profiles,
   artifact contracts, and counted loops the machine graphs and inspector render.
 
-## Future Work
+## 14. Future Work
 
 - Filter or dim the plan by state, level, or category.
 - Diff visualization against another snapshot or git ref.

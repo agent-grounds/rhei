@@ -164,7 +164,7 @@ fn stop_wait_handles_an_unchecked_run_only_with_proven_ownership() {
 /// The whole of the `--wait` contract, under an outage: keep waiting, then
 /// report the run's own result. Reporting "has ended / recorded no exit status"
 /// and exiting non-zero — which is what an unreadable lock used to produce —
-/// fails the CI step of §5.3 for a run that passed.
+/// fails the CI step of §FS-rhei-run-headless.5.3 for a run that passed.
 // §FS-rhei-run-headless.5.3
 #[test]
 fn attach_wait_waits_out_the_outage_and_reports_the_runs_own_result() {
@@ -243,7 +243,7 @@ fn attach_json_never_ends_a_truncated_stream_at_zero() {
 // ---------------------------------------------------------------------------
 
 /// `--wait` without `--json` opens no surface and reads no records, so the
-/// named-file refusal of §8 does not belong to it: a run that failed to write
+/// named-file refusal of §FS-rhei-run-headless.8 does not belong to it: a run that failed to write
 /// its event log is still a run whose exit status is worth waiting for.
 // §FS-rhei-run-headless.5.3 §FS-rhei-run-headless.8
 #[test]

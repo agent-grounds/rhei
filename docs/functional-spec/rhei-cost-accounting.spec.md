@@ -8,7 +8,7 @@ For agent spawning see [Agents Specification](rhei-agents.spec.md). For run
 events and dashboard transport see [Run TUI Specification](rhei-run-tui.spec.md).
 For visual dashboard behavior see [Flow Visualization](rhei-viz.spec.md).
 
-## Goals
+**Goals**
 
 1. Every `claude-code`, `codex`, and `pi` invocation spawned by `rhei run`
    produces either a measured usage record or an explicit failure/status
@@ -21,7 +21,7 @@ For visual dashboard behavior see [Flow Visualization](rhei-viz.spec.md).
 5. Monitoring views show spend, token totals, cache effect, and coverage while
    work is running. [§FS-rhei-run-tui](rhei-run-tui.spec.md#fs-rhei-run-tui-rhei-run-tui-and-run-event-journal) [§FS-rhei-viz](rhei-viz.spec.md#fs-rhei-viz-flow-visualization)
 
-## Non-Goals
+**Non-Goals**
 
 - Guessing billing from transcript bytes, prompt text length, or local
   tokenizers when measured usage exists.
@@ -1368,7 +1368,7 @@ Invocation details are served from a separate loopback endpoint such as
 | Unreadable accounting root | Name the root, read every other root in scope, and do not report `complete` ([§FS-rhei-cost-accounting.6.2](rhei-cost-accounting.spec.md#62-coverage-of-a-selection)). With `--json`, a structured error naming the root, and its `roots` entry carries the count it could contribute. |
 | Concurrent writes | Write to a unique staging path, then atomically rename to `<invocation_file_id>.json`. Rollup files may be regenerated after pass writes complete. |
 
-## Related Specifications
+## 12. Related Specifications
 
 - [Agents Specification](rhei-agents.spec.md) - agent configuration and spawn behavior
 - [Run Specification](rhei-run.spec.md) - orchestrator execution loop

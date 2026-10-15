@@ -4,7 +4,7 @@ This document specifies **program states** — states that execute a determinist
 
 For agent states see [Agents Specification](rhei-agents.spec.md). For the state machine format see [States Specification](rhei-states.spec.md).
 
-## Overview
+**Overview**
 
 A program state runs a command as a subprocess. The command receives context through environment variables and command-line template variables. Its exit code and file outputs determine what happens next. This is the right choice for deterministic workflow steps — builds, tests, linting, deployment, data transforms, migrations — where an AI agent would add latency and cost without value.
 
@@ -513,7 +513,7 @@ transitions:
 |-------|------|----------|-------------|
 | `exit_code` | integer, integer array, or `"nonzero"` | No | Exit-code condition for transitions from program states. Only evaluated when the program exits without calling `rhei transition`. |
 
-## Example: CI Pipeline — Pure Program Workflow
+## 11. Example: CI Pipeline — Pure Program Workflow
 
 A fully deterministic pipeline with no AI agents:
 
@@ -632,7 +632,7 @@ transitions:
     exit_code: nonzero
 ```
 
-## Example: Mixed Agent and Program Workflow
+## 12. Example: Mixed Agent and Program Workflow
 
 Program states and agent states coexist naturally in the same state machine. Use programs for deterministic steps and agents for creative work:
 
@@ -723,7 +723,7 @@ transitions:
 
 In this workflow, the agent implements code, then deterministic build and test steps verify the result. If they fail, control returns to the agent for fixes. This creates a tight agent-program feedback loop where each component does what it does best.
 
-## Related Specifications
+## 13. Related Specifications
 
 - [States Specification](rhei-states.spec.md) — State machine format, per-state fields, artifact contracts
 - [Agents Specification](rhei-agents.spec.md) — Agent states (the AI-driven complement to program states)

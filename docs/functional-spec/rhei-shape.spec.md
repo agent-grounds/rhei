@@ -198,7 +198,7 @@ gate, not a convention: three real files ship rather than one file and two
 symlinks, because the skills are embedded at build time and a symlink is not
 portable [§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity).
 
-## Related Specifications
+## 8. Related Specifications
 
 - [Mid-Term Memory](rhei-memory.spec.md) — what is keyed by task, and the fold a parent's line carries
 - [Plan Language Usage Guide](rhei-authoring.spec.md) — where a plan author lands

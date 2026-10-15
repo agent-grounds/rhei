@@ -335,13 +335,13 @@ Removed runtime output.
 Kept run-scoped output not owned by any ticket (run report, dashboard, accounting rollups). Reset without `--rhei` to clear it.
 ```
 
-## Relationship to Other Commands
+## 5. Relationship to Other Commands
 
 `rhei reset` inverts the forward commands (`next`, `transition`, `complete`, `run`): it returns every task to the state it was authored in ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)) and removes the `runtime/` directory.
 
 See [How Rhei Is Used — Command Surface](rhei-usage.spec.md#22-command-surface) for the full table comparing all five coordination commands.
 
-## Related Specifications
+## 6. Related Specifications
 
 - [Plan Language Specification](rhei-plan-language.spec.md) — plan formats and semantic constraints
 - [States Specification](rhei-states.spec.md) — profile resolution and `initial` state rules

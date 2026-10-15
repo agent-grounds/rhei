@@ -57,7 +57,7 @@ pub(super) fn draw(f: &mut Frame, state: &UiState) {
     }
 
     // Minimal: below the room for two regions, collapse to a compact list +
-    // links strip (§1.5.6).
+    // links strip (§FS-rhei-run-tui.1.5.6).
     let minimal = area.width < 60 || area.height < 14;
 
     let header_height = header_height(state);

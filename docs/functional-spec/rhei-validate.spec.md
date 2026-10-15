@@ -444,7 +444,7 @@ and warning output are unchanged, as are `rhei states` text and JSON output. A
 conflicting per-rhei declaration under an explicit override remains a
 resolution refusal rather than a semantic validation report.
 
-## Related Specifications
+## 7. Related Specifications
 
 - [Plan Language Specification](rhei-plan-language.spec.md) - parse and semantic constraints
 - [States Specification](rhei-states.spec.md) - state machine format and defaults

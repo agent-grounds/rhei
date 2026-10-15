@@ -357,7 +357,7 @@ fn observed_target_falls_back_to_declared_when_the_window_holds_no_model() {
     );
 }
 
-// agent-grounds/rhei#146 acceptance 1 and 9: the built-in codex profile is the §9.2
+// agent-grounds/rhei#146 acceptance 1 and 9: the built-in codex profile is the §FS-rhei-snapshots.9.2
 // table row, in code. §FS-rhei-snapshots.9.2 §FS-rhei-snapshots.9.3.4
 #[test]
 fn built_in_codex_profile_declares_the_nested_session_locator() {

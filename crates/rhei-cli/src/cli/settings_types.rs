@@ -115,7 +115,7 @@ struct SnapshotSettings {
     #[serde(default)]
     redactor: Option<PathBuf>,
     /// Optional allow-list for redactor environment forwarding. The v1 hook
-    /// keeps the parent environment closed by default per §4.2.
+    /// keeps the parent environment closed by default per §FS-rhei-snapshot-operations.4.2.
     #[serde(default)]
     redactor_env: Vec<String>,
 }
@@ -394,7 +394,7 @@ fn built_in_agents() -> BTreeMap<String, CustomAgentProfile> {
 
     // Its session block is the §FS-rhei-snapshots.9.2 row: `resume` as a
     // `codex exec` subcommand and no `fork` (§FS-rhei-snapshots.9.3.4),
-    // `--ephemeral` off, no `session_dir_flag`, so §9.1.1 finds the rollout.
+    // `--ephemeral` off, no `session_dir_flag`, so §FS-rhei-snapshots.9.1.1 finds the rollout.
 
     // Interactive continuation is the top-level `codex`, not `codex exec`.
     // §FS-rhei-agents.2: Built-in codex profile.

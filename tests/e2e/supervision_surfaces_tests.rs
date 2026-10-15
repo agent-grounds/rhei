@@ -120,7 +120,7 @@ fn execute_on_validation_rejects_and_warns_through_rhei_validate() {
         "a supervisor with no terminal edge is warned about; got:\n{combined}"
     );
 }
-/// The manual-worker loop of §3.4 runs to the end: claim, release, let a child
+/// The manual-worker loop of §FS-rhei-supervision.3.4 runs to the end: claim, release, let a child
 /// finish, and claim the visit that child's checkpoint earned.
 ///
 /// The release self-loop ends the visit, so it ends the claim. A claim that

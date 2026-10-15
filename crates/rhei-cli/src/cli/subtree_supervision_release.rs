@@ -146,7 +146,7 @@ fn withhold_empty_supervising_visit(visit: FinishedVisit<'_>) -> Option<String> 
 /// Rule 2 goes unasked — no subprocess ran, so nothing could have moved while
 /// it did — and there is no spawn record, because nothing was spawned and so
 /// nothing was charged. `judge` is false for the advances that intended no
-/// visit at any state (`--no-agent`, `--no-program`), which §3.6 exempts.
+/// visit at any state (`--no-agent`, `--no-program`), which §FS-rhei-supervision.3.6 exempts.
 // §FS-rhei-supervision.3.6
 fn withhold_empty_supervising_advance(
     judge: bool,
@@ -266,7 +266,7 @@ fn prior_blocking_descendant(
 }
 
 /// What a dry run prints for an advance that fires the release edge — or, when
-/// §3.6 withholds it, for the edge it will not fire, because a run that will
+/// §FS-rhei-supervision.3.6 withholds it, for the edge it will not fire, because a run that will
 /// not take an edge must not report that it would.
 // §FS-rhei-run.4 §FS-rhei-supervision.3.6
 fn format_dry_run_advance(

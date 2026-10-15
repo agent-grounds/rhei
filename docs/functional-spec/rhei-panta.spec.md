@@ -562,7 +562,7 @@ do not need write permission to the project: root guards live in the platform
 state directory keyed by canonical root. With no marker, loading and command
 scope are unchanged.
 
-## Related Specifications
+## 7. Related Specifications
 
 - [Plan Language](rhei-plan-language.spec.md) — grammar, the node hierarchy, and the virtual-root model [§FS-rhei-plan-language.3](rhei-plan-language.spec.md#3-semantic-constraints)
 - [Panta Architecture](../architecture/rhei-panta.spec.md) — load model, on-disk layout, id rules [§AR-rhei-panta](../architecture/rhei-panta.spec.md#ar-rhei-panta-panta-root-architecture)

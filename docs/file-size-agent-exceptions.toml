@@ -22,7 +22,7 @@ path = "crates/rhei-cli/src/cli/run_agent_mode.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 1200, unit = "lines" }
+max_accepted = { value = 1300, unit = "lines" }
 until = "Pass selection — collecting a pass's agent, program, and callback work and applying the non-concurrent claim filter — has a part of its own, leaving this file the run's setup, its pass driver, and its end-of-run report."
 reason = """
 The execution bodies are parts of their own now; what is left is the run's own lifecycle. Pass selection has no boundary to move to: it reads the plan, the machines, and the settings and writes the three task lists the pass driver dispatches, and those lists are locals of the loop. Setup and the end-of-run report stay beside it because the report is written from the counters the loop advances.
@@ -644,4 +644,34 @@ until = "parse()'s per-line arms (the header and frontmatter, the content chapte
 issue = "agent-grounds/rhei#350"
 reason = """
 The file is one function: parse() is a single line loop of about a thousand lines whose arms share its mutable state (the open task stack, the metadata cursor, the fence and frontmatter flags), so there is no cohesive group of items to move into a sibling module, and cutting the loop across files would break apart code that belongs together. The boundary that is missing is the arms as functions over an explicit parser state. #350 only deletes from this file (the retired line's regex and its two passes, replaced by one refusal), and restructuring the parser in the same commit would hide that deletion inside a rewrite.
+"""
+[[exceptions]]
+path = "crates/rhei-cli/src/rhei_tui/tui/views.rs"
+match = "exact"
+rules = ["source"]
+kind = "deferred"
+max_accepted = { value = 900, unit = "lines" }
+until = "The shared view helpers live in a module of their own and the Machine, Cost and Journal views have left this file."
+reason = """
+The Flow view and the Machine, Cost and Journal views (§FS-rhei-run-tui.1.5.3, §FS-rhei-run-tui.1.5.4) are separable, but they share this file's private rendering helpers - the section headers, pills, border styles and placeholder - so the views cannot leave until those helpers have a module of their own that every view imports. That is a code move with its own review; the change that met this budget (agent-grounds/rhei#493) only rewrote a citation in a comment.
+"""
+[[exceptions]]
+path = "crates/rhei-cli/src/cli/settings_types.rs"
+match = "exact"
+rules = ["source"]
+kind = "deferred"
+max_accepted = { value = 600, unit = "lines" }
+until = "The built-in agent profile catalogue lives in a module of its own."
+reason = """
+Most of the excess is the built-in agent catalogue (built_in_agents, the profiles of §FS-rhei-snapshots.9.2), which belongs beside the profile registry rather than beside the settings types, and that registry has no module of its own to receive it yet. The change that met this budget (agent-grounds/rhei#493) only rewrote two citations in comments.
+"""
+[[exceptions]]
+path = "docs/functional-spec/rhei-run-report.spec.md"
+match = "exact"
+rules = ["citable-spec"]
+kind = "deferred"
+max_accepted = { value = 800, unit = "lines" }
+until = "The end-of-run console summary is a document of its own with its own FS declaration, and every FS-rhei-run-report.3.* citation has been repointed at it."
+reason = """
+§3 End-of-Run Console Summary is about 500 of these lines and is a subject of its own, but it cannot leave until it has an FS declaration of its own and every FS-rhei-run-report.3.* citation in the crates, the tests and the sibling specs has been repointed, which is a restructure with its own review. The change that met this budget (agent-grounds/rhei#493) only rewrote one citation.
 """

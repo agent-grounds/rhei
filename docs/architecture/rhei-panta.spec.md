@@ -370,7 +370,7 @@ de-emphasized form is deferred presentation work tracked on the roadmap; the
 de-emphasis is presentational only and never alters scheduling
 ([§FS-rhei-panta.4](../functional-spec/rhei-panta.spec.md#4-invisibility)).
 
-## Related Specifications
+## 8. Related Specifications
 
 - [Panta (functional)](../functional-spec/rhei-panta.spec.md) [§FS-rhei-panta](../functional-spec/rhei-panta.spec.md#fs-rhei-panta-panta-the-project-root-above-all-rheis)
 - [Plan Language](../functional-spec/rhei-plan-language.spec.md) [§FS-rhei-plan-language.3](../functional-spec/rhei-plan-language.spec.md#3-semantic-constraints)

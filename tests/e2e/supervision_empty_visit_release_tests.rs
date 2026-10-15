@@ -136,7 +136,7 @@ fn run(plan: &Path, machine: &Path, parallel: Option<&str>) -> String {
     combined
 }
 
-/// The run reached §3.6 at all: Task 1.1 woke the supervisor and the visit
+/// The run reached §FS-rhei-supervision.3.6 at all: Task 1.1 woke the supervisor and the visit
 /// after it was held as empty.
 fn assert_reached_hold(log: &[String], output: &str) {
     assert!(

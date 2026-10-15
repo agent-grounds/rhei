@@ -420,7 +420,7 @@ its own; delete that file for `billing` to run under the project's instead
 - **Duplicate ids** — two tasks with the same id (numeric or named) are
   rejected, as are duplicate child task ids under one parent.
 
-## Worked Examples
+**Worked Examples**
 
 The [`examples/`](../../examples/) directory contains end-to-end plans that
 exercise the patterns above:

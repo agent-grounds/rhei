@@ -213,9 +213,9 @@ Three real files ship rather than one file and two links, because the skills are
 embedded in the binary at build time and a symlink does not survive that — nor
 every platform [§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity).
 
-## Example Output
+## 5. Example Output
 
-### Global (default)
+### 5.1 Global (default)
 
 ```
 $ rhei install-skills --agent all
@@ -254,7 +254,7 @@ antigravity:
 Installed rhei skills for 8 agents.
 ```
 
-### Project-local
+### 5.2 Project-local
 
 ```text
 $ rhei install-skills --local --agent claude-code
@@ -268,13 +268,13 @@ claude-code (local):
 Installed rhei skills locally for 1 agent.
 ```
 
-## Implementation Notes
+## 6. Implementation Notes
 
 - New `InstallSkills` variant in the `Commands` enum in `crates/rhei-cli/src/main.rs`.
 - Agent-specific logic should be a match arm per agent, keeping format conversion isolated.
 - The `.mdc` conversion for Cursor and marker-delimited injection for Windsurf/Copilot are the only non-trivial transforms — all others are copy/symlink plus optional registration.
 
-## Related Documentation
+## 7. Related Documentation
 
 - [Plan Language Specification](rhei-plan-language.spec.md) - Formal grammar and semantic constraints
 - [How Rhei Is Used](rhei-usage.spec.md) - Roles, coordination patterns, and agent workflows

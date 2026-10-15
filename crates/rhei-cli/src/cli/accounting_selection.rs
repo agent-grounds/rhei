@@ -225,7 +225,7 @@ impl CostSelectionResult<'_> {
             || (self.selects_named_run && self.has_unattributed())
     }
 
-    /// The rollup over the selection, with §6.2's demotion applied and its
+    /// The rollup over the selection, with §FS-rhei-cost-accounting.6.2's demotion applied and its
     /// unrecorded spawns counted. §FS-rhei-cost-accounting.6.2.1
     pub(crate) fn summary(&self) -> Option<rhei_tui::AccountingRunSummary> {
         let summary = summarize_records(self.records.iter().copied())?;

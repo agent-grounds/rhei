@@ -60,8 +60,8 @@ pub(crate) fn attach_command(
 ///
 /// Ahead of either surface, because both would otherwise wait forever on a file
 /// that is not there. Only the paths that actually *read* records ask for this:
-/// §5.3's quiet wait opens no surface and reads none, and a run that failed to
-/// write its log (§8) must still be waitable.
+/// §FS-rhei-run-headless.5.3's quiet wait opens no surface and reads none, and a run that failed to
+/// write its log (§FS-rhei-run-headless.8) must still be waitable.
 // §FS-rhei-run-headless.8
 fn require_event_log(descriptor: &RunDescriptor, events_path: &Path) -> MietteResult<()> {
     if descriptor.liveness().has_ended() || events_path.is_file() {
@@ -186,7 +186,7 @@ fn report_finished_run(descriptor: &RunDescriptor) {
 ///
 /// Only a recorded `0` is success. A run that recorded *nothing* did not end
 /// on its own — a `SIGKILL`, an OOM kill, a machine that went away — and
-/// reporting that as success made `--wait` tell every CI job built on §5.3
+/// reporting that as success made `--wait` tell every CI job built on §FS-rhei-run-headless.5.3
 /// that a killed run had passed.
 // §FS-rhei-run-headless.5.3
 fn exit_with_run_status(descriptor: &RunDescriptor) -> MietteResult<()> {

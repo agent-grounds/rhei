@@ -490,7 +490,7 @@ movement, or a movement that contradicts its metadata, is corrupt history and
 is never presented as a forced hop. `runtime/transitions.log` receives no row:
 a manual recovery owns no run slot. [§FS-rhei-complete.3.1](rhei-complete.spec.md#31-state-transition-ledger)
 
-## Relationship to Other Commands
+## 7. Relationship to Other Commands
 
 | Command            | What it does                                                                    |
 |--------------------|---------------------------------------------------------------------------------|
@@ -502,7 +502,7 @@ a manual recovery owns no run slot. [§FS-rhei-complete.3.1](rhei-complete.spec.
 
 The typical agent loop is: `next` (claim) → work → `transition` (advance as needed) → `complete` (finish, record result, release).
 
-## Related Specifications
+## 8. Related Specifications
 
 - [Plan Language Specification](rhei-plan-language.spec.md) — state-value grammar and validation rules
 - [States Specification](rhei-states.spec.md) — state machine format

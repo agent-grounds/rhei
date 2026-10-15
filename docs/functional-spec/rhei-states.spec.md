@@ -838,7 +838,7 @@ The `instructions` and `personality` fields support template variable substituti
   `\{task_id\}` renders as `{task_id}` instead of the current task id. Brace
   content that is not a supported runtime variable already remains literal.
 
-### Example
+**Example**
 
 ```yaml
 states:
@@ -1239,7 +1239,7 @@ for availability semantics, timeout behavior, and the
 [Transitions Specification](rhei-transitions.spec.md) for declaring those
 transitions.
 
-### Example
+### 7.4 Example
 
 ```yaml
 states:
@@ -1340,7 +1340,7 @@ profiles:
   ceiling is **not** a validation error — the node gets the machine's value and
   the run reports both.
 
-### Example
+### 8.3 Example
 
 ```yaml
 profiles:
@@ -1427,7 +1427,7 @@ returns each node to its resolved profile's `initial`.
 - Any authored `**State:**` on a node must appear in that node's resolved
   profile's `allowed` set.
 
-### Example
+### 9.4 Example
 
 ```yaml
 node_policy:
@@ -1473,7 +1473,7 @@ Not every state can be completed directly via `rhei complete`. The command requi
 
 - From `pending`: direct completion to `completed` is available.
 
-## Related Documentation
+## 12. Related Documentation
 
 - [Plan Language Specification](rhei-plan-language.spec.md) - Formal grammar and semantic constraints
 - [Agents Specification](rhei-agents.spec.md) - Agent configuration, invocation profiles, timeout, and log capture

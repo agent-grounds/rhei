@@ -404,7 +404,7 @@ Definition](rhei-states.spec.md#12-per-state-fields) for the `gating: true`
 field (e.g., `human-review` in the default machine; custom machines may define
 additional gating states such as `security-review` or `legal-review`).
 
-## Relationship to Other Commands
+**Relationship to Other Commands**
 
 `rhei next` is the claim step of the manual-worker loop: `next` (claim) → work → `transition` (advance as needed) → `complete` (finish, record result, release). `--peek` is the read-only variant that inspects the next claimable task without taking it.
 
@@ -446,7 +446,7 @@ Agent: claude-code (impl-fast = anthropic/claude-sonnet-4-6)
 <resolved instructions>
 ```
 
-## Related Specifications
+## 7. Related Specifications
 
 - [Plan Language Specification](rhei-plan-language.spec.md) — grammar and semantic constraints
 - [How Rhei Is Used](rhei-usage.spec.md) — roles and coordination patterns

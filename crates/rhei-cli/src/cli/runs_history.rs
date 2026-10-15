@@ -9,7 +9,7 @@
 // §FS-rhei-run-headless.6.1 §FS-rhei-run-headless.6.2
 
 /// The object `--json` emits once history has been asked for. The bare array
-/// stays the answer to the live-run question §6 already defined.
+/// stays the answer to the live-run question §FS-rhei-run-headless.6 already defined.
 // §FS-rhei-run-headless.6.1
 const RUN_HISTORY_SCHEMA: &str = "rhei.run-history.v1";
 
@@ -52,7 +52,7 @@ impl RunHistoryQuery {
             .map(|since_epoch| since_epoch.as_secs() as i64)
         else {
             // A run whose start cannot be read is not a run this window can
-            // place, and dropping it silently is what §6.2 exists to prevent —
+            // place, and dropping it silently is what §FS-rhei-run-headless.6.2 exists to prevent —
             // so it is kept and the listing shows it.
             return true;
         };

@@ -207,7 +207,7 @@ An unresolvable `--task` id is [§FS-rhei-errors.1.3](rhei-errors.spec.md#13-nea
 line that names `rhei list`, exactly as every other ticket-taking command
 reports one.
 
-## Related Specifications
+## 6. Related Specifications
 
 - [Mid-Term Memory](rhei-memory.spec.md) — the store, the block, and the fold
 - [Reset Command](rhei-reset.spec.md) — what a reset takes with it

@@ -1,10 +1,10 @@
 # DF-subtree-supervision: A supervisor is a barrier over its subtree, woken after the fact
 
-## Status
+## 1. Status
 
 accepted
 
-## Context
+## 2. Context
 
 The non-leaf task model made a parent a task in its own right, worked once
 after every descendant is terminal and never concurrently with one of them
@@ -38,7 +38,7 @@ comes next. Four shapes were weighed. [§FS-rhei-supervision](../../functional-s
    ([§FS-rhei-transitions.3.2](../../functional-spec/rhei-transitions.spec.md#32-callback-trigger-triggeredby-callback)) and would make the supervisor a second
    transition authority beside `rhei run`.
 
-## Decision
+## 3. Decision
 
 Supervision is an engine-owned **hold/release barrier** declared on a state
 with `execute_on: <scope>-<event>` ([§FS-rhei-supervision.1](../../functional-spec/rhei-supervision.spec.md#1-declaring-a-supervisor)) — one of
@@ -73,7 +73,7 @@ plain and reusable unsupervised.
   the subtree, and it is not ready again until a descendant produces a
   checkpoint. Supervision never spins.
 
-## Consequences
+## 4. Consequences
 
 A spent supervising visit must recover without releasing its hold or losing
 the checkpoints it has yet to read. `rhei retry` grants an audited attempt

@@ -2,14 +2,14 @@
 
 This roadmap is sequenced against the project outcomes. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
 
-## Release Checklist
+## 1. Release Checklist
 
 The release process is automated through GitHub Actions. The workflow verifies
 the requested version, builds multi-platform PGO binaries, publishes crates.io
 packages in dependency order when requested, and creates or updates the GitHub
 release from `docs/changelog.md`. [§FS-rhei-distribution](functional-spec/rhei-distribution.spec.md#fs-rhei-distribution-rhei-distribution-and-release-process) [§AR-ci-release](architecture/ci-release.spec.md#ar-ci-release-ci-and-release-automation-mirror-local-gates)
 
-### Preflight
+### 1.1 Preflight
 
 Run from the repository root before preparing a release:
 
@@ -33,7 +33,7 @@ PGO release binary:
 gh workflow run pre-release-checks.yml
 ```
 
-### Version Preparation
+### 1.2 Version Preparation
 
 Use `scripts/set-release-version.py <version>` to keep the workspace version,
 internal crate dependency requirements, npm package versions, and PyPI package
@@ -46,7 +46,7 @@ Patch and minor release helpers perform those steps automatically after a green
 `CI` run on `main`, dry-run the release workflow from a candidate branch, then
 fast-forward `main` and dispatch publishing.
 
-### Publishing
+### 1.3 Publishing
 
 Manual publishing is done from the `Release` workflow:
 
@@ -61,14 +61,14 @@ The workflow creates or reuses `vX.Y.Z`, builds release artifacts for Linux
 GNU x86_64/aarch64, macOS x86_64/aarch64, and Windows x86_64/aarch64, publishes
 the Rust crates, and uploads checksummed binaries to the GitHub release.
 
-### Package Wrappers
+### 1.4 Package Wrappers
 
 The npm and PyPI package wrappers remain source-built wrappers around the
 matching `rhei-cli` crate version. Their checked-in version metadata is kept in
 sync by `scripts/set-release-version.py`; publishing those wrapper packages
 should happen only after the matching `rhei-cli` crate version is available.
 
-## Completed: CLI Next No-Claim Diagnostics
+## 2. Completed: CLI Next No-Claim Diagnostics
 
 Status: completed. `rhei next` now distinguishes completed plans, human-gated
 tasks, claimed in-flight tasks, mid-workflow tasks that need an explicit
@@ -76,13 +76,13 @@ transition, and prerequisite-blocked tasks. Mid-workflow diagnostics include
 copy-pasteable `rhei transition` commands for each outgoing transition, while
 blocked-prerequisite diagnostics name the first unfinished prior and its state. [§FS-rhei-next](functional-spec/rhei-next.spec.md#fs-rhei-next-rhei-next) [§FS-rhei-transition-cmd](functional-spec/rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition)
 
-## Completed: CLI Parse Error Accumulation
+## 3. Completed: CLI Parse Error Accumulation
 
 Status: completed. `rhei validate` now accumulates recoverable parse errors for
 single-file plans and Directory Workspace task files so authors can fix a batch
 of markdown mistakes without repeated parse/repair cycles. [§FS-rhei-plan-language](functional-spec/rhei-plan-language.spec.md#fs-rhei-plan-language-rhei-plan-language-specification) [§FS-rhei-validate](functional-spec/rhei-validate.spec.md#fs-rhei-validate-rhei-validate)
 
-## Completed: Panta Default Execution Model
+## 4. Completed: Panta Default Execution Model
 
 Status: completed. Every load path yields a Panta-rooted graph: a bare rhei is
 the single rhei of an implicit Panta with its id derived from the source
@@ -93,7 +93,7 @@ Originally delivered with one deliberate limit — one state machine governed a
 whole project — since lifted: the machine is per-rhei, defaulted by the
 manifest ([§DA-per-rhei-state-machines](decisions/architectural/per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest)). [§FS-rhei-panta](functional-spec/rhei-panta.spec.md#fs-rhei-panta-panta-the-project-root-above-all-rheis) [§AR-rhei-panta](architecture/rhei-panta.spec.md#ar-rhei-panta-panta-root-architecture)
 
-## Planned: CLI UX and Release Polish
+## 5. Planned: CLI UX and Release Polish
 
 Status: planned. This section is the canonical home for useful follow-up work
 from the April 2026 PM review and the product-management pre-release pass. The
@@ -153,7 +153,7 @@ old notes are historical; this roadmap owns the remaining backlog.
   `metadata` field is that task's map and nothing else
   ([§FS-rhei-list.4.2](functional-spec/rhei-list.spec.md#42-json---json)).
 
-## Planned: A Dry Run That Prints the Composed Prompt
+## 6. Planned: A Dry Run That Prints the Composed Prompt
 
 Status: implemented on this branch, one item open. A `rhei run` agent used to
 see its own task, its children, its direct priors, and its exports — not its
@@ -174,7 +174,7 @@ the fencing rule of [§FS-rhei-memory.4.5](functional-spec/rhei-memory.spec.md#4
   claim-mode `rhei next` is the only way to see a composed prompt today.
   [§FS-rhei-memory.5](functional-spec/rhei-memory.spec.md#5-surfaces)
 
-## Planned: Relocatable Rhei Root and Cross-Worktree Coordination
+## 7. Planned: Relocatable Rhei Root and Cross-Worktree Coordination
 
 Status: planned. Today the coordination signal — a task's claim, `**State:**`,
 and the transition that rewrites it — lives inside the working-tree task file,
@@ -205,7 +205,7 @@ share live state through the filesystem rather than through commits. [§DA-panta
   out-of-band transport — a shared filesystem or a small sync server — the same
   constraint every on-disk tracker faces. [§DA-panta-root](decisions/architectural/panta-root.md#da-panta-root-panta-is-the-per-project-virtual-root-above-all-rheis) [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
 
-## Planned: Detached Run Follow-Ups
+## 8. Planned: Detached Run Follow-Ups
 
 Status: planned. Detached runs ship with `--headless`, `rhei attach`,
 `rhei stop`, `rhei runs`, and the `--json` event stream
@@ -227,7 +227,7 @@ without changing the execution model.
   run can be inspected in the TUI after the fact rather than only through its
   report and frozen dashboard. [§FS-rhei-run-headless.5.2](functional-spec/rhei-run-headless.spec.md#52-attaching-to-a-run-that-has-ended)
 
-## Planned: Dashboard and Monitoring Follow-Ups
+## 9. Planned: Dashboard and Monitoring Follow-Ups
 
 Status: planned. The first dashboard visualization pass is complete; these
 items improve operator diagnosis without changing the execution model.
@@ -238,7 +238,7 @@ items improve operator diagnosis without changing the execution model.
 - Add task-opening affordances, state/level filtering or dimming, a dependency
   graph view, and diff visualization against another snapshot or git ref. [§FS-rhei-viz](functional-spec/rhei-viz.spec.md#fs-rhei-viz-flow-visualization)
 
-## Planned: Subtree Supervision Follow-Ups
+## 10. Planned: Subtree Supervision Follow-Ups
 
 Status: shipped, with two follow-ups. A non-leaf task can look after its
 subtree while it runs instead of only integrating it at the end: a state
@@ -293,7 +293,7 @@ and `rhei list --ready` excludes a held descendant by the ready set's own rule.
   predate that and still paste raw. Change them together, with one rule for
   every pasted body. [§FS-rhei-agents.3](functional-spec/rhei-agents.spec.md#3-prompt-composition)
 
-## Planned: Composition by Union Follow-Ups
+## 11. Planned: Composition by Union Follow-Ups
 
 Status: planned. `agent-grounds/rhei#323` replaces the mount-and-seam block
 compiler with composition by **graph union**: `rhei instantiate --into` places a
@@ -340,7 +340,7 @@ against composition: #351, where [§FS-rhei-reset.2](functional-spec/rhei-reset.
 engine's reason for keeping `budgetTicketId`, and #352, where the engine
 silently rebinds a live binding's `display_id`.
 
-## Planned: Snapshot Adapter and Retention Work
+## 12. Planned: Snapshot Adapter and Retention Work
 
 Status: planned. Snapshot v1 intentionally ships a conservative built-in
 support boundary; Pi is supported, while other built-in agents require adapter
@@ -358,7 +358,7 @@ spikes before Rhei can safely capture and resume their native sessions.
   audit support in a future manifest schema without turning snapshots into
   cross-agent transcript replay. [§FS-rhei-snapshot-operations](functional-spec/rhei-snapshot-operations.spec.md#fs-rhei-snapshot-operations-rhei-snapshot-operations-specification) [§FS-rhei-snapshots](functional-spec/rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification)
 
-## Completed: Post-Alpha Snapshot Continuation
+## 13. Completed: Post-Alpha Snapshot Continuation
 
 Status: completed. Interactive `rhei snapshot continue` drops an operator into
 a preloaded agent session and, unless `--no-capture` is passed, captures the
@@ -369,7 +369,7 @@ Rhei-readable session capture layout fail clearly with
 `unsupported-snapshot-session` and can still be replaced by custom
 session-capable profiles. [§FS-rhei-snapshot-operations](functional-spec/rhei-snapshot-operations.spec.md#fs-rhei-snapshot-operations-rhei-snapshot-operations-specification) [§FS-rhei-snapshots](functional-spec/rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification)
 
-## Completed: Post-Alpha Dashboard Visualization
+## 14. Completed: Post-Alpha Dashboard Visualization
 
 Status: completed. The browser dashboard that accompanies `rhei run` includes
 Gantt, heatmap cube, and Sankey plan views ahead of the operational Tasks,

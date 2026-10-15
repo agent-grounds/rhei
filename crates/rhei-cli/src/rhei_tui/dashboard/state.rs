@@ -358,7 +358,7 @@ impl From<&RunSummary> for DashboardSummary {
 }
 
 /// Compact per-task accounting rollups carried in the snapshot's `task_runtime`
-/// overlay. §FS-rhei-cost-accounting §6, §10.
+/// overlay. §FS-rhei-cost-accounting.6, §FS-rhei-cost-accounting.10.
 #[derive(Clone, Serialize)]
 pub(crate) struct TaskAccounting {
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -35,7 +35,7 @@ The output is plain text on stdout. Each line is `<component> <semver-or-build-v
 The component names are stable for scripts that need to extract a specific
 component version, whether or not that component is a separately published crate.
 
-## Related Specifications
+## 4. Related Specifications
 
 - [Validate Command](rhei-validate.spec.md) - command used to verify plans
 - [States Command](rhei-states-cmd.spec.md) - command used to inspect state-machine configuration

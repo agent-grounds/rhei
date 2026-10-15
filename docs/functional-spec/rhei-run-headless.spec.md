@@ -590,7 +590,7 @@ retain the previous best-effort descriptor re-read and lock-only stop behavior.
   driving TUI does ([§FS-rhei-run-tui.1.8](rhei-run-tui.spec.md#18-failure-modes)) — and because it was only ever a
   reader, the run is unaffected.
 
-## Related Specifications
+## 9. Related Specifications
 
 - [Run Command](rhei-run.spec.md) — the execution loop, run locks, and interruption
 - [Run JSON Stream](rhei-run-json.spec.md) — the event record contract and `runtime/events.jsonl`

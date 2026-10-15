@@ -1,10 +1,10 @@
 # DA-detached-runs: A detached run is a supervisor process, not a daemon service
 
-## Status
+## 1. Status
 
 accepted
 
-## Context
+## 2. Context
 
 `rhei run` fused two roles into one process: the **orchestrator** that owns
 every subprocess and every transition, and the **surface** that renders what it
@@ -27,7 +27,7 @@ fixed-column journal, which was designed for `tail -f`, not for a parser.
 The three have one cause and one fix: give the run an identity, publish its
 events in a form something else can read, and make the surface a client.
 
-## Decision
+## 3. Decision
 
 **A detached run is the same `rhei run` process, re-executed in its own
 session.** `--headless` spawns `rhei run` again as a child with `setsid`, its
@@ -109,7 +109,7 @@ rather than growing a second, subtly different teardown.
 the reflex that ends a foreground command would otherwise end a run that
 another terminal — or another person — is also watching.
 
-## Consequences
+## 4. Consequences
 
 The detached child must **not** arm the parent-death signal that
 [§DA-supervised-process-groups](supervised-process-groups.md#da-supervised-process-groups-subprocesses-are-supervised-process-groups-with-one-termination-path) arms for agents and programs. That backstop
@@ -142,7 +142,7 @@ detached ones, a plain foreground `rhei run` is attachable and machine-readable
 too. That was not the goal; it is what falls out of putting the identity on the
 run rather than on the flag.
 
-## Alternatives Considered
+## 5. Alternatives Considered
 
 **A `rheid` daemon owning many runs.** One process to attach to, cross-run
 scheduling, a natural home for a registry. Rejected: it introduces a second

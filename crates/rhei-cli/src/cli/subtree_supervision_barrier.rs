@@ -181,7 +181,7 @@ fn apply_supervision_transition(
 /// The release self-loop is the one non-terminal edge that drops a
 /// `**Assignee:**`: the visit it was claimed for is over, and a claim that
 /// outlived it would read as "the supervisor is working right now" — every
-/// later descendant exit taken for the supervisor's own doing (§2.1), and the
+/// later descendant exit taken for the supervisor's own doing (§FS-rhei-supervision.2.1), and the
 /// supervisor itself never scheduled again.
 // §FS-rhei-supervision.3.1 §FS-rhei-supervision.3.4
 fn transition_ends_supervisor_visit(
@@ -414,7 +414,7 @@ fn subtree_admits_to_ready_set(
 
 /// Who holds a ticket, and whether that holder can still release it on its own.
 ///
-/// A supervisor parked at a human gate keeps its block (§3.1 rule 4), so "the
+/// A supervisor parked at a human gate keeps its block (§FS-rhei-supervision.3.1 rule 4), so "the
 /// supervisor releases it on its next visit" stops being true: there is no next
 /// visit until a human moves the supervisor.
 // §FS-rhei-supervision.3.1 §FS-rhei-supervision.3.4

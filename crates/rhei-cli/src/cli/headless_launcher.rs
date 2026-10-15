@@ -279,7 +279,7 @@ fn report_finished_early(
     err: &mut dyn Write,
 ) -> std::io::Result<()> {
     if json {
-        // The record still carries the id, so the CI shape of §5.3 keeps
+        // The record still carries the id, so the CI shape of §FS-rhei-run-headless.5.3 keeps
         // working; the prose about it belongs on stderr.
         writeln!(out, "{}", descriptor_json(descriptor))?;
         return writeln!(err, "Run {} finished before the launcher returned.", descriptor.id);

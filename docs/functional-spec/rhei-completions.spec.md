@@ -9,7 +9,7 @@ The generated scripts are dynamic: the shell calls back into the installed
 current working directory, including discovered template names for
 `rhei instantiate <TEMPLATE>` and template-specific input arguments.
 
-## UX Goal
+**UX Goal**
 
 Every meaningful command-line slot should complete. A user should be able to
 start with `rhei <TAB>` and discover the command tree, then keep pressing
@@ -558,7 +558,7 @@ rhei completions elvish --install --system
 
 PowerShell and Elvish system paths are provided for package scripts that manage those runtimes, but users may still need to source the generated file from their profile depending on their local shell configuration.
 
-## Examples
+## 14. Examples
 
 Install Fish completions:
 
@@ -586,12 +586,12 @@ Preview Bash completions without installing them:
 rhei completions bash
 ```
 
-## Non-Goals
+## 15. Non-Goals
 
 - `rhei completions` does not edit shell rc files, profiles, or startup scripts.
 - It does not generate completions for external agent commands spawned by `rhei run`.
 
-## Related Specifications
+## 16. Related Specifications
 
 - [Templates Specification](rhei-templates.spec.md) — Template input syntax,
   positional inputs, and instantiation precedence.

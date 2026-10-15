@@ -203,11 +203,11 @@ fn repeated_empty_visits_never_spend_the_attempt_budget() {
 
 /// What a held visit leaves behind: nothing. The fixture carries everything a
 /// fired self-loop would have rewritten — a spent visit count, a delivered
-/// checkpoint, a `phase` — so the preservation §3.6 claims is asserted against
+/// checkpoint, a `phase` — so the preservation §FS-rhei-supervision.3.6 claims is asserted against
 /// a plan that has something to lose. The `**Assignee:**` the release edge
-/// drops (§3.4) is not among them and is not in the fixture: `rhei run`
+/// drops (§FS-rhei-supervision.3.4) is not among them and is not in the fixture: `rhei run`
 /// schedules neither a claimed ticket (§FS-rhei-run.3) nor a supervisor whose
-/// descendant is claimed (§3.1, the drain), so no visit this rule judges can
+/// descendant is claimed (§FS-rhei-supervision.3.1, the drain), so no visit this rule judges can
 /// have one, and a field placed where it survives either way asserts nothing.
 // §FS-rhei-supervision.3.6
 #[test]

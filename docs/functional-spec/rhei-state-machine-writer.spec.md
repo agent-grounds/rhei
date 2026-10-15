@@ -4,7 +4,7 @@ This document specifies a new role in the Rhei ecosystem: the **State Machine Wr
 
 For the YAML schema and transition callback system see the [Transitions Specification](rhei-transitions.spec.md). For the default state machine see the [States Specification](rhei-states.spec.md).
 
-## Purpose
+**Purpose**
 
 The default `rhei` state machine is a minimal `pending` -> `completed` workflow with only basic task instructions. Many projects need domain-specific workflows:
 
@@ -214,7 +214,7 @@ The state machine writer follows this process:
 
 11. **Validate with the CLI.** If the `rhei` CLI is available, run `rhei states --state-machine <path>` to verify the file parses correctly.
 
-## Examples
+**Examples**
 
 > **Note:** The instructions in these examples include phrasing like "on
 > success, transition to X" for readability. In production state machines
@@ -224,7 +224,7 @@ The state machine writer follows this process:
 > rule #2 above). The examples below are shown in the looser convention for
 > narrative clarity only.
 
-### Example 1: Data Pipeline Project
+**Example 1: Data Pipeline Project**
 
 **Input — specification:** "We process customer data through ingestion, transformation, validation, and publication stages. Bad data must be quarantined for manual review."
 
@@ -339,7 +339,7 @@ node_policy:
   default: default
 ```
 
-### Example 2: Multi-Team Feature Delivery
+**Example 2: Multi-Team Feature Delivery**
 
 **Input — specification:** "Features go through design, implementation, security review, QA, and release. Security issues block release."
 
@@ -460,7 +460,7 @@ node_policy:
   default: default
 ```
 
-## Relationship to Other Roles
+**Relationship to Other Roles**
 
 | Role | Relationship |
 |------|-------------|
@@ -471,7 +471,7 @@ node_policy:
 
 The state machine writer runs **before** the plan writer. The plan writer consumes the YAML file; it does not design workflows.
 
-## When to Use a Custom State Machine
+**When to Use a Custom State Machine**
 
 Use the default `rhei` state machine when:
 - The project follows a standard agent workflow (implement, review, complete).
@@ -497,7 +497,7 @@ The file's `name:` is the machine's name wherever it resolves, and nothing has t
 
 A `**States:**` line in an index names nothing and is refused ([§FS-rhei-plan-language.2.2](rhei-plan-language.spec.md#22-the-retired-states-line)); the placement is the whole of it. `--state-machine` replaces resolution for the whole scope, so it works for a plan, a workspace, or a project that runs a single machine. It cannot supply one machine among several.
 
-## Related Specifications
+## 6. Related Specifications
 
 - [Plan Language Specification](rhei-plan-language.spec.md) — formal grammar and semantic constraints
 - [States Specification](rhei-states.spec.md) — default state machine format

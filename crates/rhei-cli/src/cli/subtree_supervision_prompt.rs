@@ -69,7 +69,7 @@ fn render_child_task_results(
 
 /// The one qualified id a checkpoint's rhei-local `task` can name.
 ///
-/// A checkpoint records the rhei-local id (§3.3), while the merged plan graph
+/// A checkpoint records the rhei-local id (§FS-rhei-supervision.3.3), while the merged plan graph
 /// carries every task under its project qualification. That qualification is
 /// the supervisor's own leading segments, so prefixing the recorded id with
 /// them names exactly one node — never a deeper cousin whose id merely ends

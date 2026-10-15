@@ -19,7 +19,7 @@ struct ActiveRunFrontend {
     summary: Arc<SummarySink>,
     /// The intervene registry, present only when the dashboard is live. The run
     /// loop registers each running agent's stdin here so `/intervene` can reach
-    /// it. AR §7.
+    /// it. §AR-rhei-viz-flow.7.
     intervene: Option<Arc<RunInterveneSink>>,
     /// Whether to publish the dashboard URL as a run link. False when the
     /// operator asked for no dashboard but the run still needs its control
@@ -175,7 +175,7 @@ fn start_run_frontend(
     let loader_machines = machines.set.clone();
     let loader: rhei_tui::PlanLoader =
         Arc::new(move || load_plan_for_dashboard(&plan_path, &loader_machines));
-    // AR §7: the intervene registry the run loop registers agents into.
+    // §AR-rhei-viz-flow.7: the intervene registry the run loop registers agents into.
     let registry = Arc::new(RunInterveneSink::new(workspace_root.join("runtime")));
     let gate = Arc::new(RunGateTransitionSink::new(
         plan_input.to_path_buf(),
@@ -360,7 +360,7 @@ fn transition_dashboard_gate(
 /// Re-read the plan from disk and build the dashboard's [`VizModel`] via
 /// `rhei-viz` (flatten the resolved machine, derive plan state, classify).
 /// Called on every `/snapshot` request, so failures must be non-fatal — return
-/// `None` and let the dashboard fall back to the last good model. AR §5.2.
+/// `None` and let the dashboard fall back to the last good model. §AR-rhei-viz-flow.5.2.
 fn load_plan_for_dashboard(
     plan_path: &Path,
     machines: &rhei_validator::MachineSet,

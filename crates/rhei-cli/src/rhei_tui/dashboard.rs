@@ -27,7 +27,7 @@ const SLOT_TRAFFIC_LIMIT: usize = 60;
 /// from a transient reload failure keeps the previous model. §AR-rhei-viz-flow.3
 pub type PlanLoader = Arc<dyn Fn() -> Option<VizModel> + Send + Sync>;
 
-/// The single inbound, state-changing-adjacent path (AR §7): deliver a message
+/// The single inbound, state-changing-adjacent path (§AR-rhei-viz-flow.7): deliver a message
 /// to the stdin of the agent running one task, and **nothing else**. There is
 /// no path from the loopback server to plan-state mutation. The host
 /// (`rhei-cli`) implements delivery, the agent-capability gate, and the durable
@@ -79,7 +79,7 @@ pub trait GateTransitionSink: Send + Sync {
 /// `/snapshot`: which slot (if any) is running the task, the active invocation's
 /// template values, whether it was deferred this pass, and its compact
 /// accounting rollups. Absent on a static render, so the supplementary surfaces
-/// degrade by field-presence. AR §4.
+/// degrade by field-presence. §AR-rhei-viz-flow.4.
 #[derive(Clone, Serialize)]
 pub struct TaskRuntime {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -97,7 +97,7 @@ pub struct TaskRuntime {
 
 /// The live `/snapshot` payload: the [`VizModel`] static base (plan_title,
 /// plan_state, about, tasks, machine) plus the runtime overlay
-/// (`DashboardState`, auto links, and per-task runtime). AR §4.
+/// (`DashboardState`, auto links, and per-task runtime). §AR-rhei-viz-flow.4.
 #[derive(Serialize)]
 struct SnapshotPayload<'a> {
     #[serde(flatten)]
@@ -150,7 +150,7 @@ impl DashboardSink {
         Self::start_with_plan_and_intervene(workspace, parallel, total_tasks, plan_loader, None)
     }
 
-    /// Constructor that also wires the `/intervene` delivery channel (AR §7).
+    /// Constructor that also wires the `/intervene` delivery channel (§AR-rhei-viz-flow.7).
     /// When `intervene` is `None`, `POST /intervene` reports the agent as not
     /// reachable.
     pub fn start_with_plan_and_intervene(
@@ -339,17 +339,17 @@ fn handle_client(
     };
 
     match request.path.as_str() {
-        // AR §2: the one Flow asset, served verbatim; its JS polls /snapshot.
+        // §AR-rhei-viz-flow.2: the one Flow asset, served verbatim; its JS polls /snapshot.
         "/" => write_response(
             &mut stream,
             "text/html; charset=utf-8",
             crate::rhei_viz_model::live_asset().as_bytes(),
         ),
-        // §FS-rhei-viz §11: open an artifact or log file in the operator's editor.
+        // §FS-rhei-viz.11: open an artifact or log file in the operator's editor.
         "/open" => handle_open(&mut stream, state, &request.query),
-        // AR §6: tail a running task's durable agent log for the live terminal.
+        // §AR-rhei-viz-flow.6: tail a running task's durable agent log for the live terminal.
         "/log" => handle_log(&mut stream, state, &request.query),
-        // AR §7: the one mutation boundary — deliver a message to an agent's stdin.
+        // §AR-rhei-viz-flow.7: the one mutation boundary — deliver a message to an agent's stdin.
         "/intervene" => handle_intervene(&mut stream, intervene, &request.body),
         // §FS-rhei-viz.5.1: explicit human transition out of a gating state.
         "/transition-gate" => handle_gate_transition(&mut stream, gate_transition, &request.body),
@@ -360,7 +360,7 @@ fn handle_client(
             };
             // Rebuild the plan view. If the loader is missing or returns None
             // (transient parse error during a write), reuse the last good model
-            // rather than blanking the surface (§FS-rhei-viz §7.1).
+            // rather than blanking the surface (§FS-rhei-viz.7.1).
             let fresh = plan.and_then(|loader| loader());
             let mut base = if let Some(model) = fresh {
                 if let Ok(mut last) = last_plan.lock() {
@@ -371,7 +371,7 @@ fn handle_client(
                 last_plan.lock().ok().and_then(|g| g.clone()).unwrap_or_default()
             };
 
-            // §FS-rhei-viz §9: promote the derived plan state to `active` when a
+            // §FS-rhei-viz.9: promote the derived plan state to `active` when a
             // top-level task is assigned to a running slot (the runtime signal
             // the pure derivation in `rhei-viz` cannot see).
             let active_tasks: HashSet<&str> = snapshot_state
@@ -385,7 +385,7 @@ fn handle_client(
             }
 
             // Per-task runtime overlay: in_slot, deferred-this-pass, and the
-            // compact accounting rollups. §FS-rhei-cost-accounting §10.
+            // compact accounting rollups. §FS-rhei-cost-accounting.10.
             let deferred_set: HashSet<&str> =
                 snapshot_state.deferred.iter().map(|s| s.as_str()).collect();
             let accounting_by_task =
@@ -583,7 +583,7 @@ fn read_http_request(stream: &mut TcpStream) -> Option<HttpRequest> {
     };
 
     // POST bodies may arrive after the first read or exceed the 8 KiB request
-    // buffer; read the declared body before dispatching mutation routes. AR §7.
+    // buffer; read the declared body before dispatching mutation routes. §AR-rhei-viz-flow.7.
     let body_start = header_end + 4;
     let mut body = raw.get(body_start..).unwrap_or_default().to_vec();
     if body.len() < content_length {
@@ -678,7 +678,7 @@ fn handle_log(stream: &mut TcpStream, state: &Arc<Mutex<DashboardState>>, query:
     }
 }
 
-/// AR §7: deliver a `POST /intervene` message to one agent's stdin via the
+/// §AR-rhei-viz-flow.7: deliver a `POST /intervene` message to one agent's stdin via the
 /// host's [`InterveneSink`]. This route never transitions a task, writes the
 /// plan, or mutates task metadata — it only hands bytes to the sink, which owns
 /// delivery and the durable audit trail.

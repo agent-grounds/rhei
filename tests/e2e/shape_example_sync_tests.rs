@@ -180,7 +180,8 @@ fn the_shape_rule_is_one_normative_copy_every_skill_extracts() {
     // The extract is an extract: every one of its quoted blocks is in the spec
     // verbatim, so editing the spec is the only way to change the rule. Only a
     // link's target may differ, because each copy links from where it lives.
-    // A numbered block is §2's corollaries; the numbered links below the rule
+
+    // A numbered block is §FS-rhei-shape.2's corollaries; the numbered links below the rule
     // are the extract's own.
     let (rule, _links) = first.split_once(LINKS_HEADING).expect("the extract ends with its links");
     let spec_text = link_targets_by_name(&spec);

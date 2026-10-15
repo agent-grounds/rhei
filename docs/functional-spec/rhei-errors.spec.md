@@ -4,7 +4,7 @@ Every failure Rhei reports must tell the user three things: what failed, why, an
 what to run next. An error a user cannot act on without reading the source or
 the spec is a defect, not a diagnostic.
 
-This follows from [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals): execution is predictable only when the
+This follows from [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals): execution is predictable only when the
 tool says how to get unstuck, and simple work stays simple only when a wrong
 first command teaches the right second command.
 

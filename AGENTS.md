@@ -51,7 +51,7 @@ A `§<ID>` is a pointer to a fact, not a file path. Resolve it with `grund` and 
 ### Project map
 
 - [GND](docs/grund.md): Reason for existence
-- [GOAL](docs/functional-spec/goals.md): Outcomes the project is trying to achieve
+- [GOAL](docs/goals.md): Outcomes the project is trying to achieve
 - [REQ](docs/requirements): Cross-cutting requirements every feature is held to
 - [FS](docs/functional-spec): User-visible behavior and requirements
 - [AR](docs/architecture): System design and technical structure
@@ -60,7 +60,7 @@ A `§<ID>` is a pointer to a fact, not a file path. Resolve it with `grund` and 
 - [ADR](docs/adr): Architecture decision records
 - [tests/e2e/](tests/e2e): User scenarios: black-box proof of the spec
 - [tests/integration/](tests/integration): Integration tests: proof that the parts fit as designed
-- [RM](docs/functional-spec/roadmap.md): Planned milestones and sequencing
+- [RM](docs/roadmap.md): Planned milestones and sequencing
 
 ### Project namespaces
 

@@ -5,7 +5,7 @@ amount of more of it. Every unit of neural work Rhei starts therefore has a
 finite, engine-checked bound in force before the first subprocess is spawned —
 and has one **without anyone declaring anything**, because a bound that has to
 be authored is absent from exactly the plans that were written before anyone
-thought about bounds. [§GOAL-rhei-outcomes](../functional-spec/goals.md#goal-rhei-outcomes-goals)
+thought about bounds. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 Rhei reached `agent-grounds/rhei#232` at $75.58, of which $66 was spent in
 review and fix rounds past a configured ceiling of two, because nothing bounded

@@ -2,7 +2,7 @@
 
 Rhei records token usage for agent work, converts measured tokens into cost
 with a reproducible price book, rolls the result up to every task node, and
-shows those totals in the CLI, TUI, and browser dashboard. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals) [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run)
+shows those totals in the CLI, TUI, and browser dashboard. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals) [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run)
 
 For agent spawning see [Agents Specification](rhei-agents.spec.md). For run
 events and dashboard transport see [Run TUI Specification](rhei-run-tui.spec.md).

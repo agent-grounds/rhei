@@ -5,7 +5,7 @@ operator can understand what happened without replaying the browser dashboard,
 reading raw logs, or knowing the internal artifact-reuse rules. The report is a
 commit-friendly UI: plain Markdown first, with enough structure for dashboards
 and future JSON export to render the same facts. It complements the live TUI and
-Flow dashboard; it does not replace either surface. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+Flow dashboard; it does not replace either surface. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 The report answers four questions:
 

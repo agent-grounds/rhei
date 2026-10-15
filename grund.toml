@@ -26,7 +26,7 @@ title = "Reason for existence"
 
 [[kinds]]
 kind = "GOAL"
-file = "docs/functional-spec/goals.md"
+file = "docs/goals.md"
 title = "Outcomes the project is trying to achieve"
 
 [[kinds]]
@@ -75,7 +75,7 @@ title = "Integration tests: proof that the parts fit as designed"
 
 [[kinds]]
 kind = "RM"
-file = "docs/functional-spec/roadmap.md"
+file = "docs/roadmap.md"
 title = "Planned milestones and sequencing"
 
 [scan]

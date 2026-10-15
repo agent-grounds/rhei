@@ -70,9 +70,9 @@ declaration ID rather than this file.
 Supporting product documents:
 
 - [Project purpose](../grund.md) [§GND-rhei-purpose](../grund.md#gnd-rhei-purpose-governed-agent-work)
-- [Goals](goals.md)
+- [Goals](../goals.md)
 - [Requirements](../requirements/README.md) [§REQ-cross-platform](../requirements/cross-platform.md#req-cross-platform-one-tool-on-linux-macos-and-windows)
-- [Roadmap](roadmap.md) [§RM-rhei-roadmap](roadmap.md#rm-rhei-roadmap-roadmap)
+- [Roadmap](../roadmap.md) [§RM-rhei-roadmap](../roadmap.md#rm-rhei-roadmap-roadmap)
 - [Comparison](comparison.md)
 - [Rhei vs. beads](rhei-vs-beads.md)
 - [Tab completions setup](tab-completions.md)

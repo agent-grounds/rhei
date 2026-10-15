@@ -6,7 +6,7 @@ so answering "which session produced which change" means replaying transition
 history by hand. A workspace may declare its metrics, and Rhei then records —
 at execution time, as a first-hand fact — which measurement produced which
 value and which sessions ran inside that measurement's window, and presents the
-trajectory in its reports. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+trajectory in its reports. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 Rhei never computes a metric and never trusts an agent's claim about one. The
 workspace's own measure states produce the values; Rhei only reads what they

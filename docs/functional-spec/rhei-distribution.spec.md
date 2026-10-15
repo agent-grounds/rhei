@@ -4,7 +4,7 @@ Rhei releases ship the command-line binary, Rust crates, and release notes in a
 repeatable process so users can install the same version from crates.io or a
 GitHub release artifact. The release process must keep published package
 versions, binary names, and release notes aligned with the workspace version.
-[§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+[§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 ## 1. Release Targets
 

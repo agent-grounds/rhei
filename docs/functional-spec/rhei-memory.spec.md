@@ -11,7 +11,7 @@ This document specifies how an invocation of a task **reads** that memory. Under
 the prompt must *reconstitute* the memory — tell the agent where it stands,
 what happened before it, what happened to it, and how to find anything the
 prompt left out — and it must do so by a fixed algorithm, at a bounded cost in
-tokens. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+tokens. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 This spec extends the prompt of [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition) with four sections. The
 sections are graph- and runtime-level context, not configured in `states.yaml`,

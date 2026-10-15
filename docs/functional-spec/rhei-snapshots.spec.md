@@ -4,7 +4,7 @@ This document defines the *session snapshot* model: how `rhei run` captures
 an agent's transcript at supported agent-bearing state exits — for same-agent
 state inheritance, ancestor-chain sub-task branching, operator analysis
 sessions that attach to past states, and (when the provider permits it) for
-prompt-cache benefits. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+prompt-cache benefits. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 Snapshots come in two flavors that share the same storage and manifest
 schema:

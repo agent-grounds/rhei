@@ -4,7 +4,7 @@ Panta is the single, invisible root of a Rhei project. It sits above every rhei
 and every ticket, gives new rheis a default home, and is the one anchor from
 which an operator can see the whole project as a single graph. Making the whole
 project visible from one root, and keeping "add a rhei" a zero-friction action,
-serve Rhei's monitoring and predictability goals. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+serve Rhei's monitoring and predictability goals. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 The name follows *panta rhei* ("everything flows"): Panta is the still point that
 contains all the flows. The decision and its rationale are recorded in

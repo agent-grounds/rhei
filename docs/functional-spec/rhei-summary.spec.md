@@ -4,7 +4,7 @@ Read-only Markdown summary of a run, compact enough to paste into a pull
 request body: one numbered line per agent invocation the accounting recorded,
 then the aggregate token accounting. No local paths, no workspace boilerplate,
 and no dependency on a finished run — a step of a live run can summarize the
-run it belongs to. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+run it belongs to. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 [§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)
 
 The existing surfaces each miss this use. `rhei render --format github`

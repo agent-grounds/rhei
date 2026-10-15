@@ -3,7 +3,7 @@
 Validate a Rhei plan or Directory Workspace against the Rhei plan language,
 the resolved state machine, project settings, and runtime context checks. The
 command is read-only and exists to make execution predictable before a worker
-or orchestrator mutates plan state. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+or orchestrator mutates plan state. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 ## 1. Usage
 

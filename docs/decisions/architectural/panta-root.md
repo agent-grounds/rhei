@@ -11,7 +11,7 @@ and rendered in isolation; there is no default home for a newly created rhei, no
 registry of the rheis in a project, and no single graph that spans them. This
 limits the monitoring and predictability goals — an operator cannot see "what is
 everything in this project doing" from one root, only one plan at a time.
-[§GOAL-rhei-outcomes](../../functional-spec/goals.md#goal-rhei-outcomes-goals)
+[§GOAL-rhei-outcomes](../../goals.md#goal-rhei-outcomes-goals)
 
 The plan language already models a virtual level-0 `rhei` root that "denotes the
 plan itself," is not authored in markdown, is not persisted as a task node, and

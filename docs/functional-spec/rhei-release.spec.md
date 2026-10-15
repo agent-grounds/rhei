@@ -2,7 +2,7 @@
 
 Drop a ticket's `**Assignee:**` so work that was claimed but never finished can
 be picked up again. Release changes nothing else: not the ticket's state, not
-its result artifacts, not the transition ledger. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+its result artifacts, not the transition ledger. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 ## Motivation
 

@@ -23,7 +23,7 @@ price is that a composed machine's states are `m6_review__split` and
 state, which is why `changeset-review`'s coordinate ticket has to instruct its
 agent to "use the compiled state names declared in states.yaml" instead of
 saying which state to move to. Readable, reviewable plans are the goal the
-project is held to ([§GOAL-rhei-outcomes](../../functional-spec/goals.md#goal-rhei-outcomes-goals)), and an alias-encoded machine is the
+project is held to ([§GOAL-rhei-outcomes](../../goals.md#goal-rhei-outcomes-goals)), and an alias-encoded machine is the
 one artifact in the system that a person is not expected to read.
 
 **It could only express one shape.** A mount is a stage of one node's

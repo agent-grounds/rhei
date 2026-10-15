@@ -3,7 +3,7 @@
 One question, asked once, about every unit of work an author writes down:
 **who reads what this step writes?** The answer decides which construct the
 work becomes, and this page is the only place that answer is written
-normatively. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+normatively. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 Before this page, two shipped skills answered it opposite ways for the same
 work. `rhei-state-machine-writer` claimed every distinct workflow phase for a

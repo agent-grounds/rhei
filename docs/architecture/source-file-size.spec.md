@@ -3,7 +3,7 @@
 Rhei source files are part of the working memory shared by humans and agents.
 They must stay small enough for focused review, reliable agent context loading,
 and predictable refactoring. This architecture rule supports readable,
-reviewable plans and predictable execution work. [§GOAL-rhei-outcomes](../functional-spec/goals.md#goal-rhei-outcomes-goals)
+reviewable plans and predictable execution work. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 ## 1. File Size Policy
 

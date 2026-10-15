@@ -3,7 +3,7 @@
 Rhei must have one canonical language-reference entry point so humans and
 agents can quickly answer "what files and syntax make up a valid Rhei
 workflow?" without reconstructing the model from scattered feature specs. This
-supports readable, reviewable plans and predictable execution. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+supports readable, reviewable plans and predictable execution. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 This page is the entry point for the Rhei language surface. It does not replace
 the narrower normative specs; it maps each language surface to the document

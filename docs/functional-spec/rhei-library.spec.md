@@ -6,7 +6,7 @@ are added to a machine and a plan that already exist, under the names their
 authors wrote. Nothing is renamed, qualified or alias-encoded, so the result is
 what the union of two authored files would have been if a person had typed it —
 which is what keeps output predictable
-([§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)) and what lets a
+([§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)) and what lets a
 prompt name a state instead of being sent to look one up.
 
 Composition happens entirely inside `rhei instantiate`, through two surfaces
@@ -29,7 +29,7 @@ flat files every other command already reads: one `states.yaml`, one plan, one
 set of task files. There is no grammar change, no loader change and no
 namespace — at runtime a composed plan is indistinguishable from one a person
 typed, which is what keeps output predictable
-([§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)) and is the reason the union refuses rather
+([§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)) and is the reason the union refuses rather
 than invents wherever two authors disagree.
 
 Two things carry it, and they are the same mechanism seen from two sides:

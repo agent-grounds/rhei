@@ -4,7 +4,7 @@
 authored plans whose text predates a stricter Rhei rule. Migration never makes
 old text mean something different because of its inferred age: it rewrites the
 authored language into the current valid form, after which ordinary validation
-and execution apply unchanged. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+and execution apply unchanged. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 This specification defines only the direct export-producer dependency
 migration. It is not a general validator-version framework.

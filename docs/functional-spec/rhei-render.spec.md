@@ -3,7 +3,7 @@
 Render a Rhei plan or Directory Workspace into a selected read-only output
 format. Rendering is for inspection, export, and scripting; it does not validate
 state-machine reachability beyond the parse/load step and does not modify
-runtime state. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+runtime state. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 ## 1. Usage
 

@@ -103,4 +103,4 @@ guidance of [§REQ-bounded-neural-work.1](../../requirements/bounded-neural-work
   with the built-in `claude-code` profile still unsupported
   ([§FS-rhei-snapshots.9.3](../../functional-spec/rhei-snapshots.spec.md#93-per-agent-runtime-behavior)) a supervisor runs each visit cold, carried by
   checkpoints and briefs. That adapter is tracked on the roadmap
-  independently ([§RM-rhei-roadmap](../../functional-spec/roadmap.md#rm-rhei-roadmap-roadmap)).
+  independently ([§RM-rhei-roadmap](../../roadmap.md#rm-rhei-roadmap-roadmap)).

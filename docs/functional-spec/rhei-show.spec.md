@@ -5,7 +5,7 @@ that answers "what does this ticket say" — for a duplicate check, a triage
 decision, a supervisor's brief, or a script. It resolves nothing about state and
 modifies nothing: no lock, no runtime write, and no state-machine validation, so
 a plan broken somewhere else is still a plan whose tickets can be read.
-[§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+[§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 Every other read that carries a body carries a document around it. `rhei render`
 emits the whole plan ([§FS-rhei-render](rhei-render.spec.md#fs-rhei-render-rhei-render)), `rhei list` emits no body at all

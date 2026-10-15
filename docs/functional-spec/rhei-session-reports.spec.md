@@ -6,7 +6,7 @@ machines — a header, a raw JSONL event stream, an exit footer — and a human 
 wants to know what a session actually did must scroll megabytes of deltas. Rhei
 renders each session log into one readable Markdown report so an operator can
 review a session — its prompt, its tool calls, what it wrote, and what it
-achieved — without parsing the stream. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+achieved — without parsing the stream. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 The report is a derived artifact. It is computed only from the session log and
 from facts the engine recorded while the session ran; regenerating it is always

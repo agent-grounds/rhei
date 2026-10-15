@@ -2,7 +2,7 @@
 
 Rhei is a cross-platform tool, not a Unix tool with ports. This requirement
 holds for every feature from the moment it is specified: a feature is not
-complete until its tests pass on every supported platform. [§GOAL-rhei-outcomes](../functional-spec/goals.md#goal-rhei-outcomes-goals)
+complete until its tests pass on every supported platform. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 ## 1. Supported Platforms
 

@@ -13,7 +13,7 @@ the same agent session continued from its previous visit *where the agent
 supports one* (today that is `pi`; with the built-in `claude-code` profile the
 supervisor runs each visit cold, carried by its checkpoints and its briefs),
 and holds the rest
-of the subtree while the supervisor decides how to steer it. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+of the subtree while the supervisor decides how to steer it. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 Supervision builds on the non-leaf task model ([§FS-rhei-plan-language.3](rhei-plan-language.spec.md#3-semantic-constraints)): a
 parent is a task in its own right, and a parent and one of its descendants are

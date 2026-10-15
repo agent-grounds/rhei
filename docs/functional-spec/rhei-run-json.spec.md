@@ -5,7 +5,7 @@ frontend beside the TUI and plain stdout ([§FS-rhei-run-tui.1.4](rhei-run-tui.s
 event is written to stdout as one JSON object per line, in the order the engine
 emitted it, and **nothing else is ever written to stdout**. A tool that reads
 `rhei run --json` needs no screen-scraping and no knowledge of the terminal
-surface. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+surface. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 The same records are what `rhei run` writes durably to `runtime/events.jsonl`
 ([§FS-rhei-run-json.3](rhei-run-json.spec.md#3-durable-event-log)) and what `rhei attach --json` replays from a detached run

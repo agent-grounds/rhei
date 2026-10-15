@@ -5,7 +5,7 @@ binds them into one process: close the terminal and the run dies with it, and
 the only way to watch a run is to be the shell that started it. `--headless`
 separates them. The run becomes a detached supervisor identified by a **run
 id**; `rhei attach` is a client that connects a terminal surface to it and
-disconnects again without touching the work. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+disconnects again without touching the work. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 ```bash
 rhei run --headless plan.rhei.md   # prints a run id, returns

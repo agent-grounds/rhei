@@ -36,7 +36,7 @@ fixtures `examples/inflight-dashboard` and `examples/disjoint-tracks`.
    entered to see its surroundings: what it depends on, what it unblocks, where it
    sits in its state machine and where it can go next, the prompt it runs, and its
    artifacts. Walking from a node to a neighbor and back costs one keystroke
-   [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals).
+   [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals).
 3. **Show the machine, not just the plan.** The resolved state machine is drawn as
    a graph — one per disjoint workflow — so the shape of the process is legible
    alongside the shape of the work.

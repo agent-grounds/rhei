@@ -2,7 +2,7 @@
 
 Print the resolved state machine so humans and scripts can inspect available
 states, transitions, profiles, node policy, artifacts, agents, programs, and
-snapshot configuration before executing a plan. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+snapshot configuration before executing a plan. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 ## 1. Usage
 

@@ -588,7 +588,7 @@ non-zero with a diagnostic that names the paths instead of silently reporting a
 durable success. This check is read-only: it does not create commits, stage
 files, or reject untracked runtime artifacts. Outside Git repositories, or
 when `HEAD` does not move during the run, the check is a no-op.
-[§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+[§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 ### 3.2. Interruption and Process Ownership
 
@@ -716,7 +716,7 @@ through the same group-termination path before the command returns. On Linux
 each subprocess additionally arms a parent-death signal, so a `SIGKILL`ed or
 OOM-killed supervisor — which runs no code at all — still delivers `SIGTERM` to
 what it started. That backstop is best-effort and Linux-only; the handled paths
-above are the contract. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+above are the contract. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 **Lost console output.** When the run's own output disappears mid-run — the
 reader of a pipe stopped (`EPIPE`), or the terminal it was printing to went

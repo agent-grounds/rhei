@@ -5,7 +5,7 @@ the only writer of the project note store ([§FS-rhei-memory.2](rhei-memory.spec
 whose entries compose into `### Project Notes` in every ordinary prompt
 ([§FS-rhei-memory.3.1](rhei-memory.spec.md#31--position)). A task that finds out something the next ticket would
 otherwise pay to rediscover spends its one slot at the moment it finds out, and
-every prompt composed afterwards carries it. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
+every prompt composed afterwards carries it. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 Every other channel rhei has runs in a fixed direction. A brief goes down from
 a supervisor ([§FS-rhei-supervision.5.2](rhei-supervision.spec.md#52-the-brief)), a handoff goes between the states of

@@ -7,7 +7,7 @@ own, outside the checkout, named so that no other test can name the same one
 is specified: an artifact a test leaves behind is a defect of the harness, never
 a cost of testing. Reading is held to the same line as writing: what a test
 reads is its own too, so its verdict never turns on what another test or the
-machine put somewhere shared. [§GOAL-rhei-outcomes](../functional-spec/goals.md#goal-rhei-outcomes-goals)
+machine put somewhere shared. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 
 ## 1. The Checkout Is Not A Test's Directory
 

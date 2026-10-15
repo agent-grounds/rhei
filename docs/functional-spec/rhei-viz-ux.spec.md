@@ -9,7 +9,7 @@ opening it should cause no startle and no context switch. Bright, busy, and
 animated surfaces make everyday agent work feel like operating infrastructure
 instead of reading a plan [§GND-rhei-purpose.1](../grund.md#1-the-problem), and they fight the goal of
 monitoring that is useful and pretty enough to read at a glance
-[§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals).
+[§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals).
 
 The principle in one line: **keep the calm of the command line, add the
 structure of a UI, and add nothing else.**
@@ -36,7 +36,7 @@ structure of a UI, and add nothing else.**
    Any node, not only the running ones, can be entered to see its surroundings:
    what it depends on, what it unblocks, where it sits in its state machine and
    what it can move to next. Walking from a node to a neighbor and back costs a
-   keystroke, never a tab hunt or a rebuilt mental model [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals).
+   keystroke, never a tab hunt or a rebuilt mental model [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals).
 
 ## Non-Goals
 

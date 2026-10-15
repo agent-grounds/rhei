@@ -84,7 +84,7 @@ Listing the names a registry knows says what exists; it does not say where to
 write the one the author wanted. So when a name is refused against a registry
 that settings declare, the error also names the key the entry is written under
 and the files it may be written in — the project settings file and the global
-one (§FS-rhei-agents.1.1). Unknown agent ids and unknown agent modes follow this
+one ([§FS-rhei-agents.1.1](rhei-agents.spec.md#11-global-and-project-settings)). Unknown agent ids and unknown agent modes follow this
 rule.
 
 The clause is an instruction, not a report. A registry is seeded with built-in
@@ -94,14 +94,14 @@ either way — where to declare the name they wanted — so the wording still re
 correctly when the file it names does not exist yet.
 
 Which project file is named is not a free choice. It is the file the merge
-resolved and never the one Rhei writes (§FS-rhei-agents.1.1), so a project still
+resolved and never the one Rhei writes ([§FS-rhei-agents.1.1](rhei-agents.spec.md#11-global-and-project-settings)), so a project still
 on the deprecated home is sent to the file Rhei is actually reading rather than
 to one that would shadow it.
 
-Where a single command reports many failures under one help line (§1.1), this
+Where a single command reports many failures under one help line ([§FS-rhei-errors.1.1](rhei-errors.spec.md#11-message)), this
 remedy rides in each entry rather than in the help: one help line cannot carry
 four different keys, and the entry is also what a machine consumer reads as that
-failure's own message (§5).
+failure's own message ([§FS-rhei-errors.5](rhei-errors.spec.md#5-machine-readable-errors)).
 
 ### 1.5. The Subject a Check Measured
 
@@ -140,7 +140,7 @@ the manifest path that declared it. When two declarations disagree, it names
 both paths. A nested failure includes the complete root-to-failure alias chain;
 a recursion failure includes the repeated block and whole cycle. Unknown ports,
 data endpoints, inputs, and aliases list the small valid set or suggest the
-closest name under §1.3.
+closest name under [§FS-rhei-errors.1.3](rhei-errors.spec.md#13-near-misses).
 
 The help line gives the nearest accepted edit or a command that reveals the
 surface, such as `rhei instantiate ... --list-inputs`. An ownership or identity
@@ -219,7 +219,7 @@ and gives a runnable command targeting `DIRECTORY/ID` directly.
 A missing manifest is a plan-shape failure, not evidence of a filesystem
 failure. Its diagnostic therefore gives no permissions, writability, or free
 space advice. Genuine filesystem failures retain their cause-derived guidance
-from §6. A headless run reports the same startup diagnosis and nonzero outcome
+from [§FS-rhei-errors.6](rhei-errors.spec.md#6-coverage). A headless run reports the same startup diagnosis and nonzero outcome
 through [§FS-rhei-run-headless.1.1](rhei-run-headless.spec.md#11-startup-is-synchronous) rather than hiding it in the detached run's log.
 
 This refusal does not change what Rhei accepts: recognized Panta Projects,
@@ -270,7 +270,7 @@ Help is derived from the failure, never assigned by the area of code it sits
 in. A remedy that does not act on the reported failure — telling the user to
 check a destination for a command that writes to stdout, or to edit the state
 machine for a `waitpid` failure — is the same defect as no help at all, and the
-honest answer for a cause the user cannot have created is §1.2's bug report.
+honest answer for a cause the user cannot have created is [§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help)'s bug report.
 Recurring categories share one wording so that improving a remedy improves
 every site that reaches it.
 
@@ -278,9 +278,9 @@ every site that reaches it.
 `<qualified-id> cannot be removed: <reason>`, names every blocker with the
 path, task or run it was found in, and ends with the remedy that applies — for
 a ticket with history, its machine's cancellation through `rhei transition`
-(§FS-rhei-remove.3.4); for a dependent or a child, the ticket to change first.
+([§FS-rhei-remove.3.4](rhei-remove.spec.md#34-a-ticket-with-history)); for a dependent or a child, the ticket to change first.
 A pending removal that blocks another entry point prints the one `rhei remove`
-invocation that resumes it (§FS-rhei-recover.4).
+invocation that resumes it ([§FS-rhei-recover.4](rhei-recover.spec.md#4-pending-root-interlock)).
 
 ## 7. A Spawn Failure the Command Line's Size Explains
 
@@ -304,16 +304,16 @@ prompt delivery:
 ```
 
 The answer is yes only when the prompt is what the platform refused. A line can
-be too long for a reason the prompt had nothing to do with, and §7.2 says what
+be too long for a reason the prompt had nothing to do with, and [§FS-rhei-errors.7.2](rhei-errors.spec.md#72-when-the-size-is-not-the-prompts) says what
 the failure states then.
 
-Three things follow from §1.2, and none of them is cosmetic.
+Three things follow from [§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help), and none of them is cosmetic.
 
 The remedy is a change the user can make. A settings entry for a built-in id
 replaces that profile wholesale
 ([§FS-rhei-agents.1.3](rhei-agents.spec.md#13-merge-semantics)), so "set
 `stdin_prompt` on `gemini`" would paste back as a different failure — a partial
-profile with no session layout — which §1.2 rules out. The help therefore names
+profile with no session layout — which [§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help) rules out. The help therefore names
 the agents that already deliver on stdin and the shape of a custom entry that
 does.
 
@@ -365,7 +365,7 @@ Two things can be true at once: the platform refused the line, and the prompt is
 not what made it too long. A failure that prints the prompt's byte count beside a
 larger limit has then said something false in the same sentence as something
 true, and offered a remedy that would leave the line exactly as long as it was.
-That is the confidently wrong cause §1.2 rules out, arriving by a different door
+That is the confidently wrong cause [§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help) rules out, arriving by a different door
 than a missing `PATH`.
 
 So the question is asked in two parts. **Did the prompt reach the command line at
@@ -395,7 +395,7 @@ the help it had, because prompt delivery is not the remedy:
 ```
 
 And rhei states no size its own measurement does not support. A composed length
-is an approximation of what the operating system counts (§7.1), so a refusal of a
+is an approximation of what the operating system counts ([§FS-rhei-errors.7.1](rhei-errors.spec.md#71-what-answers-the-question-per-platform)), so a refusal of a
 line rhei measures as fitting is left to speak for itself: nothing is added, and
 the `PATH` remedy stands alone.
 

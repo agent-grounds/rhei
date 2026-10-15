@@ -33,12 +33,12 @@ the Directory Workspace shape lifted one level: where a workspace holds
 `index.rhei.md` plus task files, a Panta holds `index.panta.md` plus rhei
 entries. Per-ticket artifacts live under each rhei's own execution root; a
 single-file rhei's root is the project directory, so its artifacts and the
-project-level rollups share the project `runtime/` (§6).
+project-level rollups share the project `runtime/` ([§AR-rhei-panta.6](rhei-panta.spec.md#6-command-scope-mechanics)).
 
 `index.panta.md` is the Panta manifest. It plays the role `index.rhei.md` plays
 for a workspace: project title and content sections — the default machine is
-the `states.yaml` beside it (§AR-rhei-panta.4), and a `**States:**` line here is a
-parse error (§FS-rhei-plan-language.2.2); it contains no authored
+the `states.yaml` beside it ([§AR-rhei-panta.4](rhei-panta.spec.md#4-state-machine-binding)), and a `**States:**` line here is a
+parse error ([§FS-rhei-plan-language.2.2](../functional-spec/rhei-plan-language.spec.md#22-the-retired-states-line)); it contains no authored
 nodes. Rhei discovery scans the project
 directory's **immediate children** in deterministic, `/`-normalized order: each
 non-hidden `*.rhei.md` file is a single-file rhei, and each non-hidden
@@ -49,7 +49,7 @@ promoted to a rhei. The `runtime/` artifact tree and the reserved `basin/`
 directory are skipped (the latter is loaded as the synthetic basin rhei). A
 directory is a Panta when it contains `index.panta.md`.
 
-A project laid from a project template (§FS-rhei-templates.6.4) is this layout
+A project laid from a project template ([§FS-rhei-templates.6.4](../functional-spec/rhei-templates.spec.md#64-laying-a-panta-project)) is this layout
 and nothing more: its default machine is the root `states.yaml`, the
 `prompt_templates/` and `scripts/` that machine runs are copied beside the
 manifest, its settings are the project's `.agent-grounds/rhei/settings.json`,
@@ -94,7 +94,7 @@ under the rhei-local key.
 The read side of that contract is wider than the write side. A Directory
 Workspace rhei's on-disk entries may come from two places — its `index.rhei.md`
 and the metadata-only frontmatter block a `tasks/` file may open with
-(§FS-rhei-plan-language.1.4) — and the load merges them, per rhei, under
+([§FS-rhei-plan-language.1.4](../functional-spec/rhei-plan-language.spec.md#14-directory-workspace-metadata)) — and the load merges them, per rhei, under
 rhei-local ids before the re-keying above. Only the index's are **writable**:
 every writer of `metadata.tasks.<id>` locates its target by the `# Rhei:` or
 `# Panta:` header of a metadata document, which no task file carries, and
@@ -102,10 +102,10 @@ re-reads and re-parses that document rather than serializing the merged graph.
 So the runtime's keys stay in the index by construction, and the source map
 keeps keying by node rather than by metadata key. A `basin/` ticket file admits
 no such block at all: the basin's metadata document is the project manifest
-(§FS-rhei-panta.2).
+([§FS-rhei-panta.2](../functional-spec/rhei-panta.spec.md#2-default-home-for-new-rheis)).
 
 One key of the project metadata is never rhei-local: `metadata.retiredTickets`
-(§FS-rhei-remove.5.1) is keyed by project-qualified id already, lives in the
+([§FS-rhei-remove.5.1](../functional-spec/rhei-remove.spec.md#51-where-it-is-recorded)) is keyed by project-qualified id already, lives in the
 manifest of a Panta project and in the lone rhei's metadata document otherwise,
 and is read from there as written. A member rhei's own copy of the key is not
 merged, so a retirement survives the replacement of the rhei it came from.
@@ -117,9 +117,9 @@ virtual `panta` root and attaches that one rhei as its sole level-1 child, so th
 in-memory graph has the same shape whether or not an `index.panta.md` exists. The
 implicit Panta has no manifest, so the project default state machine is the
 built-in `rhei` machine; the single rhei still resolves its machine from the
-`states.yaml` in its own execution root when one is there (§4).
+`states.yaml` in its own execution root when one is there ([§AR-rhei-panta.4](rhei-panta.spec.md#4-state-machine-binding)).
 
-The implicit Panta's one rhei is not anonymous: it has a derived id (§3), and its
+The implicit Panta's one rhei is not anonymous: it has a derived id ([§AR-rhei-panta.3](rhei-panta.spec.md#3-identity-and-id-namespacing)), and its
 tickets are project-qualified exactly as in a multi-rhei project, so a bare
 `auth.rhei.md` exposes ticket ids `auth.1`, artifact paths
 `runtime/results/auth.1.md`, and CLI targets `rhei complete auth.1`. The only
@@ -149,7 +149,7 @@ owners; member and direct manifest access also checks the basin marker before
 and after acquisition. Nested loads reuse that complete set without inverted
 acquisition. The typed project-metadata image does not change public ownership:
 qualified basin counters/checkpoints remain in `index.panta.md`.
-§FS-rhei-panta.6.6 §FS-rhei-recover.2
+[§FS-rhei-panta.6.6](../functional-spec/rhei-panta.spec.md#66-pending-forced-recovery) [§FS-rhei-recover.2](../functional-spec/rhei-recover.spec.md#2-marker-format)
 
 ## 3. Identity and id namespacing
 
@@ -160,7 +160,7 @@ its tickets:
   rhei's source location: the file stem for a single-file rhei (`auth.rhei.md` ->
   `auth`) and the directory name for a Directory Workspace rhei (`billing/` ->
   `billing`). This rule is the same for an explicit Panta and for the implicit
-  Panta wrapping a bare rhei (§2), so loading `auth.rhei.md` directly yields the
+  Panta wrapping a bare rhei ([§AR-rhei-panta.2](rhei-panta.spec.md#2-load-model)), so loading `auth.rhei.md` directly yields the
   rhei id `auth`. Where the path carries no last component of its own — `.`,
   `./`, a trailing `..`, or a Directory Workspace named by its own
   `index.rhei.md` — the name comes from where the path *resolves*, so those
@@ -229,13 +229,13 @@ with no file of its own takes the project default wholesale, and machines are
 never combined or namespaced.
 
 The project default is written by a person, or by `rhei instantiate` laying a
-project template (§FS-rhei-templates.6.4) — never as a side effect of laying a
-member (§DA-per-rhei-state-machines item 8). Because every rhei with no file of
+project template ([§FS-rhei-templates.6.4](../functional-spec/rhei-templates.spec.md#64-laying-a-panta-project)) — never as a side effect of laying a
+member ([§DA-per-rhei-state-machines](../decisions/architectural/per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest) item 8). Because every rhei with no file of
 its own and the basin inherit it wholesale, a laid default **replaces** the root
 file whole and is never unioned into, and the replacement is checked first
 against every ticket resolution sends to the project root, through the same
 resolved machine set validation uses, refusing on any it would strand
-(§FS-rhei-library.2.3). Which tickets those are is resolution's answer above,
+([§FS-rhei-library.2.3](../functional-spec/rhei-library.spec.md#23-the-default-machine-is-replaced-never-unioned-into)). Which tickets those are is resolution's answer above,
 and is not recomputed by the writer.
 
 Cross-rhei semantics need no shared vocabulary. The one computation where two
@@ -335,7 +335,7 @@ to schedule a ticket.
 
 ## 6. Command scope mechanics
 
-`rhei run` resolves each ticket through its owning rhei's machine (§4).
+`rhei run` resolves each ticket through its owning rhei's machine ([§AR-rhei-panta.4](rhei-panta.spec.md#4-state-machine-binding)).
 Cross-rhei dependency readiness judges the prior ticket against the prior's
 machine and requires a successful terminal state (`final: true` and a
 normalized state name other than `cancelled`). This is the same predicate
@@ -346,7 +346,7 @@ closed — the dependent stays blocked — whenever the prior state or its
 state-machine meaning cannot be resolved reliably.
 
 The ready-set scan, claim selection, and rollup all walk the current single
-merged graph (§2), so project-wide is the natural default and `--rhei` is a
+merged graph ([§AR-rhei-panta.2](rhei-panta.spec.md#2-load-model)), so project-wide is the natural default and `--rhei` is a
 candidate filter applied after the merge. A live run replaces that graph only
 at the admission checkpoints of [§FS-rhei-run.3](../functional-spec/rhei-run.spec.md#3-execution-loop), after every new member has a complete entry in the
 per-rhei machine and runtime maps. The fan-out commands — `rhei run` and

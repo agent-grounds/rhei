@@ -83,7 +83,7 @@ can start in different states within the same state machine.
 |-------|------|----------|-------------|
 | `prompt_template` | string or object | No | Reusable prompt selected from sibling `prompt_templates/<id>.md`. String form is the template id. Object form is `{name, values}` where `values` supplies concrete scalar values for placeholders in that template. |
 | `personality` | string | No | State-specific role framing printed by `rhei next` for that state |
-| `role` | string | No | `cancellation` classifies abandonment independently of spelling; requires `final: true`. Omitted roles preserve bare-name inference. §1.4 |
+| `role` | string | No | `cancellation` classifies abandonment independently of spelling; requires `final: true`. Omitted roles preserve bare-name inference. [§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names) |
 | `gating` | boolean | No | When `true`, autonomous commands (`rhei next`, `rhei complete`, engine-triggered transitions) must not transition out of this state. Only explicit human-initiated transitions are allowed. |
 | `concurrent` | boolean | No | When `true`, `rhei run` may work multiple ready tasks in this state simultaneously (up to `--parallel`). When `false` (the default), at most one ready task per pass is scheduled for this state and the rest are deferred to a later pass. This is a scheduling hint only — state entry, exit, and transition semantics are unchanged. Fanout invocations from a single task (`all_targets` / `all_models`) are not affected by this flag. |
 | `poll` | object | No | Marks this state as a time-triggered *polling* state. Contains `interval` (duration string, e.g. `5m`) and `max_attempts` (integer ≥ 1). On each attempt the state's `agent` or `program` runs once and the engine evaluates transitions normally; a self-loop (`from: X, to: X`) is interpreted as "not done yet, retry after `interval`". Between attempts the `--parallel` slot is released and the task is not ready again until the interval elapses. After `max_attempts` attempts the engine will not take a self-loop and instead selects a matching exhaustion transition (typically `condition: pollAttempts >= pollMaxAttempts`); if none matches, the task fails. May also carry `waiting_on` (a short label naming the person or role the poll waits for), which declares the wait as a *person* wait rather than machine backoff. Mutually exclusive with `visits`. See [Polling States](#2-polling-states) below and [Run Specification — Polling States](rhei-run.spec.md#51-polling-states). |
@@ -94,7 +94,7 @@ can start in different states within the same state machine.
 | `target_locked` | boolean | No | When `true`, the state's execution identity is essential to the phase and must not be reassigned per task: any task-level `**Model:**` or `**Target:**` override ([§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides)) on a task entering this state is a validation error. Defaults to `false`. |
 | `all_models` | string array | No | The complete set of declared model profile identifiers allowed to work this state |
 | `snapshot` | object | No | Per-state session snapshot emit/inherit contract. Optional; details and closed-schema validation live in [Snapshots Specification](rhei-snapshots.spec.md). |
-| `session` | enum | No | Session behavior for repeated visits: `cold` (the default) or `continue`. Continuation preloads this state's immediately preceding visit when possible and otherwise runs cold; see §FS-rhei-snapshots.4.7. |
+| `session` | enum | No | Session behavior for repeated visits: `cold` (the default) or `continue`. Continuation preloads this state's immediately preceding visit when possible and otherwise runs cold; see [§FS-rhei-snapshots.4.7](rhei-snapshots.spec.md#47-state-local-continuation). |
 | `model` | string | No | A single model profile identifier from the machine-level `models` list |
 | `agent` | string | No | The coding agent CLI that executes work in this state. Must be an agent id resolved against the merged `agents` registry (built-ins → global → project `settings.json`). Inline agent objects are not permitted — define custom agents in the `agents` registry. See [Agents Specification](rhei-agents.spec.md). |
 | `agent_mode` | string | No | Named flag set applied to the resolved agent for this state. Must match a key in the resolved agent's `modes` map. See [Agents Specification — Modes](rhei-agents.spec.md#22-modes). |
@@ -230,7 +230,7 @@ implicit rather than declared: see [Terminal Result](#33-terminal-result).
   tuple. The legality rules apply to explicit `cold` as well as `continue` so
   an authored field never becomes a misleading no-op. `continue` must not be
   combined with `snapshot.inherit`; `snapshot.emit` may coexist. The full
-  runtime contract is §FS-rhei-snapshots.4.7.
+  runtime contract is [§FS-rhei-snapshots.4.7](rhei-snapshots.spec.md#47-state-local-continuation).
 - Every non-final state must be able to reach some `final: true` state. A state
   is left by an edge whoever moves the task can take, which is what decides
   whether an edge counts here: every `from: <state>` edge counts, a `from: "*"`
@@ -245,10 +245,10 @@ implicit rather than declared: see [Terminal Result](#33-terminal-result).
   `condition` or `exit_code` can ever hold, because that is not decidable here:
   the rule under-reports, never over-reports.
 - A transition whose exact `from` names a `final: true` state is a load error
-  citing §FS-rhei-transitions.4.6. Wildcards already exclude final sources.
+  citing [§FS-rhei-transitions.4.6](rhei-transitions.spec.md#46-wildcard-semantics). Wildcards already exclude final sources.
   This keeps terminal exits outside the declared machine: when an operator
   must reopen one, the missing-edge-only path is
-  §FS-rhei-transition-cmd.6. Machines that relied on exact terminal-source
+  [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery). Machines that relied on exact terminal-source
   edges are rejected even though older rhei versions executed them.
 - A state that declares both `poll` and `snapshot.inherit` is a validation
   error in v1. Polling states may still emit snapshots on terminal exit when
@@ -399,7 +399,7 @@ waiting on a human being as live work.
   Surrounding whitespace is not part of it: the label is trimmed once when the
   machine loads, so the stored value is the one every surface shows and the
   machine's own JSON cannot name a different person from the text beside it. A
-  label that is blank once trimmed is the error in §FS-rhei-states.1.3.
+  label that is blank once trimmed is the error in [§FS-rhei-states.1.3](rhei-states.spec.md#13-validation-rules).
 - **Scheduling is unchanged.** The state still self-resumes on its own
   `interval`, still releases its `--parallel` slot between attempts, still
   counts attempts against `max_attempts`, and still leaves the state by an
@@ -693,7 +693,7 @@ requires a fresh non-whitespace `--result` on that invocation, even when the
 file already has content; its operator reason and terminal result answer
 different questions. Leaving a terminal state preserves the result file as
 history while removing the task-body result link, and every later forced final
-re-entry appends a new result entry. §FS-rhei-transition-cmd.6
+re-entry appends a new result entry. [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)
 
 A file that exists but is only whitespace counts as **no result**, on the same
 reading [§FS-rhei-states.3.2](rhei-states.spec.md#32-state-handoffs) applies to handoffs: an existence-only contract
@@ -1017,7 +1017,7 @@ States can declare which coding agent transport executes work in that state. The
 `agents` registry — the built-in agents (`claude-code`, `codex`, `gemini`,
 `kilocode`, `cursor`) plus any entries declared in
 `~/.config/rhei/settings.json` and the plan root's project settings file
-(`.agent-grounds/rhei/settings.json`, §FS-rhei-agents.1.1). Inline
+(`.agent-grounds/rhei/settings.json`, [§FS-rhei-agents.1.1](rhei-agents.spec.md#11-global-and-project-settings)). Inline
 object-shaped agent definitions are not accepted on a state; a custom agent
 must be declared in the registry first.
 

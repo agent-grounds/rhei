@@ -13,7 +13,7 @@ accounting [§FS-rhei-cost-accounting](../functional-spec/rhei-cost-accounting.s
 belong to the provider-spend obligation on `agent-grounds/rhei#460`. The reason
 is unchanged for the counts — importing that evidence here would make a count
 depend on evidence a count does not need — and it is why the spend dimension of
-§FS-rhei-budgets.1 consumes a record written elsewhere rather than measuring
+[§FS-rhei-budgets.1](../functional-spec/rhei-budgets.spec.md#1-the-two-counts-and-the-days-spend) consumes a record written elsewhere rather than measuring
 anything of its own.
 
 ## 1. The boundary
@@ -30,7 +30,7 @@ may spend, and the ancestry token where the run is nested. `travel_units` is
 fanout rule of [§FS-rhei-budgets.4.1](../functional-spec/rhei-budgets.spec.md#41-travel) expressed as arithmetic rather than as a
 special case. A returned reservation names the amount it reserved as well as
 its units, because the settle that later revises that amount has to have
-something to name §FS-rhei-budgets.6.2.
+something to name [§FS-rhei-budgets.6.2](../functional-spec/rhei-budgets.spec.md#62-reserve-then-settle).
 
 A source-level dependency rule keeps subprocess creation below this module, so
 that adding a new spawn path cannot accidentally omit admission.
@@ -116,7 +116,7 @@ cannot.
 The record is also checked, not only read. Resolving a project to its account
 compares the root presenting a uuid with the root the index binds it to, under
 that uuid's authority lock and **before the journal is opened** — the place the
-absent-directory lookup already sits in §AR-neural-admission.3's order — so a
+absent-directory lookup already sits in [§AR-neural-admission.3](neural-admission.spec.md#3-lock-order)'s order — so a
 copied project is refused before any byte reaches the holder's history, and a
 moved one is rebound there. On one machine a uuid has at most one live root:
 one root holds an account and one root writes its witness
@@ -131,7 +131,7 @@ current day key. The day's spend is derived in the same pass and from the same
 receipts — a reservation's `spend` receipt where it has one, its reserved worst
 case where it has none — so an amount is no more stored here than a count is,
 and lowering `spend_per_day` rewrites nothing for the reason lowering a count
-ceiling does not §FS-rhei-budgets.3.4.
+ceiling does not [§FS-rhei-budgets.3.4](../functional-spec/rhei-budgets.spec.md#34-the-spend-window).
 
 This is why a window needs no renewal event, and therefore has nothing to forge,
 replay twice, or lose ([§FS-rhei-budgets.3.3](../functional-spec/rhei-budgets.spec.md#33-the-window-is-a-key-not-a-refill)). It is also why lowering a ceiling
@@ -155,7 +155,7 @@ Admission asks two questions in this order, and the order is the whole of it:
 whose descriptor this is, and then what the journal holds. A descriptor whose
 minting account is not this journal's own names **no ancestor here** — the caller
 is admitted unparented and its receipt records `parent_reservation: null`, which
-is what keeps replay (§AR-neural-admission.5) from later reading a receipt that
+is what keeps replay ([§AR-neural-admission.5](neural-admission.spec.md#5-replay-not-balance)) from later reading a receipt that
 names an ancestor this journal does not hold and calling the chain corrupt. A
 descriptor that names **no** minting account is taken as this project's, so a
 caller too old to say whose it is loses nothing.

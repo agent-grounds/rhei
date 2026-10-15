@@ -26,11 +26,11 @@ The latest report may be overwritten by the next run. Timestamped reports are
 append-only unless `rhei reset` removes `runtime/`, matching the existing runtime
 artifact lifecycle. A failed run still writes a report with the information
 available up to the failure point. A `--dry-run` is the one exception: it is a
-side-effect-free preview and writes no report file (§3.5).
+side-effect-free preview and writes no report file ([§FS-rhei-run-report.3.5](rhei-run-report.spec.md#35-dry-runs-and-empty-runs)).
 
 The timestamped history entry is the durable completion evidence for an exact
 `rhei summary --run <ID> --prices <BOOK>` selection
-(§FS-rhei-summary.1). Its `Run:` header associates the full report with that
+([§FS-rhei-summary.1](rhei-summary.spec.md#1-usage)). Its `Run:` header associates the full report with that
 exact id; a filename prefix, the overwriteable latest report alone, or an
 invocation record alone does not establish that the run ended. “Completed” in
 this selection sense means the run reached its immutable end-of-run report,
@@ -53,7 +53,7 @@ The report layout is optimized for scan-first reading:
    advances, dry-run transitions, terminal-at-start tasks, and blocked tasks.
    When accounting exists, a second strip shows what **this run** spent: cost,
    explicitly inclusive input/output totals, their cache-read and cache-write
-   parts, and coverage (§2.1).
+   parts, and coverage ([§FS-rhei-run-report.2.1](rhei-run-report.spec.md#21-accounting-strip)).
 3. **Attention** - the shortest path to action: blocked tasks, gating tasks, and
    halted tasks with the exact reason.
 4. **Transition Ledger** - one row per transition attempt or no-op observation,
@@ -129,7 +129,7 @@ where nothing was ever measured; the report stays silent, as `rhei cost` says
 `(no accounting records found)` rather than printing a total of zero.
 
 The end-of-run console summary carries the same quantity under the same scope
-label (§3.1), grouping cache parts with their inclusive whole. For an input
+label ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)), grouping cache parts with their inclusive whole. For an input
 total of 1,100 with 700 cache-read and 300 cache-write tokens, and an output
 total of 50 whose cache parts are unavailable, it reads `In 1.1k (incl. cache:
 read 700, write 300)` and `Out 50 (incl. cache: read -, write -)`.
@@ -142,7 +142,7 @@ columns are ordered exactly as `Total`, `Input (incl. cache)`, `Input cache
 read`, `Input cache write`, `Output (incl. cache)`, `Output cache read`, and
 `Output cache write`.
 
-These are the same inclusive totals and cache parts as §2.1: cache parts are
+These are the same inclusive totals and cache parts as [§FS-rhei-run-report.2.1](rhei-run-report.spec.md#21-accounting-strip): cache parts are
 not added to either side or to `Total`. An unavailable cache dimension reads
 `-`, while a measured zero reads `0`. The table's task scope, direct-cost
 meaning, cost, and coverage placement are unchanged.
@@ -162,7 +162,7 @@ language: monospace, dark, near-zero chrome, and saturated color reserved for
 states that need attention, so the terminal, the TUI tiles, and the dashboard
 name the same state the same way. [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) When stdout is not a TTY, the
 existing line-oriented output is preserved verbatim so scripts and tests that
-match it keep working (§3.4).
+match it keep working ([§FS-rhei-run-report.3.4](rhei-run-report.spec.md#34-plain--non-tty-mode)).
 
 ### 3.1. Layout
 
@@ -217,7 +217,7 @@ the summary prints five stacked groups:
    group of its own — same columns, calm marker, omitted when empty — and the
    durable report gets a matching `## Waiting` section after `## Attention`.
    Held tickets are therefore counted in neither the `N gated · M blocked`
-   header nor `could not advance` (§2), for the same reason a parent held open
+   header nor `could not advance` ([§FS-rhei-run-report.2](rhei-run-report.spec.md#2-markdown-ui)), for the same reason a parent held open
    by its own subtree is not: the ticket that *is* someone's problem — the
    supervisor, or the human gate holding it — reports for itself.
 
@@ -257,7 +257,7 @@ the summary prints five stacked groups:
    that resumes itself, and its row says when: the renewal instant is the
    blocker's deadline and `renews automatically` is the next action. A ticket
    halted on spend is always in that case, because spend is bounded by a window
-   (§FS-rhei-budgets.3.4).
+   ([§FS-rhei-budgets.3.4](rhei-budgets.spec.md#34-the-spend-window)).
 
    The durable report additionally records, in a `## Bounds` section after
    `## Attention`, each dimension's effective bound with its value source and
@@ -265,17 +265,17 @@ the summary prints five stacked groups:
    start and at the end of the run. The spend row carries its amounts in the
    account's currency, and where any part of the day was charged at the
    fallback rather than measured it names how much, by the three marks of
-   §FS-rhei-budgets.6.2 — a report that showed only the total would say a day
+   [§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle) — a report that showed only the total would say a day
    was spent without saying how much of it was estimated. A run that halted on a bound names that
    bound there as well as in Attention, so the record answers "what stopped it"
    without the reader reconstructing it from rows. Where the machine delegated
-   a count ceiling to the project (§FS-rhei-budgets.2), the ceiling and policy
-   rows of §FS-rhei-budgets.2.3 follow the bounds table, once, and a clamped
+   a count ceiling to the project ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)), the ceiling and policy
+   rows of [§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued) follow the bounds table, once, and a clamped
    row's limiting source reads `limited by project settings`.
 
    The end of the run is the account **after the run's last receipt is
    durable** — the last invocation's `start` and `spend` receipts
-   (§FS-rhei-budgets.5.2) included —
+   ([§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal)) included —
    not the account as it stood when the run admitted its last spawn. Reading
    it at that admission left out exactly the invocation that ended the run: a
    one-ticket run reported `$0.00` and no mark for a day `rhei budget show`
@@ -288,7 +288,7 @@ the summary prints five stacked groups:
    shows `0` (or `$0.00`) there; a reservation still held when the run ended
    shows as outstanding rather than vanishing from the arithmetic.
 
-   A task parked by a recognized provider limit (§FS-rhei-run.3.3) also
+   A task parked by a recognized provider limit ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)) also
    belongs in **Waiting**, never **Attention**. Its row names `provider openai`,
    the reporting task, and the UTC `nextAttemptAt`, with automatic resumption as
    the next action. It does not count as failed or `could not advance`; an
@@ -353,13 +353,13 @@ the summary prints five stacked groups:
    A parent held open **only** by its own subtree is therefore not halted work
    and takes **no Attention row**: it is counted in neither the `N gated ·
    M blocked` header, nor `could not advance` (§2), nor the Transition Ledger
-   (§4). The open descendant is the halted work and is already counted there.
+   ([§FS-rhei-run-report.4](rhei-run-report.spec.md#4-transition-ledger)). The open descendant is the halted work and is already counted there.
    Counting the parent as well multiplied one gated leaf by the height of the
    tree above it — three ancestors made four Attention rows, `4 gated`, and
    four blocked ledger entries for a single human decision, with the topmost
    parent's reason text repeating the whole transitive subtree. The parent
    stays visible in the task tree instead, with its own calm marker and its own
-   `waiting on open descendant …` detail (§3.2). A parent that is itself
+   `waiting on open descendant …` detail ([§FS-rhei-run-report.3.2](rhei-run-report.spec.md#32-task-tree)). A parent that is itself
    gating, `blocked`, or `failed` keeps its Attention row: those are things to
    act on whatever its children are doing, even though the open subtree
    outranks them in the classification order above.
@@ -421,7 +421,7 @@ the summary prints five stacked groups:
    When a ticket is blocked by both a live prior and a cancelled one, the row
    names the cancelled one, whatever order `**Prior:**` lists them in: the
    live prior may yet finish, the cancelled one never will, so it is the
-   permanent cause. The console's `Nothing to schedule` lines ([§FS-rhei-run-report.3](#3-end-of-run-console-summary), and
+   permanent cause. The console's `Nothing to schedule` lines ([§FS-rhei-run-report.3](rhei-run-report.spec.md#3-end-of-run-console-summary), and
    [§FS-rhei-run.4](rhei-run.spec.md#4-dry-run)) give the same reading. A cancelled prior changes no
    classification rung and no exit status — the ticket is still prior-blocked
    work a human must act on; only what the row says about it changes. Under
@@ -440,7 +440,7 @@ the summary prints five stacked groups:
    which is not always `0`: a program that took a declared route
    ([§FS-rhei-programs.3.2](rhei-programs.spec.md#32-evaluation-order)) out of a non-zero exit owes the ticket's result
    the same way, and a row reading `0` would contradict the same report's own
-   Transition Ledger (§4) two sections below it and send the operator looking
+   Transition Ledger ([§FS-rhei-run-report.4](rhei-run-report.spec.md#4-transition-ledger)) two sections below it and send the operator looking
    for an exit that never happened. A row whose exit the run has no code for —
    a worker a signal ended — names none, and reads `worker exited without …`. That is the whole difference between a report an operator can
    act on and one that says the task "stalled" and suggests reading logs that
@@ -460,8 +460,8 @@ the summary prints five stacked groups:
    the copy that has to be right.
 4. **Tasks** - the source-order task tree, every task on one aligned row, so the
    operator sees the whole plan's outcome, not only the halted tail. This mirrors
-   the report's Task Final States section (§5). Tree and collapse rules are in
-   §3.2.
+   the report's Task Final States section ([§FS-rhei-run-report.5](rhei-run-report.spec.md#5-artifact-evidence)). Tree and collapse rules are in
+   [§FS-rhei-run-report.3.2](rhei-run-report.spec.md#32-task-tree).
 5. **Pointers** - the latest report path, the timestamped history entry, and the
    dashboard artifact when one was written.
 
@@ -519,7 +519,7 @@ report, TUI, and dashboard show. Each row is four aligned columns:
   | Marker | Fallback | Meaning |
   | --- | --- | --- |
   | `✓` | `+` | terminal-success state (`completed` or a custom terminal-success state) |
-  | `⏸` | `=` | deliberately paused - a gating state awaiting a human (`human-gate`), or a non-leaf task held open only by its own subtree (§3.1) |
+  | `⏸` | `=` | deliberately paused - a gating state awaiting a human (`human-gate`), or a non-leaf task held open only by its own subtree ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)) |
   | `!` | `!` | blocked or failed - needs attention |
   | `⊘` | `~` | `cancelled` |
   | `·` | `.` | terminal at the start of the run |
@@ -528,7 +528,7 @@ report, TUI, and dashboard show. Each row is four aligned columns:
   eligibility rule working ([§FS-rhei-plan-language.3](rhei-plan-language.spec.md#3-semantic-constraints)), not a fault: one gated
   leaf otherwise turns every ancestor above it into its own attention row. Such
   a parent takes the paused marker, and the task tree is the only place it
-  appears — it is counted in no Attention, header, or ledger tally (§3.1). Its
+  appears — it is counted in no Attention, header, or ledger tally ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)). Its
   detail column still reads `waiting on open descendant …`, so the tree shows
   the shape of the wait without inflating any count. A parent that is itself
   `blocked` or `failed` keeps the `!` marker: that is wrong independently of
@@ -547,7 +547,7 @@ report, TUI, and dashboard show. Each row is four aligned columns:
   one agent and two programs read `agent+program×2`. Homogeneous work keeps
   `agent`, `program`, or its repeated-kind spelling such as `agent×3` or
   `program×2`. This label rule applies to both the console task tree and the
-  persisted report's Task Final States tree (§FS-rhei-run-report.2); timing
+  persisted report's Task Final States tree ([§FS-rhei-run-report.2](rhei-run-report.spec.md#2-markdown-ui)); timing
   semantics are unchanged.
 
 Only `!` rows take saturated attention color. `✓`, `·`, and `⊘` rows are calm
@@ -588,7 +588,7 @@ folded row that speaks for one; the fold names a cancelled descendant in its
 parent's breakdown instead of giving it a row. Folding is a rendering decision
 and changes no number: a folded descendant is still counted in every Attention,
 header, and ledger tally it was counted in before. The report's Task
-Final States section (§2, item 5) is the un-collapsed source of truth, and
+Final States section ([§FS-rhei-run-report.2](rhei-run-report.spec.md#2-markdown-ui), item 5) is the un-collapsed source of truth, and
 `rhei list --parent <id>` is the drill-down a folded line points a reader at
 [§FS-rhei-list.4.1](rhei-list.spec.md#41-text-default).
 
@@ -641,12 +641,12 @@ Final states: blocked=5, cancelled=1, completed=9, human-gate=2
   …
 ```
 
-Neither fold of §3.2 reaches this path. The subtree fold and the forty-row
+Neither fold of [§FS-rhei-run-report.3.2](rhei-run-report.spec.md#32-task-tree) reaches this path. The subtree fold and the forty-row
 collapse belong to the rich summary a person reads on a terminal; the preserved
 lines keep one row per task whatever the plan's shape, because a script that
 greps them must not have to know it.
 
-The durable Markdown report (§1, §4) now backs the non-TTY path: after the
+The durable Markdown report ([§FS-rhei-run-report.1](rhei-run-report.spec.md#1-report-artifact), [§FS-rhei-run-report.4](rhei-run-report.spec.md#4-transition-ledger)) now backs the non-TTY path: after the
 preserved line-oriented output, `rhei run` prints a greppable `Report:
 runtime/run-report.md` pointer to the report it just wrote.
 
@@ -736,14 +736,14 @@ remaining reuse case is an artifact left behind by an earlier run of the same
 ticket. Such a run shows `driver: reused-output` and `output: milestone reused`
 instead of implying that an agent completed the work.
 
-**Implementation status.** The durable report (§1, §2) and the Transition Ledger
-(§4) are emitted from the run event stream and the run-start state snapshot: every
+**Implementation status.** The durable report ([§FS-rhei-run-report.1](rhei-run-report.spec.md#1-report-artifact), [§FS-rhei-run-report.2](rhei-run-report.spec.md#2-markdown-ui)) and the Transition Ledger
+([§FS-rhei-run-report.4](rhei-run-report.spec.md#4-transition-ledger)) are emitted from the run event stream and the run-start state snapshot: every
 spawned agent/program transition carries its real driver, exit, log path, and the
 synthesized callback-only, terminal-at-start, and blocked rows complete the
-picture. A report is written for every run except a `--dry-run` preview (§3.5),
+picture. A report is written for every run except a `--dry-run` preview ([§FS-rhei-run-report.3.5](rhei-run-report.spec.md#35-dry-runs-and-empty-runs)),
 including runs that abort with an error mid-execution — the latter via a
-best-effort write of the data available up to the failure (§1). The per-artifact
-Inputs/Outputs evidence columns (§5) and the `reused-output` driver are not yet
+best-effort write of the data available up to the failure ([§FS-rhei-run-report.1](rhei-run-report.spec.md#1-report-artifact)). The per-artifact
+Inputs/Outputs evidence columns ([§FS-rhei-run-report.5](rhei-run-report.spec.md#5-artifact-evidence)) and the `reused-output` driver are not yet
 captured — distinguishing reuse from a callback advance needs a pre-run
 output-existence snapshot from the engine, so no-spawn advances are reported as
 `callback-only`. Until that lands, the report makes the artifact-reuse case
@@ -865,7 +865,7 @@ The execution engine must retain enough per-run facts to render the report:
   paths;
 - every halted task with the most concrete blocker known to the scheduler;
 - the run's own accounting rollup and the workspace lifetime total, told apart,
-  along with which of the two sources produced the strip (§2.1).
+  along with which of the two sources produced the strip ([§FS-rhei-run-report.2.1](rhei-run-report.spec.md#21-accounting-strip)).
 
 These facts already overlap heavily with the run event surface and transition
 journal, but the report should not be reconstructed only from

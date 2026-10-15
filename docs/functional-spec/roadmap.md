@@ -336,7 +336,7 @@ release decision:
   `states.yaml` in its own root, else the project's ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution)).
 
 Two side-findings of #323's agora are filed against the ground rather than
-against composition: #351, where §FS-rhei-reset.2 gives the opposite of the
+against composition: #351, where [§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior) gives the opposite of the
 engine's reason for keeping `budgetTicketId`, and #352, where the engine
 silently rebinds a live binding's `display_id`.
 

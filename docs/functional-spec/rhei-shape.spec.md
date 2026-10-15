@@ -16,7 +16,7 @@ decides what every later agent is told, so a coin flip there is a coin flip
 over the whole run.
 
 The rule is not a preference. It is a consequence of where rhei already keeps
-things, and §2 derives it.
+things, and [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) derives it.
 
 ## 1. The constructs
 
@@ -34,7 +34,7 @@ Four constructs, and the option of no construct at all.
   survives a reset, a copy of its document and a relocation of it
   [§FS-rhei-budgets.1](rhei-budgets.spec.md#1-the-two-counts-and-the-days-spend).
 - A **subtask** is a task whose node is written under another task's node. It is
-  a task in every respect §2; what is added is the relationship, and §3 says
+  a task in every respect [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test); what is added is the relationship, and [§FS-rhei-shape.3](rhei-shape.spec.md#3-children) says
   when that relationship is earned.
 - A **rhei** is a plan of its own, with its own execution root and its own
   state machine. Work becomes a rhei when it has participants, rounds or a
@@ -96,7 +96,7 @@ that is the shape to copy.
 
 Progressive disclosure is **not** a reason for a child. A parent added only so
 that a reader meets three items one level down adds an identity, a travel
-bound §5, a result file and a prompt that has to say something, in exchange for
+bound [§FS-rhei-shape.5](rhei-shape.spec.md#5-what-promoting-a-phase-costs), a result file and a prompt that has to say something, in exchange for
 an indentation. `rhei list --parent <id>` and the folded lines of
 [§FS-rhei-memory.3.2](rhei-memory.spec.md#32--plan-history) and [§FS-rhei-run-report.3.2](rhei-run-report.spec.md#32-task-tree) already give a reader depth on
 demand.
@@ -121,33 +121,33 @@ and the children are siblings.
 
 ### 3.3. Promotion
 
-Promotion runs in one direction and is checked by §2, never by how a plan
+Promotion runs in one direction and is checked by [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test), never by how a plan
 looks. Author the *how* as a state machine, the *what* as flat tasks, and add
-depth only where a parent owes one of §3.2's three. Where §2 and §3.2 disagree
-— what a phase writes is read from outside, but no parent owes anything — §2
+depth only where a parent owes one of [§FS-rhei-shape.3.2](rhei-shape.spec.md#32-the-three-reasons-a-task-has-children)'s three. Where [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) and [§FS-rhei-shape.3.2](rhei-shape.spec.md#32-the-three-reasons-a-task-has-children) disagree
+— what a phase writes is read from outside, but no parent owes anything — [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test)
 wins and the result is a flat sibling.
 
 ## 4. The decision table
 
-Each row is the test of §2 applied to a case this project has actually argued
+Each row is the test of [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) applied to a case this project has actually argued
 about.
 
 | The work | Construct | Because |
 |---|---|---|
-| a counted `review → fix` loop where only the final code is read | **states** of one task | every round's output reaches only the next round §2 |
-| a reproducer, a contract or a gate's verdict a later step consumes by name | **task** | named from outside its own state chain, and an outcome of its own §2 |
-| claiming the work before anything is spent on it | **task** beside the root | a person checks who holds it, and it is no other task's outcome §2 |
-| a reading several checks are each owed to | **subtasks** under the reading | the parent speaks for the verdict and the children start inside it §3.2 |
-| one child per item, where the item count is unknown when the plan is authored | **subtasks** appended by the parent | the parent steers what it cannot enumerate §3.2 |
-| the parts of one feature — schema, endpoint, UI | **flat tasks** with `**Prior:**` | nothing is owed above them §3.1 |
-| the same parts, plus an integration somebody reads | **subtasks** under the integrator | the parent's deliverable is made out of theirs §3.2 |
-| a wait for something outside the plan | **state** | a wait makes nothing; an answer it brings back is the waiting task's own outcome, kept in its export §2 |
-| opening the pull request for a change a task committed | **program state** of that task | the URL is the task's own outcome, kept in its export and on the forge §2 |
-| classifying an issue that carries no kind | **agent state**, then **program state**, of the task that triages it | the kind is the task's own outcome, and the label keeps it §2 |
-| a lookup that must happen before a verdict | **program state** | its product is read by the verdict, in the same task §2 |
-| a supervisor's own decision between two steps | **no new node** | it is the parent's work, in the parent's body and brief §3.2 |
-| a discussion with participants, rounds and a ruling | **its own rhei** | participants and a ruling are a plan, not a state §1 |
-| a checklist one session finishes, nothing kept between items | **body prose** | nothing is memory, so nothing needs an identity §2 |
+| a counted `review → fix` loop where only the final code is read | **states** of one task | every round's output reaches only the next round [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) |
+| a reproducer, a contract or a gate's verdict a later step consumes by name | **task** | named from outside its own state chain, and an outcome of its own [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) |
+| claiming the work before anything is spent on it | **task** beside the root | a person checks who holds it, and it is no other task's outcome [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) |
+| a reading several checks are each owed to | **subtasks** under the reading | the parent speaks for the verdict and the children start inside it [§FS-rhei-shape.3.2](rhei-shape.spec.md#32-the-three-reasons-a-task-has-children) |
+| one child per item, where the item count is unknown when the plan is authored | **subtasks** appended by the parent | the parent steers what it cannot enumerate [§FS-rhei-shape.3.2](rhei-shape.spec.md#32-the-three-reasons-a-task-has-children) |
+| the parts of one feature — schema, endpoint, UI | **flat tasks** with `**Prior:**` | nothing is owed above them [§FS-rhei-shape.3.1](rhei-shape.spec.md#31-the-default-is-flat) |
+| the same parts, plus an integration somebody reads | **subtasks** under the integrator | the parent's deliverable is made out of theirs [§FS-rhei-shape.3.2](rhei-shape.spec.md#32-the-three-reasons-a-task-has-children) |
+| a wait for something outside the plan | **state** | a wait makes nothing; an answer it brings back is the waiting task's own outcome, kept in its export [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) |
+| opening the pull request for a change a task committed | **program state** of that task | the URL is the task's own outcome, kept in its export and on the forge [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) |
+| classifying an issue that carries no kind | **agent state**, then **program state**, of the task that triages it | the kind is the task's own outcome, and the label keeps it [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) |
+| a lookup that must happen before a verdict | **program state** | its product is read by the verdict, in the same task [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) |
+| a supervisor's own decision between two steps | **no new node** | it is the parent's work, in the parent's body and brief [§FS-rhei-shape.3.2](rhei-shape.spec.md#32-the-three-reasons-a-task-has-children) |
+| a discussion with participants, rounds and a ruling | **its own rhei** | participants and a ruling are a plan, not a state [§FS-rhei-shape.1](rhei-shape.spec.md#1-the-constructs) |
+| a checklist one session finishes, nothing kept between items | **body prose** | nothing is memory, so nothing needs an identity [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) |
 
 ## 5. What promoting a phase costs
 
@@ -161,7 +161,7 @@ This section is **descriptive**. It names the coupling so that an author
 promoting a phase knows what the promotion buys, and so that a reader of
 [§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-five-levels) knows that level 3 bounds transitions per identity
 and that this page decides how many identities there are. It says nothing about
-whether buying travel that way is legitimate; §2 decides the construct, and the
+whether buying travel that way is legitimate; [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) decides the construct, and the
 travel follows.
 
 ## 6. `subtask` is a spelling, not a promise
@@ -180,13 +180,13 @@ Four surfaces carry this rule and exactly one of them is edited by hand.
 
 - **This page** is the normative copy. A change to the rule is a change here.
 - **[§FS-rhei-authoring.3](rhei-authoring.spec.md#3-tasks-and-child-tasks-choosing-the-shape-then-spelling-it)** points at this page and states the flat default where
-  a plan author lands. It is a usage guide, so it carries no copy of §2 or §4
+  a plan author lands. It is a usage guide, so it carries no copy of [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) or [§FS-rhei-shape.4](rhei-shape.spec.md#4-the-decision-table)
   [§AR-rhei-language-reference.2](../architecture/language-reference.spec.md#2-documentation-boundary).
 - **`references/shape.md`**, shipped under `rhei-plan-writer`,
   `rhei-state-machine-writer` and `rhei-template-writer`
   [§FS-rhei-install-skills](rhei-install-skills.spec.md#fs-rhei-install-skills-rhei-install-skills), is a **mechanically checked extract**: the memory
-  test of §2 with its corollaries, the three reasons of §3.2 and the table of
-  §4, byte for byte as this page writes them, followed by the links to the
+  test of [§FS-rhei-shape.2](rhei-shape.spec.md#2-the-memory-test) with its corollaries, the three reasons of [§FS-rhei-shape.3.2](rhei-shape.spec.md#32-the-three-reasons-a-task-has-children) and the table of
+  [§FS-rhei-shape.4](rhei-shape.spec.md#4-the-decision-table), byte for byte as this page writes them, followed by the links to the
   paired examples. It is not authored prose and nothing is added to it that
   this page does not say.
 - **The authoring skills** state the rule and link a runnable example of it. A

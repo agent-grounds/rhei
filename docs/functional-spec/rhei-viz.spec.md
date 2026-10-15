@@ -10,7 +10,7 @@ The same renderer serves two modes from one model: a **dynamic** surface that
 updates live during `rhei run`, and a **static** artifact that can be frozen at
 the end of a run or generated offline from a plan. Both use the same asset and
 renderer, so they look and behave identically; their output differs only by the
-runtime overlay (§8). A page frozen at the end of a run inlines the final live
+runtime overlay ([§FS-rhei-viz.8](rhei-viz.spec.md#8-data-contract)). A page frozen at the end of a run inlines the final live
 snapshot, so it equals the live page except that it stops updating; a page
 generated offline from a plan has no runtime overlay, so it omits live-only
 content (running slots, accounting, the real agent transcript).
@@ -21,7 +21,7 @@ motion, the console-first feel shared with the terminal — is governed by
 For the plan grammar see the [Plan Language Specification](rhei-plan-language.spec.md);
 for the state machine see the [States Specification](rhei-states.spec.md).
 
-The surface ships as the `rhei viz` command (§7.2). The `xtask` static renderer
+The surface ships as the `rhei viz` command ([§FS-rhei-viz.7.2](rhei-viz.spec.md#72-static-offline-or-frozen)). The `xtask` static renderer
 (`cargo xtask examples viz <name>`) dogfoods it against the canonical design
 fixtures `examples/inflight-dashboard` and `examples/disjoint-tracks`.
 
@@ -42,12 +42,12 @@ fixtures `examples/inflight-dashboard` and `examples/disjoint-tracks`.
    alongside the shape of the work.
 4. **Lead with live work.** The view surfaces tasks that are running now and
    exposes each live task's streaming agent output. A live task whose agent keeps
-   an interactive stdin open also offers a way to intervene (§5); intervention is
+   an interactive stdin open also offers a way to intervene ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)); intervention is
    opt-in per agent, so the composer appears only where messaging can succeed.
 5. **Dynamic and static parity.** The live surface and a static page render from
    one model with one asset, one layout, and one behavior; their output differs
    only by the runtime overlay — liveness, running slots, accounting, and the
-   real agent transcript (§8).
+   real agent transcript ([§FS-rhei-viz.8](rhei-viz.spec.md#8-data-contract)).
 6. **Self-contained and calm.** The page carries its CSS and JavaScript inline,
    with no external scripts, stylesheets, fonts, or network assets, and it obeys
    the console-first language of [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux).
@@ -56,14 +56,14 @@ fixtures `examples/inflight-dashboard` and `examples/disjoint-tracks`.
 
 - No general plan editing, mutation, transitioning, or diff mode from the
   surface. It is read-only with respect to plan state except for the narrow live
-  human-gate transition action in §5.1: open-in-editor spawns the operator's
-  editor (§11) and intervene messages a running agent (§5), but neither writes or
+  human-gate transition action in [§FS-rhei-viz.5.1](rhei-viz.spec.md#51-human-gate-transitions): open-in-editor spawns the operator's
+  editor ([§FS-rhei-viz.11](rhei-viz.spec.md#11-open-in-editor-route)) and intervene messages a running agent ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)), but neither writes or
   advances the plan.
 - No remote deployment. The live surface is loopback-only; the static surface is
   a local file.
 - No redefinition of the look-and-feel; that is [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux).
 - The dense chart overviews (Gantt, Cube, Sankey) are supplementary scanning aids
-  (§12), not the primary surface.
+  ([§FS-rhei-viz.12](rhei-viz.spec.md#12-supplementary-dense-views)), not the primary surface.
 
 ## 1. The Flow Surface
 
@@ -73,16 +73,16 @@ The page is a single screen with five regions, top to bottom:
   is present, and a one-line state-machine summary.
 - **Strip** — a List/Graph mode toggle, summary counts, and the glyph legend.
 - **Running-now panel** — chips for tasks currently assigned to a runtime slot;
-  hidden when no top-level task is running (§5).
-- **Flow** — two panes. The left pane is the plan in **List** mode (§2) or
-  **Graph** mode (§3); the right pane is the **Surroundings** inspector for the
-  selected node (§4). In list mode the outline is a fixed column and surroundings
+  hidden when no top-level task is running ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)).
+- **Flow** — two panes. The left pane is the plan in **List** mode ([§FS-rhei-viz.2](rhei-viz.spec.md#2-list-mode-outline)) or
+  **Graph** mode ([§FS-rhei-viz.3](rhei-viz.spec.md#3-graph-mode-dependency-dag)); the right pane is the **Surroundings** inspector for the
+  selected node ([§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector)). In list mode the outline is a fixed column and surroundings
   grows to the right edge; in graph mode the DAG fills the left and surroundings
   is a fixed column. Below ~1060px the panes stack.
 - **Machines** — the resolved state machine drawn as one graph per disjoint
-  workflow, with a clickable legend and a state-detail panel (§6).
+  workflow, with a clickable legend and a state-detail panel ([§FS-rhei-viz.6](rhei-viz.spec.md#6-state-machine-graphs)).
 
-The surface is keyboard-first and mouse-optional, per [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) §7:
+The surface is keyboard-first and mouse-optional, per [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) [§FS-rhei-viz.7](rhei-viz.spec.md#7-dynamic-and-static-rendering):
 `j`/`k` or arrows move the selection through the plan in source order, `g` and
 `l` switch to Graph and List mode, and the selection drives both the surroundings
 inspector and the machine-detail panel together. All content is selectable and
@@ -126,7 +126,7 @@ fill of graph nodes, so the eye reads status at a glance. During a dynamic run,
 `live` is a runtime overlay category for tasks assigned to a running slot; it is
 the single place motion is allowed: a spinner on list rows and marching-ants on
 graph nodes, both stilled to a static dot under `prefers-reduced-motion`, per
-[§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) §4. State pills always carry the exact state text and its shared
+[§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) [§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector). State pills always carry the exact state text and its shared
 calm color from [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) §3.2; color is never the only signal.
 
 During a dynamic run, `task_runtime[id].in_slot` is an overlay on top of the
@@ -142,7 +142,7 @@ The strip shows total top-level tasks and category counts for active, blocked,
 gate, done, and failed. When a runtime overlay is present, it also shows how many
 slots are currently active — the count of live work, including nested subtasks
 that occupy a slot — so the running indicator never reads zero while work is
-visibly underway. Counts and legend update in place on refresh (§7).
+visibly underway. Counts and legend update in place on refresh ([§FS-rhei-viz.7](rhei-viz.spec.md#7-dynamic-and-static-rendering)).
 
 ## 2. List Mode (Outline)
 
@@ -164,10 +164,10 @@ tooltips that can cover neighboring panes.
 The left pane renders the **prerequisite** graph over top-level tasks: nodes are
 laid out in dependency layers by longest path over `**Prior:**` edges among
 top-level tasks, with curved edges from each prior to its dependent. Node fill
-follows the state category (§1.1); live nodes animate, stilled under reduced
+follows the state category ([§FS-rhei-viz.1.1](rhei-viz.spec.md#11-state-category-and-glyph)); live nodes animate, stilled under reduced
 motion. Clicking a node selects it. Graph mode answers "what unblocks what" at the
 plan level; per-node prerequisite detail across all levels lives in the
-surroundings inspector (§4).
+surroundings inspector ([§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector)).
 
 ## 4. Surroundings Inspector
 
@@ -176,9 +176,9 @@ the selected task or subtask it shows, top to bottom:
 
 - **Head** — glyph, id, title, the state pill, and flags (`initial`/`terminal`/
   `gating` from the machine, `waiting on <label>` when the state is a poll that
-  declares one (§FS-rhei-states.2.5), plus `root task` or `depth N`), followed
+  declares one ([§FS-rhei-states.2.5](rhei-states.spec.md#25-waiting-on-a-person)), plus `root task` or `depth N`), followed
   by the state's description. The label is shown, not just carried: the `⏸`
-  glyph of §1.1 says the node is somebody's turn but not whose, and that is the
+  glyph of [§FS-rhei-viz.1.1](rhei-viz.spec.md#11-state-category-and-glyph) says the node is somebody's turn but not whose, and that is the
   one thing the operator needs to act on it.
 - **Last state** — always shown as its own section for the selected node. The
   collapsed row is labeled `last state` and shows the state immediately before
@@ -188,7 +188,7 @@ the selected task or subtask it shows, top to bottom:
   timestamp-free: `<task-id> <from>@<to>`. A validated adjacent
   `!force-v1`/movement pair contributes that movement once and makes its
   exceptional reason available to the inspector; malformed pairs are reported
-  rather than rendered as history (§FS-rhei-complete.3.1). New commands write
+  rather than rendered as history ([§FS-rhei-complete.3.1](rhei-complete.spec.md#31-state-transition-ledger)). New commands write
   state history to that central ledger. The live and static renderers may combine the central
   ledger with `runtime/transitions.log` to repair older or partially written run
   histories; legacy per-task result headings are used only when no central
@@ -211,7 +211,7 @@ the selected task or subtask it shows, top to bottom:
   Shown only when the state declares prompt-template or inline instructions.
 - **Intervene / output** — for nodes assigned to a runtime slot, the streaming
   agent terminal and capability-gated message composer; for offline active-state
-  previews, a representative transcript with delivery disabled (§5).
+  previews, a representative transcript with delivery disabled ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)).
 - **Children** — descendants with their glyphs, ids, titles, and states, and a
   `done/total ✓` header; shown only for nodes with children.
 - **Artifacts** — the state's input (`in ◂`) and output (`out ▸`) contracts as
@@ -229,11 +229,11 @@ within the row, while artifact paths wrap inside the pane instead of creating
 horizontal overflow.
 
 Every chip in came-from, next-state, and the machine legend is clickable: a
-transition chip highlights the target state across the machine graphs (§6) while
+transition chip highlights the target state across the machine graphs ([§FS-rhei-viz.6](rhei-viz.spec.md#6-state-machine-graphs)) while
 keeping the task in context; a dependency chip selects that neighbor. Clicking
 across the inspector is how an operator walks the plan and the machine without
 losing their place. Content swaps obey the single ≤150ms opacity fade of
-[§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) §4.
+[§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) [§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector).
 
 ## 5. Running Execution View
 
@@ -256,7 +256,7 @@ transcript, but it is not counted as running.
 **Messaging is capability-gated.** The message composer is shown only when the
 running agent keeps an interactive stdin open and is therefore reachable — the
 per-agent `intervene_stdin` opt-in, surfaced per slot in the snapshot as
-`task_runtime[id].intervene` (§8). When a live agent is *not* reachable — a
+`task_runtime[id].intervene` ([§FS-rhei-viz.8](rhei-viz.spec.md#8-data-contract)). When a live agent is *not* reachable — a
 one-shot or EOF-driven transport — the block states plainly that the agent can't
 be messaged live and names the remedy (set `intervene_stdin` on the agent's
 profile and rerun), rather than dead-ending the operator or inviting input that
@@ -272,7 +272,7 @@ attached with `rhei attach` is the third client of that same boundary
 [§FS-rhei-run-headless.5](rhei-run-headless.spec.md#5-rhei-attach): the loopback server is the run's **control server**,
 and the browser page is one thing it serves rather than the reason it runs.
 
-In the static surface (§7.2) the terminal shows a representative transcript so the
+In the static surface ([§FS-rhei-viz.7.2](rhei-viz.spec.md#72-static-offline-or-frozen)) the terminal shows a representative transcript so the
 layout has realistic shape, and the composer is shown disabled — its messages are
 illustrative and are not delivered.
 
@@ -308,7 +308,7 @@ This is the only plan-state mutation allowed from the dashboard. It is available
 only while the loopback dashboard is live and only for tasks currently in a
 gating state. The static and frozen surfaces render gate choices as inert
 inspection affordances, not as working controls. Intervene remains separate: it
-messages a running agent and never transitions or edits the plan (§5).
+messages a running agent and never transitions or edits the plan ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)).
 
 ## 6. State-Machine Graphs
 
@@ -317,7 +317,7 @@ legible alongside the work. Disjoint workflows render as **separate graphs**: th
 machine is split into connected components over non-wildcard transitions, and each
 component is drawn on its own.
 
-- **Multi-state components** render first, ordered by canonical state order (§10);
+- **Multi-state components** render first, ordered by canonical state order ([§FS-rhei-viz.10](rhei-viz.spec.md#10-level-grouped-state-vocabularies));
   a machine with more than one is labeled as `N disjoint` tracks, matching node
   kinds routed through `profiles`/`node_policy` (e.g. a feature, a bugfix, and a
   research track).
@@ -330,35 +330,35 @@ Each graph uses a layered layout by longest path. Cycles — counted review/fix
 loops, rework and reopen edges — are tolerated: a back edge (to a node still on
 the DFS stack) is excluded from layering and drawn as a dashed loop with a
 distinct arrowhead, so a `review ⇄ fix` loop reads as a loop. Each node is a
-state pill colored by §10, carrying its flags in a tooltip. A legend lists every
+state pill colored by [§FS-rhei-viz.10](rhei-viz.spec.md#10-level-grouped-state-vocabularies), carrying its flags in a tooltip. A legend lists every
 state with its description and doubles as the prompt index.
 
 Clicking a state — in a graph or the legend — opens the **state-detail** panel:
 its flags (`initial`/`terminal`/`gating`, `counted ×N` when the state
 declares `visits: N`, and `waiting on <label>` when its poll declares one
-(§FS-rhei-states.2.5)), description, and the raw prompt template for the state.
+([§FS-rhei-states.2.5](rhei-states.spec.md#25-waiting-on-a-person))), description, and the raw prompt template for the state.
 Selecting a task highlights its current state across every graph and shows the
-prompt *instantiated* for that task in the surroundings inspector (§4), so the
+prompt *instantiated* for that task in the surroundings inspector ([§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector)), so the
 operator sees both the template and its resolution. The plan's overview prose, if
 present, is shown above the graphs as "what this Rhei is doing."
 
 ## 7. Dynamic and Static Rendering
 
-One renderer and one model (§8) drive two modes.
+One renderer and one model ([§FS-rhei-viz.8](rhei-viz.spec.md#8-data-contract)) drive two modes.
 
 ### 7.1. Dynamic (live during `rhei run`)
 
 The live surface is served on the dashboard's loopback server alongside `rhei run`
 [§FS-rhei-run-tui.1.6](rhei-run-tui.spec.md#16-browser-dashboard) and refreshes through the same polling loop as the rest of
 the dashboard. Liveness is shown by content changing in place, never by movement,
-per [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) §4: a poll updates row text, pills, running-now chips, and the
+per [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) [§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector): a poll updates row text, pills, running-now chips, and the
 agent terminal where they sit, with no layout shift, stable ordering, and the
 operator's scroll position and text selection preserved. The surface tolerates a
 temporary plan-reload failure by rendering the last-good snapshot already cached.
 If the loopback transport becomes unavailable after a live snapshot, the surface
 keeps the last-good plan data but clears runtime-only "running now" affordances
 after a short retry grace, so a closed run cannot leave rows spinning forever.
-Artifact and log links open through the open-in-editor route (§11). When the run
+Artifact and log links open through the open-in-editor route ([§FS-rhei-viz.11](rhei-viz.spec.md#11-open-in-editor-route)). When the run
 finishes and the loopback server exits, the surface writes a frozen,
 self-contained HTML artifact under `runtime/` from the final snapshot, so the
 operator keeps an inspectable view.
@@ -370,13 +370,13 @@ a Directory Workspace, merging the `index.rhei.md` with any standalone plan file
 — together with its resolved state machine, with the model embedded inline and no
 live polling. Artifact and log links are **illustrative**: the files they point to
 materialize under `runtime/` only during a live run. The agent terminal shows a
-representative transcript and the intervene composer is inert (§5). This is what
+representative transcript and the intervene composer is inert ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)). This is what
 `cargo xtask examples viz <name>` produces today and what the frozen run-end
-artifact (§7.1) reuses; it is also what the `rhei viz` command renders.
+artifact ([§FS-rhei-viz.7.1](rhei-viz.spec.md#71-dynamic-live-during-rhei-run)) reuses; it is also what the `rhei viz` command renders.
 
 `rhei viz` defaults its output to the workspace's `runtime/` directory —
 `runtime/<input>.html` for a plan file, `runtime/rhei-viz.html` for a workspace
-directory — the same location the run-end freeze (§7.1) writes to, so generating
+directory — the same location the run-end freeze ([§FS-rhei-viz.7.1](rhei-viz.spec.md#71-dynamic-live-during-rhei-run)) writes to, so generating
 a view never drops an HTML file beside a checked-in plan. `--output <FILE>`
 overrides the location.
 
@@ -482,7 +482,7 @@ Rules:
 - **Templates resolve per node.** `{task_id}`, `{task_title}`, `{visit_count}`,
   `{visits}`, `{model}` and similar scalars, and `{input/output.<name>.path}`
   artifact references, are resolved against the selected node when rendering its
-  prompt (§4) and artifact links. A live render substitutes the running task's
+  prompt ([§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspector)) and artifact links. A live render substitutes the running task's
   real values, including the concrete target/model/agent from its slot. A static
   render resolves authored single-target/model states directly, preserves any
   `-N` visit suffix from the plan row as `visit_count`, and renders multi-target
@@ -495,7 +495,7 @@ Rules:
   `task_runtime[id].intervene` is `true` only when that slot's agent keeps a
   writable stdin held open so a `/intervene` message can be delivered now (the
   agent's `intervene_stdin` opt-in). The surface gates the message composer on
-  this flag (§5); it is absent on a static render, so the composer is never
+  this flag ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)); it is absent on a static render, so the composer is never
   offered as deliverable offline.
 
 ## 9. Plan-State Derivation
@@ -514,7 +514,7 @@ terminal states:
 
 Terminal states are those the machine flags terminal (built-ins: `completed`,
 `cancelled`, `archived`, `failed`). Active-like means a non-terminal state in the
-`active` category (§1.1): not `draft`, not `pending`, and not a profile entry
+`active` category ([§FS-rhei-viz.1.1](rhei-viz.spec.md#11-state-category-and-glyph)): not `draft`, not `pending`, and not a profile entry
 state. A plan of `pending` tasks therefore derives `pending`, not `active`, under
 any profile.
 
@@ -563,7 +563,7 @@ surface:
 
 - **Gantt** — one row per item (plan row, each top-level task, each child indented
   beneath its parent) against state axes split into per-level groups when level
-  vocabularies differ (§10).
+  vocabularies differ ([§FS-rhei-viz.10](rhei-viz.spec.md#10-level-grouped-state-vocabularies)).
 - **Cube** — a dense top-level-task by descendant-slot heatmap, with the derived
   plan state as a full-width strip; can switch from state coloring to a
   subtree-cost heatmap. [§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)
@@ -571,7 +571,7 @@ surface:
   thickness equal to the descendant count, or to cost. [§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)
 
 Plans without descendants render a useful monochrome empty state rather than a
-blank chart, per [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) §7.
+blank chart, per [§FS-rhei-viz-ux](rhei-viz-ux.spec.md#fs-rhei-viz-ux-console-first-visualization-ux) [§FS-rhei-viz.7](rhei-viz.spec.md#7-dynamic-and-static-rendering).
 
 ## Related Specifications
 

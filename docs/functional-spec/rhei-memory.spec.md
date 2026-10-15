@@ -16,7 +16,7 @@ tokens. [§GOAL-rhei-outcomes](goals.md#goal-rhei-outcomes-goals)
 This spec extends the prompt of [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition) with four sections. The
 sections are graph- and runtime-level context, not configured in `states.yaml`,
 and `rhei next` renders them for a manual worker exactly as `rhei run` does
-(§5). It depends on:
+([§FS-rhei-memory.5](rhei-memory.spec.md#5-surfaces)). It depends on:
 
 - [§FS-rhei-plan-language](rhei-plan-language.spec.md#fs-rhei-plan-language-rhei-plan-language-specification) for the task hierarchy, plan formats, and content sections
 - [§FS-rhei-panta](rhei-panta.spec.md#fs-rhei-panta-panta-the-project-root-above-all-rheis) and [§AR-rhei-panta.5](../architecture/rhei-panta.spec.md#5-execution-root-and-per-rhei-runtime) for rheis, execution roots, and qualified ids
@@ -33,25 +33,25 @@ help from anything outside the prompt and the files it names — for **every
 task in the Panta** that is terminal when the prompt is composed: its qualified
 id, its title, its final state, and its result. Tasks in the invocation's own
 rhei are **listed, or reachable by the command a folded line or an
-`### In Flight` progress row names** (§3.2) — the row carries the pointer where
+`### In Flight` progress row names** ([§FS-rhei-memory.3.2](rhei-memory.spec.md#32--plan-history)) — the row carries the pointer where
 the subtree's open parent has no line of its own to fold into;
 every transitive prior is listed; every
-other rhei is reachable through the map in §3.4, which names each rhei's
+other rhei is reachable through the map in [§FS-rhei-memory.3.4](rhei-memory.spec.md#34--rhei-commands-additions), which names each rhei's
 execution root, so no terminal task in the project is unreachable from any
 other. The ledger of each execution root ([§FS-rhei-complete.3.1](rhei-complete.spec.md#31-state-transition-ledger)) gives the
 order in which they finished.
 
 The own-rhei clause was **amended deliberately** to admit that second way, and
 it is the only way this requirement is satisfied other than by a line in the
-prompt. The reason is §1.3: that point already pairs every cap with an overflow
+prompt. The reason is [§FS-rhei-memory.1.3](rhei-memory.spec.md#13-bounded-and-progressive): that point already pairs every cap with an overflow
 line naming the **command or file** that holds the rest, so the specification
 had already decided that a command is an acceptable holder of what the prompt
-leaves out — §1.1 and §1.3 simply did not agree. The 40-line cap made the
+leaves out — [§FS-rhei-memory.1.1](rhei-memory.spec.md#11-everything-before-is-reachable) and [§FS-rhei-memory.1.3](rhei-memory.spec.md#13-bounded-and-progressive) simply did not agree. The 40-line cap made the
 earlier clause false whenever a decomposed parent pushed the list past it
 (§4.3.4), so the amendment widens an exception the spec admits rather than
-opening a new one. A folded line (§3.2) is therefore not an omission: it counts
+opening a new one. A folded line ([§FS-rhei-memory.3.2](rhei-memory.spec.md#32--plan-history)) is therefore not an omission: it counts
 every descendant it stands for and names the command that lists the next rung
-down, which reaches the whole subtree one rung at a time (§1.3).
+down, which reaches the whole subtree one rung at a time ([§FS-rhei-memory.1.3](rhei-memory.spec.md#13-bounded-and-progressive)).
 
 Reachability is navigation, not permission to read every payload. A task's
 resolved `**Excludes:**` policy ([§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)) may remove source bytes, but it never removes a task's
@@ -66,7 +66,7 @@ tree of every execution root, the resolved state machines, the resolved
 settings, the invocation identity (task, state, visit count, execution
 identity), the invocation's resolved exclusions, and the set of invocations of the current `rhei run` still in flight
 when the prompt is composed (§4.3.5). Composition performs no summarization,
-ranking, or selection beyond the rules written in §4: a summary is a fixed
+ranking, or selection beyond the rules written in [§FS-rhei-memory.4](rhei-memory.spec.md#4-composition-algorithm): a summary is a fixed
 slice of a file, an order is a stated order, a cap is a stated number, and a
 truncation leaves a stated overflow line. The same inputs produce the same
 bytes. Nothing that varies per run — a run id, a timestamp, a pid — appears in
@@ -111,7 +111,7 @@ task ([§AR-rhei-panta.5](../architecture/rhei-panta.spec.md#5-execution-root-an
 the project directory for single-file rheis. Transcripts are the exception:
 one `rhei run` writes one log tree, under the root it was started from, so in a
 Panta the transcripts of every member rhei sit together at the project root and
-not under the member. A prompt therefore names that directory outright (§3.4)
+not under the member. A prompt therefore names that directory outright ([§FS-rhei-memory.3.4](rhei-memory.spec.md#34--rhei-commands-additions))
 rather than describing it as a path under something else. The note store is the
 other exception, and for the opposite reason: it is one file for the whole
 project, so a fact found in one rhei reaches a ticket in another ([§FS-rhei-note.3.1](rhei-note.spec.md#31-where-it-lives)).
@@ -126,7 +126,7 @@ Orientation comes before the instructions so the instructions are read with
 the goal in mind; the broader memory comes after the task's own inputs because
 the inputs are what the task acts on and the history is what it acts *within*.
 Every source payload named below is filtered before its file bytes are read;
-the navigation-only fields remain as §1.1 requires.
+the navigation-only fields remain as [§FS-rhei-memory.1.1](rhei-memory.spec.md#11-everything-before-is-reachable) requires.
 
 ### 3.1. `## Position`
 
@@ -223,7 +223,7 @@ Facts earlier tickets left for whoever came next, newest first.
   rest of `## Position` is unchanged, and the prompt still carries the task's
   own content, child map, checkpoints, supervisor brief and declared inputs,
   previous-visit memory, and other applicable sections defined by
-  [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition), [§FS-rhei-supervision.5](rhei-supervision.spec.md#5-prompt-composition), and this spec. `### Reading the rhei` (§3.4) names
+  [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition), [§FS-rhei-supervision.5](rhei-supervision.spec.md#5-prompt-composition), and this spec. `### Reading the rhei` ([§FS-rhei-memory.3.4](rhei-memory.spec.md#34--rhei-commands-additions)) names
   the owning rhei document, project root, the note store, and read-only
   navigation commands, so the full standing context remains directly reachable
   without its bytes being copied into every supervisory handoff.
@@ -261,7 +261,7 @@ Finished work on the way from the plan's roots to this task, oldest first. Full 
   task and of each of its ancestors — and every **transitive prior** of this
   task in any rhei, including cancelled tasks: why something was not done is
   memory too. An off-path finished task contributes no line of its own; the
-  listed ancestor above it counts it. The predicate is §4.3 step 1. Tasks
+  listed ancestor above it counts it. The predicate is [§FS-rhei-memory.4.3](rhei-memory.spec.md#43-plan-history) step 1. Tasks
   outside the owning rhei carry a trailing `(rhei `<id>`, prior)`.
 - **A listed task with descendants folds its subtree into its own line**, with
   the clause ` — {n} subtasks: {breakdown}`. `{n}` is every descendant at any
@@ -274,7 +274,7 @@ Finished work on the way from the plan's roots to this task, oldest first. Full 
   descendant renders no such clause, and its line is the shape it has always
   had. The preamble names the drill-down once — `rhei list --parent <id>` — so
   no folded line repeats it.
-- `{summary}` is derived by the rule in §4.3, never written by a model. An
+- `{summary}` is derived by the rule in [§FS-rhei-memory.4.3](rhei-memory.spec.md#43-plan-history), never written by a model. An
   excluded result is not opened and renders `payload excluded` while keeping
   the task, state, and result location visible. A task
   whose result is already pasted in full in this prompt — under `## Prior Task
@@ -387,14 +387,14 @@ What you write is what the next agent and the human see.
 - Write progress as plain paragraphs or lists, never Markdown headings: a heading inside a task body declares a child task, so one such as `#### Notes` breaks the plan; the run reverts your task body to what it was before this attempt and spends the attempt.
 ```
 
-`Reading the rhei` is the map that makes §1.1 true across rheis: it names
+`Reading the rhei` is the map that makes [§FS-rhei-memory.1.1](rhei-memory.spec.md#11-everything-before-is-reachable) true across rheis: it names
 every execution root in the project, so the results of a rhei the prompt does
 not list are one path away. A rhei whose execution root holds no plan document
 — the synthetic `basin`, whose manifest is never authored ([§FS-rhei-panta.4](rhei-panta.spec.md#4-invisibility)) —
 omits the `— plan …` clause and names this task's file alone. `Agent transcripts`
 names the resolved `runtime/logs/` directory of this run — the one `Previous
 log:` resolves against (§3.3) — because that tree belongs to the run and not to
-a rhei (§2). Paths are rendered relative to the execution root named in the
+a rhei ([§FS-rhei-memory.2](rhei-memory.spec.md#2-the-store)). Paths are rendered relative to the execution root named in the
 prompt, or absolute when `RHEI_CHECKOUT_ROOT` differs from it, by the same rule
 `{output.<name>.path}` follows ([§FS-rhei-states.4](rhei-states.spec.md#4-template-variables-in-instructions-and-personality)). `rhei next`, which exports
 no checkout-root context, renders every such path absolute. `Notes left for
@@ -446,7 +446,7 @@ Given an invocation `I = (task, state, visit_count, identity)`:
    project root in a Panta whose members are all directory workspaces, so the
    store is named as an input of its own.
 
-Before opening any candidate payload in §4.2–§4.4 or the prompt sections owned
+Before opening any candidate payload in [§FS-rhei-memory.4.2](rhei-memory.spec.md#42-position)–[§FS-rhei-memory.4.4](rhei-memory.spec.md#44-previous-visits) or the prompt sections owned
 by [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition), compare its logical and canonical source to `X`. Omit an exact file match or a descendant of an
 excluded directory. This check precedes reading, summarizing, truncating,
 fencing, or rendering. It covers exports, prior/child/current results, history,
@@ -465,7 +465,7 @@ are never silently omitted here.
    when `task ∈ Prior(sibling)` or `Consumes(sibling)` names an export of
    `task`, and append `— {n} subtasks` where the sibling has `n > 0`
    descendants at any depth — the set, the cap and the overflow line are
-   unchanged; only the line gains that suffix. Paste `body(P)`, fenced (§4.5); cap 200 lines, overflow line
+   unchanged; only the line gains that suffix. Paste `body(P)`, fenced ([§FS-rhei-memory.4.5](rhei-memory.spec.md#45-fencing-and-rendering)); cap 200 lines, overflow line
    `… truncated; read <task file path of P>`.
 3. If the normalized `state(task)` declares `execute_on`, render neither
    `### Rhei Context` nor `### Project Context`. Otherwise, `### Rhei Context`
@@ -501,25 +501,25 @@ are never silently omitted here.
    invocation. `T` is on the path when either `T` is a top-level task of `R₀`'s
    plan, or the parent of `T` is `task` or an ancestor of `task`. Excluded:
    `task` itself; every ancestor of `task`, since `## Position` already names
-   each one with its state and pastes the nearest one's body (§4.2); and every
+   each one with its state and pastes the nearest one's body ([§FS-rhei-memory.4.2](rhei-memory.spec.md#42-position)); and every
    descendant of `task` already rendered under `## Child Task Results` or
    `## Checkpoints`. Membership is a predicate on `T` rather than a walk, so a
    task on the path that belongs to another rhei contributes no line and prunes
    nothing: its own children are still candidates, and it is itself reached
-   through the map of §3.4 and through `priors` where it is one. Order:
+   through the map of [§FS-rhei-memory.3.4](rhei-memory.spec.md#34--rhei-commands-additions) and through `priors` where it is one. Order:
    unchanged — by the position in `L(R₀)` of each task's last line entering a
    terminal state; tasks with no ledger line (imported plans) come first, in
    plan order.
 
    A listed `T` with `n > 0` descendants at any depth renders the fold clause of
-   §3.2: `— {n} subtasks: {breakdown}`, where `{breakdown}` buckets all `n`
-   descendants by the normalized state name §3.1 defines, in the resolved
+   [§FS-rhei-memory.3.2](rhei-memory.spec.md#32--plan-history): `— {n} subtasks: {breakdown}`, where `{breakdown}` buckets all `n`
+   descendants by the normalized state name [§FS-rhei-memory.3.1](rhei-memory.spec.md#31--position) defines, in the resolved
    machine's declaration order, omitting empty buckets. `n` is the size of the
    subtree rather than a selection from it: every descendant counts, whatever
    its state and whatever rhei owns it, and whether or not it also keeps a line
    of its own under step 2. A count is navigation, so it is unaffected by
    `X`: no fold clause opens a file, and an excluded subtree is still counted in
-   full (§1.1, [§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)).
+   full ([§FS-rhei-memory.1.1](rhei-memory.spec.md#11-everything-before-is-reachable), [§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions)).
 2. `priors` = the transitive closure of `Prior(task)` minus `own`, in plan
    order, each tagged `(rhei <R>, prior)`.
 3. When `T`'s result source is excluded, do not open it and render `payload
@@ -600,7 +600,7 @@ are never silently omitted here.
    record from an earlier visit is not a retry and renders nothing: re-entering
    a state is a fresh start, not a second attempt.
    `{ending}` is the sentence of the `Re-spawning` line
-   (§FS-rhei-agents.3.2.1), word for word, so the operator and the retry
+   ([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)), word for word, so the operator and the retry
    read one ending: the record's `ending` before its `code`, and a record with
    no `code` is `ended without an exit code (a signal ended it)`, never
    `exited 0`. `{unmet}` is ` without meeting this state's completion
@@ -662,8 +662,8 @@ are never silently omitted here.
    transcript: ` Its edit broke the plan at `{file}:{line}` ({message}), so the
    run reverted this task's text to what it was before that attempt; what it
    wrote is in `{reverted-text file}`.` — the location, the loader's message and
-   the file the warning of §FS-rhei-run.3.7 names, read from the record and
-   spelled by (§FS-rhei-agents.4.1) like the transcript path. A retry is told
+   the file the warning of [§FS-rhei-run.3.7](rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan) names, read from the record and
+   spelled by ([§FS-rhei-agents.4.1](rhei-agents.spec.md#41-paths-in-the-prompt)) like the transcript path. A retry is told
    where its predecessor's text went because the revert took legitimate child
    tasks with it, and the retry is the one that can add them again. Omit the
    sentence, and the space before it, when the record carries no revert.
@@ -697,7 +697,7 @@ are never silently omitted here.
 ## 5. Surfaces
 
 - `rhei run` composes the sections for every spawned agent, in every mode. The
-  shared `## Position` renderer applies the role rule of §3.1 and §4.2.
+  shared `## Position` renderer applies the role rule of [§FS-rhei-memory.3.1](rhei-memory.spec.md#31--position) and [§FS-rhei-memory.4.2](rhei-memory.spec.md#42-position).
 - `rhei next` text output renders the same sections in the same order after
   the instructions, as it does for the supervision sections today
   ([§FS-rhei-supervision.3.4](rhei-supervision.spec.md#34-manual-workers)); JSON output carries each as a string field named
@@ -707,7 +707,7 @@ are never silently omitted here.
   `### Project Notes` — on both surfaces, and an ordinary task keeps all
   three on both. Two differences follow from what that
   surface prints:
-  - `rhei next` renders no `## Rhei Commands`, so the two sub-sections of §3.4
+  - `rhei next` renders no `## Rhei Commands`, so the two sub-sections of [§FS-rhei-memory.3.4](rhei-memory.spec.md#34--rhei-commands-additions)
     would arrive with no `##` parent. On this surface they are wrapped in
     `## Rhei Navigation`; the JSON field stays `navigation`.
   - `rhei next` pastes neither `## Prior Task Results` nor `## Child Task
@@ -838,7 +838,7 @@ Finished work on the way from the plan's roots to this task, oldest first. Full 
 - Task release.archive: Archive the artifacts [pending] — 1 of 2 subtasks finished
 ```
 
-The `…` stands for the parent body and the two context blocks of §3.1, which
+The `…` stands for the parent body and the two context blocks of [§FS-rhei-memory.3.1](rhei-memory.spec.md#31--position), which
 this example does not pin; every other line above is the exact bytes.
 
 Read the three sections against each other and the rule is visible:

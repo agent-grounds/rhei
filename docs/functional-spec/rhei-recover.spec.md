@@ -4,7 +4,7 @@ Resolve a forced state transition that was interrupted after its durable
 recovery marker was published. Recovery is explicit and attended: ordinary
 commands never finish or undo the operation as a side effect of loading the
 root. This command is the only consumer allowed to remove
-`.rhei/forced-recovery.json`. §FS-rhei-transition-cmd.6.1
+`.rhei/forced-recovery.json`. [§FS-rhei-transition-cmd.6.1](rhei-transition-cmd.spec.md#61-durable-transaction-and-audit-pair)
 
 ## 1. Usage and authority
 
@@ -96,7 +96,7 @@ absolute paths, alternative filenames, unknown owners, symlink escapes, or
 ambiguous owner arrangements are allowed. All `execution-root` image paths
 retain version 1's containment checks. Counted visits and checkpoints remain
 in that manifest under qualified basin ids, with unrelated metadata and bytes
-included in both images. §FS-rhei-panta.6
+included in both images. [§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)
 
 There is still exactly one marker, under `PROJECT/basin/.rhei/`, one explicit
 recovery invocation targeting that basin, and one commit witness in its
@@ -122,7 +122,7 @@ remains durable until every selected image and the ledger outcome are durable.
 Recovery acquires the same locks and in the same order as the force operation:
 all affected run locks in sorted canonical-root order, all exclusive root
 guards in that order, then sorted metadata/task files and the transition
-ledger (§FS-rhei-transition-cmd.6.1). Derive the affected owners from canonical
+ledger ([§FS-rhei-transition-cmd.6.1](rhei-transition-cmd.spec.md#61-durable-transaction-and-audit-pair)). Derive the affected owners from canonical
 filesystem identities and the validated image owners, without parsing the
 in-doubt plan: the execution root, plus the immediate parent project for a
 version-2 basin manifest image, and filesystem-discovered project members
@@ -191,11 +191,11 @@ parent's shared guards. It revalidates the discovered roots after loading.
 
 Init includes both its host and destination in the guarded operation, including
 host companion-file writes and creation of a previously absent destination
-(§FS-rhei-init.2). It discovers the affected existing owners and retains their
+([§FS-rhei-init.2](rhei-init.spec.md#2-behavior)). It discovers the affected existing owners and retains their
 sorted shared guards before any creation or other effect and through all writes.
 
 External run-registry reporting may retain an uncheckable root as unknown using
-only its registry entry (§FS-rhei-run-headless.3). Failure to inspect a root is
+only its registry entry ([§FS-rhei-run-headless.3](rhei-run-headless.spec.md#3-run-identity-and-liveness)). Failure to inspect a root is
 neither proof of pending recovery nor permission to read that root: no dependent
 root reads, mutations, ended classification or pruning may follow. Unrelated
 accessible entries remain resolvable under their own guards. An established
@@ -214,7 +214,7 @@ rhei recover <execution-root>
 
 A pending removal is the same interlock under a second marker,
 `.rhei/pending-removal.json` at the project execution root
-(§FS-rhei-remove.6.2). While it exists every entry point other than the
+([§FS-rhei-remove.6.2](rhei-remove.spec.md#62-pending-removal)). While it exists every entry point other than the
 `rhei remove` invocation that resumes it refuses in the same place and the same
 way, naming the pending ticket and printing exactly one command:
 
@@ -232,7 +232,7 @@ interlock and must not access an in-doubt root.
 The marker check above needs nothing from the account: it reads
 `<root>/.rhei/forced-recovery.json` inside the root. Creating the lock does
 need the account's state directory, which rhei has no way to guarantee is
-writable (§DA-detached-runs). Where the lock for a root cannot be located,
+writable ([§DA-detached-runs](../decisions/architectural/detached-runs.md#da-detached-runs-a-detached-run-is-a-supervisor-process-not-a-daemon-service)). Where the lock for a root cannot be located,
 created, or opened, a **shared** acquisition proceeds without it. The marker is
 still checked before and after, an established marker still refuses, and the
 command's bytes and effects are otherwise unchanged. What is given up is mutual
@@ -244,7 +244,7 @@ Exclusive acquisition never degrades. The force and recovery coordinators exist
 to publish, inspect, and resolve a marker, and doing that without exclusion is
 worse than refusing: they fail, and the refusal names the lock path it could
 not create, the execution root it was for, the underlying error, and
-`XDG_STATE_HOME` as the lever (§FS-rhei-errors.1.5). The same subjects are
+`XDG_STATE_HOME` as the lever ([§FS-rhei-errors.1.5](rhei-errors.spec.md#15-the-subject-a-check-measured)). The same subjects are
 named when a shared acquisition degrades, as one warning on stderr per
 canonical root per process; stdout and the exit status are unchanged.
 
@@ -260,7 +260,7 @@ again.
 Confirmation, canonical paths, user attribution, file and directory syncing,
 atomic replacement, truncation, shared/exclusive guards, and run-lock owner
 diagnostics have the same contract on Linux, macOS, and Windows.
-§REQ-cross-platform
+[§REQ-cross-platform](../requirements/cross-platform.md#req-cross-platform-one-tool-on-linux-macos-and-windows)
 
 An injected or real interruption is recoverable at every boundary: before and
 after marker publication; before and after each image replacement; between the

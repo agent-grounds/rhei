@@ -1,11 +1,11 @@
 # FS-rhei-agent-output-drain: Agent Output at Exit
 
 An agent invocation ends at its direct subprocess's exit
-(§FS-rhei-agents.3.2.1), and what judges it afterwards reads the stdout and
+([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)), and what judges it afterwards reads the stdout and
 stderr rhei captured from it: provider-limit recognition
-(§FS-rhei-agents.2.3), the invocation's usage capture
-(§FS-rhei-cost-accounting.4), and the log, whose exit footer closes the
-transcript (§FS-rhei-agents.8). This point says how much of that output they
+([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)), the invocation's usage capture
+([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow)), and the log, whose exit footer closes the
+transcript ([§FS-rhei-agents.8](rhei-agents.spec.md#8-log-capture)). This point says how much of that output they
 read. The exit is the boundary: what was written before it is read whole, and
 what a descendant writes after it is read only if it arrives in time.
 

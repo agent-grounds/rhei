@@ -10,12 +10,12 @@ This is the user-visible realization of [§REQ-bounded-neural-work](../requireme
 owns the runtime boundary beneath it.
 
 The spend bounded here is **measured** spend, read from the cost accounting
-record a completed invocation already produces §FS-rhei-cost-accounting.
+record a completed invocation already produces [§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting).
 Nothing in this specification qualifies a transport, brokers a request,
 confines a process, or settles money: spend as a provider bills it is the
 stricter grade and remains an obligation on `agent-grounds/rhei#460`. What is
 added here is a ceiling over what this engine's own records say was spent
-§REQ-bounded-neural-work.6.
+[§REQ-bounded-neural-work.6](../requirements/bounded-neural-work.spec.md#6-the-residual-gap).
 
 ## 1. The two counts and the day's spend
 
@@ -41,7 +41,7 @@ runtime of the project. A bare rhei is the single rhei of its implicit project (
 Like invocations it is a property of the **project**, and the same one durable
 account holds it. Unlike either count it is an amount of money: admission
 tallies no unit of it, and its value comes from the accounting record the
-invocation produced §FS-rhei-cost-accounting.
+invocation produced [§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting).
 
 Because travel is per identity, how many travel bounds a pipeline holds is
 decided by its shape rather than by this page: one task with six states holds
@@ -53,7 +53,7 @@ an amount of money. Neither is `visits:`, `attempts:`, or a poll counter: those
 bound a state entry, and they may refresh or increment without touching either
 count ([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-five-levels)). Spend is the amount, held in integer
 micro-units of the account's currency so that the arithmetic below stays exact
-and no rounding accumulates §FS-rhei-cost-accounting.5.
+and no rounding accumulates [§FS-rhei-cost-accounting.5](rhei-cost-accounting.spec.md#5-pricing).
 
 At every durable boundary, for each of the three:
 
@@ -95,7 +95,7 @@ the machine that pays for it.
 Only the paying machine may hand the ceiling to the project, by setting
 `defaults.clamp_projects: false` in its own settings file, and only for
 `transition_limit` and `invocations_per_day`
-([§REQ-bounded-neural-work.2](../requirements/bounded-neural-work.spec.md#2-bounded-by-default-refusing-nothing-that-runs-today), §DF-delegated-count-ceiling). Each key is decided on its own: where
+([§REQ-bounded-neural-work.2](../requirements/bounded-neural-work.spec.md#2-bounded-by-default-refusing-nothing-that-runs-today), [§DF-delegated-count-ceiling](../decisions/functional/delegated-count-ceiling.md#df-delegated-count-ceiling-a-paying-machine-may-hand-the-two-count-ceilings-to-the-project)). Each key is decided on its own: where
 the project declares the key, its value replaces the machine's as the ceiling,
 whether it is higher or lower; where it does not, the machine's value or the
 built-in stays the ceiling, exactly as on a machine that never set the switch.
@@ -120,7 +120,7 @@ anything here.
 
 The first term of the chain above is not open to every dimension:
 `spend_per_day` resolves on the **machine and project tiers only**
-§FS-rhei-budgets.2.1.
+[§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys).
 
 ### 2.1. The settings keys
 
@@ -137,7 +137,7 @@ only the machine's settings may carry
 | `clamp_projects` | boolean, machine settings only | `true` | `false` makes a declared project `transition_limit` or `invocations_per_day` the ceiling in place of the machine's |
 
 `clamp_projects` is not a bound but the machine's choice of whose value the two
-count bounds are clamped to (§FS-rhei-budgets.2). It does not reach
+count bounds are clamped to ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)). It does not reach
 `invocation_lifetime_max` or `spend_per_day`, and it is refused by its presence,
 whatever its value, anywhere but the machine settings file
 ([§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults)).
@@ -158,7 +158,7 @@ the definition of a healthy history, the observed maxima, the multiplier, and
 what the evidence could not see — is recorded in [§REQ-bounded-neural-work.7](../requirements/bounded-neural-work.spec.md#7-the-defaults-are-measured-not-chosen) so
 that a re-measurement can supersede them honestly. The spend number was
 measured over a different corpus under a restated definition of healthy, which
-§REQ-bounded-neural-work.7.5 states separately for exactly that reason.
+[§REQ-bounded-neural-work.7.5](../requirements/bounded-neural-work.spec.md#75-the-spend-default-and-the-four-things-it-could-not-see) states separately for exactly that reason.
 
 `invocation_lifetime_max` is a ceiling, not an allowance: nothing consumes it
 and no project receives it. It clamps `rhei budget init` and every `adjust`.
@@ -166,7 +166,7 @@ and no project receives it. It clamps `rhei budget init` and every `adjust`.
 `spend_per_day` is a **bare number** carrying no symbol and no currency code:
 `400`, `25.00` and `9.5` are all accepted, to at most six decimal places, which
 is the micro-unit the amount is held in. The currency is the account's own and
-is fixed by §FS-rhei-budgets.5.5, not by this key, because a machine setting
+is fixed by [§FS-rhei-budgets.5.5](rhei-budgets.spec.md#55-one-currency-per-account), not by this key, because a machine setting
 that named a currency could disagree with the records it is charged from and
 nothing would say which of the two was wrong.
 
@@ -198,7 +198,7 @@ chain above, so a machine that has never been configured still bounds every node
 of every profile. A declared value is an inner value like any other: honored
 when it is at or below the active ceiling, clamped and reported when it is
 above. The active ceiling is the machine's, or the project's where the machine
-delegated `transition_limit` to it (§FS-rhei-budgets.2), so under delegation a
+delegated `transition_limit` to it ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)), so under delegation a
 profile asking above the project's value gets the project's value.
 
 Every node resolves a profile and therefore a travel bound, including the
@@ -326,7 +326,7 @@ recorded one.
 Spend is bounded per **UTC calendar day**, always. It is not a third invocation
 contract and it does not follow the one the account holds: an account moved to
 the lifetime contract by `rhei budget init` still has its spend bounded by the
-day, because §FS-rhei-budgets.10 grants no spend allowance for a lifetime
+day, because [§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget) grants no spend allowance for a lifetime
 contract to bound.
 
 The day key is the one [§FS-rhei-budgets.3.3](rhei-budgets.spec.md#33-the-window-is-a-key-not-a-refill) already defines, read through the one
@@ -379,7 +379,7 @@ missing arms before the ticket advances.
 A retry costs **zero travel and one invocation**. A fresh visit refreshes
 `attempts:` and never the project account.
 
-An attended `rhei retry` grant (§FS-rhei-retry.2) creates no travel, visit or
+An attended `rhei retry` grant ([§FS-rhei-retry.2](rhei-retry.spec.md#2-grant-and-refusals)) creates no travel, visit or
 invocation headroom; every admitted granted attempt costs one invocation like
 any other retry, and is refused when that account is exhausted.
 
@@ -418,7 +418,7 @@ project directory that the project does not discover — under its `runtime/`, i
 a grouping folder or a reproducer's scratch directory — is a bare rhei with an
 account of its own, and nothing it does is charged to, or appended to the
 journal of, the enclosing project. Run from inside one of that project's agents,
-it is the case of §FS-rhei-budgets.7.2: admitted unparented and noted once.
+it is the case of [§FS-rhei-budgets.7.2](rhei-budgets.spec.md#72-a-descriptor-minted-for-another-project): admitted unparented and noted once.
 
 The directory is deliberately **outside `runtime/`**, so that [§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior)'s wholesale
 deletion of `runtime/` cannot reach it. It is machine state rather than authored
@@ -449,7 +449,7 @@ older build.
 A `spend` receipt is the settle, and it has to be a kind of its own because
 every other kind is appended *before* a measured cost can exist. It names the
 `reservation_id` it settles, the `amount_micro` charged, the `currency`, and a
-`basis` of `measured`, `unpriced`, or `unmeasurable` §FS-rhei-budgets.6.2. At
+`basis` of `measured`, `unpriced`, or `unmeasurable` [§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle). At
 most one `spend` receipt may name a reservation: a second naming the same
 reservation with different content is corruption, and one naming a reservation
 the chain does not hold is corruption. A build that does not know the kind
@@ -462,7 +462,7 @@ live sources are tolerated only while their bytes agree. That is what makes a
 *moved* ticket keep its travel, and only a moved one: agreeing bytes are what
 distinguishes a relocated document from a conflicting one, and say nothing about
 whether one identity has two live claimants, so a *copy* does not take the
-travel of the ticket it was copied from §FS-rhei-budgets.5.2.1. Two documents
+travel of the ticket it was copied from [§FS-rhei-budgets.5.2.1](rhei-budgets.spec.md#521-one-identity-one-live-ticket). Two documents
 claiming one identity with different content are a conflict rather than a fork.
 
 The binding is also what a ticket carrying no identity is resolved *from*. A
@@ -478,13 +478,13 @@ comes back. The key is rhei's own and registered as one
 is also what keeps it out of the author metadata a query publishes. The display id is part of the key, because one document holds every
 ticket of a rhei and a binding matched on the path alone would hand one ticket's
 travel to its sibling — and the key may only move to a display id the document
-no longer claims the identity under §FS-rhei-budgets.5.2.1.
+no longer claims the identity under [§FS-rhei-budgets.5.2.1](rhei-budgets.spec.md#521-one-identity-one-live-ticket).
 
 `rhei remove` leaves the journal exactly as it is: no receipt is appended,
 rewritten or dropped, and no binding is released. A ticket with any receipt is
-not untouched and cannot be removed at all (§FS-rhei-remove.2); one with a
+not untouched and cannot be removed at all ([§FS-rhei-remove.2](rhei-remove.spec.md#2-untouched)); one with a
 binding alone keeps it, its `budgetTicketId` moving unchanged into the
-retirement record (§FS-rhei-remove.5.1).
+retirement record ([§FS-rhei-remove.5.1](rhei-remove.spec.md#51-where-it-is-recorded)).
 
 #### 5.2.1. One identity, one live ticket
 
@@ -508,7 +508,7 @@ still claim, and that is the one fact this rule turns on — how many live ticke
 name the uuid.
 
 **More than one — refused.** The admission is refused under
-§FS-rhei-budgets.8's contract rather than as a halt: no arm is started, no edge
+[§FS-rhei-budgets.8](rhei-budgets.spec.md#8-exhaustion)'s contract rather than as a halt: no arm is started, no edge
 is applied, no task result is written, and the ticket stays in the state it is
 in. No bound is what stopped it, so it carries the plain `error:` shape rather
 than the six-row report of an exhausted bound:
@@ -533,7 +533,7 @@ and `work.1` claiming one uuid in two live documents whose bytes agree — and t
 line then names both paths instead of one file name, because a bare name would
 not locate either of them:
 `claimed by:  plan.1 and work.1, live in <path> and <path>`. Its **one** remedy
-— §FS-rhei-budgets.8 requires exactly one — is a fresh `budgetTicketId` for
+— [§FS-rhei-budgets.8](rhei-budgets.spec.md#8-exhaustion) requires exactly one — is a fresh `budgetTicketId` for
 whichever of the two did not earn the history, in its file. Deleting a key is not
 offered, because whether it resolves anything depends on which of the two takes
 the next edge: in an account whose binding has already moved, a keyless ticket
@@ -563,7 +563,7 @@ bound is reported all the same.
 A ticket carrying no identity never reaches this rule. It resolves through the
 binding on its own display id and source path, so the display id it then binds
 is the one already recorded and the binding does not move: the lost-write case
-of §FS-rhei-budgets.5.2 keeps its answer.
+of [§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal) keeps its answer.
 
 That resolution is where the rule reaches its limit, and this point says so
 rather than claiming otherwise. A renumber leaves the binding naming the id it
@@ -580,7 +580,7 @@ both claimants and the display id the account counts the history against, and
 leaves **which of the two earned it** to the person, who can tell.
 
 A **retired** identity has no live claimant, and that does not free it: the
-display id it was bound to is retired (§FS-rhei-remove.5.2), and a live ticket
+display id it was bound to is retired ([§FS-rhei-remove.5.2](rhei-remove.spec.md#52-what-a-retired-id-forbids)), and a live ticket
 presenting the identity under any other display id is refused with the shape
 above, naming the retirement record as the holder. Retirement is the end of an
 identity, never a way to hand its bound to a new ticket.
@@ -664,8 +664,8 @@ because they are not the same accident:
 | `journal_absent` | the journal file is not there at all | both readings, and one runnable command for each |
 | `journal_truncated` | a journal exists but holds fewer receipts than the witness | restore it by copying the witness back |
 | `chain_broken` | a journal exists and its identity, sequence or hash chain does not verify | restore it by copying the witness back |
-| `held_elsewhere` | the uuid this root presents is bound to another root that still holds it | both roots, and `rhei budget forget` for this one (§FS-rhei-budgets.5.4.1) |
-| `foreign_tail` | the witness runs past the journal and that tail names another root | the other root, and setting the witness aside; never the copy (§FS-rhei-budgets.5.4.2) |
+| `held_elsewhere` | the uuid this root presents is bound to another root that still holds it | both roots, and `rhei budget forget` for this one ([§FS-rhei-budgets.5.4.1](rhei-budgets.spec.md#541-a-second-root-presenting-the-account)) |
+| `foreign_tail` | the witness runs past the journal and that tail names another root | the other root, and setting the witness aside; never the copy ([§FS-rhei-budgets.5.4.2](rhei-budgets.spec.md#542-a-tail-written-from-another-root)) |
 
 The names are the vocabulary a machine reader gets
 ([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)) and the reason the
@@ -715,7 +715,7 @@ on disk tells a copy from a move: whether the bound root's own `budgets/` still
 | the index binds the uuid to | reading | answer |
 |---|---|---|
 | this root | its home | proceed |
-| no root | **adopted** (§FS-rhei-budgets.5.4) | proceed, and record this root |
+| no root | **adopted** ([§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted)) | proceed, and record this root |
 | another root that still holds it | **copy** — `held_elsewhere` | refused before anything is appended |
 | only roots that no longer hold it — gone, holding another uuid, or holding no account | **move** | rebind to this root, drop the stale roots, warn once, proceed |
 
@@ -724,7 +724,7 @@ answer creates something no one asked for. Proceeding writes the copy's
 receipts into the original's history and locks the original out; minting would
 make `cp -r` a way to restart a project at zero consumed, and
 [§REQ-bounded-neural-work.4](../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity) names a copy of a plan among the things that
-create no capacity. This is §FS-rhei-budgets.5.2.1's argument one level up: a
+create no capacity. This is [§FS-rhei-budgets.5.2.1](rhei-budgets.spec.md#521-one-identity-one-live-ticket)'s argument one level up: a
 copied ticket does not take the original's travel, and a copied project does not
 take the original's account.
 
@@ -734,7 +734,7 @@ answers: `rhei budget forget '<this root>' --reason '<why>'` where this is a
 copy, and moving or deleting the holder first where this root is meant to
 replace it. The holder is untouched — its next charge proceeds as if the copy
 had never been made. `rhei budget forget` in the copy retires the copy's claim
-(§FS-rhei-budgets.10), and its next charge opens a fresh account at zero
+([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)), and its next charge opens a fresh account at zero
 consumed; the two projects then run side by side.
 
 A **moved** project keeps its account and its history. Its first charge at the
@@ -748,12 +748,12 @@ After a move the old path is free: a new project laid there gets a fresh account
 rather than the moved one's, which lives on at its new root.
 
 Deleting a copy's `budgets/` by hand still gives it a fresh account, as it gives
-any root one. That is the residual §FS-rhei-budgets.5.3 already states, and this
+any root one. That is the residual [§FS-rhei-budgets.5.3](rhei-budgets.spec.md#53-the-witness) already states, and this
 rule neither widens nor narrows it.
 
 #### 5.4.2. A tail written from another root
 
-A witness written to by a copy before §FS-rhei-budgets.5.4.1 refused it runs
+A witness written to by a copy before [§FS-rhei-budgets.5.4.1](rhei-budgets.spec.md#541-a-second-root-presenting-the-account) refused it runs
 past the original's journal, and the original reads as truncated. Where that
 extra tail holds an `identity` receipt whose `source_path` lies outside this
 root, the tail is not this project's lost history, and the account is reported
@@ -764,7 +764,7 @@ the tail came from it, and **never** offer copying the witness over the journal:
 that copy would write transitions this project never took and spend it never
 made into its history. They offer one runnable command that moves the witness
 aside under a kept name, keeping every byte; the next charge then adopts the
-journal that is this project's own (§FS-rhei-budgets.5.4).
+journal that is this project's own ([§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted)).
 
 A tail that carries no `identity` receipt cannot be told apart from a tail this
 project lost, so it stays `journal_truncated`, with the restore.
@@ -783,7 +783,7 @@ and the account. Nothing is converted: an exchange rate is a fact about a day
 that this ledger does not hold, and adding two currencies would make every
 number above this line wrong without saying so.
 
-This is the same answer §FS-rhei-cost-accounting.5.1 already gives for a second
+This is the same answer [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection) already gives for a second
 currency arriving in one accounting root, taken at a different boundary and for
 a different reason — that check protects a rollup, this one protects a bound —
 which is why the rule is stated here, where the account that holds the currency
@@ -806,10 +806,10 @@ serialized transaction:
    else the binding the ledger already holds for it ([§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal)), else a
    fresh one;
 3. check one travel unit for the ticket, one invocation unit per arm, and the
-   worst case each arm may spend (§FS-rhei-budgets.6.2) against the effective
+   worst case each arm may spend ([§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle)) against the effective
    bounds and against every ancestor envelope — in that order, so that a spawn
    standing at two bounds at once is refused on the count and reports the text
-   it already reported (§FS-rhei-budgets.8);
+   it already reported ([§FS-rhei-budgets.8](rhei-budgets.spec.md#8-exhaustion));
 4. append and durably sync one reservation carrying every unit and every
    reserved amount, or refuse and append nothing;
 5. only then create the subprocess.
@@ -858,7 +858,7 @@ The worst case reserved for every neural start is a flat **20.00** in the
 account's currency. It is not derived per model, because no agent profile
 declares a token or a context limit to derive one from; it is the largest
 single invocation this workspace has recorded, rounded up, and it carries no
-margin of its own §REQ-bounded-neural-work.7.5. Its size bounds the *in-flight*
+margin of its own [§REQ-bounded-neural-work.7.5](../requirements/bounded-neural-work.spec.md#75-the-spend-default-and-the-four-things-it-could-not-see). Its size bounds the *in-flight*
 exposure rather than the day's total, because a settled reservation gives it
 back.
 
@@ -872,7 +872,7 @@ A settle has four outcomes, and only the first revises:
 | a settle that could not be written | the reserve, left outstanding | `unsettled` |
 
 The third row decides where the fallback has to be charged. Usage extraction is
-not supported for every agent §FS-rhei-cost-accounting.3.2, so for that class
+not supported for every agent [§FS-rhei-cost-accounting.3.2](rhei-cost-accounting.spec.md#32-extraction-status), so for that class
 no record is ever written and a settle never runs at all. The worst case is
 therefore charged at the **reserve**, which always runs because admission
 always runs. **No invocation is ever charged nothing.** A dimension that read
@@ -884,7 +884,7 @@ amount is not stored as a mark but *derived*: a reservation carrying a spend
 reserve, with no `spend` receipt, whose owning run is gone — the same test the
 release step above already performs, on the same account under the same lock.
 It stays outstanding, so a wrong day reads high rather than silently low, and
-every surface of §FS-rhei-budgets.9 says how many there are.
+every surface of [§FS-rhei-budgets.9](rhei-budgets.spec.md#9-visibility) says how many there are.
 
 A `spend` receipt settles money and nothing else. It releases no travel unit
 and no invocation unit and changes neither count in either direction, so every
@@ -917,7 +917,7 @@ one nested run which is no descendant at all. A `rhei run` whose own account is
 not the one holding the ancestor was never inside that envelope, so opening a
 balance in its own ledger is the *absence* of an envelope to escape rather than
 an escape from one. Such a run is still counted — on its own project's bounds,
-§FS-rhei-budgets.7.2 — and what §REQ-bounded-neural-work.6 forbids is work
+[§FS-rhei-budgets.7.2](rhei-budgets.spec.md#72-a-descriptor-minted-for-another-project) — and what [§REQ-bounded-neural-work.6](../requirements/bounded-neural-work.spec.md#6-the-residual-gap) forbids is work
 counted **nowhere**. Reading that fallback as an escape hatch from the
 requirement has it backwards: the hatch would be to charge an account this run
 has no claim on.
@@ -945,7 +945,7 @@ The three answers differ in kind:
   names no ancestor of this run. This is not `ancestor_unavailable`, because
   nothing was unavailable: there was no ancestry to authenticate. The run is
   admitted unparented against its own account and says so once
-  (§FS-rhei-budgets.7.2).
+  ([§FS-rhei-budgets.7.2](rhei-budgets.spec.md#72-a-descriptor-minted-for-another-project)).
 - **`RHEI_BUDGET_PARENT_ACCOUNT` is absent.** The reservation is taken as an
   ancestor exactly as it is when the accounts match, refusal included. A parent
   too old to name its account is the only thing that produces this case, and it
@@ -964,7 +964,7 @@ A run whose account is not the one holding the ancestor is admitted
 **unparented**: it draws nothing against the exporter's envelope, it is not held
 to the exporter's deadline, and the receipt it writes names no parent. It is not
 thereby unbounded. It is held to its own project's three bounds of
-§FS-rhei-budgets.1, resolved from that project's settings and clamped by the
+[§FS-rhei-budgets.1](rhei-budgets.spec.md#1-the-two-counts-and-the-days-spend), resolved from that project's settings and clamped by the
 machine ceiling ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)), exactly as an unparented run always has
 been.
 
@@ -1037,7 +1037,7 @@ error: ticket 'plan.1' has spent its travel bound
 ```
 
 A clamped bound carries the requester as well, in the one line of
-§FS-rhei-budgets.2.3, and the remedy still names the limiter rather than the
+[§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued), and the remedy still names the limiter rather than the
 requester:
 
 ```text
@@ -1046,7 +1046,7 @@ requester:
 ```
 
 Where the machine delegated the dimension's ceiling to the project
-(§FS-rhei-budgets.2), the halt gains one row, `ceiling:`, directly after
+([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)), the halt gains one row, `ceiling:`, directly after
 `bound:`, and the remedy names the project's file. `<P>` and `<M>` stand for
 the project and machine settings files actually read:
 
@@ -1083,7 +1083,7 @@ error: project 'panta' has spent today's invocation capacity
 ```
 
 A spend halt has the same six rows and the same labels. Its remedy is the
-renewal instant, because spend is bounded by a window §FS-rhei-budgets.3.4 and
+renewal instant, because spend is bounded by a window [§FS-rhei-budgets.3.4](rhei-budgets.spec.md#34-the-spend-window) and
 the rule above does not change for being about money — which costs the halt the
 chance to mention `defaults.spend_per_day`, and is the accepted price of one
 halt reading the same on every surface:
@@ -1102,7 +1102,7 @@ worst case of the request that was just refused, added to whatever the day
 already held outstanding, because consumed alone never reaches a spend
 ceiling — what reaches it is consumed plus the next reserve, and a halt whose
 arithmetic the reader cannot do has not said what stopped the work. And every
-amount is written in the account's currency §FS-rhei-budgets.5.5: `$` before
+amount is written in the account's currency [§FS-rhei-budgets.5.5](rhei-budgets.spec.md#55-one-currency-per-account): `$` before
 the number for USD, the code after it otherwise, as in `25.00 EUR`.
 
 A spend halt carries **one optional row**, present only where some part of the
@@ -1128,7 +1128,7 @@ is spent, on every surface that already shows autonomous work:
 
 Wherever a view lists the bounds — `rhei validate`, `rhei budget show`, the run's
 text summary and the run report — it follows them, where the machine delegated a
-ceiling, with the ceiling and policy rows of §FS-rhei-budgets.2.3, once per view
+ceiling, with the ceiling and policy rows of [§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued), once per view
 and never per spawn. The run's JSON and TUI records carry the same facts as
 fields ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)).
 - **`rhei run`** text and TUI show each bound with consumed, outstanding, and
@@ -1142,7 +1142,7 @@ fields ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)).
 
 Every surface that carries the spend dimension carries the account's currency
 with it, and says how much of the day was charged at the fallback rather than
-measured, by the three marks of §FS-rhei-budgets.6.2.
+measured, by the three marks of [§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle).
 
 Where cost accounting also exists for a run, the two are still reported side by
 side and neither is described as the other. Accounting only measures, prices
@@ -1152,7 +1152,7 @@ distinction and it is unchanged. What is new is that one dimension of the
 budget is now *charged* from those records rather than only displayed beside
 them, and it is the dimension whose unit is money rather than a count. Where
 extraction fails, that dimension is charged the worst case rather than nothing
-§FS-rhei-budgets.6.2 — which is a fact about the bound, not a change to what
+[§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle) — which is a fact about the bound, not a change to what
 accounting measured.
 
 ## 10. `rhei budget`
@@ -1177,9 +1177,9 @@ effective bound, its value source and limiting source, consumed, outstanding,
 remaining, the contract in force, the window day key where one applies, the
 account's health, and the project identity. For spend it reports the amounts in
 the account's currency and additionally how much of the day was charged at the
-fallback rather than measured, by the three marks of §FS-rhei-budgets.6.2.
+fallback rather than measured, by the three marks of [§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle).
 Where the machine delegated a ceiling, the text report follows its bound lines
-with the ceiling and policy rows of §FS-rhei-budgets.2.3.
+with the ceiling and policy rows of [§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued).
 
 Under `--format json` each entry of `bounds` carries `effective`, `source`,
 `requested`, and `limited_by`, which is `"machine"` or `"project"` — whoever
@@ -1199,7 +1199,7 @@ project spend: $20.00 consumed + $0.00 outstanding / $400.00; $380.00 remaining 
 ```
 
 `init` and `adjust` take no spend argument and gain none. There is no spend
-allowance to grant: spend is bounded by a window always §FS-rhei-budgets.3.4,
+allowance to grant: spend is bounded by a window always [§FS-rhei-budgets.3.4](rhei-budgets.spec.md#34-the-spend-window),
 and a window is renewed by the passage of time rather than by an audited grant.
 
 `adjust` changes the allowance and never consumption. Every adjustment is
@@ -1239,7 +1239,7 @@ fails *and* writes outside the path it named.
 The account's `health` is a closed vocabulary of two values, `verified` and
 `damaged`. Where it is `damaged` the report additionally carries the `damage`
 sub-case — one of `journal_absent`, `journal_truncated`, `chain_broken`,
-`held_elsewhere`, `foreign_tail`, the five of §FS-rhei-budgets.5.4 — and where it is `verified` there is no `damage`
+`held_elsewhere`, `foreign_tail`, the five of [§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted) — and where it is `verified` there is no `damage`
 to carry. A reader may depend on both: neither gains a value without this
 section gaining it too.
 
@@ -1271,19 +1271,19 @@ account was not this project's. Six cases, and two act:
 | the account at this path | `forget` |
 |---|---|
 | journal present and verifying | **refuses**, exits non-zero, writes nothing, and names `adjust` as what changes an allowance |
-| journal present and damaged (`journal_truncated`, `chain_broken`) | **refuses**, exits non-zero, writes nothing, and names the restore of §FS-rhei-budgets.5.4 |
-| journal present and its tail from another root (`foreign_tail`) | **refuses**, exits non-zero, writes nothing, and names setting the witness aside (§FS-rhei-budgets.5.4.2) |
+| journal present and damaged (`journal_truncated`, `chain_broken`) | **refuses**, exits non-zero, writes nothing, and names the restore of [§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted) |
+| journal present and its tail from another root (`foreign_tail`) | **refuses**, exits non-zero, writes nothing, and names setting the witness aside ([§FS-rhei-budgets.5.4.2](rhei-budgets.spec.md#542-a-tail-written-from-another-root)) |
 | no witness claims this root | **refuses**, exits non-zero, naming the path — the lawful **absent** state has nothing to retire, and a path with no record is far more often a typo |
 | damaged with the journal wholly absent (`journal_absent`) | retires it |
 | the account is held by another root (`held_elsewhere`) | retires **this root's claim**: moves `budgets/<uuid>/` to `budgets/retired/<uuid>-<stamp>/` with the audit receipt beside it, and touches neither the witness nor the index |
 
 The refusal on a sound account is the guarantee of
-§FS-rhei-budgets.5.3 and not a convenience: without it this command would be a
+[§FS-rhei-budgets.5.3](rhei-budgets.spec.md#53-the-witness) and not a convenience: without it this command would be a
 way to reset a working balance, and the bound would hold only until someone ran
 it.
 
 The refusal where a journal is **present** follows from
-§FS-rhei-budgets.5.4 rather than adding to it: a journal that is there and bound
+[§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted) rather than adding to it: a journal that is there and bound
 to this root **is** this project's, so the remedy is to restore its tail, and retiring the root
 would discard a real account while leaving that journal exactly as unverifiable
 as it was — an operator left worse off than before they ran the command. Nothing
@@ -1292,7 +1292,7 @@ restore as their answer. A damaged report never offers `forget` in those
 sub-cases either; this says what happens when it is asked for anyway. A copy's
 journal is the one present journal that is not this root's: the account is the
 holder's, so retiring the copy's claim gives up nothing of this project's and
-leaves the holder's history exactly as it was (§FS-rhei-budgets.5.4.1).
+leaves the holder's history exactly as it was ([§FS-rhei-budgets.5.4.1](rhei-budgets.spec.md#541-a-second-root-presenting-the-account)).
 
 Retiring is one audited move, and nothing is destroyed by it. The witness
 directory is moved under a `retired/` name beside the live ones, keeping
@@ -1305,7 +1305,7 @@ behind would hand the next project at the path the retired project's identity,
 and a retirement that leaves the identity in place has not retired the root.
 
 Because the uuid is gone, anything keyed to it starts fresh — a ticket's budget
-identity is `ticket:<project-uuid>:<…>` (§FS-rhei-budgets.5.2), so travel
+identity is `ticket:<project-uuid>:<…>` ([§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal)), so travel
 recorded against the retired account is not in the new one. On a reused path
 there is no such key to lose, the plan files being a fresh copy. Anywhere else
 that is a reason to restore rather than to forget, which is why `forget` refuses
@@ -1319,14 +1319,14 @@ a sound account and why a damaged report puts restore first.
 | `agent_timeout`, `attempts:`, `visits:`, `poll.max_attempts` | untouched, and not clamped |
 | `rhei reset` | still deletes `runtime/` and restores authored state; the account is not under `runtime/` and survives, and so does the ticket's budget identity ([§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior)) |
 | `rhei reset --rhei` | removes what is keyed by an in-scope ticket id and **no receipts**: a narrowed reset that dropped a ticket's travel would make `--rhei` the faucet ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)) |
-| `rhei remove` | deletes an untouched ticket's definition and residue and retires its id; it appends, rewrites and refunds nothing in the account, and a retired identity is never rebound (§FS-rhei-remove.5.2) |
+| `rhei remove` | deletes an untouched ticket's definition and residue and retires its id; it appends, rewrites and refunds nothing in the account, and a retired identity is never rebound ([§FS-rhei-remove.5.2](rhei-remove.spec.md#52-what-a-retired-id-forbids)) |
 | `rhei run --rhei` | narrows candidates only. One account, one balance, whatever the selection ([§FS-rhei-run.2.5](rhei-run.spec.md#25-project-scope---rhei)) |
 | `rhei run --dry-run` | reports the bounds and what the pass would cost, and spends nothing |
 | detached and concurrent runs | the same account, serialized by the same lock ([§FS-rhei-run-headless](rhei-run-headless.spec.md#fs-rhei-run-headless-detached-runs)) |
 | snapshots, appended work, live member admission | a new member joins the run and the one account; joining creates no capacity |
 | cost accounting | unchanged in how it measures, prices and rolls up. What is new is that one record it already wrote is now read by the spend dimension ([§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)) |
-| a plan with no spend field | there is no spend field to omit: `spend_per_day` is not plan-declarable, and every plan runs under the machine's value or the built-in (§FS-rhei-budgets.2.1) |
-| `rhei budget init` / `adjust` | neither gains a spend argument, because there is no spend allowance to grant (§FS-rhei-budgets.10) |
+| a plan with no spend field | there is no spend field to omit: `spend_per_day` is not plan-declarable, and every plan runs under the machine's value or the built-in ([§FS-rhei-budgets.2.1](rhei-budgets.spec.md#21-the-settings-keys)) |
+| `rhei budget init` / `adjust` | neither gains a spend argument, because there is no spend allowance to grant ([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)) |
 | git | the account is machine state and is gitignored; a project that commits it anyway is *adopted* on the next machine ([§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted)). The rule is seeded by `rhei init` ([§FS-rhei-budgets.5.1](rhei-budgets.spec.md#51-where-it-lives)), so a directory holding a hand-driven plan that `rhei init` never created owns the ignore rule itself |
 
 Six things do change for someone, and they are the point rather than a side
@@ -1343,9 +1343,9 @@ effect:
    20.00 rather than nothing. The busiest project-day in this workspace's whole
    archive was $96.37, so the ceiling is not what a working project meets — but
    more than twenty unmeasurable invocations in one day is, and that is the
-   sharpest edge in the bound rather than an oversight §FS-rhei-budgets.6.2.
+   sharpest edge in the bound rather than an oversight [§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle).
 6. A project whose price book names a currency the account does not hold is
-   refused before any agent starts, where it ran before §FS-rhei-budgets.5.5.
+   refused before any agent starts, where it ran before [§FS-rhei-budgets.5.5](rhei-budgets.spec.md#55-one-currency-per-account).
 
 And one thing stops being true: `rhei reset` no longer returns a ticket to a
 state from which it can consume without limit.

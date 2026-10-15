@@ -13,8 +13,8 @@ rhei next <RHEI_PLAN> [--peek] [--task <ID>] [--rhei <RHEI_ID>]
 | Flag               | Required | Default | Description                                                        |
 |--------------------|----------|---------|--------------------------------------------------------------------|
 | `--peek`           | No       | false   | Print the next claimable task without transitioning it             |
-| `--task <ID>`      | No       |         | Target a specific ticket instead of auto-selecting. See §2.1.      |
-| `--rhei <RHEI_ID>` | No       | all     | Narrow candidate selection to the named rheis (repeatable). §2.2.  |
+| `--task <ID>`      | No       |         | Target a specific ticket instead of auto-selecting. See [§FS-rhei-next.2.1](rhei-next.spec.md#21-ticket-targets).      |
+| `--rhei <RHEI_ID>` | No       | all     | Narrow candidate selection to the named rheis (repeatable). [§FS-rhei-next.2.2](rhei-next.spec.md#22-project-scope---rhei).  |
 
 ### 2.1. Ticket Targets
 
@@ -79,7 +79,7 @@ A task is *claimable* when:
 7. For automatic selection, its current state is the machine's initial state
    for that task node. Automatic claim mode enters a ticket at the top of its
    workflow, so it passes over one already partway through. `--task` names a
-   ticket explicitly and bypasses only this initial-state restriction (§3.4).
+   ticket explicitly and bypasses only this initial-state restriction ([§FS-rhei-next.3.4](rhei-next.spec.md#34-claiming-a-non-leaf-ticket-with---task)).
 
 Rules 1, 2, 4, 5 and 6 are the *ready set* — the one definition `rhei run`
 ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)) schedules from and `rhei list --ready` reports
@@ -97,7 +97,7 @@ its subtree is terminal, which is also when `rhei run` will schedule it
 ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)). Until then a parent and its own descendant are never worked
 at the same time.
 
-Rule 1 governs `--task` too; see §3.4.
+Rule 1 governs `--task` too; see [§FS-rhei-next.3.4](rhei-next.spec.md#34-claiming-a-non-leaf-ticket-with---task).
 
 Rule 1 has one declared refinement. A task in a *supervising* state is
 claimable while its subtree is held and nothing beneath it is in flight, and a
@@ -119,7 +119,7 @@ reported as held by its supervisor rather than as blocked.
 4. Select the first candidate in plan order.
 5. Acquire the plan file's canonical sibling sidecar as the sole writer lock,
    leaving the replaceable plan destination unlocked
-   (§FS-rhei-transition-cmd.3).
+   ([§FS-rhei-transition-cmd.3](rhei-transition-cmd.spec.md#3-behavior)).
 6. Re-read the current destination pathname and repeat the task's complete
    readiness and availability decision under the sidecar, including
    re-checking required `inputs` (guards against concurrent claims and moved
@@ -228,10 +228,10 @@ Task auth.1 claimed by manual (stays in 'pending')
 ```
 
 Both names are the state as the **machine** declares it, with the `-<visit>`
-suffix a counted loop writes into `**State:**` dropped (§4.1).
+suffix a counted loop writes into `**State:**` dropped ([§FS-rhei-next.4.1](rhei-next.spec.md#41-output-peek-mode)).
 
 The second form is not an edge case — it is *every* claim under the built-in
-machine, whose initial state is also its working state (§3). Reporting only
+machine, whose initial state is also its working state ([§FS-rhei-next.3](rhei-next.spec.md#3-default-behavior-claim-mode)). Reporting only
 `Task auth.1 (already in 'pending')` there described the state the caller could
 already see and said nothing about the `**Assignee:**` write, which is the
 whole point of claiming: the durable mark that stops a second worker taking the
@@ -273,7 +273,7 @@ Missing required input artifact: findings (runtime/findings/auth.review-cache-ke
 ### 3.4. Claiming a Non-Leaf Ticket with `--task`
 
 `--task` names a ticket explicitly and bypasses the automatic initial-state
-restriction, but no other readiness or availability rule (§3). Targeting a
+restriction, but no other readiness or availability rule ([§FS-rhei-next.3](rhei-next.spec.md#3-default-behavior-claim-mode)). Targeting a
 non-leaf ticket whose subtree is still open fails, naming every open descendant
 and pointing at what is claimable instead:
 
@@ -294,7 +294,7 @@ refusal that told the caller to wait for the children to "advance the parent"
 would describe a mechanism that does not exist.
 
 Once eligible, an ordinary parent uses the same one-edge passive-state rule as
-a leaf (§3); a supervising parent retains its supervision-specific in-place
+a leaf ([§FS-rhei-next.3](rhei-next.spec.md#3-default-behavior-claim-mode)); a supervising parent retains its supervision-specific in-place
 claim behavior. `rhei transition` and `rhei complete` move claimed work
 afterwards, both subject to the descendants-first guard on the shared
 transition path ([§FS-rhei-transition-cmd.3.1](rhei-transition-cmd.spec.md#31-descendants-first-on-terminal-entry)).
@@ -383,7 +383,7 @@ action is:
 
 Every row speaks about a task the caller can act on directly, so the categories
 are computed over *workable* tasks — leaves, plus non-leaf tasks whose subtree
-is already terminal (§3, rule 1). A parent therefore never masquerades as
+is already terminal ([§FS-rhei-next.3](rhei-next.spec.md#3-default-behavior-claim-mode), rule 1). A parent therefore never masquerades as
 gated, in-progress, or mid-workflow while its children are the real work. No
 row is needed for a parent whose subtree is open: some non-terminal leaf sits
 under it, and that leaf is workable, so one of the rows above already names the

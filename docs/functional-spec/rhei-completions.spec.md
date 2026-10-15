@@ -96,7 +96,7 @@ and `rh <TAB>` completes exactly like `rhei <TAB>`.
 - Unless `--install` or `--output` is passed, the command does not create, modify, or remove files.
 - With `--install`, the command creates parent directories as needed, overwrites the target completion file atomically enough for normal CLI use, and prints the installed path to stdout.
 - Generated completions call back into the current binary through the `COMPLETE` environment variable and reflect the current binary's command tree, global options, subcommands, flags, value enums, and supported dynamic argument values.
-- `rhei instantiate <TEMPLATE>` completes discovered project and user template names using the same precedence as `rhei templates` (§FS-rhei-templates.1): `<project>/.agent-grounds/rhei/templates/<name>/` first, then `~/.agent-grounds/rhei/templates/<name>/`, with the deprecated `.agents/rhei/templates/` searched after each. If the partially typed value is path-like (absolute, dot-prefixed, or contains `/`), directory completion is used instead.
+- `rhei instantiate <TEMPLATE>` completes discovered project and user template names using the same precedence as `rhei templates` ([§FS-rhei-templates.1](rhei-templates.spec.md#1-template-discovery)): `<project>/.agent-grounds/rhei/templates/<name>/` first, then `~/.agent-grounds/rhei/templates/<name>/`, with the deprecated `.agents/rhei/templates/` searched after each. If the partially typed value is path-like (absolute, dot-prefixed, or contains `/`), directory completion is used instead.
 
 ## 6. Completion Contract
 
@@ -170,7 +170,7 @@ is path-like when it is absolute, dot-prefixed, or contains `/`.
 
 Dynamic completion may inspect only local files and configuration:
 
-- The current working directory and its `.agent-grounds/rhei/` tree, and the deprecated `.agents/rhei/` tree behind it (§FS-rhei-templates.1.1).
+- The current working directory and its `.agent-grounds/rhei/` tree, and the deprecated `.agents/rhei/` tree behind it ([§FS-rhei-templates.1.1](rhei-templates.spec.md#11-rheis-project-local-home-and-its-deprecated-predecessor)).
 - User Rhei configuration under the documented user config directories.
 - The plan/workspace argument already present on the command line.
 - The selected template's `template.yaml`.

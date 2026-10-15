@@ -23,8 +23,8 @@ Flags are grouped by concern:
 | `--continue-on-error`    | false   | Continue to the next task when an agent or program exits non-zero          |
 | `--parallel <N>`         | 1       | Maximum number of agents or programs to run concurrently (0 = unlimited)   |
 | `--prices <PATH>`        | `defaults.prices`, else profile or built-in | Override profile-derived and built-in pricing with a validated local price book and copy it into the run's accounting roots. Its default is the `defaults.prices` settings key ([§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults)), which a machine or project file may set so every run here prices from one book; a path given on the command line wins. Without either, selected profiles with authored rates produce a generated snapshot before execution; otherwise built-in pricing is unchanged. See [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection). |
-| `--rhei <RHEI_ID>`       | all     | Narrow this run to the named rheis (repeatable). See §2.5.                  |
-| `--until-idle`           | false   | Run the available work, then return when every open task is waiting on a person or a future deadline, instead of sleeping for it. Exits `3` and reports the earliest next attempt. Implies plain output; conflicts with `--tui` and `--headless`. See §3 step 9 and §5.1. |
+| `--rhei <RHEI_ID>`       | all     | Narrow this run to the named rheis (repeatable). See [§FS-rhei-run.2.5](rhei-run.spec.md#25-project-scope---rhei).                  |
+| `--until-idle`           | false   | Run the available work, then return when every open task is waiting on a person or a future deadline, instead of sleeping for it. Exits `3` and reports the earliest next attempt. Implies plain output; conflicts with `--tui` and `--headless`. See [§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 9 and [§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states). |
 | `--tui`                  | auto    | Force TUI mode even when stdout is not detected as a TTY                   |
 | `--no-tui`               | auto    | Force plain stdout output even when stdout is a TTY                        |
 | `--json`                 | false   | Emit the run as a JSONL event stream on stdout. See [Run JSON Stream](rhei-run-json.spec.md) |
@@ -72,7 +72,7 @@ the normal precedence rules. [§FS-rhei-agents.1.4](rhei-agents.spec.md#14-resol
 graph, and a bare rhei is simply the single rhei of its implicit Panta
 ([§FS-rhei-panta.6.2](rhei-panta.spec.md#62-rhei-run)). `--rhei <RHEI_ID>` is repeatable and narrows the run to
 the named rheis. With no `--rhei`, successfully published project members may
-join the candidate set while the run is live (§3). With one or more `--rhei`
+join the candidate set while the run is live ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)). With one or more `--rhei`
 flags, the candidate set is exactly the member ids resolved at startup: later
 members still participate in strict graph validation, dependency resolution,
 and project-wide locking, but never become candidates in that run.
@@ -116,7 +116,7 @@ at. This is what makes a project-level `rhei run <project>` and a direct
 `rhei run <project>/<rhei>` mutually exclusive: both contend on the member
 rhei's lock. Locks are acquired in one canonical (sorted, absolute) order so
 two multi-root runs cannot deadlock. `--dry-run` takes no locks
-(§4). Narrowing with `--rhei` does not narrow the lock set: a narrowed run
+([§FS-rhei-run.4](rhei-run.spec.md#4-dry-run)). Narrowing with `--rhei` does not narrow the lock set: a narrowed run
 still locks the whole project, keeping lock behavior independent of scheduling
 scope.
 
@@ -131,11 +131,11 @@ promise.
 
 An operator-forced transition acquires the same involved roots
 non-blocking—after confirmation and before its exclusive root guard—and holds
-them through marker removal (§FS-rhei-transition-cmd.6). It never queues behind
+them through marker removal ([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)). It never queues behind
 a live run: the refusal names the recorded owner. Conversely, run startup
 checks the pending-recovery interlock before and after acquiring its shared root
 guards and refuses a marked root rather than completing or undoing the
-operator's transaction (§FS-rhei-recover.4).
+operator's transaction ([§FS-rhei-recover.4](rhei-recover.spec.md#4-pending-root-interlock)).
 
 A **foreground** run blocks on a lock another run holds — waiting for your turn
 is a queueing idiom people use on purpose — but says so first, naming the run it
@@ -144,7 +144,7 @@ line goes to stderr when stdout is a record stream ([§FS-rhei-run-json.1](rhei-
 wait is **interruptible**: `Ctrl+C` ends it at once, reporting that it stopped
 waiting and leaving the run that holds the lock untouched. A wait a command
 announces has to be one the operator can take back, and a wait parked inside a
-blocking `flock` cannot see the signal at all (§3.2). A **detached child** does
+blocking `flock` cannot see the signal at all ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)). A **detached child** does
 not queue: it fails immediately with the diagnostic above, because its launcher
 is holding a startup handshake open and would otherwise report a timeout for
 what is really a lock refusal ([§FS-rhei-run-headless.1.1](rhei-run-headless.spec.md#11-startup-is-synchronous)).
@@ -201,7 +201,7 @@ validation diagnostic and migration help, without rewriting the plan, with one
 scoped exception: a break that falls inside the region of a task whose worker
 is in flight or has just exited is that worker's edit, and the run waits for it,
 restores that one region to its text before the attempt, and goes on
-([§3.7](#37-a-workers-edit-that-breaks-the-plan)). Validation warnings retain
+([§FS-rhei-run.3.7](rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan)). Validation warnings retain
 the initial report's once-per-run presentation.
 
 Only after that validation does the run compare discovered member ids with the
@@ -247,7 +247,7 @@ headless, and JSONL surfaces; no new output record family is introduced.
    use the same full task tree. Tasks whose current state declares `poll:` and whose
    `metadata.tasks.<id>.pollNextAttemptAt.<state-name>` is later than the
    current wall-clock time are excluded from the ready set until the interval
-   elapses. A task with an applicable provider-limit record (§3.3) is also
+   elapses. A task with an applicable provider-limit record ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)) is also
    excluded until its `nextAttemptAt`; queued work sharing that record's
    identity is suppressed for the same interval. See [Next Command](rhei-next.spec.md#3-default-behavior-claim-mode)
    for the manual claimability rule and [Polling States](#51-polling-states) for
@@ -283,7 +283,7 @@ headless, and JSONL surfaces; no new output record family is introduced.
    - Spawn the subprocess with the state's resolved instructions, remaining
      transport and invocation-detail environment variables defined in
      [Agents Specification — Environment Variables](rhei-agents.spec.md#4-environment-variables), checkout-root working directory, and timeout.
-   - Wait for the subprocess to exit, for the timeout to fire, or for the run to be interrupted. Each subprocess runs in its own process group and is terminated as a group — `SIGTERM`, grace 10 s, then `SIGKILL` — whichever of the three reasons ends it (§3.2).
+   - Wait for the subprocess to exit, for the timeout to fire, or for the run to be interrupted. Each subprocess runs in its own process group and is terminated as a group — `SIGTERM`, grace 10 s, then `SIGKILL` — whichever of the three reasons ends it ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)).
 4. On subprocess exit, evaluate the state's [Completion Condition](rhei-agents.spec.md#32-completion-condition): exit code `0` plus every required `outputs:` artifact present on disk. When the transition this exit would select lands on a `final: true` state, the ticket's non-empty `runtime/results/<task-id>.md` is one more required artifact of that condition ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)) — the subprocess is the worker that knows why the ticket is finishing, and it was told the path in its prompt ([§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition)), or, for a program, in `RHEI_RESULT_PATH` ([§FS-rhei-programs.2](rhei-programs.spec.md#2-environment-variables)).
 
    That last artifact is owed on a **declared route** as well as on a zero exit:
@@ -311,9 +311,9 @@ headless, and JSONL surfaces; no new output record family is introduced.
      state's error or timeout transition per
      [Agents Specification — Execution Loop](rhei-agents.spec.md#52-execution-loop).
      The error route selects only a transition the state declares with
-     `exit_code` (§FS-rhei-programs.3.2), except a poll state's exhaustion
+     `exit_code` ([§FS-rhei-programs.3.2](rhei-programs.spec.md#32-evaluation-order)), except a poll state's exhaustion
      edge: once its attempt budget is spent, the first matching non-self-loop
-     transition is selected regardless of `exit_code` (§5.1).
+     transition is selected regardless of `exit_code` ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)).
      When no such transition is declared and `--continue-on-error` is unset,
      `rhei run` aborts with a non-zero exit code. These outcomes are the
      engine's own, so the engine supplies the ticket's result message for them
@@ -365,7 +365,7 @@ headless, and JSONL surfaces; no new output record family is introduced.
      timeout edge, or a move to `cancelled` would record a verdict on work the
      engine never saw.
      The halt preserves `The ticket stays in '{state}'.` and appends
-     `rhei retry <ID>` recovery advice (§FS-rhei-retry.3). For a supervising
+     `rhei retry <ID>` recovery advice ([§FS-rhei-retry.3](rhei-retry.spec.md#3-output-and-halt-advice)). For a supervising
      visit it also names the held subtree and unread checkpoint count and
      warns that its self-loop releases instead. Poll behavior is unchanged.
    - **The subprocess exited `0` in a supervising state and the visit released
@@ -387,7 +387,7 @@ headless, and JSONL surfaces; no new output record family is introduced.
      and a fresh `rhei run` does visit the state again. "Once per run, forever"
      is accepted here because the alternative is worse than unbounded: a
      supervisor bars its subtree while it is held, so a spent budget requires
-     attended recovery (§FS-rhei-retry.2), and within a run the
+     attended recovery ([§FS-rhei-retry.2](rhei-retry.spec.md#2-grant-and-refusals)), and within a run the
      ticket is re-visited only after something else advanced
      ([§FS-rhei-supervision.3.6](rhei-supervision.spec.md#36-empty-visits)).
    - **The worker's edit broke the plan.** The plan, re-read after the exit
@@ -396,7 +396,7 @@ headless, and JSONL surfaces; no new output record family is introduced.
      have selected: the run restores the region to its text before the attempt,
      keeps what the worker wrote beside the attempt's log, and charges the
      attempt against the visit's budget
-     ([§3.7](#37-a-workers-edit-that-breaks-the-plan)). The rest is the missing-output path above: the
+     ([§FS-rhei-run.3.7](rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan)). The rest is the missing-output path above: the
      ticket keeps its state, is not spawned again in the pass, and the run
      **continues with the other claimable tickets** in every mode, with or
      without `--continue-on-error`. A later pass retries the visit, and a spent
@@ -443,7 +443,7 @@ headless, and JSONL surfaces; no new output record family is introduced.
 
    **With `--until-idle`, this step has a third outcome.** Where a continuous
    run with nothing ready would consult the earliest effective deadline and
-   sleep (§5.1), a selected run performs the same final live-member admission
+   sleep ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)), a selected run performs the same final live-member admission
    checkpoint and **returns idle** instead: nothing is ready, nothing is in
    flight, and every in-scope non-terminal task is *idle-compatible*. It exits
    `3`, names the dominant kind of wait, and reports the earliest instant at
@@ -452,7 +452,7 @@ headless, and JSONL surfaces; no new output record family is introduced.
    option drains rather than making one scan — newly ready dependents and
    already-due retries run, parallel slots refill, and an in-flight worker is
    never abandoned, because a sleep site is unreachable while one is running —
-   and the pass loop, the readiness rules, the admission checkpoint, and §3.2's
+   and the pass loop, the readiness rules, the admission checkpoint, and [§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)'s
    three reasons for ending early are untouched. A run that does not select the
    option keeps every exit code and every byte of output it has today.
 
@@ -477,7 +477,7 @@ headless, and JSONL surfaces; no new output record family is introduced.
    idle-compatibility is decided. Idle is a property of the whole in-scope
    plan: one in-scope task whose classified blocker is actionable defeats it
    however many tasks wait beside it, so a real problem never hides under a
-   waiting result, and an interrupt ([§FS-rhei-run.3.2](#32-interruption-and-process-ownership)) defeats both.
+   waiting result, and an interrupt ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) defeats both.
    `--continue-on-error` governs how far independent work drains inside a pass
    and never this precedence.
 
@@ -496,8 +496,8 @@ headless, and JSONL surfaces; no new output record family is introduced.
    passes achieve.
 
    A ticket that stalled under step 5 is out of the running until the run
-   releases it, and when the run does is §3.5's rule
-   ([§FS-rhei-run.3.6](#36-stall-release)).
+   releases it, and when the run does is [§FS-rhei-run.3.5](rhei-run.spec.md#35-resumed-program-poll-deadline-regression)'s rule
+   ([§FS-rhei-run.3.6](rhei-run.spec.md#36-stall-release)).
 
 ### Who supplies the result on a terminal edge
 
@@ -601,7 +601,7 @@ shutdown are two triggers of the same routine.
 ticket's work: agents, programs, and the snapshot redactor
 ([§FS-rhei-snapshots](rhei-snapshots.spec.md#fs-rhei-snapshots-rhei-session-snapshots-specification)). Three are deliberately outside it: a subprocess a
 *callback* starts is that callback's own child and is governed by the callback
-contract; the `git` queries of the consistency check of §3.1 are short
+contract; the `git` queries of the consistency check of [§FS-rhei-run.3.1](rhei-run.spec.md#31-git-consistency-after-subprocess-commits) are short
 synchronous bookkeeping that has ended before the check returns; and the editor
 the browser dashboard launches ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)) is detached on purpose, because
 it is the operator's and outliving the run is the point.
@@ -640,7 +640,7 @@ ledger called the ticket timed out.
 **A death the shutdown delivered is an interruption.** An invocation that ends
 on its own, without exiting successfully, once the run's shutdown has begun is
 recorded `interrupted` exactly like one the sequence ended: it fires no
-transition and spends no attempt (§FS-rhei-agents.3.2.3). The usual case is an
+transition and spends no attempt ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)). The usual case is an
 agent dead of its own copy of the signal that stopped the run — systemd's
 default `KillMode=control-group`, a container stop, or a `kill` to a whole
 session delivers it to every process at once, so the agent is gone before the
@@ -680,7 +680,7 @@ all: it disconnects the surface and never reaches the run
    program log footer ([§FS-rhei-agents.8](rhei-agents.spec.md#8-log-capture)) — and names the log path;
 5. exits `128 + signal`: `130` for `SIGINT`, `143` for `SIGTERM`, `129` for
    `SIGHUP`. A run interrupted with non-terminal tickets remaining reports the
-   interruption, not the halt diagnostic of §3 step 9. It reports the
+   interruption, not the halt diagnostic of [§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 9. It reports the
    interruption when the signal cut the run's loop short — which is what the
    points above describe. A run whose loop had already finished when the signal
    arrived, one parked on the TUI's finished screen ([§FS-rhei-run-tui.1.5.7](rhei-run-tui.spec.md#157-liveness-color-and-lifecycle)),
@@ -739,7 +739,7 @@ that goes away *after* the run has ended finds the report already on disk
 
 ### 3.3. Provider-Limit Parking
 
-A recognized provider limit (§FS-rhei-agents.2.3) parks the invocation
+A recognized provider limit ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)) parks the invocation
 instead of routing its non-zero exit as an agent failure. The task
 keeps its authored state, no transition or callback fires, no snapshot is
 emitted, and the invocation does not spend the state visit's `attempts:`
@@ -795,7 +795,7 @@ metadata:
 The `agent` field is the resolved agent registry id, recorded verbatim. It says
 which invocation observed the limit and it keys the suppression below; it is
 not a recognition condition, and a record naming any other entry reads exactly
-the same way (§FS-rhei-agents.2.3).
+the same way ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)).
 
 The execution identity is the pair of resolved agent registry id and resolved
 provider. Model, mode, and task are deliberately not part of it: the signal
@@ -823,7 +823,7 @@ or update it under the rules above.
 A parked task is in deliberate waiting, not stalled, failed, or in Attention.
 When no other runnable work remains, a foreground or headless run stays alive
 and sleeps until provider-limited work becomes eligible. An operator interrupt
-ends the run under §FS-rhei-run.3.2 without losing the wait; a later run uses
+ends the run under [§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership) without losing the wait; a later run uses
 the persisted deadline. Headless launch still returns its run id immediately,
 and attach reads the same provider and deadline from the run event stream.
 
@@ -863,16 +863,16 @@ project's whole day. A run that ends because the pass loop made no progress and
 a run that ends because a bound is spent are reported as the different things
 they are.
 
-`rhei run --dry-run` ([§FS-rhei-run.4](#4-dry-run)) runs this checkpoint read-only: it reports
+`rhei run --dry-run` ([§FS-rhei-run.4](rhei-run.spec.md#4-dry-run)) runs this checkpoint read-only: it reports
 each bound with its value, source, and what the predicted pass would cost, and
 debits nothing.
 
 ### 3.5. Resumed Program Poll Deadline Regression
 
 Restarting a program poll during its persisted backoff keeps autonomous
-execution selected (§FS-rhei-run.3), but must not create the next subprocess before the
-original deadline (§FS-rhei-run.5.1). After that deadline, the resumed run must execute
-the program and route from its actual exit (§FS-rhei-programs.3.2). Restart
+execution selected ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)), but must not create the next subprocess before the
+original deadline ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)). After that deadline, the resumed run must execute
+the program and route from its actual exit ([§FS-rhei-programs.3.2](rhei-programs.spec.md#32-evaluation-order)). Restart
 does not supply an exit code or complete the task without an invocation.
 
 Regression coverage must include an observer delayed between reading the
@@ -923,7 +923,7 @@ often one ticket may be re-spawned. That bound is the attempt budget of step
 **A supervisor held for an empty visit is the exception**
 ([§FS-rhei-supervision.3.6](rhei-supervision.spec.md#36-empty-visits)). Its stall
 charges no attempt budget, so nothing but this rule bounds how often one run
-spawns it, and the rule has to keep the promise §3.6 makes: within one run, the
+spawns it, and the rule has to keep the promise [§FS-rhei-run.3.6](rhei-run.spec.md#36-stall-release) makes: within one run, the
 held visit is spawned again only after something advanced **after it was
 held**. Three things that look like progress are not, for this ticket:
 
@@ -935,7 +935,7 @@ held**. Three things that look like progress are not, for this ticket:
 2. **A poll's self-loop.** Rescheduling the next attempt applies no transition
    (step 8), so it is no advance for any ticket's release.
 3. **A deadline sleep.** A run that sleeps until the earliest effective
-   deadline (§5.1) and wakes to find a ticket ready has moved nothing by
+   deadline ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)) and wakes to find a ticket ready has moved nothing by
    sleeping, so waking does not release the held supervisor; the attempt the
    deadline made due releases it only if that attempt advances something. Nor
    does the held supervisor end the run before the sleep: a stalled ticket
@@ -946,9 +946,9 @@ So a run whose held supervisor's subtree cannot move spawns the empty visit
 once and halts when nothing else is left, and a run with other work beside it
 spawns the visit again at most once for each advance made after the hold — and
 advances that land between two releases buy one re-spawn between them, not one
-each. The worker pool (§5) keeps the same rule as the sequential loop. Every
+each. The worker pool ([§FS-rhei-run.5](rhei-run.spec.md#5-parallel-execution)) keeps the same rule as the sequential loop. Every
 other stall — a missing output, a spent attempt budget, a refused admission
-(§3.4) — keeps the release of the two paragraphs above unchanged.
+([§FS-rhei-run.3.4](rhei-run.spec.md#34-bound-admission)) — keeps the release of the two paragraphs above unchanged.
 
 ### 3.7. A Worker's Edit That Breaks the Plan
 
@@ -980,23 +980,23 @@ share their task's region and one snapshot, and the region is in flight while
 any of them runs.
 
 A region is **in flight** only while a worker process for its task is alive. A
-task at a gate, parked on a provider limit (§3.3), or between two attempts of a
-poll (§5.1) holds no process, so its region is not in flight.
+task at a gate, parked on a provider limit ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)), or between two attempts of a
+poll ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)) holds no process, so its region is not in flight.
 
 #### 3.7.2. Which Case a Failed Reload Is
 
 Every reload the run makes — the one after a worker exits and before its exit is
-routed (step 4), and every scheduling checkpoint (§3) — goes through one rule.
+routed (step 4), and every scheduling checkpoint ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)) — goes through one rule.
 When the plan fails to load, the location the loader's error carries, a file and
 a line, decides the case:
 
 1. **The region of the task whose worker just exited**, with no other
-   invocation of that task still running: the run restores it (§3.7.3) and
-   charges the attempt (§3.7.4).
+   invocation of that task still running: the run restores it ([§FS-rhei-run.3.7.3](rhei-run.spec.md#373-the-restore)) and
+   charges the attempt ([§FS-rhei-run.3.7.4](rhei-run.spec.md#374-the-charge)).
 2. **The region of a task whose worker is still running**: the run waits for it
-   (§3.7.5).
+   ([§FS-rhei-run.3.7.5](rhei-run.spec.md#375-the-wait)).
 3. **Anywhere else**, or an error that carries no location: the run stops,
-   attributed (§3.7.6).
+   attributed ([§FS-rhei-run.3.7.6](rhei-run.spec.md#376-stopping-attributed)).
 
 The run cannot tell who wrote a line. An operator's hand edit inside a running
 task's region is reverted like the worker's own, and kept in the same file; an
@@ -1010,7 +1010,7 @@ run reads the file again and finds the two boundaries: the task's own heading
 line, and the heading line that followed the region at spawn. Each must be
 found **exactly once**, the second after the first; the end of the file stands
 for a snapshot that had no following heading. The run then writes the text it
-is about to replace to the reverted-text file (§3.7.7), and replaces only the
+is about to replace to the reverted-text file ([§FS-rhei-run.3.7.7](rhei-run.spec.md#377-what-the-operator-reads)), and replaces only the
 text from the task's heading up to the following heading with the snapshot.
 Every other byte of the file is kept, so a sibling's transition written to the
 same file during the visit, or a supervisor's note under its own task, survives
@@ -1020,8 +1020,8 @@ In the shared-file preservation scenario, a sibling that completes during the
 culprit's visit keeps both its completed state and its finalized result link.
 It runs exactly once. A later task in another file keeps its dependency on that
 sibling and can complete after it. The culprit's malformed body is restored,
-its bad attempt is charged without a transition (§3.7.4), and its successful
-retry leaves the reverted text available (§3.7.7). This scenario uses a complete
+its bad attempt is charged without a transition ([§FS-rhei-run.3.7.4](rhei-run.spec.md#374-the-charge)), and its successful
+retry leaves the reverted text available ([§FS-rhei-run.3.7.7](rhei-run.spec.md#377-what-the-operator-reads)). This scenario uses a complete
 current file image for the worker's edit: publishing the edit must not discard
 the sibling's intervening finalization. It exercises scoped preservation; it
 does not extend recovery to arbitrary external truncate-mode rewrites.
@@ -1029,7 +1029,7 @@ does not extend recovery to arbitrary external truncate-mode rewrites.
 The restore **refuses** rather than guesses. When either boundary is missing or
 found more than once — the worker rewrote its own heading, or a concurrent
 writer moved the text around it — nothing is written and the run stops,
-attributed (§3.7.6), saying the restore was refused and which boundary it could
+attributed ([§FS-rhei-run.3.7.6](rhei-run.spec.md#376-stopping-attributed)), saying the restore was refused and which boundary it could
 not find.
 
 After the restore the run reloads. A plan that still fails to load was broken by
@@ -1059,7 +1059,7 @@ that ends with tickets unfinished. A retry never gets a fresh budget
 ([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-five-levels)).
 
 A worker whose own attempt ended by its **timeout** or by the run's
-**interruption** (§3.2) has its region restored first, by the same rule, and its
+**interruption** ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) has its region restored first, by the same rule, and its
 ending then keeps the routing it already has: the timeout routes through the
 state's timeout transition, and the interruption charges nothing.
 
@@ -1079,12 +1079,12 @@ the wait.
 The wait is bounded by the culprit's own process and nothing else, and it ends
 when the culprit exits **for any reason**: its own exit, its state's timeout,
 which keeps running during the wait, or the operator's Ctrl-C, which keeps its
-ordinary meaning (§3.2). The culprit's exit is processed during the wait, never
-behind it, so its own post-exit reload restores its region (§3.7.3) and charges
-it (§3.7.4). Then the run reloads and processes the held completions in the
+ordinary meaning ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)). The culprit's exit is processed during the wait, never
+behind it, so its own post-exit reload restores its region ([§FS-rhei-run.3.7.3](rhei-run.spec.md#373-the-restore)) and charges
+it ([§FS-rhei-run.3.7.4](rhei-run.spec.md#374-the-charge)). Then the run reloads and processes the held completions in the
 order the workers exited, against the restored plan. A culprit that has gone to
 a gate or parked holds no process and so is never waited on: a break in its
-region is the third case of §3.7.2.
+region is the third case of [§FS-rhei-run.3.7.2](rhei-run.spec.md#372-which-case-a-failed-reload-is).
 
 #### 3.7.6. Stopping, Attributed
 
@@ -1092,7 +1092,7 @@ A break the run cannot attribute to a worker that has exited — anywhere outsid
 every in-flight region, or a restore refused or followed by a reload that still
 fails — stops the run as an invalid reload always has: it rewrites nothing
 further, and it exits non-zero. Workers still in flight are interrupted as on
-Ctrl-C and are not charged (§3.2); the worker whose exit found the break is
+Ctrl-C and are not charged ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)); the worker whose exit found the break is
 recorded the same way, interrupted and uncharged, with its exit unrouted, so a
 fixed plan resumes it as an interruption rather than a completion that never
 moved.
@@ -1158,12 +1158,12 @@ cannot release its descendants.
 No file lock is acquired, no markdown is rewritten, and no runtime artifacts are created.
 
 Plain and JSON dry runs use their selected run frontend and carry initial
-validation warnings through it with the ordering and frequency in §3. JSON
+validation warnings through it with the ordering and frequency in [§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop). JSON
 stdout remains pure JSONL. The warnings do not change the predicted exit status,
 and neither dry-run form creates a run descriptor, journal, event log, report,
 or any other runtime file.
 
-A dry run **reports** the manual-only condition of §3 instead of aborting on
+A dry run **reports** the manual-only condition of [§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) instead of aborting on
 the first task that hits it:
 
 ```text
@@ -1221,7 +1221,7 @@ about to execute — aborts a dry run exactly as it aborts the real run: the sam
 message, and the same non-zero exit. A dry run never reaches the point of
 printing `Would spawn:` for an invocation the real run would refuse before
 spawning it. A state that resolves to no finite `agent_timeout` is one such
-error (§FS-rhei-agents.3.2.2); the rule is the general one and this is an
+error ([§FS-rhei-agents.3.2.2](rhei-agents.spec.md#322-timeout-requirement)); the rule is the general one and this is an
 instance of it. It differs from the manual-only condition above only in where
 the condition is decided: that one is found by the scan, task by task, which is
 why it is reported for every task instead of aborting on the first.
@@ -1235,13 +1235,13 @@ With `--parallel N`, up to `N` subprocesses run concurrently. The orchestrator:
   `SlotReleased`; see [Run TUI Specification — Run Event Journal](rhei-run-tui.spec.md#17-journal-format).
 - Serializes every state write through its own file lock, so two agents completing at once cannot corrupt the plan.
 - Refills freed slots immediately: after any subprocess exits and its result is
-  processed, the orchestrator performs the admission checkpoint in §3,
+  processed, the orchestrator performs the admission checkpoint in [§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop),
   recomputes the ready set, and starts newly ready work while the rest of the
   pool keeps running. Admitted work consumes the same ordinary slots; it never
   expands the pool. Each task
   selected during that refill is resolved from its reloaded task metadata with
   the normal execution precedence, including the full task `**Target:**`
-  override defined by §FS-rhei-plan-language.3.11.
+  override defined by [§FS-rhei-plan-language.3.11](rhei-plan-language.spec.md#311-task-execution-overrides).
 
 Tasks whose transitions would race on the same task node are never scheduled in
 parallel: scheduling is driven by the ready set, which excludes tasks already in
@@ -1268,7 +1268,7 @@ the later of its applicable poll deadline and provider-limit deadline. The run
 sleeps until the earliest such effective eligibility deadline among all
 waiting tasks, bounded below by 1 s, and **in the continuous mode** does not
 emit `run_finished` merely because all remaining work is provider-limited —
-under `--until-idle` that is precisely when it does (§3 step 9). Poll attempt
+under `--until-idle` that is precisely when it does ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 9). Poll attempt
 counters, self-loop selection, and exhaustion are unchanged.
 
 **The sleep is the continuous mode's.** With `--until-idle`, each site that
@@ -1296,7 +1296,7 @@ Once `stateVisits.<state-name>` reaches `poll.max_attempts`, the engine refuses 
 A poll that declares `waiting_on` ([§FS-rhei-states.2.5](rhei-states.spec.md#25-waiting-on-a-person)) is scheduled by every
 rule above, unchanged: same attempts, same slot release, same sleep to the
 earliest `pollNextAttemptAt`, same exhaustion edge, and the same contribution
-to whether the run ends non-zero (§4) — a poll inside its backoff window
+to whether the run ends non-zero ([§FS-rhei-run.4](rhei-run.spec.md#4-dry-run)) — a poll inside its backoff window
 already counted as deliberate waiting there. What the field adds is how the run
 *reports* the ticket: it is named as waiting on that person rather than left to
 read as work in flight ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout), [§FS-rhei-run-report.4](rhei-run-report.spec.md#4-transition-ledger)). Under

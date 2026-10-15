@@ -53,7 +53,7 @@ The human operator has full authority over the plan. They can:
 - Edit the plan structure (add tasks, change dependencies) — usually by re-invoking the plan writer.
 - Override any state, including terminal states, when explicitly needed,
   through the attended `rhei transition --force --reason` and explicit
-  `rhei recover` contracts (§FS-rhei-transition-cmd.6, §FS-rhei-recover).
+  `rhei recover` contracts ([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery), [§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover)).
 
 The human is the only role that can unblock `human-review` gates. This is by design: certain decisions (ship/no-ship, scope changes, external approvals) require human judgment.
 
@@ -64,7 +64,7 @@ The state machine is the single coordination protocol between all roles. It defi
 1. **What states exist** and what each one means (via `description` and `instructions` fields).
 2. **What transitions are legal** — any transition not declared is forbidden
    to ordinary callers. A human operator may use only the narrow, attended
-   missing-edge recovery of §FS-rhei-transition-cmd.6; it does not make the
+   missing-edge recovery of [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery); it does not make the
    edge part of the machine or bypass a declared edge's safeguards.
 3. **Who acts in each state** — the `instructions` field tells the current role what to do and when to hand off.
 
@@ -107,11 +107,11 @@ Commands for authoring, inspecting, and running a workflow:
 | `rhei version`     | Reports the installed version ([§FS-rhei-version](rhei-version.spec.md#fs-rhei-version-rhei-version)) |
 | `rhei run`         | Drives the full plan forward under orchestrator authority (`--rhei <id>` narrows a project-scoped run) |
 | `rhei next`        | Claims the next ready task for a manual worker; `--task` may advance one eligible passive edge, while `--peek` is read-only and `--rhei <id>` narrows scope |
-| `rhei transition`  | Atomically changes a task's state via compare-and-swap; `--result` carries the message a `final: true` target requires, and the attended `--force --reason` form repairs a missing edge ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result), §FS-rhei-transition-cmd.6) |
-| `rhei recover`     | Explicitly rolls back or forward an interrupted forced transition; every other command refuses the marked execution root (§FS-rhei-recover) |
+| `rhei transition`  | Atomically changes a task's state via compare-and-swap; `--result` carries the message a `final: true` target requires, and the attended `--force --reason` form repairs a missing edge ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result), [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)) |
+| `rhei recover`     | Explicitly rolls back or forward an interrupted forced transition; every other command refuses the marked execution root ([§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover)) |
 | `rhei complete`    | Terminal transition invoked by a manual worker: the inferred one-hop terminal target plus the shared transition carrying a literal `--result` or UTF-8 `--result-file` message |
 | `rhei reset`       | Returns each task to the state it was authored in ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)), removes `runtime/`; narrowed with `--rhei <id>` it removes only the in-scope tickets' keyed output ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)) |
-| `rhei remove`      | Takes back an untouched ticket — no transition, claim, result or other history — deleting its section and empty residue and retiring its id so no later create reissues it; `--dry-run` previews (§FS-rhei-remove) |
+| `rhei remove`      | Takes back an untouched ticket — no transition, claim, result or other history — deleting its section and empty residue and retiring its id so no later create reissues it; `--dry-run` previews ([§FS-rhei-remove](rhei-remove.spec.md#fs-rhei-remove-rhei-remove)) |
 | `rhei snapshot`    | Lists, shows, prunes, or continues from session snapshots captured by `rhei run` |
 | `rhei roster`      | Inspects the effective agents, models, bindings, defaults, sources, and merge provenance for a project ([§FS-rhei-agents.1.1.7](rhei-agents.spec.md#117-inspecting-the-effective-roster)) |
 | `rhei show`       | Prints one task's heading and body by id, and nothing else; `--json` for the machine form ([§FS-rhei-show](rhei-show.spec.md#fs-rhei-show-rhei-show)) |
@@ -120,19 +120,19 @@ Commands for authoring, inspecting, and running a workflow:
 `rhei run` and the manual-worker flow (`next` / `transition` / `complete`) are mutually exclusive per execution — they never overlap on the same task because `rhei run` holds transition responsibility for the states it drives. The typical manual-worker loop is `next` (claim) → work → `transition` (advance as needed) → `complete` (finish, record result, release).
 
 When an invocation on a provider Rhei recognizes reports the supported
-reset-bearing limit signal (§FS-rhei-agents.2.3), `rhei run` parks that
+reset-bearing limit signal ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)), `rhei run` parks that
 work until the displayed UTC deadline instead of reporting an ordinary failure.
 Foreground runs remain attached while waiting;
 headless launch still returns a run id and `rhei attach` shows the provider,
 reporting task, and deadline. Interrupting the wait is safe: the task stays in
 its authored state, and a later `rhei run` resumes from the persisted deadline.
 `rhei reset` deliberately discards that wait with the rest of the task's
-runtime state. §FS-rhei-run.3.3
+runtime state. [§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)
 
 Codex's full `You've hit your usage limit. Visit
 https://chatgpt.com/codex/settings/usage to purchase more credits or try again at
 Oct 9th, 2026 11:19 PM.` refusal is recognized as plain output or as the textual
-`message` of a Codex stdout JSON `error` event (§FS-rhei-agents.2.3). Its date
+`message` of a Codex stdout JSON `error` event ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)). Its date
 uses the machine's OS-local timezone, so Codex and Rhei must share that zone.
 On Europe/Zurich, this example parks until `2026-10-09T21:20:00Z`, the first
 instant after the reported minute. Invalid, ambiguous, or expired absolute
@@ -140,7 +140,7 @@ deadlines remain ordinary failures. Parking preserves the state and records
 `ending=provider_limited`, `charged=0`, and `attempt_charged=false`;
 `--until-idle` exits with waiting status `3`, and repeated runs before the
 deadline spawn no further work with the same agent/provider identity. The
-persisted wait survives restart (§FS-rhei-run.3.3).
+persisted wait survives restart ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)).
 
 Ticket ids in command output are project-qualified — `<rhei-id>.<task-id>`, e.g. `plan.1` for a single-file `plan.rhei.md` — and `rhei list` accepts the same `--rhei <id>` narrowing as `run`, `next`, and `reset` ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
 

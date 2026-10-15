@@ -33,7 +33,7 @@ command that started it.
 `rhei run --headless` re-executes `rhei run` as a child in a **new session and
 process group**, with stdin on `/dev/null` and stdout and stderr redirected to
 `runtime/run.log`. The launcher then waits for the child to publish its run
-descriptor (§2) and returns. A `SIGHUP` on the launching terminal reaches the
+descriptor ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)) and returns. A `SIGHUP` on the launching terminal reaches the
 launcher's session, not the run's.
 
 The child is an ordinary `rhei run`: it acquires the same run locks
@@ -49,20 +49,20 @@ detached selected run would hand its caller `0` and a run id whatever became of
 it, and the one status the option exists to deliver could never reach the
 timer. Like the other two it is declared on the flags and refused at startup
 with status `2`, before any lock, descriptor, journal or event log is written
-and before any ticket moves. It is also what preserves §1.2 by construction: a
+and before any ticket moves. It is also what preserves [§FS-rhei-run-headless.1.2](rhei-run-headless.spec.md#12-human-gates) by construction: a
 detached run can never carry the option, so the promise that a detached run
 waits at a human gate needs no exception.
 
 `--json` alongside `--headless` describes **the launcher's** output: it prints
-the new run's descriptor (§2) as one JSON object instead of the human block,
+the new run's descriptor ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)) as one JSON object instead of the human block,
 and is not forwarded to the detached run. A detached run's machine-readable
-form is `runtime/events.jsonl` and `rhei attach --json` (§5.3), not a stream
+form is `runtime/events.jsonl` and `rhei attach --json` ([§FS-rhei-run-headless.5.3](rhei-run-headless.spec.md#53---json)), not a stream
 into a log file nobody reads.
 
 ### 1.1. Startup Is Synchronous
 
 The launcher does not print an id for a run that already died. It waits, up to
-30 seconds, for the child to publish `runtime/run.json` (§2) naming the child's
+30 seconds, for the child to publish `runtime/run.json` ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)) naming the child's
 own pid, while watching for the child to exit first. The **workspace
 descriptor** is the handshake, not the registry entry: the launcher knows the
 workspace it is launching into, whereas the registry lives under a state
@@ -83,7 +83,7 @@ directory it has no way to guarantee is writable. Four outcomes:
   `rhei runs` will show what became of it.
 
 **An id the launcher prints already resolves.** The child writes its registry
-entry (§2) only after its workspace descriptor, so the handshake can end before
+entry ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)) only after its workspace descriptor, so the handshake can end before
 the entry exists. Before printing an id, under either outcome that prints one,
 the launcher therefore writes the descriptor it just read to the registry
 itself, never replacing an entry already there: `rhei attach <id>`,
@@ -108,7 +108,7 @@ refusal rather than as a 30-second "did not report ready".
 
 The launcher's exit code answers "did the run start?", not "did the run
 succeed?". The run's own exit code is recorded in the descriptor and reachable
-with `rhei attach --wait` (§5.3).
+with `rhei attach --wait` ([§FS-rhei-run-headless.5.3](rhei-run-headless.spec.md#53---json)).
 
 ### 1.2. Human Gates
 
@@ -159,11 +159,11 @@ Every non-dry run — detached or not — publishes `runtime/run.json`:
 present**, and `null` until the run records one — a fixed shape a consumer can
 read without having to tell "still running" from "this build omitted the
 field". `control_url` is present only while the loopback control server is live
-(§4) and is the same address `runtime/dashboard.json` publishes for
+([§FS-rhei-run-headless.4](rhei-run-headless.spec.md#4-the-control-server-and-the-browser-page)) and is the same address `runtime/dashboard.json` publishes for
 `rhei intervene` ([§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view)). `log` is absent for a foreground run, which
 has no redirected console of its own.
 `state_machine` is present only when the run was given an explicit
-`--state-machine`, and is what an attached surface resolves under (§5).
+`--state-machine`, and is what an attached surface resolves under ([§FS-rhei-run-headless.5](rhei-run-headless.spec.md#5-rhei-attach)).
 
 **Every path is absolute.** A descriptor is read by a process standing in some
 other directory, so a relative `plan` or `events` names nothing where it is
@@ -174,7 +174,7 @@ was typed: a run that queued behind another began when it got the lock, and
 The descriptor is rewritten once more when the process ends, with the terminal
 `status` and the run's `exit_code`. A run that is `SIGKILL`ed writes nothing
 further and is left saying `running` — which is why liveness is decided by the
-run lock and not by this field (§3).
+run lock and not by this field ([§FS-rhei-run-headless.3](rhei-run-headless.spec.md#3-run-identity-and-liveness)).
 
 Every run also writes a **registry entry** at
 `$XDG_STATE_HOME/rhei/runs/<id>.json` (falling back to
@@ -182,12 +182,12 @@ Every run also writes a **registry entry** at
 a bare id to a workspace, so `rhei attach <id>` works from any directory. A
 failure to write it is a warning, not a silence: the run continues, reachable by
 path rather than by id. For a detached run the launcher gives that warning on
-the operator's terminal, since the child's lands in `runtime/run.log` (§1.1).
+the operator's terminal, since the child's lands in `runtime/run.log` ([§FS-rhei-run-headless.1.1](rhei-run-headless.spec.md#11-startup-is-synchronous)).
 
 **The entry outlives the run.** When the run ends its entry is rewritten with the
 terminal status and exit code rather than deleted, because the question
 `rhei attach <id>` answers after a run ends — how did it go? — is the one the CI
-shape of §5.3 is built on, and an id that stops resolving the instant the answer
+shape of [§FS-rhei-run-headless.5.3](rhei-run-headless.spec.md#53---json) is built on, and an id that stops resolving the instant the answer
 exists is useless. Entries are removed only when the workspace no longer names
 the run: superseded by a later run, or the workspace descriptor gone from disk.
 At most 100 ended entries are kept, newest first.
@@ -225,7 +225,7 @@ remains resolvable by id; an unrelated accessible run remains stoppable by exact
 id under its own guards and the existing signal-identity checks. An access
 failure must not invent a pending-recovery hop. An established recovery marker,
 even with unreadable or corrupt contents, retains the strict refusal in
-§FS-rhei-recover.4.
+[§FS-rhei-recover.4](rhei-recover.spec.md#4-pending-root-interlock).
 
 **Unknown is a verdict about one probe, not a state the entry carries.** When
 access returns there is nothing to recover: the outage pruned nothing and wrote
@@ -236,7 +236,7 @@ history heading `--all` gives an ended one. That is the whole of what an outage
 owes the entry. **The run's own survival across the outage is not promised, and
 must not be read as part of this guarantee.** The carve-out here is for the
 observer; a participant that cannot read the state it is required to check
-stops instead (§FS-rhei-recover.4), so a run whose own execution root goes
+stops instead ([§FS-rhei-recover.4](rhei-recover.spec.md#4-pending-root-interlock)), so a run whose own execution root goes
 unreadable underneath it may well end there. A surface that still reports such
 a run as **running** afterwards is reporting that the outage happened to miss
 it, not that recovery kept it alive.
@@ -297,18 +297,18 @@ could not probe — none of those say anything about the run. A missing lock fil
 is not a free lock, because `flock` survives unlinking; on Linux the stable
 ownership inspection decides whether the recorded process owns the displaced
 run-lock inode, is gone or not its owner, or cannot be checked conclusively.
-Only a *decided* end lets anything be pruned, and only the two conditions of §2
-prune at all; an unknown entry is kept and reported (§6). Treating unknown as
+Only a *decided* end lets anything be pruned, and only the two conditions of [§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)
+prune at all; an unknown entry is kept and reported ([§FS-rhei-run-headless.6](rhei-run-headless.spec.md#6-rhei-runs)). Treating unknown as
 death let a momentary `chmod 000`, a full disk, an exhausted descriptor table,
 or an inconclusive ownership inspection permanently unregister a run that was
 working the whole time.
 
 **Every consumer answers the third case, and none of them answers it "ended".**
-Resolution keeps it (above); `rhei runs` lists it separately (§6); `rhei attach`
-opens its surface and says what it could not confirm (§5.2). On Linux, `rhei
+Resolution keeps it (above); `rhei runs` lists it separately ([§FS-rhei-run-headless.6](rhei-run-headless.spec.md#6-rhei-runs)); `rhei attach`
+opens its surface and says what it could not confirm ([§FS-rhei-run-headless.5.2](rhei-run-headless.spec.md#52-attaching-to-a-run-that-has-ended)). On Linux, `rhei
 stop` treats liveness and permission to signal as separate questions: it may
 signal an undecided or current-path-live entry only after the exact ownership
-proof below succeeds (§7). Platforms without that proof retain the lock-only
+proof below succeeds ([§FS-rhei-run-headless.7](rhei-run-headless.spec.md#7-rhei-stop)). Platforms without that proof retain the lock-only
 stop behavior. The commands that *wait* — `attach --wait`, `attach --json`,
 `stop --wait` — keep waiting through an undecided probe rather than reporting an
 end that was never observed. Waiting is bounded: after a short grace of
@@ -352,7 +352,7 @@ did not start. It is a **reader of files plus a client of the control server**:
 
 - The plan model comes from the plan on disk, through the same loader the run
   itself uses, and under the **run's own state machine** — the one the
-  descriptor records (§2), not whatever the default resolves to now. A surface
+  descriptor records ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)), not whatever the default resolves to now. A surface
   that resolved a different machine would draw states the run cannot be in.
 - The runtime overlay comes from `runtime/events.jsonl`
   ([§FS-rhei-run-json.3](rhei-run-json.spec.md#3-durable-event-log)): the client replays the file to rebuild slot state,
@@ -394,7 +394,7 @@ run's recorded result and points at what outlived it — `runtime/run-report.md`
 ([§FS-rhei-viz.7.1](rhei-viz.spec.md#71-dynamic-live-during-rhei-run)) — because those, not a screen, are what the operator came
 back for.
 
-A run whose liveness could not be decided (§3) is **not** a run that has ended.
+A run whose liveness could not be decided ([§FS-rhei-run-headless.3](rhei-run-headless.spec.md#3-run-identity-and-liveness)) is **not** a run that has ended.
 `rhei attach` opens the surface anyway and warns once, naming what it could not
 check. Reporting a working run as finished is the worse of the two mistakes: the
 operator loses the surface, and the run's own output says nothing about it.
@@ -415,7 +415,7 @@ id=$(rhei run --headless --json plan.rhei.md | jq -r .id)
 rhei attach --json --wait "$id"     # exits with the run's status
 ```
 
-The id keeps resolving after the run ends (§2), so the wait may also be started
+The id keeps resolving after the run ends ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)), so the wait may also be started
 late — or arrive after the answer.
 
 **Only a recorded `0` exits `0`.** A run that recorded *no* exit status did not
@@ -424,15 +424,15 @@ end on its own: it was `SIGKILL`ed, OOM-killed, or its machine went away.
 killed run passes CI.
 
 `--wait` without `--json` opens **no surface at all**. It waits quietly and
-prints the same result block an attach to an already-finished run prints (§5.2),
+prints the same result block an attach to an already-finished run prints ([§FS-rhei-run-headless.5.2](rhei-run-headless.spec.md#52-attaching-to-a-run-that-has-ended)),
 so a wait that outlived its run and an attach that arrived afterwards are
 indistinguishable to the reader. Reading no records is also why it is the one
 shape that needs no `runtime/events.jsonl`: a run that failed to write its log
-(§8) is still a run whose exit status is worth waiting for. The three shapes are
+([§FS-rhei-run-headless.8](rhei-run-headless.spec.md#8-failure-modes)) is still a run whose exit status is worth waiting for. The three shapes are
 therefore: `attach` is a terminal surface, `attach --wait` is a quiet wait,
 `attach --json` is a record stream.
 
-Both waits treat an undecided probe (§3) as "keep waiting", not as an end, and
+Both waits treat an undecided probe ([§FS-rhei-run-headless.3](rhei-run-headless.spec.md#3-run-identity-and-liveness)) as "keep waiting", not as an end, and
 both give up loudly rather than quietly: past the grace they report on stderr
 what they could not check and exit non-zero. For `--json` that also means the
 stream is announced as possibly incomplete, because a stream ending without
@@ -445,17 +445,17 @@ rhei runs [--json] [--all] [--since <TIME>] [--until <TIME>]
 ```
 
 Lists the live runs on this machine — id, plan, pid, start time, parallelism,
-and control URL — newest first, pruning the registry entries §2 says are
+and control URL — newest first, pruning the registry entries [§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor) says are
 prunable. With no live runs it says so and exits `0`: an empty list is an
 answer, not a failure. The address is labelled as the run's **control** URL, not
-as a dashboard: under `--no-dashboard` nothing may invite a browser (§4), and
+as a dashboard: under `--no-dashboard` nothing may invite a browser ([§FS-rhei-run-headless.4](rhei-run-headless.spec.md#4-the-control-server-and-the-browser-page)), and
 the endpoints an attached surface needs are up either way.
 
-Entries whose liveness could not be decided (§3) are **listed separately, with
+Entries whose liveness could not be decided ([§FS-rhei-run-headless.3](rhei-run-headless.spec.md#3-run-identity-and-liveness)) are **listed separately, with
 the reason**. Keeping them silently and omitting them from the listing produces
 exactly the "no runs are live" lie the tri-state exists to prevent.
 
-`--json` emits an array of the live descriptor objects (§2) and follows the
+`--json` emits an array of the live descriptor objects ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)) and follows the
 error envelope of [§FS-rhei-errors.5](rhei-errors.spec.md#5-machine-readable-errors); undecidable entries are reported on stderr,
 so stdout stays the array and nothing else.
 
@@ -468,10 +468,10 @@ half-open interval and in the same time vocabulary `rhei cost` uses
 [§FS-rhei-cost-accounting.8.2](rhei-cost-accounting.spec.md#82-selecting-records), and both imply `--all`: a window is a
 question about history.
 
-With none of the three, `rhei runs` is exactly what §6 describes — live runs
+With none of the three, `rhei runs` is exactly what [§FS-rhei-run-headless.6](rhei-run-headless.spec.md#6-rhei-runs) describes — live runs
 only, the same pruning, the same empty-list line, and `--json` emitting the bare
 array. Under `--all` or a window, `--json` emits an object instead, so the answer
-can carry what §6.2 requires:
+can carry what [§FS-rhei-run-headless.6.2](rhei-run-headless.spec.md#62-what-retention-hid) requires:
 
 ```json
 {
@@ -483,7 +483,7 @@ can carry what §6.2 requires:
 
 ### 6.2. What Retention Hid
 
-The registry keeps a bounded number of ended entries (§2). That is enough to
+The registry keeps a bounded number of ended entries ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)). That is enough to
 resolve an id after the fact and not enough to answer a question about a window:
 the entries past the cap were unlinked and no longer exist to be counted.
 
@@ -518,7 +518,7 @@ the run is not known to have ended — sends it again, which is the escalation
 [§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership) reserves for an operator who asks twice. It is not a different
 mechanism and does not skip the first grace; the run's own handler decides what
 a second signal means, exactly as it does for a doubled Ctrl+C. An undecided
-probe (§3) does not skip the escalation either, for the same reason it does not
+probe ([§FS-rhei-run-headless.3](rhei-run-headless.spec.md#3-run-identity-and-liveness)) does not skip the escalation either, for the same reason it does not
 skip the first signal.
 
 `--wait` blocks until the run has actually gone, and then reports its recorded
@@ -529,7 +529,7 @@ down the work it was asked to stop.
 
 Stopping a run that has already ended is not an error: it says so and exits
 `0`. That short-circuit needs a *decided* end, though. An entry whose liveness
-could not be checked (§3) still reaches the pre-signal checks rather than being
+could not be checked ([§FS-rhei-run-headless.3](rhei-run-headless.spec.md#3-run-identity-and-liveness)) still reaches the pre-signal checks rather than being
 reported as ended. On Linux, failure to open a stable process handle decides
 that the recorded process is absent only for `ESRCH`; unsupported pidfds,
 permission failures, resource exhaustion, and every other open error are
@@ -559,13 +559,13 @@ retain the previous best-effort descriptor re-read and lock-only stop behavior.
 - **A second `--headless` run on the same workspace.** It fails at the run lock
   with the existing diagnostic ([§FS-rhei-run.2.6](rhei-run.spec.md#26-run-lock)), synchronously, before an id
   is printed. Two launchers racing each other fail the same way, at the launch
-  lock of §1.1, and only one run is ever started.
+  lock of [§FS-rhei-run-headless.1.1](rhei-run-headless.spec.md#11-startup-is-synchronous), and only one run is ever started.
 - **The run dies without cleaning up.** The descriptor still says `running`.
   On Linux, the next `rhei runs` stops listing it as live once exact ownership
   finds the recorded supervisor gone or not the owner, even when another
   process inherited and retains the held lock description. On other platforms,
   the next free-lock probe stops listing it. `rhei attach` reports the run as
-  ended. The entry stays until the workspace stops naming the run (§2), so
+  ended. The entry stays until the workspace stops naming the run ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)), so
   `rhei attach <id>` can still say what happened — and `--wait` reports the
   missing exit status rather than inventing `0`. Any independently retained
   kernel lock still refuses a new run until its holder releases it.
@@ -573,11 +573,11 @@ retain the previous best-effort descriptor re-read and lock-only stop behavior.
   continues. The surfaces that read records — `rhei attach` and
   `rhei attach --json` — are then unavailable and say so, naming the file. A run
   that cannot be watched is still a run that works, and still a run
-  `rhei attach --wait` can wait for (§5.3).
+  `rhei attach --wait` can wait for ([§FS-rhei-run-headless.5.3](rhei-run-headless.spec.md#53---json)).
 - **A detached run's `run.log` grows without bound.** It is truncated at run
   start, like the latest run report: one file is one run, and the previous
   run's console is superseded rather than accumulated.
-- **Two runs write one `run.log`.** The launch lock of §1.1 serialises
+- **Two runs write one `run.log`.** The launch lock of [§FS-rhei-run-headless.1.1](rhei-run-headless.spec.md#11-startup-is-synchronous) serialises
   launchers, not a *live* run's writes: where the pre-check is blind — two
   launches on member plans that share a root, so the refusal is left to the run
   lock — a second launcher truncates the console log a running child is still

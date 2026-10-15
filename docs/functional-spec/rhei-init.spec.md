@@ -36,8 +36,8 @@ missing). The project directory is `DIR/panta/`, or `DIR` itself with
 |---------------------|--------------------|---------------------------------------------------------|
 | `--here`            | off                | Make `DIR` itself the project instead of `DIR/panta/`. The mode for adopting a directory of existing, versioned plans |
 | `--title <title>`   | from the host      | Project title written to the manifest heading           |
-| `--no-agents`       | off                | Skip the `AGENTS.md` agent-discovery note (§4)          |
-| `--force`           | off                | Re-initialize an existing project: overwrite the manifest (re-deriving the title); companion files update in place. Pair with `--here` when the host itself is the project (§2) |
+| `--no-agents`       | off                | Skip the `AGENTS.md` agent-discovery note ([§FS-rhei-init.4](rhei-init.spec.md#4-agent-discovery-note-agentsmd))          |
+| `--force`           | off                | Re-initialize an existing project: overwrite the manifest (re-deriving the title); companion files update in place. Pair with `--here` when the host itself is the project ([§FS-rhei-init.2](rhei-init.spec.md#2-behavior)) |
 
 The default title is derived from the **host** directory's name in both
 modes — `panta/` is a location, not an identity: `-` and `_` become spaces
@@ -47,9 +47,9 @@ and each word is capitalized (`my-project` → `My Project`).
 
 Before any initialization effect, discover the affected existing execution-root
 owners of both the host and destination and acquire their shared access guards
-in sorted canonical order (§FS-rhei-panta.6.6). Check pending recovery before
+in sorted canonical order ([§FS-rhei-panta.6.6](rhei-panta.spec.md#66-pending-forced-recovery)). Check pending recovery before
 and after acquisition and retain the guards through all writes
-(§FS-rhei-recover.4). This includes host ignore/agent-note updates and creation
+([§FS-rhei-recover.4](rhei-recover.spec.md#4-pending-root-interlock)). This includes host ignore/agent-note updates and creation
 of a new destination: a missing `host/panta` never exempts an existing host from
 the boundary. Neither `--force` nor `--here` bypasses it.
 
@@ -95,9 +95,9 @@ the boundary. Neither `--force` nor `--here` bypasses it.
    unanimously-declared machine as the project default, back when a divergent
    member was a load error; the per-rhei model removed both the error and the
    need.)
-5. **Seed ignore rules** (§3).
-6. **Write the agent-discovery note** unless `--no-agents` (§4).
-7. **Report what became visible** (§5).
+5. **Seed ignore rules** ([§FS-rhei-init.3](rhei-init.spec.md#3-ignore-rules)).
+6. **Write the agent-discovery note** unless `--no-agents` ([§FS-rhei-init.4](rhei-init.spec.md#4-agent-discovery-note-agentsmd)).
+7. **Report what became visible** ([§FS-rhei-init.5](rhei-init.spec.md#5-discovery-report)).
 
 ## 3. Ignore rules
 
@@ -149,7 +149,7 @@ note goes into the instruction file that is actually used. A host with both
 files (including the common `CLAUDE.md → AGENTS.md` symlink) keeps `AGENTS.md`
 as the target, and re-running init finds and rewrites the note in whichever
 file carries it. Init names the file it changed either way, in the host-changes
-list (§5).
+list ([§FS-rhei-init.5](rhei-init.spec.md#5-discovery-report)).
 
 The note:
 
@@ -258,7 +258,7 @@ user did not name. Writing them silently is the surprise: a team discovers
 weeks later that no plan was ever committed, and the `.gitignore` line that
 caused it was never mentioned. Only files actually changed are listed —
 re-running init over an up-to-date `.gitignore` and `AGENTS.md` reports
-neither, because the entries and the marked block are idempotent (§2).
+neither, because the entries and the marked block are idempotent ([§FS-rhei-init.2](rhei-init.spec.md#2-behavior)).
 
 The omitted-plan-target resolution knows the convention: a `panta/` child
 containing `index.panta.md` resolves as the project for commands run in the
@@ -276,5 +276,5 @@ host directory or anywhere under it ([§FS-rhei-panta.6](rhei-panta.spec.md#6-pr
   ([§FS-rhei-templates](rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification)).
 - It does not touch git beyond `.gitignore`: no hooks, no commits.
 - It does not write a state machine or a `**States:**` line — the manifest
-  stays bare (§2); each rhei keeps the `states.yaml` in its own root, and the
+  stays bare ([§FS-rhei-init.2](rhei-init.spec.md#2-behavior)); each rhei keeps the `states.yaml` in its own root, and the
   built-in `rhei` machine covers the rest ([§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification)).

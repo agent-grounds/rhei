@@ -88,7 +88,7 @@ Each is pinned to a released crates.io version, never to a git revision, so the
 gate runs exactly what a contributor gets from `cargo install <tool> --version
 <pin>` and the contributor setup can name that same version.
 
-Both jobs stay inside the one `CI` workflow because the release helpers (§3)
+Both jobs stay inside the one `CI` workflow because the release helpers ([§AR-ci-release.3](ci-release.spec.md#3-release-workflows))
 look the green run up by workflow name.
 
 ## 2. Local Hooks

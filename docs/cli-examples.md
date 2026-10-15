@@ -2,7 +2,7 @@
 
 When a visit has exhausted its attempts, grant it another configured budget
 without moving it. A supervisor keeps its held subtree and unread checkpoints
-(§FS-rhei-retry.2); the grant takes effect on the next run:
+([§FS-rhei-retry.2](functional-spec/rhei-retry.spec.md#2-grant-and-refusals)); the grant takes effect on the next run:
 
 ```bash
 rhei retry plan.1

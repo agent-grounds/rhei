@@ -55,7 +55,7 @@ it would name no edit anyone could make.
 The register is `fissile`'s exception registries, not a table maintained by
 hand: `docs/file-size-agent-exceptions.toml` for entries that leave a soft
 finding standing and `docs/file-size-human-exceptions.toml` for entries that
-clear the hard gate. `.agent-grounds/fissile.toml` encodes §1 — 500 soft and
+clear the hard gate. `.agent-grounds/fissile.toml` encodes [§AR-source-file-size.1](source-file-size.spec.md#1-file-size-policy) — 500 soft and
 2500 hard for source, 750 and 2500 for a citable spec, 250 and 500 for an
 entrypoint — so the rule is now checked at commit time rather than stated and
 hoped for.
@@ -64,7 +64,7 @@ The gate itself is one `fissile check --staged` hook in
 answers for the files a commit actually touches and stays silent about the
 backlog it did not create.
 
-Each entry still carries what §1 asks of it: the path, the reason the size is
+Each entry still carries what [§AR-source-file-size.1](source-file-size.spec.md#1-file-size-policy) asks of it: the path, the reason the size is
 necessary, and the condition that should trigger splitting it. `fissile` spells
 those as `path`, `reason`, and `until`, and adds `kind`, which fixes what the
 reason has to establish — `structural` names the constraint that makes splitting
@@ -85,7 +85,7 @@ retune` moves the number when only the number is wrong, leaving the reason
 alone.
 
 Entries are added with `fissile exception add`, never by hand. A hard entry is a
-human's to add: it is the only thing that clears a gate §1 calls not allowed,
+human's to add: it is the only thing that clears a gate [§AR-source-file-size.1](source-file-size.spec.md#1-file-size-policy) calls not allowed,
 and an agent that could write one could waive the rule it is being held to.
 
 ## 3. Split Shape

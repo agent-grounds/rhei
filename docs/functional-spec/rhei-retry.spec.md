@@ -2,7 +2,7 @@
 
 Grant an exhausted current visit one more configured attempt budget without
 moving the ticket. Recovery must preserve the held subtree and unread
-checkpoints of a supervising visit (§FS-rhei-supervision.3.5).
+checkpoints of a supervising visit ([§FS-rhei-supervision.3.5](rhei-supervision.spec.md#35-failed-visits)).
 
 ## 1. Usage
 
@@ -11,15 +11,15 @@ rhei retry <TICKET_ID>
 rhei retry <RHEI_PLAN> --task <TASK_ID>
 ```
 
-Use the shared ticket-or-plan target rules (§FS-rhei-usage.2), qualified ticket
+Use the shared ticket-or-plan target rules ([§FS-rhei-usage.2](rhei-usage.spec.md#2-coordination-through-the-state-machine)), qualified ticket
 IDs in output, and the active state machine. The command applies to every
 non-poll, non-terminal state, including ordinary agent and program states.
 
 ## 2. Grant and Refusals
 
-Grant exactly one configured `attempts:` budget (§FS-rhei-agents.3.2.3) to an
+Grant exactly one configured `attempts:` budget ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)) to an
 exhausted current visit. Persist `grants: [{at, os_user, attempts}]` in its
-current spawn record (§FS-rhei-agents.8.4); older records default to no grants.
+current spawn record ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)); older records default to no grants.
 The effective allowance is configured attempts plus all grants for that visit.
 Keep the same move-count visit key, monotonic attempt/log numbering, state,
 move ledger, `stateVisits`, supervision phase and pending checkpoints.
@@ -55,7 +55,7 @@ Refuse non-zero, without writing anything, when:
 The grant takes effect on the next `rhei run`, because a live run already set
 the halted ticket aside. It creates no travel, visit or invocation headroom;
 each admitted granted neural attempt still costs an invocation and may be
-refused by that account (§FS-rhei-budgets.4.2). Provider-limited and withheld
+refused by that account ([§FS-rhei-budgets.4.2](rhei-budgets.spec.md#42-invocations)). Provider-limited and withheld
 attempts retain their independent non-charge rules. `visits:` and
 `transition_limit` are not consulted: nothing moves.
 
@@ -87,5 +87,5 @@ clauses, using the configured budget and singular/plural checkpoint spelling:
 `rhei run` still halts on an exhausted visit until a grant exists. `retry`
 applies no transition and requires no self-loop. `rhei transition` self-loops
 release supervisors and require `--release-subtree` when checkpoints are
-pending (§FS-rhei-transition-cmd.2). `rhei reset` removes spawn records and
+pending ([§FS-rhei-transition-cmd.2](rhei-transition-cmd.spec.md#2-options)). `rhei reset` removes spawn records and
 their grants, restoring the plain allowance but refunding no capacity.

@@ -20,7 +20,7 @@ its role, and the spec that owns its grammar and behavior:
 | `index.panta.md` | Panta project manifest: title, content; no authored nodes | [§FS-rhei-panta.1](rhei-panta.spec.md#1-what-panta-is), [§FS-rhei-plan-language.1.5](rhei-plan-language.spec.md#15-panta-project) |
 | rhei entry (in the project dir) | One rhei per entry — a `*.rhei.md` or a Directory Workspace — discovered at project scope | [§FS-rhei-panta.1](rhei-panta.spec.md#1-what-panta-is), [§FS-rhei-plan-language.1.5](rhei-plan-language.spec.md#15-panta-project) |
 | `*.rhei.md` | Single-File Plan: a rhei with its `## Tasks` inline | [§FS-rhei-plan-language.1.1](rhei-plan-language.spec.md#11-single-file-plan-1-agent-or-low-concurrency) |
-| `index.rhei.md` + `tasks/**/*.md` | Directory Workspace rhei: manifest plus merged workspace task files. The index carries the workspace's plan-wide frontmatter and is its only writable metadata document; a task file may open with a metadata-only block for the tasks it defines | [§FS-rhei-plan-language.1.2](rhei-plan-language.spec.md#12-directory-workspace-agent-teams-high-concurrency), §FS-rhei-plan-language.1.4 |
+| `index.rhei.md` + `tasks/**/*.md` | Directory Workspace rhei: manifest plus merged workspace task files. The index carries the workspace's plan-wide frontmatter and is its only writable metadata document; a task file may open with a metadata-only block for the tasks it defines | [§FS-rhei-plan-language.1.2](rhei-plan-language.spec.md#12-directory-workspace-agent-teams-high-concurrency), [§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata) |
 | `basin/` task files (optional) | Unfiled tickets loaded as the reserved synthetic `basin` rhei. Nodes only — no frontmatter of any kind, because the basin's metadata document is the project manifest | [§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis), [§FS-rhei-plan-language.1.5](rhei-plan-language.spec.md#15-panta-project) |
 
 A bare rhei — a lone `*.rhei.md` or workspace with no enclosing
@@ -35,7 +35,7 @@ The remaining three surfaces:
 
 - State machines: `states.yaml`. Owned by [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) and
   [§FS-rhei-transitions](rhei-transitions.spec.md#fs-rhei-transitions-rhei-transitions-specification); the per-state `session` field is owned jointly by
-  §FS-rhei-states.1.2 and §FS-rhei-snapshots.4.7.
+  [§FS-rhei-states.1.2](rhei-states.spec.md#12-per-state-fields) and [§FS-rhei-snapshots.4.7](rhei-snapshots.spec.md#47-state-local-continuation).
 - Templates and their composition: template directories with `template.yaml`
   plus rendered plan and state files. Template discovery, rendering, and
   single-template instantiation are owned by
@@ -57,8 +57,8 @@ The remaining three surfaces:
 
 The plan and project markdown surface is the primary source of truth for project
 membership, task state, dependencies, hierarchy, assignees, and result links.
-State machines constrain which states and transitions are legal. Cancellation roles (§FS-rhei-states.1.4) and scoped wildcard source sets
-(§FS-rhei-transitions.4.6) are ordinary flat-machine properties. Templates are a
+State machines constrain which states and transitions are legal. Cancellation roles ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)) and scoped wildcard source sets
+([§FS-rhei-transitions.4.6](rhei-transitions.spec.md#46-wildcard-semantics)) are ordinary flat-machine properties. Templates are a
 preprocessing layer that materializes ordinary plan markdown and optional state
 machines before runtime parsing.
 
@@ -84,9 +84,9 @@ Use this order when learning or auditing the language:
    [§FS-rhei-library.3](rhei-library.spec.md#3-the-union-rules) before authoring a template meant to be placed.
 
 Command specs such as [§FS-rhei-validate](rhei-validate.spec.md#fs-rhei-validate-rhei-validate), [§FS-rhei-migrate](rhei-migrate.spec.md#fs-rhei-migrate-rhei-migrate), [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next), [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition),
-[§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover), §FS-rhei-retry, [§FS-rhei-complete](rhei-complete.spec.md#fs-rhei-complete-rhei-complete), [§FS-rhei-note](rhei-note.spec.md#fs-rhei-note-rhei-note), §FS-rhei-remove, and [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run) define command behavior over the language;
-they are not the primary grammar reference. Read §FS-rhei-recover with
-§FS-rhei-transition-cmd.6 when auditing operator recovery or an execution root
+[§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover), [§FS-rhei-retry](rhei-retry.spec.md#fs-rhei-retry-rhei-retry), [§FS-rhei-complete](rhei-complete.spec.md#fs-rhei-complete-rhei-complete), [§FS-rhei-note](rhei-note.spec.md#fs-rhei-note-rhei-note), [§FS-rhei-remove](rhei-remove.spec.md#fs-rhei-remove-rhei-remove), and [§FS-rhei-run](rhei-run.spec.md#fs-rhei-run-rhei-run) define command behavior over the language;
+they are not the primary grammar reference. Read [§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover) with
+[§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery) when auditing operator recovery or an execution root
 blocked by `.rhei/forced-recovery.json`.
 
 ## 3. Ownership Rules
@@ -100,11 +100,11 @@ Language changes must preserve a single discoverable entry point:
   [§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition).
 - The tooling one task needs is authored with `**MCP servers:**` and
   `**Skills:**`, and a state refuses it with `withhold_task_tooling`; their
-  grammar is §FS-rhei-plan-language.2, and what they mean, how they combine
+  grammar is [§FS-rhei-plan-language.2](rhei-plan-language.spec.md#2-grammar-ebnf), and what they mean, how they combine
   with a state's tooling and what validation refuses are owned by
-  §FS-rhei-task-tooling.
+  [§FS-rhei-task-tooling](rhei-task-tooling.spec.md#fs-rhei-task-tooling-tooling-one-task-needs).
 - Adding, removing, or renaming a user-authored project or rhei file kind or
-  directory must update the file-kind map in §1 in the same change as the
+  directory must update the file-kind map in [§FS-rhei-language-reference.1](rhei-language-reference.spec.md#1-language-surfaces) in the same change as the
   owning spec edit.
 - New state-machine fields belong in [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification) or [§FS-rhei-transitions](rhei-transitions.spec.md#fs-rhei-transitions-rhei-transitions-specification)
   and must be linked from this page when users author them directly.
@@ -136,7 +136,7 @@ Language changes must preserve a single discoverable entry point:
   nothing: it is authored in the machine settings file alone, where `false`
   makes the project's declared `transition_limit` and `invocations_per_day` the
   ceiling in place of the machine's, and it is refused in project settings, a
-  plan and a profile (§FS-rhei-budgets.2, §FS-rhei-agents.1.1.1).
+  plan and a profile ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from), [§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults)).
 - The price book a machine or a project names once — the `defaults.prices`
   settings key — is owned by
   [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection), which says what a selected book
@@ -150,8 +150,8 @@ Language changes must preserve a single discoverable entry point:
 - The time bound on transition callbacks, `callback_timeout`, is authored on a
   transition rule or at the machine's root of `states.yaml`; its precedence,
   what it bounds, and what expiry does on each platform are owned by
-  §FS-rhei-transitions.4.10, and what `rhei validate` refuses about it by
-  §FS-rhei-validate.4.
+  [§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound), and what `rhei validate` refuses about it by
+  [§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior).
 - New execution references that appear in authored files must identify their
   owner spec from this page.
 - Which construct a unit of work becomes — a state, a task, a child task, a

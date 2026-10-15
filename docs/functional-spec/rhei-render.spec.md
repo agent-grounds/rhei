@@ -130,7 +130,7 @@ compatibility question of its own and larger than the surface it would protect.
 
 Each rendered task has an optional string field `inherits`. When authored, its
 normalized value is either `"none"` or `"<name> from <axis>"`, matching
-§FS-rhei-plan-language.3.14. The key is absent, not `null` or an empty string,
+[§FS-rhei-plan-language.3.14](rhei-plan-language.spec.md#314-task-snapshot-inheritance-overrides). The key is absent, not `null` or an empty string,
 when `**Inherits:**` was omitted. This field reports authored task metadata;
 it does not expand or duplicate an inherited state-machine rule.
 
@@ -181,7 +181,7 @@ loaded on its own — keeps its authored shape: content sections, then one
 
 `--format json` keeps its flat shape: it emits the AST, and the merged section
 titles are part of that AST. Its only project-specific addition is the `rheis`
-attribution array (§3.1).
+attribution array ([§FS-rhei-render.3.1](rhei-render.spec.md#31-json)).
 
 ## 4. Behavior
 

@@ -41,7 +41,7 @@ Render the avatar in the profile header and comment list. Fall back to initials 
 
 `**Prior:**` declares dependencies — Task 2 cannot be claimed until Task 1 is
 in a successful terminal state as defined by the active state machine
-(`final: true` and without cancellation role (§FS-rhei-states.1.4); in the built-in `rhei` machine,
+(`final: true` and without cancellation role ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)); in the built-in `rhei` machine,
 `completed`). Tasks without `**Prior:**` are immediately dependency-ready.
 
 Tasks may also be decomposed hierarchically when the plan's optional
@@ -128,7 +128,7 @@ The single-file format is a hierarchical structure:
 
 A `## Tasks` section holding **no** task nodes is a valid, empty rhei — the
 section heading is required, its contents are not. This mirrors the Directory
-Workspace rule below (§1.2) rather than contradicting it: the two formats
+Workspace rule below ([§FS-rhei-plan-language.1.2](rhei-plan-language.spec.md#12-directory-workspace-agent-teams-high-concurrency)) rather than contradicting it: the two formats
 describe the same rhei, and a rhei that is empty in one of them cannot be
 illegal in the other. It is the state a rhei passes through between being
 created and receiving its first ticket, which is exactly what `rhei new`
@@ -164,7 +164,7 @@ A Directory Workspace consists of:
 3. **Workspace Task Files**: Files within `tasks/` that contain one or more
    node definitions (`### <kind> <id>:`), optionally preceded by a
    metadata-only frontmatter block carrying the authored
-   `metadata.tasks.<id>` entries of the tasks that file defines (§1.4). They do
+   `metadata.tasks.<id>` entries of the tasks that file defines ([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)). They do
    not require the `# Rhei:` header, and `index.rhei.md` remains the
    workspace's only *writable* metadata document.
 
@@ -245,15 +245,15 @@ frontmatter and is the only file into which a Rhei command ever writes
 `metadata.tasks.<id>` entries for the tasks that file defines, so a task's
 custom field lives in the same file as its `**State:**`, `**Prior:**` and
 `**Assignee:**` and two agents on two sparse checkouts of one plan each write
-exactly one file (§1.2, §FS-rhei-authoring.4).
+exactly one file ([§FS-rhei-plan-language.1.2](rhei-plan-language.spec.md#12-directory-workspace-agent-teams-high-concurrency), [§FS-rhei-authoring.4](rhei-authoring.spec.md#4-metadata)).
 
 Four rules govern that block. Each one is a diagnostic rather than a
-convention, and §FS-rhei-validate.4 gives the message and the error class of
+convention, and [§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior) gives the message and the error class of
 each:
 
 1. **Metadata only.** Its one permitted top-level key is `metadata`. A
    plan-wide setting such as `structure` is declared once in `index.rhei.md`
-   and applies to every task file (§FS-rhei-authoring.3.3); so is every other
+   and applies to every task file ([§FS-rhei-authoring.3.3](rhei-authoring.spec.md#33-depth-and-node-kinds)); so is every other
    top-level key. A task file sets nothing that reaches beyond the tasks it
    defines.
 2. **Its own tasks only.** Every `metadata.tasks.<id>` entry names an id that
@@ -271,28 +271,28 @@ each:
    rule to predict which value wins.
 4. **Authored, never written.** No Rhei command reads the block for its own
    bookkeeping or rewrites it. The runtime leaves it exactly as it found it,
-   `rhei reset` included (§FS-rhei-reset.2), and the merged map it feeds is
+   `rhei reset` included ([§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior)), and the merged map it feeds is
    reachable through the surfaces that already exist — `{meta.<key>}`
-   (§FS-rhei-states.4.1), callback task metadata (§FS-rhei-transitions.2.2),
-   and `rhei render` (§FS-rhei-render.3.1). No read surface is added.
+   ([§FS-rhei-states.4.1](rhei-states.spec.md#41-variable-namespace)), callback task metadata ([§FS-rhei-transitions.2.2](rhei-transitions.spec.md#22-metadata-storage-example)),
+   and `rhei render` ([§FS-rhei-render.3.1](rhei-render.spec.md#31-json)). No read surface is added.
 
 A metadata block under `basin/` is refused instead of admitted: a basin ticket
 file has no metadata document of its own, because the basin's manifest is the
 project's, so basin ticket metadata lives in `index.panta.md` under
-project-qualified ids (§FS-rhei-panta.2, §AR-rhei-panta.2). That is a load
+project-qualified ids ([§FS-rhei-panta.2](rhei-panta.spec.md#2-default-home-for-new-rheis), [§AR-rhei-panta.2](../architecture/rhei-panta.spec.md#2-load-model)). That is a load
 error naming the file.
 
 **Runtime-managed metadata is read from and written to `index.rhei.md`, and
 nowhere else.** The runtime's keys are named here rather than inferred, because
 writing a counter back into whichever file it was read from would move the
 shared-write hotspot instead of closing it:
-`metadata.tasks.<id>.stateVisits.<state-name>` (§FS-rhei-transitions.2.3),
+`metadata.tasks.<id>.stateVisits.<state-name>` ([§FS-rhei-transitions.2.3](rhei-transitions.spec.md#23-counted-loop-metadata)),
 `metadata.tasks.<id>.pollNextAttemptAt.<state-name>`,
 `metadata.tasks.<id>.providerLimits`, `metadata.tasks.<id>.budgetTicketId`
-(§FS-rhei-budgets.5.1), and the task's `supervision` block
-(§FS-rhei-supervision.3.3). Each is keyed by the task id as the workspace's own
+([§FS-rhei-budgets.5.1](rhei-budgets.spec.md#51-where-it-lives)), and the task's `supervision` block
+([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)). Each is keyed by the task id as the workspace's own
 files spell it — the rhei-local id, which the load re-keys to the
-project-qualified id (§AR-rhei-panta.2) — and each goes to the index whether or
+project-qualified id ([§AR-rhei-panta.2](../architecture/rhei-panta.spec.md#2-load-model)) — and each goes to the index whether or
 not that task's file carries a block of its own.
 
 Persistence ownership is normative:
@@ -348,7 +348,7 @@ A Panta Project consists of:
    rhei. This directory is loaded as a synthetic Directory Workspace rhei with id
    `basin`; its contents are authored as workspace task files. The synthetic
    basin has no authored `index.rhei.md`, runs under the project default
-   machine (§1.3 clause 2), and stores per-ticket runtime artifacts relative to `basin/`.
+   machine ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) clause 2), and stores per-ticket runtime artifacts relative to `basin/`.
 
 Each rhei's id is derived from its location in the project directory: the
 filename stem for a Single-File Plan (`auth.rhei.md` -> `auth`) or the directory
@@ -772,7 +772,7 @@ header. The line is no longer part of the language, and it is **refused rather
 than ignored**: a line beginning `**States:**` anywhere in a `rhei_document`, a
 `workspace_index` (`index.rhei.md`) or a `panta_manifest` (`index.panta.md`) is
 a parse error. Dropping it silently would leave a tree that was written to run
-under one machine running under whichever `states.yaml` §1.3 now finds, with
+under one machine running under whichever `states.yaml` [§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) now finds, with
 nothing to say the machine changed; refusing it makes the moment the line is
 deleted the moment the machine moves, and `rhei states` shows where it moved
 to.
@@ -796,7 +796,7 @@ candidates rather than printing the error over the prompt.
 Two places are not refused, because the line never meant anything there and no
 machine changes because of it:
 
-- **Inside a fenced code block** (§2.1), where every line is content, so a
+- **Inside a fenced code block** ([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)), where every line is content, so a
   document can still quote the old syntax.
 - **In a task body or a workspace task file.** The grammar never gave the line
   a meaning below the header, so it is ordinary task text, like any other bold
@@ -853,7 +853,7 @@ hold/release rule is specified in [§FS-rhei-supervision.3](rhei-supervision.spe
 
 Dependency readiness requires successful terminal dependencies: a task is ready
 with respect to `**Prior:**` only when every referenced dependency is in a
-terminal state without cancellation role (§FS-rhei-states.1.4). State-machine
+terminal state without cancellation role ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)). State-machine
 `instructions` text is descriptive guidance for agents and must not narrow or
 override this readiness rule unless the machine introduces a separate normative
 field for that purpose.
@@ -1218,7 +1218,7 @@ A result block is optional syntax, but it has a lifecycle invariant:
   successful non-cancelled terminal completion.
 - Every successful terminal entry, including `rhei transition` and an
   operator-forced entry, performs the shared terminal finalization and leaves
-  exactly one valid result block (§FS-rhei-complete.3). A forced exit from a
+  exactly one valid result block ([§FS-rhei-complete.3](rhei-complete.spec.md#3-result-file)). A forced exit from a
   terminal state removes that block while preserving the append-only result
   file; a later final re-entry appends its fresh result and restores one block.
 - `rhei reset` removes result blocks along with other runtime completion
@@ -1301,7 +1301,7 @@ This section is canonical for artifact enforcement order across commands:
 | Command | Enforced artifacts | Ordering |
 |---------|--------------------|----------|
 | `rhei next` | Current-state `inputs`; source `outputs` and effective-target `inputs` when a claim advances | Before a task is claimable, resolve the current state's inputs. Required inputs must exist; optional inputs are resolved and exposed but missing optional inputs do not block. Claim mode acquires the selected plan destination's canonical sibling sidecar and re-reads the current pathname before repeating the applicable automatic or explicit readiness check. A passive initial state selected automatically, or an eligible passive state selected explicitly, may advance one non-terminal edge as defined in the next-command spec; that shared transition path checks source outputs after `on_leave` and effective-target inputs before persistence. State, metadata, ownership, callbacks, and the one ledger entry share the claim transaction. `next --peek` does not acquire a writer sidecar, check outputs, run callbacks, write state, or write result files. |
-| `rhei transition` | Source-state `outputs`; target-state `inputs`; the target's terminal result | After the compare-and-swap guard and edge validation, execute `on_leave` unless skipped. Then check required source outputs — skipped when the effective target has cancellation role (§FS-rhei-states.1.4), which abandons the work rather than finishing it — resolve target inputs for the final target state, and reject before the state write if any required artifact is missing. Optional target inputs are skipped for blocking but still resolved. When the final target is `final: true`, its implicit terminal result is checked at the same point ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)): a non-empty `runtime/results/<task-id>.md` or a `--result` message, or the transition is rejected before the state write. Write the target state, execute `on_enter` unless skipped, atomically persist the task file, then append the transition audit entry to `runtime/state-transitions.log` and, for a terminal target, the terminal finalization. |
+| `rhei transition` | Source-state `outputs`; target-state `inputs`; the target's terminal result | After the compare-and-swap guard and edge validation, execute `on_leave` unless skipped. Then check required source outputs — skipped when the effective target has cancellation role ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)), which abandons the work rather than finishing it — resolve target inputs for the final target state, and reject before the state write if any required artifact is missing. Optional target inputs are skipped for blocking but still resolved. When the final target is `final: true`, its implicit terminal result is checked at the same point ([§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)): a non-empty `runtime/results/<task-id>.md` or a `--result` message, or the transition is rejected before the state write. Write the target state, execute `on_enter` unless skipped, atomically persist the task file, then append the transition audit entry to `runtime/state-transitions.log` and, for a terminal target, the terminal finalization. |
 | `rhei complete` | Source-state `outputs`; completion-target `inputs`; the completion target's terminal result | Select the non-cancelled terminal completion target first, then use the same transition artifact order as `rhei transition`, carrying `--result` as the terminal result. `rhei complete` adds no artifact rule of its own; its target never has cancellation role, so the cancellation waiver never applies to it. |
 | `rhei run` | Current-state `inputs`; source-state `outputs` for successful work; target-state `inputs`; the selected target's terminal result | Before spawning work, the ready-set scan checks current-state required inputs and skips missing optional inputs for blocking. After a subprocess exits `0`, required source outputs are part of the completion condition; if any are missing, no transition fires, the task stays in its current state, it is not spawned again within the pass, and the run continues with the other claimable tickets in both execution modes ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 5). When the transition the run would select lands on a `final: true` state, the ticket's non-empty `runtime/results/<task-id>.md` — or, per invocation of a fanned-out state, its own fragment under `runtime/results/<task-id>/<state>/<visit_count>/` — is part of that same completion condition and a missing one is reported exactly like a missing required output ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop), [§FS-rhei-agents.3.2](rhei-agents.spec.md#32-completion-condition), [§FS-rhei-states.3.3](rhei-states.spec.md#33-terminal-result)). Non-zero, timeout, and tooling-failure routes select error transitions as specified by `rhei run`, do not require normal source outputs, and carry an engine-written result message when they land on a terminal state. For any selected target transition, required target inputs are checked before the state write and optional target inputs do not block. A successful-work transition also re-checks source outputs after `on_leave` and before the state write. Result-file writes, if any, happen only after the transition succeeds. |
 
@@ -1315,7 +1315,7 @@ and expose the path and existence flag to templates, agents, and programs.
 `optional: true` is valid only on inputs. Outputs are always required when
 declared, and a missing output blocks the transition out of the source state
 except for the `rhei run` failure, timeout, and tooling-unavailable routes
-described above, and except on a transition into a cancellation-role state (§FS-rhei-states.1.4).
+described above, and except on a transition into a cancellation-role state ([§FS-rhei-states.1.4](rhei-states.spec.md#14-reserved-state-names)).
 Cancellation abandons the work, so the source state's artifact contract is
 moot: there is no output to require of a step that is not being finished. The
 terminal-result obligation is *not* waived with it — a cancel into a cancellation-role terminal
@@ -1471,7 +1471,7 @@ say which export it meant, the second is a leftover from an edit.
 `**Consumes:**` declares export data-flow for prompt injection; it is not a
 filesystem visibility or access-control boundary. A worker can read undeclared
 sibling exports under `runtime/exports/`, consistently with the project memory
-map ([§FS-rhei-memory.1.1](rhei-memory.spec.md#11-everything-before-is-reachable) [§FS-rhei-memory.3.4](rhei-memory.spec.md#3-the-sections)). A template that needs a blind round should schedule its
+map ([§FS-rhei-memory.1.1](rhei-memory.spec.md#11-everything-before-is-reachable) [§FS-rhei-memory.3.4](rhei-memory.spec.md#34--rhei-commands-additions)). A template that needs a blind round should schedule its
 participants concurrently and brief them not to inspect sibling exports. Those
 measures reduce accidental cross-reading; neither enforces blindness once an
 export exists. `**Prior:**`, not `**Consumes:**`, determines readiness.
@@ -1500,7 +1500,7 @@ language explicitly with
 operation authors the missing direct edges.
 
 When a consumed export reference resolves, an exclusion may never overlap it;
-§3.13 defines the overlap rule and makes that contradiction a validation error.
+[§FS-rhei-plan-language.3.13](rhei-plan-language.spec.md#313-task-read-exclusions) defines the overlap rule and makes that contradiction a validation error.
 
 #### 3.12.2. Consumer Availability
 
@@ -1624,7 +1624,7 @@ A task may override the name and lineage axis of the active state's
 
 The value is either `none` or `<snapshot-name> from <axis>`, where `<axis>` is
 `self`, `ancestor`, or `prior` and the name obeys the snapshot-name grammar in
-§FS-rhei-snapshots.4.2. The field appears after `**Prior:**` when both are
+[§FS-rhei-snapshots.4.2](rhei-snapshots.spec.md#42-snapshotinherit). The field appears after `**Prior:**` when both are
 present and before `**Provides:**`, `**Consumes:**`, `**Excludes:**`,
 `**Assignee:**`, `**Model:**`, or `**Target:**`. It may appear at most once. An empty value, an
 unsupported axis, extra words, a duplicate, or a recognized metadata field in
@@ -1643,7 +1643,7 @@ autonomous state and counted visit and is re-read immediately before each
 spawn. It has no effect on human, final, gating, or program states, and it does
 not relax state restrictions such as the prohibition on polling inheritance.
 The effective rule and its runtime behavior are defined by
-§FS-rhei-snapshots.4.
+[§FS-rhei-snapshots.4](rhei-snapshots.spec.md#4-state-machine-yaml-grammar).
 
 ## 4. Token Types
 

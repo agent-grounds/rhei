@@ -238,7 +238,7 @@ and run totals without assuming the slot is still active. [§FS-rhei-cost-accoun
 
 Warnings from the initial validation report are ordinary `Message` events at
 `Warn` level, emitted after `RunStarted` and before the first scheduling event
-(§FS-rhei-run.3). Consequently the TUI and dashboard retain them in their
+([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)). Consequently the TUI and dashboard retain them in their
 journal model, the JSON frontend and durable event log retain warning message
 records, and the plain/headless frontend writes them to stderr. Reusing this
 event path preserves the wording and frequency of existing validation warnings.
@@ -253,7 +253,7 @@ so the shared chrome can show whose ceiling is in force
 ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued)). The spend
 dimension is one of them, and it carries the account's currency so a frontend
 renders `$25.00` or `25.00 EUR` rather than a bare number whose unit the reader
-has to guess (§FS-rhei-budgets.5.5). It is emitted once after `RunStarted` and
+has to guess ([§FS-rhei-budgets.5.5](rhei-budgets.spec.md#55-one-currency-per-account)). It is emitted once after `RunStarted` and
 before the first scheduling event, so the bounds are on screen *before* any
 capacity is spent, and again after each receipt is durable rather than only at
 exhaustion. `BudgetHalt` carries the same fields for one refused admission plus
@@ -288,7 +288,7 @@ The TUI keeps a bounded recent traffic buffer per active slot and may drop displ
 - **`StdoutSink`** — reproduces the current `println!` output exactly. It is the default frontend when stdout is not a TTY, and so is what a headless run's `runtime/run.log` is written through. It appends lines rather than keying a view, so on usage it prints one accounting line per invocation, on the `Final` report only ([§FS-rhei-cost-accounting.7.1](rhei-cost-accounting.spec.md#71-line-oriented-frontends)).
 - **`JsonSink`** — writes one JSON object per event to stdout and nothing else, selected by `--json`. Its record contract is specified in [Run JSON Stream](rhei-run-json.spec.md); this document owns only its place among the frontends.
 - **`EventLogSink`** — appends the same records to `runtime/events.jsonl`, in every mode and whichever frontend is selected, so a separate process can follow a run it did not start ([§FS-rhei-run-json.3](rhei-run-json.spec.md#3-durable-event-log) [§FS-rhei-run-headless.5](rhei-run-headless.spec.md#5-rhei-attach)). Like the journal, its write failures are warnings, never aborts.
-- **`TuiSink`** — owns a bounded `crossbeam_channel` and a render thread. It implements `EventSink` by pushing events onto the channel; the render thread consumes events and updates the UI. The render thread maintains the shared run model — plan rows and the resolved machine supplied by the host, overlaid with runtime state from the event stream — and draws the Flow surface defined in §1.5.
+- **`TuiSink`** — owns a bounded `crossbeam_channel` and a render thread. It implements `EventSink` by pushing events onto the channel; the render thread consumes events and updates the UI. The render thread maintains the shared run model — plan rows and the resolved machine supplied by the host, overlaid with runtime state from the event stream — and draws the Flow surface defined in [§FS-rhei-run-tui.1.5](rhei-run-tui.spec.md#15-tui-surface).
 
 ### 1.4. Frontend Selection
 
@@ -308,7 +308,7 @@ parses cannot also be a screen a person reads.
 `--until-idle` ([§FS-rhei-run.2.1](rhei-run.spec.md#21-standalone)) follows the same settled pattern one row below:
 it overrides TTY auto-detection and conflicts with an explicit `--tui`. A
 finished TUI run parks on its final surface until the operator presses `q`
-(§1.5.7), so the run loop returns and the process does not — an option whose
+([§FS-rhei-run-tui.1.5.7](rhei-run-tui.spec.md#157-liveness-color-and-lifecycle)), so the run loop returns and the process does not — an option whose
 whole point is returning cannot use that frontend. The conflict is declared on
 the flags, so it is refused at startup with status `2` and a diagnostic naming
 `--no-tui`, before any lock, descriptor, journal or event log is written; a
@@ -386,10 +386,10 @@ surroundings model of [§FS-rhei-viz.4](rhei-viz.spec.md#4-surroundings-inspecto
 | `/` | filter the active view (`Flow`/task-cost rows by id, title, or state; `Machine` by state/task text; `Journal` by line text); `Esc` clears |
 | `g` | (Cost) cycle grouping: task → agent → model → state |
 | `f` | (Journal) cycle severity/kind filter |
-| `m` | message the selected running agent when an intervention channel is available (§1.5.5) |
+| `m` | message the selected running agent when an intervention channel is available ([§FS-rhei-run-tui.1.5.5](rhei-run-tui.spec.md#155-live-actions-intervene-and-human-gate)) |
 | `?` | toggle the key-help overlay |
 | `q` | quit once the run has finished; during a live run, stop with `Ctrl+C` |
-| `Ctrl+C` | restore the terminal and re-raise `SIGINT` (§1.8) |
+| `Ctrl+C` | restore the terminal and re-raise `SIGINT` ([§FS-rhei-run-tui.1.8](rhei-run-tui.spec.md#18-failure-modes)) |
 
 **An attached surface reverses the last two rows.** When the surface is a
 client of a run it did not start (`rhei attach`), `q` and `Ctrl+C` both
@@ -418,7 +418,7 @@ borrowed previous-state outputs of [§FS-rhei-viz.4](rhei-viz.spec.md#4-surround
 The outline folds a terminal parent's subtree by the rule and the clause of
 [§FS-rhei-run-report.3.2](rhei-run-report.spec.md#32-task-tree), so one finished forty-child parent is one line
 here too. Because the outline is navigable and has no expand key of its own
-(§1.5.2), `Enter` on a folded parent row expands it in place rather than
+([§FS-rhei-run-tui.1.5.2](rhei-run-tui.spec.md#152-navigation-selection-and-keys)), `Enter` on a folded parent row expands it in place rather than
 leaving finished children unreachable; the inspector's `children` section
 remains the other way in. The selection standing inside a folded subtree, or an
 active `/` filter, holds that subtree open too, so the outline never hides the
@@ -441,7 +441,7 @@ Beyond Flow, the tab bar offers three compact views over the same model:
   and state-category markers ([§FS-rhei-viz.6](rhei-viz.spec.md#6-state-machine-graphs)).
 - **Cost** — run totals and grouped rollups by task, agent, model, or state;
   coverage gaps carry a glyph, never color alone ([§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)).
-- **Journal** — full run-event journal with severity and text filtering (§1.7).
+- **Journal** — full run-event journal with severity and text filtering ([§FS-rhei-run-tui.1.7](rhei-run-tui.spec.md#17-journal-format)).
   Links remain in the shared links strip rather than consuming Journal body
   space.
 
@@ -492,7 +492,7 @@ runs do not wait **for a human gate** — they still sleep to a future poll or
 provider-limit deadline ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)), which is a different wait and is
 not scoped by this sentence. After `RunFinished`, live actions are disabled but
 the final surface remains navigable until `q`; non-TTY and `--no-tui` output
-remains line-oriented (§1.4, §3).
+remains line-oriented ([§FS-rhei-run-tui.1.4](rhei-run-tui.spec.md#14-frontend-selection), [§FS-rhei-run-tui.3](rhei-run-tui.spec.md#3-backward-compatibility)).
 
 `--until-idle` ([§FS-rhei-run.2.1](rhei-run.spec.md#21-standalone)) is independent of the frontend: on every
 frontend it supports — plain stdout, a non-TTY stdout, explicit `--no-tui`,
@@ -530,7 +530,7 @@ records is the result the run reached; nothing was interrupted ([§FS-rhei-run.3
 going or already finished. Crossterm reports it as a failed input poll or a
 failed read — the pty was closed, the session hung up — and there is then
 nothing to draw to and nobody to press a key: the render thread restores what it
-can and returns, and the run continues headless (§1.8). Treating either as "no
+can and returns, and the run continues headless ([§FS-rhei-run-tui.1.8](rhei-run-tui.spec.md#18-failure-modes)). Treating either as "no
 key was pressed" turned a closed terminal into a loop that spun as fast as the
 CPU allowed and never returned, which wedged the shutdown waiting on it.
 
@@ -552,7 +552,7 @@ graph, opens any node's surroundings (dependencies, transitions, prompt,
 artifacts, children), and draws the resolved state machine as one graph per
 disjoint workflow. A live task exposes its streaming agent output and a way to
 intervene. [§FS-rhei-viz](rhei-viz.spec.md#fs-rhei-viz-flow-visualization) [§FS-rhei-viz.5](rhei-viz.spec.md#5-running-execution-view) The TUI renders this same Flow surface and
-a terminal-appropriate subset of these views (§1.5).
+a terminal-appropriate subset of these views ([§FS-rhei-run-tui.1.5](rhei-run-tui.spec.md#15-tui-surface)).
 
 Supplementary surfaces share the same `/snapshot` data and console-first
 language:
@@ -594,7 +594,7 @@ Rules:
 - `outcome` is one of `completed`, `failed`, `waiting`, `provider_limited`, `cancelled`, `timeout`, `interrupted` — the vocabulary [§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records) serializes.
 - A provider-limited release adds `provider` and `next_attempt_at`; its task column is the reporting task. The TUI renders that slot as a calm wait carrying the same provider and deadline, never as failed attention.
 - A released invocation whose selected transition is a poll state's self-loop records `outcome=waiting`, whatever its exit code: the machine declared that exit as "not done yet", so the attempt is neither a failure nor a finished state ([§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics)). The third line above is one — exit `75` matched a declared self-loop, so the attempt reads as the wait it was. The attempt that *leaves* the state, including by the exhaustion edge, keeps the outcome its own exit earns.
-- A released invocation whose edit broke the plan, and whose task region the run restored, adds `reverted=<file>:<line>` — the workspace-relative file and the 1-based line the loader reported (§FS-rhei-run.3.7). Its outcome is `failed`, or `timeout` / `interrupted` when that is what ended it, so the vocabulary does not grow: `reverted` says why a zero exit moved nothing. The attempt that follows is its own pair of lines, under its `-attempt{n}` log.
+- A released invocation whose edit broke the plan, and whose task region the run restored, adds `reverted=<file>:<line>` — the workspace-relative file and the 1-based line the loader reported ([§FS-rhei-run.3.7](rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan)). Its outcome is `failed`, or `timeout` / `interrupted` when that is what ended it, so the vocabulary does not grow: `reverted` says why a zero exit moved nothing. The attempt that follows is its own pair of lines, under its `-attempt{n}` log.
 
   ```
   2026-04-21T14:03:22Z  ws.1  end@cover  runtime/logs/task-ws.1-cover.log  exit=0,duration=4s,outcome=failed,reverted=tasks/01-cover.md:6
@@ -606,7 +606,7 @@ A `SlotAssigned` produces one line; its paired `SlotReleased` produces a second 
 A manual transition, including an operator-forced missing-edge recovery, is not
 an invocation and holds no run slot, so it emits no event here. Its ordinary or
 exceptional state history belongs only in `runtime/state-transitions.log`.
-§FS-rhei-transition-cmd.6.1
+[§FS-rhei-transition-cmd.6.1](rhei-transition-cmd.spec.md#61-durable-transaction-and-audit-pair)
 
 When an invocation selects a task transition, Rhei completes that transition's
 processing—including successful `on_enter`, the central
@@ -631,8 +631,8 @@ it.
 - **Panic in the execution engine** — a panic hook registered by `TuiSink` calls `ratatui::restore()` before re-raising, so the terminal is never left in raw mode.
 - **Ctrl+C** — because the TUI runs the terminal in raw mode, Ctrl+C arrives as a key event rather than an automatic `SIGINT`. `TuiSink` restores the terminal, explicitly re-raises `SIGINT` for the process, and then exits its render loop. The re-raised signal enters the run's interruption contract ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) exactly as a `SIGINT` from outside would: in-flight invocations are terminated as process groups and reaped, no ticket transitions, and `rhei run` exits `130`. Because the render loop has already ended, the shutdown notice — including "press Ctrl+C again to kill immediately" — reaches the restored terminal rather than the journal pane; see below.
 - **Engine messages after the screen is restored** — from the moment the TUI leaves the alternate screen, by any route (Ctrl+C, the operator quitting, a panic, or the end of the run), warnings and errors the engine emits are written to stderr instead of the journal pane, which no longer exists. Every other event is dropped: a restored terminal has nowhere to show slot state, and nothing that is not text is worth interrupting the operator with. The engine keeps emitting through the one event stream either way — where a message is legible is the frontend's decision, not the engine's. Without this an external `SIGTERM` arriving mid-render wrote the shutdown notice into the alternate screen, and one arriving in the gap between the restore and the render thread's return was accepted by the channel and silently discarded.
-- **The terminal goes away** — when reading input fails (the pty was closed, the session hung up), the render thread restores what it can, marks the screen gone, and returns, at any point in the run (§1.5.7). The engine keeps running: a `SIGHUP` that accompanied the hangup interrupts it through [§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership), and without one the run finishes headless — warnings and errors on stderr by the rule above, every other event dropped, because the journal pane is gone. Its own console output has nowhere left to go either: writing to the dead terminal fails the way writing to a closed pipe does, and `rhei` ends quietly on it rather than reporting an internal error — after terminating every in-flight process group, because that exit runs no destructors ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)). When the terminal disappears *after* the run has ended, the durable report is already on disk ([§FS-rhei-run-report.1](rhei-run-report.spec.md#1-report-artifact)); that, not the screen, is what the operator comes back to. When it disappears mid-run there is no report to come back to: the run ended before it could write one, and the task files it left behind are the record.
-- **Terminal too small for two panes** — auto-degrade to the compact list of §1.5.6; never crash.
+- **The terminal goes away** — when reading input fails (the pty was closed, the session hung up), the render thread restores what it can, marks the screen gone, and returns, at any point in the run ([§FS-rhei-run-tui.1.5.7](rhei-run-tui.spec.md#157-liveness-color-and-lifecycle)). The engine keeps running: a `SIGHUP` that accompanied the hangup interrupts it through [§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership), and without one the run finishes headless — warnings and errors on stderr by the rule above, every other event dropped, because the journal pane is gone. Its own console output has nowhere left to go either: writing to the dead terminal fails the way writing to a closed pipe does, and `rhei` ends quietly on it rather than reporting an internal error — after terminating every in-flight process group, because that exit runs no destructors ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)). When the terminal disappears *after* the run has ended, the durable report is already on disk ([§FS-rhei-run-report.1](rhei-run-report.spec.md#1-report-artifact)); that, not the screen, is what the operator comes back to. When it disappears mid-run there is no report to come back to: the run ended before it could write one, and the task files it left behind are the record.
+- **Terminal too small for two panes** — auto-degrade to the compact list of [§FS-rhei-run-tui.1.5.6](rhei-run-tui.spec.md#156-responsive-degradation); never crash.
 - **Slow log file growth** — the log tailer uses a bounded 50-line ring buffer and never blocks the engine thread.
 - **Journal write failure** — log a warning to stderr and continue; journal errors never abort a run.
 
@@ -668,7 +668,7 @@ Existing flags (`--parallel`, `--dry-run`, `--continue-on-error`, `--agent`, etc
 - The journal file is new. Runs that never produced a journal before will now produce one at `runtime/transitions.log`. This file is additive and does not alter plan state.
 - No existing flags change meaning.
 - The interactive TUI now stays open after the run finishes until the operator
-  quits (§1.5.7); non-TTY and `--no-tui` runs still return when the run ends.
+  quits ([§FS-rhei-run-tui.1.5.7](rhei-run-tui.spec.md#157-liveness-color-and-lifecycle)); non-TTY and `--no-tui` runs still return when the run ends.
 
 ## 4. Implementation Surface
 

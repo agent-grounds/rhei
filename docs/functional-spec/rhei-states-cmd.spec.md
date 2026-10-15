@@ -121,7 +121,7 @@ Text output includes:
   An edge that declares a `callback_timeout` carries it as
   `callback_timeout=<bound>` beside its other annotations, and a machine-level
   `callback_timeout` is printed once in the header beside the name and version
-  (§FS-rhei-transitions.4.10).
+  ([§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound)).
 
 ## 5. JSON Output
 

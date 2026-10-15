@@ -172,7 +172,7 @@ An unknown skill name is an error that lists the skills the binary carries.
 The default behavior copies skill files into the target directory. `--link` symlinks instead — useful during development so skills stay up-to-date with local changes, but requires the rhei source to remain at a stable path.
 
 Because a symlink into a temporary extraction would dangle the moment the
-command exits, `--link` needs one of the filesystem sources in §4.3. When only
+command exits, `--link` needs one of the filesystem sources in [§FS-rhei-install-skills.4.3](rhei-install-skills.spec.md#43-resolve-skill-source). When only
 the embedded copy is available, `--link` fails with an error naming the two
 paths that would have satisfied it and pointing at plain copying instead.
 
@@ -201,8 +201,8 @@ With `--uninstall`, remove symlinks/copied files and delete the registered secti
 ### 4.8. Bundled reference files
 
 A skill directory's `references/` subtree is part of the skill: every file under
-it, at any depth, is installed with the `SKILL.md` for every target in §3, and
-is resolved from the same source as the skill itself (§4.3).
+it, at any depth, is installed with the `SKILL.md` for every target in [§FS-rhei-install-skills.3](rhei-install-skills.spec.md#3-agent-targets), and
+is resolved from the same source as the skill itself ([§FS-rhei-install-skills.4.3](rhei-install-skills.spec.md#43-resolve-skill-source)).
 
 One of those files is shared. `references/shape.md` ships under
 `rhei-plan-writer`, `rhei-state-machine-writer` and `rhei-template-writer`, and

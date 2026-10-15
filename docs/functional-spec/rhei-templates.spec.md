@@ -15,7 +15,7 @@ A **template** is a directory containing:
 3. **Prompt templates** (`prompt_templates/*.md`) — optional; when present next
    to `states.yaml`, the directory declares reusable state prompt fragments
    referenced by state-level `prompt_template` fields.
-4. A **plan skeleton** — either a single-file plan (`plan.rhei.md`) or a directory-workspace layout (`index.rhei.md` + `tasks/`) — or, for a **project template**, a Panta manifest (`index.panta.md`) in its place (§FS-rhei-templates.2).
+4. A **plan skeleton** — either a single-file plan (`plan.rhei.md`) or a directory-workspace layout (`index.rhei.md` + `tasks/`) — or, for a **project template**, a Panta manifest (`index.panta.md`) in its place ([§FS-rhei-templates.2](rhei-templates.spec.md#2-directory-layout)).
 5. **Additional files** — any non-manifest files bundled with the template. Text files are rendered with a restricted MiniJinja template environment; binary files are copied verbatim into the output.
 
 Materialized template files may contain **instantiation templates** (`{{ ... }}`, `{% ... %}`) that are resolved at instantiation time from user-supplied inputs. These are distinct from the single-brace **runtime variables** (`{name}`) defined by the state-machine and plan specifications. Rendering is ordered: first resolve MiniJinja templates across template files during `rhei instantiate`, then let later `rhei` commands resolve runtime `{...}` variables against the instantiated workspace. The manifest (`template.yaml`) is parsed before rendering and is never itself templated.
@@ -88,8 +88,8 @@ project-local copy under the deprecated name still precedes a farther copy
 under the current name.
 
 Rhei never *writes* to `.agents/rhei/`. Every path that creates project-local
-rhei material — a template's root `settings.json` on instantiation (§4), the
-settings hoist into an enclosing project (§6.2) — writes under
+rhei material — a template's root `settings.json` on instantiation ([§FS-rhei-templates.4](rhei-templates.spec.md#4-template-shipped-settings)), the
+settings hoist into an enclosing project ([§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project)) — writes under
 `.agent-grounds/rhei/`, so rhei's own output is never a path rhei then warns
 about.
 
@@ -190,10 +190,10 @@ none: every template stands alone, including one built out of others, which is
 what makes it testable at any level
 ([§FS-rhei-library.6](rhei-library.spec.md#6-includes-a-template-built-from-templates)).
 A project template stands alone by laying a whole project with `--output`, which
-`rhei validate` then passes (§FS-rhei-templates.6.4); its `states.yaml` is the project's default
+`rhei validate` then passes ([§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project)); its `states.yaml` is the project's default
 machine and its `includes:` entries are the project's members. The layout is
 the whole of the distinction — no field in `template.yaml` declares it — and
-`rhei templates` reports it (§FS-rhei-templates.6.3).
+`rhei templates` reports it ([§FS-rhei-templates.6.3](rhei-templates.spec.md#63-rhei-templates)).
 For single-file templates the entry-point filename also determines the
 ticket-id prefix of every instantiated workspace: the file stem is the rhei id,
 so `plan.rhei.md` yields tickets `plan.1`, `plan.2`, ..., regardless of the
@@ -286,7 +286,7 @@ in the output tree, where `rhei run` and `rhei validate` automatically pick it
 up and compose it over the user's global `~/.config/rhei/settings.json`.
 
 When the output joins a Panta project the file is **hoisted to the project**
-instead (§6.2): settings resolve once, at the root the plan loads from, and for
+instead ([§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project)): settings resolve once, at the root the plan loads from, and for
 a member rhei that root is the project, not the workspace. Left in the
 workspace, a template's own agent registry was silently unread, and the
 template's own default targets then failed validation as unknown agents.
@@ -362,7 +362,7 @@ comment syntax**: `{# ... #}` is ordinary text. A bundled shell script's
 `${#ARR[@]}`, a Makefile, or any other file holding `{#` passes through
 unchanged, never aborts instantiation, and never loses the text that follows
 it. Because earlier versions read `{#` as a comment opener and cut everything up
-to the next `#}`, rendering a file that contains `{#` also warns (§5.3), so a
+to the next `#}`, rendering a file that contains `{#` also warns ([§FS-rhei-templates.5.3](rhei-templates.spec.md#53-render-diagnostics)), so a
 template authored against that behavior is told its output has changed rather
 than changing silently.
 
@@ -417,7 +417,7 @@ To emit a literal `{{` or `{%`, prefer MiniJinja raw blocks:
 
 For backward compatibility, `\{{` also emits a literal `{{` and the backslash is consumed during instantiation.
 
-`{#` needs no escape, because it is not syntax (§5): it is emitted as written
+`{#` needs no escape, because it is not syntax ([§FS-rhei-templates.5](rhei-templates.spec.md#5-instantiation-template-syntax)): it is emitted as written
 whether or not a `#}` follows it anywhere in the file. Wrapping it in a raw
 block is harmless and remains supported, so a template that already fences a
 shell body in `{% raw %}` ... `{% endraw %}` keeps rendering exactly as it does
@@ -444,7 +444,7 @@ what it requires of instantiation:
   how to list the inputs the template does declare.
 - Neither names a construct the file does not contain. A failure caused by an
   unclosed `{%` is never reported as an invalid `{{ }}` expression, and no
-  instantiation diagnostic mentions comments, which are not syntax here (§5).
+  instantiation diagnostic mentions comments, which are not syntax here ([§FS-rhei-templates.5](rhei-templates.spec.md#5-instantiation-template-syntax)).
 - A `{% raw %}` ... `{% endraw %}` region is literal text and is never blamed:
   an unclosed opener inside one is not a failure and is not reported as one.
 - Where no unclosed opener can be identified, the message falls back to the
@@ -459,13 +459,13 @@ difference here, and the spelling that platform's own shell and editor take
 
 Rendering a file whose text contains `{#` also emits one **warning** per file on
 stderr, naming the file and the line of the first occurrence and saying that the
-text is now emitted verbatim (§5). The warning is not a failure: instantiation
+text is now emitted verbatim ([§FS-rhei-templates.5](rhei-templates.spec.md#5-instantiation-template-syntax)). The warning is not a failure: instantiation
 proceeds and the exit code is unchanged, so `--dry-run` is the way to ask which
 files a template has that earlier versions silently cut.
 
 ### 5.4. Reserved Code Points
 
-Emitting `{#` and `\{{` as written (§5, §5.2) costs a handful of code points:
+Emitting `{#` and `\{{` as written ([§FS-rhei-templates.5](rhei-templates.spec.md#5-instantiation-template-syntax), [§FS-rhei-templates.5.2](rhei-templates.spec.md#52-escaping)) costs a handful of code points:
 rendering stands them in for that text while the parser is looking at it and
 puts the text back afterwards. They are a C1 control and two private-use
 scalars, which no plan, script, or configuration file is authored with. They are
@@ -582,7 +582,7 @@ a flag ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-i
 
 1. **Show choices when omitted.** If no template is provided, print the same human-readable discovered-template list as `rhei templates` and exit successfully.
 2. **Locate template.** Resolve `<template>` through the per-name discovery
-   chain in §1.2 unless it is already a filesystem path. The first matching
+   chain in [§FS-rhei-templates.1.2](rhei-templates.spec.md#12-the-ancestor-walk-checks-both-names-at-each-level) unless it is already a filesystem path. The first matching
    directory wins; named instantiation loads that copy and reports its load or
    validation error rather than falling through to a farther copy. Direct paths
    include absolute paths, relative paths containing `/`, and dot-prefixed
@@ -593,7 +593,7 @@ a flag ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-i
 3. **Load manifest.** Parse `template.yaml`, validate schema.
 4. **Collect inputs.** Resolve inputs using this precedence order: manifest defaults < `--values` files from left to right < positional input values < `KEY=VALUE` input arguments and `--set` flags from left to right < `--set-file` flags from left to right. Error on missing required inputs, unknown input names, ambiguous positional values, or duplicate `positional` declarations. Validate types and `validate` patterns. For `array` / `object` inputs, positional values, `KEY=VALUE`, `--set`, and `--set-file` values are parsed as YAML/JSON snippets before validation.
 5. **Render templates.** Walk all materialized text files in the template directory and render them through the restricted MiniJinja environment. `template.yaml` is parsed before this step and is never rendered into the output. Error on any unresolved instantiation template reference.
-6. **Write staged output.** In normal mode outside a Panta project, copy the resolved tree to `--output` as before. For a prospective project member, render into a uniquely named hidden sibling of `--output` under the same parent. Project discovery ignores this incomplete directory, and same-parent placement permits atomic publication. `--output` must not already exist; instantiation fails rather than merging into or overwriting it. In `--dry-run` mode, the CLI skips the output-path existence check, materializes into a temporary scratch directory instead of `--output`, validates that scratch output, and reports what would have been written. Preserve directory structure and file permissions. Hidden files and directories (names starting with `.`) and `template.yaml` itself are excluded from copied template input. A root-level `settings.json` in the template is moved to `.agent-grounds/rhei/settings.json` under the output root; all other files preserve their template-relative paths. A template that declares `includes:` has each included template rendered and unioned into this staged tree in list order before it is validated (§FS-rhei-library.6).
+6. **Write staged output.** In normal mode outside a Panta project, copy the resolved tree to `--output` as before. For a prospective project member, render into a uniquely named hidden sibling of `--output` under the same parent. Project discovery ignores this incomplete directory, and same-parent placement permits atomic publication. `--output` must not already exist; instantiation fails rather than merging into or overwriting it. In `--dry-run` mode, the CLI skips the output-path existence check, materializes into a temporary scratch directory instead of `--output`, validates that scratch output, and reports what would have been written. Preserve directory structure and file permissions. Hidden files and directories (names starting with `.`) and `template.yaml` itself are excluded from copied template input. A root-level `settings.json` in the template is moved to `.agent-grounds/rhei/settings.json` under the output root; all other files preserve their template-relative paths. A template that declares `includes:` has each included template rendered and unioned into this staged tree in list order before it is validated ([§FS-rhei-library.6](rhei-library.spec.md#6-includes-a-template-built-from-templates)).
 7. **Validate and publish.** Validate a prospective member through its project under the intended final member id, using the staged files as that member's source. For a composition, construct and serialize the complete lock before final validation, and validate with the lock present in the staged tree. Reconcile template settings with project settings for this validation without exposing a half-applied member or settings merge. Resolve the member's own state machine, callbacks, and every `agent`, `model`, `mcp_servers`, and `skills` reference in that final project context. After validation succeeds, commit the reconciled project settings and atomically rename the hidden sibling to `--output`; that rename publishes the flat workspace, settings, and lock together. A successful command publishes exactly one visible member. Validation, lock serialization/write, or publication failure removes staged output and restores prior project settings unless `--keep-on-error` is passed. With `--keep-on-error`, retain the whole staged set, including any successfully written lock and reconciled settings, at the requested visible path when safe or at the reported hidden staging path otherwise. Because the project loader is strict, invalid retained output makes project-scoped commands fail until it is repaired or removed. Standalone validation continues to use the output's `states.yaml` when present and the built-in default otherwise.
 8. **Or union into an existing rhei.** With `--into`, steps 6 and 7 are replaced: the rendered template is unioned into the target's own `states.yaml`, index frontmatter and task files under [§FS-rhei-library.3](rhei-library.spec.md#3-the-union-rules)'s three rules, the whole result is validated in memory, and only then is anything written — under the sibling lock a create takes ([§FS-rhei-new.4](rhei-new.spec.md#4-ids)), keeping the host's bytes and inserting the template's entries at the end of each block. Nothing is staged, so a refusal leaves the target byte-identical and `--keep-on-error` has nothing to keep. The target must have a machine in its own execution root ([§FS-rhei-library.2.1](rhei-library.spec.md#21-the-machine-the-target-must-have)). `settings.json` hoists exactly as [§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project) specifies. `--dry-run` prints the insertion and writes nothing. When the target is a Panta project rather than a rhei, [§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target) says what is laid instead.
 9. **Print summary.** After successful validation, print a human-readable instantiation summary with the output path, task/state counts, instantiated output tree, rendered task tree, the last few rendered task definitions in source order, and a stop-point explanation. `--dry-run` performs the same serialization and validation in scratch and writes nothing at the requested output. For normal instantiation without `--execute`, the stop point is the next ready task and the reason is that execution has not started. With `--into`, the summary is the insertion instead: what the union added, where, and how many tickets it placed.
@@ -793,9 +793,9 @@ default — silently re-governed every later plain rhei: a hand-written
 machine and failed. Both existed only to police a uniformity the model no longer
 requires. A template whose only job is to lay a project's default is a different
 thing, laid outright rather than as a side effect of laying a member
-(§FS-rhei-templates.6.4).
+([§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project)).
 
-**Settings hoist.** A template's bundled `settings.json` (§4) is written to the
+**Settings hoist.** A template's bundled `settings.json` ([§FS-rhei-templates.4](rhei-templates.spec.md#4-template-shipped-settings)) is written to the
 *project's* `.agent-grounds/rhei/settings.json` rather than the workspace's, merged
 key-by-key into whatever is already there. Values the project already defines
 always win — a template must not quietly redefine an agent the operator
@@ -805,7 +805,7 @@ left in the workspace, where nothing would read it.
 **A project settings file the hoist read from the deprecated home is reported
 as superseded, not as material to move.** The merge is written to
 `.agent-grounds/rhei/settings.json` and the deprecated file is left on disk
-holding its pre-merge content, so the generic move-warning (§1.3) would be
+holding its pre-merge content, so the generic move-warning ([§FS-rhei-templates.1.3](rhei-templates.spec.md#13-the-deprecation-warning)) would be
 actively wrong here: it names a path rhei has just written itself, and obeying
 it drops the template's entries. The hoist therefore says its own piece
 instead, naming the deprecated file, stating that the merged file supersedes it
@@ -872,12 +872,12 @@ Options:
 
 Without a positional, prints a table of discovered templates with name,
 version, description, source path, and required input count. Project-local
-names are aggregated across every ancestor in §1.2 and appear once each; user
+names are aggregated across every ancestor in [§FS-rhei-templates.1.2](rhei-templates.spec.md#12-the-ancestor-walk-checks-both-names-at-each-level) and appear once each; user
 and built-in copies appear only when no project ancestor already contributed
 that name. `--source` filters this listing by tier without changing named
 lookup precedence.
 
-A project template (§FS-rhei-templates.2) is listed like any other, never dropped: the listing
+A project template ([§FS-rhei-templates.2](rhei-templates.spec.md#2-directory-layout)) is listed like any other, never dropped: the listing
 is how a caller finds out what `--output` will produce. The JSON entry carries a
 `layout` key — `single-file`, `workspace`, or `project` — and the human table
 marks a project template as one.
@@ -894,9 +894,9 @@ unfiltered listing and named instantiation select.
 When discovery encounters an unreadable or invalid template directory,
 `rhei templates` skips it and prints the existing warning instead of failing
 the entire listing or detail lookup. This skip may expose the next valid copy.
-It does not change named instantiation's rule in §6.1.2: instantiation stops at
+It does not change named instantiation's rule in [§FS-rhei-templates.6.1.2](rhei-templates.spec.md#612-behavior): instantiation stops at
 the first matching directory and reports that copy's error. Deprecated-home
-warnings remain governed by §1.3 and fire only for copies actually read.
+warnings remain governed by [§FS-rhei-templates.1.3](rhei-templates.spec.md#13-the-deprecation-warning) and fire only for copies actually read.
 
 #### 6.3.1. The JSON entry carries the whole input schema
 
@@ -909,7 +909,7 @@ subset the human table prints:
 | `name`, `type`, `required`, `description` | always present |
 | `default` | the declared default, or `null` |
 | `validate` | the declared pattern, or `null` |
-| `format` | the declared format (§3.1), or `null` |
+| `format` | the declared format ([§FS-rhei-templates.3.1](rhei-templates.spec.md#31-validation-rules)), or `null` |
 | `positional` | the declared 1-based slot, or `null` |
 | `items` | for `type: array`, the element schema; `null` otherwise |
 | `properties` | for `type: object`, a name → schema map; `null` otherwise |
@@ -928,7 +928,7 @@ text, `items.format` says the same of every element of an array, and
 ### 6.4. Laying a Panta project
 
 A **project template** carries `index.panta.md` where a plan template carries
-its plan (§FS-rhei-templates.2). It is how a *project* — a lifecycle machine, the scripts and
+its plan ([§FS-rhei-templates.2](rhei-templates.spec.md#2-directory-layout)). It is how a *project* — a lifecycle machine, the scripts and
 prompt fragments that machine runs, the settings it needs, and the member rheis
 that belong to it — ships as a template rather than as a hand-written script
 that renders a machine, copies it over a project's, links its bundle and edits
@@ -936,7 +936,7 @@ the manifest.
 
 `rhei instantiate <project-template> --output <dir>` lays a whole project at a
 `<dir>` that does not exist yet, after rendering with the collected inputs
-exactly as §FS-rhei-templates.6.1.2 steps 3–5 do:
+exactly as [§FS-rhei-templates.6.1.2](rhei-templates.spec.md#612-behavior) steps 3–5 do:
 
 - **the manifest**: the rendered `index.panta.md` at `<dir>`;
 - **the default machine**: the rendered `states.yaml` at `<dir>/states.yaml`.
@@ -951,10 +951,10 @@ exactly as §FS-rhei-templates.6.1.2 steps 3–5 do:
   already has ([§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target)). Other bundled files travel as they
   do for a plan template, except `README.md`, which describes the template;
 - **the settings**: a bundled `settings.json` hoisted to
-  `<dir>/.agent-grounds/rhei/settings.json` as §FS-rhei-templates.6.2 specifies;
+  `<dir>/.agent-grounds/rhei/settings.json` as [§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project) specifies;
 - **the members**: one member rhei per `includes:` entry, laid at
   `<dir>/<entry-name>/` by the same member-laying path the default `--output`
-  inside a project takes (§FS-rhei-templates.6.2) — rendered, staged, validated through the
+  inside a project takes ([§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project)) — rendered, staged, validated through the
   project and published the same way. A member is a directory whose name is its
   rhei id ([§AR-rhei-panta.1](../architecture/rhei-panta.spec.md#1-on-disk-layout)). An entry carrying `under:` is refused naming the
   entry ([§FS-rhei-library.6.1](rhei-library.spec.md#61-under)).
@@ -975,7 +975,7 @@ the project is already there, and the same template laid both ways — once into
 a scratch directory, once onto a fresh project — produces the same default
 machine, the same bundle, the same settings and the same members.
 
-This is not the silent adoption §FS-rhei-templates.6.2 rules out. Naming the project's default is
+This is not the silent adoption [§FS-rhei-templates.6.2](rhei-templates.spec.md#62-instantiating-inside-a-panta-project) rules out. Naming the project's default is
 the whole of what a project template is for, so writing it is the command the
 caller ran rather than a side effect of laying something else
 ([§DA-per-rhei-state-machines](../decisions/architectural/per-rhei-state-machines.md#da-per-rhei-state-machines-the-state-machine-is-a-per-rhei-property-defaulted-by-the-manifest) item 8).
@@ -1160,7 +1160,7 @@ All `{{...}}` are resolved during instantiation. All `{...}` remain for runtime.
 | **Directory workspaces** | Templates can produce directory workspaces. The `tasks/` directory and `index.rhei.md` are resolved like any other template file. |
 | **`rhei validate`** | Runs automatically post-instantiation. Template authors can validate their templates with `rhei instantiate --dry-run`. |
 | **Program states** | Program states (`program` field) work in templates. Instantiation variables resolve in `program` strings, `program.command` arrays, `program.env` values, and `program.working_directory`. Runtime variables in those fields pass through to `rhei run`. |
-| **Bundled shell scripts and workflow fragments** | A script bundled in a template is rendered like any other text file and arrives with its permissions, executable bit included. Shell parameter expansion is not instantiation syntax and passes through verbatim, `${#ARR[@]}` included (§5). A GitHub Actions `${{ ... }}` *is* a `{{ ... }}` interpolation and is still read as one, so a workflow fragment that must keep its own expressions wraps them in `{% raw %}` ... `{% endraw %}`; where it does not, the failure names the line and the expression rather than the manifest (§5.3). |
+| **Bundled shell scripts and workflow fragments** | A script bundled in a template is rendered like any other text file and arrives with its permissions, executable bit included. Shell parameter expansion is not instantiation syntax and passes through verbatim, `${#ARR[@]}` included ([§FS-rhei-templates.5](rhei-templates.spec.md#5-instantiation-template-syntax)). A GitHub Actions `${{ ... }}` *is* a `{{ ... }}` interpolation and is still read as one, so a workflow fragment that must keep its own expressions wraps them in `{% raw %}` ... `{% endraw %}`; where it does not, the failure names the line and the expression rather than the manifest ([§FS-rhei-templates.5.3](rhei-templates.spec.md#53-render-diagnostics)). |
 | **Skills** | The `rhei-plan-worker` skill works on instantiated plans identically to hand-authored plans. No skill changes required. |
 | **`install-skills`** | Unchanged. Templates are orthogonal to skill installation. |
 
@@ -1186,7 +1186,7 @@ plan-language question and is owned by
 | `version` | YAML scalar | Yes | Informational metadata only in v1. |
 | `description` | string | Yes | Must be non-empty after trimming. |
 | `inputs` | sequence of mappings | No | Defaults to an empty list when omitted. |
-| `includes` | sequence | No | Templates this one is built from, unioned in list order. An entry is a bare template name, or a mapping with `template:` and an optional `under:` naming a template-relative task to place that template's tickets beneath. §FS-rhei-library.6 |
+| `includes` | sequence | No | Templates this one is built from, unioned in list order. An entry is a bare template name, or a mapping with `template:` and an optional `under:` naming a template-relative task to place that template's tickets beneath. [§FS-rhei-library.6](rhei-library.spec.md#6-includes-a-template-built-from-templates) |
 
 Each `inputs[]` entry is a YAML mapping with these fields:
 

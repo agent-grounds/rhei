@@ -1,109 +1,172 @@
-grund_config_version = 1
+grund_config_version = 2
 project_name = "Rhei"
 
-[reference]
+[schema]
 marker = "§"
-trigger = "$$"
-strict = true
-require_grounding = false
-inline_style = "citation-with-note" # citation-with-note | citation-only
-inline_note_suggested_lines = 1
-inline_note_max_lines = 3
-inline_note_max_columns = 120
-warn_on_suggested = false
-
-[id]
-format = "{kind}-{slug}" # placeholders: {kind} required; use {number}, {slug}, or both
-section_separator = "."
-section_heading_levels = "strict" # strict | warn | loose
-number_pattern = "\\d+"
+shorthand = "canonical"
+id_format = "{kind}-{slug}" # placeholders: {kind} required; use {number}, {slug}, or both
 slug_pattern = "[a-z0-9][a-z0-9-]*"
-named_sections = true
+number_pattern = "\\d+"
+section_separator = "."
+heading_depth = "must" # strict | warn | loose
 
-[[kinds]]
-kind = "GND"
-file = "docs/grund.md"
-title = "Reason for existence"
-
-[[kinds]]
-kind = "GOAL"
-file = "docs/goals.md"
-title = "Outcomes the project is trying to achieve"
-
-[[kinds]]
-kind = "REQ"
-folder = "docs/requirements"
-title = "Cross-cutting requirements every feature is held to"
-
-[[kinds]]
-kind = "FS"
-folder = "docs/functional-spec"
-title = "User-visible behavior and requirements"
-
-[[kinds]]
-kind = "AR"
-folder = "docs/architecture"
-title = "System design and technical structure"
-
-[[kinds]]
-kind = "DF"
-folder = "docs/decisions/functional"
-title = "Product behavior decisions and tradeoffs"
-
-[[kinds]]
-kind = "DA"
-folder = "docs/decisions/architectural"
-title = "Architecture decisions and tradeoffs"
-
-[[kinds]]
-kind = "ADR"
-folder = "docs/adr"
-title = "Architecture decision records"
-
-# The two test homes are places, not ID namespaces: a test cites the document
-# whose claim it proves and is never cited back.
-[[kinds]]
-kind = "e2e"
-folder = "tests/e2e"
-citable = false
-title = "User scenarios: black-box proof of the spec"
-
-[[kinds]]
-kind = "integration"
-folder = "tests/integration"
-citable = false
-title = "Integration tests: proof that the parts fit as designed"
-
-[[kinds]]
-kind = "RM"
-file = "docs/roadmap.md"
-title = "Planned milestones and sequencing"
-
-[scan]
-include = ["AGENTS.md", "README.md", "docs", "examples", "crates", "packages", "scripts", "tests"]
+[schema.sources]
+languages = ["v1_markdown", "v1_c_family", "v1_go", "v1_python", "v1_ruby"]
+declarations = "any-comment"
 # `templates/` holds payloads for `rhei instantiate`, not this project's own
 # grounded documents. A template's fixture spec is meant to be copied verbatim
 # into every instantiated workspace, so scanning it declares the same id twice.
-exclude = ["target", "node_modules", ".git", "dist", "build", ".venv", "templates"]
-extensions = ["md", "rs", "go", "java", "kt", "ts", "tsx", "js", "py", "c", "cpp", "swift", "scala", "rb", "php", "cs"]
-comment_prefixes = ["//", "#", ";", "--", "*", "/*"]
-docstring_python = true
+exclude = ["target/", "node_modules/", ".git/", "dist/", "build/", ".venv/", "templates/"]
 respect_gitignore = true
+
+[schema.sources.extensions]
+md = "v1_markdown"
+rs = "v1_c_family"
+go = "v1_go"
+java = "v1_c_family"
+kt = "v1_c_family"
+ts = "v1_c_family"
+tsx = "v1_c_family"
+js = "v1_c_family"
+py = "v1_python"
+c = "v1_c_family"
+cpp = "v1_c_family"
+swift = "v1_c_family"
+scala = "v1_c_family"
+rb = "v1_ruby"
+php = "v1_c_family"
+cs = "v1_c_family"
+
+[schema.sources.definitions.v1_markdown]
+class = "document"
+comment_prefixes = ["//", "#", ";", "--", "*", "/*"]
+doc_comments = "none"
+docstrings = "off"
+
+[schema.sources.definitions.v1_c_family]
+class = "source"
+comment_prefixes = ["//", "#", ";", "--", "*", "/*"]
+doc_comments = "c-family"
+docstrings = "off"
+
+[schema.sources.definitions.v1_go]
+class = "source"
+comment_prefixes = ["//", "#", ";", "--", "*", "/*"]
+doc_comments = "go"
+docstrings = "off"
+
+[schema.sources.definitions.v1_python]
+class = "source"
+comment_prefixes = ["//", "#", ";", "--", "*", "/*"]
+doc_comments = "python"
+docstrings = "python"
+
+[schema.sources.definitions.v1_ruby]
+class = "source"
+comment_prefixes = ["//", "#", ";", "--", "*", "/*"]
+doc_comments = "ruby"
+docstrings = "off"
+
+[schema.notes.lines]
+must = 3
+may = 1
+
+[schema.notes.columns]
+must = 120
+
+[schema.notes.text]
+must = true # citation-with-note | citation-only
+
+[schema.kinds.GND]
+files = ["docs/grund.md"]
+
+[schema.kinds.GOAL]
+files = ["docs/goals.md"]
+
+[schema.kinds.REQ]
+folders = ["docs/requirements"]
+
+[schema.kinds.FS]
+folders = ["docs/functional-spec"]
+
+[schema.kinds.AR]
+folders = ["docs/architecture"]
+
+[schema.kinds.DF]
+folders = ["docs/decisions/functional"]
+
+[schema.kinds.DA]
+folders = ["docs/decisions/architectural"]
+
+[schema.kinds.ADR]
+folders = ["docs/adr"]
+
+# The two test homes are places, not ID namespaces: a test cites the document
+# whose claim it proves and is never cited back.
+[schema.kinds.e2e]
+folders = ["tests/e2e"]
+citable = false
+
+[schema.kinds.integration]
+folders = ["tests/integration"]
+citable = false
+
+[schema.kinds.RM]
+files = ["docs/roadmap.md"]
+
+[schema.kinds.code]
+files = ["AGENTS.md", "README.md"]
+folders = ["docs", "examples", "crates", "packages", "scripts", "tests"]
+
+[rules.citations]
 
 # A scenario proves the What as a user sees it, so one that reads the design is
 # not black-box; an integration test proves the How.
-[citations.e2e]
+[rules.citations.e2e]
 must = ["FS"]
 should-not = ["AR"]
 
-[citations.integration]
+[rules.citations.integration]
 should = ["AR"]
 
-[output]
-format = "text"
-color = "auto"
-relative_paths = true
+[presentation]
+trigger = "$$"
+rules = "root"
 
-[fmt.cross_refs]
-enabled = true
-anchor_format = "github" # github | gitlab | mkdocs | pandoc | none
+[presentation.kinds.GND]
+title = "Reason for existence"
+
+[presentation.kinds.GOAL]
+title = "Outcomes the project is trying to achieve"
+
+[presentation.kinds.REQ]
+title = "Cross-cutting requirements every feature is held to"
+
+[presentation.kinds.FS]
+title = "User-visible behavior and requirements"
+
+[presentation.kinds.AR]
+title = "System design and technical structure"
+
+[presentation.kinds.DF]
+title = "Product behavior decisions and tradeoffs"
+
+[presentation.kinds.DA]
+title = "Architecture decisions and tradeoffs"
+
+[presentation.kinds.ADR]
+title = "Architecture decision records"
+
+[presentation.kinds.e2e]
+title = "User scenarios: black-box proof of the spec"
+
+[presentation.kinds.integration]
+title = "Integration tests: proof that the parts fit as designed"
+
+[presentation.kinds.RM]
+title = "Planned milestones and sequencing"
+
+[presentation.fmt]
+anchors = "github" # github | gitlab | mkdocs | pandoc | none
+links = "index"
+exclude = []

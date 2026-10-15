@@ -142,6 +142,17 @@ The measure is a runner that delays every fixture's interpreter by more than
 the bounds the margin replaced and by less than the margin: the binary fails
 only the tests whose bound is the behaviour [§REQ-cross-platform.8.1](cross-platform.md#81-a-bound-that-is-the-behaviour-stays-as-tight-as-the-behaviour).
 
+For the e2e binary's shared mock-example settings, both the fallback
+`defaults.agent_timeout` and every generated agent profile's `timeout` take
+the one named 60-second fixture margin. The profile wins over the fallback,
+so protecting only the default leaves the short bound in force. A focused
+check reads the helper's generated settings and checks both levels, including
+every profile. The behavioural measure is the discussion example with healthy
+mock interpreter starts delayed seven seconds: it still converges, its
+downstream task completes, and `decision.md` and `applied.md` exist. These
+example bounds are execution margins; the behaviour-bound exception below
+continues to apply to tests that mean their timeout to fire.
+
 ### 8.1 A Bound That Is The Behaviour Stays As Tight As The Behaviour
 
 Some bounds are what the test is about: a timeout the test means to fire, or the

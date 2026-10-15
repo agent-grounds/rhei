@@ -79,13 +79,11 @@ file = "docs/functional-spec/roadmap.md"
 title = "Planned milestones and sequencing"
 
 [scan]
-include = ["AGENTS.md", "README.md", "docs", "examples", "crates", "packages", "scripts", "skills", "tests"]
+include = ["AGENTS.md", "README.md", "docs", "examples", "crates", "packages", "scripts", "tests"]
 # `templates/` holds payloads for `rhei instantiate`, not this project's own
 # grounded documents. A template's fixture spec is meant to be copied verbatim
 # into every instantiated workspace, so scanning it declares the same id twice.
-# `tests/e2e/fixtures` is test-input data the scanner never cites through, same
-# reasoning as `templates/`.
-exclude = ["target", "node_modules", ".git", "dist", "build", ".venv", "docs/plans", "templates", "tests/e2e/fixtures"]
+exclude = ["target", "node_modules", ".git", "dist", "build", ".venv", "templates"]
 extensions = ["md", "rs", "go", "java", "kt", "ts", "tsx", "js", "py", "c", "cpp", "swift", "scala", "rb", "php", "cs"]
 comment_prefixes = ["//", "#", ";", "--", "*", "/*"]
 docstring_python = true

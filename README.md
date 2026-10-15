@@ -357,6 +357,9 @@ The rest — `grund config validate`, `lychee`, and the two checks for
 AI-attribution boilerplate — are in
 [`.pre-commit-config.yaml`](.pre-commit-config.yaml), which is the list itself.
 
+The hooks run the tools on your `PATH`, and the gate runs grund 0.18.0;
+[CONTRIBUTING.md](CONTRIBUTING.md#install-the-hooks-first) has the install command.
+
 The release writes the changelog from the merged pull requests' titles — see
 [CONTRIBUTING.md](CONTRIBUTING.md).
 

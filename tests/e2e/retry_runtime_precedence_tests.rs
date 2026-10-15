@@ -140,8 +140,8 @@ fn assert_recovery(parallel: bool) {
     let stem = "runtime/spawns/task-follow.1-work-mock-openai-model-a.json";
     let active_path = fixture.project.join(stem);
     let dormant_path = member.join(stem);
-    // Both records come from real runs. Re-admission makes the member record
-    // newer without moving the affected ticket or planting either record.
+    // Both records and their retry history come from real runs; only the dormant
+    // ended timestamp is advanced below to make its strict ordering deterministic.
     fixture.failed_run();
     assert!(dormant_path.exists());
     assert!(!active_path.exists());
@@ -158,6 +158,23 @@ fn assert_recovery(parallel: bool) {
         "### Task 2: Re-publish\n**State:** publish\n",
     );
     fixture.failed_run();
+    // Keep dormant ended later than both real endings, independent of clock precision (§FS-rhei-retry.2).
+    let active = record(&active_path);
+    let mut dormant = record(&dormant_path);
+    let latest_ended = [&active, &dormant]
+        .into_iter()
+        .map(|record| {
+            time::OffsetDateTime::parse(
+                record["ended"].as_str().unwrap(),
+                &time::format_description::well_known::Rfc3339,
+            )
+            .unwrap()
+        })
+        .max()
+        .unwrap();
+    let newer = latest_ended + time::Duration::seconds(1);
+    dormant["ended"] = super::provider_limit_support::utc_at(newer.unix_timestamp() as u64).into();
+    fs::write(&dormant_path, serde_json::to_vec_pretty(&dormant).unwrap()).unwrap();
     let dormant_before = fs::read(&dormant_path).unwrap();
     let dormant = record(&dormant_path);
     let active = record(&active_path);

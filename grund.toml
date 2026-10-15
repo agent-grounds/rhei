@@ -100,8 +100,8 @@ should-not = ["AR"]
 should = ["AR"]
 
 [output]
-format = "text" # text | json
-color = "auto" # auto | always | never
+format = "text"
+color = "auto"
 relative_paths = true
 
 [fmt.cross_refs]

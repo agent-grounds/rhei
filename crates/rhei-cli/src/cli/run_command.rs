@@ -107,6 +107,9 @@ impl RunIdentity {
     // §FS-rhei-budgets.7.2: the identity owns a fresh entitlement for this run alone.
     fn new() -> Self {
         let started_wall = std::time::SystemTime::now();
+        // Private clock seam for deterministic identity regressions. §FS-rhei-run.2.7
+        #[cfg(test)]
+        let started_wall = RUN_IDENTITY_TEST_WALL.with(|wall| wall.get().unwrap_or(started_wall));
         Self {
             id: short_run_id(started_wall),
             started: Instant::now(),

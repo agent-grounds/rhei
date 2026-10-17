@@ -203,6 +203,15 @@ include!("cli/new_task_tooling.rs");
 include!("cli/new_ticket_write.rs");
 include!("cli/new_verify.rs");
 include!("cli/run_command.rs");
+#[cfg(test)]
+thread_local! {
+    static RUN_IDENTITY_TEST_WALL: std::cell::Cell<Option<std::time::SystemTime>> = const {
+        std::cell::Cell::new(None)
+    };
+}
+#[cfg(test)]
+#[path = "../../../tests/e2e/run_id_allocation_tests.rs"]
+mod run_id_allocation_tests;
 include!("cli/run_live_admission.rs");
 include!("cli/run_slot_release.rs");
 include!("cli/run_worker_regions.rs");

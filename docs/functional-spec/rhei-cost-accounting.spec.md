@@ -372,6 +372,10 @@ narration, and log naming; this identity rule does not introduce another
 counter or change attempt budgets, interruption charging, log names, or reset
 behavior.
 
+The run id is selected against retained history as required by
+[§FS-rhei-run.2.7](rhei-run.spec.md#27-run-identity), so separate runs remain
+distinct even when failed spawns leave visit, move, and attempt unchanged.
+
 A failed best-effort publication of `runtime/run.json` does not change the
 current run's in-memory identity or prevent agent execution. Both schedulers
 use that same identity for accounting even when no descriptor was published.
@@ -1367,6 +1371,15 @@ Invocation details are served from a separate loopback endpoint such as
 | Accounting identity conflict | Inspection retains the first valid record, reports the conflicting record and both paths, and continues read-only. Run preflight checks the complete in-scope root union, using the root selection and shared-root task filtering in [§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary), before per-root currency checks. A conflict within or across those roots refuses before mutation or spawn with an accounting-identity diagnostic naming both paths; it must not describe the conflict as a selected-currency failure. |
 | Unreadable accounting root | Name the root, read every other root in scope, and do not report `complete` ([§FS-rhei-cost-accounting.6.2](rhei-cost-accounting.spec.md#62-coverage-of-a-selection)). With `--json`, a structured error naming the root, and its `roots` entry carries the count it could contribute. |
 | Concurrent writes | Write to a unique staging path, then atomically rename to `<invocation_file_id>.json`. Rollup files may be regenerated after pass writes complete. |
+
+When an attempt-scoped identity conflict is accompanied by retained evidence
+of distinct run starts sharing its run id (for example, two run reports with
+different start instants), the diagnostic must name the reused run id and
+explain that distinct runs reused it. It still names both conflicting record
+paths, refuses before spawning, and gives useful repair or removal guidance;
+it never automatically repairs history. Equal run ids or unequal copies of
+one run's record alone do not establish two distinct runs, and must not be
+reported as proof of run-id reuse.
 
 ## 12. Related Specifications
 

@@ -317,9 +317,8 @@ fn emit_run_report(
     }
 }
 
-/// A short, stable run identifier derived from the run's wall-clock start. FNV-1a
-/// over the start nanoseconds folded to six hex digits — enough to disambiguate
-/// history entries without a random-number dependency. §FS-rhei-run-report.2
+/// The initial run-id candidate: FNV-1a over start nanoseconds, folded to six
+/// hex digits. Allocation must check it against history. §FS-rhei-run.2.7
 fn short_run_id(started_at: std::time::SystemTime) -> String {
     let nanos =
         started_at.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);

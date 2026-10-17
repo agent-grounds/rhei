@@ -184,9 +184,15 @@ fn generated_archive_is_valid(path: &Path, price_book: &PriceBook) -> bool {
 
 /// Refuse conflicts over the same root union and shared-root task scope that
 /// inspection reads, before currency checks or any accounting mutation.
+/// The owning run root supplies historical evidence even when scope omits its
+/// accounting records. §FS-rhei-cost-accounting.11
 // §FS-rhei-panta.6.5 §FS-rhei-cost-accounting.11
-fn validate_accounting_identity(roots: &[AccountingRoot], scope: &RheiScope) -> MietteResult<()> {
-    let inspection = read_cost_inspection_over(roots, scope);
+fn validate_accounting_identity(
+    roots: &[AccountingRoot],
+    scope: &RheiScope,
+    run_root: &Path,
+) -> MietteResult<()> {
+    let inspection = read_cost_inspection_beside(roots, scope, Some(run_root));
     if let Some(error) = inspection.identity_conflicts.first() {
         return Err(miette!(
             help = "repair or remove the conflicting invocation record before starting another run",

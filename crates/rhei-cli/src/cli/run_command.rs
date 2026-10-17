@@ -50,7 +50,7 @@ fn run_execution_root(input: &Path) -> PathBuf {
 
 /// Every execution root a run locks: its own plus each rhei's, so project
 /// and member-rhei runs contend on the same lock. Canonicalized and sorted —
-/// one global acquisition order, no lock-order deadlock. §FS-rhei-run.2.6
+/// one global acquisition order, no lock-order deadlock. §FS-rhei-run.2.6 §FS-rhei-run.2.7
 fn run_lock_roots(loaded: &LoadedPlan, workspace_root: &Path) -> BTreeSet<PathBuf> {
     // Dedup is what keeps this set safe to lock: `flock` on a second
     // descriptor for an inode this process already holds blocks forever. A
@@ -63,7 +63,7 @@ fn run_lock_roots(loaded: &LoadedPlan, workspace_root: &Path) -> BTreeSet<PathBu
     };
     let mut roots = BTreeSet::new();
     roots.insert(canonical(workspace_root));
-    for root in loaded.task_roots.values() {
+    for root in loaded.task_roots.values().chain(loaded.rhei_roots.values()) {
         roots.insert(canonical(root));
     }
     roots
@@ -85,44 +85,9 @@ fn run_accounting_roots(
     roots
 }
 
-/// One run's identity: the id it is named by everywhere, and when it began.
-/// Computed once, as soon as the run holds its locks, so the run report, the
-/// descriptor, and `rhei attach <id>` all speak about the same run by the same
-/// name — rather than each execution mode deriving its own. Stamping it before
-/// the locks made `started_at` the time the command was typed, which is not
-/// when a queued run began.
-// §FS-rhei-run.2.7
-struct RunIdentity {
-    id: String,
-    started: Instant,
-    started_wall: std::time::SystemTime,
-    /// Whether this process is the detached child of a `--headless` launch.
-    headless: bool,
-    /// Shared by every admission until this run returns, across execution modes
-    /// and project roots. §FS-rhei-budgets.7.2
-    budget: BudgetRun,
-}
-
-impl RunIdentity {
-    // §FS-rhei-budgets.7.2: the identity owns a fresh entitlement for this run alone.
-    fn new() -> Self {
-        let started_wall = std::time::SystemTime::now();
-        // Private clock seam for deterministic identity regressions. §FS-rhei-run.2.7
-        #[cfg(test)]
-        let started_wall = RUN_IDENTITY_TEST_WALL.with(|wall| wall.get().unwrap_or(started_wall));
-        Self {
-            id: short_run_id(started_wall),
-            started: Instant::now(),
-            started_wall,
-            headless: is_headless_child(),
-            budget: begin_budget_run(),
-        }
-    }
-}
-
 /// Stamp each opened lock with portable exact-run ownership. Linux also stores
 /// stable process identity for displaced-inode liveness checks.
-/// §FS-rhei-run-headless.3 §FS-rhei-summary.5
+/// §FS-rhei-run-headless.3 §FS-rhei-summary.5 §FS-rhei-run.2.7
 fn record_run_lock_ownership(
     locks: &mut [HeldRunLock],
     identity: &RunIdentity,
@@ -298,11 +263,6 @@ fn run_command(
         })?;
         opts.select_price_book(book);
     }
-    // Stamped only now: a run that queued behind someone else's lock began
-    // when it got the lock, not when it was typed, and `rhei runs` orders by
-    // this. §FS-rhei-run.2.7
-    let identity = RunIdentity::new();
-    record_run_lock_ownership(&mut run_locks, &identity)?;
     // §FS-rhei-run.3.1: detect subprocess commits that leave run-owned state dirty.
     let git_consistency = RunGitConsistencyGuard::capture(&workspace_root, input, !opts.dry_run());
 
@@ -376,11 +336,14 @@ fn run_command(
         opts.select_price_book(price_book);
     }
 
-    if !opts.dry_run() {
+    let identity = if opts.dry_run() {
+        RunIdentity::new()
+    } else {
         // §FS-rhei-cost-accounting.11 §FS-rhei-panta.6.5: identity spans the selected root union.
         validate_accounting_identity(
             &accounting_roots(&loaded, &workspace_root, &rhei_scope),
             &rhei_scope,
+            &workspace_root,
         )?;
         let accounting_roots = run_accounting_roots(&loaded, &workspace_root, &rhei_scope);
         // Every root is preflighted while all run locks are held and before
@@ -396,6 +359,10 @@ fn run_command(
                 )?;
             }
         }
+        // Select under every held lock, after read-only preflight and before
+        // accounting mutation or publication. §FS-rhei-run.2.7
+        let identity = RunIdentity::allocate(&lock_roots)?;
+        record_run_lock_ownership(&mut run_locks, &identity)?;
         // The caller-owned book is durable everywhere this run can start an
         // agent before the first such process is spawned. §FS-rhei-cost-accounting.5.1
         if custom_price_book.is_some() {
@@ -407,7 +374,8 @@ fn run_command(
                 write_generated_price_book(&root.join("runtime/accounting"), price_book)?;
             }
         }
-    }
+        identity
+    };
 
     let roots = ReadySetRoots { workspace_root: &workspace_root, task_roots: &loaded.task_roots };
     let use_standalone_mode = should_use_agent_mode(

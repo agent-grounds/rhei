@@ -173,6 +173,7 @@ include!("cli/accounting_pricing.rs");
 include!("cli/accounting_reading.rs");
 include!("cli/accounting_session.rs");
 include!("cli/accounting_selection.rs");
+include!("cli/accounting_identity.rs");
 include!("cli/accounting_roots.rs");
 include!("cli/accounting_spawns.rs");
 include!("cli/accounting.rs");
@@ -202,6 +203,7 @@ include!("cli/new_ticket.rs");
 include!("cli/new_task_tooling.rs");
 include!("cli/new_ticket_write.rs");
 include!("cli/new_verify.rs");
+include!("cli/run_identity.rs");
 include!("cli/run_command.rs");
 #[cfg(test)]
 thread_local! {

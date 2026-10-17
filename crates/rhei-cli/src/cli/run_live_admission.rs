@@ -102,10 +102,16 @@ impl LiveRunContext {
                 .cloned()
                 .collect();
             let mut new_locks = acquire_run_locks_for_roots(new_roots.iter(), opts)?;
+            // A published identity cannot change when another root joins. §FS-rhei-run.2.7
+            validate_admitted_run_identity(&new_roots, identity)?;
             record_run_lock_ownership(&mut new_locks, identity)?;
 
             let scope = rhei_scope_set(opts.rhei_scope());
-            validate_accounting_identity(&accounting_roots(&loaded, workspace_root, &scope), &scope)?;
+            validate_accounting_identity(
+                &accounting_roots(&loaded, workspace_root, &scope),
+                &scope,
+                workspace_root,
+            )?;
             let roots = run_accounting_roots(&loaded, workspace_root, &scope);
             for root in &roots {
                 validate_price_book_currency(&root.join("runtime/accounting"), opts.price_book())?;

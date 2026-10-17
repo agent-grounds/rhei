@@ -167,6 +167,22 @@ start — see [Detached Runs](rhei-run-headless.spec.md) and
 [Run JSON Stream](rhei-run-json.spec.md). A foreground run publishes them too:
 the identity belongs to the run, not to `--headless`.
 
+After acquiring the existing run locks, a run selects one id of six lowercase
+hexadecimal digits that is absent from retained run reports, descriptors, and durable
+invocation records across all involved execution and accounting roots,
+including shared roots. Report-only history and accounting-only history each
+reserve an id independently. An occupied candidate is rejected and another
+candidate checked; retries must progress even with a frozen wall clock and
+must refuse safely if no unused id can be selected. A different unchecked
+hash is not a uniqueness check. History is neither rewritten nor removed.
+
+The selected in-memory identity is used for lock ownership, descriptors,
+registry entries, events, reports, and both sequential and parallel accounting.
+Best-effort descriptor publication failure does not trigger a second identity
+or bypass collision checking. This preserves the existing short-id format,
+artifact schemas, lookup behavior, and dry-run behavior without a new flag,
+configuration, or migration.
+
 ## 3. Execution Loop
 
 `rhei run` runs passes until no further forward progress is possible:

@@ -1,6 +1,13 @@
 // One collision-checked identity, selected while all execution roots are locked.
 // §FS-rhei-run.2.7
 
+/// One platform-normalized key for locked roots and retained registry workspaces.
+/// Preserve the lock-root fallback, including the empty relative parent. §FS-rhei-run.2.7
+fn run_root_key(root: &Path) -> PathBuf {
+    let root = if root.as_os_str().is_empty() { Path::new(".") } else { root };
+    rhei_core::platform::canonical_path(root).unwrap_or_else(|_| root.to_path_buf())
+}
+
 /// One run's identity, shared by every publication and execution mode.
 /// §FS-rhei-run.2.7
 struct RunIdentity {
@@ -109,9 +116,10 @@ impl RunIdentityHistory {
         // Read retained external descriptors without sweeping or touching unrelated roots.
         // Registry availability remains best effort. §FS-rhei-run.2.7
         if let Some(entries) = run_registry_dir().and_then(|dir| fs::read_dir(dir).ok()) {
+            let root_keys: BTreeSet<_> = roots.iter().map(|root| run_root_key(root)).collect();
             for entry in entries.flatten() {
                 if let Some(descriptor) = read_descriptor(&entry.path()) {
-                    if roots.contains(&canonical_root_key(&descriptor.workspace)) {
+                    if root_keys.contains(&run_root_key(&descriptor.workspace)) {
                         history.descriptor(&descriptor);
                     }
                 }

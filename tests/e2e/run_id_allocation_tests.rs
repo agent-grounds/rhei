@@ -55,9 +55,8 @@ fn run_at(input: &Path, root: &Path, nanos: u64, parallel: usize) -> String {
         .env("RHEI_499_TEST_NANOS", nanos.to_string())
         .env("RHEI_499_TEST_PARALLEL", parallel.to_string());
     let log = root.join("fixture-child.log");
-    command
-        .stdout(fs::File::create(&log).unwrap())
-        .stderr(fs::File::options().append(true).open(&log).unwrap());
+    let capture = fs::File::create(&log).unwrap();
+    command.stdout(capture.try_clone().unwrap()).stderr(capture);
     let mut child = command.spawn().unwrap();
     let deadline = Instant::now() + Duration::from_secs(60);
     loop {
@@ -146,7 +145,6 @@ fn identity_consistent(root: &Path, id: &str) {
 }
 
 #[test]
-#[ignore = "red until #499: colliding starts must not wedge later runs; implement removes this"]
 fn run_id_499_colliding_starts_preserve_missing_agent_control() {
     for second in [CONTROL, COLLISION] {
         let (dir, input) = fixture(false);
@@ -214,43 +212,36 @@ fn retained_only(kind: &str, project: bool, parallel: usize) {
 }
 
 #[test]
-#[ignore = "red until #499: report-only history must reject a frozen candidate; implement removes this"]
 fn run_id_499_report_only_frozen_candidate() {
     retained_only("report", false, 1);
 }
 
 #[test]
-#[ignore = "red until #499: accounting-only history must reject a frozen candidate; implement removes this"]
 fn run_id_499_accounting_only_frozen_candidate() {
     retained_only("accounting", false, 1);
 }
 
 #[test]
-#[ignore = "red until #499: sequential project runs must check other roots; implement removes this"]
 fn run_id_499_project_sequential_rejects_other_root_candidate() {
     retained_only("report", true, 1);
 }
 
 #[test]
-#[ignore = "red until #499: parallel project runs must check other roots; implement removes this"]
 fn run_id_499_project_parallel_rejects_other_root_candidate() {
     retained_only("report", true, 2);
 }
 
 #[test]
-#[ignore = "red until #499: sequential runs must check other accounting roots; implement removes this"]
 fn run_id_499_project_sequential_rejects_other_accounting_root() {
     retained_only("accounting", true, 1);
 }
 
 #[test]
-#[ignore = "red until #499: parallel runs must check other accounting roots; implement removes this"]
 fn run_id_499_project_parallel_rejects_other_accounting_root() {
     retained_only("accounting", true, 2);
 }
 
 #[test]
-#[ignore = "red until #499: retained descriptor alone must reserve an id; implement removes this"]
 fn run_id_499_descriptor_only_frozen_candidate() {
     let (dir, input) = fixture(false);
     let root = dir.path();
@@ -266,7 +257,6 @@ fn run_id_499_descriptor_only_frozen_candidate() {
 }
 
 #[test]
-#[ignore = "red until #499: shared roots must reserve ids from other tasks; implement removes this"]
 fn run_id_499_shared_root_reserves_other_task_history() {
     let (dir, input) = fixture(false);
     let root = dir.path();
@@ -310,13 +300,11 @@ fn descriptor_failure(parallel: usize) {
 }
 
 #[test]
-#[ignore = "red until #499: sequential identity must survive descriptor failure; implement removes this"]
 fn run_id_499_sequential_descriptor_failure_keeps_selected_identity() {
     descriptor_failure(1);
 }
 
 #[test]
-#[ignore = "red until #499: parallel identity must survive descriptor failure; implement removes this"]
 fn run_id_499_parallel_descriptor_failure_keeps_selected_identity() {
     descriptor_failure(2);
 }

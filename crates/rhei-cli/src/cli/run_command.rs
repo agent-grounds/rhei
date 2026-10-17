@@ -57,14 +57,10 @@ fn run_lock_roots(loaded: &LoadedPlan, workspace_root: &Path) -> BTreeSet<PathBu
     // ticket root can arrive as the empty path — `parent()` of a bare
     // relative filename — which canonicalizes to nothing and so slips past
     // dedup as a second name for the run's own directory.
-    let canonical = |root: &Path| {
-        let root = if root.as_os_str().is_empty() { Path::new(".") } else { root };
-        rhei_core::platform::canonical_path(root).unwrap_or_else(|_| root.to_path_buf())
-    };
     let mut roots = BTreeSet::new();
-    roots.insert(canonical(workspace_root));
+    roots.insert(run_root_key(workspace_root));
     for root in loaded.task_roots.values().chain(loaded.rhei_roots.values()) {
-        roots.insert(canonical(root));
+        roots.insert(run_root_key(root));
     }
     roots
 }

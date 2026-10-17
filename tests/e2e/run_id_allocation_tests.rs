@@ -4,6 +4,9 @@
 
 use super::*;
 
+#[path = "run_id_registry_tests.rs"]
+mod registry;
+
 const FIRST: u64 = 1_791_839_823_004_821_827;
 const COLLISION: u64 = 1_791_843_000_017_266_136;
 const CONTROL: u64 = 1_791_843_423_128_278_616;
@@ -37,8 +40,12 @@ fn fixture(project: bool) -> (tempfile::TempDir, PathBuf) {
 }
 
 fn run_at(input: &Path, root: &Path, nanos: u64, parallel: usize) -> String {
+    run_fixture_at(input, root, nanos, parallel, "run_id_allocation_tests::run_id_fixture_child")
+}
+
+fn run_fixture_at(input: &Path, root: &Path, nanos: u64, parallel: usize, test: &str) -> String {
     let mut command = std::process::Command::new(std::env::current_exe().unwrap());
-    command.args(["--exact", "run_id_allocation_tests::run_id_fixture_child", "--nocapture"]);
+    command.args(["--exact", test, "--nocapture"]);
     for (key, _) in std::env::vars_os() {
         if key.to_string_lossy().starts_with("RHEI_") || key.to_string_lossy().starts_with("GIT_") {
             command.env_remove(key);

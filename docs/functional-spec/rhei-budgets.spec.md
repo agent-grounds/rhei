@@ -655,7 +655,18 @@ no prompt is shown, nothing is printed, and establishment mints nothing.
 **Damaged** — a witness exists for this root but the journal is absent,
 truncated, or its hash chain does not verify; or the account this root presents
 is held by another root; or the witness's tail was written from another root.
-New work is **refused**, naming both paths. A damaged account is never repaired
+New work is **refused**, naming both paths. This includes program states in
+both sequential execution and the worker pool: account trust is verified before
+creating the subprocess or recording an attempt start. On refusal, task state,
+poll counters, retry deadlines and attempt records stay as they were before the
+run; repeated refused runs perform no program side effects. Verification spends
+no invocation, reserves no neural capacity and does not establish an absent
+account; programs retain the charging rules of
+[§FS-rhei-budgets.4.3](rhei-budgets.spec.md#43-what-spends-neither).
+This is a check before starting work, not a lock held for the subprocess's
+lifetime or a guarantee against damage occurring after verification.
+
+A damaged account is never repaired
 in place; what a refusal offers depends on which of five sub-cases it is,
 because they are not the same accident:
 
@@ -1139,6 +1150,12 @@ fields ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)).
 - **the run report** records the starting and ending snapshot of all three
   dimensions, every reservation the run made, and the exact halt reason
   ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)).
+
+An account-verification refusal before a program start is a failed run, with
+the existing account diagnosis, paths and recovery guidance in its durable run
+report. The report must name that refusal as the halt reason rather than report
+normal completion or classify the refused task as waiting on its external poll
+dependency. It must not record a spawn, exit or transition that did not happen.
 
 Every surface that carries the spend dimension carries the account's currency
 with it, and says how much of the day was charged at the fallback rather than

@@ -1,4 +1,4 @@
-//! Missing account directories must not hide witnessed missing history.
+//! Missing account directories or locks must not hide witnessed missing history.
 //! §FS-rhei-budgets.5.4 §FS-rhei-budgets.10 §FS-rhei-remove.2
 
 use super::budget_path_reuse_support::said;
@@ -93,6 +93,8 @@ impl Fixture {
             &self.account.join("journal.jsonl").display().to_string(),
             &self.witness.display().to_string(),
             "2 receipts",
+            &rhei_core::platform::make_directory_command(&self.account),
+            &rhei_core::platform::copy_command(&self.witness, &self.account.join("journal.jsonl")),
             "rhei budget forget",
         ] {
             assert!(report.contains(expected), "show must contain {expected:?}:\n{report}");
@@ -169,4 +171,20 @@ fn missing_budget_directory_adjust_reports_witnessed_missing_journal() {
 #[test]
 fn missing_budget_directory_remove_reports_witnessed_missing_journal() {
     check_missing_directory(REMOVE);
+}
+
+/// §FS-rhei-budgets.5.4: a surviving directory must not make the lock the diagnosis.
+#[test]
+fn missing_budget_directory_lock_reports_witnessed_missing_journal() {
+    let case = Fixture::new();
+    fs::remove_file(case.account.join("journal.jsonl")).expect("remove journal, keep directory");
+    fs::remove_file(case.account.join("journal.jsonl.lock"))
+        .expect("remove incidental lock, keep directory");
+
+    for args in [ADJUST, REMOVE] {
+        case.assert_refusal(args, false);
+        assert_eq!(fs::read_dir(&case.account).expect("account survives").count(), 0);
+        case.assert_show_contrast(false);
+        assert_eq!(fs::read_dir(&case.account).expect("account survives").count(), 0);
+    }
 }

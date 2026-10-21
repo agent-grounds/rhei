@@ -19,6 +19,9 @@
 // §FS-rhei-run-report.3.1 §FS-rhei-run.4: one classification, every surface.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum HaltCause {
+    /// Account verification refused work before a program could start.
+    /// §FS-rhei-budgets.9
+    AccountRefused { diagnosis: String, remedy: String },
     /// A non-leaf ticket whose own subtree is still open. It is a task in its
     /// own right, so it is reported — but the work is in the descendants.
     /// §FS-rhei-plan-language.3
@@ -128,6 +131,8 @@ impl HaltCause {
     /// diagnostics. Both name concrete commands wherever one exists.
     fn describe(&self, id: &str, state: &str) -> (String, String) {
         match self {
+            // Preserve the account's diagnosis, paths and guidance. §FS-rhei-budgets.9
+            HaltCause::AccountRefused { diagnosis, remedy } => (diagnosis.clone(), remedy.clone()),
             HaltCause::WaitingOnDescendants { open } => (
                 format!("waiting on open descendant {open}"),
                 "finish the descendants; the parent is claimable once its subtree is terminal"

@@ -3,9 +3,9 @@
 //!
 //! `agent-grounds/rhei#401` reached this halt through a budget index another
 //! process held open on Windows. This scenario reaches it the portable way: the
-//! budget index is a directory, so the timeout edge's charge - the project's
-//! first, which establishes the account - cannot read it on any platform, and
-//! no wait would ever make it readable.
+//! running program makes the budget index a directory, so the timeout edge's
+//! charge - the project's first, which establishes the account - cannot read it
+//! on any platform, and no wait would ever make it readable.
 // §FS-rhei-run.3 §FS-rhei-budgets.5.3
 
 use std::fs;
@@ -45,15 +45,17 @@ const PLAN: &str = "# Rhei: Timeout\n\n## Tasks\n\n### Task 1: Build artifact\n*
 #[test]
 fn a_halt_after_a_timeout_transition_failed_to_fire_says_so() {
     let dir = unique_temp_dir("timeout-charge-halt");
-    let script = write_python_agent(&dir, "build.py", "time.sleep(5)\n");
+    // Damage the index after pre-start verification. §FS-rhei-budgets.5.4
+    let script = write_python_agent(
+        &dir,
+        "build.py",
+        "pathlib.Path(os.environ['XDG_STATE_HOME'], 'rhei/budget-authority/roots.json').mkdir(parents=True)\n\
+         time.sleep(5)\n",
+    );
     let plan = write_fixture_file(&dir, "plan.rhei.md", PLAN);
     let machine =
         write_fixture_file(&dir, "states.yaml", &timeout_machine(&fixture_command(&script)));
     let home = dir.join(".home");
-    // A directory where the index file belongs: unreadable as a file everywhere.
-    fs::create_dir_all(home.join("state/rhei/budget-authority/roots.json"))
-        .expect("block the budget index");
-
     let output = rhei_command(&home)
         .current_dir(&*dir)
         .arg("--state-machine")

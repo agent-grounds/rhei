@@ -89,6 +89,8 @@ fn spawn_parallel_program_work_item(
         );
         return Ok(ParallelProgramSpawnOutcome::Skipped);
     }
+    // Initial dispatch and pool refills share this boundary. §FS-rhei-budgets.5.4
+    verify_program_account(&task_workspace_root, &item.task_id_str, &item.current_state)?;
     let workspace_root = task_workspace_root.as_path();
 
     let log = plan.log.clone();

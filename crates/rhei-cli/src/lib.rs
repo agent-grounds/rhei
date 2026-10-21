@@ -122,6 +122,7 @@ include!("cli/settings_load_validate.rs");
 include!("cli/budget_bounds.rs");
 include!("cli/budget_ancestry.rs");
 include!("cli/budget_runtime.rs");
+include!("cli/budget_program.rs");
 include!("cli/budget_travel.rs");
 include!("cli/budget_command.rs");
 include!("cli/budget_report.rs");

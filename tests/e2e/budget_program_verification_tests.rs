@@ -69,25 +69,21 @@ fn report_names_refusal(parallel: usize) {
 }
 
 #[test]
-#[ignore = "red until #501: sequential programs verify before work; implement removes this"]
 fn issue501_sequential_refuses_before_program_work() {
     refused_before_work(1);
 }
 
 #[test]
-#[ignore = "red until #501: worker-pool programs verify before work; implement removes this"]
 fn issue501_worker_pool_refuses_before_program_work() {
     refused_before_work(2);
 }
 
 #[test]
-#[ignore = "red until #501: sequential reports name the account refusal; implement removes this"]
 fn issue501_sequential_report_names_account_refusal() {
     report_names_refusal(1);
 }
 
 #[test]
-#[ignore = "red until #501: worker-pool reports name the account refusal; implement removes this"]
 fn issue501_worker_pool_report_names_account_refusal() {
     report_names_refusal(2);
 }

@@ -88,11 +88,26 @@ struct SummaryState {
     /// what stopped it without the reader reconstructing it from rows.
     /// §FS-rhei-budgets.8
     bound_halts: Vec<(String, rhei_tui::BoundReport, Option<String>, String)>,
+    /// Refused work has no invocation; retain its diagnosis separately.
+    /// §FS-rhei-budgets.9
+    program_refusals: HashMap<String, ProgramAccountRefusal>,
 }
 
 impl SummarySink {
     pub fn new() -> Self {
         Self { inner: Mutex::new(SummaryState::default()) }
+    }
+
+    /// Preserve a pre-start account refusal while propagating the original error.
+    /// Neither the activity counters nor the execution ledger record a start.
+    /// §FS-rhei-budgets.9
+    fn record_program_refusal(&self, error: miette::Report) -> miette::Report {
+        if let Some(refusal) = error.downcast_ref::<ProgramAccountRefusal>() {
+            if let Ok(mut state) = self.inner.lock() {
+                state.program_refusals.insert(refusal.task.clone(), refusal.clone());
+            }
+        }
+        error
     }
 
     /// Snapshot the accumulated activity for rendering after the run. A poisoned
@@ -814,6 +829,26 @@ impl RunSummaryReport {
         .into_iter()
         .map(|(task, cause)| (task.id.to_string(), cause))
         .collect();
+
+        // A refused start outranks the poll wait inferred from unchanged state.
+        // It has no worker activity to classify. §FS-rhei-budgets.9
+        let mut halt_causes = halt_causes;
+        if let Ok(state) = summary.inner.lock() {
+            for refusal in state.program_refusals.values() {
+                if let Some(task) = find_task_by_id(&rhei.tasks, &parse_task_id(&refusal.task)) {
+                    let machine = machines.for_task(&task.id);
+                    if normalized_state_name(task.state.as_str(), machine) == refusal.state {
+                        halt_causes.insert(
+                            refusal.task.clone(),
+                            HaltCause::AccountRefused {
+                                diagnosis: refusal.diagnosis.clone(),
+                                remedy: refusal.remedy.clone(),
+                            },
+                        );
+                    }
+                }
+            }
+        }
 
         // Source-order walk that preserves hierarchy depth.
         let mut rows = Vec::new();

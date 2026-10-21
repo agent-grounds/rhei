@@ -119,6 +119,8 @@ fn run_sequential_program_work_items(
             progress.stalled_tasks.insert(task_id_str.clone());
             continue;
         }
+        // Verify on every start, before slot/attempt mutations. §FS-rhei-budgets.5.4
+        verify_program_account(&task_workspace_root, task_id_str, current_state)?;
         let log = plan.log.clone();
 
         run_info!("\nSpawning program for Task {}: {}", task_id_str, task.title);

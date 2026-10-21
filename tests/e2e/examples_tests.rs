@@ -344,16 +344,16 @@ fn example_parallel_worktrees_runs_with_mock_agents() {
     );
     assert_success(&result);
     assert_all_tasks_in_state(&workspace, &machine_path, "completed");
+    // The targets are subtasks of one `batch` ticket, so one tasks file keeps
+    // --parallel; the batch reports once they finish. §FS-rhei-run.2.5
+    assert!(workspace.join("runtime/report.md").exists(), "the batch ticket reports");
     // The integrate state's artifact is `summary`, not `result`: a declared
     // artifact called `result` would collide in the prompt and in stall reports
     // with the ticket's own terminal result. §FS-rhei-states.3.3
-    assert!(workspace.join("runtime/summaries/parallel-worktrees-example.cli-summary.md").exists());
-    assert!(workspace
-        .join("runtime/summaries/parallel-worktrees-example.core-summary.md")
-        .exists());
-    assert!(workspace
-        .join("runtime/summaries/parallel-worktrees-example.validator-summary.md")
-        .exists());
+    for target in ["cli", "core", "validator"] {
+        let summary = format!("parallel-worktrees-example.batch.{target}-summary.md");
+        assert!(workspace.join("runtime/summaries").join(summary).exists(), "{target}");
+    }
 }
 
 #[test]

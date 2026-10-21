@@ -8,20 +8,29 @@
 #         | creates an isolated git worktree at                 |
 #         | {{worktree_root}}/{task_id} on branch               |
 #         | {{branch_prefix}}/{task_id}                         |
+#                                                                |
+#   report  (the batch ticket, once every target is done) -------+
 #
 #   any non-final state --> cancelled [final]
 #
-# Per-task paths (every target task is identical and independent):
-#   <target.id>:  prepare-worktree -> work -> integrate -> completed
+# Per-task paths:
+#   batch.<target.id>  (one per target, identical and independent):
+#                      prepare-worktree -> work -> integrate -> completed
+#   batch              (their parent): report -> completed
 #
-# Parallelism: TWO things must both be true.
-#   1. The tasks file fans out one top-level task per target with NO
-#      `**Prior:**` between them, so every task is ready at once.
-#   2. Every working state is marked `concurrent: true`. Without it (the
+# Parallelism: THREE things must all be true.
+#   1. The targets fan out with NO `**Prior:**` between them, so every target
+#      is ready at once.
+#   2. They are subtasks of one top-level ticket, `batch`. The template renders
+#      every target into one tasks file, and when every top-level ticket of a
+#      plan lives in one file `rhei run` drops --parallel to 1 (`rhei validate`
+#      warns about it). Only top-level tickets count toward a file, so one
+#      batch ticket holding the targets keeps them parallel.
+#   3. Every working state is marked `concurrent: true`. Without it (the
 #      default is false) `rhei run` schedules at most one task per state per
 #      pass and the fan-out serializes regardless of --parallel.
 # Then `rhei run --parallel N` (directory workspaces only — it is ignored on
-# single-file plans) advances up to N tasks concurrently. Each task works in
+# single-file plans) advances up to N targets concurrently. Each target works in
 # its own worktree + branch keyed by {task_id}, so concurrent agents never
 # edit the same checkout.
 #
@@ -115,6 +124,26 @@ states:
         path: runtime/summaries/{task_id}-summary.md
         description: Branch, commit, and status for this target
 
+  report:
+    description: Report every target's branch once the whole batch has finished.
+    target: {{agent}}
+    instructions: |
+      Report on the batch, Task {task_id}: {task_title}.
+
+      Every target is a subtask of this ticket, and every one has finished.
+      Read each target's integration summary under `runtime/summaries/` (the
+      `*-summary.md` files) and write one batch report to
+      `{output.report.path}`: a line per target with its branch, commit SHA,
+      and status, and a line for each target that was cancelled instead. Do not
+      merge anything — the branches are left for human review.
+
+      Record why the batch is finishing in the result file named in your
+      `## Result` section, then transition to `completed`.
+    outputs:
+      - name: report
+        path: runtime/report.md
+        description: Branch, commit, and status of every target in the batch
+
   completed:
     description: This target is done; its branch is ready for review.
     instructions: |
@@ -141,6 +170,10 @@ transitions:
   - from: integrate
     to: completed
     description: Branch committed and result recorded.
+
+  - from: report
+    to: completed
+    description: Batch report written.
 
   - from: "*"
     to: cancelled

@@ -1,4 +1,10 @@
-### Task cli: Apply the batch task in crates/rhei-cli
+### Task batch: Apply the batch task to every target
+**State:** report
+
+Each target below is a subtask of this ticket and works in its own git
+worktree. Once every one of them has finished, report on the whole batch.
+
+#### Task batch.cli: Apply the batch task in crates/rhei-cli
 **State:** prepare-worktree
 
 **Target path:** `crates/rhei-cli` — make all edits inside this target's own worktree
@@ -12,7 +18,7 @@ root) summarizing the crate's public responsibility in two or three
 sentences. Do not change any other code or behavior.
 
 
-### Task core: Apply the batch task in crates/rhei-core
+#### Task batch.core: Apply the batch task in crates/rhei-core
 **State:** prepare-worktree
 
 **Target path:** `crates/rhei-core` — make all edits inside this target's own worktree
@@ -26,7 +32,7 @@ root) summarizing the crate's public responsibility in two or three
 sentences. Do not change any other code or behavior.
 
 
-### Task validator: Apply the batch task in crates/rhei-validator
+#### Task batch.validator: Apply the batch task in crates/rhei-validator
 **State:** prepare-worktree
 
 **Target path:** `crates/rhei-validator` — make all edits inside this target's own worktree

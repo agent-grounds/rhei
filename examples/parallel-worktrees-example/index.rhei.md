@@ -4,8 +4,10 @@
 
 The same task runs once per target, each inside its own git worktree on its own
 branch, so the targets advance concurrently with `rhei run --parallel N` without
-several agents editing one checkout. Each task walks
-`prepare-worktree → work → integrate → completed` independently.
+several agents editing one checkout. Each target is a subtask of one batch
+ticket and walks `prepare-worktree → work → integrate → completed`
+independently; once every target has finished, the batch ticket writes one
+report (`report → completed`).
 
 ## Shared task
 

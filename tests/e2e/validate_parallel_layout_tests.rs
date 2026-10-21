@@ -187,7 +187,6 @@ fn copy_tree(src: &Path, dst: &Path) {
 /// rhei's own example of `--parallel` must not be the layout that disables it.
 // §FS-rhei-run.2.5 §FS-rhei-validate.4.5
 #[test]
-#[ignore = "red until #503: the example's three targets share tasks/01-targets.md; implement removes this"]
 fn parallel_worktrees_example_keeps_its_parallelism() {
     let dir = unique_temp_dir("parallel-worktrees-layout");
     let ws = dir.join("parallel-worktrees-example");

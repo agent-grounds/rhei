@@ -46,6 +46,8 @@ mod budget_nested_plan_tests;
 mod budget_path_reuse_quoting_tests;
 mod budget_path_reuse_support;
 mod budget_path_reuse_tests;
+mod budget_program_verification_support;
+mod budget_program_verification_tests;
 mod budget_run_report_end_tests;
 mod budget_spend_tests;
 mod budget_support;

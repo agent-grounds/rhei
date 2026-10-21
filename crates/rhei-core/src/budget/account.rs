@@ -6,7 +6,7 @@
 //! §FS-rhei-budgets.5.1 §AR-neural-admission.7
 
 use super::diagnosis::{
-    foreign_tail, journal_path, Damage, Diagnosis, History, Inspection, Retired,
+    foreign_tail, journal_path, Damage, Damaged, Diagnosis, History, Inspection, Retired,
 };
 use super::journal::{Audit, Journal};
 use super::roots::{held_elsewhere_refusal, record_root, retract_root, settle, witnessed_roots};
@@ -120,7 +120,8 @@ impl Account {
     /// journal in §AR-neural-admission.3's lock order and already excludes the
     /// only writer that could create one, so classifying under it alone is
     /// correctly serialized. Wherever the directory exists the journal lock is
-    /// taken exactly as before. §FS-rhei-budgets.10
+    /// taken exactly as before. Both cases use the shared opener's missing
+    /// history classification. §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
     pub fn inspect(&self) -> Result<Inspection> {
         if let Some(holder) = &self.held_by {
             // The holder's witness, read under its lock and never written: a
@@ -136,33 +137,7 @@ impl Account {
             );
             return Ok(Inspection::Damaged(Box::new(diagnosis.held_by(holder))));
         }
-        if !self.directory().exists() {
-            let authority = super::authority::Authority::lock(&self.root, &self.uuid)?;
-            if authority.is_empty() {
-                return Ok(Inspection::Absent);
-            }
-            let history = History::read(&format!("panta:{}", self.uuid), authority.bytes());
-            return Ok(Inspection::Damaged(Box::new(Diagnosis::new(
-                Damage::JournalAbsent,
-                &self.root,
-                &self.uuid,
-                authority.path(),
-                history,
-            ))));
-        }
-        let (journal, damaged) = Journal::locked_or_damaged(&self.root, &self.uuid, false, false)?;
-        let Some(damaged) = damaged else {
-            return Ok(Inspection::Verified(Box::new(journal)));
-        };
-        let diagnosis = Diagnosis::new(
-            damaged.damage,
-            &self.root,
-            &self.uuid,
-            journal.authority_path(),
-            journal.recorded_history(),
-        )
-        .with_foreign(damaged.foreign);
-        Ok(Inspection::Damaged(Box::new(diagnosis)))
+        Ok(Journal::locked_or_damaged(&self.root, &self.uuid, false, false)?.inspection())
     }
 
     /// Retire this root: the operator's answer to the reading the tool cannot
@@ -357,7 +332,9 @@ fn classify(
     witness: &[u8],
     authority: &super::authority::Authority,
 ) -> Option<Damage> {
-    let Some(journal) = journal else { return Some(Damage::JournalAbsent) };
+    let Some(journal) = journal else {
+        return Damaged::missing_journal(project_id, authority).map(|damaged| damaged.damage);
+    };
     let truncated = || match foreign_tail(root, journal, witness) {
         Some(_) => Damage::ForeignTail,
         None => Damage::JournalTruncated,

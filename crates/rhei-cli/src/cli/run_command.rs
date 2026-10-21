@@ -1,16 +1,3 @@
-/// Top-level tickets per owning plan file. Only top-level tickets are
-/// independently schedulable — a subtask always executes inside its ticket's
-/// slot — so descendants never add to a file's count. §FS-rhei-run.2.5
-fn ticket_file_counts(loaded: &LoadedPlan) -> BTreeMap<&Path, usize> {
-    let mut counts: BTreeMap<&Path, usize> = BTreeMap::new();
-    for task in &loaded.rhei.tasks {
-        if let Some(path) = loaded.task_sources.get(&task.id.to_string()) {
-            *counts.entry(path.as_path()).or_default() += 1;
-        }
-    }
-    counts
-}
-
 /// The artifact root a run composes every prompt against: the workspace the
 /// input names, resolved to an absolute path before anything is loaded.
 ///
@@ -264,32 +251,28 @@ fn run_command(
 
     // §FS-rhei-run.2.5: when every ticket lives in one plan file, parallelism
     // can only schedule same-file tickets against one checkout — fall back to
-    // sequential, as for a bare single-file plan.
-    let ticket_counts = ticket_file_counts(&loaded);
-    let shared_file =
-        ticket_counts.iter().find(|(_, count)| **count > 1).map(|(path, _)| (*path).to_path_buf());
-    let single_shared_file = ticket_counts.len() == 1 && shared_file.is_some();
-    let effective_parallel = if opts.parallel() > 1 && single_shared_file {
-        eprintln!(
-            "warning: --parallel > 1 is not supported when every ticket lives in one \
-             plan file (risk of conflicting edits). Falling back to sequential execution."
-        );
-        1
-    } else {
+    // sequential, as for a bare single-file plan. Validate reads this same layout.
+    let effective_parallel = match ticket_file_layout(&loaded) {
+        TicketFileLayout::AllInOne(_) if opts.parallel() > 1 => {
+            eprintln!(
+                "warning: --parallel > 1 is not supported when every ticket lives in one \
+                 plan file (risk of conflicting edits). Falling back to sequential execution."
+            );
+            1
+        }
         // A project keeps parallelism, but two tickets of one rhei file are
         // still concurrent work against a single checkout — say so instead
         // of silently dropping the single-file warning. §FS-rhei-run.2.5
-        if opts.parallel() > 1 {
-            if let Some(shared) = &shared_file {
-                eprintln!(
-                    "warning: --parallel > 1 schedules tickets from the same rhei file \
-                     concurrently ({}); plan-file writes serialize on the sibling sidecar, but \
-                     agents may still collide in the shared checkout.",
-                    shared.display()
-                );
-            }
+        TicketFileLayout::Shared(shared) if opts.parallel() > 1 => {
+            eprintln!(
+                "warning: --parallel > 1 schedules tickets from the same rhei file \
+                 concurrently ({}); plan-file writes serialize on the sibling sidecar, but \
+                 agents may still collide in the shared checkout.",
+                shared.display()
+            );
+            opts.parallel()
         }
-        opts.parallel()
+        _ => opts.parallel(),
     };
 
     // Initial validation pass.

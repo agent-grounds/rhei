@@ -105,7 +105,6 @@ fn assert_silent(result: &CliRun, why: &str) {
 /// and the shared file, and keeps the Consumes advisory as it is.
 // §FS-rhei-validate.4.5 §FS-rhei-run.2.5
 #[test]
-#[ignore = "red until #503: validate is silent about the one-file layout; implement removes this"]
 fn validate_warns_when_one_file_layout_serializes_a_concurrent_state() {
     let ticket = ticket("propose");
     let (_dir, ws, machine) = blind_round_plan(

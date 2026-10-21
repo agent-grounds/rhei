@@ -143,7 +143,7 @@ impl Journal {
     /// a journal restored by hand, which is the remedy §FS-rhei-budgets.5.4
     /// offers and a refusal prints, arrives without one, and refusing to open it
     /// would make the offered restore a command that fixes nothing. Nothing of
-    /// the account is created by that. Where the directory itself is absent,
+    /// the account is created by that. Where the journal and lock are absent,
     /// classify the missing history under the authority alone, which excludes
     /// every writer in §AR-neural-admission.3's lock order. That result carries
     /// no usable journal, and creates no directory or lock. §FS-rhei-budgets.5.4
@@ -173,7 +173,7 @@ impl Journal {
             Err(error)
                 if !create
                     && error.kind() == std::io::ErrorKind::NotFound
-                    && matches!(std::fs::metadata(&dir), Err(error)
+                    && matches!(std::fs::metadata(&path), Err(error)
                         if error.kind() == std::io::ErrorKind::NotFound) =>
             {
                 return Ok(

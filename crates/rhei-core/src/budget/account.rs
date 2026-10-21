@@ -115,11 +115,11 @@ impl Account {
     /// it.
     ///
     /// This is what makes `rhei budget show` runnable in the state a refusal
-    /// sends an operator to. Where the account directory is **absent** there is
-    /// no journal lock to take and none is taken: the authority sits above the
+    /// sends an operator to. Where the journal and its lock are **absent** there
+    /// is no journal lock to take and none is taken: the authority sits above the
     /// journal in §AR-neural-admission.3's lock order and already excludes the
     /// only writer that could create one, so classifying under it alone is
-    /// correctly serialized. Wherever the directory exists the journal lock is
+    /// correctly serialized. Wherever the journal exists the journal lock is
     /// taken exactly as before. Both cases use the shared opener's missing
     /// history classification. §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
     pub fn inspect(&self) -> Result<Inspection> {

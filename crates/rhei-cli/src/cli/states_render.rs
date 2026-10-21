@@ -1329,6 +1329,10 @@ fn validation_pass_for_loaded(
     // §FS-rhei-plan-language.1.2
     report.warnings.extend(empty_rhei_warnings(&loaded));
     report.warnings.extend(ignored_member_settings_warnings(input, &loaded));
+    // A concurrent state the file layout serializes is valid, but `rhei run`
+    // would drop --parallel to 1 under it — name it before the round is spent.
+    // §FS-rhei-validate.4.5
+    report.warnings.extend(serialized_concurrent_state_warnings(input, &loaded, &machines));
 
     report.help.dedup();
     Ok(ValidationPass {

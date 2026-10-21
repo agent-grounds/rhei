@@ -678,6 +678,18 @@ because they are not the same accident:
 | `held_elsewhere` | the uuid this root presents is bound to another root that still holds it | both roots, and `rhei budget forget` for this one ([§FS-rhei-budgets.5.4.1](rhei-budgets.spec.md#541-a-second-root-presenting-the-account)) |
 | `foreign_tail` | the witness runs past the journal and that tail names another root | the other root, and setting the witness aside; never the copy ([§FS-rhei-budgets.5.4.2](rhei-budgets.spec.md#542-a-tail-written-from-another-root)) |
 
+When a witness survives for this root, a wholly absent journal is
+`journal_absent` even if its entire account directory, including the incidental
+`journal.jsonl.lock`, is gone. A non-creating account open must give the same
+missing-journal refusal and committed witness path and receipt context as when
+only the journal file is missing; it must not blame the missing lock file.
+This applies to `budget adjust` and to the unreadable-budget blocker reported by
+`remove --dry-run` ([§FS-rhei-remove.2](rhei-remove.spec.md#2-untouched)). Both
+continue to refuse the requested change, leave the account directory absent and
+the witness bytes unchanged, and removal leaves the plan unchanged. Inspection
+with `budget show` continues to report the same damaged sub-case and remedies
+([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)).
+
 The names are the vocabulary a machine reader gets
 ([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)) and the reason the
 split exists. Where a journal is present **and its uuid is bound to this root,

@@ -161,14 +161,12 @@ fn check_missing_directory(args: &[&str]) {
 
 /// §FS-rhei-budgets.5.4: absence of the incidental lock must not mask journal_absent.
 #[test]
-#[ignore = "red until #504: adjust must diagnose missing journal with its witness; implement removes this"]
 fn missing_budget_directory_adjust_reports_witnessed_missing_journal() {
     check_missing_directory(ADJUST);
 }
 
 /// §FS-rhei-budgets.5.4 §FS-rhei-remove.2: unreadable history still refuses removal.
 #[test]
-#[ignore = "red until #504: remove must diagnose missing journal with its witness; implement removes this"]
 fn missing_budget_directory_remove_reports_witnessed_missing_journal() {
     check_missing_directory(REMOVE);
 }

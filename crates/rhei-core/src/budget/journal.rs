@@ -8,7 +8,7 @@
 //! §FS-rhei-budgets.5.2 §AR-neural-admission.4
 
 use super::diagnosis::{
-    absent_journal_refusal, foreign_tail, foreign_tail_refusal, Damage, Damaged, Diagnosis, History,
+    foreign_tail, foreign_tail_refusal, Damage, Damaged, Diagnosis, History, Opening,
 };
 use super::replay::State;
 use super::types::{add, uuid, BudgetError, Contract, Snapshot};
@@ -122,14 +122,12 @@ impl Journal {
         Ok(ledger)
     }
 
+    /// Refuse damaged history with the same classification inspection reports.
+    /// §FS-rhei-budgets.5.4
     fn locked(root: &Path, project_uuid: &str, writable: bool, create: bool) -> Result<Self> {
-        let (ledger, damaged) = Self::locked_or_damaged(root, project_uuid, writable, create)?;
-        match damaged {
-            // A caller that only wanted the account gets exactly the words it
-            // got before the classification became a value.
-            // §FS-rhei-budgets.5.4
-            Some(damaged) => Err(damaged.error),
-            None => Ok(ledger),
+        match Self::locked_or_damaged(root, project_uuid, writable, create)? {
+            Opening::Verified(ledger) => Ok(*ledger),
+            Opening::Damaged(_, error) | Opening::Absent(error) => Err(error),
         }
     }
 
@@ -145,14 +143,16 @@ impl Journal {
     /// a journal restored by hand, which is the remedy §FS-rhei-budgets.5.4
     /// offers and a refusal prints, arrives without one, and refusing to open it
     /// would make the offered restore a command that fixes nothing. Nothing of
-    /// the account is created by that, and where the account directory itself is
-    /// absent this still fails exactly as it did before. §FS-rhei-budgets.10
+    /// the account is created by that. Where the directory itself is absent,
+    /// classify the missing history under the authority alone, which excludes
+    /// every writer in §AR-neural-admission.3's lock order. That result carries
+    /// no usable journal, and creates no directory or lock. §FS-rhei-budgets.5.4
     pub(crate) fn locked_or_damaged(
         root: &Path,
         project_uuid: &str,
         writable: bool,
         create: bool,
-    ) -> Result<(Self, Option<Damaged>)> {
+    ) -> Result<Opening> {
         uuid(project_uuid)?;
         let authority = super::authority::Authority::lock(root, project_uuid)?;
         let dir = root.join(".agent-grounds/rhei/budgets").join(project_uuid);
@@ -162,13 +162,29 @@ impl Journal {
         let path = dir.join("journal.jsonl");
         let lock_path = dir.join("journal.jsonl.lock");
         // A journal that is there is lockable, restored by hand or not.
-        let lock = OpenOptions::new()
+        let lock = match OpenOptions::new()
             .create(create || path.exists())
             .truncate(false)
             .read(true)
             .write(true)
             .open(&lock_path)
-            .map_err(|error| BudgetError::unreachable(&lock_path, &error))?;
+        {
+            Ok(lock) => lock,
+            Err(error)
+                if !create
+                    && error.kind() == std::io::ErrorKind::NotFound
+                    && matches!(std::fs::metadata(&dir), Err(error)
+                        if error.kind() == std::io::ErrorKind::NotFound) =>
+            {
+                return Ok(
+                    match Damaged::missing_journal(&format!("panta:{project_uuid}"), &authority) {
+                        Some(damaged) => Opening::damaged(root, project_uuid, &authority, damaged),
+                        None => Opening::Absent(BudgetError::unreachable(&lock_path, &error)),
+                    },
+                );
+            }
+            Err(error) => return Err(BudgetError::unreachable(&lock_path, &error)),
+        };
         lock.lock_exclusive()?;
         let mut ledger = Self {
             authority,
@@ -185,6 +201,9 @@ impl Journal {
             day: String::new(),
         };
         let damaged = ledger.load()?;
+        if let Some(damaged) = damaged {
+            return Ok(Opening::damaged(root, project_uuid, &ledger.authority, damaged));
+        }
         // A kind this build does not understand is not a broken account: it is
         // a newer one. It reports, and it may not append.
         // §FS-rhei-budgets.5.2
@@ -195,7 +214,7 @@ impl Journal {
             &super::window::day_key(super::window::now()?),
             ledger.state.highest_day.as_deref(),
         );
-        Ok((ledger, damaged))
+        Ok(Opening::Verified(Box::new(ledger)))
     }
 
     /// The three ledger states of §FS-rhei-budgets.5.4, told apart by name.
@@ -215,29 +234,16 @@ impl Journal {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(error.into()),
         };
-        // The presence is kept as a flag and the bytes are **moved**: the two
-        // branches below need to know whether there was a file, not to read its
-        // contents a second time, and this is every admission's path.
-        let existed = present.is_some();
-        let bytes = present.unwrap_or_default();
+        let Some(bytes) = present else {
+            return Ok(Damaged::missing_journal(&self.project_id, &self.authority));
+        };
         if bytes.is_empty() {
             // **Absent** when the witness agrees there is nothing; **damaged**
             // when the witness knows of receipts this root no longer has.
             if self.authority.is_empty() {
                 return Ok(None);
             }
-            // The file itself is the seam: no file at all is the one case
-            // whose history may belong to another project, so the copy that
-            // adopts it may not be the remedy. §FS-rhei-budgets.5.4
-            return Ok(Some(if existed {
-                self.truncated(&bytes, self.witness_ahead_refusal())
-            } else {
-                Damaged {
-                    damage: Damage::JournalAbsent,
-                    error: absent_journal_refusal(self.authority.path(), &self.recorded_history()),
-                    foreign: None,
-                }
-            }));
+            return Ok(Some(self.truncated(&bytes, self.witness_ahead_refusal())));
         }
         // Verify the chain on its own terms first, so an **adopted** journal is
         // one this machine has checked rather than one it merely inherited.
@@ -300,10 +306,6 @@ impl Journal {
     /// read. §FS-rhei-budgets.5.3
     pub(crate) fn recorded_history(&self) -> History {
         History::read(&self.project_id, self.authority.bytes())
-    }
-
-    pub(crate) fn authority_path(&self) -> &Path {
-        self.authority.path()
     }
 
     pub fn snapshot(&self) -> Result<Snapshot> {

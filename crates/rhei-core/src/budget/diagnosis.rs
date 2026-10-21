@@ -74,6 +74,65 @@ pub(crate) struct Damaged {
     pub(crate) foreign: Option<Foreign>,
 }
 
+impl Damaged {
+    /// A missing journal is damaged exactly when its witness holds history,
+    /// regardless of whether the directory or lock survives. §FS-rhei-budgets.5.4
+    pub(crate) fn missing_journal(
+        project_id: &str,
+        authority: &super::authority::Authority,
+    ) -> Option<Self> {
+        (!authority.is_empty()).then(|| Self {
+            damage: Damage::JournalAbsent,
+            error: absent_journal_refusal(
+                authority.path(),
+                &History::read(project_id, authority.bytes()),
+            ),
+            foreign: None,
+        })
+    }
+}
+
+/// The shared open result: only a verified journal exposes a transaction;
+/// missing directories can be classified under the authority alone without
+/// manufacturing an unlocked journal. §FS-rhei-budgets.5.4 §AR-neural-admission.3
+pub(crate) enum Opening {
+    Verified(Box<Journal>),
+    Damaged(Box<Diagnosis>, BudgetError),
+    /// No history to report; retain the opening error for non-creating callers.
+    Absent(BudgetError),
+}
+
+impl Opening {
+    /// Both reporting and refusing carry the same history and classification.
+    /// §FS-rhei-budgets.5.4
+    pub(crate) fn damaged(
+        root: &Path,
+        uuid: &str,
+        authority: &super::authority::Authority,
+        damaged: Damaged,
+    ) -> Self {
+        let diagnosis = Diagnosis::new(
+            damaged.damage,
+            root,
+            uuid,
+            authority.path(),
+            History::read(&format!("panta:{uuid}"), authority.bytes()),
+        )
+        .with_foreign(damaged.foreign);
+        Self::Damaged(Box::new(diagnosis), damaged.error)
+    }
+
+    /// Inspection reports the same classification a non-creating open refuses.
+    /// §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
+    pub(crate) fn inspection(self) -> Inspection {
+        match self {
+            Self::Verified(journal) => Inspection::Verified(journal),
+            Self::Damaged(diagnosis, _) => Inspection::Damaged(diagnosis),
+            Self::Absent(_) => Inspection::Absent,
+        }
+    }
+}
+
 /// What the committed history holds, for a report that has no journal to read.
 ///
 /// Replayed through the journal's own verifier rather than a second parser:

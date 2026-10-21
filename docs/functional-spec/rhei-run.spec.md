@@ -105,7 +105,8 @@ and project-wide locking, but never become candidates in that run.
   not shared. When *every* ticket in the run lives in one plan file, parallel
   slots could only ever schedule same-file tickets — the run then falls back
   to sequential execution with a warning, exactly as for a bare single-file
-  plan.
+  plan. `rhei validate` tests this same condition and warns before the run
+  when a concurrent state would be serialized by it ([§FS-rhei-validate.4.5](rhei-validate.spec.md#45-a-layout-that-serializes-a-concurrent-state)).
 
 ### 2.6. Run Lock
 

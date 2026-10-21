@@ -155,7 +155,10 @@ error naming its line
 
    The warning is advisory: it does not change plan validity, export
    resolution, readiness, or the filesystem a worker can read
-   ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)).
+   ([§FS-rhei-plan-language.3.12](rhei-plan-language.spec.md#312-task-exports)). Its advice to schedule a round concurrently
+   cannot be followed when the plan's file layout makes `rhei run` drop
+   `--parallel` to 1; that case gets its own warning,
+   [§FS-rhei-validate.4.5](rhei-validate.spec.md#45-a-layout-that-serializes-a-concurrent-state), and this text stays as it is.
 7. Report each bound in force as a **warning**, one line per dimension, with
    its effective value, its value source, and — when the active ceiling
    clamped a higher request — the machine or the project as the limiting source
@@ -330,6 +333,40 @@ A parse error in the **task body** of a file that carries a block still reports
 that file's own line number, with or without `structure` declared in the index.
 The block changes what the loader reads before the body; it must not change
 where the loader says a problem is.
+
+### 4.5. A layout that serializes a concurrent state
+
+`rhei run --parallel N` falls back to sequential execution when every
+top-level ticket of the run lives in one plan file and there is more than one
+of them ([§FS-rhei-run.2.5](rhei-run.spec.md#25-project-scope---rhei)). That is a fact about the plan's files, decided
+before any task runs, and a `concurrent: true` state
+([§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification)) is the author's statement that its tasks should overlap.
+Validation therefore reports the contradiction before the run instead of
+leaving it to one line of the run's log.
+
+Validation **warns** when both hold:
+
+1. the plan meets the fallback condition of [§FS-rhei-run.2.5](rhei-run.spec.md#25-project-scope---rhei), judged by the
+   same rule `rhei run` applies: only top-level tickets count toward a file,
+   every one of them lives in one plan file, and there are at least two; and
+2. a state that is `concurrent: true` in the machine governing its tasks
+   holds two or more tasks, counted by the tasks' current `**State:**`.
+
+One warning per such state, naming the state and the shared plan file
+relative to the plan root, saying that `rhei run` drops `--parallel` to 1 and
+that giving a top-level ticket a file of its own avoids it:
+
+```text
+warning: state 'propose' is concurrent, but every top-level ticket is in tasks/01-ticket.md, so rhei run drops --parallel to 1; give a top-level ticket a file of its own
+```
+
+It is silent when the top-level tickets span two or more files, when a single
+top-level ticket holds every concurrent task as its subtasks (that plan
+already runs in parallel, [§FS-rhei-run.2.5](rhei-run.spec.md#25-project-scope---rhei)), and when no concurrent state
+holds two tasks. It is a warning, never an error: the fallback is correct
+behaviour, the plan is valid, and the exit code is unchanged. The
+`**Consumes:**` advisory of [§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior), item 6, is printed unchanged
+beside it.
 
 ## 5. Watch Mode
 

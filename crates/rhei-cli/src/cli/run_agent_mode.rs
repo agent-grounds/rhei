@@ -700,7 +700,9 @@ fn run_agent_mode(
                 &workspace_root,
                 &sink,
                 &mut progress,
-            )?;
+            )
+            // Keep the actual refusal for the fallback report. §FS-rhei-budgets.9
+            .map_err(|error| summary_sink.record_program_refusal(error))?;
         }
 
         if agent_tasks.is_empty() && (program_tasks.is_empty() || !run_programs_in_worker_pool) {
@@ -953,7 +955,9 @@ fn run_agent_mode(
                 intervene.as_ref(),
                 &mut progress,
                 identity,
-            )?;
+            )
+            // Includes refusals during initial fill and later refills. §FS-rhei-budgets.9
+            .map_err(|error| summary_sink.record_program_refusal(error))?;
             report_guard.machines = live.machines.set.clone();
         }
 

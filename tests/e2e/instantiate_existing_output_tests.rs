@@ -55,7 +55,6 @@ fn assert_dry_run_refuses_like_real(dry: &CliRun, real: &CliRun, wording: &str) 
 /// An explicit existing `--output`: "output path '…' already exists".
 /// §FS-rhei-templates.6.1.2
 #[test]
-#[ignore = "red until #507: dry-run accepts an existing output the real run refuses; implement removes this"]
 fn dry_run_refuses_existing_explicit_output_like_real_write() {
     let dir = unique_temp_dir("instantiate-existing-explicit");
     let output = dir.join("out");
@@ -71,7 +70,6 @@ fn dry_run_refuses_existing_explicit_output_like_real_write() {
 /// The default output, `<cwd>/fix`, already exists: "has already been
 /// instantiated here under that name". §FS-rhei-templates.6.1.2
 #[test]
-#[ignore = "red until #507: dry-run accepts an existing output the real run refuses; implement removes this"]
 fn dry_run_refuses_existing_default_output_like_real_write() {
     let dir = unique_temp_dir("instantiate-existing-default");
     let output = dir.join("fix");

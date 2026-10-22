@@ -83,3 +83,24 @@ fn dry_run_refuses_existing_default_output_like_real_write() {
         "has already been instantiated here under that name",
     );
 }
+
+/// `--into <project>` over an existing member `<project>/fix` refuses alike
+/// dry and real, as the default output does. §FS-rhei-library.2.2
+#[test]
+fn dry_run_refuses_existing_into_project_member_like_real_write() {
+    let dir = unique_temp_dir("instantiate-existing-into-member");
+    let project = dir.join("proj");
+    fs::create_dir(&project).unwrap();
+    write_fixture_file(&project, "index.panta.md", "# Panta: Existing member\n");
+    let member = project.join("fix");
+    fs::create_dir(&member).unwrap();
+    write_fixture_file(&member, "sentinel.txt", SENTINEL);
+    let template = fix_template();
+    let args = ["instantiate", &template, "--into", project.to_str().unwrap()];
+    let (dry, real) = dry_then_real(&dir, &member, &args);
+    assert_dry_run_refuses_like_real(
+        &dry,
+        &real,
+        "has already been instantiated here under that name",
+    );
+}

@@ -175,9 +175,8 @@
         dry_run: bool,
     ) -> MietteResult<()> {
         let output_dir = project.join(&manifest.name);
-        if !dry_run && output_dir.exists() {
-            return Err(instantiate_output_exists_error(&output_dir, template, input_args, false));
-        }
+        // The same refusal as the default `--output`, dry run included. §FS-rhei-library.2.2
+        refuse_existing_output(&output_dir, template, input_args, false)?;
         // The hoist rewrites the project's settings, so the write is serialized
         // on the project as every other `--into` is. §FS-rhei-library.2
         let _lock = if dry_run { None } else { Some(lock_new_create(project)?) };

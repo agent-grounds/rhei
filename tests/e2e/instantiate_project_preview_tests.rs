@@ -1,5 +1,6 @@
-//! Existing-destination previews and workspace and basin sibling remedies
-//! retain strict prospective project validation. §FS-rhei-templates.6.1.2
+//! An existing destination refuses its preview like the real write, and workspace
+//! and basin sibling remedies retain strict prospective project validation.
+//! §FS-rhei-templates.6.1.2
 
 use std::fs;
 use std::path::Path;
@@ -7,44 +8,35 @@ use std::path::Path;
 use super::instantiate_project_validation_support::*;
 use super::*;
 
-/// Preview scratch in place of an existing workspace, preserving directories,
-/// files and settings, while real writes still refuse that destination.
-/// §FS-rhei-templates.6.1.2
+/// An existing workspace refuses the preview exactly as it refuses the real
+/// write, before any project validation, preserving directories, files and
+/// settings. §FS-rhei-templates.6.1.2
 #[test]
-fn existing_workspace_preview_uses_scratch_and_preserves_project() {
+fn existing_workspace_refuses_preview_like_real_write_and_preserves_project() {
     let scenario = Scenario::new();
     assert_success(&scenario.output_run(&[]));
     assert!(scenario.output().join("index.rhei.md").is_file());
     scenario.add_incoming_settings();
-    write_fixture_file(
-        &scenario.template,
-        "tasks/001-only.md",
-        "### Task 2: Prospective task\n**State:** todo\n",
-    );
+    scenario.add_broken_sibling();
     let before = snapshot(&scenario.project);
-    for flags in [&["--dry-run"][..], &["--dry-run", "--keep-on-error"][..]] {
-        let preview = scenario.output_run(flags);
-        assert_eq!(snapshot(&scenario.project), before, "preview changes no existing bytes");
-        assert_success(&preview);
-        assert!(preview.stdout.contains("new.2"), "preview must use scratch:\n{}", preview.stdout);
-    }
     let real = scenario.output_run(&[]);
     assert_eq!(real.status.code(), Some(1), "existing output must refuse a real write");
     assert_eq!(snapshot(&scenario.project), before, "real refusal preserves existing output");
-
-    scenario.add_broken_sibling();
-    let before = snapshot(&scenario.project);
-    let refused = scenario.output_run(&["--dry-run", "--keep-on-error"]);
-    assert_eq!(snapshot(&scenario.project), before, "refusal changes no existing bytes");
-    assert_sibling_remedy(&scenario, &refused);
+    for flags in [&["--dry-run"][..], &["--dry-run", "--keep-on-error"][..]] {
+        let preview = scenario.output_run(flags);
+        assert_eq!(snapshot(&scenario.project), before, "preview changes no existing bytes");
+        assert_eq!(preview.status.code(), Some(1), "preview refuses:\n{}", preview.stdout);
+        assert_eq!(preview.stderr, real.stderr, "preview reports the real write's error");
+        assert!(!preview.stdout.contains("Instantiate this template with:"), "{}", preview.stdout);
+    }
 }
 
-/// Replacing one destination must not hide a different entry with the same id.
+/// A different entry already holding the new member's id refuses the preview.
 /// §FS-rhei-templates.6.1.2
 #[test]
-fn existing_workspace_preview_keeps_other_entry_id_collisions() {
+fn preview_refuses_other_entry_with_the_same_id() {
     let scenario = Scenario::new();
-    assert_success(&scenario.output_run(&[]));
+    scenario.clean_control();
     write_fixture_file(
         &scenario.project,
         "new.rhei.md",

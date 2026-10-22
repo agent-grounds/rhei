@@ -135,11 +135,12 @@ fn into_project_dry_run_refuses_existing_sibling() {
     assert_sibling_remedy(&scenario, &preview);
 }
 
-/// The documented existence exception must still preview in the intended
-/// project context, preserving all existing destination bytes on either result.
+/// An existing destination refuses the dry run with every byte preserved; a
+/// fresh destination still previews in the intended project context, passing
+/// when clean and refused for a broken sibling.
 /// §FS-rhei-templates.6.1.2
 #[test]
-fn dry_run_preserves_existing_output_on_success_and_sibling_refusal() {
+fn dry_run_refuses_existing_output_and_previews_fresh_output_in_project() {
     let scenario = Scenario::new();
     scenario.clean_control();
     scenario.add_incoming_settings();
@@ -151,14 +152,26 @@ fn dry_run_preserves_existing_output_on_success_and_sibling_refusal() {
         "the existing destination belongs to its owner\n",
     );
     let before = snapshot(&scenario.project);
+    let existing = scenario.output_run(&["--dry-run", "--keep-on-error"]);
+    assert_eq!(snapshot(&scenario.project), before, "refusal preserves existing destination");
+    assert_eq!(existing.status.code(), Some(1), "existing output refuses:\n{}", existing.stdout);
+    let wording = format!("output path '{}' already exists", scenario.output().display());
+    assert!(existing.stderr.contains(&wording), "existence refusal:\n{}", existing.stderr);
+    assert!(
+        !existing.stdout.contains("Instantiate this template with:"),
+        "a refused dry run offers no runnable invocation:\n{}",
+        existing.stdout
+    );
+    fs::remove_dir_all(scenario.output()).unwrap();
+    let before = snapshot(&scenario.project);
     let clean = scenario.output_run(&["--dry-run", "--keep-on-error"]);
-    assert_eq!(snapshot(&scenario.project), before, "success preserves existing destination");
+    assert_eq!(snapshot(&scenario.project), before, "success writes nothing");
     assert_success(&clean);
     scenario.add_broken_sibling();
     let before = snapshot(&scenario.project);
     let broken = scenario.output_run(&["--dry-run", "--keep-on-error"]);
-    assert_eq!(snapshot(&scenario.project), before, "refusal preserves existing destination");
-    assert_refused_for_sibling(&broken);
+    assert_eq!(snapshot(&scenario.project), before, "sibling refusal writes nothing");
+    assert!(!scenario.output().exists(), "dry run publishes no output");
     assert_sibling_remedy(&scenario, &broken);
 }
 

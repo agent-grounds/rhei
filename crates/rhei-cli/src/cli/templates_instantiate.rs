@@ -98,14 +98,7 @@
         let explicit_output = output.is_some();
         let output_dir = output.map(Path::to_path_buf).unwrap_or(default_output);
 
-        if !dry_run && output_dir.exists() {
-            return Err(instantiate_output_exists_error(
-                &output_dir,
-                template,
-                &template_input_args,
-                explicit_output,
-            ));
-        }
+        refuse_existing_output(&output_dir, template, &template_input_args, explicit_output)?;
 
         let entrypoint = if layout == TemplateLayout::Project {
             let lay = ProjectLay {
@@ -364,6 +357,26 @@
     /// output directory is the template's own name, and a rhei's id *is* its
     /// directory name — is invisible from the message.
     // §FS-rhei-templates.6.2
+    /// Step 6's existence check, applied before anything is rendered and alike
+    /// for a dry run and a real write, so a preview never passes a command its
+    /// write refuses. §FS-rhei-templates.6.1.2
+    fn refuse_existing_output(
+        output_dir: &Path,
+        template: &str,
+        input_args: &[String],
+        explicit_output: bool,
+    ) -> MietteResult<()> {
+        if output_dir.exists() {
+            return Err(instantiate_output_exists_error(
+                output_dir,
+                template,
+                input_args,
+                explicit_output,
+            ));
+        }
+        Ok(())
+    }
+
     fn instantiate_output_exists_error(
         output_dir: &Path,
         template: &str,

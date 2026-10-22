@@ -347,16 +347,6 @@
         shell_command(&parts)
     }
 
-    /// The error for `rhei instantiate` when the output directory is taken.
-    ///
-    /// Instantiating the same template twice is the ordinary way to review two
-    /// specs, audit two subjects, or run two release checklists, and it is the
-    /// most likely second thing anyone does with a template. The bare
-    /// `output path '…' already exists` was a dead end at exactly that moment:
-    /// it named no fix, and the reason the collision happens — the default
-    /// output directory is the template's own name, and a rhei's id *is* its
-    /// directory name — is invisible from the message.
-    // §FS-rhei-templates.6.2
     /// Step 6's existence check, applied before anything is rendered and alike
     /// for a dry run and a real write, so a preview never passes a command its
     /// write refuses. §FS-rhei-templates.6.1.2
@@ -377,6 +367,16 @@
         Ok(())
     }
 
+    /// The error for `rhei instantiate` when the output directory is taken.
+    ///
+    /// Instantiating the same template twice is the ordinary way to review two
+    /// specs, audit two subjects, or run two release checklists, and it is the
+    /// most likely second thing anyone does with a template. The bare
+    /// `output path '…' already exists` was a dead end at exactly that moment:
+    /// it named no fix, and the reason the collision happens — the default
+    /// output directory is the template's own name, and a rhei's id *is* its
+    /// directory name — is invisible from the message.
+    // §FS-rhei-templates.6.2
     fn instantiate_output_exists_error(
         output_dir: &Path,
         template: &str,

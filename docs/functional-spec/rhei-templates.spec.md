@@ -338,6 +338,34 @@ Rules:
   template-declared entries, add project-specific overrides, or clear the
   `defaults` lists.
 
+### 4.1. Shipped Codex Launches Ask for No Full Access
+
+A managed ChatGPT workspace refuses `danger-full-access`, and a worker refused
+it falls back to read-only, exits `0` and writes nothing. So no launch a shipped
+template makes asks for it unless the user selects it:
+
+- Laid with its defaults on a machine with no settings of its own, and again
+  with its `.example-values.yaml` where it ships one, no state of a shipped
+  template resolves a Codex launch whose arguments contain
+  `danger-full-access`. The launch counted is the one `rhei validate` resolves —
+  the state's `target` or `all_targets` selectors, or its agent and mode by
+  [§FS-rhei-agents.1.4.1](rhei-agents.spec.md#141-mode-resolution-order) — with the mode's flags and the model binding's
+  `autonomous_args`. A Codex launch is one whose profile resolves to the
+  `codex` family or whose command runs the `codex` binary.
+- Every shipped Codex profile that declares `yolo` also declares `workspace`,
+  with the built-in's flags ([§FS-rhei-agents.2](rhei-agents.spec.md#2-known-agent-profiles)), and `yolo` keeps its meaning. A
+  user who wants the old posture selects `codex[yolo]`.
+- A shipped mode that asks for `workspace-write` belongs to a profile that
+  resolves `writable_roots` ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)), written by a profile that
+  replaces the built-in or inherited through `family: codex`. Without the roots
+  the worker could write neither the plan nor Rhei's own state.
+- A template that prepares a separate checkout for a later state records it in
+  `runtime/worktree-refs/<task-id>.yaml`, so that the later state's checkout
+  root, and the roots granted with it, are that checkout
+  ([§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables)).
+
+A plan already laid keeps the settings it was laid with.
+
 ## 5. Instantiation Template Syntax
 
 Instantiation rendering uses a restricted [MiniJinja](https://github.com/mitsuhiko/minijinja)-style environment. This is intentionally distinct from the single-brace runtime variables (`{task_id}`, `{visit_count}`, etc.) that later `rhei` commands resolve at execution time.

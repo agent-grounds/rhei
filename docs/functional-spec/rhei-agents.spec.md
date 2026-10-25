@@ -209,6 +209,7 @@ agent's `command`, flags, and modes are declared.
 | `mcp_config_flag` | string | No | Flag used to attach a generated MCP config file. `rhei run` writes the resolved set to a temporary JSON file, in the shape [§FS-rhei-mcp-config-file](rhei-mcp-config-file.spec.md#fs-rhei-mcp-config-file-the-mcp-config-file-an-agent-is-handed) gives, and passes it with this flag once. Mutually exclusive with `mcp_flag`. |
 | `skill_flag` | string | No | Flag used to enable one skill per occurrence. `rhei run` emits the flag once per resolved skill id. Omit to declare the agent does not support skills. |
 | `deny_read` | object | No | Optional read-denial adapter. In v1 its only field is required `path_flag`: a non-empty string repeated once per resolved excluded absolute path before the profile separator. |
+| `writable_roots` | object | No | Optional writable-root adapter. Its only field is required `path_flag`: a non-empty string repeated once per writable root Rhei computes at launch ([Modes](#22-modes)), before the profile separator. An empty `path_flag` is a settings error. Omit when the agent takes no such grant. |
 | `modes` | object | No | Named flag sets, keyed by mode name. Values are ordered string arrays appended to the command at spawn time. See [Modes](#22-modes). |
 | `effort` | object | No | Native reasoning-effort mapping. Contains `values`, `args`, and optional `conflicts` as defined below. Omission means this profile ignores valid state effort. |
 | `session` | object | No | Optional `CustomAgentProfile.session` block describing snapshot resume, fork, interactive continuation, and transcript layout capabilities. The authoritative schema is [Snapshots Specification — CustomAgentProfile.session](rhei-snapshots.spec.md#91-customagentprofilesession). |
@@ -308,9 +309,10 @@ what a field parsed to:
   being indistinguishable from silence.
 - `command` is required only when `family` is absent. `{"family": "gemini"}` is
   a complete profile: Gemini under another id.
-- `modes`, `effort`, `session`, and `deny_read` are replaced **whole**, never
-  merged key by key — the same rule a same-id entry already follows. A profile
-  writing one mode has exactly that mode, and a written `"modes": {}` has none.
+- `modes`, `effort`, `session`, `deny_read`, and `writable_roots` are replaced
+  **whole**, never merged key by key — the same rule a same-id entry already
+  follows. A profile writing one mode has exactly that mode, and a written
+  `"modes": {}` has none.
 - A key that is not a field of the table above is a warning naming the key and
   the known fields, not a refusal: such a key loads today and does nothing, and
   refusing it would reject files that load now.
@@ -853,6 +855,15 @@ historically the agent's default.
 | `kilocode` | `kilo` | positional via `--auto <prompt>` | `--model <m>` | unsupported | unsupported | `--yolo` |
 | `pi` | `pi` | `-p <prompt>` | `--model <m>` | unsupported | `--skill <path>` | (no modes — pi has no permission layer; isolate at the sandbox/container level) |
 
+**The built-in `codex` profile declares a second mode, `workspace`,** after
+`yolo`: `--sandbox workspace-write --skip-git-repo-check -c
+approval_policy="never" -c sandbox_workspace_write.network_access=true`. It runs
+unattended with network on and writes only under the roots Rhei grants it at
+launch ([§FS-rhei-agents.2.2](rhei-agents.spec.md#22-modes)), which a managed workspace that refuses `danger-full-access`
+still allows. `yolo` is unchanged and stays first, so `codex` with no mode still
+resolves to `yolo` ([§FS-rhei-agents.1.4.1](rhei-agents.spec.md#141-mode-resolution-order)); `codex[yolo]` remains the choice for an
+account without managed requirements.
+
 **Prompt delivery is a property of the transport, not of the prompt.** A profile
 either passes the prompt as one command-line argument or writes it to the
 agent's stdin, and it does the same for a one-line prompt and for a supervisor
@@ -894,6 +905,10 @@ are.
 None of the six built-in profiles declares `deny_read`; each therefore provides
 composition-only exclusion. A mode name, model, permission flag, or writable
 root never implies read denial.
+`codex` is the only built-in profile that declares `writable_roots`, with
+`path_flag: --add-dir`. A `family: codex` profile inherits it, and the
+`workspace` mode, unless it writes `writable_roots` or `modes` itself; a same-id
+`codex` entry without `family` replaces the built-in wholesale and gets neither.
 
 ### 2.1. Custom Agents
 
@@ -996,6 +1011,37 @@ before accounting, prompt, model, snapshot, tooling, and the final separator.
 Unrelated arguments retain their order. When effort is omitted, Rhei performs
 no filtering or insertion, preserving the existing argv byte for byte.
 
+**Writable roots.** When the resolved profile declares `writable_roots`, Rhei
+computes the roots afresh at every launch, sequential or parallel, and appends
+one `<path_flag> <root>` pair per root to the base command arguments after any
+`deny_read` pairs. Every pair is therefore part of `<command...>` above: before
+the mode flags, and before the final separator. The roots are, in this order:
+
+1. the plan's rhei root, then the Panta project directory around it when the
+   rhei is a member of one;
+2. the checkout root the agent runs in, as [§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables) resolves it —
+   the task's worktree ref, then the enclosing git top level, then the working
+   directory;
+3. that checkout's git directory and git common directory, as `git rev-parse
+   --path-format=absolute --git-dir --git-common-dir` reports them, so that a
+   commit in a linked worktree can write its metadata; neither is added when the
+   checkout is not a git repository;
+4. the `rhei/` directory under each state base Rhei's root-guard and
+   budget-authority resolvers use for the run — normally one,
+   `$XDG_STATE_HOME/rhei`.
+
+Each root is one absolute path in its own argument: no shell, no TOML, no `~`
+or `$HOME` expansion, and its spelling is kept as resolved, spaces, quotes,
+non-ASCII characters and platform separators included. A root that resolves to
+the same directory as an earlier one is dropped and the earlier spelling kept.
+Mode tokens are never rewritten, so a grant a user writes into a mode, such as
+`"--add-dir", "/home/me/.cargo"`, passes through literally and must be absolute.
+A profile without `writable_roots` gets no root arguments. The roots grant
+nothing a mode does not already allow, so under `danger-full-access` they are
+inert. They are computed at launch rather than when a plan is laid, because
+settings may be hoisted to the Panta project and the checkout may change between
+states.
+
 Mode names are free-form. `yolo` is a widely-used convention for
 "autonomous, dangerous posture"; `safe`, `review`, `plan`, and `audit` are
 other common choices. Rhei does not interpret mode names — it only injects
@@ -1080,6 +1126,13 @@ as `resets Oct 1, 5:59am` remain ordinary process results. Unknown, wrong-case,
 or absent providers never park; program states resolve no agent and never
 park. The rationale and examples for these boundaries are in
 [§FS-rhei-provider-refusal-rationale](rhei-provider-refusal-rationale.spec.md#fs-rhei-provider-refusal-rationale-why-provider-refusal-recognition-is-closed).
+
+### 2.4. Configuration Fallbacks
+
+A Codex worker may report that it overrode a setting Rhei asked for and went on
+with a weaker one. Rhei keeps that report as a diagnostic of the invocation,
+informational only and never a provider refusal, by the rules of
+[§FS-rhei-configuration-fallbacks](rhei-configuration-fallbacks.spec.md#fs-rhei-configuration-fallbacks-codex-configuration-fallbacks).
 
 ## 3. Prompt Composition
 

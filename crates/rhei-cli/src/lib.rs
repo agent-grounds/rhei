@@ -117,6 +117,7 @@ include!("cli/control_client.rs");
 include!("cli/run_options.rs");
 include!("cli/run_frontend.rs");
 include!("cli/settings_types.rs");
+include!("cli/built_in_agents.rs");
 include!("cli/settings_ceiling_policy.rs");
 include!("cli/agent_family.rs");
 include!("cli/settings_load_validate.rs");

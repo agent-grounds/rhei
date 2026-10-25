@@ -656,16 +656,6 @@ reason = """
 The Flow view and the Machine, Cost and Journal views (§FS-rhei-run-tui.1.5.3, §FS-rhei-run-tui.1.5.4) are separable, but they share this file's private rendering helpers - the section headers, pills, border styles and placeholder - so the views cannot leave until those helpers have a module of their own that every view imports. That is a code move with its own review; the change that met this budget (agent-grounds/rhei#493) only rewrote a citation in a comment.
 """
 [[exceptions]]
-path = "crates/rhei-cli/src/cli/settings_types.rs"
-match = "exact"
-rules = ["source"]
-kind = "deferred"
-max_accepted = { value = 600, unit = "lines" }
-until = "The built-in agent profile catalogue lives in a module of its own."
-reason = """
-Most of the excess is the built-in agent catalogue (built_in_agents, the profiles of §FS-rhei-snapshots.9.2), which belongs beside the profile registry rather than beside the settings types, and that registry has no module of its own to receive it yet. The change that met this budget (agent-grounds/rhei#493) only rewrote two citations in comments.
-"""
-[[exceptions]]
 path = "docs/functional-spec/rhei-run-report.spec.md"
 match = "exact"
 rules = ["citable-spec"]

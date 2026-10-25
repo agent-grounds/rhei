@@ -55,7 +55,8 @@ The report layout is optimized for scan-first reading:
    explicitly inclusive input/output totals, their cache-read and cache-write
    parts, and coverage ([§FS-rhei-run-report.2.1](rhei-run-report.spec.md#21-accounting-strip)).
 3. **Attention** - the shortest path to action: blocked tasks, gating tasks, and
-   halted tasks with the exact reason.
+   halted tasks with the exact reason. A halt whose invocation carried a Codex
+   configuration fallback ([§FS-rhei-configuration-fallbacks](rhei-configuration-fallbacks.spec.md#fs-rhei-configuration-fallbacks-codex-configuration-fallbacks)) names it beside the missing outputs.
 4. **Transition Ledger** - one row per transition attempt or no-op observation,
    in chronological order.
 5. **Task Final States** - source-order task tree with final state, start state,
@@ -63,8 +64,8 @@ The report layout is optimized for scan-first reading:
 6. **Artifacts Checked** - grouped artifact evidence for readers investigating
    reuse, missing inputs, or missing outputs.
 7. **Invocations** - spawned agents/programs with command labels, targets,
-   models, exit status, duration, logs, accounting record if present, and output
-   paths.
+   models, exit status, duration, logs, accounting record if present, output
+   paths, and the configuration fallbacks the invocation carried, if any.
 8. **Task Costs** - direct task cost and token totals when accounting was
    reported. The task cost is the sum of agent states spawned directly for that
    task; subtree accounting remains available through `rhei cost`. [§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)
@@ -448,6 +449,23 @@ the summary prints five stacked groups:
    nothing identifiable behind keeps the generic stalled reading; a ticket the
    run never scheduled says so, rather than borrowing it.
 
+   When the invocation that left those artifacts missing carried a Codex
+   configuration fallback ([§FS-rhei-configuration-fallbacks](rhei-configuration-fallbacks.spec.md#fs-rhei-configuration-fallbacks-codex-configuration-fallbacks)), the row says why it wrote
+   nothing, after the missing artifacts:
+   `; Codex configuration fallback: <message>`, one such clause per distinct
+   message in the order the worker emitted them, in sequential and parallel
+   runs alike:
+
+   ```text
+   | plan.1 | review | worker exited 0 without overview (runtime/overview.md), result (…); Codex configuration fallback: Configured value for `permission_profile` is disallowed by requirements; falling back … | write the file(s) above and rerun, or record the outcome with `rhei transition …` |
+   ```
+
+   The clause names only that invocation's fallbacks. A later attempt that
+   halts without one reads like any other halt, and an invocation that carried
+   a fallback and still wrote every output it owed gets no Attention row: the
+   report shows its fallback under Invocations ([§FS-rhei-run-report.2](rhei-run-report.spec.md#2-markdown-ui) item
+   7) and nowhere else.
+
    The same classification feeds the live halt message and `--dry-run`
    ([§FS-rhei-run.4](rhei-run.spec.md#4-dry-run)), so the durable report and the terminal never disagree
    about one run. They did: the report described a claimed ticket, a
@@ -649,6 +667,14 @@ greps them must not have to know it.
 The durable Markdown report ([§FS-rhei-run-report.1](rhei-run-report.spec.md#1-report-artifact), [§FS-rhei-run-report.4](rhei-run-report.spec.md#4-transition-ledger)) now backs the non-TTY path: after the
 preserved line-oriented output, `rhei run` prints a greppable `Report:
 runtime/run-report.md` pointer to the report it just wrote.
+
+An invocation that carried a Codex configuration fallback ([§FS-rhei-configuration-fallbacks](rhei-configuration-fallbacks.spec.md#fs-rhei-configuration-fallbacks-codex-configuration-fallbacks))
+adds one warning line per distinct message when its slot is released, before
+any missing-output warning for it, whether or not the invocation succeeded:
+
+```text
+  warning: Codex configuration fallback for task <id> in state '<state>': <message>
+```
 
 ### 3.5. Dry runs and empty runs
 
@@ -861,8 +887,9 @@ The execution engine must retain enough per-run facts to render the report:
 - every input/output artifact resolved for each decision, with pre/post
   existence status and optionality;
 - every spawned agent/program, including resolved agent/target/model label,
-  command label, exit status, duration, log path, accounting path, and output
-  paths;
+  command label, exit status, duration, log path, accounting path, output
+  paths, and the configuration fallbacks its own output carried
+  ([§FS-rhei-configuration-fallbacks](rhei-configuration-fallbacks.spec.md#fs-rhei-configuration-fallbacks-codex-configuration-fallbacks)), kept per invocation so one attempt's never reaches another;
 - every halted task with the most concrete blocker known to the scheduler;
 - the run's own accounting rollup and the workspace lifetime total, told apart,
   along with which of the two sources produced the strip ([§FS-rhei-run-report.2.1](rhei-run-report.spec.md#21-accounting-strip)).

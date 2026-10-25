@@ -28,7 +28,7 @@ const PLACEHOLDER: &str = "placeholder";
 /// the one case this guard exists for. Each is its name and its source path:
 /// the path is what the commands are given, because a bare name walks every
 /// rhei home above the test and the user tier first. §REQ-test-isolation.4
-fn shipped_templates() -> Vec<(String, PathBuf)> {
+pub(super) fn shipped_templates() -> Vec<(String, PathBuf)> {
     let dir = repo_root().join("crates/rhei-cli/templates");
     let mut names: Vec<(String, PathBuf)> = fs::read_dir(&dir)
         .unwrap_or_else(|err| panic!("read {}: {err}", dir.display()))
@@ -43,7 +43,7 @@ fn shipped_templates() -> Vec<(String, PathBuf)> {
 
 /// `name=placeholder` for every input the template requires and gives no
 /// default, taken from the command's own JSON rather than from `template.yaml`.
-fn required_inputs(dir: &Path, template: &str) -> Vec<String> {
+pub(super) fn required_inputs(dir: &Path, template: &str) -> Vec<String> {
     let detail = run_raw(&["templates", template, "--json"], dir);
     assert_success(&detail);
     let value: serde_json::Value =

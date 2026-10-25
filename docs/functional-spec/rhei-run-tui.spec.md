@@ -161,6 +161,7 @@ pub enum RunEvent {
         wall_clock: SystemTime,
         exit_code: Option<i32>,
         duration_ms: u64,
+        configuration_fallbacks: Vec<String>,
     },
     PassEnded {
         pass: u32,
@@ -211,6 +212,11 @@ source-order task ids.
 `SlotAssigned` is emitted at spawn time; `SlotReleased` is emitted when the spawned agent or program exits. Both events carry the slot index so the renderer can update the right slot without reconciliation. Both events also carry `from` and `to`: when `from == to`, the worker started or ended in the same autonomous state and renderers must not present that as a real self-transition.
 
 `SlotAssigned.agent` identifies the resolved agent or target label when the invocation is agent-backed; it is `None` for program-backed work. `SlotReleased.exit_code` is the subprocess exit status when one is available, and `duration_ms` is the invocation duration in milliseconds.
+
+`SlotReleased.configuration_fallbacks` holds the distinct Codex configuration
+fallback messages the released invocation's own output carried, in the order
+first seen ([§FS-rhei-configuration-fallbacks](rhei-configuration-fallbacks.spec.md#fs-rhei-configuration-fallbacks-codex-configuration-fallbacks)). It is empty for every other invocation, and it is
+never carried over from an earlier invocation of the same task.
 
 `SlotReleased.outcome` is what the released invocation earned, and three of its
 values are not read off the exit status alone. `Waiting` is a poll state's

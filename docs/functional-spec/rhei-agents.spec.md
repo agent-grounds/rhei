@@ -1032,8 +1032,12 @@ the mode flags, and before the final separator. The roots are, in this order:
 
 Each root is one absolute path in its own argument: no shell, no TOML, no `~`
 or `$HOME` expansion, and its spelling is kept as resolved, spaces, quotes,
-non-ASCII characters and platform separators included. A root that resolves to
-the same directory as an earlier one is dropped and the earlier spelling kept.
+non-ASCII characters and platform separators included. A root with no Unicode
+spelling, such as a Unix directory name that is not valid UTF-8, is not passed,
+because any spelling the profile's arguments can carry would name another
+directory; Rhei warns on the console at that launch, naming it. A root that
+resolves to the same directory as an earlier one is dropped and the earlier
+spelling kept.
 Mode tokens are never rewritten, so a grant a user writes into a mode, such as
 `"--add-dir", "/home/me/.cargo"`, passes through literally and must be absolute.
 A profile without `writable_roots` gets no root arguments. The roots grant

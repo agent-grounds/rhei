@@ -50,7 +50,7 @@ rhei run examples/spec-implementation-example --dry-run
 ```bash
 rm -rf examples/spec-implementation-example
 rhei instantiate crates/rhei-cli/templates/spec-implementation \
-  --values examples/spec-implementation-example/instantiation-values.yaml \
+  --values crates/rhei-cli/templates/spec-implementation/.example-values.yaml \
   --output examples/spec-implementation-example
 ```
 

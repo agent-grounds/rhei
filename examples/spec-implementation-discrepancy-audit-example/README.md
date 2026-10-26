@@ -16,7 +16,7 @@ implementation_roots:
   - skills
   - crates/rhei-cli/templates
   - examples
-audit_target: codex[yolo]:openai:gpt-5.5
+audit_target: codex[workspace]:openai:gpt-5.5
 extra_context: |
   Example instantiation for the Rhei repository. The extra implementation root
   exercises non-default array input handling in the template smoke test.

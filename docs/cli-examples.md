@@ -174,6 +174,21 @@ the run's whole rate table, so an entry the book omits is unpriced rather than
 falling back to the built-in one. See
 [§FS-rhei-cost-accounting.5.1](functional-spec/rhei-cost-accounting.spec.md#51-price-book-selection).
 
+A Codex worker that a managed workspace's requirements moved to a weaker setting
+exits `0` and writes nothing. The run names the setting where the missing
+outputs are named: a warning on the console when the worker's slot is released,
+and a clause after the missing outputs in the ticket's Attention row
+([§FS-rhei-configuration-fallbacks](functional-spec/rhei-configuration-fallbacks.spec.md#fs-rhei-configuration-fallbacks-codex-configuration-fallbacks)):
+
+```text
+  warning: Codex configuration fallback for task plan.1 in state 'review': Configured value for `permission_profile` is disallowed by requirements; falling back …
+| plan.1 | review | worker exited 0 without overview (runtime/overview.md); Codex configuration fallback: Configured value for `permission_profile` is disallowed by requirements; falling back … | write the file(s) above and rerun, or record the outcome with `rhei transition …` |
+```
+
+Rerunning as is falls back again. Select a mode the account allows, such as
+`codex[workspace]`, which writes under the roots Rhei grants at launch
+([§FS-rhei-agents.2.2](functional-spec/rhei-agents.spec.md#22-modes)).
+
 Render a self-contained HTML Flow visualization and open it in the browser:
 
 ```bash

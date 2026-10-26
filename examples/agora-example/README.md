@@ -17,7 +17,7 @@ The structured `target_agents` array drives both fan-out states:
 ```yaml
 target_agents:
   - { id: claude, label: Claude proposal, selector: claude-code[yolo]:anthropic:claude-opus-4-7 }
-  - { id: codex,  label: Codex proposal,  selector: codex[yolo]:openai:gpt-5.5 }
+  - { id: codex,  label: Codex proposal,  selector: codex[workspace]:openai:gpt-5.5 }
   - { id: gemini, label: Gemini proposal, selector: gemini[yolo]:google:gemini-3.1-pro-preview }
 ```
 

@@ -111,7 +111,7 @@ states:
         - spec_ref  = `main..HEAD`
 
       ## Step 1: Resolve the spec set
-
+      
       Multi-spec mode. Resolve `main..HEAD` to a concrete set of changed
       `*.spec.md` files using the project's VCS tooling from the
       repository root. The reference can be any of:

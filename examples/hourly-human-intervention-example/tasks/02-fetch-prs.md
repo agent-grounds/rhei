@@ -13,9 +13,9 @@ share one investigation and one fix path, such as:
 
 - CI failure PRs from GitHub Actions or status checks; create one child
   `ci-failure-triage` task per PR so each can be restarted and rechecked
-- PR needs metadata, test, or Forge workflow changes in `/home/vjovanov/c/rhei/master`
-- PR exposes a Forge automation defect in `/home/vjovanov/c/rhei/master/forge`
-- PR exposes Native Image or GraalVM behavior in `/home/vjovanov/c/rhei/graalvm/ce` or `/home/vjovanov/c/rhei/graalvm/ee`
+- PR needs metadata, test, or Forge workflow changes in `/home/vjovanov/ag/rhei/main/master`
+- PR exposes a Forge automation defect in `/home/vjovanov/ag/rhei/main/master/forge`
+- PR exposes Native Image or GraalVM behavior in `/home/vjovanov/ag/rhei/main/graalvm/ce` or `/home/vjovanov/ag/rhei/main/graalvm/ee`
 - PR needs human product/reviewer input on GitHub before automation continues
 
 Append one child task under this task for each non-empty non-CI class, using

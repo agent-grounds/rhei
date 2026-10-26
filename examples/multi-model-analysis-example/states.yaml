@@ -10,7 +10,7 @@ states:
 
       - gemini[yolo]:google:gemini-3.1-pro-preview
 
-      - codex[yolo]:openai:gpt-5-codex
+      - codex[workspace]:openai:gpt-5-codex
 
     personality: |
       You are {agent} in mode {agent.mode} running target {target}.
@@ -71,7 +71,7 @@ states:
         description: Gemini analysis note
 
       - name: codex-analysis
-        path: runtime/analyses/codex-yolo-openai-gpt-5-codex.md
+        path: runtime/analyses/codex-workspace-openai-gpt-5-codex.md
         description: Codex analysis note
 
     outputs:

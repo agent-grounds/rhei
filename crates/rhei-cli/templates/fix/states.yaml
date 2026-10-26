@@ -15,8 +15,10 @@ states:
       name: prepare-workspace
       values: { task_id: "{task_id}", task_title: "{task_title}" }
     outputs:
+      # Where the checkout resolver reads it, so the later states run in the
+      # prepared checkout. §FS-rhei-templates.4.1 §FS-rhei-agents.4
       - name: workspace-ref
-        path: runtime/workspaces/{task_id}.yaml
+        path: runtime/worktree-refs/{task_id}.yaml
         description: Location and branch of the isolated final-fix workspace
 
 {% endif %}
@@ -29,7 +31,7 @@ states:
         path: runtime/decisions/{task_id}-final-decision.md
 {% if fix_prepare != 'none' %}
       - name: workspace-ref
-        path: runtime/workspaces/{task_id}.yaml
+        path: runtime/worktree-refs/{task_id}.yaml
 {% endif %}
     personality: |
       You are the final fix agent. Apply only the accepted fixes from the
@@ -54,7 +56,7 @@ states:
         path: runtime/fixes/{task_id}-final-fix.md
 {% if fix_prepare != 'none' %}
       - name: workspace-ref
-        path: runtime/workspaces/{task_id}.yaml
+        path: runtime/worktree-refs/{task_id}.yaml
 {% endif %}
     prompt_template:
       name: commit-fix

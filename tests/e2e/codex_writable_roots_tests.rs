@@ -163,7 +163,6 @@ fn a_wrapper_that_writes_its_own_modes_still_inherits_its_roots() {
 /// binary swapped, each writes through its roots. §FS-rhei-templates.4.1
 /// §FS-rhei-agents.2.2
 #[test]
-#[ignore = "red until #509: changeset-review's composed profiles ask for danger-full-access with no roots; implement removes this"]
 fn changeset_review_composed_profiles_write_through_their_roots() {
     let dir = unique_temp_dir("codex-roots-changeset");
     let Some(checkout) = git_repository(&dir.join("checkout")) else { return };

@@ -1,0 +1,7 @@
+repo: oracle/graalvm-reachability-metadata
+label: human-intervention
+analysis_target: codex[workspace]:openai:gpt-5.5
+forge_fix_target: codex[workspace]:openai:gpt-5.5
+graalvm_fix_target: codex[workspace]:openai:gpt-5.5
+review_target: codex[workspace]:openai:gpt-5.5
+github_reviewers: []

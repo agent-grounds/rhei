@@ -37,7 +37,7 @@
 # Fan-out points:
 #   None. The template creates multiple independent partition tasks, and
 #   `concurrent: true` allows parallel work across partitions.
-#   Autonomous work states run on codex[yolo]:openai:gpt-5.5.
+#   Autonomous work states run on codex[workspace]:openai:gpt-5.5.
 #
 # Per-task path:
 #   audit partition:
@@ -55,7 +55,7 @@ personality: |
 states:
   scope-spec:
     description: Identify the normative spec clauses and implementation surfaces for this partition.
-    target: codex[yolo]:openai:gpt-5.5
+    target: codex[workspace]:openai:gpt-5.5
     concurrent: true
     agent_timeout: 1h
     instructions: |
@@ -74,7 +74,7 @@ states:
 
   compare-implementation:
     description: Compare the scoped specification claims against code, tests, and command behavior.
-    target: codex[yolo]:openai:gpt-5.5
+    target: codex[workspace]:openai:gpt-5.5
     concurrent: true
     agent_timeout: 2h
     inputs:
@@ -97,7 +97,7 @@ states:
 
   elaborate-discrepancies:
     description: Turn raw discrepancies into actionable explanations with risk and impact.
-    target: codex[yolo]:openai:gpt-5.5
+    target: codex[workspace]:openai:gpt-5.5
     concurrent: true
     agent_timeout: 1h
     inputs:
@@ -119,7 +119,7 @@ states:
 
   propose-reconciliation:
     description: Propose how to reconcile each discrepancy before human decision.
-    target: codex[yolo]:openai:gpt-5.5
+    target: codex[workspace]:openai:gpt-5.5
     concurrent: true
     agent_timeout: 1h
     inputs:

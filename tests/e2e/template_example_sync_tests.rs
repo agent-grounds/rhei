@@ -29,6 +29,14 @@ const TEMPLATE_EXAMPLES: &[(&str, &str)] = &[
     ("multi-model-analysis", "multi-model-analysis-example"),
     ("spec-review", "spec-review-example"),
     ("supervised-delivery", "supervised-delivery-example"),
+    ("agora", "agora-example"),
+    ("changeset-review", "changeset-review-example"),
+    ("product-management", "product-management-example"),
+    ("spec-implementation", "spec-implementation-example"),
+    ("spec-implementation-discrepancy-audit", "spec-implementation-discrepancy-audit-example"),
+    // Not hourly-human-intervention: its `type: path` defaults render as absolute
+    // paths under the directory it is instantiated from, so its example differs
+    // with every checkout location.
 ];
 
 /// Example-owned files that the rendered template output does not include.

@@ -9,27 +9,35 @@
       "modes": {
         "xhigh": [
           "--sandbox",
-          "danger-full-access",
+          "workspace-write",
           "-c",
           "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true",
           "-c",
           "model_reasoning_effort=\"xhigh\""
         ]
       },
-      "stdin_prompt": true
+      "stdin_prompt": true,
+      "writable_roots": {
+        "path_flag": "--add-dir"
+      }
     },
     "fix-codex": {
       "command": [
         "codex",
         "exec"
       ],
+      "family": "codex",
       "model_flag": "--model",
       "modes": {
         "xhigh": [
           "--sandbox",
-          "danger-full-access",
+          "workspace-write",
           "-c",
           "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true",
           "-c",
           "model_reasoning_effort=\"xhigh\""
         ]

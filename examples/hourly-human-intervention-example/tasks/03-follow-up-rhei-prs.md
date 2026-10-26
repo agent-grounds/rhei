@@ -1,8 +1,7 @@
 ### Task follow-up-rhei-prs: Follow up on RHEI pull requests
 **State:** rhei-pr-follow-up
 
-Fetch every open GitHub pull request in `oracle/graalvm-reachability-metadata`
-labeled `rhei`.
+Fetch every open GitHub pull request in `oracle/graalvm-reachability-metadata` labeled `rhei`.
 
 For each PR, inspect review decisions, review comments, issue comments,
 requested changes, CI status, mergeability, head branch, changed files, and the

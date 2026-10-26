@@ -4,7 +4,7 @@ product_brief: |
   Improve the Rhei authoring and execution experience for teams that use
   agent-driven plans. Focus on predictable execution, useful monitoring, and
   templates that are easy to instantiate repeatedly.
-implementation_scope: "docs/functional-spec, .agent-grounds/rhei/templates, examples"
+implementation_scope: "docs/functional-spec, crates/rhei-cli/templates, examples"
 pm_targets:
   - id: claude
     label: Claude PM entries

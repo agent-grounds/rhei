@@ -24,14 +24,14 @@ task then runs the shared fix state machine:
    - Forge fix, review, fix, review, publish/add reviewers
    - GraalVM proposal, human review, fix, review, fix, review, publish/add reviewers
 
-The `rhei` PR follow-up task works independently from `human-intervention`
-triage. It finds open PRs labeled `rhei`, addresses reviewer comments in
-isolated worktrees, and may merge a PR only when reviewers approve and
-repository gates are green.
+The `rhei` PR follow-up task works independently from `human-intervention` triage. It
+finds open PRs labeled `rhei`, addresses reviewer comments in isolated
+worktrees, and may merge a PR only when reviewers approve and repository gates
+are green.
 
-Use `/home/vjovanov/c/rhei/master` for Forge and reachability-metadata fixes. Use
-`/home/vjovanov/c/rhei/graalvm/ce` and `/home/vjovanov/c/rhei/graalvm/ee` for GraalVM code
-changes; `/home/vjovanov/c/rhei/graalvm` is only the coordination directory containing
+Use `/home/vjovanov/ag/rhei/main/master` for Forge and reachability-metadata fixes. Use
+`/home/vjovanov/ag/rhei/main/graalvm/ce` and `/home/vjovanov/ag/rhei/main/graalvm/ee` for GraalVM code
+changes; `/home/vjovanov/ag/rhei/main/graalvm` is only the coordination directory containing
 those checkouts. Refresh the local GraalVM from
-`/home/vjovanov/c/rhei/graalvm/ee/vm-enterprise` with `mxb ee` before validations that
+`/home/vjovanov/ag/rhei/main/graalvm/ee/vm-enterprise` with `mxb ee` before validations that
 depend on the GraalVM build.

@@ -32,7 +32,7 @@ inputs:
     description: Execution target that scopes, compares, elaborates, and proposes reconciliation for each partition.
     type: string
     format: execution-target
-    default: codex[yolo]:openai:gpt-5.5
+    default: codex[workspace]:openai:gpt-5.5
 
   - name: extra_context
     description: Optional free-form audit context appended to the rendered workspace overview.

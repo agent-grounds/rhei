@@ -1,0 +1,16 @@
+change_ref: PR#42
+review_targets:
+  - claude-code[yolo]:anthropic:claude-opus-4-7
+  - codex[xhigh]:openai:gpt-5.5
+validation_targets:
+  - claude-code[yolo]:anthropic:claude-opus-4-7
+  - codex[xhigh]:openai:gpt-5.5
+proposal_targets:
+  - claude-code[yolo]:anthropic:claude-opus-4-7
+  - codex[xhigh]:openai:gpt-5.5
+review_focus:
+  - performance
+  - security
+  - concurrency
+fix_prepare: worktree
+fix_commit: pr

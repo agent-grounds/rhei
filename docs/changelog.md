@@ -3,16 +3,18 @@
 *Each release's section is generated from the pull requests merged since the
 previous release; nothing here is written by hand.*
 
-## 2. [0.6.2] - 2026-10-19
+## 2. [0.6.3] - 2026-10-26
 
-- [Prevent run id reuse from blocking later workspace runs](https://github.com/agent-grounds/rhei/pull/500) (PR #500)
-- [Give mock example agents the shared fixture timeout margin](https://github.com/agent-grounds/rhei/pull/498) (PR #498)
-- [Make retry runtime precedence fixture timestamp ordering deterministic](https://github.com/agent-grounds/rhei/pull/496) (PR #496)
-- [Pin the gate to released grund 0.18.0 and migrate grund.toml to version 2](https://github.com/agent-grounds/rhei/pull/494) (PR #494)
-- [Recover exhausted visits in place and require explicit subtree release](https://github.com/agent-grounds/rhei/pull/492) (PR #492)
+- [Let programs write results directly on fresh plans](https://github.com/agent-grounds/rhei/pull/512) (PR #512)
+- [Launch the shipped templates' Codex states with workspace-write and granted writable roots, and report Codex configuration fallbacks](https://github.com/agent-grounds/rhei/pull/510) (PR #510)
+- [Refuse an existing output in instantiate --dry-run like the real write](https://github.com/agent-grounds/rhei/pull/508) (PR #508)
+- [Warn in rhei validate when the file layout serializes a concurrent state](https://github.com/agent-grounds/rhei/pull/505) (PR #505)
+- [Report missing budget journals instead of blaming their lock file](https://github.com/agent-grounds/rhei/pull/506) (PR #506)
+- [Verify program budget accounts before spawning](https://github.com/agent-grounds/rhei/pull/502) (PR #502)
 
 ## 3. Older releases
 
+- [0.6.2](changelog/0.6.2.md) - 2026-10-19: 5 pull requests.
 - [0.6.1](changelog/0.6.1.md) - 2026-10-12: 14 pull requests.
 - [0.6.0](changelog/0.6.0.md) - 2026-10-03: 51 pull requests.
 - [0.5.1](changelog/0.5.1.md) - 2026-09-28: - Let an `agents.<id>` profile name the built-in family it belongs to.

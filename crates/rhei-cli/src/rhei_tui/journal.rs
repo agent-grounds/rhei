@@ -245,6 +245,7 @@ mod tests {
             wall_clock: fixed_time() + Duration::from_millis(3_490),
             exit_code: Some(0),
             duration_ms: 3_490,
+            configuration_fallbacks: Vec::new(),
             reverted: None,
         });
 
@@ -313,6 +314,7 @@ mod tests {
             wall_clock: fixed_time(),
             exit_code: Some(1),
             duration_ms: 10,
+            configuration_fallbacks: Vec::new(),
             reverted: None,
         });
 

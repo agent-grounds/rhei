@@ -7,7 +7,7 @@ const BUILT_IN_AGENT_FAMILIES: [&str; 6] =
 /// Every key an `agents.<id>` entry may carry. A key outside this list loads
 /// and does nothing, so it earns a warning rather than a refusal.
 // §FS-rhei-agents.1.1.2: An unknown key is a warning naming the known fields.
-const AGENT_PROFILE_FIELDS: [&str; 14] = [
+const AGENT_PROFILE_FIELDS: [&str; 15] = [
     "family",
     "command",
     "prompt_flag",
@@ -19,6 +19,7 @@ const AGENT_PROFILE_FIELDS: [&str; 14] = [
     "mcp_config_flag",
     "skill_flag",
     "deny_read",
+    "writable_roots",
     "modes",
     "effort",
     "session",
@@ -44,7 +45,8 @@ fn known_agent_families() -> String {
 /// The oracle for "did this entry set the field" is the set of keys the entry
 /// actually wrote, which the merge already keeps for roster provenance — so a
 /// written `false` beats an inherited `true` without any field changing type.
-/// `modes`, `effort`, `session`, and `deny_read` are replaced whole. Every
+/// `modes`, `effort`, `session`, `deny_read`, and `writable_roots` are
+/// replaced whole. Every
 /// field taken from the family joins the entry's supplied set, because
 /// `rhei roster` reports such a profile resolved.
 /// §FS-rhei-agents.1.3 §FS-rhei-agents.1.1.2 §FS-rhei-agents.1.1.7
@@ -103,6 +105,9 @@ fn apply_agent_family_inheritance(
         }
         if inherit("deny_read", parent.deny_read.is_some()) {
             profile.deny_read = parent.deny_read.clone();
+        }
+        if inherit("writable_roots", parent.writable_roots.is_some()) {
+            profile.writable_roots = parent.writable_roots.clone();
         }
         if inherit("modes", !parent.modes.is_empty()) {
             profile.modes = parent.modes.clone();

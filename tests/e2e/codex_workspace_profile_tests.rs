@@ -18,7 +18,6 @@ const MACHINE: &str = "name: roots\nversion: 1\nstates:\n  working:\n    initial
 /// other built-in. The roster sorts mode names, so the order is pinned by the
 /// launch guard in `codex_writable_roots_tests`. §FS-rhei-agents.2
 #[test]
-#[ignore = "red until #509: the built-in codex declares only yolo and no writable_roots; implement removes this"]
 fn roster_shows_codex_workspace_mode_and_writable_roots_beside_unchanged_yolo() {
     let dir = unique_temp_dir("codex-workspace-roster");
     let home = dir.join("home");
@@ -67,7 +66,6 @@ fn validate_with_profile(name: &str, profile: serde_json::Value) -> CliRun {
 /// An empty `writable_roots.path_flag` is refused, as an empty `deny_read`
 /// one is. §FS-rhei-agents.1.1.2
 #[test]
-#[ignore = "red until #509: writable_roots is an unknown key, so an empty path_flag validates; implement removes this"]
 fn an_empty_writable_roots_path_flag_is_refused() {
     let run = validate_with_profile(
         "codex-workspace-empty-flag",
@@ -80,7 +78,6 @@ fn an_empty_writable_roots_path_flag_is_refused() {
 /// `writable_roots` is a field of a profile, so writing it draws no
 /// unknown-key warning. §FS-rhei-agents.1.1.2
 #[test]
-#[ignore = "red until #509: writable_roots is warned about as an unknown key; implement removes this"]
 fn writable_roots_is_a_known_profile_field() {
     let run = validate_with_profile(
         "codex-workspace-known-field",

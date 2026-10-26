@@ -237,6 +237,7 @@
             wall_clock: std::time::SystemTime::now(),
             exit_code: Some(0),
             duration_ms: 1_200,
+            configuration_fallbacks: Vec::new(),
             reverted: None,
         });
     }

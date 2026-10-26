@@ -27,6 +27,9 @@ struct SlotRelease {
     wall_clock: std::time::SystemTime,
     exit_code: Option<i32>,
     duration_ms: u64,
+    /// What the invocation's own output reported it fell back from; never an
+    /// earlier attempt's. §FS-rhei-configuration-fallbacks
+    configuration_fallbacks: Vec<String>,
 }
 
 /// A [`SlotRelease`] not emitted yet, because its outcome is not settled yet.
@@ -142,6 +145,7 @@ impl Drop for PendingSlotRelease {
             wall_clock: release.wall_clock,
             exit_code: release.exit_code,
             duration_ms: release.duration_ms,
+            configuration_fallbacks: release.configuration_fallbacks,
             reverted: self.reverted.take(),
         });
     }

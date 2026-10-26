@@ -212,14 +212,21 @@ pub fn pin_state_dir_for_tests(dir: PathBuf) -> bool {
 
 /// Lock storage belongs to the account, never to a read-only project. §FS-rhei-recover.4
 fn lock_path(root: &Path) -> io::Result<PathBuf> {
+    Ok(guard_lock(&guard_state_base()?, root))
+}
+
+/// The state directory every root guard resolves under, `rhei/` excluded. A
+/// worker that runs a nested `rhei` writes its guards here, so a launch grants
+/// it. §FS-rhei-recover.4 §FS-rhei-agents.2.2
+pub fn guard_state_base() -> io::Result<PathBuf> {
     #[cfg(test)]
     if let Some(base) = LOCK_BASE.with(|base| base.borrow().clone()) {
-        return Ok(guard_lock(&base, root));
+        return Ok(base);
     }
     if let Some(base) = PINNED_STATE_DIR.get() {
-        return Ok(guard_lock(base, root));
+        return Ok(base.clone());
     }
-    let base = std::env::var_os("XDG_STATE_HOME")
+    std::env::var_os("XDG_STATE_HOME")
         .map(PathBuf::from)
         .filter(|path| path.is_absolute())
         .or_else(|| {
@@ -229,8 +236,7 @@ fn lock_path(root: &Path) -> io::Result<PathBuf> {
                 std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/state"))
             }
         })
-        .ok_or_else(|| io::Error::other("cannot locate rhei platform state directory"))?;
-    Ok(guard_lock(&base, root))
+        .ok_or_else(|| io::Error::other("cannot locate rhei platform state directory"))
 }
 
 /// Naming the lock is separate from creating it, so a guard that fails can say

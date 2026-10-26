@@ -87,6 +87,10 @@ pub struct CustomAgentProfile {
     /// denial for the spawned process tree. §FS-rhei-agents.1.1.2
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub deny_read: Option<DenyReadAdapter>,
+    /// Optional adapter that accepts one repeated absolute path flag, passed
+    /// once per writable root Rhei computes at launch. §FS-rhei-agents.1.1.2
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub writable_roots: Option<WritableRootsAdapter>,
     /// Named modes. Each mode is an ordered flag list appended to the
     /// command at spawn time. A well-known mode name is `yolo`, but any
     /// name is allowed — Rhei does not interpret mode names.
@@ -109,6 +113,13 @@ pub struct CustomAgentProfile {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct DenyReadAdapter {
+    pub path_flag: String,
+}
+
+/// The flag a profile repeats once per writable root. §FS-rhei-agents.2.2
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct WritableRootsAdapter {
     pub path_flag: String,
 }
 

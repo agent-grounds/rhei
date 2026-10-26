@@ -25,6 +25,10 @@ struct TaskActivity {
     /// never names one attempt's artifacts beside another's exit.
     // §FS-rhei-run-report.3.1 §FS-rhei-programs.3.2
     last_exit_code: Option<i32>,
+    /// The Codex configuration fallbacks of that same released invocation,
+    /// cleared with it by the next spawn so no attempt inherits another's.
+    // §FS-rhei-configuration-fallbacks §FS-rhei-run-report.3.1
+    last_configuration_fallbacks: Vec<String>,
 }
 
 /// Build the detail column for a task row: driver + timing when the run spawned

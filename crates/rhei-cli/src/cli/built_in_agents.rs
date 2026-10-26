@@ -68,6 +68,28 @@ fn built_in_agents() -> BTreeMap<String, CustomAgentProfile> {
 
     // Interactive continuation is the top-level `codex`, not `codex exec`.
     // §FS-rhei-agents.2: Built-in codex profile.
+    let mut codex_modes = modes_yolo_only(flags(&[
+        "--sandbox",
+        "danger-full-access",
+        "--skip-git-repo-check",
+        "-c",
+        "approval_policy=\"never\"",
+    ]));
+    // `workspace` follows an unchanged first `yolo`, so a bare `codex` still
+    // resolves to `yolo`; it writes only under the roots granted at launch.
+    // §FS-rhei-agents.2 §FS-rhei-agents.1.4.1
+    codex_modes.insert(
+        "workspace".to_string(),
+        flags(&[
+            "--sandbox",
+            "workspace-write",
+            "--skip-git-repo-check",
+            "-c",
+            "approval_policy=\"never\"",
+            "-c",
+            "sandbox_workspace_write.network_access=true",
+        ]),
+    );
     agents.insert(
         "codex".to_string(),
         CustomAgentProfile {
@@ -76,13 +98,11 @@ fn built_in_agents() -> BTreeMap<String, CustomAgentProfile> {
             model_flag: Some("--model".to_string()),
             stdin_prompt: true,
             mcp_flag: Some("--mcp".to_string()),
-            modes: modes_yolo_only(flags(&[
-                "--sandbox",
-                "danger-full-access",
-                "--skip-git-repo-check",
-                "-c",
-                "approval_policy=\"never\"",
-            ])),
+            // §FS-rhei-agents.2: `codex` is the only built-in declaring `writable_roots`.
+            writable_roots: Some(rhei_validator::WritableRootsAdapter {
+                path_flag: "--add-dir".to_string(),
+            }),
+            modes: codex_modes,
             effort: Some(effort(
                 &["minimal", "low", "medium", "high", "xhigh"],
                 &["-c", "model_reasoning_effort=\"{value}\""],

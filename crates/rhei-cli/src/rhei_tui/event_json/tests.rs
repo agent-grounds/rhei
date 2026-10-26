@@ -46,6 +46,7 @@ fn every_variant() -> Vec<RunEvent> {
             wall_clock: at(),
             exit_code: Some(0),
             duration_ms: 3_490,
+            configuration_fallbacks: Vec::new(),
             reverted: None,
         },
         RunEvent::PassEnded { pass: 1, progressed: true },
@@ -137,6 +138,7 @@ fn a_failed_outcome_carries_its_reason() {
         wall_clock: at(),
         exit_code: Some(2),
         duration_ms: 1,
+        configuration_fallbacks: Vec::new(),
         reverted: None,
     };
     let record = encode(Some(1), &event, at(), None);
@@ -186,6 +188,7 @@ fn a_waiting_outcome_round_trips_and_carries_no_reason() {
         wall_clock: at(),
         exit_code: Some(75),
         duration_ms: 1,
+        configuration_fallbacks: Vec::new(),
         reverted: None,
     };
     let record = encode(Some(1), &event, at(), None);
@@ -217,6 +220,7 @@ fn a_provider_limited_outcome_round_trips_with_its_deadline() {
         wall_clock: at(),
         exit_code: Some(1),
         duration_ms: 1,
+        configuration_fallbacks: Vec::new(),
         reverted: None,
     };
     let record = encode(Some(1), &event, at(), None);
@@ -379,4 +383,53 @@ fn the_stop_payload_round_trips_without_moving_the_schema() {
         "an unselected run's stream carries no stop key at all; got:\n{}",
         unselected["summary"]
     );
+}
+
+fn released_with(fallbacks: Vec<String>) -> RunEvent {
+    RunEvent::SlotReleased {
+        slot: 0,
+        task: "auth.1".to_string(),
+        from: "a".to_string(),
+        to: "a".to_string(),
+        log_path: PathBuf::from("l"),
+        outcome: TaskOutcome::Completed,
+        finished_at: Instant::now(),
+        wall_clock: at(),
+        exit_code: Some(0),
+        duration_ms: 1,
+        configuration_fallbacks: fallbacks,
+        reverted: None,
+    }
+}
+
+/// `configuration_fallbacks` is present only when the invocation carried one,
+/// survives a decode in order, and moves neither the exit nor the outcome.
+// §FS-rhei-run-json.2.1 §FS-rhei-run-json.2.2 §FS-rhei-configuration-fallbacks
+#[test]
+fn a_release_carries_its_configuration_fallbacks_only_when_it_has_some() {
+    let messages = vec![
+        "Configured value for `approval_policy` is disallowed by requirements; falling back"
+            .to_string(),
+        "Configured value for `permission_profile` is disallowed by requirements; falling back"
+            .to_string(),
+    ];
+    let record = encode(Some(1), &released_with(messages.clone()), at(), None);
+    assert_eq!(record["configuration_fallbacks"], serde_json::json!(messages));
+    assert_eq!(record["exit_code"], 0);
+    assert_eq!(record["outcome"], "completed");
+    match decode(&record.to_string()).expect("decode").event {
+        RunEvent::SlotReleased { configuration_fallbacks, .. } => {
+            assert_eq!(configuration_fallbacks, messages);
+        }
+        other => panic!("expected a release, got {other:?}"),
+    }
+
+    let record = encode(Some(2), &released_with(Vec::new()), at(), None);
+    assert!(record.get("configuration_fallbacks").is_none(), "{record}");
+    match decode(&record.to_string()).expect("decode").event {
+        RunEvent::SlotReleased { configuration_fallbacks, .. } => {
+            assert!(configuration_fallbacks.is_empty());
+        }
+        other => panic!("expected a release, got {other:?}"),
+    }
 }

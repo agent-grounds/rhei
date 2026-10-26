@@ -65,6 +65,16 @@ fn roster_json_exposes_the_versioned_shape_and_complete_built_in_modes() {
                 "--skip-git-repo-check",
                 "-c",
                 "approval_policy=\"never\""
+            ],
+            // §FS-rhei-agents.2: the managed-workspace mode beside an unchanged `yolo`.
+            "workspace": [
+                "--sandbox",
+                "workspace-write",
+                "--skip-git-repo-check",
+                "-c",
+                "approval_policy=\"never\"",
+                "-c",
+                "sandbox_workspace_write.network_access=true"
             ]
         })
     );

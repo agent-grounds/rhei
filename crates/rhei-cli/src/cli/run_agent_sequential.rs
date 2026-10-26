@@ -289,7 +289,13 @@ fn run_sequential_agent_invocation(
 
     // Re-resolved policy is materialized into adapter flags only for a profile
     // that explicitly declares the capability. §FS-rhei-agents.5.2.1
-    let spawn_resolved = agent_with_exclusion_adapter(resolved, &exclusions);
+    // Writable roots are computed here, at the launch. §FS-rhei-agents.2.2
+    let launch = LaunchRoots {
+        rhei_root: &task_workspace_root,
+        project_root: workspace_root,
+        checkout_root: &checkout_root.path,
+    };
+    let spawn_resolved = agent_with_path_adapters(resolved, &exclusions, launch);
     // Ambiguity is recorded *before* the capability is transferred: a crash
     // from here on can never refund the invocation. §FS-rhei-budgets.6.2
     budget_record_start(workspace_root, task_id_str, false, sink);
@@ -333,6 +339,8 @@ fn run_sequential_agent_invocation(
     let duration_ms = started_at.elapsed().as_millis() as u64;
     let finished_wall = SystemTime::now();
     let (outcome, exit_code) = slot_outcome(&spawn_result);
+    let configuration_fallbacks =
+        announce_configuration_fallbacks(&spawn_result, task_id_str, current_state, sink);
     // The session just ended; its report and metrics note are epilogues of
     // the spawn, not of the transition that follows.
     // §FS-rhei-session-reports.4 §FS-rhei-metrics.2
@@ -363,6 +371,7 @@ fn run_sequential_agent_invocation(
             wall_clock: finished_wall,
             exit_code,
             duration_ms,
+            configuration_fallbacks,
         },
     );
     lease.exited(&plan, &mut release);

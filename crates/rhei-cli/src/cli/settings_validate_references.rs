@@ -139,6 +139,7 @@ fn validate_intrinsic_settings(settings: &RheiSettings) -> Vec<String> {
                 id
             ));
         }
+        errors.extend(empty_writable_roots_flag(id, profile));
     }
 
     // MCP server registry self-validation: exactly one of `command`/`url`;

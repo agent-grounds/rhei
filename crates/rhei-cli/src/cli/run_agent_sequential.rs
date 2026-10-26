@@ -295,7 +295,7 @@ fn run_sequential_agent_invocation(
         project_root: workspace_root,
         checkout_root: &checkout_root.path,
     };
-    let spawn_resolved = agent_with_path_adapters(resolved, &exclusions, launch);
+    let spawn_resolved = agent_with_path_adapters(resolved, &exclusions, launch, sink);
     // Ambiguity is recorded *before* the capability is transferred: a crash
     // from here on can never refund the invocation. §FS-rhei-budgets.6.2
     budget_record_start(workspace_root, task_id_str, false, sink);

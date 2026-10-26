@@ -405,14 +405,15 @@ fn validate_loaded_exclusions(
 
 /// Apply the declared path adapters to a clone of the selected profile: the
 /// filesystem-denial pairs, then one writable-root pair per root this launch
-/// is granted. Extending its fixed command arguments places every pair before
-/// the mode flags and the profile separator without changing generic command
-/// construction.
+/// is granted, warning on `sink` of a root left out. Extending its fixed
+/// command arguments places every pair before the mode flags and the profile
+/// separator without changing generic command construction.
 // §FS-rhei-agents.1.1.2 §FS-rhei-agents.3 §FS-rhei-agents.2.2
 fn agent_with_path_adapters(
     resolved: &ResolvedAgent,
     exclusions: &ResolvedExclusions,
     launch: LaunchRoots<'_>,
+    sink: &Arc<dyn rhei_tui::EventSink>,
 ) -> ResolvedAgent {
     let mut adapted = resolved.clone();
     if let Some(deny_read) = &adapted.profile.deny_read {
@@ -423,7 +424,11 @@ fn agent_with_path_adapters(
     }
     if let Some(writable) = &adapted.profile.writable_roots {
         let roots = launch_writable_roots(launch);
-        adapted.profile.command.extend(writable_root_args(&writable.path_flag, &roots));
+        let (args, left_out) = writable_root_args(&writable.path_flag, &roots);
+        adapted.profile.command.extend(args);
+        for root in &left_out {
+            emit_run_message(sink, rhei_tui::MessageLevel::Warn, left_out_root_warning(root));
+        }
     }
     adapted
 }

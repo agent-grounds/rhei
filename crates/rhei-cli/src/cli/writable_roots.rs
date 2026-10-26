@@ -78,17 +78,34 @@ fn checkout_git_dirs(checkout_root: &Path) -> Vec<PathBuf> {
         .stdin(std::process::Stdio::null())
         .output();
     match output {
-        Ok(output) if output.status.success() => {
-            git_dirs_from_rev_parse(&String::from_utf8_lossy(&output.stdout))
-        }
+        Ok(output) if output.status.success() => git_dirs_from_rev_parse(&output.stdout),
         _ => Vec::new(),
     }
 }
 
-/// One directory per line of `git rev-parse` output, spelled as git spelled it.
-/// §FS-rhei-agents.2.2
-fn git_dirs_from_rev_parse(stdout: &str) -> Vec<PathBuf> {
-    stdout.lines().map(str::trim).filter(|line| !line.is_empty()).map(PathBuf::from).collect()
+/// One directory per line of `git rev-parse` output, spelled as git spelled it:
+/// on Unix the bytes are not decoded first, so a name that is not UTF-8 reaches
+/// [`writable_root_args`] as itself. §FS-rhei-agents.2.2
+fn git_dirs_from_rev_parse(stdout: &[u8]) -> Vec<PathBuf> {
+    stdout
+        .split(|byte| *byte == b'\n')
+        .map(<[u8]>::trim_ascii)
+        .filter(|line| !line.is_empty())
+        .map(path_from_git_bytes)
+        .collect()
+}
+
+/// A Unix path is its bytes.
+#[cfg(unix)]
+fn path_from_git_bytes(line: &[u8]) -> PathBuf {
+    use std::os::unix::ffi::OsStrExt;
+    PathBuf::from(std::ffi::OsStr::from_bytes(line))
+}
+
+/// Git for Windows writes paths as UTF-8, which decodes without loss.
+#[cfg(not(unix))]
+fn path_from_git_bytes(line: &[u8]) -> PathBuf {
+    PathBuf::from(String::from_utf8_lossy(line).into_owned())
 }
 
 /// `rhei/` under each state base the root-guard and budget-authority resolvers
@@ -106,11 +123,24 @@ fn nested_rhei_state_dirs() -> Vec<PathBuf> {
     .collect()
 }
 
-/// One `<path_flag> <root>` pair per root, each root a single argument.
-/// §FS-rhei-agents.2.2
-fn writable_root_args(path_flag: &str, roots: &[PathBuf]) -> Vec<String> {
-    roots
-        .iter()
-        .flat_map(|root| [path_flag.to_string(), root.to_string_lossy().into_owned()])
-        .collect()
+/// One `<path_flag> <root>` pair per root, each root a single argument, and
+/// the roots left out because they have no Unicode spelling: the profile's
+/// arguments are text, and a lossy spelling would grant a directory that does
+/// not exist. §FS-rhei-agents.2.2
+fn writable_root_args(path_flag: &str, roots: &[PathBuf]) -> (Vec<String>, Vec<PathBuf>) {
+    let mut args = Vec::new();
+    let mut left_out = Vec::new();
+    for root in roots {
+        match root.to_str() {
+            Some(spelling) => args.extend([path_flag.to_string(), spelling.to_string()]),
+            None => left_out.push(root.clone()),
+        }
+    }
+    (args, left_out)
+}
+
+/// The console warning for a root [`writable_root_args`] left out, naming it
+/// with its bytes escaped so the directory can be found. §FS-rhei-agents.2.2
+fn left_out_root_warning(root: &Path) -> String {
+    format!("  warning: writable root {root:?} has no Unicode spelling, so it is not granted")
 }

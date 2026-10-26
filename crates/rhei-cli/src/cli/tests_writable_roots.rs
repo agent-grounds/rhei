@@ -183,7 +183,7 @@ mod writable_roots_tests {
         ]);
         assert_eq!(roots, vec![plan.clone(), checkout.clone(), state.clone()]);
 
-        let args = writable_root_args("--add-dir", &roots);
+        let (args, left_out) = writable_root_args("--add-dir", &roots);
         assert_eq!(
             args,
             vec![
@@ -195,6 +195,7 @@ mod writable_roots_tests {
                 state.display().to_string(),
             ]
         );
+        assert!(left_out.is_empty());
         assert!(args[1].contains("plans dir ü") && args[1].contains("it's 'quoted'"));
     }
 
@@ -209,9 +210,51 @@ mod writable_roots_tests {
         std::fs::create_dir_all(&plan).unwrap();
         let roots = distinct_absolute_roots([plan.clone(), plan.join(".")]);
         assert_eq!(roots, vec![plan.clone()]);
-        let args = writable_root_args("--add-dir", &roots);
+        let (args, _) = writable_root_args("--add-dir", &roots);
         assert_eq!(args, vec!["--add-dir".to_string(), plan.display().to_string()]);
         assert!(args[1].contains("it's \"quoted\""));
+    }
+
+    /// A root with no Unicode spelling is left out of the pairs, never granted
+    /// under a lossy name, and the launch warns naming it; a git directory
+    /// reported in such bytes keeps them. Unix only, because a Windows name is
+    /// not bytes; the odd name is never created, since not every Unix file
+    /// system accepts it. §FS-rhei-agents.2.2 §REQ-cross-platform.3
+    #[cfg(unix)]
+    #[test]
+    fn a_root_with_no_unicode_spelling_is_left_out_with_a_warning() {
+        use std::os::unix::ffi::OsStrExt;
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let plain = dir.path().join("plan");
+        std::fs::create_dir_all(&plain).unwrap();
+        let odd = dir.path().join(std::ffi::OsStr::from_bytes(b"state\xfd")).join(".git");
+
+        let mut stdout = plain.as_os_str().as_bytes().to_vec();
+        stdout.push(b'\n');
+        stdout.extend_from_slice(odd.as_os_str().as_bytes());
+        stdout.extend_from_slice(b"\r\n");
+        assert_eq!(git_dirs_from_rev_parse(&stdout), vec![plain.clone(), odd.clone()]);
+
+        let (args, left_out) = writable_root_args("--add-dir", &[plain.clone(), odd.clone()]);
+        assert_eq!(args, vec!["--add-dir".to_string(), plain.display().to_string()]);
+        assert_eq!(left_out, vec![odd.clone()]);
+        let warning = left_out_root_warning(&odd);
+        assert!(warning.contains(r"state\xFD"), "{warning}");
+
+        // Through the adapter: the launch's own root has the odd name.
+        let launch = LaunchRoots { rhei_root: &odd, project_root: &odd, checkout_root: &plain };
+        let sink = Arc::new(Messages::default());
+        let argv = composed(&agent_with_path_adapters(
+            &codex_agent(),
+            &ResolvedExclusions::default(),
+            launch,
+            &(sink.clone() as Arc<dyn rhei_tui::EventSink>),
+        ));
+        assert!(argv.iter().all(|arg| !arg.contains('\u{FFFD}')), "no lossy spelling: {argv:?}");
+        let granted = plain.display().to_string();
+        assert!(argv.windows(2).any(|w| w == ["--add-dir", granted.as_str()]), "{argv:?}");
+        let warned = sink.0.lock().unwrap().clone();
+        assert_eq!(warned, vec![left_out_root_warning(&odd)]);
     }
 
     /// One directory reached through a link is one root, kept as first spelled.
@@ -256,7 +299,7 @@ mod writable_roots_tests {
         let root = PathBuf::from(r"/srv/plans\ü\plan");
         assert_eq!(distinct_absolute_roots([root.clone()]), vec![root.clone()]);
         assert_eq!(
-            writable_root_args("--add-dir", &[root]),
+            writable_root_args("--add-dir", &[root]).0,
             strings(&["--add-dir", r"/srv/plans\ü\plan"])
         );
     }
@@ -272,7 +315,7 @@ mod writable_roots_tests {
         let forward = PathBuf::from(native.display().to_string().replace('\\', "/"));
         assert_eq!(distinct_absolute_roots([native.clone(), forward]), vec![native.clone()]);
         assert_eq!(
-            writable_root_args("--add-dir", &[native.clone()]),
+            writable_root_args("--add-dir", &[native.clone()]).0,
             vec!["--add-dir".to_string(), native.display().to_string()]
         );
     }
@@ -295,7 +338,7 @@ mod writable_roots_tests {
         let launch =
             LaunchRoots { rhei_root: &member, project_root: &project, checkout_root: &checkout };
         let git_dirs =
-            git_dirs_from_rev_parse(&format!("{}\n{}\n", git_dir.display(), common.display()));
+            git_dirs_from_rev_parse(format!("{}\n{}\n", git_dir.display(), common.display()).as_bytes());
         // Both resolvers normally answer with one base, which is granted once.
         let roots =
             ordered_writable_roots(launch, git_dirs.clone(), vec![state.clone(), state.clone()]);
@@ -309,7 +352,7 @@ mod writable_roots_tests {
         let standalone =
             LaunchRoots { rhei_root: &member, project_root: &member, checkout_root: &checkout };
         let plain = checkout.join(".git");
-        let dirs = git_dirs_from_rev_parse(&format!("{0}\n{0}\n", plain.display()));
+        let dirs = git_dirs_from_rev_parse(format!("{0}\n{0}\n", plain.display()).as_bytes());
         assert_eq!(dirs.len(), 2);
         let roots = ordered_writable_roots(standalone, dirs, vec![state.clone()]);
         assert_eq!(roots, vec![member.clone(), checkout.clone(), plain, state.clone()]);
@@ -332,6 +375,42 @@ mod writable_roots_tests {
         let roots = launch_writable_roots(launch);
         assert!(roots_are_one_directory(&roots[0], dir.path()), "{roots:?}");
         assert!(roots.iter().any(|root| roots_are_one_directory(root, &state)), "{roots:?}");
+    }
+
+    /// Every message a launch emits, as text.
+    #[cfg(unix)]
+    #[derive(Default)]
+    struct Messages(std::sync::Mutex<Vec<String>>);
+
+    #[cfg(unix)]
+    impl rhei_tui::EventSink for Messages {
+        fn emit(&self, event: rhei_tui::RunEvent) {
+            if let rhei_tui::RunEvent::Message { text, .. } = event {
+                self.0.lock().unwrap().push(text);
+            }
+        }
+    }
+
+    fn quiet() -> Arc<dyn rhei_tui::EventSink> {
+        Arc::new(rhei_tui::NullSink)
+    }
+
+    /// The built-in `codex` profile in its `workspace` mode, read on stdin.
+    #[cfg(unix)]
+    fn codex_agent() -> ResolvedAgent {
+        let mut profile = resolve("cdx", serde_json::json!({ "family": "codex" }));
+        profile.stdin_prompt = true;
+        ResolvedAgent {
+            agent: AgentConfig::from("cdx"),
+            profile,
+            mode: Some("workspace".to_string()),
+            target: None,
+            model: None,
+            model_provider: None,
+            model_name: None,
+            timeout_secs: Some(60),
+            autonomous_args: Vec::new(),
+        }
     }
 
     fn composed(resolved: &ResolvedAgent) -> Vec<String> {
@@ -395,7 +474,7 @@ mod writable_roots_tests {
             ..Default::default()
         };
         let launch = LaunchRoots { rhei_root: &plan, project_root: &plan, checkout_root: &plan };
-        let argv = composed(&agent_with_path_adapters(&resolved, &exclusions, launch));
+        let argv = composed(&agent_with_path_adapters(&resolved, &exclusions, launch, &quiet()));
 
         let at = |needle: &str| argv.iter().position(|arg| arg == needle).unwrap();
         let separator = at("--");
@@ -423,7 +502,7 @@ mod writable_roots_tests {
         // The same profile with no grant gets no root arguments at all.
         let mut bare = resolved.clone();
         bare.profile.writable_roots = None;
-        let argv = composed(&agent_with_path_adapters(&bare, &exclusions, launch));
+        let argv = composed(&agent_with_path_adapters(&bare, &exclusions, launch, &quiet()));
         assert_eq!(argv.iter().filter(|arg| *arg == "--add-dir").count(), 1, "{argv:?}");
     }
 }

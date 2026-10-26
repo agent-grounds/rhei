@@ -317,7 +317,7 @@ fn spawn_parallel_agent_work_item(
         project_root: snapshot_roots.project,
         checkout_root: &working_dir,
     };
-    let resolved_for_thread = agent_with_path_adapters(&item.resolved, &exclusions, launch);
+    let resolved_for_thread = agent_with_path_adapters(&item.resolved, &exclusions, launch, sink);
     let tooling_for_thread = tooling.clone();
     let sink_for_thread = sink.clone();
     let intervene_for_thread = intervene.cloned();

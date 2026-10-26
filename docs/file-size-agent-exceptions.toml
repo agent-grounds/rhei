@@ -424,11 +424,11 @@ path = "docs/functional-spec/rhei-agents.spec.md"
 match = "exact"
 rules = ["citable-spec"]
 kind = "deferred"
-max_accepted = { value = 2100, unit = "lines" }
+max_accepted = { value = 2200, unit = "lines" }
 until = "The agent specification is split at its own top-level boundaries — the profile registry and built-in catalogue apart from prompt composition, and the run loop apart from timeouts and log capture — each half carrying its own declaration, with every `§FS-rhei-agents.<n>` citation repointed."
 issue = "agent-grounds/rhei#179"
 reason = """
-Three subjects share this declaration: what an agent profile is, what rhei composes when it spawns one, and what the run loop does around it. The split is real and is not this change's to make. What is edited here is one ticket's specification point — `agents.<id>.family`, the built-in a wrapped profile belongs to, written into the field table, the merge rule, the roster's provenance, the wholesale-replacement rule it is the counterpart to, and the log header that carries it — and splitting the document in the same commit would move every section citation alongside a behaviour change, which is precisely what a spec-first commit must not hide. agent-grounds/rhei#462 adds the first machine-only settings key, `defaults.clamp_projects`, to the defaults table with its agreed rule, and keeps where it is refused and how in §FS-rhei-budgets.2.1 so this document stays under its hard limit.
+Three subjects share this declaration: what an agent profile is, what rhei composes when it spawns one, and what the run loop does around it. The split is real and is not this change's to make. What is edited here is one ticket's specification point — `agents.<id>.family`, the built-in a wrapped profile belongs to, written into the field table, the merge rule, the roster's provenance, the wholesale-replacement rule it is the counterpart to, and the log header that carries it — and splitting the document in the same commit would move every section citation alongside a behaviour change, which is precisely what a spec-first commit must not hide. agent-grounds/rhei#462 adds the first machine-only settings key, `defaults.clamp_projects`, to the defaults table with its agreed rule, and keeps where it is refused and how in §FS-rhei-budgets.2.1 so this document stays under its hard limit. agent-grounds/rhei#509 writes the writable roots a Codex launch is granted into §FS-rhei-agents.2.2, beside the modes they are passed with, which carried it 2053 -> 2100; its review then added that a root with no Unicode spelling is left out with a warning, 2100 -> 2104.
 """
 [[exceptions]]
 path = "docs/functional-spec/rhei-transitions.spec.md"

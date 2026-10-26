@@ -85,7 +85,16 @@ agent isolation does not remove these values from a program Rhei launches:
 | `RHEI_INPUT_<NAME>_EXISTS` | `true` or `false` — whether the declared input artifact exists on disk. Set for every declared input, required or optional. `<NAME>` is the artifact `name` uppercased with hyphens and spaces replaced by underscores (e.g., `continuation-notes` → `RHEI_INPUT_CONTINUATION_NOTES_EXISTS`). |
 | `RHEI_INPUT_<NAME>_PATH` | Resolved path of the declared input artifact. Set for every declared input regardless of whether the file exists. Same name transform as `RHEI_INPUT_<NAME>_EXISTS`. |
 
+Before spawning a program, Rhei creates the canonical ticket result file's
+parent directory if needed, including on a fresh plan. A program can therefore
+write directly to the supplied `RHEI_RESULT_PATH` without first creating Rhei's
+runtime directories. This preparation neither creates nor truncates the result
+file; writing its content remains the program's responsibility. If directory
+preparation fails, Rhei reports a launch error without spawning the program.
+
 Additional variables declared in `program.env` are merged on top of this base set. When a `program.env` key collides with a base variable, the `program.env` value wins.
+The directory guarantee above applies to the canonical result path, not an
+arbitrary path supplied by a `program.env` override.
 
 `RHEI_ROOT` is not part of this program contract. A program locates its plan
 through `RHEI_PLAN_PATH` and resolves relative files from its working directory.

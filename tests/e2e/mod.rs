@@ -184,6 +184,7 @@ mod roster_support;
 mod run_id_conflict_tests;
 mod run_lock_wait_tests;
 mod run_report_driver_labels_tests;
+mod run_result_directory_tests;
 mod run_shell_program_tests;
 mod run_shutdown_delivery_tests;
 mod run_signals_tests;

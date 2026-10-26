@@ -167,48 +167,15 @@ fn spawn_parallel_agent_work_item(
         emit_run_message(sink, rhei_tui::MessageLevel::Warn, warning.clone());
     }
     if !gate.required.is_empty() {
-        let mcp_unavailable = unavailable_ids(&gate.required, ToolingKind::Mcp);
-        let skill_unavailable = unavailable_ids(&gate.required, ToolingKind::Skill);
-        let mut fired = false;
-        if !mcp_unavailable.is_empty() {
-            match fire_tooling_unavailable_transition(
-                input,
-                machines,
-                &item.task_id_str,
-                &item.current_state,
-                ToolingKind::Mcp,
-                &mcp_unavailable,
-                opts.no_callbacks(),
-            ) {
-                TimeoutTransitionOutcome::Fired => fired = true,
-                TimeoutTransitionOutcome::NoRule | TimeoutTransitionOutcome::Failed => {}
-            }
-        }
-        if !fired && !skill_unavailable.is_empty() {
-            match fire_tooling_unavailable_transition(
-                input,
-                machines,
-                &item.task_id_str,
-                &item.current_state,
-                ToolingKind::Skill,
-                &skill_unavailable,
-                opts.no_callbacks(),
-            ) {
-                TimeoutTransitionOutcome::Fired => fired = true,
-                TimeoutTransitionOutcome::NoRule | TimeoutTransitionOutcome::Failed => {}
-            }
-        }
-        if !fired {
-            let message =
-                format_required_tooling_error(&item.task_id_str, &item.current_state, &gate.required);
-            emit_run_message(sink, rhei_tui::MessageLevel::Error, format!("  error: {message}"));
-            if !opts.continue_on_error() {
-                return Err(miette!(
-                    help = run_report_help(),
-                    "{message}"
-                ));
-            }
-        }
+        let fired = route_unavailable_required_tooling(
+            input,
+            machines,
+            sink,
+            &item.task_id_str,
+            &item.current_state,
+            &gate.required,
+            opts,
+        )?;
         return Ok(if fired {
             ParallelAgentSpawnOutcome::Advanced
         } else {

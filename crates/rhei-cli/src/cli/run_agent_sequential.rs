@@ -57,53 +57,18 @@ fn run_sequential_agent_invocation(
         run_warn!("{warning}");
     }
     if !gate.required.is_empty() {
-        let mcp_unavailable = unavailable_ids(&gate.required, ToolingKind::Mcp);
-        let skill_unavailable = unavailable_ids(&gate.required, ToolingKind::Skill);
-        let mut fired = false;
-        if !mcp_unavailable.is_empty() {
-            match fire_tooling_unavailable_transition(
-                input,
-                machines,
-                task_id_str,
-                current_state,
-                ToolingKind::Mcp,
-                &mcp_unavailable,
-                opts.no_callbacks(),
-            ) {
-                TimeoutTransitionOutcome::Fired => {
-                    *progress.advanced_any = true;
-                    fired = true;
-                }
-                TimeoutTransitionOutcome::NoRule | TimeoutTransitionOutcome::Failed => {}
-            }
-        }
-        if !fired && !skill_unavailable.is_empty() {
-            match fire_tooling_unavailable_transition(
-                input,
-                machines,
-                task_id_str,
-                current_state,
-                ToolingKind::Skill,
-                &skill_unavailable,
-                opts.no_callbacks(),
-            ) {
-                TimeoutTransitionOutcome::Fired => {
-                    *progress.advanced_any = true;
-                    fired = true;
-                }
-                TimeoutTransitionOutcome::NoRule | TimeoutTransitionOutcome::Failed => {}
-            }
-        }
-        if !fired {
-            let message =
-                format_required_tooling_error(task_id_str, current_state, &gate.required);
-            run_error!("  error: {message}");
-            if !opts.continue_on_error() {
-                return Err(miette!(
-                    help = run_report_help(),
-                    "{message}"
-                ));
-            }
+        let fired = route_unavailable_required_tooling(
+            input,
+            machines,
+            sink,
+            task_id_str,
+            current_state,
+            &gate.required,
+            opts,
+        )?;
+        if fired {
+            *progress.advanced_any = true;
+        } else {
             // Nothing routed the ticket anywhere; the pass moves on.
             // §FS-rhei-run.3
             progress.stalled_tasks.insert(task_id_str.clone());

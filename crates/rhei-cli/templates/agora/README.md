@@ -18,10 +18,10 @@ state-machine diagram.
 | `plan_title` | string | `Agora` | Title of the instantiated workspace. |
 | `discussion_title` | string | required | Short title for the discussion being resolved. |
 | `discussion` | string | required | Full discussion/transcript/brief. Use `--set-file` for long input. |
-| `splitter_agent` | string | `codex[yolo]:openai:gpt-5.5` | Agent that turns the input into point tasks. |
+| `splitter_agent` | string | `codex[workspace]:openai:gpt-5.5` | Agent that turns the input into point tasks. |
 | `target_agents` | object[] | claude/codex/gemini | Agents that propose and discuss solutions for every point. Each entry is `{ id, label, selector }`; the array must not be empty, and both `id` and `selector` values must be unique. |
-| `point_aggregator_agent` | string | `codex[yolo]:openai:gpt-5.5` | Agent that tags disagreements and resolves each point. |
-| `final_aggregator_agent` | string | `codex[yolo]:openai:gpt-5.5` | Agent that synthesizes the final cross-point solution. |
+| `point_aggregator_agent` | string | `codex[workspace]:openai:gpt-5.5` | Agent that tags disagreements and resolves each point. |
+| `final_aggregator_agent` | string | `codex[workspace]:openai:gpt-5.5` | Agent that synthesizes the final cross-point solution. |
 | `presentation_agent` | string | `claude-code[yolo]:anthropic:claude-opus-4-7` | Agent that writes the simplest human-facing summary. |
 | `max_points` | positive number | `8` | Soft cap for how many point tasks the splitter should create. |
 | `output_dir` | string | `runtime/agora` | Workspace-relative artifact directory. |
@@ -70,7 +70,7 @@ target_agents:
     selector: claude-code[yolo]:anthropic:claude-opus-4-7
   - id: codex
     label: Codex proposal
-    selector: codex[yolo]:openai:gpt-5.5
+    selector: codex[workspace]:openai:gpt-5.5
   - id: gemini
     label: Gemini proposal
     selector: gemini[yolo]:google:gemini-3.1-pro-preview
@@ -84,6 +84,45 @@ cargo run -p rhei-cli -- instantiate agora \
   --set-file discussion=./discussion.txt \
   --output ./agora-demo
 ```
+
+## Codex sandbox
+
+This template's `settings.json` declares its own `codex` profile. Every mode in
+it runs unattended (`approval_policy="never"`) with network on; they differ in
+what they may write:
+
+| Mode | Writes |
+|---|---|
+| `workspace` | only under the roots Rhei grants at launch |
+| `high`, `xhigh` | the same as `workspace`, at that reasoning effort |
+| `yolo` | anywhere: `--sandbox danger-full-access` |
+
+The roots are the plan and the Panta project around it, the checkout the state
+runs in with its git directories, and Rhei's own state directory
+(§FS-rhei-agents.2.2). No default selects `yolo`: a managed ChatGPT workspace
+refuses `danger-full-access`, and the worker then falls back to read-only, exits
+`0` and writes nothing.
+
+**Migrating.** A plan laid with an earlier Rhei keeps the settings it was laid
+with, and with them `danger-full-access`. In a plan laid now, a Codex state
+cannot write outside those roots: not a build cache such as `~/.cargo`,
+`~/.gradle` or `~/.npm`, and not another repository. Grant a directory by
+appending it to the mode in the plan's `.agent-grounds/rhei/settings.json`, or
+in the Panta project's copy if the settings were hoisted:
+
+```json
+"xhigh": ["--sandbox", "workspace-write", "--skip-git-repo-check",
+          "-c", "approval_policy=\"never\"",
+          "-c", "sandbox_workspace_write.network_access=true",
+          "-c", "model_reasoning_effort=\"xhigh\"",
+          "--add-dir", "/home/me/.cargo"]
+```
+
+The path must be absolute: Rhei passes mode tokens through untouched, so `~` and
+`$HOME` are not expanded. The way back is to select `codex[yolo]`. It works only
+on an account without managed requirements: under them, Codex rust-v0.159.3 and
+later stop at startup when given `danger-full-access` with
+`approval_policy="never"`, and earlier releases fall back to read-only.
 
 ## Example
 

@@ -16,7 +16,7 @@ The full input set is checked in at `instantiation-values.yaml`. The structured
 agents:
   - { id: claude, label: Claude analysis note, selector: claude-code[yolo]:anthropic:claude-opus-4-7 }
   - { id: gemini, label: Gemini analysis note, selector: gemini[yolo]:google:gemini-3.1-pro-preview }
-  - { id: codex,  label: Codex analysis note,  selector: codex[yolo]:openai:gpt-5-codex }
+  - { id: codex,  label: Codex analysis note,  selector: codex[workspace]:openai:gpt-5-codex }
 ```
 
 The dry-run below shows one `analyze → summarize` transition per target, which

@@ -34,19 +34,16 @@ To regenerate this example from the template:
 
 ```bash
 rm -rf examples/changeset-review-example
-cargo run -p rhei-cli -- instantiate changeset-review \
-  --set change_ref=PR#42 \
-  --set 'review_targets=["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"]' \
-  --set 'validation_targets=["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"]' \
-  --set 'proposal_targets=["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"]' \
-  --set 'review_focus=["performance","security","concurrency"]' \
-  --set fix_prepare=worktree \
-  --set fix_commit=pr \
+cargo run -p rhei-cli -- instantiate crates/rhei-cli/templates/changeset-review \
+  --values crates/rhei-cli/templates/changeset-review/.example-values.yaml \
   --output examples/changeset-review-example
 ```
 
-The example ships `.agent-grounds/rhei/settings.json`, which provides the default
-`agent_timeout` and adds Codex `high` / `xhigh` modes. The `xhigh` mode passes
-`model_reasoning_effort="xhigh"` to Codex. Claude Code remains included as a
-second default reviewer, but Rhei does not currently expose a Claude
-reasoning-effort flag.
+Restore this README and `instantiation-values.yaml` after regenerating.
+
+The example ships `.agent-grounds/rhei/settings.json`, which declares two Codex
+profiles, `codex` and `fix-codex`, each with one mode, `xhigh`:
+`workspace-write` with network on, under the roots Rhei grants at launch, and
+`model_reasoning_effort="xhigh"`. Each agent state bounds itself with
+`agent_timeout: 1h`. Claude Code remains included as a second default reviewer,
+but Rhei does not currently expose a Claude reasoning-effort flag.

@@ -88,13 +88,11 @@ transitions:
 }
 
 #[test]
-#[ignore = "red until #511: fresh program result parent is prepared before spawn; implement removes this"]
 fn fresh_program_result_directory_sequential() {
     direct_result_write(1);
 }
 
 #[test]
-#[ignore = "red until #511: fresh program result parent is prepared before spawn; implement removes this"]
 fn fresh_program_result_directory_worker_pool() {
     direct_result_write(2);
 }

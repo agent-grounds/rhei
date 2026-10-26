@@ -279,5 +279,5 @@ node_policy:
   default: changeset-review
   by_type:
     task: changeset-review
-# --- code-review 1.0.0 src:sha256:28e45a922395b490113686bb20cb4356b6cf9d2120932580dc5dc36c1df9cb6a inputs: {change_ref: "PR#42", proposal_targets: ["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"], review_focus: ["performance","security","concurrency"], review_targets: ["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"], smart_target: "codex[xhigh]:openai:gpt-5.5", validation_targets: ["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"]} ---
-# --- fix 1.0.0 src:sha256:225cfd265ee1be4bdeb70278ace21f5b8f7d3371b4e95ef054682ab49d41388c inputs: {fix_commit: "pr", fix_prepare: "worktree", smart_target: "codex[xhigh]:openai:gpt-5.5"} ---
+# --- code-review 1.0.0 src:sha256:5d69378100872c640016681ae756611c5cc79c7ee2737b6698c4505ed32d0f8c inputs: {change_ref: "PR#42", proposal_targets: ["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"], review_focus: ["performance","security","concurrency"], review_targets: ["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"], smart_target: "codex[xhigh]:openai:gpt-5.5", validation_targets: ["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"]} ---
+# --- fix 1.0.0 src:sha256:a86aac17742e0c2d97b4513b3a1556505c5ce4ad81d567aa47371eeb95533032 inputs: {fix_commit: "pr", fix_prepare: "worktree", smart_target: "codex[xhigh]:openai:gpt-5.5"} ---

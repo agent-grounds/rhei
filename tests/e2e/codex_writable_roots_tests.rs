@@ -18,7 +18,6 @@ use super::*;
 /// the working directory: the plan, the checkout, its git dir and Rhei's state
 /// directory are all roots. §FS-rhei-agents.2.2
 #[test]
-#[ignore = "red until #509: codex declares no workspace mode and passes no --add-dir roots; implement removes this"]
 fn a_codex_workspace_launch_writes_its_plan_state_and_commit_through_its_roots() {
     let dir = unique_temp_dir("codex-roots-plain");
     let Some(checkout) = git_repository(&dir.join("checkout")) else { return };
@@ -56,7 +55,6 @@ fn a_codex_workspace_launch_writes_its_plan_state_and_commit_through_its_roots()
 /// In a linked worktree the checkout's git dir and the common dir differ, and a
 /// commit there writes both. §FS-rhei-agents.2.2 §FS-rhei-agents.4
 #[test]
-#[ignore = "red until #509: codex declares no workspace mode and passes no --add-dir roots; implement removes this"]
 fn a_codex_workspace_launch_commits_in_a_linked_worktree() {
     let dir = unique_temp_dir("codex-roots-worktree");
     let Some(main) = git_repository(&dir.join("main")) else { return };
@@ -95,7 +93,6 @@ fn a_codex_workspace_launch_commits_in_a_linked_worktree() {
 /// the project directory is one of them beside the member rhei.
 /// §FS-rhei-agents.2.2 §FS-rhei-templates.4
 #[test]
-#[ignore = "red until #509: codex declares no workspace mode and passes no --add-dir roots; implement removes this"]
 fn a_codex_workspace_launch_from_a_panta_member_grants_the_project_too() {
     let dir = unique_temp_dir("codex-roots-panta");
     let Some(checkout) = git_repository(&dir.join("checkout")) else { return };
@@ -126,7 +123,6 @@ fn a_codex_workspace_launch_from_a_panta_member_grants_the_project_too() {
 /// `writable_roots`, and a grant it writes into a mode passes through as
 /// written. §FS-rhei-agents.1.1.2 §FS-rhei-agents.2.2
 #[test]
-#[ignore = "red until #509: no profile resolves writable_roots, so no --add-dir roots are passed; implement removes this"]
 fn a_wrapper_that_writes_its_own_modes_still_inherits_its_roots() {
     let dir = unique_temp_dir("codex-roots-own-modes");
     let Some(checkout) = git_repository(&dir.join("checkout")) else { return };

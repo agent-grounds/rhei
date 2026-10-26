@@ -93,6 +93,7 @@ fn built_in_agent_fields(profile: &CustomAgentProfile) -> BTreeSet<String> {
         ("mcp_flag", profile.mcp_flag.is_some()),
         ("mcp_config_flag", profile.mcp_config_flag.is_some()),
         ("skill_flag", profile.skill_flag.is_some()),
+        ("writable_roots", profile.writable_roots.is_some()),
         ("modes", !profile.modes.is_empty()),
         ("session", profile.session.is_some()),
     ] {

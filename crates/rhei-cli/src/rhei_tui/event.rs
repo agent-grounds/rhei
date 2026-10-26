@@ -412,6 +412,10 @@ pub enum RunEvent {
         wall_clock: SystemTime,
         exit_code: Option<i32>,
         duration_ms: u64,
+        /// The distinct Codex configuration fallbacks this invocation's own
+        /// output carried, in the order first seen; empty for every other
+        /// invocation and never an earlier one's. §FS-rhei-run-tui.1.1
+        configuration_fallbacks: Vec<String>,
         /// `<file>:<line>` where the worker's edit broke the plan, when the run
         /// reverted it. §FS-rhei-run.3.7.7
         reverted: Option<String>,

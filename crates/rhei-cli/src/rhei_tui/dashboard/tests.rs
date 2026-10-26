@@ -417,6 +417,7 @@ fn snapshot_does_not_mark_released_slot_active() {
         wall_clock: SystemTime::now(),
         exit_code: Some(0),
         duration_ms: 10,
+        configuration_fallbacks: Vec::new(),
         reverted: None,
     });
 

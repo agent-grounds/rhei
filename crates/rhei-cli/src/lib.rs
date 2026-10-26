@@ -86,12 +86,14 @@ include!("cli/metadata_rewrite.rs");
 #[path = "cli/provider_local_time.rs"]
 mod provider_local_time;
 include!("cli/provider_limits.rs");
+include!("cli/codex_config_fallbacks.rs");
 include!("cli/subtree_supervision.rs");
 include!("cli/subtree_supervision_owner.rs");
 include!("cli/subtree_supervision_barrier.rs");
 include!("cli/transition_context.rs");
 include!("cli/checkout_roots.rs");
 include!("cli/exclusion_policy.rs");
+include!("cli/writable_roots.rs");
 include!("cli/exclusion_requirements.rs");
 include!("cli/artifacts.rs");
 include!("cli/task_exports.rs");
@@ -322,6 +324,7 @@ mod tests {
     include!("cli/tests_codex_provider_native.rs");
     include!("cli/tests_agent_prompt_transport.rs");
     include!("cli/tests_agent_family.rs");
+    include!("cli/tests_writable_roots.rs");
     include!("cli/tests_spawn_records.rs");
     include!("cli/tests_retry_contract.rs");
     include!("cli/tests_retry_operations.rs");

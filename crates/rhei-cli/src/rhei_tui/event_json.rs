@@ -88,6 +88,7 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
             outcome,
             exit_code,
             duration_ms,
+            configuration_fallbacks,
             reverted,
             ..
         } => {
@@ -107,6 +108,10 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
             }
             put("exit_code", json!(exit_code));
             put("duration_ms", json!(duration_ms));
+            // Present only when the invocation carried one. §FS-rhei-run-json.2.1
+            if !configuration_fallbacks.is_empty() {
+                put("configuration_fallbacks", json!(configuration_fallbacks));
+            }
             // §FS-rhei-run-json.2.1
             if let Some(location) = reverted {
                 put("reverted", json!(location));
@@ -390,6 +395,7 @@ fn decode_event(kind: &str, v: &Value, wall_clock: SystemTime) -> Option<RunEven
             wall_clock,
             exit_code: v.get("exit_code").and_then(Value::as_i64).map(|code| code as i32),
             duration_ms: num("duration_ms"),
+            configuration_fallbacks: list("configuration_fallbacks"),
             reverted: opt_text("reverted"),
         },
         "pass_ended" => RunEvent::PassEnded {

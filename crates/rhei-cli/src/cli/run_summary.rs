@@ -25,6 +25,8 @@ struct LedgerRecord {
     exit_code: Option<i32>,
     duration_ms: u64,
     outcome: LedgerOutcome,
+    /// What the invocation reported it fell back from. §FS-rhei-run-report.2
+    configuration_fallbacks: Vec<String>,
 }
 
 /// The terminal disposition of a spawned invocation, mirrored from
@@ -193,6 +195,7 @@ impl rhei_tui::EventSink for SummarySink {
                 let entry = state.tasks.entry(task).or_default();
                 entry.missing_outputs = None;
                 entry.last_exit_code = None;
+                entry.last_configuration_fallbacks.clear();
             }
             rhei_tui::RunEvent::SlotReleased {
                 slot,
@@ -203,6 +206,7 @@ impl rhei_tui::EventSink for SummarySink {
                 outcome,
                 exit_code,
                 duration_ms,
+                configuration_fallbacks,
                 ..
             } => {
                 let driver = state.inflight.remove(&slot).unwrap_or("program");
@@ -218,6 +222,8 @@ impl rhei_tui::EventSink for SummarySink {
                 // follows the missing-artifact event of the same attempt.
                 // §FS-rhei-run-report.3.1
                 entry.last_exit_code = exit_code;
+                // Kept per invocation, so a retry never inherits it. §FS-rhei-configuration-fallbacks
+                entry.last_configuration_fallbacks = configuration_fallbacks.clone();
                 let outcome = match outcome {
                     rhei_tui::TaskOutcome::Completed => LedgerOutcome::Completed,
                     rhei_tui::TaskOutcome::Failed(msg) => LedgerOutcome::Failed(msg),
@@ -242,6 +248,7 @@ impl rhei_tui::EventSink for SummarySink {
                     exit_code,
                     duration_ms,
                     outcome,
+                    configuration_fallbacks,
                 });
             }
             // Upsert by invocation id, then rebuild the rows the report touched:
@@ -693,7 +700,8 @@ struct LedgerEntry {
 struct InvocationRow {
     driver: &'static str,
     task: String,
-    /// `exit 0`, `exit 42`, `cancelled`, `timed out`, or `—`.
+    /// `exit 0`, `exit 42`, `cancelled`, `timed out`, or `—`, followed by
+    /// the invocation's configuration fallbacks. §FS-rhei-run-report.2
     exit: String,
     duration_ms: u64,
     /// Relative log path.
@@ -805,6 +813,7 @@ impl RunSummaryReport {
                         .map(|(_, entries)| UnwrittenOutputs {
                             entries: entries.clone(),
                             exit_code: entry.last_exit_code,
+                            configuration_fallbacks: entry.last_configuration_fallbacks.clone(),
                         })
                 })
             },
@@ -1245,7 +1254,8 @@ impl RunSummaryReport {
                     "| {} | {} | {} | {} | [{}]({}) |\n",
                     inv.task,
                     inv.driver,
-                    inv.exit,
+                    // A fallback message may hold a `|`. §FS-rhei-run-report.2
+                    md_cell(&inv.exit),
                     format_duration_short(inv.duration_ms),
                     inv.log,
                     inv.log,
@@ -1767,7 +1777,7 @@ fn build_invocations(
                 (LedgerOutcome::Interrupted, _) => "interrupted".to_string(),
                 (_, Some(code)) => format!("exit {code}"),
                 (_, None) => "—".to_string(),
-            },
+            } + &configuration_fallback_clauses(&rec.configuration_fallbacks),
             duration_ms: rec.duration_ms,
             log: relativize(&rec.log_path, workspace_root),
         })
@@ -1871,4 +1881,5 @@ mod run_summary_tests {
     include!("tests_run_summary.rs");
     include!("tests_run_summary_accounting.rs");
     include!("tests_run_summary_cancelled_prior.rs");
+    include!("tests_run_summary_fallbacks.rs");
 }

@@ -21,6 +21,9 @@ struct AgentSpawnOutcome {
     /// A strict provider refusal recognized after output drain and before the
     /// generic non-zero completion paths run. §FS-rhei-agents.2.3
     provider_limit: Option<ProviderLimit>,
+    /// The Codex configuration fallbacks this invocation's own output carried,
+    /// distinct and in the order first seen. §FS-rhei-configuration-fallbacks
+    configuration_fallbacks: Vec<String>,
 }
 
 impl InvocationOutcome for AgentSpawnOutcome {
@@ -248,6 +251,7 @@ fn spawn_and_wait_agent(
                 usage_capture_path: None,
                 cli_session: None,
                 provider_limit: None,
+                configuration_fallbacks: Vec::new(),
             });
         }
         // A command line too large to hand over fails here exactly as a missing
@@ -402,6 +406,11 @@ fn spawn_and_wait_agent(
             ended_wall,
         )
     });
+    // Read beside the refusal, never as one: it decides nothing. §FS-rhei-configuration-fallbacks
+    let configuration_fallbacks = captured_lines
+        .lock()
+        .map(|lines| codex_configuration_fallbacks(resolved.family(), &lines))
+        .unwrap_or_default();
     let timeout_message =
         if timed_out { resolved.timeout_secs.map(format_duration_human) } else { None };
     // The spawn ran. Say so where the next pass, the next run, and the engine's
@@ -465,5 +474,6 @@ fn spawn_and_wait_agent(
         usage_capture_path,
         cli_session,
         provider_limit,
+        configuration_fallbacks,
     })
 }

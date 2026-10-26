@@ -101,8 +101,17 @@ enum HaltCause {
     /// `plan` is the plan argument as the operator would type it, carried here
     /// so the suggested `rhei transition` runs from wherever they are reading
     /// the report rather than only from the plan's own directory.
+    ///
+    /// `configuration_fallbacks` are the Codex configuration fallbacks that
+    /// same invocation reported, which say why it wrote nothing.
+    /// §FS-rhei-configuration-fallbacks
     // §FS-rhei-run-report.3.1 §FS-rhei-agents.3.2.1 §FS-rhei-errors.2
-    MissingOutputs { entries: Vec<String>, exit_code: Option<i32>, plan: String },
+    MissingOutputs {
+        entries: Vec<String>,
+        exit_code: Option<i32>,
+        plan: String,
+        configuration_fallbacks: Vec<String>,
+    },
     /// A required `inputs:` artifact of the ticket's current state is not on
     /// disk, so readiness refused to schedule it. `entries` are the
     /// `name (path)` renderings of the files that were looked for.
@@ -244,11 +253,11 @@ impl HaltCause {
             // Name the files. The whole point of this cause is that the operator
             // does not have to go read a log to learn which one is missing.
             // §FS-rhei-run-report.3.1
-            HaltCause::MissingOutputs { entries, exit_code, plan } => (
+            HaltCause::MissingOutputs { entries, exit_code, plan, configuration_fallbacks } => (
                 match exit_code {
                     Some(code) => format!("worker exited {code} without {}", entries.join(", ")),
                     None => format!("worker exited without {}", entries.join(", ")),
-                },
+                } + &configuration_fallback_clauses(configuration_fallbacks),
                 format!(
                     "write the file(s) above and rerun, or record the outcome with \
                      `rhei transition{} --task {id} --from {state} --to <state> --result …`",
@@ -314,6 +323,8 @@ fn suggested_final_state(machine: &rhei_validator::StateMachine, state: &str) ->
 struct UnwrittenOutputs {
     entries: Vec<String>,
     exit_code: Option<i32>,
+    /// What that worker reported it fell back from. §FS-rhei-configuration-fallbacks
+    configuration_fallbacks: Vec<String>,
 }
 
 /// Classify why a non-terminal ticket did not advance. `worked` marks a ticket
@@ -443,6 +454,7 @@ fn classify_halt(
                 entries: unwritten.entries,
                 exit_code: unwritten.exit_code,
                 plan: plan_arg.to_string(),
+                configuration_fallbacks: unwritten.configuration_fallbacks,
             },
             _ => HaltCause::Stalled,
         };

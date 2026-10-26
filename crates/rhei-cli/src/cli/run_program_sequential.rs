@@ -166,6 +166,7 @@ fn run_sequential_program_work_items(
                 wall_clock: finished_wall,
                 exit_code,
                 duration_ms,
+                configuration_fallbacks: Vec::new(),
             },
         );
         let reverted = lease.exited(&plan, &mut release);

@@ -65,6 +65,14 @@ pub use account::{Account, Retirement, ACCOUNT_DIR};
 pub use admission::{AdmissionRequest, AppliedEdge, Arm, EffectiveBounds, ReservationGroup};
 pub use ancestry::{Ancestry, AncestryDescriptor};
 pub(crate) use authority::pin_base as pin_authority_base;
+
+/// The state directory the budget authority resolves under, `rhei/` excluded.
+/// A worker that runs a nested `rhei` writes its witnesses here, so a launch
+/// grants it. §FS-rhei-budgets.5.3 §FS-rhei-agents.2.2
+pub fn authority_state_base() -> Result<std::path::PathBuf> {
+    authority::authority_base()
+}
+
 pub use bounds::{
     ceiling_policy_line, halt_text, Bound, BoundSource, BoundUnit, Limiter, Remedy, SettingsFiles,
     CLAMP_PROJECTS,

@@ -199,6 +199,7 @@ fn spawn_parallel_program_work_item(
                     wall_clock: std::time::SystemTime::now(),
                     exit_code,
                     duration_ms,
+                    configuration_fallbacks: Vec::new(),
                 },
             );
             let reverted = lease.exited(&plan_for_thread, &mut release);

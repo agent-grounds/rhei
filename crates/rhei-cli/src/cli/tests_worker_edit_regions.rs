@@ -243,6 +243,7 @@ Raise it.
                 wall_clock: std::time::SystemTime::now(),
                 exit_code: Some(0),
                 duration_ms: 1,
+                configuration_fallbacks: Vec::new(),
             };
             PendingSlotRelease::hold(self.sink.clone(), release)
         }

@@ -309,9 +309,15 @@ fn spawn_parallel_agent_work_item(
         wall_clock: started_wall,
     });
 
-    // Each fan-out identity receives its own freshly resolved adapter paths.
-    // §FS-rhei-agents.5.2.2
-    let resolved_for_thread = agent_with_exclusion_adapter(&item.resolved, &exclusions);
+    // Each fan-out identity receives its own freshly resolved adapter paths,
+    // and its writable roots, computed at this launch. §FS-rhei-agents.5.2.2
+    // §FS-rhei-agents.2.2
+    let launch = LaunchRoots {
+        rhei_root: snapshot_roots.execution,
+        project_root: snapshot_roots.project,
+        checkout_root: &working_dir,
+    };
+    let resolved_for_thread = agent_with_path_adapters(&item.resolved, &exclusions, launch);
     let tooling_for_thread = tooling.clone();
     let sink_for_thread = sink.clone();
     let intervene_for_thread = intervene.cloned();
@@ -390,6 +396,8 @@ fn spawn_parallel_agent_work_item(
             );
             let duration_ms = started_at.elapsed().as_millis() as u64;
             let (outcome, exit_code) = slot_outcome(&result);
+            let configuration_fallbacks =
+                announce_configuration_fallbacks(&result, &tid, &sname, &sink_for_thread);
             let finished_wall = std::time::SystemTime::now();
             // The session just ended; its report and metrics note are
             // epilogues of the spawn, exactly as on the sequential path.
@@ -420,6 +428,7 @@ fn spawn_parallel_agent_work_item(
                     wall_clock: finished_wall,
                     exit_code,
                     duration_ms,
+                    configuration_fallbacks,
                 },
             );
             lease.exited(&plan_for_thread, &mut release);

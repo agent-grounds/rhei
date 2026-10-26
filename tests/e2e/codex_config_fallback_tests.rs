@@ -59,14 +59,12 @@ fn md(message: &str) -> String {
 }
 
 #[test]
-#[ignore = "red until #509: the halt never names the Codex configuration fallback; implement removes this"]
 fn an_item_error_fallback_explains_a_sequential_halt() {
     let events = [item_error(PERMISSION_FALLBACK)];
     assert_fallback_explains_the_halt("codex-fallback-seq", &events, PERMISSION_FALLBACK, false);
 }
 
 #[test]
-#[ignore = "red until #509: the halt never names the Codex configuration fallback; implement removes this"]
 fn an_item_error_fallback_explains_a_parallel_halt() {
     let events = [item_error(PERMISSION_FALLBACK)];
     assert_fallback_explains_the_halt("codex-fallback-par", &events, PERMISSION_FALLBACK, true);
@@ -74,7 +72,6 @@ fn an_item_error_fallback_explains_a_parallel_halt() {
 
 /// A top-level `error` event counts too, for any field. §FS-rhei-configuration-fallbacks
 #[test]
-#[ignore = "red until #509: the halt never names the Codex configuration fallback; implement removes this"]
 fn a_top_level_error_fallback_for_another_field_explains_the_halt() {
     let events = [top_error(APPROVAL_FALLBACK)];
     assert_fallback_explains_the_halt("codex-fallback-top", &events, APPROVAL_FALLBACK, false);
@@ -84,7 +81,6 @@ fn a_top_level_error_fallback_for_another_field_explains_the_halt() {
 /// under Invocations and on the console, and gets no Attention row.
 /// §FS-rhei-run-report.3.1 §FS-rhei-run-report.2
 #[test]
-#[ignore = "red until #509: Invocations never shows a Codex configuration fallback; implement removes this"]
 fn a_successful_invocation_shows_its_fallback_only_under_invocations() {
     let events = [item_error(APPROVAL_FALLBACK)];
     let script = Script { events: &events, writes: true, ..Script::default() };
@@ -107,7 +103,6 @@ fn a_successful_invocation_shows_its_fallback_only_under_invocations() {
 /// A later attempt that halts without a fallback does not inherit the earlier
 /// attempt's. §FS-rhei-configuration-fallbacks §FS-rhei-run-report.8
 #[test]
-#[ignore = "red until #509: the halt never names the Codex configuration fallback; implement removes this"]
 fn a_later_attempt_does_not_inherit_an_earlier_fallback() {
     let events = [item_error(PERMISSION_FALLBACK)];
     let script = Script { events: &events, emit_attempts: 1, attempts: 2, ..Script::default() };

@@ -304,10 +304,10 @@ path = "crates/rhei-cli/src/rhei_tui/tui/tests.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 820, unit = "lines" }
+max_accepted = { value = 900, unit = "lines" }
 until = "The UiState fixture is shared from a test-support module so state, input, and view tests can live beside the code they cover."
 reason = """
-Over budget before this change; the touch that surfaced it added two lines, the inspector-flags test for a person-waiting poll carried it 797 -> 807, and the final-report field a `UsageReported` event now names carried it 810 -> 811. One test module covers state application, key handling, and view derivation because they are exercised through one UiState fixture, and a view test cannot move out until that fixture does.
+Over budget before this change; the touch that surfaced it added two lines, the inspector-flags test for a person-waiting poll carried it 797 -> 807, and the final-report field a `UsageReported` event now names carried it 810 -> 811. The configuration fallbacks a `SlotReleased` event now carries (agent-grounds/rhei#509) carried it 839 -> 841: two constructors gained the field, and no test was added. One test module covers state application, key handling, and view derivation because they are exercised through one UiState fixture, and a view test cannot move out until that fixture does.
 """
 [[exceptions]]
 path = "crates/rhei-cli/src/rhei_tui/tui/state.rs"
@@ -599,10 +599,10 @@ path = "crates/rhei-cli/src/cli/tests_run_summary.rs"
 match = "exact"
 rules = ["source"]
 kind = "deferred"
-max_accepted = { value = 600, unit = "lines" }
+max_accepted = { value = 900, unit = "lines" }
 until = "The run report has a model type the Markdown writer and the TTY renderer both consume, so the tests for each renderer move beside it."
 reason = """
-Over budget the moment a test is added: the file was 493 lines before this one. It mirrors run_summary.rs, whose own entry names the same missing boundary — the report model, its Markdown writer and its TTY renderer are three surfaces behind one struct, and a test cannot move out of this file until the surface it covers has a module of its own.
+Over budget the moment a test is added: the file was 493 lines before this one. It mirrors run_summary.rs, whose own entry names the same missing boundary — the report model, its Markdown writer and its TTY renderer are three surfaces behind one struct, and a test cannot move out of this file until the surface it covers has a module of its own. The file had grown to 871 lines under the 600 this entry recorded; the configuration fallbacks a `SlotReleased` event now carries (agent-grounds/rhei#509) added one constructor field, and that change's own report tests went into tests_run_summary_fallbacks.rs instead.
 """
 [[exceptions]]
 path = "crates/rhei-cli/src/cli/next_command.rs"

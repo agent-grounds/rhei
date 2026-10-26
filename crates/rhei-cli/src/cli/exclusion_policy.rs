@@ -403,21 +403,27 @@ fn validate_loaded_exclusions(
     errors
 }
 
-/// Apply a declared filesystem-denial adapter to a clone of the selected
-/// profile. Extending its fixed command arguments places every pair before the
-/// profile separator without changing generic command construction.
-// §FS-rhei-agents.1.1.2 §FS-rhei-agents.3
-fn agent_with_exclusion_adapter(
+/// Apply the declared path adapters to a clone of the selected profile: the
+/// filesystem-denial pairs, then one writable-root pair per root this launch
+/// is granted. Extending its fixed command arguments places every pair before
+/// the mode flags and the profile separator without changing generic command
+/// construction.
+// §FS-rhei-agents.1.1.2 §FS-rhei-agents.3 §FS-rhei-agents.2.2
+fn agent_with_path_adapters(
     resolved: &ResolvedAgent,
     exclusions: &ResolvedExclusions,
+    launch: LaunchRoots<'_>,
 ) -> ResolvedAgent {
     let mut adapted = resolved.clone();
-    let Some(deny_read) = &adapted.profile.deny_read else {
-        return adapted;
-    };
-    for path in exclusions.adapter_paths() {
-        adapted.profile.command.push(deny_read.path_flag.clone());
-        adapted.profile.command.push(path);
+    if let Some(deny_read) = &adapted.profile.deny_read {
+        for path in exclusions.adapter_paths() {
+            adapted.profile.command.push(deny_read.path_flag.clone());
+            adapted.profile.command.push(path);
+        }
+    }
+    if let Some(writable) = &adapted.profile.writable_roots {
+        let roots = launch_writable_roots(launch);
+        adapted.profile.command.extend(writable_root_args(&writable.path_flag, &roots));
     }
     adapted
 }

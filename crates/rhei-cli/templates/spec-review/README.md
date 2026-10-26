@@ -100,9 +100,12 @@ your own replace `codex` by id, give that entry the same `family` and
 `rhei validate`, and without the family it is granted no roots unless it writes
 `writable_roots` itself. The way back is `agent_mode: yolo` on both states in
 the rendered `states.yaml`. It works only on an account without managed
-requirements: under them, Codex rust-v0.159.3 and later stop at startup when
-given `danger-full-access` with `approval_policy="never"`, and earlier releases
-fall back to read-only.
+requirements: where they refuse `danger-full-access`, Codex rust-v0.159.3 stops
+at startup if they still allow `approval_policy="never"` and otherwise falls
+back on both settings and runs read-only, as earlier releases do; Rhei names
+each fallback. Where `never` is refused, every Codex invocation also reports an
+`approval_policy` fallback, harmless under `on-request`, since writes inside the
+granted roots need no approval there.
 
 ## Quick start
 

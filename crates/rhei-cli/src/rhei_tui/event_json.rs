@@ -13,15 +13,21 @@
 // §FS-rhei-run-json.2
 
 use std::path::{Path, PathBuf};
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime};
 
 use serde_json::{json, Map, Value};
 
 use crate::rhei_tui::event::{
-    AccountingRunSummary, AgentStream, BoundCeiling, BoundReport, MessageLevel, RunEvent,
-    RunSummary, TaskOutcome, UsageReport, UsageSummary,
+    AccountingRunSummary, AgentStream, MessageLevel, RunEvent, RunSummary, TaskOutcome,
+    UsageReport, UsageSummary,
 };
 use crate::rhei_tui::run_stop::RunStop;
+
+mod bounds;
+mod rfc3339;
+
+use bounds::{bound_report, bound_value, ceiling_policy_value};
+pub use rfc3339::{format_rfc3339, parse_rfc3339};
 
 /// Wire version of the record contract. Moves only when a documented field is
 /// removed or changes meaning; adding records or fields does not move it.
@@ -179,96 +185,6 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
         }
     }
     map
-}
-
-/// One count dimension's fields, shared by the snapshot record and the halt so
-/// the two cannot drift apart. §FS-rhei-run-json.2.1
-fn bound_value(bound: &BoundReport) -> Value {
-    let mut value = json!({
-        "dimension": bound.dimension,
-        "effective": bound.effective,
-        "value_source": bound.value_source,
-        "limiting_source": bound.limiting_source,
-        "consumed": bound.consumed,
-        "outstanding": bound.outstanding,
-        "remaining": bound.remaining,
-        "mode": bound.mode,
-        "window": bound.window,
-        // Present exactly on the dimension whose amounts are money, so a
-        // reader never has to parse a rendered `$`. §FS-rhei-run-json.2.1
-        "currency": bound.currency,
-        "unpriced": bound.marks.map(|marks| marks.unpriced),
-        "unmeasurable": bound.marks.map(|marks| marks.unmeasurable),
-        "unsettled": bound.marks.map(|marks| marks.unsettled),
-    });
-    // Only on a delegated entry, so a machine that never set the switch emits
-    // the records it always did. §FS-rhei-run-json.2.1
-    if let Some(ceiling) = &bound.ceiling {
-        value["ceiling"] = json!({
-            "value": ceiling.value,
-            "source": "project",
-            "path": ceiling.path,
-        });
-    }
-    value
-}
-
-/// `{ "delegated": [<keys>], "setting": "defaults.clamp_projects", "path" }`
-/// over the delegated entries among `bounds`; `None` where there are none.
-/// §FS-rhei-run-json.2.1
-fn ceiling_policy_value(bounds: &[BoundReport]) -> Option<Value> {
-    let delegated: Vec<&BoundCeiling> =
-        bounds.iter().filter_map(|bound| bound.ceiling.as_ref()).collect();
-    let first = delegated.first()?;
-    Some(json!({
-        "delegated": delegated.iter().map(|ceiling| ceiling.key.as_str()).collect::<Vec<_>>(),
-        "setting": rhei_core::budget::CLAMP_PROJECTS,
-        "path": first.delegated_by,
-    }))
-}
-
-/// Read a delegated entry's `ceiling` back, taking the key from its dimension
-/// and the delegating file from the record's `ceiling_policy`.
-/// §FS-rhei-run-json.2.1
-fn bound_ceiling(entry: &Value, policy: Option<&Value>) -> Option<BoundCeiling> {
-    let ceiling = entry.get("ceiling")?;
-    let dimension = entry.get("dimension")?.as_str()?;
-    let key = [rhei_core::budget::Dimension::Travel, rhei_core::budget::Dimension::Invocations]
-        .into_iter()
-        .find(|known| known.label() == dimension)?
-        .settings_key();
-    Some(BoundCeiling {
-        key: key.to_string(),
-        value: ceiling.get("value").and_then(Value::as_u64).unwrap_or_default(),
-        path: ceiling.get("path").and_then(Value::as_str).map(str::to_owned),
-        delegated_by: policy
-            .and_then(|policy| policy.get("path"))
-            .and_then(Value::as_str)
-            .map(str::to_owned),
-    })
-}
-
-fn bound_report(v: &Value, policy: Option<&Value>) -> Option<BoundReport> {
-    Some(BoundReport {
-        ceiling: bound_ceiling(v, policy),
-        dimension: v.get("dimension")?.as_str()?.to_owned(),
-        effective: v.get("effective").and_then(Value::as_u64).unwrap_or_default(),
-        value_source: v.get("value_source").and_then(Value::as_str).unwrap_or("").to_owned(),
-        limiting_source: v.get("limiting_source").and_then(Value::as_str).map(str::to_owned),
-        consumed: v.get("consumed").and_then(Value::as_u64).unwrap_or_default(),
-        outstanding: v.get("outstanding").and_then(Value::as_u64).unwrap_or_default(),
-        remaining: v.get("remaining").and_then(Value::as_u64).unwrap_or_default(),
-        mode: v.get("mode").and_then(Value::as_str).unwrap_or("").to_owned(),
-        window: v.get("window").and_then(Value::as_str).map(str::to_owned),
-        currency: v.get("currency").and_then(Value::as_str).map(str::to_owned),
-        marks: v.get("unpriced").and_then(Value::as_u64).map(|unpriced| {
-            rhei_core::budget::SpendMarks {
-                unpriced,
-                unmeasurable: v.get("unmeasurable").and_then(Value::as_u64).unwrap_or_default(),
-                unsettled: v.get("unsettled").and_then(Value::as_u64).unwrap_or_default(),
-            }
-        }),
-    })
 }
 
 /// Encode one event as a complete record: envelope plus payload.
@@ -590,57 +506,6 @@ fn decode_summary(value: Option<&Value>) -> RunSummary {
             .map(Box::new),
         stop: value.get("stop").and_then(RunStop::from_value),
     }
-}
-
-// ---------------------------------------------------------------------------
-// Timestamps
-// ---------------------------------------------------------------------------
-
-/// UTC RFC 3339, second precision — the `ts` format of §FS-rhei-run-json.2.
-pub fn format_rfc3339(at: SystemTime) -> String {
-    let secs = at.duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
-    let (y, mo, d, h, mi, s) = civil_from_epoch(secs);
-    format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{s:02}Z")
-}
-
-/// Parse the format [`format_rfc3339`] writes. Deliberately strict: this reads
-/// back only our own output, so a lenient parser would only hide corruption.
-pub fn parse_rfc3339(text: &str) -> Option<SystemTime> {
-    let bytes = text.as_bytes();
-    if bytes.len() != 20 || bytes[19] != b'Z' {
-        return None;
-    }
-    let field = |from: usize, to: usize| text.get(from..to)?.parse::<i64>().ok();
-    let (year, month, day) = (field(0, 4)?, field(5, 7)?, field(8, 10)?);
-    let (hour, minute, second) = (field(11, 13)?, field(14, 16)?, field(17, 19)?);
-    let days = days_from_civil(year, month, day);
-    let secs = days * 86_400 + hour * 3600 + minute * 60 + second;
-    u64::try_from(secs).ok().map(|s| UNIX_EPOCH + std::time::Duration::from_secs(s))
-}
-
-/// Days since the Unix epoch for a civil date (Howard Hinnant's algorithm).
-fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
-    let year = year - i64::from(month <= 2);
-    let era = if year >= 0 { year } else { year - 399 } / 400;
-    let yoe = year - era * 400;
-    let doy = (153 * (if month > 2 { month - 3 } else { month + 9 }) + 2) / 5 + day - 1;
-    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    era * 146_097 + doe - 719_468
-}
-
-fn civil_from_epoch(secs: i64) -> (i64, u32, u32, u32, u32, u32) {
-    let days = secs.div_euclid(86_400);
-    let tod = secs.rem_euclid(86_400) as u32;
-    let z = days + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = (z - era * 146_097) as u32;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    (y + i64::from(m <= 2), m, d, tod / 3600, (tod % 3600) / 60, tod % 60)
 }
 
 #[cfg(test)]

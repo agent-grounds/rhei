@@ -3,7 +3,7 @@
 use super::*;
 use crate::rhei_tui::event::{RunSummary, Slot};
 use crate::rhei_tui::run_stop::{IdleBlocker, RunStop, StopReason};
-use std::time::Duration;
+use std::time::{Duration, UNIX_EPOCH};
 
 fn at() -> SystemTime {
     UNIX_EPOCH + Duration::from_secs(1_755_864_202)

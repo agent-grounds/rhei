@@ -159,12 +159,12 @@ mod writable_roots_tests {
     }
 
     /// Roots keep their order, a second spelling of one directory is dropped
-    /// for the earlier one, and nothing about a spelling is rewritten.
-    /// §FS-rhei-agents.2.2
+    /// for the earlier one, and nothing about a spelling is rewritten. The
+    /// names are ones every platform allows. §FS-rhei-agents.2.2 §REQ-cross-platform.3
     #[test]
     fn roots_keep_their_order_and_spelling_and_drop_a_second_spelling() {
         let dir = tempfile::tempdir().expect("tmpdir");
-        let plan = dir.path().join("plans dir ü").join("it's \"quoted\"");
+        let plan = dir.path().join("plans dir ü").join("it's 'quoted'");
         let checkout = dir.path().join("checkout");
         std::fs::create_dir_all(&plan).unwrap();
         std::fs::create_dir_all(&checkout).unwrap();
@@ -195,7 +195,23 @@ mod writable_roots_tests {
                 state.display().to_string(),
             ]
         );
-        assert!(args[1].contains("plans dir ü") && args[1].contains("it's \"quoted\""));
+        assert!(args[1].contains("plans dir ü") && args[1].contains("it's 'quoted'"));
+    }
+
+    /// A double quote is kept too, where the file system allows it in a name;
+    /// Unix only, because Windows refuses `"` in one. §FS-rhei-agents.2.2
+    /// §REQ-cross-platform.3
+    #[cfg(unix)]
+    #[test]
+    fn a_double_quote_in_a_unix_root_is_kept() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let plan = dir.path().join("plans dir ü").join("it's \"quoted\"");
+        std::fs::create_dir_all(&plan).unwrap();
+        let roots = distinct_absolute_roots([plan.clone(), plan.join(".")]);
+        assert_eq!(roots, vec![plan.clone()]);
+        let args = writable_root_args("--add-dir", &roots);
+        assert_eq!(args, vec!["--add-dir".to_string(), plan.display().to_string()]);
+        assert!(args[1].contains("it's \"quoted\""));
     }
 
     /// One directory reached through a link is one root, kept as first spelled.

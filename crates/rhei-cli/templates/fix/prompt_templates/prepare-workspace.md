@@ -29,8 +29,12 @@ Create an isolated workspace using mode `{{fix_prepare}}`:
 Record the resulting location to `{output.workspace-ref.path}`:
 
   mode: {{fix_prepare}}
-  path: <absolute path where final-fix must work>
+  path: <absolute path of the checkout's top level, where final-fix must work>
   branch: <branch name>
   base: <commit or branch>
+
+Rhei reads `path` from this file and starts the later states in that
+checkout, with write access to it, so it must be absolute and must be what
+`git rev-parse --show-toplevel` prints inside it.
 
 Transition to `final-fix` once the workspace is ready.

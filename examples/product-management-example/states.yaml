@@ -106,7 +106,7 @@ states:
         path: runtime/product-management/{task_id}/entries-pass-{visit_count}-claude-code-yolo-anthropic-claude-opus-4-7.md
         description: Claude PM entries
       - name: codex-entries
-        path: runtime/product-management/{task_id}/entries-pass-{visit_count}-codex-xhigh-openai-gpt-5-5.md
+        path: runtime/product-management/{task_id}/entries-pass-{visit_count}-codex-xhigh-openai-gpt-5.5.md
         description: Codex PM entries
     personality: |
       You are the product-management aggregator and validator. Be skeptical,
@@ -201,7 +201,7 @@ states:
 
       Implementation scope:
 
-      docs/functional-spec, .agent-grounds/rhei/templates, examples
+      docs/functional-spec, crates/rhei-cli/templates, examples
 
       Apply only entries listed under "Accepted for implementation". Do not
       implement rejected, deferred, or needs-human-input entries. Keep each

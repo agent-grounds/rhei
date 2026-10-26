@@ -31,10 +31,12 @@
 name: agora
 version: 1.0.0
 
+
+
 states:
   split-points:
     description: Split the input discussion into separate decision-point tasks.
-    target: codex[yolo]:openai:gpt-5.5
+    target: codex[workspace]:openai:gpt-5.5
     instructions: |
       Split Task {task_id}: {task_title}.
 
@@ -80,7 +82,7 @@ states:
 
       - claude-code[yolo]:anthropic:claude-opus-4-7
 
-      - codex[yolo]:openai:gpt-5.5
+      - codex[workspace]:openai:gpt-5.5
 
       - gemini[yolo]:google:gemini-3.1-pro-preview
 
@@ -109,7 +111,7 @@ states:
   aggregate-disagreements:
     description: Aggregate proposals, tag agreements and disagreements, and frame the discussion.
     concurrent: true
-    target: codex[yolo]:openai:gpt-5.5
+    target: codex[workspace]:openai:gpt-5.5
     inputs:
 
       - name: claude-proposal
@@ -117,7 +119,7 @@ states:
         description: Proposal from claude
 
       - name: codex-proposal
-        path: runtime/agora/points/{task_id}/proposals/codex-yolo-openai-gpt-5.5.md
+        path: runtime/agora/points/{task_id}/proposals/codex-workspace-openai-gpt-5.5.md
         description: Proposal from codex
 
       - name: gemini-proposal
@@ -174,7 +176,7 @@ states:
 
       - claude-code[yolo]:anthropic:claude-opus-4-7
 
-      - codex[yolo]:openai:gpt-5.5
+      - codex[workspace]:openai:gpt-5.5
 
       - gemini[yolo]:google:gemini-3.1-pro-preview
 
@@ -188,7 +190,7 @@ states:
         description: Proposal from claude
 
       - name: codex-proposal
-        path: runtime/agora/points/{task_id}/proposals/codex-yolo-openai-gpt-5.5.md
+        path: runtime/agora/points/{task_id}/proposals/codex-workspace-openai-gpt-5.5.md
         description: Proposal from codex
 
       - name: gemini-proposal
@@ -220,7 +222,7 @@ states:
   resolve-point:
     description: Aggregate the discussion and choose the best solution for one point.
     concurrent: true
-    target: codex[yolo]:openai:gpt-5.5
+    target: codex[workspace]:openai:gpt-5.5
     inputs:
       - name: disagreement-map
         path: runtime/agora/points/{task_id}/disagreement-map.md
@@ -231,7 +233,7 @@ states:
         description: Discussion response from claude
 
       - name: codex-discussion
-        path: runtime/agora/points/{task_id}/discussion/codex-yolo-openai-gpt-5.5.md
+        path: runtime/agora/points/{task_id}/discussion/codex-workspace-openai-gpt-5.5.md
         description: Discussion response from codex
 
       - name: gemini-discussion
@@ -262,7 +264,7 @@ states:
 
   final-solution:
     description: Synthesize all resolved point decisions into one final solution.
-    target: codex[yolo]:openai:gpt-5.5
+    target: codex[workspace]:openai:gpt-5.5
     personality: |
       You are the final aggregator. Produce one coherent answer from the point
       decisions. Keep the answer practical and note dependencies between points.

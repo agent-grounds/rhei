@@ -22,7 +22,7 @@ inputs:
     description: Agent target that breaks the input discussion into separate points
     type: string
     format: execution-target
-    default: codex[yolo]:openai:gpt-5.5
+    default: codex[workspace]:openai:gpt-5.5
 
   - name: target_agents
     description: Agent targets that independently propose and discuss solutions for each point
@@ -44,7 +44,7 @@ inputs:
         selector: claude-code[yolo]:anthropic:claude-opus-4-7
       - id: codex
         label: Codex proposal
-        selector: codex[yolo]:openai:gpt-5.5
+        selector: codex[workspace]:openai:gpt-5.5
       - id: gemini
         label: Gemini proposal
         selector: gemini[yolo]:google:gemini-3.1-pro-preview
@@ -53,13 +53,13 @@ inputs:
     description: Agent target that aggregates proposals and identifies disagreements for each point
     type: string
     format: execution-target
-    default: codex[yolo]:openai:gpt-5.5
+    default: codex[workspace]:openai:gpt-5.5
 
   - name: final_aggregator_agent
     description: Agent target that proposes the final cross-point solution
     type: string
     format: execution-target
-    default: codex[yolo]:openai:gpt-5.5
+    default: codex[workspace]:openai:gpt-5.5
 
   - name: presentation_agent
     description: Agent target that turns the final solution into the simplest human-readable presentation

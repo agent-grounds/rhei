@@ -1,0 +1,19 @@
+spec_ref: main..HEAD
+spec_title: Spec Implementation Example (current-branch spec diff)
+implementation_target: claude-code[yolo]:anthropic:claude-opus-4-7
+review_targets:
+  - claude-code[yolo]:anthropic:claude-opus-4-7
+  - codex[xhigh]:openai:gpt-5.5
+smart_target: codex[xhigh]:openai:gpt-5.5
+review_passes: 2
+focus_areas:
+  - performance
+  - error handling
+  - concurrency
+e2e_writer: claude-code[yolo]:anthropic:claude-opus-4-7
+e2e_verifier: codex[xhigh]:openai:gpt-5.5
+e2e_passes: 2
+e2e_test_root: e2e
+mock_agent: mock
+release_only_marker: release-only
+release_only_test_root: e2e/release-only

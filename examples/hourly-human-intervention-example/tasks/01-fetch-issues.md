@@ -12,9 +12,9 @@ one investigation and one fix path, such as:
 
 - CI failure issues from GitHub Actions or status checks; create one child
   `ci-failure-triage` task per issue so each can be restarted and rechecked
-- metadata or test change in `/home/vjovanov/c/rhei/master`
-- Forge automation defect in `/home/vjovanov/c/rhei/master/forge`
-- Native Image or GraalVM behavior in `/home/vjovanov/c/rhei/graalvm/ce` or `/home/vjovanov/c/rhei/graalvm/ee`
+- metadata or test change in `/home/vjovanov/ag/rhei/main/master`
+- Forge automation defect in `/home/vjovanov/ag/rhei/main/master/forge`
+- Native Image or GraalVM behavior in `/home/vjovanov/ag/rhei/main/graalvm/ce` or `/home/vjovanov/ag/rhei/main/graalvm/ee`
 - missing external information or product decision requiring a human GitHub issue/comment
 
 Append one child task under this task for each non-empty non-CI class, using

@@ -37,25 +37,25 @@ inputs:
     description: Execution target for fetching, classification, deep analysis, and routing.
     type: string
     format: execution-target
-    default: codex[yolo]:openai:gpt-5.5
+    default: codex[workspace]:openai:gpt-5.5
 
   - name: forge_fix_target
     description: Execution target for Forge and reachability-metadata fixes.
     type: string
     format: execution-target
-    default: codex[yolo]:openai:gpt-5.5
+    default: codex[workspace]:openai:gpt-5.5
 
   - name: graalvm_fix_target
     description: Execution target for GraalVM fixes.
     type: string
     format: execution-target
-    default: codex[yolo]:openai:gpt-5.5
+    default: codex[workspace]:openai:gpt-5.5
 
   - name: review_target
     description: Execution target for automated review passes.
     type: string
     format: execution-target
-    default: codex[yolo]:openai:gpt-5.5
+    default: codex[workspace]:openai:gpt-5.5
 
   - name: github_reviewers
     description: GitHub reviewers to request when creating or updating PRs. Empty means use repository defaults.

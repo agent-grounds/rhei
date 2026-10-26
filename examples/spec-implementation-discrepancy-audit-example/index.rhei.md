@@ -2,7 +2,7 @@
 
 ## Context
 
-Audit the written Rhei specifications under `docs` against the
+Audit the written Rhei specifications under `docs/functional-spec` against the
 current implementation. The workspace is partitioned so multiple agents can
 independently scope, compare, elaborate, and propose reconciliation for
 different spec areas before a human chooses the final reconciliation outcome.
@@ -10,7 +10,7 @@ different spec areas before a human chooses the final reconciliation outcome.
 Implementation roots to inspect:
 - `crates`
 - `skills`
-- `.agent-grounds/rhei/templates`
+- `crates/rhei-cli/templates`
 - `examples`
 
 

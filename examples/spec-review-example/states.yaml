@@ -29,6 +29,7 @@ states:
   review:
     description: Review the specification and produce findings.
     agent: codex
+    agent_mode: workspace
     instructions: |
       Review pass {visit_count} of {visits} for Task {task_id}: {task_title}.
 
@@ -56,6 +57,7 @@ states:
   fix:
     description: Fix the specification based on review findings.
     agent: codex
+    agent_mode: workspace
     instructions: |
       Fix pass {visit_count} of {visits} for Task {task_id}: {task_title}.
 

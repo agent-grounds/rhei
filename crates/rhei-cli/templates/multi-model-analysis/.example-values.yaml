@@ -17,6 +17,6 @@ agents:
     selector: gemini[yolo]:google:gemini-3.1-pro-preview
   - id: codex
     label: Codex analysis note
-    selector: codex[yolo]:openai:gpt-5-codex
+    selector: codex[workspace]:openai:gpt-5-codex
 summary_agent: claude-code[yolo]:anthropic:claude-opus-4-7
 final_document_path: runtime/final-analysis.md

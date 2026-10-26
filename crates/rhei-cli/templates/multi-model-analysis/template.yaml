@@ -46,7 +46,7 @@ inputs:
         selector: gemini[yolo]:google:gemini-3.1-pro-preview
       - id: codex
         label: Codex analysis note
-        selector: codex[yolo]:openai:gpt-5-codex
+        selector: codex[workspace]:openai:gpt-5-codex
 
   - name: summary_agent
     description: Agent target that synthesizes the final document

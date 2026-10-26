@@ -14,11 +14,11 @@ target_agents:
     selector: claude-code[yolo]:anthropic:claude-opus-4-7
   - id: codex
     label: Codex proposal
-    selector: codex[yolo]:openai:gpt-5.5
+    selector: codex[workspace]:openai:gpt-5.5
   - id: gemini
     label: Gemini proposal
     selector: gemini[yolo]:google:gemini-3.1-pro-preview
-splitter_agent: codex[yolo]:openai:gpt-5.5
-point_aggregator_agent: codex[yolo]:openai:gpt-5.5
-final_aggregator_agent: codex[yolo]:openai:gpt-5.5
+splitter_agent: codex[workspace]:openai:gpt-5.5
+point_aggregator_agent: codex[workspace]:openai:gpt-5.5
+final_aggregator_agent: codex[workspace]:openai:gpt-5.5
 presentation_agent: claude-code[yolo]:anthropic:claude-opus-4-7

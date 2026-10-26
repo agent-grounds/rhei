@@ -16,7 +16,6 @@ use super::*;
 /// values, resolves a Codex launch that asks for `danger-full-access`.
 /// §FS-rhei-templates.4.1
 #[test]
-#[ignore = "red until #509: shipped templates launch Codex with danger-full-access; implement removes this"]
 fn no_shipped_template_launch_asks_codex_for_full_access() {
     let dir = unique_temp_dir("template-sandbox-sweep");
     let mut offenders = Vec::new();
@@ -48,7 +47,6 @@ fn no_shipped_template_launch_asks_codex_for_full_access() {
 /// declares `workspace`, with the built-in's flags. §FS-rhei-templates.4.1
 /// §FS-rhei-agents.2
 #[test]
-#[ignore = "red until #509: no Codex profile declares a workspace mode; implement removes this"]
 fn every_shipped_codex_profile_with_yolo_also_declares_workspace() {
     let dir = unique_temp_dir("template-sandbox-workspace");
     let expected: Vec<serde_json::Value> =
@@ -109,7 +107,6 @@ fn every_shipped_workspace_write_launch_resolves_writable_roots() {
 /// where the checkout resolver reads it: `runtime/worktree-refs/<task-id>.yaml`.
 /// §FS-rhei-templates.4.1 §FS-rhei-agents.4
 #[test]
-#[ignore = "red until #509: fix records its prepared checkout outside worktree-refs; implement removes this"]
 fn shipped_fix_records_its_prepared_checkout_as_a_worktree_ref() {
     let dir = unique_temp_dir("template-sandbox-worktree-ref");
     let mut checked = Vec::new();

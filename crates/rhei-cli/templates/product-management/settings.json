@@ -11,6 +11,9 @@
       "model_flag": "--model",
       "stdin_prompt": true,
       "mcp_flag": "--mcp",
+      "writable_roots": {
+        "path_flag": "--add-dir"
+      },
       "modes": {
         "yolo": [
           "--sandbox",
@@ -19,30 +22,45 @@
           "-c",
           "approval_policy=\"never\""
         ],
-        "medium": [
+        "workspace": [
           "--sandbox",
-          "danger-full-access",
+          "workspace-write",
           "--skip-git-repo-check",
           "-c",
           "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true"
+        ],
+        "medium": [
+          "--sandbox",
+          "workspace-write",
+          "--skip-git-repo-check",
+          "-c",
+          "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true",
           "-c",
           "model_reasoning_effort=\"medium\""
         ],
         "high": [
           "--sandbox",
-          "danger-full-access",
+          "workspace-write",
           "--skip-git-repo-check",
           "-c",
           "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true",
           "-c",
           "model_reasoning_effort=\"high\""
         ],
         "xhigh": [
           "--sandbox",
-          "danger-full-access",
+          "workspace-write",
           "--skip-git-repo-check",
           "-c",
           "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true",
           "-c",
           "model_reasoning_effort=\"xhigh\""
         ]

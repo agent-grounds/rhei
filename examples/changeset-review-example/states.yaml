@@ -15,6 +15,7 @@ states:
   split:
     description: Coordinator writes an architectural overview of the change, then spawns one review task per logical part plus an aggregate task.
     target: codex[xhigh]:openai:gpt-5.5
+    agent_timeout: 1h
     prompt_template:
       name: split
       values: { task_id: "{task_id}", task_title: "{task_title}" }
@@ -30,6 +31,7 @@ states:
     all_targets:
       - claude-code[yolo]:anthropic:claude-opus-4-7
       - codex[xhigh]:openai:gpt-5.5
+    agent_timeout: 1h
     personality: |
       You are {target}, a rigorous reviewer. Focus on correctness,
       regressions, and material risks specific to the assigned part. Skip
@@ -44,6 +46,7 @@ states:
   aggregate-reviews:
     description: Smart target deduplicates reviewer findings into candidate issues.
     target: codex[xhigh]:openai:gpt-5.5
+    agent_timeout: 1h
     personality: |
       You are the review aggregator. Deduplicate aggressively, preserve
       evidence, and do not invent issues beyond what reviewers reported.
@@ -59,6 +62,7 @@ states:
     all_targets:
       - claude-code[yolo]:anthropic:claude-opus-4-7
       - codex[xhigh]:openai:gpt-5.5
+    agent_timeout: 1h
     inputs:
       - name: review-issues
         path: runtime/issues/{task_id}-candidate-issues.md
@@ -77,6 +81,7 @@ states:
     all_targets:
       - claude-code[yolo]:anthropic:claude-opus-4-7
       - codex[xhigh]:openai:gpt-5.5
+    agent_timeout: 1h
     inputs:
       - name: review-issues
         path: runtime/issues/{task_id}-candidate-issues.md
@@ -95,6 +100,7 @@ states:
   aggregate-proposals:
     description: Smart target aggregates fix proposals into a discrepancy matrix.
     target: codex[xhigh]:openai:gpt-5.5
+    agent_timeout: 1h
     inputs:
       - name: review-issues
         path: runtime/issues/{task_id}-candidate-issues.md
@@ -112,6 +118,7 @@ states:
   decide:
     description: Smart target adjudicates validation/proposal discrepancies and writes the final fix plan.
     target: codex[xhigh]:openai:gpt-5.5
+    agent_timeout: 1h
     inputs:
       - name: review-issues
         path: runtime/issues/{task_id}-candidate-issues.md
@@ -142,6 +149,7 @@ states:
   prepare-workspace:
     description: Set up an isolated workspace (worktree) before applying final fixes.
     target: codex[xhigh]:openai:gpt-5.5
+    agent_timeout: 1h
     inputs:
       - name: final-decision
         path: runtime/decisions/{task_id}-final-decision.md
@@ -149,17 +157,20 @@ states:
       name: prepare-workspace
       values: { task_id: "{task_id}", task_title: "{task_title}" }
     outputs:
+      # Where the checkout resolver reads it, so the later states run in the
+      # prepared checkout. §FS-rhei-templates.4.1 §FS-rhei-agents.4
       - name: workspace-ref
-        path: runtime/workspaces/{task_id}.yaml
+        path: runtime/worktree-refs/{task_id}.yaml
         description: Location and branch of the isolated final-fix workspace
   final-fix:
     description: Smart target applies the accepted final fixes.
     target: codex[xhigh]:openai:gpt-5.5
+    agent_timeout: 1h
     inputs:
       - name: final-decision
         path: runtime/decisions/{task_id}-final-decision.md
       - name: workspace-ref
-        path: runtime/workspaces/{task_id}.yaml
+        path: runtime/worktree-refs/{task_id}.yaml
     personality: |
       You are the final fix agent. Apply only the accepted fixes from the
       final decision. Do not broaden scope. If an accepted item turns out to
@@ -175,11 +186,12 @@ states:
   commit-fix:
     description: Smart target commits or publishes the final fixes (pr).
     target: codex[xhigh]:openai:gpt-5.5
+    agent_timeout: 1h
     inputs:
       - name: final-fix-note
         path: runtime/fixes/{task_id}-final-fix.md
       - name: workspace-ref
-        path: runtime/workspaces/{task_id}.yaml
+        path: runtime/worktree-refs/{task_id}.yaml
     prompt_template:
       name: commit-fix
       values: { task_id: "{task_id}", task_title: "{task_title}" }
@@ -267,5 +279,5 @@ node_policy:
   default: changeset-review
   by_type:
     task: changeset-review
-# --- code-review 1.0.0 src:sha256:18873da0c87a2818881a2b3331017a278732cfbfc2e6eba4daca2713863439ef inputs: {change_ref: "PR#42", proposal_targets: ["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"], review_focus: ["performance","security","concurrency"], review_targets: ["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"], smart_target: "codex[xhigh]:openai:gpt-5.5", validation_targets: ["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"]} ---
-# --- fix 1.0.0 src:sha256:43a679fa0e1a94f2311e7ef9543c1775a7245b0a6e1b1c83adba98d1d0225c56 inputs: {fix_commit: "pr", fix_prepare: "worktree", smart_target: "codex[xhigh]:openai:gpt-5.5"} ---
+# --- code-review 1.0.0 src:sha256:efd6ec989af71c5db7d4c87bcff6c4d23ec203b16ab2aa4e86f9c58356845f12 inputs: {change_ref: "PR#42", proposal_targets: ["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"], review_focus: ["performance","security","concurrency"], review_targets: ["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"], smart_target: "codex[xhigh]:openai:gpt-5.5", validation_targets: ["claude-code[yolo]:anthropic:claude-opus-4-7","codex[xhigh]:openai:gpt-5.5"]} ---
+# --- fix 1.0.0 src:sha256:fad505eba2fe4a50b155def74f4fab792788f9d0305599714007706d44af85f9 inputs: {fix_commit: "pr", fix_prepare: "worktree", smart_target: "codex[xhigh]:openai:gpt-5.5"} ---

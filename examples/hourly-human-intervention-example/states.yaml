@@ -121,7 +121,7 @@ states:
   fetch:
     description: Fetch all human-intervention items of one GitHub kind and classify them into root-cause classes.
     initial: true
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     instructions: |
       Fetch and classify Task {task_id}: {task_title}.
 
@@ -157,10 +157,10 @@ states:
         `fails-native-image-run`.
       - `human-github`: the item lacks information, needs product/reviewer
         judgment, or cannot be fixed safely by automation.
-      - `forge`: the fix likely belongs in `/home/vjovanov/c/rhei/master`, including
+      - `forge`: the fix likely belongs in `/home/vjovanov/ag/rhei/main/master`, including
         metadata, tests, Forge workflows, prompts, scripts, or PR automation.
-      - `graalvm`: the fix likely belongs in `/home/vjovanov/c/rhei/graalvm/ce` or
-        `/home/vjovanov/c/rhei/graalvm/ee`, including Native Image, SVM, CE, EE, or the
+      - `graalvm`: the fix likely belongs in `/home/vjovanov/ag/rhei/main/graalvm/ce` or
+        `/home/vjovanov/ag/rhei/main/graalvm/ee`, including Native Image, SVM, CE, EE, or the
         local GraalVM build.
 
       Write the classification manifest to `{output.classification.path}` with
@@ -227,7 +227,7 @@ states:
 
   deep-analysis:
     description: Deeply analyze one root-cause class before deciding where it should be fixed.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     instructions: |
       Deeply analyze Task {task_id}: {task_title}.
 
@@ -237,10 +237,10 @@ states:
       relevant local code.
 
       Use these checkout roots:
-      - Forge and reachability metadata: `/home/vjovanov/c/rhei/master`
-      - GraalVM CE git checkout: `/home/vjovanov/c/rhei/graalvm/ce`
-      - GraalVM EE git checkout: `/home/vjovanov/c/rhei/graalvm/ee`
-      - GraalVM coordination directory: `/home/vjovanov/c/rhei/graalvm`
+      - Forge and reachability metadata: `/home/vjovanov/ag/rhei/main/master`
+      - GraalVM CE git checkout: `/home/vjovanov/ag/rhei/main/graalvm/ce`
+      - GraalVM EE git checkout: `/home/vjovanov/ag/rhei/main/graalvm/ee`
+      - GraalVM coordination directory: `/home/vjovanov/ag/rhei/main/graalvm`
 
       The goal is a cause analysis, not a quick guess. Reconstruct:
       - what Forge did
@@ -269,7 +269,7 @@ states:
 
   ci-failure-triage:
     description: Restart or rerun one CI failure item, then complete it if transient or route it if persistent.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     instructions: |
       Triage CI failure Task {task_id}: {task_title}.
 
@@ -309,10 +309,10 @@ states:
         status note and leave `human-intervention` in place; do not append a fix task yet.
       - If the rerun fails the same way or the failure is persistent without a
         rerun, append one child task under this task:
-        - use `forge-fix` when the fix belongs in `/home/vjovanov/c/rhei/master` or
-          `/home/vjovanov/c/rhei/master/forge`
+        - use `forge-fix` when the fix belongs in `/home/vjovanov/ag/rhei/main/master` or
+          `/home/vjovanov/ag/rhei/main/master/forge`
         - use `graalvm-propose-fix` when the fix belongs in
-          `/home/vjovanov/c/rhei/graalvm/ce` or `/home/vjovanov/c/rhei/graalvm/ee`
+          `/home/vjovanov/ag/rhei/main/graalvm/ce` or `/home/vjovanov/ag/rhei/main/graalvm/ee`
         - use `github-human-issue` when a human decision or external owner is
           required
       - If an existing fix/review pipeline task or PR already covers this item,
@@ -333,7 +333,7 @@ states:
 
   route:
     description: Decide whether the class needs human GitHub handoff, a Forge fix, or a GraalVM fix, then append the next task.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     inputs:
       - name: cause-analysis
         path: runtime/analysis/{task_id}.md
@@ -347,10 +347,10 @@ states:
         comment because automation lacks required information, the decision is
         product/reviewer-owned, the root cause is external, or the safe action is
         to document why automation cannot proceed.
-      - `forge`: the class can be fixed in `/home/vjovanov/c/rhei/master` or
-        `/home/vjovanov/c/rhei/master/forge`.
-      - `graalvm`: the class needs a fix in `/home/vjovanov/c/rhei/graalvm/ce`,
-        `/home/vjovanov/c/rhei/graalvm/ee`, or both.
+      - `forge`: the class can be fixed in `/home/vjovanov/ag/rhei/main/master` or
+        `/home/vjovanov/ag/rhei/main/master/forge`.
+      - `graalvm`: the class needs a fix in `/home/vjovanov/ag/rhei/main/graalvm/ce`,
+        `/home/vjovanov/ag/rhei/main/graalvm/ee`, or both.
 
       Write `{output.routing.path}` with:
       - selected route
@@ -388,7 +388,7 @@ states:
 
   github-human-issue:
     description: Create or update GitHub human-facing issue/comment for items that cannot be fixed autonomously.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     instructions: |
       Prepare human GitHub handoff for Task {task_id}: {task_title}.
 
@@ -424,12 +424,12 @@ states:
 
   forge-fix:
     description: Implement the first Forge or reachability-metadata fix.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     instructions: |
       Implement the Forge-side fix for Task {task_id}: {task_title}.
 
-      Work in `/home/vjovanov/c/rhei/master` unless the task body narrows the scope to
-      `/home/vjovanov/c/rhei/master/forge`. Read the referenced cause analysis and routing
+      Work in `/home/vjovanov/ag/rhei/main/master` unless the task body narrows the scope to
+      `/home/vjovanov/ag/rhei/main/master/forge`. Read the referenced cause analysis and routing
       decision. Apply the smallest change that addresses the root cause.
 
       This route covers:
@@ -454,12 +454,12 @@ states:
 
   forge-review:
     description: Review the Forge fix. Runs twice with a fix pass in between.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     visits: 2
     instructions: |
       Review Forge fix pass {visit_count} of {visits} for Task {task_id}: {task_title}.
 
-      Inspect the current diff in `/home/vjovanov/c/rhei/master` and the fix notes under
+      Inspect the current diff in `/home/vjovanov/ag/rhei/main/master` and the fix notes under
       `runtime/fixes/` for this task. Review for correctness, scope control,
       validation quality, and whether the GitHub human-intervention items are
       actually addressed.
@@ -476,13 +476,13 @@ states:
 
   forge-review-fix:
     description: Address findings from the first Forge review pass.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     instructions: |
       Fix Forge review findings for Task {task_id}: {task_title}.
 
       Read the latest `runtime/reviews/{task_id}-forge-review-*.md`. If the
       review says `none`, do a no-op pass and record that no changes were
-      needed. Otherwise, address only the blocking findings in `/home/vjovanov/c/rhei/master`.
+      needed. Otherwise, address only the blocking findings in `/home/vjovanov/ag/rhei/main/master`.
 
       Run focused validation for the touched area. Write
       `{output.forge-review-fix-note.path}` with files changed, findings
@@ -494,11 +494,11 @@ states:
 
   forge-publish:
     description: Open or update the Forge PR or issue and request reviewers.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     instructions: |
       Publish the Forge fix for Task {task_id}: {task_title}.
 
-      Work in `/home/vjovanov/c/rhei/master`. Decide whether to:
+      Work in `/home/vjovanov/ag/rhei/main/master`. Decide whether to:
       - update an existing PR connected to the human-intervention item
       - open a new PR in `oracle/graalvm-reachability-metadata`
       - update a GitHub issue/comment when no PR is appropriate
@@ -537,13 +537,13 @@ states:
 
   graalvm-propose-fix:
     description: Propose the GraalVM fix and stop for human review before editing GraalVM.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     instructions: |
       Propose the GraalVM fix for Task {task_id}: {task_title}.
 
       Work from the GraalVM git checkout that owns the suspected code:
-      `/home/vjovanov/c/rhei/graalvm/ce`, `/home/vjovanov/c/rhei/graalvm/ee`, or both. The
-      `/home/vjovanov/c/rhei/graalvm` path is only the coordination directory containing
+      `/home/vjovanov/ag/rhei/main/graalvm/ce`, `/home/vjovanov/ag/rhei/main/graalvm/ee`, or both. The
+      `/home/vjovanov/ag/rhei/main/graalvm` path is only the coordination directory containing
       those checkouts. Read the local `AGENTS.md` files before proposing
       concrete edits.
 
@@ -553,7 +553,7 @@ states:
       - candidate files and APIs
       - expected behavior change
       - validation commands
-      - whether `mxb ee` from `/home/vjovanov/c/rhei/graalvm/ee/vm-enterprise` is needed
+      - whether `mxb ee` from `/home/vjovanov/ag/rhei/main/graalvm/ee/vm-enterprise` is needed
       - risk to Native Image compatibility
 
       Write `{output.graalvm-proposal.path}`. Do not edit GraalVM files in this
@@ -579,7 +579,7 @@ states:
 
   graalvm-fix:
     description: Implement the approved GraalVM fix.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     inputs:
       - name: graalvm-proposal
         path: runtime/proposals/{task_id}-graalvm.md
@@ -587,14 +587,14 @@ states:
     instructions: |
       Implement the approved GraalVM fix for Task {task_id}: {task_title}.
 
-      Work in `/home/vjovanov/c/rhei/graalvm/ce`, `/home/vjovanov/c/rhei/graalvm/ee`, or both as
+      Work in `/home/vjovanov/ag/rhei/main/graalvm/ce`, `/home/vjovanov/ag/rhei/main/graalvm/ee`, or both as
       approved by the proposal. Do not run git commands from
-      `/home/vjovanov/c/rhei/graalvm`; it is not necessarily a git repository. Keep CE and
+      `/home/vjovanov/ag/rhei/main/graalvm`; it is not necessarily a git repository. Keep CE and
       EE ownership boundaries clear.
 
       If validation depends on the local GraalVM used by Forge, refresh it from:
 
-        cd /home/vjovanov/c/rhei/graalvm/ee/vm-enterprise
+        cd /home/vjovanov/ag/rhei/main/graalvm/ee/vm-enterprise
         mxb ee
 
       Then run the narrowest meaningful validation from the relevant GraalVM
@@ -613,13 +613,13 @@ states:
 
   graalvm-review:
     description: Review the GraalVM fix. Runs twice with a fix pass in between.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     visits: 2
     instructions: |
       Review GraalVM fix pass {visit_count} of {visits} for Task {task_id}: {task_title}.
 
-      Inspect the current diff in `/home/vjovanov/c/rhei/graalvm/ce`,
-      `/home/vjovanov/c/rhei/graalvm/ee`, or both according to the fix note. Review
+      Inspect the current diff in `/home/vjovanov/ag/rhei/main/graalvm/ce`,
+      `/home/vjovanov/ag/rhei/main/graalvm/ee`, or both according to the fix note. Review
       correctness, CE/EE ownership, Native Image behavior, validation, and
       whether the Forge human-intervention items are actually unblocked.
 
@@ -635,14 +635,14 @@ states:
 
   graalvm-review-fix:
     description: Address findings from the first GraalVM review pass.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     instructions: |
       Fix GraalVM review findings for Task {task_id}: {task_title}.
 
       Read the latest `runtime/reviews/{task_id}-graalvm-review-*.md`. If the
       review says `none`, do a no-op pass and record that no changes were
       needed. Otherwise, address only the blocking findings in
-      `/home/vjovanov/c/rhei/graalvm/ce`, `/home/vjovanov/c/rhei/graalvm/ee`, or both according to
+      `/home/vjovanov/ag/rhei/main/graalvm/ce`, `/home/vjovanov/ag/rhei/main/graalvm/ee`, or both according to
       the review.
 
       Run focused validation for the touched area. Write
@@ -655,11 +655,11 @@ states:
 
   graalvm-publish:
     description: Open or update the GraalVM issue/PR and request reviewers.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     instructions: |
       Publish the GraalVM fix for Task {task_id}: {task_title}.
 
-      Work in `/home/vjovanov/c/rhei/graalvm/ce`, `/home/vjovanov/c/rhei/graalvm/ee`, or both.
+      Work in `/home/vjovanov/ag/rhei/main/graalvm/ce`, `/home/vjovanov/ag/rhei/main/graalvm/ee`, or both.
       Decide whether the result needs a CE PR, an EE PR, both, or an
       issue/comment for the GraalVM owners. Use each local checkout's repository
       conventions and `AGENTS.md` guidance.
@@ -696,7 +696,7 @@ states:
 
   rhei-pr-follow-up:
     description: Address reviewer feedback on RHEI-labeled pull requests and merge approved PRs.
-    target: "codex[yolo]:openai:gpt-5.5"
+    target: "codex[workspace]:openai:gpt-5.5"
     instructions: |
       Follow up on RHEI pull requests for Task {task_id}: {task_title}.
 

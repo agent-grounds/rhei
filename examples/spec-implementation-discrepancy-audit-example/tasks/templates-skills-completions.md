@@ -14,7 +14,7 @@ Spec scope:
 Implementation roots:
 - `crates`
 - `skills`
-- `.agent-grounds/rhei/templates`
+- `crates/rhei-cli/templates`
 - `examples`
 
 Focus on template manifests, rendered plan validity, bundled `states.yaml`

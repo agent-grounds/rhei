@@ -170,7 +170,7 @@ fn write_mock_agent_settings(workspace: &Path, agent_script: &Path) {
       "prompt_flag": "--prompt",
       "model_flag": "--model",
       "timeout": "{FIXTURE_MARGIN}",
-      "modes": {{ "yolo": [] }}
+      "modes": {{ "yolo": [], "workspace": [] }}
     }}"#,
         fixture_command(agent_script)
     );
@@ -373,7 +373,7 @@ fn example_multi_model_analysis_runs_with_mock_agents() {
     assert!(workspace
         .join("runtime/analyses/gemini-yolo-google-gemini-3.1-pro-preview.md")
         .exists());
-    assert!(workspace.join("runtime/analyses/codex-yolo-openai-gpt-5-codex.md").exists());
+    assert!(workspace.join("runtime/analyses/codex-workspace-openai-gpt-5-codex.md").exists());
 }
 
 #[test]

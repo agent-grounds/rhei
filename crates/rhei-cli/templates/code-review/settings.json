@@ -4,8 +4,9 @@
       "command": ["codex", "exec"],
       "model_flag": "--model",
       "stdin_prompt": true,
+      "writable_roots": {"path_flag": "--add-dir"},
       "modes": {
-        "xhigh": ["--sandbox", "danger-full-access", "-c", "approval_policy=\"never\"", "-c", "model_reasoning_effort=\"xhigh\""]
+        "xhigh": ["--sandbox", "workspace-write", "-c", "approval_policy=\"never\"", "-c", "sandbox_workspace_write.network_access=true", "-c", "model_reasoning_effort=\"xhigh\""]
       }
     }
   }

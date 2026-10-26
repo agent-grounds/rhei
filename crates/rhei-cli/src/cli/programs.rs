@@ -172,6 +172,19 @@ fn spawn_and_wait_program(
     // log, not the journal. §FS-rhei-run.3.2
     sink: &Arc<dyn rhei_tui::EventSink>,
 ) -> MietteResult<ProgramSpawnOutcome> {
+    // Prepare only the canonical parent; leave result content and env overrides
+    // to the program. A preparation error prevents spawn. §FS-rhei-programs.2
+    let result_path = absolute_result_file_path(
+        render_context.workspace_root,
+        &render_context.task.id.to_string(),
+    );
+    if let Some(parent) = result_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| miette!(
+            help = "program results are written under runtime/results/. Check that directory is writable.",
+            "failed to create result directory '{}': {e}", parent.display()
+        ))?;
+    }
+
     if let Some(parent) = log_path.parent() {
         fs::create_dir_all(parent)
             .map_err(|e| miette!(

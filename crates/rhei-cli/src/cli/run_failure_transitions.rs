@@ -119,6 +119,44 @@ fn fire_tooling_unavailable_transition(
     }
 }
 
+/// What a turn does about required tooling its agent cannot have: fire the
+/// state's `mcp_unavailable` transition, else its `skill_unavailable` one, and
+/// when neither fires, report the missing entries and fail the run unless it
+/// continues on error. `Ok(true)` when a transition moved the ticket. Both
+/// launch paths route through here, so they cannot route it differently.
+/// §FS-rhei-agents.6.1
+fn route_unavailable_required_tooling(
+    input: &Path,
+    machines: &ExecutionMachines,
+    sink: &Arc<dyn rhei_tui::EventSink>,
+    task_id_str: &str,
+    state: &str,
+    required: &[ToolingUnavailable],
+    opts: &RunOptions,
+) -> MietteResult<bool> {
+    let fired = [ToolingKind::Mcp, ToolingKind::Skill].into_iter().any(|kind| {
+        let unavailable = unavailable_ids(required, kind);
+        !unavailable.is_empty()
+            && fire_tooling_unavailable_transition(
+                input,
+                machines,
+                task_id_str,
+                state,
+                kind,
+                &unavailable,
+                opts.no_callbacks(),
+            ) == TimeoutTransitionOutcome::Fired
+    });
+    if !fired {
+        let message = format_required_tooling_error(task_id_str, state, required);
+        emit_run_message(sink, rhei_tui::MessageLevel::Error, format!("  error: {message}"));
+        if !opts.continue_on_error() {
+            return Err(miette!(help = run_report_help(), "{message}"));
+        }
+    }
+    Ok(fired)
+}
+
 fn find_timeout_transition(
     machine: &rhei_validator::StateMachine,
     from_state: &str,

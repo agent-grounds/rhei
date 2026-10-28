@@ -67,7 +67,7 @@
     "rhei_build": {
       "description": "The rhei build that wrote the record.",
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": ["version", "commit", "dirty"],
       "properties": {
         "version": { "type": "string", "minLength": 1 },
@@ -78,7 +78,7 @@
     "checkout_head_at_start": {
       "description": "The checkout's HEAD when the run took its locks, or null when none was known.",
       "type": ["object", "null"],
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": ["repo", "commit"],
       "properties": {
         "repo": { "type": ["string", "null"], "minLength": 1 },

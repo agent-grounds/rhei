@@ -174,6 +174,30 @@ the run's whole rate table, so an entry the book omits is unpriced rather than
 falling back to the built-in one. See
 [§FS-rhei-cost-accounting.5.1](functional-spec/rhei-cost-accounting.spec.md#51-price-book-selection).
 
+A book written before the models a machine now targets prices none of them, and
+every invocation is charged the $20.00 spend reserve instead. `rhei validate`,
+and `rhei run` before its first reserve, name the pairs the book has no exact
+entry for, once per book
+([§FS-rhei-validate.4.6](functional-spec/rhei-validate.spec.md#46-a-targeted-model-the-price-book-cannot-price)):
+
+```text
+warning: price book foundation-site-2026-09-02 (/work/prices.json) has no entry for anthropic/claude-opus-5-5, anthropic/claude-sonnet-5-5: their invocations will be measured but unpriced, and each is charged the spend reserve. Add an entry for each pair to price them.
+```
+
+A day spent that way halts with the same names beneath `estimated:`, and
+`rhei budget show` repeats them from the journal
+([§FS-rhei-budgets.8.1](functional-spec/rhei-budgets.spec.md#81-naming-what-was-unpriced)):
+
+```text
+project spend: $400.00 consumed + $0.00 outstanding / $400.00; $0.00 remaining (window (2026-10-26Z))
+  estimated:   20 unpriced (charged at $20.00 each)
+               anthropic/claude-opus-5-5 (10), anthropic/claude-sonnet-5-5 (10) have no entry in price book foundation-site-2026-09-02 (/work/prices.json)
+```
+
+Add an entry for each named pair to that book. It prices the invocations that
+settle after it changes; charges already settled stay as they are, and the
+window renews the day.
+
 A Codex worker that a managed workspace's requirements moved to a weaker setting
 exits `0` and writes nothing. The run names the setting where the missing
 outputs are named: a warning on the console when the worker's slot is released,

@@ -181,6 +181,14 @@ impl RunOptions {
         self.price_book = price_book;
     }
 
+    /// Where the selected book came from, as an unpriced receipt and the
+    /// coverage warning name it: the caller's file, a book composed from
+    /// profile prices, or the built-in one.
+    /// §FS-rhei-budgets.5.2 §FS-rhei-validate.4.6
+    fn price_book_origin(&self) -> PriceBookOrigin {
+        PriceBookOrigin::of(&self.price_book, self.prices_path())
+    }
+
     /// Rhei ids this invocation is narrowed to; empty means the whole project.
     /// §FS-rhei-panta.6
     fn rhei_scope(&self) -> &[String] {

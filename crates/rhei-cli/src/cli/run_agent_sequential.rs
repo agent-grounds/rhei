@@ -406,7 +406,12 @@ fn run_sequential_agent_invocation(
         // reaches `Ok(None)`, so the settle charges it the reserve instead.
         // §FS-rhei-budgets.6.2
         Ok(Some(usage)) => {
-            budget_record_spend(task_id_str, Some(&usage));
+            budget_record_spend(
+                task_id_str,
+                Some(&usage),
+                opts.price_book(),
+                &opts.price_book_origin(),
+            );
             if let Err(err) = regenerate_accounting_indexes(workspace_root, &loaded.rhei)
             {
                 run_warn!("  warning: failed to update accounting rollups: {}", err);

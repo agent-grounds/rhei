@@ -7,9 +7,14 @@
 
 use super::journal::Receipt;
 use super::types::{add, BudgetError, Contract, Counter, Snapshot, SpendBasis, SpendMarks};
+use super::unpriced::{tally, PricingContext, UnpricedDetail};
 use super::Result;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+
+/// A day's spend: the amounts, the marks, the roots that may be unsettled, and
+/// what the unpriced mark holds. §FS-rhei-budgets.6.2 §FS-rhei-budgets.8.1
+type DaySpend = (Counter, SpendMarks, Vec<String>, Vec<UnpricedDetail>);
 
 #[derive(Clone, Debug)]
 pub(crate) struct Reservation {
@@ -291,21 +296,31 @@ impl State {
     /// `spend_per_day` rewrites nothing. A released reservation contributes
     /// nothing at all: the one lawful release is proof that no process could
     /// have started, so there was no request to pay for.
+    ///
+    /// An unpriced settle is tallied by the pricing context its receipt
+    /// carries, and one that carries none is the unknown context: what was
+    /// not recorded is never reconstructed. §FS-rhei-budgets.8.1
     /// §FS-rhei-budgets.3.4 §AR-neural-admission.5
-    fn spend(&self, day: &str) -> Result<(Counter, SpendMarks, Vec<String>)> {
+    fn spend(&self, day: &str) -> Result<DaySpend> {
         let mut counter = Counter::default();
         let mut marks = SpendMarks::default();
         let mut unsettled = Vec::new();
+        let mut unpriced = BTreeMap::<PricingContext, u64>::new();
         for r in self.reservations.values() {
             if r.released || r.spend_reserve == 0 || r.window != day {
                 continue;
             }
             match &r.spend {
-                Some((amount, basis, _)) => {
+                Some((amount, basis, receipt)) => {
                     counter.consumed = add(counter.consumed, *amount)?;
                     match basis {
                         SpendBasis::Measured => {}
-                        SpendBasis::Unpriced => marks.unpriced = add(marks.unpriced, 1)?,
+                        SpendBasis::Unpriced => {
+                            marks.unpriced = add(marks.unpriced, 1)?;
+                            let context = PricingContext::from_json(receipt.get("pricing_context"));
+                            let count = unpriced.entry(context).or_default();
+                            *count = add(*count, 1)?;
+                        }
                         SpendBasis::Unmeasurable => {
                             marks.unmeasurable = add(marks.unmeasurable, 1)?
                         }
@@ -324,7 +339,7 @@ impl State {
                 }
             }
         }
-        Ok((counter, marks, unsettled))
+        Ok((counter, marks, unsettled, tally(unpriced)))
     }
 
     /// Replay re-derives ancestry from the chain itself: a receipt naming a
@@ -412,7 +427,7 @@ impl State {
         for (ticket, applied) in &self.travel {
             travel.entry(ticket.clone()).or_default().consumed = *applied;
         }
-        let (spend, spend_marks, spend_unsettled_roots) = self.spend(day)?;
+        let (spend, spend_marks, spend_unsettled_roots, spend_unpriced) = self.spend(day)?;
         let mut reservations = BTreeMap::new();
         for (id, r) in &self.reservations {
             let mut row = r.payload.clone();
@@ -435,6 +450,7 @@ impl State {
             spend,
             currency: self.currency.clone(),
             spend_marks,
+            spend_unpriced,
             spend_unsettled_roots,
             reservations,
             health: "verified",

@@ -24,9 +24,15 @@ pub(super) fn bound_value(bound: &BoundReport) -> Value {
         // Present exactly on the dimension whose amounts are money, so a
         // reader never has to parse a rendered `$`. §FS-rhei-run-json.2.1
         "currency": bound.currency,
-        "unpriced": bound.marks.map(|marks| marks.unpriced),
-        "unmeasurable": bound.marks.map(|marks| marks.unmeasurable),
-        "unsettled": bound.marks.map(|marks| marks.unsettled),
+        "unpriced": bound.marks.as_ref().map(|marks| marks.unpriced),
+        "unmeasurable": bound.marks.as_ref().map(|marks| marks.unmeasurable),
+        "unsettled": bound.marks.as_ref().map(|marks| marks.unsettled),
+        // What `unpriced` holds, `null` on a count entry as the marks are.
+        // §FS-rhei-run-json.2.1 §FS-rhei-budgets.8.1
+        "unpriced_details": bound
+            .marks
+            .as_ref()
+            .map(|marks| rhei_core::budget::details_json(&marks.unpriced_details)),
     });
     // Only on a delegated entry, so a machine that never set the switch emits
     // the records it always did. §FS-rhei-run-json.2.1
@@ -93,7 +99,23 @@ pub(super) fn bound_report(v: &Value, policy: Option<&Value>) -> Option<BoundRep
                 unpriced,
                 unmeasurable: v.get("unmeasurable").and_then(Value::as_u64).unwrap_or_default(),
                 unsettled: v.get("unsettled").and_then(Value::as_u64).unwrap_or_default(),
+                unpriced_details: unpriced_details(v, unpriced),
             }
         }),
     })
+}
+
+/// Read `unpriced_details` back. A record written before the member existed
+/// reads as if every unpriced receipt had no context. §FS-rhei-run-json.2.1
+fn unpriced_details(entry: &Value, unpriced: u64) -> Vec<rhei_core::budget::UnpricedDetail> {
+    match entry.get("unpriced_details").and_then(Value::as_array) {
+        Some(details) => {
+            details.iter().filter_map(rhei_core::budget::UnpricedDetail::from_json).collect()
+        }
+        None if unpriced > 0 => vec![rhei_core::budget::UnpricedDetail {
+            context: rhei_core::budget::PricingContext::default(),
+            count: unpriced,
+        }],
+        None => Vec::new(),
+    }
 }

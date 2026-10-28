@@ -302,17 +302,29 @@ fn run_command(
     // §FS-rhei-validate.4 §FS-rhei-run.3
     report.warnings.dedup();
 
-    // An explicit caller book already won above. Otherwise resolve the whole
-    // selected invocation scope once and compose its effective profile book
-    // before any execution surface starts. §FS-rhei-cost-accounting.5.1
+    // Resolved once: it composes the profile book where no caller book won, and
+    // coverage is checked over it below, where a failure only skips the check.
+    // §FS-rhei-cost-accounting.5.1 §FS-rhei-validate.4.6
+    let invocations = match selected_run_invocations(&loaded, &machines, &settings, &opts, &rhei_scope) {
+        Ok(invocations) => invocations,
+        Err(err) if custom_price_book.is_none() => return Err(err),
+        Err(_) => Vec::new(),
+    };
     let generated_profile_book = if custom_price_book.is_none() {
-        let invocations = selected_run_invocations(&loaded, &machines, &settings, &opts, &rhei_scope)?;
         profile_price_book(&settings, &invocations)?
     } else {
         None
     };
     if let Some(price_book) = generated_profile_book.clone() {
         opts.select_price_book(price_book);
+    }
+    // Told before the first reserve, dry runs included, about the book this
+    // run selected; `--no-agent` resolved nothing and checks nothing.
+    // §FS-rhei-validate.4.6
+    if let Some(warning) =
+        price_book_coverage_warning(opts.price_book(), &opts.price_book_origin(), &invocations)
+    {
+        eprintln!("warning: {warning}");
     }
 
     let identity = if opts.dry_run() {

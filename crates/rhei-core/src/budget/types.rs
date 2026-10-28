@@ -79,11 +79,14 @@ impl Dimension {
 /// wants an accounting extractor for the agent, and `unsettled` is a run that
 /// went away before it could say what it spent. A day with none of them was
 /// measured outright and says nothing at all. §FS-rhei-budgets.6.2
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SpendMarks {
     pub unpriced: u64,
     pub unmeasurable: u64,
     pub unsettled: u64,
+    /// What the `unpriced` count holds, one entry per distinct pricing
+    /// context, ordered; the counts sum to `unpriced`. §FS-rhei-budgets.8.1
+    pub unpriced_details: Vec<super::unpriced::UnpricedDetail>,
 }
 
 impl SpendMarks {
@@ -116,6 +119,27 @@ impl SpendMarks {
             "{written} (charged at {} each)",
             crate::money::format_micro(reserve, currency)
         ))
+    }
+
+    /// The continuation lines beneath the row, unindented: one per book group
+    /// naming the unpriced pairs and the book that lacked them. Empty where
+    /// nothing was unpriced. §FS-rhei-budgets.8.1
+    pub fn continuations(&self) -> Vec<String> {
+        if self.unpriced == 0 {
+            return Vec::new();
+        }
+        super::unpriced::group_lines(&self.unpriced_details)
+    }
+
+    /// The row and its groups in one line, for a surface that cannot hold
+    /// several, such as a table cell. §FS-rhei-run-report.3.1
+    pub fn one_line(&self, reserve: u64, currency: Option<&str>) -> Option<String> {
+        let row = self.row(reserve, currency)?;
+        let groups = self.continuations();
+        if groups.is_empty() {
+            return Some(row);
+        }
+        Some(format!("{row}: {}", groups.join("; ")))
     }
 }
 
@@ -229,8 +253,13 @@ pub struct Snapshot {
     /// How much of the day was charged at the worst case rather than
     /// measured. `unsettled` is not in here: it needs the owning run's lock
     /// to tell a dead reserve from one in flight, which is a question the
-    /// chain alone cannot answer. §FS-rhei-budgets.6.2
+    /// chain alone cannot answer, and neither are the names of what was
+    /// unpriced, which [`Snapshot::marks`] joins from `spend_unpriced`.
+    /// §FS-rhei-budgets.6.2
     pub spend_marks: SpendMarks,
+    /// The day's unpriced receipts by pricing context, read from the journal
+    /// alone. §FS-rhei-budgets.8.1
+    pub spend_unpriced: Vec<super::unpriced::UnpricedDetail>,
     /// The execution roots of started reservations still holding a spend
     /// reserve, from which a caller that can take those locks derives the
     /// `unsettled` mark. §FS-rhei-budgets.6.2
@@ -256,10 +285,15 @@ impl Snapshot {
 
     /// The three marks, with `unsettled` resolved by the same "is the owning
     /// run gone" proof the release step performs: a started reserve whose run
-    /// is still live is in flight, not unsettled. §FS-rhei-budgets.6.2
+    /// is still live is in flight, not unsettled. The unpriced count comes
+    /// with the names of what it holds. §FS-rhei-budgets.6.2 §FS-rhei-budgets.8.1
     pub fn marks(&self, is_run_gone: &dyn Fn(&str) -> bool) -> SpendMarks {
         let unsettled = self.spend_unsettled_roots.iter().filter(|root| is_run_gone(root)).count();
-        SpendMarks { unsettled: unsettled as u64, ..self.spend_marks }
+        SpendMarks {
+            unsettled: unsettled as u64,
+            unpriced_details: self.spend_unpriced.clone(),
+            ..self.spend_marks.clone()
+        }
     }
 }
 

@@ -144,7 +144,7 @@ fn a_spend_halt_says_six_things_and_a_seventh_only_where_it_has_to() {
         &spent,
         &bound,
         &Remedy::Renews("2026-09-27T00:00:00Z".into()),
-        &SpendMarks { unpriced: 2, unmeasurable: 0, unsettled: 1 },
+        &SpendMarks { unpriced: 2, unmeasurable: 0, unsettled: 1, ..SpendMarks::default() },
     );
 
     assert!(
@@ -255,7 +255,10 @@ fn an_unpriced_or_unmeasurable_invocation_is_charged_the_reserve() {
     drop(journal);
 
     assert_eq!(spend_of(&case), Counter { consumed: 2 * RESERVE, reserved: 0 });
-    assert_eq!(marks_of(&case), SpendMarks { unpriced: 1, unmeasurable: 1, unsettled: 0 });
+    assert_eq!(
+        marks_of(&case),
+        SpendMarks { unpriced: 1, unmeasurable: 1, unsettled: 0, ..SpendMarks::default() }
+    );
 }
 
 /// `unsettled` is derived rather than stored, and it needs the same "is the

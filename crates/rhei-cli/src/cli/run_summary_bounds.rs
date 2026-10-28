@@ -52,13 +52,16 @@ impl BoundsSection {
 
     /// How much of a dimension was charged at the worst case rather than
     /// measured. A report that showed only the total would say a day was
-    /// spent without saying how much of it was estimated.
-    /// §FS-rhei-run-report.3.1 §FS-rhei-budgets.6.2
+    /// spent without saying how much of it was estimated. What was unpriced is
+    /// named in the same parenthesis, in one line, because a table cell cannot
+    /// hold the halt's continuation lines.
+    /// §FS-rhei-run-report.3.1 §FS-rhei-budgets.6.2 §FS-rhei-budgets.8.1
     fn estimated(bound: &rhei_tui::BoundReport) -> String {
         bound
             .marks
+            .as_ref()
             .and_then(|marks| {
-                marks.row(rhei_core::budget::built_in::SPEND_RESERVE, bound.currency.as_deref())
+                marks.one_line(rhei_core::budget::built_in::SPEND_RESERVE, bound.currency.as_deref())
             })
             .map(|row| format!(" ({row})"))
             .unwrap_or_default()

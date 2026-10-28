@@ -351,6 +351,7 @@ fn spawn_parallel_agent_work_item(
     let worktree_root_for_thread = worktree_root.clone();
     let task_for_accounting = task.clone();
     let price_book_for_thread = opts.price_book().clone();
+    let price_book_origin_for_thread = opts.price_book_origin();
     let task_id_for_panic = tid.clone();
     let state_for_panic = sname.clone();
     // Read before the plan moves into the worker, like the outlook above:
@@ -463,7 +464,12 @@ fn spawn_parallel_agent_work_item(
                 // the claim map is global, so the settle still finds it.
                 // §FS-rhei-budgets.6.2
                 Ok(Some(usage)) => {
-                    budget_record_spend(&tid_for_spend, Some(&usage));
+                    budget_record_spend(
+                        &tid_for_spend,
+                        Some(&usage),
+                        &price_book_for_thread,
+                        &price_book_origin_for_thread,
+                    );
                     (true, None)
                 }
                 Ok(None) => (false, None),

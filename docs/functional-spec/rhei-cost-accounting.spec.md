@@ -325,6 +325,14 @@ Unattributed records are not an error condition: they are the history a
 workspace held before the field existed, and an aggregate that quietly omits
 them under-reports that history.
 
+A record written for an agent spawned inside `rhei run` also carries the run's
+`rhei_build` and `checkout_head_at_start`, copied from the run descriptor with
+the same shape and the same `null`s ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)). They are copied
+rather than looked up because the next run overwrites `runtime/run.json`, and a
+record is read long after. Both are optional under the same schema string: a
+record without them still parses, and a reader that needs them reads it as
+`unknown` ([§FS-rhei-summary.2.4](rhei-summary.spec.md#24-the-provenance-line)).
+
 ### 3.6. Token Convention of a Record
 
 `token_convention` names the convention a record's token dimensions follow.

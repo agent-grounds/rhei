@@ -121,7 +121,7 @@ byte-identical without a rollback path to get wrong.
 `--dry-run` runs the same stages and prints the insertion it would have made.
 Byte-exact serialization of every field the union writes is therefore a property
 the diff depends on, rather than a property of a lock file
-([§FS-rhei-library.7.1](../functional-spec/rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-provenance)).
+([§FS-rhei-library.7.1](../functional-spec/rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-template-provenance)).
 
 ## 6. What the flat boundary keeps
 

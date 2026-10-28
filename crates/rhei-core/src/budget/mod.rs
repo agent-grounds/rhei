@@ -59,6 +59,8 @@ pub(crate) mod test_support;
 #[cfg(test)]
 mod travel_tests;
 #[cfg(test)]
+mod unpriced_naming_tests;
+#[cfg(test)]
 mod window_tests;
 
 pub use account::{Account, Retirement, ACCOUNT_DIR};

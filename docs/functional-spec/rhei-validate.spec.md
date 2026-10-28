@@ -180,6 +180,9 @@ error naming its line
 
    Validation resolves and reports these bounds; it never locks, appends, or
    debits the account ([§FS-rhei-budgets.6.3](rhei-budgets.spec.md#63-what-never-debits)).
+
+   It then warns, once per price book, about every targeted provider/model pair
+   that book cannot price ([§FS-rhei-validate.4.6](rhei-validate.spec.md#46-a-targeted-model-the-price-book-cannot-price)).
 8. Exit non-zero when any validation error remains. Warnings do not make the
    command fail.
 
@@ -368,6 +371,65 @@ behaviour, the plan is valid, and the exit code is unchanged. The
 `**Consumes:**` advisory of [§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior), item 6, is printed unchanged
 beside it.
 
+### 4.6. A targeted model the price book cannot price
+
+A measured invocation whose provider/model pair has no exact entry in the
+selected price book settles as `unpriced` and is charged the spend reserve
+([§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle)). Nothing about that is an error — the plan is valid and
+the run is bounded — but it is knowable before any agent starts, and an
+operator told only at the spend halt has already spent the day. Validation
+therefore **warns** about it, as [§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents) warns about a profile
+whose invocations cannot be measured at all.
+
+**What is checked.** The book is the one a run of this plan would select
+([§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection)) with no `--prices` flag: `defaults.prices` from
+the merged settings, otherwise the book composed from profile prices,
+otherwise the built-in book. `rhei validate` gains no `--prices` flag. The pairs
+are the final provider/model pairs of every agent invocation the plan can reach,
+resolved the way [§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior) step 3 resolves agent timeouts: each
+selected task and its descendants, in their current state and every
+nonterminal agent state reachable through declared transitions, per task, with
+`**Target:**` and fan-out resolved member by member. Program and gating states
+contribute no pair but do not stop the walk; unreachable states contribute
+nothing. An invocation whose pair cannot be resolved statically contributes
+nothing — no warning is guessed for it.
+
+**The warning.** One per book, never one per pair, listing every pair it has no
+exact entry for, ascending by provider then model:
+
+```text
+warning: price book foundation-site-2026-09-02 (/work/prices.json) has no entry for anthropic/claude-opus-5-5, anthropic/claude-sonnet-5-5: their invocations will be measured but unpriced, and each is charged the spend reserve. Add an entry for each pair to price them.
+```
+
+The book is written as the halt writes it ([§FS-rhei-budgets.8.1](rhei-budgets.spec.md#81-naming-what-was-unpriced)):
+`price book <id> (<where>)`, with the path for a caller-owned book, `built-in`
+for the built-in book, and `composed from profile prices` for a composed one.
+One warning per book matters most for the built-in book, which prices one pair
+(`anthropic/claude-sonnet-4-6`): a machine with no book of its own gets a
+single line naming every other targeted pair, not one line each.
+
+A book that cannot be checked is said once, and validation still succeeds
+absent other errors:
+
+```text
+warning: price book /work/prices.json (from defaults.prices in /home/me/.config/rhei/settings.json) cannot be read, so the targeted models' prices are not checked: <reason>
+warning: profile prices conflict, so the targeted models' prices are not checked: <the composition diagnostic>
+```
+
+**Where it sits.** On stdout with the other warnings, after the four bound
+lines and any delegation lines of [§FS-rhei-validate.6](rhei-validate.spec.md#6-output), and before every other
+conditional warning, because it is about the spend bound those lines report.
+It is advisory: it changes no exit code, writes no runtime or account file,
+copies no book, and reaches no network. A book that is checked is only read.
+
+**At run start.** `rhei run`, including `--dry-run`, prints the same warning,
+once per book, on stderr — the channel the no-family warning uses — after the
+price book is selected and before its first reserve, so the operator is told
+before anything is charged. It checks the book the run selected, so a `--prices`
+book is the one named. `rhei run --no-agent` resolves no agent invocation and
+checks nothing. A run keeps its existing fatal refusals for a book it cannot
+read; it does not warn about one.
+
 ## 5. Watch Mode
 
 With `--watch`, the command resolves the same state machine once, prints a
@@ -431,6 +493,18 @@ warning: spend_per_day: 400.00 (built_in)
 warning: transition_limit ceiling: 1000 (project, /work/forge/.agent-grounds/rhei/settings.json)
 warning: invocations_per_day ceiling: 500 (project, /work/forge/.agent-grounds/rhei/settings.json)
 warning: count ceiling policy: delegated transition_limit, invocations_per_day by defaults.clamp_projects=false in /home/me/.config/rhei/settings.json
+```
+
+The price-book coverage warning of [§FS-rhei-validate.4.6](rhei-validate.spec.md#46-a-targeted-model-the-price-book-cannot-price), where there is one,
+follows the bound and delegation lines, before every other conditional warning:
+
+```text
+Validation succeeded
+warning: transition_limit: 80 (built_in)
+warning: invocations_per_day: 200 (built_in)
+warning: invocation_lifetime_max: 6000 (built_in)
+warning: spend_per_day: 400.00 (built_in)
+warning: price book foundation-site-2026-09-02 (/work/prices.json) has no entry for anthropic/claude-opus-5-5, anthropic/claude-sonnet-5-5: their invocations will be measured but unpriced, and each is charged the spend reserve. Add an entry for each pair to price them.
 ```
 
 These lines are unconditional, because every plan resolves all four of those

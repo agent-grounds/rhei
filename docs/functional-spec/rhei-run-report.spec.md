@@ -267,7 +267,18 @@ the summary prints five stacked groups:
    account's currency, and where any part of the day was charged at the
    fallback rather than measured it names how much, by the three marks of
    [§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle) — a report that showed only the total would say a day
-   was spent without saying how much of it was estimated. A run that halted on a bound names that
+   was spent without saying how much of it was estimated. Where some of it was
+   `unpriced`, the cell also names what, in one line, because a table cell
+   cannot hold the halt's continuation lines (`md_cell` folds a newline into a
+   space): the marks row, a colon, then each book group of
+   [§FS-rhei-budgets.8.1](rhei-budgets.spec.md#81-naming-what-was-unpriced) in its order, joined by `; `, all inside the one
+   parenthesis:
+
+   ```text
+   $400.00 (20 unpriced (charged at $20.00 each): anthropic/claude-opus-5-5 (10), anthropic/claude-sonnet-5-5 (10) have no entry in price book foundation-site-2026-09-02 (/work/prices.json))
+   ```
+
+   A run that halted on a bound names that
    bound there as well as in Attention, so the record answers "what stopped it"
    without the reader reconstructing it from rows. Where the machine delegated
    a count ceiling to the project ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)), the ceiling and policy

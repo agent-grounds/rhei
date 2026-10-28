@@ -80,8 +80,8 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `message` | Engine diagnostics | `level` (`info`/`warn`/`error`), `text` |
 | `link` | The run produced a URL or file link | `label`, `url` |
 | `agent_output` | A live agent output line ([§FS-rhei-run-json.2.3](rhei-run-json.spec.md#23-agent-output)) | `slot`, `task`, `stream`, `line` |
-| `budget_snapshot` | Once before scheduling, and again after each receipt is durable | `bounds` (one entry per dimension: `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `currency` on the spend entry, and `ceiling` on a delegated entry), and `ceiling_policy` where any ceiling was delegated |
-| `budget_halt` | An admission was refused | `task`, `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `renews_at`, `remedy`, `reason_code`, `ceiling` and `ceiling_policy` where the dimension's ceiling was delegated, and on a spend halt `currency`, `unpriced`, `unmeasurable`, `unsettled` |
+| `budget_snapshot` | Once before scheduling, and again after each receipt is durable | `bounds` (one entry per dimension: `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `currency` on the spend entry, `unpriced`, `unmeasurable`, `unsettled` and `unpriced_details` — `null` on a count entry — and `ceiling` on a delegated entry), and `ceiling_policy` where any ceiling was delegated |
+| `budget_halt` | An admission was refused | `task`, `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `renews_at`, `remedy`, `reason_code`, `ceiling` and `ceiling_policy` where the dimension's ceiling was delegated, and on a spend halt `currency`, `unpriced`, `unmeasurable`, `unsettled`, `unpriced_details` |
 | `run_finished` | Once, when the run loop ends ([§FS-rhei-run-json.2.4](rhei-run-json.spec.md#24-where-run_finished-sits)) | `summary` |
 
 `outcome` is one of `completed`, `failed`, `waiting`, `provider_limited`,
@@ -164,6 +164,14 @@ always ([§FS-rhei-budgets.3.4](rhei-budgets.spec.md#34-the-spend-window)). The 
 halt and are `0` where nothing was charged at the fallback, because a reader
 distinguishing "none" from "not reported" should not have to infer it from an
 absent key ([§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle)).
+`unpriced_details` names what the `unpriced` count holds, in the shape and order
+`rhei budget show --format json` gives it ([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)): one entry per
+distinct receipt pricing context, its six members `null` where unknown, plus
+`count`, the counts summing to `unpriced` ([§FS-rhei-budgets.8.1](rhei-budgets.spec.md#81-naming-what-was-unpriced)). It is present
+on a spend halt and on the spend entry of `budget_snapshot.bounds`, an empty
+array where nothing was unpriced, and `null` on every count entry, as
+`unpriced`, `unmeasurable` and `unsettled` already are there. A record written
+before the member existed reads as if every unpriced receipt had no context.
 `reason_code` is stable and machine-readable; the human text of the same halt is
 a `message` record at `error` level. Adding these records does not move the
 schema version ([§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version)): a reader that does not know them skips

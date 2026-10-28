@@ -40,10 +40,13 @@ impl GitAnswer {
     }
 }
 
-/// `git --no-optional-locks -C <dir> <args>`, so asking never writes the index.
-/// §FS-rhei-templates.6.1.5
+/// `git --no-optional-locks -C <dir> <args>`, so asking never writes the index,
+/// in the C locale, so `unversioned` is told from `unknown` by git's English
+/// stderr whatever the caller's locale. §FS-rhei-templates.6.1.5
 fn git_answer(dir: &Path, args: &[&str]) -> GitAnswer {
     let output = std::process::Command::new("git")
+        .env("LC_ALL", "C")
+        .env("LANGUAGE", "C")
         .arg("--no-optional-locks")
         .arg("-C")
         .arg(dir)

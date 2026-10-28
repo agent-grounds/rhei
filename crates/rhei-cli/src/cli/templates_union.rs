@@ -367,6 +367,7 @@
                     values: &values,
                     members: &members,
                     dry_run,
+                    builtin: resolved.is_builtin(),
                     input_files: &input_files,
                 };
                 return lay_project_into(&lay, &project);

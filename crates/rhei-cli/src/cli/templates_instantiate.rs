@@ -109,6 +109,7 @@
                 values: &resolved_values,
                 members: &members,
                 dry_run,
+                builtin: resolved_template.is_builtin(),
                 input_files: &input_files,
             };
             lay_project_output(&lay, &output_dir, keep_on_error)?;

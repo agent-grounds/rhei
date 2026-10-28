@@ -1025,7 +1025,8 @@ the manifest.
 exactly as [§FS-rhei-templates.6.1.2](rhei-templates.spec.md#612-behavior) steps 3–5 do:
 
 - **the manifest**: the rendered `index.panta.md` at `<dir>`;
-- **the default machine**: the rendered `states.yaml` at `<dir>/states.yaml`.
+- **the default machine**: the rendered `states.yaml` at `<dir>/states.yaml`,
+  ending in its `laid` fence ([§FS-rhei-library.7.1](rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-template-provenance)).
   That file's presence is what makes it the project default
   ([§FS-rhei-plan-language.1.3](rhei-plan-language.spec.md#13-state-machine-resolution) clause 2), so laying it writes **no `**States:**`
   line** anywhere — the line is refused

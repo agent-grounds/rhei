@@ -23,6 +23,10 @@ struct SpawnRecordFacts {
     worker: String,
     started: String,
     ended: String,
+    /// The record's file name under `runtime/spawns/`, which is what tells two
+    /// spawns of one fanned-out state apart. §FS-rhei-summary.6.1
+    #[serde(skip)]
+    spawn: String,
 }
 
 /// One agent spawn no record in the reading matches. It carries no token, cost
@@ -31,12 +35,29 @@ struct SpawnRecordFacts {
 struct UnrecordedSpawn {
     task: String,
     state: String,
+    moves: u64,
+    attempt: u64,
+    /// Its spawn record's file name. §FS-rhei-summary.6.1
+    spawn: String,
     worker: String,
     started: String,
     ended: String,
 }
 
 impl UnrecordedSpawn {
+    fn from_facts(spawn: SpawnRecordFacts) -> Self {
+        UnrecordedSpawn {
+            task: spawn.task,
+            state: spawn.state,
+            moves: spawn.moves,
+            attempt: spawn.attempt,
+            spawn: spawn.spawn,
+            worker: spawn.worker,
+            started: spawn.started,
+            ended: spawn.ended,
+        }
+    }
+
     /// Where the window axis places it. §FS-rhei-cost-accounting.6.2.1
     fn started_secs(&self) -> Option<i64> {
         epoch_secs(rhei_tui::parse_rfc3339(&self.started)?)
@@ -100,7 +121,10 @@ fn read_agent_spawns(accounting_root: &Path) -> (Vec<SpawnRecordFacts>, Vec<Stri
         match fs::read_to_string(&path).map_err(|err| err.to_string()).and_then(|text| {
             serde_json::from_str::<SpawnRecordFacts>(&text).map_err(|err| err.to_string())
         }) {
-            Ok(spawn) if spawn.kind == "agent" => spawns.push(spawn),
+            Ok(spawn) if spawn.kind == "agent" => spawns.push(SpawnRecordFacts {
+                spawn: entry.file_name().to_string_lossy().into_owned(),
+                ..spawn
+            }),
             Ok(_) => {}
             Err(err) => errors.push(format!("{}: {err}", path.display())),
         }
@@ -133,20 +157,19 @@ fn unrecorded_agent_spawns(
                 .get(&(spawn.task.as_str(), spawn.state.as_str()))
                 .is_some_and(|step| step.iter().any(|record| record_answers_for(record, spawn)))
         })
-        .map(|spawn| UnrecordedSpawn {
-            task: spawn.task,
-            state: spawn.state,
-            worker: spawn.worker,
-            started: spawn.started,
-            ended: spawn.ended,
-        })
+        .map(UnrecordedSpawn::from_facts)
         .collect();
-    // One whose `started` will not read goes last, where no merge waits on it.
+    sort_unrecorded(&mut unrecorded);
+    unrecorded
+}
+
+/// `started` order; one whose `started` will not read goes last, where no
+/// merge waits on it. A checkpoint's replay sorts its spawns the same way.
+fn sort_unrecorded(unrecorded: &mut [UnrecordedSpawn]) {
     unrecorded.sort_by_key(|spawn| {
         let started = spawn.started_secs();
-        (started.is_none(), started, spawn.task.clone(), spawn.state.clone())
+        (started.is_none(), started, spawn.task.clone(), spawn.state.clone(), spawn.spawn.clone())
     });
-    unrecorded
 }
 
 /// Whether one record of the spawn's own task and state is the record of it.

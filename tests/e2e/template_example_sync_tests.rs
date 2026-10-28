@@ -80,6 +80,41 @@ fn collect_files(root: &Path, dir: &Path, skip: &[&str], out: &mut Vec<String>) 
     }
 }
 
+/// A machine's fence lines without what names the commit the example was laid
+/// from: the `laid` line goes, and an inclusion fence loses its `git:` field and
+/// state word. Both move with every commit of this repository, and neither is
+/// what the template renders. §FS-rhei-library.7.1
+fn without_source_fields(rel: &str, bytes: Vec<u8>) -> Vec<u8> {
+    if !rel.ends_with("states.yaml") {
+        return bytes;
+    }
+    const STATES: [&str; 5] = ["clean", "dirty", "unversioned", "unknown", "builtin"];
+    let text = String::from_utf8_lossy(&bytes);
+    let mut out = String::new();
+    for line in text.split_inclusive('\n') {
+        if line.starts_with("# --- laid ") {
+            continue;
+        }
+        if !line.starts_with("# --- ") {
+            out.push_str(line);
+            continue;
+        }
+        let fields: Vec<&str> = line.split(' ').collect();
+        for (index, field) in fields.iter().enumerate() {
+            let state = STATES.contains(field)
+                && fields.get(index + 1).is_some_and(|next| next.starts_with("inputs:"));
+            if field.starts_with("git:") || state {
+                continue;
+            }
+            if index > 0 && !out.ends_with('\n') {
+                out.push(' ');
+            }
+            out.push_str(field);
+        }
+    }
+    out.into_bytes()
+}
+
 #[test]
 fn committed_examples_match_template_instantiation() {
     let templates_root = repo_root().join("crates/rhei-cli/templates");
@@ -139,10 +174,14 @@ fn committed_examples_match_template_instantiation() {
              {template_name}; regenerate the example (see its README)"
         );
 
-        // Byte-for-byte equality on every rendered file.
+        // Byte-for-byte equality on every rendered file, fences aside.
         for rel in &generated {
-            let generated_bytes = fs::read(out.join(rel)).expect("read generated file");
-            let committed_bytes = fs::read(example_dir.join(rel)).expect("read committed file");
+            let generated_bytes =
+                without_source_fields(rel, fs::read(out.join(rel)).expect("read generated file"));
+            let committed_bytes = without_source_fields(
+                rel,
+                fs::read(example_dir.join(rel)).expect("read committed file"),
+            );
             assert!(
                 generated_bytes == committed_bytes,
                 "{example_name}/{rel} differs from the template instantiation; \

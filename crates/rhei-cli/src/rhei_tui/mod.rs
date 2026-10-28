@@ -7,6 +7,7 @@ mod event;
 mod event_bounds;
 mod event_json;
 mod event_log;
+mod event_provenance;
 mod event_sink;
 mod frontend;
 mod journal;
@@ -18,9 +19,9 @@ mod tui;
 pub use dashboard::{DashboardSink, GateTransitionSink, InterveneSink, PlanLoader};
 pub use event::{
     bound_journal_line, summarize_usage_summaries, AccountingRunSummary, AgentStream, BoundCeiling,
-    BoundReport, DimensionStatus, DimensionSummary, EventSink, MessageLevel, NullSink,
-    PricingStatus, RunEvent, RunSummary, Slot, TaskOutcome, Tee, UsageCoverage, UsageReport,
-    UsageStatus, UsageSummary,
+    BoundReport, CheckoutHead, DimensionStatus, DimensionSummary, EventSink, MessageLevel,
+    NullSink, PricingStatus, RheiBuild, RunEvent, RunProvenance, RunSummary, Slot, TaskOutcome,
+    Tee, UsageCoverage, UsageReport, UsageStatus, UsageSummary,
 };
 pub use event_json::{
     decode as decode_event, encode as encode_event, format_rfc3339, parse_rfc3339, SCHEMA_VERSION,

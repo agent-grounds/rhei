@@ -197,6 +197,8 @@ fn print_versions() {
     println!("rhei-core {}", rhei_core::version());
     println!("rhei-validator {}", rhei_validator::version());
     println!("rhei-output {}", rhei_output::version());
+    // §FS-rhei-version.2: a fifth `<component> <version>` line, never omitted.
+    println!("rhei-build {}", rhei_build_identity().version_line());
 }
 
 /// Handler for the `install-skills` subcommand.

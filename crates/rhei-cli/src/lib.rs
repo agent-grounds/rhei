@@ -12,6 +12,11 @@ pub mod rhei_viz;
 #[doc(hidden)]
 pub mod rhei_viz_model;
 
+// §FS-rhei-version.2: shared with build.rs, which is the only caller of `resolve`
+// outside the module's own unit tests.
+#[cfg_attr(not(test), allow(dead_code))]
+mod build_identity;
+
 // §AR-source-file-size: The CLI is split into bounded include parts.
 include!("cli/path_guards.rs");
 include!("cli/cli_declarations.rs");
@@ -63,6 +68,7 @@ mod templates {
     include!("cli/templates_render_diagnostics.rs");
     include!("cli/templates_materialize.rs");
     include!("cli/templates_summary.rs");
+    include!("cli/templates_source_identity.rs");
 
     #[cfg(test)]
     mod tests {
@@ -165,6 +171,7 @@ include!("cli/run_prompt_visits.rs");
 include!("cli/run_prompt_navigation.rs");
 include!("cli/run_diag.rs");
 include!("cli/run_git_consistency.rs");
+include!("cli/provenance_identity.rs");
 include!("cli/supervised.rs");
 include!("cli/agent_command.rs");
 include!("cli/mcp_config_file.rs");
@@ -190,6 +197,8 @@ include!("cli/accounting_presentation.rs");
 include!("cli/run_lock_owner_read.rs");
 include!("cli/summary_repricing.rs");
 include!("cli/summary_command.rs");
+include!("cli/summary_checkpoint.rs");
+include!("cli/summary_tally.rs");
 include!("cli/programs.rs");
 include!("cli/snapshot_pointer.rs");
 include!("cli/snapshot_records.rs");
@@ -357,6 +366,7 @@ mod tests {
     include!("cli/tests_accounting_attempt_identity.rs");
     include!("cli/tests_summary.rs");
     include!("cli/tests_summary_repricing.rs");
+    include!("cli/tests_summary_checkpoint.rs");
     include!("cli/tests_settings_tooling.rs");
     include!("cli/tests_mcp_surface.rs");
     include!("cli/tests_budget_spend.rs");

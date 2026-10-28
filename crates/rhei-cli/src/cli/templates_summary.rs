@@ -85,6 +85,7 @@
         materialized: &MaterializedTemplate,
         display_output_dir: &Path,
         state_machine_path: Option<&Path>,
+        source_line: &str,
         dry_run: bool,
     ) -> MietteResult<()> {
         let entrypoint = materialized.entrypoint();
@@ -117,6 +118,8 @@
         println!();
         println!("=== Instantiation Summary ===");
         println!("Output: {}", display_output_dir.display());
+        // §FS-rhei-templates.6.1.3: whether what it read was committed.
+        println!("{source_line}");
         println!("Tasks: {}", tasks.len());
         println!("States: {}", format_state_counts(&loaded.rhei));
         println!();

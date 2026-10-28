@@ -324,7 +324,8 @@ fn summary_of_a_workspace_with_no_accounting_still_prints_the_lead_line() {
         result.stdout,
         "`integration-test` workflow: 0 agent invocations across 0 models; \
          2 tasks completed, 1 cancelled, 1 in progress.\n\n\
-         Token accounting was not measured for this run.\n",
+         Token accounting was not measured for this run.\n\n\
+         Provenance: template unknown · no invocations recorded\n",
         "got:\n{}",
         result.stdout
     );

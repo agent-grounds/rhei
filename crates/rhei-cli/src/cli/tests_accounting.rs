@@ -3,6 +3,8 @@ fn accounting_test_record() -> AccountingInvocationRecord {
         schema: ACCOUNTING_INVOCATION_SCHEMA.to_string(),
         invocation_id: "1::work::codex::visit-1".to_string(),
         run_id: None,
+        rhei_build: None,
+        checkout_head_at_start: None,
         task_id: "1".to_string(),
         state: "work".to_string(),
         visit: 1,

@@ -54,7 +54,8 @@ use std::time::{Duration, Instant};
 #[command(
     name = "rhei",
     author,
-    version,
+    // §FS-rhei-version.2: `rhei 0.6.4-dev (d0446a7)`, set by build.rs.
+    version = env!("RHEI_BUILD_VERSION_LABEL"),
     about = "Run governed agent workflows from Markdown plans",
     long_about = None,
     arg_required_else_help = true,

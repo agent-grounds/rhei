@@ -249,6 +249,17 @@ rhei version
 rh version
 ```
 
+`rhei version` names each component's version and, last, the commit the binary
+was built from, or `unknown` when the build could not tell:
+
+```text
+rhei-cli 0.6.4-dev
+rhei-core 0.6.4-dev
+rhei-validator 0.6.4-dev
+rhei-output 0.6.4-dev
+rhei-build d0446a7aa9c3e1f0b2d4c6a8e0f1a2b3c4d5e6f7
+```
+
 If an older `/usr/local/bin/rhei` appears before `~/.cargo/bin/rhei`, either adjust `PATH` or invoke the Cargo-installed binary directly:
 
 ```bash

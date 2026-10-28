@@ -63,6 +63,8 @@ pub(super) mod run_descriptor_tests {
             log: Some(workspace.join("runtime/run.log")),
             events: workspace.join("runtime/events.jsonl"),
             exit_code: None,
+            rhei_build: None,
+            checkout_head_at_start: None,
         }
     }
 

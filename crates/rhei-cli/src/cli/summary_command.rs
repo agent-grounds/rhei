@@ -27,6 +27,16 @@ struct SummaryOptions {
     /// Reprice that run with this local v1 book; requires --run and writes nothing
     #[arg(long, value_name = "BOOK", requires = "run")]
     prices: Option<PathBuf>,
+    // Each refuses the other and the `--run`/`--prices` pairing, as clap's usage
+    // error naming both flags. §FS-rhei-summary.1
+    /// Print the checkpoint document of the records, spawns and task states this
+    /// summary covers, instead of Markdown
+    #[arg(long, conflicts_with_all = ["checkpoint", "details", "run", "prices"])]
+    print_checkpoint: bool,
+    /// Print the summary of exactly the set a checkpoint document names
+    /// (`-` reads it from stdin), whatever has been recorded since
+    #[arg(long, value_name = "FILE|-", conflicts_with_all = ["run", "prices"])]
+    checkpoint: Option<String>,
 }
 
 /// Resolve the machine that gives a summary's task tally its meaning.
@@ -134,6 +144,31 @@ fn summary_command(
     for error in &inspection.errors {
         eprintln!("warning: {error}");
     }
+    if options.print_checkpoint {
+        print!("{}", SummaryCheckpoint::of(&inspection, &loaded.rhei, &scope).canonical());
+        return Ok(());
+    }
+    // A replay reads its spawns again wherever the live reading found them.
+    // §FS-rhei-summary.6.1
+    let (inspection, checkpoint) = match options.checkpoint.as_deref() {
+        Some(given) => {
+            let checkpoint = read_summary_checkpoint(given)?;
+            let mut spawn_roots: Vec<PathBuf> = roots.iter().map(|root| root.path.clone()).collect();
+            spawn_roots.push(run_root.join(ACCOUNTING_DIR));
+            (replay_summary_checkpoint(inspection, &checkpoint, given, &spawn_roots)?, checkpoint)
+        }
+        None => {
+            let checkpoint = SummaryCheckpoint::of(&inspection, &loaded.rhei, &scope);
+            (inspection, checkpoint)
+        }
+    };
+    let template = summary_template_provenance(resolved.path.as_deref());
+    let reading = SummaryReading {
+        selected_run: alternate.as_ref().map(|(run_id, _)| *run_id),
+        alternate_book: alternate.as_ref().map(|(_, book)| book),
+        recorded_tasks: options.checkpoint.is_some().then_some(checkpoint.tasks.as_slice()),
+        provenance: Some(summary_provenance_line(&inspection, &checkpoint.id(), &template)),
+    };
     print!(
         "{}",
         render_summary_reading(
@@ -142,14 +177,24 @@ fn summary_command(
             &inspection,
             &scope,
             options.details,
-            alternate.as_ref().map(|(run_id, _)| *run_id),
-            alternate.as_ref().map(|(_, book)| book),
+            &reading
         )
     );
     Ok(())
 }
 
-/// The whole document, in the three parts of §FS-rhei-summary.2, optionally
+/// What one reading adds to the workspace's: the exact run and its book, the
+/// task states a checkpoint recorded, and the provenance line.
+/// §FS-rhei-summary.1 §FS-rhei-summary.2.4
+#[derive(Default)]
+struct SummaryReading<'a> {
+    selected_run: Option<&'a str>,
+    alternate_book: Option<&'a PriceBook>,
+    recorded_tasks: Option<&'a [CheckpointTask]>,
+    provenance: Option<String>,
+}
+
+/// The whole document, in the four parts of §FS-rhei-summary.2, optionally
 /// wrapped in the collapsed block of §FS-rhei-summary.3.
 #[cfg(test)]
 fn render_summary(
@@ -159,7 +204,7 @@ fn render_summary(
     scope: &RheiScope,
     details: bool,
 ) -> String {
-    render_summary_reading(rhei, machine, inspection, scope, details, None, None)
+    render_summary_reading(rhei, machine, inspection, scope, details, &SummaryReading::default())
 }
 
 /// Render either the ordinary workspace reading or one exact alternate-book
@@ -171,10 +216,9 @@ fn render_summary_reading(
     inspection: &CostInspection,
     scope: &RheiScope,
     details: bool,
-    selected_run: Option<&str>,
-    alternate_book: Option<&PriceBook>,
+    reading: &SummaryReading,
 ) -> String {
-    let tail = summary_lead_tail(rhei, machine, inspection, scope, selected_run);
+    let tail = summary_lead_tail(rhei, machine, inspection, scope, reading);
     let name = &machine.name;
     let mut out = String::new();
     if details {
@@ -190,9 +234,17 @@ fn render_summary_reading(
         out.push_str(&steps);
         out.push('\n');
     }
-    out.push_str(&summary_accounting_reading(inspection, alternate_book));
-    if details {
+    out.push_str(&summary_accounting_reading(inspection, reading.alternate_book));
+    // Last, so the accounting keeps its number; inside the block before it
+    // closes. §FS-rhei-summary.2.4 §FS-rhei-summary.3
+    if let Some(provenance) = &reading.provenance {
         out.push('\n');
+        out.push_str(provenance);
+        out.push('\n');
+    } else if details {
+        out.push('\n');
+    }
+    if details {
         out.push_str("</details>\n");
     }
     out
@@ -207,8 +259,9 @@ fn summary_lead_tail(
     machine: &rhei_validator::StateMachine,
     inspection: &CostInspection,
     scope: &RheiScope,
-    selected_run: Option<&str>,
+    reading: &SummaryReading,
 ) -> String {
+    let selected_run = reading.selected_run;
     let unrecorded = inspection.unrecorded.len();
     let invocations = inspection.invocations.len() + unrecorded;
     let gap = if unrecorded > 0 {
@@ -222,8 +275,11 @@ fn summary_lead_tail(
         .filter_map(|held| held.record.model.as_deref())
         .collect();
     let run = selected_run.map(|id| format!("run `{id}`; ")).unwrap_or_default();
+    // A replay counts the states its checkpoint recorded. §FS-rhei-summary.1
     let tally = if selected_run.is_some() {
         selected_run_task_tally(machine, inspection)
+    } else if let Some(tasks) = reading.recorded_tasks {
+        tally_states(machine, tasks.iter().map(|task| task.state.as_str()))
     } else {
         summary_task_tally(rhei, machine, scope)
     };
@@ -233,76 +289,6 @@ fn summary_lead_tail(
         models.len(),
         plural_s(models.len()),
     )
-}
-
-/// A completed-run tally comes from the last recorded state of each represented
-/// task, never from the plan's current state.
-/// §FS-rhei-summary.2.1
-fn selected_run_task_tally(
-    machine: &rhei_validator::StateMachine,
-    inspection: &CostInspection,
-) -> String {
-    let mut tasks: BTreeMap<&str, &str> = BTreeMap::new();
-    for held in &inspection.invocations {
-        tasks.insert(held.record.task_id.as_str(), held.record.state.as_str());
-    }
-    tally_states(machine, tasks.values().copied())
-}
-
-/// Tasks per terminal state in machine declaration order, with the
-/// in-progress remainder appended so a mid-run summary says it is one.
-///
-/// The tally counts the tasks of the invocation's own scope: one sentence must
-/// not describe two, and a member's invocations beside the whole project's task
-/// counts reads as a summary of neither. §FS-rhei-summary.2.1
-fn summary_task_tally(
-    rhei: &rhei_core::ast::Rhei,
-    machine: &rhei_validator::StateMachine,
-    scope: &RheiScope,
-) -> String {
-    let tasks: Vec<&rhei_core::ast::Task> = narrow_to_rhei_scope(flatten_tasks(rhei), scope);
-    tally_states(machine, tasks.iter().map(|task| task.state.as_str()))
-}
-
-/// Count recorded or current task states in machine declaration order.
-/// §FS-rhei-summary.2.1
-fn tally_states<'a>(
-    machine: &rhei_validator::StateMachine,
-    states: impl IntoIterator<Item = &'a str>,
-) -> String {
-    let states: Vec<&str> = states.into_iter().collect();
-    let mut parts: Vec<(usize, &str)> = Vec::new();
-    for (state, def) in &machine.states {
-        if !def.terminal {
-            continue;
-        }
-        let count = states.iter().filter(|task_state| **task_state == state.as_str()).count();
-        if count > 0 {
-            parts.push((count, state.as_str()));
-        }
-    }
-    let terminal: HashSet<&str> = machine
-        .states
-        .iter()
-        .filter(|(_, def)| def.terminal)
-        .map(|(state, _)| state.as_str())
-        .collect();
-    let in_progress = states.iter().filter(|state| !terminal.contains(**state)).count();
-    if in_progress > 0 {
-        parts.push((in_progress, "in progress"));
-    }
-    if parts.is_empty() {
-        return "no tasks".to_string();
-    }
-    let mut tally = String::new();
-    for (index, (count, label)) in parts.iter().enumerate() {
-        if index == 0 {
-            tally.push_str(&format!("{count} task{} {label}", plural_s(*count)));
-        } else {
-            tally.push_str(&format!(", {count} {label}"));
-        }
-    }
-    tally
 }
 
 /// One numbered entry per invocation record, and one per agent spawn no record

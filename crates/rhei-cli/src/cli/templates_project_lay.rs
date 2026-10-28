@@ -75,6 +75,8 @@
         values: &'a BTreeMap<String, serde_json::Value>,
         members: &'a [ProjectMember],
         dry_run: bool,
+        /// The values files each member's `laid` fence records. §FS-rhei-templates.6.1.5
+        input_files: &'a [PathBuf],
     }
 
     /// A project template rendered into scratch space with the collected
@@ -436,6 +438,8 @@
             output_dir: &project.join(&member.manifest.name),
             dry_run,
             keep_on_error: false,
+            builtin: member.resolved.is_builtin(),
+            input_files: lay.input_files,
         })
         .map_err(|err| {
             miette!(

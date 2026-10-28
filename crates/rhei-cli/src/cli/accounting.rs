@@ -203,6 +203,8 @@ fn record_agent_accounting_attempt(
     let pricing =
         price_tokens(invocation.price_book, provider.as_deref(), model.as_deref(), &tokens);
     let target_slug = resolved_agent_target_slug(invocation.resolved);
+    // §FS-rhei-cost-accounting.3.5: a record written inside a run copies its provenance.
+    let provenance = identity.run_id.as_ref().and_then(|_| current_run_provenance());
     let record = AccountingInvocationRecord {
         schema: ACCOUNTING_INVOCATION_SCHEMA.to_string(),
         // §FS-rhei-cost-accounting.3.7: use the identity created by the
@@ -211,6 +213,8 @@ fn record_agent_accounting_attempt(
         // §FS-rhei-cost-accounting.3.5: every record written inside a run names
         // it, so attributing spend to a run is a fact rather than an inference.
         run_id: identity.run_id.clone(),
+        rhei_build: provenance.as_ref().map(|provenance| provenance.rhei_build.clone()),
+        checkout_head_at_start: provenance.map(|provenance| provenance.checkout_head_at_start),
         task_id: invocation.task.id.to_string(),
         state: invocation.state.to_string(),
         visit: invocation.visit,

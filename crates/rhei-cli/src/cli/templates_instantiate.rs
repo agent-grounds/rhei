@@ -99,6 +99,7 @@
         let output_dir = output.map(Path::to_path_buf).unwrap_or(default_output);
 
         refuse_existing_output(&output_dir, template, &template_input_args, explicit_output)?;
+        let input_files = input_file_paths(values_files, set_files);
 
         let entrypoint = if layout == TemplateLayout::Project {
             let lay = ProjectLay {
@@ -108,6 +109,7 @@
                 values: &resolved_values,
                 members: &members,
                 dry_run,
+                input_files: &input_files,
             };
             lay_project_output(&lay, &output_dir, keep_on_error)?;
             output_dir.clone()
@@ -121,6 +123,8 @@
                 output_dir: &output_dir,
                 dry_run,
                 keep_on_error,
+                builtin: resolved_template.is_builtin(),
+                input_files: &input_files,
             })?;
             report_laid_rhei(&laid, &output_dir, &manifest.name, dry_run)?;
             laid.materialized.entrypoint()

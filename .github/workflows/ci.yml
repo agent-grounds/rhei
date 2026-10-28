@@ -59,6 +59,12 @@ jobs:
       - name: cargo build
         run: cargo build --workspace --all-targets --locked
 
+      # The build script records the commit rhei was built from, so a published
+      # crate without it would build as `unknown`. §FS-rhei-version.2
+      - name: rhei-cli package carries build.rs
+        if: runner.os == 'Linux'
+        run: cargo package --list -p rhei-cli --locked --allow-dirty | grep -qx build.rs
+
       - name: cargo test
         timeout-minutes: 45
         run: cargo test --workspace --all-targets --locked --no-fail-fast

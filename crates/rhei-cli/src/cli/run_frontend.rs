@@ -259,6 +259,8 @@ fn start_run_frontend(
         log: identity.headless.then(|| run_console_log_path(workspace_root)),
         events: rhei_tui::event_log_path(workspace_root),
         exit_code: None,
+        rhei_build: Some(identity.provenance.rhei_build.clone()),
+        checkout_head_at_start: identity.provenance.checkout_head_at_start.clone(),
     });
 
     let is_tui = frontend.is_tui;

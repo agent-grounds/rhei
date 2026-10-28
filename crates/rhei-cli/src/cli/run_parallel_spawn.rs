@@ -58,11 +58,8 @@ fn spawn_parallel_agent_work_item(
     // Initial members retain project-level transcripts; admitted members use
     // their own runtime. §FS-rhei-agents.8.1 §FS-rhei-panta.6.2
     let task_workspace_root = loaded.task_root(&item.task_id_str, workspace_root);
-    let agent_runtime_dir = if machines.uses_member_local_runtime(&item.task_id_str) {
-        task_workspace_root.join("runtime")
-    } else {
-        runtime_dir.to_path_buf()
-    };
+    let agent_runtime_dir =
+        machines.agent_runtime_dir(&item.task_id_str, &task_workspace_root, runtime_dir);
     let visit_count = render_visit_count(
         loaded.rhei.metadata.as_ref(),
         &task.id,

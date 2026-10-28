@@ -384,6 +384,23 @@ impl ExecutionMachines {
         let rhei_id = task_id.split('.').next().unwrap_or(task_id);
         self.member_local_runtimes.contains(rhei_id)
     }
+
+    /// Where a ticket's agents keep their logs and spawn records: the run's
+    /// runtime directory, or its own root's when its rhei was admitted after
+    /// startup. The agent spawn sites plan under it, and so does the scan
+    /// that asks what their next spawn would be. §FS-rhei-panta.6.2 §FS-rhei-agents.8.4
+    fn agent_runtime_dir(
+        &self,
+        task_id: &str,
+        task_root: &Path,
+        run_runtime_dir: &Path,
+    ) -> PathBuf {
+        if self.uses_member_local_runtime(task_id) {
+            task_root.join("runtime")
+        } else {
+            run_runtime_dir.to_path_buf()
+        }
+    }
 }
 
 /// Resolve every machine a loaded plan runs under: the project default, plus

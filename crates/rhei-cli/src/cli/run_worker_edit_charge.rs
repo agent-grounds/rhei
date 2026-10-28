@@ -90,11 +90,9 @@ fn announce_worker_revert(revert: &WorkerRevert, release: &mut PendingSlotReleas
     let sink = &release.sink.clone();
     release.reverted(&revert.location);
     emit_run_message(sink, rhei_tui::MessageLevel::Warn, revert.warning());
-    let budget = match revert.budget {
-        AttemptBudget::Visit(budget) => budget,
-        AttemptBudget::Poll { max_attempts } => max_attempts,
-    };
-    if revert.attempt_charged && revert.charged >= budget {
+    // A restore is a revert, so its attempt is the visit's last reverted one.
+    let spent = revert.budget.spent(revert.charged, true).filter(|_| revert.attempt_charged);
+    if let Some(budget) = spent {
         let halt =
             render_spent_visit_halt(&revert.task_id, &revert.state, budget, REVERTED_EDIT_OWED, revert.recovery);
         emit_run_message(sink, rhei_tui::MessageLevel::Warn, halt);
@@ -141,7 +139,8 @@ fn charge_reverted_attempt(
     };
     let bound = machine.states.get(state).and_then(|def| def.poll.as_ref());
     let spent = bound.zip(read_spawn_record(spawn_record)).is_some_and(|(poll, stored)| {
-        stored.reverted.is_some() && stored.charged >= u64::from(poll.max_attempts)
+        let budget = AttemptBudget::Poll { max_attempts: u64::from(poll.max_attempts) };
+        budget.spent(stored.charged, stored.reverted.is_some()).is_some()
     });
     record_poll_self_loop(reloaded, input, machine, task, state, state, spent.then_some(0))
         .map(|_| ())

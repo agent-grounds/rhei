@@ -218,20 +218,26 @@ fn earliest_pending_agent_deadline(
     settings: &RheiSettings,
     opts: &RunOptions,
     scope: &RheiScope,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> Option<u64> {
-    agent_deadline_since(rhei, machines, settings, opts, scope, current_unix_secs() + 1)
+    agent_deadline_since(rhei, machines, settings, opts, scope, spawns, current_unix_secs() + 1)
 }
 
 /// The earliest agent deadline at or after `since`, even one already passed.
 /// A pass that read its ready set at `since` has not tried a poll that fell
 /// due while it ran, so the pass loop must not halt as if nothing were
 /// pending. §FS-rhei-run.3.6 item 3 §FS-rhei-run.5.1
+///
+/// A poll whose next spawn its site would refuse for a spent bound is stalled,
+/// not pending, so it contributes nothing, and `spawns` is where that spawn's
+/// record is read. §FS-rhei-run.3.7.4
 fn agent_deadline_since(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     settings: &RheiSettings,
     opts: &RunOptions,
     scope: &RheiScope,
+    spawns: &SpawnSiteRoots<'_>,
     since: u64,
 ) -> Option<u64> {
     let now = current_unix_secs();
@@ -260,22 +266,32 @@ fn agent_deadline_since(
                 .as_ref()
                 .and_then(|_| poll_next_attempt_at(rhei.metadata.as_ref(), &task.id, &state))
                 .filter(|deadline| *deadline >= since);
-            let provider = if state_def.program.is_some() {
+            let agents = if state_def.program.is_some() {
                 None
             } else {
-                resolve_agent_invocations_for_task(machine, &state, settings, opts, Some(task))
-                    .ok()?
-                    .iter()
-                    .filter_map(|resolved| {
-                        resolved_provider_eligibility_deadline(rhei, machines, resolved, now)
-                    })
-                    .max()
+                Some(
+                    resolve_agent_invocations_for_task(machine, &state, settings, opts, Some(task))
+                        .ok()?,
+                )
             };
-            match (poll, provider) {
-                (Some(poll), Some(provider)) => Some(poll.max(provider)),
-                (Some(deadline), None) | (None, Some(deadline)) => Some(deadline),
-                (None, None) => None,
-            }
+            let provider = agents
+                .iter()
+                .flatten()
+                .filter_map(|resolved| {
+                    resolved_provider_eligibility_deadline(rhei, machines, resolved, now)
+                })
+                .max();
+            let deadline = match (poll, provider) {
+                (Some(poll), Some(provider)) => poll.max(provider),
+                (Some(deadline), None) | (None, Some(deadline)) => deadline,
+                (None, None) => return None,
+            };
+            // No run waits for a spawn a spent poll bound refuses, whatever
+            // `pollNextAttemptAt` is left. §FS-rhei-run.5.1 §FS-rhei-run.3.7.4
+            let budget = resolve_attempt_budget(Some(state_def), settings);
+            let stalled = state_def.poll.is_some()
+                && spawns.next_spawns_spent(rhei, machine, task, &state, agents.as_deref(), budget);
+            (!stalled).then_some(deadline)
         })
         .min()
 }

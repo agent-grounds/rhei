@@ -188,6 +188,7 @@ fn idle_return(
     settings: &RheiSettings,
     opts: &RunOptions,
     scope: &RheiScope,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> Option<IdleReturn> {
     if !opts.until_idle() {
         return None;
@@ -213,10 +214,12 @@ fn idle_return(
         // shape the judgment accepted and this walk has no word for; `mixed`
         // says "more than one plain answer" rather than inventing a fifth.
         .unwrap_or(rhei_tui::IdleBlocker::Mixed);
-    let next_attempt_at = earliest_pending_agent_deadline(rhei, machines, settings, opts, scope)
-        .map(|deadline| {
-            rhei_tui::format_rfc3339(std::time::UNIX_EPOCH + Duration::from_secs(deadline))
-        });
+    let next_attempt_at =
+        earliest_pending_agent_deadline(rhei, machines, settings, opts, scope, spawns).map(
+            |deadline| {
+                rhei_tui::format_rfc3339(std::time::UNIX_EPOCH + Duration::from_secs(deadline))
+            },
+        );
     Some(IdleReturn { blocker, waiting: waiting.len(), next_attempt_at })
 }
 

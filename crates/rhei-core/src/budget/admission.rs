@@ -320,16 +320,7 @@ impl Journal {
         basis: SpendBasis,
         audit: &Audit,
     ) -> Result<()> {
-        self.append(
-            "spend",
-            json!({
-                "reservation_id": reservation,
-                "amount_micro": amount_micro,
-                "currency": currency,
-                "basis": basis.as_str(),
-            }),
-            audit,
-        )
+        self.settle_spend_in_context(reservation, amount_micro, currency, basis, None, audit)
     }
 
     /// Record ambiguity *before* capability transfer. A crash after this point

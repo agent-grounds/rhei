@@ -423,6 +423,12 @@ pub fn halt_text(spent: &Exhaustion, bound: &Bound, remedy: &Remedy, marks: &Spe
     // it rather than the contract below. §FS-rhei-budgets.8
     if let Some(estimated) = marks.row(super::built_in::SPEND_RESERVE, currency) {
         lines.push(row("estimated:", &estimated));
+        // Aligned under the value column, never wrapped, so one `grep` finds
+        // a pair; they qualify `estimated:` and are not a second remedy.
+        // §FS-rhei-budgets.8.1
+        for group in marks.continuations() {
+            lines.push(row("", &group));
+        }
     }
     lines.push(row("mode:", &mode));
     lines.push(match remedy {

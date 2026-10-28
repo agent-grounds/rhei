@@ -1207,6 +1207,9 @@ fn run_validation_once(input: &Path, state_machine: Option<&Path>) -> MietteResu
     // it is spent is not visible. Resolved and reported only — nothing here
     // locks, appends, or debits. §FS-rhei-validate.4 §FS-rhei-budgets.6.3
     let mut reported = validated_bound_lines(input, state_machine);
+    // About the spend bound just reported, so before every other conditional
+    // warning. §FS-rhei-validate.4.6
+    reported.extend(validated_price_book_coverage(input, state_machine));
     reported.extend(warnings);
     print_validation_report(&reported);
     Ok(())

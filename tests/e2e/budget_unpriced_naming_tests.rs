@@ -188,7 +188,6 @@ fn assert_details(details: &serde_json::Value, each: u64, surface: &str) {
 /// `estimated:` row says which pairs and which book.
 // §FS-rhei-budgets.8.1 §REQ-bounded-neural-work.5
 #[test]
-#[ignore = "red until #515: the spend halt names the unpriced pairs and the book; implement removes this"]
 fn a_spend_halt_on_unpriced_models_names_them_and_the_book_that_lacks_them() {
     let (dir, plan, machine, prices) = setup_unpriced("unpriced-naming-halt", "");
 
@@ -210,7 +209,6 @@ fn a_spend_halt_on_unpriced_models_names_them_and_the_book_that_lacks_them() {
 /// `rhei budget show` names them beneath its `estimated:` line, in the halt's
 /// words, aligned under that line's value column. §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #515: budget show names the unpriced pairs and the book; implement removes this"]
 fn budget_show_names_the_unpriced_models_beneath_its_estimated_line() {
     let (_dir, plan, machine, prices) = setup_unpriced("unpriced-naming-show", FOUR_SPAWNS);
     run_with_book(&plan, &machine, &prices, false);
@@ -225,7 +223,6 @@ fn budget_show_names_the_unpriced_models_beneath_its_estimated_line() {
 /// `rhei budget show --format json` carries the same groups as
 /// `spend.unpriced_details`, summing to `unpriced`. §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #515: budget show JSON carries spend.unpriced_details; implement removes this"]
 fn budget_show_json_carries_the_unpriced_details() {
     let (dir, plan, machine, prices) = setup_unpriced("unpriced-naming-show-json", FOUR_SPAWNS);
     run_with_book(&plan, &machine, &prices, false);
@@ -244,7 +241,6 @@ fn budget_show_json_carries_the_unpriced_details() {
 /// The run report's Bounds cell names them in one line, because a table cell
 /// cannot hold the halt's continuation lines. §FS-rhei-run-report.3.1
 #[test]
-#[ignore = "red until #515: the run report's Bounds cell names the unpriced pairs; implement removes this"]
 fn the_run_reports_bounds_cell_names_the_unpriced_models_in_one_line() {
     let (dir, plan, machine, prices) = setup_unpriced("unpriced-naming-report", FOUR_SPAWNS);
     run_with_book(&plan, &machine, &prices, false);
@@ -267,7 +263,6 @@ fn the_run_reports_bounds_cell_names_the_unpriced_models_in_one_line() {
 /// entry of `budget_snapshot.bounds`, and `null` on every count entry.
 /// §FS-rhei-run-json.2.1
 #[test]
-#[ignore = "red until #515: budget_halt and budget_snapshot carry unpriced_details; implement removes this"]
 fn the_json_stream_carries_unpriced_details_and_null_on_count_entries() {
     let (_dir, plan, machine, prices) = setup_unpriced("unpriced-naming-json", FOUR_SPAWNS);
 
@@ -303,7 +298,6 @@ fn the_json_stream_carries_unpriced_details_and_null_on_count_entries() {
 /// alone answers the question, and its charge is still the reserve.
 /// §FS-rhei-budgets.5.2 §FS-rhei-budgets.6.2
 #[test]
-#[ignore = "red until #515: an unpriced spend receipt carries pricing_context; implement removes this"]
 fn an_unpriced_spend_receipt_carries_its_pricing_context() {
     let (dir, plan, machine, prices) = setup_unpriced("unpriced-naming-receipt", FOUR_SPAWNS);
     run_with_book(&plan, &machine, &prices, false);
@@ -339,7 +333,6 @@ fn an_unpriced_spend_receipt_carries_its_pricing_context() {
 /// `rhei validate` warns once for the book, listing every targeted pair it has
 /// no entry for, after the bound lines. §FS-rhei-validate.4.6
 #[test]
-#[ignore = "red until #515: validate warns once per book about uncovered targets; implement removes this"]
 fn validate_warns_once_per_book_about_the_targeted_models_it_cannot_price() {
     let (_dir, plan, machine, _prices) = setup_unpriced("unpriced-naming-validate", "");
 
@@ -370,7 +363,6 @@ fn validate_warns_once_per_book_about_the_targeted_models_it_cannot_price() {
 /// reserve nothing is admitted, and the warning is already on stderr ahead of
 /// the halt. §FS-rhei-validate.4.6
 #[test]
-#[ignore = "red until #515: run warns about uncovered targets before its first reserve; implement removes this"]
 fn run_warns_about_the_uncovered_models_before_its_first_reserve() {
     let (dir, plan, machine, prices) = setup_unpriced("unpriced-naming-run-warning", NO_SPAWN);
 

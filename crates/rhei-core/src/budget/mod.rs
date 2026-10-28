@@ -28,6 +28,7 @@ mod journal;
 mod replay;
 mod roots;
 mod types;
+mod unpriced;
 mod window;
 
 #[cfg(test)]
@@ -61,6 +62,8 @@ mod travel_tests;
 #[cfg(test)]
 mod unpriced_naming_tests;
 #[cfg(test)]
+mod unpriced_tests;
+#[cfg(test)]
 mod window_tests;
 
 pub use account::{Account, Retirement, ACCOUNT_DIR};
@@ -87,6 +90,7 @@ pub use roots::witnessed_root;
 pub use types::{
     BudgetError, Contract, Counter, Dimension, Exhaustion, Snapshot, SpendBasis, SpendMarks,
 };
+pub use unpriced::{book_phrase, details_json, PricingContext, UnpricedDetail};
 pub use window::{day_key, instant, now, renewal_instant, CLOCK_ENV};
 
 pub(crate) type Result<T> = std::result::Result<T, BudgetError>;

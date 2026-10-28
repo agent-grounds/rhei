@@ -164,8 +164,9 @@ fn spawns(workspace: &Path) -> Vec<String> {
 /// §FS-rhei-templates.6.1: the template instantiates from its defaults and a
 /// dry run shows the one shape supervision gives it — the supervisor ready,
 /// everything else held. Validation emits only the required `Consumes`
-/// advisory (§FS-rhei-validate.6), with no supervisor configuration warning
-/// under §FS-rhei-supervision.1.2.
+/// advisory (§FS-rhei-validate.6), after the built-in book's coverage warning
+/// for the template's targets (§FS-rhei-validate.4.6), with no supervisor
+/// configuration warning under §FS-rhei-supervision.1.2.
 #[test]
 fn the_default_instantiation_validates_clean_and_holds_every_child() {
     let dir = unique_temp_dir("supervised-delivery-defaults");
@@ -194,6 +195,9 @@ fn the_default_instantiation_validates_clean_and_holds_every_child() {
         format!(
             "Validation succeeded\n{VALIDATED_BOUNDS}{}",
             concat!(
+                "warning: price book builtin-2026-05-20 (built-in) has no entry for ",
+                "anthropic/claude-opus-4-7, openai/gpt-5.5: their invocations will be measured but ",
+                "unpriced, and each is charged the spend reserve. Add an entry for each pair to price them.\n",
                 "warning: **Consumes:** declares export data-flow for prompt injection, not filesystem visibility. ",
                 "Workers can read undeclared sibling exports under runtime/exports/. For a blind round, schedule ",
                 "participants concurrently and brief them not to inspect sibling exports; neither measure enforces ",

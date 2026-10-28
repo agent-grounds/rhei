@@ -54,11 +54,16 @@ impl BudgetLine {
     }
 
     /// The marks, on their own line beneath the one above, in the words the
-    /// halt uses. Absent where the whole day was measured.
-    /// §FS-rhei-budgets.10
+    /// halt uses, followed by the names of what was unpriced aligned under
+    /// this line's value column. Absent where the whole day was measured.
+    /// §FS-rhei-budgets.10 §FS-rhei-budgets.8.1
     pub fn marks_line(&self) -> Option<String> {
         let written = self.marks.row(super::built_in::SPEND_RESERVE, self.currency.as_deref())?;
-        Some(format!("  estimated:   {written}"))
+        let mut lines = vec![format!("  estimated:   {written}")];
+        lines.extend(
+            self.marks.continuations().into_iter().map(|group| format!("{:15}{group}", "")),
+        );
+        Some(lines.join("\n"))
     }
 }
 

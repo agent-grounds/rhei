@@ -202,7 +202,11 @@ is the reference.
 The spend bound only bounds spending on runs that are priced: an invocation
 whose model the price book does not price is charged a flat reserve instead of
 what it cost. Name one book in `defaults.prices` and every run on the machine
-prices from it without `rhei run --prices`. See
+prices from it without `rhei run --prices`. `rhei validate`, and `rhei run`
+before its first reserve, warn about every targeted provider/model pair the
+selected book has no entry for, and a halt and `rhei budget show` name the
+unpriced pairs and the book that lacked them. Adding the entries prices later
+invocations; it does not change charges already settled. See
 [Cost accounting](docs/functional-spec/rhei-cost-accounting.spec.md).
 
 A project laid down at a path a *different* project used before it is refused,

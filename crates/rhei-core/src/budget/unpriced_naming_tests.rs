@@ -18,7 +18,6 @@ const RESERVE: u64 = built_in::SPEND_RESERVE;
 /// the `estimated:` line, aligned under that line's value column.
 /// §FS-rhei-budgets.8.1 §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #515: an unpriced receipt without context reads as the unknown group; implement removes this"]
 fn an_unpriced_receipt_without_a_pricing_context_reads_as_the_unknown_group() {
     let case = Case::new();
     let mut journal = case.open();

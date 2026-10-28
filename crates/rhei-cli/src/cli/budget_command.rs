@@ -222,7 +222,8 @@ fn budget_ceiling_policy_json<'a>(
 }
 
 /// The spend dimension, with its currency and how much of the day was
-/// estimated rather than measured. §FS-rhei-budgets.10 §FS-rhei-budgets.6.2
+/// estimated rather than measured, and what the unpriced part holds.
+/// §FS-rhei-budgets.10 §FS-rhei-budgets.6.2 §FS-rhei-budgets.8.1
 fn budget_spend_json(line: &BudgetLine, currency: Option<&str>) -> serde_json::Value {
     serde_json::json!({
         "bound": line.bound,
@@ -234,6 +235,7 @@ fn budget_spend_json(line: &BudgetLine, currency: Option<&str>) -> serde_json::V
         "unpriced": line.marks.unpriced,
         "unmeasurable": line.marks.unmeasurable,
         "unsettled": line.marks.unsettled,
+        "unpriced_details": rhei_core::budget::details_json(&line.marks.unpriced_details),
     })
 }
 

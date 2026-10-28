@@ -331,6 +331,7 @@ mod tests {
     include!("cli/tests_agent_resolution.rs");
     include!("cli/tests_cli_target_overrides.rs");
     include!("cli/tests_provider_limits.rs");
+    include!("cli/tests_wait_deadlines.rs");
     include!("cli/tests_codex_provider_local.rs");
     include!("cli/tests_codex_provider_native.rs");
     include!("cli/tests_agent_prompt_transport.rs");

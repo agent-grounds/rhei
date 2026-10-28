@@ -18,8 +18,8 @@ use std::time::{Instant, SystemTime};
 use serde_json::{json, Map, Value};
 
 use crate::rhei_tui::event::{
-    AccountingRunSummary, AgentStream, MessageLevel, RunEvent, RunSummary, TaskOutcome,
-    UsageReport, UsageSummary,
+    AccountingRunSummary, AgentStream, MessageLevel, RunEvent, RunProvenance, RunSummary,
+    TaskOutcome, UsageReport, UsageSummary,
 };
 use crate::rhei_tui::run_stop::RunStop;
 
@@ -57,13 +57,16 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
         map.insert(key.to_string(), value);
     };
     match event {
-        RunEvent::RunStarted { run_id, workspace, parallel, total_tasks } => {
+        RunEvent::RunStarted { run_id, workspace, parallel, total_tasks, provenance } => {
             put("event", json!("run_started"));
             put("schema", json!(SCHEMA_VERSION));
             put("run_id", json!(run_id));
             put("workspace", json!(workspace.display().to_string()));
             put("parallel", json!(parallel));
             put("total_tasks", json!(total_tasks));
+            // §FS-rhei-run-json.2.1: always present, additions under schema 1.
+            put("rhei_build", json!(provenance.rhei_build));
+            put("checkout_head_at_start", json!(provenance.checkout_head_at_start));
         }
         RunEvent::PassStarted { pass, ready } => {
             put("event", json!("pass_started"));
@@ -366,6 +369,7 @@ fn decode_event(kind: &str, v: &Value, wall_clock: SystemTime) -> Option<RunEven
             workspace: path("workspace"),
             parallel: num("parallel") as u16,
             total_tasks: num("total_tasks") as usize,
+            provenance: RunProvenance::from_fields(v),
         },
         "pass_started" => RunEvent::PassStarted { pass: num("pass") as u32, ready: list("ready") },
         "slot_assigned" => RunEvent::SlotAssigned {

@@ -17,6 +17,9 @@ struct RunIdentity {
     headless: bool,
     /// Shared across execution modes and project roots. §FS-rhei-budgets.7.2
     budget: BudgetRun,
+    /// The build, and the checkout HEAD once the run holds its locks.
+    /// §FS-rhei-run-headless.2
+    provenance: rhei_tui::RunProvenance,
 }
 
 impl RunIdentity {
@@ -32,6 +35,10 @@ impl RunIdentity {
             started_wall,
             headless: is_headless_child(),
             budget: begin_budget_run(),
+            provenance: rhei_tui::RunProvenance {
+                rhei_build: rhei_build_record(),
+                checkout_head_at_start: None,
+            },
         }
     }
 

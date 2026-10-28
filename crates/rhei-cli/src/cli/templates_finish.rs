@@ -27,6 +27,7 @@
                 &laid.materialized,
                 output_dir,
                 state_machine_path.as_deref(),
+                &laid.source_line,
                 true,
             );
         }
@@ -43,6 +44,7 @@
             &laid.materialized,
             output_dir,
             state_machine_path.as_deref(),
+            &laid.source_line,
             false,
         )
     }

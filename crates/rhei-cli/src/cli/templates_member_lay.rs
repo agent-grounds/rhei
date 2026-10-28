@@ -19,6 +19,10 @@
         output_dir: &'a Path,
         dry_run: bool,
         keep_on_error: bool,
+        /// Whether the template is built into rhei, and the input files the
+        /// lay read, for the `laid` fence. §FS-rhei-templates.6.1.5
+        builtin: bool,
+        input_files: &'a [PathBuf],
     }
 
     /// A rhei that was laid — or, under `--dry-run`, that would be — and what
@@ -30,6 +34,8 @@
         /// Computed after validation, emitted only when the whole instantiation
         /// succeeds, including a project's later members. §FS-rhei-library.7.2.3
         shared_inputs: Vec<String>,
+        /// The instantiation summary's `Source:` line. §FS-rhei-templates.6.1.3
+        source_line: String,
         /// The `--dry-run` render, kept until the summary has read it.
         _scratch: Option<tempfile::TempDir>,
     }
@@ -100,6 +106,16 @@
             })
             .inspect_err(|_| discard(&target_dir))?;
 
+        // One `laid` fence on the machine the lay wrote, after any inclusion
+        // fences: recorded, never refused. §FS-rhei-library.7.1 §FS-rhei-templates.6.1.5
+        let source = SourceIdentity::of(lay.template_dir, lay.builtin, lay.input_files);
+        template_digest(lay.template_dir)
+            .and_then(|digest| {
+                let fence = laid_fence(lay.manifest, &digest, &source, lay.values);
+                append_laid_fence(&target_dir.join("states.yaml"), &fence)
+            })
+            .inspect_err(|_| discard(&target_dir))?;
+
         // Dry runs always discard scratch; real failures obey retention. §FS-rhei-templates.6.1.2
         let fail = |settings: Option<&PreparedProjectSettings>, err: Report| -> Report {
             if lay.dry_run {
@@ -157,7 +173,8 @@
             publish_staged_member(&target_dir, lay.output_dir, settings.as_ref(), lay.keep_on_error)?;
             materialized.output_dir = lay.output_dir.to_path_buf();
         }
-        Ok(LaidRhei { materialized, placement, settings, shared_inputs, _scratch: None })
+        let source_line = source.source_line();
+        Ok(LaidRhei { materialized, placement, settings, shared_inputs, source_line, _scratch: None })
     }
 
     /// `rhei instantiate <plan-template> --into <project>`: the member the
@@ -173,6 +190,7 @@
         input_args: &[String],
         project: &Path,
         dry_run: bool,
+        source: (bool, &[PathBuf]),
     ) -> MietteResult<()> {
         let output_dir = project.join(&manifest.name);
         // The same refusal as the default `--output`, dry run included. §FS-rhei-library.2.2
@@ -189,6 +207,8 @@
             output_dir: &output_dir,
             dry_run,
             keep_on_error: false,
+            builtin: source.0,
+            input_files: source.1,
         })?;
         report_laid_rhei(&laid, &output_dir, &manifest.name, dry_run)
     }

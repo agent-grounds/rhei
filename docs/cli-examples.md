@@ -155,6 +155,28 @@ This summary is read-only: ordinary accounting keeps its stored prices. The
 positional workspace and any repeatable `--rhei` flags bound which run records
 and immutable completion report may be selected.
 
+Provenance for a pull request: a `describe` step freezes the summary it
+prints, and a later `ship` step prints exactly that block again, however many
+records were written in between:
+
+```bash
+rhei summary WORKSPACE --print-checkpoint > checkpoint.json   # in describe
+rhei summary WORKSPACE --details                              # the PR body
+rhei summary WORKSPACE --details --checkpoint checkpoint.json # in ship: the same bytes
+```
+
+Every summary ends with the line that says which build ran, which commit the
+checkout started on, which template the plan was laid from, and which set of
+records it covers:
+
+```text
+Provenance: rhei 0.6.4-dev @ d0446a7 · checkout HEAD at start agent-grounds/rhei@a1b2c3d · template `supervised-ticket-fix` 1.0.0 @ agent-grounds/agent-grounds@d292a9b (clean) · checkpoint 3f9a2c41d0b7: run 55177a, 7 invocations
+```
+
+The checkpoint names no path, so it may be stored beside the pull request. A
+record or spawn it names that has since been reset away is refused by name. See
+[§FS-rhei-summary.6](functional-spec/rhei-summary.spec.md#6-the-checkpoint-document) and [§FS-rhei-summary.2.4](functional-spec/rhei-summary.spec.md#24-the-provenance-line).
+
 Name one price book for every run on this machine, instead of threading
 `--prices` through each entry point that might start one:
 

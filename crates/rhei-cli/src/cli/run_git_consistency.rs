@@ -24,6 +24,17 @@ impl RunGitConsistencyGuard {
         Self { repo_root: Some(repo_root), head_before: Some(head_before), tracked_paths }
     }
 
+    /// The commit the guard captured, with the repository's reduced remote:
+    /// one capture serves both the guard and the run's provenance.
+    /// §FS-rhei-run-headless.2
+    fn checkout_head_at_start(&self) -> Option<rhei_tui::CheckoutHead> {
+        let (repo_root, head) = (self.repo_root.as_deref()?, self.head_before.as_deref()?);
+        let head = checkout_head_at(repo_root)
+            .filter(|found| found.commit == head)
+            .unwrap_or(rhei_tui::CheckoutHead { repo: None, commit: head.to_string() });
+        build_identity::is_commit(&head.commit).then_some(head)
+    }
+
     fn verify_after_success(&self) -> MietteResult<()> {
         // §FS-rhei-run.3.1 §AR-agent-orchestrator-workflow.3.4: detect stale HEAD after run-owned writes.
         let (Some(repo_root), Some(head_before)) = (&self.repo_root, &self.head_before) else {

@@ -446,11 +446,15 @@
         name: &str,
         version: &str,
         digest: &str,
+        source: &str,
         inputs: &BTreeMap<String, serde_json::Value>,
     ) -> String {
         let rendered: Vec<String> =
             inputs.iter().map(|(key, value)| format!("{key}: {value}")).collect();
-        format!("# --- {name} {version} src:sha256:{digest} inputs: {{{}}} ---\n", rendered.join(", "))
+        format!(
+            "# --- {name} {version} src:sha256:{digest} {source} inputs: {{{}}} ---\n",
+            rendered.join(", ")
+        )
     }
 
     fn union_target_help() -> &'static str {

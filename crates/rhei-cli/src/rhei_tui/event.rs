@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::time::{Instant, SystemTime};
 
 pub use super::event_bounds::{bound_journal_line, BoundCeiling, BoundReport};
+pub use super::event_provenance::{CheckoutHead, RheiBuild, RunProvenance};
 pub use super::event_sink::{EventSink, NullSink, Tee};
 
 /// Slot index assigned to a running task invocation.
@@ -371,6 +372,8 @@ pub enum RunEvent {
         workspace: PathBuf,
         parallel: u16,
         total_tasks: usize,
+        /// The build and the checkout HEAD at start. §FS-rhei-run-json.2.1
+        provenance: RunProvenance,
     },
     PassStarted {
         pass: u32,

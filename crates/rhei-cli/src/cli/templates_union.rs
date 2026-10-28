@@ -9,6 +9,9 @@
         name: String,
         version: String,
         digest: String,
+        /// `git:<repo>@<commit> <state>`, or the state word alone.
+        /// §FS-rhei-templates.6.1.5
+        source: String,
         inputs: BTreeMap<String, serde_json::Value>,
         /// The rendered workspace, which is an ordinary rhei.
         root: PathBuf,
@@ -149,6 +152,7 @@
             &part.name,
             &part.version,
             &part.digest,
+            &part.source,
             &part.inputs,
         ));
         writes.files.push((host.machine.clone(), machine));
@@ -352,6 +356,7 @@
             set_values,
             set_files,
         )?;
+        let input_files = input_file_paths(values_files, set_files);
         let host = match target {
             IntoTarget::Rhei(host) => host,
             IntoTarget::Project(project) if layout == TemplateLayout::Project => {
@@ -362,13 +367,14 @@
                     values: &values,
                     members: &members,
                     dry_run,
+                    input_files: &input_files,
                 };
                 return lay_project_into(&lay, &project);
             }
             IntoTarget::Project(project) => {
                 return lay_member_into_project(
                     template_dir, template, &manifest, layout, &values, input_args, &project,
-                    dry_run,
+                    dry_run, (resolved.is_builtin(), &input_files),
                 );
             }
         };
@@ -380,7 +386,8 @@
             )
         })?;
         let part_root = scratch.path().join(&manifest.name);
-        let part = render_part(template_dir, &manifest, &values, &part_root, None)?;
+        let part =
+            render_part(template_dir, resolved.is_builtin(), &manifest, &values, &part_root, None)?;
         let mode = if dry_run { UnionMode::DryRun } else { UnionMode::Place };
         union_into_host(&host, &part, mode, ArtifactSides::Placement)
     }

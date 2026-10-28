@@ -158,6 +158,12 @@
         fn path(&self) -> &Path {
             &self.path
         }
+
+        /// A template compiled into rhei, extracted for this lay: it has no
+        /// source files to ask git about. §FS-rhei-templates.6.1.5
+        fn is_builtin(&self) -> bool {
+            self._extracted.is_some()
+        }
     }
 
     fn resolve_template_reference(reference: &str) -> MietteResult<ResolvedTemplate> {

@@ -352,7 +352,9 @@ fn run_command(
         }
         // Select under every held lock, after read-only preflight and before
         // accounting mutation or publication. §FS-rhei-run.2.7
-        let identity = RunIdentity::allocate(&lock_roots)?;
+        let mut identity = RunIdentity::allocate(&lock_roots)?;
+        // §FS-rhei-run-headless.2: the HEAD the consistency guard captured.
+        identity.provenance.checkout_head_at_start = git_consistency.checkout_head_at_start();
         record_run_lock_ownership(&mut run_locks, &identity)?;
         // The caller-owned book is durable everywhere this run can start an
         // agent before the first such process is spawned. §FS-rhei-cost-accounting.5.1

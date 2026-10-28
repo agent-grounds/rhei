@@ -17,6 +17,18 @@ struct AccountingInvocationRecord {
     // §FS-rhei-cost-accounting.3.5
     #[serde(default, skip_serializing_if = "Option::is_none")]
     run_id: Option<String>,
+    /// The run's build and the checkout HEAD it started on, copied from the
+    /// run descriptor because the next run overwrites it. Optional under the
+    /// same schema string; `checkout_head_at_start` keeps its `null`, which is
+    /// a fact, apart from absence. §FS-rhei-cost-accounting.3.5
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rhei_build: Option<rhei_tui::RheiBuild>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_present_value"
+    )]
+    checkout_head_at_start: Option<Option<rhei_tui::CheckoutHead>>,
     task_id: String,
     state: String,
     visit: u64,
@@ -64,6 +76,16 @@ struct AccountingInvocationRecord {
     token_convention: Option<String>,
     tokens: AccountingTokens,
     pricing: AccountingPricing,
+}
+
+/// A field that is present, `null` included, as `Some`; absence stays `None`
+/// through `#[serde(default)]`. §FS-rhei-cost-accounting.3.5
+fn deserialize_present_value<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::Deserialize<'de>,
+{
+    <Option<T> as serde::Deserialize>::deserialize(deserializer).map(Some)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]

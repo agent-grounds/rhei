@@ -19,6 +19,8 @@ mod summary_repricing_activity_tests {
             log: None,
             events: root.join("runtime/events.jsonl"),
             exit_code: None,
+            rhei_build: None,
+            checkout_head_at_start: None,
         }
     }
 

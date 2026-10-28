@@ -169,7 +169,14 @@
                 )
             })?;
             let part_root = scratch.path().join(&included.name);
-            let part = render_part(included_dir, &included, values, &part_root, entry.under())?;
+            let part = render_part(
+                included_dir,
+                resolved.is_builtin(),
+                &included,
+                values,
+                &part_root,
+                entry.under(),
+            )?;
             let single_file = layout == TemplateLayout::SingleFile;
             let host = UnionHost {
                 root: rendered.to_path_buf(),
@@ -204,6 +211,7 @@
     /// what joins a host is always a whole rhei. §FS-rhei-library.6
     fn render_part(
         template_dir: &Path,
+        builtin: bool,
         manifest: &TemplateManifest,
         values: &BTreeMap<String, serde_json::Value>,
         root: &Path,
@@ -223,6 +231,9 @@
             name: manifest.name.clone(),
             version: manifest.version_string(),
             digest: template_digest(template_dir)?,
+            // The part's own files, its includes among them; inputs stay off
+            // an inclusion fence's state word. §FS-rhei-templates.6.1.5
+            source: SourceIdentity::of(template_dir, builtin, &[]).fence_fields(),
             inputs,
             root: root.to_path_buf(),
         })

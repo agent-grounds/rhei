@@ -144,6 +144,12 @@ pub(crate) struct RunDescriptor {
     // §FS-rhei-run-headless.2
     #[serde(default)]
     pub(crate) exit_code: Option<i32>,
+    /// What ran and on what: always serialized, `null` where an older
+    /// descriptor carried none. §FS-rhei-run-headless.2
+    #[serde(default)]
+    pub(crate) rhei_build: Option<rhei_tui::RheiBuild>,
+    #[serde(default)]
+    pub(crate) checkout_head_at_start: Option<rhei_tui::CheckoutHead>,
 }
 
 impl RunDescriptor {
@@ -339,6 +345,9 @@ struct PublishedRun {
     id: String,
     pid: u32,
     workspace: PathBuf,
+    /// Copied onto every invocation record the run writes, because the next
+    /// run overwrites run.json. §FS-rhei-cost-accounting.3.5
+    provenance: rhei_tui::RunProvenance,
 }
 
 static PUBLISHED_DESCRIPTOR: OnceLock<Mutex<Option<PublishedRun>>> = OnceLock::new();
@@ -387,6 +396,10 @@ pub(crate) fn publish_run_descriptor(descriptor: &RunDescriptor) {
         id: descriptor.id.clone(),
         pid: descriptor.pid,
         workspace: descriptor.workspace.clone(),
+        provenance: rhei_tui::RunProvenance {
+            rhei_build: descriptor.rhei_build.clone().unwrap_or_default(),
+            checkout_head_at_start: descriptor.checkout_head_at_start.clone(),
+        },
     });
     let Some(registry) = run_registry_path(&descriptor.id) else {
         eprintln!(
@@ -420,6 +433,16 @@ pub(crate) fn current_run_id() -> Option<String> {
         .unwrap_or_else(|poison| poison.into_inner())
         .as_ref()
         .map(|published| published.id.clone())
+}
+
+/// The published run's provenance, for the records it writes.
+/// §FS-rhei-cost-accounting.3.5
+pub(crate) fn current_run_provenance() -> Option<rhei_tui::RunProvenance> {
+    published_slot()
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .as_ref()
+        .map(|published| published.provenance.clone())
 }
 
 /// Stamp the run's terminal status and exit code into both copies.

@@ -71,6 +71,7 @@ fn run_callback_mode(
         workspace: workspace_root.clone(),
         parallel: frontend_parallel,
         total_tasks: initial_total_tasks,
+        provenance: identity.provenance.clone(),
     });
     emit_initial_validation_warnings(&sink, initial_warnings);
     frontend.announce_dashboard();

@@ -32,6 +32,7 @@ fn every_variant() -> Vec<RunEvent> {
             workspace: PathBuf::from("/w"),
             parallel: 2,
             total_tasks: 7,
+            provenance: crate::rhei_tui::RunProvenance::default(),
         },
         RunEvent::PassStarted { pass: 1, ready: vec!["auth.1".to_string()] },
         assigned(0),

@@ -18,7 +18,6 @@ use super::provenance_support::{
 use super::{assert_success, rhei_command, unique_temp_dir, CliRun};
 
 #[test]
-#[ignore = "red until #514: `rhei version` prints no rhei-build line; implement removes this"]
 fn rhei_version_prints_the_build_line_after_the_four_component_lines() {
     // §FS-rhei-version.2 §FS-rhei-version.3: a fifth `<component> <version>`
     // line, the first four untouched.
@@ -46,7 +45,6 @@ fn rhei_version_prints_the_build_line_after_the_four_component_lines() {
 }
 
 #[test]
-#[ignore = "red until #514: `rhei --version` names no build; implement removes this"]
 fn rhei_dash_dash_version_carries_the_build_in_a_parenthetical() {
     // §FS-rhei-version.2: `rhei <version> (<sha7>[, dirty])` or `(build unknown)`,
     // the version still the second field.
@@ -73,7 +71,6 @@ fn rhei_dash_dash_version_carries_the_build_in_a_parenthetical() {
 }
 
 #[test]
-#[ignore = "red until #514: a flat lay writes no `laid` fence; implement removes this"]
 fn a_committed_template_lays_a_clean_fence_naming_its_commit() {
     // §FS-rhei-library.7.1 §FS-rhei-templates.6.1.5: the fence names the
     // reduced remote and the commit, and the template is `clean`.
@@ -88,7 +85,6 @@ fn a_committed_template_lays_a_clean_fence_naming_its_commit() {
 }
 
 #[test]
-#[ignore = "red until #514: an edited template lays no `dirty` state; implement removes this"]
 fn an_edited_template_lays_dirty_and_the_source_line_names_its_root() {
     // §FS-rhei-templates.6.1.5 §FS-rhei-templates.6.1.3: recorded, not
     // refused; `Source:` names the one non-clean root and its file count.
@@ -106,7 +102,6 @@ fn an_edited_template_lays_dirty_and_the_source_line_names_its_root() {
 }
 
 #[test]
-#[ignore = "red until #514: a values file's state is not recorded; implement removes this"]
 fn a_values_file_outside_any_repository_leaves_the_fence_clean() {
     // §FS-rhei-templates.6.1.5: inputs never enter the state word; they show
     // on `Source:` only.
@@ -127,7 +122,6 @@ fn a_values_file_outside_any_repository_leaves_the_fence_clean() {
 
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #514: a symlinked template records no source; implement removes this"]
 fn a_template_reached_through_a_symlink_names_the_target_repository() {
     // §FS-rhei-templates.6.1.5: symlinks are resolved before the repository
     // is asked, so the link's own directory, in no repository, does not count.
@@ -144,7 +138,6 @@ fn a_template_reached_through_a_symlink_names_the_target_repository() {
 }
 
 #[test]
-#[ignore = "red until #514: with no git the lay records no `unknown`; implement removes this"]
 fn with_no_git_on_path_the_lay_reads_unknown_and_still_succeeds() {
     // §FS-rhei-templates.6.1.5 §REQ-cross-platform: no git is `unknown`, no
     // `git:` field, and the lay is never refused for it.
@@ -222,7 +215,6 @@ fn assert_run_fields(value: &serde_json::Value, head: &str, what: &str) {
 }
 
 #[test]
-#[ignore = "red until #514: run.json and run_started carry no build or head; implement removes this"]
 fn a_run_records_its_build_and_the_checkout_head_at_start() {
     // §FS-rhei-run-headless.2 §FS-rhei-run-json.2.1 §FS-rhei-cost-accounting.3.5:
     // both fields on the descriptor, the stream's head and every record.
@@ -250,7 +242,6 @@ fn a_run_records_its_build_and_the_checkout_head_at_start() {
 }
 
 #[test]
-#[ignore = "red until #514: run.json has no checkout_head_at_start; implement removes this"]
 fn a_run_outside_any_repository_records_a_null_head() {
     // §FS-rhei-run-headless.2: always present, `null` when nothing is known.
     let lay = Lay::new("provenance-no-repo", None);
@@ -267,7 +258,6 @@ fn a_run_outside_any_repository_records_a_null_head() {
 }
 
 #[test]
-#[ignore = "red until #514: the summary prints no provenance line; implement removes this"]
 fn the_provenance_line_is_exact_and_prints_last() {
     // §FS-rhei-summary.2.4 §FS-rhei-summary.3: the fourth part, after a blank
     // line, and inside `<details>` just before it closes.
@@ -302,7 +292,6 @@ fn the_provenance_line_is_exact_and_prints_last() {
 }
 
 #[test]
-#[ignore = "red until #514: there is no --print-checkpoint or --checkpoint; implement removes this"]
 fn a_checkpoint_replays_byte_for_byte_what_the_live_summary_printed() {
     // §FS-rhei-summary.1 §FS-rhei-summary.6: taken beside a live `--details` mid-run, the
     // checkpoint replays that text exactly after `t3` has run, tally included.
@@ -333,7 +322,6 @@ fn a_checkpoint_replays_byte_for_byte_what_the_live_summary_printed() {
 }
 
 #[test]
-#[ignore = "red until #514: no checkpoint carries unrecorded spawns; implement removes this"]
 fn a_checkpoint_carries_unrecorded_spawns_by_their_spawn_file_and_refuses_a_lost_one() {
     // §FS-rhei-summary.6.1 §FS-rhei-summary.5: an unrecorded spawn is a
     // member named by its spawn record's file name; once that record is gone,
@@ -377,7 +365,6 @@ fn a_checkpoint_carries_unrecorded_spawns_by_their_spawn_file_and_refuses_a_lost
 }
 
 #[test]
-#[ignore = "red until #514: the empty summary prints no provenance line; implement removes this"]
 fn an_empty_summary_names_only_the_template() {
     // §FS-rhei-summary.5: zero invocations still say which template.
     let lay = Lay::new("provenance-empty", Some(TEMPLATE_REMOTE));
@@ -393,7 +380,6 @@ fn an_empty_summary_names_only_the_template() {
 }
 
 #[test]
-#[ignore = "red until #514: --checkpoint is not a flag; implement removes this"]
 fn checkpoint_flags_refuse_each_other_and_the_run_pairing() {
     // §FS-rhei-summary.1: usage errors that name both flags, not an unknown flag.
     let lay = Lay::new("provenance-refusals", None);
@@ -410,7 +396,6 @@ fn checkpoint_flags_refuse_each_other_and_the_run_pairing() {
 }
 
 #[test]
-#[ignore = "red until #514: the summary prints no provenance line; implement removes this"]
 fn a_file_remote_prints_the_bare_commit_and_no_path() {
     // §FS-rhei-summary.4: a remote that is a path reduces to nothing.
     let dir = unique_temp_dir("provenance-file-remote-root");

@@ -54,6 +54,7 @@ mod budget_spend_tests;
 mod budget_support;
 mod budget_travel_establish_tests;
 mod budget_travel_halt_tests;
+mod budget_unpriced_naming_tests;
 mod budget_window_tests;
 mod callback_timeout_support;
 mod callback_timeout_tests;

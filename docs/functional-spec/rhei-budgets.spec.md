@@ -457,6 +457,42 @@ reads the account **read-only** rather than refusing it, which is what the
 closed-vocabulary rule above already promises and what a downgrade across this
 version is owed.
 
+A `spend` receipt whose `basis` is `unpriced` additionally carries a
+`pricing_context` naming what could not be priced and by which book, so the
+journal alone says what the mark wants [§FS-rhei-budgets.8.1](rhei-budgets.spec.md#81-naming-what-was-unpriced):
+
+```json
+"pricing_context": {
+  "provider": "anthropic",
+  "model": "claude-opus-5-5",
+  "price_book_id": "foundation-site-2026-09-02",
+  "price_book_path": "/work/prices.json",
+  "price_book_source": "file",
+  "missing_entry": true
+}
+```
+
+Every member is present and may be `null` where it is unknown. `provider` and
+`model` are the invocation's final pair as its accounting record names it.
+`price_book_id` is the selected book's id [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection).
+`price_book_source` is `file` for a caller-owned book named by `--prices` or
+`defaults.prices`, `builtin` for the built-in book, `profiles` for a book
+composed from profile prices, and `none` where no book was selected.
+`price_book_path` is the path the caller-owned book was read from — never the
+run's `runtime/accounting/prices.json` copy — and `null` for the other three.
+`missing_entry` is `true` only where a known pair was checked against the book
+and found no exact entry, `false` where the book has the entry but the usage
+could not be priced by it (`not-applicable`, nothing measured), and `null`
+where that cannot be established. No digest of the book is recorded: the id,
+the path and the source are what a reader is told, and a group split on a value
+the text never prints would read as two identical lines.
+
+The context rides the existing kind for the same reason the reserve's fields
+do: a build that predates it ignores payload keys it does not know. A `spend`
+receipt written before it, or one whose basis is not `unpriced`, carries none,
+and every surface reads such an unpriced receipt as the explicit unknown group
+of [§FS-rhei-budgets.8.1](rhei-budgets.spec.md#81-naming-what-was-unpriced). No receipt is rewritten to add one.
+
 A ticket's identity is bound by **source path and content hash**, so several
 live sources are tolerated only while their bytes agree. That is what makes a
 *moved* ticket keep its travel, and only a moved one: agreeing bytes are what
@@ -909,6 +945,13 @@ release step above already performs, on the same account under the same lock.
 It stays outstanding, so a wrong day reads high rather than silently low, and
 every surface of [§FS-rhei-budgets.9](rhei-budgets.spec.md#9-visibility) says how many there are.
 
+A settle keeps what it knows about an unpriced invocation: the `unpriced`
+receipt carries the pricing context of [§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal), taken from the
+invocation's accounting record and the book the run selected. Carrying it
+changes neither the amount charged nor the mark — the charge is still the
+reserve, and an entry added to the book afterwards changes no charge already
+settled [§FS-rhei-budgets.8.1](rhei-budgets.spec.md#81-naming-what-was-unpriced).
+
 A `spend` receipt settles money and nothing else. It releases no travel unit
 and no invocation unit and changes neither count in either direction, so every
 paragraph above this one is as true after a settle as before it.
@@ -1140,6 +1183,73 @@ It sits between `consumed:` and `mode:`, because it qualifies the numbers above
 it. A mark with no members is left out of the list rather than printed as a
 zero.
 
+### 8.1. Naming what was unpriced
+
+An `unpriced` mark wants a price-book entry [§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle), and a count
+alone does not say which. Price entries match provider and model exactly
+[§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection), so naming the pair and the book that lacked it
+names the fix. Wherever the `estimated:` row counts `unpriced` invocations, it
+therefore also names them, from the `pricing_context` their `spend` receipts
+carry [§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal) — the journal alone answers it, so the naming
+survives an accounting directory that was deleted or reset.
+
+The row's first line is unchanged. Beneath it come **continuation lines**,
+aligned under the value column, one per **book group**: the window day's
+unpriced receipts grouped by `price_book_source`, `price_book_id`,
+`price_book_path` and `missing_entry`. A halt where two models were unpriced by
+one book reads:
+
+```text
+error: project 'panta' has spent today's measured budget
+       dimension:   project spend
+       bound:       $400.00 (built_in)
+       consumed:    $400.00  outstanding: $20.00  remaining: $0.00
+       estimated:   20 unpriced (charged at $20.00 each)
+                    anthropic/claude-opus-5-5 (10), anthropic/claude-sonnet-5-5 (10) have no entry in price book foundation-site-2026-09-02 (/work/prices.json)
+       mode:        window (2026-10-26Z)
+       renews at:   2026-10-27T00:00:00Z
+```
+
+A continuation line is never wrapped, so a reader can match one with a single
+`grep`. Its parts are fixed:
+
+- **A pair** is `<provider>/<model> (<count>)`; a receipt whose context names
+  no provider or no model is `an unknown model (<count>)`. Pairs are listed
+  ascending by provider then model, an unknown model first, joined by `, `.
+- **A book** is `price book <price_book_id> (<where>)`, where `<where>` is the
+  path the book was read from for `file`, `built-in` for `builtin`, and
+  `composed from profile prices` for `profiles` [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection).
+- **The clause** follows `missing_entry`:
+
+  | context | continuation line |
+  |---|---|
+  | `missing_entry: true` | `<pairs> has no entry in <book>` for one pair, `have` for more |
+  | `missing_entry: false` | `<pairs>: <book> has an entry, but no measured usage could be priced` |
+  | `missing_entry: null`, a known book | `<pairs>: could not be checked against <book>` |
+  | `price_book_source: "none"` | `<pairs>: no price book was selected` |
+  | no `pricing_context`, or a `price_book_source` of `null` | `<count> with no pricing context (settled before rhei recorded one)` |
+
+  The last row is a receipt written before receipts carried a context. Rhei
+  never reconstructs one from today's targets or books: what was not recorded
+  stays unknown, and is said to be.
+- Book groups are ordered by `price_book_source`, `price_book_id`,
+  `price_book_path` and then `missing_entry`, each ascending with a missing
+  value first, so the receipts without a context come first.
+
+Only `unpriced` is named. `unmeasurable` and `unsettled` keep their counts in
+the first line and gain no continuation: neither has a price-book entry that
+could fix it. A row with no `unpriced` member has no continuation line, so a
+day of only `unmeasurable` or `unsettled` charges reads exactly as before.
+
+The halt still names exactly one remedy, the renewal instant. The continuation
+lines are not a second remedy and no `pricing:` or `to price it:` row is added
+[§REQ-bounded-neural-work.5](../requirements/bounded-neural-work.spec.md#5-exhaustion-is-a-halt-where-the-ticket-stands): they qualify `estimated:`, the way `estimated:`
+qualifies `consumed:`. **Adding the missing entries does not change charges
+already settled.** A receipt is never rewritten and no reserve is refunded
+[§REQ-bounded-neural-work.4](../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity); the book is consulted by invocations that settle
+after it changes, so the entry prices tomorrow's work and the window renews
+today's.
+
 ## 9. Visibility
 
 Every bound in force is visible with its value and its source **before** capacity
@@ -1172,6 +1282,12 @@ dependency. It must not record a spawn, exit or transition that did not happen.
 Every surface that carries the spend dimension carries the account's currency
 with it, and says how much of the day was charged at the fallback rather than
 measured, by the three marks of [§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle).
+
+Every surface that counts `unpriced` invocations also names them, by the book
+groups of [§FS-rhei-budgets.8.1](rhei-budgets.spec.md#81-naming-what-was-unpriced) read from the journal: the halt and `rhei budget
+show` as continuation lines, the run report in one line, and the run's JSON as
+`unpriced_details`. The TUI's bound line, which shows no mark today, gains
+none.
 
 Where cost accounting also exists for a run, the two are still reported side by
 side and neither is described as the other. Accounting only measures, prices
@@ -1225,7 +1341,34 @@ uses, and the line is absent where the whole day was measured:
 ```text
 project spend: $20.00 consumed + $0.00 outstanding / $400.00; $380.00 remaining (window (2026-09-26Z))
   estimated:   1 unpriced (charged at $20.00 each)
+               anthropic/claude-opus-9 (1) has no entry in price book builtin-2026-05-20 (built-in)
 ```
+
+The continuation lines are the halt's [§FS-rhei-budgets.8.1](rhei-budgets.spec.md#81-naming-what-was-unpriced), word for word, and
+aligned under this line's value column rather than the halt's.
+
+Under `--format json` the `spend` object carries them as `unpriced_details`, an
+array with one entry per distinct pricing context — the six members of the
+receipt's `pricing_context` [§FS-rhei-budgets.5.2](rhei-budgets.spec.md#52-the-journal), `null` where unknown, plus
+the integer `count` of receipts that share it:
+
+```json
+"unpriced": 20,
+"unpriced_details": [
+  { "provider": "anthropic", "model": "claude-opus-5-5",
+    "price_book_id": "foundation-site-2026-09-02", "price_book_path": "/work/prices.json",
+    "price_book_source": "file", "missing_entry": true, "count": 10 },
+  { "provider": "anthropic", "model": "claude-sonnet-5-5",
+    "price_book_id": "foundation-site-2026-09-02", "price_book_path": "/work/prices.json",
+    "price_book_source": "file", "missing_entry": true, "count": 10 }
+]
+```
+
+Entries are ordered by `price_book_source`, `price_book_id`, `price_book_path`,
+`provider`, `model` and `missing_entry`, each ascending with `null` first. The
+counts sum to `unpriced`, and the array is empty, never absent, where nothing
+was unpriced. A receipt without a context is one entry whose six members are
+all `null`. Every existing member of the object is unchanged.
 
 `init` and `adjust` take no spend argument and gain none. There is no spend
 allowance to grant: spend is bounded by a window always [§FS-rhei-budgets.3.4](rhei-budgets.spec.md#34-the-spend-window),

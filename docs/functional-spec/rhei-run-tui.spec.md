@@ -269,6 +269,10 @@ spend halt the three fallback marks ([§FS-rhei-budgets.9](rhei-budgets.spec.md#
 view and keep the latest snapshot in the shared chrome; a halt is additionally
 an `error`-level `Message` so a frontend that renders neither record still says
 why the run stopped.
+The shared chrome's bound line is unchanged by the naming of unpriced models
+([§FS-rhei-budgets.8.1](rhei-budgets.spec.md#81-naming-what-was-unpriced)): it shows no mark today and gains no names. The halt's
+`Message` is the halt text, continuation lines included, so the Journal view
+names the unpriced pairs and their book wherever the halt does.
 
 `RunFinished` is emitted once with aggregate counts for spawned agents, spawned programs, terminal tasks, total tasks, and accounting totals when available.
 

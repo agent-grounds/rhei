@@ -522,12 +522,23 @@ run with a diagnostic that names the supplied path, and, where the path came
 from `defaults.prices`, the settings file that declared it. Selection never
 fetches a book over the network.
 
-`defaults.prices` becomes a path when settings merge and a file only when a run
-prices, so a command that prices nothing never opens it: `rhei roster`,
-`rhei validate` and `rhei list` all succeed on a machine whose declared book is
-missing or misspelled, and `rhei roster` prints the authored string with the
-tier that wrote it rather than a resolved or canonical one
-([§FS-rhei-agents.1.3](rhei-agents.spec.md#13-merge-semantics)). A run is where the path is refused.
+`defaults.prices` becomes a path when settings merge and a file only when a
+command prices or checks coverage. `rhei roster` and `rhei list` never open it:
+both succeed on a machine whose declared book is missing or misspelled, and
+`rhei roster` prints the authored string with the tier that wrote it rather
+than a resolved or canonical one ([§FS-rhei-agents.1.3](rhei-agents.spec.md#13-merge-semantics)). `rhei validate` opens
+it read-only to check which targeted pairs it prices
+([§FS-rhei-validate.4.6](rhei-validate.spec.md#46-a-targeted-model-the-price-book-cannot-price)) — it no longer never opens the book — and still
+succeeds on a book it cannot read, saying so in a warning rather than failing.
+A run is where the path is refused.
+
+Coverage is told before anything is charged. A provider/model pair that a
+reachable agent state targets and the selected book has no exact entry for
+would settle every invocation as `unpriced` at the spend reserve
+([§FS-rhei-budgets.6.2](rhei-budgets.spec.md#62-reserve-then-settle)), so `rhei validate`, and `rhei run` before its first
+reserve, warn about it once per book with the warning of [§FS-rhei-validate.4.6](rhei-validate.spec.md#46-a-targeted-model-the-price-book-cannot-price).
+The warning changes no selection: exact matching stays exact, and a missed pair
+gains no fallback price.
 
 The document object and each entry object accept arbitrary additional JSON
 properties as metadata. Rhei preserves every additional property's JSON value

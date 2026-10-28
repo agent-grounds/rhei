@@ -240,17 +240,8 @@ impl SpawnPlan {
     /// fires no edge, can leave `poll.max_attempts` spent here.
     // §FS-rhei-agents.3.2.3 §FS-rhei-run.3.7.4
     fn budget_spent(&self, budget: AttemptBudget) -> Option<u64> {
-        let budget = self.effective_budget(budget);
         let last_reverted = self.previous.as_ref().is_some_and(|prev| prev.reverted.is_some());
-        match budget {
-            AttemptBudget::Visit(budget) if self.charged >= budget => Some(budget),
-            AttemptBudget::Poll { max_attempts }
-                if last_reverted && self.charged >= max_attempts =>
-            {
-                Some(max_attempts)
-            }
-            AttemptBudget::Visit(_) | AttemptBudget::Poll { .. } => None,
-        }
+        self.effective_budget(budget).spent(self.charged, last_reverted)
     }
 
     /// The line the run prints beside `Log:` when it is retrying rather than
@@ -431,6 +422,26 @@ enum AttemptBudget {
     /// last attempt was reverted stalls here once it reaches the bound.
     // §FS-rhei-run.3.7.4
     Poll { max_attempts: u64 },
+}
+
+impl AttemptBudget {
+    /// The bound a visit has spent, if it has, once `charged` of its attempts
+    /// are charged and its last one was reverted or not: a state's own budget
+    /// at its count, a poll's only when that last edit was reverted too.
+    ///
+    /// The one copy of the rule. The spawner refuses on it, a reverted
+    /// attempt's charge and halt read it, and the deadline scan asks the
+    /// spawner, so none of them can call a visit spent that another would
+    /// still spawn. §FS-rhei-agents.3.2.3 §FS-rhei-run.3.7.4 §FS-rhei-run.5.1
+    fn spent(self, charged: u64, last_reverted: bool) -> Option<u64> {
+        match self {
+            AttemptBudget::Visit(budget) if charged >= budget => Some(budget),
+            AttemptBudget::Poll { max_attempts } if last_reverted && charged >= max_attempts => {
+                Some(max_attempts)
+            }
+            AttemptBudget::Visit(_) | AttemptBudget::Poll { .. } => None,
+        }
+    }
 }
 
 /// How many spawns one visit to this state may have.

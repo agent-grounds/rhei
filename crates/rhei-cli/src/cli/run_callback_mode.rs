@@ -392,7 +392,9 @@ fn run_callback_mode(
         .as_ref()
         .filter(|_| !interrupted_run && (!opts.dry_run() || pass == 0))
         .and_then(|loaded| {
-            idle_return(&loaded.rhei, &live.machines.set, &live.settings, opts, &rhei_scope)
+            let (machines, settings) = (&live.machines, &live.settings);
+            let spawns = SpawnSiteRoots::new(&workspace_root, &runtime_dir, loaded, machines);
+            idle_return(&loaded.rhei, &machines.set, settings, opts, &rhei_scope, &spawns)
         });
     if idle.is_some() {
         request_idle_exit();

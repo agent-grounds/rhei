@@ -3,7 +3,7 @@
 //
 // Its own part because these ask the scheduler rather than the provider-limit
 // parser beside them: a recognized limit is one input here, beside the poll,
-// the claim and the gate.
+// the claim, the gate, and the spawn records a spent bound is read from.
 
 // §AR-source-file-size.3 §FS-rhei-run.5.1 §FS-rhei-run-report.3.1
 
@@ -154,6 +154,8 @@ transitions:
         rhei.metadata = Some(metadata);
         let machines = rhei_validator::MachineSet::single(provider_machine(true));
         let settings = RheiSettings { agents: built_in_agents(), ..RheiSettings::default() };
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let runtime = dir.path().join("runtime");
         assert_eq!(
             earliest_pending_agent_deadline(
                 &rhei,
@@ -161,6 +163,7 @@ transitions:
                 &settings,
                 &default_run_options(),
                 &None,
+                &SpawnSiteRoots::plan_only(dir.path(), &runtime),
             ),
             Some(now + 180)
         );
@@ -246,6 +249,8 @@ transitions:
         let machines = rhei_validator::MachineSet::single(machine);
         let settings = RheiSettings { agents: built_in_agents(), ..RheiSettings::default() };
 
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let runtime = dir.path().join("runtime");
         assert_eq!(
             earliest_pending_agent_deadline(
                 &rhei,
@@ -253,6 +258,7 @@ transitions:
                 &settings,
                 &default_run_options(),
                 &None,
+                &SpawnSiteRoots::plan_only(dir.path(), &runtime),
             ),
             None,
             "expiry cannot release a task its prior's gate still holds"
@@ -314,5 +320,70 @@ transitions:
             remaining_work_is_only_gating_or_poll_blocked(&gated, &machines, &None),
             "releasing the claim moves nothing while the gate holds"
         );
+    }
+
+    /// A program poll bounded at three attempts, as the deadline scan meets it.
+    const POLL_MACHINE: &str = r#"name: poll
+version: 1
+states:
+  waiting:
+    program:
+      command: "true"
+    poll:
+      interval: 3s
+      max_attempts: 3
+  done:
+    final: true
+transitions:
+  - from: waiting
+    to: waiting
+    exit_code: 75
+  - from: waiting
+    to: done
+"#;
+
+    /// Once the reverted attempts have spent the bound, the deadline the last
+    /// charge left adds nothing to the scan, even when it is due at the very
+    /// second the pass read its ready set. One attempt short, it still does.
+    // §FS-rhei-run.3.7.4 §FS-rhei-run.5.1
+    #[test]
+    fn a_spent_poll_bound_adds_no_deadline_to_the_scan() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let (root, runtime) = (dir.path(), dir.path().join("runtime"));
+        let machine = rhei_validator::StateMachine::from_yaml_str(POLL_MACHINE).expect("machine");
+        let machines = rhei_validator::MachineSet::single(machine.clone());
+        let plan = "# Rhei: Poll\n\n## Tasks\n\n### Task 1: One\n**State:** waiting\n";
+        let mut rhei = rhei_core::parse(plan).expect("plan");
+        let since = current_unix_secs();
+        rhei.metadata =
+            Some(set_poll_next_attempt_metadata(None, &parse_task_id("1"), "waiting", since, 1));
+        let settings = RheiSettings::default();
+        let spawns = SpawnSiteRoots::plan_only(root, &runtime);
+        let opts = default_run_options();
+        let scan =
+            || agent_deadline_since(&rhei, &machines, &settings, &opts, &None, &spawns, since);
+        let edit = RevertedEdit {
+            location: "plan.md:1".into(),
+            message: "broken".into(),
+            text: root.join("reverted.md"),
+        };
+        for attempt in 1..=3 {
+            assert_eq!(scan(), Some(since), "attempt {attempt} is still to come");
+            let (plan, _) =
+                plan_named_spawn(&machine, root, &runtime, "1", "waiting", 1, None).expect("plan");
+            plan.record_spawn(SpawnEnding {
+                task_id: "1",
+                state_name: "waiting",
+                kind: "program",
+                worker: "true",
+                started: "2026-10-28T10:00:00Z",
+                ended: "2026-10-28T10:00:01Z",
+                duration: "1s",
+                code: Some(75),
+                ending: "exited",
+            });
+            record_spawn_revert(&plan.record, &edit).expect("revert kept on the record");
+        }
+        assert_eq!(scan(), None, "no attempt follows a spent bound, so none is waited for");
     }
 }

@@ -123,3 +123,103 @@ fn plan_named_spawn(
         None => Ok((plan, number)),
     }
 }
+
+/// The roots a run's spawn sites plan a ticket's next spawn under: where its
+/// ledger is read and its spawn record kept. A reading of the plan holds them
+/// to ask what that spawn would be without making it. §FS-rhei-agents.8.4
+struct SpawnSiteRoots<'a> {
+    /// Each ticket's own root, which its ledger and a program's record sit under.
+    tasks: ReadySetRoots<'a>,
+    /// The run's runtime directory, where an initial member's agents record.
+    runtime_dir: &'a Path,
+    /// Which rheis' agents record under their own root instead. §FS-rhei-panta.6.2
+    machines: &'a ExecutionMachines,
+}
+
+impl<'a> SpawnSiteRoots<'a> {
+    /// The roots a run's spawn sites plan under, with each ticket's own root as
+    /// its loaded plan gives it.
+    fn new(
+        workspace_root: &'a Path,
+        runtime_dir: &'a Path,
+        loaded: &'a LoadedPlan,
+        machines: &'a ExecutionMachines,
+    ) -> Self {
+        let tasks = ReadySetRoots { workspace_root, task_roots: &loaded.task_roots };
+        Self { tasks, runtime_dir, machines }
+    }
+
+    /// Whether every spawn this ticket's state would make next is refused for
+    /// `budget` spent, asked as its spawn site asks it: the same plan, from the
+    /// same roots and under the same name, held to the same gate. So a reader
+    /// that asks this never waits for a spawn the spawner will refuse.
+    ///
+    /// `agents` is `None` for a program state. A plan its site would refuse for
+    /// another reason, such as an unreadable ledger, answers `false`: that
+    /// refusal is not a spent budget.
+    // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.4 §FS-rhei-run.3.7.4
+    fn next_spawns_spent(
+        &self,
+        rhei: &rhei_core::ast::Rhei,
+        machine: &rhei_validator::StateMachine,
+        task: &rhei_core::ast::Task,
+        state_name: &str,
+        agents: Option<&[ResolvedAgent]>,
+        budget: AttemptBudget,
+    ) -> bool {
+        let task_id = task.id.to_string();
+        let task_root = self.tasks.artifact_root(&task_id);
+        let visit_count = render_visit_count(
+            rhei.metadata.as_ref(),
+            &task.id,
+            state_name,
+            task.state.as_str(),
+            machine,
+        );
+        let spent = |runtime_dir: &Path, identity: Option<&str>| {
+            let planned = plan_named_spawn(
+                machine,
+                task_root,
+                runtime_dir,
+                &task_id,
+                state_name,
+                visit_count,
+                identity,
+            );
+            planned.is_ok_and(|(plan, _)| plan.budget_spent(budget).is_some())
+        };
+        match agents {
+            // A program records under its ticket's own root. §FS-rhei-programs.5.1
+            None => spent(&task_root.join("runtime"), None),
+            Some(agents) => {
+                let runtime_dir =
+                    self.machines.agent_runtime_dir(&task_id, task_root, self.runtime_dir);
+                !agents.is_empty()
+                    && agents.iter().all(|agent| {
+                        spent(&runtime_dir, resolved_agent_log_identity(agent).as_deref())
+                    })
+            }
+        }
+    }
+
+    /// A single-file plan's roots, where every ticket's root is the plan's own
+    /// and no rhei was admitted after startup: the shape the unit tests build.
+    #[cfg(test)]
+    fn plan_only(workspace_root: &'a Path, runtime_dir: &'a Path) -> Self {
+        static NONE_ADMITTED: std::sync::OnceLock<ExecutionMachines> = std::sync::OnceLock::new();
+        let machines = NONE_ADMITTED.get_or_init(|| ExecutionMachines {
+            set: rhei_validator::MachineSet::single(
+                rhei_validator::StateMachine::builtin_default(),
+            ),
+            default_callbacks: CallbackPaths {
+                plan_path: PathBuf::new(),
+                state_machine_path: None,
+                working_dir: PathBuf::new(),
+            },
+            per_rhei_callbacks: BTreeMap::new(),
+            member_local_runtimes: BTreeSet::new(),
+            state_machine_override: None,
+        });
+        Self { tasks: ReadySetRoots::plan_only(workspace_root), runtime_dir, machines }
+    }
+}

@@ -248,4 +248,21 @@ mod spawn_records {
 
         assert_eq!(previous_ending(dir.path()).as_deref(), Some("was provider-limited"));
     }
+
+    /// The one rule every reader of a poll's bound asks: the bound is spent only
+    /// when the visit's last attempt was reverted and the charges reach it.
+    // §FS-rhei-run.3.7.4 §FS-rhei-agents.3.2.3
+    #[test]
+    fn a_poll_bound_is_spent_only_by_a_reverted_attempt_that_reaches_it() {
+        let poll = AttemptBudget::Poll { max_attempts: 3 };
+        assert_eq!(poll.spent(3, true), Some(3), "reverted, and the bound is reached");
+        assert_eq!(poll.spent(2, true), None, "reverted, with an attempt still to come");
+        assert_eq!(
+            poll.spent(3, false),
+            None,
+            "at the bound but not reverted: the poll's own exhaustion edge answers for it"
+        );
+        let visit = AttemptBudget::Visit(2);
+        assert_eq!(visit.spent(2, false), Some(2), "a visit budget reads no revert");
+    }
 }

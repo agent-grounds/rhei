@@ -36,7 +36,6 @@ sys.exit(75)
 /// inside the same second, so it is left to the race test.
 // §FS-rhei-run.3.7.4 §FS-rhei-run.5.1 §REQ-bounded-neural-work.1
 #[test]
-#[ignore = "red until #517: a run sleeps for a poll attempt whose bound is spent; implement removes this"]
 fn no_run_waits_for_a_spent_poll_bound_when_the_last_attempt_crosses_a_second() {
     let dir = unique_temp_dir("worker-edit-late-poll-culprit");
     let script = write_python_agent(&dir, "poll.py", LATE_POLL_CULPRIT);

@@ -151,7 +151,9 @@ Every non-dry run — detached or not — publishes `runtime/run.json`:
   "parallel": 2,
   "log": "/home/u/proj/panta/auth/runtime/run.log",
   "events": "/home/u/proj/panta/auth/runtime/events.jsonl",
-  "exit_code": null
+  "exit_code": null,
+  "rhei_build": { "version": "0.6.4-dev", "commit": "d0446a7aa9…", "dirty": false },
+  "checkout_head_at_start": { "repo": "agent-grounds/rhei", "commit": "a1b2c3d4e5…" }
 }
 ```
 
@@ -164,6 +166,20 @@ field". `control_url` is present only while the loopback control server is live
 has no redirected console of its own.
 `state_machine` is present only when the run was given an explicit
 `--state-machine`, and is what an attached surface resolves under ([§FS-rhei-run-headless.5](rhei-run-headless.spec.md#5-rhei-attach)).
+
+`rhei_build` and `checkout_head_at_start` say what ran and on what, and both
+are **always present**. `rhei_build` is the build of [§FS-rhei-version.2](rhei-version.spec.md#2-behavior):
+`version` is the CLI's version, and `commit` (40 hex) and `dirty` are `null`
+where the build reads `unknown`. `checkout_head_at_start` is the commit HEAD
+named in the repository holding the workspace when the run took its locks — the
+capture the HEAD-consistency guard already makes — with `repo` the remote
+reduced as [§FS-rhei-summary.4](rhei-summary.spec.md#4-what-the-summary-never-contains) says, or `null` where none reduces. It is `null`
+as a whole when the workspace is in no repository or git cannot be run. It is
+named for exactly what it is: a `ship` step rebases and commits after it, so
+the checkout HEAD at start, the commit an invocation saw and the commit a pull
+request publishes are three different things, and this is only the first.
+Both fields are additions, so a reader of an older descriptor treats them as
+absent.
 
 **Every path is absolute.** A descriptor is read by a process standing in some
 other directory, so a relative `plan` or `events` names nothing where it is

@@ -69,7 +69,7 @@ or repurposing a field named here is a breaking change and moves `schema`
 
 | `event` | Emitted when | Payload beyond the envelope |
 |---------|--------------|------------------------------|
-| `run_started` | Once, at the head of the stream | `schema`, `run_id`, `workspace`, `parallel`, `total_tasks` |
+| `run_started` | Once, at the head of the stream | `schema`, `run_id`, `workspace`, `parallel`, `total_tasks`, `rhei_build`, `checkout_head_at_start` |
 | `pass_started` | Each scheduler pass begins | `pass`, `ready` (task ids in source order) |
 | `slot_assigned` | A worker is spawned | `slot`, `task`, `from`, `to`, `agent` (null for programs), `log_path` |
 | `slot_released` | That worker exits | `slot`, `task`, `from`, `to`, `log_path`, `outcome`, `exit_code`, `duration_ms`; a provider-limited release also has `provider` and `next_attempt_at`, a release whose task region was restored has `reverted`, and a release whose output carried a Codex configuration fallback has `configuration_fallbacks` |
@@ -83,6 +83,12 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `budget_snapshot` | Once before scheduling, and again after each receipt is durable | `bounds` (one entry per dimension: `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `currency` on the spend entry, `unpriced`, `unmeasurable`, `unsettled` and `unpriced_details` — `null` on a count entry — and `ceiling` on a delegated entry), and `ceiling_policy` where any ceiling was delegated |
 | `budget_halt` | An admission was refused | `task`, `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `renews_at`, `remedy`, `reason_code`, `ceiling` and `ceiling_policy` where the dimension's ceiling was delegated, and on a spend halt `currency`, `unpriced`, `unmeasurable`, `unsettled`, `unpriced_details` |
 | `run_finished` | Once, when the run loop ends ([§FS-rhei-run-json.2.4](rhei-run-json.spec.md#24-where-run_finished-sits)) | `summary` |
+
+`run_started.rhei_build` and `run_started.checkout_head_at_start` are the run
+descriptor's fields of the same names, with the same values and the same
+`null`s ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)): always present, so a consumer reading the
+head of the stream knows which build ran and what the checkout started on. They
+are additions under [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version), so `schema` stays `1`.
 
 `outcome` is one of `completed`, `failed`, `waiting`, `provider_limited`,
 `cancelled`, `timeout`, `interrupted`, matching the journal vocabulary of [§FS-rhei-run-tui.1.7](rhei-run-tui.spec.md#17-journal-format).

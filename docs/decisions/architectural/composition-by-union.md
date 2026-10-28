@@ -84,10 +84,16 @@ Five things follow, and they are the decision rather than its implementation.
    person typed — which is what keeps output predictable.
    [§AR-rhei-library](../../architecture/rhei-library.spec.md#ar-rhei-library-graph-union-architecture)
 5. **Provenance is one comment line.** `# --- <template> <version> src:sha256:…
-   inputs: {…} ---` in `states.yaml` per inclusion. No lock file, no generated
-   header, no per-node record: when a state keeps its author's name, what it
-   came from is answered by reading it.
-   [§FS-rhei-library.7.1](../../functional-spec/rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-provenance)
+   git:<repo>@<commit> <state> inputs: {…} ---` in `states.yaml` per inclusion,
+   and one `laid` line of the same shape for the template a flat instantiation
+   rendered. No lock file, no generated header, no per-node record: when a state
+   keeps its author's name, what it came from is answered by reading it.
+   *Amended for #514:* the line also names the commit the template came from and
+   whether its files were committed, and a flat lay writes one, so a plan says
+   which template source produced it. The intent is unchanged — it is still one
+   line, and a sidecar file holding the same facts is the lock file this
+   decision refused.
+   [§FS-rhei-library.7.1](../../functional-spec/rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-template-provenance)
 
 The block compiler and its vocabulary are removed rather than kept beside this.
 Two mechanisms for one job is the cost the readable one exists to avoid, and

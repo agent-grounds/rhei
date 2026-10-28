@@ -162,6 +162,8 @@ mod operator_unwritable_state_home_tests;
 mod parallel_target_override_tests;
 mod poll_resume_program_tests;
 mod poll_wait_outcome_tests;
+mod provenance_support;
+mod provenance_tests;
 mod provider_limit_cleanup_tests;
 mod provider_limit_codex_tests;
 mod provider_limit_compatibility_tests;

@@ -22,6 +22,8 @@
     "schema": { "const": "rhei.accounting.invocation.v1" },
     "invocation_id": { "type": "string" },
     "run_id": { "type": "string", "minLength": 1 },
+    "rhei_build": { "$ref": "#/$defs/rhei_build" },
+    "checkout_head_at_start": { "$ref": "#/$defs/checkout_head_at_start" },
     "task_id": { "type": "string" },
     "state": { "type": "string" },
     "visit": { "type": "integer", "minimum": 0 },
@@ -62,6 +64,27 @@
     "pricing": { "$ref": "#/$defs/pricing" }
   },
   "$defs": {
+    "rhei_build": {
+      "description": "The rhei build that wrote the record.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "commit", "dirty"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "commit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
+        "dirty": { "type": ["boolean", "null"] }
+      }
+    },
+    "checkout_head_at_start": {
+      "description": "The checkout's HEAD when the run took its locks, or null when none was known.",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["repo", "commit"],
+      "properties": {
+        "repo": { "type": ["string", "null"], "minLength": 1 },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+      }
+    },
     "cli_session": {
       "type": "object",
       "additionalProperties": true,

@@ -20,6 +20,8 @@ list. The raw material for all of it is already durable under
 ```bash
 rhei summary [RHEI_PLAN_OR_WORKSPACE] [--details] [--rhei <ID>]
 rhei summary [RHEI_PLAN_OR_WORKSPACE] --run <ID> --prices <BOOK> [--details] [--rhei <ID>]
+rhei summary [RHEI_PLAN_OR_WORKSPACE] --print-checkpoint [--rhei <ID>]
+rhei summary [RHEI_PLAN_OR_WORKSPACE] --checkpoint <FILE|-> [--details] [--rhei <ID>]
 ```
 
 The positional resolves exactly as `rhei cost`'s does: a plan file, a
@@ -49,9 +51,40 @@ remeasure usage, write or migrate an invocation, replace stored pricing, or
 copy the supplied book into an accounting root. Ordinary summary invocations
 retain the live-workspace behavior above and need no finished-run evidence.
 
+`--print-checkpoint` and `--checkpoint` freeze a summary so it can be printed
+again later. An ordinary summary spans the workspace's whole history, so the
+block a `describe` step printed is not the block printed after `ship` has added
+records of its own. `--print-checkpoint` prints, instead of Markdown, the
+checkpoint document of [§FS-rhei-summary.6](rhei-summary.spec.md#6-the-checkpoint-document): exactly the set of records, spawns
+and task states the ordinary summary would cover at that moment. It writes no
+file; the caller redirects stdout. `--checkpoint <FILE>` (or `-` for stdin)
+prints the summary of exactly that set, inside the roots the positional and
+`--rhei` select, whatever has been recorded since:
+
+- the lead, the steps, the accounting and the provenance line are drawn from the
+  set's members alone;
+- the task tally counts the task states the document recorded, not the plan's
+  current states, so a replay prints what the live summary printed when the
+  document was taken — byte for byte, provenance line included;
+- an unrecorded spawn in the set enters the steps, the invocation count and the
+  gap count by its own `task` and `state`, as [§FS-rhei-summary.2.2](rhei-summary.spec.md#22-the-steps) places one.
+
+A spawn record is written when its spawn ends ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)) and an
+invocation record when its invocation ends, so the step that runs
+`--print-checkpoint`, and any sibling still running, are not in the set. That
+is what lets a `describe` step take the document and a later `ship` replay it
+with neither of their own records in it. A time cutoff could not: describe's
+own record is written after it started, so a cutoff taken at describe admits it.
+
+`--print-checkpoint` and `--checkpoint` refuse each other, and each refuses
+`--run` and `--prices`, as usage errors that name both flags.
+`--print-checkpoint` refuses `--details` too, because it prints no Markdown.
+The `--run`/`--prices` pairing is untouched.
+
 ## 2. Output
 
-Three parts, in order.
+Four parts, in this order, numbered as they print: the lead, the steps, the
+accounting, and the provenance line.
 
 ### 2.1. The lead line
 
@@ -157,11 +190,53 @@ When pricing is `priced`, the ordinary `cost` row follows. When it is
 is `unpriced`, no money row appears: missing replacement rates are not a zero
 cost and never fall back to a stored amount. [§FS-rhei-cost-accounting.6.2](rhei-cost-accounting.spec.md#62-coverage-of-a-selection)
 
+### 2.4. The provenance line
+
+The last part of every summary, after a blank line: which rhei build ran,
+which commit the checkout started on, which template the plan was laid from,
+and which set of records the summary covers.
+
+```text
+Provenance: rhei 0.6.4-dev @ d0446a7 · checkout HEAD at start agent-grounds/rhei@a1b2c3d · template `supervised-ticket-fix` 1.0.0 @ agent-grounds/agent-grounds@d292a9b (clean) · checkpoint 3f9a2c41d0b7: run 55177a, 7 invocations
+```
+
+`Provenance: rhei <build> · checkout HEAD at start <head> · template <tmpl> ·
+checkpoint <id>: <runs><n> invocation[s]`, with its fields read so:
+
+- **`<build>`** is `<version> @ <sha7>`, with ` (dirty)` after it for a dirty
+  build, or `<version> @ unknown`, read from each member record's `rhei_build`
+  ([§FS-rhei-cost-accounting.3.5](rhei-cost-accounting.spec.md#35-run-attribution)). Distinct builds are joined with `, ` in the
+  order of their first use. A member with no `rhei_build`, and an unrecorded
+  spawn, contribute `unknown`.
+- **`<head>`** is the `checkout_head_at_start` of the member record that started
+  first: `<repo>@<sha7>`, `<sha7>` when its `repo` is `null`, or `unknown`
+  when that record carries none.
+- **`<tmpl>`** is read from the `laid` fence ([§FS-rhei-library.7.1](rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-template-provenance)) of the
+  state machine the lead names. With a commit it reads
+  `` `<name>` <version> @ <repo>@<sha7> (<state>) `` — `@ <sha7>` when the
+  fence's `git:` names no repository; with no commit it reads
+  `` `<name>` <version> src:sha256:<12-hex> (<state>) ``; a built-in template
+  reads `` `<name>` <version> (built into rhei) ``; and a machine with no `laid`
+  fence — one typed by hand, or laid before fences were written — reads
+  `unknown`.
+- **`<id>`** is the checkpoint id of [§FS-rhei-summary.6.2](rhei-summary.spec.md#62-canonical-bytes-and-the-checkpoint-id), the same whether the
+  summary is live or replayed.
+- **`<runs>`** names the distinct `run_id`s of the member records, each cut to
+  its first six characters, in the order the runs started: `run 55177a, ` for
+  one and `runs 55177a, 9b1c03, ` for several. Records with no `run_id` and
+  unrecorded spawns name no run, and when no member names one `<runs>` is
+  empty. `<n>` counts every member, unrecorded spawns included.
+
+It is the last part rather than one between the steps and the accounting so
+that the accounting keeps its number. With `--details` it sits inside the
+block, before `</details>`. It is provenance under a trusted orchestrator: it
+says what rhei recorded, and it detects no drift and seals nothing.
+
 ## 3. `--details`
 
 Wraps the whole output in one collapsed block for a pull request body: the
-lead line becomes the `<summary>`, prefixed `AI workflow: `, and the steps and
-accounting follow inside, with a blank line after `</summary>` so GitHub
+lead line becomes the `<summary>`, prefixed `AI workflow: `, and the steps, the
+accounting and the provenance line follow inside, with a blank line after `</summary>` so GitHub
 renders the Markdown within:
 
 ```text
@@ -171,11 +246,12 @@ renders the Markdown within:
 1. `ticket.ticket` supervising (visit 1) — ...
 ...
 
+Provenance: rhei 0.6.4-dev @ d0446a7 · ...
 </details>
 ```
 
 The wrapper is unchanged for explicit `--run`/`--prices`: its inner lead,
-steps, provenance, and accounting are the selected-run reading from [§FS-rhei-summary.2](rhei-summary.spec.md#2-output).
+steps, price-book rows, accounting, and provenance line are the selected-run reading from [§FS-rhei-summary.2](rhei-summary.spec.md#2-output).
 
 ## 4. What the summary never contains
 
@@ -185,7 +261,13 @@ steps, provenance, and accounting are the selected-run reading from [§FS-rhei-s
    roots line ([§FS-rhei-cost-accounting.8](rhei-cost-accounting.spec.md#8-cli-inspection)): that line names directories, and
    this output goes into a pull request body. An empty summary stays [§FS-rhei-summary.5](rhei-summary.spec.md#5-empty-and-error-cases)'s. The
    caller-supplied price-book path is a local filesystem path too; only the
-   validated book id and currency may appear in successful stdout.
+   validated book id and currency may appear in successful stdout, and the
+   checkpoint file's path never does. A remote the provenance line names is
+   **reduced** to `owner/repo`, its host kept in front when it is not
+   `github.com` (`gitlab.example.org/owner/repo`), with the scheme, any
+   credentials, a `.git` suffix and an `ssh` user stripped. A remote that is a
+   local path or a `file://` URL reduces to nothing, and the line prints the
+   bare commit.
 2. Task content — no briefs, no export bodies, no result text. Task ids and
    states only.
 3. Estimated numbers — an unmeasured record contributes no token line, and an
@@ -195,7 +277,9 @@ steps, provenance, and accounting are the selected-run reading from [§FS-rhei-s
 
 1. No accounting directory, or no invocation records: the lead line still
    prints (zero invocations, the task tally from the plan) followed by the
-   unmeasured line; exit 0. A freshly instantiated workspace is summarizable.
+   unmeasured line and a provenance line that names only the template,
+   `Provenance: template <tmpl> · no invocations recorded`; exit 0. A freshly
+   instantiated workspace is summarizable.
 2. A positional that resolves to no plan or workspace fails exactly as
    `rhei cost` does, with the same guidance.
 3. In explicit `--run`/`--prices` mode, each of these is a nonzero actionable
@@ -215,3 +299,48 @@ steps, provenance, and accounting are the selected-run reading from [§FS-rhei-s
    books use [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection)'s diagnostic that names the supplied
    path. Missing exact rates inside a valid book are accounting outcomes under
    [§FS-rhei-summary.2.3](rhei-summary.spec.md#23-the-accounting), not input errors.
+5. With `--checkpoint`, each of these is a nonzero actionable error before
+   Markdown is written, naming the checkpoint file as given:
+   - a file that cannot be read, is not JSON, or whose `schema` is not
+     `rhei.summary.checkpoint.v1`;
+   - a **missing member** — an invocation id no record in the selected roots
+     carries, or a spawn whose record is gone — named by its id or its spawn
+     file name. Invocation records survive only a narrowed `rhei reset`: a full
+     reset deletes all of `runtime/`, accounting included, so a checkpoint
+     taken before one fails here. A spawn record is removed by any reset and
+     rewritten by a later attempt of its visit, so it can vanish sooner.
+
+   The refused flag combinations of [§FS-rhei-summary.1](rhei-summary.spec.md#1-usage) are usage errors.
+
+## 6. The checkpoint document
+
+What `--print-checkpoint` prints and `--checkpoint` reads: one JSON object,
+`rhei.summary.checkpoint.v1`, whose schema is
+`crates/rhei-cli/schemas/rhei.summary.checkpoint.v1.schema.json`.
+
+### 6.1. Its members
+
+```json
+{"invocations":["0f3a…","9b1c…"],"schema":"rhei.summary.checkpoint.v1","spawns":[{"attempt":1,"moves":4,"spawn":"task-ticket.review-review.json","state":"review","task":"ticket.review"}],"tasks":[{"id":"ticket","state":"supervising"},{"id":"ticket.review","state":"completed"}]}
+```
+
+- `invocations` — the sorted `invocation_id`s of the records in scope.
+- `spawns` — each unrecorded agent spawn in scope ([§FS-rhei-cost-accounting.6.2.1](rhei-cost-accounting.spec.md#621-agent-spawns-with-no-record)),
+  as `{task, state, moves, attempt, spawn}`, sorted by `spawn`. `spawn` is the
+  spawn record's file name under `runtime/spawns/`, which is the only thing that
+  tells two entries of one fanned-out state apart ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)); the
+  other four are what the replay prints and tallies, and its `started`,
+  `ended` and `worker` are read from that record again on replay.
+- `tasks` — every task in scope, as `{id, state}` with the state it was in at
+  that moment, sorted by `id`. These are what a replay's task tally counts.
+
+It names no path, so it may be published or stored beside the pull request.
+
+### 6.2. Canonical bytes and the checkpoint id
+
+The document is printed in its canonical encoding: keys in sorted order, no
+insignificant whitespace, arrays sorted as [§FS-rhei-summary.6.1](rhei-summary.spec.md#61-its-members) says, and one
+trailing newline. The **checkpoint id** is the first 12 hex digits of the
+sha256 of exactly those bytes. A live summary computes the id of the document
+`--print-checkpoint` would print at that moment, and a replay computes it from
+the document it reads re-encoded canonically, so the two agree.

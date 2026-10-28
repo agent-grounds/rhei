@@ -83,7 +83,7 @@ adds is where the result goes:
    except `README.md`, which describes the template and stays behind.
 4. The template's tickets are written where `rhei new` would write them
    ([§FS-rhei-new.3.1](rhei-new.spec.md#31-where-it-is-written)) with their ids re-parented ([§FS-rhei-library.4](rhei-library.spec.md#4-placement-ids-tickets-and-frontmatter)).
-5. One fence comment records the inclusion ([§FS-rhei-library.7.1](rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-provenance)).
+5. One fence comment records the inclusion ([§FS-rhei-library.7.1](rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-template-provenance)).
 
 The union is validated **in the scope the target actually runs in**, and
 nothing is written until it passes. For a member rhei that scope is its project:
@@ -636,13 +636,35 @@ Four consequences, none of them further machinery:
 
 ## 7. Provenance, diagnostics, and what `--into` refuses to combine
 
-### 7.1. The fence comment is the whole of provenance
+### 7.1. The fence comment is the whole of template provenance
 
-One comment line is appended to `states.yaml` per inclusion:
+One comment line is appended to `states.yaml` per template laid or included.
+An inclusion — an `includes:` part or a template placed with `--into` — writes:
 
 ```text
-# --- agora 1.2.0 src:sha256:… inputs: {…} ---
+# --- agora 1.2.0 src:sha256:… git:agent-grounds/agent-grounds@<40 hex> clean inputs: {…} ---
 ```
+
+A flat `rhei instantiate` writes one `laid` fence for the template it rendered,
+at the end of the machine file it wrote, whose inputs are a digest because a
+values or `--set-file` file can be any size:
+
+```text
+# --- laid supervised-ticket-fix 1.0.0 src:sha256:… git:agent-grounds/agent-grounds@<40 hex> clean inputs:sha256:… ---
+```
+
+- `src:sha256:` is the digest of the template's **source** tree, never of the
+  rendered output: scripts and prompts are rendered too, so a rendered hash
+  would move with every input.
+- `git:` names the commit that holds the template directory, symlinks resolved,
+  with the repository it came from; it is left out when no commit is known.
+- The state word — `clean`, `dirty`, `unversioned`, `unknown` or `builtin` —
+  covers the template's own files only.
+- `inputs:sha256:` is the digest of the resolved input map, values and
+  `--set-file` contents included.
+
+How each is computed is [§FS-rhei-templates.6.1.5](rhei-templates.spec.md#615-source-identity); what
+`rhei summary` publishes from the `laid` fence is [§FS-rhei-summary.2.4](rhei-summary.spec.md#24-the-provenance-line).
 
 That is all of it. There is no lock file, no generated header, no per-node
 provenance record, and no alias-encoded identity: names in the output are the
@@ -742,7 +764,7 @@ A union adds to the target's `states.yaml` by inserting lines at the end of a
 collection ([§FS-rhei-library.2](rhei-library.spec.md#2---into-placing-a-template-into-a-plan-or-a-project)). A collection written in flow style — `{ … }` or
 `[ … ]` on its key's own line — has no end to insert a line at: an entry can
 only join it by rewriting that line, which breaks the added-lines-only diff
-[§FS-rhei-library.7.1](rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-provenance) promises. So when the union has something to add to a
+[§FS-rhei-library.7.1](rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-template-provenance) promises. So when the union has something to add to a
 collection the target writes in flow style — `states`, `transitions`,
 `profiles`, `models`, `node_policy`, or `node_policy.by_type` — `--into`
 **refuses**, with or without `--dry-run`, before it writes anything and before

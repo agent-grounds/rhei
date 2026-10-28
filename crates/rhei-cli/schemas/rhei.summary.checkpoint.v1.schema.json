@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rhei.summary.checkpoint.v1",
+  "title": "Rhei summary checkpoint v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "invocations", "spawns", "tasks"],
+  "properties": {
+    "schema": { "const": "rhei.summary.checkpoint.v1" },
+    "invocations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "spawns": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/spawn" }
+    },
+    "tasks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/task" }
+    }
+  },
+  "$defs": {
+    "spawn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task", "state", "moves", "attempt", "spawn"],
+      "properties": {
+        "task": { "type": "string", "minLength": 1 },
+        "state": { "type": "string", "minLength": 1 },
+        "moves": { "type": "integer", "minimum": 0 },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "spawn": { "type": "string", "pattern": "^task-[^/\\\\]+\\.json$" }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "state"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "state": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -76,7 +76,7 @@ transitions:
 
 /// A directory workspace `ws` beside the scripts in `dir`, where they find
 /// it, with one task file per task and its machine.
-fn workspace(dir: &Path, tasks: &[(&str, &str)], machine: &str) -> (PathBuf, PathBuf) {
+pub(super) fn workspace(dir: &Path, tasks: &[(&str, &str)], machine: &str) -> (PathBuf, PathBuf) {
     let ws = dir.join("ws");
     fs::create_dir_all(ws.join("tasks")).expect("create workspace");
     fs::write(ws.join("index.rhei.md"), "# Rhei: Worker edit race\n").expect("write index");
@@ -87,11 +87,11 @@ fn workspace(dir: &Path, tasks: &[(&str, &str)], machine: &str) -> (PathBuf, Pat
     (ws, machine)
 }
 
-fn task_text(ws: &Path, file: &str) -> String {
+pub(super) fn task_text(ws: &Path, file: &str) -> String {
     fs::read_to_string(ws.join("tasks").join(file)).expect("read task file")
 }
 
-fn runs(dir: &Path, name: &str) -> usize {
+pub(super) fn runs(dir: &Path, name: &str) -> usize {
     fs::read_to_string(dir.join(name)).map(|text| text.lines().count()).unwrap_or(0)
 }
 
@@ -317,7 +317,7 @@ append(here / 'poll-runs.txt', 'ran\n')
 sys.exit(75)
 "#;
 
-fn poll_machine(command: &str) -> String {
+pub(super) fn poll_machine(command: &str) -> String {
     format!(
         r#"name: poll-culprit
 version: 1

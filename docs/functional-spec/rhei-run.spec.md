@@ -1073,7 +1073,10 @@ say here. A later pass spawns the next attempt with the informed retry line of
 own budget and stalls in its state, named in the halt like any other ticket
 that ran out of attempts, and the run's exit code is the one step 9 gives a run
 that ends with tickets unfinished. A retry never gets a fresh budget
-([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-five-levels)).
+([§REQ-bounded-neural-work.1](../requirements/bounded-neural-work.spec.md#1-the-five-levels)). On a poll state, once those attempts have spent `poll.max_attempts`, the
+stalled ticket adds no deadline to the sleep of [§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states) or to `--until-idle`'s
+published earliest next attempt, whatever `pollNextAttemptAt` its last charge
+left behind: no run waits for an attempt that will never spawn.
 
 A worker whose own attempt ended by its **timeout** or by the run's
 **interruption** ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) has its region restored first, by the same rule, and its
@@ -1278,7 +1281,7 @@ States that declare a [`poll:`](rhei-states.spec.md#2-polling-states) block are 
 - Releases the `--parallel` slot so other ready tasks may run.
 - Does not hold a timer thread; the next pass re-scans and picks the task up again only once `pollNextAttemptAt` is in the past.
 
-If, at the end of a pass, every remaining non-terminal task is either in a gating state, blocked behind a gating dependency, or blocked by a pending `pollNextAttemptAt`, `rhei run` sleeps until the earliest `pollNextAttemptAt` across all blocked poll tasks (bounded below by 1 s to avoid busy-looping) and then begins a new pass. If no poll deadline is pending and only gating remains, the run exits as it does today.
+If, at the end of a pass, every remaining non-terminal task is either in a gating state, blocked behind a gating dependency, or blocked by a pending `pollNextAttemptAt`, `rhei run` sleeps until the earliest `pollNextAttemptAt` across all blocked poll tasks (bounded below by 1 s to avoid busy-looping) and then begins a new pass. If no poll deadline is pending and only gating remains, the run exits as it does today. A poll whose reverted attempts have spent `poll.max_attempts` is not blocked by its `pollNextAttemptAt`, because no attempt follows it ([§FS-rhei-run.3.7.4](rhei-run.spec.md#374-the-charge)).
 
 Provider-limit waits join this same deadline scan. For one task, eligibility is
 the later of its applicable poll deadline and provider-limit deadline. The run

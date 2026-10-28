@@ -646,8 +646,10 @@ An inclusion — an `includes:` part or a template placed with `--into` — writ
 ```
 
 A flat `rhei instantiate` writes one `laid` fence for the template it rendered,
-at the end of the machine file it wrote, whose inputs are a digest because a
-values or `--set-file` file can be any size:
+at the end of the machine file it wrote — and so does a project lay, on the
+default machine it lays at the project's root ([§FS-rhei-templates.6.4](rhei-templates.spec.md#64-laying-a-panta-project)) as on
+each member's — whose inputs are a digest because a values or `--set-file`
+file can be any size:
 
 ```text
 # --- laid supervised-ticket-fix 1.0.0 src:sha256:… git:agent-grounds/agent-grounds@<40 hex> clean inputs:sha256:… ---

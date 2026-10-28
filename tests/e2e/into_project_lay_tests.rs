@@ -23,6 +23,8 @@ use super::*;
 fn a_project_template_lays_a_project_standalone() {
     let dir = unique_temp_dir("lay-standalone");
     let template = write_lifecycle_templates(&dir);
+    let home = template.parent().expect("the templates home");
+    let commit = super::provenance_support::commit_repository(&dir, home, None);
 
     let laid = rhei_in(&dir, &dir, &["instantiate", "lifecycle", "--output", "laid"]);
     assert_success(&laid);
@@ -33,10 +35,20 @@ fn a_project_template_lays_a_project_standalone() {
         !manifest.contains("**States:**"),
         "laying the default writes states.yaml, never the deprecated line; got:\n{manifest}"
     );
+    // The default machine is the rendered template machine plus its one `laid`
+    // fence, naming the committed template. §FS-rhei-library.7.1
+    let default =
+        std::fs::read_to_string(project.join("states.yaml")).expect("the default machine");
+    let (body, fence) = default.trim_end().rsplit_once('\n').expect("a machine with a fence");
     assert_eq!(
-        std::fs::read(project.join("states.yaml")).expect("the default machine"),
-        std::fs::read(template.join("states.yaml")).expect("the template's machine"),
+        format!("{body}\n"),
+        std::fs::read_to_string(template.join("states.yaml")).expect("the template's machine"),
         "the template's machine is the project default, at the project root"
+    );
+    assert!(
+        fence.starts_with("# --- laid lifecycle 1.0.0 src:sha256:")
+            && fence.contains(&format!(" git:{commit} clean inputs:sha256:")),
+        "the default machine ends in a clean `laid` fence naming {commit}; got {fence:?}"
     );
     for bundled in ["prompt_templates/brief.md", "scripts/collect.sh"] {
         let meta = std::fs::symlink_metadata(project.join(bundled))
@@ -56,6 +68,33 @@ fn a_project_template_lays_a_project_standalone() {
     }
 
     assert_success(&rhei_in(&dir, &dir, &["validate", "laid"]));
+}
+
+/// A member that runs under the project default reads its provenance from the
+/// default's `laid` fence, so the summary names the project template rather
+/// than `template unknown`. §FS-rhei-summary.2.4 §FS-rhei-library.7.1
+#[test]
+fn a_summary_under_a_laid_project_default_names_the_project_template() {
+    let dir = unique_temp_dir("lay-summary");
+    let template = write_project_template(&dir, "lifecycle", &laid_machine(&[]), "");
+    let home = template.parent().expect("the templates home");
+    let commit = super::provenance_support::commit_repository(&dir, home, None);
+    assert_success(&rhei_in(&dir, &dir, &["instantiate", "lifecycle", "--output", "laid"]));
+    write_member(
+        &dir.join("laid"),
+        "release",
+        "# Rhei: Release\n\n## Overview\n\nRuns under the project default.\n",
+        None,
+        "### Task ticket: Ship the release\n**State:** shipped\n\nShip it.\n",
+    );
+
+    let summary = rhei_in(&dir, &dir, &["summary", "laid"]);
+    assert_success(&summary);
+    let expected = format!(
+        "Provenance: template `lifecycle` 1.0.0 @ {} (clean) · no invocations recorded",
+        &commit[..7]
+    );
+    assert_eq!(summary.stdout.lines().last(), Some(expected.as_str()), "got:\n{}", summary.stdout);
 }
 
 /// A project template is listed, never dropped, and its JSON entry says which
@@ -117,6 +156,11 @@ fn into_a_project_lays_the_default_and_its_members() {
     into.remove("index.panta.md");
     assert_same_tree(&laid, &into, "--into a project lays what --output lays");
     assert_eq!(machine_name(&project.join("states.yaml")), "laidmachine");
+    let default = std::fs::read_to_string(project.join("states.yaml")).expect("the default");
+    assert!(
+        default.lines().last().is_some_and(|line| line.starts_with("# --- laid lifecycle 1.0.0 ")),
+        "--into ends the default in its `laid` fence (§FS-rhei-library.7.1); got:\n{default}"
+    );
 
     assert_success(&rhei_in(&dir, &dir, &["validate", "reports"]));
 }

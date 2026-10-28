@@ -75,7 +75,10 @@
         values: &'a BTreeMap<String, serde_json::Value>,
         members: &'a [ProjectMember],
         dry_run: bool,
-        /// The values files each member's `laid` fence records. §FS-rhei-templates.6.1.5
+        /// Whether the template is built into rhei, and the values files the
+        /// `laid` fences of its default machine and each member record.
+        /// §FS-rhei-templates.6.1.5
+        builtin: bool,
         input_files: &'a [PathBuf],
     }
 
@@ -118,6 +121,11 @@
                 lay.manifest.name
             ));
         }
+        // The default machine is a machine the lay wrote, so it carries the one
+        // `laid` fence a flat lay's does. §FS-rhei-library.7.1 §FS-rhei-templates.6.1.5
+        let source = SourceIdentity::of(lay.template_dir, lay.builtin, lay.input_files);
+        let fence = laid_fence(lay.manifest, &template_digest(lay.template_dir)?, &source, lay.values);
+        append_laid_fence(&machine_path, &fence)?;
         let machine = machine_name_of(&read_text(&machine_path)?).ok_or_else(|| {
             miette!(
                 help = "a state machine names itself with a top-level `name:`.",

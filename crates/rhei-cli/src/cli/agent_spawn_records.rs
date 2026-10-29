@@ -460,8 +460,8 @@ fn resolve_attempt_budget(
     state_def: Option<&rhei_validator::StateDef>,
     settings: &RheiSettings,
 ) -> AttemptBudget {
-    if let Some(max_attempts) = state_def.and_then(|def| def.poll.as_ref()) {
-        return AttemptBudget::Poll { max_attempts: u64::from(max_attempts.max_attempts) };
+    if let Some(budget) = state_def.and_then(poll_attempt_budget) {
+        return budget;
     }
     AttemptBudget::Visit(
         state_def
@@ -471,6 +471,14 @@ fn resolve_attempt_budget(
             .unwrap_or(DEFAULT_ATTEMPT_BUDGET)
             .max(1),
     )
+}
+
+/// A `poll:` state's budget, its own `poll.max_attempts`: no setting reaches
+/// it, so a reader asking only about a poll's bound need load none.
+// §FS-rhei-agents.3.2.3 §FS-rhei-run.3.7.4
+fn poll_attempt_budget(state_def: &rhei_validator::StateDef) -> Option<AttemptBudget> {
+    let poll = state_def.poll.as_ref()?;
+    Some(AttemptBudget::Poll { max_attempts: u64::from(poll.max_attempts) })
 }
 
 /// A plan for a unit test that only cares about the transcript a spawn writes:

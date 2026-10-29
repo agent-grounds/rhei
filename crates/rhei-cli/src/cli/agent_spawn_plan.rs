@@ -139,8 +139,9 @@ struct SpawnSiteRoots<'a> {
     runtime_dir: &'a Path,
     /// Which rheis' agents record under their own root instead. §FS-rhei-panta.6.2
     machines: &'a ExecutionMachines,
-    /// The run's settings. `None` reads the merged settings when a poll first
-    /// asks, as the ready set's input check reads them.
+    /// The run's settings. `None` reads the merged settings each time an agent
+    /// poll asks, as the ready set's input check reads them per ticket; a
+    /// program poll resolves no agents and reads none.
     settings: Option<&'a RheiSettings>,
     /// The options each agent resolves under, which name the record it keeps.
     opts: &'a RunOptions,
@@ -162,7 +163,8 @@ impl<'a> SpawnSiteRoots<'a> {
     }
 
     /// The roots a reading no run is behind plans under, given the plan's own
-    /// runtime: the default options, and the settings a poll first asks for.
+    /// runtime: the default options, and the merged settings, read each time an
+    /// agent poll asks.
     fn reading(
         workspace_root: &'a Path,
         runtime_dir: &'a Path,
@@ -197,8 +199,12 @@ impl<'a> SpawnSiteRoots<'a> {
 
     /// Whether this ticket's `poll:` state has spent its bound: every spawn it
     /// would make next is refused for `poll.max_attempts`, so it is stalled, not
-    /// waiting. A state that is no poll, or whose agents or settings do not
-    /// resolve, answers `false` and leaves its deadline standing.
+    /// waiting. A state that is no poll, or an agent poll whose agents or
+    /// settings do not resolve, answers `false` and leaves its deadline standing.
+    ///
+    /// Settings are read only to resolve an agent poll's agents. A poll's budget
+    /// is its own `max_attempts`, which no setting changes, so a program poll
+    /// answers from its spawn record alone.
     // §FS-rhei-run.3.7.4
     fn poll_bound_spent(
         &self,
@@ -207,27 +213,24 @@ impl<'a> SpawnSiteRoots<'a> {
         task: &rhei_core::ast::Task,
         state_name: &str,
     ) -> bool {
-        let Some(state_def) = machine.states.get(state_name).filter(|def| def.poll.is_some())
-        else {
-            return false;
-        };
-        let mut read = None;
-        let settings = match self.settings {
-            Some(settings) => settings,
-            None => match load_merged_settings(self.tasks.workspace_root) {
-                Ok(settings) => &*read.insert(settings),
-                Err(_) => return false,
-            },
-        };
+        let Some(state_def) = machine.states.get(state_name) else { return false };
+        let Some(budget) = poll_attempt_budget(state_def) else { return false };
         let agents = if state_def.program.is_some() {
             None
         } else {
+            let mut read = None;
+            let settings = match self.settings {
+                Some(settings) => settings,
+                None => match load_merged_settings(self.tasks.workspace_root) {
+                    Ok(settings) => &*read.insert(settings),
+                    Err(_) => return false,
+                },
+            };
             let resolved =
                 resolve_agent_invocations_for_task(machine, state_name, settings, self.opts, Some(task));
             let Ok(resolved) = resolved else { return false };
             Some(resolved)
         };
-        let budget = resolve_attempt_budget(Some(state_def), settings);
         self.next_spawns_spent(rhei, machine, task, state_name, agents.as_deref(), budget)
     }
 

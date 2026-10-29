@@ -76,9 +76,28 @@ impl SpawnPlan {
     }
 }
 
-/// The resolved agent configuration this spawn was built from.
-/// §FS-rhei-evidence.6
-fn agent_evidence_config(resolved: &ResolvedAgent, tooling: &ResolvedTooling) -> serde_json::Value {
+/// The state's part of an agent's consumed configuration: its effort, its
+/// attempt budget and its snapshot rules. §FS-rhei-evidence.6
+fn agent_evidence_state(state_def: Option<&rhei_validator::StateDef>, budget: AttemptBudget) -> serde_json::Value {
+    let (per, max) = match budget {
+        AttemptBudget::Visit(max) => ("visit", max),
+        AttemptBudget::Poll { max_attempts } => ("poll", max_attempts),
+    };
+    serde_json::json!({
+        "effort": state_def.and_then(|state| state.effort).map(|effort| effort.as_str()),
+        "attempt_budget": { "per": per, "max": max },
+        "snapshot": state_def.and_then(|state| state.snapshot.as_ref()),
+        "session": state_def.and_then(|state| state.session),
+    })
+}
+
+/// The resolved agent configuration this spawn was built from, with the
+/// state's part of it. §FS-rhei-evidence.6
+fn agent_evidence_config(
+    resolved: &ResolvedAgent,
+    tooling: &ResolvedTooling,
+    state: &serde_json::Value,
+) -> serde_json::Value {
     let mcp: Vec<serde_json::Value> = tooling
         .mcp_servers
         .iter()
@@ -104,6 +123,10 @@ fn agent_evidence_config(resolved: &ResolvedAgent, tooling: &ResolvedTooling) ->
         "timeout_secs": resolved.timeout_secs,
         "mcp_servers": mcp,
         "skills": skills,
+        "effort": state["effort"],
+        "attempt_budget": state["attempt_budget"],
+        "snapshot": state["snapshot"],
+        "session": state["session"],
     })
 }
 
@@ -130,7 +153,8 @@ fn begin_agent_evidence(start: AgentEvidenceStart<'_>) -> MietteResult<Option<Ev
     let argv = evidence_argv(start.cmd, Some(start.prompt));
     let mut prompt = run.retain(start.prompt.as_bytes(), "prompt");
     prompt["delivery"] = serde_json::json!(prompt_delivery(start.resolved, &argv));
-    let (version, note) = run.agent_cli_version(start.resolved);
+    let cwd = evidence_cwd(start.cmd);
+    let (version, note) = run.agent_cli_version(start.resolved, Path::new(&cwd));
     let snapshot = start.snapshot.and_then(|preload| {
         Some(serde_json::json!({
             "ref": preload.parent_ref.clone()?,
@@ -143,8 +167,8 @@ fn begin_agent_evidence(start: AgentEvidenceStart<'_>) -> MietteResult<Option<Ev
         "task_id": start.task_id,
         "state": start.state_name,
         "argv": argv,
-        "cwd": evidence_cwd(start.cmd),
-        "config": evidence_config(&run, agent_evidence_config(start.resolved, start.tooling)),
+        "cwd": cwd,
+        "config": evidence_config(&run, agent_evidence_config(start.resolved, start.tooling, &start.plan.evidence_state)),
         "prompt": prompt,
         "agent_cli_version": version,
         "agent_cli_version_note": note,

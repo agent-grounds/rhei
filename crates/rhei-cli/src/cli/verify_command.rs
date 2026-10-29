@@ -109,8 +109,7 @@ fn render_verify_json(outcome: &VerifyOutcome) -> serde_json::Value {
 /// when verification fails. §FS-rhei-verify.1 §FS-rhei-verify.5
 fn verify_command(input: Option<PathBuf>, digest: Option<&str>, json: bool) -> MietteResult<()> {
     let target = resolve_plan_target(input)?;
-    let root = execution_workspace_root(&normalize_workspace_input(target.path()));
-    let root = rhei_core::platform::canonical_path(&root).unwrap_or(root);
+    let root = evidence_root_for(target.path());
     let outcome = verify_evidence(&root, digest);
     if json {
         println!("{}", render_verify_json(&outcome));

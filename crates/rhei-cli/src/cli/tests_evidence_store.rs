@@ -71,25 +71,42 @@ mod evidence_store {
     }
 
     #[test]
-    fn the_probe_cache_holds_until_the_executables_size_or_mtime_changes() {
+    fn the_probe_cache_holds_until_a_stamped_files_size_or_mtime_changes() {
         let dir = tempfile::tempdir().expect("tmpdir");
         let run = run_in(dir.path());
-        let argv = vec!["cli".to_string(), "--version".to_string()];
+        let key = (vec!["cli".to_string(), "--version".to_string()], dir.path().to_path_buf());
         let mtime = std::time::SystemTime::UNIX_EPOCH;
         let calls = std::cell::Cell::new(0);
         let probe = |_: &[String]| {
             calls.set(calls.get() + 1);
             (Some(format!("cli {}", calls.get())), None)
         };
-        let first = run.cached_version_probe(argv.clone(), Some((10, Some(mtime))), probe);
-        let same = run.cached_version_probe(argv.clone(), Some((10, Some(mtime))), probe);
+        let first = run.cached_version_probe(key.clone(), vec![Some((10, Some(mtime)))], probe);
+        let same = run.cached_version_probe(key.clone(), vec![Some((10, Some(mtime)))], probe);
         assert_eq!((first.0.as_deref(), same.0.as_deref()), (Some("cli 1"), Some("cli 1")));
-        let resized = run.cached_version_probe(argv.clone(), Some((11, Some(mtime))), probe);
+        let resized = run.cached_version_probe(key.clone(), vec![Some((11, Some(mtime)))], probe);
         assert_eq!(resized.0.as_deref(), Some("cli 2"), "a new size probes again");
         let later = mtime + Duration::from_secs(1);
-        let touched = run.cached_version_probe(argv, Some((11, Some(later))), probe);
+        let touched = run.cached_version_probe(key.clone(), vec![Some((11, Some(later)))], probe);
         assert_eq!(touched.0.as_deref(), Some("cli 3"), "a new mtime probes again");
-        assert_eq!(calls.get(), 3);
+        let elsewhere = (key.0.clone(), dir.path().join("other"));
+        let moved = run.cached_version_probe(elsewhere, vec![Some((11, Some(later)))], probe);
+        assert_eq!(moved.0.as_deref(), Some("cli 4"), "another cwd is another probe");
+        assert_eq!(calls.get(), 4);
+    }
+
+    /// A wrapper's script is stamped beside its interpreter, resolved from the
+    /// spawn's cwd, so editing the script probes again. §FS-rhei-evidence.7
+    #[test]
+    fn a_wrappers_script_is_stamped_from_the_spawns_cwd() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        fs::write(dir.path().join("wrap.sh"), "echo 1\n").expect("script");
+        let command = ["bash".to_string(), "wrap.sh".to_string(), "exec".to_string()];
+        let before = command_stamps(&command, dir.path());
+        assert_eq!(before.len(), 2, "bash and wrap.sh; `exec` names no file: {before:?}");
+        assert!(before[1].is_some_and(|(len, _)| len == 7), "{before:?}");
+        fs::write(dir.path().join("wrap.sh"), "echo 22\n").expect("script");
+        assert_ne!(command_stamps(&command, dir.path()), before, "the script's edit is seen");
     }
 
     #[test]
@@ -109,6 +126,27 @@ mod evidence_store {
         assert_eq!(written["path"], "runtime/evidence/runs/run-1/manifest.json");
         assert_eq!(written["sha256"], sha256_hex(&bytes));
         assert!(write_evidence_manifest(&root, "run-1", &manifest).is_none(), "written once");
+    }
+
+    /// The state's snapshot rules, effort and attempt budget are in the
+    /// configuration an agent consumes. §FS-rhei-evidence.6
+    #[test]
+    fn the_states_part_of_an_agents_configuration_names_its_snapshot_rules() {
+        let state: rhei_validator::StateDef = serde_yaml::from_str(
+            "description: Work\nagent: mock\neffort: low\nsession: continue\nsnapshot:\n  emit: { name: probe, on: always }\n",
+        )
+        .expect("state");
+        let value = agent_evidence_state(Some(&state), AttemptBudget::Poll { max_attempts: 4 });
+        assert_eq!(value["effort"], "low");
+        assert_eq!(value["attempt_budget"], serde_json::json!({ "per": "poll", "max": 4 }));
+        assert_eq!(value["snapshot"]["emit"], serde_json::json!({ "name": "probe", "on": "always" }));
+        assert_eq!(value["session"], "continue");
+        let none = agent_evidence_state(None, AttemptBudget::Visit(3));
+        assert_eq!(none["snapshot"], serde_json::Value::Null);
+        let mut unsnapshotted = state.clone();
+        unsnapshotted.snapshot = None;
+        let other = agent_evidence_state(Some(&unsnapshotted), AttemptBudget::Poll { max_attempts: 4 });
+        assert_ne!(canonical_json_text(&value), canonical_json_text(&other), "the rules change the hash");
     }
 
     #[test]

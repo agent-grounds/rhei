@@ -42,7 +42,8 @@ struct EvidenceRun {
     settings: RheiSettings,
     started_at: String,
     provenance: rhei_tui::RunProvenance,
-    probes: Mutex<BTreeMap<Vec<String>, VersionProbe>>,
+    /// Keyed by the probe's argv and the directory it runs in. §FS-rhei-evidence.7
+    probes: Mutex<BTreeMap<(Vec<String>, PathBuf), VersionProbe>>,
     accounting: Mutex<BTreeSet<PathBuf>>,
     /// Per task, the process whose exit the orchestrator is about to route.
     /// §FS-rhei-evidence.2.2
@@ -56,6 +57,18 @@ static EVIDENCE_RUN: Mutex<Option<Arc<EvidenceRun>>> = Mutex::new(None);
 /// The run this process is recording, if it is recording one.
 fn evidence_run() -> Option<Arc<EvidenceRun>> {
     EVIDENCE_RUN.lock().unwrap_or_else(|poison| poison.into_inner()).clone()
+}
+
+/// The root whose `runtime/evidence/` a run on `path` records into: the
+/// project for a member rhei, else `path`'s own execution root. The run, a
+/// transition's callbacks, the reset event and `rhei verify` all take it from
+/// here, so none of them can record into or read from another.
+/// §FS-rhei-evidence.1 §FS-rhei-panta.6
+fn evidence_root_for(path: &Path) -> PathBuf {
+    let input = normalize_workspace_input(path);
+    let root = rhei_core::workspace::panta_member(&input)
+        .map_or_else(|| execution_workspace_root(&input), |(project, _)| project);
+    rhei_core::platform::canonical_path(&root).unwrap_or(root)
 }
 
 /// The recording run, when `log_path` lies in its root: a process is recorded
@@ -75,7 +88,8 @@ fn start_evidence_run(
     started_at: &str,
     provenance: &rhei_tui::RunProvenance,
 ) -> MietteResult<()> {
-    let run = EvidenceRun::new(root, run_id, started_at, provenance, load_merged_settings(root)?);
+    let root = evidence_root_for(root);
+    let run = EvidenceRun::new(&root, run_id, started_at, provenance, load_merged_settings(&root)?);
     finalize_killed_runs(&run);
     *EVIDENCE_RUN.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(Arc::new(run));
     Ok(())

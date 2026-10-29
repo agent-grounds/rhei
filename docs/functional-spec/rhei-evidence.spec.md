@@ -38,7 +38,9 @@ runtime/evidence/                      in the run's root, beside run.json
 The **run's root** is the directory whose `runtime/run.json` describes the run
 ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)): the workspace, or in a Panta project the project
 root. One run's evidence is one directory, `runs/<run-id>/`, so a run is one
-thing to verify and, later, one thing to pack.
+thing to verify and, later, one thing to pack. A member rhei's root is its
+project's, whichever command asks — the run, a transition's callbacks, a reset
+or `rhei verify` — even though the member keeps its own execution root.
 
 ### 1.1. Nothing Is Rewritten
 
@@ -95,8 +97,8 @@ which is also its `<key>`. It names one process and says nothing about the
 firing or its order. The record places it by facts that already exist: the
 task, `from`, `to`, the callback's phase, and the ticket's move count.
 
-Callback evidence is written only into a **live run**: the workspace the
-transition acts on has its run lock held and its id in `runtime/run.json`
+Callback evidence is written only into a **live run**: the run's root of the
+workspace the transition acts on ([§FS-rhei-evidence.1](rhei-evidence.spec.md#1-the-store)) has its run lock held and its id in `runtime/run.json`
 ([§FS-rhei-run-headless.3](rhei-run-headless.spec.md#3-run-identity-and-liveness)). With no live run nothing is written, because no
 run's manifest could cover it. Nothing about the owner reaches a worker's
 environment; [§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables) is unchanged.
@@ -104,7 +106,8 @@ environment; [§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables) i
 `owner_invocation_ids` names the process the callback ran inside:
 
 - a transition the orchestrator fires itself to route an exit names the one
-  invocation whose exit it routes;
+  invocation whose exit it routes, on every callback of that transition —
+  `on_leave` and `on_enter` alike — and on none after it;
 - a `rhei transition <task>` or `rhei complete <task>` in a workspace with a
   live run names every start record of that task, in that run's directory,
   that has no end record — one for a single slot, all of them for a fan-out,
@@ -238,7 +241,9 @@ another matter's.
   ([§FS-rhei-agents.1.1.7](rhei-agents.spec.md#117-inspecting-the-effective-roster)), the selected mode, the resolved model profile with
   its binding for this agent, effort, timeout and attempt budget, the MCP
   servers and skills left after availability checks, and the state's snapshot
-  rules.
+  rules. The state's part sits under `effort` (the canonical value, before
+  translation), `attempt_budget` (`{per, max}`, `per` being `visit` or `poll`),
+  `snapshot` and `session`, each `null` when the state declares none.
 - **A program:** the state's `program` object after template expansion, and
   its timeout.
 - **A callback:** its declaration after resolution, and its time bound.
@@ -262,16 +267,21 @@ why the object follows the retention and redaction rules of
 
 The profile field `version_args` ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)) is appended to the
 profile's **whole** `command` — never to its first element — and run with stdin
-closed, bounded at 10 seconds. A wrapper `["bash", "scripts/x.sh"]` is asked
+closed, bounded at 10 seconds, in the directory the agent is spawned in (the
+record's `cwd`), so a wrapper named relative to the checkout resolves as it does
+for the agent. A wrapper `["bash", "scripts/x.sh"]` is asked
 `bash scripts/x.sh --version`, not bash. The recorded version is the first
 non-empty line of stdout, trimmed.
 
 - Every built-in declares `["--version"]`, which its own command accepts:
   `claude --version`, and `codex exec --version`. A profile with a `family`
   inherits its built-in's value; `version_args: null` turns the probe off.
-- The probe runs once per run per distinct resolved command, and again when the
-  resolved executable's size or modification time changes, because a CLI can
-  update itself mid-run.
+- The probe runs once per run per distinct resolved command and directory, and
+  again when a stamped file's size or modification time changes, because a CLI
+  can update itself mid-run. The stamped files are the resolved executable and
+  every later element of `command` that names a file from that directory: for
+  `["bash", "scripts/x.sh"]` the script, which is what changes when the wrapper
+  does, as well as bash.
 - With no version, `agent_cli_version` is `null` and `agent_cli_version_note`
   says why: `no version_args`, `probe exited <code>`, `probe timed out`, or
   `probe printed nothing`.

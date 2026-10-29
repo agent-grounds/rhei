@@ -231,6 +231,9 @@ struct SpawnPlan {
     /// left by an earlier visit is not one: re-entering a state is a fresh
     /// start, not a second attempt at the last one.
     previous: Option<SpawnRecord>,
+    /// The state's part of the configuration an agent spawn consumes; `null`
+    /// for a program. §FS-rhei-evidence.6
+    evidence_state: serde_json::Value,
 }
 
 impl SpawnPlan {
@@ -496,5 +499,6 @@ fn spawn_plan_for_test(log: &Path) -> SpawnPlan {
         }),
         charged: 0,
         previous: None,
+        evidence_state: serde_json::Value::Null,
     }
 }

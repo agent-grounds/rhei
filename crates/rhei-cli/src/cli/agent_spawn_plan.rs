@@ -41,6 +41,7 @@ fn plan_spawn_attempt(
         accounting: None,
         charged,
         previous,
+        evidence_state: serde_json::Value::Null,
     }
 }
 

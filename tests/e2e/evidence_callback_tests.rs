@@ -207,3 +207,132 @@ fn an_agents_transition_on_a_second_plan_writes_into_neither_store() {
     sorted.sort();
     assert_eq!(sorted, ["agent", "program"], "only the outer run's own processes");
 }
+
+/// Every callback start record under `evidence`, as `(phase, owners)`, sorted.
+fn callback_owners(evidence: &Path) -> Vec<(String, serde_json::Value)> {
+    let mut found: Vec<(String, serde_json::Value)> = records(evidence, "start")
+        .into_iter()
+        .filter(|record| record["kind"] == "callback")
+        .map(|record| {
+            let phase =
+                format!("{}->{} {}", record["from"], record["to"], record["callback_phase"]);
+            (phase.replace('"', ""), record["owner_invocation_ids"].clone())
+        })
+        .collect();
+    found.sort_by(|a, b| a.0.cmp(&b.0));
+    found
+}
+
+/// The program's exit routes `measure -> work`, whose `on_leave` and
+/// `on_enter` both run: each names the program, not only the first.
+/// §FS-rhei-evidence.2.2
+#[test]
+fn every_callback_of_a_routed_exit_names_the_invocation_it_routes() {
+    let ws = evidence_workspace("evidence-callback-both", Profile::default());
+    let (leave, _) = saving_callback(&ws.root, "on-leave.py");
+    let (enter, _) = saving_callback(&ws.root, "on-enter.py");
+    edit_machine(
+        &ws,
+        "  - { from: measure, to: work, description: Measured, exit_code: 0 }\n",
+        &format!(
+            "  - from: measure\n    to: work\n    description: Measured\n    exit_code: 0\n    on_leave: {}\n    on_enter: {}\n",
+            callback_yaml(&leave),
+            callback_yaml(&enter)
+        ),
+    );
+    let run = run_cli("run", &ws.plan, &ws.machine, &["--no-tui"]);
+    assert!(run.status.success(), "fixture run:\n{}\n{}", run.stdout, run.stderr);
+
+    let evidence = ws.evidence_dir();
+    let program = serde_json::json!([one_start(&evidence, "program")["invocation_id"]]);
+    assert_eq!(
+        callback_owners(&evidence),
+        [
+            ("measure->work on_enter".to_string(), program.clone()),
+            ("measure->work on_leave".to_string(), program),
+        ]
+    );
+}
+
+/// Turn the probe workspace into a Panta project whose one member, `billing`,
+/// is a directory workspace: its own execution root is not the run's root.
+/// Returns the member. §FS-rhei-panta.6
+fn into_panta_member(ws: &EvidenceWorkspace) -> PathBuf {
+    let plan = fs::read_to_string(&ws.plan).expect("plan");
+    fs::remove_file(&ws.plan).expect("remove the single-file plan");
+    fs::write(ws.root.join("index.panta.md"), "# Panta: Evidence\n").expect("write project");
+    let member = ws.root.join("billing");
+    fs::create_dir_all(member.join("tasks")).expect("member tasks dir");
+    fs::write(member.join("index.rhei.md"), "# Rhei: Billing\n").expect("write member");
+    let tasks = &plan[plan.find("### Task 1").expect("the probe task")..];
+    fs::write(member.join("tasks/probe.md"), tasks).expect("write member tasks");
+    member
+}
+
+/// In a Panta project the run records under the project root, and so does
+/// every callback: the one the run fires routing the program's exit, and the
+/// one an agent's own `rhei transition` fires, each naming its owner.
+/// §FS-rhei-evidence.2.2 §FS-rhei-evidence.1
+#[test]
+fn a_panta_members_callbacks_record_into_the_projects_run() {
+    let ws = evidence_workspace("evidence-callback-panta", Profile::default());
+    let member = into_panta_member(&ws);
+    let (routed, _) = saving_callback(&ws.root, "on-routed.py");
+    let (by_agent, by_agent_saved) = saving_callback(&ws.root, "on-agent.py");
+    edit_machine(
+        &ws,
+        "  - { from: measure, to: work, description: Measured, exit_code: 0 }\n",
+        &format!(
+            "  - from: measure\n    to: work\n    description: Measured\n    exit_code: 0\n    on_enter: {}\n",
+            callback_yaml(&routed)
+        ),
+    );
+    edit_machine(
+        &ws,
+        "  done:\n",
+        "  parked:\n    description: Waiting on a person\n    gating: true\n  done:\n",
+    );
+    edit_machine(
+        &ws,
+        "  - { from: work, to: done, description: Worked }\n",
+        &format!(
+            "  - from: work\n    to: parked\n    description: Worked\n    on_enter: {}\n  - {{ from: parked, to: done, description: Released }}\n",
+            callback_yaml(&by_agent)
+        ),
+    );
+    write_python_agent(&ws.root, "stub-agent.py", NESTED_AGENT);
+    let argv = serde_json::json!([
+        rhei_binary().display().to_string(),
+        "--state-machine",
+        ws.machine.display().to_string(),
+        "transition",
+        member.display().to_string(),
+        "--task",
+        "1",
+        "--from",
+        "work",
+        "--to",
+        "parked"
+    ]);
+    fs::write(ws.root.join("nested.json"), argv.to_string()).expect("nested argv");
+    let run = run_cli("run", &member, &ws.machine, &["--no-tui"]);
+    let nested = fs::read_to_string(ws.root.join("nested-exit.txt"))
+        .unwrap_or_else(|_| panic!("fixture: the agent ran:\n{}\n{}", run.stdout, run.stderr));
+    assert!(nested.starts_with("0\n"), "fixture: the agent's own transition succeeded:\n{nested}");
+    assert!(by_agent_saved.is_file(), "fixture: the agent's transition fired its callback");
+
+    assert!(!member.join("runtime/evidence").exists(), "nothing records under the member");
+    let evidence = ws.evidence_dir();
+    assert_store_exists(&evidence);
+    let program = one_start(&evidence, "program")["invocation_id"].clone();
+    let agent = one_start(&evidence, "agent")["invocation_id"].clone();
+    assert_eq!(
+        callback_owners(&evidence),
+        [
+            ("measure->work on_enter".to_string(), serde_json::json!([program])),
+            ("work->parked on_enter".to_string(), serde_json::json!([agent])),
+        ]
+    );
+    let verified = ws.verify(&[]);
+    assert!(verified.status.success(), "verify:\n{}\n{}", verified.stdout, verified.stderr);
+}

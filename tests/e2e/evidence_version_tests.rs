@@ -8,7 +8,7 @@ use std::fs;
 use super::evidence_support::{
     assert_store_exists, evidence_workspace, one_start, records, EvidenceWorkspace, Profile,
 };
-use super::python_command;
+use super::{git_command, python_command, run_cli};
 
 /// Two tickets that both start on the `mock` agent.
 const TWO_TICKETS: &str = r#"# Rhei: Two probes
@@ -213,4 +213,38 @@ transitions:
         ]
     );
     assert_eq!(probes(&ws).len(), 2, "probed again after the change");
+}
+
+/// A wrapper named relative to the checkout, `[python, stub-agent.py]`, in a
+/// checkout whose root is not the run's: the probe runs where the agent is
+/// spawned, so it finds the wrapper and records its answer. §FS-rhei-evidence.7
+#[test]
+fn a_relative_wrapper_is_probed_in_the_directory_the_agent_runs_in() {
+    let ws = evidence_workspace("evidence-version-wrapper", Profile::default());
+    let project = ws.root.join("proj");
+    fs::create_dir_all(&project).expect("project dir");
+    for name in ["plan.rhei.md", "states.yaml", ".agent-grounds"] {
+        fs::rename(ws.root.join(name), project.join(name)).expect("move into the project");
+    }
+    let settings_path = project.join(".agent-grounds/rhei/settings.json");
+    let mut settings: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&settings_path).expect("settings")).expect("JSON");
+    settings["agents"]["mock"]["command"] = serde_json::json!([python_command(), "stub-agent.py"]);
+    settings["agents"]["mock"]["version_args"] = serde_json::json!(["--version"]);
+    fs::write(&settings_path, settings.to_string()).expect("write settings");
+    let init = git_command().current_dir(&ws.root).args(["init", "-q"]).output().expect("git");
+    assert!(init.status.success(), "fixture: git init");
+
+    let (plan, machine) = (project.join("plan.rhei.md"), project.join("states.yaml"));
+    let run = run_cli("run", &plan, &machine, &["--no-tui", "--no-callbacks"]);
+    assert!(run.status.success(), "fixture run:\n{}\n{}", run.stdout, run.stderr);
+    let agent = one_start(&project.join("runtime/evidence"), "agent");
+    let cwd = std::path::Path::new(agent["cwd"].as_str().expect("cwd"));
+    assert_ne!(
+        cwd,
+        project.canonicalize().expect("project"),
+        "fixture: the checkout is not the run root"
+    );
+    assert_eq!(agent["agent_cli_version"], "stub-cli 1.2.3", "{agent:#}");
+    assert_eq!(agent["agent_cli_version_note"], serde_json::Value::Null, "{agent:#}");
 }

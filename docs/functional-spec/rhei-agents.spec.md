@@ -35,7 +35,10 @@ Files:
 
 - Global: `~/.config/rhei/settings.json`
 - Project: `<plan-root>/.agent-grounds/rhei/settings.json`, and failing that
-  `<plan-root>/.agents/rhei/settings.json`, in the workspace or plan directory
+  `<plan-root>/.agents/rhei/settings.json`, where `<plan-root>` is the
+  directory holding a single-file plan, the Directory Workspace itself, or the
+  Panta project directory. For any member of a Panta project it is the project
+  directory, never the member's own ([§FS-rhei-agents.1.1.8](rhei-agents.spec.md#118-the-settings-root-of-a-project-member))
 
 Both files use the same schema. Project settings compose with global settings by
 key rather than replacing the whole file.
@@ -599,6 +602,45 @@ as normal pipeline termination under [§FS-rhei-usage.2.2](rhei-usage.spec.md#22
 
 Inspection has no execution side effects: it writes no file, creates no
 runtime tree, performs no transition or migration, and spawns no subprocess.
+
+#### 1.1.8. The settings root of a project member
+
+**A member of a Panta project reads its project's settings, never its own.**
+Settings are project-wide ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)). A member is a rhei the project
+discovers: a single-file plan beside `index.panta.md`, a Directory Workspace
+directly under it, or its `basin/`. For any member, the `<plan-root>` of
+[§FS-rhei-agents.1.1](rhei-agents.spec.md#11-global-and-project-settings) is the project directory. Its project settings file is
+`<project>/.agent-grounds/rhei/settings.json`, or, failing that, the deprecated
+fallback, chosen by first match as above.
+
+This holds for every read, not only the one a run makes when it starts:
+
+- a transition applied to a member's ticket, whether by `rhei transition`
+  (with or without `--force`) or by a run moving the ticket on after one of its
+  agents or programs exits, including the terminal edge that folds a fan-out's
+  result fragments;
+- a command pointed at the member's own path rather than at the project, such
+  as `rhei snapshot … --plan <project>/<member>`;
+- shell completion for a command line that names the member's path.
+
+A member's ticket is therefore governed by the same settings files at every
+step as the run that spawned it: no step reads a project settings file other
+than the one the run read when it started. Under `rhei run --strict-inputs` the project candidates sealed and read
+once ([§FS-rhei-seal.8.3](rhei-seal.spec.md#83-settings-are-read-once)) are these same project-directory files.
+
+A settings file inside a member, `<member>/.agent-grounds/rhei/settings.json`
+or `<member>/.agents/rhei/settings.json`, is read by nothing. It is not merged.
+It is not a fallback when the project has no settings file. A malformed one
+cannot fail a command. `rhei validate` warns that it is ignored and names the
+project file its contents belong in.
+
+Only the settings root widens. A member keeps its own execution root, so its
+results, runtime tree, accounting, and snapshot cache stay under the member
+([§FS-rhei-panta.6.3](rhei-panta.spec.md#63-completion-and-rollup), [§FS-rhei-panta.6.5](rhei-panta.spec.md#65-cost-and-summary)). A plan merely nested inside a project
+directory is not a member if the project does not discover it, for example a
+plan in a grouping folder, under `runtime/`, or in a scratch directory. Such a
+plan is a bare rhei, the single rhei of its own implicit project, and it reads
+the settings at its own `<plan-root>`.
 
 ### 1.2. Per-State Settings
 

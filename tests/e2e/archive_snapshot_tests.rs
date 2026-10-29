@@ -88,7 +88,6 @@ fn packed_transcripts(tar: &Path) -> Vec<String> {
 /// generation's own `manifest.json` still records the old hash.
 /// §FS-rhei-verify.2 §FS-rhei-verify.3
 #[test]
-#[ignore = "red until #525: verify compares the generation's manifest field and never hashes the transcript; implement removes this"]
 fn an_edited_cached_transcript_fails_in_place() {
     let dir = unique_temp_dir("verify-transcript-bytes");
     snapshot_run(&dir, None);

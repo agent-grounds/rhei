@@ -10,11 +10,11 @@ struct SourceRun {
     manifest: Option<(String, Vec<u8>)>,
 }
 
-/// A snapshot generation as a source holds it: the path a finding names, and
-/// the `transcript_sha256` it is held to. §FS-rhei-evidence.8
+/// A snapshot generation as a source holds it: the path of its transcript,
+/// and the transcript's bytes when they are there. §FS-rhei-verify.2
 struct SourceGeneration {
     path: String,
-    transcript_sha256: String,
+    transcript: Option<Vec<u8>>,
 }
 
 /// Where the checker reads from. Every path is relative to the run's root and
@@ -37,7 +37,7 @@ trait EvidenceSource {
 /// §FS-rhei-verify.2 §FS-rhei-snapshots.7
 struct WorkspaceSource {
     root: PathBuf,
-    cached: std::cell::OnceCell<Vec<SnapshotRecord>>,
+    cached: std::cell::OnceCell<(PathBuf, Vec<SnapshotRecord>)>,
 }
 
 impl WorkspaceSource {
@@ -45,11 +45,13 @@ impl WorkspaceSource {
         WorkspaceSource { root: root.to_path_buf(), cached: std::cell::OnceCell::new() }
     }
 
-    fn cached(&self) -> &[SnapshotRecord] {
+    /// The cache the settings name, wherever it is, and the generations in it.
+    fn cached(&self) -> &(PathBuf, Vec<SnapshotRecord>) {
         self.cached.get_or_init(|| {
-            let cache =
-                snapshot_cache_dir(&load_merged_settings_for_completion(&self.root), &self.root);
-            read_snapshot_records(&cache).unwrap_or_default()
+            let settings = load_merged_settings_for_completion(&self.root);
+            let cache = snapshot_cache_dir(&settings, &self.root);
+            let records = read_snapshot_records(&cache).unwrap_or_default();
+            (cache, records)
         })
     }
 }
@@ -110,14 +112,12 @@ impl EvidenceSource for WorkspaceSource {
     }
 
     fn generation(&self, reference: &serde_json::Value) -> Option<SourceGeneration> {
-        let record =
-            self.cached().iter().find(|record| snapshot_parent_ref(record) == *reference)?;
+        let records = &self.cached().1;
+        let record = records.iter().find(|record| snapshot_parent_ref(record) == *reference)?;
+        let transcript = record.transcript_path();
         Some(SourceGeneration {
-            path: evidence_relative(&self.root, &record.path),
-            transcript_sha256: record.manifest["transcript_sha256"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string(),
+            path: evidence_relative(&self.root, &transcript),
+            transcript: fs::read(&transcript).ok(),
         })
     }
 }

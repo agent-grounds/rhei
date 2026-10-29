@@ -148,6 +148,8 @@ The runtime currently supports:
   `runtime/`
 - recording what each process a run started was handed, and checking later
   that it is still what the run wrote, with `rhei verify`
+- packing one run's evidence into a single file with `rhei archive`, which
+  `rhei verify` checks away from the workspace it ran in
 - rendering plans as JSON, GitHub-style markdown, or terminal-oriented progress
   output
 - rendering a self-contained HTML **Flow** visualization of a plan or workspace

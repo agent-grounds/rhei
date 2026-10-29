@@ -1121,9 +1121,19 @@ moved.
 
 The diagnostic names the task whose region holds the line, if one does, the
 `file:line`, and the loader's message, and its `help:` is about the text that
-broke rather than about task metadata. A `rhei run` started on a plan that a
-crash left broken between a worker's exit and its restore refuses at startup as
-before, with the same attribution.
+broke, so it follows the same line. A break inside a task's region is text a
+worker could have written there, and its `help:` is about what a task body may
+hold rather than about task metadata: progress as plain paragraphs or lists,
+because a heading there declares a child task. A break that no task's region
+holds — a line of the header above the first task, such as a retired
+`**States:**`, or a `## Tasks` section in a workspace index — is no task body's
+text, and its `help:` is the loader's own, the one `rhei validate` prints for
+the same plan. Where the line falls decides it, not whether a worker has run:
+the head, the `file:line`, the loader's message and the non-zero exit are the
+same either way. A `rhei run` started on a plan that a crash left broken
+between a worker's exit and its restore refuses at startup as before, with the
+same attribution; that break lies in the region of the task whose restore it
+missed, so it keeps the task-body `help:`.
 
 #### 3.7.7. What the Operator Reads
 

@@ -289,6 +289,7 @@ mod worker_edit_revert_prompt_tests;
 mod worker_edit_revert_race_tests;
 mod worker_edit_revert_support;
 mod worker_edit_revert_tests;
+mod worker_edit_stop_help_tests;
 mod workspace_task_metadata_tests;
 
 /// The plan and machine text most of them start from.

@@ -266,7 +266,7 @@ impl WorkerRegions {
             None => format!("the plan broke at {place}"),
         };
         // Text under a task's heading is text a worker could have written; any other
-        // line, a task file's own heading included, gets the loader's help. §FS-rhei-run.3.7.6
+        // line, a task file's first line included, gets the loader's help. §FS-rhei-run.3.7.6
         let help = match &owner {
             Some(_) => format!("{}. Fix or remove that text, then re-run.", worker_edit_help()),
             None => plan_authoring_help().to_string(),

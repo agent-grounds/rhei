@@ -1139,8 +1139,10 @@ non-zero exit are the same either way. A `rhei run` started on a plan that a
 crash left broken between a worker's exit and its restore refuses at startup as
 before, with the same attribution. A break below the heading of the task whose
 restore it missed keeps the task-body `help:`; one on that heading line itself,
-the rewritten heading of [§FS-rhei-run.3.7.3](rhei-run.spec.md#373-the-restore), is not that task's body, so in a task
-file it gets the loader's help.
+the rewritten heading of [§FS-rhei-run.3.7.3](rhei-run.spec.md#373-the-restore), is not that task's body, so where no task
+heading is above it, as on a task file's first line, it gets the loader's help,
+and anywhere else it falls under the task heading above it and gets the
+task-body `help:`.
 
 #### 3.7.7. What the Operator Reads
 

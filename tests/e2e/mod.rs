@@ -133,6 +133,7 @@ mod loop_budget_refusal_tests;
 mod mcp_config_file_tests;
 mod mcp_surface_tests;
 mod member_publication_tests;
+mod member_settings_root_tests;
 mod memory_map_tests;
 mod memory_note_store_tests;
 mod memory_prompt_tests;

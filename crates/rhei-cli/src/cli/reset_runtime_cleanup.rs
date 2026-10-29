@@ -123,6 +123,8 @@ fn remove_scoped_runtime_artifacts(
     scope: &RheiScope,
     machines: &rhei_validator::MachineSet,
     reset_locks: &mut ResetWriterLocks,
+    // Every file removed, for the reset event. §FS-rhei-evidence.10.1
+    removed_paths: &mut Vec<PathBuf>,
 ) -> MietteResult<bool> {
     let mut removed = false;
     let mut task_ids: Vec<String> = Vec::new();
@@ -179,11 +181,11 @@ fn remove_scoped_runtime_artifacts(
             // §DA-per-rhei-state-machines
             let machine = machines.for_task_str(task_id);
             for target in scoped_runtime_targets(&runtime, task_id, machine) {
-                removed |= remove_scoped_target(&target)?;
+                removed |= remove_scoped_target(&target, removed_paths)?;
             }
             if local_id != task_id && legacy_sweep_ok(&base) {
                 for target in scoped_runtime_targets(&runtime, local_id, machine) {
-                    removed |= remove_scoped_target(&target)?;
+                    removed |= remove_scoped_target(&target, removed_paths)?;
                 }
             }
         }
@@ -262,9 +264,9 @@ fn scoped_runtime_targets(
     targets
 }
 
-fn remove_scoped_target(target: &ScopedTarget) -> MietteResult<bool> {
+fn remove_scoped_target(target: &ScopedTarget, removed_paths: &mut Vec<PathBuf>) -> MietteResult<bool> {
     match target {
-        ScopedTarget::Exact(path) => remove_runtime_path(path),
+        ScopedTarget::Exact(path) => remove_runtime_path(path, removed_paths),
         ScopedTarget::Prefixed { dir, prefix } => {
             if !dir.is_dir() {
                 return Ok(false);
@@ -277,7 +279,7 @@ fn remove_scoped_target(target: &ScopedTarget) -> MietteResult<bool> {
                 let name = entry.file_name();
                 let Some(name) = name.to_str() else { continue };
                 if name.starts_with(prefix.as_str()) {
-                    removed |= remove_runtime_path(&entry.path())?;
+                    removed |= remove_runtime_path(&entry.path(), removed_paths)?;
                 }
             }
             Ok(removed)
@@ -285,7 +287,8 @@ fn remove_scoped_target(target: &ScopedTarget) -> MietteResult<bool> {
     }
 }
 
-fn remove_runtime_path(path: &Path) -> MietteResult<bool> {
+fn remove_runtime_path(path: &Path, removed_paths: &mut Vec<PathBuf>) -> MietteResult<bool> {
+    removed_paths.extend(files_under(path));
     if path.is_dir() {
         fs::remove_dir_all(path)
             .map_err(|err| file_io_report(path, "failed to remove runtime directory", err))?;
@@ -308,4 +311,14 @@ fn prune_transition_ledger(
     reset_locks: &mut ResetWriterLocks,
 ) -> MietteResult<bool> {
     reset_locks.ledger(root)?.prune(task_ids)
+}
+
+/// Every file at or under `path`, as a removal is about to take them.
+fn files_under(path: &Path) -> Vec<PathBuf> {
+    if !path.is_dir() {
+        return if path.exists() { vec![path.to_path_buf()] } else { Vec::new() };
+    }
+    fs::read_dir(path)
+        .map(|entries| entries.flatten().flat_map(|entry| files_under(&entry.path())).collect())
+        .unwrap_or_default()
 }

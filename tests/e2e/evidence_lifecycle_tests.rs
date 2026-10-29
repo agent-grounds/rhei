@@ -132,7 +132,6 @@ fn panta_workspace(prefix: &str) -> EvidenceWorkspace {
 /// naming the earlier run and every log it removed.
 /// §FS-rhei-evidence.10.1 §FS-rhei-reset.2.1 §FS-rhei-reset.4
 #[test]
-#[ignore = "red until #520: a narrowed reset writes no reset event and keeps no store; implement removes this"]
 fn a_narrowed_reset_keeps_the_store_and_writes_a_reset_event() {
     let ws = panta_workspace("evidence-reset-narrow");
     ws.run();

@@ -1119,21 +1119,28 @@ recorded the same way, interrupted and uncharged, with its exit unrouted, so a
 fixed plan resumes it as an interruption rather than a completion that never
 moved.
 
-The diagnostic names the task whose region holds the line, if one does, the
-`file:line`, and the loader's message, and its `help:` is about the text that
-broke, so it follows the same line. A break inside a task's region is text a
-worker could have written there, and its `help:` is about what a task body may
-hold rather than about task metadata: progress as plain paragraphs or lists,
-because a heading there declares a child task. A break that no task's region
-holds — a line of the header above the first task, such as a retired
-`**States:**`, or a `## Tasks` section in a workspace index — is no task body's
-text, and its `help:` is the loader's own, the one `rhei validate` prints for
-the same plan. Where the line falls decides it, not whether a worker has run:
-the head, the `file:line`, the loader's message and the non-zero exit are the
-same either way. A `rhei run` started on a plan that a crash left broken
-between a worker's exit and its restore refuses at startup as before, with the
-same attribution; that break lies in the region of the task whose restore it
-missed, so it keeps the task-body `help:`.
+The diagnostic names the task under whose heading the line falls — the last task
+heading above it — if there is one, the `file:line`, and the loader's message,
+and its `help:` is about the text that broke, so it follows the same line. Text
+under a task's heading is that task's body, text a worker could have written
+there: a break in it names the task, and its `help:` is about what a task body
+may hold rather than about task metadata: progress as plain paragraphs or lists,
+because a heading there declares a child task. A task's own heading line is not
+text under it, though its region holds it ([§FS-rhei-run.3.7.1](rhei-run.spec.md#371-the-region)). A break under no
+task's heading — a line of the header above the first task, such as a retired
+`**States:**`, a `## Tasks` section in a workspace index, or a task file's own
+heading on its first line, malformed or repeating another file's id
+— names no task, and its `help:` is the loader's plan-authoring help, about the
+plan's markup and task metadata. That is the help `rhei validate` gives a parse
+error, though its workspace check says more where it applies: for one id in two
+task files it says to renumber one. Where the line falls decides it, not whether
+a worker has run: the head, the `file:line`, the loader's message and the
+non-zero exit are the same either way. A `rhei run` started on a plan that a
+crash left broken between a worker's exit and its restore refuses at startup as
+before, with the same attribution. A break below the heading of the task whose
+restore it missed keeps the task-body `help:`; one on that heading line itself,
+the rewritten heading of [§FS-rhei-run.3.7.3](rhei-run.spec.md#373-the-restore), is not that task's body, so in a task
+file it gets the loader's help.
 
 #### 3.7.7. What the Operator Reads
 

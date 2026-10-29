@@ -141,9 +141,11 @@ fn restore_region(
     Ok((restored, text[span.start..span.end].to_string()))
 }
 
-/// The in-file id of the innermost task whose region holds 1-based `line`: the
-/// last node heading before it, since a later heading of any depth would have
-/// ended or nested that region first. §FS-rhei-run.3.7.6
+/// The in-file id of the innermost task under whose heading 1-based `line`
+/// falls: the last node heading before it, since a later heading of any depth
+/// would have ended or nested that task first. A task's own heading line is not
+/// under it, so line 1 of a task file has no owner, though `region_span` counts
+/// that line in the task's region. §FS-rhei-run.3.7.6
 fn region_owner_at(text: &str, line: usize) -> Option<String> {
     let mut in_code = false;
     let mut owner = None;
@@ -155,8 +157,8 @@ fn region_owner_at(text: &str, line: usize) -> Option<String> {
     owner
 }
 
-/// The task id, as the run prints it, of the task whose region holds `line`
-/// of `file`: the in-file id under the id of the rhei that owns the file.
+/// The task id, as the run prints it, of the task under whose heading `line`
+/// of `file` falls: the in-file id under the id of the rhei that owns the file.
 // §FS-rhei-run.3.7.6 §AR-rhei-panta.3
 fn task_owning_line(file: &Path, line: usize) -> Option<String> {
     let local = region_owner_at(&fs::read_to_string(file).ok()?, line)?;

@@ -1,7 +1,7 @@
-//! The `help:` of an attributed stop follows the line that broke: a break no
-//! task's region holds gets the loader's help, the one `rhei validate` prints
-//! for the same plan, and a break inside a task's region keeps the help about
-//! what a task body may hold (agent-grounds/rhei#522).
+//! The `help:` of an attributed stop follows the line that broke: a break under
+//! no task's heading gets the loader's plan-authoring help, and a break in the
+//! text under a task's heading keeps the help about what a task body may hold
+//! (agent-grounds/rhei#522).
 //!
 //! Every case here is a plan broken before the run starts, so no worker runs:
 //! the startup load is attributed the way a mid-run reload is, and where the
@@ -16,6 +16,9 @@ use super::*;
 /// The sentence of the help about a task body's text.
 const HEADING_HELP: &str = "a heading inside a task body declares a child task";
 
+/// The head of the loader's plan-authoring help.
+const PLAN_AUTHORING_HELP: &str = "check the plan's task metadata (**State:**";
+
 /// A directory plan named `name`, with `index` as its `index.rhei.md` and each
 /// of `tasks` under `tasks/`.
 fn directory_plan(dir: &TestDir, name: &str, index: &str, tasks: &[(&str, &str)]) -> PathBuf {
@@ -28,7 +31,8 @@ fn directory_plan(dir: &TestDir, name: &str, index: &str, tasks: &[(&str, &str)]
     plan
 }
 
-/// `rhei <args> <plan>` with its state under `dir`, read with miette's wrap undone.
+/// `rhei <args> <plan>` with its state under `dir`, read with miette's wrap
+/// undone and Windows path separators read as `/`, the way the cases name them.
 fn rhei(dir: &TestDir, args: &[&str], plan: &Path) -> CliRun {
     let out = rhei_command(dir.join(".home"))
         .current_dir(dir)
@@ -36,7 +40,9 @@ fn rhei(dir: &TestDir, args: &[&str], plan: &Path) -> CliRun {
         .arg(plan)
         .output()
         .expect("rhei should run");
-    CliRun::from(&out)
+    let mut run = CliRun::from(&out);
+    run.stderr = run.stderr.replace('\\', "/");
+    run
 }
 
 /// What a run on `plan` prints, in the order a reader meets it.
@@ -55,13 +61,15 @@ fn help_of(run: &CliRun) -> String {
         .unwrap_or_else(|| panic!("the diagnostic carries a help line:\n{}", run.stderr))
 }
 
-/// A plan broken outside every task's region stops `rhei run` with the head it
-/// has today and the help `rhei validate` gives the same plan.
-fn assert_loader_help(dir: &TestDir, plan: &Path, head: &str, message: &str) {
-    let validate = rhei(dir, &["validate"], plan);
-    assert!(!validate.status.success(), "validate refuses it too\n{}", validate.stderr);
-    let loader_help = help_of(&validate);
-
+/// A plan broken under no task's heading stops `rhei run` with the head it has
+/// today, naming no task, and a help that contains `loader_help`.
+fn assert_run_gives_loader_help(
+    dir: &TestDir,
+    plan: &Path,
+    head: &str,
+    message: &str,
+    loader_help: &str,
+) {
     let run = run_once(dir, plan);
     assert!(run.stderr.contains(head), "the head names the line: `{head}`\n{}", run.stderr);
     assert!(run.stderr.contains(message), "the head carries the loader's message\n{}", run.stderr);
@@ -71,10 +79,17 @@ fn assert_loader_help(dir: &TestDir, plan: &Path, head: &str, message: &str) {
         !help.contains(HEADING_HELP),
         "no task body holds the break, so the help must not send the reader to one: {help}"
     );
-    assert!(
-        help.contains(&loader_help),
-        "the help is the loader's, as `rhei validate` prints it (`{loader_help}`): {help}"
-    );
+    assert!(help.contains(loader_help), "the help is the loader's (`{loader_help}`): {help}");
+}
+
+/// A header line of the index: there `rhei validate` gives the same parse
+/// error the same plan-authoring help, so the run's help is compared with it.
+fn assert_loader_help(dir: &TestDir, plan: &Path, head: &str, message: &str) {
+    let validate = rhei(dir, &["validate"], plan);
+    assert!(!validate.status.success(), "validate refuses it too\n{}", validate.stderr);
+    let loader_help = help_of(&validate);
+    assert!(loader_help.contains(PLAN_AUTHORING_HELP), "validate's parse help: {loader_help}");
+    assert_run_gives_loader_help(dir, plan, head, message, &loader_help);
 }
 
 /// The report's first fixture: a retired `**States:**` header line, on line 2
@@ -106,8 +121,33 @@ fn a_tasks_section_in_the_index_stops_the_run_with_the_loaders_help() {
     );
 }
 
+/// A task file's own heading on its first line, repeating another file's id, is
+/// not text under any task's heading, though Task 2's region holds it: the run
+/// names no task and gives the loader's help, which fits a rewritten heading.
+/// `rhei validate`'s workspace check says more here (renumber one), so the help
+/// is not compared with validate's.
+#[test]
+fn a_task_files_own_heading_line_stops_the_run_with_the_loaders_help() {
+    let dir = unique_temp_dir("stop-help-heading-line");
+    let one = "### Task 1: One\n**State:** pending\n\nBody.\n";
+    let two = "### Task 1: Two\n**State:** pending\n\nBody.\n";
+    let plan = directory_plan(
+        &dir,
+        "heading-line",
+        "# Rhei: demo\n",
+        &[("01-one.md", one), ("02-two.md", two)],
+    );
+    assert_run_gives_loader_help(
+        &dir,
+        &plan,
+        "the plan broke at tasks/02-two.md:1 (",
+        "duplicate task ID '1'",
+        PLAN_AUTHORING_HELP,
+    );
+}
+
 /// The boundary: a heading inside a task body, there before the run started, is
-/// a break inside that task's region, so it keeps the help about task bodies.
+/// text under that task's heading, so it keeps the help about task bodies.
 #[test]
 fn a_heading_in_a_task_body_before_the_run_keeps_the_heading_help() {
     let dir = unique_temp_dir("stop-help-heading-body");

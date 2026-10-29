@@ -27,6 +27,24 @@ const PUBLISHED_ACCOUNTING_SCHEMAS: &[(&str, &str)] = &[
         "rhei.accounting.usage.v1",
         include_str!("../../schemas/rhei.accounting.usage.v1.schema.json"),
     ),
+    // The evidence documents and the summary checkpoint, beside the accounting
+    // ones. §FS-rhei-evidence §FS-rhei-summary.6
+    (
+        "rhei.evidence.event.v1",
+        include_str!("../../schemas/rhei.evidence.event.v1.schema.json"),
+    ),
+    (
+        "rhei.evidence.invocation.v1",
+        include_str!("../../schemas/rhei.evidence.invocation.v1.schema.json"),
+    ),
+    (
+        "rhei.evidence.manifest.v1",
+        include_str!("../../schemas/rhei.evidence.manifest.v1.schema.json"),
+    ),
+    (
+        "rhei.summary.checkpoint.v1",
+        include_str!("../../schemas/rhei.summary.checkpoint.v1.schema.json"),
+    ),
 ];
 
 fn accounting_schema_command(name: Option<&str>) -> MietteResult<()> {

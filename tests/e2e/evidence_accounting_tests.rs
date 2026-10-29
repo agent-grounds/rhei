@@ -65,7 +65,6 @@ fn named_accounting(manifest: &serde_json::Value) -> Vec<(String, String)> {
 /// Two of four agent spawns have an accounting record; the manifest names
 /// exactly those two, by path and hash. §FS-rhei-evidence.9.1
 #[test]
-#[ignore = "red until #520: a run writes no manifest to name its accounting records; implement removes this"]
 fn the_manifest_names_each_accounting_record_by_path_and_hash() {
     let ws = spawn_workspace("evidence-accounting", NOFAMILY_PLAN, NOFAMILY_MACHINE);
     ws.run();
@@ -82,7 +81,6 @@ fn the_manifest_names_each_accounting_record_by_path_and_hash() {
 /// and the manifest's paths are relative to the project root, the run's root.
 /// §FS-rhei-evidence.9.1 §FS-rhei-cost-accounting.2
 #[test]
-#[ignore = "red until #520: a run writes no manifest to name its accounting records; implement removes this"]
 fn a_panta_projects_manifest_names_records_relative_to_the_project_root() {
     let ws = member_workspace("evidence-accounting-panta");
     ws.run();
@@ -112,7 +110,6 @@ const PUBLISHED: [&str; 10] = [
 /// `rhei schema` lists and prints the evidence schemas and the summary
 /// checkpoint's beside the accounting ones. §FS-rhei-cost-accounting.8.1
 #[test]
-#[ignore = "red until #520: `rhei schema --list` names neither the evidence nor the checkpoint schemas; implement removes this"]
 fn rhei_schema_publishes_the_evidence_and_checkpoint_schemas() {
     let dir = unique_temp_dir("evidence-schema-list");
     let list = CliRun::from(

@@ -50,7 +50,6 @@ fn probes(ws: &EvidenceWorkspace) -> Vec<String> {
 /// One distinct command is probed once for the whole run, and both spawns
 /// record what it answered. §FS-rhei-evidence.7
 #[test]
-#[ignore = "red until #520: no agent CLI version is probed or recorded; implement removes this"]
 fn one_command_is_probed_once_for_two_spawns() {
     let mut profile = Profile::default();
     profile.fields["version_args"] = serde_json::json!(["--version"]);
@@ -73,7 +72,6 @@ fn one_command_is_probed_once_for_two_spawns() {
 /// A profile with no `version_args` and no family records `null` and says why.
 /// §FS-rhei-evidence.7
 #[test]
-#[ignore = "red until #520: no start record carries agent_cli_version; implement removes this"]
 fn a_profile_without_version_args_records_null_with_a_note() {
     let ws = evidence_workspace("evidence-version-none", Profile::default());
     ws.run();
@@ -121,7 +119,6 @@ fn assert_built_in_probes_its_whole_command(family: &str, trailing: &[&str], exp
 /// `codex exec --version`: the codex built-in's command is `codex exec`, and
 /// its probe is appended after `exec`. §FS-rhei-evidence.7
 #[test]
-#[ignore = "red until #520: built-ins declare no version_args and nothing is probed; implement removes this"]
 fn the_codex_built_in_probes_its_whole_command() {
     assert_built_in_probes_its_whole_command("codex", &["exec"], "exec --version");
 }
@@ -129,7 +126,6 @@ fn the_codex_built_in_probes_its_whole_command() {
 /// `claude --version`, inherited by a `family: claude-code` wrapper.
 /// §FS-rhei-evidence.7
 #[test]
-#[ignore = "red until #520: built-ins declare no version_args and nothing is probed; implement removes this"]
 fn the_claude_code_built_in_probes_its_whole_command() {
     assert_built_in_probes_its_whole_command("claude-code", &[], "--version");
 }
@@ -139,7 +135,6 @@ fn the_claude_code_built_in_probes_its_whole_command() {
 /// where a script is one: on Unix. §FS-rhei-evidence.7
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #520: no agent CLI version is probed or recorded; implement removes this"]
 fn a_changed_executable_is_probed_again_mid_run() {
     use std::os::unix::fs::PermissionsExt;
 

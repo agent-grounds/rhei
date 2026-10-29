@@ -31,6 +31,11 @@ pub(super) fn top_error(message: &str) -> String {
 }
 
 const SHIM: &str = r#"
+# A family profile's version probe asks `<command> --version`; answer it as
+# the CLI would, with no attempt counted. §FS-rhei-evidence.7
+if sys.argv[-1:] == ['--version']:
+    print('fake-codex 0.0.0')
+    raise SystemExit(0)
 attempt = int(pathlib.Path(COUNTER).read_text()) + 1 if pathlib.Path(COUNTER).exists() else 1
 write(COUNTER, str(attempt))
 if attempt <= EMIT_ATTEMPTS:
@@ -44,6 +49,11 @@ if WRITE:
 "#;
 
 const HELPER: &str = r#"
+# A family profile's version probe asks `<command> --version`; answer it as
+# the CLI would, with no attempt counted. §FS-rhei-evidence.7
+if sys.argv[-1:] == ['--version']:
+    print('fake-codex 0.0.0')
+    raise SystemExit(0)
 root = pathlib.Path(env('RHEI_ROOT'))
 write(root / 'runtime' / 'exports' / env('RHEI_TASK_ID') / 'working.md', 'helper\n')
 result('Independent helper completed.\n')

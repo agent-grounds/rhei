@@ -242,6 +242,17 @@ fn start_run_frontend(
     }
     let sink: Arc<dyn rhei_tui::EventSink> = Arc::new(rhei_tui::Tee::new(inner));
 
+    // Before run.json is replaced, so a killed run is finalized with what it
+    // recorded of itself. §FS-rhei-evidence.9.3
+    if let Err(err) = start_evidence_run(
+        workspace_root,
+        &identity.id,
+        &rhei_tui::format_rfc3339(identity.started_wall),
+        &identity.provenance,
+    ) {
+        eprintln!("warning: this run records no evidence: {err}");
+    }
+
     // Published once the control URL is known, so a reader learns where to
     // reach this run in the same breath it learns the run exists.
     // §FS-rhei-run-headless.2
@@ -261,6 +272,7 @@ fn start_run_frontend(
         exit_code: None,
         rhei_build: Some(identity.provenance.rhei_build.clone()),
         checkout_head_at_start: identity.provenance.checkout_head_at_start.clone(),
+        evidence_manifest: None,
     });
 
     let is_tui = frontend.is_tui;

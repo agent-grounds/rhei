@@ -5,13 +5,19 @@ use std::path::{Path, PathBuf};
 
 use super::*;
 
-const SCHEMA_IDS: [&str; 6] = [
+// The evidence and checkpoint contracts are published beside the accounting
+// ones. §FS-rhei-cost-accounting.8.1
+const SCHEMA_IDS: [&str; 10] = [
     "rhei.accounting.cost.v1",
     "rhei.accounting.invocation.v1",
     "rhei.accounting.prices.v1",
     "rhei.accounting.summary.v1",
     "rhei.accounting.task.v1",
     "rhei.accounting.usage.v1",
+    "rhei.evidence.event.v1",
+    "rhei.evidence.invocation.v1",
+    "rhei.evidence.manifest.v1",
+    "rhei.summary.checkpoint.v1",
 ];
 
 const ACCOUNTING_MACHINE: &str = r#"name: accounting-contract

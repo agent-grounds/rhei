@@ -202,5 +202,10 @@ fn built_in_agents() -> BTreeMap<String, CustomAgentProfile> {
         },
     );
 
+    // Every built-in's own command answers `--version`: `claude --version`,
+    // `codex exec --version`. §FS-rhei-evidence.7
+    for profile in agents.values_mut() {
+        profile.version_args = Some(flags(&["--version"]));
+    }
     agents
 }

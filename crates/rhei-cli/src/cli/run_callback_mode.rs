@@ -473,6 +473,16 @@ fn run_callback_mode(
         (terminal_count, total_tasks)
     };
 
+    let evidence_manifest = finish_evidence_at_loop_end(
+        input,
+        &workspace_root,
+        &runtime_dir,
+        &live.machines,
+        &live.settings,
+        &rhei_scope,
+        interrupted_run,
+        opts,
+    );
     sink.emit(RunEvent::RunFinished {
         summary: RunSummary {
             agents_spawned: 0,
@@ -482,6 +492,7 @@ fn run_callback_mode(
             accounting: None,
             workspace_accounting: None,
             stop: stop.clone(),
+            evidence_manifest,
         },
     });
     frontend.write_frozen_dashboard();

@@ -130,6 +130,7 @@ subprocess starts and published once it has started.
 | `agent_cli_version`, `agent_cli_version_note` | yes ([§FS-rhei-evidence.7](rhei-evidence.spec.md#7-the-agent-cli-version)) | — | — |
 | `snapshot` | [§FS-rhei-evidence.8](rhei-evidence.spec.md#8-the-snapshot-generation) | — | — |
 | `grants` | copied from the spawn record | copied from the spawn record | — |
+| `log_path` | the log's path, relative to the run's root | the same | — |
 
 `rhei_build` and `checkout_head_at_start` are the manifest's, not each
 record's ([§FS-rhei-evidence.9.1](rhei-evidence.spec.md#91-what-it-names)).
@@ -142,6 +143,11 @@ literal element `<prompt>`. A program declared with `shell: true`, or as a
 string, records the shell it ran under: `["sh", "-c", "<line>"]`, or
 `["cmd", "/S", "/C", "<line>"]` on Windows. `cwd` is the absolute working
 directory the process was started in.
+
+`argv` is recorded unredacted: a program's argv is authored in the plan the
+workspace already holds, and an agent's argv carries flags and paths, not MCP
+values, which reach it through a config file whose `env` is reduced to names
+([§FS-rhei-evidence.6.1](rhei-evidence.spec.md#61-environment-names-only)).
 
 ### 3.3. Publication and Refusal
 
@@ -283,8 +289,9 @@ untouched.
 ## 9. The Manifest
 
 When a run ends, rhei writes `runs/<run-id>/manifest.json`
-(`rhei.evidence.manifest.v1`), after the run report and before `run.json` takes
-its terminal status, so the two agree. Its **digest** is the sha256 of the file,
+(`rhei.evidence.manifest.v1`) as the run loop ends, before the `run_finished`
+record that carries its digest and before `run.json` takes its terminal status,
+so the two agree. Its **digest** is the sha256 of the file,
 which is canonical.
 
 ### 9.1. What It Names
@@ -317,7 +324,7 @@ A killed run leaves its directory with no manifest. The next `rhei run` in that
 workspace, once it holds the run lock, finalizes it: `status: incomplete`,
 `finalized_by` the new run's id, each process with a start record and no end
 record listed with `completed: false`, and each log recorded as found at that
-moment. No end record is invented for a process that has none. That
+moment, located by the start record's `log_path`. No end record is invented for a process that has none. That
 finalization is the recovery event.
 
 ### 9.4. The Manifest and the Checkpoint

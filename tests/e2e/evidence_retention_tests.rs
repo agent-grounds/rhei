@@ -11,7 +11,6 @@ use super::evidence_support::{
 /// `hash-only` keeps the hashes of the prompt and of every configuration
 /// object, and no bytes of either. §FS-rhei-evidence.5.2
 #[test]
-#[ignore = "red until #520: no evidence is written, so retention has nothing to govern; implement removes this"]
 fn hash_only_keeps_the_hashes_and_stores_no_prompt_or_configuration() {
     let profile = Profile {
         settings: serde_json::json!({ "evidence": { "retention": "hash-only" } }),
@@ -36,7 +35,6 @@ fn hash_only_keeps_the_hashes_and_stores_no_prompt_or_configuration() {
 /// An unknown retention value is a settings error, not a silent default.
 /// §FS-rhei-agents.1.1.8
 #[test]
-#[ignore = "red until #520: `evidence.retention` is not a settings key, so any value is ignored; implement removes this"]
 fn an_unknown_retention_value_is_refused() {
     let profile = Profile {
         settings: serde_json::json!({ "evidence": { "retention": "forever" } }),
@@ -115,7 +113,6 @@ mod redaction {
     /// The stored copies are the redactor's output; the record keeps the
     /// original's hash and says it holds a redacted copy. §FS-rhei-evidence.5.3
     #[test]
-    #[ignore = "red until #520: no evidence is written, so nothing is redacted into it; implement removes this"]
     fn a_redactor_stores_redacted_copies_and_the_record_keeps_the_original_hash() {
         let ws = secret_workspace("evidence-redacted", false);
         ws.run();
@@ -147,7 +144,6 @@ mod redaction {
     /// A redactor that fails stores nothing (`withheld`), and the agent still
     /// runs to its result. §FS-rhei-evidence.5.3
     #[test]
-    #[ignore = "red until #520: no evidence is written, so nothing is withheld from it; implement removes this"]
     fn a_failing_redactor_withholds_the_copy_and_the_agent_still_runs() {
         let ws = secret_workspace("evidence-withheld", true);
         ws.run();

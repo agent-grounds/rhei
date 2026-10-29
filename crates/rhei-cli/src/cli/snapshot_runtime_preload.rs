@@ -420,5 +420,7 @@ fn preload_snapshot_inherit_before_spawn_with_prior_sources(
         })?;
     }
     preload.parent_ref = Some(snapshot_parent_ref(&source));
+    preload.transcript_sha256 =
+        source.manifest.get("transcript_sha256").and_then(|v| v.as_str()).map(str::to_string);
     Ok(preload)
 }

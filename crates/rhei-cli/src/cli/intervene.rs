@@ -10,6 +10,15 @@
 
 use std::sync::mpsc::{channel, Sender};
 
+/// One live message a running agent received, as its evidence keeps it.
+/// §FS-rhei-evidence.5.4
+#[derive(Clone, Debug)]
+struct DeliveredIntervention {
+    at: String,
+    message: String,
+    outcome: String,
+}
+
 struct InterveneWrite {
     bytes: Vec<u8>,
     ack: Sender<Result<(), String>>,
@@ -25,6 +34,7 @@ struct InterveneTarget {
     slot: rhei_tui::Slot,
     state: String,
     stdin_format: AgentStdinFormat,
+    delivered: Arc<Mutex<Vec<DeliveredIntervention>>>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -85,17 +95,25 @@ impl RunInterveneSink {
                     slot,
                     state: state.to_string(),
                     stdin_format,
+                    delivered: Arc::new(Mutex::new(Vec::new())),
                 },
             );
         }
     }
 
     /// Drop a task's registration once its agent exits. Dropping the stored
-    /// sender ends the writer thread, which closes the child's stdin.
-    pub(crate) fn unregister(&self, task_id: &str, slot: rhei_tui::Slot) {
-        if let Ok(mut targets) = self.targets.lock() {
-            targets.remove(&InterveneKey { task_id: task_id.to_string(), slot });
-        }
+    /// sender ends the writer thread, which closes the child's stdin. Returns
+    /// the messages it received, in delivery order. §FS-rhei-evidence.5.4
+    pub(crate) fn unregister(
+        &self,
+        task_id: &str,
+        slot: rhei_tui::Slot,
+    ) -> Vec<DeliveredIntervention> {
+        let Ok(mut targets) = self.targets.lock() else { return Vec::new() };
+        targets
+            .remove(&InterveneKey { task_id: task_id.to_string(), slot })
+            .and_then(|target| target.delivered.lock().ok().map(|delivered| delivered.clone()))
+            .unwrap_or_default()
     }
 
     /// Append one line to the durable audit trail. Serialized through `audit`
@@ -171,6 +189,7 @@ impl rhei_tui::InterveneSink for RunInterveneSink {
                         target.slot,
                         target.state.clone(),
                         target.stdin_format,
+                        target.delivered.clone(),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -190,7 +209,7 @@ impl rhei_tui::InterveneSink for RunInterveneSink {
 
         let mut delivered = 0usize;
         let mut failed = 0usize;
-        for (task_id, tx, log_file, slot, state, stdin_format) in targets {
+        for (task_id, tx, log_file, slot, state, stdin_format, received) in targets {
             let bytes = stdin_message_bytes(stdin_format, message);
             let (ack_tx, ack_rx) = channel();
             if tx.send(InterveneWrite { bytes, ack: ack_tx }).is_err() {
@@ -217,6 +236,13 @@ impl rhei_tui::InterveneSink for RunInterveneSink {
                 )
             });
             self.audit(&task_id, Some(slot), &state, message, "delivered");
+            if let Ok(mut received) = received.lock() {
+                received.push(DeliveredIntervention {
+                    at: format_iso8601_utc(std::time::SystemTime::now()),
+                    message: message.to_string(),
+                    outcome: "delivered".to_string(),
+                });
+            }
             delivered += 1;
         }
 
@@ -284,6 +310,7 @@ mod intervene_tests {
                 slot,
                 state: "review".to_string(),
                 stdin_format,
+                delivered: Arc::new(Mutex::new(Vec::new())),
             },
             rx,
         )

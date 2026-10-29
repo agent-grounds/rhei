@@ -150,6 +150,10 @@ pub(crate) struct RunDescriptor {
     pub(crate) rhei_build: Option<rhei_tui::RheiBuild>,
     #[serde(default)]
     pub(crate) checkout_head_at_start: Option<rhei_tui::CheckoutHead>,
+    /// `{path, sha256}` of the run's evidence manifest once it ends; `null`
+    /// until then. §FS-rhei-evidence.9.2
+    #[serde(default)]
+    pub(crate) evidence_manifest: Option<serde_json::Value>,
 }
 
 impl RunDescriptor {
@@ -469,6 +473,9 @@ pub(crate) fn finalize_run_descriptor(exit_code: i32) {
     }
     descriptor.status = if exit_code == 0 { RunStatus::Finished } else { RunStatus::Failed };
     descriptor.exit_code = Some(exit_code);
+    // Written before run.json takes its terminal status, so the two agree.
+    // §FS-rhei-evidence.9
+    descriptor.evidence_manifest = finish_evidence_run(exit_code);
     descriptor.control_url = None;
     let _ = write_descriptor(&published.path, &descriptor);
     finalize_registry_entry(&published, &descriptor);

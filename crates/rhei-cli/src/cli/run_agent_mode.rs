@@ -1180,6 +1180,16 @@ fn run_agent_mode(
         }
     };
 
+    let evidence_manifest = finish_evidence_at_loop_end(
+        input,
+        &workspace_root,
+        &runtime_dir,
+        &live.machines,
+        &live.settings,
+        &rhei_scope,
+        interrupted_run,
+        opts,
+    );
     sink.emit(RunEvent::RunFinished {
         summary: RunSummary {
             agents_spawned,
@@ -1191,6 +1201,7 @@ fn run_agent_mode(
             accounting: accounting.as_ref().map(|rollup| rollup.run.clone()),
             workspace_accounting: accounting.and_then(|rollup| rollup.workspace).map(Box::new),
             stop: stop.clone(),
+            evidence_manifest,
         },
     });
     // The loop reached the point where it writes a report, so the finished

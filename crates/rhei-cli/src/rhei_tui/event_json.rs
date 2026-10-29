@@ -166,6 +166,8 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
         RunEvent::RunFinished { summary } => {
             put("event", json!("run_finished"));
             put("summary", summary_value(summary));
+            // Beside the summary, `null` on a dry run. §FS-rhei-run-json.2.1
+            put("evidence_manifest", summary.evidence_manifest.clone().unwrap_or(Value::Null));
         }
         // These two do not move the schema version: a reader that does not
         // know them skips them like any other unrecognized `event`.
@@ -464,7 +466,12 @@ fn decode_event(kind: &str, v: &Value, wall_clock: SystemTime) -> Option<RunEven
             line: text("line"),
             wall_clock,
         },
-        "run_finished" => RunEvent::RunFinished { summary: decode_summary(v.get("summary")) },
+        "run_finished" => RunEvent::RunFinished {
+            summary: RunSummary {
+                evidence_manifest: v.get("evidence_manifest").filter(|m| m.is_object()).cloned(),
+                ..decode_summary(v.get("summary"))
+            },
+        },
         _ => return seal::decode_seal_halt(kind, v),
     })
 }
@@ -517,6 +524,7 @@ fn decode_summary(value: Option<&Value>) -> RunSummary {
             .and_then(|a| serde_json::from_value::<AccountingRunSummary>(a).ok())
             .map(Box::new),
         stop: value.get("stop").and_then(RunStop::from_value),
+        evidence_manifest: None,
     }
 }
 

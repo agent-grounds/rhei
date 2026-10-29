@@ -391,7 +391,14 @@ impl ProviderFixture {
     pub fn new(name: &str, tasks: &[(&str, &str)], machine_text: &str, body: &str) -> Self {
         let (dir, root, machine) = create_workspace(name, "# Rhei: Provider controls\n", tasks);
         let body = format!(
-            r#"def await_marker(path):
+            r#"# A built-in profile's version probe asks `<command> --version`; answer it
+# as the CLI would, without counting a start. §FS-rhei-evidence.7
+if sys.argv[-1:] == ['--version']:
+    print('fake-cli 0.0.0')
+    raise SystemExit(0)
+
+
+def await_marker(path):
     until = time.monotonic() + {marker_patience}
     while not path.exists():
         if time.monotonic() >= until:

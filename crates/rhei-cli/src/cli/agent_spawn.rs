@@ -229,6 +229,18 @@ fn spawn_and_wait_agent(
         cmd.env(PARENT_ACCOUNT_ENV, account);
     }
     cmd.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
+    // Published before the spawn and removed if it never starts. §FS-rhei-evidence.3.3
+    let mut evidence = begin_agent_evidence(AgentEvidenceStart {
+        resolved,
+        tooling,
+        prompt,
+        cmd: &cmd,
+        task_id,
+        state_name,
+        plan,
+        snapshot: snapshot_preload,
+        log_path,
+    })?;
 
     // The agent leads its own process group, so its MCP servers and shell tools
     // are terminated with it, and it never inherits the operator's terminal.
@@ -243,6 +255,9 @@ fn spawn_and_wait_agent(
         // started, so there is no verdict on the ticket, no transition fires,
         // and the log goes with `unstarted`. §FS-rhei-run.3.2 §FS-rhei-agents.8.1
         Err(err) if spawn_was_interrupted(&err) => {
+            if let Some(evidence) = evidence.take() {
+                evidence.abandon();
+            }
             return Ok(AgentSpawnOutcome {
                 status: never_started_status(),
                 timed_out: false,
@@ -256,7 +271,12 @@ fn spawn_and_wait_agent(
         }
         // A command line too large to hand over fails here exactly as a missing
         // binary does, so the size is asked about first. §FS-rhei-errors.7
-        Err(e) => return Err(spawn_failure_report(&e, resolved, prompt, &cmd)),
+        Err(e) => {
+            if let Some(evidence) = evidence.take() {
+                evidence.abandon();
+            }
+            return Err(spawn_failure_report(&e, resolved, prompt, &cmd));
+        }
     };
     let child = &mut supervised.child;
 
@@ -369,11 +389,10 @@ fn spawn_and_wait_agent(
 
     // The agent has exited: drop its intervene registration, which ends the
     // stdin writer thread and closes the pipe.
-    if registered_intervene {
-        if let Some(registry) = intervene {
-            registry.unregister(task_id, slot);
-        }
-    }
+    let interventions = match (registered_intervene, intervene) {
+        (true, Some(registry)) => registry.unregister(task_id, slot),
+        _ => Vec::new(),
+    };
 
     // Everything the agent wrote before it exited is read before anything
     // below reads the capture. §FS-rhei-agent-output-drain.1
@@ -415,6 +434,15 @@ fn spawn_and_wait_agent(
         if timed_out { resolved.timeout_secs.map(format_duration_human) } else { None };
     // The spawn ran. Say so where the next pass, the next run, and the engine's
     // own account of this state will all read it. §FS-rhei-agents.8.4
+    let ending = if provider_limit.is_some() {
+        "provider_limited"
+    } else if timed_out {
+        "timed out"
+    } else if interrupted {
+        "interrupted"
+    } else {
+        "exited"
+    };
     plan.record_spawn(SpawnEnding {
         task_id,
         state_name,
@@ -424,15 +452,7 @@ fn spawn_and_wait_agent(
         ended: &format_iso8601_utc(ended_wall),
         duration: &duration,
         code: status.code(),
-        ending: if provider_limit.is_some() {
-            "provider_limited"
-        } else if timed_out {
-            "timed out"
-        } else if interrupted {
-            "interrupted"
-        } else {
-            "exited"
-        },
+        ending,
     });
     with_agent_log(&log_file, |f| {
         if let Some(limit) = &provider_limit {
@@ -463,6 +483,10 @@ fn spawn_and_wait_agent(
         help = agent_log_help(),
         "failed to append to log file '{}': {e}", log_path.display()
     ))?;
+    // The footer is the log's last byte now. §FS-rhei-evidence.4
+    if let Some(evidence) = evidence {
+        evidence.finish(status.code(), ending, Some(log_path), Some(interventions));
+    }
 
     let cli_session = cli_session_capture
         .and_then(|capture| capture.lock().ok().and_then(|observed| observed.clone()));

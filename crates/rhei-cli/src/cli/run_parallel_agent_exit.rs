@@ -426,6 +426,7 @@ fn handle_parallel_agent_exit(
                     Some(&mut emit_before_transition),
                 ),
             };
+            let refused = leave_refused_exit_unrouted(&auto_advance_result, &mut release, &spawn_record);
             match auto_advance_result {
                 Ok(Some(advance)) => {
                     // A scheduled next attempt is not a move: the attempt
@@ -499,10 +500,13 @@ fn handle_parallel_agent_exit(
                     }
                 }
                 Err(err) => {
-                    run_warn!(
-                        "  warning: agent exited 0 but task {} could not auto-advance from '{}': {}",
-                        task_id_str, state_name, err
-                    );
+                    // A refused callback already said why. §FS-rhei-seal.8.5
+                    if !refused {
+                        run_warn!(
+                            "  warning: agent exited 0 but task {} could not auto-advance from '{}': {}",
+                            task_id_str, state_name, err
+                        );
+                    }
                     // Did not move: without this the refill
                     // re-spawns it, and the error repeats.
                     // §FS-rhei-run.3
@@ -510,82 +514,18 @@ fn handle_parallel_agent_exit(
                 }
             }
         }
-    } else if timed_out {
-        run_warn!(
-            "  agent timed out for task {} in '{}'",
-            task_id_str,
-            state_name
-        );
-        if let Some(to_state) = failure_selected_to_state.as_deref() {
-            match fire_selected_timeout_transition(
-                input,
-                machines,
-                &task_id_str,
-                &state_name,
-                to_state,
-                timeout_secs,
-                opts,
-            ) {
-                TimeoutTransitionOutcome::Fired => *progress.advanced_any = true,
-                // Did not move: the pool must not re-spawn
-                // it from the live ready set this pass.
-                // §FS-rhei-run.3
-                TimeoutTransitionOutcome::NoRule
-                | TimeoutTransitionOutcome::Failed => {
-                    progress.stalled_tasks.insert(task_id_str.clone());
-                }
-            }
-        } else {
-            {
-                run_warn!(
-                    "  warning: agent for task {} timed out from '{}' but no timeout transition is declared; task remains in state",
-                    task_id_str, state_name
-                );
-                // §FS-rhei-run.3: a ticket that timed out
-                // with nowhere to go would time out again,
-                // once per free slot, for the whole pass.
-                progress.stalled_tasks.insert(task_id_str.clone());
-            }
-        }
     } else {
-        let code = status.code().unwrap_or(-1);
-        run_error!(
-            "  error: agent exited with code {} for task {}",
-            code,
-            task_id_str
-        );
-        if let Some(to_state) = failure_selected_to_state.as_deref() {
-            match fire_agent_exit_transition(
-                input,
-                machines,
-                &task_id_str,
-                &state_name,
-                to_state,
-                code,
-                failure_selected_rule,
-                opts.no_callbacks(),
-            ) {
-                TimeoutTransitionOutcome::Fired => *progress.advanced_any = true,
-                // §FS-rhei-run.3: the exit routed nowhere,
-                // so the ticket is still ready and would be
-                // re-spawned into every slot that frees up.
-                TimeoutTransitionOutcome::NoRule
-                | TimeoutTransitionOutcome::Failed => {
-                    progress.stalled_tasks.insert(task_id_str.clone());
-                }
-            }
-        } else if !opts.continue_on_error() {
-            return Err(miette!(
-                help = run_report_help(),
-                "agent exited with code {code} for Task {task_id_str}. \
-                 Use --continue-on-error to skip failures."
-            ));
-        } else {
-            // `--continue-on-error` skips the failure; it
-            // must not turn it into an unbounded respawn
-            // loop within the pass. §FS-rhei-run.3
-            progress.stalled_tasks.insert(task_id_str.clone());
-        }
+        let failure = ParallelAgentFailure {
+            task_id_str: &task_id_str,
+            state_name: &state_name,
+            timed_out,
+            timeout_secs,
+            code: status.code().unwrap_or(-1),
+            to_state: failure_selected_to_state.as_deref(),
+            selected_rule: failure_selected_rule,
+            spawn_record: &spawn_record,
+        };
+        route_parallel_agent_failure(failure, input, machines, opts, sink, &mut release, progress)?;
     }
 
     // The slot goes first so the settle's account is the visit's last

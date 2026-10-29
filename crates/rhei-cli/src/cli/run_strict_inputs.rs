@@ -165,42 +165,50 @@ struct StrictRefusal {
 
 /// Re-hash the ticket's rhei and compare it with the latest generation.
 /// `None` when the run is not strict, the rhei is out of scope, or nothing
-/// changed. §FS-rhei-seal.8.2
-fn strict_check(task_id: &str) -> Option<StrictRefusal> {
+/// changed. A sealed file the run cannot read is an error naming it, as it is
+/// at a live admission: a change's path is always a sealed one. §FS-rhei-seal.4
+/// §FS-rhei-seal.8.2
+fn strict_check(task_id: &str) -> MietteResult<Option<StrictRefusal>> {
     let mut guard = STRICT_INPUTS.lock().unwrap_or_else(|poison| poison.into_inner());
-    let strict = guard.as_mut()?;
+    let Some(strict) = guard.as_mut() else { return Ok(None) };
     let rhei = task_id.split('.').next().unwrap_or(task_id);
-    let entry = strict.rheis.get_mut(rhei)?;
-    if entry.drift.is_none() {
-        let changes = match take_seal_snapshot(&entry.scope) {
-            Ok(current) => seal_changes(&entry.sealed, &current),
-            // A sealed file the run cannot read is not the file it sealed.
-            Err(err) => vec![SealChange { path: format!("{err}"), kind: "modified" }],
-        };
-        if changes.is_empty() {
-            return None;
-        }
-        entry.drift = Some(changes);
+    let Some(entry) = strict.rheis.get_mut(rhei) else { return Ok(None) };
+    if !entry.recheck()? {
+        return Ok(None);
     }
     let (generation, changes) = (entry.generation, entry.drift.clone().unwrap_or_default());
-    Some(StrictRefusal {
+    Ok(Some(StrictRefusal {
         first: strict.refused.insert(task_id.to_string()),
         rhei: rhei.to_string(),
         generation,
         changes,
         remedy: strict.remedy(rhei),
-    })
+    }))
+}
+
+impl StrictRhei {
+    /// Whether the rhei has drifted from its latest generation, re-hashing it
+    /// until the first drift is found and cached. §FS-rhei-seal.8.4
+    fn recheck(&mut self) -> MietteResult<bool> {
+        if self.drift.is_none() {
+            let changes = seal_changes(&self.sealed, &take_seal_snapshot(&self.scope)?);
+            if !changes.is_empty() {
+                self.drift = Some(changes);
+            }
+        }
+        Ok(self.drift.is_some())
+    }
 }
 
 /// Whether a strict run refuses to start `task_id` in `state`: its rhei's
 /// sealed inputs changed. Called before bound admission, so a refusal reserves
 /// and charges nothing. §FS-rhei-seal.8.2 §FS-rhei-seal.8.4
-fn strict_refuses_start(task_id: &str, state: &str) -> bool {
-    let Some(refusal) = strict_check(task_id) else { return false };
+fn strict_refuses_start(task_id: &str, state: &str) -> MietteResult<bool> {
+    let Some(refusal) = strict_check(task_id)? else { return Ok(false) };
     if refusal.first {
         emit_seal_halt(task_id, state, &refusal, "was not started");
     }
-    true
+    Ok(true)
 }
 
 /// Whether this run already refused `task_id`; it is not scheduled again.
@@ -216,7 +224,7 @@ fn strict_check_callback(runs_callback: bool, task_id: &str, state: &str) -> Mie
     if !runs_callback {
         return Ok(());
     }
-    let Some(refusal) = strict_check(task_id) else { return Ok(()) };
+    let Some(refusal) = strict_check(task_id)? else { return Ok(()) };
     if refusal.first {
         emit_seal_halt(task_id, state, &refusal, "had its exit left unrouted");
     }
@@ -241,6 +249,41 @@ impl miette::Diagnostic for SealRefused {}
 
 fn is_seal_refusal(error: &miette::Report) -> bool {
     error.downcast_ref::<SealRefused>().is_some()
+}
+
+/// How a worker's exit was routed, read for a callback refused at its check point.
+trait ExitRouting {
+    fn seal_refused(&self) -> bool;
+}
+
+impl<T> ExitRouting for MietteResult<T> {
+    fn seal_refused(&self) -> bool {
+        self.as_ref().is_err_and(is_seal_refusal)
+    }
+}
+
+impl ExitRouting for TimeoutTransitionOutcome {
+    fn seal_refused(&self) -> bool {
+        *self == TimeoutTransitionOutcome::Refused
+    }
+}
+
+/// The one place an exit whose callback was refused is settled, whichever
+/// worker made it and whichever edge it selected: the attempt recorded at
+/// `record` is interrupted and uncharged, its exit unrouted. `true` when the
+/// exit was refused, so the caller stalls the ticket where it is. This holds
+/// with and without `--parallel`. §FS-rhei-seal.8.5
+fn leave_refused_exit_unrouted(
+    routed: &impl ExitRouting,
+    release: &mut PendingSlotRelease,
+    record: &Path,
+) -> bool {
+    if !routed.seal_refused() {
+        return false;
+    }
+    release.interrupted();
+    uncharge_stopped_attempt(record);
+    true
 }
 
 /// The refusal, as prose and as a `seal_halt` record. §FS-rhei-seal.8.4
@@ -303,14 +346,7 @@ fn strict_admission(
     let Some(strict) = guard.as_mut() else { return Ok(BTreeSet::new()) };
     let mut drifted = BTreeSet::new();
     for (rhei, entry) in strict.rheis.iter_mut() {
-        if entry.drift.is_none() {
-            let current = take_seal_snapshot(&entry.scope)?;
-            let changes = seal_changes(&entry.sealed, &current);
-            if !changes.is_empty() {
-                entry.drift = Some(changes);
-            }
-        }
-        if entry.drift.is_some() {
+        if entry.recheck()? {
             drifted.insert(rhei.clone());
         }
     }

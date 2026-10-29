@@ -49,7 +49,7 @@ fn schedule_agent_work_items(
 
     for item in items {
         // §FS-rhei-seal.8.2: before a slot or bound admission; a refused start is a stall.
-        if strict_refuses_start(&item.task_id_str, &item.current_state) {
+        if strict_refuses_start(&item.task_id_str, &item.current_state)? {
             skipped.push(item.task_id_str.clone());
             continue;
         }
@@ -137,7 +137,7 @@ fn schedule_program_work_items(
 
     for item in items {
         // §FS-rhei-seal.8.2: before a slot or bound admission; a refused start is a stall.
-        if strict_refuses_start(&item.task_id_str, &item.current_state) {
+        if strict_refuses_start(&item.task_id_str, &item.current_state)? {
             skipped.push(item.task_id_str.clone());
             continue;
         }

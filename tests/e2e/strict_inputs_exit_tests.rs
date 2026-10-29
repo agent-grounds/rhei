@@ -3,10 +3,14 @@
 //! routes normally, and a transition whose callback is refused leaves the exit
 //! unrouted, interrupted and uncharged. §FS-rhei-seal.8.5
 
+#[path = "strict_inputs_charge_tests.rs"]
+mod charge_tests;
+
 use std::fs;
 
 use super::strict_inputs_support::*;
 use super::*;
+use charge_tests::assert_uncharged_interrupted;
 
 /// Two workers run at once; ticket 1 edits the script while ticket 2 is still
 /// running. Neither exit has a callback, so both route to `completed`. Ticket 3,
@@ -57,6 +61,7 @@ fn a_refused_callback_leaves_the_exit_unrouted_until_the_change_is_sealed() {
     assert_eq!(task_state(&drift.ws, 1), "step", "a refused callback leaves the exit unrouted");
     assert_eq!(task_state(&drift.ws, 2), "step");
     assert_eq!(spawned(&drift.ws, "drift.2"), Vec::<String>::new());
+    assert_uncharged_interrupted(&drift.ws, "drift.1");
 
     assert_success(&drift.seal());
     assert_success(&drift.run(&["--strict-inputs"]));

@@ -79,7 +79,7 @@ fn run_sequential_program_work_items(
             machine,
         );
         // §FS-rhei-seal.8.2: a changed sealed input refuses the start before any of it.
-        if strict_refuses_start(task_id_str, current_state) {
+        if strict_refuses_start(task_id_str, current_state)? {
             progress.stalled_tasks.insert(task_id_str.clone());
             continue;
         }
@@ -221,14 +221,16 @@ fn run_sequential_program_work_items(
                 }
 
                 if program_outcome.timed_out {
-                    match fire_timeout_transition(
+                    let fired = fire_timeout_transition(
                         input,
                         machines,
                         task_id_str,
                         current_state,
                         program_outcome.timeout_secs,
                         opts,
-                    ) {
+                    );
+                    leave_refused_exit_unrouted(&fired, &mut release, &plan.record);
+                    match fired {
                         TimeoutTransitionOutcome::Fired => {}
                         TimeoutTransitionOutcome::NoRule => {
                             run_warn!(
@@ -237,7 +239,7 @@ fn run_sequential_program_work_items(
                                 current_state
                             );
                         }
-                        TimeoutTransitionOutcome::Failed => {}
+                        TimeoutTransitionOutcome::Failed | TimeoutTransitionOutcome::Refused => {}
                     }
                     reloaded = load_run_plan(input)?;
                     state_after = reloaded
@@ -324,7 +326,7 @@ fn run_sequential_program_work_items(
                         continue;
                     }
                     let route = loaded.task_route(task_id_str, input);
-                    let effective_to = match execute_system_program_exit_transition(
+                    let routed = execute_system_program_exit_transition(
                         TransitionFiles {
                             task_file: &route.task_file,
                             metadata_file: &route.metadata_file,
@@ -343,17 +345,12 @@ fn run_sequential_program_work_items(
                         // machine. §FS-rhei-programs.3.2
                         Some(exit_route.selected_rule),
                         opts.no_callbacks(),
-                    ) {
-                        Ok(to) => to,
-                        // §FS-rhei-seal.8.5: a refused callback leaves the exit unrouted, uncharged.
-                        Err(err) if is_seal_refusal(&err) => {
-                            release.interrupted();
-                            uncharge_stopped_attempt(&plan.record);
-                            progress.stalled_tasks.insert(task_id_str.clone());
-                            continue;
-                        }
-                        Err(err) => return Err(err),
-                    };
+                    );
+                    if leave_refused_exit_unrouted(&routed, &mut release, &plan.record) {
+                        progress.stalled_tasks.insert(task_id_str.clone());
+                        continue;
+                    }
+                    let effective_to = routed?;
                     run_info!(
                         "  Task {} advanced: '{}' -> '{}'",
                         task_id_str,

@@ -128,6 +128,26 @@ fn an_edit_on_disk_is_found_against_the_latest_generation() {
 
 #[cfg(unix)]
 #[test]
+fn an_unreadable_sealed_file_is_an_error_naming_it_never_a_change() {
+    // §FS-rhei-seal.4: a change's path is a sealed path; strict_check and admission share recheck.
+    use std::os::unix::fs::PermissionsExt;
+    let (dir, scope) = seal_fixture();
+    let sealed = take_seal_snapshot(&scope).unwrap();
+    let mut entry = StrictRhei { scope, generation: 1, sealed, drift: None };
+    let script = dir.path().join("scripts/step.py");
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o000)).unwrap();
+    if fs::read(&script).is_ok() {
+        return; // Root reads it anyway; there is nothing unreadable to test.
+    }
+    let err = entry.recheck().expect_err("an unreadable sealed file is an error");
+    assert!(err.to_string().contains("scripts/step.py"), "names the file: {err}");
+    assert!(entry.drift.is_none(), "no change is cached for a file never read");
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o644)).unwrap();
+    assert!(!entry.recheck().unwrap(), "readable again and unchanged: no drift");
+}
+
+#[cfg(unix)]
+#[test]
 fn a_symlink_is_recorded_with_its_text_and_a_directory_link_is_not_followed() {
     // §FS-rhei-seal.3.3
     let (dir, scope) = seal_fixture();

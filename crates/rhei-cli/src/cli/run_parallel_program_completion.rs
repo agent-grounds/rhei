@@ -92,14 +92,16 @@ fn handle_parallel_program_completion(
             }
 
             if program_outcome.timed_out {
-                match fire_timeout_transition(
+                let fired = fire_timeout_transition(
                     input,
                     machines,
                     &task_id_str,
                     &state_name,
                     program_outcome.timeout_secs,
                     opts,
-                ) {
+                );
+                leave_refused_exit_unrouted(&fired, &mut release, &spawn_record);
+                match fired {
                     TimeoutTransitionOutcome::Fired => {}
                     TimeoutTransitionOutcome::NoRule => {
                         emit_run_message(
@@ -111,7 +113,7 @@ fn handle_parallel_program_completion(
                             ),
                         );
                     }
-                    TimeoutTransitionOutcome::Failed => {}
+                    TimeoutTransitionOutcome::Failed | TimeoutTransitionOutcome::Refused => {}
                 }
                 reloaded = load_run_plan(input)?;
                 state_after = reloaded
@@ -234,10 +236,7 @@ fn handle_parallel_program_completion(
                     Some(exit_route.selected_rule),
                     opts.no_callbacks(),
                 );
-                // §FS-rhei-seal.8.5: a refused callback leaves the exit unrouted, uncharged.
-                if routed.as_ref().is_err_and(is_seal_refusal) {
-                    release.interrupted();
-                    uncharge_stopped_attempt(&spawn_record);
+                if leave_refused_exit_unrouted(&routed, &mut release, &spawn_record) {
                     return Ok(ParallelProgramCompletionEffect { advanced: false, program_spawned: true });
                 }
                 routed?;

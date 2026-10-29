@@ -735,6 +735,11 @@ re-run to continue. A run that died of an error reports the error, and its
 tickets are described by why the run failed — never by "re-run to continue",
 which would point the operator away from the failure that killed them.
 
+Either way, every invocation the teardown ends is recorded as item 4 says
+before `rhei run` exits — on an interrupt, an error return, or a stop on a break
+no exited worker made ([§FS-rhei-run.3.7.6](rhei-run.spec.md#376-stopping-attributed)). Reaping an invocation is not
+recording it, so the run waits for the record and never exits between the two.
+
 **Supervisor death.** Termination is not conditional on a signal `rhei run` can
 handle. An early error return, a panic unwind, and a normal end all pass
 through the same group-termination path before the command returns. On Linux

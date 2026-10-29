@@ -190,8 +190,13 @@ fn an_edit_to_another_tasks_body_stops_the_run_attributed() {
 
         let journal = case.journal();
         let culprit = end_records(&journal, "ws.1", "cover");
-        assert_eq!(culprit.len(), 1, "{journal}");
-        assert_eq!(meta_value(&culprit[0], "outcome").as_deref(), Some("interrupted"), "{journal}");
+        assert_eq!(culprit.len(), 1, "{journal}\n{}", ran.output());
+        assert_eq!(
+            meta_value(&culprit[0], "outcome").as_deref(),
+            Some("interrupted"),
+            "{journal}\n{}",
+            ran.output()
+        );
         if mode.concurrent() {
             for record in end_records(&journal, "ws.2", "other") {
                 assert_eq!(

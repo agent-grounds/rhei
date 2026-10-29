@@ -105,7 +105,6 @@ fn an_edited_cached_transcript_fails_in_place() {
 /// The in-workspace cache's generations are packed and verified from the
 /// archive after the workspace is gone. §FS-rhei-archive.2.1
 #[test]
-#[ignore = "red until #525: rhei archive does not exist; implement removes this"]
 fn generations_in_the_workspace_cache_are_packed() {
     let dir = unique_temp_dir("archive-workspace-cache");
     snapshot_run(&dir, None);
@@ -122,7 +121,6 @@ fn generations_in_the_workspace_cache_are_packed() {
 /// generation, until its packed transcript is edited. §FS-rhei-archive.2.1
 /// §FS-rhei-verify.3
 #[test]
-#[ignore = "red until #525: rhei archive does not exist and verify reads no archive; implement removes this"]
 fn generations_in_an_external_cache_are_verified_from_the_archive() {
     let dir = unique_temp_dir("archive-external-cache");
     let cache_dir = unique_temp_dir("archive-external-cache-store");

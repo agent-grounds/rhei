@@ -39,7 +39,6 @@ fn finished(prefix: &str) -> (EvidenceWorkspace, String) {
 /// An unknown run and one with no manifest are refused. §FS-rhei-archive.3.1
 /// §FS-rhei-archive.5.1
 #[test]
-#[ignore = "red until #525: rhei archive does not exist; implement removes this"]
 fn an_unknown_or_unfinalized_run_is_refused() {
     let (ws, run) = finished("archive-unknown-run");
     let (_keep, kept) = elsewhere("archive-unknown-run-kept");
@@ -61,7 +60,6 @@ fn an_unknown_or_unfinalized_run_is_refused() {
 
 /// A run that fails verify in place is not packed. §FS-rhei-archive.3.1
 #[test]
-#[ignore = "red until #525: rhei archive does not exist; implement removes this"]
 fn a_run_that_fails_in_place_is_not_packed() {
     let (ws, run) = finished("archive-mismatch");
     let (_, manifest) = only_manifest(&ws.evidence_dir());
@@ -85,7 +83,6 @@ fn a_run_that_fails_in_place_is_not_packed() {
 /// `write_failed`; one under `runtime/evidence/` is a usage error.
 /// §FS-rhei-archive.1 §FS-rhei-archive.3.2 §FS-rhei-archive.5.1
 #[test]
-#[ignore = "red until #525: rhei archive does not exist; implement removes this"]
 fn the_output_is_never_replaced_and_a_failed_write_leaves_nothing() {
     let (ws, run) = finished("archive-output");
     let (_keep, kept) = elsewhere("archive-output-kept");
@@ -109,7 +106,6 @@ fn the_output_is_never_replaced_and_a_failed_write_leaves_nothing() {
 /// A manifest path with `..` is never read, even when it hashes as recorded.
 /// §FS-rhei-archive.3.3
 #[test]
-#[ignore = "red until #525: rhei archive does not exist; implement removes this"]
 fn a_manifest_path_with_a_parent_component_is_refused() {
     let (ws, run) = finished("archive-dotdot");
     let outside = ws.root.parent().expect("a parent").join(format!("{run}-outside.txt"));
@@ -130,7 +126,6 @@ fn a_manifest_path_with_a_parent_component_is_refused() {
 /// refused: the packer does not follow it. §FS-rhei-archive.3.3
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #525: rhei archive does not exist; implement removes this"]
 fn a_log_replaced_by_a_symlink_outside_is_refused() {
     let (ws, run) = finished("archive-symlink");
     let (_, manifest) = only_manifest(&ws.evidence_dir());

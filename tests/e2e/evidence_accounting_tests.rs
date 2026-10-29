@@ -93,14 +93,15 @@ fn a_panta_projects_manifest_names_records_relative_to_the_project_root() {
     assert_eq!(named_accounting(&manifest), held);
 }
 
-/// The eleven published ids, sorted, as `rhei schema --list` prints them.
-const PUBLISHED: [&str; 11] = [
+/// The twelve published ids, sorted, as `rhei schema --list` prints them.
+const PUBLISHED: [&str; 12] = [
     "rhei.accounting.cost.v1",
     "rhei.accounting.invocation.v1",
     "rhei.accounting.prices.v1",
     "rhei.accounting.summary.v1",
     "rhei.accounting.task.v1",
     "rhei.accounting.usage.v1",
+    "rhei.archive.v1",
     "rhei.evidence.event.v1",
     "rhei.evidence.invocation.v1",
     "rhei.evidence.manifest.v1",

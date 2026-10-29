@@ -1166,9 +1166,10 @@ Rhei publishes one JSON Schema for every accounting schema id it writes:
 
 It publishes, through the same command, the ids of the other durable documents
 it writes: `rhei.summary.checkpoint.v1` ([§FS-rhei-summary.6](rhei-summary.spec.md#6-the-checkpoint-document)), the seal's
-`rhei.seal.v1` ([§FS-rhei-seal.3](rhei-seal.spec.md#3-the-record)), and the evidence schemas
+`rhei.seal.v1` ([§FS-rhei-seal.3](rhei-seal.spec.md#3-the-record)), the evidence schemas
 `rhei.evidence.invocation.v1`, `rhei.evidence.manifest.v1` and
-`rhei.evidence.event.v1` ([§FS-rhei-evidence](rhei-evidence.spec.md#fs-rhei-evidence-per-invocation-evidence)). Listing is sorted by id.
+`rhei.evidence.event.v1` ([§FS-rhei-evidence](rhei-evidence.spec.md#fs-rhei-evidence-per-invocation-evidence)), and the archive index `rhei.archive.v1`
+([§FS-rhei-archive.4.2](rhei-archive.spec.md#42-the-index)). Listing is sorted by id.
 
 The versioned source files live in `crates/rhei-cli/schemas/` and are embedded
 in the binary. `rhei schema <schema-id>` writes the embedded file bytes to

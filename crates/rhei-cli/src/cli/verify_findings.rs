@@ -34,6 +34,9 @@ impl VerifyFinding {
                 | "nothing_to_verify"
                 | "archive_unreadable"
                 | "archive_unsafe_member"
+                | "unknown_run"
+                | "output_exists"
+                | "write_failed"
         )
     }
 
@@ -113,7 +116,7 @@ fn check_named_file(source: &dyn EvidenceSource, run: &mut VerifiedRun, entry: &
         return;
     }
     match source.read(path) {
-        Some(bytes) => {
+        SourceRead::Found(bytes) => {
             let found = sha256_hex(&bytes);
             if found == recorded {
                 run.files_verified += 1;
@@ -124,12 +127,17 @@ fn check_named_file(source: &dyn EvidenceSource, run: &mut VerifiedRun, entry: &
                 findings.push(finding);
             }
         }
-        None => {
-            let mut finding = VerifyFinding::new("missing", Some(&run.run_id), Some(path.to_string()));
-            finding.recorded_sha256 = Some(recorded.to_string());
-            findings.push(finding);
-        }
+        read => findings.push(unread_finding(read, &run.run_id, path, recorded)),
     }
+}
+
+/// A path a source did not read: `missing`, or one it refused as unsafe.
+/// §FS-rhei-verify.3 §FS-rhei-archive.3.3
+fn unread_finding(read: SourceRead, run_id: &str, path: &str, recorded: &str) -> VerifyFinding {
+    let code = if matches!(read, SourceRead::Unsafe) { "archive_unsafe_member" } else { "missing" };
+    let mut finding = VerifyFinding::new(code, Some(run_id), Some(path.to_string()));
+    finding.recorded_sha256 = Some(recorded.to_string());
+    finding
 }
 
 /// The snapshot generations a manifest names, checked where the source has
@@ -145,10 +153,8 @@ fn check_snapshots(source: &dyn EvidenceSource, run: &mut VerifiedRun, manifest:
             continue;
         };
         // The transcript's bytes are hashed, never its generation's own claim.
-        let Some(bytes) = generation.transcript else {
-            let mut finding = VerifyFinding::new("missing", Some(&run.run_id), Some(generation.path));
-            finding.recorded_sha256 = Some(recorded);
-            findings.push(finding);
+        let SourceRead::Found(bytes) = generation.transcript else {
+            findings.push(unread_finding(generation.transcript, &run.run_id, &generation.path, &recorded));
             continue;
         };
         let actual = sha256_hex(&bytes);

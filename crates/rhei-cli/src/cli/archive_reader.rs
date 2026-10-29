@@ -183,8 +183,8 @@ impl EvidenceSource for ArchiveSource {
             .collect()
     }
 
-    fn read(&self, path: &str) -> Option<Vec<u8>> {
-        self.members.get(path).cloned()
+    fn read(&self, path: &str) -> SourceRead {
+        self.members.get(path).cloned().map_or(SourceRead::Absent, SourceRead::Found)
     }
 
     fn records(&self, run: &SourceRun) -> Vec<String> {
@@ -210,13 +210,19 @@ impl EvidenceSource for ArchiveSource {
         let manifest =
             listed.iter().find(|path| path.rsplit('/').next() == Some("manifest.json"))?;
         let Some(bytes) = self.members.get(manifest) else {
-            return Some(SourceGeneration { path: manifest.clone(), transcript: None });
+            return Some(SourceGeneration {
+                path: manifest.clone(),
+                transcript: SourceRead::Absent,
+            });
         };
         let own: serde_json::Value = serde_json::from_slice(bytes).unwrap_or_default();
         let name = own["transcript_path"].as_str().unwrap_or("transcript.jsonl");
         let dir = manifest.rsplit_once('/').map_or("", |(dir, _)| dir);
         let path = format!("{dir}/{name}");
-        let transcript = listed.contains(&path).then(|| self.members.get(&path).cloned()).flatten();
+        let transcript = match self.members.get(&path) {
+            Some(bytes) if listed.contains(&path) => SourceRead::Found(bytes.clone()),
+            _ => SourceRead::Absent,
+        };
         Some(SourceGeneration { path, transcript })
     }
 }

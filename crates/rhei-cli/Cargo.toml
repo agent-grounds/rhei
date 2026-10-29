@@ -45,6 +45,9 @@ serde_json = "1"
 textwrap = { version = "0.16", default-features = false }
 serde_yaml = "0.9"
 sha2 = "0.10"
+# `rhei archive` writes one uncompressed tar, ustar plus GNU long names; no
+# `xattr`. §FS-rhei-archive.4
+tar = { version = "0.4", default-features = false }
 fs2 = "0.4.3"
 tempfile = "3.27.0"
 uuid = { version = "=1.11.0", features = ["v4", "v7"] }

@@ -18,7 +18,6 @@ use super::evidence_support::{
 /// text, `--json` and `--digest` agree with the in-place verify before it.
 /// §FS-rhei-verify §FS-rhei-verify.1 §FS-rhei-verify.2.1 §FS-rhei-archive.1
 #[test]
-#[ignore = "red until #525: rhei archive does not exist and verify reads no archive; implement removes this"]
 fn an_archive_verifies_away_from_its_workspace_as_it_did_in_place() {
     let ws = evidence_workspace("archive-round-trip", Profile::default());
     ws.run();
@@ -50,7 +49,6 @@ fn an_archive_verifies_away_from_its_workspace_as_it_did_in_place() {
 /// Packing the same run twice gives the same bytes: the index first, then the
 /// members sorted. §FS-rhei-archive.4.1
 #[test]
-#[ignore = "red until #525: rhei archive does not exist; implement removes this"]
 fn packing_a_run_twice_gives_the_same_bytes() {
     let ws = evidence_workspace("archive-deterministic", Profile::default());
     ws.run();
@@ -71,7 +69,6 @@ fn packing_a_run_twice_gives_the_same_bytes() {
 /// `rhei.archive.v1`, and every member the manifest names is packed at its
 /// path. §FS-rhei-archive.2 §FS-rhei-archive.4.2
 #[test]
-#[ignore = "red until #525: rhei archive does not exist; implement removes this"]
 fn the_index_and_the_members_are_what_the_manifest_names() {
     let ws = evidence_workspace("archive-index", Profile::default());
     ws.run();
@@ -101,7 +98,6 @@ fn the_index_and_the_members_are_what_the_manifest_names() {
 /// A member whose path ustar cannot hold round-trips through a GNU long name.
 /// §FS-rhei-archive.4
 #[test]
-#[ignore = "red until #525: rhei archive does not exist and verify reads no archive; implement removes this"]
 fn a_member_path_ustar_cannot_hold_round_trips() {
     let mut ws = evidence_workspace("archive-long-path", Profile::default());
     let long =
@@ -131,7 +127,6 @@ fn a_member_path_ustar_cannot_hold_round_trips() {
 /// A strict run's seal generation is packed at its path and verified from the
 /// archive. §FS-rhei-archive.2.2
 #[test]
-#[ignore = "red until #525: rhei archive does not exist and verify reads no archive; implement removes this"]
 fn a_strict_runs_seal_generation_is_packed_and_verified() {
     let ws = strict_run("archive-seal");
     let (_, manifest) = only_manifest(&ws.evidence_dir());
@@ -148,7 +143,6 @@ fn a_strict_runs_seal_generation_is_packed_and_verified() {
 /// `rhei archive --json` is the verify object plus `archive: {path, sha256}`.
 /// §FS-rhei-archive.5.1
 #[test]
-#[ignore = "red until #525: rhei archive does not exist; implement removes this"]
 fn archive_json_is_the_verify_object_plus_the_file_written() {
     let ws = evidence_workspace("archive-json", Profile::default());
     ws.run();
@@ -171,7 +165,6 @@ fn archive_json_is_the_verify_object_plus_the_file_written() {
 
 /// Both commands' help name the archive. §FS-rhei-archive.6 §FS-rhei-verify.1
 #[test]
-#[ignore = "red until #525: rhei archive does not exist; implement removes this"]
 fn help_names_the_archive() {
     let (_dir, here) = elsewhere("archive-help");
     let help = rhei_in(&here, &here.join(".home"), &["archive", "--help"]);

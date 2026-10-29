@@ -395,6 +395,7 @@ fn command_wants_json(command: &Commands) -> bool {
         Commands::Templates { json, .. } => *json,
         Commands::Cost { json, .. } => *json,
         Commands::Verify { options } => options.json,
+        Commands::Archive { options } => options.json,
         Commands::Runs { json, .. } => *json,
         // `attach --json` streams records on stdout, so a failure must not
         // print miette prose beside them. §FS-rhei-run-json.1

@@ -1,0 +1,422 @@
+//! The harness every scenario in this directory shares: spawning `rhei` with an
+//! isolated home, building workspaces and fixture files, and reading or
+//! asserting on what a command printed. It was lifted out of `mod.rs` so that
+//! file stays the module tree alone.
+
+use super::{
+    git_env, python_command, rendered_stderr, rhei_binary, unique_dir_name, TestDir, STATE_MACHINE,
+};
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+
+/// Execution margin for healthy fixture starts on stalled runners. §REQ-cross-platform.8
+pub(super) const FIXTURE_MARGIN: &str = "60s";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+pub struct CliRun {
+    pub status: std::process::ExitStatus,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+/// A finished process read the way an assertion should read it.
+///
+/// Every test that spawns its own command builds its `CliRun` here rather than
+/// decoding the captured bytes itself, so the reading of stderr stays one
+/// decision instead of sixty. §FS-rhei-errors.2
+impl From<&Output> for CliRun {
+    fn from(out: &Output) -> Self {
+        CliRun { status: out.status, stdout: stdout(out), stderr: stderr(out) }
+    }
+}
+
+pub fn unique_temp_dir(prefix: &str) -> TestDir {
+    // §REQ-cross-platform.6
+    TestDir::create(
+        std::env::temp_dir()
+            .join(unique_dir_name::unique_dir_name(&format!("rhei-integ-{prefix}"))),
+    )
+}
+
+pub fn unique_scratchpad_dir(prefix: &str) -> TestDir {
+    // §REQ-cross-platform.6
+    TestDir::create(
+        repo_root()
+            .join("scratchpad")
+            .join(unique_dir_name::unique_dir_name(&format!("rhei-integ-{prefix}"))),
+    )
+}
+
+/// Compare existing paths by filesystem identity rather than spelling. macOS
+/// exposes temporary directories through both `/var` and `/private/var`.
+pub fn assert_same_path(actual: &Path, expected: &Path) {
+    assert_eq!(
+        fs::canonicalize(actual).expect("actual path should resolve"),
+        fs::canonicalize(expected).expect("expected path should resolve")
+    );
+}
+
+pub fn write_fixture_file(dir: &Path, name: &str, contents: &str) -> PathBuf {
+    let path = dir.join(name);
+    fs::write(&path, contents).expect("fixture file should be written");
+    path
+}
+
+/// Set up a single-file test: returns (temp_dir, plan_path, machine_path).
+pub fn setup_single_file(prefix: &str, plan: &str) -> (TestDir, PathBuf, PathBuf) {
+    let dir = unique_temp_dir(prefix);
+    let plan_path = write_fixture_file(&dir, "plan.rhei.md", plan);
+    let machine_path = write_fixture_file(&dir, "states.yaml", STATE_MACHINE);
+    (dir, plan_path, machine_path)
+}
+
+/// Set up a directory workspace. Returns (temp_dir, workspace_root,
+/// machine_path); the workspace lives inside the temp directory, so the first
+/// element is what has to stay bound for the tree to outlive the setup call.
+pub fn create_workspace(
+    prefix: &str,
+    index: &str,
+    task_files: &[(&str, &str)],
+) -> (TestDir, PathBuf, PathBuf) {
+    let dir = unique_temp_dir(prefix);
+    let ws = dir.join("workspace");
+    let tasks_dir = ws.join("tasks");
+    fs::create_dir_all(&tasks_dir).expect("create workspace dirs");
+    fs::write(ws.join("index.rhei.md"), index).expect("write index");
+    for (name, content) in task_files {
+        fs::write(tasks_dir.join(name), content).expect("write task file");
+    }
+    let machine_path = write_fixture_file(&dir, "states.yaml", STATE_MACHINE);
+    (dir, ws, machine_path)
+}
+
+pub fn fixture_path(name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures").join(name)
+}
+
+pub fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("crate should have workspace parent")
+        .parent()
+        .expect("workspace root should exist")
+        .to_path_buf()
+}
+
+pub(super) fn copy_dir_recursive(src: &Path, dst: &Path) {
+    fs::create_dir_all(dst).expect("create fixture directory");
+
+    for entry in fs::read_dir(src).expect("read fixture directory") {
+        let entry = entry.expect("fixture entry");
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        let file_type = entry.file_type().expect("fixture file type");
+
+        if file_type.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path);
+            continue;
+        }
+
+        fs::copy(&src_path, &dst_path).expect("copy fixture file");
+        let permissions = fs::metadata(&src_path).expect("fixture metadata").permissions();
+        fs::set_permissions(&dst_path, permissions).expect("fixture permissions");
+    }
+}
+
+pub fn copy_workspace_fixture(prefix: &str, fixture_name: &str) -> (TestDir, PathBuf, PathBuf) {
+    let dir = unique_scratchpad_dir(prefix);
+    let workspace_path = dir.join(fixture_name);
+    copy_dir_recursive(&fixture_path(fixture_name), &workspace_path);
+    let machine_path = workspace_path.join("team-states.yaml");
+    // A fixture's `cli:` callbacks name their interpreter as
+    // `RHEI_FIXTURE_PYTHON`, because which of `python3` and `python` exists is
+    // a fact about the host and not about the fixture. The committed machine
+    // is the template; the copy is what runs.
+    let machine = fs::read_to_string(&machine_path).expect("fixture state machine");
+    fs::write(&machine_path, machine.replace("RHEI_FIXTURE_PYTHON", python_command()))
+        .expect("fixture state machine with the host's interpreter");
+    (dir, workspace_path, machine_path)
+}
+
+/// Every `rhei` an end-to-end test spawns, with **both** state locations pinned
+/// under `home`.
+///
+/// The run registry is machine-wide and every non-dry run publishes into it, so
+/// a `HOME` alone leaves a test writing entries into the developer's own
+/// `$XDG_STATE_HOME/rhei/runs` wherever their environment sets that variable.
+
+// §FS-rhei-run-headless.2
+pub fn rhei_command(home: impl AsRef<Path>) -> Command {
+    let home = home.as_ref();
+    let _ = fs::create_dir_all(home.join("state"));
+    let mut cmd = rhei_process();
+    cmd.env("HOME", home);
+    cmd.env("XDG_STATE_HOME", home.join("state"));
+    cmd
+}
+
+/// Every spawn of the built binary, with what decides how a diagnostic is
+/// *rendered* taken out of the operator's hands.
+///
+/// miette asks `supports-color` before it asks whether stderr is a tty, and
+/// `FORCE_COLOR` or `CLICOLOR_FORCE` answers yes for a pipe as well. On a
+/// machine that sets either, every gutter arrives wrapped in ANSI escapes, no
+/// block matches, `undo_soft_wrap` hands the text back untouched, and every
+/// assertion this suite unwraps for fails there and nowhere else — the
+/// machine-dependent failure the unwrapping exists to remove, wearing a
+/// different variable. §FS-rhei-errors.2
+pub fn rhei_process() -> Command {
+    rhei_process_at(rhei_binary())
+}
+
+/// [`rhei_process`] for a test that runs a *copy* of the binary from elsewhere.
+pub fn rhei_process_at(bin: impl AsRef<Path>) -> Command {
+    let mut cmd = Command::new(bin.as_ref());
+    cmd.env_remove("FORCE_COLOR");
+    cmd.env_remove("CLICOLOR_FORCE");
+    // Which repository the spawn acts on is the test's to choose too, and a
+    // caller that wants one sets it after this. §REQ-test-isolation.3
+    git_env::scrub_git_repository_env(&mut cmd);
+    cmd
+}
+
+/// Captured stdout, as the process wrote it. Nothing renders stdout, so there
+/// is nothing between the bytes and the assertion.
+pub fn stdout(out: &Output) -> String {
+    String::from_utf8_lossy(&out.stdout).into_owned()
+}
+
+/// Redirected stdout, as the process wrote it; missing while a caller polls is
+/// empty. The file seam matches `stdout`.
+pub fn stdout_from_file(path: impl AsRef<Path>) -> String {
+    fs::read_to_string(path).unwrap_or_default()
+}
+
+/// Captured stderr exactly as the process wrote it — miette's gutter, soft wrap, and all.
+///
+/// Rendering tests use this; message assertions use `stderr` so terminal width cannot decide them. §FS-rhei-errors.2
+pub fn raw_stderr(out: &Output) -> String {
+    String::from_utf8_lossy(&out.stderr).into_owned()
+}
+
+/// Redirected stderr exactly as rendered; missing while polling is empty. §FS-rhei-errors.2
+pub fn raw_stderr_from_file(path: impl AsRef<Path>) -> String {
+    fs::read_to_string(path).unwrap_or_default()
+}
+
+/// Captured stderr with renderer soft wraps undone and nothing else changed.
+/// This assertion seam keeps terminal-dependent break positions from changing
+/// `contains` outcomes. §FS-rhei-errors.2
+pub fn stderr(out: &Output) -> String {
+    rendered_stderr::undo_soft_wrap(&raw_stderr(out))
+}
+
+/// Redirected stderr with renderer soft wraps undone for ordinary assertions.
+/// The file seam matches `stderr`; missing while a caller polls is empty.
+/// §FS-rhei-errors.2
+pub fn stderr_from_file(path: impl AsRef<Path>) -> String {
+    rendered_stderr::undo_soft_wrap(&raw_stderr_from_file(path))
+}
+
+/// Run an arbitrary rhei subcommand.
+pub fn run_cli(
+    subcommand: &str,
+    plan_path: &Path,
+    machine_path: &Path,
+    extra_args: &[&str],
+) -> CliRun {
+    let mut cmd = rhei_command(isolated_home_for(plan_path));
+    cmd.arg("--state-machine").arg(machine_path).arg(subcommand).arg(plan_path);
+    for arg in extra_args {
+        cmd.arg(arg);
+    }
+    let output = cmd.output().expect("rhei command should run");
+    CliRun::from(&output)
+}
+
+/// Run an arbitrary rhei subcommand without passing `--state-machine`.
+pub fn run_cli_without_machine(subcommand: &str, plan_path: &Path, extra_args: &[&str]) -> CliRun {
+    let mut cmd = rhei_command(isolated_home_for(plan_path));
+    cmd.arg(subcommand).arg(plan_path);
+    for arg in extra_args {
+        cmd.arg(arg);
+    }
+    let output = cmd.output().expect("rhei command should run");
+    CliRun::from(&output)
+}
+
+pub(super) fn isolated_home_for(plan_path: &Path) -> PathBuf {
+    plan_path.parent().unwrap_or_else(|| Path::new(".")).join(".home")
+}
+
+/// Run `rhei transition`.
+pub fn run_transition(
+    plan_path: &Path,
+    machine_path: &Path,
+    task: &str,
+    from: &str,
+    to: &str,
+) -> CliRun {
+    run_cli(
+        "transition",
+        plan_path,
+        machine_path,
+        &["--task", task, "--from", from, "--to", to, "--no-callbacks"],
+    )
+}
+
+/// Run `rhei transition --result`, which every move into a `final: true` state
+/// needs unless the ticket already has a result on disk. §FS-rhei-states.3.3
+pub fn run_transition_with_result(
+    plan_path: &Path,
+    machine_path: &Path,
+    task: &str,
+    from: &str,
+    to: &str,
+    result: &str,
+) -> CliRun {
+    run_cli(
+        "transition",
+        plan_path,
+        machine_path,
+        &["--task", task, "--from", from, "--to", to, "--result", result, "--no-callbacks"],
+    )
+}
+
+/// Render the plan as JSON via `rhei render --format json --pretty` and return
+/// the parsed JSON. All state assertions go through the CLI this way.
+pub fn render_json(plan_path: &Path, machine_path: &Path) -> serde_json::Value {
+    let result = run_cli("render", plan_path, machine_path, &["--format", "json", "--pretty"]);
+    assert_success(&result);
+    serde_json::from_str(&result.stdout).expect("render JSON should parse")
+}
+
+/// Assert that every task in the plan has the given state, verified via CLI.
+pub fn assert_all_tasks_in_state(plan_path: &Path, machine_path: &Path, expected: &str) {
+    let json = render_json(plan_path, machine_path);
+    let tasks = json["tasks"].as_array().expect("tasks array");
+    assert!(!tasks.is_empty(), "plan should have tasks");
+    for task in tasks {
+        let id = &task["id"];
+        let state = task["state"].as_str().expect("state field");
+        assert_eq!(state, expected, "Task {} should be '{}', got '{}'", id, expected, state);
+    }
+}
+
+/// The task answering to `task_id`, searched this level first and then into
+/// each subtree: the render nests subtasks under `children` rather than
+/// flattening them into `tasks`, so a dotted local id such as "1.1" is
+/// otherwise unfindable. Taking this level first means every lookup that
+/// resolves today resolves exactly as it did.
+pub(super) fn find_task<'a>(
+    tasks: &'a [serde_json::Value],
+    task_id: &str,
+) -> Option<&'a serde_json::Value> {
+    // JSON id has shape { "path": "...", "segments": [...] }, with the path
+    // qualified by the implicit Panta rhei id (e.g. "plan.1"). Match either the
+    // exact path or the local id after the rhei qualifier - the cut is at the
+    // first dot, so a top-level local carries none and a nested one keeps its
+    // own ("1.1"), and neither can answer for the other.
+    let matches = |t: &serde_json::Value| {
+        t["id"]["path"].as_str().is_some_and(|path| {
+            path == task_id || path.split_once('.').is_some_and(|(_, local)| local == task_id)
+        })
+    };
+    tasks.iter().find(|t| matches(t)).or_else(|| {
+        tasks.iter().find_map(|t| t["children"].as_array().and_then(|c| find_task(c, task_id)))
+    })
+}
+
+/// Assert a single task has the expected state, verified via CLI. `task_id` is
+/// a number ("1"), a name ("setup"), or a subtask's dotted local id ("1.1").
+pub fn assert_task_state(plan_path: &Path, machine_path: &Path, task_id: &str, expected: &str) {
+    let json = render_json(plan_path, machine_path);
+    let tasks = json["tasks"].as_array().expect("tasks array");
+    let task = find_task(tasks, task_id)
+        .unwrap_or_else(|| panic!("Task {} not found in rendered JSON", task_id));
+    let state = task["state"].as_str().expect("state field");
+    assert_eq!(state, expected, "Task {} should be '{}', got '{}'", task_id, expected, state);
+}
+
+/// Assert that stderr contains `expected`, exactly as the binary printed it.
+///
+/// `CliRun.stderr` already has the renderer's wrap undone, so there is nothing
+/// left here for the assertion to forgive. It used to collapse both sides to
+/// their ASCII-graphic characters, which defeats the wrap by defeating every
+/// space — and so also matched a phrase spanning a message and its `help:`
+/// block, and healed a token the renderer broke mid-word. Both are phrases
+/// nobody printed, and a false pass costs more than the false failure it
+/// replaces. §FS-rhei-errors.2
+pub fn assert_stderr_contains(result: &CliRun, expected: &str) {
+    assert!(
+        result.stderr.contains(expected),
+        "expected stderr to contain {:?}; got:\n{}",
+        expected,
+        result.stderr
+    );
+}
+
+/// `<TIME>` text that is not a time. Each one reaches the parser as raw bytes:
+/// a trailing multi-byte character, a bare one, nothing at all, and two that
+/// are the right *length* for an instant or a date without being one.
+/// §FS-rhei-cost-accounting.8.2
+pub const HOSTILE_TIME_TEXTS: &[&str] = &[
+    // What pasting `--since 7d ` out of a rendered document actually gives you.
+    "7d\u{a0}",
+    "7\u{e9}",
+    "30\u{65e5}",
+    "\u{e9}",
+    "",
+    // Ten bytes, so the bare-date branch takes it; twenty, so the instant
+    // branch does — neither of them on a character boundary its fields expect.
+    "2026-09-\u{e9}",
+    "202\u{e9}-09-01T00:00:0Z",
+];
+
+/// Hold one `<TIME>`-taking flag to the refusal an unreadable value earns: a
+/// usage error naming what could not be read, and never a panic.
+/// §FS-rhei-cost-accounting.8.2
+pub fn assert_refuses_time_text(result: &CliRun, flag: &str, text: &str) {
+    assert!(
+        !result.status.success(),
+        "{flag} {text:?} must be refused, not answered; got:\n{}",
+        result.stdout
+    );
+    assert!(
+        !result.stderr.contains("panicked"),
+        "{flag} {text:?} panicked instead of refusing it:\n{}",
+        result.stderr
+    );
+    assert_stderr_contains(result, &format!("could not read '{text}' as a time for {flag}"));
+}
+
+/// The bounds report every successful validation carries, after the success
+/// line and before any conditional warning.
+///
+/// Every plan has all four bounds in force, so every successful validation
+/// reports all four; an isolated home has configured none, so all four read
+/// `built_in`. This replaced the older promise that a graph without
+/// `**Consumes:**` emitted `Validation succeeded\n` byte for byte — that
+/// sentence described the advisory's blast radius and cannot survive a report
+/// every plan gets.
+// §FS-rhei-validate.4 §FS-rhei-validate.6 §FS-rhei-budgets.2.3
+pub const VALIDATED_BOUNDS: &str = concat!(
+    "warning: transition_limit: 80 (built_in)\n",
+    "warning: invocations_per_day: 200 (built_in)\n",
+    "warning: invocation_lifetime_max: 6000 (built_in)\n",
+    "warning: spend_per_day: 400.00 (built_in)\n",
+);
+
+pub fn assert_success(result: &CliRun) {
+    assert!(
+        result.status.success(),
+        "command should succeed\nstdout:\n{}\nstderr:\n{}",
+        result.stdout,
+        result.stderr
+    );
+}

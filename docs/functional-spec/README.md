@@ -39,7 +39,8 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-budgets](rhei-budgets.spec.md#fs-rhei-budgets-bounded-ticket-travel-project-invocations-and-a-days-spend) | Bounded ticket travel and project invocations: resolution, the machine ceiling, the account, and the halt |
 | [§FS-rhei-summary](rhei-summary.spec.md#fs-rhei-summary-rhei-summary) | `rhei summary`: a pull-request-ready Markdown account of a run |
 | [§FS-rhei-evidence](rhei-evidence.spec.md#fs-rhei-evidence-per-invocation-evidence) | Per-invocation evidence: what each process a run started was given and produced, and the run manifest over it |
-| [§FS-rhei-verify](rhei-verify.spec.md#fs-rhei-verify-rhei-verify) | `rhei verify`: check a workspace against its run manifests |
+| [§FS-rhei-verify](rhei-verify.spec.md#fs-rhei-verify-rhei-verify) | `rhei verify`: check a workspace or an archive against its run manifests |
+| [§FS-rhei-archive](rhei-archive.spec.md#fs-rhei-archive-rhei-archive) | `rhei archive`: pack one run's evidence into a file verified away from its workspace |
 | [§FS-rhei-next](rhei-next.spec.md#fs-rhei-next-rhei-next) | `rhei next` command behavior |
 | [§FS-rhei-transition-cmd](rhei-transition-cmd.spec.md#fs-rhei-transition-cmd-rhei-transition) | `rhei transition` command behavior |
 | [§FS-rhei-recover](rhei-recover.spec.md#fs-rhei-recover-rhei-recover) | Explicit recovery of an interrupted operator-forced transition |

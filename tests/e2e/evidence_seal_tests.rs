@@ -16,7 +16,7 @@ use super::verify_findings_tests::finding;
 
 /// A strict probe run to completion, with a callback on the routed edge so
 /// every kind of start record is written.
-fn strict_run(prefix: &str) -> EvidenceWorkspace {
+pub(super) fn strict_run(prefix: &str) -> EvidenceWorkspace {
     let ws = evidence_workspace(prefix, Profile::default());
     let callback =
         super::write_python_agent(&ws.root, "on-enter.py", "sys.stdin.read()\nsys.exit(0)\n");

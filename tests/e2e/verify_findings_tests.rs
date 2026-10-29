@@ -147,7 +147,7 @@ fn a_run_with_no_manifest_is_not_finalized_and_does_not_fail() {
     assert_eq!(json["verified"], true);
 }
 
-const SNAPSHOT_MACHINE: &str = r#"name: verify-snapshot
+pub(super) const SNAPSHOT_MACHINE: &str = r#"name: verify-snapshot
 version: 1
 states:
   source:

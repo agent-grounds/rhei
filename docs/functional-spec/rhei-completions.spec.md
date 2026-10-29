@@ -271,9 +271,13 @@ does not silently drift from the current CLI surface.
 | `reset` | `RHEI_PLAN` | Rhei plan/workspace path completion |
 | `seal` | `RHEI_PLAN` | Rhei plan/workspace path completion |
 | `seal` | `--rhei` | Rhei ids from the selected project |
-| `verify` | `RHEI_PLAN_OR_WORKSPACE` | Rhei plan/workspace path completion |
+| `verify` | `RHEI_PLAN_OR_WORKSPACE` | Rhei plan/workspace path completion, and file path completion for an archive |
 | `verify` | `--digest` | No completion: a 64-hex digest |
 | `verify` | `--json` | Static flag completion |
+| `archive` | `RHEI_PLAN_OR_WORKSPACE` | Rhei plan/workspace path completion |
+| `archive` | `--run` | No completion: a run id under `runtime/evidence/runs/` |
+| `archive` | `--output` | File path completion |
+| `archive` | `--json` | Static flag completion |
 | `remove` | `TICKET_OR_PLAN` | Rhei plan/workspace path completion |
 | `remove` | `--task` | Task ids from the selected plan/workspace |
 | `remove` | `--rhei` | Rhei ids from the selected project |

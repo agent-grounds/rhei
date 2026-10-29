@@ -90,6 +90,7 @@ Execution:
   intervene   Send a message to a running agent's stdin during a live run
   cost        Inspect run token and cost accounting artifacts
   summary     Print a compact Markdown run summary for a pull request body
+  verify      Check that the evidence a run recorded is still what it wrote
   report      Render readable Markdown reports from agent session logs
   snapshot    Inspect, prune, or continue from session snapshots
   next        Claim the next ready task, or explicitly claim a named task
@@ -543,6 +544,22 @@ enum Commands {
         /// List every published schema id
         #[arg(long)]
         list: bool,
+    },
+    /// Check that what a workspace's runs recorded is still what they wrote
+    ///
+    /// Exits 0 when a manifest verified and nothing failed; 1 on a mismatched, missing or
+    /// unlisted file, an unknown --digest, or nothing to verify; 2 on a usage error.
+    // §FS-rhei-verify.1 §FS-rhei-verify.5
+    Verify {
+        /// Path to the markdown plan file (.rhei.md) or workspace directory
+        #[arg(value_name = "RHEI_PLAN_OR_WORKSPACE", add = ArgValueCompleter::new(complete_rhei_plan_path))]
+        input: Option<PathBuf>,
+        /// Verify only the manifest whose file has this full 64-hex sha256
+        #[arg(long, value_name = "SHA256", value_parser = parse_verify_digest)]
+        digest: Option<String>,
+        /// Print one JSON object instead of text
+        #[arg(long)]
+        json: bool,
     },
     /// Print a compact Markdown run summary for a pull request body
     // §FS-rhei-summary.1: the positional resolves exactly as `rhei cost`'s does.

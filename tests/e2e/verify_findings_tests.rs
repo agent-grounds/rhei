@@ -55,7 +55,6 @@ fn assert_fails_with(ws: &EvidenceWorkspace, code: &str, path: &str) -> serde_js
 /// An edited log is a mismatch, named with its path and both full hashes.
 /// §FS-rhei-verify.3 §FS-rhei-verify.4 §FS-rhei-verify.4.1
 #[test]
-#[ignore = "red until #520: a run writes no manifest and `rhei verify` does not exist; implement removes this"]
 fn an_edited_log_is_a_mismatch_with_both_hashes() {
     let ws = evidence_workspace("verify-edited-log", Profile::default());
     ws.run();
@@ -79,7 +78,6 @@ fn an_edited_log_is_a_mismatch_with_both_hashes() {
 
 /// An edited start record is a mismatch on that record. §FS-rhei-verify.3
 #[test]
-#[ignore = "red until #520: a run writes no evidence records; implement removes this"]
 fn an_edited_start_record_is_a_mismatch() {
     let ws = evidence_workspace("verify-edited-record", Profile::default());
     ws.run();
@@ -96,7 +94,6 @@ fn an_edited_start_record_is_a_mismatch() {
 
 /// A deleted prompt object is missing. §FS-rhei-verify.3
 #[test]
-#[ignore = "red until #520: no prompt object is stored; implement removes this"]
 fn a_deleted_prompt_object_is_missing() {
     let ws = evidence_workspace("verify-missing-object", Profile::default());
     ws.run();
@@ -117,7 +114,6 @@ fn a_deleted_prompt_object_is_missing() {
 /// A record its manifest does not name, in a finalized run, is unlisted.
 /// §FS-rhei-verify.2 §FS-rhei-verify.3
 #[test]
-#[ignore = "red until #520: a run writes no evidence records; implement removes this"]
 fn an_extra_record_in_a_finalized_run_is_unlisted() {
     let ws = evidence_workspace("verify-unlisted", Profile::default());
     ws.run();
@@ -132,7 +128,6 @@ fn an_extra_record_in_a_finalized_run_is_unlisted() {
 /// A run directory with no manifest is reported, not failed.
 /// §FS-rhei-verify.3 §FS-rhei-verify.4.1
 #[test]
-#[ignore = "red until #520: a run writes no evidence records; implement removes this"]
 fn a_run_with_no_manifest_is_not_finalized_and_does_not_fail() {
     let ws = evidence_workspace("verify-not-finalized", Profile::default());
     ws.run();
@@ -185,7 +180,6 @@ transitions:
 /// A snapshot generation no longer in the cache is not checked, and does not
 /// fail. §FS-rhei-verify.3 §FS-rhei-evidence.8
 #[test]
-#[ignore = "red until #520: a run writes no manifest naming its snapshots; implement removes this"]
 fn a_snapshot_generation_not_in_the_cache_is_reported_and_passes() {
     let dir = unique_temp_dir("verify-snapshot-gone");
     let agent = write_fake_snapshot_agent(&dir);

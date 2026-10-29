@@ -305,6 +305,7 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             let scope = target.scope_with(&options.rhei);
             summary_command(target.path(), &scope, before_subcommand.as_deref(), &options)
         }
+        Commands::Verify { input, digest, json } => verify_command(input, digest.as_deref(), json),
         Commands::Report { input, task, state, full } => {
             report_command(&input, task.as_deref(), state.as_deref(), full)
         }

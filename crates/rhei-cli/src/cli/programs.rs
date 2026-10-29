@@ -237,6 +237,7 @@ fn spawn_and_wait_program(
     // A program is never handed the operator's terminal, and it leads its own
     // process group so its children go with it. §FS-rhei-run.3.2
     cmd.stdin(std::process::Stdio::null());
+    let mut evidence = begin_program_evidence(resolved, &cmd, render_context, plan, log_path)?;
     let supervised_label =
         format!("{}@{}", render_context.task.id, render_context.state_name);
     let mut supervised = match Supervised::spawn(&mut cmd, &supervised_label) {
@@ -248,6 +249,7 @@ fn spawn_and_wait_program(
         // so it never ran, the ticket keeps its state, and the log goes with
         // `unstarted`. §FS-rhei-run.3.2 §FS-rhei-agents.8.1
         Err(err) if spawn_was_interrupted(&err) => {
+            evidence.take().into_iter().for_each(EvidenceInvocation::abandon);
             return Ok(ProgramSpawnOutcome {
                 status: never_started_status(),
                 timed_out: false,
@@ -256,6 +258,7 @@ fn spawn_and_wait_program(
             });
         }
         Err(e) => {
+            evidence.take().into_iter().for_each(EvidenceInvocation::abandon);
             return Err(miette!(
                 help = "the program state could not start its command. Check the command exists and is executable, then re-run.",
                 "failed to spawn program: {e}"
@@ -337,6 +340,8 @@ fn spawn_and_wait_program(
         }
         let _ = writeln!(f, "===");
     }
+    let ending = if timed_out { "timed out" } else if interrupted { "interrupted" } else { "exited" };
+    evidence.into_iter().for_each(|e| e.finish(status.code(), ending, Some(log_path), None));
 
     Ok(ProgramSpawnOutcome {
         status,

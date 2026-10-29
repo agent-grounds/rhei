@@ -96,6 +96,7 @@ fn built_in_agent_fields(profile: &CustomAgentProfile) -> BTreeSet<String> {
         ("writable_roots", profile.writable_roots.is_some()),
         ("modes", !profile.modes.is_empty()),
         ("session", profile.session.is_some()),
+        ("version_args", profile.version_args.is_some()),
     ] {
         if supplied {
             fields.insert(name.to_string());
@@ -573,6 +574,7 @@ fn load_merged_roster(
         } else {
             merge_snapshot_settings(global.snapshots, project.snapshots)
         },
+        evidence: project.evidence.or(global.evidence),
     };
 
     Ok(MergedRoster { settings, sources, provenance, agent_fields })

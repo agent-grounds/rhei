@@ -249,6 +249,7 @@ mod agent_family {
             "modes": { "yolo": ["--yolo"] },
             "effort": { "values": { "high": "high" }, "args": ["--effort"] },
             "session": { "resume": true },
+            "version_args": ["--version"],
         }))
         .expect("a profile carrying every field decodes");
         let CustomAgentProfile {
@@ -267,6 +268,7 @@ mod agent_family {
             modes: _,
             effort: _,
             session: _,
+            version_args: _,
         } = &profile;
         profile
     }

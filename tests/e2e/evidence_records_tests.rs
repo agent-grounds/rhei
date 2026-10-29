@@ -67,7 +67,6 @@ fn a_program_then_an_agent_leave_the_evidence_the_reproducer_asks_for() {
 /// the published schema, under the key its id derives. §FS-rhei-evidence.2.1
 /// §FS-rhei-evidence.1.1 §FS-rhei-evidence.9.1
 #[test]
-#[ignore = "red until #520: no start or end record is written for any process; implement removes this"]
 fn each_process_leaves_one_start_and_one_end_record_under_its_key() {
     let ws = evidence_workspace("evidence-records", Profile::default());
     ws.run();
@@ -104,7 +103,6 @@ fn each_process_leaves_one_start_and_one_end_record_under_its_key() {
 /// The prompt's bytes are retained under their hash, and the stored object is
 /// exactly what the agent read on stdin. §FS-rhei-evidence.5 §FS-rhei-evidence.5.2
 #[test]
-#[ignore = "red until #520: no prompt is retained in runtime/evidence/objects/; implement removes this"]
 fn the_retained_prompt_is_the_bytes_the_agent_read() {
     let ws = evidence_workspace("evidence-prompt", Profile::default());
     ws.run();
@@ -124,7 +122,6 @@ fn the_retained_prompt_is_the_bytes_the_agent_read() {
 /// `<prompt>` in argv in its place, and hashes the same bytes.
 /// §FS-rhei-evidence.5.1 §FS-rhei-evidence.3.2
 #[test]
-#[ignore = "red until #520: no start record says how a prompt was delivered; implement removes this"]
 fn a_prompt_passed_as_an_argument_is_a_placeholder_in_argv() {
     let profile = Profile {
         fields: serde_json::json!({ "prompt_flag": "--prompt", "timeout": "60s" }),
@@ -152,7 +149,6 @@ fn a_prompt_passed_as_an_argument_is_a_placeholder_in_argv() {
 /// `config.sha256` is the sha256 of the stored configuration object, which is
 /// one canonical JSON document. §FS-rhei-evidence.6.2 §FS-rhei-evidence.1.2
 #[test]
-#[ignore = "red until #520: no configuration object is recorded; implement removes this"]
 fn the_configuration_hash_is_the_hash_of_the_stored_object() {
     let ws = evidence_workspace("evidence-config", Profile::default());
     ws.run();
@@ -176,7 +172,6 @@ fn the_configuration_hash_is_the_hash_of_the_stored_object() {
 /// Every `env` map is a sorted list of names: no value, and no hash of a
 /// value, appears anywhere under `runtime/evidence/`. §FS-rhei-evidence.6.1
 #[test]
-#[ignore = "red until #520: no configuration object is recorded, so no env names are; implement removes this"]
 fn env_maps_are_recorded_as_names_without_values_or_their_hashes() {
     const PROGRAM_SECRET: &str = "program-secret-0b5e7d";
     const MCP_SECRET: &str = "mcp-secret-91c4aa";

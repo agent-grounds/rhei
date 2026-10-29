@@ -87,13 +87,17 @@ fn supplied_agent_value(
     })?;
     let object = value.as_object_mut().expect("agent profiles serialize as objects");
     object.retain(|field, _| supplied.contains(field));
-    // These two fields have serde omission rules on the execution type. For
+    // These fields have serde omission rules on the execution type. For
     // roster output, explicit empty/null values remain observable.
     if supplied.contains("modes") && !object.contains_key("modes") {
         object.insert("modes".to_string(), serde_json::json!({}));
     }
     if supplied.contains("session") && !object.contains_key("session") {
         object.insert("session".to_string(), serde_json::Value::Null);
+    }
+    // A written `version_args: null` turns the probe off. §FS-rhei-evidence.7
+    if supplied.contains("version_args") && !object.contains_key("version_args") {
+        object.insert("version_args".to_string(), serde_json::Value::Null);
     }
     Ok(value)
 }

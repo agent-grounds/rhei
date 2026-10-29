@@ -108,6 +108,11 @@ pub struct CustomAgentProfile {
     // §FS-rhei-snapshots.9.1: CustomAgentProfile.session schema.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session: Option<serde_json::Value>,
+    /// Arguments appended to the whole `command` to ask the CLI its version,
+    /// recorded in each invocation's evidence. `null` turns the probe off.
+    // §FS-rhei-agents.1.1.2 §FS-rhei-evidence.7
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_args: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]

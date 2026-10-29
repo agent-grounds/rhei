@@ -42,6 +42,7 @@
       ]
     },
     "grants": { "type": "array", "items": { "type": "object" } },
+    "log_path": { "$ref": "#/$defs/path" },
     "owner_invocation_ids": {
       "type": "array",
       "uniqueItems": true,

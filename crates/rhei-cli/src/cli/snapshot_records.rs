@@ -54,6 +54,9 @@ struct SnapshotPreload {
     // they search; the default is the v1 flat lookup.
     // §FS-rhei-snapshots.9.1.1 §FS-rhei-snapshots.10.1
     fixed_session_locator: SnapshotSessionLocator,
+    /// The used generation's own `transcript_sha256`, for its evidence.
+    // §FS-rhei-evidence.8
+    transcript_sha256: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

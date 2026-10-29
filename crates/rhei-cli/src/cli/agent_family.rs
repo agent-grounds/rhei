@@ -7,7 +7,7 @@ const BUILT_IN_AGENT_FAMILIES: [&str; 6] =
 /// Every key an `agents.<id>` entry may carry. A key outside this list loads
 /// and does nothing, so it earns a warning rather than a refusal.
 // §FS-rhei-agents.1.1.2: An unknown key is a warning naming the known fields.
-const AGENT_PROFILE_FIELDS: [&str; 15] = [
+const AGENT_PROFILE_FIELDS: [&str; 16] = [
     "family",
     "command",
     "prompt_flag",
@@ -23,6 +23,7 @@ const AGENT_PROFILE_FIELDS: [&str; 15] = [
     "modes",
     "effort",
     "session",
+    "version_args",
 ];
 
 /// The built-in a profile behaves as: what it declared, or its own id.
@@ -117,6 +118,9 @@ fn apply_agent_family_inheritance(
         }
         if inherit("session", parent.session.is_some()) {
             profile.session = parent.session.clone();
+        }
+        if inherit("version_args", parent.version_args.is_some()) {
+            profile.version_args = parent.version_args.clone();
         }
         agent_fields.insert(id, supplied);
     }

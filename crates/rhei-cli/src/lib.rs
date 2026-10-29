@@ -202,6 +202,11 @@ include!("cli/summary_tally.rs");
 include!("cli/programs.rs");
 include!("cli/snapshot_pointer.rs");
 include!("cli/snapshot_records.rs");
+// §FS-rhei-evidence: per-invocation evidence and the run manifest.
+include!("cli/evidence_store.rs");
+include!("cli/evidence_version.rs");
+include!("cli/evidence_invocation.rs");
+include!("cli/evidence_manifest.rs");
 include!("cli/snapshot_session_locator.rs");
 include!("cli/snapshot_list_show.rs");
 include!("cli/snapshot_refs_gc.rs");
@@ -342,6 +347,7 @@ mod tests {
     include!("cli/tests_agent_family.rs");
     include!("cli/tests_writable_roots.rs");
     include!("cli/tests_spawn_records.rs");
+    include!("cli/tests_evidence_store.rs");
     include!("cli/tests_retry_contract.rs");
     include!("cli/tests_retry_operations.rs");
     include!("cli/tests_retry_handlers.rs");

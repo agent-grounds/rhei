@@ -17,6 +17,7 @@ fn operator_registry_descriptor(root: &Path) -> RunDescriptor {
         exit_code: None,
         rhei_build: None,
         checkout_head_at_start: None,
+        evidence_manifest: None,
     }
 }
 

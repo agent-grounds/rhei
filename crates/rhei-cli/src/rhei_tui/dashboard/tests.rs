@@ -822,6 +822,7 @@ fn frozen_dashboard_writes_self_contained_final_artifact() {
             accounting: None,
             workspace_accounting: None,
             stop: None,
+            evidence_manifest: None,
         },
     });
 

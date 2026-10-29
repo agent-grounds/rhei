@@ -243,11 +243,13 @@ fn record_agent_accounting_attempt(
         pricing,
     };
 
-    write_invocation_record_with_profile(
+    let written = write_invocation_record_with_profile(
         &accounting_root,
         &record,
         invocation.resolved.model_profile_id(),
     )?;
+    // The run's manifest names it by path and hash. §FS-rhei-evidence.9.1
+    note_evidence_accounting(&written);
     let usage =
         usage_summary_from_record(&record, &ReachablePriceBooks::with_selected(invocation.price_book));
     // §FS-rhei-cost-accounting.7: Emit UsageReported after durable write.

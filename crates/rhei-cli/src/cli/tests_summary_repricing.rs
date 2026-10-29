@@ -21,6 +21,7 @@ mod summary_repricing_activity_tests {
             exit_code: None,
             rhei_build: None,
             checkout_head_at_start: None,
+            evidence_manifest: None,
         }
     }
 

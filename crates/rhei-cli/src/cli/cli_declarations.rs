@@ -535,12 +535,12 @@ enum Commands {
         #[arg(long, value_name = "TIME")]
         until: Option<String>,
     },
-    /// Print or list published accounting JSON Schemas
+    /// Print or list published JSON Schemas
     Schema {
-        /// Full accounting schema id to print; omitted, lists published ids
+        /// Full schema id to print; omitted, lists published ids
         #[arg(value_name = "SCHEMA_ID", conflicts_with = "list")]
         name: Option<String>,
-        /// List every published accounting schema id
+        /// List every published schema id
         #[arg(long)]
         list: bool,
     },

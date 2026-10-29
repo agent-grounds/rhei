@@ -113,7 +113,7 @@ fn operator_marker_blocks_run_discovery_and_intervention() {
         workspace: dir.path().to_path_buf(), plan, state_machine: Some(machine),
         control_url: None, started_at: "2026-09-18T00:00:00Z".into(), headless: false,
         parallel: 1, log: None, events: "runtime/events.jsonl".into(), exit_code: None,
-        rhei_build: None, checkout_head_at_start: None,
+        rhei_build: None, checkout_head_at_start: None, evidence_manifest: None,
     };
     let entry = dir.path().join("isolated-registry-entry.json");
     fs::write(&entry, serde_json::to_vec(&descriptor).unwrap()).unwrap();

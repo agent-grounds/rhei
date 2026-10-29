@@ -71,6 +71,9 @@ pub struct RunSummary {
     /// the one it emitted before this field existed.
     // §FS-rhei-run-json.2.1
     pub stop: Option<crate::rhei_tui::run_stop::RunStop>,
+    /// `{path, sha256}` of the run's evidence manifest, carried at the top of
+    /// the `run_finished` record. §FS-rhei-evidence.9.2
+    pub evidence_manifest: Option<serde_json::Value>,
 }
 
 /// Severity of an engine log message.

@@ -98,7 +98,6 @@ fn agent_log(ws: &EvidenceWorkspace) -> PathBuf {
 /// §FS-rhei-reset.2 step 4: the store lives under `runtime/`, so a full reset
 /// deletes it with the rest. §FS-rhei-evidence.10
 #[test]
-#[ignore = "red until #520: a run leaves no runtime/evidence/ for a reset to remove; implement removes this"]
 fn a_full_reset_removes_the_evidence_store() {
     let ws = evidence_workspace("evidence-reset-full", Profile::default());
     ws.run();
@@ -183,7 +182,6 @@ fn a_narrowed_reset_keeps_the_store_and_writes_a_reset_event() {
 /// attempt's start record carries the spawn record's grants.
 /// §FS-rhei-evidence.3.1 §FS-rhei-retry.2
 #[test]
-#[ignore = "red until #520: no start record carries an attempt's grants; implement removes this"]
 fn a_retried_attempts_start_record_carries_the_grant() {
     let ws = gated_workspace("evidence-retry", Profile::default());
     fs::write(ws.root.join("fail"), "").expect("fail the first attempt");
@@ -218,7 +216,6 @@ fn a_retried_attempts_start_record_carries_the_grant() {
 /// With nothing to recover, `rhei recover` still leaves every evidence byte
 /// as it was. §FS-rhei-recover.3 §FS-rhei-evidence.10
 #[test]
-#[ignore = "red until #520: a run leaves no runtime/evidence/ for recover to leave alone; implement removes this"]
 fn rhei_recover_leaves_every_evidence_byte_unchanged() {
     let ws = evidence_workspace("evidence-recover", Profile::default());
     ws.run();
@@ -238,7 +235,6 @@ fn rhei_recover_leaves_every_evidence_byte_unchanged() {
 // `--headless` and `rhei stop` are Unix-only in this suite. §FS-rhei-run-headless.1.3
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #520: an interrupted run leaves no end record or manifest; implement removes this"]
 fn an_interrupted_run_ends_its_records_and_writes_its_manifest() {
     let ws = gated_workspace("evidence-interrupt", Profile::default());
     fs::write(ws.root.join("slow"), "").expect("hold the agent");
@@ -272,7 +268,6 @@ fn an_interrupted_run_ends_its_records_and_writes_its_manifest() {
 /// `incomplete`, naming itself, with the killed process not completed.
 /// §FS-rhei-evidence.9.3
 #[test]
-#[ignore = "red until #520: a killed run is never finalized as incomplete; implement removes this"]
 fn a_killed_run_is_finalized_as_incomplete_by_the_next_run() {
     let ws = gated_workspace("evidence-killed", Profile::default());
     fs::write(ws.root.join("slow"), "").expect("hold the agent");
@@ -344,7 +339,6 @@ path.write_text('## Result\n\nIntervened.\n', encoding='utf-8')
 /// A live message delivered with `rhei intervene` is recorded in the agent's
 /// end record: its hash, size and outcome. §FS-rhei-evidence.5.4 §FS-rhei-viz.5
 #[test]
-#[ignore = "red until #520: no end record lists the interventions an agent received; implement removes this"]
 fn a_live_intervention_is_recorded_in_the_end_record() {
     const MESSAGE: &str = "evidence intervention probe";
     let profile = Profile {

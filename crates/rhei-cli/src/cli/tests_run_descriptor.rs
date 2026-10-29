@@ -65,6 +65,7 @@ pub(super) mod run_descriptor_tests {
             exit_code: None,
             rhei_build: None,
             checkout_head_at_start: None,
+            evidence_manifest: None,
         }
     }
 

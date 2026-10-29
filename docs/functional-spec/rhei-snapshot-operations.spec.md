@@ -387,6 +387,10 @@ Redactor process contract:
   summary are logged to the run log. The manifest does not record whether a
   redactor ran.
 
+The same redactor runs on every value per-invocation evidence retains — prompts,
+intervention messages and configuration objects — and there, unlike here, the
+record says which copy it holds ([§FS-rhei-evidence.5.3](rhei-evidence.spec.md#53-redaction)).
+
 The redaction hook is the supported privacy boundary. Gitignore alone is not
 considered sufficient for transcripts containing secrets surfaced through
 tool output.

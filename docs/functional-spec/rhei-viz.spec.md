@@ -267,7 +267,9 @@ The same channel is reachable from the terminal, for operators who run without a
 browser open: `rhei intervene --task <id> [--slot <N>] -m "<message>"` discovers
 the live run's loopback address and delivers the message through the identical
 `/intervene` boundary and capability gate as the composer. It is the headless
-sibling of the composer, not a second code path [§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary). A surface
+sibling of the composer, not a second code path [§AR-rhei-viz-flow.7](../architecture/rhei-viz-flow.spec.md#7-intervene-the-single-mutation-boundary). Each
+message delivered either way is recorded in the agent's evidence end record
+([§FS-rhei-evidence.5.4](rhei-evidence.spec.md#54-interventions)). A surface
 attached with `rhei attach` is the third client of that same boundary
 [§FS-rhei-run-headless.5](rhei-run-headless.spec.md#5-rhei-attach): the loopback server is the run's **control server**,
 and the browser page is one thing it serves rather than the reason it runs.

@@ -83,7 +83,7 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `budget_snapshot` | Once before scheduling, and again after each receipt is durable | `bounds` (one entry per dimension: `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `currency` on the spend entry, `unpriced`, `unmeasurable`, `unsettled` and `unpriced_details` — `null` on a count entry — and `ceiling` on a delegated entry), and `ceiling_policy` where any ceiling was delegated |
 | `budget_halt` | An admission was refused | `task`, `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `renews_at`, `remedy`, `reason_code`, `ceiling` and `ceiling_policy` where the dimension's ceiling was delegated, and on a spend halt `currency`, `unpriced`, `unmeasurable`, `unsettled`, `unpriced_details` |
 | `seal_halt` | A strict run refused a start because a sealed input changed ([§FS-rhei-seal.8.4](rhei-seal.spec.md#84-the-refusal)) | `task`, `rhei`, `reason_code`, `generation`, `changes` |
-| `run_finished` | Once, when the run loop ends ([§FS-rhei-run-json.2.4](rhei-run-json.spec.md#24-where-run_finished-sits)) | `summary` |
+| `run_finished` | Once, when the run loop ends ([§FS-rhei-run-json.2.4](rhei-run-json.spec.md#24-where-run_finished-sits)) | `summary`, `evidence_manifest` |
 
 `run_started.rhei_build` and `run_started.checkout_head_at_start` are the run
 descriptor's fields of the same names, with the same values and the same
@@ -128,6 +128,10 @@ changes neither `outcome` nor `exit_code`. It is an addition under
 `openai`, and `next_attempt_at` is its RFC 3339 UTC safe deadline. It is not a
 `failed` outcome. The stream remains open while the ordinary run loop waits;
 `run_finished` is emitted only when that loop later finishes or halts.
+
+`run_finished.evidence_manifest` is `{path, sha256}`: the run's evidence
+manifest and its full digest ([§FS-rhei-evidence.9.2](rhei-evidence.spec.md#92-where-it-is-announced)), the same value
+`runtime/run.json` ends with. It is an addition under [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version).
 
 `run_finished.summary` gains one object, **`stop`**, present exactly when
 `--until-idle` ([§FS-rhei-run.2.1](rhei-run.spec.md#21-standalone)) is selected — an unselected run's stream stays

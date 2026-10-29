@@ -83,6 +83,13 @@ mod entry_log_restart_tests;
 mod entry_log_support;
 mod entry_log_tests;
 mod error_guidance_tests;
+mod evidence_accounting_tests;
+mod evidence_callback_tests;
+mod evidence_lifecycle_tests;
+mod evidence_records_tests;
+mod evidence_retention_tests;
+mod evidence_support;
+mod evidence_version_tests;
 mod examples_tests;
 mod exclusions_context_tests;
 mod exclusions_regressions_tests;
@@ -284,6 +291,9 @@ mod until_idle_support;
 mod validate_parallel_layout_tests;
 mod validate_retry_cache_tests;
 mod validation_source_tests;
+mod verify_findings_tests;
+mod verify_reset_tests;
+mod verify_tests;
 mod waiting_on_person_tests;
 mod worker_capture_precondition_tests;
 mod worker_edit_inflight_stop_tests;
@@ -321,7 +331,8 @@ pub use git_env::{
     repository_env_as_a_hook_leaves_it, repository_env_names_no_report_mentioned,
 };
 pub use python_fixture::{
-    fixture_command, fixture_command_line, python_command, write_python_agent,
+    fixture_command, fixture_command_line, fixture_command_with_args, python_command,
+    write_python_agent,
 };
 
 /// A `cli:` callback that runs one line of Python, spelled as a YAML scalar.

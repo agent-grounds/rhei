@@ -21,6 +21,8 @@ Grant exactly one configured `attempts:` budget ([§FS-rhei-agents.3.2.3](rhei-a
 exhausted current visit. Persist `grants: [{at, os_user, attempts}]` in its
 current spawn record ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)); older records default to no grants.
 The effective allowance is configured attempts plus all grants for that visit.
+Retry writes no evidence; the granted attempt's start record copies the grants
+from the spawn record when it runs ([§FS-rhei-evidence.3.1](rhei-evidence.spec.md#31-fields)).
 Keep the same move-count visit key, monotonic attempt/log numbering, state,
 move ledger, `stateVisits`, supervision phase and pending checkpoints.
 

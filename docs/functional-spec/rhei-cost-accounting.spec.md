@@ -380,6 +380,11 @@ narration, and log naming; this identity rule does not introduce another
 counter or change attempt budgets, interruption charging, log names, or reset
 behavior.
 
+A program spawn gets an `invocation_id` from the same spawn plan in the same
+spelling, with `program` as its target segment, so its evidence
+([§FS-rhei-evidence.2.1](rhei-evidence.spec.md#21-agents-and-programs)) keys by the one identity rule. It still gets no
+accounting record.
+
 The run id is selected against retained history as required by
 [§FS-rhei-run.2.7](rhei-run.spec.md#27-run-identity), so separate runs remain
 distinct even when failed spawns leave visit, move, and attempt unchanged.
@@ -1158,6 +1163,11 @@ Rhei publishes one JSON Schema for every accounting schema id it writes:
 - `rhei.accounting.cost.v1`
 - `rhei.accounting.task.v1`
 - `rhei.accounting.prices.v1`
+
+It publishes, through the same command, the ids of the other durable documents
+it writes: `rhei.summary.checkpoint.v1` ([§FS-rhei-summary.6](rhei-summary.spec.md#6-the-checkpoint-document)) and the evidence
+schemas `rhei.evidence.invocation.v1`, `rhei.evidence.manifest.v1` and
+`rhei.evidence.event.v1` ([§FS-rhei-evidence](rhei-evidence.spec.md#fs-rhei-evidence-per-invocation-evidence)). Listing is sorted by id.
 
 The versioned source files live in `crates/rhei-cli/schemas/` and are embedded
 in the binary. `rhei schema <schema-id>` writes the embedded file bytes to

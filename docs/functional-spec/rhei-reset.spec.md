@@ -163,6 +163,13 @@ Run-scoped output is **not** ticket-owned — the run report, the dashboard, and
 the accounting rollups describe a run, not a ticket — so a narrowed reset keeps
 it and says so on stdout. Reset without `--rhei` to clear it.
 
+Run evidence ([§FS-rhei-evidence](rhei-evidence.spec.md#fs-rhei-evidence-per-invocation-evidence)) is run-scoped too, so a narrowed reset keeps
+`runtime/evidence/` whole and says so. Because the ticket's next entry takes a
+log name an earlier run's manifest names, it writes one reset event naming
+every path it removed ([§FS-rhei-evidence.10.1](rhei-evidence.spec.md#101-the-reset-event)), and `rhei verify` reports
+those paths as pruned for the earlier runs. A full reset deletes the store with
+the rest of `runtime/` (step 4) and writes nothing.
+
 The project note store is kept for the same reason and reported the same way
 ([§FS-rhei-note.3.1](rhei-note.spec.md#31-where-it-lives)). It is one shared journal charged to every plan, not a
 ticket's artifact: it is not keyed by a ticket id, an in-scope ticket's entry
@@ -342,6 +349,7 @@ Moved <K> task(s) back:
   Task <id>: <current> → <authored>
 Removed runtime output.
 Kept run-scoped output not owned by any ticket (run report, dashboard, accounting rollups). Reset without `--rhei` to clear it.
+Kept run evidence in runtime/evidence/; recorded the removed paths as reset event <uuid>.
 ```
 
 ## 5. Relationship to Other Commands

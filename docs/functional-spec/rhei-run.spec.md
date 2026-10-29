@@ -767,6 +767,12 @@ what the run did is in the task files, which are already current. A terminal
 that goes away *after* the run has ended finds the report already on disk
 ([§FS-rhei-run-tui.1.8](rhei-run-tui.spec.md#18-failure-modes)).
 
+**Evidence across an early end.** An invocation that is interrupted gets an
+evidence end record with `ending: interrupted`, and an interrupted run still
+writes its manifest with the run's status. A run killed outright writes
+neither; the next `rhei run` in that workspace finalizes it as `incomplete`
+once it holds the run lock ([§FS-rhei-evidence.9.3](rhei-evidence.spec.md#93-a-run-killed-outright)).
+
 ### 3.3. Provider-Limit Parking
 
 A recognized provider limit ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)) parks the invocation

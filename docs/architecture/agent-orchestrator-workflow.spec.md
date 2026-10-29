@@ -454,6 +454,13 @@ reconstruct that binding from transition history or file timestamps.
 opposite: derived views computed from session logs and recorded facts,
 regenerable at any time and never load-bearing. [§FS-rhei-session-reports.1](../functional-spec/rhei-session-reports.spec.md#1-report-artifact)
 
+Per-invocation evidence under `runtime/evidence/` joins the engine-owned durable
+facts: the orchestrator writes each start record as it publishes a spawn and
+each end record after the log is closed, because only then does it know
+first-hand what the process was given and produced; nothing reconstructs it
+later, and no decision reads it. The run manifest is written once at run end
+over those records. [§FS-rhei-evidence](../functional-spec/rhei-evidence.spec.md#fs-rhei-evidence-per-invocation-evidence) [§FS-rhei-verify](../functional-spec/rhei-verify.spec.md#fs-rhei-verify-rhei-verify)
+
 At `rhei run` entry, the CLI records the repository root and `HEAD` only when
 the execution workspace is inside Git. At successful run exit, it re-reads
 `HEAD`; if `HEAD` moved, the CLI performs a read-only tracked-status check over

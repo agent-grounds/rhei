@@ -156,6 +156,52 @@ impl ArchiveSource {
         self.index["manifest"]["path"].as_str().unwrap_or_default()
     }
 
+    /// The first index entry for `reference`: the `manifest.json` member it
+    /// lists, and every member it lists. §FS-rhei-verify.2.1
+    fn packed_generation(&self, reference: &serde_json::Value) -> Option<(String, Vec<String>)> {
+        let packed =
+            self.index["snapshots"].as_array()?.iter().find(|entry| entry["ref"] == *reference)?;
+        let listed = self.listed(&packed["members"]);
+        let manifest =
+            listed.iter().find(|path| path.rsplit('/').next() == Some("manifest.json"))?.clone();
+        Some((manifest, listed))
+    }
+
+    /// The members a check reads, and so the only ones named: the index never
+    /// names one on its own, since `--digest` does not cover it. §FS-rhei-verify.2.1
+    fn named_members(&self, manifest: &serde_json::Value) -> BTreeSet<String> {
+        let mut named: BTreeSet<String> =
+            [ARCHIVE_INDEX.to_string(), self.manifest_path().to_string()].into();
+        named.extend(
+            manifest_named(manifest)
+                .iter()
+                .filter_map(|entry| entry["path"].as_str().map(str::to_string)),
+        );
+        for snapshot in manifest["snapshots"].as_array().into_iter().flatten() {
+            let Some((own, _)) = self.packed_generation(&snapshot["ref"]) else { continue };
+            named.insert(own);
+            if let Some(generation) = self.generation(&snapshot["ref"]) {
+                if matches!(generation.transcript, SourceRead::Found(_)) {
+                    named.insert(generation.path);
+                }
+            }
+        }
+        for path in self.listed(&self.index["events"]) {
+            let event: serde_json::Value = self
+                .members
+                .get(&path)
+                .and_then(|bytes| serde_json::from_slice(bytes).ok())
+                .unwrap_or_default();
+            let lists = event["runs"]
+                .as_array()
+                .is_some_and(|runs| runs.iter().any(|r| r.as_str() == Some(self.run_id())));
+            if lists {
+                named.insert(path);
+            }
+        }
+        named
+    }
+
     /// The paths an index list names.
     fn listed(&self, value: &serde_json::Value) -> Vec<String> {
         value.as_array().map_or_else(Vec::new, |all| {
@@ -204,11 +250,8 @@ impl EvidenceSource for ArchiveSource {
     /// A generation from the members the index lists for its `ref`: its
     /// `manifest.json` says where the transcript is. §FS-rhei-verify.2.1
     fn generation(&self, reference: &serde_json::Value) -> Option<SourceGeneration> {
-        let packed =
-            self.index["snapshots"].as_array()?.iter().find(|entry| entry["ref"] == *reference)?;
-        let listed = self.listed(&packed["members"]);
-        let manifest =
-            listed.iter().find(|path| path.rsplit('/').next() == Some("manifest.json"))?;
+        let (manifest, listed) = self.packed_generation(reference)?;
+        let manifest = &manifest;
         let Some(bytes) = self.members.get(manifest) else {
             return Some(SourceGeneration {
                 path: manifest.clone(),
@@ -216,9 +259,8 @@ impl EvidenceSource for ArchiveSource {
             });
         };
         let own: serde_json::Value = serde_json::from_slice(bytes).unwrap_or_default();
-        let name = own["transcript_path"].as_str().unwrap_or("transcript.jsonl");
         let dir = manifest.rsplit_once('/').map_or("", |(dir, _)| dir);
-        let path = format!("{dir}/{name}");
+        let path = format!("{dir}/{}", snapshot_transcript_name(&own));
         let transcript = match self.members.get(&path) {
             Some(bytes) if listed.contains(&path) => SourceRead::Found(bytes.clone()),
             _ => SourceRead::Absent,
@@ -228,8 +270,8 @@ impl EvidenceSource for ArchiveSource {
 }
 
 /// What only an archive can get wrong, after the shared checks: a refused
-/// member, a member nothing names or one at a path a packed reset event prunes
-/// (`unlisted`), and a member the index lists that is absent (`missing`).
+/// member, a member no check reads or one at a path a packed reset event
+/// prunes (`unlisted`), and a member the index lists that is absent (`missing`).
 /// §FS-rhei-verify.2.1 §FS-rhei-verify.3
 fn archive_member_findings(source: &ArchiveSource, findings: &mut Vec<VerifyFinding>) {
     let run = Some(source.run_id());
@@ -242,18 +284,8 @@ fn archive_member_findings(source: &ArchiveSource, findings: &mut Vec<VerifyFind
         .get(source.manifest_path())
         .and_then(|bytes| serde_json::from_slice(bytes).ok())
         .unwrap_or_default();
-    let mut named: BTreeSet<String> =
-        [ARCHIVE_INDEX.to_string(), source.manifest_path().to_string()].into();
-    named.extend(
-        manifest_named(&manifest)
-            .iter()
-            .filter_map(|entry| entry["path"].as_str().map(str::to_string)),
-    );
+    let named = source.named_members(&manifest);
     let events = source.listed(&source.index["events"]);
-    named.extend(events.iter().cloned());
-    for packed in source.index["snapshots"].as_array().into_iter().flatten() {
-        named.extend(source.listed(&packed["members"]));
-    }
     let reported: BTreeSet<String> = findings
         .iter()
         .filter(|finding| finding.reason_code == "unlisted")

@@ -116,12 +116,7 @@ impl SnapshotRecord {
     }
 
     fn transcript_path(&self) -> PathBuf {
-        let relative = self
-            .manifest
-            .get("transcript_path")
-            .and_then(serde_json::Value::as_str)
-            .unwrap_or("transcript.jsonl");
-        self.path.join(relative)
+        self.path.join(snapshot_transcript_name(&self.manifest))
     }
 
     fn to_listing_json(&self, orphaned: bool) -> serde_json::Value {
@@ -141,6 +136,13 @@ impl SnapshotRecord {
             "path": self.path.display().to_string(),
         })
     }
+}
+
+/// Where a generation's transcript lives, relative to its directory: the
+/// `transcript_path` its own `manifest.json` records, `transcript.jsonl` when
+/// it records none. The one copy of the rule, for the cache and the archive.
+fn snapshot_transcript_name(manifest: &serde_json::Value) -> &str {
+    manifest.get("transcript_path").and_then(serde_json::Value::as_str).unwrap_or("transcript.jsonl")
 }
 
 fn snapshot_parent_ref(record: &SnapshotRecord) -> serde_json::Value {

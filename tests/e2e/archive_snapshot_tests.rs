@@ -8,7 +8,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::archive_support::{
-    archive, assert_refused, elsewhere, flip_member_byte, index, only_run_id, rhei_in,
+    archive, assert_refused, elsewhere, flip_member_byte, index, only_run_id, rewrite, rhei_in,
     verify_archive_json,
 };
 use super::evidence_support::every_file;
@@ -143,4 +143,29 @@ fn generations_in_an_external_cache_are_verified_from_the_archive() {
     flip_member_byte(&tar, &packed[0]);
     let (result, json) = verify_archive_json(&kept, &tar, &[]);
     assert_eq!(assert_refused(&result, &json, "mismatch")["path"], packed[0].as_str());
+}
+
+/// A member listed under a real generation's entry beside its manifest and
+/// transcript is unlisted: no check reads it. §FS-rhei-verify.2.1
+#[test]
+fn an_extra_member_under_a_generation_entry_is_unlisted() {
+    let dir = unique_temp_dir("archive-generation-extra");
+    snapshot_run(&dir, None);
+    let (_guard, kept, tar) = pack(&dir, "archive-generation-extra-kept");
+    let mut edited = index(&tar);
+    let digest = edited["manifest"]["sha256"].as_str().expect("digest").to_string();
+    let entry = &mut edited["snapshots"].as_array_mut().expect("index.snapshots")[0];
+    let own = entry["members"][0].as_str().expect("a member").to_string();
+    let extra = format!("{}/extra.txt", own.rsplit_once('/').expect("a directory").0);
+    entry["members"].as_array_mut().expect("members").push(extra.clone().into());
+    let edited = serde_json::to_vec(&edited).unwrap();
+    let smuggled = kept.join("extra.tar");
+    rewrite(
+        &tar,
+        &smuggled,
+        |path, bytes| Some(if path == "rhei-archive.json" { edited.clone() } else { bytes }),
+        &[(extra.clone(), b"extra\n".to_vec())],
+    );
+    let (result, json) = verify_archive_json(&kept, &smuggled, &["--digest", &digest]);
+    assert_eq!(assert_refused(&result, &json, "unlisted")["path"], extra.as_str());
 }

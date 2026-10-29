@@ -3,7 +3,7 @@
 // from the live ready set until the pass has nothing left in flight.
 //
 // Its own part because the pool is where concurrency is decided — slots,
-// channel, refill, and the join at the end. What a finished agent's exit means
+// channel, refill, and the join on every way out. What a finished agent's exit means
 // is the part next door, and it reads the same for one worker or eight.
 
 // §AR-source-file-size.3 §FS-rhei-run.3
@@ -39,7 +39,13 @@ fn run_agent_worker_pool(
     // channel, and the scheduler refills freed capacity after every
     // processed result. Re-reading the plan preserves dependency checks. §FS-rhei-run.3
     let (tx, rx) = std::sync::mpsc::channel::<ParallelAgentThreadMessage>();
-    let mut handles = Vec::new();
+    // Every way out of this function passes through its drop. §FS-rhei-run.3.2
+    let mut workers = PoolWorkers {
+        handles: Vec::new(),
+        rx,
+        sink: sink.clone(),
+        owner: current_run_owner(),
+    };
     let mut free_slots: BTreeSet<rhei_tui::Slot> = (0..frontend_parallel).collect();
     let mut next_extra_slot = frontend_parallel;
     let mut active_invocation_counts: HashMap<String, usize> = HashMap::new();
@@ -69,7 +75,7 @@ fn run_agent_worker_pool(
         &mut next_extra_slot,
         &mut active_invocation_counts,
         &mut active_state_counts,
-        &mut handles,
+        &mut workers.handles,
     )?;
     *progress.advanced_any |= program_schedule_outcome.advanced;
     // Nothing started and nothing routed: without this the refill
@@ -110,7 +116,7 @@ fn run_agent_worker_pool(
         &mut next_extra_slot,
         &mut active_invocation_counts,
         &mut active_state_counts,
-        &mut handles,
+        &mut workers.handles,
     )?;
     *progress.advanced_any |= schedule_outcome.advanced;
     progress.stalled_tasks.extend(schedule_outcome.skipped.iter().cloned());
@@ -124,9 +130,9 @@ fn run_agent_worker_pool(
         let provider_wait = active_invocation_counts.len() < task_limit
             && has_pending_provider_wait(&load_run_plan(input)?.rhei, &live.machines.set);
         let message = if provider_wait {
-            rx.recv_timeout(Duration::from_secs(1))
+            workers.rx.recv_timeout(Duration::from_secs(1))
         } else {
-            rx.recv().map_err(|_| std::sync::mpsc::RecvTimeoutError::Disconnected)
+            workers.rx.recv().map_err(|_| std::sync::mpsc::RecvTimeoutError::Disconnected)
         };
         let completion = match message {
             Ok(ParallelAgentThreadMessage::Completed(completion)) => completion,
@@ -175,7 +181,7 @@ fn run_agent_worker_pool(
                     &mut next_extra_slot,
                     &mut active_invocation_counts,
                     &mut active_state_counts,
-                    &mut handles,
+                    &mut workers.handles,
                     identity,
                 )?;
                 active_worker_count += refill_outcome.spawned;
@@ -234,7 +240,7 @@ fn run_agent_worker_pool(
                     &mut next_extra_slot,
                     &mut active_invocation_counts,
                     &mut active_state_counts,
-                    &mut handles,
+                    &mut workers.handles,
                     identity,
                 )?;
                 active_worker_count += refill_outcome.spawned;
@@ -366,7 +372,7 @@ fn run_agent_worker_pool(
             &mut next_extra_slot,
             &mut active_invocation_counts,
             &mut active_state_counts,
-            &mut handles,
+            &mut workers.handles,
             identity,
         )?;
         active_worker_count += refill_outcome.spawned;
@@ -374,7 +380,8 @@ fn run_agent_worker_pool(
         progress.stalled_tasks.extend(refill_outcome.skipped.iter().cloned());
     }
 
-    for handle in handles {
+    // Popped one at a time, so a panic reported below leaves the rest to the drop.
+    while let Some(handle) = workers.handles.pop() {
         if handle.join().is_err() {
             let err = miette!(
                 help = internal_error_help(),
@@ -388,4 +395,49 @@ fn run_agent_worker_pool(
     }
 
     Ok(())
+}
+
+/// The pool's worker threads and the channel they report on, held so that no
+/// way out of the pool leaves a worker behind.
+///
+/// A worker reaps its subprocess and only then writes what the invocation
+/// ended as. Its release goes into the journal, the run report's ledger, and
+/// the event log when it drops, on this thread or the worker's. The normal end
+/// joins every worker. Any other way out, whether a `?` on a reload that stops
+/// the run, an error `return`, or an unwind, comes through [`Drop`] instead.
+/// There the run is stopped, its groups are ended, and every worker is joined
+/// before the pool hands its error on. Without that, `rhei run` could exit
+/// between a reap and its record. §FS-rhei-run.3.2 §FS-rhei-run.3.7.6
+struct PoolWorkers {
+    handles: Vec<std::thread::JoinHandle<()>>,
+    rx: std::sync::mpsc::Receiver<ParallelAgentThreadMessage>,
+    sink: Arc<dyn rhei_tui::EventSink>,
+    /// The run whose groups these workers lead.
+    owner: u64,
+}
+
+impl Drop for PoolWorkers {
+    fn drop(&mut self) {
+        if self.handles.is_empty() {
+            return;
+        }
+        // Stopped and ended first: a join waits on a subprocess still running. §FS-rhei-run.3.2
+        mark_run_stopping(self.owner);
+        terminate_live_groups(Some(self.owner));
+        let panicked = || miette!(help = internal_error_help(), "agent thread panicked");
+        for handle in self.handles.drain(..) {
+            if handle.join().is_err() {
+                let text = format!("  error: {}", panicked());
+                emit_run_message(&self.sink, rhei_tui::MessageLevel::Error, text);
+            }
+        }
+        // A completion nobody read writes its release as it drops, before the run exits.
+        // §FS-rhei-run-tui.1.7
+        while let Ok(message) = self.rx.try_recv() {
+            if let ParallelAgentThreadMessage::Panicked { task_id_str, .. } = &message {
+                let text = format!("  error for task {task_id_str}: {}", panicked());
+                emit_run_message(&self.sink, rhei_tui::MessageLevel::Error, text);
+            }
+        }
+    }
 }

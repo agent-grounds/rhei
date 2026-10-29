@@ -27,8 +27,8 @@ any malformed argument is.
 
 ## 2. What It Checks
 
-- every file a manifest's `files` and `accounting` name exists and hashes as
-  recorded;
+- every file a manifest's `files`, `accounting` and `seals` name exists and
+  hashes as recorded;
 - a finalized run directory holds no record its manifest does not name;
 - each snapshot generation a manifest names, when it is in the cache, still has
   the recorded `transcript_sha256`.

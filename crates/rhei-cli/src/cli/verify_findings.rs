@@ -166,7 +166,7 @@ fn verify_manifest(root: &Path, run_dir: &Path, run: &mut VerifiedRun, manifest:
                 .collect()
         })
         .unwrap_or_default();
-    let named: Vec<serde_json::Value> = ["files", "accounting"]
+    let named: Vec<serde_json::Value> = ["files", "accounting", "seals"]
         .iter()
         .flat_map(|field| manifest[*field].as_array().cloned().unwrap_or_default())
         .collect();

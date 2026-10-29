@@ -200,6 +200,19 @@ impl StrictRhei {
     }
 }
 
+/// The generation a strict run last compared `task_id`'s rhei against and
+/// found unchanged, with its file: `None` in a run that is not strict or is
+/// dry, for a rhei out of scope, and for one that drifted, so no record names
+/// a generation the run did not check. §FS-rhei-seal.8.2 §FS-rhei-evidence.3.1
+fn strict_checked_seal(task_id: &str) -> Option<(String, u32, PathBuf)> {
+    let guard = STRICT_INPUTS.lock().unwrap_or_else(|poison| poison.into_inner());
+    let strict = guard.as_ref().filter(|strict| !strict.dry_run)?;
+    let rhei = task_id.split('.').next().unwrap_or(task_id);
+    let entry = strict.rheis.get(rhei).filter(|entry| entry.drift.is_none())?;
+    let file = entry.scope.seal_dir().join(format!("{}.json", entry.generation));
+    Some((rhei.to_string(), entry.generation, file))
+}
+
 /// Whether a strict run refuses to start `task_id` in `state`: its rhei's
 /// sealed inputs changed. Called before bound admission, so a refusal reserves
 /// and charges nothing. §FS-rhei-seal.8.2 §FS-rhei-seal.8.4

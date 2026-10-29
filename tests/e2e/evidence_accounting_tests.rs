@@ -93,8 +93,8 @@ fn a_panta_projects_manifest_names_records_relative_to_the_project_root() {
     assert_eq!(named_accounting(&manifest), held);
 }
 
-/// The ten published ids, sorted, as `rhei schema --list` prints them.
-const PUBLISHED: [&str; 10] = [
+/// The eleven published ids, sorted, as `rhei schema --list` prints them.
+const PUBLISHED: [&str; 11] = [
     "rhei.accounting.cost.v1",
     "rhei.accounting.invocation.v1",
     "rhei.accounting.prices.v1",
@@ -104,11 +104,12 @@ const PUBLISHED: [&str; 10] = [
     "rhei.evidence.event.v1",
     "rhei.evidence.invocation.v1",
     "rhei.evidence.manifest.v1",
+    "rhei.seal.v1",
     "rhei.summary.checkpoint.v1",
 ];
 
-/// `rhei schema` lists and prints the evidence schemas and the summary
-/// checkpoint's beside the accounting ones. §FS-rhei-cost-accounting.8.1
+/// `rhei schema` lists and prints the evidence schemas, the seal's and the
+/// summary checkpoint's beside the accounting ones. §FS-rhei-cost-accounting.8.1
 #[test]
 fn rhei_schema_publishes_the_evidence_and_checkpoint_schemas() {
     let dir = unique_temp_dir("evidence-schema-list");

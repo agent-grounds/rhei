@@ -41,6 +41,11 @@ const PUBLISHED_ACCOUNTING_SCHEMAS: &[(&str, &str)] = &[
         "rhei.evidence.manifest.v1",
         include_str!("../../schemas/rhei.evidence.manifest.v1.schema.json"),
     ),
+    // A seal generation, which an evidence start record names. §FS-rhei-seal.3
+    (
+        "rhei.seal.v1",
+        include_str!("../../schemas/rhei.seal.v1.schema.json"),
+    ),
     (
         "rhei.summary.checkpoint.v1",
         include_str!("../../schemas/rhei.summary.checkpoint.v1.schema.json"),

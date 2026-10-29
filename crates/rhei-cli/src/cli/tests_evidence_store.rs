@@ -171,6 +171,7 @@ mod evidence_store {
             "rhei.evidence.event.v1",
             "rhei.evidence.invocation.v1",
             "rhei.evidence.manifest.v1",
+            "rhei.seal.v1",
             "rhei.summary.checkpoint.v1",
         ] {
             assert!(published.contains(&id), "{id} is published: {published:?}");

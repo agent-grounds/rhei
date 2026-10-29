@@ -114,6 +114,7 @@ fn begin_callback_evidence(start: CallbackEvidenceStart<'_>) -> MietteResult<Opt
         "argv": evidence_argv(&cmd, None),
         "cwd": evidence_cwd(&cmd),
         "config": evidence_config(&run, config),
+        "seal": evidence_seal(&run, start.task_id),
     });
     EvidenceInvocation::publish(run, "callback", "callback_id", callback_id, record).map(Some)
 }

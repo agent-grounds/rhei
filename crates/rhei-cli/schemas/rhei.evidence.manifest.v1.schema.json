@@ -6,7 +6,8 @@
   "type": "object",
   "required": [
     "schema", "run_id", "status", "exit_code", "started_at", "ended_at", "finalized_by",
-    "rhei_build", "checkout_head_at_start", "invocations", "files", "accounting", "snapshots"
+    "rhei_build", "checkout_head_at_start", "invocations", "files", "accounting", "seals",
+    "snapshots"
   ],
   "properties": {
     "schema": { "const": "rhei.evidence.manifest.v1" },
@@ -33,6 +34,7 @@
     },
     "files": { "type": "array", "items": { "$ref": "#/$defs/file" } },
     "accounting": { "type": "array", "items": { "$ref": "#/$defs/file" } },
+    "seals": { "type": "array", "items": { "$ref": "#/$defs/file" } },
     "snapshots": {
       "type": "array",
       "items": {

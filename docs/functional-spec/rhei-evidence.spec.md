@@ -133,10 +133,20 @@ subprocess starts and published once it has started.
 | `agent_cli_version`, `agent_cli_version_note` | yes ([§FS-rhei-evidence.7](rhei-evidence.spec.md#7-the-agent-cli-version)) | — | — |
 | `snapshot` | [§FS-rhei-evidence.8](rhei-evidence.spec.md#8-the-snapshot-generation) | — | — |
 | `grants` | copied from the spawn record | copied from the spawn record | — |
+| `seal` | the checked generation, or `null` | the same | the same |
 | `log_path` | the log's path, relative to the run's root | the same | — |
 
 `rhei_build` and `checkout_head_at_start` are the manifest's, not each
 record's ([§FS-rhei-evidence.9.1](rhei-evidence.spec.md#91-what-it-names)).
+
+`seal` is `{rhei, generation, path}`: the seal generation ([§FS-rhei-seal.3.1](rhei-seal.spec.md#31-generations)) a
+strict run ([§FS-rhei-seal.8.2](rhei-seal.spec.md#82-check-points)) compared the task's rhei against before this
+start and found unchanged, and that generation file's path relative to the
+run's root. The path is on the record so the manifest can name the file from
+the records alone, a killed run's included. It is `null` in a run that is not
+strict, which neither writes nor checks a seal, and for a callback a `rhei
+transition` fires outside the run's process, which no strict run checked. A
+record never names a generation the run did not check.
 
 ### 3.2. `argv` and `cwd`
 
@@ -318,6 +328,9 @@ which is canonical.
   it has one. In a Panta project those live in the owning rhei's accounting
   root ([§FS-rhei-cost-accounting.2](rhei-cost-accounting.spec.md#2-runtime-files)), and their paths are relative to the run's
   root like every other;
+- `seals`: `{path, sha256}` for each seal generation file a record's `seal`
+  names. A generation file is written once ([§FS-rhei-seal.3.1](rhei-seal.spec.md#31-generations)), so any
+  difference later is a real `mismatch`;
 - `snapshots`: `{ref, transcript_sha256}` for every generation used or emitted.
 
 ### 9.2. Where It Is Announced

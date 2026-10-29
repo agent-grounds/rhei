@@ -44,6 +44,9 @@ struct EvidenceRun {
     provenance: rhei_tui::RunProvenance,
     probes: Mutex<BTreeMap<Vec<String>, VersionProbe>>,
     accounting: Mutex<BTreeSet<PathBuf>>,
+    /// Per task, the process whose exit the orchestrator is about to route.
+    /// §FS-rhei-evidence.2.2
+    routed: Mutex<BTreeMap<String, String>>,
     /// `{path, sha256}` once the manifest is written; it is written once.
     manifest: Mutex<Option<serde_json::Value>>,
 }
@@ -144,6 +147,7 @@ impl EvidenceRun {
             provenance: provenance.clone(),
             probes: Mutex::new(BTreeMap::new()),
             accounting: Mutex::new(BTreeSet::new()),
+            routed: Mutex::new(BTreeMap::new()),
             manifest: Mutex::new(None),
         }
     }

@@ -96,12 +96,23 @@ pub struct CallbackResult {
     pub stdout: String,
     /// Stderr captured from the callback (if any).
     pub stderr: String,
+    /// The process's exit code; `None` when it was stopped, killed by a
+    /// signal, or never ran. §FS-rhei-evidence.4
+    pub exit_code: Option<i32>,
 }
 
 impl CallbackResult {
     /// Implicit success — used when a callback emits no parseable payload.
     fn implicit_success(stdout: String, stderr: String) -> Self {
-        Self { success: true, error: None, next_state: None, data: None, stdout, stderr }
+        Self {
+            success: true,
+            error: None,
+            next_state: None,
+            data: None,
+            stdout,
+            stderr,
+            exit_code: Some(0),
+        }
     }
 }
 
@@ -264,6 +275,7 @@ impl CallbackExecutor for ShellCallbackExecutor {
                     data: None,
                     stdout: String::from_utf8_lossy(&stdout).into_owned(),
                     stderr: String::from_utf8_lossy(&stderr).into_owned(),
+                    exit_code: None,
                 }),
             };
         }
@@ -322,6 +334,7 @@ fn interpret_output(output: Output) -> CallbackResult {
             data: None,
             stdout,
             stderr,
+            exit_code: code,
         };
     }
 
@@ -356,7 +369,8 @@ fn parse_callback_stdout(stdout: &str, stderr: String) -> Option<CallbackResult>
         error.or_else(|| Some("transition rejected by callback".to_string()))
     };
 
-    Some(CallbackResult { success, error, next_state, data, stdout: stdout.to_string(), stderr })
+    let stdout = stdout.to_string();
+    Some(CallbackResult { success, error, next_state, data, stdout, stderr, exit_code: Some(0) })
 }
 
 /// A no-op executor that skips all callbacks (used with `--no-callbacks`).
@@ -375,6 +389,7 @@ impl CallbackExecutor for NoopCallbackExecutor {
             data: None,
             stdout: String::new(),
             stderr: String::new(),
+            exit_code: None,
         })
     }
 }

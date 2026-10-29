@@ -265,11 +265,13 @@ impl WorkerRegions {
             Some(task) => format!("Task {task}'s text broke the plan at {place}"),
             None => format!("the plan broke at {place}"),
         };
-        miette!(
-            help = format!("{}. Fix or remove that text, then re-run.", worker_edit_help()),
-            "{head} ({}).{refused}",
-            at.message
-        )
+        // A task region holds text a worker could have written; any other line gets
+        // the loader's help, as `rhei validate` prints it. §FS-rhei-run.3.7.6
+        let help = match &owner {
+            Some(_) => format!("{}. Fix or remove that text, then re-run.", worker_edit_help()),
+            None => plan_authoring_help().to_string(),
+        };
+        miette!(help = help, "{head} ({}).{refused}", at.message)
     }
 }
 

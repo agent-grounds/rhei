@@ -43,6 +43,8 @@ rhei-cli = { path = "../../crates/rhei-cli" }
 jsonschema = { version = "0.18.3", default-features = false }
 serde_yaml = "0.9"
 sha2 = "0.10"
+# Reads, rewrites and hand-builds the archives `rhei archive` writes. §FS-rhei-archive.4
+tar = { version = "0.4", default-features = false }
 # Keep jsonschema's broad transitive ranges on dependencies that Cargo 1.82 can
 # parse and rustc 1.82 can compile; CI verifies the workspace at that MSRV.
 time = "=0.3.36"

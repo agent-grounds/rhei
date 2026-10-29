@@ -38,7 +38,7 @@ runtime/evidence/                      in the run's root, beside run.json
 The **run's root** is the directory whose `runtime/run.json` describes the run
 ([§FS-rhei-run-headless.2](rhei-run-headless.spec.md#2-the-run-descriptor)): the workspace, or in a Panta project the project
 root. One run's evidence is one directory, `runs/<run-id>/`, so a run is one
-thing to verify and, later, one thing to pack. A member rhei's root is its
+thing to verify and one thing to pack ([§FS-rhei-archive](rhei-archive.spec.md#fs-rhei-archive-rhei-archive)). A member rhei's root is its
 project's, whichever command asks — the run, a transition's callbacks, a reset
 or `rhei verify` — even though the member keeps its own execution root.
 
@@ -369,6 +369,7 @@ on id, and neither embeds the other.
 | a run killed outright | start records with no end record | the next `rhei run` finalizes it ([§FS-rhei-evidence.9.3](rhei-evidence.spec.md#93-a-run-killed-outright)) |
 | `rhei snapshot gc` | untouched | nothing; `rhei verify` reports a pruned generation as not cached |
 | `rhei remove` | untouched | nothing |
+| `rhei archive` | untouched | nothing in the workspace; only `--output` ([§FS-rhei-archive.3.4](rhei-archive.spec.md#34-rhei-writes-only---output)) |
 
 ### 10.1. The Reset Event
 

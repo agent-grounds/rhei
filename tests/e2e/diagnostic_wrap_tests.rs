@@ -280,8 +280,10 @@ fn every_end_to_end_file_reads_stderr_through_the_harness() {
         .expect("the end-to-end directory should be readable")
         .map(|entry| entry.expect("directory entry").path())
         .filter(|path| path.extension().is_some_and(|ext| ext == "rs"))
-        // `mod.rs` is the seam: it is the one place allowed to hold the bytes.
-        .filter(|path| path.file_name().is_some_and(|name| name != "mod.rs"))
+        // The harness, `helpers.rs` under `mod.rs`, is the seam: the one place allowed the bytes.
+        .filter(|path| {
+            path.file_name().is_some_and(|name| name != "mod.rs" && name != "helpers.rs")
+        })
         .collect();
     files.sort();
 

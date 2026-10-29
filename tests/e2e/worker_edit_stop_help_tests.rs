@@ -80,7 +80,6 @@ fn assert_loader_help(dir: &TestDir, plan: &Path, head: &str, message: &str) {
 /// The report's first fixture: a retired `**States:**` header line, on line 2
 /// of the index, above every task.
 #[test]
-#[ignore = "red until #522: a break outside every task region carries the worker-edit heading help; implement removes this"]
 fn a_retired_states_line_stops_the_run_with_the_loaders_help() {
     let dir = unique_temp_dir("stop-help-states-line");
     let index = "# Rhei: demo\n**States:** x\n\n### Task 1: One\n**State:** pending\n\nBody.\n";
@@ -95,7 +94,6 @@ fn a_retired_states_line_stops_the_run_with_the_loaders_help() {
 
 /// The report's second fixture: a `## Tasks` section in a workspace index.
 #[test]
-#[ignore = "red until #522: a break outside every task region carries the worker-edit heading help; implement removes this"]
 fn a_tasks_section_in_the_index_stops_the_run_with_the_loaders_help() {
     let dir = unique_temp_dir("stop-help-tasks-section");
     let index = "# Rhei: demo\n\n## Tasks\n\n### Task 1: One\n**State:** pending\n\nBody.\n";

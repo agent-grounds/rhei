@@ -64,6 +64,9 @@ pub enum Edit {
     ChildAndNote,
     /// The note into Task 3's body, on the first attempt only.
     OtherTask,
+    /// A retired `**States:** x` header line into the index, on line 2, outside
+    /// every task's region, on the first attempt only.
+    IndexHeader,
 }
 
 impl Edit {
@@ -73,6 +76,7 @@ impl Edit {
             Edit::Always => "always",
             Edit::ChildAndNote => "child",
             Edit::OtherTask => "other-task",
+            Edit::IndexHeader => "index-header",
         }
     }
 }
@@ -90,6 +94,8 @@ if edit == 'always' or not marker.exists():
     marker.write_text('x')
     if edit == 'other-task':
         append(ws / 'tasks' / '03-later.md', note)
+    elif edit == 'index-header':
+        append(ws / 'index.rhei.md', '**States:** x\n')
     elif edit == 'child':
         append(own, child + note)
     else:

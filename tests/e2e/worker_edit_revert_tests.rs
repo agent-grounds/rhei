@@ -12,6 +12,12 @@ use super::worker_edit_revert_support::*;
 /// The help the old diagnostic printed, which sent the reader to task metadata.
 const METADATA_HELP: &str = "**State:**, **Prior:**";
 
+/// The loader's plan-authoring help, which a break under no task's heading gets.
+const LOADER_HELP: &str = "check the plan's task metadata (**State:**";
+
+/// The sentence of the help about a task body's text.
+const HEADING_HELP: &str = "a heading inside a task body declares a child task";
+
 /// The ticket's own case: Task 1 writes `#### Visit 1 (cover)` into its body
 /// and exits 0. Task 2 still completes, Task 1 is reverted and completes on its
 /// second attempt, and the operator is told which task broke what, where.
@@ -195,6 +201,32 @@ fn an_edit_to_another_tasks_body_stops_the_run_attributed() {
                 );
             }
         }
+    }
+}
+
+/// A worker that writes a line no task's heading is above, a retired header
+/// line in the index, stops the run the way a plan broken before it started
+/// refuses: no task named, the loader's help, nothing reverted, nobody charged.
+// §FS-rhei-run.3.7.6
+#[test]
+fn a_header_line_written_mid_run_stops_the_run_with_the_loaders_help() {
+    for mode in MODES {
+        let case = Scenario::new("index-header", mode, Edit::IndexHeader, false, false);
+        let ran = case.run();
+        let out = ran.combined();
+
+        assert!(!ran.run.status.success(), "the run stops\n{}", ran.output());
+        assert!(out.contains("the plan broke at index.rhei.md:2 ("), "{}", ran.output());
+        assert!(out.contains("is no longer part of the plan language"), "{}", ran.output());
+        assert!(!out.contains("'s text broke the plan"), "no task named\n{}", ran.output());
+        assert!(out.contains(LOADER_HELP), "the loader's help\n{}", ran.output());
+        assert!(!out.contains(HEADING_HELP), "not the task-body help\n{}", ran.output());
+        let index = fs::read_to_string(case.ws.join("index.rhei.md")).expect("read the index");
+        assert!(index.contains("**States:** x"), "nothing is reverted:\n{index}");
+
+        let culprit = end_records(&case.journal(), "ws.1", "cover");
+        assert_eq!(culprit.len(), 1, "{}", case.journal());
+        assert_eq!(meta_value(&culprit[0], "outcome").as_deref(), Some("interrupted"));
     }
 }
 

@@ -18,6 +18,7 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 
 use super::agent_reentry_support::write_settings;
+use super::note_store_support::isolated_command;
 use super::python_fixture::{fixture_command_with_args, python_command};
 use super::worker_edit_revert_support::{
     end_records, journal_in, meta_value, portable, slot_released, COVER, LATER, OTHER,
@@ -207,7 +208,13 @@ fn run_forced(worker: Worker) -> Forced {
             .spawn()
             .expect("the lock holder starts"),
     );
-    let run = run_cli("run", &ws, &machine, &["--no-tui", "--no-callbacks", "--parallel", "2"]);
+    // The home `run_cli` gives it, without the identity of a `rhei run` the suite runs under: the
+    // mock agent's admission would refuse an ancestor reservation this account never made.
+    // §FS-rhei-budgets.7.1
+    let mut cmd = isolated_command(&here);
+    cmd.arg("--state-machine").arg(&machine).arg("run").arg(&ws);
+    cmd.args(["--no-tui", "--no-callbacks", "--parallel", "2"]);
+    let run = CliRun::from(&cmd.output().expect("rhei run starts"));
     fs::write(here.join("rhei-exited"), "x").expect("mark rhei's exit");
     let _ = holder.0.wait();
     Forced { _dir: dir, here, ws, run, worker }
@@ -218,7 +225,6 @@ fn run_forced(worker: Worker) -> Forced {
 /// its worker thread is still between the reap and the record.
 // §FS-rhei-run.3.2 §FS-rhei-run.3.7.6 §FS-rhei-run-tui.1.7 §FS-rhei-run-json.2.1
 #[test]
-#[ignore = "red until #526: a worker in flight at a stop on a break gets no end@ record; implement removes this"]
 fn a_program_in_flight_at_a_stop_on_a_break_is_recorded_before_the_run_exits() {
     assert_recorded_before_exit(Worker::Program);
 }
@@ -226,7 +232,6 @@ fn a_program_in_flight_at_a_stop_on_a_break_is_recorded_before_the_run_exits() {
 /// The same for an agent worker, which runs on the same worker pool.
 // §FS-rhei-run.3.2 §FS-rhei-run.3.7.6 §FS-rhei-run-tui.1.7 §FS-rhei-run-json.2.1
 #[test]
-#[ignore = "red until #526: a worker in flight at a stop on a break gets no end@ record; implement removes this"]
 fn an_agent_in_flight_at_a_stop_on_a_break_is_recorded_before_the_run_exits() {
     assert_recorded_before_exit(Worker::Agent);
 }

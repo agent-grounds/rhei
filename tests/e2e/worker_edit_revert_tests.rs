@@ -186,7 +186,11 @@ fn an_edit_to_another_tasks_body_stops_the_run_attributed() {
         assert!(out.contains("Task ws.3"), "names the task whose text broke\n{}", ran.output());
         assert!(out.contains("Malformed node heading"), "{}", ran.output());
         assert!(!out.contains(METADATA_HELP), "the help is about headings\n{}", ran.output());
-        assert!(case.task_file("03-later.md").contains("#### Visit"), "nothing is reverted");
+        assert!(
+            case.task_file("03-later.md").contains("#### Visit"),
+            "nothing is reverted\n{}",
+            ran.output()
+        );
 
         let journal = case.journal();
         let culprit = end_records(&journal, "ws.1", "cover");
@@ -197,13 +201,26 @@ fn an_edit_to_another_tasks_body_stops_the_run_attributed() {
             "{journal}\n{}",
             ran.output()
         );
+        // Task 2 started is Task 2 recorded, interrupted, before the run exits; a run that
+        // stopped before spawning it journals nothing for it. §FS-rhei-run.3.2
         if mode.concurrent() {
-            for record in end_records(&journal, "ws.2", "other") {
+            let sibling: Vec<&str> = journal
+                .lines()
+                .filter(|line| line.split_whitespace().nth(1) == Some("ws.2"))
+                .collect();
+            let started =
+                sibling.iter().any(|line| line.split_whitespace().nth(2) == Some("start@other"));
+            if started {
+                let ends = end_records(&journal, "ws.2", "other");
+                assert_eq!(ends.len(), 1, "{journal}\n{}", ran.output());
                 assert_eq!(
-                    meta_value(&record, "outcome").as_deref(),
+                    meta_value(&ends[0], "outcome").as_deref(),
                     Some("interrupted"),
-                    "{journal}"
+                    "{journal}\n{}",
+                    ran.output()
                 );
+            } else {
+                assert!(sibling.is_empty(), "{journal}\n{}", ran.output());
             }
         }
     }

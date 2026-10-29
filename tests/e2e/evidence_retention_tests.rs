@@ -2,7 +2,7 @@
 //! `retain`, nothing under `hash-only`, the redactor's output when one is set,
 //! and nothing — with the spawn still running — when the redactor fails.
 //! §FS-rhei-evidence.5 §FS-rhei-evidence.5.2 §FS-rhei-evidence.5.3
-//! §FS-rhei-agents.1.1.8
+//! §FS-rhei-agents.1.1.9
 
 use super::evidence_support::{
     assert_store_exists, every_file, evidence_workspace, one_start, records, sha256_hex, Profile,
@@ -33,7 +33,7 @@ fn hash_only_keeps_the_hashes_and_stores_no_prompt_or_configuration() {
 }
 
 /// An unknown retention value is a settings error, not a silent default.
-/// §FS-rhei-agents.1.1.8
+/// §FS-rhei-agents.1.1.9
 #[test]
 fn an_unknown_retention_value_is_refused() {
     let profile = Profile {

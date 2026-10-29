@@ -132,14 +132,20 @@ impl EvidenceSource for PackingSource {
         let (cache, records) = self.workspace.cached();
         let record = records.iter().find(|record| snapshot_parent_ref(record) == *reference)?;
         let path = evidence_relative(&self.workspace.root, &record.transcript_path());
-        let Ok(dir) = record.path.strip_prefix(cache) else {
+        let relative = |full: &Path| -> Option<String> {
+            let parts: Vec<String> = full
+                .strip_prefix(cache)
+                .ok()?
+                .components()
+                .map(|c| c.as_os_str().to_string_lossy().into_owned())
+                .collect();
+            Some(parts.join("/"))
+        };
+        let (Some(own), Some(transcript)) =
+            (relative(&record.path.join("manifest.json")), relative(&record.transcript_path()))
+        else {
             return Some(SourceGeneration { path, transcript: SourceRead::Unsafe });
         };
-        let dir: Vec<String> =
-            dir.components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect();
-        let dir = dir.join("/");
-        let name = record.manifest["transcript_path"].as_str().unwrap_or("transcript.jsonl");
-        let (own, transcript) = (format!("{dir}/manifest.json"), format!("{dir}/{name}"));
         let members = [format!("snapshots/{own}"), format!("snapshots/{transcript}")];
         let read = match self.take(cache, &own, &members[0]) {
             SourceRead::Found(_) => self.take(cache, &transcript, &members[1]),

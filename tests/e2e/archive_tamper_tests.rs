@@ -103,6 +103,43 @@ fn a_planted_reset_event_turns_the_edited_member_unlisted() {
     assert_eq!(assert_refused(&result, &json, "unlisted")["path"], logs[0].as_str());
 }
 
+/// The index, which `--digest` does not cover, never names a member on its own:
+/// one listed under a `ref` the manifest does not name, or as an event that does
+/// not list the run, is still unlisted. §FS-rhei-verify.2.1 §FS-rhei-verify.3
+#[test]
+fn a_member_only_the_index_names_is_unlisted() {
+    let (_guard, kept, tar, _) = packed("archive-index-named");
+    let packed_index = index(&tar);
+    let digest = packed_index["manifest"]["sha256"].as_str().expect("digest").to_string();
+    let event_path = "runtime/evidence/events/zzz.json";
+    let event = serde_json::json!({ "runs": ["another-run"], "removed": [] });
+    let cases: Vec<(&str, &str, Vec<u8>, serde_json::Value)> = vec![
+        ("bogus-ref", "evil.txt", b"evil\n".to_vec(), {
+            let mut edited = packed_index.clone();
+            let entry = serde_json::json!({ "ref": { "bogus": true }, "members": ["evil.txt"] });
+            edited["snapshots"].as_array_mut().expect("index.snapshots").push(entry);
+            edited
+        }),
+        ("foreign-event", event_path, serde_json::to_vec(&event).unwrap(), {
+            let mut edited = packed_index.clone();
+            edited["events"].as_array_mut().expect("index.events").push(event_path.into());
+            edited
+        }),
+    ];
+    for (name, member, bytes, edited) in cases {
+        let smuggled = kept.join(format!("{name}.tar"));
+        let edited = serde_json::to_vec(&edited).unwrap();
+        rewrite(
+            &tar,
+            &smuggled,
+            |path, bytes| Some(if path == "rhei-archive.json" { edited.clone() } else { bytes }),
+            &[(member.to_string(), bytes)],
+        );
+        let (result, json) = verify_archive_json(&kept, &smuggled, &["--digest", &digest]);
+        assert_eq!(assert_refused(&result, &json, "unlisted")["path"], member, "{name}");
+    }
+}
+
 /// Each unsafe member is refused with its code, and nothing is written.
 /// §FS-rhei-verify.2.1 §FS-rhei-verify.3
 #[test]

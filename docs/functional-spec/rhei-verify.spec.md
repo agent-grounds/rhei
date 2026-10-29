@@ -43,11 +43,15 @@ any malformed argument is.
 
 ### 2.1. From an Archive
 
-An archive is read, never unpacked: each member is hashed as it streams, and
-nothing is written to disk. Each check above reads a member instead of a file
+An archive is read into memory, never unpacked to disk. Each check above reads a member instead of a file
 at the same relative path, and a generation from the members the index lists
 for its `ref` instead of the cache. The reader classifies members from the
-index, never from a path prefix.
+index, never from a path prefix. The index only classifies: `--digest` does not
+cover it, so it never names a member on its own. A member is named only when a
+check reads it — the manifest, a file the manifest names, the `manifest.json`
+and transcript of a generation whose `ref` the manifest's `snapshots` names,
+and a reset event that lists the run. Anything else the index lists is
+`unlisted`.
 
 A member path is safe when it is relative, `/`-separated, not empty, and has no
 `.` or `..` component, no drive and no `\`. Every member must be safe, a

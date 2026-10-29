@@ -52,7 +52,7 @@ Selection is owned by `rhei next` — do not re-implement it in prose. A task is
 3. The task has no `**Assignee:**` field.
 4. The current state is neither terminal nor gating.
 5. Every required `inputs` artifact declared on the current state exists.
-6. No `poll:` deadline on the current state is still in the future — a polled state is not retried before its next attempt is due.
+6. No `poll:` deadline on the current state is still in the future, unless the poll's reverted attempts have spent `poll.max_attempts` — a polled state is not retried before its next attempt is due, and a spent one has no next attempt to wait for.
 7. The current state is the machine's initial state. `rhei next` enters a ticket at the top of its workflow; one already partway through belongs to whoever holds it. Rules 3 and 7 are `rhei next`'s own narrowing — `rhei list --ready` reports the wider *ready set*, so a ticket it names can still be one `rhei next` declines.
 
 When multiple tasks are claimable, `rhei next` picks the first in plan order — do not pre-rank by descendant count or other heuristics. Validation rejects plans where a child task lists its parent or another ancestor as `**Prior:**`; if you hit that failure, do not work around it by manually claiming the child — ask for or make a structural fix so the follow-up task is a sibling.

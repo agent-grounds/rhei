@@ -33,7 +33,7 @@ directory. Listing is project-wide: filters apply across every rhei, and
 | `--contains <TEXT>`      | Case-insensitive substring match against task title and content body.             |
 | `--terminal`             | Only tasks whose state is terminal in the resolved state machine.                 |
 | `--non-terminal`         | Only tasks whose state is non-terminal. Mutually exclusive with `--terminal`.     |
-| `--ready`                | Only tasks the ready set holds — descendants all terminal, `**Prior:**` set satisfied, state declared by the machine and neither terminal nor gating, the state's required `inputs:` on disk, and no `poll:` deadline still ahead ([§FS-rhei-list.3.1](rhei-list.spec.md#31-what---ready-means)). Mutually exclusive with `--blocked`. |
+| `--ready`                | Only tasks the ready set holds — descendants all terminal, `**Prior:**` set satisfied, state declared by the machine and neither terminal nor gating, the state's required `inputs:` on disk, and no `poll:` deadline still ahead, unless reverted attempts have spent `poll.max_attempts` ([§FS-rhei-list.3.1](rhei-list.spec.md#31-what---ready-means)). Mutually exclusive with `--blocked`. |
 | `--blocked`              | Only non-terminal tasks that are not ready — the complement of `--ready` ([§FS-rhei-list.3.1](rhei-list.spec.md#31-what---ready-means)).  |
 | `--limit <N>`            | Cap the number of printed tasks. `0` means no limit (default).                    |
 | `--json`                 | Emit a JSON array instead of human-readable text.                                 |
@@ -102,7 +102,8 @@ A ticket is ready when every descendant is terminal, every task in its
 `**Prior:**` field is in a successful terminal state, its own state is one the
 machine declares and is neither terminal nor gating, every required `inputs:`
 artifact declared on that state exists on disk, and no `poll:` deadline recorded
-for that state is still in the future. An input marked `optional: true` is not
+for that state is still in the future, unless the poll's reverted attempts have
+spent `poll.max_attempts` ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)). An input marked `optional: true` is not
 part of it, exactly as it is not for the scheduler ([§FS-rhei-states.3](rhei-states.spec.md#3-artifact-contracts)).
 
 The declared-state condition is one only `rhei list` can reach. Every command

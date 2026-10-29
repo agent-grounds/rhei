@@ -75,7 +75,8 @@ A task is *claimable* when:
    `poll:` block and `metadata.tasks.<id>.pollNextAttemptAt.<state-name>` is
    later than the current wall-clock time, the task is not claimable until the
    interval elapses ([§FS-rhei-states.2](rhei-states.spec.md#2-polling-states)). This is the same exclusion `rhei run`
-   applies to the ready set ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)).
+   applies to the ready set ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)), and it lapses as that one does once
+   the poll's reverted attempts have spent `poll.max_attempts` ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)).
 7. For automatic selection, its current state is the machine's initial state
    for that task node. Automatic claim mode enters a ticket at the top of its
    workflow, so it passes over one already partway through. `--task` names a

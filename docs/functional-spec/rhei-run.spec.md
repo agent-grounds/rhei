@@ -264,7 +264,9 @@ headless, and JSONL surfaces; no new output record family is introduced.
    use the same full task tree. Tasks whose current state declares `poll:` and whose
    `metadata.tasks.<id>.pollNextAttemptAt.<state-name>` is later than the
    current wall-clock time are excluded from the ready set until the interval
-   elapses. A task with an applicable provider-limit record ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)) is also
+   elapses, unless their reverted attempts have spent `poll.max_attempts`: then
+   the deadline holds nothing back ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)), and the ticket is ready for
+   its spawn site to halt ([§FS-rhei-run.3.7.4](rhei-run.spec.md#374-the-charge)). A task with an applicable provider-limit record ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)) is also
    excluded until its `nextAttemptAt`; queued work sharing that record's
    identity is suppressed for the same interval. See [Next Command](rhei-next.spec.md#3-default-behavior-claim-mode)
    for the manual claimability rule and [Polling States](#51-polling-states) for

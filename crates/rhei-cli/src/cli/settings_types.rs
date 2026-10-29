@@ -96,7 +96,7 @@ struct RheiSettings {
     // §FS-rhei-agents.1.1.6 §FS-rhei-snapshot-operations.4: Snapshot settings.
     #[serde(default)]
     snapshots: Option<SnapshotSettings>,
-    /// Top-level evidence block. §FS-rhei-agents.1.1.8
+    /// Top-level evidence block. §FS-rhei-agents.1.1.9
     #[serde(default)]
     evidence: Option<EvidenceSettings>,
 }

@@ -1,7 +1,7 @@
 // The per-invocation evidence store: `runtime/evidence/` in the run's root,
 // written once per fact and never rewritten. §FS-rhei-evidence.1
 
-/// The `evidence` settings block. §FS-rhei-agents.1.1.8
+/// The `evidence` settings block. §FS-rhei-agents.1.1.9
 #[derive(Debug, Clone, Default, Deserialize)]
 struct EvidenceSettings {
     #[serde(default)]
@@ -18,7 +18,7 @@ enum EvidenceRetention {
 
 impl<'de> Deserialize<'de> for EvidenceRetention {
     /// An unknown value is refused by name, never read as the default.
-    /// §FS-rhei-agents.1.1.8
+    /// §FS-rhei-agents.1.1.9
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = String::deserialize(deserializer)?;
         match value.as_str() {

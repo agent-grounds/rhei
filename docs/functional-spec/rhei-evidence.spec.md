@@ -215,7 +215,7 @@ bytes are the same whichever way it travels, and `prompt.delivery` says which:
 
 ### 5.2. Retention
 
-`evidence.retention` ([§FS-rhei-agents.1.1.8](rhei-agents.spec.md#118-evidence)) governs all three kinds of
+`evidence.retention` ([§FS-rhei-agents.1.1.9](rhei-agents.spec.md#119-evidence)) governs all three kinds of
 retained value together: `retain`, the default, keeps the bytes; `hash-only`
 keeps none. Retaining is the default because a hash without the bytes cannot
 answer what an agent was told. The store lives under `runtime/`, which

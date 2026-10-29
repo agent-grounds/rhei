@@ -12,6 +12,9 @@ enum TimeoutTransitionOutcome {
     /// A matching rule existed but execution failed; details have already
     /// been logged.
     Failed,
+    /// A strict run refused the rule's callback because the ticket's sealed
+    /// inputs changed; the refusal has already been said. §FS-rhei-seal.8.5
+    Refused,
 }
 
 /// Each task whose timeout transition this process selected and failed to apply,
@@ -109,6 +112,7 @@ fn fire_tooling_unavailable_transition(
             );
             TimeoutTransitionOutcome::Fired
         }
+        Err(err) if is_seal_refusal(&err) => TimeoutTransitionOutcome::Refused,
         Err(err) => {
             diag_warn!(
                 "  warning: failed to fire tooling-unavailable transition for Task {}: {}",
@@ -134,20 +138,26 @@ fn route_unavailable_required_tooling(
     required: &[ToolingUnavailable],
     opts: &RunOptions,
 ) -> MietteResult<bool> {
+    let mut refused = false;
     let fired = [ToolingKind::Mcp, ToolingKind::Skill].into_iter().any(|kind| {
         let unavailable = unavailable_ids(required, kind);
-        !unavailable.is_empty()
-            && fire_tooling_unavailable_transition(
-                input,
-                machines,
-                task_id_str,
-                state,
-                kind,
-                &unavailable,
-                opts.no_callbacks(),
-            ) == TimeoutTransitionOutcome::Fired
+        if unavailable.is_empty() || refused {
+            return false;
+        }
+        let outcome = fire_tooling_unavailable_transition(
+            input,
+            machines,
+            task_id_str,
+            state,
+            kind,
+            &unavailable,
+            opts.no_callbacks(),
+        );
+        refused = outcome == TimeoutTransitionOutcome::Refused;
+        outcome == TimeoutTransitionOutcome::Fired
     });
-    if !fired {
+    // No worker ran, so nothing is charged; the refusal was said. §FS-rhei-seal.8.5
+    if !fired && !refused {
         let message = format_required_tooling_error(task_id_str, state, required);
         emit_run_message(sink, rhei_tui::MessageLevel::Error, format!("  error: {message}"));
         if !opts.continue_on_error() {
@@ -247,6 +257,7 @@ fn fire_selected_timeout_transition(
             timeouts_unfired().retain(|(task_id, _)| task_id != task_id_str);
             TimeoutTransitionOutcome::Fired
         }
+        Err(err) if is_seal_refusal(&err) => TimeoutTransitionOutcome::Refused,
         Err(err) => {
             diag_warn!(
                 "  warning: failed to fire timeout transition for Task {}: {}",
@@ -308,6 +319,7 @@ fn fire_agent_exit_transition(
             );
             TimeoutTransitionOutcome::Fired
         }
+        Err(err) if is_seal_refusal(&err) => TimeoutTransitionOutcome::Refused,
         Err(err) => {
             diag_warn!(
                 "  warning: failed to fire error transition for Task {}: {}",

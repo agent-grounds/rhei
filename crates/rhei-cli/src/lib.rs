@@ -249,6 +249,7 @@ include!("cli/run_agent_sequential.rs");
 include!("cli/run_agent_sequential_completion.rs");
 include!("cli/run_agent_pool.rs");
 include!("cli/run_parallel_agent_exit.rs");
+include!("cli/run_parallel_agent_failure.rs");
 include!("cli/run_callback_mode.rs");
 include!("cli/run_missing_outputs.rs");
 include!("cli/run_failure_transitions.rs");

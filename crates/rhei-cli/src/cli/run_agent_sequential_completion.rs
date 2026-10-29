@@ -431,6 +431,7 @@ fn handle_sequential_agent_completion(
                             Some(&mut emit_before_transition),
                         ),
                     };
+                    let refused = leave_refused_exit_unrouted(&advance, &mut release, &spawn_record);
                     match advance {
                         Ok(Some(advance)) => {
                             // The engine scheduled another attempt rather than
@@ -500,10 +501,13 @@ fn handle_sequential_agent_completion(
                             progress.stalled_tasks.insert(task_id_str.clone());
                         }
                         Err(err) => {
-                            run_warn!(
-                                "  warning: agent exited 0 but task {} could not auto-advance from '{}': {}",
-                                task_id_str, state_before, err
-                            );
+                            // A refused callback already said why. §FS-rhei-seal.8.5
+                            if !refused {
+                                run_warn!(
+                                    "  warning: agent exited 0 but task {} could not auto-advance from '{}': {}",
+                                    task_id_str, state_before, err
+                                );
+                            }
                             progress.stalled_tasks.insert(task_id_str.clone());
                         }
                     }
@@ -512,7 +516,7 @@ fn handle_sequential_agent_completion(
                 let duration = timeout_secs.map(format_duration_human).unwrap_or_default();
                 run_warn!("  agent timed out after {} for task {}", duration, task_id_str);
                 if let Some(to_state) = failure_selected_to_state.as_deref() {
-                    match fire_selected_timeout_transition(
+                    let fired = fire_selected_timeout_transition(
                         input,
                         machines,
                         task_id_str,
@@ -520,12 +524,15 @@ fn handle_sequential_agent_completion(
                         to_state,
                         timeout_secs,
                         opts,
-                    ) {
+                    );
+                    leave_refused_exit_unrouted(&fired, &mut release, &spawn_record);
+                    match fired {
                         TimeoutTransitionOutcome::Fired => *progress.advanced_any = true,
                         // Nowhere to go: the ticket is out of this
                         // pass, not out of the run. §FS-rhei-run.3
                         TimeoutTransitionOutcome::NoRule
-                        | TimeoutTransitionOutcome::Failed => {
+                        | TimeoutTransitionOutcome::Failed
+                        | TimeoutTransitionOutcome::Refused => {
                             progress.stalled_tasks.insert(task_id_str.clone());
                         }
                     }
@@ -546,7 +553,7 @@ fn handle_sequential_agent_completion(
                     task_id_str
                 );
                 if let Some(to_state) = failure_selected_to_state.as_deref() {
-                    match fire_agent_exit_transition(
+                    let fired = fire_agent_exit_transition(
                         input,
                         machines,
                         task_id_str,
@@ -555,10 +562,13 @@ fn handle_sequential_agent_completion(
                         code,
                         failure_selected_rule,
                         opts.no_callbacks(),
-                    ) {
+                    );
+                    leave_refused_exit_unrouted(&fired, &mut release, &spawn_record);
+                    match fired {
                         TimeoutTransitionOutcome::Fired => *progress.advanced_any = true,
                         TimeoutTransitionOutcome::NoRule
-                        | TimeoutTransitionOutcome::Failed => {
+                        | TimeoutTransitionOutcome::Failed
+                        | TimeoutTransitionOutcome::Refused => {
                             progress.stalled_tasks.insert(task_id_str.clone());
                         }
                     }

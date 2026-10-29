@@ -27,6 +27,11 @@ const PUBLISHED_ACCOUNTING_SCHEMAS: &[(&str, &str)] = &[
         "rhei.accounting.usage.v1",
         include_str!("../../schemas/rhei.accounting.usage.v1.schema.json"),
     ),
+    // The index of an archive `rhei archive` writes. §FS-rhei-archive.4.2
+    (
+        "rhei.archive.v1",
+        include_str!("../../schemas/rhei.archive.v1.schema.json"),
+    ),
     // The evidence documents and the summary checkpoint, beside the accounting
     // ones. §FS-rhei-evidence §FS-rhei-summary.6
     (

@@ -91,6 +91,7 @@ Execution:
   cost        Inspect run token and cost accounting artifacts
   summary     Print a compact Markdown run summary for a pull request body
   verify      Check that the evidence a run recorded is still what it wrote
+  archive     Pack a run's evidence into one file `rhei verify` checks elsewhere
   report      Render readable Markdown reports from agent session logs
   snapshot    Inspect, prune, or continue from session snapshots
   next        Claim the next ready task, or explicitly claim a named task
@@ -547,6 +548,12 @@ enum Commands {
     Verify {
         #[command(flatten)]
         options: VerifyOptions,
+    },
+    /// Pack one finished run's evidence into one file `rhei verify` checks away from its workspace
+    #[command(long_about = ARCHIVE_LONG_ABOUT)] // §FS-rhei-archive.1 §FS-rhei-archive.6
+    Archive {
+        #[command(flatten)]
+        options: ArchiveOptions,
     },
     /// Print a compact Markdown run summary for a pull request body
     // §FS-rhei-summary.1: the positional resolves exactly as `rhei cost`'s does.

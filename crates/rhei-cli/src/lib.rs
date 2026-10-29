@@ -212,6 +212,8 @@ include!("cli/evidence_callback.rs");
 include!("cli/verify_source.rs");
 include!("cli/verify_findings.rs");
 include!("cli/archive_reader.rs");
+include!("cli/archive_pack.rs");
+include!("cli/archive_command.rs");
 include!("cli/verify_command.rs");
 include!("cli/snapshot_session_locator.rs");
 include!("cli/snapshot_list_show.rs");

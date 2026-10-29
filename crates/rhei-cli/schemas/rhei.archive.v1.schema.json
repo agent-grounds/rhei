@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rhei.archive.v1",
+  "title": "Rhei archive index v1",
+  "description": "The first member of an archive rhei archive writes: the run, its manifest, and which members are reset events and snapshot generations. FS-rhei-archive.4.2",
+  "type": "object",
+  "required": ["schema", "run_id", "manifest", "events", "snapshots"],
+  "$defs": {
+    "member": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\][^\\\\]*$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "properties": {
+    "schema": { "const": "rhei.archive.v1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "manifest": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "$ref": "#/$defs/member" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "events": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/member" } },
+    "snapshots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ref", "members"],
+        "properties": {
+          "ref": { "type": "object" },
+          "members": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/member" } }
+        }
+      }
+    }
+  }
+}

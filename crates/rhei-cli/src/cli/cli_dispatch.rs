@@ -308,6 +308,7 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             summary_command(target.path(), &scope, before_subcommand.as_deref(), &options)
         }
         Commands::Verify { options } => verify_command(options),
+        Commands::Archive { options } => archive_command(options),
         Commands::Report { input, task, state, full } => {
             report_command(&input, task.as_deref(), state.as_deref(), full)
         }

@@ -38,7 +38,6 @@ fn packed(prefix: &str) -> (TestDir, PathBuf, PathBuf, Vec<String>) {
 /// One byte of a log changed inside the tar is a mismatch with both hashes.
 /// §FS-rhei-verify.3
 #[test]
-#[ignore = "red until #525: verify reads no archive; implement removes this"]
 fn an_edited_member_is_a_mismatch() {
     let (_guard, kept, tar, logs) = packed("archive-edited");
     let recorded = sha256_hex(&members(&tar).into_iter().find(|(p, _)| *p == logs[0]).unwrap().1);
@@ -54,7 +53,6 @@ fn an_edited_member_is_a_mismatch() {
 /// A member taken out is missing; a member added is unlisted.
 /// §FS-rhei-verify.2.1 §FS-rhei-verify.3
 #[test]
-#[ignore = "red until #525: verify reads no archive; implement removes this"]
 fn a_removed_member_is_missing_and_an_added_one_unlisted() {
     let (_guard, kept, tar, logs) = packed("archive-missing");
     let removed = kept.join("removed.tar");
@@ -73,7 +71,6 @@ fn a_removed_member_is_missing_and_an_added_one_unlisted() {
 /// packer never writes a member at a pruned path, so the log is unlisted,
 /// even under the manifest's `--digest`. §FS-rhei-verify.2.1
 #[test]
-#[ignore = "red until #525: verify reads no archive; implement removes this"]
 fn a_planted_reset_event_turns_the_edited_member_unlisted() {
     let (_guard, kept, tar, logs) = packed("archive-planted-event");
     let packed_index = index(&tar);
@@ -109,7 +106,6 @@ fn a_planted_reset_event_turns_the_edited_member_unlisted() {
 /// Each unsafe member is refused with its code, and nothing is written.
 /// §FS-rhei-verify.2.1 §FS-rhei-verify.3
 #[test]
-#[ignore = "red until #525: verify reads no archive; implement removes this"]
 fn unsafe_members_are_refused() {
     let (_guard, kept, tar, logs) = packed("archive-unsafe");
     let work = kept.join("work");
@@ -137,7 +133,6 @@ fn unsafe_members_are_refused() {
 /// Bytes that are a tar but not a whole archive are `archive_unreadable`, with
 /// no run. §FS-rhei-verify.1 §FS-rhei-verify.3
 #[test]
-#[ignore = "red until #525: verify reads no archive; implement removes this"]
 fn an_unreadable_archive_is_refused_with_no_run() {
     let (_guard, kept, tar, _) = packed("archive-unreadable");
     let bytes = fs::read(&tar).expect("archive bytes");

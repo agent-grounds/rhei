@@ -10,11 +10,19 @@ struct SourceRun {
     manifest: Option<(String, Vec<u8>)>,
 }
 
+/// What a source found at a path: its bytes, nothing, or a path it refuses to
+/// read because it is unsafe. §FS-rhei-archive.3.3
+enum SourceRead {
+    Found(Vec<u8>),
+    Absent,
+    Unsafe,
+}
+
 /// A snapshot generation as a source holds it: the path of its transcript,
-/// and the transcript's bytes when they are there. §FS-rhei-verify.2
+/// and what is there. §FS-rhei-verify.2
 struct SourceGeneration {
     path: String,
-    transcript: Option<Vec<u8>>,
+    transcript: SourceRead,
 }
 
 /// Where the checker reads from. Every path is relative to the run's root and
@@ -24,8 +32,8 @@ trait EvidenceSource {
     fn runs(&self) -> Vec<SourceRun>;
     /// The bytes of each reset event. §FS-rhei-evidence.10.1
     fn events(&self) -> Vec<Vec<u8>>;
-    /// The bytes at `path`, or `None` when nothing is there.
-    fn read(&self, path: &str) -> Option<Vec<u8>>;
+    /// What is at `path`.
+    fn read(&self, path: &str) -> SourceRead;
     /// The start and end records a run directory holds, sorted.
     fn records(&self, run: &SourceRun) -> Vec<String>;
     /// The generation `reference` names, or `None` when it is not cached.
@@ -92,8 +100,8 @@ impl EvidenceSource for WorkspaceSource {
         workspace_events(&evidence_dir(&self.root))
     }
 
-    fn read(&self, path: &str) -> Option<Vec<u8>> {
-        fs::read(evidence_join(&self.root, path)).ok()
+    fn read(&self, path: &str) -> SourceRead {
+        fs::read(evidence_join(&self.root, path)).map_or(SourceRead::Absent, SourceRead::Found)
     }
 
     fn records(&self, run: &SourceRun) -> Vec<String> {
@@ -117,7 +125,7 @@ impl EvidenceSource for WorkspaceSource {
         let transcript = record.transcript_path();
         Some(SourceGeneration {
             path: evidence_relative(&self.root, &transcript),
-            transcript: fs::read(&transcript).ok(),
+            transcript: fs::read(&transcript).map_or(SourceRead::Absent, SourceRead::Found),
         })
     }
 }

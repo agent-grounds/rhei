@@ -1382,6 +1382,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2",
+ "tar",
  "tempfile",
  "textwrap",
  "tz-rs",

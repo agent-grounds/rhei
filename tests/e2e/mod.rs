@@ -88,6 +88,7 @@ mod evidence_callback_tests;
 mod evidence_lifecycle_tests;
 mod evidence_records_tests;
 mod evidence_retention_tests;
+mod evidence_seal_tests;
 mod evidence_support;
 mod evidence_version_tests;
 mod examples_tests;

@@ -9,6 +9,8 @@ struct EvidenceContents {
     invocations: Vec<serde_json::Value>,
     files: BTreeMap<String, String>,
     snapshots: Vec<serde_json::Value>,
+    /// Each seal generation file a record names, with its hash now.
+    seals: BTreeMap<String, String>,
     earliest_start: Option<String>,
 }
 
@@ -71,6 +73,12 @@ fn evidence_contents(root: &Path, run_dir: &Path) -> EvidenceContents {
             "key": key,
             "completed": completed,
         }));
+        // A generation file is written once, so its hash now is its hash. §FS-rhei-seal.3.1
+        if let Some(seal) = record.get("seal").and_then(|seal| seal["path"].as_str()) {
+            if let Ok(found) = fs::read(evidence_join(root, seal)) {
+                contents.seals.insert(seal.to_string(), sha256_hex(&found));
+            }
+        }
         if let Some(snapshot) = record.get("snapshot").filter(|s| s.is_object()) {
             if !contents.snapshots.contains(snapshot) {
                 contents.snapshots.push(snapshot.clone());
@@ -119,6 +127,11 @@ fn evidence_manifest_value(root: &Path, run: ManifestRun<'_>) -> serde_json::Val
         })
         .collect();
     accounting.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
+    let seals: Vec<serde_json::Value> = contents
+        .seals
+        .iter()
+        .map(|(path, hex)| serde_json::json!({ "path": path, "sha256": hex }))
+        .collect();
     serde_json::json!({
         "schema": EVIDENCE_MANIFEST_SCHEMA,
         "run_id": run.run_id,
@@ -132,6 +145,7 @@ fn evidence_manifest_value(root: &Path, run: ManifestRun<'_>) -> serde_json::Val
         "invocations": contents.invocations,
         "files": files,
         "accounting": accounting,
+        "seals": seals,
         "snapshots": contents.snapshots,
     })
 }

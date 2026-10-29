@@ -50,6 +50,19 @@ fn evidence_cwd(cmd: &std::process::Command) -> String {
     rhei_core::platform::canonical_path(&dir).unwrap_or(dir).display().to_string()
 }
 
+/// The seal generation the strict run checked before this start, as
+/// `{rhei, generation, path}`; `null` outside a strict run. §FS-rhei-evidence.3.1
+fn evidence_seal(run: &EvidenceRun, task_id: &str) -> serde_json::Value {
+    match strict_checked_seal(task_id) {
+        Some((rhei, generation, file)) => serde_json::json!({
+            "rhei": rhei,
+            "generation": generation,
+            "path": run.relative(&file),
+        }),
+        None => serde_json::Value::Null,
+    }
+}
+
 /// How the prompt travelled. §FS-rhei-evidence.5.1
 fn prompt_delivery(resolved: &ResolvedAgent, argv: &[String]) -> &'static str {
     if agent_stdin_format(resolved) == AgentStdinFormat::ClaudeCodeStreamJson {
@@ -174,6 +187,7 @@ fn begin_agent_evidence(start: AgentEvidenceStart<'_>) -> MietteResult<Option<Ev
         "agent_cli_version_note": note,
         "snapshot": snapshot,
         "grants": start.plan.evidence_grants(),
+        "seal": evidence_seal(&run, start.task_id),
         "log_path": run.relative(start.log_path),
     });
     EvidenceInvocation::publish(run, "agent", "invocation_id", id, record).map(Some)
@@ -218,6 +232,7 @@ fn begin_program_evidence(
         "cwd": evidence_cwd(cmd),
         "config": evidence_config(&run, config),
         "grants": plan.evidence_grants(),
+        "seal": evidence_seal(&run, task_id),
         "log_path": run.relative(log_path),
     });
     EvidenceInvocation::publish(run, "program", "invocation_id", id, record).map(Some)

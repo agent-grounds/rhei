@@ -209,6 +209,7 @@ include!("cli/evidence_invocation.rs");
 include!("cli/evidence_manifest.rs");
 include!("cli/evidence_reset.rs");
 include!("cli/evidence_callback.rs");
+include!("cli/verify_source.rs");
 include!("cli/verify_findings.rs");
 include!("cli/verify_command.rs");
 include!("cli/snapshot_session_locator.rs");

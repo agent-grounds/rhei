@@ -25,8 +25,11 @@ At the end of `rhei run`, Rhei writes:
 The latest report may be overwritten by the next run. Timestamped reports are
 append-only unless `rhei reset` removes `runtime/`, matching the existing runtime
 artifact lifecycle. A failed run still writes a report with the information
-available up to the failure point. A `--dry-run` is the one exception: it is a
-side-effect-free preview and writes no report file ([§FS-rhei-run-report.3.5](rhei-run-report.spec.md#35-dry-runs-and-empty-runs)).
+available up to the failure point. That includes a run stopped on a plan a
+worker broke ([§FS-rhei-run.3.7.6](rhei-run.spec.md#376-stopping-attributed)):
+the plan on disk no longer parses, so the report describes the plan as the run
+last loaded it. A `--dry-run` is the one exception: it is a side-effect-free
+preview and writes no report file ([§FS-rhei-run-report.3.5](rhei-run-report.spec.md#35-dry-runs-and-empty-runs)).
 
 The timestamped history entry is the durable completion evidence for an exact
 `rhei summary --run <ID> --prices <BOOK>` selection

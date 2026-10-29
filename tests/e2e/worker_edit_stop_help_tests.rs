@@ -164,3 +164,24 @@ fn a_heading_in_a_task_body_before_the_run_keeps_the_heading_help() {
     assert!(help.contains(HEADING_HELP), "the help is about the task body's text: {help}");
     assert!(!help.contains("**State:**, **Prior:**"), "not about task metadata: {help}");
 }
+
+/// A child task's heading in a task file, not on its first line, is not under
+/// the child's own heading but under the task heading above it: a malformed one
+/// names that task and keeps the help about task bodies.
+#[test]
+fn a_malformed_child_heading_in_a_task_file_keeps_the_heading_help() {
+    let dir = unique_temp_dir("stop-help-child-heading");
+    let task = "### Task 1: One\n**State:** pending\n\nBody.\n\n\
+                #### Task 1.1 Child\n**State:** pending\n\nChild body.\n";
+    let plan = directory_plan(&dir, "child-heading", "# Rhei: demo\n", &[("01-one.md", task)]);
+
+    let run = run_once(&dir, &plan);
+    assert!(
+        run.stderr.contains("Task child-heading.1's text broke the plan at tasks/01-one.md:6 ("),
+        "the break is attributed to the task heading above it\n{}",
+        run.stderr
+    );
+    let help = help_of(&run);
+    assert!(help.contains(HEADING_HELP), "the help is about the task body's text: {help}");
+    assert!(!help.contains("**State:**, **Prior:**"), "not about task metadata: {help}");
+}

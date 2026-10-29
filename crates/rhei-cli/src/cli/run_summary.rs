@@ -309,8 +309,10 @@ fn emit_run_report(
     stats: RunStats,
 ) {
     use std::io::IsTerminal;
-    let Ok(loaded) = load_plan(input) else {
-        return;
+    // A plan a worker broke is reported as the run last loaded it. §FS-rhei-run-report.1
+    let loaded = match load_plan(input).or_else(|err| run_plan_as_last_loaded(input, err)) {
+        Ok(loaded) => loaded,
+        Err(err) => return eprintln!("warning: could not write run report: {err}"),
     };
     // A dry run is a side-effect-free preview: render the console summary but
     // never touch the durable report on disk. §FS-rhei-run-report.3.5
@@ -1680,14 +1682,15 @@ fn build_ledger(
         if !task_records.is_empty() {
             for rec in &task_records {
                 let log = relativize(&rec.log_path, workspace_root);
+                // An interruption, like a provider wait, takes no transition. §FS-rhei-run-report.4
+                let unrouted = matches!(
+                    rec.outcome,
+                    LedgerOutcome::ProviderLimited { .. } | LedgerOutcome::Interrupted
+                );
                 ledger.push(LedgerEntry {
                     task: row.id.clone(),
                     from: rec.from.clone(),
-                    to: if matches!(rec.outcome, LedgerOutcome::ProviderLimited { .. }) {
-                        "-".to_string()
-                    } else {
-                        rec.to.clone()
-                    },
+                    to: if unrouted { "-".to_string() } else { rec.to.clone() },
                     driver: rec.driver,
                     invocation: format!("{} / {}", rec.driver, log),
                     reason: ledger_outcome_reason(&rec.outcome, rec.exit_code),

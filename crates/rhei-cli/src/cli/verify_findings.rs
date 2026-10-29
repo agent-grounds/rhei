@@ -1,6 +1,6 @@
 // What `rhei verify` checks: every file a run manifest names, the records a
-// finalized run directory holds, and the snapshot generations it used. It
-// reads only. §FS-rhei-verify.2 §FS-rhei-verify.3
+// finalized run directory holds, and the snapshot generations it used, read
+// through one evidence source. It reads only. §FS-rhei-verify.2 §FS-rhei-verify.3
 
 /// One disagreement or omission, with its stable reason. §FS-rhei-verify.3
 #[derive(Clone, Debug)]
@@ -72,12 +72,16 @@ impl VerifyOutcome {
 
 /// The paths each reset event prunes, by the run ids it lists.
 /// §FS-rhei-evidence.10.1
+#[cfg(test)]
 fn pruned_paths(evidence: &Path) -> BTreeMap<String, BTreeSet<String>> {
+    pruned_by_events(&workspace_events(evidence))
+}
+
+/// [`pruned_paths`] over events a source read. §FS-rhei-evidence.10.1
+fn pruned_by_events(events: &[Vec<u8>]) -> BTreeMap<String, BTreeSet<String>> {
     let mut pruned: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    let Ok(entries) = fs::read_dir(evidence.join("events")) else { return pruned };
-    for entry in entries.filter_map(Result::ok) {
-        let Ok(bytes) = fs::read(entry.path()) else { continue };
-        let Ok(event) = serde_json::from_slice::<serde_json::Value>(&bytes) else { continue };
+    for bytes in events {
+        let Ok(event) = serde_json::from_slice::<serde_json::Value>(bytes) else { continue };
         let strings = |field: &str| -> Vec<String> {
             event[field]
                 .as_array()
@@ -93,7 +97,7 @@ fn pruned_paths(evidence: &Path) -> BTreeMap<String, BTreeSet<String>> {
 }
 
 /// Check one manifest-named file against its recorded hash.
-fn check_named_file(root: &Path, run: &mut VerifiedRun, entry: &serde_json::Value, pruned: &BTreeSet<String>, findings: &mut Vec<VerifyFinding>) {
+fn check_named_file(source: &dyn EvidenceSource, run: &mut VerifiedRun, entry: &serde_json::Value, pruned: &BTreeSet<String>, findings: &mut Vec<VerifyFinding>) {
     let (Some(path), Some(recorded)) = (entry["path"].as_str(), entry["sha256"].as_str()) else {
         return;
     };
@@ -102,8 +106,8 @@ fn check_named_file(root: &Path, run: &mut VerifiedRun, entry: &serde_json::Valu
         findings.push(VerifyFinding::new("pruned", Some(&run.run_id), Some(path.to_string())));
         return;
     }
-    match fs::read(evidence_join(root, path)) {
-        Ok(bytes) => {
+    match source.read(path) {
+        Some(bytes) => {
             let found = sha256_hex(&bytes);
             if found == recorded {
                 run.files_verified += 1;
@@ -114,7 +118,7 @@ fn check_named_file(root: &Path, run: &mut VerifiedRun, entry: &serde_json::Valu
                 findings.push(finding);
             }
         }
-        Err(_) => {
+        None => {
             let mut finding = VerifyFinding::new("missing", Some(&run.run_id), Some(path.to_string()));
             finding.recorded_sha256 = Some(recorded.to_string());
             findings.push(finding);
@@ -122,30 +126,22 @@ fn check_named_file(root: &Path, run: &mut VerifiedRun, entry: &serde_json::Valu
     }
 }
 
-/// The snapshot generations a manifest names, checked where the cache has
+/// The snapshot generations a manifest names, checked where the source has
 /// them. §FS-rhei-verify.2 §FS-rhei-evidence.8
-fn check_snapshots(root: &Path, run: &mut VerifiedRun, manifest: &serde_json::Value, findings: &mut Vec<VerifyFinding>) {
-    let named = manifest["snapshots"].as_array().cloned().unwrap_or_default();
-    if named.is_empty() {
-        return;
-    }
-    let cache = snapshot_cache_dir(&load_merged_settings_for_completion(root), root);
-    let cached = read_snapshot_records(&cache).unwrap_or_default();
-    for snapshot in named {
+fn check_snapshots(source: &dyn EvidenceSource, run: &mut VerifiedRun, manifest: &serde_json::Value, findings: &mut Vec<VerifyFinding>) {
+    for snapshot in manifest["snapshots"].as_array().cloned().unwrap_or_default() {
         let recorded = snapshot["transcript_sha256"].as_str().unwrap_or_default().to_string();
-        let found = cached.iter().find(|record| snapshot_parent_ref(record) == snapshot["ref"]);
-        let Some(record) = found else {
+        let Some(generation) = source.generation(&snapshot["ref"]) else {
             let mut finding = VerifyFinding::new("snapshot_not_cached", Some(&run.run_id), None);
             finding.recorded_sha256 = Some(recorded);
             findings.push(finding);
             continue;
         };
-        let actual = record.manifest["transcript_sha256"].as_str().unwrap_or_default().to_string();
+        let actual = generation.transcript_sha256;
         if actual == recorded {
             run.snapshots_verified += 1;
         } else {
-            let path = evidence_relative(root, &record.path);
-            let mut finding = VerifyFinding::new("mismatch", Some(&run.run_id), Some(path));
+            let mut finding = VerifyFinding::new("mismatch", Some(&run.run_id), Some(generation.path));
             finding.recorded_sha256 = Some(recorded);
             finding.found_sha256 = Some(actual);
             findings.push(finding);
@@ -153,8 +149,16 @@ fn check_snapshots(root: &Path, run: &mut VerifiedRun, manifest: &serde_json::Va
     }
 }
 
+/// The `{path, sha256}` entries a manifest names. §FS-rhei-evidence.9.1
+fn manifest_named(manifest: &serde_json::Value) -> Vec<serde_json::Value> {
+    ["files", "accounting", "seals"]
+        .iter()
+        .flat_map(|field| manifest[*field].as_array().cloned().unwrap_or_default())
+        .collect()
+}
+
 /// Verify one finalized run directory against its manifest.
-fn verify_manifest(root: &Path, run_dir: &Path, run: &mut VerifiedRun, manifest: &serde_json::Value, pruned: &BTreeSet<String>, findings: &mut Vec<VerifyFinding>) {
+fn verify_manifest(source: &dyn EvidenceSource, source_run: &SourceRun, run: &mut VerifiedRun, manifest: &serde_json::Value, pruned: &BTreeSet<String>, findings: &mut Vec<VerifyFinding>) {
     run.status = manifest["status"].as_str().unwrap_or_default().to_string();
     run.exit_code = manifest["exit_code"].as_i64();
     run.started_at = manifest["started_at"].as_str().unwrap_or_default().to_string();
@@ -166,68 +170,51 @@ fn verify_manifest(root: &Path, run_dir: &Path, run: &mut VerifiedRun, manifest:
                 .collect()
         })
         .unwrap_or_default();
-    let named: Vec<serde_json::Value> = ["files", "accounting", "seals"]
-        .iter()
-        .flat_map(|field| manifest[*field].as_array().cloned().unwrap_or_default())
-        .collect();
+    let named = manifest_named(manifest);
     for entry in &named {
-        check_named_file(root, run, entry, pruned, findings);
+        check_named_file(source, run, entry, pruned, findings);
     }
     // A finalized run directory holds no record its manifest does not name.
     let listed: BTreeSet<&str> = named.iter().filter_map(|entry| entry["path"].as_str()).collect();
-    let mut records: Vec<PathBuf> = fs::read_dir(run_dir)
-        .map(|entries| entries.filter_map(Result::ok).map(|entry| entry.path()).collect())
-        .unwrap_or_default();
-    records.sort();
-    for record in records {
-        let name = record.file_name().and_then(|n| n.to_str()).unwrap_or_default();
-        if !(name.ends_with(".start.json") || name.ends_with(".end.json")) {
-            continue;
-        }
-        let path = evidence_relative(root, &record);
+    for path in source.records(source_run) {
         if !listed.contains(path.as_str()) {
             findings.push(VerifyFinding::new("unlisted", Some(&run.run_id), Some(path)));
         }
     }
-    check_snapshots(root, run, manifest, findings);
+    check_snapshots(source, run, manifest, findings);
 }
 
-/// Verify every manifest under `root`, oldest run first, or only the one
-/// whose file has `digest`. §FS-rhei-verify.1 §FS-rhei-verify.3
+/// Verify every manifest under `root` in place. §FS-rhei-verify.1
 fn verify_evidence(root: &Path, digest: Option<&str>) -> VerifyOutcome {
-    let evidence = evidence_dir(root);
-    let pruned = pruned_paths(&evidence);
+    verify_source(&WorkspaceSource::new(root), digest)
+}
+
+/// Verify every manifest `source` holds, oldest run first, or only the one
+/// whose file has `digest`. §FS-rhei-verify.1 §FS-rhei-verify.3
+fn verify_source(source: &dyn EvidenceSource, digest: Option<&str>) -> VerifyOutcome {
+    let pruned = pruned_by_events(&source.events());
     let mut outcome = VerifyOutcome::default();
-    let mut dirs: Vec<PathBuf> = fs::read_dir(evidence.join("runs"))
-        .map(|entries| entries.filter_map(Result::ok).map(|e| e.path()).filter(|p| p.is_dir()).collect())
-        .unwrap_or_default();
-    dirs.sort();
     let empty = BTreeSet::new();
-    for dir in dirs {
-        let run_id = dir.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string();
+    for source_run in source.runs() {
+        let run_id = source_run.run_id.clone();
         let mut run = VerifiedRun { run_id: run_id.clone(), ..VerifiedRun::default() };
-        let manifest_path = dir.join("manifest.json");
-        let Ok(bytes) = fs::read(&manifest_path) else {
+        let Some((manifest_path, bytes)) = &source_run.manifest else {
             if digest.is_none() {
                 run.status = "not finalized".to_string();
-                outcome.findings.push(VerifyFinding::new(
-                    "not_finalized",
-                    Some(&run_id),
-                    Some(evidence_relative(root, &dir)),
-                ));
+                outcome.findings.push(VerifyFinding::new("not_finalized", Some(&run_id), Some(source_run.dir.clone())));
                 outcome.runs.push(run);
             }
             continue;
         };
-        let found = sha256_hex(&bytes);
+        let found = sha256_hex(bytes);
         if digest.is_some_and(|wanted| wanted != found) {
             continue;
         }
-        run.manifest = Some(evidence_relative(root, &manifest_path));
+        run.manifest = Some(manifest_path.clone());
         run.digest = Some(found);
-        let manifest = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
+        let manifest = serde_json::from_slice(bytes).unwrap_or(serde_json::Value::Null);
         let pruned = pruned.get(&run_id).unwrap_or(&empty);
-        verify_manifest(root, &dir, &mut run, &manifest, pruned, &mut outcome.findings);
+        verify_manifest(source, &source_run, &mut run, &manifest, pruned, &mut outcome.findings);
         outcome.runs.push(run);
     }
     // Oldest first: by the manifest's start, a run with none last. §FS-rhei-verify.1

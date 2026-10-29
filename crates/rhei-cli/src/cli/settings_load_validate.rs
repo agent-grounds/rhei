@@ -209,6 +209,28 @@ fn validate_agent_effort_profiles(
     Ok(())
 }
 
+/// The project an execution root belongs to: the Panta project that discovers
+/// it as a member, or the root itself when it is a project or a bare rhei.
+///
+/// Membership is read as the loader reads it (§FS-rhei-panta.6): a Directory
+/// Workspace or the `basin/` its parent discovers belongs to that parent, and
+/// anything else - a plan under the project's `runtime/`, in a grouping folder,
+/// in a scratch directory - is a bare rhei however deep inside a project it
+/// sits. This is the root settings are read at (§FS-rhei-agents.1.1.8) and the
+/// one an account belongs to (§FS-rhei-budgets.5.1); results, runtime and the
+/// snapshot cache stay at the execution root.
+fn discovering_project_root(execution_root: &Path) -> PathBuf {
+    if rhei_core::workspace::is_panta_project(execution_root) {
+        return execution_root.to_path_buf();
+    }
+    // A root spelled `.` names no entry of its own, so ask about where it is.
+    let entry = std::fs::canonicalize(execution_root).unwrap_or_else(|_| execution_root.to_path_buf());
+    match rhei_core::workspace::panta_member(&entry) {
+        Some((project, _)) => project,
+        None => execution_root.to_path_buf(),
+    }
+}
+
 /// Load merged settings plus the source decisions that produced every roster
 /// value. Execution discards the additional record; inspection renders it
 /// without re-reading or re-merging settings. §FS-rhei-agents.1.1.7
@@ -216,6 +238,8 @@ fn load_merged_roster(
     plan_root: &Path,
     warn_before_project_load: bool,
 ) -> MietteResult<MergedRoster> {
+    // A member reads its project's settings on every read, never its own. §FS-rhei-agents.1.1.8
+    let plan_root = &discovering_project_root(plan_root);
     let machine_file = machine_settings_file();
     let global_document = match &machine_file {
         Some(path) => load_settings_document(path)?,

@@ -358,28 +358,64 @@ transitions:
         let settings = RheiSettings::default();
         let spawns = SpawnSiteRoots::plan_only(root, &runtime);
         let scan = || agent_deadline_since(&rhei, &machines, &settings, &None, &spawns, since);
+        for attempt in 1..=3 {
+            assert_eq!(scan(), Some(since), "attempt {attempt} is still to come");
+            record_reverted_poll_attempt(&machine, root, &runtime);
+        }
+        assert_eq!(scan(), None, "no attempt follows a spent bound, so none is waited for");
+    }
+
+    /// A program poll asked with no run behind it answers from its spawn record
+    /// alone: it resolves no agents, so it reads no settings, and a project
+    /// settings file that does not load leaves its answer as it is.
+    // §FS-rhei-run.5.1 §FS-rhei-run.3.7.4
+    #[test]
+    fn a_program_poll_answers_its_spent_bound_without_reading_settings() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let (root, runtime) = (dir.path(), dir.path().join("runtime"));
+        let settings_file = root.join(PROJECT_SETTINGS_RELATIVE_PATH);
+        fs::create_dir_all(settings_file.parent().expect("settings parent")).expect("mkdir");
+        fs::write(&settings_file, "{ not json").expect("write malformed settings");
+        assert!(load_merged_settings(root).is_err(), "the settings do not load");
+        let machine = rhei_validator::StateMachine::from_yaml_str(POLL_MACHINE).expect("machine");
+        let plan = "# Rhei: Poll\n\n## Tasks\n\n### Task 1: One\n**State:** waiting\n";
+        let mut rhei = rhei_core::parse(plan).expect("plan");
+        let since = current_unix_secs();
+        rhei.metadata =
+            Some(set_poll_next_attempt_metadata(None, &parse_task_id("1"), "waiting", since, 1));
+        let spawns = SpawnSiteRoots { settings: None, ..SpawnSiteRoots::plan_only(root, &runtime) };
+        for _ in 1..=3 {
+            record_reverted_poll_attempt(&machine, root, &runtime);
+        }
+        let task = &rhei.tasks[0];
+        assert_eq!(spawns.pending_poll_deadline(&rhei, &machine, task, "waiting", since), None);
+    }
+
+    /// Spawn the program poll's next attempt under `root` and record it as an
+    /// attempt whose edit was reverted, charged to its bound.
+    fn record_reverted_poll_attempt(
+        machine: &rhei_validator::StateMachine,
+        root: &Path,
+        runtime: &Path,
+    ) {
+        let (plan, _) =
+            plan_named_spawn(machine, root, runtime, "1", "waiting", 1, None).expect("plan");
+        plan.record_spawn(SpawnEnding {
+            task_id: "1",
+            state_name: "waiting",
+            kind: "program",
+            worker: "true",
+            started: "2026-10-28T10:00:00Z",
+            ended: "2026-10-28T10:00:01Z",
+            duration: "1s",
+            code: Some(75),
+            ending: "exited",
+        });
         let edit = RevertedEdit {
             location: "plan.md:1".into(),
             message: "broken".into(),
             text: root.join("reverted.md"),
         };
-        for attempt in 1..=3 {
-            assert_eq!(scan(), Some(since), "attempt {attempt} is still to come");
-            let (plan, _) =
-                plan_named_spawn(&machine, root, &runtime, "1", "waiting", 1, None).expect("plan");
-            plan.record_spawn(SpawnEnding {
-                task_id: "1",
-                state_name: "waiting",
-                kind: "program",
-                worker: "true",
-                started: "2026-10-28T10:00:00Z",
-                ended: "2026-10-28T10:00:01Z",
-                duration: "1s",
-                code: Some(75),
-                ending: "exited",
-            });
-            record_spawn_revert(&plan.record, &edit).expect("revert kept on the record");
-        }
-        assert_eq!(scan(), None, "no attempt follows a spent bound, so none is waited for");
+        record_spawn_revert(&plan.record, &edit).expect("revert kept on the record");
     }
 }

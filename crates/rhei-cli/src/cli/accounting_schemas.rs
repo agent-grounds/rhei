@@ -52,6 +52,17 @@ const PUBLISHED_ACCOUNTING_SCHEMAS: &[(&str, &str)] = &[
     ),
 ];
 
+/// `rhei schema`'s arguments. §FS-rhei-cost-accounting.8.1
+#[derive(Args, Debug)]
+struct SchemaOptions {
+    /// Full schema id to print; omitted, lists published ids
+    #[arg(value_name = "SCHEMA_ID", conflicts_with = "list")]
+    name: Option<String>,
+    /// List every published schema id
+    #[arg(long)]
+    list: bool,
+}
+
 fn accounting_schema_command(name: Option<&str>) -> MietteResult<()> {
     let Some(name) = name else {
         for (schema_id, _) in PUBLISHED_ACCOUNTING_SCHEMAS {

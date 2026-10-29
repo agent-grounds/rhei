@@ -24,8 +24,10 @@ fn render_verify_text(outcome: &VerifyOutcome) -> String {
             let _ = writeln!(out, "run {}  not finalized", run.run_id);
             continue;
         };
-        let exit = run.exit_code.map_or_else(|| "no exit".to_string(), |code| format!("exit {code}"));
-        let _ = writeln!(out, "run {}  {} ({exit})  manifest sha256:{digest}", run.run_id, run.status);
+        let exit =
+            run.exit_code.map_or_else(|| "no exit".to_string(), |code| format!("exit {code}"));
+        let _ =
+            writeln!(out, "run {}  {} ({exit})  manifest sha256:{digest}", run.run_id, run.status);
         let count = |kind: &str| run.invocations.iter().filter(|(k, _)| k == kind).count();
         let open = run.invocations.iter().filter(|(_, completed)| !completed).count();
         let _ = writeln!(
@@ -44,7 +46,8 @@ fn render_verify_text(outcome: &VerifyOutcome) -> String {
             let _ = write!(verified, ", {generations} verified");
         }
         let _ = writeln!(out, "{verified}");
-        for finding in outcome.findings.iter().filter(|f| f.run_id.as_deref() == Some(&run.run_id)) {
+        for finding in outcome.findings.iter().filter(|f| f.run_id.as_deref() == Some(&run.run_id))
+        {
             let _ = writeln!(
                 out,
                 "  {} {}",
@@ -101,16 +104,44 @@ fn render_verify_json(outcome: &VerifyOutcome) -> serde_json::Value {
             })
         })
         .collect();
-    let findings: Vec<serde_json::Value> = outcome.findings.iter().map(VerifyFinding::to_json).collect();
+    let findings: Vec<serde_json::Value> =
+        outcome.findings.iter().map(VerifyFinding::to_json).collect();
     serde_json::json!({ "runs": runs, "findings": findings, "verified": outcome.verified() })
 }
 
-/// Resolve the run's root as `rhei summary` does, verify, print, and exit `1`
-/// when verification fails. §FS-rhei-verify.1 §FS-rhei-verify.5
-fn verify_command(input: Option<PathBuf>, digest: Option<&str>, json: bool) -> MietteResult<()> {
-    let target = resolve_plan_target(input)?;
-    let root = evidence_root_for(target.path());
-    let outcome = verify_evidence(&root, digest);
+/// `rhei verify`'s arguments. §FS-rhei-verify.1
+#[derive(Args, Debug)]
+struct VerifyOptions {
+    /// Path to the markdown plan file (.rhei.md), workspace directory, or archive file
+    #[arg(value_name = "RHEI_PLAN_OR_WORKSPACE", add = ArgValueCompleter::new(complete_plan_or_archive_path))]
+    input: Option<PathBuf>,
+    /// Verify only the manifest whose file has this full 64-hex sha256
+    #[arg(long, value_name = "SHA256", value_parser = parse_verify_digest)]
+    digest: Option<String>,
+    /// Print one JSON object instead of text
+    #[arg(long)]
+    json: bool,
+}
+
+/// `rhei verify --help`'s long description. §FS-rhei-verify.1 §FS-rhei-verify.5
+const VERIFY_LONG_ABOUT: &str = "\
+Check that what a workspace's runs, or an archive of one, recorded is still what they wrote
+
+The positional is an archive `rhei archive` wrote when it names a tar file; the checks, the output
+and the exit status are the same as in place. Exits 0 when a manifest verified and nothing failed;
+1 on a mismatched, missing or unlisted file, an unknown --digest, nothing to verify, or an
+unreadable or unsafe archive; 2 on a usage error.";
+
+/// Read an archive when the positional is one, or else resolve the run's root
+/// as `rhei summary` does; verify, print, and exit `1` when verification
+/// fails. §FS-rhei-verify.1 §FS-rhei-verify.5
+fn verify_command(options: VerifyOptions) -> MietteResult<()> {
+    let VerifyOptions { input, digest, json } = options;
+    let digest = digest.as_deref();
+    let outcome = match input {
+        Some(archive) if is_archive_file(&archive) => verify_archive(&archive, digest),
+        input => verify_evidence(&evidence_root_for(resolve_plan_target(input)?.path()), digest),
+    };
     if json {
         println!("{}", render_verify_json(&outcome));
     } else {

@@ -27,7 +27,13 @@ impl VerifyFinding {
     fn fails(&self) -> bool {
         matches!(
             self.reason_code,
-            "mismatch" | "missing" | "unlisted" | "unknown_digest" | "nothing_to_verify"
+            "mismatch"
+                | "missing"
+                | "unlisted"
+                | "unknown_digest"
+                | "nothing_to_verify"
+                | "archive_unreadable"
+                | "archive_unsafe_member"
         )
     }
 

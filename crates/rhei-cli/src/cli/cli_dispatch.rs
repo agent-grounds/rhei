@@ -297,7 +297,9 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
                 until: until.as_deref(),
             })
         }
-        Commands::Schema { name, list: _ } => accounting_schema_command(name.as_deref()),
+        Commands::Schema { options } => {
+            accounting_schema_command(options.name.as_deref().filter(|_| !options.list))
+        }
         // `rhei summary` resolves its positional and its `--rhei` exactly as
         // `rhei cost` does, so the two narrow together. §FS-rhei-summary.1
         Commands::Summary { options } => {
@@ -305,7 +307,7 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             let scope = target.scope_with(&options.rhei);
             summary_command(target.path(), &scope, before_subcommand.as_deref(), &options)
         }
-        Commands::Verify { input, digest, json } => verify_command(input, digest.as_deref(), json),
+        Commands::Verify { options } => verify_command(options),
         Commands::Report { input, task, state, full } => {
             report_command(&input, task.as_deref(), state.as_deref(), full)
         }
@@ -414,7 +416,7 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             )
         }
         // §FS-rhei-seal.5
-        Commands::Seal { input, rhei, state_machine } => {
+        Commands::Seal { options: SealOptions { input, rhei, state_machine } } => {
             let target = resolve_plan_target(input)?;
             seal_command(
                 target.path(),

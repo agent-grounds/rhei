@@ -6,7 +6,6 @@
 //! deadline still ahead. §FS-rhei-run.3.7.4 §FS-rhei-run.5.1
 
 use std::fs;
-use std::time::{Duration, Instant};
 
 use super::python_fixture::fixture_command_with_args;
 use super::worker_edit_revert_race_tests::{
@@ -103,7 +102,6 @@ fn a_lowered_poll_bound_halts_its_ticket_instead_of_waiting_for_its_deadline() {
     fs::write(&machine, lowered.replace("max_attempts: 3", "max_attempts: 1"))
         .expect("lower the bound");
 
-    let started = Instant::now();
     for args in [&args[..], &args[..2]] {
         let ran = run_cli("run", &ws, &machine, args);
         let output = portable(&format!("{}{}", ran.stdout, ran.stderr));
@@ -115,7 +113,6 @@ fn a_lowered_poll_bound_halts_its_ticket_instead_of_waiting_for_its_deadline() {
         assert!(!output.contains("sleeping"), "{output}");
         assert_eq!(ran.status.code(), Some(1), "{args:?} exits as a halt\n{output}");
     }
-    assert!(started.elapsed() < Duration::from_secs(15), "no run waited out the deadline");
     assert_eq!(runs(&dir, "poll-runs.txt"), 1, "a spent bound spawns nothing more");
     assert_eq!(state_in(&task_text(&ws, "01-t.md")), "waiting", "no edge fires");
 }

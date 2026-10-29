@@ -381,14 +381,20 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
                 clear_runtime_metadata_in_file(&index, true, reset_locks.plan(&index)?)?;
             }
         }
+        let mut removed_paths = Vec::new();
         let removed = remove_scoped_runtime_artifacts(
             &loaded,
             input,
             &decision.scope,
             &machines,
             &mut reset_locks,
+            &mut removed_paths,
         )?;
         report_reset_summary(&decision, removed);
+        // The store is kept and the removals recorded for verify. §FS-rhei-evidence.10.1
+        if let Some(event) = write_reset_event(&loaded, input, &decision.scope, &removed_paths) {
+            println!("Kept run evidence in runtime/evidence/; recorded the removed paths as reset event {event}.");
+        }
         // A narrowed reset can only speak for ticket-owned artifacts; run-scoped
         // rollups belong to the run, not the ticket. Say so rather than leaving
         // the operator to discover the difference. §FS-rhei-panta.6.4

@@ -112,6 +112,21 @@ mod evidence_store {
     }
 
     #[test]
+    fn a_reset_event_lists_its_scope_runs_and_removals() {
+        let event = reset_event_value(
+            "e1",
+            vec!["auth".to_string()],
+            vec!["auth.1".to_string()],
+            vec!["run-a".to_string()],
+            vec!["runtime/logs/x.log".to_string()],
+        );
+        assert_eq!(event["schema"], "rhei.evidence.event.v1");
+        assert_eq!(event["kind"], "reset");
+        assert_eq!(event["runs"], serde_json::json!(["run-a"]));
+        assert_eq!(event["removed"], serde_json::json!(["runtime/logs/x.log"]));
+    }
+
+    #[test]
     fn the_evidence_and_checkpoint_schemas_are_published() {
         let published: Vec<&str> = PUBLISHED_ACCOUNTING_SCHEMAS.iter().map(|(id, _)| *id).collect();
         for id in [

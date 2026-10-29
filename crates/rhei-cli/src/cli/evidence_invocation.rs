@@ -9,6 +9,7 @@ struct EvidenceInvocation {
     kind: &'static str,
     id_field: &'static str,
     id: String,
+    task_id: String,
     start_path: PathBuf,
 }
 
@@ -220,7 +221,12 @@ impl EvidenceInvocation {
                 start_path.display()
             )
         })?;
-        Ok(EvidenceInvocation { run, kind, id_field, id, start_path })
+        let task_id = record["task_id"].as_str().unwrap_or_default().to_string();
+        if kind != "callback" {
+            // A new process of the task supersedes any exit still unrouted.
+            run.routed_exits().remove(&task_id);
+        }
+        Ok(EvidenceInvocation { run, kind, id_field, id, task_id, start_path })
     }
 
     /// The spawn never started: remove the start record, as its log is
@@ -277,6 +283,10 @@ impl EvidenceInvocation {
         );
         if let Err(err) = write_evidence_exclusively(&end_path, &record) {
             diag_warn!("evidence: could not write {}: {err}", end_path.display());
+        }
+        // The orchestrator routes this exit next; its callbacks name this id.
+        if self.kind != "callback" {
+            self.run.routed_exits().insert(self.task_id, self.id);
         }
     }
 }

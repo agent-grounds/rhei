@@ -503,10 +503,21 @@ fn execute_transition_with_origin(
                     agent,
                     context_json: Some(&context_json),
                 };
-                let result = executor.execute(cb, &ctx).map_err(|e| miette!(
-                    help = state_machine_help(),
-                    "{e}"
-                ))?;
+                let bound = machine.callback_bound(matching_rule);
+                let evidence = begin_callback_evidence(CallbackEvidenceStart {
+                    workspace_root: &workspace_root,
+                    artifact_root: files.artifact_root,
+                    task_id: files.artifact_id,
+                    from,
+                    to,
+                    phase: "on_leave",
+                    callback: cb,
+                    bound: bound.as_ref(),
+                    cwd: &callback_paths.working_dir,
+                })?;
+                let result = executor.execute(cb, &ctx);
+                finish_callback_evidence(evidence, result.as_ref().ok());
+                let result = result.map_err(|e| miette!(help = state_machine_help(), "{e}"))?;
                 if !result.success {
                     if let Some(task_handle) = &task_handle {
                         task_handle.release();
@@ -898,8 +909,22 @@ fn execute_transition_with_origin(
                 context_json: Some(&on_enter_context_json),
             };
             // §FS-rhei-transitions.4.10: a redirect resolves from the rule it took.
-            let executor = ShellCallbackExecutor::new(machine.callback_bound(matching_rule));
-            let result = match executor.execute(cb, &callback_ctx) {
+            let bound = machine.callback_bound(matching_rule);
+            let executor = ShellCallbackExecutor::new(bound.clone());
+            let evidence = begin_callback_evidence(CallbackEvidenceStart {
+                workspace_root: &workspace_root,
+                artifact_root: files.artifact_root,
+                task_id: files.artifact_id,
+                from,
+                to,
+                phase: "on_enter",
+                callback: cb,
+                bound: bound.as_ref(),
+                cwd: &callback_paths.working_dir,
+            })?;
+            let result = executor.execute(cb, &callback_ctx);
+            finish_callback_evidence(evidence, result.as_ref().ok());
+            let result = match result {
                 Ok(result) => result,
                 Err(err) if origin.claim => {
                     let original = miette!(help = state_machine_help(), "{err}");

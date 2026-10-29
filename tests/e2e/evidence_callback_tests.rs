@@ -55,7 +55,6 @@ fn firing_id(saved: &Path) -> String {
 /// argv and cwd and an end record, and the firing id is nowhere in the store.
 /// §FS-rhei-evidence.2.2 §FS-rhei-evidence.3.1 §FS-rhei-evidence.4
 #[test]
-#[ignore = "red until #520: a callback the run fires leaves no evidence record; implement removes this"]
 fn a_callback_the_run_fires_records_its_owner_and_never_its_firing_id() {
     let ws = evidence_workspace("evidence-callback-run", Profile::default());
     let (script, saved) = saving_callback(&ws.root, "on-enter.py");
@@ -95,7 +94,6 @@ fn a_callback_the_run_fires_records_its_owner_and_never_its_firing_id() {
 /// shell: the edge's callback fires with no live run, and the store gains
 /// nothing. §FS-rhei-evidence.2.2 §FS-rhei-evidence.1.3
 #[test]
-#[ignore = "red until #520: a run leaves no runtime/evidence/ to stay unchanged; implement removes this"]
 fn a_callback_an_operator_fires_outside_a_run_writes_nothing() {
     let ws = evidence_workspace("evidence-callback-shell", Profile::default());
     let (script, saved) = saving_callback(&ws.root, "on-release.py");
@@ -171,7 +169,6 @@ result('## Result\n\nStub agent finished.\n')
 /// neither its own run's store nor the other plan gains a callback record.
 /// §FS-rhei-evidence.2.2 §FS-rhei-agents.4
 #[test]
-#[ignore = "red until #520: the outer run leaves no runtime/evidence/ to compare; implement removes this"]
 fn an_agents_transition_on_a_second_plan_writes_into_neither_store() {
     let ws = evidence_workspace("evidence-callback-nested", Profile::default());
     let (second, second_machine, saved) = second_plan(&ws.root.join("second"));

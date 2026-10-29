@@ -15,7 +15,6 @@ use super::{python_command, run_cli};
 /// The triage reproducer of #520, ported: a program, then a stub agent, and
 /// every gap it named. §FS-rhei-evidence.3.1 §FS-rhei-evidence.4 §FS-rhei-verify.5
 #[test]
-#[ignore = "red until #520: a run leaves no runtime/evidence/ and `rhei verify` does not exist; implement removes this"]
 fn a_program_then_an_agent_leave_the_evidence_the_reproducer_asks_for() {
     let mut profile = Profile::default();
     profile.fields["version_args"] = serde_json::json!(["--version"]);

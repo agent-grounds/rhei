@@ -12,7 +12,6 @@ use super::verify_findings_tests::finding;
 /// A clean run verifies, and the text names the run and its full digest.
 /// §FS-rhei-verify.4 §FS-rhei-verify.5
 #[test]
-#[ignore = "red until #520: `rhei verify` does not exist and a run writes no manifest; implement removes this"]
 fn a_clean_run_verifies_and_prints_its_full_digest() {
     let ws = evidence_workspace("verify-clean", Profile::default());
     ws.run();
@@ -35,7 +34,6 @@ fn a_clean_run_verifies_and_prints_its_full_digest() {
 /// `unknown_digest`, and a shortened one is a usage error. §FS-rhei-verify.1
 /// §FS-rhei-verify.3
 #[test]
-#[ignore = "red until #520: `rhei verify --digest` does not exist; implement removes this"]
 fn digest_selects_one_manifest_by_its_full_sha256() {
     let ws = evidence_workspace("verify-digest", Profile::default());
     ws.run();
@@ -58,7 +56,6 @@ fn digest_selects_one_manifest_by_its_full_sha256() {
 /// A workspace with no manifest has nothing to verify, which fails.
 /// §FS-rhei-verify.3 §FS-rhei-verify.5
 #[test]
-#[ignore = "red until #520: `rhei verify --json` does not exist; implement removes this"]
 fn a_workspace_with_no_manifest_has_nothing_to_verify() {
     let ws = evidence_workspace("verify-nothing", Profile::default());
     fs::create_dir_all(ws.root.join("runtime/logs")).expect("a runtime from before evidence");
@@ -72,7 +69,6 @@ fn a_workspace_with_no_manifest_has_nothing_to_verify() {
 /// `run.json` and the `run_finished` record name the manifest and its digest.
 /// §FS-rhei-evidence.9.2 §FS-rhei-run-json.2.1 §FS-rhei-run-headless.2
 #[test]
-#[ignore = "red until #520: run.json and run_finished carry no evidence_manifest; implement removes this"]
 fn run_json_and_run_finished_announce_the_manifest() {
     let ws = evidence_workspace("verify-announce", Profile::default());
     ws.run();
@@ -104,7 +100,6 @@ fn run_json_and_run_finished_announce_the_manifest() {
 /// Verify only reads: every byte under `runtime/` is the same afterwards.
 /// §FS-rhei-verify
 #[test]
-#[ignore = "red until #520: `rhei verify` does not exist; implement removes this"]
 fn verify_writes_nothing() {
     let ws = evidence_workspace("verify-read-only", Profile::default());
     ws.run();

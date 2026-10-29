@@ -65,7 +65,6 @@ fn first_run_id(ws: &EvidenceWorkspace) -> String {
 /// runs exits 0, the old paths pruned for the first run only.
 /// §FS-rhei-verify.3 §FS-rhei-evidence.10.1
 #[test]
-#[ignore = "red until #520: a run writes no manifest and a narrowed reset writes no event; implement removes this"]
 fn a_narrowed_reset_and_a_rerun_of_the_ticket_verify_both_runs() {
     let ws = project("verify-reset-rerun");
     run_project(&ws);
@@ -96,7 +95,6 @@ fn a_narrowed_reset_and_a_rerun_of_the_ticket_verify_both_runs() {
 /// A log a narrowed reset removed and nothing re-created is pruned, not
 /// missing. §FS-rhei-verify.3
 #[test]
-#[ignore = "red until #520: a run writes no manifest and a narrowed reset writes no event; implement removes this"]
 fn a_log_removed_by_a_narrowed_reset_is_pruned() {
     let ws = project("verify-reset-pruned");
     run_project(&ws);
@@ -125,7 +123,6 @@ fn a_log_removed_by_a_narrowed_reset_is_pruned() {
 /// A log deleted by hand, with no reset to explain it, is missing.
 /// §FS-rhei-verify.3
 #[test]
-#[ignore = "red until #520: a run writes no manifest; implement removes this"]
 fn a_log_deleted_by_hand_is_missing() {
     let ws = project("verify-hand-deleted");
     run_project(&ws);

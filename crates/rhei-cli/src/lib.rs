@@ -209,6 +209,8 @@ include!("cli/evidence_invocation.rs");
 include!("cli/evidence_manifest.rs");
 include!("cli/evidence_reset.rs");
 include!("cli/evidence_callback.rs");
+include!("cli/verify_findings.rs");
+include!("cli/verify_command.rs");
 include!("cli/snapshot_session_locator.rs");
 include!("cli/snapshot_list_show.rs");
 include!("cli/snapshot_refs_gc.rs");
@@ -350,6 +352,7 @@ mod tests {
     include!("cli/tests_writable_roots.rs");
     include!("cli/tests_spawn_records.rs");
     include!("cli/tests_evidence_store.rs");
+    include!("cli/tests_verify_findings.rs");
     include!("cli/tests_retry_contract.rs");
     include!("cli/tests_retry_operations.rs");
     include!("cli/tests_retry_handlers.rs");

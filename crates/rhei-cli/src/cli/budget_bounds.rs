@@ -157,18 +157,8 @@ fn plan_count_bounds_with(settings: &RheiSettings, declared: Option<u64>) -> Cou
 /// buy capacity would not be bounded at all.
 /// §FS-rhei-budgets.1 §FS-rhei-budgets.5.1
 fn budget_project_root(workspace_root: &Path) -> PathBuf {
-    if rhei_core::workspace::is_panta_project(workspace_root) {
-        return workspace_root.to_path_buf();
-    }
-    // A root spelled `.` names no entry of its own, so ask about where it is.
-    let entry = std::fs::canonicalize(workspace_root).unwrap_or_else(|_| workspace_root.to_path_buf());
-
-    // Only the project that discovers the root charges it; an enclosing one that
-    // does not is no account of this plan's. §FS-rhei-budgets.5.1
-    match rhei_core::workspace::panta_member(&entry) {
-        Some((project, _)) => project,
-        None => workspace_root.to_path_buf(),
-    }
+    // An account is the project's for the reason settings are. §FS-rhei-budgets.5.1
+    discovering_project_root(workspace_root)
 }
 
 /// The four bound lines `rhei validate` reports, in dimension order.

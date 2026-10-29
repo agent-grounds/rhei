@@ -97,7 +97,6 @@ impl MemberProject {
 /// The reported case: a transition on a member's ticket, the project named,
 /// must not parse the member's malformed settings file. §FS-rhei-agents.1.1.8
 #[test]
-#[ignore = "red until #529: a member transition parses the member's own settings file; implement removes this"]
 fn a_member_transition_ignores_the_members_own_settings_file() {
     let fixture = MemberProject::new("member-settings-transition", Some("{}\n"), Some(MALFORMED));
     let project = fixture.project_arg();
@@ -131,7 +130,6 @@ fn a_member_transition_ignores_the_members_own_settings_file() {
 /// The same transition with the member's own path as the target, which loads
 /// through the project and narrows to `m1`. §FS-rhei-agents.1.1.8 §FS-rhei-panta.6
 #[test]
-#[ignore = "red until #529: a transition named by the member path parses the member's settings file; implement removes this"]
 fn a_member_transition_named_by_the_member_path_ignores_its_settings_file() {
     let fixture = MemberProject::new("member-settings-member-path", Some("{}\n"), Some(MALFORMED));
     let member = fixture.member_arg();
@@ -157,7 +155,6 @@ fn a_member_transition_named_by_the_member_path_ignores_its_settings_file() {
 /// root file fails it by name, and a valid member file does not stand in.
 /// §FS-rhei-agents.1.1.8
 #[test]
-#[ignore = "red until #529: a member transition reads the member's file instead of the project root's; implement removes this"]
 fn a_member_transition_reads_the_project_root_settings_file() {
     let fixture = MemberProject::new("member-settings-root-read", Some(MALFORMED), Some("{}\n"));
     let project = fixture.project_arg();
@@ -196,7 +193,6 @@ fn a_member_transition_reads_the_project_root_settings_file() {
 /// selecting and applying the terminal edge that follows must read the same.
 /// §FS-rhei-agents.1.1.8 §FS-rhei-run.3
 #[test]
-#[ignore = "red until #529: a run's agent-exit edge in a member parses the member's settings file; implement removes this"]
 fn a_project_run_finishes_a_member_agent_without_reading_its_settings_file() {
     let fixture = MemberProject::new("member-settings-agent-run", None, Some(MALFORMED));
     let agent =
@@ -236,7 +232,6 @@ transitions:
 /// program's exit-code edge is applied as a transition, which must read the
 /// settings the run read at start. §FS-rhei-agents.1.1.8 §FS-rhei-run.3
 #[test]
-#[ignore = "red until #529: a run's program-exit edge in a member parses the member's settings file; implement removes this"]
 fn a_project_run_moves_a_member_program_on_without_reading_its_settings_file() {
     let fixture = MemberProject::new("member-settings-run", Some("{}\n"), Some(MALFORMED));
     let program = write_python_agent(&fixture.root, "finish.py", "result('done\\n')\n");
@@ -276,7 +271,6 @@ transitions:
 /// edge it is refused for that reason, not for a file nothing reads.
 /// §FS-rhei-agents.1.1.8 §FS-rhei-transition-cmd.6
 #[test]
-#[ignore = "red until #529: a forced member transition parses the member's settings file; implement removes this"]
 fn a_forced_member_transition_ignores_the_members_own_settings_file() {
     let fixture = MemberProject::new("member-settings-force", Some("{}\n"), Some(MALFORMED));
     let project = fixture.project_arg();
@@ -308,7 +302,6 @@ fn a_forced_member_transition_ignores_the_members_own_settings_file() {
 /// The snapshot commands pointed at the member's own path read the project's
 /// settings, while the member keeps its own cache. §FS-rhei-agents.1.1.8
 #[test]
-#[ignore = "red until #529: snapshot commands at a member path parse the member's settings file; implement removes this"]
 fn snapshot_commands_pointed_at_a_member_ignore_its_settings_file() {
     let fixture = MemberProject::new("member-settings-snapshot", Some("{}\n"), Some(MALFORMED));
     let member = fixture.member_arg();
@@ -326,7 +319,6 @@ fn snapshot_commands_pointed_at_a_member_ignore_its_settings_file() {
 /// Completing `--agent` for a command line naming the member offers the
 /// project root's agents, not the member file's. §FS-rhei-agents.1.1.8
 #[test]
-#[ignore = "red until #529: completion for a member path offers the member file's agents; implement removes this"]
 fn completion_for_a_member_path_offers_the_project_root_agents() {
     let agent = |id: &str| {
         format!(

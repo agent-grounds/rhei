@@ -8,11 +8,11 @@ impl EvidenceRun {
 }
 
 /// The run a transition on `workspace_root` records into: this process's own
-/// run when it is that workspace's, else the workspace's live run, else none.
-/// The flag says whether the run is this process. §FS-rhei-evidence.2.2
+/// run when it records that workspace's evidence root, else that root's live
+/// run, else none. The flag says whether the run is this process.
+/// §FS-rhei-evidence.2.2
 fn callback_evidence_run(workspace_root: &Path) -> Option<(Arc<EvidenceRun>, bool)> {
-    let root = rhei_core::platform::canonical_path(workspace_root)
-        .unwrap_or_else(|_| workspace_root.to_path_buf());
+    let root = evidence_root_for(workspace_root);
     if let Some(run) = evidence_run().filter(|run| run.root == root) {
         return Some((run, true));
     }
@@ -24,6 +24,27 @@ fn callback_evidence_run(workspace_root: &Path) -> Option<(Arc<EvidenceRun>, boo
     let provenance = rhei_tui::RunProvenance::default();
     let run = EvidenceRun::new(&root, &descriptor.id, &descriptor.started_at, &provenance, settings);
     Some((Arc::new(run), false))
+}
+
+/// Holds the exit a transition routes until the transition ends, so every
+/// callback on the edge names it and no later transition does.
+/// §FS-rhei-evidence.2.2
+struct RoutedExitScope {
+    task_id: String,
+}
+
+impl RoutedExitScope {
+    fn new(task_id: &str) -> Self {
+        RoutedExitScope { task_id: task_id.to_string() }
+    }
+}
+
+impl Drop for RoutedExitScope {
+    fn drop(&mut self) {
+        if let Some(run) = evidence_run() {
+            run.routed_exits().remove(&self.task_id);
+        }
+    }
 }
 
 /// Every start record of `task_id` in the run's directory with no end
@@ -68,8 +89,9 @@ struct CallbackEvidenceStart<'a> {
 fn begin_callback_evidence(start: CallbackEvidenceStart<'_>) -> MietteResult<Option<EvidenceInvocation>> {
     let Some(command) = start.callback.0.strip_prefix("cli:") else { return Ok(None) };
     let Some((run, in_process)) = callback_evidence_run(start.workspace_root) else { return Ok(None) };
-    // The orchestrator routes an exit in its own process. §FS-rhei-evidence.2.2
-    let routed = if in_process { run.routed_exits().remove(start.task_id) } else { None };
+    // The orchestrator routes an exit in its own process; every callback of
+    // that transition names it. §FS-rhei-evidence.2.2
+    let routed = if in_process { run.routed_exits().get(start.task_id).cloned() } else { None };
     let owners = routed.map_or_else(|| open_invocation_ids(&run, start.task_id), |id| vec![id]);
     let mut cmd = rhei_core::platform::system_shell_command(command);
     cmd.current_dir(start.cwd);

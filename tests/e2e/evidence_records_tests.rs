@@ -215,3 +215,46 @@ fn env_maps_are_recorded_as_names_without_values_or_their_hashes() {
     let text = String::from_utf8(agent_config).expect("UTF-8");
     assert!(text.contains(r#"["ALPHA_HOST","ZETA_TOKEN"]"#), "sorted names only: {text}");
 }
+
+/// The stored agent configuration of a probe run whose `work` state reads
+/// `work_state` after its `agent: mock` line, and its `config.sha256`.
+fn agent_config_with(prefix: &str, work_state: &str) -> (serde_json::Value, String) {
+    let ws = evidence_workspace(prefix, Profile::default());
+    let machine = fs::read_to_string(&ws.machine).expect("machine");
+    let machine = machine
+        .replace("    attempts: 1\n", "")
+        .replace("    agent: mock\n", &format!("    agent: mock\n{work_state}"));
+    fs::write(&ws.machine, machine).expect("write machine");
+    ws.run();
+    let agent = one_start(&ws.evidence_dir(), "agent");
+    let hash = agent["config"]["sha256"].as_str().expect("config.sha256").to_string();
+    let stored = object(&ws.evidence_dir(), &hash).expect("the configuration object is stored");
+    (serde_json::from_slice(&stored).expect("configuration JSON"), hash)
+}
+
+/// The state's effort and its attempt budget are part of the configuration an
+/// agent consumes: two spawns that differ in only one of them have different
+/// `config.sha256`. The snapshot rules, which need a target, are pinned by the
+/// unit test beside `agent_evidence_state`. §FS-rhei-evidence.6
+#[test]
+fn effort_and_the_attempt_budget_are_in_the_configuration_hash() {
+    let (base, base_hash) = agent_config_with("evidence-config-base", "    attempts: 1\n");
+    assert_eq!(base["effort"], serde_json::Value::Null, "{base:#}");
+    assert_eq!(base["attempt_budget"], serde_json::json!({ "per": "visit", "max": 1 }));
+    assert_eq!(base["snapshot"], serde_json::Value::Null, "{base:#}");
+
+    let (effort, effort_hash) =
+        agent_config_with("evidence-config-effort", "    attempts: 1\n    effort: high\n");
+    assert_eq!(effort["effort"], "high", "{effort:#}");
+
+    let (attempts, attempts_hash) =
+        agent_config_with("evidence-config-attempts", "    attempts: 2\n");
+    assert_eq!(attempts["attempt_budget"], serde_json::json!({ "per": "visit", "max": 2 }));
+
+    let hashes = [&base_hash, &effort_hash, &attempts_hash];
+    for (i, a) in hashes.iter().enumerate() {
+        for b in &hashes[i + 1..] {
+            assert_ne!(a, b, "each input changes the hash: {hashes:?}");
+        }
+    }
+}

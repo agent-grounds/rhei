@@ -47,8 +47,7 @@ fn write_reset_event(
     scope: &RheiScope,
     removed: &[PathBuf],
 ) -> Option<String> {
-    let root = execution_workspace_root(input);
-    let root = rhei_core::platform::canonical_path(&root).unwrap_or(root);
+    let root = evidence_root_for(input);
     if !evidence_dir(&root).is_dir() {
         return None;
     }

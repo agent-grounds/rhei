@@ -91,6 +91,7 @@ fn spawn_parallel_agent_work_item(
     attach_agent_accounting(&mut plan, task_id, state, &item.resolved, visit_count, run_id);
     let budget =
         resolve_attempt_budget(machine.states.get(item.current_state.as_str()), settings);
+    plan.evidence_state = agent_evidence_state(machine.states.get(item.current_state.as_str()), budget);
     if let Some(spent_budget) = plan.budget_spent(budget) {
         // `Skipped` is the pool's stall: the scheduler records it in
         // `stalled_tasks`, so the ticket keeps its state and is out of the

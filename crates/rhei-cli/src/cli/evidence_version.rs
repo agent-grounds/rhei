@@ -4,10 +4,13 @@
 /// How long a version probe may take. §FS-rhei-evidence.7
 const VERSION_PROBE_BOUND: Duration = Duration::from_secs(10);
 
-/// One probe's answer, and the executable it was taken from.
+/// A file's size and modification time, `None` when it is not there.
+type FileStamp = Option<(u64, Option<std::time::SystemTime>)>;
+
+/// One probe's answer, and the stamps of the files it was taken from.
 #[derive(Clone, Debug)]
 struct VersionProbe {
-    stamp: Option<(u64, Option<std::time::SystemTime>)>,
+    stamp: Vec<FileStamp>,
     version: Option<String>,
     note: Option<String>,
 }
@@ -27,12 +30,12 @@ fn version_probe_line(stdout: &[u8]) -> Option<String> {
         .map(str::to_string)
 }
 
-/// Where `program` resolves: itself when it names a path, else the first
-/// match on `PATH`.
-fn resolved_executable(program: &str) -> Option<PathBuf> {
+/// Where `program` resolves for a process started in `cwd`: itself when it
+/// names a path, else the first match on `PATH`.
+fn resolved_executable(program: &str, cwd: &Path) -> Option<PathBuf> {
     let named = Path::new(program);
     if named.components().count() > 1 || named.is_absolute() {
-        return Some(named.to_path_buf());
+        return Some(cwd.join(named));
     }
     let path = std::env::var_os("PATH")?;
     std::env::split_paths(&path).find_map(|dir| {
@@ -43,10 +46,18 @@ fn resolved_executable(program: &str) -> Option<PathBuf> {
     })
 }
 
-/// The size and modification time a cached answer is valid for.
-fn executable_stamp(program: &str) -> Option<(u64, Option<std::time::SystemTime>)> {
-    let metadata = fs::metadata(resolved_executable(program)?).ok()?;
+fn file_stamp(path: &Path) -> FileStamp {
+    let metadata = fs::metadata(path).ok()?;
     Some((metadata.len(), metadata.modified().ok()))
+}
+
+/// The stamps a cached answer is valid for: the executable's, then each later
+/// element of `command` that names a file from `cwd`, since a wrapper's script
+/// is what changes when the wrapper does. §FS-rhei-evidence.7
+fn command_stamps(command: &[String], cwd: &Path) -> Vec<FileStamp> {
+    let executable = resolved_executable(&command[0], cwd).and_then(|path| file_stamp(&path));
+    let scripts = command[1..].iter().map(|arg| cwd.join(arg)).filter(|path| path.is_file());
+    std::iter::once(executable).chain(scripts.map(|path| file_stamp(&path))).collect()
 }
 
 /// Run one probe, stdin closed, bounded. No model is called. §FS-rhei-evidence.7
@@ -98,11 +109,12 @@ fn run_version_probe(argv: &[String], cwd: &Path) -> (Option<String>, Option<Str
 }
 
 impl EvidenceRun {
-    /// `(agent_cli_version, agent_cli_version_note)` for `resolved`, from the
-    /// cache unless the executable's size or modification time changed. The
-    /// command is the profile's as configured: launch adapters append path
-    /// flags to the resolved one. §FS-rhei-evidence.7
-    fn agent_cli_version(&self, resolved: &ResolvedAgent) -> (Option<String>, Option<String>) {
+    /// `(agent_cli_version, agent_cli_version_note)` for `resolved`, probed in
+    /// `cwd`, the directory the agent is spawned in, and taken from the cache
+    /// unless a stamped file changed. The command is the profile's as
+    /// configured: launch adapters append path flags to the resolved one.
+    /// §FS-rhei-evidence.7
+    fn agent_cli_version(&self, resolved: &ResolvedAgent, cwd: &Path) -> (Option<String>, Option<String>) {
         let Some(version_args) = resolved.profile.version_args.as_ref() else {
             return (None, Some("no version_args".to_string()));
         };
@@ -117,24 +129,24 @@ impl EvidenceRun {
             return (None, Some("no version_args".to_string()));
         }
         let argv = version_probe_argv(command, version_args);
-        let stamp = executable_stamp(&command[0]);
-        self.cached_version_probe(argv, stamp, |argv| run_version_probe(argv, &self.root))
+        let stamp = command_stamps(command, cwd);
+        self.cached_version_probe((argv, cwd.to_path_buf()), stamp, |argv| run_version_probe(argv, cwd))
     }
 
-    /// The cached answer for `argv` while its executable's `stamp` holds,
+    /// The cached answer for `(argv, cwd)` while its files' `stamp` holds,
     /// else a fresh `probe`. §FS-rhei-evidence.7
     fn cached_version_probe(
         &self,
-        argv: Vec<String>,
-        stamp: Option<(u64, Option<std::time::SystemTime>)>,
+        key: (Vec<String>, PathBuf),
+        stamp: Vec<FileStamp>,
         probe: impl FnOnce(&[String]) -> (Option<String>, Option<String>),
     ) -> (Option<String>, Option<String>) {
         let mut probes = self.probes.lock().unwrap_or_else(|poison| poison.into_inner());
-        if let Some(cached) = probes.get(&argv).filter(|cached| cached.stamp == stamp) {
+        if let Some(cached) = probes.get(&key).filter(|cached| cached.stamp == stamp) {
             return (cached.version.clone(), cached.note.clone());
         }
-        let (version, note) = probe(&argv);
-        probes.insert(argv, VersionProbe { stamp, version: version.clone(), note: note.clone() });
+        let (version, note) = probe(&key.0);
+        probes.insert(key, VersionProbe { stamp, version: version.clone(), note: note.clone() });
         (version, note)
     }
 }

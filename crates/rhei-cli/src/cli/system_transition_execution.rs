@@ -170,6 +170,8 @@ fn execute_transition_with_origin(
     let task_file = files.task_file;
     let metadata_file = files.metadata_file;
     let workspace_root = execution_workspace_root(&callback_paths.plan_path);
+    // The exit this transition routes is named by its callbacks and by none after. §FS-rhei-evidence.2.2
+    let _routed_exit = RoutedExitScope::new(files.artifact_id);
     let settings = load_merged_settings(&workspace_root)?;
     let default_options = default_run_options();
     let run_options = run_options.unwrap_or(&default_options);

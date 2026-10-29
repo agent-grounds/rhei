@@ -117,6 +117,7 @@ fn run_sequential_agent_invocation(
     };
     attach_agent_accounting(&mut plan, task_id_str, current_state, resolved, visit_count, run_id);
     let budget = resolve_attempt_budget(machine.states.get(current_state), settings);
+    plan.evidence_state = agent_evidence_state(machine.states.get(current_state), budget);
     if let Some(spent_budget) = plan.budget_spent(budget) {
         // The same stall step 5 gives any unmet completion condition: the ticket
         // keeps its state, no transition fires, and the pass moves on.

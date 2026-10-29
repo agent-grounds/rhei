@@ -352,9 +352,8 @@ fn collect_ready_agent_work_items(
         find_runnable_tasks_with_options(
             &loaded.rhei,
             &machines.set,
-            &ReadySetRoots { workspace_root, task_roots: &loaded.task_roots },
+            &SpawnSiteRoots::new(workspace_root, runtime_dir, loaded, machines, Some(settings), opts),
             active_task_ids,
-            opts,
         ),
         &rhei_scope,
     ) {
@@ -473,6 +472,7 @@ fn collect_ready_program_work_items(
     settings: &RheiSettings,
     opts: &RunOptions,
     workspace_root: &Path,
+    runtime_dir: &Path,
     active_task_ids: &HashSet<String>,
     active_nonconcurrent_states: &HashSet<String>,
 ) -> MietteResult<(Vec<ProgramWorkItem>, Vec<String>)> {
@@ -486,9 +486,8 @@ fn collect_ready_program_work_items(
         find_runnable_tasks_with_options(
             &loaded.rhei,
             &machines.set,
-            &ReadySetRoots { workspace_root, task_roots: &loaded.task_roots },
+            &SpawnSiteRoots::new(workspace_root, runtime_dir, loaded, machines, Some(settings), opts),
             active_task_ids,
-            opts,
         ),
         &rhei_scope,
     ) {

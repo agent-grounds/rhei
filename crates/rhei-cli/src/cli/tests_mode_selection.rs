@@ -44,7 +44,7 @@ transitions:
             &rhei_validator::MachineSet::single(machine),
             &default_settings(),
             opts,
-            &ReadySetRoots::plan_only(root),
+            &SpawnSiteRoots { opts, ..SpawnSiteRoots::plan_only(root, &root.join("runtime")) },
         )
         .expect("mode selection should succeed")
     }
@@ -91,7 +91,7 @@ metadata:
             find_runnable_tasks(
                 &future,
                 &rhei_validator::MachineSet::single(machine.clone()),
-                &ReadySetRoots::plan_only(dir.path()),
+                &SpawnSiteRoots::plan_only(dir.path(), &dir.path().join("runtime")),
                 &HashSet::new(),
             )
             .is_empty(),

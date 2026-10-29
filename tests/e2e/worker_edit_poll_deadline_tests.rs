@@ -2,12 +2,16 @@
 //! ending in a later second than the deadline it was spawned for: the timing
 //! agent-grounds/rhei#517's macOS run hit by chance, forced here so the sleep
 //! the run takes for that spent bound is announced on every run rather than on
-//! some. §FS-rhei-run.3.7.4 §FS-rhei-run.5.1
+//! some. Beside it, the same bound spent by lowering `poll.max_attempts` under a
+//! deadline still ahead. §FS-rhei-run.3.7.4 §FS-rhei-run.5.1
 
 use std::fs;
+use std::time::{Duration, Instant};
 
 use super::python_fixture::fixture_command_with_args;
-use super::worker_edit_revert_race_tests::{poll_machine, runs, task_text, workspace};
+use super::worker_edit_revert_race_tests::{
+    poll_machine, runs, task_text, workspace, POLL_CULPRIT,
+};
 use super::worker_edit_revert_support::{portable, state_in};
 use super::*;
 
@@ -72,4 +76,46 @@ fn no_run_waits_for_a_spent_poll_bound_when_the_last_attempt_crosses_a_second() 
         after_last.all(|rest| !rest.contains("sleeping")),
         "no run waits once the bound is spent\n{output}"
     );
+}
+
+/// A bound spent by lowering `poll.max_attempts` between runs, while the last
+/// charge's `pollNextAttemptAt` is still twenty seconds ahead, ends every run as
+/// the spent bound itself does: the ticket stays ready, its spawn site halts it,
+/// and no run reads the deadline as a wait — neither the continuous run's sleep
+/// nor `--until-idle`'s poll wait with no attempt to name.
+// §FS-rhei-run.5.1 §FS-rhei-run.3.7.4 §REQ-bounded-neural-work.1
+#[test]
+fn a_lowered_poll_bound_halts_its_ticket_instead_of_waiting_for_its_deadline() {
+    let dir = unique_temp_dir("worker-edit-lowered-poll-bound");
+    let script = write_python_agent(&dir, "poll.py", POLL_CULPRIT);
+    let machine = poll_machine(&fixture_command_with_args(&script, &[]))
+        .replace("interval: 3s", "interval: 20s");
+    let task = "### Task 1: One\n**State:** waiting\n\nBody.\n";
+    let (ws, machine) = workspace(&dir, &[("01-t.md", task)], &machine);
+    let args = ["--no-tui", "--no-callbacks", "--until-idle"];
+
+    // One reverted attempt of three: the run waits on the poll, as it should.
+    let first = run_cli("run", &ws, &machine, &args);
+    let first_out = portable(&format!("{}{}", first.stdout, first.stderr));
+    assert!(first_out.contains("1 waiting on poll; next attempt"), "{first_out}");
+    assert!(!first_out.contains("next attempt none"), "{first_out}");
+    let lowered = fs::read_to_string(&machine).expect("read the machine");
+    fs::write(&machine, lowered.replace("max_attempts: 3", "max_attempts: 1"))
+        .expect("lower the bound");
+
+    let started = Instant::now();
+    for args in [&args[..], &args[..2]] {
+        let ran = run_cli("run", &ws, &machine, args);
+        let output = portable(&format!("{}{}", ran.stdout, ran.stderr));
+        assert!(
+            output.contains("halting Task ws.1 in state 'waiting': 1 attempts spent"),
+            "the spawn site halts the spent ticket\n{output}"
+        );
+        assert!(!output.contains("waiting on poll"), "{output}");
+        assert!(!output.contains("sleeping"), "{output}");
+        assert_eq!(ran.status.code(), Some(1), "{args:?} exits as a halt\n{output}");
+    }
+    assert!(started.elapsed() < Duration::from_secs(15), "no run waited out the deadline");
+    assert_eq!(runs(&dir, "poll-runs.txt"), 1, "a spent bound spawns nothing more");
+    assert_eq!(state_in(&task_text(&ws, "01-t.md")), "waiting", "no edge fires");
 }

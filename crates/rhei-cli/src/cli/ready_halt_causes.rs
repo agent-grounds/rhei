@@ -334,7 +334,7 @@ struct UnwrittenOutputs {
 /// recorded any; `interrupted` marks one whose last invocation the run's
 /// shutdown ended.
 ///
-/// `roots` are the artifact roots the ready-set scan resolves against, so a
+/// `spawns` carries the artifact roots the ready-set scan resolves against, so a
 /// ticket refused for a file that is not there is explained by the file rather
 /// than by never having been scheduled. Every caller has them — the run knows
 /// the roots it just scanned with — so no surface can be short of them and
@@ -352,7 +352,7 @@ fn classify_halt(
     missing: Option<UnwrittenOutputs>,
     interrupted: bool,
     plan_arg: &str,
-    roots: &ReadySetRoots<'_>,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> HaltCause {
     let machine = machines.for_task(&task.id);
     let state = normalized_state_name(task.state.as_str(), machine);
@@ -402,8 +402,8 @@ fn classify_halt(
             rhei,
             machines,
             roots: ReadySetRoots {
-                workspace_root: roots.workspace_root,
-                task_roots: roots.task_roots,
+                workspace_root: spawns.tasks.workspace_root,
+                task_roots: spawns.tasks.task_roots,
             },
             supervisor: task,
         };
@@ -462,8 +462,8 @@ fn classify_halt(
     // Readiness refused this ticket because a file it needs is not there — but
     // only say so when the input is what the scan stopped at, never over a wait
     // no file can end. §FS-rhei-run-report.3.1 §FS-rhei-states.3
-    if !ready_scan_stops_before_inputs(task, rhei, machines, machine, &state) {
-        let entries = missing_state_inputs_for_ready_set(roots, rhei, machine, task, &state);
+    if !ready_scan_stops_before_inputs(task, rhei, machines, machine, &state, spawns) {
+        let entries = missing_state_inputs_for_ready_set(&spawns.tasks, rhei, machine, task, &state);
         if !entries.is_empty() {
             return HaltCause::MissingInputs { entries };
         }

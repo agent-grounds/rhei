@@ -25,7 +25,7 @@ fn classify_halted_tasks<'a>(
     missing: &dyn Fn(&str, &str) -> Option<UnwrittenOutputs>,
     interrupted: &dyn Fn(&str) -> bool,
     plan_arg: &str,
-    roots: &ReadySetRoots<'_>,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> Vec<(&'a rhei_core::ast::Task, HaltCause)> {
     let mut all = Vec::new();
     collect_plan_tasks(&rhei.tasks, &mut all);
@@ -50,7 +50,7 @@ fn classify_halted_tasks<'a>(
                 missing(&id, &state),
                 interrupted(&id),
                 plan_arg,
-                roots,
+                spawns,
             );
             (task, cause)
         })
@@ -76,7 +76,7 @@ fn halted_task_report(
     machines: &rhei_validator::MachineSet,
     scope: &RheiScope,
     plan_path: &Path,
-    roots: &ReadySetRoots<'_>,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> (Vec<String>, bool) {
     let mut lines = Vec::new();
     // Suggested commands carry the plan, so they run from wherever the operator
@@ -92,7 +92,7 @@ fn halted_task_report(
         &|_, _| None,
         &|_| false,
         &plan_arg,
-        roots,
+        spawns,
     ) {
         let machine = machines.for_task(&task.id);
         let state = normalized_state_name(task.state.as_str(), machine);
@@ -100,6 +100,6 @@ fn halted_task_report(
         let (reason, next) = cause.describe(&id, &state);
         lines.push(format!("Task {id} ({state}): {reason} \u{2014} {next}"));
     }
-    let needs_human = !remaining_work_is_only_gating_or_poll_blocked(rhei, machines, scope);
+    let needs_human = !remaining_work_is_only_gating_or_poll_blocked(rhei, machines, scope, spawns);
     (lines, needs_human)
 }

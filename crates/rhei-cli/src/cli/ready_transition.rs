@@ -133,11 +133,11 @@ fn ready_scan_stops_before_inputs(
     machines: &rhei_validator::MachineSet,
     machine: &rhei_validator::StateMachine,
     state_name: &str,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> bool {
-    if machine.states.get(state_name).and_then(|def| def.poll.as_ref()).is_some()
-        && poll_next_attempt_at(rhei.metadata.as_ref(), &task.id, state_name)
-            .is_some_and(|deadline| deadline > current_unix_secs())
-    {
+    // The scan's own poll skip, so a spent bound reaches the inputs here too.
+    let now = current_unix_secs();
+    if spawns.pending_poll_deadline(rhei, machine, task, state_name, now + 1).is_some() {
         return true;
     }
     if !task_is_supervising(task, machine) {
@@ -251,15 +251,18 @@ fn format_open_descendants(
 /// quiescent rather than once its subtree is terminal, so a caller with no run
 /// behind it passes an empty set.
 ///
+/// `spawns` is where a poll's spawn record is read: a poll whose bound is spent
+/// is not held by its deadline. §FS-rhei-run.5.1
+///
 /// Returns task references in source order.
 // §FS-rhei-supervision.3.2: the ready set's one supervision refinement.
 fn find_ready_tasks<'a>(
     rhei: &'a rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
-    roots: &ReadySetRoots<'_>,
+    spawns: &SpawnSiteRoots<'_>,
     spawned: &HashSet<String>,
 ) -> Vec<&'a rhei_core::ast::Task> {
-    find_ready_tasks_in_view(rhei, machines, roots, spawned, ReadySetView::RunnableNow, None)
+    find_ready_tasks_in_view(rhei, machines, spawns, spawned, ReadySetView::RunnableNow, None)
 }
 
 /// Apply the one readiness implementation through either its ordinary
@@ -268,7 +271,7 @@ fn find_ready_tasks<'a>(
 fn find_ready_tasks_in_view<'a>(
     rhei: &'a rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
-    roots: &ReadySetRoots<'_>,
+    spawns: &SpawnSiteRoots<'_>,
     spawned: &HashSet<String>,
     view: ReadySetView,
     run_options: Option<&RunOptions>,
@@ -317,9 +320,9 @@ fn find_ready_tasks_in_view<'a>(
         }
 
         if view == ReadySetView::RunnableNow
-            && machine.states.get(&normalized_state).and_then(|def| def.poll.as_ref()).is_some()
-            && poll_next_attempt_at(rhei.metadata.as_ref(), &task.id, &normalized_state)
-                .is_some_and(|deadline| deadline > current_unix_secs())
+            && spawns
+                .pending_poll_deadline(rhei, machine, task, &normalized_state, current_unix_secs() + 1)
+                .is_some()
         {
             continue;
         }
@@ -336,10 +339,10 @@ fn find_ready_tasks_in_view<'a>(
         });
 
         // §AR-rhei-panta.5: input artifacts resolve from the owning rhei execution root.
-        let artifact_root = roots.artifact_root(&task.id.to_string());
+        let artifact_root = spawns.tasks.artifact_root(&task.id.to_string());
         if all_priors_done
             && state_inputs_exist_for_ready_set(
-                roots.workspace_root,
+                spawns.tasks.workspace_root,
                 artifact_root,
                 rhei,
                 machine,
@@ -358,13 +361,13 @@ fn find_ready_tasks_in_view<'a>(
 /// Ready tickets `rhei run` will not touch because someone already holds them.
 /// The loop counts only what it can schedule, so a held ticket vanished from
 /// the pass report and read as "not ready". §FS-rhei-run.3
-// §AR-rhei-panta.5: `roots` keeps a member's inputs resolving at its own root.
+// §AR-rhei-panta.5: `spawns` keeps a member's inputs resolving at its own root.
 fn find_held_tasks<'a>(
     rhei: &'a rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
-    roots: &ReadySetRoots<'_>,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> Vec<&'a rhei_core::ast::Task> {
-    find_ready_tasks(rhei, machines, roots, &HashSet::new())
+    find_ready_tasks(rhei, machines, spawns, &HashSet::new())
         .into_iter()
         .filter(|task| task.assignee.is_some())
         .collect()
@@ -435,10 +438,10 @@ enum ClaimSelection {
 fn find_claimable_tasks_for_selection<'a>(
     rhei: &'a rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
-    roots: &ReadySetRoots<'_>,
+    spawns: &SpawnSiteRoots<'_>,
     selection: ClaimSelection,
 ) -> Vec<&'a rhei_core::ast::Task> {
-    find_ready_tasks(rhei, machines, roots, &HashSet::new())
+    find_ready_tasks(rhei, machines, spawns, &HashSet::new())
         .into_iter()
         .filter(|task| task.assignee.is_none())
         .filter(|task| {
@@ -460,9 +463,9 @@ fn find_claimable_tasks_for_selection<'a>(
 fn find_claimable_tasks<'a>(
     rhei: &'a rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
-    roots: &ReadySetRoots<'_>,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> Vec<&'a rhei_core::ast::Task> {
-    find_claimable_tasks_for_selection(rhei, machines, roots, ClaimSelection::Automatic)
+    find_claimable_tasks_for_selection(rhei, machines, spawns, ClaimSelection::Automatic)
 }
 
 fn task_is_in_initial_state(

@@ -29,7 +29,8 @@ fn run_callback_mode(
     // terminal is restored; disarmed on the happy path (see end of run).
     let mut report_guard = RunReportGuard {
         input,
-        machines: live.machines.set.clone(),
+        machines: live.machines.clone(),
+        opts,
         runtime_dir: runtime_dir.clone(),
         run_started,
         run_started_wall,
@@ -144,22 +145,16 @@ fn run_callback_mode(
         let (loaded, admitted) = live.checkpoint(input, &workspace_root, opts, identity)?;
         if !admitted.is_empty() {
             run_info!("Admitted {} new rhei member(s): {}", admitted.len(), admitted.join(", "));
-            report_guard.machines = live.machines.set.clone();
+            report_guard.machines = live.machines.clone();
         }
-        let machines = &live.machines;
-        // §AR-rhei-panta.5: every look at this pass's ready set — the scan, the
-        // held-ticket pass, and the halt report that explains what it refused —
-        // resolves artifacts under the roots the loaded plan gives its tickets.
-        let roots =
-            ReadySetRoots { workspace_root: &workspace_root, task_roots: &loaded.task_roots };
+        let (machines, settings) = (&live.machines, &live.settings);
+        // §AR-rhei-panta.5 §FS-rhei-run.5.1: every look at this pass's ready set — scan,
+        // held tickets, halt report — resolves artifacts under the roots the loaded plan
+        // gives its tickets, and asks a poll what its spawn site would.
+        let spawns =
+            SpawnSiteRoots::new(&workspace_root, &runtime_dir, &loaded, machines, Some(settings), opts);
         let ready = narrow_to_rhei_scope(
-            find_runnable_tasks_with_options(
-                &loaded.rhei,
-                &machines.set,
-                &roots,
-                &HashSet::new(),
-                opts,
-            ),
+            find_runnable_tasks_with_options(&loaded.rhei, &machines.set, &spawns, &HashSet::new()),
             &rhei_scope,
         );
         if ready.is_empty() {
@@ -168,7 +163,7 @@ fn run_callback_mode(
                 // surface as agent mode; keep it alive only when gates are the
                 // remaining blocker. §FS-rhei-run-tui.1.5.5
                 if opts.waits_for_human_gates(frontend.is_tui)
-                    && should_wait_for_human_gate(&loaded.rhei, &machines.set, &rhei_scope)
+                    && should_wait_for_human_gate(&loaded.rhei, &machines.set, &rhei_scope, &spawns)
                 {
                     if !awaiting_gate_announced {
                         run_info!("{}", awaiting_gate_notice(frontend.is_tui));
@@ -181,9 +176,12 @@ fn run_callback_mode(
                 // is: the run returns here instead of sleeping.
                 // §FS-rhei-run.3 §FS-rhei-run.5.1
                 if !opts.until_idle() {
-                    if let Some(deadline) =
-                        earliest_pending_poll_deadline(&loaded.rhei, &machines.set, &rhei_scope)
-                    {
+                    if let Some(deadline) = earliest_pending_poll_deadline(
+                        &loaded.rhei,
+                        &machines.set,
+                        &rhei_scope,
+                        &spawns,
+                    ) {
                         let sleep_secs = deadline.saturating_sub(current_unix_secs()).max(1);
                         run_info!(
                             "No ready tasks; sleeping {}s until the next poll attempt.",
@@ -201,7 +199,7 @@ fn run_callback_mode(
                 // The same roots the ready-set scan just used, so a halt line
                 // names the file it looked for. §AR-rhei-panta.5
                 let (lines, needs_human) =
-                    halted_task_report(&loaded.rhei, &machines.set, &rhei_scope, input, &roots);
+                    halted_task_report(&loaded.rhei, &machines.set, &rhei_scope, input, &spawns);
                 if !lines.is_empty() {
                     run_info!("\nNothing to schedule. Why each remaining ticket is not moving:");
                     for line in &lines {
@@ -232,7 +230,7 @@ fn run_callback_mode(
         // A ticket someone already claimed is ready but unschedulable; saying
         // nothing made it look like it was not ready at all. §FS-rhei-run.3
         let held =
-            narrow_to_rhei_scope(find_held_tasks(&loaded.rhei, &machines.set, &roots), &rhei_scope);
+            narrow_to_rhei_scope(find_held_tasks(&loaded.rhei, &machines.set, &spawns), &rhei_scope);
         if !held.is_empty() {
             run_info!("Held by an assignee, so not scheduled: {}", format_held_tasks(&held));
         }
@@ -393,8 +391,9 @@ fn run_callback_mode(
         .filter(|_| !interrupted_run && (!opts.dry_run() || pass == 0))
         .and_then(|loaded| {
             let (machines, settings) = (&live.machines, &live.settings);
-            let spawns = SpawnSiteRoots::new(&workspace_root, &runtime_dir, loaded, machines);
-            idle_return(&loaded.rhei, &machines.set, settings, opts, &rhei_scope, &spawns)
+            let spawns =
+                SpawnSiteRoots::new(&workspace_root, &runtime_dir, loaded, machines, Some(settings), opts);
+            idle_return(&loaded.rhei, &machines.set, settings, &rhei_scope, &spawns)
         });
     if idle.is_some() {
         request_idle_exit();
@@ -495,7 +494,8 @@ fn run_callback_mode(
     // callback-only. Disarm the guard so its fallback only fires on early error.
     emit_run_report(
         input,
-        &live.machines.set,
+        &live.machines,
+        opts,
         &summary_sink,
         &runtime_dir,
         RunStats {
@@ -531,13 +531,17 @@ fn run_callback_mode(
 
     if !opts.dry_run() {
         let loaded = load_run_plan(input)?;
+        let (machines, settings) = (&live.machines, &live.settings);
+        let spawns =
+            SpawnSiteRoots::new(&workspace_root, &runtime_dir, &loaded, machines, Some(settings), opts);
         // §FS-rhei-panta.6.1: a narrowed run halts on in-scope work only —
         // out-of-scope tickets left non-terminal are not a failure.
-        if scoped_unfinished_task_exists(&loaded.rhei, &live.machines.set, &rhei_scope)
+        if scoped_unfinished_task_exists(&loaded.rhei, &machines.set, &rhei_scope)
             && !remaining_work_is_only_gating_or_poll_blocked(
                 &loaded.rhei,
-                &live.machines.set,
+                &machines.set,
                 &rhei_scope,
+                &spawns,
             )
         {
             return Err(miette!(

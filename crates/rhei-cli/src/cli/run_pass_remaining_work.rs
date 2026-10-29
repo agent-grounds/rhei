@@ -149,6 +149,7 @@ fn earliest_pending_poll_deadline(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     scope: &RheiScope,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> Option<u64> {
     let mut tasks = Vec::new();
     collect_plan_tasks(&rhei.tasks, &mut tasks);
@@ -160,10 +161,8 @@ fn earliest_pending_poll_deadline(
         .filter_map(|task| {
             let machine = machines.for_task(&task.id);
             let state = normalized_state_name(task.state.as_str(), machine);
-            machine.states.get(&state).and_then(|def| def.poll.as_ref())?;
-            poll_next_attempt_at(rhei.metadata.as_ref(), &task.id, &state)
+            spawns.pending_poll_deadline(rhei, machine, task, &state, current_unix_secs() + 1)
         })
-        .filter(|deadline| *deadline > current_unix_secs())
         .min()
 }
 
@@ -216,11 +215,10 @@ fn earliest_pending_agent_deadline(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     settings: &RheiSettings,
-    opts: &RunOptions,
     scope: &RheiScope,
     spawns: &SpawnSiteRoots<'_>,
 ) -> Option<u64> {
-    agent_deadline_since(rhei, machines, settings, opts, scope, spawns, current_unix_secs() + 1)
+    agent_deadline_since(rhei, machines, settings, scope, spawns, current_unix_secs() + 1)
 }
 
 /// The earliest agent deadline at or after `since`, even one already passed.
@@ -230,12 +228,11 @@ fn earliest_pending_agent_deadline(
 ///
 /// A poll whose next spawn its site would refuse for a spent bound is stalled,
 /// not pending, so it contributes nothing, and `spawns` is where that spawn's
-/// record is read. §FS-rhei-run.3.7.4
+/// record is read and its agents resolved. §FS-rhei-run.3.7.4
 fn agent_deadline_since(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     settings: &RheiSettings,
-    opts: &RunOptions,
     scope: &RheiScope,
     spawns: &SpawnSiteRoots<'_>,
     since: u64,
@@ -261,37 +258,27 @@ fn agent_deadline_since(
             if state_def.terminal || state_def.gating {
                 return None;
             }
-            let poll = state_def
-                .poll
-                .as_ref()
-                .and_then(|_| poll_next_attempt_at(rhei.metadata.as_ref(), &task.id, &state))
-                .filter(|deadline| *deadline >= since);
-            let agents = if state_def.program.is_some() {
+            let poll = spawns.pending_poll_deadline(rhei, machine, task, &state, since);
+            let provider = if state_def.program.is_some() {
                 None
             } else {
-                Some(
-                    resolve_agent_invocations_for_task(machine, &state, settings, opts, Some(task))
-                        .ok()?,
-                )
+                resolve_agent_invocations_for_task(machine, &state, settings, spawns.opts, Some(task))
+                    .ok()?
+                    .iter()
+                    .filter_map(|resolved| {
+                        resolved_provider_eligibility_deadline(rhei, machines, resolved, now)
+                    })
+                    .max()
             };
-            let provider = agents
-                .iter()
-                .flatten()
-                .filter_map(|resolved| {
-                    resolved_provider_eligibility_deadline(rhei, machines, resolved, now)
-                })
-                .max();
-            let deadline = match (poll, provider) {
-                (Some(poll), Some(provider)) => poll.max(provider),
-                (Some(deadline), None) | (None, Some(deadline)) => deadline,
-                (None, None) => return None,
-            };
-            // No run waits for a spawn a spent poll bound refuses, whatever
-            // `pollNextAttemptAt` is left. §FS-rhei-run.5.1 §FS-rhei-run.3.7.4
-            let budget = resolve_attempt_budget(Some(state_def), settings);
-            let stalled = state_def.poll.is_some()
-                && spawns.next_spawns_spent(rhei, machine, task, &state, agents.as_deref(), budget);
-            (!stalled).then_some(deadline)
+            // No run waits for a spawn a spent poll bound refuses, so its provider
+            // window adds nothing either. §FS-rhei-run.5.1 §FS-rhei-run.3.7.4
+            let provider = provider
+                .filter(|_| poll.is_some() || !spawns.poll_bound_spent(rhei, machine, task, &state));
+            match (poll, provider) {
+                (Some(poll), Some(provider)) => Some(poll.max(provider)),
+                (Some(deadline), None) | (None, Some(deadline)) => Some(deadline),
+                (None, None) => None,
+            }
         })
         .min()
 }
@@ -320,11 +307,12 @@ fn should_wait_for_human_gate(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     scope: &RheiScope,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> bool {
     // The gate itself may sit in any rhei — the TUI shows the whole project —
     // but only in-scope work decides whether waiting can still bear fruit.
     has_pending_human_gate(rhei, machines)
-        && remaining_work_is_only_gating_or_poll_blocked(rhei, machines, scope)
+        && remaining_work_is_only_gating_or_poll_blocked(rhei, machines, scope, spawns)
 }
 
 /// One "is this ticket deliberately waiting?" judgment over a whole plan.
@@ -368,6 +356,8 @@ struct DeliberateWaitJudgment<'a> {
     tasks: Vec<&'a rhei_core::ast::Task>,
     state_map: HashMap<&'a TaskId, String>,
     machines: &'a rhei_validator::MachineSet,
+    /// Where a poll's spawn record is read, to tell its wait from a spent bound.
+    spawns: &'a SpawnSiteRoots<'a>,
     /// Verdicts already reached, so a ticket answers the same whichever walk
     /// arrives at it.
     memo: HashMap<TaskId, bool>,
@@ -379,6 +369,7 @@ impl<'a> DeliberateWaitJudgment<'a> {
     fn new(
         rhei: &'a rhei_core::ast::Rhei,
         machines: &'a rhei_validator::MachineSet,
+        spawns: &'a SpawnSiteRoots<'a>,
     ) -> Self {
         let mut tasks = Vec::new();
         collect_plan_tasks(&rhei.tasks, &mut tasks);
@@ -388,7 +379,8 @@ impl<'a> DeliberateWaitJudgment<'a> {
                 (&task.id, normalized_state_name(task.state.as_str(), machines.for_task(&task.id)))
             })
             .collect();
-        Self { rhei, tasks, state_map, machines, memo: HashMap::new(), stack: HashSet::new() }
+        let (memo, stack) = (HashMap::new(), HashSet::new());
+        Self { rhei, tasks, state_map, machines, spawns, memo, stack }
     }
 
     /// The verdict for `task`, or `None` when `task` is already on the current
@@ -450,9 +442,9 @@ impl<'a> DeliberateWaitJudgment<'a> {
         if task.assignee.is_some() {
             return false;
         }
-        if poll_next_attempt_at(self.rhei.metadata.as_ref(), &task.id, &state)
-            .is_some_and(|deadline| deadline > current_unix_secs())
-        {
+        // §FS-rhei-run.5.1: a poll whose bound is spent waits for nothing.
+        let now = current_unix_secs();
+        if self.spawns.pending_poll_deadline(self.rhei, machine, task, &state, now + 1).is_some() {
             return true;
         }
         // The fourth deliberate wait, belonging with the other three: the
@@ -488,8 +480,9 @@ fn remaining_work_is_only_gating_or_poll_blocked(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     scope: &RheiScope,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> bool {
-    let mut judgment = DeliberateWaitJudgment::new(rhei, machines);
+    let mut judgment = DeliberateWaitJudgment::new(rhei, machines, spawns);
     let tasks = judgment.tasks.clone();
     tasks
         .into_iter()

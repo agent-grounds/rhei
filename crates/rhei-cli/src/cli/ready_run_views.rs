@@ -17,28 +17,28 @@ enum ReadySetView {
 fn find_runnable_tasks<'a>(
     rhei: &'a rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
-    roots: &ReadySetRoots<'_>,
+    spawns: &SpawnSiteRoots<'_>,
     spawned: &HashSet<String>,
 ) -> Vec<&'a rhei_core::ast::Task> {
-    find_runnable_tasks_with_options(rhei, machines, roots, spawned, &default_run_options())
+    find_runnable_tasks_with_options(rhei, machines, spawns, spawned)
 }
 
 /// The run scheduler's ready view, including the run-level identity used to
-/// render required input artifacts. §FS-rhei-agents.1.4
+/// render required input artifacts: the options `spawns` carries.
+/// §FS-rhei-agents.1.4
 fn find_runnable_tasks_with_options<'a>(
     rhei: &'a rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
-    roots: &ReadySetRoots<'_>,
+    spawns: &SpawnSiteRoots<'_>,
     spawned: &HashSet<String>,
-    opts: &RunOptions,
 ) -> Vec<&'a rhei_core::ast::Task> {
     find_ready_tasks_in_view(
         rhei,
         machines,
-        roots,
+        spawns,
         spawned,
         ReadySetView::RunnableNow,
-        Some(opts),
+        Some(spawns.opts),
     )
         .into_iter()
         .filter(|task| task.assignee.is_none())
@@ -52,16 +52,15 @@ fn find_runnable_tasks_with_options<'a>(
 fn find_runnable_program_polls_for_mode_selection<'a>(
     rhei: &'a rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
-    roots: &ReadySetRoots<'_>,
-    opts: &RunOptions,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> Vec<&'a rhei_core::ast::Task> {
     find_ready_tasks_in_view(
         rhei,
         machines,
-        roots,
+        spawns,
         &HashSet::new(),
         ReadySetView::ProgramModeProbe,
-        Some(opts),
+        Some(spawns.opts),
     )
     .into_iter()
     .filter(|task| task.assignee.is_none())

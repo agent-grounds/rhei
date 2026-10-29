@@ -295,7 +295,8 @@ impl rhei_tui::EventSink for SummarySink {
 /// Best-effort — a load or write failure must not mask the result. §FS-rhei-run-report.1 §FS-rhei-run-report.3
 fn emit_run_report(
     input: &std::path::Path,
-    machines: &rhei_validator::MachineSet,
+    machines: &ExecutionMachines,
+    opts: &RunOptions,
     summary: &SummarySink,
     runtime_dir: &std::path::Path,
     stats: RunStats,
@@ -310,12 +311,13 @@ fn emit_run_report(
     // The commands the report suggests carry the plan, so they run from
     // wherever the operator is reading it. §FS-rhei-errors.2
     let plan_arg = plan_arg_for_help(input);
-    // The run's own per-ticket execution roots, beside the run's own workspace
-    // root in `stats`: the report explains a halted ticket under exactly the
-    // roots its ready-set scan looked under. §AR-rhei-panta.5
-    let task_roots = &loaded.task_roots;
+    // The run's own roots, with its workspace root from `stats`: the report explains a halted
+    // ticket under exactly the roots its ready-set scan looked under, and asks a poll what its
+    // spawn site would. §AR-rhei-panta.5 §FS-rhei-run.5.1
+    let workspace_root = stats.workspace_root.clone();
+    let spawns = SpawnSiteRoots::new(&workspace_root, runtime_dir, &loaded, machines, None, opts);
     let mut report =
-        RunSummaryReport::build(&loaded.rhei, machines, summary, stats, &plan_arg, task_roots);
+        RunSummaryReport::build(&loaded.rhei, &machines.set, summary, stats, &plan_arg, &spawns);
     // Write the durable report even when stdout is piped, so CI runs leave the
     // artifact; a dry run writes nothing, leaving `report_path` unset so no pointer
     // prints below. §FS-rhei-run-report.1 §FS-rhei-run-report.3.5
@@ -409,7 +411,8 @@ struct RunReportGuard<'a> {
     input: &'a std::path::Path,
     // Owned so live Panta admission can replace the active machine set while
     // this fallback remains armed. §FS-rhei-run.3 §AR-rhei-panta.4
-    machines: rhei_validator::MachineSet,
+    machines: ExecutionMachines,
+    opts: &'a RunOptions,
     runtime_dir: std::path::PathBuf,
     run_started: std::time::Instant,
     run_started_wall: std::time::SystemTime,
@@ -452,6 +455,7 @@ impl Drop for RunReportGuard<'_> {
         emit_run_report(
             self.input,
             &self.machines,
+            self.opts,
             &summary,
             &self.runtime_dir,
             RunStats {
@@ -774,18 +778,17 @@ const MAX_ATTENTION_ROWS: usize = 5;
 
 impl RunSummaryReport {
     /// Build the report from the on-disk plan, the run's spawn counts, and the
-    /// per-task activity captured by [`SummarySink`]. `task_roots` with
-    /// `stats.workspace_root` are the roots the run's own ready-set scan
-    /// resolved artifacts under, so the report explains a halted ticket exactly
-    /// as the halt message did.
+    /// per-task activity captured by [`SummarySink`]. `spawns` carries the roots
+    /// the run's own ready-set scan resolved artifacts under, so the report
+    /// explains a halted ticket exactly as the halt message did.
     // §FS-rhei-run-report.8 §AR-rhei-panta.5
-    pub fn build(
+    fn build(
         rhei: &rhei_core::ast::Rhei,
         machines: &rhei_validator::MachineSet,
         summary: &SummarySink,
         stats: RunStats,
         plan_arg: &str,
-        task_roots: &std::collections::HashMap<String, std::path::PathBuf>,
+        spawns: &SpawnSiteRoots<'_>,
     ) -> Self {
         let activity = summary.snapshot();
         // Read once: the ledger answers both "why is this ticket halted" below
@@ -833,7 +836,7 @@ impl RunSummaryReport {
             },
             plan_arg,
             // The run's own roots, so every surface of one run agrees. §AR-rhei-panta.5
-            &ReadySetRoots { workspace_root: &stats.workspace_root, task_roots },
+            spawns,
         )
         .into_iter()
         .map(|(task, cause)| (task.id.to_string(), cause))

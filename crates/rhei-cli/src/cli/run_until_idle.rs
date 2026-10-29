@@ -64,6 +64,8 @@ struct IdleBlockerScan<'a> {
     tasks: Vec<&'a rhei_core::ast::Task>,
     state_map: HashMap<&'a TaskId, String>,
     machines: &'a rhei_validator::MachineSet,
+    /// Where a poll's spawn record is read, to tell its wait from a spent bound.
+    spawns: &'a SpawnSiteRoots<'a>,
     /// Tickets on the current walk, so a prior cycle contributes nothing
     /// rather than recursing forever.
     stack: HashSet<TaskId>,
@@ -73,6 +75,7 @@ impl<'a> IdleBlockerScan<'a> {
     fn new(
         rhei: &'a rhei_core::ast::Rhei,
         machines: &'a rhei_validator::MachineSet,
+        spawns: &'a SpawnSiteRoots<'a>,
     ) -> Self {
         let mut tasks = Vec::new();
         collect_plan_tasks(&rhei.tasks, &mut tasks);
@@ -82,7 +85,7 @@ impl<'a> IdleBlockerScan<'a> {
                 (&task.id, normalized_state_name(task.state.as_str(), machines.for_task(&task.id)))
             })
             .collect();
-        Self { rhei, tasks, state_map, machines, stack: HashSet::new() }
+        Self { rhei, tasks, state_map, machines, spawns, stack: HashSet::new() }
     }
 
     fn classify(&mut self, task: &'a rhei_core::ast::Task) -> Option<rhei_tui::IdleBlocker> {
@@ -163,9 +166,8 @@ impl<'a> IdleBlockerScan<'a> {
         {
             return Some(rhei_tui::IdleBlocker::ProviderLimit);
         }
-        if poll_next_attempt_at(self.rhei.metadata.as_ref(), &task.id, &state)
-            .is_some_and(|deadline| deadline > now)
-        {
+        // §FS-rhei-run.5.1: a poll whose bound is spent waits for nothing.
+        if self.spawns.pending_poll_deadline(self.rhei, machine, task, &state, now + 1).is_some() {
             return Some(rhei_tui::IdleBlocker::Poll);
         }
         None
@@ -186,20 +188,19 @@ fn idle_return(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     settings: &RheiSettings,
-    opts: &RunOptions,
     scope: &RheiScope,
     spawns: &SpawnSiteRoots<'_>,
 ) -> Option<IdleReturn> {
-    if !opts.until_idle() {
+    if !spawns.opts.until_idle() {
         return None;
     }
     if !scoped_unfinished_task_exists(rhei, machines, scope) {
         return None;
     }
-    if !remaining_work_is_only_gating_or_poll_blocked(rhei, machines, scope) {
+    if !remaining_work_is_only_gating_or_poll_blocked(rhei, machines, scope, spawns) {
         return None;
     }
-    let mut scan = IdleBlockerScan::new(rhei, machines);
+    let mut scan = IdleBlockerScan::new(rhei, machines, spawns);
     let tasks = scan.tasks.clone();
     let waiting: Vec<&rhei_core::ast::Task> = tasks
         .into_iter()
@@ -215,7 +216,7 @@ fn idle_return(
         // says "more than one plain answer" rather than inventing a fifth.
         .unwrap_or(rhei_tui::IdleBlocker::Mixed);
     let next_attempt_at =
-        earliest_pending_agent_deadline(rhei, machines, settings, opts, scope, spawns).map(
+        earliest_pending_agent_deadline(rhei, machines, settings, scope, spawns).map(
             |deadline| {
                 rhei_tui::format_rfc3339(std::time::UNIX_EPOCH + Duration::from_secs(deadline))
             },

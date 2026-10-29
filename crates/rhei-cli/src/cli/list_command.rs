@@ -225,11 +225,14 @@ fn list_command(
     // `list` does — the scan stats each required input artifact.
     let ready_ids: HashSet<&TaskId> = if filters.ready || filters.blocked {
         let workspace_root = execution_workspace_root(input);
+        let runtime_dir = workspace_root.join("runtime");
+        let execution = ExecutionMachines::build(&resolved, input, &loaded)?;
         find_ready_tasks(
             &loaded.rhei,
             &machines,
-            // §AR-rhei-panta.5: a member's inputs resolve at its own root.
-            &ReadySetRoots { workspace_root: &workspace_root, task_roots: &loaded.task_roots },
+            // §AR-rhei-panta.5: a member's inputs resolve at its own root, and a
+            // poll is asked what its spawn site would. §FS-rhei-run.5.1
+            &SpawnSiteRoots::reading(&workspace_root, &runtime_dir, &loaded, &execution),
             // Nothing is in flight beyond what the plan itself records: a
             // listing has no run behind it. §FS-rhei-supervision.3.2
             &HashSet::new(),

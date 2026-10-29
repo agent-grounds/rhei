@@ -41,6 +41,8 @@ fn next_command(
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
     let machines = ExecutionMachines::build(&resolved, input, &loaded)?;
     let workspace_root = execution_workspace_root(&machines.default_callbacks.plan_path);
+    let runtime_dir = workspace_root.join("runtime");
+    let spawns = SpawnSiteRoots::reading(&workspace_root, &runtime_dir, &loaded, &machines);
 
     // Validate the plan first.
     let report = rhei_validator::validate_with_machine_set(&loaded.rhei, &machines.set);
@@ -94,10 +96,7 @@ fn next_command(
                 find_claimable_tasks(
                     &loaded.rhei,
                     &machines.set,
-                    &ReadySetRoots {
-                        workspace_root: &workspace_root,
-                        task_roots: &loaded.task_roots,
-                    },
+                    &spawns,
                 ),
                 &scope,
             );
@@ -233,14 +232,10 @@ fn next_command(
             &settings,
             &format!("Task {} cannot be claimed in state {}.", tid, state_name),
         )?;
-        let roots = ReadySetRoots {
-            workspace_root: &workspace_root,
-            task_roots: &loaded.task_roots,
-        };
         let explicitly_claimable = find_claimable_tasks_for_selection(
             &loaded.rhei,
             &machines.set,
-            &roots,
+            &spawns,
             ClaimSelection::Explicit,
         )
         .into_iter()
@@ -264,11 +259,7 @@ fn next_command(
     } else {
         // §FS-rhei-panta.6.1: `--rhei` narrows candidates, not prior resolution.
         let ready = narrow_to_rhei_scope(
-            find_claimable_tasks(
-                &loaded.rhei,
-                &machines.set,
-                &ReadySetRoots { workspace_root: &workspace_root, task_roots: &loaded.task_roots },
-            ),
+            find_claimable_tasks(&loaded.rhei, &machines.set, &spawns),
             &scope,
         );
         if ready.is_empty() {

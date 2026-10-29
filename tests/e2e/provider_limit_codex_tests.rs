@@ -28,7 +28,7 @@ fn fixture(name: &str, transport: &str, parallel: bool) -> ProviderFixture {
     let helper = write_python_agent(
         &fixture.dir,
         "helper.py",
-        "root = pathlib.Path(env('RHEI_ROOT'))\nwrite(root / 'runtime' / 'exports' / env('RHEI_TASK_ID') / 'finding.md', 'helper finding')\nresult('Independent helper completed.\\n')\n",
+        "if sys.argv[-1:] == ['--version']:\n    raise SystemExit(0)\nroot = pathlib.Path(env('RHEI_ROOT'))\nwrite(root / 'runtime' / 'exports' / env('RHEI_TASK_ID') / 'finding.md', 'helper finding')\nresult('Independent helper completed.\\n')\n",
     );
     fs::write(
         fixture.root.join(".agent-grounds/rhei/settings.json"),

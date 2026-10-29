@@ -175,6 +175,11 @@ pub fn wrapped_argv(workspace: &WrappedWorkspace) -> Vec<String> {
 /// §FS-rhei-cost-accounting.4
 pub const CODEX_DIALECT_AGENT: &str = r#"import json
 
+# A family profile's version probe asks `<command> --version`; answer it as
+# the CLI would, before anything is written. §FS-rhei-evidence.7
+if sys.argv[-1:] == ['--version']:
+    print('fake-codex 0.0.0')
+    raise SystemExit(0)
 write(pathlib.Path(env('RHEI_ROOT')) / 'runtime' / 'wrapped-argv.json', json.dumps(sys.argv[1:]))
 print(json.dumps({'type': 'thread.started', 'thread_id': 'thread-family-332'}), flush=True)
 print(json.dumps({
@@ -193,6 +198,11 @@ result('## Result\n\nWrapped agent finished.\n')
 /// report read. §FS-rhei-cost-accounting.4 §FS-rhei-session-reports.6.2
 pub const CLAUDE_DIALECT_AGENT: &str = r#"import json
 
+# A family profile's version probe asks `<command> --version`; answer it as
+# the CLI would, before anything is written. §FS-rhei-evidence.7
+if sys.argv[-1:] == ['--version']:
+    print('fake-claude 0.0.0')
+    raise SystemExit(0)
 write(pathlib.Path(env('RHEI_ROOT')) / 'runtime' / 'wrapped-argv.json', json.dumps(sys.argv[1:]))
 print(json.dumps({'type': 'system', 'subtype': 'init', 'session_id': 'session-family-332'}), flush=True)
 print(json.dumps({

@@ -49,7 +49,7 @@ fn parallel_workers_route_their_exits_and_the_next_start_is_refused() {
 fn a_refused_callback_leaves_the_exit_unrouted_until_the_change_is_sealed() {
     let dir = unique_temp_dir("strict-callback-log");
     let log = dir.join("callbacks.log");
-    let code = format!("open(r'{}', 'a').write('ran\\n')", log.display());
+    let code = format!("open(r'{}', 'a', newline='').write('ran\\n')", log.display());
     let callback = python_callback_yaml(&code);
     let shape = MachineShape { on_enter: Some(&callback), ..MachineShape::default() };
     let drift = lay_drift("strict-callback", &[&ticket_chain(2)], &shape);

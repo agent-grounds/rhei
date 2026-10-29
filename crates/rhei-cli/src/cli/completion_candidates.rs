@@ -225,6 +225,17 @@ fn complete_any_path(current: &OsStr) -> Vec<CompletionCandidate> {
     PathCompleter::any().complete(current)
 }
 
+/// A plan or workspace, or an archive file for `rhei verify`. §FS-rhei-completions.7
+fn complete_plan_or_archive_path(current: &OsStr) -> Vec<CompletionCandidate> {
+    let mut candidates = complete_rhei_plan_path(current);
+    for candidate in complete_path_with_extensions(current, &["tar"]) {
+        if !candidates.iter().any(|known| known.get_value() == candidate.get_value()) {
+            candidates.push(candidate);
+        }
+    }
+    candidates
+}
+
 fn complete_yaml_path(current: &OsStr) -> Vec<CompletionCandidate> {
     complete_path_with_extensions(current, &["yaml", "yml"])
 }

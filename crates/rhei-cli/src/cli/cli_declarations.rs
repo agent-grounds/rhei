@@ -538,28 +538,15 @@ enum Commands {
     },
     /// Print or list published JSON Schemas
     Schema {
-        /// Full schema id to print; omitted, lists published ids
-        #[arg(value_name = "SCHEMA_ID", conflicts_with = "list")]
-        name: Option<String>,
-        /// List every published schema id
-        #[arg(long)]
-        list: bool,
+        #[command(flatten)]
+        options: SchemaOptions,
     },
-    /// Check that what a workspace's runs recorded is still what they wrote
-    ///
-    /// Exits 0 when a manifest verified and nothing failed; 1 on a mismatched, missing or
-    /// unlisted file, an unknown --digest, or nothing to verify; 2 on a usage error.
+    /// Check that what a workspace's runs, or an archive of one, recorded is still what they wrote
+    #[command(long_about = VERIFY_LONG_ABOUT)]
     // §FS-rhei-verify.1 §FS-rhei-verify.5
     Verify {
-        /// Path to the markdown plan file (.rhei.md) or workspace directory
-        #[arg(value_name = "RHEI_PLAN_OR_WORKSPACE", add = ArgValueCompleter::new(complete_rhei_plan_path))]
-        input: Option<PathBuf>,
-        /// Verify only the manifest whose file has this full 64-hex sha256
-        #[arg(long, value_name = "SHA256", value_parser = parse_verify_digest)]
-        digest: Option<String>,
-        /// Print one JSON object instead of text
-        #[arg(long)]
-        json: bool,
+        #[command(flatten)]
+        options: VerifyOptions,
     },
     /// Print a compact Markdown run summary for a pull request body
     // §FS-rhei-summary.1: the positional resolves exactly as `rhei cost`'s does.
@@ -790,15 +777,8 @@ enum Commands {
     /// Seal each rhei's run inputs — machine, scripts, settings, price book —
     /// as a new generation that `rhei run --strict-inputs` checks against
     Seal {
-        /// Path to a states YAML file; it is sealed in place of the machine it replaces
-        #[arg(long, value_name = "PATH", add = ArgValueCompleter::new(complete_yaml_path))]
-        state_machine: Option<PathBuf>,
-        /// Plan or project to seal; omitted, the nearest enclosing one is used
-        #[arg(value_name = "RHEI_PLAN", add = ArgValueCompleter::new(complete_rhei_plan_path))]
-        input: Option<PathBuf>,
-        /// Seal only the named rhei (repeatable; one id per flag)
-        #[arg(long = "rhei", value_name = "RHEI_ID", add = ArgValueCompleter::new(complete_rhei_id))]
-        rhei: Vec<String>,
+        #[command(flatten)]
+        options: SealOptions,
     },
     /// Release a claim: drop `**Assignee:**` from a ticket so it can be picked
     /// up again, leaving its state and artifacts untouched

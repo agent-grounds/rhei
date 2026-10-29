@@ -67,6 +67,8 @@ pub enum Edit {
     /// A retired `**States:** x` header line into the index, on line 2, outside
     /// every task's region, on the first attempt only.
     IndexHeader,
+    /// Nothing, and exit 1: an ordinary failed run of the same plan.
+    Fail,
 }
 
 impl Edit {
@@ -77,6 +79,7 @@ impl Edit {
             Edit::ChildAndNote => "child",
             Edit::OtherTask => "other-task",
             Edit::IndexHeader => "index-header",
+            Edit::Fail => "fail",
         }
     }
 }
@@ -90,6 +93,9 @@ own = ws / 'tasks' / '01-cover.md'
 note = '\n#### Visit 1 (cover)\n\nLatest measurement was report-1.json (64.38%, 47/73 lines).\n'
 child = '\n#### Task 1.1: Child the worker added\n**State:** other\n\nA legitimate child.\n'
 marker = here / 'noted'
+if edit == 'fail':
+    append(here / 'cover-runs.txt', 'ran\n')
+    sys.exit(1)
 if edit == 'always' or not marker.exists():
     marker.write_text('x')
     if edit == 'other-task':

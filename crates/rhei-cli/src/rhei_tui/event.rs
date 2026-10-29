@@ -504,4 +504,16 @@ pub enum RunEvent {
         /// work — never an inner value the machine ceiling would clamp.
         remedy: String,
     },
+    /// A strict run refused a ticket because a sealed input of its rhei changed.
+    /// The prose arrives as an `error` [`RunEvent::Message`]; this carries the
+    /// facts. §FS-rhei-seal.8.4 §FS-rhei-run-json.2.1
+    SealHalt {
+        task: String,
+        rhei: String,
+        state: String,
+        generation: u32,
+        /// Each changed path with its kind, sorted by path.
+        changes: Vec<(String, String)>,
+        remedy: String,
+    },
 }

@@ -38,7 +38,6 @@ fn lay_follow_template(project: &Path) -> std::path::PathBuf {
 }
 
 #[test]
-#[ignore = "red until #521: admission re-adopts a drifted member's machine; implement removes this"]
 fn admission_seals_a_new_member_and_refuses_a_member_whose_machine_changed() {
     let dir = unique_temp_dir("strict-admission");
     let project = dir.join("project");

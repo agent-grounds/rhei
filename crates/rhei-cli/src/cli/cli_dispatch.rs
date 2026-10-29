@@ -412,6 +412,15 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
                 dry_run,
             )
         }
+        // §FS-rhei-seal.5
+        Commands::Seal { input, rhei, state_machine } => {
+            let target = resolve_plan_target(input)?;
+            seal_command(
+                target.path(),
+                state_machine.or(before_subcommand).as_deref(),
+                &target.scope_with(&rhei),
+            )
+        }
         Commands::Remove { input, task, rhei, dry_run, state_machine } => remove_command(
             input,
             task,

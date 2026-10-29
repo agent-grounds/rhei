@@ -374,6 +374,9 @@ fn run_command(
     let runtime_dir = workspace_root.join("runtime");
     let spawns =
         SpawnSiteRoots::new(&workspace_root, &runtime_dir, &loaded, &machines, Some(&settings), &opts);
+    // §FS-rhei-seal.8.1: sealed before the first spawn, held until the run ends.
+    let _strict =
+        arm_strict_inputs(input, &loaded, &resolved, &rhei_scope, &settings, &opts, &identity.id)?;
     let use_standalone_mode = should_use_agent_mode(
         &loaded.rhei,
         &machines.set,
@@ -414,7 +417,8 @@ fn run_command(
             &identity,
         )
     };
-    result?;
+    // §FS-rhei-seal.8.4: a refused start exits 1, under --until-idle too.
+    strict_refusal_outcome(result)?;
     // An interrupted run made no claim of durable success, so the commit
     // postcondition has nothing to check; a run torn down by its own failure
     // still owes it. §FS-rhei-run.3.1 §FS-rhei-run.3.2

@@ -126,7 +126,10 @@ impl LiveRunContext {
             self.run_locks.append(&mut new_locks);
         }
 
-        self.machines = machines;
+        // §FS-rhei-seal.8.6: a drifted member keeps what it held; an admitted one is sealed.
+        let drifted = strict_admission(&admitted, &loaded, &resolved)?;
+        let held = std::mem::replace(&mut self.machines, machines);
+        keep_held_machines(&held, &mut self.machines, &drifted);
         self.machines.member_local_runtimes.extend(admitted.iter().cloned());
         self.settings = settings;
         self.initialized_rheis = current;

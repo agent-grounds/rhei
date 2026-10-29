@@ -31,6 +31,10 @@ struct StandaloneExecutionFlags {
     /// Continue to the next task when an agent exits non-zero
     #[arg(long)]
     continue_on_error: bool,
+    /// Seal each rhei's machine, scripts, settings and price book, and refuse
+    /// to start work when one changed since it was sealed (see `rhei seal`)
+    #[arg(long)]
+    strict_inputs: bool,
     /// Maximum number of agents to run concurrently (0 = unlimited)
     #[arg(long, default_value_t = 1, add = ArgValueCompleter::new(complete_parallel))]
     parallel: usize,
@@ -148,6 +152,11 @@ impl RunOptions {
 
     fn parallel(&self) -> usize {
         self.standalone.parallel
+    }
+
+    /// §FS-rhei-run.3.8
+    fn strict_inputs(&self) -> bool {
+        self.standalone.strict_inputs
     }
 
     fn prices_path(&self) -> Option<&Path> {

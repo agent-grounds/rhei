@@ -186,6 +186,13 @@ impl rhei_tui::EventSink for SummarySink {
             rhei_tui::RunEvent::BudgetHalt { task, bound, renews_at, remedy, .. } => {
                 state.bound_halts.push((task, bound, renews_at, remedy));
             }
+            // §FS-rhei-seal.8.4: the Attention row of a refused start, as an account refusal's.
+            rhei_tui::RunEvent::SealHalt { task, state: from, changes, remedy, .. } => {
+                let file = changes.first().map(|(path, _)| path.as_str()).unwrap_or_default();
+                let diagnosis = format!("sealed input changed: {file}");
+                let refusal = ProgramAccountRefusal { task, state: from, diagnosis, remedy };
+                state.program_refusals.insert(refusal.task.clone(), refusal);
+            }
             // `agent` is `Some` for agent-backed work, `None` for programs.
             rhei_tui::RunEvent::SlotAssigned { slot, task, agent, .. } => {
                 let driver = if agent.is_some() { "agent" } else { "program" };

@@ -271,6 +271,8 @@ impl DashboardState {
             RunEvent::BudgetHalt { task, bound, .. } => {
                 self.push_recent("error", format!("{task} halted on {}", bound.dimension));
             }
+            // The refusal's prose arrives as its own error `Message`. §FS-rhei-seal.8.4
+            RunEvent::SealHalt { .. } => {}
         }
     }
 

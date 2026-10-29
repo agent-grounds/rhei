@@ -16,7 +16,6 @@ use super::*;
 /// starts ticket 2 as its first attempt, on the accepted bytes.
 // §FS-rhei-seal.8.2 §FS-rhei-seal.8.4 §FS-rhei-seal.8.5
 #[test]
-#[ignore = "red until #521: a script edited mid-run is executed by the next ticket; implement removes this"]
 fn a_script_edited_mid_run_refuses_the_next_ticket_until_it_is_resealed() {
     let drift = lay_drift("strict-script", &[&ticket_chain(2)], &MachineShape::default());
     on_ticket(&drift.ws, 1, EDIT_SCRIPT);
@@ -51,7 +50,6 @@ fn a_script_edited_mid_run_refuses_the_next_ticket_until_it_is_resealed() {
 /// run without the flag executes the edit, because nothing changes without it.
 // §FS-rhei-seal.8.1 §FS-rhei-seal.8.4
 #[test]
-#[ignore = "red until #521: a machine edited between runs is executed by the next run; implement removes this"]
 fn a_machine_edited_between_runs_is_refused_and_only_a_non_strict_run_executes_it() {
     let drift = lay_drift("strict-machine", &[&ticket_chain(2)], &MachineShape::default());
 
@@ -86,7 +84,6 @@ fn a_machine_edited_between_runs_is_refused_and_only_a_non_strict_run_executes_i
 /// generation compared, and each changed path with its kind.
 // §FS-rhei-seal.8.4 §FS-rhei-run-json.2.1
 #[test]
-#[ignore = "red until #521: a refusal has no machine-readable record; implement removes this"]
 fn a_json_refusal_carries_a_stable_reason_code_and_the_changed_paths() {
     let drift = lay_drift("strict-json", &[&ticket_chain(2)], &MachineShape::default());
     on_ticket(&drift.ws, 1, EDIT_SCRIPT);

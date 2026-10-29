@@ -231,6 +231,7 @@ thread_local! {
 #[path = "../../../tests/e2e/run_id_allocation_tests.rs"]
 mod run_id_allocation_tests;
 include!("cli/run_live_admission.rs");
+include!("cli/run_strict_inputs.rs");
 include!("cli/run_slot_release.rs");
 include!("cli/run_worker_regions.rs");
 include!("cli/run_worker_edits.rs");
@@ -288,6 +289,8 @@ include!("cli/report_command.rs");
 include!("cli/locked_runtime_journal.rs");
 include!("cli/transition_ledger.rs");
 include!("cli/release_command.rs");
+include!("cli/seal_record.rs");
+include!("cli/seal_command.rs");
 include!("cli/remove_command.rs");
 include!("cli/remove_evidence.rs");
 include!("cli/remove_residue.rs");
@@ -388,6 +391,7 @@ mod tests {
     include!("cli/tests_subtree_supervision_owner.rs");
     include!("cli/tests_subtree_supervision_barrier.rs");
     include!("cli/tests_run_descriptor.rs");
+    include!("cli/tests_run_input_seal.rs");
     include!("cli/tests_stop_pidfd.rs");
     include!("cli/tests_run_registry.rs");
     include!("cli/tests_headless_launch_registry.rs");

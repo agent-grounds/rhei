@@ -34,7 +34,6 @@ fn entry<'a>(record: &'a serde_json::Value, suffix: &str) -> &'a serde_json::Val
 
 // §FS-rhei-seal.3.1 §FS-rhei-seal.5
 #[test]
-#[ignore = "red until #521: there is no `rhei seal`; implement removes this"]
 fn rhei_seal_appends_a_generation_and_keeps_the_earlier_one_byte_identical() {
     let drift = one_ticket("seal-append");
     let first = drift.seal();
@@ -63,7 +62,6 @@ fn rhei_seal_appends_a_generation_and_keeps_the_earlier_one_byte_identical() {
 /// fence's facts. §DA-run-input-seal.3
 // §FS-rhei-seal.3.2 §FS-rhei-seal.3.3
 #[test]
-#[ignore = "red until #521: there is no seal record; implement removes this"]
 fn a_generation_carries_its_header_and_validates_against_its_schema() {
     let drift = one_ticket("seal-header");
     assert_success(&drift.seal());
@@ -97,7 +95,6 @@ fn a_generation_carries_its_header_and_validates_against_its_schema() {
 
 // §FS-rhei-seal.5
 #[test]
-#[ignore = "red until #521: there is no `rhei seal` to refuse a live run; implement removes this"]
 fn rhei_seal_refuses_while_a_run_is_live_and_names_it() {
     let drift = one_ticket("seal-live");
     on_ticket(&drift.ws, 1, "write(ws / 'started', 'x')\nwait_for('release', 60.0)\n");
@@ -133,7 +130,6 @@ fn rhei_seal_refuses_while_a_run_is_live_and_names_it() {
 
 // §FS-rhei-seal.6 §FS-rhei-reset.2
 #[test]
-#[ignore = "red until #521: there is no seal for a reset to remove; implement removes this"]
 fn a_full_reset_removes_the_seal() {
     let drift = one_ticket("seal-full-reset");
     assert_success(&drift.seal());
@@ -146,7 +142,6 @@ fn a_full_reset_removes_the_seal() {
 /// so, and the next generation is 2: numbers never restart. §FS-rhei-reset.2.1
 // §FS-rhei-seal.6
 #[test]
-#[ignore = "red until #521: there is no seal for a narrowed reset to keep; implement removes this"]
 fn a_narrowed_reset_keeps_the_seal_and_says_so() {
     let drift = one_ticket("seal-narrowed-reset");
     assert_success(&drift.seal());
@@ -169,7 +164,6 @@ fn a_narrowed_reset_keeps_the_seal_and_says_so() {
 /// the seal records only the settings files, each candidate present or absent.
 // §FS-rhei-seal.2.3 §FS-rhei-seal.2.2
 #[test]
-#[ignore = "red until #521: there is no seal under the built-in machine; implement removes this"]
 fn a_rhei_under_the_built_in_machine_seals_only_settings() {
     let dir = unique_temp_dir("seal-built-in");
     let home = dir.join("home");

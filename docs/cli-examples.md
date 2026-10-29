@@ -9,6 +9,33 @@ rhei retry plan.1
 rhei run plan.rhei.md
 ```
 
+Strict inputs: seal what a laid plan executes — its machine, the `scripts/`
+and `prompt_templates/` beside it, the settings files and the price book — and
+refuse to start work in a rhei after one of them changed
+([§FS-rhei-run.3.8](functional-spec/rhei-run.spec.md#38-strict-inputs)). Seal right after laying, so an edit made
+before the first run is caught too:
+
+```bash
+rhei seal drift                      # Sealed rhei `drift`: generation 1, 3 files
+rhei run drift --strict-inputs       # refuses a ticket once scripts/step.py changes
+```
+
+```text
+error: drift.2 was not started: a file sealed for rhei `drift` has changed
+  modified  scripts/step.py   (sealed in generation 1)
+  The ticket stays in 'step'. Nothing was charged.
+  help: restore the file, or accept the change with `rhei seal drift`; then run again
+```
+
+Nothing was charged, so accepting the edit and running again starts the ticket
+as its first attempt. Earlier generations are kept byte for byte
+([§FS-rhei-seal.5](functional-spec/rhei-seal.spec.md#5-rhei-seal)):
+
+```bash
+rhei seal drift                      # Sealed rhei `drift`: generation 2 (generation 1 kept)
+rhei run drift --strict-inputs
+```
+
 Validate a plan with the built-in default states definition:
 
 ```bash

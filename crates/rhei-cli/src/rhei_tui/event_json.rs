@@ -25,6 +25,7 @@ use crate::rhei_tui::run_stop::RunStop;
 
 mod bounds;
 mod rfc3339;
+mod seal;
 
 use bounds::{bound_report, bound_value, ceiling_policy_value};
 pub use rfc3339::{format_rfc3339, parse_rfc3339};
@@ -191,6 +192,7 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
             put("renews_at", json!(renews_at));
             put("remedy", json!(remedy));
         }
+        RunEvent::SealHalt { .. } => seal::put_seal_halt(event, &mut put),
     }
     map
 }
@@ -463,7 +465,7 @@ fn decode_event(kind: &str, v: &Value, wall_clock: SystemTime) -> Option<RunEven
             wall_clock,
         },
         "run_finished" => RunEvent::RunFinished { summary: decode_summary(v.get("summary")) },
-        _ => return None,
+        _ => return seal::decode_seal_halt(kind, v),
     })
 }
 

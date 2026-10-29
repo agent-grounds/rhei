@@ -220,6 +220,7 @@ agent's `command`, flags, and modes are declared.
 | `modes` | object | No | Named flag sets, keyed by mode name. Values are ordered string arrays appended to the command at spawn time. See [Modes](#22-modes). |
 | `effort` | object | No | Native reasoning-effort mapping. Contains `values`, `args`, and optional `conflicts` as defined below. Omission means this profile ignores valid state effort. |
 | `session` | object | No | Optional `CustomAgentProfile.session` block describing snapshot resume, fork, interactive continuation, and transcript layout capabilities. The authoritative schema is [Snapshots Specification — CustomAgentProfile.session](rhei-snapshots.spec.md#91-customagentprofilesession). |
+| `version_args` | string array or `null` | No | Arguments appended to the profile's whole `command` to ask the agent CLI its version, recorded in the invocation's evidence ([§FS-rhei-evidence.7](rhei-evidence.spec.md#7-the-agent-cli-version)). Every built-in declares `["--version"]`, and a `family` profile inherits it. `null` turns the probe off. |
 
 Strict MCP configuration is a launch behavior of the resolved `claude-code`
 family for every agent `rhei run` spawns for a state, with no new profile field:
@@ -641,6 +642,18 @@ directory is not a member if the project does not discover it, for example a
 plan in a grouping folder, under `runtime/`, or in a scratch directory. Such a
 plan is a bare rhei, the single rhei of its own implicit project, and it reads
 the settings at its own `<plan-root>`.
+
+#### 1.1.9. `evidence`
+
+`evidence` is an optional top-level settings block for per-invocation evidence
+([§FS-rhei-evidence](rhei-evidence.spec.md#fs-rhei-evidence-per-invocation-evidence)). Its one field, `retention`, is `retain` (the default) or
+`hash-only`, and it governs every retained value together — the prompt,
+intervention messages and the configuration object ([§FS-rhei-evidence.5.2](rhei-evidence.spec.md#52-retention)). It
+composes by key like every other block. An unknown value is a settings error.
+
+```json
+{ "evidence": { "retention": "hash-only" } }
+```
 
 ### 1.2. Per-State Settings
 
@@ -2471,6 +2484,10 @@ that lock and preserve each other's updates. A concurrent run sees either no
 grant or the entire grant, never a partial record or a lost grant
 ([§FS-rhei-retry.2](rhei-retry.spec.md#2-grant-and-refusals)). `rhei reset` removes the grants with `runtime/spawns/`
 and refunds no capacity.
+
+The spawn record answers for the visit. Each attempt's inputs and outputs are
+its evidence ([§FS-rhei-evidence.3](rhei-evidence.spec.md#3-the-start-record), [§FS-rhei-evidence.4](rhei-evidence.spec.md#4-the-end-record)), written once per
+attempt, and no rewrite of the spawn record touches them.
 
 If the prior record contains malformed JSON, it supplies no previous-attempt
 proof or grants. A worker that runs without such proof still publishes its

@@ -181,6 +181,10 @@ request publishes are three different things, and this is only the first.
 Both fields are additions, so a reader of an older descriptor treats them as
 absent.
 
+`evidence_manifest` is `{path, sha256}` once the run ends — the run's evidence
+manifest, its path relative to the run's root and its full digest
+([§FS-rhei-evidence.9.2](rhei-evidence.spec.md#92-where-it-is-announced)) — and `null` until then. It is an addition too.
+
 **Every path is absolute.** A descriptor is read by a process standing in some
 other directory, so a relative `plan` or `events` names nothing where it is
 read. `started_at` is stamped once the run holds its locks, not when the command

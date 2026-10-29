@@ -158,7 +158,8 @@ is evidence of an out-of-band edit and refuses the whole recovery. Installing
 images is idempotent: an already-correct image is not appended or transformed.
 The recovery id in the exceptional audit row is also checked before any append;
 recovery never writes a second result entry, checkpoint, movement row, or
-exception row.
+exception row. It writes no evidence either, and leaves every byte under
+`runtime/evidence/` unchanged: its audit pair is the record ([§FS-rhei-evidence.10](rhei-evidence.spec.md#10-lifecycle)).
 
 Once the required images and ledger state are synced, recovery durably removes
 the marker by unlinking it and syncing `.rhei`. An interruption before that

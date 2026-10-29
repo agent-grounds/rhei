@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rhei.evidence.invocation.v1",
+  "title": "Rhei per-invocation evidence record v1",
+  "description": "One write-once start or end record of one process a run started. FS-rhei-evidence.3 FS-rhei-evidence.4",
+  "type": "object",
+  "required": ["schema", "phase", "kind", "run_id"],
+  "properties": {
+    "schema": { "const": "rhei.evidence.invocation.v1" },
+    "phase": { "enum": ["start", "end"] },
+    "kind": { "enum": ["agent", "program", "callback"] },
+    "run_id": { "type": "string", "minLength": 1 },
+    "invocation_id": { "type": "string", "minLength": 1 },
+    "callback_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "state": { "type": "string", "minLength": 1 },
+    "started_at": { "$ref": "#/$defs/timestamp" },
+    "ended_at": { "$ref": "#/$defs/timestamp" },
+    "argv": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "cwd": { "type": "string", "minLength": 1 },
+    "prompt": {
+      "allOf": [
+        { "$ref": "#/$defs/retained" },
+        {
+          "type": "object",
+          "required": ["delivery"],
+          "properties": { "delivery": { "enum": ["argument", "stdin", "stdin-json", "none"] } }
+        }
+      ]
+    },
+    "config": { "$ref": "#/$defs/retained" },
+    "agent_cli_version": { "type": ["string", "null"] },
+    "agent_cli_version_note": { "type": ["string", "null"] },
+    "snapshot": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["ref", "transcript_sha256"],
+          "properties": { "transcript_sha256": { "$ref": "#/$defs/sha256" } }
+        }
+      ]
+    },
+    "grants": { "type": "array", "items": { "type": "object" } },
+    "owner_invocation_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "from": { "type": "string", "minLength": 1 },
+    "to": { "type": "string", "minLength": 1 },
+    "callback_phase": { "type": "string", "minLength": 1 },
+    "moves": { "type": "integer", "minimum": 0 },
+    "exit_code": { "type": ["integer", "null"] },
+    "ending": { "type": "string", "minLength": 1 },
+    "log": { "$ref": "#/$defs/file" },
+    "interventions": {
+      "type": "array",
+      "items": {
+        "allOf": [
+          { "$ref": "#/$defs/retained" },
+          {
+            "type": "object",
+            "required": ["at", "outcome"],
+            "properties": {
+              "at": { "$ref": "#/$defs/timestamp" },
+              "outcome": { "type": "string", "minLength": 1 }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "callback" } } },
+      "then": { "required": ["callback_id"] },
+      "else": { "required": ["invocation_id"] }
+    },
+    {
+      "if": { "properties": { "phase": { "const": "start" } } },
+      "then": { "required": ["task_id", "state", "started_at", "argv", "cwd", "config"] },
+      "else": { "required": ["ended_at", "exit_code", "ending"] }
+    },
+    {
+      "if": {
+        "properties": { "phase": { "const": "start" }, "kind": { "const": "agent" } },
+        "required": ["phase", "kind"]
+      },
+      "then": { "required": ["prompt", "agent_cli_version", "snapshot"] }
+    },
+    {
+      "if": {
+        "properties": { "phase": { "const": "start" }, "kind": { "const": "callback" } },
+        "required": ["phase", "kind"]
+      },
+      "then": { "required": ["owner_invocation_ids", "from", "to", "callback_phase", "moves"] }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "minLength": 1 },
+    "file": {
+      "type": "object",
+      "required": ["path", "sha256", "bytes"],
+      "properties": {
+        "path": { "$ref": "#/$defs/path" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "path": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\][^\\\\]*$" },
+    "retained": {
+      "type": "object",
+      "required": ["sha256", "bytes", "stored"],
+      "properties": {
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "stored": { "enum": ["original", "redacted", "none", "withheld"] },
+        "stored_sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "if": { "properties": { "stored": { "const": "redacted" } } },
+      "then": { "required": ["stored_sha256"] }
+    }
+  }
+}

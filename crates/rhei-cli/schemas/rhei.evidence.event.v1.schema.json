@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rhei.evidence.event.v1",
+  "title": "Rhei evidence event v1",
+  "description": "One narrowed reset: the runs whose manifests it prunes and the paths it removed. FS-rhei-evidence.10.1",
+  "type": "object",
+  "required": ["schema", "event_id", "kind", "at", "rheis", "tickets", "runs", "removed"],
+  "properties": {
+    "schema": { "const": "rhei.evidence.event.v1" },
+    "event_id": { "type": "string", "minLength": 1 },
+    "kind": { "const": "reset" },
+    "at": { "type": "string", "minLength": 1 },
+    "rheis": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "tickets": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "runs": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "removed": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "pattern": "^[^/\\\\][^\\\\]*$" }
+    }
+  }
+}

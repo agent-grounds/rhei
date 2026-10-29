@@ -260,6 +260,11 @@ the summary prints five stacked groups:
    halted on spend is always in that case, because spend is bounded by a window
    ([§FS-rhei-budgets.3.4](rhei-budgets.spec.md#34-the-spend-window)).
 
+   A ticket refused by a strict run because a sealed input changed
+   ([§FS-rhei-seal.8.4](rhei-seal.spec.md#84-the-refusal)) belongs in **Attention** too, and for the same reason:
+   only a person resumes it. Its blocker reads `sealed input changed: <file>`,
+   naming the first changed file, and its next action is `rhei seal <plan>`.
+
    The durable report additionally records, in a `## Bounds` section after
    `## Attention`, each dimension's effective bound with its value source and
    limiting source, and the consumed, outstanding and remaining amounts at the

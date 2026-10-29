@@ -378,6 +378,11 @@ is membership growth inside the existing recorded run, not a nested or sibling
 run. Consequently an unrestricted run may execute more work and last longer
 than the membership visible when it began.
 
+Under `rhei run --strict-inputs`, an existing member whose sealed inputs
+changed is not re-adopted at admission and starts nothing new, while a newly
+admitted member is sealed on arrival as its own generation 1 and runs
+([§FS-rhei-seal.8.6](rhei-seal.spec.md#86-admission)).
+
 Before spawning, `rhei run` reports the resolved scope and the rheis it will
 touch ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)). A bare rhei runs as the single rhei of its implicit Panta, so the
 project-wide loop is the only execution path.

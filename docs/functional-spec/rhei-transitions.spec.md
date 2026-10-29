@@ -1125,6 +1125,11 @@ A `cli:` callback runs under the time bound its edge resolves
 ([§FS-rhei-transitions.4.10](rhei-transitions.spec.md#410-callback-time-bound)); where the edge and the
 machine declare none, it runs unbounded, as it always has.
 
+Under `rhei run --strict-inputs` a transition that runs a callback is a check
+point: the rhei's sealed inputs are compared with its seal before the callback
+runs, and a refused callback leaves the exit unrouted
+([§FS-rhei-seal.8.5](rhei-seal.spec.md#85-an-exit-found-after-drift)). The callback command stays opaque.
+
 ### 4.8. Callback Mappings
 
 Platform-specific callback mappings allow the same logical callback name to resolve to different implementations:

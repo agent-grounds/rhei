@@ -93,6 +93,8 @@ Five things follow, and they are the decision rather than its implementation.
    which template source produced it. The intent is unchanged — it is still one
    line, and a sidecar file holding the same facts is the lock file this
    decision refused.
+   What a run executes is a different record, admitted by
+   [§DA-run-input-seal](run-input-seal.md#da-run-input-seal-a-strict-run-checks-what-it-executes-against-a-seal-the-run-takes); it holds none of these facts.
    [§FS-rhei-library.7.1](../../functional-spec/rhei-library.spec.md#71-the-fence-comment-is-the-whole-of-template-provenance)
 
 The block compiler and its vocabulary are removed rather than kept beside this.

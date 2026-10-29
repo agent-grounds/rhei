@@ -82,6 +82,7 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `agent_output` | A live agent output line ([§FS-rhei-run-json.2.3](rhei-run-json.spec.md#23-agent-output)) | `slot`, `task`, `stream`, `line` |
 | `budget_snapshot` | Once before scheduling, and again after each receipt is durable | `bounds` (one entry per dimension: `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `currency` on the spend entry, `unpriced`, `unmeasurable`, `unsettled` and `unpriced_details` — `null` on a count entry — and `ceiling` on a delegated entry), and `ceiling_policy` where any ceiling was delegated |
 | `budget_halt` | An admission was refused | `task`, `dimension`, `effective`, `value_source`, `limiting_source`, `consumed`, `outstanding`, `remaining`, `mode`, `window`, `renews_at`, `remedy`, `reason_code`, `ceiling` and `ceiling_policy` where the dimension's ceiling was delegated, and on a spend halt `currency`, `unpriced`, `unmeasurable`, `unsettled`, `unpriced_details` |
+| `seal_halt` | A strict run refused a start because a sealed input changed ([§FS-rhei-seal.8.4](rhei-seal.spec.md#84-the-refusal)) | `task`, `rhei`, `reason_code`, `generation`, `changes` |
 | `run_finished` | Once, when the run loop ends ([§FS-rhei-run-json.2.4](rhei-run-json.spec.md#24-where-run_finished-sits)) | `summary` |
 
 `run_started.rhei_build` and `run_started.checkout_head_at_start` are the run
@@ -182,6 +183,15 @@ before the member existed reads as if every unpriced receipt had no context.
 a `message` record at `error` level. Adding these records does not move the
 schema version ([§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version)): a reader that does not know them skips
 them like any other unrecognized `event`.
+
+`seal_halt.reason_code` is `sealed_input_changed`, stable and machine-readable,
+so a consumer never parses the prose of the same refusal, which is a `message`
+record at `error` level. `rhei` is the rhei whose seal was checked, `task` the
+ticket whose start was refused, `generation` the latest generation it was
+compared with, and `changes` one `{ "path", "kind" }` per changed path, sorted
+by `path`, with the path spelled as the seal spells it and `kind` one of
+`modified`, `added`, `deleted`, `mode`, `link` ([§FS-rhei-seal.4](rhei-seal.spec.md#4-changes)). The record is an
+addition under [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version), so `schema` does not move.
 
 `usage_reported.report` is `streamed` for a running total observed
 mid-invocation and `final` for the one report that follows the durable record;

@@ -72,6 +72,8 @@ Deliberate automation states the intent once with `--yes`.
      `metadata.tasks.<id>.providerLimits` are deleted, together with the task's
      `supervision` block ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)). A `metadata.tasks.<id>` entry left empty by those deletions is removed as well, and so are `metadata.tasks` and `metadata` when nothing else remains in them: an empty entry is a record of nothing, and the next reader would have to decide whether it meant something. Both the deletions and that pruning are confined to the plan's **writable** metadata document — `index.rhei.md` for a Directory Workspace ([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)). A workspace task file's own metadata block is authored, holds none of the runtime keys named above, and is neither read nor rewritten by reset: it survives byte-identical.
 4. After every plan file is rewritten — the ledger step 3 reads lives there — for a directory workspace, delete the `runtime/` directory at the workspace root if it exists. For a single-file plan, delete the `runtime/` directory next to the plan file if it exists. This removes result files, findings, logs, and journaled transition records.
+   It removes the run-input seals under `runtime/seal/` with the rest
+   ([§FS-rhei-seal.6](rhei-seal.spec.md#6-lifecycle)).
 5. Write each modified task file atomically (temp file + rename). Release the
    sidecar stack in reverse order.
 
@@ -168,6 +170,13 @@ may be the only record of a fact an out-of-scope ticket is relying on, and
 removing one ticket's lines would mean rewriting bytes that append-only exists
 to protect. A narrowed reset therefore keeps `runtime/notes.md` whole and says
 so on stdout; reset without `--rhei` removes it with the rest of `runtime/`.
+
+The run-input seals under `runtime/seal/` are kept for the same reason and
+reported the same way ([§FS-rhei-seal.6](rhei-seal.spec.md#6-lifecycle)). A seal is keyed by rhei, not by ticket;
+records that survive the narrowed reset may name its generations; and a second
+generation 1 at the same path would break its write-once rule. Generation
+numbers therefore never restart while `runtime/` exists. For a fresh baseline
+on one rhei, run `rhei seal --rhei <id>`.
 
 The reported moves are the moves this invocation will actually make, resolved
 over in-scope tickets only. A dry run is read as a promise about what changes,

@@ -81,6 +81,11 @@ fn run_sequential_agent_invocation(
     let task_workspace_root = loaded.task_root(task_id_str, workspace_root);
     let agent_runtime_dir =
         machines.agent_runtime_dir(task_id_str, &task_workspace_root, runtime_dir);
+    // §FS-rhei-seal.8.2: a changed sealed input refuses the start before any of it.
+    if strict_refuses_start(task_id_str, current_state) {
+        progress.stalled_tasks.insert(task_id_str.clone());
+        return Ok(());
+    }
     let visit_count = render_visit_count(
         loaded.rhei.metadata.as_ref(),
         &task.id,

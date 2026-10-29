@@ -42,6 +42,8 @@ fn find_runnable_tasks_with_options<'a>(
     )
         .into_iter()
         .filter(|task| task.assignee.is_none())
+        // §FS-rhei-seal.8.4: a refused ticket holds no non-concurrent state from its siblings.
+        .filter(|task| !strict_ticket_refused(&task.id.to_string()))
         .collect()
 }
 

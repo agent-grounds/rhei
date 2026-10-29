@@ -96,6 +96,7 @@ Execution:
   complete    Complete a task: transition to terminal state, write ledger/result,\n              link it from the task, and remove the assignee
   note        Leave one fact for whoever works next, anywhere in this project
   release     Drop a ticket's assignee so abandoned work can be claimed again
+  seal        Seal a rhei's run inputs for `rhei run --strict-inputs`
   reset       Return every task to the state it was authored in; for workspaces,\n              also remove runtime output
 
 Authoring:
@@ -768,6 +769,19 @@ enum Commands {
         /// Skip execution of on_leave/on_enter callbacks
         #[arg(long)]
         no_callbacks: bool,
+    },
+    /// Seal each rhei's run inputs — machine, scripts, settings, price book —
+    /// as a new generation that `rhei run --strict-inputs` checks against
+    Seal {
+        /// Path to a states YAML file; it is sealed in place of the machine it replaces
+        #[arg(long, value_name = "PATH", add = ArgValueCompleter::new(complete_yaml_path))]
+        state_machine: Option<PathBuf>,
+        /// Plan or project to seal; omitted, the nearest enclosing one is used
+        #[arg(value_name = "RHEI_PLAN", add = ArgValueCompleter::new(complete_rhei_plan_path))]
+        input: Option<PathBuf>,
+        /// Seal only the named rhei (repeatable; one id per flag)
+        #[arg(long = "rhei", value_name = "RHEI_ID", add = ArgValueCompleter::new(complete_rhei_id))]
+        rhei: Vec<String>,
     },
     /// Release a claim: drop `**Assignee:**` from a ticket so it can be picked
     /// up again, leaving its state and artifacts untouched

@@ -395,11 +395,12 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
 
         // The note store is kept for the same reason and named beside them: one
         // shared journal charged to every plan, not keyed by a ticket id.
-        // §FS-rhei-reset.2.1 §FS-rhei-note.3.1
+        // §FS-rhei-reset.2.1 §FS-rhei-note.3.1 §FS-rhei-seal.6: seals are keyed by rhei.
         println!(
             "Kept run-scoped output not owned by any ticket (run report, dashboard, \
-             accounting rollups) and the project note store (runtime/notes.md). \
-             Reset without `--rhei` to clear them."
+             accounting rollups), the project note store (runtime/notes.md), and the \
+             run-input seals (runtime/seal/). Reset without `--rhei` to clear them; for a \
+             fresh seal of one rhei, run `rhei seal --rhei <id>`."
         );
         #[cfg(test)]
         run_reset_before_unlock_hook(&decision);

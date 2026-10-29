@@ -50,7 +50,9 @@ Rhei is the only agent runtime that combines all of:
   through state machines, spawns agents or deterministic programs, captures
   logs and artifacts, and exposes the same model through reusable crates and
   bindings. `--until-idle` lets a timer drive it: the run returns at idle with
-  the earliest next attempt instead of holding a process.
+  the earliest next attempt instead of holding a process. `--strict-inputs`
+  seals each rhei's machine, scripts, settings and price book, and refuses to
+  start work after one changed until `rhei seal` accepts the change.
 - **Parents that supervise, not just integrate.** A state declaring
   `execute_on: <scope>-<event>` turns the task holding it into a *supervisor*: the
   orchestrator wakes it after every finished child, every child transition,

@@ -215,7 +215,7 @@ does not silently drift from the current CLI surface.
 | `instantiate` | `--output` | Output path completion |
 | `instantiate` | `--execute`, `--dry-run`, `--keep-on-error`, `--list-inputs` | Static flag completion |
 | `run` | `RHEI_PLAN` | Rhei plan/workspace path completion |
-| `run` | `--dry-run`, `--no-callbacks`, `--continue-on-error` | Static flag completion |
+| `run` | `--dry-run`, `--no-callbacks`, `--continue-on-error`, `--strict-inputs` | Static flag completion |
 | `run` | `--parallel` | Small integer suggestions (`1`, `2`, `4`, `8`, `0`) |
 | `run` | `--tui`, `--no-tui`, `--dashboard`, `--no-dashboard` | Static flag completion |
 | `run` | `--no-agent` | Static flag completion |
@@ -269,6 +269,8 @@ does not silently drift from the current CLI surface.
 | `transition --force` | `--to` | Valid profile target states missing both an exact and ordinarily matching wildcard edge from `--from` |
 | `recover` | `EXECUTION_ROOT` | Directory path completion |
 | `reset` | `RHEI_PLAN` | Rhei plan/workspace path completion |
+| `seal` | `RHEI_PLAN` | Rhei plan/workspace path completion |
+| `seal` | `--rhei` | Rhei ids from the selected project |
 | `remove` | `TICKET_OR_PLAN` | Rhei plan/workspace path completion |
 | `remove` | `--task` | Task ids from the selected plan/workspace |
 | `remove` | `--rhei` | Rhei ids from the selected project |

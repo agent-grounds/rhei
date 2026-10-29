@@ -214,7 +214,7 @@ fn handle_parallel_program_completion(
                     });
                 }
                 let route = reloaded.task_route(&task_id_str, input);
-                execute_system_program_exit_transition(
+                let routed = execute_system_program_exit_transition(
                     TransitionFiles {
                         task_file: &route.task_file,
                         metadata_file: &route.metadata_file,
@@ -233,7 +233,14 @@ fn handle_parallel_program_completion(
                     // machine. §FS-rhei-programs.3.2
                     Some(exit_route.selected_rule),
                     opts.no_callbacks(),
-                )?;
+                );
+                // §FS-rhei-seal.8.5: a refused callback leaves the exit unrouted, uncharged.
+                if routed.as_ref().is_err_and(is_seal_refusal) {
+                    release.interrupted();
+                    uncharge_stopped_attempt(&spawn_record);
+                    return Ok(ParallelProgramCompletionEffect { advanced: false, program_spawned: true });
+                }
+                routed?;
                 emit_run_message(
                     sink,
                     rhei_tui::MessageLevel::Info,

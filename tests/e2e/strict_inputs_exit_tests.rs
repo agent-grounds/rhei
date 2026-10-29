@@ -13,7 +13,6 @@ use super::*;
 /// which waits on both, is the next start in the rhei and is refused.
 // §FS-rhei-seal.8.5 §FS-rhei-run.5
 #[test]
-#[ignore = "red until #521: drift under a parallel worker goes unrefused; implement removes this"]
 fn parallel_workers_route_their_exits_and_the_next_start_is_refused() {
     let tasks = [
         "### Task 1: Edits the script\n**State:** step\n",
@@ -43,7 +42,6 @@ fn parallel_workers_route_their_exits_and_the_next_start_is_refused() {
 /// the ticket is resumed and both callbacks run.
 // §FS-rhei-seal.8.5 §FS-rhei-run.3.7.6 §FS-rhei-transitions.4.7
 #[test]
-#[ignore = "red until #521: a callback runs after its sealed inputs changed; implement removes this"]
 fn a_refused_callback_leaves_the_exit_unrouted_until_the_change_is_sealed() {
     let dir = unique_temp_dir("strict-callback-log");
     let log = dir.join("callbacks.log");

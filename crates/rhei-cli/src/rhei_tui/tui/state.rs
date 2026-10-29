@@ -627,6 +627,8 @@ impl UiState {
                     ),
                 );
             }
+            // The refusal's prose arrives as its own error `Message`. §FS-rhei-seal.8.4
+            RunEvent::SealHalt { .. } => {}
         }
     }
 

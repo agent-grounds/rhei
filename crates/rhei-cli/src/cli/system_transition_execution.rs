@@ -461,6 +461,8 @@ fn execute_transition_with_origin(
     // One identity spans model fan-out, redirects, and the enter phase. It is
     // allocated only after the pre-callback guards accept. §FS-rhei-transitions.1.2
     let callback_bearing = matching_rule.on_leave.is_some() || matching_rule.on_enter.is_some();
+    // §FS-rhei-seal.8.2: a callback that will run is a strict check point, before any write.
+    strict_check_callback(!no_callbacks && callback_bearing, files.artifact_id, from)?;
     let firing_id = (!no_callbacks && callback_bearing).then(|| uuid::Uuid::new_v4().to_string());
     let ledger_status = rhei_core::callback::TransitionLedgerStatus::Pending;
 

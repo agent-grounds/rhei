@@ -557,6 +557,10 @@ fn load_merged_roster(
 /// Preserve execution's settings-only interface while sharing exactly the
 /// merge used by roster inspection. §FS-rhei-agents.1.1.7
 fn load_merged_settings(plan_root: &Path) -> MietteResult<RheiSettings> {
+    // §FS-rhei-seal.8.3: a strict run reads settings once; every later read gets that copy.
+    if let Some(kept) = strict_kept_settings() {
+        return Ok(kept);
+    }
     let settings = load_merged_roster(plan_root, true)?.settings;
     warn_unmeasured_agent_profiles(&settings.agents);
     Ok(settings)

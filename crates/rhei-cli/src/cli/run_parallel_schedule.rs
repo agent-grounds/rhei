@@ -48,6 +48,11 @@ fn schedule_agent_work_items(
     let mut skipped = Vec::new();
 
     for item in items {
+        // §FS-rhei-seal.8.2: before a slot or bound admission; a refused start is a stall.
+        if strict_refuses_start(&item.task_id_str, &item.current_state) {
+            skipped.push(item.task_id_str.clone());
+            continue;
+        }
         if !selected_task_ids.contains(&item.task_id_str) {
             if selected_task_ids.len() >= max_new_tasks {
                 continue;
@@ -131,6 +136,11 @@ fn schedule_program_work_items(
     let mut skipped = Vec::new();
 
     for item in items {
+        // §FS-rhei-seal.8.2: before a slot or bound admission; a refused start is a stall.
+        if strict_refuses_start(&item.task_id_str, &item.current_state) {
+            skipped.push(item.task_id_str.clone());
+            continue;
+        }
         if !selected_task_ids.contains(&item.task_id_str) {
             if selected_task_ids.len() >= max_new_tasks {
                 continue;

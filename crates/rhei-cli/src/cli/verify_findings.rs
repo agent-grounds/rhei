@@ -127,7 +127,8 @@ fn check_named_file(source: &dyn EvidenceSource, run: &mut VerifiedRun, entry: &
 }
 
 /// The snapshot generations a manifest names, checked where the source has
-/// them. §FS-rhei-verify.2 §FS-rhei-evidence.8
+/// them: each transcript's bytes against the recorded `transcript_sha256`.
+/// §FS-rhei-verify.2 §FS-rhei-evidence.8
 fn check_snapshots(source: &dyn EvidenceSource, run: &mut VerifiedRun, manifest: &serde_json::Value, findings: &mut Vec<VerifyFinding>) {
     for snapshot in manifest["snapshots"].as_array().cloned().unwrap_or_default() {
         let recorded = snapshot["transcript_sha256"].as_str().unwrap_or_default().to_string();
@@ -137,7 +138,14 @@ fn check_snapshots(source: &dyn EvidenceSource, run: &mut VerifiedRun, manifest:
             findings.push(finding);
             continue;
         };
-        let actual = generation.transcript_sha256;
+        // The transcript's bytes are hashed, never its generation's own claim.
+        let Some(bytes) = generation.transcript else {
+            let mut finding = VerifyFinding::new("missing", Some(&run.run_id), Some(generation.path));
+            finding.recorded_sha256 = Some(recorded);
+            findings.push(finding);
+            continue;
+        };
+        let actual = sha256_hex(&bytes);
         if actual == recorded {
             run.snapshots_verified += 1;
         } else {

@@ -221,6 +221,28 @@ missing or unlisted file, and `2` on a usage error such as a short digest. A
 path a narrowed `rhei reset --rhei` removed is reported as pruned, not missing.
 See [§FS-rhei-verify](functional-spec/rhei-verify.spec.md#fs-rhei-verify-rhei-verify) and [§FS-rhei-evidence](functional-spec/rhei-evidence.spec.md#fs-rhei-evidence-per-invocation-evidence).
 
+Keep a run's evidence after its workspace is gone, or hand it to someone who
+has neither the workspace nor its snapshot cache. `rhei archive` packs one
+finished run into one uncompressed tar, checking it in place first and each
+member again as it is written, and `rhei verify` checks the file anywhere with
+the same output, `--digest` and exit status as in place:
+
+```bash
+rhei archive WORKSPACE --run 55177a --output ~/evidence/55177a.tar
+rhei verify ~/evidence/55177a.tar --digest "$(jq -r .evidence_manifest.sha256 WORKSPACE/runtime/run.json)"
+tar xOf ~/evidence/55177a.tar runtime/evidence/runs/55177a/manifest.json | sha256sum
+```
+
+Rhei writes only `--output`, never over an existing file, and keeps no copy:
+where the archive lives and how long is yours to decide. It is meant to leave
+the machine, so know what it carries in clear. `hash-only` and the redactor
+reach only retained values; logs are never redacted, and they often repeat the
+prompt. Start records carry `argv` unredacted and the absolute `cwd`, and seal
+generations name the user settings path. A transcript is redacted only if the
+redactor ran when its generation was emitted, and "no absolute path enters the
+archive" is true of member names only. See [§FS-rhei-archive](functional-spec/rhei-archive.spec.md#fs-rhei-archive-rhei-archive) and
+[§FS-rhei-archive.6](functional-spec/rhei-archive.spec.md#6-what-it-carries-in-clear).
+
 Name one price book for every run on this machine, instead of threading
 `--prices` through each entry point that might start one:
 

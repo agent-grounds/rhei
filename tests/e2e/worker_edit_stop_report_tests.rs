@@ -85,7 +85,6 @@ fn assert_reported(case: &Scenario, ran: &Ran) -> String {
 /// report from the plan as it last loaded it, with Task 1's invocation in the
 /// ledger and the invocations as `interrupted`. §FS-rhei-run.3.7.6
 #[test]
-#[ignore = "red until #531: an attributed broken-plan stop writes no run report; implement removes this"]
 fn a_run_stopped_on_a_plan_a_worker_broke_still_writes_its_report() {
     let case = Scenario::new("stop-report", Mode::Sequential, Edit::OtherTask, true, false);
     let ran = case.run();

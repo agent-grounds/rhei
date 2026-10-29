@@ -43,6 +43,7 @@ Raise it.
             held: BTreeMap::new(),
             stopped: Default::default(),
             refusals: BTreeMap::new(),
+            last_loaded: None,
         }
     }
 

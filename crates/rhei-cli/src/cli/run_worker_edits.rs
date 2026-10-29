@@ -110,6 +110,8 @@ struct WorkerRegions {
     /// lock, and read by every exit and held release after it. §FS-rhei-run.3.7.6
     stopped: bool,
     refusals: BTreeMap<String, String>,
+    /// The plan as the run last loaded it, without root guards. §FS-rhei-run-report.1
+    last_loaded: Option<LoadedPlan>,
 }
 
 static WORKER_REGIONS: Mutex<WorkerRegions> = Mutex::new(WorkerRegions {
@@ -119,6 +121,7 @@ static WORKER_REGIONS: Mutex<WorkerRegions> = Mutex::new(WorkerRegions {
     held: BTreeMap::new(),
     stopped: false,
     refusals: BTreeMap::new(),
+    last_loaded: None,
 });
 
 /// Signalled whenever a region leaves flight, which is what a waiting reload waits for.
@@ -141,6 +144,7 @@ fn arm_worker_regions(input: &Path) {
     regions.held.clear();
     regions.stopped = false;
     regions.refusals.clear();
+    regions.last_loaded = None;
 }
 
 /// `path` as the journal spells it: relative to the workspace root when inside it.
@@ -283,7 +287,7 @@ impl WorkerRegions {
 // §FS-rhei-run.3.7.2 §FS-rhei-run.3.7.5 §FS-rhei-run.3.7.6
 fn load_run_plan(input: &Path) -> MietteResult<LoadedPlan> {
     let unlocked = match load_plan(input) {
-        Ok(loaded) => return Ok(loaded),
+        Ok(loaded) => return Ok(kept_as_last_loaded(loaded)),
         Err(err) => err,
     };
     let mut regions = worker_regions();
@@ -294,7 +298,10 @@ fn load_run_plan(input: &Path) -> MietteResult<LoadedPlan> {
         // Under the registry lock, so no restore lands between this load and
         // the classification below.
         let err = match load_plan(input) {
-            Ok(loaded) => return Ok(loaded),
+            Ok(loaded) => {
+                drop(regions);
+                return Ok(kept_as_last_loaded(loaded));
+            }
             Err(err) => err,
         };
         let at = locate_plan_break(input);
@@ -325,6 +332,27 @@ fn load_run_plan(input: &Path) -> MietteResult<LoadedPlan> {
         regions =
             REGION_LEFT_FLIGHT.wait(regions).unwrap_or_else(std::sync::PoisonError::into_inner);
     }
+}
+
+/// `loaded`, kept first as the run's last loaded plan for its report. The copy
+/// leaves out the root guards, which cover only the reads `loaded` is for, and it
+/// and the plan it replaces are made and freed outside the registry lock. §FS-rhei-run-report.1
+fn kept_as_last_loaded(loaded: LoadedPlan) -> LoadedPlan {
+    if worker_regions().armed {
+        let mut kept = loaded.clone();
+        kept._root_guards.clear();
+        let _replaced = worker_regions().last_loaded.replace(kept);
+    }
+    loaded
+}
+
+/// The run's last loaded plan, under root guards taken now, when the plan on disk
+/// fails with `err`, as one a worker broke does. §FS-rhei-run-report.1 §FS-rhei-run.3.7.6
+fn run_plan_as_last_loaded(input: &Path, err: Report) -> MietteResult<LoadedPlan> {
+    let Some(mut loaded) = worker_regions().last_loaded.clone() else { return Err(err) };
+    loaded._root_guards =
+        rhei_core::root_access::for_input(input).map_err(|err| diagnostic!("{err}"))?;
+    Ok(loaded)
 }
 
 /// A startup load whose failure is attributed as a mid-run one is.

@@ -391,6 +391,7 @@ fn empty_rhei_warnings(loaded: &LoadedPlan) -> Vec<String> {
     }
 }
 
+#[derive(Clone)]
 struct LoadedPlan {
     /// Guard lifetime includes consumers of this graph. §FS-rhei-panta.6.6
     _root_guards: Vec<rhei_core::root_access::RootAccessGuard>,

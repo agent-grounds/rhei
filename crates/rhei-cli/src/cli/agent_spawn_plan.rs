@@ -125,8 +125,13 @@ fn plan_named_spawn(
 }
 
 /// The roots a run's spawn sites plan a ticket's next spawn under: where its
-/// ledger is read and its spawn record kept. A reading of the plan holds them
-/// to ask what that spawn would be without making it. §FS-rhei-agents.8.4
+/// ledger is read and its spawn record kept, and what its agents resolve
+/// under. A reading of the plan holds them to ask what that spawn would be
+/// without making it. §FS-rhei-agents.8.4
+///
+/// A reading no run is behind asks as a run started now would: under the
+/// plan's own runtime, with the default options, and with no rhei admitted
+/// after startup.
 struct SpawnSiteRoots<'a> {
     /// Each ticket's own root, which its ledger and a program's record sit under.
     tasks: ReadySetRoots<'a>,
@@ -134,6 +139,11 @@ struct SpawnSiteRoots<'a> {
     runtime_dir: &'a Path,
     /// Which rheis' agents record under their own root instead. §FS-rhei-panta.6.2
     machines: &'a ExecutionMachines,
+    /// The run's settings. `None` reads the merged settings when a poll first
+    /// asks, as the ready set's input check reads them.
+    settings: Option<&'a RheiSettings>,
+    /// The options each agent resolves under, which name the record it keeps.
+    opts: &'a RunOptions,
 }
 
 impl<'a> SpawnSiteRoots<'a> {
@@ -144,9 +154,81 @@ impl<'a> SpawnSiteRoots<'a> {
         runtime_dir: &'a Path,
         loaded: &'a LoadedPlan,
         machines: &'a ExecutionMachines,
+        settings: Option<&'a RheiSettings>,
+        opts: &'a RunOptions,
     ) -> Self {
         let tasks = ReadySetRoots { workspace_root, task_roots: &loaded.task_roots };
-        Self { tasks, runtime_dir, machines }
+        Self { tasks, runtime_dir, machines, settings, opts }
+    }
+
+    /// The roots a reading no run is behind plans under, given the plan's own
+    /// runtime: the default options, and the settings a poll first asks for.
+    fn reading(
+        workspace_root: &'a Path,
+        runtime_dir: &'a Path,
+        loaded: &'a LoadedPlan,
+        machines: &'a ExecutionMachines,
+    ) -> Self {
+        Self::new(workspace_root, runtime_dir, loaded, machines, None, no_run_options())
+    }
+
+    /// The one answer to whether a poll ticket waits for its next attempt, and
+    /// until when: the `pollNextAttemptAt` its state records, while that is at
+    /// or after `since` and the attempt it schedules would spawn. A poll whose
+    /// bound is spent is not blocked by it, whatever the last charge or a lowered
+    /// `max_attempts` left there, so the ticket stays ready and its spawn site
+    /// halts it. A reader asking whether the deadline holds now passes `now + 1`.
+    ///
+    /// The spawn record is read only for a poll this deadline would hold.
+    // §FS-rhei-run.5.1 §FS-rhei-run.3.7.4
+    fn pending_poll_deadline(
+        &self,
+        rhei: &rhei_core::ast::Rhei,
+        machine: &rhei_validator::StateMachine,
+        task: &rhei_core::ast::Task,
+        state_name: &str,
+        since: u64,
+    ) -> Option<u64> {
+        machine.states.get(state_name)?.poll.as_ref()?;
+        let deadline = poll_next_attempt_at(rhei.metadata.as_ref(), &task.id, state_name)
+            .filter(|deadline| *deadline >= since)?;
+        (!self.poll_bound_spent(rhei, machine, task, state_name)).then_some(deadline)
+    }
+
+    /// Whether this ticket's `poll:` state has spent its bound: every spawn it
+    /// would make next is refused for `poll.max_attempts`, so it is stalled, not
+    /// waiting. A state that is no poll, or whose agents or settings do not
+    /// resolve, answers `false` and leaves its deadline standing.
+    // §FS-rhei-run.3.7.4
+    fn poll_bound_spent(
+        &self,
+        rhei: &rhei_core::ast::Rhei,
+        machine: &rhei_validator::StateMachine,
+        task: &rhei_core::ast::Task,
+        state_name: &str,
+    ) -> bool {
+        let Some(state_def) = machine.states.get(state_name).filter(|def| def.poll.is_some())
+        else {
+            return false;
+        };
+        let mut read = None;
+        let settings = match self.settings {
+            Some(settings) => settings,
+            None => match load_merged_settings(self.tasks.workspace_root) {
+                Ok(settings) => &*read.insert(settings),
+                Err(_) => return false,
+            },
+        };
+        let agents = if state_def.program.is_some() {
+            None
+        } else {
+            let resolved =
+                resolve_agent_invocations_for_task(machine, state_name, settings, self.opts, Some(task));
+            let Ok(resolved) = resolved else { return false };
+            Some(resolved)
+        };
+        let budget = resolve_attempt_budget(Some(state_def), settings);
+        self.next_spawns_spent(rhei, machine, task, state_name, agents.as_deref(), budget)
     }
 
     /// Whether every spawn this ticket's state would make next is refused for
@@ -203,7 +285,8 @@ impl<'a> SpawnSiteRoots<'a> {
     }
 
     /// A single-file plan's roots, where every ticket's root is the plan's own
-    /// and no rhei was admitted after startup: the shape the unit tests build.
+    /// and no rhei was admitted after startup: the shape the unit tests build,
+    /// under the default settings rather than whatever the machine has.
     #[cfg(test)]
     fn plan_only(workspace_root: &'a Path, runtime_dir: &'a Path) -> Self {
         static NONE_ADMITTED: std::sync::OnceLock<ExecutionMachines> = std::sync::OnceLock::new();
@@ -220,6 +303,15 @@ impl<'a> SpawnSiteRoots<'a> {
             member_local_runtimes: BTreeSet::new(),
             state_machine_override: None,
         });
-        Self { tasks: ReadySetRoots::plan_only(workspace_root), runtime_dir, machines }
+        static DEFAULT_SETTINGS: std::sync::OnceLock<RheiSettings> = std::sync::OnceLock::new();
+        let settings = Some(DEFAULT_SETTINGS.get_or_init(RheiSettings::default));
+        let tasks = ReadySetRoots::plan_only(workspace_root);
+        Self { tasks, runtime_dir, machines, settings, opts: no_run_options() }
     }
+}
+
+/// The options a reading no run is behind resolves agents under.
+fn no_run_options() -> &'static RunOptions {
+    static DEFAULTS: std::sync::OnceLock<RunOptions> = std::sync::OnceLock::new();
+    DEFAULTS.get_or_init(default_run_options)
 }

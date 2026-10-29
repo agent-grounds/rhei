@@ -13,8 +13,8 @@
     }
 
     /// A single-file plan gives its tickets no execution roots of their own.
-    fn no_task_roots() -> std::collections::HashMap<String, std::path::PathBuf> {
-        std::collections::HashMap::new()
+    fn no_task_roots() -> SpawnSiteRoots<'static> {
+        SpawnSiteRoots::plan_only(std::path::Path::new("examples/test"), std::path::Path::new(""))
     }
 
     /// Parse a tiny plan whose tasks carry the given `(id, state)` pairs.

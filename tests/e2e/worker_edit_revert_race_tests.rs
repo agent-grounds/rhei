@@ -311,7 +311,7 @@ fn a_held_exit_restored_for_it_before_a_stop_is_a_failed_reverted_attempt() {
 }
 
 /// Appends a heading to its own task body and asks to be polled again.
-const POLL_CULPRIT: &str = r#"here = pathlib.Path(__file__).parent
+pub(super) const POLL_CULPRIT: &str = r#"here = pathlib.Path(__file__).parent
 append(here / 'ws' / 'tasks' / '01-t.md', '\n#### Visit (poll)\n\nnote\n')
 append(here / 'poll-runs.txt', 'ran\n')
 sys.exit(75)

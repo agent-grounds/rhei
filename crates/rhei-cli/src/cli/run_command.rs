@@ -370,13 +370,16 @@ fn run_command(
         identity
     };
 
-    let roots = ReadySetRoots { workspace_root: &workspace_root, task_roots: &loaded.task_roots };
+    // The run's own runtime, as each mode names it. §FS-rhei-run.5.1
+    let runtime_dir = workspace_root.join("runtime");
+    let spawns =
+        SpawnSiteRoots::new(&workspace_root, &runtime_dir, &loaded, &machines, Some(&settings), &opts);
     let use_standalone_mode = should_use_agent_mode(
         &loaded.rhei,
         &machines.set,
         &settings,
         &opts,
-        &roots,
+        &spawns,
     )? || (loaded.is_panta_project()
         && opts.rhei_scope().is_empty()
         && !opts.dry_run()
@@ -428,7 +431,7 @@ fn should_use_agent_mode(
     machines: &rhei_validator::MachineSet,
     settings: &RheiSettings,
     opts: &RunOptions,
-    roots: &ReadySetRoots<'_>,
+    spawns: &SpawnSiteRoots<'_>,
 ) -> MietteResult<bool> {
     if !opts.no_agent()
         && machines.distinct().iter().any(|machine| {
@@ -446,7 +449,7 @@ fn should_use_agent_mode(
     // shares every non-temporal readiness constraint. §FS-rhei-run.3
     if !opts.no_program()
         && !narrow_to_rhei_scope(
-            find_runnable_program_polls_for_mode_selection(rhei, machines, roots, opts),
+            find_runnable_program_polls_for_mode_selection(rhei, machines, spawns),
             &rhei_scope_set(opts.rhei_scope()),
         )
         .is_empty()
@@ -455,7 +458,7 @@ fn should_use_agent_mode(
     }
 
     for task in narrow_to_rhei_scope(
-        find_runnable_tasks_with_options(rhei, machines, roots, &HashSet::new(), opts),
+        find_runnable_tasks_with_options(rhei, machines, spawns, &HashSet::new()),
         &rhei_scope_set(opts.rhei_scope()),
     ) {
         let machine = machines.for_task(&task.id);

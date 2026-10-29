@@ -161,9 +161,8 @@ transitions:
                 &rhei,
                 &machines,
                 &settings,
-                &default_run_options(),
                 &None,
-                &SpawnSiteRoots::plan_only(dir.path(), &runtime),
+                &SpawnSiteRoots { settings: Some(&settings), ..SpawnSiteRoots::plan_only(dir.path(), &runtime) },
             ),
             Some(now + 180)
         );
@@ -197,7 +196,7 @@ transitions:
         let machines = rhei_validator::MachineSet::single(provider_machine(false));
 
         assert!(
-            remaining_work_is_only_gating_or_poll_blocked(&rhei, &machines, &None),
+            remaining_work_is_only_gating_or_poll_blocked(&rhei, &machines, &None, &SpawnSiteRoots::plan_only(Path::new("."), Path::new("runtime"))),
             "a parked task resumes when its deadline elapses, with nothing for an \
              operator to repair"
         );
@@ -256,9 +255,8 @@ transitions:
                 &rhei,
                 &machines,
                 &settings,
-                &default_run_options(),
                 &None,
-                &SpawnSiteRoots::plan_only(dir.path(), &runtime),
+                &SpawnSiteRoots { settings: Some(&settings), ..SpawnSiteRoots::plan_only(dir.path(), &runtime) },
             ),
             None,
             "expiry cannot release a task its prior's gate still holds"
@@ -307,7 +305,7 @@ transitions:
             1,
         ));
         assert!(
-            !remaining_work_is_only_gating_or_poll_blocked(&polled, &machines, &None),
+            !remaining_work_is_only_gating_or_poll_blocked(&polled, &machines, &None, &SpawnSiteRoots::plan_only(Path::new("."), Path::new("runtime"))),
             "a claim really does stop a poll from reaching its next attempt"
         );
 
@@ -317,7 +315,7 @@ transitions:
         )
         .expect("parse the gated plan");
         assert!(
-            remaining_work_is_only_gating_or_poll_blocked(&gated, &machines, &None),
+            remaining_work_is_only_gating_or_poll_blocked(&gated, &machines, &None, &SpawnSiteRoots::plan_only(Path::new("."), Path::new("runtime"))),
             "releasing the claim moves nothing while the gate holds"
         );
     }
@@ -359,9 +357,7 @@ transitions:
             Some(set_poll_next_attempt_metadata(None, &parse_task_id("1"), "waiting", since, 1));
         let settings = RheiSettings::default();
         let spawns = SpawnSiteRoots::plan_only(root, &runtime);
-        let opts = default_run_options();
-        let scan =
-            || agent_deadline_since(&rhei, &machines, &settings, &opts, &None, &spawns, since);
+        let scan = || agent_deadline_since(&rhei, &machines, &settings, &None, &spawns, since);
         let edit = RevertedEdit {
             location: "plan.md:1".into(),
             message: "broken".into(),

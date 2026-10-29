@@ -29,14 +29,13 @@ fn ensure_claimable_under_lock(
             qualified_id
         )
     })?;
-    let roots = ReadySetRoots {
-        workspace_root: context.workspace_root,
-        task_roots: &loaded.task_roots,
-    };
+    let runtime_dir = context.workspace_root.join("runtime");
+    let spawns =
+        SpawnSiteRoots::reading(context.workspace_root, &runtime_dir, &loaded, context.machines);
     let still_claimable = find_claimable_tasks_for_selection(
         &loaded.rhei,
         &context.machines.set,
-        &roots,
+        &spawns,
         context.selection,
     )
     .into_iter()

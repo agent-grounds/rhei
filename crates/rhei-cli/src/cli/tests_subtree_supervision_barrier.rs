@@ -10,7 +10,7 @@
         let machines = rhei_validator::MachineSet::single(supervision_machine());
         let dir = tempfile::tempdir().expect("tmpdir");
         let spawned: HashSet<String> = spawned.iter().map(|id| (*id).to_string()).collect();
-        find_ready_tasks(rhei, &machines, &ReadySetRoots::plan_only(dir.path()), &spawned)
+        find_ready_tasks(rhei, &machines, &SpawnSiteRoots::plan_only(dir.path(), &dir.path().join("runtime")), &spawned)
         .iter()
         .map(|task| task.id.to_string())
         .collect()

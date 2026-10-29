@@ -58,6 +58,10 @@ contract — stderr, once per distinct path per process, silent when only
 the directory moved is [§FS-rhei-templates.1.1](rhei-templates.spec.md#11-rheis-project-local-home-and-its-deprecated-predecessor). Rhei writes only
 `.agent-grounds/rhei/settings.json`.
 
+Under `rhei run --strict-inputs` the global file and both project candidates
+are sealed inputs — each recorded present or absent — and the run reads them
+once, at start ([§FS-rhei-seal.8.3](rhei-seal.spec.md#83-settings-are-read-once)).
+
 **A message that names the project settings file names the one being read.**
 Where rhei tells an author to define an agent, a model, or a default in project
 settings, the path it prints is the file the merge resolved — the deprecated one

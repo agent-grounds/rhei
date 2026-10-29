@@ -24,6 +24,7 @@ Flags are grouped by concern:
 | `--parallel <N>`         | 1       | Maximum number of agents or programs to run concurrently (0 = unlimited)   |
 | `--prices <PATH>`        | `defaults.prices`, else profile or built-in | Override profile-derived and built-in pricing with a validated local price book and copy it into the run's accounting roots. Its default is the `defaults.prices` settings key ([§FS-rhei-agents.1.1.1](rhei-agents.spec.md#111-defaults)), which a machine or project file may set so every run here prices from one book; a path given on the command line wins. Without either, selected profiles with authored rates produce a generated snapshot before execution; otherwise built-in pricing is unchanged. See [§FS-rhei-cost-accounting.5.1](rhei-cost-accounting.spec.md#51-price-book-selection). |
 | `--rhei <RHEI_ID>`       | all     | Narrow this run to the named rheis (repeatable). See [§FS-rhei-run.2.5](rhei-run.spec.md#25-project-scope---rhei).                  |
+| `--strict-inputs`        | false   | Seal this run's execution inputs and refuse a spawn, program or callback whose sealed inputs changed. Without it no seal is written or checked. See [§FS-rhei-run.3.8](rhei-run.spec.md#38-strict-inputs). |
 | `--until-idle`           | false   | Run the available work, then return when every open task is waiting on a person or a future deadline, instead of sleeping for it. Exits `3` and reports the earliest next attempt. Implies plain output; conflicts with `--tui` and `--headless`. See [§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 9 and [§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states). |
 | `--tui`                  | auto    | Force TUI mode even when stdout is not detected as a TTY                   |
 | `--no-tui`               | auto    | Force plain stdout output even when stdout is a TTY                        |
@@ -220,6 +221,11 @@ is in flight or has just exited is that worker's edit, and the run waits for it,
 restores that one region to its text before the attempt, and goes on
 ([§FS-rhei-run.3.7](rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan)). Validation warnings retain
 the initial report's once-per-run presentation.
+
+Under `--strict-inputs` a checkpoint checks each existing member's seal before
+its machine is re-adopted from disk: a member whose sealed inputs changed is
+not re-adopted and starts nothing more, and a newly admitted member is sealed
+on arrival ([§FS-rhei-seal.8.6](rhei-seal.spec.md#86-admission)).
 
 Only after that validation does the run compare discovered member ids with the
 initialized set. The membership delta controls initialization, not whether
@@ -1167,6 +1173,29 @@ replaced, so legitimate child tasks the worker appended in the same attempt are
 kept there, and the retry is told to add them again. The warning, the retry
 line and the spawn record name this one path; the journal's `reverted=` key
 names the location, and its log column the attempt's log beside the file.
+
+### 3.8. Strict Inputs
+
+`rhei run --strict-inputs` checks what it executes against each rhei's seal
+([§FS-rhei-seal](rhei-seal.spec.md#fs-rhei-seal-rhei-seal-and-the-run-input-seal)) and refuses to start anything whose sealed inputs changed. It catches
+accidental drift — a script edited mid-run, a machine edited between two runs —
+under a trusted orchestrator. Without the flag no seal is written or checked,
+and a rhei sealed earlier is neither checked nor re-sealed.
+[§DA-run-input-seal](../decisions/architectural/run-input-seal.md#da-run-input-seal-a-strict-run-checks-what-it-executes-against-a-seal-the-run-takes)
+
+- **Who seals.** The run, at start, for every in-scope rhei without a seal;
+  later runs compare with the latest generation ([§FS-rhei-seal.8.1](rhei-seal.spec.md#81-who-seals)).
+- **Check points.** Every agent spawn, program, and transition that runs a
+  callback, before bound admission ([§FS-rhei-seal.8.2](rhei-seal.spec.md#82-check-points)). Settings are read
+  once, at start ([§FS-rhei-seal.8.3](rhei-seal.spec.md#83-settings-are-read-once)).
+- **The refusal.** The ticket stays where it is, nothing is charged, nothing
+  more starts in that rhei, and the run exits `1` naming each changed file and
+  `rhei seal` ([§FS-rhei-seal.8.4](rhei-seal.spec.md#84-the-refusal)).
+- **An exit found after drift** routes normally when its transition runs no
+  callback, and is left unrouted as [§FS-rhei-run.3.7.6](rhei-run.spec.md#376-stopping-attributed) records it when its
+  callback is refused ([§FS-rhei-seal.8.5](rhei-seal.spec.md#85-an-exit-found-after-drift)).
+- **Admission.** A drifted member is not re-adopted; a new member is sealed on
+  arrival and runs ([§FS-rhei-seal.8.6](rhei-seal.spec.md#86-admission)).
 
 ## 4. Dry Run
 

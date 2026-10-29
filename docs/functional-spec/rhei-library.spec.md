@@ -671,6 +671,8 @@ How each is computed is [§FS-rhei-templates.6.1.5](rhei-templates.spec.md#615-s
 That is all of it. There is no lock file, no generated header, no per-node
 provenance record, and no alias-encoded identity: names in the output are the
 names the authors wrote, so what a state came from is answered by reading it.
+Whether a run's inputs changed after it began is answered by its seal
+([§FS-rhei-seal](rhei-seal.spec.md#fs-rhei-seal-rhei-seal-and-the-run-input-seal)), which records none of the fields above.
 
 Byte-exact serialization of the fields a union writes — `transition_limit`
 included — is what lets `--dry-run` promise a diff of added lines and nothing

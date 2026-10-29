@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rhei.seal.v1",
+  "title": "Rhei run-input seal generation v1",
+  "description": "One generation of a rhei's run-input seal, runtime/seal/<rhei>/<n>.json. Written once, never rewritten. See FS-rhei-seal.3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "generation",
+    "rhei",
+    "taken_by",
+    "run_id",
+    "taken_at",
+    "rhei_build",
+    "machine",
+    "directories",
+    "entries"
+  ],
+  "properties": {
+    "schema": { "const": "rhei.seal.v1" },
+    "generation": { "type": "integer", "minimum": 1 },
+    "rhei": { "type": "string", "minLength": 1 },
+    "taken_by": { "enum": ["run", "rhei seal"] },
+    "run_id": { "type": ["string", "null"], "minLength": 1 },
+    "taken_at": { "type": "string", "minLength": 1 },
+    "rhei_build": { "$ref": "#/$defs/rhei_build" },
+    "machine": { "type": ["string", "null"], "minLength": 1 },
+    "directories": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/directory" }
+    },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "rhei_build": {
+      "description": "The rhei build that took the generation, as the run descriptor spells it.",
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["version", "commit", "dirty"],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "commit": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
+        "dirty": { "type": ["boolean", "null"] }
+      }
+    },
+    "directory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "present"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "present": { "type": "boolean" }
+      }
+    },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "entry": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "kind", "sha256", "executable"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "kind": { "const": "file" },
+            "sha256": { "$ref": "#/$defs/sha256" },
+            "executable": { "type": ["boolean", "null"] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "kind", "target", "sha256"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "kind": { "const": "symlink" },
+            "target": { "type": "string" },
+            "sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "kind"],
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "kind": { "const": "absent" }
+          }
+        }
+      ]
+    }
+  }
+}

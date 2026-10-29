@@ -215,6 +215,7 @@ A template whose entry point is `index.panta.md` lays a whole Panta project ([§
 1. **Bundle scripts and runbooks the state machine references from callbacks** (`on_leave`, `on_enter`, or `program` states).
 2. **Binary assets are copied verbatim** (images, fonts, compiled artifacts pass through without rendering).
 3. **Avoid bundling anything the user can reasonably supply** — smaller templates are easier to audit.
+4. **Never write into the template's own `scripts/` or `prompt_templates/` at run time** — both are sealed inputs of `rhei run --strict-inputs`, so such a template cannot run strict ([§FS-rhei-seal.2.1](../../../../docs/functional-spec/rhei-seal.spec.md#21-the-machine-and-its-directories)). A caller who wants edits made after laying to be caught runs `rhei seal` right after instantiating.
 
 ## Workflow
 

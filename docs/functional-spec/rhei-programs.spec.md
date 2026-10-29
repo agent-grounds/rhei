@@ -331,6 +331,11 @@ Program states integrate into the same `rhei run` loop as agent states. The reso
 
 Programs take precedence because they are declared explicitly on the state and represent a deliberate choice for deterministic execution.
 
+Under `rhei run --strict-inputs` a program is a check point: before it is
+spawned, the rhei's sealed inputs are compared with its seal, and a change
+refuses the start ([§FS-rhei-run.3.8](rhei-run.spec.md#38-strict-inputs)). The command itself stays opaque — the
+check covers the sealed files, not what the command reaches.
+
 ### 6.2. Sequential Mode
 
 Within the sequential execution loop (see [Agents Specification](rhei-agents.spec.md#521-sequential-mode-default---parallel-1)):

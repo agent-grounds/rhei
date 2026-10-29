@@ -46,6 +46,7 @@ one `FS-<slug>` ID at its H1.
 | [§FS-rhei-release](rhei-release.spec.md#fs-rhei-release-rhei-release) | `rhei release` command behavior |
 | [§FS-rhei-remove](rhei-remove.spec.md#fs-rhei-remove-rhei-remove) | `rhei remove` command behavior: taking back an untouched ticket and retiring its id |
 | [§FS-rhei-reset](rhei-reset.spec.md#fs-rhei-reset-rhei-reset) | `rhei reset` command behavior |
+| [§FS-rhei-seal](rhei-seal.spec.md#fs-rhei-seal-rhei-seal-and-the-run-input-seal) | `rhei seal` and the run-input seal a `--strict-inputs` run checks |
 | [§FS-rhei-list](rhei-list.spec.md#fs-rhei-list-rhei-list) | `rhei list` command behavior |
 | [§FS-rhei-show](rhei-show.spec.md#fs-rhei-show-rhei-show) | `rhei show` command behavior |
 | [§FS-rhei-note](rhei-note.spec.md#fs-rhei-note-rhei-note) | `rhei note`: one fact left for whoever works next in this project |

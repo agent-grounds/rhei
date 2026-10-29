@@ -231,6 +231,7 @@ It is the last part rather than one between the steps and the accounting so
 that the accounting keeps its number. With `--details` it sits inside the
 block, before `</details>`. It is provenance under a trusted orchestrator: it
 says what rhei recorded, and it detects no drift and seals nothing.
+A strict run detects drift ([§FS-rhei-run.3.8](rhei-run.spec.md#38-strict-inputs)); this line does not.
 
 ## 3. `--details`
 

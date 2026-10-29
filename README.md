@@ -146,6 +146,8 @@ The runtime currently supports:
   prompt anywhere in the project carries it, and `rhei reset` clears it
 - recording runtime logs, results, snapshots, and dashboard state under
   `runtime/`
+- recording what each process a run started was handed, and checking later
+  that it is still what the run wrote, with `rhei verify`
 - rendering plans as JSON, GitHub-style markdown, or terminal-oriented progress
   output
 - rendering a self-contained HTML **Flow** visualization of a plan or workspace

@@ -204,6 +204,23 @@ The checkpoint names no path, so it may be stored beside the pull request. A
 record or spawn it names that has since been reset away is refused by name. See
 [§FS-rhei-summary.6](functional-spec/rhei-summary.spec.md#6-the-checkpoint-document) and [§FS-rhei-summary.2.4](functional-spec/rhei-summary.spec.md#24-the-provenance-line).
 
+Check what a run recorded. Every `rhei run` writes a start and an end record
+for each agent, program, and callback it starts under `runtime/evidence/`, and
+a manifest when it ends; `run.json` and the `run_finished` record name that
+manifest's digest. `rhei verify` re-hashes every file a manifest names, oldest
+run first, or only the run whose manifest has the digest given:
+
+```bash
+rhei verify WORKSPACE
+rhei verify WORKSPACE --digest "$(jq -r .evidence_manifest.sha256 WORKSPACE/runtime/run.json)"
+rhei verify WORKSPACE --json
+```
+
+It exits `0` when everything named still matches, `1` on any mismatch,
+missing or unlisted file, and `2` on a usage error such as a short digest. A
+path a narrowed `rhei reset --rhei` removed is reported as pruned, not missing.
+See [§FS-rhei-verify](functional-spec/rhei-verify.spec.md#fs-rhei-verify-rhei-verify) and [§FS-rhei-evidence](functional-spec/rhei-evidence.spec.md#fs-rhei-evidence-per-invocation-evidence).
+
 Name one price book for every run on this machine, instead of threading
 `--prices` through each entry point that might start one:
 

@@ -1372,6 +1372,22 @@ not tell you, and only the first is a fact about the plan. The text and report
 surfaces say instead that no timed retry is available, and the stop reason
 names the wait.
 
+**Every look at one reading of the plan judges a deadline at the instant that
+reading was taken.** The ready scan, the deadline the run sleeps for, the
+judgement that the run halts or is idle, and the earliest effective next
+attempt it reports all follow from one reading of the plan, and each of them
+compares a deadline, provider-limit deadlines included, with the instant that
+reading was taken, never with a clock read of its own. A poll the scan held
+back because its `pollNextAttemptAt` was still in the future is therefore
+pending to every judgement that follows from the same reading, however long
+the scan took: the run sleeps for it, or under `--until-idle` returns idle and
+reports it, and never drops it as already past, which would leave the ticket
+neither ready nor waiting and halt the run with an attempt still owed. A
+deadline that falls due while the pass runs is the next scan's to take up.
+This adds no wait and moves no deadline. How long the run sleeps is not such a
+judgement: it is measured from the clock when the sleep begins, under the 1 s
+floor above.
+
 Once `stateVisits.<state-name>` reaches `poll.max_attempts`, the engine refuses to select a self-loop transition and picks the first matching non-self-loop instead. If no non-self-loop transition matches, the run halts that task with a "polling exhausted with no matching non-self-loop transition" error — `--continue-on-error` applies as with any other task failure. A non-self-loop exit at any attempt clears both `pollNextAttemptAt.<state-name>` and `stateVisits.<state-name>`.
 
 A poll that declares `waiting_on` ([§FS-rhei-states.2.5](rhei-states.spec.md#25-waiting-on-a-person)) is scheduled by every

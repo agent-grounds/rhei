@@ -286,12 +286,15 @@ fn budget_no_account(project_root: &Path) -> miette::Report {
 
 /// `show`'s refusals while it finds and classifies the account. Every other
 /// budget refusal sends the operator to `show`, so none of these sends them
-/// back, and none is a bug in rhei: each is a file or setting the operator can
-/// correct. A budget path it could not reach is not damage, and the help names
-/// the access rhei needs. Any other refusal is a check that runs before the
+/// back, and none is a bug in rhei: each is a file, path or setting the operator
+/// can correct. A budget path it could not reach is not damage, and the help
+/// names the access rhei needs. Any other refusal gets the help that says to
+/// correct what the message names. Most are checks that run before the
 /// classification can — the witness index parses, the authority directory is
-/// absolute and outside the account, the project holds one account directory
-/// — so the help names those places and what each must hold.
+/// absolute and outside the account, the project holds one account directory —
+/// so that help also lists what each of those places must hold. They are not
+/// the whole set: a `RHEI_BUDGET_NOW` that does not parse, or a project root the
+/// witness index cannot record, ends here too, and the message names it.
 /// §FS-rhei-budgets.10 §FS-rhei-errors.1.2
 fn budget_show_result<T>(project_root: &Path, result: Result<T, BudgetError>) -> MietteResult<T> {
     result.map_err(|err| {

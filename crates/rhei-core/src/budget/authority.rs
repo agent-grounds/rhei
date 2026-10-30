@@ -215,7 +215,7 @@ impl Authority {
 /// full disk does. §AR-neural-admission.4
 pub(super) type Writer = fn(&File, &[u8]) -> std::io::Result<()>;
 
-/// The one [`Writer`] outside a test.
+/// The one [`Writer`] outside a test. §AR-neural-admission.4
 pub(super) fn write_whole(mut file: &File, line: &[u8]) -> std::io::Result<()> {
     file.write_all(line)
 }

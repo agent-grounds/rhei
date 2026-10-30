@@ -1,9 +1,9 @@
 //! A charge whose append fails partway.
 //!
-//! A write cut short reaches the file before its error comes back, so today the
-//! failed append leaves part of a receipt in the witness, or a whole receipt in
-//! the witness that the journal never got, and every later edge on the project
-//! is refused (`agent-grounds/rhei#536`, the reproducer's part A). A failed
+//! A write cut short reaches the file before its error comes back, so before the
+//! fix a failed append left part of a receipt in the witness, or a whole receipt
+//! in the witness that the journal never got, and every later edge on the project
+//! was refused (`agent-grounds/rhei#536`, the reproducer's part A). A failed
 //! append leaves both files as they were before the edge, and the same edge
 //! goes through once the cause is gone, with nothing to repair
 //! ([§FS-rhei-budgets.5.4.3](../../docs/functional-spec/rhei-budgets.spec.md)).
@@ -20,10 +20,15 @@ use super::*;
 /// `SIGXFSZ` ignored, so the kernel writes what fits and then fails the write.
 /// The limit is set in bytes, so it sits inside the next receipt without
 /// charging edges up to a 4096-byte block as the shell reproducer did.
+///
+/// It runs on Linux only. Windows has no per-process limit on the size of a
+/// file. On the macOS runner the same limit was set and the edge still went
+/// through (`agent-grounds/rhei#538`, run 41072427663). Elsewhere the seam unit
+/// test `a_witness_append_cut_short_leaves_the_witness_as_it_was` in rhei-core
+/// and the failed journal append below are the evidence for this rule.
 // §FS-rhei-budgets.5.4.3
-// A file-size limit and SIGXFSZ are POSIX; Windows has no per-process limit on
-// the size of a file, and the failed journal append below is the portable form.
-#[cfg(unix)]
+// Linux only, for the reason above.
+#[cfg(target_os = "linux")]
 #[test]
 fn a_witness_write_cut_short_leaves_both_files_as_they_were() {
     use nix::sys::resource::{setrlimit, Resource};

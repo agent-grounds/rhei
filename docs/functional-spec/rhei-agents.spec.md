@@ -1721,6 +1721,8 @@ numbering, state, move ledger, `stateVisits`, supervision phase, or checkpoints.
 It creates no travel, visit, or invocation headroom: each admitted neural
 attempt still costs an invocation ([§FS-rhei-budgets.4.2](rhei-budgets.spec.md#42-invocations)). Grants cannot be
 stockpiled while attempts remain and cannot be issued by a spawned worker.
+A damaged budget account is reported ahead of an exhausted visit
+([§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted)), because no grant gets past it.
 
 Two is the initial invocation plus one informed retry. It is deliberate. A
 retry that is told nothing repeats its predecessor exactly and buys nothing, so

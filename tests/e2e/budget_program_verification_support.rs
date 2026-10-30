@@ -108,23 +108,7 @@ sys.exit({exit})
     }
 
     pub fn truncate_journal(&self) -> (PathBuf, PathBuf) {
-        let accounts = self.project.join(".agent-grounds/rhei/budgets");
-        let journals: Vec<_> = fs::read_dir(accounts)
-            .unwrap()
-            .map(|entry| entry.unwrap().path().join("journal.jsonl"))
-            .filter(|path| path.is_file())
-            .collect();
-        assert_eq!(journals.len(), 1, "one isolated account");
-        let journal = journals[0].clone();
-        let uuid = journal.parent().unwrap().file_name().unwrap();
-        let witness =
-            self.home.join("state/rhei/budget-authority").join(uuid).join("history.jsonl");
-        let intact = fs::read_to_string(&journal).unwrap();
-        assert_eq!(intact, fs::read_to_string(&witness).unwrap(), "premise: verified account");
-        let mut receipts: Vec<_> = intact.lines().collect();
-        assert!(receipts.len() > 1, "truncate a real established history");
-        receipts.pop();
-        fs::write(&journal, format!("{}\n", receipts.join("\n"))).unwrap();
+        let (journal, witness) = drop_last_receipt(&self.project, &self.home);
         let shown = self.cli(&["budget", "show", "."]);
         assert!(!shown.status.success());
         assert!(
@@ -177,7 +161,30 @@ sys.exit({exit})
     }
 }
 
-fn snapshot_files(dir: &Path, files: &mut BTreeMap<PathBuf, Vec<u8>>) {
+/// Drop the project journal's last receipt, which the witness keeps: the
+/// `journal_truncated` damage, independent of how a witness is written.
+/// Returns the journal and the witness.
+pub(super) fn drop_last_receipt(project: &Path, home: &Path) -> (PathBuf, PathBuf) {
+    let accounts = project.join(".agent-grounds/rhei/budgets");
+    let journals: Vec<_> = fs::read_dir(accounts)
+        .unwrap()
+        .map(|entry| entry.unwrap().path().join("journal.jsonl"))
+        .filter(|path| path.is_file())
+        .collect();
+    assert_eq!(journals.len(), 1, "one isolated account");
+    let journal = journals[0].clone();
+    let uuid = journal.parent().unwrap().file_name().unwrap();
+    let witness = home.join("state/rhei/budget-authority").join(uuid).join("history.jsonl");
+    let intact = fs::read_to_string(&journal).unwrap();
+    assert_eq!(intact, fs::read_to_string(&witness).unwrap(), "premise: verified account");
+    let mut receipts: Vec<_> = intact.lines().collect();
+    assert!(receipts.len() > 1, "truncate a real established history");
+    receipts.pop();
+    fs::write(&journal, format!("{}\n", receipts.join("\n"))).unwrap();
+    (journal, witness)
+}
+
+pub(super) fn snapshot_files(dir: &Path, files: &mut BTreeMap<PathBuf, Vec<u8>>) {
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries {
             let path = entry.unwrap().path();

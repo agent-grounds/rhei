@@ -48,6 +48,11 @@ fn dependency_is_satisfied(state: &str, machine: &rhei_validator::StateMachine) 
 }
 
 fn current_unix_secs() -> u64 {
+    // Test harness only: the built binary always reads the system clock.
+    #[cfg(test)]
+    if let Some(held) = HELD_UNIX_SECS.with(std::cell::Cell::get) {
+        return held;
+    }
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
 }
 

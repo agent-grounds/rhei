@@ -267,6 +267,12 @@ include!("cli/run_callback_mode.rs");
 include!("cli/run_missing_outputs.rs");
 include!("cli/run_failure_transitions.rs");
 include!("cli/run_pass_remaining_work.rs");
+// The second `current_unix_secs` answers on this thread while a unit test holds
+// the clock, to show it turning between two reads. §FS-rhei-run.5.1
+#[cfg(test)]
+thread_local! {
+    static HELD_UNIX_SECS: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
+}
 include!("cli/run_summary_usage.rs");
 include!("cli/run_summary_accounting.rs");
 include!("cli/run_summary_bounds.rs");
@@ -349,6 +355,7 @@ mod tests {
     include!("cli/tests_cli_target_overrides.rs");
     include!("cli/tests_provider_limits.rs");
     include!("cli/tests_wait_deadlines.rs");
+    include!("cli/tests_wait_deadline_reading.rs");
     include!("cli/tests_codex_provider_local.rs");
     include!("cli/tests_codex_provider_native.rs");
     include!("cli/tests_agent_prompt_transport.rs");

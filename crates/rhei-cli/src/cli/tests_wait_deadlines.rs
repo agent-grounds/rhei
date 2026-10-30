@@ -321,7 +321,7 @@ transitions:
     }
 
     /// A program poll bounded at three attempts, as the deadline scan meets it.
-    const POLL_MACHINE: &str = r#"name: poll
+    pub(super) const POLL_MACHINE: &str = r#"name: poll
 version: 1
 states:
   waiting:
@@ -398,10 +398,20 @@ transitions:
         root: &Path,
         runtime: &Path,
     ) {
+        record_reverted_attempt_of(machine, "1", root, runtime);
+    }
+
+    /// The same for the ticket `task_id`, as a loaded plan names it.
+    pub(super) fn record_reverted_attempt_of(
+        machine: &rhei_validator::StateMachine,
+        task_id: &str,
+        root: &Path,
+        runtime: &Path,
+    ) {
         let (plan, _) =
-            plan_named_spawn(machine, root, runtime, "1", "waiting", 1, None).expect("plan");
+            plan_named_spawn(machine, root, runtime, task_id, "waiting", 1, None).expect("plan");
         plan.record_spawn(SpawnEnding {
-            task_id: "1",
+            task_id,
             state_name: "waiting",
             kind: "program",
             worker: "true",

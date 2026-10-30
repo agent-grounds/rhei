@@ -35,11 +35,12 @@ impl Write for CutShort<'_> {
 }
 
 /// Half of the line, then an error.
-fn cut_short(file: &File, line: &[u8]) -> io::Result<()> {
+pub(super) fn cut_short(file: &File, line: &[u8]) -> io::Result<()> {
     CutShort { file, room: line.len() / 2 }.write_all(line)
 }
 
-const LINE: &[u8] = b"{\"schema\":\"rhei.budget.receipt.v1\",\"kind\":\"a receipt cut short\"}\n";
+pub(super) const LINE: &[u8] =
+    b"{\"schema\":\"rhei.budget.receipt.v1\",\"kind\":\"a receipt cut short\"}\n";
 
 /// The witness's write is cut short: the witness is cut back to its length
 /// before the append, its in-memory copy never took the line, and the error

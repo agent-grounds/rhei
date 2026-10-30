@@ -691,6 +691,15 @@ witness, and writes the `initialize` receipt recording the resolved defaults,
 all inside the one transaction it was already holding. No command is required,
 no prompt is shown, nothing is printed, and establishment mints nothing.
 
+A journal that is there but holds no receipt — zero bytes long, emptied or
+recreated empty from outside rhei — records no history either: with no witness
+history for its uuid, the account is absent too. An account directory that
+holds only the incidental `journal.jsonl.lock` is an empty one in the sense
+above. The first charge takes an empty journal as the account's own, under the
+uuid its directory already names, rather than refusing it for being there. And
+`rhei budget show` reports either state as an account not yet established, as
+it reports any absent account ([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)).
+
 **Damaged** — a witness exists for this root but the journal is absent,
 truncated, or its hash chain does not verify; or the account this root presents
 is held by another root; or the witness's tail was written from another root;
@@ -1484,6 +1493,15 @@ other rather than refused for the missing file. **Runnable** is literal: in that
 sub-case the directory the journal belongs in is missing too, so the restore is
 offered as the one command that creates it and copies — a remedy that fails with
 `No such file or directory` is the ticket's own complaint in miniature.
+
+An **absent** account is not damaged, and `show` does not describe it as an
+account it failed to read. It says the project has no budget account yet, names
+the charges that establish one and `rhei budget init`, writes nothing, and exits
+non-zero — whether the account directory is gone, holds only its lock file, or
+holds a journal with no receipt in it ([§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted)). And since `show`
+is where a refusal sends the operator, no refusal `show` raises sends them back
+to it: its help is one of the next actions [§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help) allows, and never
+`rhei budget show`, the command they have just run.
 
 Literal on the operator's own platform, too, because a command line is for the
 shell they are holding. The restore is spelled in that shell — `mkdir -p … && cp

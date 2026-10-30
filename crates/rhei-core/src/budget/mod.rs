@@ -39,6 +39,8 @@ mod ancestry_tests;
 #[cfg(test)]
 mod bounds_tests;
 #[cfg(test)]
+mod empty_journal_tests;
+#[cfg(test)]
 mod failed_append_tests;
 #[cfg(test)]
 mod foreign_tail_tests;

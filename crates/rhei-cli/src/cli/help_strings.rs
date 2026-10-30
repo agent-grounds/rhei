@@ -333,11 +333,13 @@ fn cost_task_scope_help() -> &'static str {
      or narrow to the rhei that owns the ticket. List the rheis with: rhei list"
 }
 
-/// The budget authority directory, spelled from the variables that place it:
-/// the refusal its help answers may be that neither is set. §FS-rhei-budgets.5.3
+/// The budget authority directory, spelled from the variables that place it, in
+/// the order rhei tries them: the refusal its help answers may be that none is
+/// set. §FS-rhei-budgets.5.3
 fn budget_authority_spelling() -> &'static str {
-    "$XDG_STATE_HOME/rhei/budget-authority, or $HOME/.local/state/rhei/budget-authority \
-     where XDG_STATE_HOME is unset"
+    "$XDG_STATE_HOME/rhei/budget-authority; where XDG_STATE_HOME is unset, \
+     $HOME/.local/state/rhei/budget-authority; and where HOME is unset too, \
+     %USERPROFILE%\\.local\\state\\rhei\\budget-authority"
 }
 
 /// Help for a budget path `rhei budget show` could not reach or could not place.
@@ -347,22 +349,23 @@ fn budget_unreachable_help(project_root: &Path) -> String {
     format!(
         "rhei opens a budget account's files for reading and writing, even to report it: \
          give this user read and write access to {} and to the budget authority directory \
-         ({}), so one of those two variables must be set",
+         ({})",
         project_root.join(rhei_core::budget::ACCOUNT_DIR).display(),
         budget_authority_spelling()
     )
 }
 
-/// Help for a check `rhei budget show` runs before it can classify the account.
-/// Each is on a file or setting the operator controls, so the help says what
-/// each place must hold rather than asking for a bug report.
+/// Help for any other refusal `rhei budget show` raises while it finds and
+/// classifies the account. Each is on a file, path or setting the operator
+/// controls, so the help says to correct what the message names, and lists what
+/// an account needs of the places it reads, rather than asking for a bug report.
 /// §FS-rhei-budgets.10 §FS-rhei-errors.1.2
 fn budget_unclassified_help(project_root: &Path) -> String {
     format!(
-        "correct what the message names, which rhei checks before it can classify the \
-         account: {} holds one account directory; the budget authority directory ({}) is an \
-         absolute path outside it; and its roots.json is a JSON object from each project \
-         root to its account uuid",
+        "correct what the message names. For reference, an account needs {} to hold one \
+         account directory; the budget authority directory ({}) to be an absolute path \
+         outside it; and its roots.json to be a JSON object from each project root to its \
+         account uuid",
         project_root.join(rhei_core::budget::ACCOUNT_DIR).display(),
         budget_authority_spelling()
     )

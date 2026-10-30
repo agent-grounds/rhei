@@ -129,6 +129,8 @@ fn budget_show_never_sends_the_operator_back_to_budget_show() {
     assert!(!said(&text).contains("rhei budget show"), "text help:\n{}", said(&text));
     let help = json["help"].as_str().unwrap_or_default();
     assert!(!help.contains("rhei budget show"), "JSON help: {json}");
+    // The access help spells the authority directory as §FS-rhei-budgets.5.3 places it.
+    assert!(help.contains("%USERPROFILE%"), "JSON help names every fallback: {json}");
 }
 
 /// A refusal `show` raises before it can classify the account is the operator's
@@ -161,6 +163,8 @@ fn budget_show_names_the_correction_for_a_witness_index_that_does_not_parse() {
     let help = json["help"].as_str().unwrap_or_default();
     assert!(message.contains("roots.json"), "JSON message names the index: {json}");
     assert!(help.contains("roots.json"), "JSON help says what the index holds: {json}");
+    // The correction help spells the authority directory as §FS-rhei-budgets.5.3 places it.
+    assert!(help.contains("%USERPROFILE%"), "JSON help names every fallback: {json}");
     assert!(!help.contains("bug in rhei"), "JSON help blames rhei: {json}");
     assert!(!help.contains("rhei budget show"), "JSON help names show itself: {json}");
 }

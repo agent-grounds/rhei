@@ -7,9 +7,9 @@
 //! the append fails, and the next opener refuses the incomplete chain.
 //! §FS-rhei-budgets.5.2 §AR-neural-admission.4
 
-use super::diagnosis::{
-    foreign_tail, foreign_tail_refusal, Damage, Damaged, Diagnosis, History, Opening,
-};
+use super::authority::{cut, write_whole, Writer};
+use super::classify::{classify, Reading, Sides};
+use super::diagnosis::{Diagnosis, Opening};
 use super::replay::State;
 use super::types::{add, uuid, BudgetError, Contract, Snapshot};
 use super::Result;
@@ -19,7 +19,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 /// Supplied by the owning driver, which authenticates its local operator.
@@ -155,6 +155,9 @@ impl Journal {
     ) -> Result<Opening> {
         uuid(project_uuid)?;
         let authority = super::authority::Authority::lock(root, project_uuid)?;
+        // Resolved, because a foreign tail is told by whether a source path lies
+        // under it, and sources are recorded resolved. §FS-rhei-budgets.5.4.2
+        let resolved = crate::platform::canonical_path(root).unwrap_or_else(|_| root.to_path_buf());
         let dir = root.join(".agent-grounds/rhei/budgets").join(project_uuid);
         if create {
             super::authority::durable_directories(&dir)?;
@@ -176,12 +179,20 @@ impl Journal {
                     && matches!(std::fs::metadata(&path), Err(error)
                         if error.kind() == std::io::ErrorKind::NotFound) =>
             {
-                return Ok(
-                    match Damaged::missing_journal(&format!("panta:{project_uuid}"), &authority) {
-                        Some(damaged) => Opening::damaged(root, project_uuid, &authority, damaged),
-                        None => Opening::Absent(BudgetError::unreachable(&lock_path, &error)),
-                    },
-                );
+                let sides = Sides {
+                    root: &resolved,
+                    uuid: project_uuid,
+                    witness_path: authority.path(),
+                    witness: authority.bytes(),
+                    journal: None,
+                };
+                return Ok(match classify(&sides) {
+                    Reading::Damaged(diagnosis, error) => Opening::Damaged(diagnosis, error),
+                    // A journal that is not there verifies nothing.
+                    Reading::Absent | Reading::Verified(_) => {
+                        Opening::Absent(BudgetError::unreachable(&lock_path, &error))
+                    }
+                });
             }
             Err(error) => return Err(BudgetError::unreachable(&lock_path, &error)),
         };
@@ -189,9 +200,7 @@ impl Journal {
         let mut ledger = Self {
             authority,
             _lock: lock,
-            // Resolved, because a foreign tail is told by whether a source path
-            // lies under it, and sources are recorded resolved. §FS-rhei-budgets.5.4.2
-            root: crate::platform::canonical_path(root).unwrap_or_else(|_| root.to_path_buf()),
+            root: resolved,
             path,
             project_id: format!("panta:{project_uuid}"),
             state: State::default(),
@@ -200,9 +209,8 @@ impl Journal {
             writable,
             day: String::new(),
         };
-        let damaged = ledger.load()?;
-        if let Some(damaged) = damaged {
-            return Ok(Opening::damaged(root, project_uuid, &ledger.authority, damaged));
+        if let Some((diagnosis, error)) = ledger.load()? {
+            return Ok(Opening::Damaged(diagnosis, error));
         }
         // A kind this build does not understand is not a broken account: it is
         // a newer one. It reports, and it may not append.
@@ -220,12 +228,13 @@ impl Journal {
     /// The three ledger states of §FS-rhei-budgets.5.4, told apart by name.
     ///
     /// Damage is returned rather than only raised, and it is returned
-    /// *classified*: a journal that is wholly absent is not the same accident
-    /// as one whose tail was lost, and only the first is indistinguishable from
-    /// a path a different project used before this one.
-    /// §FS-rhei-budgets.5.4
-    fn load(&mut self) -> Result<Option<Damaged>> {
-        let present = match File::open(&self.path) {
+    /// *classified* — by the one classifier every caller shares — so a journal
+    /// that is wholly absent, one whose tail was lost and a witness that ends
+    /// mid-receipt are each the accident they are. What is left here is what
+    /// only an open does: replay the verified chain, and adopt a journal this
+    /// machine has no witness for. §FS-rhei-budgets.5.4 §FS-rhei-budgets.5.4.3
+    fn load(&mut self) -> Result<Option<(Box<Diagnosis>, BudgetError)>> {
+        let journal = match File::open(&self.path) {
             Ok(mut file) => {
                 let mut bytes = Vec::new();
                 file.read_to_end(&mut bytes)?;
@@ -234,78 +243,25 @@ impl Journal {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
             Err(error) => return Err(error.into()),
         };
-        let Some(bytes) = present else {
-            return Ok(Damaged::missing_journal(&self.project_id, &self.authority));
+        let sides = Sides {
+            root: &self.root,
+            uuid: self.account_uuid(),
+            witness_path: self.authority.path(),
+            witness: self.authority.bytes(),
+            journal: journal.as_deref(),
         };
-        if bytes.is_empty() {
-            // **Absent** when the witness agrees there is nothing; **damaged**
-            // when the witness knows of receipts this root no longer has.
-            if self.authority.is_empty() {
-                return Ok(None);
-            }
-            return Ok(Some(self.truncated(&bytes, self.witness_ahead_refusal())));
-        }
-        // Verify the chain on its own terms first, so an **adopted** journal is
-        // one this machine has checked rather than one it merely inherited.
-        if let Err(error) = self.replay(&bytes) {
-            return Ok(Some(Damaged { damage: Damage::ChainBroken, error, foreign: None }));
-        }
+        let replayed = match classify(&sides) {
+            Reading::Absent => return Ok(None),
+            Reading::Damaged(diagnosis, error) => return Ok(Some((diagnosis, error))),
+            Reading::Verified(replayed) => replayed,
+        };
+        self.state = replayed.state;
+        self.receipts = replayed.receipts;
+        self.last_hash = replayed.last_hash;
         if self.authority.is_empty() {
-            self.authority.adopt(&bytes)?;
-            return Ok(None);
+            self.authority.adopt(journal.as_deref().unwrap_or_default())?;
         }
-        match self.authority.verify(&bytes, &self.path) {
-            Ok(()) => Ok(None),
-            // A journal the witness merely continues lost its tail; one that
-            // diverges was rolled back or edited, which is the chain's own
-            // failure however it was spelled. §FS-rhei-budgets.5.4
-            Err(error) if self.authority.continues(&bytes) => {
-                Ok(Some(self.truncated(&bytes, error)))
-            }
-            Err(error) => Ok(Some(Damaged { damage: Damage::ChainBroken, error, foreign: None })),
-        }
-    }
-
-    /// A witness ahead of a present journal lost this project's tail — unless
-    /// that tail was written from another root, which the restore would import.
-    /// §FS-rhei-budgets.5.4 §FS-rhei-budgets.5.4.2
-    fn truncated(&self, bytes: &[u8], error: BudgetError) -> Damaged {
-        let Some(foreign) = foreign_tail(&self.root, bytes, self.authority.bytes()) else {
-            return Damaged { damage: Damage::JournalTruncated, error, foreign: None };
-        };
-        let uuid = self.account_uuid();
-        let diagnosis = Diagnosis::new(
-            Damage::ForeignTail,
-            &self.root,
-            uuid,
-            self.authority.path(),
-            self.recorded_history(),
-        )
-        .with_foreign(Some(foreign.clone()));
-        Damaged {
-            damage: Damage::ForeignTail,
-            error: foreign_tail_refusal(&diagnosis),
-            foreign: Some(foreign),
-        }
-    }
-
-    /// Today's words for a witness that knows of receipts the journal does not
-    /// have. Unchanged, because a journal that is present is this project's and
-    /// copying the witness back over it restores this project's own history.
-    /// §FS-rhei-budgets.5.4
-    fn witness_ahead_refusal(&self) -> BudgetError {
-        BudgetError::corrupt(format!(
-            "the committed history at {} records receipts the project journal at {} \
-             does not have; restore the journal by copying the witness back over it",
-            self.authority.path().display(),
-            self.path.display()
-        ))
-    }
-
-    /// What the committed history holds, for a caller that has no journal to
-    /// read. §FS-rhei-budgets.5.3
-    pub(crate) fn recorded_history(&self) -> History {
-        History::read(&self.project_id, self.authority.bytes())
+        Ok(None)
     }
 
     pub fn snapshot(&self) -> Result<Snapshot> {
@@ -423,21 +379,8 @@ impl Journal {
         let mut line = serde_json::to_vec(&receipt)?;
         let hash = digest(&line);
         line.push(b'\n');
-        // The witness first, then the journal: a crash between them leaves the
-        // witness ahead, which refuses rather than losing a receipt.
-        // §AR-neural-admission.4
-        let mut options = OpenOptions::new();
-        options.write(true).append(true);
-        if self.receipts.is_empty() {
-            options.create_new(true);
-        }
         self.writable = false;
-        self.authority.append(&line)?;
-        let mut file = options
-            .open(&self.path)
-            .map_err(|error| BudgetError::unreachable(&self.path, &error))?;
-        file.write_all(&line)?;
-        file.sync_all()?;
+        self.write_receipt(&line, write_whole)?;
         self.state = next;
         self.receipts.push(receipt);
         self.last_hash = Some(hash);
@@ -450,13 +393,57 @@ impl Journal {
         Ok(())
     }
 
-    pub(crate) fn replay(&mut self, bytes: &[u8]) -> Result<()> {
-        let replayed = replay_chain(&self.project_id, bytes)?;
-        self.state = replayed.state;
-        self.receipts = replayed.receipts;
-        self.last_hash = replayed.last_hash;
-        Ok(())
+    /// The witness first, then the journal: a crash between them leaves the
+    /// witness ahead by whole receipts, which refuses rather than losing one.
+    ///
+    /// An append that *fails* leaves neither. The witness cuts itself back; a
+    /// journal that fails cuts the journal back and then the witness, so both
+    /// are as they were before the edge. Both cuts or neither: a journal that
+    /// cannot be cut back leaves the witness a whole receipt ahead, which the
+    /// copy restores. `write` is how the line reaches the journal, passed in so
+    /// a test can cut it short. §AR-neural-admission.4
+    pub(super) fn write_receipt(&mut self, line: &[u8], write: Writer) -> Result<()> {
+        let witnessed = self.authority.bytes().len() as u64;
+        self.authority.append(line)?;
+        let Err((error, journal_cut)) =
+            append_line(&self.path, self.receipts.is_empty(), line, write)
+        else {
+            return Ok(());
+        };
+        if journal_cut.map_or(Ok(()), |length| cut(&self.path, length)).is_ok() {
+            let _ = self.authority.cut_back(witnessed);
+        }
+        Err(error)
     }
+}
+
+/// Append one line to the journal, which the account's first receipt creates.
+///
+/// A failure carries the length to cut the journal back to: none where the
+/// append never opened it or it is still at its old length, because then it
+/// holds nothing of the line; and the length of none where this append created
+/// it, so it is removed. §AR-neural-admission.4
+fn append_line(
+    path: &Path,
+    first: bool,
+    line: &[u8],
+    write: Writer,
+) -> std::result::Result<(), (BudgetError, Option<u64>)> {
+    let mut options = OpenOptions::new();
+    options.write(true).append(true);
+    if first {
+        options.create_new(true);
+    }
+    let file =
+        options.open(path).map_err(|error| (BudgetError::unreachable(path, &error), None))?;
+    let before = match first {
+        true => 0,
+        false => file.metadata().map_err(|error| (error.into(), None))?.len(),
+    };
+    write(&file, line).and_then(|()| file.sync_all()).map_err(|error| {
+        let now = file.metadata().map(|metadata| metadata.len()).ok();
+        (error.into(), (first || now != Some(before)).then_some(before))
+    })
 }
 
 /// One verified chain, held apart from the transaction that opened it.

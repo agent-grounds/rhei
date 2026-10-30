@@ -225,6 +225,15 @@ working balance or gives up a journal that should be restored instead. A project
 copied with `cp -r` still presents the original's account, so it is refused at its first
 charge until `rhei budget forget` gives it one of its own; a moved project keeps its account.
 
+A charge whose write fails, on a full disk or past a file-size limit, leaves the
+account as it was: what part of the receipt reached either file is cut back
+before the failure is reported. A witness that a killed process or a power cut
+left ending mid-receipt is refused as `witness_torn`, and `rhei budget show`
+prints the one command that keeps a copy of it and cuts it back to its last
+whole receipt. Copying the witness over the journal is never suggested, because
+it would carry the fragment along; where there is no journal at all,
+`rhei budget forget` is offered as well, for a path that was reused.
+
 ## Install
 
 ### Cargo

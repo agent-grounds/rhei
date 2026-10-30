@@ -78,24 +78,6 @@ impl Authority {
         Ok(Self { _lock: lock, _held: Held::mark(uuid), path, bytes, adopted: false })
     }
 
-    /// The journal and the witness must be the same bytes.
-    ///
-    /// A witness **ahead** of the journal is the damaged state: the journal is
-    /// absent, truncated, or was rolled back, and new work is refused naming
-    /// both paths. A journal with **no** witness on this machine is adopted
-    /// instead — see [`Self::adopt`]. §FS-rhei-budgets.5.4
-    pub(crate) fn verify(&self, bytes: &[u8], journal: &Path) -> Result<()> {
-        if self.bytes == bytes {
-            return Ok(());
-        }
-        Err(BudgetError::corrupt(format!(
-            "the committed history at {} does not match the project journal at {}; \
-             restore the journal by copying the witness back over it",
-            self.path.display(),
-            journal.display()
-        )))
-    }
-
     /// Take a verifying journal that this machine has never witnessed: a
     /// project cloned from git, or the same project on a new machine.
     ///
@@ -119,13 +101,6 @@ impl Authority {
 
     pub(crate) fn bytes(&self) -> &[u8] {
         &self.bytes
-    }
-
-    /// Whether the witness merely *continues* the journal it was compared
-    /// against, which is a journal whose tail was lost rather than one that
-    /// was rolled back or edited. §FS-rhei-budgets.5.4
-    pub(crate) fn continues(&self, journal: &[u8]) -> bool {
-        self.bytes.len() > journal.len() && self.bytes.starts_with(journal)
     }
 
     /// The directory this witness lives in.
@@ -188,14 +163,43 @@ impl Authority {
     /// them leaves the witness ahead — the damaged state, which refuses rather
     /// than silently losing a receipt. §AR-neural-admission.4
     pub(crate) fn append(&mut self, line: &[u8]) -> Result<()> {
+        self.append_through(line, write_whole)
+    }
+
+    /// [`Self::append`], with how the line reaches the file passed in.
+    ///
+    /// A write cut short reaches the file before its error comes back, so
+    /// whatever fails once the file is open — the write, its sync, the
+    /// directory's — cuts the witness back to the length it had, and the
+    /// append's own error is the one returned. The first receipt has no length
+    /// to go back to, so undone, the witness is absent again. A cut that fails
+    /// leaves the file as it is. §AR-neural-admission.4
+    pub(super) fn append_through(&mut self, line: &[u8], write: Writer) -> Result<()> {
         if self.bytes.is_empty() {
-            return self.write_initial(line);
+            return self.write_initial(line).inspect_err(|_| {
+                let _ = cut(&self.path, 0);
+            });
         }
-        let mut file = OpenOptions::new().append(true).open(&self.path)?;
-        file.write_all(line)?;
-        file.sync_all()?;
-        sync_directory(self.path.parent().expect("authority has a parent"))?;
+        let file = OpenOptions::new().append(true).open(&self.path)?;
+        let written = write(&file, line)
+            .and_then(|()| file.sync_all())
+            .map_err(BudgetError::from)
+            .and_then(|()| sync_directory(self.directory()));
+        drop(file);
+        if let Err(error) = written {
+            let _ = cut(&self.path, self.bytes.len() as u64);
+            return Err(error);
+        }
         self.bytes.extend_from_slice(line);
+        Ok(())
+    }
+
+    /// Cut the witness back to `length` after the journal failed to take the
+    /// line it just took, the in-memory copy following the file.
+    /// §AR-neural-admission.4
+    pub(crate) fn cut_back(&mut self, length: u64) -> Result<()> {
+        cut(&self.path, length)?;
+        self.bytes.truncate(length as usize);
         Ok(())
     }
 
@@ -204,6 +208,38 @@ impl Authority {
         self.bytes.extend_from_slice(bytes);
         Ok(())
     }
+}
+
+/// How a receipt line reaches a file opened to append it: the whole of it. A
+/// parameter rather than a call only so a test can stop it partway, the way a
+/// full disk does. §AR-neural-admission.4
+pub(super) type Writer = fn(&File, &[u8]) -> std::io::Result<()>;
+
+/// The one [`Writer`] outside a test.
+pub(super) fn write_whole(mut file: &File, line: &[u8]) -> std::io::Result<()> {
+    file.write_all(line)
+}
+
+/// Put a file back to the length it had before an append: shortened in place
+/// through a handle opened for writing, because Windows cannot shorten one
+/// opened only to append, and synced. A length of none is a file the append
+/// created, so it is removed. §AR-neural-admission.4
+pub(crate) fn cut(path: &Path, length: u64) -> Result<()> {
+    if length == 0 {
+        match std::fs::remove_file(path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(BudgetError::unreachable(path, &error)),
+        }
+        return sync_directory(path.parent().expect("a cut file has a parent"));
+    }
+    let file = OpenOptions::new()
+        .write(true)
+        .open(path)
+        .map_err(|error| BudgetError::unreachable(path, &error))?;
+    file.set_len(length)?;
+    file.sync_all()?;
+    Ok(())
 }
 
 /// Write-pending-then-rename, the one way durable state appears here: a reader

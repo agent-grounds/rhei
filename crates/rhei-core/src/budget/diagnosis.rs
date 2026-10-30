@@ -1,17 +1,17 @@
 //! What a damaged account is, told apart by sub-case, and what the recorded
 //! history holds.
 //!
-//! The classification is the same one `Journal::load` has always made; what is
-//! new is that it travels as a value. The caller that **refuses** and the
-//! caller that **reports** then render one judgement rather than two, which is
-//! what lets `rhei budget show` describe the very state a run was refused for.
-//! §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
+//! The classification is made once, by `classify`, and travels as a value. The
+//! caller that **refuses** and the caller that **reports** then render one
+//! judgement rather than two, which is what lets `rhei budget show` describe the
+//! very state a run was refused for. §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
 
+use super::classify::whole_receipts;
 use super::journal::{replay_chain, Journal, Receipt};
 use super::types::BudgetError;
 use std::path::{Path, PathBuf};
 
-/// Which of the five damaged sub-cases of §FS-rhei-budgets.5.4 this is.
+/// Which of the six damaged sub-cases of §FS-rhei-budgets.5.4 this is.
 ///
 /// A closed vocabulary, because it is what a machine reader gets from
 /// `rhei budget show --format json`, and no value may appear here that
@@ -32,6 +32,9 @@ pub enum Damage {
     /// The witness runs past the journal and that tail was written from
     /// another root. §FS-rhei-budgets.5.4.2
     ForeignTail,
+    /// The witness ends in bytes after its last newline, the fragment of an
+    /// append cut short. §FS-rhei-budgets.5.4.3
+    WitnessTorn,
 }
 
 impl Damage {
@@ -42,53 +45,14 @@ impl Damage {
             Self::ChainBroken => "chain_broken",
             Self::HeldElsewhere => "held_elsewhere",
             Self::ForeignTail => "foreign_tail",
+            Self::WitnessTorn => "witness_torn",
         }
-    }
-
-    /// Whether a journal file is left at this root, which is what decides the
-    /// remedy: a present journal bound to this root lost its tail and the
-    /// witness restores it, an absent one says nothing about whose it was. A
-    /// copy's and a contaminated original's journals are present too, and
-    /// [`Diagnosis::restore_command`] withholds the restore from both.
-    /// §FS-rhei-budgets.5.4
-    pub fn journal_exists(self) -> bool {
-        !matches!(self, Self::JournalAbsent)
     }
 }
 
 impl std::fmt::Display for Damage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
-    }
-}
-
-/// A classified damaged account, carrying the refusal its sub-case raises.
-///
-/// The refusal travels with the classification so that a caller which only
-/// wanted to open the account gets exactly the words it got before this split
-/// existed. §FS-rhei-budgets.5.4
-pub(crate) struct Damaged {
-    pub(crate) damage: Damage,
-    pub(crate) error: BudgetError,
-    /// Where the tail came from, under `foreign_tail`. §FS-rhei-budgets.5.4.2
-    pub(crate) foreign: Option<Foreign>,
-}
-
-impl Damaged {
-    /// A missing journal is damaged exactly when its witness holds history,
-    /// regardless of whether the directory or lock survives. §FS-rhei-budgets.5.4
-    pub(crate) fn missing_journal(
-        project_id: &str,
-        authority: &super::authority::Authority,
-    ) -> Option<Self> {
-        (!authority.is_empty()).then(|| Self {
-            damage: Damage::JournalAbsent,
-            error: absent_journal_refusal(
-                authority.path(),
-                &History::read(project_id, authority.bytes()),
-            ),
-            foreign: None,
-        })
     }
 }
 
@@ -103,25 +67,6 @@ pub(crate) enum Opening {
 }
 
 impl Opening {
-    /// Both reporting and refusing carry the same history and classification.
-    /// §FS-rhei-budgets.5.4
-    pub(crate) fn damaged(
-        root: &Path,
-        uuid: &str,
-        authority: &super::authority::Authority,
-        damaged: Damaged,
-    ) -> Self {
-        let diagnosis = Diagnosis::new(
-            damaged.damage,
-            root,
-            uuid,
-            authority.path(),
-            History::read(&format!("panta:{uuid}"), authority.bytes()),
-        )
-        .with_foreign(damaged.foreign);
-        Self::Damaged(Box::new(diagnosis), damaged.error)
-    }
-
     /// Inspection reports the same classification a non-creating open refuses.
     /// §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
     pub(crate) fn inspection(self) -> Inspection {
@@ -140,6 +85,9 @@ impl Opening {
 /// other. A witness that does not itself replay still reports its line count,
 /// because a report that refused to describe a broken witness would leave the
 /// operator with nothing at all. §FS-rhei-budgets.5.3
+///
+/// A fragment after the last newline is not a receipt, so neither the count nor
+/// what the replay finds reads it. §FS-rhei-budgets.5.4.3
 #[derive(Clone, Debug, Default)]
 pub struct History {
     pub receipts: usize,
@@ -151,6 +99,7 @@ pub struct History {
 
 impl History {
     pub(crate) fn read(project_id: &str, bytes: &[u8]) -> Self {
+        let bytes = whole_receipts(bytes);
         let lines = bytes.split(|byte| *byte == b'\n').filter(|line| !line.is_empty()).count();
         let Ok(replayed) = replay_chain(project_id, bytes) else {
             return Self { receipts: lines, ..Self::default() };
@@ -210,6 +159,23 @@ pub struct Diagnosis {
     /// The root the witness's tail was written from, under `foreign_tail`.
     /// §FS-rhei-budgets.5.4.2
     pub foreign: Option<Foreign>,
+    /// Where the witness's whole receipts end and how much follows, under
+    /// `witness_torn`. §FS-rhei-budgets.5.4.3
+    pub torn: Option<Torn>,
+    /// Whether a journal file is left at this root. Under `witness_torn` that
+    /// decides whether `forget` is offered beside the trim, so it is a fact of
+    /// its own rather than read off the sub-case. §FS-rhei-budgets.5.4.3
+    pub journal_present: bool,
+}
+
+/// A witness that ends mid-receipt, measured in bytes. §FS-rhei-budgets.5.4.3
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Torn {
+    /// The length of the witness up to the end of its last whole receipt: what
+    /// the trim cuts it back to.
+    pub whole: u64,
+    /// The bytes after it, which are no receipt.
+    pub fragment: u64,
 }
 
 /// Where a witness's tail came from, when it was not this root.
@@ -239,6 +205,8 @@ impl Diagnosis {
             history,
             held_by: None,
             foreign: None,
+            torn: None,
+            journal_present: damage != Damage::JournalAbsent,
         }
     }
 
@@ -253,6 +221,14 @@ impl Diagnosis {
     /// §FS-rhei-budgets.5.4.2
     pub(crate) fn with_foreign(mut self, foreign: Option<Foreign>) -> Self {
         self.foreign = foreign;
+        self
+    }
+
+    /// The same diagnosis, carrying where the witness's whole receipts end and
+    /// whether the journal is there. §FS-rhei-budgets.5.4.3
+    pub(crate) fn with_tear(mut self, torn: Torn, journal_present: bool) -> Self {
+        self.torn = Some(torn);
+        self.journal_present = journal_present;
         self
     }
 
@@ -291,8 +267,10 @@ impl Diagnosis {
     ///
     /// `None` where the witness is not this root's to restore from: a copy's
     /// witness is the holder's, and a tail written from another root would
-    /// import transitions and spend this project never made.
-    /// §FS-rhei-budgets.5.4.1 §FS-rhei-budgets.5.4.2
+    /// import transitions and spend this project never made. `None` too where
+    /// the witness ends mid-receipt, because the copy would carry the fragment
+    /// into the journal. §FS-rhei-budgets.5.4.1 §FS-rhei-budgets.5.4.2
+    /// §FS-rhei-budgets.5.4.3
     pub fn restore_command(&self) -> Option<String> {
         let copy = crate::platform::copy_command(&self.witness, &self.journal);
         match self.damage {
@@ -301,7 +279,7 @@ impl Diagnosis {
                 crate::platform::make_directory_command(&self.directory())
             )),
             Damage::JournalTruncated | Damage::ChainBroken => Some(copy),
-            Damage::HeldElsewhere | Damage::ForeignTail => None,
+            Damage::HeldElsewhere | Damage::ForeignTail | Damage::WitnessTorn => None,
         }
     }
 
@@ -310,13 +288,33 @@ impl Diagnosis {
     /// journal. Only under `foreign_tail`. §FS-rhei-budgets.5.4.2
     pub fn set_aside_command(&self) -> Option<String> {
         (self.damage == Damage::ForeignTail)
-            .then(|| crate::platform::move_command(&self.witness, &self.set_aside_path()))
+            .then(|| crate::platform::move_command(&self.witness, &self.kept("set-aside")))
     }
 
-    /// `history-set-aside-<stamp>.jsonl` beside the witness, stamped with its
-    /// last receipt, so the name says which history it was and never spells a
-    /// witness a lookup reads. §FS-rhei-budgets.5.4.2
-    fn set_aside_path(&self) -> PathBuf {
+    /// The trim: keep every byte of the witness beside it, then cut it back to
+    /// the end of its last whole receipt — never to the journal's length, which
+    /// would discard whole receipts past it. Offered, never run: the fragment is
+    /// the one record that a write was cut short. Only under `witness_torn`.
+    /// §FS-rhei-budgets.5.4.3
+    pub fn trim_command(&self) -> Option<String> {
+        self.torn.filter(|_| self.damage == Damage::WitnessTorn).map(|torn| {
+            crate::platform::trim_command(&self.witness, &self.kept("torn"), torn.whole)
+        })
+    }
+
+    /// `200 bytes`, the fragment after the last whole receipt, under
+    /// `witness_torn`. §FS-rhei-budgets.5.4.3
+    pub fn fragment_phrase(&self) -> Option<String> {
+        self.torn.map(|torn| match torn.fragment {
+            1 => "1 byte past its last whole receipt".to_string(),
+            n => format!("{n} bytes past its last whole receipt"),
+        })
+    }
+
+    /// `history-<what>-<stamp>.jsonl` beside the witness, stamped with its last
+    /// whole receipt, so the name says which history it was and never spells a
+    /// witness a lookup reads. §FS-rhei-budgets.5.4.2 §FS-rhei-budgets.5.4.3
+    fn kept(&self, what: &str) -> PathBuf {
         let stamp: String = self
             .history
             .last_written_at
@@ -325,7 +323,7 @@ impl Diagnosis {
             .chars()
             .filter(|c| c.is_ascii_alphanumeric())
             .collect();
-        self.witness.with_file_name(format!("history-set-aside-{stamp}.jsonl"))
+        self.witness.with_file_name(format!("history-{what}-{stamp}.jsonl"))
     }
 
     /// The command that retires the record, for the reading where a different
@@ -340,9 +338,16 @@ impl Diagnosis {
     /// A copy is the one present journal it is offered for: the account is the
     /// holder's, so retiring this root's claim gives up nothing of this
     /// project's. §FS-rhei-budgets.5.4.1
+    ///
+    /// A torn witness with no journal is offered it beside the trim: retiring
+    /// moves the witness whole, fragment included. §FS-rhei-budgets.5.4.3
     pub fn forget_command(&self) -> Option<String> {
-        matches!(self.damage, Damage::JournalAbsent | Damage::HeldElsewhere)
-            .then(|| super::roots::forget_line(&self.root))
+        let offered = match self.damage {
+            Damage::JournalAbsent | Damage::HeldElsewhere => true,
+            Damage::WitnessTorn => !self.journal_present,
+            Damage::JournalTruncated | Damage::ChainBroken | Damage::ForeignTail => false,
+        };
+        offered.then(|| super::roots::forget_line(&self.root))
     }
 
     /// One line saying what is wrong, in the words the refusal uses.
@@ -370,6 +375,10 @@ impl Diagnosis {
                     .as_ref()
                     .map(|foreign| format!(", {}", foreign.root.display()))
                     .unwrap_or_default()
+            ),
+            Damage::WitnessTorn => format!(
+                "the committed history ends mid-receipt, {}",
+                self.fragment_phrase().unwrap_or_default()
             ),
         }
     }
@@ -414,7 +423,11 @@ pub(crate) fn journal_path(root: &Path, uuid: &str) -> PathBuf {
 /// stays `journal_truncated`. The other root is the nearest ancestor of that
 /// source that holds an account directory, or the source's own directory where
 /// none does any longer. §FS-rhei-budgets.5.4.2
+///
+/// Only the tail's whole receipts are read and counted: a fragment after them
+/// is no receipt, and an identity in it is not read. §FS-rhei-budgets.5.4.2
 pub(crate) fn foreign_tail(root: &Path, journal: &[u8], witness: &[u8]) -> Option<Foreign> {
+    let witness = whole_receipts(witness);
     if witness.len() <= journal.len() || !witness.starts_with(journal) {
         return None;
     }
@@ -441,51 +454,4 @@ fn holding_root(source: &Path) -> PathBuf {
         .find(|ancestor| ancestor.join(super::account::ACCOUNT_DIR).is_dir())
         .unwrap_or(parent)
         .to_path_buf()
-}
-
-/// The refusal a tail written from another root raises: it names that root and
-/// the receipts, and offers setting the witness aside — never the copy.
-/// §FS-rhei-budgets.5.4.2
-pub(crate) fn foreign_tail_refusal(diagnosis: &Diagnosis) -> BudgetError {
-    let foreign = diagnosis.foreign.as_ref().expect("a foreign tail names its root");
-    BudgetError::new(
-        "untrustworthy_ledger",
-        format!(
-            "budget journal is untrustworthy: the committed history at {} holds {} past the \
-             project journal at {}, written from another project root, {}; copying the witness \
-             back would import them, so set the witness aside instead, keeping every byte: {}",
-            diagnosis.witness.display(),
-            match foreign.receipts {
-                1 => "1 receipt".to_string(),
-                n => format!("{n} receipts"),
-            },
-            diagnosis.journal.display(),
-            foreign.root.display(),
-            diagnosis.set_aside_command().unwrap_or_default(),
-        ),
-    )
-}
-
-/// The refusal a wholly absent journal raises.
-///
-/// Only this sub-case is new. Where a journal is present its tail is what was
-/// lost, so the other two keep the words they have always had — deliberately,
-/// because restoring from the witness is still right there. The reason code
-/// stays `untrustworthy_ledger` throughout, so a harness routing on the stable
-/// identifier is not broken by any of this. §FS-rhei-budgets.5.4
-pub(crate) fn absent_journal_refusal(witness: &Path, history: &History) -> BudgetError {
-    let last = history
-        .last_written_at
-        .as_deref()
-        .map(|at| format!(", the last on {at}"))
-        .unwrap_or_default();
-    BudgetError::new(
-        "untrustworthy_ledger",
-        format!(
-            "this project has no budget journal, but a committed history at {} records {} \
-             for this path{last}",
-            witness.display(),
-            history.receipts_phrase(),
-        ),
-    )
 }

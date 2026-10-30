@@ -21,7 +21,6 @@ use super::*;
 /// trim has run, every byte of the torn witness kept beside it.
 // §FS-rhei-budgets.5.4.3 §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #536: a torn witness reads journal_truncated and is offered the copy; implement removes this"]
 fn a_torn_witness_is_named_and_trimmed_never_copied() {
     let world = world("budget-torn-hand");
     let whole = world.tear();
@@ -59,7 +58,6 @@ fn a_torn_witness_is_named_and_trimmed_never_copied() {
 /// now works; then the edge goes through.
 // §FS-rhei-budgets.5.4.3
 #[test]
-#[ignore = "red until #536: both files ending in the fragment read chain_broken with a no-op copy; implement removes this"]
 fn the_old_advice_followed_is_trimmed_then_restored() {
     let world = world("budget-torn-advice");
     world.tear();
@@ -83,7 +81,6 @@ fn the_old_advice_followed_is_trimmed_then_restored() {
 /// the report offers both the trim and `forget`.
 // §FS-rhei-budgets.5.4.3 §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #536: a torn witness with no journal reads journal_absent with no trim; implement removes this"]
 fn forget_retires_a_torn_witness_whose_journal_is_absent() {
     let world = world("budget-torn-forget-absent");
     let uuid = world.uuid();
@@ -117,7 +114,6 @@ fn forget_retires_a_torn_witness_whose_journal_is_absent() {
 /// nothing, and names the trim rather than the copy.
 // §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #536: forget on a torn witness names the copy; implement removes this"]
 fn forget_refuses_a_torn_witness_whose_journal_is_present_naming_the_trim() {
     let world = world("budget-torn-forget-present");
     world.tear();

@@ -71,7 +71,6 @@ fn copy_line(diagnosis: &Diagnosis) -> String {
 /// fragment — is `witness_torn`, counted by its whole receipts, offered neither
 /// the copy nor `forget`, and verifies once trimmed. §FS-rhei-budgets.5.4.3
 #[test]
-#[ignore = "red until #536: a fragment after the journal reads journal_truncated with the copy; implement removes this"]
 fn a_cut_short_append_is_witness_torn_and_verifies_once_trimmed() {
     let case = bound();
     let receipts = whole_receipts(&case);
@@ -97,7 +96,6 @@ fn a_cut_short_append_is_witness_torn_and_verifies_once_trimmed() {
 /// keeps them, and the account is then `journal_truncated` with the copy, which
 /// is safe once the fragment is gone. §FS-rhei-budgets.5.4.3
 #[test]
-#[ignore = "red until #536: whole receipts and a fragment past the journal read journal_truncated; implement removes this"]
 fn whole_receipts_then_a_fragment_are_witness_torn_and_then_truncated() {
     let case = Case::new();
     let journal = fs::read(case.journal_path()).expect("read the journal");
@@ -118,7 +116,6 @@ fn whole_receipts_then_a_fragment_are_witness_torn_and_then_truncated() {
 /// A journal that diverges, under a fragment: `witness_torn` first, and
 /// `chain_broken` with the copy once trimmed. §FS-rhei-budgets.5.4.3
 #[test]
-#[ignore = "red until #536: a diverging journal under a fragment reads chain_broken with the copy; implement removes this"]
 fn a_diverging_journal_under_a_fragment_is_witness_torn_and_then_broken() {
     let case = Case::new();
     let text = fs::read_to_string(case.journal_path()).expect("read the journal");
@@ -141,7 +138,6 @@ fn a_diverging_journal_under_a_fragment_is_witness_torn_and_then_broken() {
 /// beside the trim and never the copy, and `journal_absent` once trimmed.
 /// §FS-rhei-budgets.5.4 §FS-rhei-budgets.5.4.3 §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #536: no journal and a fragment read journal_absent with the copy; implement removes this"]
 fn no_journal_and_a_fragment_are_witness_torn_with_forget_beside_the_trim() {
     let case = bound();
     tear(&case, &fragment(&case));
@@ -166,7 +162,6 @@ fn no_journal_and_a_fragment_are_witness_torn_with_forget_beside_the_trim() {
 /// fragment. `witness_torn`, then `chain_broken` with a copy that works.
 /// §FS-rhei-budgets.5.4.3
 #[test]
-#[ignore = "red until #536: both files ending in one fragment read chain_broken with a no-op copy; implement removes this"]
 fn the_old_advice_followed_is_witness_torn_and_then_restored_by_the_copy() {
     let case = bound();
     tear(&case, &fragment(&case));
@@ -187,7 +182,6 @@ fn the_old_advice_followed_is_witness_torn_and_then_restored_by_the_copy() {
 /// A complete JSON object with no newline is still an append that did not
 /// finish. §FS-rhei-budgets.5.4.3
 #[test]
-#[ignore = "red until #536: a fragment that parses reads journal_truncated; implement removes this"]
 fn a_fragment_that_parses_as_json_is_still_witness_torn() {
     let case = bound();
     tear(&case, br#"{"kind":"transition","payload":{}}"#);
@@ -201,7 +195,6 @@ fn a_fragment_that_parses_as_json_is_still_witness_torn() {
 /// `foreign_tail`, and the fragment is not counted among the foreign receipts.
 /// §FS-rhei-budgets.5.4.2
 #[test]
-#[ignore = "red until #536: the fragment is counted as a foreign receipt; implement removes this"]
 fn a_foreign_tail_that_ends_in_a_fragment_stays_foreign_without_counting_it() {
     let case = Case::new();
     let elsewhere = tempfile::tempdir().expect("another root");
@@ -238,7 +231,6 @@ fn a_copy_of_a_torn_account_stays_held_elsewhere() {
 /// `forget` with the journal present refuses, writes nothing, and answers
 /// `witness_torn` rather than offering the copy. §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #536: forget names the copy for a torn witness; implement removes this"]
 fn forget_refuses_a_torn_witness_whose_journal_is_present() {
     let case = bound();
     tear(&case, &fragment(&case));
@@ -260,7 +252,6 @@ fn forget_refuses_a_torn_witness_whose_journal_is_present() {
 /// `journal_absent`, keeping every byte of the witness, fragment included.
 /// §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #536: a torn witness with no journal retires as journal_absent; implement removes this"]
 fn forget_retires_a_torn_witness_whose_journal_is_absent() {
     let case = bound();
     let receipts = whole_receipts(&case);

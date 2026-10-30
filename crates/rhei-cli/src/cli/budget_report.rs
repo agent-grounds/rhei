@@ -10,7 +10,7 @@
 
 // §AR-source-file-size.3 §FS-rhei-budgets.10 §FS-rhei-errors.5
 
-use rhei_core::budget::{Damage, Diagnosis};
+use rhei_core::budget::Diagnosis;
 
 /// A refusal whose subject the caller has to *read* rather than only act on.
 ///
@@ -84,11 +84,22 @@ fn budget_report_damaged(
 /// it. §FS-rhei-budgets.5.4
 ///
 /// A copy is offered `forget` for itself and moving the holder for the other
-/// reading, and a tail from another root the set-aside; neither is offered the
-/// copy of the witness. §FS-rhei-budgets.5.4.1 §FS-rhei-budgets.5.4.2
+/// reading, a tail from another root the set-aside, and a witness that ends
+/// mid-receipt the trim, with `forget` beside it where there is no journal; none
+/// is offered the copy of the witness. §FS-rhei-budgets.5.4.1
+/// §FS-rhei-budgets.5.4.2 §FS-rhei-budgets.5.4.3
 fn budget_damaged_help(diagnosis: &Diagnosis) -> String {
     if let Some(set_aside) = diagnosis.set_aside_command() {
         return format!("set the witness aside, keeping every byte, with: {set_aside}");
+    }
+    if let Some(trim) = diagnosis.trim_command() {
+        let forget = diagnosis
+            .forget_command()
+            .map(|forget| format!("; if the path was reused, retire that record with: {forget}"))
+            .unwrap_or_default();
+        return format!(
+            "keep the witness and cut it back to its last whole receipt with: {trim}{forget}"
+        );
     }
     match (diagnosis.forget_command(), &diagnosis.held_by) {
         (Some(forget), Some(holder)) => format!(
@@ -107,9 +118,11 @@ fn budget_damaged_help(diagnosis: &Diagnosis) -> String {
 /// The same facts as named members, for a harness that reads a damaged
 /// account. The vocabulary is the closed one of §FS-rhei-budgets.10: `health`
 /// is `damaged` here and `verified` nowhere else, and `damage` is one of the
-/// five sub-cases. `held_by` and `foreign_root` name the other root under the
-/// two sub-cases that have one, and `restore` is absent where the witness is not
-/// this root's to restore from.
+/// six sub-cases. `held_by` and `foreign_root` name the other root under the
+/// two sub-cases that have one, `restore` is absent where the witness is not
+/// this root's to restore from, and `trim` is present under `witness_torn` and
+/// nowhere else, because a cut of the witness under `restore`'s name would give
+/// one member two opposite meanings.
 ///
 /// `project_id`, `project_root` and `account` are the members a verified report
 /// already carries, with the meanings it gives them — the identity, the target
@@ -138,6 +151,9 @@ fn budget_damaged_details(
     if let Some(forget) = diagnosis.forget_command() {
         details.insert("forget".into(), forget.into());
     }
+    if let Some(trim) = diagnosis.trim_command() {
+        details.insert("trim".into(), trim.into());
+    }
     if let Some(holder) = &diagnosis.held_by {
         details.insert("held_by".into(), serde_json::json!(holder));
     }
@@ -157,9 +173,9 @@ fn budget_damaged_lines(diagnosis: &Diagnosis, target: &Path) -> Vec<String> {
     let mut lines = vec![
         format!("Project: {} (panta:{})", target.display(), diagnosis.uuid),
         format!("Account: damaged [{}] — {}", diagnosis.damage, diagnosis.headline()),
-        match diagnosis.damage {
-            Damage::JournalAbsent => format!("Journal: {} (absent)", diagnosis.journal.display()),
-            _ => format!("Journal: {}", diagnosis.journal.display()),
+        match diagnosis.journal_present {
+            false => format!("Journal: {} (absent)", diagnosis.journal.display()),
+            true => format!("Journal: {}", diagnosis.journal.display()),
         },
         format!("Recorded history: {}", diagnosis.witness.display()),
         format!("  {}", diagnosis.history.summary()),
@@ -193,6 +209,9 @@ fn budget_damaged_lines(diagnosis: &Diagnosis, target: &Path) -> Vec<String> {
         lines.push(format!("  {set_aside}"));
         return lines;
     }
+    if let Some(trim) = diagnosis.trim_command() {
+        return budget_torn_lines(diagnosis, &trim, lines);
+    }
     let Some(forget) = diagnosis.forget_command() else {
         lines.push(
             "This journal is this project's own and its tail is what was lost — restore it:"
@@ -208,5 +227,35 @@ fn budget_damaged_lines(diagnosis: &Diagnosis, target: &Path) -> Vec<String> {
     lines.push(String::new());
     lines.push("  the path was previously held by a different project — retire that record:".into());
     lines.push(format!("    {forget}"));
+    lines
+}
+
+/// A witness that ends mid-receipt: the trim, never the copy, and what comes
+/// after it. The account is read again once the witness is cut back, and is
+/// then whatever its whole receipts make it — which may offer the copy, safe by
+/// then. Where the journal is wholly absent, `forget` stands beside the trim.
+/// §FS-rhei-budgets.5.4.3
+fn budget_torn_lines(diagnosis: &Diagnosis, trim: &str, mut lines: Vec<String>) -> Vec<String> {
+    lines.push(format!(
+        "The witness ends mid-receipt, {}: the fragment of an append that was cut short. \
+         Copying it anywhere would carry the fragment along.",
+        diagnosis.fragment_phrase().unwrap_or_default()
+    ));
+    lines.push("Keep every byte and cut the witness back to its last whole receipt:".into());
+    lines.push(format!("  {trim}"));
+    lines.push(String::new());
+    lines.push(
+        "then run `rhei budget show` again: the account is read again and answered as what its \
+         whole receipts make it."
+            .into(),
+    );
+    if let Some(forget) = diagnosis.forget_command() {
+        lines.push(String::new());
+        lines.push(
+            "If the path was previously held by a different project, retire that record instead:"
+                .into(),
+        );
+        lines.push(format!("  {forget}"));
+    }
     lines
 }

@@ -19,9 +19,12 @@ use rhei_core::budget::Retirement;
 /// since the lawful **absent** state has nothing to retire. Journal wholly
 /// absent: retired. A copy of a root that still holds the account: its claim
 /// retired, the holder's history untouched. A tail written from another root:
-/// refused, naming the set-aside. The account makes that choice under its own
+/// refused, naming the set-aside. A witness that ends mid-receipt: refused,
+/// naming the trim, where the journal is present, and retired, fragment and
+/// all, where it is wholly absent. The account makes that choice under its own
 /// lock; this command only says it in words. §FS-rhei-budgets.5.4
-/// §FS-rhei-budgets.5.4.1 §FS-rhei-budgets.5.4.2 §FS-rhei-budgets.10
+/// §FS-rhei-budgets.5.4.1 §FS-rhei-budgets.5.4.2 §FS-rhei-budgets.5.4.3
+/// §FS-rhei-budgets.10
 fn budget_forget_command(input: Option<PathBuf>, reason: &str) -> MietteResult<()> {
     let (project_root, _) = budget_command_context(input)?;
     let audit = budget_audit(reason)?;
@@ -81,6 +84,17 @@ fn budget_restore_instead(diagnosis: &Diagnosis) -> miette::Report {
                 .as_ref()
                 .map(|foreign| foreign.root.display().to_string())
                 .unwrap_or_else(|| "another project root".into())
+        );
+    }
+    // §FS-rhei-budgets.5.4.3
+    if let Some(trim) = diagnosis.trim_command() {
+        return miette!(
+            help = format!("keep the witness and cut it back to its last whole receipt with: {trim}"),
+            "the budget journal at {} is this project's own, but the committed history at {} ends \
+             mid-receipt, {}; retiring the root would discard a real account",
+            diagnosis.journal.display(),
+            diagnosis.witness.display(),
+            diagnosis.fragment_phrase().unwrap_or_default()
         );
     }
     miette!(

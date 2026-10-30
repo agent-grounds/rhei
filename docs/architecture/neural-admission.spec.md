@@ -95,6 +95,14 @@ project journal — and syncs both. A crash between the two leaves the witness
 ahead, which is the **damaged** state of [§FS-rhei-budgets.5.4](../functional-spec/rhei-budgets.spec.md#54-absent-damaged-adopted) and refuses new
 work naming both paths.
 
+The account's first receipt creates the journal, or takes over one that is
+there and empty, which is still the **absent** state ([§FS-rhei-budgets.5.4](../functional-spec/rhei-budgets.spec.md#54-absent-damaged-adopted)):
+the open read it under the authority and journal locks, so nothing can have
+reached it since. A first receipt is never written behind bytes the open did
+not replay. A journal that is not empty when the first receipt opens it fails
+the append before anything is written to it, and the witness is cut back as
+for any failed journal append below.
+
 Ahead by **whole receipts**, and an append that fails is what keeps it so. A
 write cut short — a full disk, a file-size limit, a quota — reaches the file
 before its error comes back, so whatever fails after a file is opened (the
@@ -107,9 +115,14 @@ the edge, and the append returns its own error:
   cut back to its length before the append, and then the witness is. A journal
   the append never opened, or one still at its old length, holds nothing of it
   and needs no cut;
-- where the edge wrote the account's **first** receipt, its length before the
-  append is none: the journal the append created is removed, and so is the
-  witness, which leaves the lawful **absent** state the next charge establishes.
+- where the edge wrote the account's **first** receipt into a journal the
+  append created, its length before the append is none: that journal is
+  removed, and so is the witness, which leaves the lawful **absent** state the
+  next charge establishes. Where the first receipt took over a journal that was
+  already there and empty, its length before the append is zero bytes: that
+  journal is cut back to zero bytes and left in place, not removed, and the
+  witness, which held nothing before it either, is removed as before. That is
+  the same absent state, and both files are what they were before the edge.
 
 A cut is a length change through a handle opened for writing, followed by a
 sync, and the authority's in-memory copy of the witness follows the file. A

@@ -95,6 +95,31 @@ project journal — and syncs both. A crash between the two leaves the witness
 ahead, which is the **damaged** state of [§FS-rhei-budgets.5.4](../functional-spec/rhei-budgets.spec.md#54-absent-damaged-adopted) and refuses new
 work naming both paths.
 
+Ahead by **whole receipts**, and an append that fails is what keeps it so. A
+write cut short — a full disk, a file-size limit, a quota — reaches the file
+before its error comes back, so whatever fails after a file is opened (the
+write, its sync, the directory's sync) leaves both files as they were before
+the edge, and the append returns its own error:
+
+- the witness's write fails: the witness is cut back to the length it had
+  before the append, and the journal was never opened;
+- the witness's write succeeds and the journal's append fails: the journal is
+  cut back to its length before the append, and then the witness is. A journal
+  the append never opened, or one still at its old length, holds nothing of it
+  and needs no cut;
+- where the edge wrote the account's **first** receipt, its length before the
+  append is none: the journal the append created is removed, and so is the
+  witness, which leaves the lawful **absent** state the next charge establishes.
+
+A cut is a length change through a handle opened for writing, followed by a
+sync, and the authority's in-memory copy of the witness follows the file. A
+cut that itself fails leaves the files as they are, and the append's error is
+still the one returned. On the journal's side the witness is then ahead by
+whole receipts, which the copy restores; on the witness's side the fragment
+stays. That, and a process killed or a machine that loses power mid-write, are
+the only ways a fragment reaches the disk, and [§FS-rhei-budgets.5.4.3](../functional-spec/rhei-budgets.spec.md#543-a-witness-that-ends-mid-receipt) is
+that state and its remedy.
+
 Opening verifies the whole chain: contiguous sequence, each line's
 `previous_hash` equal to the SHA-256 of the exact preceding line's bytes, and
 one project identity throughout. A journal that verifies but has no local

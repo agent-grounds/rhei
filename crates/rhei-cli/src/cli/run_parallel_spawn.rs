@@ -93,6 +93,9 @@ fn spawn_parallel_agent_work_item(
         resolve_attempt_budget(machine.states.get(item.current_state.as_str()), settings);
     plan.evidence_state = agent_evidence_state(machine.states.get(item.current_state.as_str()), budget);
     if let Some(spent_budget) = plan.budget_spent(budget) {
+        // A damaged account outranks the spent visit, refused as admission refuses an
+        // unspent one: no `rhei retry` gets past it. §FS-rhei-budgets.5.4
+        verify_spent_agent_account(workspace_root)?;
         // `Skipped` is the pool's stall: the scheduler records it in
         // `stalled_tasks`, so the ticket keeps its state and is out of the
         // running for the rest of the run. §FS-rhei-run.3 §FS-rhei-agents.3.2.3

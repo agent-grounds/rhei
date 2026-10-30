@@ -27,8 +27,6 @@ fn emptied() -> Case {
 /// uuid its directory already names, and the witness holds the same receipt.
 /// §FS-rhei-budgets.5.4
 #[test]
-#[ignore = "red until #540: the first receipt opens an existing empty journal with \
-            create_new and fails with 'File exists'; implement removes this"]
 fn the_first_charge_takes_an_empty_journal_as_its_own() {
     let case = emptied();
 
@@ -48,8 +46,6 @@ fn the_first_charge_takes_an_empty_journal_as_its_own() {
 /// absent again: both files are as they were before the edge.
 /// §AR-neural-admission.4
 #[test]
-#[ignore = "red until #540: the first receipt never reaches an existing empty journal, \
-            its open fails with 'File exists'; implement removes this"]
 fn a_failed_first_append_leaves_the_empty_journal_empty_and_in_place() {
     let case = emptied();
     let mut journal = case.account.open(true).expect("open the absent account");
@@ -91,8 +87,6 @@ fn a_first_receipt_is_not_written_behind_bytes_the_open_did_not_replay() {
 /// an empty journal, and the account directory holding only its lock file.
 /// It writes nothing. §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #540: an inspection reads an empty journal as a verified account \
-            with no initialization; implement removes this"]
 fn an_empty_journal_and_a_bare_lock_inspect_as_absent() {
     let case = emptied();
 

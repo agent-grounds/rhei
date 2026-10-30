@@ -4,16 +4,17 @@
 /// Verify existing history without establishing an account or reserving capacity.
 /// Every spawn path asks this one question before it reports a spent visit, so
 /// a damaged account is never hidden behind a `rhei retry` that cannot get past
-/// it. The journal and authority locks are released before it returns; external
-/// work never holds them. §FS-rhei-budgets.5.4
+/// it. It refuses what `rhei budget show` reports as damaged and passes what it
+/// reports as absent. The journal and authority locks are released before it
+/// returns; external work never holds them. §FS-rhei-budgets.5.4
 fn verify_account_trust(project: &Path) -> Result<(), BudgetError> {
     if !project.is_dir() {
         return Ok(());
     }
     Account::locate(project).and_then(|account| {
-        // An absent account belongs to the first charge, not this check.
-        // §FS-rhei-budgets.5.4
-        account.map(|account| account.open(false)).transpose().map(drop)
+        // Absent, even where the index still names the root, belongs to the
+        // first charge, not this check. §FS-rhei-budgets.5.4
+        account.as_ref().map_or(Ok(()), Account::verify)
     })
 }
 
@@ -39,8 +40,10 @@ fn verify_program_account(
 /// Account trust behind an agent's spent visit, at the root admission uses.
 ///
 /// An unspent visit learns of a damaged account from admission; a spent one
-/// never reaches admission, so it asks here, and is refused exactly as
-/// admission would refuse it. §FS-rhei-budgets.5.4
+/// never reaches admission, so it asks here. A damaged account is refused
+/// exactly as admission would refuse it, and an absent one passes, as
+/// admission would establish it, so the spent visit is reported.
+/// §FS-rhei-budgets.5.4
 fn verify_spent_agent_account(workspace_root: &Path) -> MietteResult<()> {
     let project = budget_project_root(workspace_root);
     budget_result_at(&project, verify_account_trust(&project))

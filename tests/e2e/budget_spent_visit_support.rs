@@ -194,6 +194,40 @@ impl SpentWorld {
         );
     }
 
+    /// Reset the account the way `rm -rf` does: the project's `budgets/` and
+    /// the witness history go, and the index entry binding this root to the
+    /// uuid stays. `rhei budget show` reads that as absent, not damaged.
+    pub fn reset_account(&self) {
+        let budgets = self.project.join(".agent-grounds/rhei/budgets");
+        let uuids: Vec<_> = fs::read_dir(&budgets)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.join("journal.jsonl").is_file())
+            .map(|path| path.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(uuids.len(), 1, "one established account");
+        let authority = self.home.join("state/rhei/budget-authority");
+        fs::remove_dir_all(&budgets).unwrap();
+        fs::remove_dir_all(authority.join(&uuids[0])).unwrap();
+        let index = fs::read_to_string(authority.join("roots.json")).unwrap();
+        assert!(index.contains(&uuids[0]), "premise: the index still names the root: {index}");
+        self.assert_account_absent("premise");
+    }
+
+    /// Nothing established the account: no account directory, and `rhei
+    /// budget show` still reports none.
+    pub fn assert_account_absent(&self, what: &str) {
+        let budgets = self.project.join(".agent-grounds/rhei/budgets");
+        assert!(!budgets.exists(), "{what}: {} was created", budgets.display());
+        let shown = self.cli(&["budget", "show", "."]);
+        assert!(
+            shown.stderr.contains("no budget account yet"),
+            "{what}: budget show does not read the account as absent:\n{}{}",
+            shown.stdout,
+            shown.stderr
+        );
+    }
+
     /// Everything a refused run must leave as it was: the plan and its task
     /// files, transcripts, spawn records, the move ledger, the account's
     /// journal and witness, and the spawn log.

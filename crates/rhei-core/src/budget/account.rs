@@ -352,15 +352,19 @@ fn canonical(root: &Path) -> Result<PathBuf> {
 /// and picking one would be picking which history to forget.
 pub(crate) fn local_uuid(root: &Path) -> Result<Option<String>> {
     let dir = root.join(ACCOUNT_DIR);
+    // Each failure names the path it could not reach, so the help that sends the
+    // operator to it has one to point at. §FS-rhei-budgets.10
     let entries = match std::fs::read_dir(&dir) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(error.into()),
+        Err(error) => return Err(BudgetError::unreachable(&dir, &error)),
     };
     let mut found: Option<String> = None;
     for entry in entries {
-        let entry = entry?;
-        if !entry.file_type()?.is_dir() {
+        let entry = entry.map_err(|error| BudgetError::unreachable(&dir, &error))?;
+        let kind =
+            entry.file_type().map_err(|error| BudgetError::unreachable(&entry.path(), &error))?;
+        if !kind.is_dir() {
             continue;
         }
         let name = entry.file_name().to_string_lossy().into_owned();

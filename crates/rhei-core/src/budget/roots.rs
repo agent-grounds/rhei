@@ -156,11 +156,18 @@ pub fn witnessed_root(uuid: &str) -> Result<Option<PathBuf>> {
 }
 
 /// The witness index: every canonical root bound to an account uuid.
-/// §FS-rhei-budgets.5.3
+///
+/// An index that does not parse is named, since the parser's own words say
+/// only where in some file it stopped. §FS-rhei-budgets.5.3 §FS-rhei-budgets.10
 pub(crate) fn witnessed_roots() -> Result<BTreeMap<PathBuf, String>> {
     let path = roots_index_path()?;
     match read_index(&path) {
-        Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
+        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|error| {
+            BudgetError::corrupt(format!(
+                "the witness index {} does not parse: {error}",
+                path.display()
+            ))
+        }),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(BTreeMap::new()),
         Err(error) => Err(BudgetError::unreachable(&path, &error)),
     }

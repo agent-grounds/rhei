@@ -131,6 +131,40 @@ fn budget_show_never_sends_the_operator_back_to_budget_show() {
     assert!(!help.contains("rhei budget show"), "JSON help: {json}");
 }
 
+/// A refusal `show` raises before it can classify the account is the operator's
+/// to correct, so its help says what to correct and does not call it a bug in
+/// rhei: here the witness index does not parse, and a charge on it sends the
+/// operator to `show`.
+// §FS-rhei-budgets.10
+#[test]
+fn budget_show_names_the_correction_for_a_witness_index_that_does_not_parse() {
+    let world = world("budget-show-bad-index");
+    fs::write(world.authority().join("roots.json"), b"not json").expect("break the index");
+
+    let edge = world.edge("work", "review");
+    let charged = said(&edge).split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(!edge.status.success(), "the charge refuses:\n{charged}");
+    assert!(
+        charged.contains("rhei budget show"),
+        "the charge sends the operator to show:\n{charged}"
+    );
+
+    let text = world.budget(&["show", &world.project.display().to_string()]);
+    let json = show_error(&world);
+
+    let said = said(&text);
+    assert!(!text.status.success(), "show refuses an index it cannot parse:\n{said}");
+    assert!(said.contains("roots.json"), "text names the index:\n{said}");
+    assert!(!said.contains("bug in rhei"), "text help blames rhei:\n{said}");
+    assert!(!said.contains("rhei budget show"), "text help names show itself:\n{said}");
+    let message = json["message"].as_str().unwrap_or_default();
+    let help = json["help"].as_str().unwrap_or_default();
+    assert!(message.contains("roots.json"), "JSON message names the index: {json}");
+    assert!(help.contains("roots.json"), "JSON help says what the index holds: {json}");
+    assert!(!help.contains("bug in rhei"), "JSON help blames rhei: {json}");
+    assert!(!help.contains("rhei budget show"), "JSON help names show itself: {json}");
+}
+
 /// `show`'s report on an absent account, in both forms: the project has no
 /// budget account yet, and `rhei budget init` establishes one. Nothing calls it
 /// untrustworthy, and no help names the command just run.

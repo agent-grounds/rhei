@@ -98,18 +98,18 @@ fn budget_show_command(
     format: BudgetFormat,
 ) -> MietteResult<()> {
     let (project_root, bounds) = budget_command_context(input)?;
-    let Some(account) = budget_show_result(Account::locate(&project_root))? else {
+    let Some(account) = budget_show_result(&project_root, Account::locate(&project_root))? else {
         return Err(budget_no_account(&project_root));
     };
-    let journal = match budget_show_result(account.inspect())? {
+    let journal = match budget_show_result(&project_root, account.inspect())? {
         Inspection::Verified(journal) => *journal,
         Inspection::Damaged(diagnosis) => {
             return Err(budget_report_damaged(&diagnosis, &project_root, format))
         }
         Inspection::Absent => return Err(budget_no_account(&project_root)),
     };
-    let snapshot = budget_show_result(journal.snapshot())?;
-    let lines = budget_show_result(journal.lines(
+    let snapshot = budget_show_invariant(journal.snapshot())?;
+    let lines = budget_show_invariant(journal.lines(
         None,
         bounds.per_day.effective,
         0,
@@ -284,22 +284,29 @@ fn budget_no_account(project_root: &Path) -> miette::Report {
     )
 }
 
-/// `show`'s own refusals. Every other budget refusal sends the operator to
-/// `show`, so none of these sends them back: a budget path it could not reach
-/// is not damage, and the help names the access rhei needs to it. Any other
-/// refusal is one the classification, which reports a damaged account rather
-/// than refusing it, did not name: a broken invariant, so the help asks for a
-/// bug report rather than inventing a remedy. §FS-rhei-budgets.10
-/// §FS-rhei-errors.1.2
-fn budget_show_result<T>(result: Result<T, BudgetError>) -> MietteResult<T> {
+/// `show`'s refusals while it finds and classifies the account. Every other
+/// budget refusal sends the operator to `show`, so none of these sends them
+/// back, and none is a bug in rhei: each is a file or setting the operator can
+/// correct. A budget path it could not reach is not damage, and the help names
+/// the access rhei needs. Any other refusal is a check that runs before the
+/// classification can — the witness index parses, the authority directory is
+/// absolute and outside the account, the project holds one account directory
+/// — so the help names those places and what each must hold.
+/// §FS-rhei-budgets.10 §FS-rhei-errors.1.2
+fn budget_show_result<T>(project_root: &Path, result: Result<T, BudgetError>) -> MietteResult<T> {
     result.map_err(|err| {
         let help = match err.reason_code.as_str() {
-            "unreachable_budget_path" => {
-                "give this user read and write access to the budget path named above: rhei \
-                 opens a budget account's files for both, even to report it"
-            }
-            _ => internal_error_help(),
+            "unreachable_budget_path" => budget_unreachable_help(project_root),
+            _ => budget_unclassified_help(project_root),
         };
         miette!(help = help, "{}", err.message)
     })
+}
+
+/// `show`'s refusals once `inspect` verified a ledger that holds receipts. The
+/// account was read and its chain replayed by then, so a refusal is a broken
+/// invariant and the help asks for a bug report rather than inventing a remedy.
+/// §FS-rhei-budgets.10 §FS-rhei-errors.1.2
+fn budget_show_invariant<T>(result: Result<T, BudgetError>) -> MietteResult<T> {
+    result.map_err(|err| miette!(help = internal_error_help(), "{}", err.message))
 }

@@ -119,6 +119,9 @@ fn run_sequential_agent_invocation(
     let budget = resolve_attempt_budget(machine.states.get(current_state), settings);
     plan.evidence_state = agent_evidence_state(machine.states.get(current_state), budget);
     if let Some(spent_budget) = plan.budget_spent(budget) {
+        // A damaged account outranks the spent visit, refused as admission refuses an
+        // unspent one: no `rhei retry` gets past it. §FS-rhei-budgets.5.4
+        verify_spent_agent_account(workspace_root)?;
         // The same stall step 5 gives any unmet completion condition: the ticket
         // keeps its state, no transition fires, and the pass moves on.
         // §FS-rhei-run.3 §FS-rhei-agents.3.2.3

@@ -56,25 +56,21 @@ fn damaged_account_named_over_spent_visit(kind: Kind, parallel: usize) {
 }
 
 #[test]
-#[ignore = "red until #537: a spent visit hides a damaged account; implement removes this"]
 fn issue537_program_sequential_spent_visit_names_damaged_account() {
     damaged_account_named_over_spent_visit(Kind::Program, 1);
 }
 
 #[test]
-#[ignore = "red until #537: a spent visit hides a damaged account; implement removes this"]
 fn issue537_program_worker_pool_spent_visit_names_damaged_account() {
     damaged_account_named_over_spent_visit(Kind::Program, 2);
 }
 
 #[test]
-#[ignore = "red until #537: a spent visit hides a damaged account; implement removes this"]
 fn issue537_agent_sequential_spent_visit_names_damaged_account() {
     damaged_account_named_over_spent_visit(Kind::Agent, 1);
 }
 
 #[test]
-#[ignore = "red until #537: a spent visit hides a damaged account; implement removes this"]
 fn issue537_agent_worker_pool_spent_visit_names_damaged_account() {
     damaged_account_named_over_spent_visit(Kind::Agent, 2);
 }

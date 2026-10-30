@@ -63,6 +63,9 @@ fn spawn_parallel_program_work_item(
             return Ok(ParallelProgramSpawnOutcome::Skipped);
         }
     };
+    // Initial dispatch and pool refills share this boundary, which comes before a spent
+    // visit is reported: no `rhei retry` gets past a damaged account. §FS-rhei-budgets.5.4
+    verify_program_account(&task_workspace_root, &item.task_id_str, &item.current_state)?;
     let budget =
         resolve_attempt_budget(machine.states.get(item.current_state.as_str()), settings);
     if let Some(spent_budget) = plan.budget_spent(budget) {
@@ -89,8 +92,6 @@ fn spawn_parallel_program_work_item(
         );
         return Ok(ParallelProgramSpawnOutcome::Skipped);
     }
-    // Initial dispatch and pool refills share this boundary. §FS-rhei-budgets.5.4
-    verify_program_account(&task_workspace_root, &item.task_id_str, &item.current_state)?;
     let workspace_root = task_workspace_root.as_path();
 
     let log = plan.log.clone();

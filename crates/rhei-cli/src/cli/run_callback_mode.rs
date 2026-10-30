@@ -116,6 +116,9 @@ fn run_callback_mode(
     // Manual-only tasks reported by a dry run; the command still exits
     // non-zero once the scan is complete. §FS-rhei-run.4
     let mut manual_only_dry_run: Vec<String> = Vec::new();
+    // The instant of the last reading the loop decided on, which the stopping
+    // decision after it judges at. §FS-rhei-run.5.1
+    let mut last_read_at = current_unix_secs();
     // Set when the pass loop found nothing to schedule and at least one
     // remaining ticket needs a human. A dry run must end the same way the real
     // run does, or it is not a prediction. §FS-rhei-run.4
@@ -153,6 +156,7 @@ fn run_callback_mode(
         // gives its tickets, and asks a poll what its spawn site would.
         let spawns =
             SpawnSiteRoots::new(&workspace_root, &runtime_dir, &loaded, machines, Some(settings), opts);
+        last_read_at = spawns.read_at;
         let ready = narrow_to_rhei_scope(
             find_runnable_tasks_with_options(&loaded.rhei, &machines.set, &spawns, &HashSet::new()),
             &rhei_scope,
@@ -391,8 +395,11 @@ fn run_callback_mode(
         .filter(|_| !interrupted_run && (!opts.dry_run() || pass == 0))
         .and_then(|loaded| {
             let (machines, settings) = (&live.machines, &live.settings);
+            // Judged where the last ready scan stood, which a poll it held is
+            // still pending to. §FS-rhei-run.5.1
             let spawns =
-                SpawnSiteRoots::new(&workspace_root, &runtime_dir, loaded, machines, Some(settings), opts);
+                SpawnSiteRoots::new(&workspace_root, &runtime_dir, loaded, machines, Some(settings), opts)
+                    .judged_at(last_read_at);
             idle_return(&loaded.rhei, &machines.set, settings, &rhei_scope, &spawns)
         });
     if idle.is_some() {
@@ -481,6 +488,7 @@ fn run_callback_mode(
         &live.settings,
         &rhei_scope,
         interrupted_run,
+        last_read_at,
         opts,
     );
     sink.emit(RunEvent::RunFinished {
@@ -543,8 +551,10 @@ fn run_callback_mode(
     if !opts.dry_run() {
         let loaded = load_run_plan(input)?;
         let (machines, settings) = (&live.machines, &live.settings);
+        // The idle verdict's instant, so the halt cannot contradict it. §FS-rhei-run.5.1
         let spawns =
-            SpawnSiteRoots::new(&workspace_root, &runtime_dir, &loaded, machines, Some(settings), opts);
+            SpawnSiteRoots::new(&workspace_root, &runtime_dir, &loaded, machines, Some(settings), opts)
+                .judged_at(last_read_at);
         // §FS-rhei-panta.6.1: a narrowed run halts on in-scope work only —
         // out-of-scope tickets left non-terminal are not a failure.
         if scoped_unfinished_task_exists(&loaded.rhei, &machines.set, &rhei_scope)

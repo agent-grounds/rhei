@@ -166,7 +166,8 @@ fn earliest_pending_poll_deadline(
         .filter_map(|task| {
             let machine = machines.for_task(&task.id);
             let state = normalized_state_name(task.state.as_str(), machine);
-            spawns.pending_poll_deadline(rhei, machine, task, &state, current_unix_secs() + 1)
+            // Pending as of the reading the loop's ready scan held it at. §FS-rhei-run.5.1
+            spawns.pending_poll_deadline(rhei, machine, task, &state, spawns.pending_since())
         })
         .min()
 }
@@ -214,8 +215,9 @@ fn deadline_alone_would_release(
 /// Earliest effective eligibility instant in agent mode. A task subject to
 /// both polling and a provider limit waits for the later one; the run wakes for
 /// the earliest task that can actually become runnable, and only a task whose
-/// deadline is its sole remaining blocker contributes one at all.
-// §FS-rhei-run.5.1
+/// deadline is its sole remaining blocker contributes one at all. Pending means
+/// pending as of the instant `spawns` was read, which is when the ready scan
+/// held it back. §FS-rhei-run.5.1
 fn earliest_pending_agent_deadline(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
@@ -223,7 +225,7 @@ fn earliest_pending_agent_deadline(
     scope: &RheiScope,
     spawns: &SpawnSiteRoots<'_>,
 ) -> Option<u64> {
-    agent_deadline_since(rhei, machines, settings, scope, spawns, current_unix_secs() + 1)
+    agent_deadline_since(rhei, machines, settings, scope, spawns, spawns.pending_since())
 }
 
 /// The earliest agent deadline at or after `since`, even one already passed.
@@ -234,6 +236,9 @@ fn earliest_pending_agent_deadline(
 /// A poll whose next spawn its site would refuse for a spent bound is stalled,
 /// not pending, so it contributes nothing, and `spawns` is where that spawn's
 /// record is read and its agents resolved. §FS-rhei-run.3.7.4
+///
+/// A provider window is judged at the instant `spawns` was read, as its poll
+/// is. §FS-rhei-run.5.1
 fn agent_deadline_since(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
@@ -242,7 +247,7 @@ fn agent_deadline_since(
     spawns: &SpawnSiteRoots<'_>,
     since: u64,
 ) -> Option<u64> {
-    let now = current_unix_secs();
+    let now = spawns.read_at;
     let mut tasks = Vec::new();
     collect_plan_tasks(&rhei.tasks, &mut tasks);
     let state_map: HashMap<&TaskId, String> = tasks
@@ -447,9 +452,10 @@ impl<'a> DeliberateWaitJudgment<'a> {
         if task.assignee.is_some() {
             return false;
         }
-        // §FS-rhei-run.5.1: a poll whose bound is spent waits for nothing.
-        let now = current_unix_secs();
-        if self.spawns.pending_poll_deadline(self.rhei, machine, task, &state, now + 1).is_some() {
+        // §FS-rhei-run.5.1: a poll whose bound is spent waits for nothing, and every clock
+        // here is judged at the instant the plan was read, as the ready scan judged it.
+        let (now, since) = (self.spawns.read_at, self.spawns.pending_since());
+        if self.spawns.pending_poll_deadline(self.rhei, machine, task, &state, since).is_some() {
             return true;
         }
         // The fourth deliberate wait, belonging with the other three: the
@@ -457,7 +463,7 @@ impl<'a> DeliberateWaitJudgment<'a> {
         // Attention. §FS-rhei-run.3.3 §FS-rhei-run-report.3.1
         if task_provider_limit(self.rhei, self.machines, task)
             .and_then(|limit| limit.deadline_epoch())
-            .is_some_and(|deadline| deadline > current_unix_secs())
+            .is_some_and(|deadline| deadline > now)
         {
             return true;
         }

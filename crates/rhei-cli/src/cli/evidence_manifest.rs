@@ -237,6 +237,8 @@ fn finish_evidence_run(exit_code: i32) -> Option<serde_json::Value> {
 
 /// Write the manifest as the run loop ends, before `run_finished` carries its
 /// digest, with the exit code the run is about to return. §FS-rhei-evidence.9.2
+/// `read_at` is the instant of the run's last ready scan, which the run's own
+/// halt verdict is judged at. §FS-rhei-run.5.1
 #[allow(clippy::too_many_arguments)]
 fn finish_evidence_at_loop_end(
     input: &Path,
@@ -246,6 +248,7 @@ fn finish_evidence_at_loop_end(
     settings: &RheiSettings,
     scope: &RheiScope,
     interrupted: bool,
+    read_at: u64,
     opts: &RunOptions,
 ) -> Option<serde_json::Value> {
     if opts.dry_run() {
@@ -253,7 +256,9 @@ fn finish_evidence_at_loop_end(
     }
     let halts = !interrupted
         && load_run_plan(input).is_ok_and(|loaded| {
-            let spawns = SpawnSiteRoots::new(workspace_root, runtime_dir, &loaded, machines, Some(settings), opts);
+            // The run's own halt verdict, at its instant. §FS-rhei-run.5.1
+            let spawns = SpawnSiteRoots::new(workspace_root, runtime_dir, &loaded, machines, Some(settings), opts)
+                .judged_at(read_at);
             scoped_unfinished_task_exists(&loaded.rhei, &machines.set, scope)
                 && !remaining_work_is_only_gating_or_poll_blocked(&loaded.rhei, &machines.set, scope, &spawns)
         });

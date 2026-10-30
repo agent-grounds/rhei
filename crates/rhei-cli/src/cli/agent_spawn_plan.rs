@@ -146,11 +146,17 @@ struct SpawnSiteRoots<'a> {
     settings: Option<&'a RheiSettings>,
     /// The options each agent resolves under, which name the record it keeps.
     opts: &'a RunOptions,
+    /// The instant, in Unix seconds, this reading of the plan stands for. The
+    /// ready scan and every judgement that follows from it compare a deadline
+    /// with this one instant, never with a clock read of their own, so a poll
+    /// the scan held back stays pending however long the scan took.
+    /// §FS-rhei-run.5.1
+    read_at: u64,
 }
 
 impl<'a> SpawnSiteRoots<'a> {
     /// The roots a run's spawn sites plan under, with each ticket's own root as
-    /// its loaded plan gives it.
+    /// its loaded plan gives it, read at this instant.
     fn new(
         workspace_root: &'a Path,
         runtime_dir: &'a Path,
@@ -160,7 +166,22 @@ impl<'a> SpawnSiteRoots<'a> {
         opts: &'a RunOptions,
     ) -> Self {
         let tasks = ReadySetRoots { workspace_root, task_roots: &loaded.task_roots };
-        Self { tasks, runtime_dir, machines, settings, opts }
+        Self { tasks, runtime_dir, machines, settings, opts, read_at: current_unix_secs() }
+    }
+
+    /// This reading, judged at the instant an earlier reading of the same run
+    /// was taken. A run's stopping decision reloads the plan its last ready
+    /// scan read and judges it where that scan stood, so a poll the scan held
+    /// back is pending to the idle and halt verdicts too. §FS-rhei-run.5.1
+    fn judged_at(self, read_at: u64) -> Self {
+        Self { read_at, ..self }
+    }
+
+    /// The `since` that asks whether a deadline is still pending as of this
+    /// reading: one second past its instant, so a deadline at that instant is
+    /// already due. §FS-rhei-run.5.1
+    fn pending_since(&self) -> u64 {
+        self.read_at.saturating_add(1)
     }
 
     /// The roots a reading no run is behind plans under, given the plan's own
@@ -180,7 +201,8 @@ impl<'a> SpawnSiteRoots<'a> {
     /// or after `since` and the attempt it schedules would spawn. A poll whose
     /// bound is spent is not blocked by it, whatever the last charge or a lowered
     /// `max_attempts` left there, so the ticket stays ready and its spawn site
-    /// halts it. A reader asking whether the deadline holds now passes `now + 1`.
+    /// halts it. A reader asking whether the deadline still holds as of this
+    /// reading passes [`Self::pending_since`], never a clock read of its own.
     ///
     /// The spawn record is read only for a poll this deadline would hold.
     // §FS-rhei-run.5.1 §FS-rhei-run.3.7.4
@@ -310,7 +332,8 @@ impl<'a> SpawnSiteRoots<'a> {
         static DEFAULT_SETTINGS: std::sync::OnceLock<RheiSettings> = std::sync::OnceLock::new();
         let settings = Some(DEFAULT_SETTINGS.get_or_init(RheiSettings::default));
         let tasks = ReadySetRoots::plan_only(workspace_root);
-        Self { tasks, runtime_dir, machines, settings, opts: no_run_options() }
+        let read_at = current_unix_secs();
+        Self { tasks, runtime_dir, machines, settings, opts: no_run_options(), read_at }
     }
 }
 

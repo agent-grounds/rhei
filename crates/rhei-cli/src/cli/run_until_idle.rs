@@ -156,7 +156,9 @@ impl<'a> IdleBlockerScan<'a> {
                 return Some(blocker);
             }
         }
-        let now = current_unix_secs();
+        // Both clocks are judged at the instant the plan was read, as the ready
+        // scan and the deliberate-wait judgment judge them. §FS-rhei-run.5.1
+        let now = self.spawns.read_at;
         // §FS-rhei-run.3.3: the fourth deliberate wait, ranked where the halt
         // classification ranks it — above the poll, because a parked ticket's
         // own line already reads as the provider's.
@@ -167,7 +169,8 @@ impl<'a> IdleBlockerScan<'a> {
             return Some(rhei_tui::IdleBlocker::ProviderLimit);
         }
         // §FS-rhei-run.5.1: a poll whose bound is spent waits for nothing.
-        if self.spawns.pending_poll_deadline(self.rhei, machine, task, &state, now + 1).is_some() {
+        let since = self.spawns.pending_since();
+        if self.spawns.pending_poll_deadline(self.rhei, machine, task, &state, since).is_some() {
             return Some(rhei_tui::IdleBlocker::Poll);
         }
         None
@@ -183,6 +186,10 @@ impl<'a> IdleBlockerScan<'a> {
 /// itself, so a real problem beside a wait defeats idle however many tickets
 /// wait beside it, and an interrupt is handled by its caller because it
 /// outranks both.
+///
+/// The judgment, the blocker and the reported next attempt all compare their
+/// deadlines with the one instant `spawns` was read at, so none of them drops
+/// a poll the run's last ready scan held back. §FS-rhei-run.5.1
 // §FS-rhei-run.3 §FS-rhei-run-report.3.1
 fn idle_return(
     rhei: &rhei_core::ast::Rhei,

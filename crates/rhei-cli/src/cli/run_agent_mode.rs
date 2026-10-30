@@ -167,6 +167,9 @@ fn run_agent_mode(
     let mut progress_since_stall_reset = false;
     // §FS-rhei-run.3.6: the stalls released only by an advance after them.
     let mut empty_visit_holds = EmptyVisitHolds::default();
+    // The instant of the last reading the loop decided on, which the stopping
+    // decision after it judges at. §FS-rhei-run.5.1
+    let mut last_read_at = current_unix_secs();
     // §FS-rhei-panta.6.1: `--rhei` narrows candidates, not prior resolution.
     let rhei_scope = rhei_scope_set(opts.rhei_scope());
     if rhei_scope.is_some() {
@@ -203,6 +206,7 @@ fn run_agent_mode(
         // gives its tickets, and asks a poll what its spawn site would.
         let spawns =
             SpawnSiteRoots::new(&workspace_root, &runtime_dir, &loaded, machines, Some(settings), opts);
+        last_read_at = spawns.read_at;
         let ready = narrow_to_rhei_scope(
             find_runnable_tasks_with_options(&loaded.rhei, &machines.set, &spawns, &HashSet::new()),
             &rhei_scope,
@@ -274,8 +278,9 @@ fn run_agent_mode(
         awaiting_gate_announced = false;
 
         pass += 1;
-        // A poll that falls due after this instant is not in `ready`. §FS-rhei-run.3.6
-        let pass_ready_at = current_unix_secs();
+        // A poll that falls due after the instant `ready` was read at is not in it.
+        // §FS-rhei-run.3.6 §FS-rhei-run.5.1
+        let pass_ready_at = spawns.read_at;
         // A ticket only counts as newly out of the running when it stepped out
         // here: a pass may continue past one, and only when it learned
         // something. §FS-rhei-run.3
@@ -1043,8 +1048,11 @@ fn run_agent_mode(
         .filter(|_| !interrupted_run && (!opts.dry_run() || pass == 0))
         .and_then(|loaded| {
             let (machines, settings) = (&live.machines, &live.settings);
+            // Judged where the last ready scan stood, which a poll it held is
+            // still pending to. §FS-rhei-run.5.1
             let spawns =
-                SpawnSiteRoots::new(&workspace_root, &runtime_dir, loaded, machines, Some(settings), opts);
+                SpawnSiteRoots::new(&workspace_root, &runtime_dir, loaded, machines, Some(settings), opts)
+                    .judged_at(last_read_at);
             idle_return(&loaded.rhei, &machines.set, settings, &rhei_scope, &spawns)
         });
     if idle.is_some() {
@@ -1188,6 +1196,7 @@ fn run_agent_mode(
         &live.settings,
         &rhei_scope,
         interrupted_run,
+        last_read_at,
         opts,
     );
     sink.emit(RunEvent::RunFinished {
@@ -1255,8 +1264,10 @@ fn run_agent_mode(
     if !opts.dry_run() {
         let loaded = load_run_plan(input)?;
         let (machines, settings) = (&live.machines, &live.settings);
+        // The idle verdict's instant, so the halt cannot contradict it. §FS-rhei-run.5.1
         let spawns =
-            SpawnSiteRoots::new(&workspace_root, &runtime_dir, &loaded, machines, Some(settings), opts);
+            SpawnSiteRoots::new(&workspace_root, &runtime_dir, &loaded, machines, Some(settings), opts)
+                .judged_at(last_read_at);
         // §FS-rhei-panta.6.1: a narrowed run halts on in-scope work only —
         // out-of-scope tickets left non-terminal are not a failure.
         if scoped_unfinished_task_exists(&loaded.rhei, &machines.set, &rhei_scope)

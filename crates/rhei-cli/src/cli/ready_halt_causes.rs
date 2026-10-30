@@ -424,8 +424,9 @@ fn classify_halt(
     {
         return HaltCause::BlockedByPrior { prior, cancelled };
     }
+    // Active as of the instant the plan was read, as the scan judged it. §FS-rhei-run.5.1
     if let Some(limit) = task_provider_limit(rhei, machines, task)
-        .filter(|limit| limit.deadline_epoch().is_some_and(|deadline| deadline > current_unix_secs()))
+        .filter(|limit| limit.deadline_epoch().is_some_and(|deadline| deadline > spawns.read_at))
     {
         return HaltCause::ProviderLimited {
             provider: limit.identity.provider,

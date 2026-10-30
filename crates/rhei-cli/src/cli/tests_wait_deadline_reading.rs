@@ -117,8 +117,6 @@ mod wait_deadline_reading {
     /// keeps the spent-bound filter.
     // §FS-rhei-run.5.1 §FS-rhei-run.3.6 §FS-rhei-run.3.7.4
     #[test]
-    #[ignore = "red until #542: the deadline query re-reads the clock after the ready scan and drops \
-                the poll it held; implement removes this"]
     fn a_poll_the_scan_held_is_still_waited_for_after_the_second_turns() {
         let clock = HeldClock::at(T);
         let plan = PollPlan::new();
@@ -153,8 +151,6 @@ mod wait_deadline_reading {
     /// gets the same answer.
     // §FS-rhei-run.5.1
     #[test]
-    #[ignore = "red until #542: the callback-mode deadline query re-reads the clock after the ready \
-                scan and drops the poll it held; implement removes this"]
     fn a_poll_the_scan_held_is_still_waited_for_in_callback_mode_after_the_second_turns() {
         let clock = HeldClock::at(T);
         let plan = PollPlan::new();
@@ -179,8 +175,6 @@ mod wait_deadline_reading {
     /// own report says the poll resumes itself.
     // §FS-rhei-run.5.1 §FS-rhei-run.3 §FS-rhei-run-report.3.1
     #[test]
-    #[ignore = "red until #542: the idle judgement re-reads the clock after the ready scan and drops \
-                the poll it held, so the run halts instead of returning idle; implement removes this"]
     fn a_poll_the_scan_held_is_still_the_idle_return_after_the_second_turns() {
         let clock = HeldClock::at(T);
         let plan = PollPlan::new();

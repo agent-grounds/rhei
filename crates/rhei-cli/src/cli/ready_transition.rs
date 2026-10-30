@@ -135,9 +135,10 @@ fn ready_scan_stops_before_inputs(
     state_name: &str,
     spawns: &SpawnSiteRoots<'_>,
 ) -> bool {
-    // The scan's own poll skip, so a spent bound reaches the inputs here too.
-    let now = current_unix_secs();
-    if spawns.pending_poll_deadline(rhei, machine, task, state_name, now + 1).is_some() {
+    // The scan's own poll skip at the scan's own instant, so a spent bound reaches
+    // the inputs here too. §FS-rhei-run.5.1
+    let since = spawns.pending_since();
+    if spawns.pending_poll_deadline(rhei, machine, task, state_name, since).is_some() {
         return true;
     }
     if !task_is_supervising(task, machine) {
@@ -319,9 +320,11 @@ fn find_ready_tasks_in_view<'a>(
             continue;
         }
 
+        // Held as of the reading's instant, which every later look at it judges at.
+        // §FS-rhei-run.5.1
         if view == ReadySetView::RunnableNow
             && spawns
-                .pending_poll_deadline(rhei, machine, task, &normalized_state, current_unix_secs() + 1)
+                .pending_poll_deadline(rhei, machine, task, &normalized_state, spawns.pending_since())
                 .is_some()
         {
             continue;

@@ -19,6 +19,7 @@
 mod account;
 mod admission;
 mod ancestry;
+mod append;
 mod authority;
 mod bounds;
 mod classify;

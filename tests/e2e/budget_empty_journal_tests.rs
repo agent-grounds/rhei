@@ -42,8 +42,6 @@ fn assert_established(world: &World, at_least: usize) {
 /// empty journal: the `initialize` receipt and the allowance land in it.
 // §FS-rhei-budgets.5.4
 #[test]
-#[ignore = "red until #540: budget init on an empty journal fails with 'File exists \
-            (os error 17)'; implement removes this"]
 fn budget_init_establishes_an_account_whose_journal_is_empty() {
     let world = emptied("budget-empty-init");
     let plan = world.plan().display().to_string();
@@ -60,8 +58,6 @@ fn budget_init_establishes_an_account_whose_journal_is_empty() {
 /// journal and moves the task.
 // §FS-rhei-budgets.5.4
 #[test]
-#[ignore = "red until #540: an applied edge on an empty journal fails with 'File exists \
-            (os error 17)'; implement removes this"]
 fn an_applied_edge_establishes_an_account_whose_journal_is_empty() {
     let world = emptied("budget-empty-edge");
 
@@ -79,8 +75,6 @@ fn an_applied_edge_establishes_an_account_whose_journal_is_empty() {
 /// established, in text and in JSON, and writes nothing.
 // §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #540: budget show calls an empty journal untrustworthy, 'missing \
-            account initialization', with help naming rhei budget show; implement removes this"]
 fn budget_show_reports_an_empty_journal_as_no_account_yet() {
     let world = emptied("budget-empty-show");
     let (journal, witness) = (world.journal(), world.witness());
@@ -95,8 +89,6 @@ fn budget_show_reports_an_empty_journal_as_no_account_yet() {
 /// is the same absent state and gets the same report.
 // §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #540: budget show calls a bare lock file untrustworthy, 'missing \
-            account initialization', with help naming rhei budget show; implement removes this"]
 fn budget_show_reports_a_journal_deleted_beside_its_lock_as_no_account_yet() {
     let world = emptied("budget-empty-lock");
     let journal = world.journal();
@@ -113,8 +105,6 @@ fn budget_show_reports_a_journal_deleted_beside_its_lock_as_no_account_yet() {
 // A journal no one may read is a Unix mode; Windows has no such permission bit to clear.
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #540: budget show's own refusal on an unreadable journal says 'inspect \
-            the project's account with: rhei budget show'; implement removes this"]
 fn budget_show_never_sends_the_operator_back_to_budget_show() {
     use std::os::unix::fs::PermissionsExt;
 

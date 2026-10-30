@@ -233,6 +233,13 @@ pub(crate) fn cut(path: &Path, length: u64) -> Result<()> {
         }
         return sync_directory(path.parent().expect("a cut file has a parent"));
     }
+    shorten(path, length)
+}
+
+/// Shorten a file in place to `length`, zero bytes included, and leave it
+/// there: the cut back of a journal the first receipt took over rather than
+/// created. §AR-neural-admission.4
+pub(crate) fn shorten(path: &Path, length: u64) -> Result<()> {
     let file = OpenOptions::new()
         .write(true)
         .open(path)

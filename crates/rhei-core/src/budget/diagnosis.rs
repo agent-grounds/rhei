@@ -68,9 +68,15 @@ pub(crate) enum Opening {
 
 impl Opening {
     /// Inspection reports the same classification a non-creating open refuses.
+    ///
+    /// An opening with no receipt is the **absent** state the first charge
+    /// establishes, not an account to report: a journal that is there and
+    /// empty, or only the journal's lock left in the account directory, with no
+    /// witness history. A verified chain always holds at least one receipt.
     /// §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
     pub(crate) fn inspection(self) -> Inspection {
         match self {
+            Self::Verified(journal) if journal.receipts().is_empty() => Inspection::Absent,
             Self::Verified(journal) => Inspection::Verified(journal),
             Self::Damaged(diagnosis, _) => Inspection::Damaged(diagnosis),
             Self::Absent(_) => Inspection::Absent,
@@ -393,8 +399,9 @@ pub enum Inspection {
     /// A verified account, with its read-only transaction still held.
     Verified(Box<Journal>),
     Damaged(Box<Diagnosis>),
-    /// Neither a journal nor a witness: the lawful **absent** state, which the
-    /// next admission establishes silently. §FS-rhei-budgets.5.4
+    /// No receipt in a journal, if there is one, and no witness: the lawful
+    /// **absent** state, which the next admission establishes silently.
+    /// §FS-rhei-budgets.5.4
     Absent,
 }
 

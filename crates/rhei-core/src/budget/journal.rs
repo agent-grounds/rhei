@@ -7,7 +7,8 @@
 //! the append fails, and the next opener refuses the incomplete chain.
 //! §FS-rhei-budgets.5.2 §AR-neural-admission.4
 
-use super::authority::{cut, write_whole, Writer};
+use super::append::append_line;
+use super::authority::{write_whole, Writer};
 use super::classify::{classify, Reading, Sides};
 use super::diagnosis::{Diagnosis, Opening};
 use super::replay::State;
@@ -103,10 +104,11 @@ impl Journal {
         Self::locked(root, project_uuid, writable, false)
     }
 
-    /// Open the account, establishing it when it is **absent** — no journal and
-    /// no witness claiming this root. That is lawful and silent: the first
-    /// charge of either kind — an admission or an applied edge — mints it
-    /// inside the transaction it is already holding. §FS-rhei-budgets.5.4
+    /// Open the account, establishing it when it is **absent** — no receipt in a
+    /// journal, whether there is no journal or an empty one, and no witness
+    /// claiming this root. That is lawful and silent: the first charge of either
+    /// kind — an admission or an applied edge — mints it inside the transaction
+    /// it is already holding. §FS-rhei-budgets.5.4
     pub fn establish(root: &Path, project_uuid: &str, audit: &Audit) -> Result<Self> {
         audit.validate()?;
         let mut ledger = Self::locked(root, project_uuid, true, true)?;
@@ -234,14 +236,17 @@ impl Journal {
     /// only an open does: replay the verified chain, and adopt a journal this
     /// machine has no witness for. §FS-rhei-budgets.5.4 §FS-rhei-budgets.5.4.3
     fn load(&mut self) -> Result<Option<(Box<Diagnosis>, BudgetError)>> {
+        // A journal this user cannot read is named, so the refusal says which
+        // file it could not reach. §FS-rhei-budgets.10
+        let unreachable = |error: std::io::Error| BudgetError::unreachable(&self.path, &error);
         let journal = match File::open(&self.path) {
             Ok(mut file) => {
                 let mut bytes = Vec::new();
-                file.read_to_end(&mut bytes)?;
+                file.read_to_end(&mut bytes).map_err(unreachable)?;
                 Some(bytes)
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-            Err(error) => return Err(error.into()),
+            Err(error) => return Err(unreachable(error)),
         };
         let sides = Sides {
             root: &self.root,
@@ -405,45 +410,15 @@ impl Journal {
     pub(super) fn write_receipt(&mut self, line: &[u8], write: Writer) -> Result<()> {
         let witnessed = self.authority.bytes().len() as u64;
         self.authority.append(line)?;
-        let Err((error, journal_cut)) =
-            append_line(&self.path, self.receipts.is_empty(), line, write)
+        let Err((error, undo)) = append_line(&self.path, self.receipts.is_empty(), line, write)
         else {
             return Ok(());
         };
-        if journal_cut.map_or(Ok(()), |length| cut(&self.path, length)).is_ok() {
+        if undo.map_or(Ok(()), |undo| undo.apply(&self.path)).is_ok() {
             let _ = self.authority.cut_back(witnessed);
         }
         Err(error)
     }
-}
-
-/// Append one line to the journal, which the account's first receipt creates.
-///
-/// A failure carries the length to cut the journal back to: none where the
-/// append never opened it or it is still at its old length, because then it
-/// holds nothing of the line; and the length of none where this append created
-/// it, so it is removed. §AR-neural-admission.4
-fn append_line(
-    path: &Path,
-    first: bool,
-    line: &[u8],
-    write: Writer,
-) -> std::result::Result<(), (BudgetError, Option<u64>)> {
-    let mut options = OpenOptions::new();
-    options.write(true).append(true);
-    if first {
-        options.create_new(true);
-    }
-    let file =
-        options.open(path).map_err(|error| (BudgetError::unreachable(path, &error), None))?;
-    let before = match first {
-        true => 0,
-        false => file.metadata().map_err(|error| (error.into(), None))?.len(),
-    };
-    write(&file, line).and_then(|()| file.sync_all()).map_err(|error| {
-        let now = file.metadata().map(|metadata| metadata.len()).ok();
-        (error.into(), (first || now != Some(before)).then_some(before))
-    })
 }
 
 /// One verified chain, held apart from the transaction that opened it.

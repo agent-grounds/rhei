@@ -56,6 +56,8 @@ mod budget_program_verification_support;
 mod budget_program_verification_tests;
 mod budget_run_report_end_tests;
 mod budget_spend_tests;
+mod budget_spent_visit_support;
+mod budget_spent_visit_tests;
 mod budget_support;
 mod budget_travel_establish_tests;
 mod budget_travel_halt_tests;

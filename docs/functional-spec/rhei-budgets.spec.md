@@ -693,7 +693,13 @@ truncated, or its hash chain does not verify; or the account this root presents
 is held by another root; or the witness's tail was written from another root.
 New work is **refused**, naming both paths. This includes program states in
 both sequential execution and the worker pool: account trust is verified before
-creating the subprocess or recording an attempt start. On refusal, task state,
+creating the subprocess or recording an attempt start. It also comes before a
+spent visit is reported ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)), on agent states as on program
+states and in sequential execution and the worker pool alike: where the visit
+has no attempt left and the account is damaged, the run reports the account
+refusal and not the spent-visit halt or its `rhei retry` advice, because no
+`rhei retry` gets past a damaged account. Once the account is repaired, the
+next run reports the spent visit. On refusal, task state,
 poll counters, retry deadlines and attempt records stay as they were before the
 run; repeated refused runs perform no program side effects. Verification spends
 no invocation, reserves no neural capacity and does not establish an absent

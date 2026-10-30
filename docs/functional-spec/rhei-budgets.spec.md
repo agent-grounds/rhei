@@ -680,7 +680,10 @@ Three states, and the specification distinguishes them by name because they are
 answered differently:
 
 **Absent** — no `budgets/` directory and no witness claiming this canonical
-root. This is **lawful and silent**. The first thing the project is **charged**
+root. It stays absent where the witness index still names the root or an empty
+account directory is left, once the journal and the witness history are both
+gone (the stated residual of [§FS-rhei-budgets.5.3](rhei-budgets.spec.md#53-the-witness)).
+This is **lawful and silent**. The first thing the project is **charged**
 for establishes it: an admission ([§FS-rhei-budgets.6.1](rhei-budgets.spec.md#61-the-transaction))
 or an applied edge ([§FS-rhei-budgets.4.1](rhei-budgets.spec.md#41-travel)),
 whichever comes first. That charge mints the uuid, creates the directory and the

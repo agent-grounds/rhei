@@ -6,7 +6,7 @@
 //! §FS-rhei-budgets.5.1 §AR-neural-admission.7
 
 use super::diagnosis::{
-    foreign_tail, journal_path, Damage, Damaged, Diagnosis, History, Inspection, Retired,
+    foreign_tail, journal_path, Damage, Damaged, Diagnosis, History, Inspection, Opening, Retired,
 };
 use super::journal::{Audit, Journal};
 use super::roots::{held_elsewhere_refusal, record_root, retract_root, settle, witnessed_roots};
@@ -104,6 +104,22 @@ impl Account {
     pub fn open(&self, writable: bool) -> Result<Journal> {
         self.refuse_copy()?;
         Journal::open(&self.root, &self.uuid, writable)
+    }
+
+    /// Verify the account's history without opening it for a charge or
+    /// establishing it.
+    ///
+    /// It refuses what `inspect` reports as damaged, a copy held elsewhere or a
+    /// damaged opening, with the error `open` would raise. It passes an
+    /// **absent** account. That one belongs to the first charge, so this creates
+    /// none of its directory, journal lock or journal, just as `inspect` creates
+    /// none. Both locks are released before it returns. §FS-rhei-budgets.5.4
+    pub fn verify(&self) -> Result<()> {
+        self.refuse_copy()?;
+        match Journal::locked_or_damaged(&self.root, &self.uuid, false, false)? {
+            Opening::Verified(_) | Opening::Absent(_) => Ok(()),
+            Opening::Damaged(_, error) => Err(error),
+        }
     }
 
     /// The ticket identity string one ticket uuid takes inside this account.

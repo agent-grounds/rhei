@@ -21,6 +21,7 @@ mod admission;
 mod ancestry;
 mod authority;
 mod bounds;
+mod classify;
 mod diagnosis;
 mod events;
 mod identity;
@@ -37,6 +38,8 @@ mod adjust_tests;
 mod ancestry_tests;
 #[cfg(test)]
 mod bounds_tests;
+#[cfg(test)]
+mod failed_append_tests;
 #[cfg(test)]
 mod foreign_tail_tests;
 #[cfg(test)]
@@ -84,7 +87,7 @@ pub use bounds::{
     ceiling_policy_line, halt_text, Bound, BoundSource, BoundUnit, Limiter, Remedy, SettingsFiles,
     CLAMP_PROJECTS,
 };
-pub use diagnosis::{Damage, Diagnosis, Foreign, History, Inspection, Retired};
+pub use diagnosis::{Damage, Diagnosis, Foreign, History, Inspection, Retired, Torn};
 pub use events::{BudgetEvent, BudgetLine};
 pub use identity::IdentityMove;
 pub use journal::{Audit, Journal, Receipt};

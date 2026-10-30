@@ -25,7 +25,6 @@ use super::*;
 // the size of a file, and the failed journal append below is the portable form.
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #536: a witness write cut short leaves a fragment in the witness; implement removes this"]
 fn a_witness_write_cut_short_leaves_both_files_as_they_were() {
     use nix::sys::resource::{setrlimit, Resource};
     use nix::sys::signal::{signal, SigHandler, Signal};
@@ -65,7 +64,6 @@ fn a_witness_write_cut_short_leaves_both_files_as_they_were() {
 /// cannot be opened for writing. Both files are as they were before the edge.
 // §FS-rhei-budgets.5.4.3
 #[test]
-#[ignore = "red until #536: a failed journal append leaves the witness a receipt ahead; implement removes this"]
 fn a_failed_journal_append_leaves_both_files_as_they_were() {
     let world = world("budget-append-journal");
     let journal_path = world.journal();
@@ -109,7 +107,6 @@ fn a_failed_journal_append_leaves_both_files_as_they_were() {
 // directory does not stop one being created, and the first journal is not there to seal.
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #536: a failed first journal append leaves a witness and no journal; implement removes this"]
 fn a_failed_first_journal_append_leaves_the_account_absent() {
     use std::os::unix::fs::PermissionsExt;
 

@@ -86,6 +86,13 @@ pub fn move_command(from: &Path, to: &Path) -> String {
     Dialect::of_this_platform().move_file(from, to)
 }
 
+/// The platform shell's own trim: keep every byte of `file` under `kept`, then
+/// cut `file` back to its first `length` bytes in place. §FS-rhei-budgets.5.4.3
+/// §REQ-cross-platform.2
+pub fn trim_command(file: &Path, kept: &Path, length: u64) -> String {
+    Dialect::of_this_platform().trim(file, kept, length)
+}
+
 /// Which shell a printed command line is written for.
 ///
 /// Named rather than left to `cfg!` at each point of use, so both halves are
@@ -139,6 +146,25 @@ impl Dialect {
             Self::Cmd => "move",
         };
         format!("{verb} {} {}", self.path(from), self.path(to))
+    }
+
+    /// The cut never empties the file first: an empty witness reads as none, so
+    /// a charge in that window would adopt the journal over the receipts past
+    /// it. `dd` with `seek` is one `ftruncate` and no `O_TRUNC`, where a `>`
+    /// would truncate; `cmd` has no command that shortens a file, so it is one
+    /// `SetLength`, with a `'` doubled for PowerShell. §FS-rhei-budgets.5.4.3
+    fn trim(self, file: &Path, kept: &Path, length: u64) -> String {
+        let keep = self.copy(file, kept);
+        match self {
+            Self::Posix => {
+                format!("{keep} && dd if=/dev/null of={} bs=1 seek={length}", self.path(file))
+            }
+            Self::Cmd => format!(
+                "{keep} && powershell -NoProfile -Command \"$f=[IO.File]::Open('{}','Open','Write');\
+                 $f.SetLength({length});$f.Close()\"",
+                file.display().to_string().replace('\'', "''")
+            ),
+        }
     }
 
     fn make_directory(self, directory: &Path) -> String {
@@ -421,6 +447,30 @@ mod tests {
         );
     }
 
+    /// The trim in both dialects, for a witness path holding a space and a `'`:
+    /// one word in each shell, the POSIX `'` closed, escaped and reopened, and
+    /// the PowerShell one doubled inside its single quotes.
+    // §FS-rhei-budgets.5.4.3 §REQ-cross-platform.2
+    #[test]
+    fn trim_command_spells_both_dialects_for_a_path_with_a_space_and_a_quote() {
+        assert_eq!(
+            Dialect::Posix.trim(
+                Path::new("/s/it's here/history.jsonl"),
+                Path::new("/s/it's here/history-torn-1.jsonl"),
+                3366
+            ),
+            r#"cp '/s/it'"'"'s here/history.jsonl' '/s/it'"'"'s here/history-torn-1.jsonl' && dd if=/dev/null of='/s/it'"'"'s here/history.jsonl' bs=1 seek=3366"#
+        );
+        assert_eq!(
+            Dialect::Cmd.trim(
+                Path::new(r"C:\s\it's here\history.jsonl"),
+                Path::new(r"C:\s\it's here\history-torn-1.jsonl"),
+                3366
+            ),
+            r#"copy "C:\s\it's here\history.jsonl" "C:\s\it's here\history-torn-1.jsonl" && powershell -NoProfile -Command "$f=[IO.File]::Open('C:\s\it''s here\history.jsonl','Open','Write');$f.SetLength(3366);$f.Close()""#
+        );
+    }
+
     /// The public pair is this platform's dialect and nothing else, so a caller
     /// never has to ask which one it got.
     // §FS-rhei-budgets.10
@@ -431,6 +481,7 @@ mod tests {
         assert_eq!(copy_command(from, to), Dialect::of_this_platform().copy(from, to));
         assert_eq!(make_directory_command(to), Dialect::of_this_platform().make_directory(to));
         assert_eq!(move_command(from, to), Dialect::of_this_platform().move_file(from, to));
+        assert_eq!(trim_command(from, to, 1), Dialect::of_this_platform().trim(from, to, 1));
         assert!(copy_command(from, to).starts_with(if cfg!(windows) { "copy " } else { "cp " }));
     }
 

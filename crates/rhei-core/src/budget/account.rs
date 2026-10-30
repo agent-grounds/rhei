@@ -5,9 +5,8 @@
 //! per rhei would let a project add a rhei to buy capacity.
 //! §FS-rhei-budgets.5.1 §AR-neural-admission.7
 
-use super::diagnosis::{
-    foreign_tail, journal_path, Damage, Damaged, Diagnosis, History, Inspection, Opening, Retired,
-};
+use super::classify::{classify, Reading, Sides};
+use super::diagnosis::{journal_path, Damage, Diagnosis, History, Inspection, Opening, Retired};
 use super::journal::{Audit, Journal};
 use super::roots::{held_elsewhere_refusal, record_root, retract_root, settle, witnessed_roots};
 use super::types::BudgetError;
@@ -167,8 +166,9 @@ impl Account {
     /// lost, so the remedy is the restore, and retiring the root would give up
     /// an account that is genuinely this project's while leaving the journal
     /// that still fails to replay. Only a journal that is wholly absent is
-    /// retired, which is the one sub-case a reused path can produce.
-    /// §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
+    /// retired, which is the one sub-case a reused path can produce — whether or
+    /// not its witness ends mid-receipt, since the move keeps every byte.
+    /// §FS-rhei-budgets.5.4 §FS-rhei-budgets.5.4.3 §FS-rhei-budgets.10
     ///
     /// Classification happens under the **authority** lock alone, which is
     /// sound and is the only way it can be done once — that lock already
@@ -202,26 +202,26 @@ impl Account {
         if authority.is_empty() {
             return Ok(Retirement::NothingToRetire);
         }
-        let project_id = format!("panta:{}", self.uuid);
         let journal = read_journal(&journal_path(&self.root, &self.uuid))?;
-        let Some(damage) =
-            classify(&self.root, &project_id, journal.as_deref(), authority.bytes(), &authority)
-        else {
-            return Ok(Retirement::Sound);
+        let sides = Sides {
+            root: &self.root,
+            uuid: &self.uuid,
+            witness_path: authority.path(),
+            witness: authority.bytes(),
+            journal: journal.as_deref(),
         };
-        let history = History::read(&project_id, authority.bytes());
-        if damage.journal_exists() {
-            // A tail written from another root is refused too, but it names
-            // the set-aside rather than the restore. §FS-rhei-budgets.5.4.2
-            let foreign = journal
-                .as_deref()
-                .filter(|_| damage == Damage::ForeignTail)
-                .and_then(|journal| foreign_tail(&self.root, journal, authority.bytes()));
-            return Ok(Retirement::RestoreInstead(Box::new(
-                Diagnosis::new(damage, &self.root, &self.uuid, authority.path(), history)
-                    .with_foreign(foreign),
-            )));
+        let diagnosis = match classify(&sides) {
+            Reading::Damaged(diagnosis, _) => diagnosis,
+            Reading::Verified(_) => return Ok(Retirement::Sound),
+            Reading::Absent => return Ok(Retirement::NothingToRetire),
+        };
+        // A tail written from another root, or a witness that ends mid-receipt,
+        // is refused too, naming the set-aside or the trim rather than the
+        // restore. §FS-rhei-budgets.5.4.2 §FS-rhei-budgets.5.4.3
+        if diagnosis.journal_present {
+            return Ok(Retirement::RestoreInstead(diagnosis));
         }
+        let Diagnosis { damage, history, .. } = *diagnosis;
         let receipt = serde_json::json!({
             "schema": "rhei.budget.retirement.v1",
             "uuid": self.uuid,
@@ -235,7 +235,7 @@ impl Account {
             "invocations": history.invocations,
         });
         retract_root(&self.root)?;
-        self.drop_empty_account_directory(damage)?;
+        self.drop_empty_account_directory()?;
         let kept_at = authority.retire(&stamp(&audit.written_at), &receipt)?;
         Ok(Retirement::Retired(Retired {
             uuid: self.uuid.clone(),
@@ -298,10 +298,7 @@ impl Account {
     /// refuses every damage a journal is present for, and this is the same
     /// condition read a second time in front of a recursive remove.
     /// §FS-rhei-budgets.10
-    fn drop_empty_account_directory(&self, damage: Damage) -> Result<()> {
-        if damage.journal_exists() {
-            return Ok(());
-        }
+    fn drop_empty_account_directory(&self) -> Result<()> {
         let directory = self.directory();
         if !directory.exists() || journal_path(&self.root, &self.uuid).exists() {
             return Ok(());
@@ -322,7 +319,8 @@ pub enum Retirement {
     /// The journal is damaged but **present**, so it is this project's own and
     /// its tail is what was lost: the remedy is the restore this carries, and
     /// nothing was written. Under `foreign_tail` the remedy is the set-aside
-    /// instead. §FS-rhei-budgets.5.4 §FS-rhei-budgets.5.4.2
+    /// instead, and under `witness_torn` the trim. §FS-rhei-budgets.5.4
+    /// §FS-rhei-budgets.5.4.2 §FS-rhei-budgets.5.4.3
     RestoreInstead(Box<Diagnosis>),
     /// No witness claims this root — the lawful **absent** state has nothing
     /// to retire. §FS-rhei-budgets.5.4
@@ -335,36 +333,6 @@ fn read_journal(path: &Path) -> Result<Option<Vec<u8>>> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(BudgetError::unreachable(path, &error)),
     }
-}
-
-/// The sub-cases of §FS-rhei-budgets.5.4 a present root can show, from the
-/// bytes alone. `None` is a journal that replays and matches the witness: the
-/// account is sound. A witness tail written from another root is
-/// `foreign_tail` rather than `journal_truncated`. §FS-rhei-budgets.5.4.2
-fn classify(
-    root: &Path,
-    project_id: &str,
-    journal: Option<&[u8]>,
-    witness: &[u8],
-    authority: &super::authority::Authority,
-) -> Option<Damage> {
-    let Some(journal) = journal else {
-        return Damaged::missing_journal(project_id, authority).map(|damaged| damaged.damage);
-    };
-    let truncated = || match foreign_tail(root, journal, witness) {
-        Some(_) => Damage::ForeignTail,
-        None => Damage::JournalTruncated,
-    };
-    if journal.is_empty() {
-        return Some(truncated());
-    }
-    if super::journal::replay_chain(project_id, journal).is_err() {
-        return Some(Damage::ChainBroken);
-    }
-    if journal == witness {
-        return None;
-    }
-    Some(if authority.continues(journal) { truncated() } else { Damage::ChainBroken })
 }
 
 /// The UTC instant compacted into something that names a directory on every

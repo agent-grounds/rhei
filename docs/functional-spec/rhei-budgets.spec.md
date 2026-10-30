@@ -693,7 +693,8 @@ no prompt is shown, nothing is printed, and establishment mints nothing.
 
 **Damaged** — a witness exists for this root but the journal is absent,
 truncated, or its hash chain does not verify; or the account this root presents
-is held by another root; or the witness's tail was written from another root.
+is held by another root; or the witness's tail was written from another root;
+or the witness ends mid-receipt.
 New work is **refused**, naming both paths. This includes program states in
 both sequential execution and the worker pool: account trust is verified before
 creating the subprocess or recording an attempt start. It also comes before a
@@ -712,7 +713,7 @@ This is a check before starting work, not a lock held for the subprocess's
 lifetime or a guarantee against damage occurring after verification.
 
 A damaged account is never repaired
-in place; what a refusal offers depends on which of five sub-cases it is,
+in place; what a refusal offers depends on which of six sub-cases it is,
 because they are not the same accident:
 
 | sub-case | what is true | what the refusal offers |
@@ -722,10 +723,16 @@ because they are not the same accident:
 | `chain_broken` | a journal exists and its identity, sequence or hash chain does not verify | restore it by copying the witness back |
 | `held_elsewhere` | the uuid this root presents is bound to another root that still holds it | both roots, and `rhei budget forget` for this one ([§FS-rhei-budgets.5.4.1](rhei-budgets.spec.md#541-a-second-root-presenting-the-account)) |
 | `foreign_tail` | the witness runs past the journal and that tail names another root | the other root, and setting the witness aside; never the copy ([§FS-rhei-budgets.5.4.2](rhei-budgets.spec.md#542-a-tail-written-from-another-root)) |
+| `witness_torn` | the witness ends in bytes after its last newline, the fragment of an append cut short | keeping the witness and trimming it to its last whole receipt; never the copy ([§FS-rhei-budgets.5.4.3](rhei-budgets.spec.md#543-a-witness-that-ends-mid-receipt)) |
+
+The copy is offered only where the witness ends in a whole receipt. A witness
+that ends in a fragment carries it into whatever it is copied over, and the
+account copied into is refused again with the same copy offered.
 
 When a witness survives for this root, a wholly absent journal is
-`journal_absent` even if its entire account directory, including the incidental
-`journal.jsonl.lock`, is gone. A non-creating account open must give the same
+`journal_absent` — `witness_torn` where that witness ends mid-receipt — even if
+its entire account directory, including the incidental `journal.jsonl.lock`, is
+gone. A non-creating account open must give the same
 missing-journal refusal and committed witness path and receipt context as when
 only the journal file is missing; it must not blame the missing lock file.
 This applies to `budget adjust` and to the unreadable-budget blocker reported by
@@ -836,6 +843,76 @@ journal that is this project's own ([§FS-rhei-budgets.5.4](rhei-budgets.spec.md
 
 A tail that carries no `identity` receipt cannot be told apart from a tail this
 project lost, so it stays `journal_truncated`, with the restore.
+
+A tail that ends in a fragment ([§FS-rhei-budgets.5.4.3](rhei-budgets.spec.md#543-a-witness-that-ends-mid-receipt)) is still `foreign_tail`
+when its whole receipts name another root: the set-aside moves the fragment
+away with everything else. The fragment is not a receipt, so it is not counted
+among the receipts the tail holds, and an `identity` in it is not read.
+
+#### 5.4.3. A witness that ends mid-receipt
+
+A witness **ends mid-receipt** when bytes follow its last newline: the
+fragment of an append that was cut short. Whether those bytes parse does not
+matter — a complete JSON object without its newline is an append that did not
+finish, and replay refuses it for the same reason.
+
+A charge whose append **fails** — a full disk, a file-size limit, a quota, on
+the witness's side or the journal's — leaves no fragment: the command reports
+its error, both files are as they were before the edge, and the same edge goes
+through once the cause is gone, with nothing to repair ([§AR-neural-admission.4](../architecture/neural-admission.spec.md#4-the-chain-and-the-witness)
+says how). What leaves a fragment is a process killed or a machine that loses
+power mid-write, or a write made before that rule existed.
+
+It is the sub-case `witness_torn`, decided after `held_elsewhere`, which is
+settled before the journal is opened, and after `foreign_tail`, whose set-aside
+already removes the fragment; and before `journal_absent`, `journal_truncated`
+and `chain_broken`, which all offer the copy. A fragment is not a receipt:
+what the recorded history holds — its receipts, first, last and invocations —
+is read from the witness's whole receipts alone.
+
+The refusal and `rhei budget show` name the witness and how many bytes follow
+its last whole receipt, and offer one runnable command, the **trim**. It keeps
+every byte of the witness under a name beside it,
+`history-torn-<stamp>.jsonl`, stamped with the last whole receipt the way the
+set-aside of [§FS-rhei-budgets.5.4.2](rhei-budgets.spec.md#542-a-tail-written-from-another-root) is, and then cuts the witness back to the
+end of its last whole receipt — never to the journal's length. Where a
+cut-short append made the tear the two are the same; where whole receipts sit
+between the journal and the fragment, cutting to the journal would discard
+receipts the witness exists to keep, and with them capacity already spent
+([§REQ-bounded-neural-work.4](../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)).
+
+The cut shortens the file in place and never empties it first: an empty
+witness reads as no witness, and a charge that landed in that window would
+adopt the journal over the receipts past it. So the trim is spelled, in the
+operator's own shell and with its paths quoted as every printed command is
+([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)):
+
+```text
+cp '<witness>' '<kept>' && dd if=/dev/null of='<witness>' bs=1 seek=<n>
+copy "<witness>" "<kept>" && powershell -NoProfile -Command "$f=[IO.File]::Open('<witness>','Open','Write');$f.SetLength(<n>);$f.Close()"
+```
+
+The first under a POSIX shell, where `dd` with `seek` cuts the file with one
+`ftruncate` and never opens it with `O_TRUNC`, and never through a `>`
+redirection, which empties the file before writing it back. The second under
+`cmd`, which has no command that shortens a file, as a single `SetLength`, with
+a `'` in the path doubled for PowerShell. If the copy fails, `&&` stops the
+command and nothing is cut.
+
+The copy is **never** offered here, whatever the journal holds: copying a
+witness that ends in a fragment writes the fragment into the journal, the
+account is refused again as `chain_broken`, and the same copy is offered, now
+changing nothing. Nor is the trim run for the operator: the next charge would
+write to an account just found damaged before anyone looked at it, and the
+fragment is the one record that a disk filled or a machine died mid-write.
+
+After the trim the account is read again and answered as whatever it then is:
+verified where the journal was the witness less the fragment, and otherwise
+the sub-case the whole receipts make — `journal_truncated` or `chain_broken`
+with the copy, which is then safe, or `journal_absent` with both readings. The
+report says so. Where the journal is wholly absent, `rhei budget forget` is
+offered beside the trim, because retiring keeps every byte, fragment included
+([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)).
 
 ### 5.5. One currency per account
 
@@ -1411,7 +1488,9 @@ offered as the one command that creates it and copies — a remedy that fails wi
 Literal on the operator's own platform, too, because a command line is for the
 shell they are holding. The restore is spelled in that shell — `mkdir -p … && cp
 …` under a POSIX shell, `mkdir … && copy …` under `cmd`, where neither `cp` nor
-`mkdir -p` exists — and every path any printed command interpolates is quoted in
+`mkdir -p` exists — and so is the trim, `cp … && dd if=/dev/null of=… bs=1
+seek=<n>` under a POSIX shell and `copy … && powershell … SetLength(<n>)` under
+`cmd` ([§FS-rhei-budgets.5.4.3](rhei-budgets.spec.md#543-a-witness-that-ends-mid-receipt)); every path any printed command interpolates is quoted in
 that shell's own form. The quoting is not cosmetic: unquoted, a project path
 holding a space makes `mkdir -p` read two words and create a directory tree
 relative to wherever the operator happened to be standing, so the offered remedy
@@ -1420,7 +1499,7 @@ fails *and* writes outside the path it named.
 The account's `health` is a closed vocabulary of two values, `verified` and
 `damaged`. Where it is `damaged` the report additionally carries the `damage`
 sub-case — one of `journal_absent`, `journal_truncated`, `chain_broken`,
-`held_elsewhere`, `foreign_tail`, the five of [§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted) — and where it is `verified` there is no `damage`
+`held_elsewhere`, `foreign_tail`, `witness_torn`, the six of [§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted) — and where it is `verified` there is no `damage`
 to carry. A reader may depend on both: neither gains a value without this
 section gaining it too.
 
@@ -1431,8 +1510,14 @@ nothing on stdout, carrying the same facts the text report states as named
 members beside `message` and `help`: `health`, `damage`, `project_id`,
 `project_root`, `account`, `journal`, `witness`, `receipts`, `invocations`,
 `restore`, and `forget` where the sub-case admits one; `held_by`, the holding
-root, under `held_elsewhere`; and `foreign_root`, the root the tail came from,
-under `foreign_tail`. A harness reading a
+root, under `held_elsewhere`; `foreign_root`, the root the tail came from,
+under `foreign_tail`; and `trim`, the command of [§FS-rhei-budgets.5.4.3](rhei-budgets.spec.md#543-a-witness-that-ends-mid-receipt), under
+`witness_torn` and nowhere else. `witness_torn` carries no `restore`, and
+carries `forget` only where the journal is wholly absent. `trim` is a member of
+its own because `restore` means copying the witness over the journal to every
+reader, and a cut of the witness under the same name would give one member two
+opposite meanings. `receipts` counts whole receipts: a fragment is not one, and
+neither `receipts` nor `invocations` reads it. A harness reading a
 damaged account gets one shape whichever state it finds, rather than prose it
 cannot parse — and `project_id` and `account` mean there exactly what they mean
 in a verified report, the identity and the account **directory**, whether or not
@@ -1447,15 +1532,17 @@ index is keyed by the resolved root, and it is that key a retirement retracts.
 
 `forget` retires a **root** rather than repairing an account: it is how an
 operator says that the path was reused, or the root is a copy, and the recorded
-account was not this project's. Six cases, and two act:
+account was not this project's. Eight cases, and three act:
 
 | the account at this path | `forget` |
 |---|---|
 | journal present and verifying | **refuses**, exits non-zero, writes nothing, and names `adjust` as what changes an allowance |
 | journal present and damaged (`journal_truncated`, `chain_broken`) | **refuses**, exits non-zero, writes nothing, and names the restore of [§FS-rhei-budgets.5.4](rhei-budgets.spec.md#54-absent-damaged-adopted) |
 | journal present and its tail from another root (`foreign_tail`) | **refuses**, exits non-zero, writes nothing, and names setting the witness aside ([§FS-rhei-budgets.5.4.2](rhei-budgets.spec.md#542-a-tail-written-from-another-root)) |
+| journal present and the witness ends mid-receipt (`witness_torn`) | **refuses**, exits non-zero, writes nothing, and names the trim ([§FS-rhei-budgets.5.4.3](rhei-budgets.spec.md#543-a-witness-that-ends-mid-receipt)) |
 | no witness claims this root | **refuses**, exits non-zero, naming the path — the lawful **absent** state has nothing to retire, and a path with no record is far more often a typo |
 | damaged with the journal wholly absent (`journal_absent`) | retires it |
+| the journal wholly absent and the witness ends mid-receipt (`witness_torn`) | retires it, as for `journal_absent`: the witness moves whole, fragment included |
 | the account is held by another root (`held_elsewhere`) | retires **this root's claim**: moves `budgets/<uuid>/` to `budgets/retired/<uuid>-<stamp>/` with the audit receipt beside it, and touches neither the witness nor the index |
 
 The refusal on a sound account is the guarantee of
@@ -1469,7 +1556,8 @@ to this root **is** this project's, so the remedy is to restore its tail, and re
 would discard a real account while leaving that journal exactly as unverifiable
 as it was — an operator left worse off than before they ran the command. Nothing
 is lost by narrowing, because a witness and a journal both present always have
-restore as their answer. A damaged report never offers `forget` in those
+restore as their answer, or the trim first where the witness ends mid-receipt. A
+damaged report never offers `forget` in those
 sub-cases either; this says what happens when it is asked for anyway. A copy's
 journal is the one present journal that is not this root's: the account is the
 holder's, so retiring the copy's claim gives up nothing of this project's and

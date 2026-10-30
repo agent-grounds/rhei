@@ -58,4 +58,7 @@ portable-pty = "=0.8.1"
 [target.'cfg(unix)'.dev-dependencies]
 # `fs` is what gates `nix::fcntl`, which the hung-up-terminal e2e needs to keep
 # the pty out of the child it spawns. §FS-rhei-run.3.2
-nix = { version = "0.29", features = ["term", "fs"] }
+# `resource` and `signal` let a transition run under RLIMIT_FSIZE with SIGXFSZ
+# ignored, which cuts a budget append short the way a full disk does.
+# §FS-rhei-budgets.5.4.3
+nix = { version = "0.29", features = ["term", "fs", "resource", "signal"] }

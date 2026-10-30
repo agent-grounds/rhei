@@ -58,6 +58,8 @@ mod spend_tests;
 #[cfg(test)]
 pub(crate) mod test_support;
 #[cfg(test)]
+mod torn_witness_tests;
+#[cfg(test)]
 mod travel_tests;
 #[cfg(test)]
 mod unpriced_naming_tests;

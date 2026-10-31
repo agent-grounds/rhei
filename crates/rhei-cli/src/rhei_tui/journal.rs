@@ -107,6 +107,7 @@ impl EventSink for JournalSink {
                     TaskOutcome::Failed(_) => "failed",
                     TaskOutcome::Waiting => "waiting",
                     TaskOutcome::ProviderLimited { .. } => "provider_limited",
+                    TaskOutcome::ProviderUnavailable { .. } => "provider_unavailable",
                     TaskOutcome::Cancelled => "cancelled",
                     TaskOutcome::TimedOut => "timeout",
                     TaskOutcome::Interrupted => "interrupted",
@@ -121,6 +122,15 @@ impl EventSink for JournalSink {
                 meta_parts.push(format!("duration={}", format_duration(duration_ms)));
                 meta_parts.push(format!("outcome={outcome_str}"));
                 if let TaskOutcome::ProviderLimited { provider, next_attempt_at } = &outcome {
+                    meta_parts.push(format!("provider={provider}"));
+                    meta_parts.push(format!("next_attempt_at={next_attempt_at}"));
+                }
+                // Only an unavailability that wrote a wait names one. §FS-rhei-run-tui.1.7
+                if let TaskOutcome::ProviderUnavailable {
+                    provider: Some(provider),
+                    next_attempt_at: Some(next_attempt_at),
+                } = &outcome
+                {
                     meta_parts.push(format!("provider={provider}"));
                     meta_parts.push(format!("next_attempt_at={next_attempt_at}"));
                 }

@@ -42,7 +42,8 @@ enum HaltCause {
     WaitingOnPerson { label: String },
     /// A supported provider has supplied a durable safe retry deadline. This
     /// is deliberate waiting, not attention. §FS-rhei-run-report.3.1
-    ProviderLimited { provider: String, next_attempt_at: String },
+    /// `kind` says whether a refusal or an unavailability set it. §FS-rhei-run.3.3
+    ProviderLimited { provider: String, next_attempt_at: String, kind: ProviderWaitKind },
     /// A supervising ancestor is owed a visit or is working, so nothing beneath
     /// it is dispatched. Named so a held subtree is never read as a stall.
     // §FS-rhei-supervision.3.4
@@ -211,8 +212,13 @@ impl HaltCause {
                     "nothing to do on Task {id}; the poll resumes itself when {label} answers"
                 ),
             ),
-            HaltCause::ProviderLimited { provider, next_attempt_at } => (
-                format!("provider {provider} limited until {next_attempt_at}"),
+            HaltCause::ProviderLimited { provider, next_attempt_at, kind } => (
+                match kind {
+                    ProviderWaitKind::Limit => format!("provider {provider} limited until {next_attempt_at}"),
+                    ProviderWaitKind::Unavailable => {
+                        format!("provider {provider} unavailable until {next_attempt_at}")
+                    }
+                },
                 format!("nothing to do on Task {id}; rhei resumes it automatically"),
             ),
             HaltCause::Claimed { assignee } => (
@@ -431,6 +437,7 @@ fn classify_halt(
         return HaltCause::ProviderLimited {
             provider: limit.identity.provider,
             next_attempt_at: limit.next_attempt_at,
+            kind: limit.kind,
         };
     }
     // Behind the claim and the prior, unlike the gate above: both really do

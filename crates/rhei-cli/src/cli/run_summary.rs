@@ -10,6 +10,8 @@
 
 // Shared task activity and detail rendering. §FS-rhei-run-report.3.2
 include!("run_summary_task_detail.rs");
+// The ledger's outcome vocabulary. §FS-rhei-run-report.4
+include!("run_summary_ledger_outcome.rs");
 
 /// One spawned transition from the run event stream, rendered into the report's
 /// ledger and invocations (agent/program only; callback and terminal-at-start
@@ -27,27 +29,6 @@ struct LedgerRecord {
     outcome: LedgerOutcome,
     /// What the invocation reported it fell back from. §FS-rhei-run-report.2
     configuration_fallbacks: Vec<String>,
-}
-
-/// The terminal disposition of a spawned invocation, mirrored from
-/// [`rhei_tui::TaskOutcome`] so the renderer does not depend on the TUI enum.
-#[derive(Debug, Clone)]
-enum LedgerOutcome {
-    Completed,
-    Failed(String),
-    /// The invocation selected its state's poll self-loop, so it neither failed
-    /// nor finished the state: it waited. §FS-rhei-states.2.2
-    Waiting,
-    ProviderLimited { provider: String, next_attempt_at: String },
-    Cancelled,
-    TimedOut,
-    /// The run was interrupted and the engine ended the invocation; no
-    /// transition was selected. §FS-rhei-run.3.2
-    Interrupted,
-    /// An outcome word this build has no variant for, kept as it was read.
-    /// Reachable only from a decoded `--json` stream — a run's own events never
-    /// carry one. §FS-rhei-run-json.2.2
-    Unrecognized(String),
 }
 
 /// `EventSink` recording per-task driver/duration for the console task tree and
@@ -231,21 +212,7 @@ impl rhei_tui::EventSink for SummarySink {
                 entry.last_exit_code = exit_code;
                 // Kept per invocation, so a retry never inherits it. §FS-rhei-configuration-fallbacks
                 entry.last_configuration_fallbacks = configuration_fallbacks.clone();
-                let outcome = match outcome {
-                    rhei_tui::TaskOutcome::Completed => LedgerOutcome::Completed,
-                    rhei_tui::TaskOutcome::Failed(msg) => LedgerOutcome::Failed(msg),
-                    rhei_tui::TaskOutcome::Waiting => LedgerOutcome::Waiting,
-                    rhei_tui::TaskOutcome::ProviderLimited {
-                        provider,
-                        next_attempt_at,
-                    } => LedgerOutcome::ProviderLimited { provider, next_attempt_at },
-                    rhei_tui::TaskOutcome::Cancelled => LedgerOutcome::Cancelled,
-                    rhei_tui::TaskOutcome::TimedOut => LedgerOutcome::TimedOut,
-                    rhei_tui::TaskOutcome::Interrupted => LedgerOutcome::Interrupted,
-                    rhei_tui::TaskOutcome::Unrecognized(name) => {
-                        LedgerOutcome::Unrecognized(name)
-                    }
-                };
+                let outcome = LedgerOutcome::from(outcome);
                 state.ledger.push(LedgerRecord {
                     task,
                     from,
@@ -655,6 +622,9 @@ struct AttentionRow {
     /// True for a durable provider wait, counted separately from supervision
     /// holds and human polling. §FS-rhei-run-report.3.1
     provider_limited: bool,
+    /// True for an unavailable provider's wait, its own kind at the same rung.
+    // §FS-rhei-run-report.3.1
+    provider_unavailable: bool,
 }
 
 /// Run-level facts the summary needs beyond the plan itself. §FS-rhei-run-report.8
@@ -1440,7 +1410,11 @@ fn collect_rows(
                 ),
                 provider_limited: matches!(
                     halt_causes.get(&id),
-                    Some(HaltCause::ProviderLimited { .. })
+                    Some(HaltCause::ProviderLimited { kind: ProviderWaitKind::Limit, .. })
+                ),
+                provider_unavailable: matches!(
+                    halt_causes.get(&id),
+                    Some(HaltCause::ProviderLimited { kind: ProviderWaitKind::Unavailable, .. })
                 ),
             };
             // A held subtree and a person wait are both somebody else's turn:
@@ -1577,7 +1551,8 @@ fn result_phrase(
 fn waiting_tally(waiting: &[AttentionRow]) -> String {
     let people = waiting.iter().filter(|row| row.waits_on_person).count();
     let provider = waiting.iter().filter(|row| row.provider_limited).count();
-    let held = waiting.len() - people - provider;
+    let unavailable = waiting.iter().filter(|row| row.provider_unavailable).count();
+    let held = waiting.len() - people - provider - unavailable;
     let mut parts = Vec::new();
     if held > 0 {
         parts.push(format!("{held} held"));
@@ -1587,6 +1562,9 @@ fn waiting_tally(waiting: &[AttentionRow]) -> String {
     }
     if provider > 0 {
         parts.push(format!("{provider} provider-limited"));
+    }
+    if unavailable > 0 {
+        parts.push(format!("{unavailable} provider-unavailable"));
     }
     parts.join(" \u{b7} ")
 }
@@ -1618,44 +1596,6 @@ fn relativize(path: &std::path::Path, root: &std::path::Path) -> String {
         .join("/")
 }
 
-/// A short reason string for a spawned invocation, from its outcome and exit.
-fn ledger_outcome_reason(outcome: &LedgerOutcome, exit_code: Option<i32>) -> String {
-    match outcome {
-        LedgerOutcome::Completed => match exit_code {
-            Some(0) | None => "exit 0".to_string(),
-            Some(code) => format!("exit {code}"),
-        },
-        LedgerOutcome::Failed(msg) => {
-            let msg = msg.lines().next().unwrap_or("").trim();
-            match exit_code {
-                Some(code) if msg.is_empty() => format!("failed, exit {code}"),
-                Some(code) => format!("exit {code}: {msg}"),
-                None if msg.is_empty() => "failed".to_string(),
-                None => format!("failed: {msg}"),
-            }
-        }
-        // The reason a poll wait gives is the wait, with the exit the machine
-        // declared as "come back later" kept beside it. §FS-rhei-states.2.2
-        LedgerOutcome::Waiting => match exit_code {
-            Some(code) => format!("poll delay, exit {code}"),
-            None => "poll delay".to_string(),
-        },
-        LedgerOutcome::ProviderLimited { provider, next_attempt_at } => {
-            format!("provider {provider} limited until {next_attempt_at}")
-        }
-        LedgerOutcome::Cancelled => "cancelled".to_string(),
-        LedgerOutcome::TimedOut => "timed out".to_string(),
-        // Not a verdict on the ticket: the run stopped the worker. §FS-rhei-run.3.2
-        LedgerOutcome::Interrupted => "interrupted".to_string(),
-        // The word the stream used, kept rather than translated into one this
-        // build knows. §FS-rhei-run-json.2.2
-        LedgerOutcome::Unrecognized(name) => match exit_code {
-            Some(code) => format!("{name}, exit {code}"),
-            None => name.clone(),
-        },
-    }
-}
-
 /// Assemble the Transition Ledger in source order: spawned rows from the event
 /// stream, plus synthesized callback / terminal-at-start / blocked rows for tasks
 /// that emit no slot events. §FS-rhei-run-report.4
@@ -1682,11 +1622,7 @@ fn build_ledger(
         if !task_records.is_empty() {
             for rec in &task_records {
                 let log = relativize(&rec.log_path, workspace_root);
-                // An interruption, like a provider wait, takes no transition. §FS-rhei-run-report.4
-                let unrouted = matches!(
-                    rec.outcome,
-                    LedgerOutcome::ProviderLimited { .. } | LedgerOutcome::Interrupted
-                );
+                let unrouted = rec.outcome.unrouted();
                 ledger.push(LedgerEntry {
                     task: row.id.clone(),
                     from: rec.from.clone(),

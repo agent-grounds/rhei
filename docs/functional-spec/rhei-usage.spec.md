@@ -160,7 +160,9 @@ free ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)); a longe
 does, and `rhei retry` grants it more attempts. The wait is keyed on the
 resolved provider, so the target or model profile must name one:
 `pi:openai-codex/<model>` names it only inside pi's model id and is charged as
-before ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)).
+before ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)). Spell it `pi:openai-codex:openai-codex/gpt-6.1-sol`,
+because the provider segment keys the wait and the model segment keeps pi's own
+`provider/model` reference.
 
 Ticket ids in command output are project-qualified — `<rhei-id>.<task-id>`, e.g. `plan.1` for a single-file `plan.rhei.md` — and `rhei list` accepts the same `--rhei <id>` narrowing as `run`, `next`, and `reset` ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
 

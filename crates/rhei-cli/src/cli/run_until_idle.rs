@@ -162,11 +162,14 @@ impl<'a> IdleBlockerScan<'a> {
         // §FS-rhei-run.3.3: the fourth deliberate wait, ranked where the halt
         // classification ranks it — above the poll, because a parked ticket's
         // own line already reads as the provider's.
-        if task_provider_limit(self.rhei, self.machines, task)
-            .and_then(|limit| limit.deadline_epoch())
-            .is_some_and(|deadline| deadline > now)
+        if let Some(limit) = task_provider_limit(self.rhei, self.machines, task)
+            .filter(|limit| limit.deadline_epoch().is_some_and(|deadline| deadline > now))
         {
-            return Some(rhei_tui::IdleBlocker::ProviderLimit);
+            // The record's own kind names the wait. §FS-rhei-run-json.2.1
+            return Some(match limit.kind {
+                ProviderWaitKind::Limit => rhei_tui::IdleBlocker::ProviderLimit,
+                ProviderWaitKind::Unavailable => rhei_tui::IdleBlocker::ProviderUnavailable,
+            });
         }
         // §FS-rhei-run.5.1: a poll whose bound is spent waits for nothing.
         let since = self.spawns.pending_since();

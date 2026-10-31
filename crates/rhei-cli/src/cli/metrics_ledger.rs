@@ -161,15 +161,8 @@ fn finish_agent_session_artifacts(
     if !metrics_declared {
         return;
     }
-    let ending = if outcome.provider_limit.is_some() {
-        "provider_limited"
-    } else if outcome.timed_out {
-        "timed out"
-    } else if outcome.interrupted {
-        "interrupted"
-    } else {
-        "exited"
-    };
+    // The spawn record's spelling; a later verdict amends the note. §FS-rhei-agents.8.4
+    let ending = spawn_ending(outcome.provider_limit.is_some(), outcome.timed_out, outcome.interrupted);
     note_metric_pending_session(
         runtime_dir,
         task_id,
@@ -181,6 +174,36 @@ fn finish_agent_session_artifacts(
         outcome.status.code(),
         ending,
     );
+}
+
+/// Give a noted session the ending a later verdict reached, so the ledger says
+/// what the spawn record says. Only the session's own line changes, so the
+/// confirmation cursor still counts the same lines. Best-effort, as the note is.
+// §FS-rhei-agents.8.4 §FS-rhei-metrics.2
+fn amend_metric_pending_ending(runtime_dir: &Path, log_path: &Path, ending: &str) {
+    let path = metric_pending_path(runtime_dir);
+    if !path.is_file() {
+        return;
+    }
+    let log = session_log_reference(runtime_dir, log_path);
+    let amend = || -> std::io::Result<()> {
+        let _lock = locked_metrics_dir(runtime_dir)?;
+        let mut notes: Vec<String> = fs::read_to_string(&path)?.lines().map(str::to_string).collect();
+        let Some((line, mut note)) = notes.iter().enumerate().rev().find_map(|(line, raw)| {
+            let note = serde_json::from_str::<MetricPendingSession>(raw).ok()?;
+            (note.log == log).then_some((line, note))
+        }) else {
+            return Ok(());
+        };
+        note.ending = ending.to_string();
+        notes[line] = serde_json::to_string(&note)?;
+        let staged = path.with_extension("jsonl.amend");
+        fs::write(&staged, notes.join("\n") + "\n")?;
+        fs::rename(&staged, &path)
+    };
+    if let Err(err) = amend() {
+        diag_warn!("could not amend the metrics note of {}: {err}", log_path.display());
+    }
 }
 
 /// A log path as records and reports spell it: relative to the workspace the

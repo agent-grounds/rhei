@@ -256,6 +256,7 @@ mod provider_limits {
         let task = parse_task_id("1");
         let limit = |deadline: &str| ProviderLimit {
             identity: ProviderIdentity { agent: "codex".into(), provider: "openai".into() },
+            kind: ProviderWaitKind::Limit,
             signal: "signal".into(),
             observed_at: "2026-09-16T19:03:12Z".into(),
             next_attempt_at: deadline.into(),
@@ -305,6 +306,7 @@ mod provider_limits {
         let resolved = codex_openai();
         let limit = ProviderLimit {
             identity: resolved_provider_identity(&resolved).unwrap(),
+            kind: ProviderWaitKind::Limit,
             signal: "signal".into(),
             observed_at: deadline(100),
             next_attempt_at: deadline(200),

@@ -21,6 +21,7 @@ use crate::rhei_tui::event::{EventSink, MessageLevel, RunEvent};
 
 mod derive;
 mod input;
+mod outcome;
 mod render;
 mod state;
 mod text;

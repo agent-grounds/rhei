@@ -83,6 +83,17 @@ impl PendingSlotRelease {
             };
         }
     }
+
+    /// A recognized provider unavailability, carrying the wait it wrote, or no
+    /// wait when its charge spent the visit's last attempt. §FS-rhei-run-json.2.1
+    fn provider_unavailable(&mut self, wait: Option<&ProviderLimit>) {
+        if let Some(release) = self.release.as_mut() {
+            release.outcome = rhei_tui::TaskOutcome::ProviderUnavailable {
+                provider: wait.map(|wait| wait.identity.provider.clone()),
+                next_attempt_at: wait.map(|wait| wait.next_attempt_at.clone()),
+            };
+        }
+    }
 }
 
 impl PendingSlotRelease {

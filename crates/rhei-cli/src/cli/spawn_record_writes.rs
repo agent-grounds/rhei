@@ -33,12 +33,16 @@ impl SpawnPlan {
             duration: ended.duration.to_string(),
             code: ended.code,
             ending: ended.ending.to_string(),
+            // One count per visit, charged or not. §FS-rhei-agents.8.4
+            unavailable: self.previous.as_ref().map_or(0, |previous| previous.unavailable),
+            signal: None,
             reverted: None,
         };
         // §FS-rhei-agents.8.4: re-read under the grant's lock, never overwrite its audit.
         let _ = update_spawn_record_with_policy(&self.record, true, |stored| {
             if let Some(stored) = stored.filter(|stored| stored.moves == self.moves) {
                 record.charged = stored.charged + u64::from(attempt_charged);
+                record.unavailable = stored.unavailable;
                 record.grants = stored.grants;
             } else if let Some(previous) = &self.previous {
                 // Legacy unsuffixed records may supply this entry's previous attempt.
@@ -117,6 +121,28 @@ fn update_spawn_record(
     update: impl FnOnce(Option<SpawnRecord>) -> MietteResult<Option<SpawnRecord>>,
 ) -> MietteResult<Option<SpawnRecord>> {
     update_spawn_record_with_policy(path, false, update)
+}
+
+/// Rewrite an `exited` record the output check found to be a recognized provider
+/// unavailability: `ending` and `signal` say so, the visit's count grows by one,
+/// and a free ending gives its charge back. The record as rewritten, or `None`
+/// when it cannot be, which leaves it `exited` and charged — the safe error.
+// §FS-rhei-agents.8.4 §FS-rhei-agents.3.2.3
+fn record_provider_unavailable(record: &Path, verdict: &ProviderUnavailable) -> Option<SpawnRecord> {
+    update_spawn_record(record, |stored| {
+        let Some(mut stored) = stored else { return Ok(None) };
+        stored.unavailable += 1;
+        stored.ending = PROVIDER_UNAVAILABLE_ENDING.to_string();
+        stored.signal = Some(verdict.signal.clone());
+        // Free only while the provider never answered, and only the first six. §FS-rhei-agents.3.2.3
+        let free = !verdict.answered && stored.unavailable <= FREE_UNAVAILABLE_ENDINGS;
+        if free && stored.attempt_charged {
+            stored.charged = stored.charged.saturating_sub(1);
+            stored.attempt_charged = false;
+        }
+        Ok(Some(stored))
+    })
+    .ok()?
 }
 
 /// Only a completed charge can replace malformed prior JSON; a grant cannot

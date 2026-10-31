@@ -1210,7 +1210,10 @@ Recognition requires all of the following:
   entry with `family: pi` is recognized;
 - the resolved provider is present, because it keys the wait ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)).
   A target or model profile that resolves none is not recognized: in
-  `pi:openai-codex/gpt-6.1-sol` the provider is only inside pi's model id;
+  `pi:openai-codex/gpt-6.1-sol` the provider is only inside pi's model id.
+  `pi:openai-codex:openai-codex/gpt-6.1-sol` is recognized, because its
+  provider segment keys the wait and its model segment keeps pi's own
+  `provider/model` reference;
 - the invocation exited `0` and was neither timed out nor interrupted;
 - a required output is missing ([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics) step 4);
 - among the stdout JSON events, the last `auto_retry_end` has `success: false`

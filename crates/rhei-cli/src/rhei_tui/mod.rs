@@ -9,6 +9,7 @@ mod event_json;
 mod event_log;
 mod event_provenance;
 mod event_sink;
+mod event_usage;
 mod frontend;
 mod journal;
 mod json;

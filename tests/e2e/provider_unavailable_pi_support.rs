@@ -24,6 +24,12 @@ pub(super) const TARGET: &str = "pi-local:openai-codex:gpt-6.1-sol";
 /// The reporter's spelling: the provider lives only inside pi's model id.
 pub(super) const TARGET_WITHOUT_PROVIDER: &str = "pi-local:openai-codex/gpt-6.1-sol";
 
+/// Two tickets, so a concurrent state fills two slots of the worker pool.
+pub(super) const TWO_TASKS: &[(&str, &str)] = &[
+    ("01.md", "### Task 1: Provider worker\n**State:** working\n"),
+    ("02.md", "### Task 2: Its sibling\n**State:** working\n"),
+];
+
 /// pi's default `maxRetries`, which every `auto_retry_start` carries as
 /// `maxAttempts`.
 const MAX_ATTEMPTS: u64 = 3;
@@ -113,6 +119,11 @@ pub(super) struct Outage {
     pub linger: u64,
     /// Whether the session writes the state's outputs whatever its stream says.
     pub writes_outputs: bool,
+    /// The plan's tickets, every one in `working`.
+    pub tasks: &'static [(&'static str, &'static str)],
+    /// Whether `working` lets its tickets run at once, which `--parallel 2`
+    /// needs to reach the worker pool.
+    pub concurrent: bool,
 }
 
 impl Outage {
@@ -124,6 +135,8 @@ impl Outage {
             agent_timeout: None,
             linger: 0,
             writes_outputs: false,
+            tasks: SINGLE_TASK,
+            concurrent: false,
         }
     }
 
@@ -132,8 +145,9 @@ impl Outage {
             .agent_timeout
             .map(|timeout| format!("    agent_timeout: {timeout}\n"))
             .unwrap_or_default();
+        let concurrent = if self.concurrent { "    concurrent: true\n" } else { "" };
         let machine = format!(
-            "name: pi-outage\nversion: 1\nstates:\n  working:\n    initial: true\n    \
+            "name: pi-outage\nversion: 1\nstates:\n  working:\n    initial: true\n{concurrent}    \
              target: {target}\n    attempts: 2\n{timeout}    outputs:\n      - name: finding\n        \
              path: runtime/exports/{{task_id}}/finding.md\n  completed:\n    final: true\n\
              transitions:\n  - from: working\n    to: completed\n",
@@ -159,7 +173,7 @@ raise SystemExit(0)
             stream = self.stream,
             linger = self.linger,
         );
-        let fixture = ProviderFixture::new(name, SINGLE_TASK, &machine, &body);
+        let fixture = ProviderFixture::new(name, self.tasks, &machine, &body);
         let command: Value = serde_json::from_str(&fixture_command(&fixture.agent)).unwrap();
         fs::write(
             fixture.root.join(".agent-grounds/rhei/settings.json"),
@@ -179,6 +193,15 @@ raise SystemExit(0)
 /// One `--until-idle` pass, its stdout and stderr kept as `<name>.stdout` and
 /// `<name>.stderr` in the test's directory.
 pub(super) fn run_once(fixture: &ProviderFixture, name: &str) -> Pass {
+    run_with(fixture, name, &[])
+}
+
+/// [`run_once`] with two workers, so a batch of two goes through the pool.
+pub(super) fn run_pool(fixture: &ProviderFixture, name: &str) -> Pass {
+    run_with(fixture, name, &["--parallel", "2"])
+}
+
+fn run_with(fixture: &ProviderFixture, name: &str, extra: &[&str]) -> Pass {
     let mut command = rhei_command(fixture.root.join(".home"));
     // A nested fixture owns its admission and accounting context. §FS-rhei-budgets.5
     for (key, _) in std::env::vars_os() {
@@ -188,6 +211,7 @@ pub(super) fn run_once(fixture: &ProviderFixture, name: &str) -> Pass {
     }
     command.arg("--state-machine").arg(&fixture.machine).arg("run").arg(&fixture.root);
     command.args(["--no-tui", "--no-dashboard", "--json", "--continue-on-error", "--until-idle"]);
+    command.args(extra);
     let mut run = RunningChild::spawn(&mut command, &fixture.dir, name);
     let status = run.wait_for_exit(name);
     let events = fs::read_to_string(fixture.dir.join(format!("{name}.stdout")))
@@ -253,7 +277,22 @@ pub(super) fn only_record(fixture: &ProviderFixture, pass: &Pass) -> Value {
 
 /// The wait the ticket holds in its state, or `Null` when it holds none.
 pub(super) fn wait(fixture: &ProviderFixture) -> Value {
-    metadata(&fixture.root)["metadata"]["tasks"]["1"]["providerLimits"]["working"].clone()
+    task_wait(fixture, "1")
+}
+
+/// [`wait`] for the ticket with local id `local`.
+pub(super) fn task_wait(fixture: &ProviderFixture, local: &str) -> Value {
+    metadata(&fixture.root)["metadata"]["tasks"][local]["providerLimits"]["working"].clone()
+}
+
+/// The row a `## <section>` table of the run report gives `task`, or an empty
+/// string when it gives none.
+pub(super) fn report_row(report: &str, section: &str, task: &str) -> String {
+    let heading = format!("## {section}\n");
+    let body = report.split_once(&heading).map(|(_, body)| body).unwrap_or_default();
+    let body = body.split("\n## ").next().unwrap_or_default();
+    let row = format!("| {task} |");
+    body.lines().find(|line| line.starts_with(&row)).unwrap_or_default().to_string()
 }
 
 /// Seconds from `observedAt` to `nextAttemptAt`: the backoff the wait chose.

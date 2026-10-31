@@ -130,11 +130,14 @@ changes neither `outcome` nor `exit_code`. It is an addition under
 `run_finished` is emitted only when that loop later finishes or halts.
 
 `provider_unavailable` is emitted for the recognized ending of
-[§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability), in place of `task_outputs_missing`. `provider` is the
-resolved provider and `next_attempt_at` the backoff deadline of
-[§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking); both are absent when the charge spent the visit's last
-attempt and no wait was written. It is not a `failed` outcome. It is an
-addition under [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version), so `schema` does not move.
+[§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability). When the ending wrote a wait it is emitted in place of
+`task_outputs_missing`, `provider` is the resolved provider, and
+`next_attempt_at` is the backoff deadline of [§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking). When the charge
+spent the visit's last attempt no wait is written and both fields are absent,
+and `task_outputs_missing` precedes it as on any exhausted visit, so the report
+names the artifacts the visit left unwritten ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)). It is
+not a `failed` outcome. It is an addition under [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version), so
+`schema` does not move.
 
 `run_finished.evidence_manifest` is `{path, sha256}`: the run's evidence
 manifest and its full digest ([§FS-rhei-evidence.9.2](rhei-evidence.spec.md#92-where-it-is-announced)), the same value

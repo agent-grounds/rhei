@@ -144,6 +144,71 @@ fn the_seventh_unavailable_ending_is_charged_and_halts_a_spent_visit() {
     assert!(released.get("next_attempt_at").is_none(), "{released:#}");
     assert!(released.get("provider").is_none(), "{released:#}");
     assert_all_tasks_in_state(&fixture.root, &fixture.machine, "working");
+
+    // A spent visit names what it left unwritten, as any exhausted visit does.
+    // §FS-rhei-run-json.2.1 §FS-rhei-run-report.3.1 §FS-rhei-run-report.4
+    let finding = format!("finding (runtime/exports/{TASK}/finding.md)");
+    let missing = seventh.event("task_outputs_missing");
+    assert_eq!(missing["task"], TASK, "{missing:#}");
+    assert_eq!(missing["state"], "working", "{missing:#}");
+    assert_eq!(missing["entries"][0], finding.as_str(), "{missing:#}");
+    let at = |name: &str| seventh.events.iter().position(|event| event["event"] == name);
+    assert!(at("task_outputs_missing") < at("slot_released"), "{}", seventh.said());
+    let report = fs::read_to_string(fixture.root.join("runtime/run-report.md")).unwrap();
+    let row = report_row(&report, "Attention", TASK);
+    assert!(
+        row.starts_with(&format!("| {TASK} | working | worker exited 0 without {finding}")),
+        "{report}"
+    );
+    assert!(row.contains("| write the file(s) above and rerun, or record"), "{report}");
+    assert!(!report.contains("stalled in non-terminal state"), "{report}");
+    let ledger = report_row(&report, "Transition Ledger", TASK);
+    assert!(ledger.ends_with("| provider unavailable |"), "{report}");
+}
+
+/// Through the worker pool the incident reads as on the single worker: each
+/// ticket keeps its attempts, says so, and waits its minute.
+// §FS-rhei-agents.5.2.2 §FS-rhei-agents.3.2.1 §FS-rhei-run.3.3 §FS-rhei-run-json.2.1
+#[test]
+fn the_worker_pool_lets_a_pi_session_that_loses_its_provider_wait() {
+    let outage = Outage { tasks: TWO_TASKS, concurrent: true, ..Outage::pi(gave_up()) };
+    let fixture = outage.fixture("pi-unavailable-pool");
+    let first = run_pool(&fixture, "first");
+
+    // The pool fills both slots before it judges either exit. §FS-rhei-agents.5.2.2
+    let at = |name: &str| first.events.iter().position(|event| event["event"] == name);
+    let assigned = first.events.iter().filter(|event| event["event"] == "slot_assigned").count();
+    assert_eq!(assigned, 2, "{}", first.said());
+    let last_assigned = first.events.iter().rposition(|event| event["event"] == "slot_assigned");
+    assert!(last_assigned < at("slot_released"), "both run at once; {}", first.said());
+
+    let warning = unavailable_warning("no attempt charged (free 1 of 6 on this visit)");
+    for (local, task) in [("1", TASK), ("2", "workspace.2")] {
+        first.assert_says(&warning.replace(TASK, task));
+        let record = fixture.records().into_iter().find(|record| record["task"] == task).unwrap();
+        assert_eq!(record["ending"], "provider_unavailable", "{record:#}; {}", first.said());
+        assert_eq!(record["attempt_charged"], false, "{record:#}");
+        assert_eq!(record["charged"], 0, "{record:#}");
+        assert_eq!(record["unavailable"], 1, "{record:#}");
+        let wait = task_wait(&fixture, local);
+        assert_eq!(wait["kind"], "unavailable", "{wait:#}; {}", first.said());
+        let deadline = wait["nextAttemptAt"].as_str().unwrap();
+        first.assert_says(&format!(
+            "waiting: pi-local on openai-codex starts again after {deadline}"
+        ));
+        let released = first
+            .events
+            .iter()
+            .find(|event| event["event"] == "slot_released" && event["task"] == task);
+        let released = released.unwrap_or_else(|| panic!("{task} released; {}", first.said()));
+        assert_eq!(released["outcome"], "provider_unavailable", "{released:#}");
+        assert_eq!(released["provider"], "openai-codex", "{released:#}");
+        assert_eq!(released["next_attempt_at"], deadline, "{released:#}");
+    }
+    first.assert_never_says("required outputs are missing");
+    assert!(!first.events.iter().any(|event| event["event"] == "task_outputs_missing"));
+    assert_eq!(first.code, Some(3), "until-idle reports the wait; {}", first.said());
+    assert_all_tasks_in_state(&fixture.root, &fixture.machine, "working");
 }
 
 /// A session the provider answered before it went away had begun the work, so

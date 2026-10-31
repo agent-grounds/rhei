@@ -1115,6 +1115,27 @@ declared, no mode flags are appended and `agent_mode` must not be set for
 states that use this agent. See
 [Mode Resolution Order](#141-mode-resolution-order) for how a mode is selected.
 
+#### 2.2.1. Writable-root fixture proof
+
+The writable-root end-to-end scenarios prove these grants using repositories
+they own, including the repository enclosing the plan. Ordinary launches,
+Panta members, wrappers with their own modes, and composed profiles must
+succeed when `TMPDIR` lies inside another disposable repository, and leave
+that enclosing repository's HEAD unchanged. The scenarios retain their checks
+for distinct plan and checkout directories, path spelling, project and state
+roots, and commits through Git metadata grants, including a linked worktree's
+separate Git and common directories. This is the fixture-isolation contract
+of [§REQ-test-isolation.4](../requirements/test-isolation.spec.md#4-what-a-test-resolves-is-what-its-fixture-names-never-what-lies-above-it), not a change to checkout precedence in
+[§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables).
+
+The fake Codex independently confines its commits to its fixture's canonical
+ownership boundary: the resolved checkout, Git directory and Git common
+directory must all belong to that boundary before it mutates Git. Writable
+grants alone do not establish fixture ownership. A deliberately misdirected
+launch with sufficient grants must record a refusal, make no commit, and leave
+the outside repository's HEAD unchanged. Tests of that refusal own the outside
+repository too, so a failing guard cannot write into a developer's repository.
+
 ### 2.3. Recognized Provider Refusals
 
 Rhei recognizes a provider refusal in addition to a normal process result.

@@ -11,7 +11,6 @@ use super::*;
 /// scenarios exactly so the child cannot select this regression recursively.
 /// §FS-rhei-agents.2.2.1
 #[test]
-#[ignore = "red until #545: enclosing TMPDIR receives fixture commits; implement removes this"]
 fn writable_roots_scenarios_leave_an_enclosing_tmpdir_repository_unchanged() {
     let dir = unique_temp_dir("codex-roots-isolation");
     let Some(outer) = git_repository(&dir.join("outer")) else { return };
@@ -83,7 +82,6 @@ fn writable_roots_scenarios_leave_an_enclosing_tmpdir_repository_unchanged() {
 /// own fixture, even when only a linked checkout is inside that fixture.
 /// §FS-rhei-agents.2.2.1
 #[test]
-#[ignore = "red until #545: the shim commits outside its fixture despite ownership; implement removes this"]
 fn the_fake_codex_refuses_outside_repositories_despite_writable_grants() {
     let dir = unique_temp_dir("codex-roots-ownership");
     let fixture = dir.join("fixture");

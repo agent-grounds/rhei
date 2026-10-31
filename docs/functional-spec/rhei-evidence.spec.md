@@ -185,6 +185,12 @@ output has already been detached ([§FS-rhei-agent-output-drain.2](rhei-agent-ou
 run interrupts gets `interrupted`. A run killed outright writes no end record;
 that is what *incomplete* means ([§FS-rhei-evidence.9.3](rhei-evidence.spec.md#93-a-run-killed-outright)).
 
+`ending` is how the process ended when its log closed, and the record is never
+rewritten ([§FS-rhei-evidence.1.1](rhei-evidence.spec.md#11-nothing-is-rewritten)). An ending the engine decides later, from
+what the attempt left on disk, is the spawn record's alone: the end record of a
+withheld or a provider-unavailable attempt says `exited`
+([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)).
+
 ## 5. Retained Values
 
 A prompt, an intervention message and a configuration object are each recorded

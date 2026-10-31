@@ -38,6 +38,16 @@ fn mcp_surface_fixture_controls_distinguish_additive_strict_and_positional_optio
 }
 
 fn exercise_profile(agent: &str) {
+    // The spawn preflight connects to every url server (§FS-rhei-agents.6.2), so
+    // all three name a port this test listens on, told apart by their paths.
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("listen for the servers");
+    let port = listener.local_addr().expect("listener address").port();
+    let registry = format!("http://127.0.0.1:{port}/registry");
+    let inherited = format!("http://127.0.0.1:{port}/inherited");
+    let state = format!("http://127.0.0.1:{port}/state");
+    let override_field = format!(
+        "    mcp_servers:\n      - id: declared\n        url: {state}\n        transport: sse\n"
+    );
     // Preserve absent/default union, clearing and same-id state precedence.
     let cases = [
         ("absent", json!([]), "", vec![]),
@@ -51,12 +61,7 @@ fn exercise_profile(agent: &str) {
             "    mcp_servers: [declared]\n",
             vec!["declared", "inherited"],
         ),
-        (
-            "override",
-            json!(["declared"]),
-            "    mcp_servers:\n      - id: declared\n        url: https://state.invalid\n        transport: sse\n",
-            vec!["declared"],
-        ),
+        ("override", json!(["declared"]), override_field.as_str(), vec!["declared"]),
     ];
     let mut leaks = Vec::new();
     for (case, defaults, state_field, expected) in cases {
@@ -68,8 +73,8 @@ fn exercise_profile(agent: &str) {
         let mut settings = json!({
             "defaults": {"mcp_servers": defaults},
             "mcp_servers": {
-                "declared": {"url": "https://registry.invalid", "transport": "sse"},
-                "inherited": {"url": "https://inherited.invalid", "transport": "sse"}
+                "declared": {"url": registry, "transport": "sse"},
+                "inherited": {"url": inherited, "transport": "sse"}
             },
             "agents": {"cld": {"family": "claude-code", "command": [claude]}}
         });
@@ -137,13 +142,9 @@ fn exercise_profile(agent: &str) {
                 .map(String::as_str)
                 .collect();
             assert_eq!(ids, expected, "attached IDs {agent}/{case}");
-            let url = if case == "override" {
-                "https://state.invalid"
-            } else {
-                "https://registry.invalid"
-            };
+            let url = if case == "override" { &state } else { &registry };
             if expected.contains(&"declared") {
-                assert_eq!(config["mcpServers"]["declared"]["url"], url);
+                assert_eq!(config["mcpServers"]["declared"]["url"], url.as_str());
             }
             let flag = argv.iter().position(|arg| *arg == "--mcp-config").expect("attachment flag");
             assert!(flag + 1 < argv.len() - 1, "config before separator");
@@ -160,6 +161,7 @@ fn exercise_profile(agent: &str) {
             }
         }
     }
+    drop(listener);
     assert!(leaks.is_empty(), "{}", leaks.join("\n"));
 }
 

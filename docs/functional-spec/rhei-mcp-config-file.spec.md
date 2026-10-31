@@ -48,5 +48,6 @@ starts the server in its own working directory regardless, so no key carries
 file declares `working_directory`, the spawn warns instead, naming the server
 id: the file cannot carry `working_directory`, so the server starts in the
 agent's working directory, the checkout root ([§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables)). The server is
-still attached and still reported available; the warning is the only
-difference.
+still attached and still reported available, and the spawn preflight neither
+checks the directory nor resolves `command` against it
+([§FS-rhei-agents.6.2](rhei-agents.spec.md#62-the-spawn-preflight)); the warning is the only difference.

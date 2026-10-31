@@ -3,7 +3,7 @@
 
 mod mcp_surface {
     use super::super::*;
-    use super::FIXTURE_MARGIN;
+    use super::{passing_mcp_preflight, FIXTURE_MARGIN};
     use serde_json::json;
 
     fn profile(id: &str, entry: serde_json::Value) -> CustomAgentProfile {
@@ -145,7 +145,7 @@ mod mcp_surface {
                 .expect("entry")
                 .extend(override_fields.as_object().expect("overrides").clone());
             let agent = resolved("cld", profile("cld", entry), None);
-            let gate = gate_tooling_for_agent(&agent, &declared(true));
+            let gate = gate_tooling_for_agent(&agent, &declared(true), &passing_mcp_preflight);
             assert!(gate.required.is_empty());
             let argv = command(&agent, &gate.tooling, dir.path(), &[]);
             if agent.profile.mcp_flag.is_some() {
@@ -156,7 +156,8 @@ mod mcp_surface {
             } else {
                 assert_eq!(gate.warnings.len(), 1);
                 assert!(gate.tooling.mcp_servers[0].definition.is_none());
-                assert_eq!(gate_tooling_for_agent(&agent, &declared(false)).required.len(), 1);
+                let gate = gate_tooling_for_agent(&agent, &declared(false), &passing_mcp_preflight);
+                assert_eq!(gate.required.len(), 1);
             }
             if !argv.iter().any(|arg| arg == "--strict-mcp-config") {
                 missing.push(format!(
@@ -176,7 +177,7 @@ mod mcp_surface {
         );
         let mut tooling = declared(true);
         tooling.mcp_servers[0].definition = None;
-        let gate = gate_tooling_for_agent(&agent, &tooling);
+        let gate = gate_tooling_for_agent(&agent, &tooling, &passing_mcp_preflight);
         assert!(gate.required.is_empty());
         assert_eq!(gate.warnings.len(), 1);
         assert_eq!(gate.tooling.mcp_servers_csv(), "");

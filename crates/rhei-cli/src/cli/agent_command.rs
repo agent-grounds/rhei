@@ -366,9 +366,14 @@ struct ToolingGateResult {
     required: Vec<ToolingUnavailable>,
 }
 
+/// Splits one invocation's set into what it attaches, the optional entries it
+/// drops with a warning, and the required ones that block the spawn. An MCP
+/// definition is held to `preflight`, which `gate_tooling_at_spawn` supplies.
+/// §FS-rhei-agents.6.1 §FS-rhei-agents.6.2
 fn gate_tooling_for_agent(
     resolved: &ResolvedAgent,
     tooling: &ResolvedTooling,
+    preflight: &dyn Fn(&McpServerProfile) -> Result<(), String>,
 ) -> ToolingGateResult {
     let mut result = ToolingGateResult::default();
     // What a withholding state held back is not gated, only logged. §FS-rhei-task-tooling.7
@@ -378,12 +383,12 @@ fn gate_tooling_for_agent(
     let mcp_supported =
         resolved.profile.mcp_flag.is_some() || resolved.profile.mcp_config_flag.is_some();
     for entry in &tooling.mcp_servers {
-        let reason = if entry.definition.is_none() {
-            Some("definition is unavailable".to_string())
-        } else if !mcp_supported {
-            Some(format!("agent '{agent_id}' declares no mcp_flag/mcp_config_flag"))
-        } else {
-            None
+        let reason = match &entry.definition {
+            None => Some("definition is unavailable".to_string()),
+            Some(_) if !mcp_supported => {
+                Some(format!("agent '{agent_id}' declares no mcp_flag/mcp_config_flag"))
+            }
+            Some(definition) => preflight(definition).err(),
         };
         if let Some(reason) = reason {
             if entry.optional {

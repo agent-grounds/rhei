@@ -8,7 +8,8 @@
 //! compiled stand-in the `--mcp-config` tests use (§REQ-cross-platform.4). It
 //! keeps every file it is handed, one per task and state. The servers are
 //! registry entries that are never launched: what is pinned is what rhei hands
-//! over, and to which task.
+//! over, and to which task. Their executables are the same stand-in, because
+//! the spawn preflight looks for each on `PATH` (§FS-rhei-agents.6.2).
 // §FS-rhei-task-tooling
 
 use std::ffi::OsString;
@@ -87,12 +88,7 @@ impl Case {
     /// `rhei run` on the built-in `claude-code` profile with the stand-in.
     fn run(&self) -> CliRun {
         let bin = self.dir.join("bin");
-        fs::create_dir_all(&bin).expect("create stand-in directory");
-        fs::copy(
-            PathBuf::from(env!("CARGO_BIN_EXE_mcp-config-fixture")),
-            bin.join(format!("claude{}", std::env::consts::EXE_SUFFIX)),
-        )
-        .expect("stage the stand-in as claude");
+        stage_mcp_config_fixture(&bin, &["claude", "mcp-thunderbird-mail", "mcp-postgres"]);
         fs::create_dir_all(self.copies()).expect("create the copy directory");
 
         let mut paths = vec![bin];

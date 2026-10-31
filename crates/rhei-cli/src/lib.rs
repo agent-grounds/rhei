@@ -176,6 +176,7 @@ include!("cli/provenance_identity.rs");
 include!("cli/supervised.rs");
 include!("cli/agent_command.rs");
 include!("cli/mcp_config_file.rs");
+include!("cli/mcp_preflight.rs");
 include!("cli/agent_output_reader.rs");
 include!("cli/agent_spawn.rs");
 include!("cli/intervene.rs");
@@ -205,6 +206,7 @@ include!("cli/snapshot_pointer.rs");
 include!("cli/snapshot_records.rs");
 // §FS-rhei-evidence: per-invocation evidence and the run manifest.
 include!("cli/evidence_store.rs");
+include!("cli/executable_lookup.rs");
 include!("cli/evidence_version.rs");
 include!("cli/evidence_invocation.rs");
 include!("cli/evidence_manifest.rs");
@@ -399,6 +401,7 @@ mod tests {
     include!("cli/tests_summary_checkpoint.rs");
     include!("cli/tests_settings_tooling.rs");
     include!("cli/tests_mcp_surface.rs");
+    include!("cli/tests_mcp_preflight.rs");
     include!("cli/tests_budget_spend.rs");
     include!("cli/tests_budget_delegation.rs");
     include!("cli/tests_budget_ancestry.rs");

@@ -7,10 +7,9 @@
 #[derive(Debug, Clone)]
 struct ResolvedMcpEntry {
     id: String,
-    /// `optional: true` on the declaring entry. Used by Half B to decide
-    /// whether a failed availability check blocks the agent or is downgraded
-    /// to a warning. Carried in Half A so the resolution path is complete.
-    #[allow(dead_code)]
+    /// `optional: true` on the declaring entry: whether a failed availability
+    /// check drops it with a warning instead of blocking the spawn.
+    /// §FS-rhei-agents.6.1
     optional: bool,
     definition: Option<McpServerProfile>,
 }
@@ -19,17 +18,15 @@ struct ResolvedMcpEntry {
 #[derive(Debug, Clone)]
 struct ResolvedSkillEntry {
     id: String,
-    #[allow(dead_code)]
     optional: bool,
     definition: Option<SkillProfile>,
 }
 
 /// The tooling a state contributes to the agent subprocess.
 ///
-/// Half A: availability is computed from registry resolution only — an entry
-/// whose id resolves (or carries an inline definition) is reported available.
-/// Half B will hook actual MCP handshake checks and skill-path probes into
-/// the same struct, leaving call sites unchanged.
+/// Resolution leaves an MCP entry's definition in place for the spawn's gate
+/// to preflight, and drops a skill's when its path cannot be read, so a
+/// skill's availability reads the same in `rhei next`. §FS-rhei-agents.6.2
 #[derive(Debug, Clone, Default)]
 struct ResolvedTooling {
     mcp_servers: Vec<ResolvedMcpEntry>,
@@ -274,17 +271,23 @@ fn resolve_skill_entry(
         // Expand leading `~` so subsequent existence checks and on-disk
         // probes see the absolute path. The expansion happens once, here.
         def.path = expand_home(&def.path);
-        // Best-effort spawn-time availability check: a skill bundle is
-        // available only when its path exists. When it does not, drop the
-        // definition so `available` is reported `false` to env vars and
-        // the `?` suffix appears in the log header. Required-vs-optional
-        // escalation lives further up the run loop (deferred Half B).
-        let path = Path::new(&def.path);
-        if !path.exists() {
+        // A skill is available only when its path can be read; dropping the
+        // definition reports it `false` and lets the gate block or warn. §FS-rhei-agents.6.2
+        if !skill_path_readable(Path::new(&def.path)) {
             definition = None;
         }
     }
     ResolvedSkillEntry { id, optional, definition }
+}
+
+/// A skill path passes the preflight when a directory can be listed or a file
+/// opened. §FS-rhei-agents.6.2
+fn skill_path_readable(path: &Path) -> bool {
+    if path.is_dir() {
+        fs::read_dir(path).is_ok()
+    } else {
+        fs::File::open(path).is_ok()
+    }
 }
 
 /// Expand a leading `~` (or `~/`) into the current user's home directory.

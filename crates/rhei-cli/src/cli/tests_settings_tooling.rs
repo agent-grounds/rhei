@@ -1019,7 +1019,7 @@ transitions: []
             ..Default::default()
         };
 
-        let gate = gate_tooling_for_agent(&resolved, &tooling);
+        let gate = gate_tooling_for_agent(&resolved, &tooling, &passing_mcp_preflight);
         assert_eq!(gate.tooling.mcp_servers.len(), 1);
         assert_eq!(gate.tooling.mcp_servers[0].id, "optional-mcp");
         assert!(gate.tooling.mcp_servers[0].definition.is_none());
@@ -1095,7 +1095,7 @@ transitions:
             timeout_secs: Some(FIXTURE_MARGIN.as_secs()),
             autonomous_args: Vec::new(),
         };
-        let gate = gate_tooling_for_agent(&resolved, &tooling);
+        let gate = gate_tooling_for_agent(&resolved, &tooling, &passing_mcp_preflight);
         assert_eq!(gate.tooling.mcp_servers.len(), 1);
         assert_eq!(gate.tooling.skills.len(), 1);
 

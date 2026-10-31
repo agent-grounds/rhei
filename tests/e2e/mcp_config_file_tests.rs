@@ -9,11 +9,15 @@
 //! keeps the file. Claude Code itself is not on CI. What is pinned is the shape,
 //! which Claude Code accepts or refuses entry by entry before it launches
 //! anything.
+//!
+//! The spawn preflight checks every server before it is attached
+//! (§FS-rhei-agents.6.2), so `mcp-declared` is staged on `PATH` the same way and
+//! the remote servers name a port this test listens on.
 // §FS-rhei-mcp-config-file
 
 use std::ffi::OsString;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use super::*;
 
@@ -57,12 +61,7 @@ fn run_on_claude_code(
 ) -> (CliRun, serde_json::Value) {
     let dir = unique_temp_dir(name);
     let bin = dir.join("bin");
-    fs::create_dir_all(&bin).expect("create stand-in directory");
-    fs::copy(
-        PathBuf::from(env!("CARGO_BIN_EXE_mcp-config-fixture")),
-        bin.join(format!("claude{}", std::env::consts::EXE_SUFFIX)),
-    )
-    .expect("stage the stand-in as claude");
+    stage_mcp_config_fixture(&bin, &["claude", "mcp-declared"]);
     let settings_dir = dir.join(".agent-grounds/rhei");
     fs::create_dir_all(&settings_dir).expect("create settings directory");
     write_fixture_file(&settings_dir, "settings.json", &settings.to_string());
@@ -102,6 +101,11 @@ fn read_handed_file(copy: &Path) -> serde_json::Value {
 // §FS-rhei-mcp-config-file.1
 #[test]
 fn a_claude_code_agent_is_handed_each_declared_server_in_the_mcp_config_schema() {
+    let listener =
+        std::net::TcpListener::bind("127.0.0.1:0").expect("listen for the remote servers");
+    let port = listener.local_addr().expect("listener address").port();
+    let (events, stream) =
+        (format!("http://127.0.0.1:{port}/sse"), format!("ws://127.0.0.1:{port}/ws"));
     let (_, handed) = run_on_claude_code(
         "mcp-config-schema",
         serde_json::json!({
@@ -110,8 +114,8 @@ fn a_claude_code_agent_is_handed_each_declared_server_in_the_mcp_config_schema()
                     "command": ["mcp-declared", "serve", "--log", "launches.log"],
                     "env": { "TOKEN": "${RHEI_E2E_MCP_TOKEN}" }
                 },
-                "events": { "url": "http://127.0.0.1:9/sse", "transport": "sse" },
-                "stream": { "url": "ws://127.0.0.1:9/ws", "transport": "websocket" }
+                "events": { "url": events, "transport": "sse" },
+                "stream": { "url": stream, "transport": "websocket" }
             }
         }),
         "declared, events, stream",
@@ -126,12 +130,13 @@ fn a_claude_code_agent_is_handed_each_declared_server_in_the_mcp_config_schema()
                     "args": ["serve", "--log", "launches.log"],
                     "env": { "TOKEN": "expanded-token" }
                 },
-                "events": { "url": "http://127.0.0.1:9/sse", "type": "sse" },
-                "stream": { "url": "ws://127.0.0.1:9/ws", "type": "ws" }
+                "events": { "url": events, "type": "sse" },
+                "stream": { "url": stream, "type": "ws" }
             }
         }),
         "the --mcp-config file claude-code was handed is not in its schema"
     );
+    drop(listener);
 }
 
 /// Claude Code takes a `cwd` or `workingDirectory` key and ignores both, so the

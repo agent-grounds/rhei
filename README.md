@@ -162,6 +162,7 @@ The primary reference documents are:
 - [`docs/functional-spec/rhei-language-reference.spec.md`](docs/functional-spec/rhei-language-reference.spec.md) — canonical entry point for the authored Rhei language surface
 - [`docs/functional-spec/rhei-plan-language.spec.md`](docs/functional-spec/rhei-plan-language.spec.md) — plan language specification
 - [`docs/functional-spec/rhei-states.spec.md`](docs/functional-spec/rhei-states.spec.md) — states specification
+- [`docs/what-an-agent-is-given.md`](docs/what-an-agent-is-given.md) — which of the settings, the state, the task and the run wins for an agent's model, MCP servers and skills, and what happens when a server cannot be reached
 - [`docs/functional-spec/states.yaml`](docs/functional-spec/states.yaml) — default validation states definition
 
 ## First 10 minutes

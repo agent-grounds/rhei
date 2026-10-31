@@ -486,7 +486,7 @@ so it can be attached to an agent subprocess.
 | `transport` | string | No | Transport for remote servers. Supported values: `sse`, `websocket`. Ignored for `command`-based servers. |
 | `env` | object | No | Environment variables for the server process. Values may reference host environment with `${VAR}` syntax. Only meaningful for `command`-based servers. |
 | `working_directory` | string | No | Working directory for the server process. Only meaningful for `command`-based servers. An `mcp_config_flag` file cannot carry it, and the spawn warns instead ([§FS-rhei-mcp-config-file.2](rhei-mcp-config-file.spec.md#2-a-working-directory-the-file-cannot-carry)). |
-| `startup_timeout` | string | No | Maximum time to wait for the server to complete its MCP handshake after launch. Duration format (`30s`, `10s`, …). Default: `10s`. |
+| `startup_timeout` | string | No | Longest the spawn preflight waits for a `url` server's host to accept a TCP connection ([§FS-rhei-agents.6.2](rhei-agents.spec.md#62-the-spawn-preflight)). Duration format (`30s`, `10s`, …) and greater than zero, on a registry entry or an inline one; anything else is a validation error. Default: `10s`. Rhei never starts a `command` server, so the field bounds nothing for one. |
 
 `command` and `url` are mutually exclusive. An entry must declare exactly one.
 
@@ -2062,23 +2062,18 @@ The task is skipped and the engine continues with other claimable tasks. When th
 
 Tooling — MCP servers and skills — can fail to be available for reasons that
 only surface at spawn time: a binary is not on `PATH`, a remote MCP URL is
-unreachable, an env var is unset, or a skill path does not exist. Rhei
-distinguishes three failure classes:
+unreachable, or a skill path does not exist. Rhei distinguishes three failure
+classes:
 
 | Failure | When detected | Default behavior |
 |---------|---------------|------------------|
 | Id referenced in a state but not in the merged registry and not an inline entry | `rhei validate` / settings load | Hard error. Same class as a dangling `model:` or `agent:` reference. |
-| Registry entry exists but the MCP server cannot start, URL is unreachable, the handshake times out, or a skill path does not exist | Agent spawn | Depends on the entry's `optional` flag (see below). |
-| MCP server starts but crashes mid-session | During agent execution | The agent surfaces the protocol error; Rhei does not intervene. The failure appears in the agent log. |
+| The entry resolves but fails the spawn preflight ([§FS-rhei-agents.6.2](rhei-agents.spec.md#62-the-spawn-preflight)): the server's executable or working directory is missing, its URL's host accepts no connection within `startup_timeout`, or a skill path is missing or unreadable | Agent spawn | Depends on the entry's `optional` flag (see below). |
+| The MCP server is reached but fails its handshake, or crashes mid-session | During agent execution | The agent surfaces the protocol error; Rhei does not intervene. The failure appears in the agent log. |
 
-An MCP server or skill is considered **available** when:
-
-- For `command`-based MCP servers: the subprocess launched, the MCP handshake
-  completed, and the server remained alive, all within its `startup_timeout`
-  (default `10s`).
-- For `url`-based MCP servers: the transport-level connection completed and
-  the MCP handshake succeeded within `startup_timeout`.
-- For skills: the configured `path` exists and is readable.
+An MCP server or skill is **available** for an invocation when its definition
+resolved, the agent can attach it, and it passed the spawn preflight. Rhei
+never starts an MCP server itself: the agent does, once, when it launches.
 
 ### 6.1. Required vs optional entries
 
@@ -2112,6 +2107,57 @@ See [Transitions Specification](rhei-transitions.spec.md) for declaring
 `mcp_unavailable` / `skill_unavailable` transitions and
 [States Specification — Template Variables](rhei-states.spec.md#4-template-variables-in-instructions-and-personality)
 for `{mcp.<name>.available}` and `{skill.<id>.available}` in prompts.
+
+### 6.2. The Spawn Preflight
+
+Immediately before each spawn, after the effective set is built
+([§FS-rhei-task-tooling.3](rhei-task-tooling.spec.md#3-the-effective-set)), `rhei run` checks every entry
+in it that has a definition. The checks read the filesystem and open at most
+one TCP connection; none of them runs the server.
+
+- **A `command` server** passes when the first element of `command` names an
+  executable file. A name with no path separator is looked up on `PATH`: the
+  entry's own `env.PATH`, after `${VAR}` expansion, when it declares one, and
+  otherwise the `PATH` `rhei run` itself was started with. On Windows the
+  lookup also tries the `PATHEXT` extensions. A name with a separator is taken
+  relative to the directory the server starts in. That directory is the
+  checkout root the agent starts in ([§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables)), unless the entry
+  declares `working_directory` and the agent attaches servers with `mcp_flag`.
+  In that case the working directory must exist, and the server starts in it;
+  a relative one is taken from the checkout root. An `mcp_config_flag` file
+  cannot carry `working_directory` ([§FS-rhei-mcp-config-file.2](rhei-mcp-config-file.spec.md#2-a-working-directory-the-file-cannot-carry)), so the
+  preflight neither checks it nor resolves against it for such an agent.
+- **A `url` server** passes when a TCP connection to the URL's host and port
+  completes within `startup_timeout` (default `10s`). The port defaults to
+  `80` for `http` and `ws` and to `443` for `https` and `wss`. A URL that names
+  no host, or no port and a scheme with no default, fails. The connection is
+  closed without a byte sent.
+- **A skill** passes when its `path`, after `~` expansion, exists and can be
+  read: a directory can be listed, a file opened.
+
+A failure is then handled by the entry's `optional` flag ([§FS-rhei-agents.6.1](rhei-agents.spec.md#61-required-vs-optional-entries)).
+Its reason, for example `command 'mcp-postgres' is not on PATH`, is named in
+the warning that drops an optional entry. It is also named in the
+required-tooling error a blocked spawn logs when no `mcp_unavailable`
+transition matches. A transition that matches receives the id alone, in
+`transitionData.unavailable`.
+
+Three choices are deliberate:
+
+- **No handshake.** A handshake would start every server twice per spawn,
+  once to probe it and once for the agent, and would wait up to
+  `startup_timeout` for each. It would also run a server's side effects, such
+  as a browser launch or a sign-in, for a probe. A missing binary and an
+  unreachable host are the failures an operator can fix before the run. A
+  server that is reached but misbehaves is the agent's to report.
+- **The definition Rhei holds is what is checked.** An agent that attaches
+  servers by id through `mcp_flag` may launch its own registration of that id.
+  The preflight still checks Rhei's entry, because that entry is what the plan
+  and the state machine named.
+- **No probe of `rhei next` or validation.** Availability belongs to the
+  machine the agent starts on, at the moment it starts. A plan validated on
+  one machine and run on another is judged on the second
+  ([§FS-rhei-states.7.3](rhei-states.spec.md#73-runtime-semantics)).
 
 ## 7. Timeout Handling
 

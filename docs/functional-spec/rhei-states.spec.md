@@ -1178,6 +1178,12 @@ registry entry (`command`/`url`/`transport`/`env`/... for MCP servers; `path`
 and `description` for skills). The string form is shorthand for `{id: <name>}`
 with `optional: false`.
 
+An object entry that carries a definition of its own (`command` or `url` for an
+MCP server, `path` for a skill) uses it even when the registry has an entry
+with the same id; validation says nothing about the shadowing. An object entry
+that carries none, such as `{id: grafana, optional: true}`, is looked up in the
+registry like the string form.
+
 ### 7.2. Effective set
 
 The **effective set** for one task's invocation in a state is
@@ -1216,7 +1222,9 @@ it fail at startup without an additive retry. Other resolved families retain
 their existing launch behavior.
 
 - Entries are resolved and availability-checked by `rhei run` at agent spawn
-  time — not at `rhei next`.
+  time — not at `rhei next`. The check is the spawn preflight
+  ([§FS-rhei-agents.6.2](rhei-agents.spec.md#62-the-spawn-preflight)): Rhei looks for the server's
+  executable or connects to its host, and never starts the server itself.
 - Required entries (the default) that fail their availability check block the
   agent spawn. The engine fires an `mcp_unavailable` or `skill_unavailable`
   transition if one is declared from the current state; otherwise the task

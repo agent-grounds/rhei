@@ -145,7 +145,7 @@
         agent.profile.skill_flag = Some("--skill".to_string());
 
         let tooling = resolve_tooling(&machine, "pending", &task, &settings);
-        let gate = gate_tooling_for_agent(&agent, &tooling);
+        let gate = gate_tooling_for_agent(&agent, &tooling, &passing_mcp_preflight);
         let unavailable = unavailable_ids(&gate.required, ToolingKind::Skill);
 
         assert_eq!(unavailable, vec!["release-notes"]);

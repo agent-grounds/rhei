@@ -144,6 +144,7 @@ fn validate_intrinsic_settings(settings: &RheiSettings) -> Vec<String> {
 
     // MCP server registry self-validation: exactly one of `command`/`url`;
     // §FS-rhei-agents.1.1.4: Validate MCP server registry entries.
+    errors.extend(registry_startup_timeout_errors(&settings.mcp_servers));
     for (id, profile) in &settings.mcp_servers {
         match (profile.command.is_some(), profile.url.is_some()) {
             (false, false) => errors.push(format!(
@@ -369,6 +370,7 @@ fn validate_mcp_entries_known(
             errors.push(format!("{label} references unknown mcp server '{}'", entry.id()));
         }
     }
+    errors.extend(inline_startup_timeout_errors(label, entries));
 }
 
 fn validate_skill_entries_known(

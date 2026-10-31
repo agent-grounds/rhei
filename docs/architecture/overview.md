@@ -77,6 +77,15 @@ Tasks progress through defined **states** (for example `draft` → `pending` →
 - Simple: A flat list of valid states for validation
 - Formal: Full transition rules with callbacks for automation
 
+### What an Agent Is Given
+
+When `rhei run` starts an agent on a task, its agent, model, MCP servers and
+skills come from the machine and project settings, the state, the task and the
+run's flags. For one value the most specific place wins. For a list such as
+MCP servers, the entries add up. [What an Agent Is Given](../what-an-agent-is-given.md)
+gives the order for each setting and says what happens when a server cannot
+be reached.
+
 ---
 
 ## Specification Documents

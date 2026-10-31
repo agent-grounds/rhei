@@ -420,3 +420,19 @@ pub fn assert_success(result: &CliRun) {
         result.stderr
     );
 }
+
+/// Copies the compiled `mcp-config-fixture` into `bin` once per name, so each
+/// resolves on a `PATH` that leads with `bin`: `claude` for the built-in agent,
+/// and the executable of every MCP server the spawn preflight must find
+/// (§FS-rhei-agents.6.2). A compiled stand-in keeps a shell script out of the
+/// fixture (§REQ-cross-platform.4).
+pub fn stage_mcp_config_fixture(bin: &Path, names: &[&str]) {
+    fs::create_dir_all(bin).expect("create stand-in directory");
+    for name in names {
+        fs::copy(
+            PathBuf::from(env!("CARGO_BIN_EXE_mcp-config-fixture")),
+            bin.join(format!("{name}{}", std::env::consts::EXE_SUFFIX)),
+        )
+        .unwrap_or_else(|err| panic!("stage the stand-in as {name}: {err}"));
+    }
+}

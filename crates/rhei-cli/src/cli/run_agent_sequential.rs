@@ -51,8 +51,13 @@ fn run_sequential_agent_invocation(
     let task = find_task_by_id(&loaded.rhei.tasks, &target_id);
     let Some(task) = task else { return Ok(()) };
 
+    // Initial members retain project-level transcripts; admitted members use
+    // their own runtime. §FS-rhei-agents.8.1 §FS-rhei-panta.6.2
+    let task_workspace_root = loaded.task_root(task_id_str, workspace_root);
+    // Before the gate: a relative MCP command resolves where the agent starts. §FS-rhei-agents.6.2
+    let checkout_root = resolve_agent_checkout_root(&task_workspace_root, task_id_str)?;
     let tooling = resolve_tooling(machine, current_state, &task.tooling, settings);
-    let gate = gate_tooling_for_agent(resolved, &tooling);
+    let gate = gate_tooling_at_spawn(resolved, &tooling, &checkout_root.path);
     for warning in &gate.warnings {
         run_warn!("{warning}");
     }
@@ -76,9 +81,6 @@ fn run_sequential_agent_invocation(
         return Ok(());
     }
     let tooling = gate.tooling;
-    // Initial members retain project-level transcripts; admitted members use
-    // their own runtime. §FS-rhei-agents.8.1 §FS-rhei-panta.6.2
-    let task_workspace_root = loaded.task_root(task_id_str, workspace_root);
     let agent_runtime_dir =
         machines.agent_runtime_dir(task_id_str, &task_workspace_root, runtime_dir);
     // §FS-rhei-seal.8.2: a changed sealed input refuses the start before any of it.
@@ -181,7 +183,6 @@ fn run_sequential_agent_invocation(
             return Ok(());
         }
     }
-    let checkout_root = resolve_agent_checkout_root(&task_workspace_root, task_id_str)?;
     // A sequential pass runs one invocation at a time, so nothing else of this
     // run is in flight. §FS-rhei-memory.4.3
     let exclusions = loaded_task_exclusions(

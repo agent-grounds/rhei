@@ -162,8 +162,10 @@ fn spawn_parallel_agent_work_item(
     };
     let workspace_root = task_workspace_root.as_path();
 
+    // Before the gate: a relative MCP command resolves where the agent starts. §FS-rhei-agents.6.2
+    let checkout_root = resolve_agent_checkout_root(workspace_root, &item.task_id_str)?;
     let tooling = resolve_tooling(machine, &item.current_state, &task.tooling, settings);
-    let gate = gate_tooling_for_agent(&item.resolved, &tooling);
+    let gate = gate_tooling_at_spawn(&item.resolved, &tooling, &checkout_root.path);
     for warning in &gate.warnings {
         emit_run_message(sink, rhei_tui::MessageLevel::Warn, warning.clone());
     }
@@ -184,7 +186,6 @@ fn spawn_parallel_agent_work_item(
         });
     }
     let tooling = gate.tooling;
-    let checkout_root = resolve_agent_checkout_root(workspace_root, &item.task_id_str)?;
     let exclusions = loaded_task_exclusions(
         &loaded,
         task,

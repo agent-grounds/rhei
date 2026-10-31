@@ -30,22 +30,6 @@ fn version_probe_line(stdout: &[u8]) -> Option<String> {
         .map(str::to_string)
 }
 
-/// Where `program` resolves for a process started in `cwd`: itself when it
-/// names a path, else the first match on `PATH`.
-fn resolved_executable(program: &str, cwd: &Path) -> Option<PathBuf> {
-    let named = Path::new(program);
-    if named.components().count() > 1 || named.is_absolute() {
-        return Some(cwd.join(named));
-    }
-    let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path).find_map(|dir| {
-        [program.to_string(), format!("{program}.exe")]
-            .into_iter()
-            .map(|name| dir.join(name))
-            .find(|candidate| candidate.is_file())
-    })
-}
-
 fn file_stamp(path: &Path) -> FileStamp {
     let metadata = fs::metadata(path).ok()?;
     Some((metadata.len(), metadata.modified().ok()))
@@ -55,7 +39,9 @@ fn file_stamp(path: &Path) -> FileStamp {
 /// element of `command` that names a file from `cwd`, since a wrapper's script
 /// is what changes when the wrapper does. §FS-rhei-evidence.7
 fn command_stamps(command: &[String], cwd: &Path) -> Vec<FileStamp> {
-    let executable = resolved_executable(&command[0], cwd).and_then(|path| file_stamp(&path));
+    let path = std::env::var_os("PATH");
+    let executable =
+        resolve_executable(&command[0], cwd, path.as_deref()).and_then(|path| file_stamp(&path));
     let scripts = command[1..].iter().map(|arg| cwd.join(arg)).filter(|path| path.is_file());
     std::iter::once(executable).chain(scripts.map(|path| file_stamp(&path))).collect()
 }

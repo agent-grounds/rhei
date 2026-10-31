@@ -80,15 +80,19 @@ mod redaction {
     }
 
     /// The probe workspace with [`SECRET`] in the task body, so in the prompt, and
-    /// in an MCP server's URL, so in the agent's configuration object.
+    /// in an MCP server's URL, so in the agent's configuration object. The URL
+    /// names the returned listener, which the spawn preflight connects to
+    /// (§FS-rhei-agents.6.2); hold it until the run is done.
     fn secret_workspace(
         prefix: &str,
         fails: bool,
-    ) -> super::super::evidence_support::EvidenceWorkspace {
+    ) -> (super::super::evidence_support::EvidenceWorkspace, std::net::TcpListener) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("listen for the server");
+        let port = listener.local_addr().expect("listener address").port();
         let mut profile = Profile::default();
         profile.fields["mcp_flag"] = serde_json::json!("--mcp");
         profile.settings = serde_json::json!({
-            "mcp_servers": { "hosted": { "url": format!("https://mcp.example/{SECRET}/sse"), "transport": "sse" } }
+            "mcp_servers": { "hosted": { "url": format!("http://127.0.0.1:{port}/{SECRET}/sse"), "transport": "sse" } }
         });
         let ws = evidence_workspace(prefix, profile);
         let redactor = write_redactor(&ws.root, fails);
@@ -107,14 +111,14 @@ mod redaction {
             machine.replace("    agent: mock\n", "    agent: mock\n    mcp_servers: [hosted]\n"),
         )
         .expect("attach the hosted server");
-        ws
+        (ws, listener)
     }
 
     /// The stored copies are the redactor's output; the record keeps the
     /// original's hash and says it holds a redacted copy. §FS-rhei-evidence.5.3
     #[test]
     fn a_redactor_stores_redacted_copies_and_the_record_keeps_the_original_hash() {
-        let ws = secret_workspace("evidence-redacted", false);
+        let (ws, _listener) = secret_workspace("evidence-redacted", false);
         ws.run();
         let evidence = ws.evidence_dir();
         assert_store_exists(&evidence);
@@ -145,7 +149,7 @@ mod redaction {
     /// runs to its result. §FS-rhei-evidence.5.3
     #[test]
     fn a_failing_redactor_withholds_the_copy_and_the_agent_still_runs() {
-        let ws = secret_workspace("evidence-withheld", true);
+        let (ws, _listener) = secret_workspace("evidence-withheld", true);
         ws.run();
         let evidence = ws.evidence_dir();
         assert_store_exists(&evidence);

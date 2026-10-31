@@ -95,6 +95,7 @@ fn handle_sequential_agent_completion(
             timed_out,
             timeout_secs,
             provider_limit,
+            provider_unavailable,
             ..
         }) => {
             *progress.agents_spawned += 1;
@@ -131,28 +132,9 @@ fn handle_sequential_agent_completion(
             // Provider classification outranks generic failure and snapshots; persist only while
             // the task occupies the reporting state. §FS-rhei-agents.5.2.1 §FS-rhei-run.3.3
             if let Some(observed) = provider_limit {
-                let effective = if stayed_in_state {
-                    persist_provider_limit(
-                        input,
-                        &reloaded,
-                        task_id_str,
-                        current_state,
-                        &observed,
-                    )?
-                } else {
-                    observed
-                };
-                release.provider_limited(&effective);
-                run_info!(
-                    "  Task {} provider-limited by {} until {}; state unchanged.",
-                    task_id_str,
-                    effective.identity.provider,
-                    effective.next_attempt_at
-                );
+                let at = (task_id_str.as_str(), current_state.as_str());
+                park_refusal(input, &reloaded, at, stayed_in_state, observed, &mut release, sink)?;
                 return Ok(());
-            }
-            if status.success() && stayed_in_state {
-                clear_persisted_provider_limit(input, &reloaded, task_id_str, current_state, resolved, started_at)?;
             }
             // Condition (3) selects that edge against the plan as re-read here,
             // so a child this invocation appended is an open descendant of it.
@@ -211,6 +193,11 @@ fn handle_sequential_agent_completion(
             } else {
                 Vec::new()
             };
+            // Cleared only once this exit is known not to be a wait. §FS-rhei-run.3.3
+            let resumed = resumed_provider(provider_unavailable.as_ref(), &missing_required_outputs);
+            if status.success() && stayed_in_state && resumed {
+                clear_persisted_provider_limit(input, &reloaded, task_id_str, current_state, resolved, started_at)?;
+            }
             let snapshot_completion = if timed_out {
                 SnapshotCompletion::Timeout
             } else if outputs_ok {
@@ -327,17 +314,17 @@ fn handle_sequential_agent_completion(
                                 }
                             }
                         }
-                        // An agent reaches this block only on a zero exit.
-                        // §FS-rhei-agents.3.2
-                        emit_missing_required_outputs_warning(
-                            "agent",
-                            task_id_str,
-                            state_before,
-                            0,
-                            &missing_required_outputs,
-                            retry_outlook,
-                            sink,
-                        );
+                        let stall = AgentStall {
+                            input,
+                            reloaded: &reloaded,
+                            task_id: task_id_str,
+                            state: state_before,
+                            spawn_record: &spawn_record,
+                            missing: &missing_required_outputs,
+                            outlook: retry_outlook,
+                            verdict: provider_unavailable.as_ref(),
+                        };
+                        stall_agent_exit(stall, &mut release, sink)?;
                         progress.stalled_tasks.insert(task_id_str.clone());
                         break 'exit_zero;
                     }

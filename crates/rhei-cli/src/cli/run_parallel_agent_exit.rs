@@ -43,7 +43,9 @@ fn handle_parallel_agent_exit(
         accounting_recorded,
         outcome,
     } = exit;
-    let AgentSpawnOutcome { status, timed_out, timeout_secs, provider_limit, .. } = outcome;
+    let AgentSpawnOutcome {
+        status, timed_out, timeout_secs, provider_limit, provider_unavailable, ..
+    } = outcome;
     // The completed ticket's own machine drives its post-exit
     // handling; callbacks resolve inside each helper from the
     // same set. §DA-per-rhei-state-machines
@@ -94,18 +96,8 @@ fn handle_parallel_agent_exit(
     // any generic failure transition, callback, or snapshot path can run.
     // §FS-rhei-agents.5.2.2 §FS-rhei-run.3.3
     if let Some(observed) = provider_limit {
-        let effective = if stayed_in_state {
-            persist_provider_limit(input, &reloaded, &task_id_str, &state_name, &observed)?
-        } else {
-            observed
-        };
-        release.provider_limited(&effective);
-        run_info!(
-            "  Task {} provider-limited by {} until {}; state unchanged.",
-            task_id_str,
-            effective.identity.provider,
-            effective.next_attempt_at
-        );
+        let at = (task_id_str.as_str(), state_name.as_str());
+        park_refusal(input, &reloaded, at, stayed_in_state, observed, &mut release, sink)?;
         // The slot goes first so the settle's account is the visit's last
         // record, as on the sequential path. §FS-rhei-run-json.2.1
         drop(release);
@@ -115,9 +107,6 @@ fn handle_parallel_agent_exit(
         // applied. §FS-rhei-budgets.4.2 §FS-rhei-agents.3.2.3
         budget_settle_visit(workspace_root, &task_id_str, sink);
         return Ok(());
-    }
-    if status.success() && stayed_in_state {
-        clear_persisted_provider_limit(input, &reloaded, &task_id_str, &state_name, &resolved, started_at)?;
     }
     let mut missing_required_outputs = Vec::new();
     let mut snapshot_completion_for_emit = None;
@@ -232,6 +221,11 @@ fn handle_parallel_agent_exit(
         }
         snapshot_completion_for_emit = Some(snapshot_completion);
     }
+    // Cleared only once this exit is known not to be a wait. §FS-rhei-run.3.3
+    let resumed = resumed_provider(provider_unavailable.as_ref(), &missing_required_outputs);
+    if status.success() && stayed_in_state && resumed {
+        clear_persisted_provider_limit(input, &reloaded, &task_id_str, &state_name, &resolved, started_at)?;
+    }
     let state_after = task_after.map(|t| t.state.as_str()).unwrap_or("unknown");
     if normalized_state_name(state_after, machine)
         != normalized_state_name(&state_name, machine)
@@ -297,17 +291,17 @@ fn handle_parallel_agent_exit(
                         }
                     }
                 }
-                // An agent reaches this block only on a zero exit.
-                // §FS-rhei-agents.3.2
-                emit_missing_required_outputs_warning(
-                    "agent",
-                    &task_id_str,
-                    &state_name,
-                    0,
-                    &missing_required_outputs,
-                    retry_outlook,
-                    sink,
-                );
+                let stall = AgentStall {
+                    input,
+                    reloaded: &reloaded,
+                    task_id: &task_id_str,
+                    state: &state_name,
+                    spawn_record: &spawn_record,
+                    missing: &missing_required_outputs,
+                    outlook: retry_outlook,
+                    verdict: provider_unavailable.as_ref(),
+                };
+                stall_agent_exit(stall, &mut release, sink)?;
                 progress.stalled_tasks.insert(task_id_str.clone());
                 break 'exit_zero;
             }

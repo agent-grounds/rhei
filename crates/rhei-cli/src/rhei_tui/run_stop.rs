@@ -65,6 +65,8 @@ pub enum IdleBlocker {
     Poll,
     /// A recognized provider limit. §FS-rhei-run.3.3
     ProviderLimit,
+    /// A recognized provider unavailability's backoff. §FS-rhei-run.3.3
+    ProviderUnavailable,
     /// More than one of the above across the in-scope plan.
     Mixed,
 }
@@ -77,6 +79,7 @@ impl IdleBlocker {
             IdleBlocker::Gate => "gate",
             IdleBlocker::Poll => "poll",
             IdleBlocker::ProviderLimit => "provider_limit",
+            IdleBlocker::ProviderUnavailable => "provider_unavailable",
             IdleBlocker::Mixed => "mixed",
         }
     }
@@ -87,6 +90,7 @@ impl IdleBlocker {
             "gate" => Some(IdleBlocker::Gate),
             "poll" => Some(IdleBlocker::Poll),
             "provider_limit" => Some(IdleBlocker::ProviderLimit),
+            "provider_unavailable" => Some(IdleBlocker::ProviderUnavailable),
             "mixed" => Some(IdleBlocker::Mixed),
             _ => None,
         }
@@ -105,6 +109,9 @@ impl IdleBlocker {
                 None => "idle \u{2014} waiting on a timed retry".to_string(),
             },
             IdleBlocker::ProviderLimit => "idle \u{2014} waiting on a provider limit".to_string(),
+            IdleBlocker::ProviderUnavailable => {
+                "idle \u{2014} waiting on an unavailable provider".to_string()
+            }
             IdleBlocker::Mixed => "idle \u{2014} mixed waits".to_string(),
         }
     }

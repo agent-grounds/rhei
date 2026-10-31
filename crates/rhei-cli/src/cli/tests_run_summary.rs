@@ -212,6 +212,7 @@ transitions:
             is_gate: true,
             waits_on_person,
             provider_limited,
+            provider_unavailable: false,
         };
         assert_eq!(waiting_tally(&[row(false, false), row(false, false)]), "2 held");
         assert_eq!(waiting_tally(&[row(true, false)]), "1 waiting on a person");
@@ -574,6 +575,7 @@ transitions:
             is_gate: false,
             waits_on_person: false,
             provider_limited: false,
+            provider_unavailable: false,
         }
     }
 

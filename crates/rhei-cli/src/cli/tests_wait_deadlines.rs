@@ -51,6 +51,7 @@ transitions:
         let identity = ProviderIdentity { agent: "codex".into(), provider: "openai".into() };
         let make = |at| ProviderLimit {
             identity: identity.clone(),
+            kind: ProviderWaitKind::Limit,
             signal: "signal".into(),
             observed_at: deadline(now),
             next_attempt_at: deadline(at),
@@ -110,6 +111,7 @@ transitions:
         let identity = ProviderIdentity { agent: "codex".into(), provider: "openai".into() };
         let limit = ProviderLimit {
             identity: identity.clone(),
+            kind: ProviderWaitKind::Limit,
             signal: "signal".into(),
             observed_at: deadline(now - 2),
             next_attempt_at: deadline(now - 1),
@@ -145,6 +147,7 @@ transitions:
         let metadata = set_poll_next_attempt_metadata(None, &task, "working", now + 180, 1);
         let limit = ProviderLimit {
             identity: ProviderIdentity { agent: "codex".into(), provider: "openai".into() },
+            kind: ProviderWaitKind::Limit,
             signal: "signal".into(),
             observed_at: deadline(now),
             next_attempt_at: deadline(now + 120),
@@ -186,6 +189,7 @@ transitions:
         let now = current_unix_secs();
         let limit = ProviderLimit {
             identity: ProviderIdentity { agent: "codex".into(), provider: "openai".into() },
+            kind: ProviderWaitKind::Limit,
             signal: "signal".into(),
             observed_at: deadline(now),
             next_attempt_at: deadline(now + 1800),

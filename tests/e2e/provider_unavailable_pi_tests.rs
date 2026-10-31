@@ -1,9 +1,8 @@
 //! A `pi` session whose provider stops answering waits instead of spending the
 //! visit's attempts (agent-grounds/rhei#513).
 //!
-//! Every test here is red until the recognition lands: today the session's
-//! exit `0` with its outputs missing is an ordinary attempt, charged, and the
-//! second one halts the visit.
+//! Without the recognition the session's exit `0` with its outputs missing is
+//! an ordinary attempt, charged, and the second one halts the visit.
 // §FS-rhei-agents.2.5 §FS-rhei-agents.3.2.3 §FS-rhei-run.3.3
 
 use super::provider_limit_support::*;
@@ -18,7 +17,6 @@ use serde_json::json;
 // §FS-rhei-agents.2.5 §FS-rhei-agents.3.2.1 §FS-rhei-agents.8.4 §FS-rhei-run.3.3
 // §FS-rhei-run-json.2.1 §FS-rhei-run-tui.1.7
 #[test]
-#[ignore = "red until #513: a pi session that gave up on its provider is charged as an attempt; implement removes this"]
 fn a_pi_session_that_loses_its_provider_waits_without_spending_an_attempt() {
     let fixture = Outage::pi(gave_up()).fixture("pi-unavailable-waits");
     let first = run_once(&fixture, "first");
@@ -87,7 +85,6 @@ fn a_pi_session_that_loses_its_provider_waits_without_spending_an_attempt() {
 /// is counted `2`, and waits twice as long.
 // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.4 §FS-rhei-run.3.3
 #[test]
-#[ignore = "red until #513: a second unavailable ending is charged and spends the visit; implement removes this"]
 fn the_count_of_unavailable_endings_carries_across_spawns_and_doubles_the_wait() {
     let fixture = Outage::pi(gave_up()).fixture("pi-unavailable-count");
     run_once(&fixture, "first");
@@ -118,7 +115,6 @@ fn the_count_of_unavailable_endings_carries_across_spawns_and_doubles_the_wait()
 /// written, because no spawn follows it.
 // §FS-rhei-agents.3.2.1 §FS-rhei-agents.3.2.3 §FS-rhei-run-json.2.1
 #[test]
-#[ignore = "red until #513: the spawn record keeps no count of unavailable endings to cap; implement removes this"]
 fn the_seventh_unavailable_ending_is_charged_and_halts_a_spent_visit() {
     let fixture = Outage::pi(gave_up()).fixture("pi-unavailable-cap");
     seed_sixth_ending(&fixture);
@@ -155,7 +151,6 @@ fn the_seventh_unavailable_ending_is_charged_and_halts_a_spent_visit() {
 /// waits its minute.
 // §FS-rhei-agents.3.2.1 §FS-rhei-agents.3.2.3 §FS-rhei-run.3.3
 #[test]
-#[ignore = "red until #513: a pi session that lost its provider mid-work is not recorded as unavailable; implement removes this"]
 fn a_session_the_provider_answered_is_charged_and_still_waits() {
     let stream = gave_up_after(&[assistant("toolUse", None)], SIGNAL);
     let fixture = Outage::pi(stream).fixture("pi-unavailable-answered");

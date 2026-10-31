@@ -21,9 +21,27 @@ struct AgentSpawnOutcome {
     /// A strict provider refusal recognized after output drain and before the
     /// generic non-zero completion paths run. §FS-rhei-agents.2.3
     provider_limit: Option<ProviderLimit>,
+    /// pi's verdict that its retries gave up on the provider; the output check
+    /// decides whether it is the ending. §FS-rhei-agents.2.5
+    provider_unavailable: Option<ProviderUnavailable>,
     /// The Codex configuration fallbacks this invocation's own output carried,
     /// distinct and in the order first seen. §FS-rhei-configuration-fallbacks
     configuration_fallbacks: Vec<String>,
+}
+
+/// How a spawn ended when its log closed: the one spelling the spawn record, the
+/// evidence end record and the metrics note start from. An ending decided after
+/// that is the spawn record's alone. §FS-rhei-agents.8.4 §FS-rhei-evidence.4
+fn spawn_ending(provider_limited: bool, timed_out: bool, interrupted: bool) -> &'static str {
+    if provider_limited {
+        "provider_limited"
+    } else if timed_out {
+        "timed out"
+    } else if interrupted {
+        "interrupted"
+    } else {
+        "exited"
+    }
 }
 
 impl InvocationOutcome for AgentSpawnOutcome {
@@ -266,6 +284,7 @@ fn spawn_and_wait_agent(
                 usage_capture_path: None,
                 cli_session: None,
                 provider_limit: None,
+                provider_unavailable: None,
                 configuration_fallbacks: Vec::new(),
             });
         }
@@ -425,6 +444,10 @@ fn spawn_and_wait_agent(
             ended_wall,
         )
     });
+    // A sibling of the refusal, read from pi's own events. §FS-rhei-agents.2.5
+    let provider_unavailable = captured_lines.lock().ok().and_then(|lines| {
+        classify_provider_unavailable(resolved, status, timed_out, interrupted, &lines, ended_wall)
+    });
     // Read beside the refusal, never as one: it decides nothing. §FS-rhei-configuration-fallbacks
     let configuration_fallbacks = captured_lines
         .lock()
@@ -434,15 +457,7 @@ fn spawn_and_wait_agent(
         if timed_out { resolved.timeout_secs.map(format_duration_human) } else { None };
     // The spawn ran. Say so where the next pass, the next run, and the engine's
     // own account of this state will all read it. §FS-rhei-agents.8.4
-    let ending = if provider_limit.is_some() {
-        "provider_limited"
-    } else if timed_out {
-        "timed out"
-    } else if interrupted {
-        "interrupted"
-    } else {
-        "exited"
-    };
+    let ending = spawn_ending(provider_limit.is_some(), timed_out, interrupted);
     plan.record_spawn(SpawnEnding {
         task_id,
         state_name,
@@ -498,6 +513,7 @@ fn spawn_and_wait_agent(
         usage_capture_path,
         cli_session,
         provider_limit,
+        provider_unavailable,
         configuration_fallbacks,
     })
 }

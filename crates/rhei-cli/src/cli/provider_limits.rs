@@ -23,6 +23,8 @@ struct ProviderIdentity {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct ProviderLimit {
     identity: ProviderIdentity,
+    /// A refusal's reset or an unavailable provider's backoff. §FS-rhei-run.3.3
+    kind: ProviderWaitKind,
     signal: String,
     observed_at: String,
     next_attempt_at: String,
@@ -242,6 +244,7 @@ fn classify_provider_limit_with_local_resolver(
 
     let limit = ProviderLimit {
         identity,
+        kind: ProviderWaitKind::Limit,
         signal: signal.clone(),
         observed_at: observed_utc.to_rfc3339_opts(SecondsFormat::Secs, true),
         next_attempt_at: deadline.to_rfc3339_opts(SecondsFormat::Secs, true),
@@ -293,6 +296,7 @@ fn provider_limit_from_value(value: &YamlValue) -> Option<ProviderLimit> {
             agent: identity.get(yaml_key("agent"))?.as_str()?.to_string(),
             provider: identity.get(yaml_key("provider"))?.as_str()?.to_string(),
         },
+        kind: ProviderWaitKind::read(map.get(yaml_key("kind"))),
         signal: map.get(yaml_key("signal"))?.as_str()?.to_string(),
         observed_at: map.get(yaml_key("observedAt"))?.as_str()?.to_string(),
         next_attempt_at: map.get(yaml_key("nextAttemptAt"))?.as_str()?.to_string(),
@@ -317,6 +321,9 @@ fn provider_limit_value(limit: &ProviderLimit) -> YamlValue {
     identity.insert(yaml_key("provider"), yaml_key(&limit.identity.provider));
     let mut record = YamlMapping::new();
     record.insert(yaml_key("identity"), YamlValue::Mapping(identity));
+    if let Some(kind) = limit.kind.written() {
+        record.insert(yaml_key("kind"), yaml_key(kind));
+    }
     record.insert(yaml_key("signal"), yaml_key(&limit.signal));
     record.insert(yaml_key("observedAt"), yaml_key(&limit.observed_at));
     record.insert(yaml_key("nextAttemptAt"), yaml_key(&limit.next_attempt_at));

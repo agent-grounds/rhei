@@ -745,11 +745,11 @@ marker its unchanged state earns.
 
 A provider-limited invocation has `driver: agent`, destination `-`, and reason
 `provider openai limited until <nextAttemptAt>`; an unavailable one has reason
-`provider openai-codex unavailable until <nextAttemptAt>`. Each entry retains the
-real exit code and log under its outcome, `provider_limited` or
-`provider_unavailable`; the ledger does not call it blocked or failed and
-records no transition. Repeated parked invocations remain separate auditable
-invocations even though a parked one consumes no agent attempt.
+`provider openai-codex unavailable until <nextAttemptAt>`, or `provider unavailable` when
+its charge spent the visit's last attempt and no wait was written. Each entry retains the
+real exit code and log under its outcome, `provider_limited` or `provider_unavailable`; the
+ledger does not call it blocked or failed and records no transition. Repeated parked
+invocations remain separate auditable invocations even though a parked one consumes no agent attempt.
 
 `driver: blocked` is used for non-terminal tasks that remain in place at run end.
 The row's `reason` must name the first concrete blocker Rhei can prove, such as

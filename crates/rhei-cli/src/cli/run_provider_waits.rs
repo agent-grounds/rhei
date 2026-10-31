@@ -11,7 +11,7 @@
 
 /// Park a recognized refusal: its wait is persisted only while the ticket still
 /// occupies the reporting state, and the line says so.
-// §FS-rhei-agents.5.2.1 §FS-rhei-run.3.3
+// §FS-rhei-agents.5.2.1 §FS-rhei-agents.5.2.2 §FS-rhei-run.3.3
 fn park_refusal(
     input: &Path,
     reloaded: &LoadedPlan,
@@ -89,8 +89,9 @@ fn stall_agent_exit(
 }
 
 /// The warning, then the wait or — when the charge spent the visit's last
-/// attempt — the exhaustion halt with no wait, because no spawn follows it.
-// §FS-rhei-agents.3.2.1 §FS-rhei-run.3.3
+/// attempt — the exhaustion halt with no wait, because no spawn follows it,
+/// naming the missing artifacts as any exhausted visit does.
+// §FS-rhei-agents.3.2.1 §FS-rhei-run.3.3 §FS-rhei-run-json.2.1
 fn settle_provider_unavailable(
     stall: &AgentStall<'_>,
     verdict: &ProviderUnavailable,
@@ -113,6 +114,13 @@ fn settle_provider_unavailable(
     ));
     if record.attempt_charged && !matches!(stall.outlook, RetryOutlook::AttemptsLeft) {
         warn(stall.outlook.halt_line(stall.task_id, stall.state, stall.missing));
+        // As any exhausted visit does, so the report names what it left unwritten.
+        // §FS-rhei-run-json.2.1 §FS-rhei-run-report.3.1
+        sink.emit(rhei_tui::RunEvent::TaskOutputsMissing {
+            task: stall.task_id.to_string(),
+            state: stall.state.to_string(),
+            entries: stall.missing.to_vec(),
+        });
         release.provider_unavailable(None);
         return Ok(());
     }

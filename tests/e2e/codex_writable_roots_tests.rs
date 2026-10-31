@@ -5,7 +5,9 @@
 //! The plan and the checkout live in separate directories, and the plan's path
 //! carries a space and a non-ASCII letter, so a root that was split, quoted or
 //! re-spelled on its way to the agent is a root the shim does not see.
-//! §FS-rhei-agents.2.2 §FS-rhei-agents.1.1.2
+//! Workspace plans live beneath their fixture checkout, or explicitly select an owned
+//! linked worktree, so ancestor Git discovery cannot select another repository.
+//! §FS-rhei-agents.2.2.1 §REQ-test-isolation.4 §FS-rhei-agents.1.1.2
 
 use std::fs;
 use std::path::Path;
@@ -14,14 +16,14 @@ use super::codex_writable_roots_support::*;
 use super::templates_tests::run_raw;
 use super::*;
 
-/// A `family: codex` wrapper, a plan outside any repository, and a checkout as
-/// the working directory: the plan, the checkout, its git dir and Rhei's state
-/// directory are all roots. §FS-rhei-agents.2.2
+/// A `family: codex` wrapper and a plan beneath its owned checkout: the plan,
+/// the checkout, its git dir and Rhei's state directory are all distinct roots.
+/// §FS-rhei-agents.2.2.1
 #[test]
 fn a_codex_workspace_launch_writes_its_plan_state_and_commit_through_its_roots() {
     let dir = unique_temp_dir("codex-roots-plain");
     let Some(checkout) = git_repository(&dir.join("checkout")) else { return };
-    let plan = dir.join("plans dir ü").join("plan");
+    let plan = checkout.join("plans dir ü").join("plan");
     write_plan_at(&plan, "Codex roots", ONE_TASK);
     let home = dir.join("home");
     let log = dir.join("shim.jsonl");
@@ -91,12 +93,12 @@ fn a_codex_workspace_launch_commits_in_a_linked_worktree() {
 
 /// Settings hoisted to a Panta project still give the wrapper its roots, and
 /// the project directory is one of them beside the member rhei.
-/// §FS-rhei-agents.2.2 §FS-rhei-templates.4
+/// §FS-rhei-agents.2.2.1 §FS-rhei-templates.4
 #[test]
 fn a_codex_workspace_launch_from_a_panta_member_grants_the_project_too() {
     let dir = unique_temp_dir("codex-roots-panta");
     let Some(checkout) = git_repository(&dir.join("checkout")) else { return };
-    let project = dir.join("plans dir ü").join("project");
+    let project = checkout.join("plans dir ü").join("project");
     let member = project.join("alpha");
     write_plan_at(&member, "alpha", ONE_TASK);
     fs::write(project.join("index.panta.md"), "# Panta: Codex roots\n").unwrap();
@@ -121,14 +123,14 @@ fn a_codex_workspace_launch_from_a_panta_member_grants_the_project_too() {
 
 /// A wrapper that writes its own `modes` replaces them whole but still inherits
 /// `writable_roots`, and a grant it writes into a mode passes through as
-/// written. §FS-rhei-agents.1.1.2 §FS-rhei-agents.2.2
+/// written. §FS-rhei-agents.1.1.2 §FS-rhei-agents.2.2.1
 #[test]
 fn a_wrapper_that_writes_its_own_modes_still_inherits_its_roots() {
     let dir = unique_temp_dir("codex-roots-own-modes");
     let Some(checkout) = git_repository(&dir.join("checkout")) else { return };
     let cache = dir.join("cache ü");
     fs::create_dir_all(&cache).unwrap();
-    let plan = dir.join("plans dir ü").join("plan");
+    let plan = checkout.join("plans dir ü").join("plan");
     write_plan_at(&plan, "Codex roots", ONE_TASK);
     let home = dir.join("home");
     let log = dir.join("shim.jsonl");
@@ -161,7 +163,7 @@ fn a_wrapper_that_writes_its_own_modes_still_inherits_its_roots() {
 /// `changeset-review` composes `codex` from `code-review` and `fix-codex` from
 /// `fix`. Launched through the selectors and modes it ships, with only the
 /// binary swapped, each writes through its roots. §FS-rhei-templates.4.1
-/// §FS-rhei-agents.2.2
+/// §FS-rhei-agents.2.2.1
 #[test]
 fn changeset_review_composed_profiles_write_through_their_roots() {
     let dir = unique_temp_dir("codex-roots-changeset");
@@ -189,7 +191,7 @@ fn changeset_review_composed_profiles_write_through_their_roots() {
         ("fix-codex", format!("fix-codex[{fix_mode}]:openai:gpt-5.5")),
     ];
 
-    let plan = dir.join("plans dir ü").join("plan");
+    let plan = checkout.join("plans dir ü").join("plan");
     write_plan_at(&plan, "Composed roots", "### Task 1: Review and fix\n**State:** review\n");
     let home = dir.join("home");
     let log = dir.join("shim.jsonl");

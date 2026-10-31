@@ -72,7 +72,7 @@ or repurposing a field named here is a breaking change and moves `schema`
 | `run_started` | Once, at the head of the stream | `schema`, `run_id`, `workspace`, `parallel`, `total_tasks`, `rhei_build`, `checkout_head_at_start` |
 | `pass_started` | Each scheduler pass begins | `pass`, `ready` (task ids in source order) |
 | `slot_assigned` | A worker is spawned | `slot`, `task`, `from`, `to`, `agent` (null for programs), `log_path` |
-| `slot_released` | That worker exits | `slot`, `task`, `from`, `to`, `log_path`, `outcome`, `exit_code`, `duration_ms`; a provider-limited release also has `provider` and `next_attempt_at`, a release whose task region was restored has `reverted`, and a release whose output carried a Codex configuration fallback has `configuration_fallbacks` |
+| `slot_released` | That worker exits | `slot`, `task`, `from`, `to`, `log_path`, `outcome`, `exit_code`, `duration_ms`; a provider-limited or provider-unavailable release also has `provider` and `next_attempt_at`, a release whose task region was restored has `reverted`, and a release whose output carried a Codex configuration fallback has `configuration_fallbacks` |
 | `pass_ended` | Each scheduler pass ends | `pass`, `progressed` |
 | `tasks_deferred` | Ready tasks yielded a same-state slot | `pass`, `tasks` |
 | `task_outputs_missing` | A worker exited `0` without its required artifacts | `task`, `state`, `entries` |
@@ -92,7 +92,7 @@ head of the stream knows which build ran and what the checkout started on. They
 are additions under [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version), so `schema` stays `1`.
 
 `outcome` is one of `completed`, `failed`, `waiting`, `provider_limited`,
-`cancelled`, `timeout`, `interrupted`, matching the journal vocabulary of [§FS-rhei-run-tui.1.7](rhei-run-tui.spec.md#17-journal-format).
+`provider_unavailable`, `cancelled`, `timeout`, `interrupted`, matching the journal vocabulary of [§FS-rhei-run-tui.1.7](rhei-run-tui.spec.md#17-journal-format).
 `waiting` is emitted when the released invocation selected a poll state's
 self-loop, whatever its exit code — a handled wait, not a failure and not a
 finished state ([§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics)). Paths
@@ -129,6 +129,16 @@ changes neither `outcome` nor `exit_code`. It is an addition under
 `failed` outcome. The stream remains open while the ordinary run loop waits;
 `run_finished` is emitted only when that loop later finishes or halts.
 
+`provider_unavailable` is emitted for the recognized ending of
+[§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability). When the ending wrote a wait it is emitted in place of
+`task_outputs_missing`, `provider` is the resolved provider, and
+`next_attempt_at` is the backoff deadline of [§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking). When the charge
+spent the visit's last attempt no wait is written and both fields are absent,
+and `task_outputs_missing` precedes it as on any exhausted visit, so the report
+names the artifacts the visit left unwritten ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)). It is
+not a `failed` outcome. It is an addition under [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version), so
+`schema` does not move.
+
 `run_finished.evidence_manifest` is `{path, sha256}`: the run's evidence
 manifest and its full digest ([§FS-rhei-evidence.9.2](rhei-evidence.spec.md#92-where-it-is-announced)), the same value
 `runtime/run.json` ends with. It is an addition under [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version).
@@ -146,7 +156,7 @@ not apply:
 
 `reason` is the closed set `complete | idle | attention | failed |
 interrupted`. `idle_blocker` is the closed set `gate | poll | provider_limit |
-mixed`, present and null when `reason` is not `idle`. `next_attempt_at` is an
+provider_unavailable | mixed`, present and null when `reason` is not `idle`. `next_attempt_at` is an
 RFC 3339 UTC instant, the same spelling and format as the `next_attempt_at` on
 `slot_released`, and is present and null when no task contributes one
 ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)) — never omitted and never a synthesized placeholder.

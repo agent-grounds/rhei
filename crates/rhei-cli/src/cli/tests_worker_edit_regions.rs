@@ -210,6 +210,8 @@ Raise it.
                 duration: String::new(),
                 code: Some(0),
                 ending: "exited".into(),
+                unavailable: 0,
+                signal: None,
                 reverted: None,
             };
             let body = serde_json::to_string_pretty(&stored).expect("record");

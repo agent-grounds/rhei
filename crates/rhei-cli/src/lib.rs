@@ -92,6 +92,7 @@ include!("cli/metadata_rewrite.rs");
 #[path = "cli/provider_local_time.rs"]
 mod provider_local_time;
 include!("cli/provider_limits.rs");
+include!("cli/provider_unavailable.rs");
 include!("cli/codex_config_fallbacks.rs");
 include!("cli/subtree_supervision.rs");
 include!("cli/subtree_supervision_owner.rs");
@@ -267,6 +268,7 @@ include!("cli/run_parallel_agent_exit.rs");
 include!("cli/run_parallel_agent_failure.rs");
 include!("cli/run_callback_mode.rs");
 include!("cli/run_missing_outputs.rs");
+include!("cli/run_provider_waits.rs");
 include!("cli/run_failure_transitions.rs");
 include!("cli/run_pass_remaining_work.rs");
 // The second `current_unix_secs` answers on this thread while a unit test holds
@@ -356,6 +358,7 @@ mod tests {
     include!("cli/tests_agent_resolution.rs");
     include!("cli/tests_cli_target_overrides.rs");
     include!("cli/tests_provider_limits.rs");
+    include!("cli/tests_provider_unavailable.rs");
     include!("cli/tests_wait_deadlines.rs");
     include!("cli/tests_wait_deadline_reading.rs");
     include!("cli/tests_codex_provider_local.rs");

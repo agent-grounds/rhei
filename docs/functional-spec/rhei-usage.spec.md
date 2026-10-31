@@ -142,6 +142,28 @@ deadlines remain ordinary failures. Parking preserves the state and records
 deadline spawn no further work with the same agent/provider identity. The
 persisted wait survives restart ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)).
 
+A `pi` session whose provider becomes unreachable exits `0` once pi's own
+retries give up, because rhei runs it in `--mode json`. When the state's
+required outputs are missing, `rhei run` recognizes that ending
+([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)) instead of charging it as the worker's attempt:
+
+```text
+warning: the provider was unavailable for task plan.1 in state 'fix': pi gave up retrying (fetch failed); no attempt charged (free 1 of 6 on this visit)
+waiting: pi on openai-codex starts again after 2026-10-29T12:31:15Z
+```
+
+The spawn record reads `ending=provider_unavailable`, `attempt_charged=false`
+and `unavailable=1`, and each further such ending waits twice as long, from 1
+minute up to an hour. `--until-idle` exits `3` with `idle_blocker:
+provider_unavailable` and the next attempt time. Six such endings per visit are
+free ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)); a longer outage halts the visit as a spent budget
+does, and `rhei retry` grants it more attempts. The wait is keyed on the
+resolved provider, so the target or model profile must name one:
+`pi:openai-codex/<model>` names it only inside pi's model id and is charged as
+before ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)). Spell it `pi:openai-codex:openai-codex/gpt-6.1-sol`,
+because the provider segment keys the wait and the model segment keeps pi's own
+`provider/model` reference.
+
 Ticket ids in command output are project-qualified — `<rhei-id>.<task-id>`, e.g. `plan.1` for a single-file `plan.rhei.md` — and `rhei list` accepts the same `--rhei <id>` narrowing as `run`, `next`, and `reset` ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
 
 #### 2.2.1 Naming a ticket

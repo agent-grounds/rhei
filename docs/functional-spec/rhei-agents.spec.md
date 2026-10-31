@@ -1115,6 +1115,27 @@ declared, no mode flags are appended and `agent_mode` must not be set for
 states that use this agent. See
 [Mode Resolution Order](#141-mode-resolution-order) for how a mode is selected.
 
+#### 2.2.1. Writable-root fixture proof
+
+The writable-root end-to-end scenarios prove these grants using repositories
+they own, including the repository enclosing the plan. Ordinary launches,
+Panta members, wrappers with their own modes, and composed profiles must
+succeed when `TMPDIR` lies inside another disposable repository, and leave
+that enclosing repository's HEAD unchanged. The scenarios retain their checks
+for distinct plan and checkout directories, path spelling, project and state
+roots, and commits through Git metadata grants, including a linked worktree's
+separate Git and common directories. This is the fixture-isolation contract
+of [§REQ-test-isolation.4](../requirements/test-isolation.spec.md#4-what-a-test-resolves-is-what-its-fixture-names-never-what-lies-above-it), not a change to checkout precedence in
+[§FS-rhei-agents.4](rhei-agents.spec.md#4-environment-variables).
+
+The fake Codex independently confines its commits to its fixture's canonical
+ownership boundary: the resolved checkout, Git directory and Git common
+directory must all belong to that boundary before it mutates Git. Writable
+grants alone do not establish fixture ownership. A deliberately misdirected
+launch with sufficient grants must record a refusal, make no commit, and leave
+the outside repository's HEAD unchanged. Tests of that refusal own the outside
+repository too, so a failing guard cannot write into a developer's repository.
+
 ### 2.3. Recognized Provider Refusals
 
 Rhei recognizes a provider refusal in addition to a normal process result.
@@ -1189,6 +1210,7 @@ as `resets Oct 1, 5:59am` remain ordinary process results. Unknown, wrong-case,
 or absent providers never park; program states resolve no agent and never
 park. The rationale and examples for these boundaries are in
 [§FS-rhei-provider-refusal-rationale](rhei-provider-refusal-rationale.spec.md#fs-rhei-provider-refusal-rationale-why-provider-refusal-recognition-is-closed).
+A provider that stops answering is not a refusal; it is [§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability).
 
 ### 2.4. Configuration Fallbacks
 
@@ -1196,6 +1218,54 @@ A Codex worker may report that it overrode a setting Rhei asked for and went on
 with a weaker one. Rhei keeps that report as a diagnostic of the invocation,
 informational only and never a provider refusal, by the rules of
 [§FS-rhei-configuration-fallbacks](rhei-configuration-fallbacks.spec.md#fs-rhei-configuration-fallbacks-codex-configuration-fallbacks).
+
+### 2.5. Recognized Provider Unavailability
+
+A `pi` session can lose its provider and still exit `0`: in `--mode json`, the
+mode rhei runs it in for cost accounting ([§FS-rhei-cost-accounting.4](rhei-cost-accounting.spec.md#4-extraction-flow)), pi sets
+no failing exit code when its own retries give up. Rhei recognizes that ending
+as the provider being unavailable rather than as the worker's attempt.
+Recognition requires all of the following:
+
+- the resolved family is `pi`. The agent registry id is not tested, so a custom
+  entry with `family: pi` is recognized;
+- the resolved provider is present, because it keys the wait ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)).
+  A target or model profile that resolves none is not recognized: in
+  `pi:openai-codex/gpt-6.1-sol` the provider is only inside pi's model id.
+  `pi:openai-codex:openai-codex/gpt-6.1-sol` is recognized, because its
+  provider segment keys the wait and its model segment keeps pi's own
+  `provider/model` reference;
+- the invocation exited `0` and was neither timed out nor interrupted;
+- a required output is missing ([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics) step 4);
+- among the stdout JSON events, the last `auto_retry_end` has `success: false`
+  and an `attempt` equal to the `maxAttempts` of the last `auto_retry_start`
+  before it, and the last assistant `message_end` comes before it with
+  `stopReason: "error"`.
+
+The last condition is pi's own verdict; rhei keeps no error grammar of its own.
+pi retries only an error it classes as transient — a network failure, `429`, a
+`5xx`, an overload — and its count reaches `maxAttempts` only when those retries
+are used up. An error pi does not retry, such as a context overflow, an
+exhausted quota or a `400`, ends the count below `maxAttempts` and stays
+charged, because waiting will not fix it. Two endings still reach the count: an
+error pi does not retry arriving on its last retry, and `finalError: "Retry
+cancelled"` from an abort during the last backoff. Both are recognized, and the
+cap of six ([§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget)) bounds what they cost.
+
+Not recognized, and charged as today: `stopReason: "error"` with no
+`auto_retry_end` (pi's auto-retry off, or a first error it does not retry); an
+`auto_retry_end` with `success: true` or an `attempt` below `maxAttempts`; the
+same stream from any other family; a target with no resolved provider; a
+timed-out or interrupted session; and a session whose required outputs are all
+on disk, which moves exactly as it does today. Stderr and non-JSON stdout
+contribute nothing.
+
+The recognized result is the `provider_unavailable` ending of
+[§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records); whether it spends an attempt is [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget). It
+is not a refusal ([§FS-rhei-agents.2.3](rhei-agents.spec.md#23-recognized-provider-refusals)): the session exits `0`, no reset instant
+is printed, and `pi`'s providers are outside that closed set. Only `pi` is
+recognized, because its stream is the only one there is evidence for; another
+family joins by a specification change backed by its own stream.
 
 ## 3. Prompt Composition
 
@@ -1559,7 +1629,23 @@ Under `orchestrator` authority, `rhei run`:
      when the selected transition lands on a `final: true` state. The result
      is reported in the same list under the artifact name `result`, with the
      same resolved-path rendering, because it is enforced by the same rule.
-   - If any is missing, the task stays in its current state and the engine
+   - If any is missing and the session is a recognized provider unavailability
+     ([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)), this check is where that is decided, and nothing
+     earlier decides it: the spawn record was written `exited` and charged when
+     the subprocess ended, like every exit-`0` record, and this check rewrites
+     it to `provider_unavailable` ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)). The task stays in its
+     state, no transition fires, and in place of the warning and halt line below
+     the engine logs `warning: the provider was unavailable for task {id} in
+     state '{state}': pi gave up retrying ({finalError}); {charge}`. `{charge}`
+     is `no attempt charged (free {n} of 6 on this visit)`, `attempt charged,
+     because the provider answered this session`, or `attempt charged, because
+     this visit's 6 free endings are spent` (§FS-rhei-agents.3.2.3). While the
+     visit has an attempt left the next line is `waiting: {agent} on {provider}
+     starts again after {nextAttemptAt}` and the wait of §FS-rhei-run.3.3 is
+     written; when the charge spent the last attempt, the exhaustion line of
+     [§FS-rhei-agents.3.2.3](rhei-agents.spec.md#323-attempt-budget) is printed in its place, word for word, and no wait is
+     written, because no spawn follows it.
+   - Otherwise, if any is missing, the task stays in its current state and the engine
      logs `warning: agent exited 0 but required outputs are missing for task
      {id} in state '{state}': <name1> (<path1>), <name2> (<path2>)` — with
      `program` in place of `agent` when a program state stalls the same way —
@@ -1593,10 +1679,12 @@ Under `orchestrator` authority, `rhei run`:
      The engine never prints its internal "no budget applies" sentinel as a
      count. `{ending}` is read from that attempt's spawn record ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)) and says
      what actually happened to it — `timed out after 30m`, `was interrupted by
-     a run shutdown`, `was provider-limited`, `exited 3`, `exited 0`, or `ended
-     without an exit code (a signal ended it)`. The record's `ending` decides
-     before its `code` does, so a `provider_limited` record reads `was
-     provider-limited` whatever its code. A record whose `code` is absent is the
+     a run shutdown`, `was provider-limited`, `found its provider unavailable
+     (fetch failed)`, `exited 3`, `exited 0`, or `ended without an exit code (a
+     signal ended it)`. The record's `ending` decides before its `code` does, so
+     a `provider_limited` record reads `was provider-limited` whatever its code,
+     and a `provider_unavailable` one `found its provider unavailable
+     ({signal})` with its `signal`, never `exited 0`. A record whose `code` is absent is the
      one sentence the code cannot supply: the subprocess did not exit, it was
      ended — on Unix by a signal — and it is never described as `exited 0`.
      `{ending}` says how the attempt ended and nothing more. It never adds
@@ -1759,7 +1847,7 @@ bounded at, and it bounds one visit only ([§REQ-bounded-neural-work.1](../requi
 Entering the state again is a new visit and brings a fresh `attempts:` budget;
 it never brings fresh project capacity. Every neural retry this budget permits
 is charged one invocation against the project's one account
-([§FS-rhei-budgets.4.2](rhei-budgets.spec.md#42-invocations)), and the four non-spend exceptions above stay local to
+([§FS-rhei-budgets.4.2](rhei-budgets.spec.md#42-invocations)), and the five non-spend exceptions here stay local to
 this counter: an attempt given back is an attempt, never an invocation, and
 nothing downstream of an admitted start refunds one.
 
@@ -1776,6 +1864,23 @@ spawn record, but the provider refused to begin the requested work; repeated
 recognized refusals therefore cannot exhaust `attempts:`. Poll counters and
 `poll.max_attempts` remain separate and are neither advanced nor refunded by
 provider-limit recognition.
+
+A recognized provider unavailability ([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)) does not spend the
+budget either, within a bound of its own. The reason is the refusal's: the
+provider never answered, so the worker never began the work it was asked to do.
+That reason draws the line. The ending is free only when no assistant message
+of the session ended without error. A session the provider did answer had begun
+the work and may have changed the checkout, so it is charged however it ended,
+as a timed-out attempt is; it is still recorded as unavailable and still waits.
+One count, the spawn record's `unavailable` ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)), covers every
+such ending of the visit, charged or not, and only the first six can be free.
+From the seventh on each is charged, and the visit's own budget and its
+exhaustion halt take over. Six is about an hour of backoff ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)),
+so an outage shorter than that costs a visit no attempt and a longer one halts
+it, naming `rhei retry`. The six are built in, with no setting. The count is
+kept with the visit, so it holds across runs and a new visit starts it at 0; a
+`rhei retry` grant adds attempts and never free endings. Poll counters are
+neither advanced nor refunded by it, and each free spawn is still an invocation.
 
 ### 3.3. Consumed Export Preflight
 
@@ -2467,6 +2572,12 @@ A program log (`=== rhei program log v1 ===`) carries the same two lines with
 reader — and a script — can tell an agent that finished from one the engine
 stopped without inferring it from the exit code.
 
+An ending the engine decides after the log is closed adds nothing to the
+footer: a withheld edge, and a provider unavailability, which the output check
+decides ([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)). The footer is written, and hashed into the
+evidence ([§FS-rhei-evidence.4](rhei-evidence.spec.md#4-the-end-record)), before outputs are checked, so it reads the
+plain exit, `code: 0` and no flag; the spawn record carries the verdict.
+
 `family:` is the resolved family of the profile that ran ([§FS-rhei-agents.1.1.2](rhei-agents.spec.md#112-agents)), and is
 written **only when it differs from `agent:`** — its absence means the profile
 declared no family and is its own, which is why every log written before
@@ -2520,8 +2631,9 @@ place by each further attempt of the same invocation. It holds:
 | `kind`, `worker` | `agent` or `program`, and the resolved agent id or command |
 | `log` | the transcript this spawn wrote |
 | `started`, `ended`, `duration`, `code` | when it ran, for how long, and how it exited |
-| `ending` | `exited`, `timed out`, `interrupted`, `provider_limited`, or `withheld` — why it stopped or remained in its state |
+| `ending` | `exited`, `timed out`, `interrupted`, `provider_limited`, `provider_unavailable`, or `withheld` — why it stopped or remained in its state |
 | `attempt_charged` | whether this invocation consumed the state visit's `attempts:` budget |
+| `unavailable` | how many `provider_unavailable` endings this visit has had, charged or not; absent reads as `0` |
 | `grants` | attended grants for this visit: `[{at, os_user, attempts}]`, recording timestamp, operating-system user and the configured budget granted |
 
 Older spawn records without `grants` read as no grants. Further attempts of
@@ -2551,6 +2663,17 @@ A provider-limited record keeps the subprocess's real non-zero `code`, uses
 resolved worker identity, and any usage the worker reported remain ordinary
 auditable spawn evidence.
 
+A `provider_unavailable` record keeps code `0` and adds `signal`, pi's
+`finalError` ([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)). It is written `exited` and charged when the
+subprocess ends, and the output check of [§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics) rewrites it in
+place under the record lock, as a withheld edge is rewritten: `ending` becomes
+`provider_unavailable`, `unavailable` counts one more, and a free ending sets
+`attempt_charged: false` and gives its charge back. Further attempts of the
+visit carry `unavailable` forward with `charged` and the grants; a new visit
+starts at `0`. A rewrite that cannot be made leaves the record `exited` and
+charged, the safe error: it spends an attempt rather than freeing one. The
+evidence end record and the log footer keep the plain exit ([§FS-rhei-evidence.4](rhei-evidence.spec.md#4-the-end-record)).
+
 The engine changes a successful `exited` record to `ending: withheld` only when
 the subprocess exited with code `0`, the invocation met its completion condition,
 and the engine withheld its release edge without moving the ticket
@@ -2565,8 +2688,8 @@ one), its `moves` equals the ticket's current transition-ledger move count, its
 `ending` is `exited` or `withheld`, and its `code` is `0`. A withheld record
 supplies proof only for that same visit and invocation; it cannot excuse work
 after a later move. Older visits and records ending in failure, timeout,
-interruption, or provider limiting remain useful history but are not successful
-current-visit proof. The existing per-invocation filename keeps fan-out
+interruption, provider limiting, or provider unavailability remain useful
+history but are not successful current-visit proof. The existing per-invocation filename keeps fan-out
 identities independent; this rule adds no persisted field or format.
 
 `task` and `state` are stored as fields and matched as fields. A reader looking

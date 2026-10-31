@@ -38,6 +38,8 @@ mod visit_pairing {
             duration: "1s".into(),
             code,
             ending: ending.into(),
+            unavailable: 0,
+            signal: None,
             reverted: None,
         }
     }

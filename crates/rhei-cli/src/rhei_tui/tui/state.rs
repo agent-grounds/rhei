@@ -13,9 +13,10 @@ pub(super) use crate::rhei_viz_model::{Machine, TaskRow};
 use crate::rhei_tui::dashboard::{GateTransitionSink, InterveneSink, PlanLoader};
 use crate::rhei_tui::event::{
     summarize_usage_summaries, AccountingRunSummary, AgentStream, MessageLevel, RunEvent, Slot,
-    TaskOutcome, UsageSummary,
+    UsageSummary,
 };
 
+use super::outcome::{outcome_level, outcome_mark, outcome_suffix};
 use super::text::sanitize_terminal_text;
 use super::theme::{category, Category, Theme};
 use super::{JOURNAL_BUFFER, SLOT_TRAFFIC_BUFFER};
@@ -489,40 +490,8 @@ impl UiState {
                 }
             }
             RunEvent::SlotReleased { slot, task, outcome, duration_ms, .. } => {
-                let sym = match outcome {
-                    TaskOutcome::Completed => "✓",
-                    TaskOutcome::Failed(_) => "✗",
-                    // The state is not done and nothing went wrong with it: the
-                    // machine asked for another attempt. §FS-rhei-states.2.2
-                    TaskOutcome::Waiting => "⏳",
-                    TaskOutcome::ProviderLimited { .. } => "⏳",
-                    TaskOutcome::Cancelled => "⊘",
-                    TaskOutcome::TimedOut => "⏱",
-                    // Distinct from cancelled's `⊘`: nothing about the ticket
-                    // is wrong, the run simply stopped. §FS-rhei-run.3.2
-                    TaskOutcome::Interrupted => "⏹",
-                    // A word from a newer run than this reader.
-                    // §FS-rhei-run-json.2.2
-                    TaskOutcome::Unrecognized(_) => "?",
-                };
-                // A handled wait claims no attention: it reads at the level a
-                // completion does, not a failure's. §FS-rhei-states.2.2
-                let level = match outcome {
-                    TaskOutcome::Completed
-                    | TaskOutcome::Waiting
-                    | TaskOutcome::ProviderLimited { .. } => MessageLevel::Info,
-                    _ => MessageLevel::Warn,
-                };
-                // Carried through rather than rewritten, so the line says what
-                // the run said even where the symbol cannot.
-                // §FS-rhei-run-json.2.2
-                let unknown = match outcome {
-                    TaskOutcome::ProviderLimited { provider, next_attempt_at } => {
-                        format!(" {provider} until {next_attempt_at}")
-                    }
-                    TaskOutcome::Unrecognized(name) => format!(" {name}"),
-                    _ => String::new(),
-                };
+                let (sym, level) = (outcome_mark(outcome), outcome_level(outcome));
+                let unknown = outcome_suffix(outcome);
                 if let Some(s) = self.slot_mut(*slot) {
                     *s = SlotState::default();
                 }

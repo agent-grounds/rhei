@@ -35,7 +35,9 @@ transitions:
 
 pub(super) const ONE_TASK: &str = "### Task 1: Write through the roots\n**State:** working\n";
 
-/// The shim's body. `LOG`, `STATE` and `EXTRA` are prepended as JSON literals.
+/// The shim's body. `FIXTURE`, `LOG`, `STATE` and `EXTRA` are JSON literals.
+/// Commits require fixture ownership as well as writable grants.
+/// §FS-rhei-agents.2.2.1 §REQ-test-isolation.4
 const SHIM: &str = r#"
 import json
 import subprocess
@@ -92,9 +94,12 @@ def git(*args):
 
 
 committed = False
-dirs = git('rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir')
+dirs = git('rev-parse', '--path-format=absolute', '--show-toplevel', '--git-dir', '--git-common-dir')
 if dirs.returncode == 0:
-    blocked = [d for d in dirs.stdout.splitlines() if not writable(os.path.join(d, 'objects'))]
+    checkout, git_dir, common_dir = dirs.stdout.splitlines()
+    # Grants do not establish ownership. §FS-rhei-agents.2.2.1 §REQ-test-isolation.4
+    blocked = [d for d in (checkout, git_dir, common_dir) if not under(d, FIXTURE)]
+    blocked.extend(d for d in (git_dir, common_dir) if not writable(os.path.join(d, 'objects')))
     refused.extend(blocked)
     if not blocked:
         committed = git(
@@ -113,6 +118,8 @@ append(LOG, json.dumps({
 
 /// Write the shim into `dir`, logging to `log`, writing nested state under
 /// `state_home`, and probing each of `extra` as a granted directory.
+/// Bind ownership to canonical `dir`, independently of launch arguments.
+/// §FS-rhei-agents.2.2.1 §REQ-test-isolation.4
 pub(super) fn write_roots_shim(
     dir: &Path,
     log: &Path,
@@ -120,9 +127,11 @@ pub(super) fn write_roots_shim(
     extra: &[&Path],
 ) -> PathBuf {
     let literal = |path: &Path| serde_json::to_string(&path.display().to_string()).unwrap();
+    let fixture = rhei_core::platform::canonical_path(dir).expect("canonical fixture boundary");
     let extra: Vec<String> = extra.iter().map(|path| path.display().to_string()).collect();
     let body = format!(
-        "LOG = {}\nSTATE = {}\nEXTRA = {}\n{SHIM}",
+        "FIXTURE = {}\nLOG = {}\nSTATE = {}\nEXTRA = {}\n{SHIM}",
+        literal(&fixture),
         literal(log),
         literal(state_home),
         serde_json::to_string(&extra).unwrap()

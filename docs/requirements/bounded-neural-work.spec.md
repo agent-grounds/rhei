@@ -42,9 +42,11 @@ either count, and neither count is refunded when they do.
 
 The levels **compose downward only**. An inner timeout, attempt, visit or poll
 counter never extends an outer count, and releasing an inner counter never
-credits an outer one. The four local non-spend exceptions of
+credits an outer one. The five local non-spend exceptions of
 [§FS-rhei-agents.3.2.3](../functional-spec/rhei-agents.spec.md#323-attempt-budget) stay local: an attempt given back is an attempt, never an
-invocation.
+invocation. The fifth, a provider that stops answering, carries a built-in
+bound of its own, at most six free endings per visit, so level 2 still admits
+a finite number of spawns per visit that nobody has to declare.
 
 ## 2. Bounded by default, refusing nothing that runs today
 

@@ -1,7 +1,7 @@
 //! Round-trip and shape tests for the record contract. §FS-rhei-run-json.2
 
 use super::*;
-use crate::rhei_tui::event::{RunSummary, Slot};
+use crate::rhei_tui::event::{RunSummary, Slot, TaskOutcome};
 use crate::rhei_tui::run_stop::{IdleBlocker, RunStop, StopReason};
 use std::time::{Duration, UNIX_EPOCH};
 

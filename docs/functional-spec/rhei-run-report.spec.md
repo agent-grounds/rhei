@@ -187,9 +187,9 @@ the summary prints five stacked groups:
 
    A run returning **idle** under `--until-idle` ([§FS-rhei-run.2.1](rhei-run.spec.md#21-standalone)) reads as
    its own outcome too. The result vocabulary gains `idle — waiting on a
-   person`, `idle — retry at <instant>`, `idle — waiting on a provider limit`
-   and `idle — mixed waits`, ranked **below `interrupted` and below
-   attention**: an interrupt outranks it, and one in-scope ticket whose
+   person`, `idle — retry at <instant>`, `idle — waiting on a provider limit`,
+   `idle — waiting on an unavailable provider` and `idle — mixed waits`, ranked
+   **below `interrupted` and below attention**: an interrupt outranks it, and one in-scope ticket whose
    classified blocker is actionable defeats it however many tickets wait
    beside it ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop) step 9). The console result line on such a run is
    script-distinguishable from an ordinary halt and **never contains `Run
@@ -308,12 +308,13 @@ the summary prints five stacked groups:
    shows `0` (or `$0.00`) there; a reservation still held when the run ended
    shows as outstanding rather than vanishing from the arithmetic.
 
-   A task parked by a recognized provider limit ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)) also
-   belongs in **Waiting**, never **Attention**. Its row names `provider openai`,
-   the reporting task, and the UTC `nextAttemptAt`, with automatic resumption as
-   the next action. It does not count as failed or `could not advance`; an
-   assignee, prior, or gate that independently prevents it from reaching the
-   retry keeps the existing higher-priority classification.
+   A task parked by a recognized provider limit, or waiting out an unavailable
+   provider ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)), also belongs in **Waiting**, never
+   **Attention**, at the same rung. Its row names `provider openai` (`provider
+   openai-codex unavailable`), the reporting task, and the UTC `nextAttemptAt`,
+   with automatic resumption as the next action. It does not count as failed or
+   `could not advance`; an assignee, prior, or gate that independently prevents
+   it from reaching the retry keeps the existing higher-priority classification.
 
    The blocker and next action come from a **plan-wide classification** of why
    each non-terminal task node is not moving, in this order: a supervisor's
@@ -409,7 +410,7 @@ the summary prints five stacked groups:
    The run's exit status and `--dry-run`'s are one judgment, not two readings
    of this classification: a run ends non-zero when work remains that is
    waiting on neither a human gate, a poll backoff, a recognized provider limit
-   ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)), nor a `**Prior:**` that is itself waiting on one of
+   or unavailable provider ([§FS-rhei-run.3.3](rhei-run.spec.md#33-provider-limit-parking)), nor a `**Prior:**` waiting on one of
    those ([§FS-rhei-run.4](rhei-run.spec.md#4-dry-run)). The provider-limit term is the fourth, and it belongs
    with the other three: the prose above already places a parked task in
    **Waiting**, "never **Attention**", so a judgment that omitted it read the
@@ -743,11 +744,12 @@ attention color, for the same reason. The ticket's own row keeps whatever
 marker its unchanged state earns.
 
 A provider-limited invocation has `driver: agent`, destination `-`, and reason
-`provider openai limited until <nextAttemptAt>`. Its invocation entry retains
-the real exit code and log while its outcome is `provider_limited`; the ledger
-does not call it blocked or failed and records no transition. Repeated parked
-invocations remain separate auditable invocations even though none consumes an
-agent attempt.
+`provider openai limited until <nextAttemptAt>`; an unavailable one has reason
+`provider openai-codex unavailable until <nextAttemptAt>`, or `provider unavailable` when
+its charge spent the visit's last attempt and no wait was written. Each entry retains the
+real exit code and log under its outcome, `provider_limited` or `provider_unavailable`; the
+ledger does not call it blocked or failed and records no transition. Repeated parked
+invocations remain separate auditable invocations even though a parked one consumes no agent attempt.
 
 `driver: blocked` is used for non-terminal tasks that remain in place at run end.
 The row's `reason` must name the first concrete blocker Rhei can prove, such as

@@ -19,15 +19,17 @@ use serde_json::{json, Map, Value};
 
 use crate::rhei_tui::event::{
     AccountingRunSummary, AgentStream, MessageLevel, RunEvent, RunProvenance, RunSummary,
-    TaskOutcome, UsageReport, UsageSummary,
+    UsageReport, UsageSummary,
 };
 use crate::rhei_tui::run_stop::RunStop;
 
 mod bounds;
+mod outcome;
 mod rfc3339;
 mod seal;
 
 use bounds::{bound_report, bound_value, ceiling_policy_value};
+use outcome::{decode_outcome, put_outcome};
 pub use rfc3339::{format_rfc3339, parse_rfc3339};
 
 /// Wire version of the record contract. Moves only when a documented field is
@@ -102,14 +104,7 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
             put("from", json!(from));
             put("to", json!(to));
             put("log_path", json!(record_path(workspace, log_path)));
-            put("outcome", json!(outcome_name(outcome)));
-            if let TaskOutcome::Failed(reason) = outcome {
-                put("reason", json!(reason));
-            }
-            if let TaskOutcome::ProviderLimited { provider, next_attempt_at } = outcome {
-                put("provider", json!(provider));
-                put("next_attempt_at", json!(next_attempt_at));
-            }
+            put_outcome(outcome, &mut put);
             put("exit_code", json!(exit_code));
             put("duration_ms", json!(duration_ms));
             // Present only when the invocation carried one. §FS-rhei-run-json.2.1
@@ -242,23 +237,6 @@ pub fn event_wall_clock(event: &RunEvent) -> Option<SystemTime> {
 /// including it would make the event log unbounded. §FS-rhei-run-json.2.3
 pub fn is_structural(event: &RunEvent) -> bool {
     !matches!(event, RunEvent::AgentOutput { .. })
-}
-
-/// The `outcome` vocabulary of a `slot_released` record. §FS-rhei-run-json.2.1
-fn outcome_name(outcome: &TaskOutcome) -> &str {
-    match outcome {
-        TaskOutcome::Completed => "completed",
-        TaskOutcome::Failed(_) => "failed",
-        TaskOutcome::Waiting => "waiting",
-        TaskOutcome::ProviderLimited { .. } => "provider_limited",
-        TaskOutcome::Cancelled => "cancelled",
-        TaskOutcome::TimedOut => "timeout",
-        TaskOutcome::Interrupted => "interrupted",
-        // Written back exactly as it was read, which is what makes a reader
-        // that re-encodes — `rhei attach --json` — pass the record on
-        // unchanged. §FS-rhei-run-json.2.2
-        TaskOutcome::Unrecognized(name) => name,
-    }
 }
 
 fn level_name(level: MessageLevel) -> &'static str {
@@ -474,34 +452,6 @@ fn decode_event(kind: &str, v: &Value, wall_clock: SystemTime) -> Option<RunEven
         },
         _ => return seal::decode_seal_halt(kind, v),
     })
-}
-
-/// Read an `outcome` back off the stream, so an attached reader shows the run
-/// the words the run itself wrote. A value this build has no variant for is
-/// kept under its own name rather than rewritten to one that is: the vocabulary
-/// is additive under one `schema`, a reader that stopped on a word it had not
-/// met would turn that into an outage, and one that renamed it would report the
-/// run as something it never said.
-// §FS-rhei-run-json.2.1 §FS-rhei-run-json.2.2
-fn decode_outcome(
-    name: &str,
-    reason: Option<String>,
-    provider: Option<String>,
-    next_attempt_at: Option<String>,
-) -> TaskOutcome {
-    match name {
-        "completed" => TaskOutcome::Completed,
-        "failed" => TaskOutcome::Failed(reason.unwrap_or_default()),
-        "waiting" => TaskOutcome::Waiting,
-        "provider_limited" => TaskOutcome::ProviderLimited {
-            provider: provider.unwrap_or_default(),
-            next_attempt_at: next_attempt_at.unwrap_or_default(),
-        },
-        "cancelled" => TaskOutcome::Cancelled,
-        "timeout" => TaskOutcome::TimedOut,
-        "interrupted" => TaskOutcome::Interrupted,
-        other => TaskOutcome::Unrecognized(other.to_string()),
-    }
 }
 
 fn decode_summary(value: Option<&Value>) -> RunSummary {

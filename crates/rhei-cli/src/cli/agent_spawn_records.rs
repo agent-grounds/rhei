@@ -59,6 +59,13 @@ struct SpawnRecord {
     /// reports the ending it is retrying, and these are different rules.
     // §FS-rhei-agents.3.2.1
     ending: String,
+    /// This visit's `provider_unavailable` endings, charged or not; absent reads
+    /// as `0`, and further attempts carry it forward. §FS-rhei-agents.8.4
+    #[serde(default, skip_serializing_if = "is_zero")]
+    unavailable: u64,
+    /// pi's `finalError`, on a `provider_unavailable` record. §FS-rhei-agents.8.4
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    signal: Option<String>,
     /// The edit the run reverted after this attempt, when its edit broke the plan.
     // §FS-rhei-run.3.7.4 §FS-rhei-memory.4.4
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -69,11 +76,19 @@ fn default_attempt_charged() -> bool {
     true
 }
 
+fn is_zero(count: &u64) -> bool {
+    *count == 0
+}
+
 /// The `ending` of an attempt whose edge §FS-rhei-supervision.3.6 took away.
 /// Its own ending because the invocation neither failed nor left its state
 /// owing an artifact, and both of the other exit-0 sentences say it did.
 // §FS-rhei-agents.3.2.3 §FS-rhei-supervision.3.6
 const WITHHELD_ENDING: &str = "withheld";
+
+/// The `ending` the output check gives a recognized provider unavailability.
+// §FS-rhei-agents.2.5 §FS-rhei-agents.8.4
+const PROVIDER_UNAVAILABLE_ENDING: &str = "provider_unavailable";
 
 impl SpawnRecord {
     /// Whether this invocation successfully finished work in `moves`, the
@@ -95,7 +110,8 @@ impl SpawnRecord {
     /// prompt both say it.
     ///
     /// Read from the record, never inferred: the `ending` decides before the
-    /// `code`, so a provider-limited record reads as one whatever its code, and
+    /// `code`, so a provider-limited record reads as one whatever its code, a
+    /// provider-unavailable one is never `exited 0` (§FS-rhei-agents.2.5), and
     /// a record with no `code` was ended rather than exited and is never
     /// `exited 0`. Whether the completion condition was met is not the
     /// record's to say — an attempt that wrote everything is re-spawned too —
@@ -111,6 +127,10 @@ impl SpawnRecord {
                     .to_string()
             }
             ("provider_limited", _) => "was provider-limited".to_string(),
+            (PROVIDER_UNAVAILABLE_ENDING, _) => format!(
+                "found its provider unavailable ({})",
+                self.signal.as_deref().unwrap_or("no error message")
+            ),
             (_, None) => "ended without an exit code (a signal ended it)".to_string(),
             (_, Some(code)) => format!("exited {code}"),
         }

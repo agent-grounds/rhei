@@ -168,6 +168,15 @@ impl DashboardState {
                     TaskOutcome::ProviderLimited { provider, next_attempt_at } => {
                         format!("provider limited: {provider} until {next_attempt_at}")
                     }
+                    // §FS-rhei-run-tui.1.7
+                    TaskOutcome::ProviderUnavailable { provider, next_attempt_at } => {
+                        match (provider, next_attempt_at) {
+                            (Some(provider), Some(at)) => {
+                                format!("provider unavailable: {provider} until {at}")
+                            }
+                            _ => "provider unavailable".to_string(),
+                        }
+                    }
                     TaskOutcome::Cancelled => "cancelled".to_string(),
                     TaskOutcome::TimedOut => "timed out".to_string(),
                     TaskOutcome::Interrupted => "interrupted".to_string(),

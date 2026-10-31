@@ -141,6 +141,7 @@ The runtime currently supports:
   `rhei reset`
 - orchestrating agents and deterministic programs with `rhei run`
 - reverting and retrying a worker whose edit breaks the plan, while the rest of the run carries on ([§FS-rhei-run.3.7](docs/functional-spec/rhei-run.spec.md#37-a-workers-edit-that-breaks-the-plan))
+- waiting out a provider outage without spending a state's attempts ([§FS-rhei-agents.2.5](docs/functional-spec/rhei-agents.spec.md#25-recognized-provider-unavailability))
 - carrying one fact sideways with `rhei note` — a task spends its single
   slot on what the next ticket would otherwise rediscover, every later
   prompt anywhere in the project carries it, and `rhei reset` clears it

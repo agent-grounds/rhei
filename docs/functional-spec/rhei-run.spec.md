@@ -856,6 +856,20 @@ when the task transitions out of the state, or when `rhei reset` removes the
 task's runtime metadata. Failed or repeated provider-limited resumptions retain
 or update it under the rules above.
 
+A recognized provider unavailability ([§FS-rhei-agents.2.5](rhei-agents.spec.md#25-recognized-provider-unavailability)) writes its wait into
+the same record, with `kind: unavailable` beside `identity` and pi's
+`finalError` as its `signal`; a record without `kind` is a limit, and an older
+rhei reads this one as a limit with the same deadline. Its deadline is a
+backoff, not a reset: the visit's `n`-th such ending, counted by the spawn
+record's `unavailable` ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)), waits `2^(n-1)` minutes after
+`observedAt` — 1, 2, 4, 8, 16 and 32 — and 60 minutes from the seventh on.
+Everything else is the rules above. The later deadline wins whichever kind set
+it, so a reset at 10 pm outranks a two-minute backoff. A recognized ending is
+not a successful resumption, so it updates the record rather than removing it.
+The wait suppresses not-yet-started work with its identity, joins the deadline
+scan ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)), and is deliberate waiting, never Attention. A charged
+ending that spends the visit's last attempt writes no wait ([§FS-rhei-agents.3.2.1](rhei-agents.spec.md#321-runtime-semantics)).
+
 A parked task is in deliberate waiting, not stalled, failed, or in Attention.
 When no other runnable work remains, a foreground or headless run stays alive
 and sleeps until provider-limited work becomes eligible. An operator interrupt

@@ -3,17 +3,29 @@
 *Each release's section is generated from the pull requests merged since the
 previous release; nothing here is written by hand.*
 
-## 2. [0.6.3] - 2026-10-26
+## 2. [0.6.4] - 2026-11-02
 
-- [Let programs write results directly on fresh plans](https://github.com/agent-grounds/rhei/pull/512) (PR #512)
-- [Launch the shipped templates' Codex states with workspace-write and granted writable roots, and report Codex configuration fallbacks](https://github.com/agent-grounds/rhei/pull/510) (PR #510)
-- [Refuse an existing output in instantiate --dry-run like the real write](https://github.com/agent-grounds/rhei/pull/508) (PR #508)
-- [Warn in rhei validate when the file layout serializes a concurrent state](https://github.com/agent-grounds/rhei/pull/505) (PR #505)
-- [Report missing budget journals instead of blaming their lock file](https://github.com/agent-grounds/rhei/pull/506) (PR #506)
-- [Verify program budget accounts before spawning](https://github.com/agent-grounds/rhei/pull/502) (PR #502)
+- [Block an agent's spawn when a required MCP server cannot be reached](https://github.com/agent-grounds/rhei/pull/546) (PR #546)
+- [Keep Codex writable-root tests from committing into repositories above TMPDIR](https://github.com/agent-grounds/rhei/pull/547) (PR #547)
+- [Let a pi session that loses its provider wait instead of spending the state's attempts](https://github.com/agent-grounds/rhei/pull/544) (PR #544)
+- [Wait for a poll the ready scan held back instead of halting when the clock's second turns](https://github.com/agent-grounds/rhei/pull/543) (PR #543)
+- [Take an empty budget journal as the account's own on the first charge, and report it as no account yet](https://github.com/agent-grounds/rhei/pull/541) (PR #541)
+- [Leave the budget account as it was when an append fails, and offer a torn witness the trim instead of the copy](https://github.com/agent-grounds/rhei/pull/538) (PR #538)
+- [Verify the budget account before reporting a spent visit](https://github.com/agent-grounds/rhei/pull/539) (PR #539)
+- [Pack a run's evidence into an archive and verify it away from its workspace](https://github.com/agent-grounds/rhei/pull/533) (PR #533)
+- [Write the run report when a run stops on a plan a worker broke](https://github.com/agent-grounds/rhei/pull/532) (PR #532)
+- [Record what every invocation was given and produced, and verify a run against it with rhei verify](https://github.com/agent-grounds/rhei/pull/527) (PR #527)
+- [Read a Panta member's settings at its project root on every read](https://github.com/agent-grounds/rhei/pull/530) (PR #530)
+- [Wait for the worker pool's threads before a stopped parallel run exits](https://github.com/agent-grounds/rhei/pull/528) (PR #528)
+- [Seal what a run executes, and refuse to start work after a sealed file changed under rhei run --strict-inputs](https://github.com/agent-grounds/rhei/pull/524) (PR #524)
+- [Give a stop on a break under no task's heading the loader's help](https://github.com/agent-grounds/rhei/pull/523) (PR #523)
+- [Stop waiting for a poll attempt whose bound is spent](https://github.com/agent-grounds/rhei/pull/519) (PR #519)
+- [Record which rhei build, template source and checkout a run used, and print a checkpointed provenance line in rhei summary](https://github.com/agent-grounds/rhei/pull/518) (PR #518)
+- [Name the models and the book behind an unpriced count](https://github.com/agent-grounds/rhei/pull/516) (PR #516)
 
 ## 3. Older releases
 
+- [0.6.3](changelog/0.6.3.md) - 2026-10-26: 6 pull requests.
 - [0.6.2](changelog/0.6.2.md) - 2026-10-19: 5 pull requests.
 - [0.6.1](changelog/0.6.1.md) - 2026-10-12: 14 pull requests.
 - [0.6.0](changelog/0.6.0.md) - 2026-10-03: 51 pull requests.

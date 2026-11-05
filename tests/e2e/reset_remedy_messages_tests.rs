@@ -14,7 +14,6 @@ use super::*;
 /// `rhei complete` on a finished ticket, named by its local id: the rhei in the
 /// command cannot come from what was typed.
 #[test]
-#[ignore = "red until #549: `rhei reset <plan> <task>` takes no task and names placeholders; implement removes this"]
 fn the_reset_remedy_of_a_finished_tickets_complete_runs_with_a_local_id() {
     let world = RemedyWorld::at("reset-remedy-complete", "lone").with_found_machine();
     world.write("plan.rhei.md", TWO_TICKETS);
@@ -36,7 +35,6 @@ fn the_reset_remedy_of_a_finished_tickets_complete_runs_with_a_local_id() {
 /// The same message with what a lone plan cannot show: a member named relatively,
 /// with a sibling to stop at and a machine named on the command.
 #[test]
-#[ignore = "red until #549: `rhei reset <plan> <task>` takes no task and names placeholders; implement removes this"]
 fn the_reset_remedy_of_a_finished_tickets_complete_runs_for_a_member_under_a_named_machine() {
     let world = RemedyWorld::at("reset-remedy-complete-member", "project");
     world.write("index.panta.md", "# Panta: Remedy\n");
@@ -147,7 +145,6 @@ fn stranded_project(name: &str) -> RemedyWorld {
 /// The halt message, the dry run and the report's Attention table are one
 /// classification, and the row names its command wherever it is read from.
 #[test]
-#[ignore = "red until #549: the row's `rhei reset` names no target; implement removes this"]
 fn the_reset_remedy_of_a_stranded_supervisors_halt_row_runs_on_every_surface() {
     let world = stranded_project("reset-remedy-stranded");
 
@@ -178,7 +175,6 @@ fn the_reset_remedy_of_a_stranded_supervisors_halt_row_runs_on_every_surface() {
 /// Started from elsewhere with a relative target, the row is read from a report
 /// long after that directory stopped mattering.
 #[test]
-#[ignore = "red until #549: the row's `rhei reset` names no target; implement removes this"]
 fn the_reset_remedy_of_a_stranded_supervisors_halt_row_runs_for_a_relative_target() {
     let world = stranded_project("reset-remedy-stranded-relative");
     let world = RemedyWorld { cwd: world.dir.to_path_buf(), target: "project".into(), ..world };

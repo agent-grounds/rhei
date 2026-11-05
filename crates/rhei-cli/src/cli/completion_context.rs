@@ -330,6 +330,9 @@ struct ExecutionMachines {
     /// run is executing instead of whatever the default resolves to.
     // §FS-rhei-run-headless.5
     state_machine_override: Option<PathBuf>,
+    /// The reset a message of this invocation offers: the target these machines
+    /// were resolved for, under the machine it was told to use. §FS-rhei-reset.5.1
+    reset: ResetOffer,
 }
 
 impl ExecutionMachines {
@@ -356,13 +359,16 @@ impl ExecutionMachines {
             per_rhei_callbacks,
             member_local_runtimes: BTreeSet::new(),
             state_machine_override: None,
+            reset: ResetOffer::new(input),
         })
     }
 
-    /// Remember the explicit machine override, for the run descriptor.
-    // §FS-rhei-run-headless.5
+    /// Remember the explicit machine override, for the run descriptor and for
+    /// the reset a message offers.
+    // §FS-rhei-run-headless.5 §FS-rhei-reset.5.1
     fn with_state_machine_override(mut self, path: Option<&Path>) -> Self {
         self.state_machine_override = path.map(Path::to_path_buf);
+        self.reset = self.reset.under_machine(path);
         self
     }
 

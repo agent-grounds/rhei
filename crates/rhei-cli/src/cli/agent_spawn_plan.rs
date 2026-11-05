@@ -42,6 +42,7 @@ fn plan_spawn_attempt(
         charged,
         previous,
         evidence_state: serde_json::Value::Null,
+        reset: None,
     }
 }
 
@@ -86,18 +87,21 @@ impl SpawnPlan {
     /// neither the attempt nor the entry moves forward because it exists.
     // §FS-rhei-agents.8.1
     fn unaccounted_log_refusal(&self, task_id: &str) -> Option<String> {
-        self.log.exists().then(|| unaccounted_log_message(&self.log, task_id))
+        self.log.exists().then(|| unaccounted_log_message(&self.log, task_id, self.reset.as_ref()))
     }
 }
 
 /// The sentence a taken, unaccounted log name is refused with, and on the line
-/// after it the remedy, naming the rhei that owns the ticket — the first
-/// segment of its qualified id. §FS-rhei-agents.8.1
-fn unaccounted_log_message(log: &Path, task_id: &str) -> String {
-    let rhei = task_id.split('.').next().unwrap_or(task_id);
+/// after it the remedy: the cheap way out, then the reset of the rhei that owns
+/// the ticket, where an invocation is behind the plan to name it.
+// §FS-rhei-agents.8.1 §FS-rhei-reset.5.1
+fn unaccounted_log_message(log: &Path, task_id: &str, reset: Option<&ResetOffer>) -> String {
+    let or_reset = reset
+        .map(|reset| format!(", or run {}", reset.for_ticket(task_id)))
+        .unwrap_or_default();
     format!(
         "refusing to spawn: {} exists and no spawn record accounts for it\n  help: move \
-         that file away, or run `rhei reset --rhei {rhei}` to clear the ticket's runtime",
+         that file away{or_reset}",
         log.display()
     )
 }
@@ -106,7 +110,11 @@ fn unaccounted_log_message(log: &Path, task_id: &str) -> String {
 /// say why it may not happen: the ledger that numbers it cannot be read, or the
 /// name is taken by a file no record accounts for. Both are refusals the
 /// caller prints before anything is composed, staged, or paid for.
+///
+/// `reset` stays on the plan, so the race-free half of the refusal, when the log
+/// is opened, offers the same command as this half. §FS-rhei-reset.5.1
 // §FS-rhei-agents.8.1 §FS-rhei-programs.5.1
+#[allow(clippy::too_many_arguments)]
 fn plan_named_spawn(
     machine: &rhei_validator::StateMachine,
     task_root: &Path,
@@ -115,10 +123,14 @@ fn plan_named_spawn(
     state_name: &str,
     visit_count: u64,
     identity: Option<&str>,
+    reset: &ResetOffer,
 ) -> Result<(SpawnPlan, LogNumber), String> {
     let number =
         resolve_log_number(machine, state_name, visit_count, task_root, runtime_dir, task_id)?;
-    let plan = plan_spawn_attempt(runtime_dir, task_root, task_id, state_name, identity, number);
+    let plan = SpawnPlan {
+        reset: Some(reset.clone()),
+        ..plan_spawn_attempt(runtime_dir, task_root, task_id, state_name, identity, number)
+    };
     match plan.unaccounted_log_refusal(task_id) {
         Some(refusal) => Err(refusal),
         None => Ok((plan, number)),
@@ -293,6 +305,7 @@ impl<'a> SpawnSiteRoots<'a> {
                 state_name,
                 visit_count,
                 identity,
+                &self.machines.reset,
             );
             planned.is_ok_and(|(plan, _)| plan.budget_spent(budget).is_some())
         };
@@ -328,6 +341,7 @@ impl<'a> SpawnSiteRoots<'a> {
             per_rhei_callbacks: BTreeMap::new(),
             member_local_runtimes: BTreeSet::new(),
             state_machine_override: None,
+            reset: ResetOffer::new(Path::new("plan.rhei.md")),
         });
         static DEFAULT_SETTINGS: std::sync::OnceLock<RheiSettings> = std::sync::OnceLock::new();
         let settings = Some(DEFAULT_SETTINGS.get_or_init(RheiSettings::default));

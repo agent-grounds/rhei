@@ -160,7 +160,8 @@ fn complete_command(
     let scope = resolve_rhei_scope(&loaded, rhei_scope)?;
     let task_id_str = &resolve_cli_task_id(&loaded, task_id_str, &scope)?;
     let resolved = resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
-    let machines = ExecutionMachines::build(&resolved, input, &loaded)?;
+    let machines = ExecutionMachines::build(&resolved, input, &loaded)?
+        .with_state_machine_override(state_machine_path);
     // One ticket is the whole scope: its machine and callback base govern.
     let machine = machines.for_task_str(task_id_str).clone();
     let callback_paths = machines.callbacks_for_str(task_id_str).clone();
@@ -186,10 +187,14 @@ fn complete_command(
     let current_state_raw = task.state.as_str();
     let current_state = normalized_state_name(current_state_raw, &machine);
 
-    // Reject tasks already in a terminal state.
+    // Reject tasks already in a terminal state. Reset is the only way back, and
+    // it takes no ticket, so the help says how far it reaches. §FS-rhei-reset.5.1
     if is_terminal_state(current_state_raw, &machine) {
         return Err(miette!(
-            help = "nothing to do — the task is finished. Reopen it with: rhei reset <plan> <task>",
+            help = format!(
+                "nothing to do — the task is finished. To reopen it, run {}",
+                machines.reset.for_ticket(task_id_str)
+            ),
             "Task {} is already in terminal state '{}'",
             task_id_str,
             current_state_raw

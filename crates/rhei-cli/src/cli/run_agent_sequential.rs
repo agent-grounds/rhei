@@ -106,6 +106,7 @@ fn run_sequential_agent_invocation(
         current_state,
         visit_count,
         resolved_agent_log_identity(resolved).as_deref(),
+        &machines.reset,
     );
     // A name the spawn cannot have is refused before it costs anything, and the
     // ticket keeps its state. §FS-rhei-agents.8.1

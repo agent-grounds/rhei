@@ -91,6 +91,7 @@ fn run_sequential_program_work_items(
             current_state,
             visit_count,
             None,
+            &machines.reset,
         );
         let plan = match plan {
             Ok((plan, _)) => plan,

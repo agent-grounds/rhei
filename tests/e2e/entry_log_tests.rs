@@ -184,9 +184,17 @@ fn a_spawn_refuses_a_log_path_no_record_accounts_for() {
         "an unaccounted log path is refused by name; logs={:?}\n{combined}",
         names_in(&dir, "runtime/logs")
     );
+    let remedy = format!(
+        "move that file away, or run `rhei reset {} --rhei plan --state-machine {}`, which \
+         returns every ticket in that rhei to its authored state and deletes their results and \
+         logs",
+        rhei_core::platform::shell_quote(&plan.display().to_string()),
+        rhei_core::platform::shell_quote(&machine.display().to_string())
+    );
     assert!(
-        combined.contains("move that file away, or run `rhei reset --rhei plan`"),
-        "the refusal carries its remedy, naming the ticket's rhei:\n{combined}"
+        combined.contains(&remedy),
+        "the refusal carries its remedy, naming the run's target and machine, the ticket's rhei \
+         and how far the reset reaches:\n{combined}"
     );
     assert_eq!(fs::read_to_string(&planted).expect("planted log"), "PLANTED, not rhei's\n");
     let first = read(&dir, "runtime/logs/task-plan.1-work.log");

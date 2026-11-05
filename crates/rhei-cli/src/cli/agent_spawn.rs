@@ -124,7 +124,7 @@ fn spawn_and_wait_agent(
     // half of that refusal. §FS-rhei-agents.8.1
     let mut unstarted = UnstartedLog::new(log_path);
     let log_file = Arc::new(Mutex::new(
-        create_log_exclusively(log_path, task_id)
+        create_log_exclusively(log_path, task_id, plan.reset.as_ref())
             .map_err(|message| miette!(help = agent_log_help(), "{message}"))?,
     ));
     unstarted.created();

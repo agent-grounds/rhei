@@ -466,6 +466,20 @@ headless, and JSONL surfaces; no new output record family is introduced.
    list`, which cannot show why. It says a timeout transition could not be
    fired and points at the warning above.
 
+   **A halt caused by refused spawning identifies that refusal.** If a remaining
+   task cannot advance because its spawn was refused, the final halt keeps its
+   exit status and names refused spawning, directing the reader to the concrete
+   refusal diagnostic and its cause (or repeating the affected task/log and
+   cause). It must not describe that task as blocked, gated, or assigned, or
+   send the reader only to `rhei list`, which cannot explain the refusal. This
+   applies to agents and programs in serial and parallel execution, including
+   a polling attempt refused within the same run after its preceding attempt's
+   completion record could not be persisted ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)). The
+   unaccounted log remains unchanged and the worker is not spawned over it;
+   polling bounds and existing recovery commands remain in force. Ordinary
+   blockage help and the timeout-transition diagnostic above retain their
+   meanings when those are the reasons for the halt.
+
    **With `--until-idle`, this step has a third outcome.** Where a continuous
    run with nothing ready would consult the earliest effective deadline and
    sleep ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)), a selected run performs the same final live-member admission

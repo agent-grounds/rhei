@@ -134,11 +134,13 @@ pub(super) fn finished_under_another_machine(name: &str) -> RemedyWorld {
     world
 }
 
-/// The state `rhei list` shows for `ticket`, a subtask's indented line included.
+/// The state `rhei list` shows for `ticket`, a subtask's indented line included,
+/// whatever kind its line starts with.
 pub(super) fn listed_state(world: &RemedyWorld, ticket: &str) -> String {
     let listing = world.rhei("list", &[]);
-    let prefix = format!("Task {ticket}: ");
-    let line = listing.stdout.lines().map(str::trim_start).find(|line| line.starts_with(&prefix));
+    let prefix = format!("{ticket}: ");
+    let names = |line: &&str| line.split_once(' ').is_some_and(|(_, id)| id.starts_with(&prefix));
+    let line = listing.stdout.lines().map(str::trim_start).find(names);
     let line = line.unwrap_or_else(|| panic!("{ticket} is not listed:\n{}", listing.stdout));
     let (_, state) = line.rsplit_once('[').expect("a state in brackets");
     state.trim_end_matches(']').to_string()

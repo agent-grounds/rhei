@@ -146,8 +146,10 @@ fn refusal_help(
     let named: Vec<&rhei_core::ast::Task> = tasks
         .into_iter()
         .filter(|task| {
-            let label = format!("{} {}", title_case_kind(&task.kind), task.id);
-            errors.iter().any(|error| error_names(error, &label))
+            // The tree rule says `Task <id>` of every kind; the profile and `**Target:**`
+            // rules say `<Kind> <id>`. §FS-rhei-reset.4
+            let labels = [format!("Task {}", task.id), format!("{} {}", title_case_kind(&task.kind), task.id)];
+            errors.iter().any(|error| labels.iter().any(|label| error_names(error, label)))
         })
         .collect();
     let moves: BTreeMap<&str, &str> =

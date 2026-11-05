@@ -224,6 +224,71 @@ fn following_the_help_under_a_retired_state_lets_the_reset_through() {
     assert_eq!(listed_state(&world, "plan.1.1"), "open", "the child reopened");
 }
 
+/// Route H's plan with nodes of kind `ticket` and `step`. The validator's tree
+/// sentence still says `Task <id>`, and the help names the parent all the same.
+const TICKET_AND_STEP: &str = r#"# Rhei: Plan
+
+---
+structure:
+  maxLevels: 2
+  nodeKinds: [ticket, step]
+---
+
+## Tasks
+
+### Ticket 1: Parent
+**State:** open
+
+#### Step 1.1: Child
+**State:** open
+"#;
+
+/// The parent's line on [`TICKET_AND_STEP`].
+fn ticket_line(state: &str) -> String {
+    format!("### Ticket 1: Parent\n**State:** {state}\n")
+}
+
+/// Route H on a plan whose nodes are not of kind `task`: the help names the edit, and
+/// following it lets the reset through. §FS-rhei-reset.4
+#[test]
+fn the_help_names_the_edit_on_a_plan_whose_nodes_are_not_tasks() {
+    let world = plan_world("reset-invalid-kinds", MACHINE, TICKET_AND_STEP);
+    finish(&world, "1.1", &[]);
+    edit(&world, "plan.rhei.md", &ticket_line("open"), &ticket_line("done"));
+    assert_validates(&world);
+
+    let said = assert_reset_refused_intact(&world, &RESET);
+    assert!(said.contains(PARENT_OVER_CHILD), "it names the parent and the child:\n{said}");
+    assert_names_the_edit(&said, "");
+
+    edit(&world, "plan.rhei.md", &ticket_line("done"), &ticket_line("open"));
+    assert_validates(&world);
+    assert_success(&world.rhei("reset", &RESET));
+    assert_validates(&world);
+    assert_eq!(listed_state(&world, "plan.1.1"), "open", "the child reopened");
+}
+
+/// The reverse shape on a plan whose nodes are not of kind `task`: the help says where
+/// the ledger sends the parent. §FS-rhei-reset.4
+#[test]
+fn the_help_says_where_the_ledger_sends_a_parent_whose_kind_is_not_task() {
+    let world = plan_world("reset-invalid-kinds-reverse", MACHINE, TICKET_AND_STEP);
+    world.write("runtime/state-transitions.log", "plan.1 done@open\n");
+    assert_validates(&world);
+
+    let said = assert_reset_refused_intact(&world, &RESET);
+
+    assert!(said.contains(PARENT_OVER_CHILD), "it names the parent and the child:\n{said}");
+    assert!(!said.contains("edit that line"), "no edit to a line changes this:\n{said}");
+    assert!(
+        said.contains(
+            "a reset moves Task plan.1 to 'done', the state the ledger records it started in, \
+             whatever its **State:** line says"
+        ),
+        "the help says where the ledger sends it:\n{said}"
+    );
+}
+
 /// The control: both finished through `rhei complete`, so the reset restores both. A
 /// claim and the result links on finished tickets are what a reset strips, and must
 /// not read as errors it introduces. Passes today; it must keep passing.

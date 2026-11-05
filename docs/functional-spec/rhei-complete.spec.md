@@ -237,9 +237,12 @@ Added avatar_url column and migration 0042
 2. Load the state machine and plan (single file or directory workspace). Validate.
 3. Locate the task by ID. Fail if the task does not exist.
 4. Reject if the task is already in a terminal state. The refusal's help is the
-   text of [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy): first the forced transition that reopens this ticket
-   alone, for an operator at a terminal and not for an agent, where the machine
-   has a state to reopen it into. Then the reset and how far it reaches, offered
+   text of [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy): first the forced transition, for an operator at a
+   terminal and not for an agent, where the machine has a state to reopen this
+   ticket into. With no finished ancestor, that transition reopens this ticket
+   alone. Under a finished ancestor it is the topmost such ancestor's, which the
+   help says has to be reopened first; an ancestor with no state to reopen it into
+   is named with no command. Then the reset and how far it reaches, offered
    only where that reset would reopen this ticket; otherwise the help says a reset
    would not, and prints no reset command.
 5. Reject if the task's current state is a [gating state](rhei-states.spec.md#12-per-state-fields) (`gating: true`) — those can only be exited by an explicit human-initiated `rhei transition`.

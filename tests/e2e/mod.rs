@@ -206,6 +206,7 @@ mod remove_resolution_tests;
 mod remove_retirement_tests;
 mod remove_tests;
 mod rendered_stderr;
+mod reset_remedy_ancestor_tests;
 mod reset_remedy_finished_tests;
 mod reset_remedy_messages_tests;
 mod reset_remedy_support;

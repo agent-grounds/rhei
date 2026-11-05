@@ -312,8 +312,13 @@ fn preload_snapshot_inherit_before_spawn_with_prior_sources(
 
     let Some(source) = source else {
         if required {
+            // §FS-rhei-errors.1.2.1
             return Err(miette!(
-                help = "no cached snapshot matches that inherit selector. List what is cached with: rhei snapshot list, or run the producing state first.",
+                help = format!(
+                    "no cached snapshot matches that inherit selector. List what is cached \
+                     with: {}, or run the producing state first.",
+                    help_subcommand_or_bare("snapshot list", "--plan", "")
+                ),
                 "missing-snapshot: no snapshot found for inherit '{}'",
                 inherit.name
             ));

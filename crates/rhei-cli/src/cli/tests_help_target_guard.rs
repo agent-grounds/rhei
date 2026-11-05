@@ -6,12 +6,6 @@ mod help_target_guard {
     /// no target to print. A site not listed here prints the one it was given.
     const NO_TARGET_TO_PRINT: &[(&str, &str, &str)] = &[
         (
-            "bounds.rs",
-            "rhei budget adjust <TARGET>",
-            "still the defect: a run's halt row, which rhei-core renders knowing no invocation; it \
-             goes with the run's other halt lines",
-        ),
-        (
             "cli_dispatch.rs",
             "rhei reset <plan-or-project>",
             "reset never infers its target, and this refusal is about omitting it; §FS-rhei-panta.6",
@@ -48,11 +42,6 @@ mod help_target_guard {
         ),
     ];
 
-    /// The snapshot helps not yet routed through `help_target.rs`.
-    const BEYOND_SNAPSHOT_HELP: &str =
-        "still the defect: a snapshot help beyond `snapshot_help`, found when budget and snapshot \
-         joined the pattern";
-
     /// Every `rhei <verb>` help text may keep, and why the line is right as it stands.
     /// A site not listed here prints the command's target through `help_target.rs`.
     const BARE_VERB_STANDS: &[(&str, &str, &str)] = &[
@@ -76,8 +65,6 @@ mod help_target_guard {
             "rhei states",
             "re-checks the machine file it names and nothing else; a plan on the line could refuse first",
         ),
-        ("help_strings.rs", "rhei snapshot gc", BEYOND_SNAPSHOT_HELP),
-        ("help_strings.rs", "rhei snapshot list", BEYOND_SNAPSHOT_HELP),
         (
             "roster_command.rs",
             "rhei roster",
@@ -91,8 +78,6 @@ mod help_target_guard {
             "rhei run",
             "`--headless` stands between the verb and the path it prints, which is the one it looked for",
         ),
-        ("snapshot_refs_gc.rs", "rhei snapshot gc", BEYOND_SNAPSHOT_HELP),
-        ("snapshot_runtime_preload.rs", "rhei snapshot list", BEYOND_SNAPSHOT_HELP),
         ("templates_instantiate.rs", "rhei run", "`--help` needs no target"),
         (
             "templates_union_host.rs",

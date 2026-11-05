@@ -281,9 +281,10 @@ fn help_command_or_bare(verb: &str) -> String {
 }
 
 /// `rhei <verb> <subcommand>` of the command's target, after `flag` where the verb
-/// takes it there, for `rhei budget` and `rhei snapshot`: neither takes
-/// `--state-machine`, and each discovers its own target, so where the command has
-/// none the line stays bare rather than gain a placeholder. §FS-rhei-errors.1.2.1
+/// takes it there, for `rhei budget` and `rhei snapshot`. No `--state-machine` is
+/// passed on: `rhei budget` takes none, and `rhei snapshot list` reads the same store
+/// with or without one. Each discovers its own target, so where the command has none
+/// the line stays bare rather than gain a placeholder. §FS-rhei-errors.1.2.1
 fn help_subcommand_or_bare(verb: &str, flag: &str, rest: &str) -> String {
     let mut line = format!("rhei {verb}");
     if let Some(word) = target_word_if_any() {

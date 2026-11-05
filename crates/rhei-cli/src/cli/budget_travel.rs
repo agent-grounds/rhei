@@ -38,11 +38,16 @@ fn budget_halt_text(refusal: &BudgetError, bounds: &CountBounds, journal: &Journ
             },
             // An explicit allowance is the ledger's own number rather than a
             // settings value, so it is reported as one and raised by the
-            // audited command. §FS-rhei-budgets.10
+            // audited command, of the target the run was given. §FS-rhei-budgets.10
             Contract::Lifetime { allowance } => halt_text(
                 spent,
                 &Bound::resolve("invocation_allowance", *allowance, None, None),
-                &Remedy::Adjust,
+                // §FS-rhei-errors.1.2.1
+                &Remedy::Adjust(help_subcommand_or_bare(
+                    "budget adjust",
+                    "",
+                    "--invocations <N> --reason <TEXT>",
+                )),
                 &none,
             ),
         },

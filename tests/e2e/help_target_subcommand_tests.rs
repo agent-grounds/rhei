@@ -2,8 +2,9 @@
 //! print the target too and stay whole: `rhei budget` and `rhei snapshot`, each
 //! pasted from the directory it was typed in. §FS-rhei-errors.1.2.1
 //!
-//! Neither takes `--state-machine`, and both discover their own target, so what
-//! these hold beside the target is that no machine and no placeholder is added.
+//! `rhei budget` takes no `--state-machine` and `rhei snapshot list` reads the same
+//! store without one, and both discover their own target, so what these hold beside
+//! the target is that no machine and no placeholder is added.
 #![cfg(unix)]
 
 use std::path::{Path, PathBuf};

@@ -319,16 +319,22 @@ fn dashboard_required_help() -> String {
     )
 }
 
-/// Help for a snapshot reference that does not parse.
-fn snapshot_reference_help() -> &'static str {
-    "a reference is <task>:<name>[:<state>][@<visit>][:<target>][/g<N>]. Copy one \
-     from: rhei snapshot list"
+/// Help for a snapshot reference that does not parse. §FS-rhei-errors.1.2.1
+fn snapshot_reference_help() -> String {
+    format!(
+        "a reference is <task>:<name>[:<state>][@<visit>][:<target>][/g<N>]. Copy one from: {}",
+        help_subcommand_or_bare("snapshot list", "--plan", "")
+    )
 }
 
-/// Help for a snapshot generation whose stored bytes do not read back.
+/// Help for a snapshot generation whose stored bytes do not read back. It names no
+/// command: `rhei snapshot gc` reads every manifest before any policy, so it refuses
+/// on this one too, which §FS-rhei-errors.1.2 calls worse than no suggestion. The
+/// message names either the generation directory or a file inside it.
 fn snapshot_corrupt_help() -> &'static str {
-    "this cached snapshot is corrupt. Delete its generation directory and re-record \
-     it: rhei snapshot gc --orphaned"
+    "this cached snapshot is corrupt. Delete the generation directory named above, or \
+     the one that holds the file named above, then re-record it by running the state \
+     that emits it."
 }
 
 /// Help for the redactor hook that runs over recorded snapshots.
@@ -350,10 +356,14 @@ fn session_capture_help() -> &'static str {
 }
 
 /// Help for a snapshot that cannot satisfy the state's `snapshot.inherit`.
-fn snapshot_inherit_help() -> &'static str {
-    "the override does not satisfy the state's snapshot.inherit contract. Pick a \
-     snapshot that does — list them with: rhei snapshot list — or relax \
-     snapshot.inherit in the state machine."
+/// §FS-rhei-errors.1.2.1
+fn snapshot_inherit_help() -> String {
+    format!(
+        "the override does not satisfy the state's snapshot.inherit contract. Pick a \
+         snapshot that does — list them with: {} — or relax snapshot.inherit in the state \
+         machine.",
+        help_subcommand_or_bare("snapshot list", "--plan", "")
+    )
 }
 
 /// Help for a snapshot this agent cannot resume. §FS-rhei-errors.1.2.1
@@ -383,10 +393,15 @@ fn snapshot_target_help() -> &'static str {
      explicit target."
 }
 
-/// Help for more than one cached generation matching an inherit rule.
-fn snapshot_ambiguous_help() -> &'static str {
-    "more than one cached generation matches. Narrow it with snapshot.inherit.select \
-     in the state machine, or prune with: rhei snapshot gc"
+/// Help for more than one cached snapshot matching an inherit rule. Each match is
+/// a distinct snapshot identity, which no `gc` policy tells apart, so the remedy is
+/// the selector and the line shows what matched. §FS-rhei-errors.1.2.1
+fn snapshot_ambiguous_help() -> String {
+    format!(
+        "more than one cached snapshot matches. Narrow it with snapshot.inherit.select in \
+         the state machine; see what matches with: {}",
+        help_subcommand_or_bare("snapshot list", "--plan", "")
+    )
 }
 
 /// Help for unpacking something embedded in the binary into scratch space.

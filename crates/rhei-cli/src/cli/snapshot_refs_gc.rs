@@ -486,7 +486,7 @@ fn refresh_current_links(
         if let Some(newest) = records.first() {
             let target = newest.path.file_name().and_then(OsStr::to_str).ok_or_else(|| {
                 miette!(
-                    help = "this cached snapshot is corrupt. Remove it with: rhei snapshot gc --orphaned",
+                    help = snapshot_corrupt_help(),
                     "invalid snapshot generation path '{}'", newest.path.display()
                 )
             })?;

@@ -6,13 +6,20 @@
 
 // §AR-source-file-size.3 §FS-rhei-reset.5.1
 
-/// What a message says about how far the reset it offers reaches. The renderer
-/// reads it too, to keep the command on the line it was printed on.
+/// What a message says about how far the reset it offers reaches.
 const RESET_OFFER_REACH: &str =
     "which returns every ticket in that rhei to its authored state and deletes their results and logs";
 
-/// The `--reason` of the forced transition a finished ticket's refusal offers.
+/// The `--reason` of the forced transition a finished ticket's refusal offers. It
+/// is there so the command runs as printed, and the message says it is the
+/// operator's to replace. §FS-rhei-reset.5.1
 const FORCED_REOPEN_REASON: &str = "reopen this finished ticket";
+
+/// Whether a diagnostic's text carries a command built here, which the renderer
+/// keeps on the line it was printed on. §FS-rhei-reset.5.1
+fn carries_offered_command(text: &str) -> bool {
+    text.contains(RESET_OFFER_REACH) || text.contains(FORCED_REOPEN_REASON)
+}
 
 /// The target and machine of the invocation printing a message, which are what
 /// the reset it offers has to name: reset never infers a target, and without the
@@ -67,18 +74,46 @@ impl ResetOffer {
         )
     }
 
-    /// The help of a refusal over a finished ticket: the operator's one-ticket way
-    /// back when there is a state to go back to, then the rhei-wide reset.
+    /// The help of a refusal over a finished ticket, standing in `from`. It offers
+    /// the rhei-wide reset only where that reset reopens this ticket: one that leaves
+    /// it finished still deletes the rhei's results and logs, so it is no way back.
+    /// A pre-authored chain's children never were in the initial state, so the forced
+    /// line goes there only when the reset is not offered beside it.
     /// §FS-rhei-reset.5.1 §FS-rhei-complete.4
-    fn reopen_finished(&self, task_id: &str, from: &str, to: Option<&str>) -> String {
-        let reset = self.for_ticket(task_id);
-        match to {
-            Some(to) => format!(
-                "nothing to do — the task is finished. An operator at a terminal can reopen this \
-                 ticket alone with {}; an agent may not run that. Otherwise, run {reset}",
+    fn reopen_finished(
+        &self,
+        loaded: &LoadedPlan,
+        input: &Path,
+        task_id: &str,
+        task: &rhei_core::ast::Task,
+        machine: &rhei_validator::StateMachine,
+        from: &str,
+    ) -> String {
+        const FINISHED: &str = "nothing to do — the task is finished.";
+        let reopens = |state: &str| machine.states.get(state).is_some_and(|def| !def.terminal);
+        let forced = |to: &str| {
+            format!(
+                "An operator at a terminal can reopen this ticket alone with {}, giving their \
+                 own reason; an agent may not run that.",
                 self.forced_reopen(task_id, from, to)
-            ),
-            None => format!("nothing to do — the task is finished. To reopen it, run {reset}"),
+            )
+        };
+
+        let root = loaded.task_route(task_id, input).execution_root;
+        let dest = reset_destination(ledger_first_departures(&root).get(task_id), from, machine);
+        if reopens(&dest) {
+            return format!(
+                "{FINISHED} {} Otherwise, run {}",
+                forced(&dest),
+                self.for_ticket(task_id)
+            );
+        }
+
+        let no_reset = format!("A reset would not reopen it: it would leave this ticket in '{dest}'");
+        let initial = initial_state_for_node(machine, &task.kind, task.profile_level()).ok();
+        match initial.filter(|state| reopens(state)) {
+            Some(initial) => format!("{FINISHED} {} {no_reset}", forced(&initial)),
+            None => format!("{FINISHED} {no_reset}"),
         }
     }
 }
@@ -86,25 +121,4 @@ impl ResetOffer {
 /// `path` as the offer prints it: absolute, and not canonical. §FS-rhei-reset.5.1
 fn offered_path(path: &Path) -> PathBuf {
     std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf())
-}
-
-/// The state a finished ticket reopens into, so the forced transition and the reset
-/// offered after it agree: what the ledger says it started in, else its profile's
-/// initial state. A pre-authored chain's children never were in the initial state,
-/// so that alone would send them somewhere a reset would not. §FS-rhei-reset.5.1
-fn reopen_state(
-    loaded: &LoadedPlan,
-    input: &Path,
-    task_id: &str,
-    task: &rhei_core::ast::Task,
-    machine: &rhei_validator::StateMachine,
-    from: &str,
-) -> Option<String> {
-    let usable = |state: &String| {
-        state != from && machine.states.get(state).is_some_and(|def| !def.terminal)
-    };
-    let route = loaded.task_route(task_id, input);
-    ledger_first_departures(&route.execution_root).remove(task_id).filter(usable).or_else(|| {
-        initial_state_for_node(machine, &task.kind, task.profile_level()).ok().filter(usable)
-    })
 }

@@ -41,13 +41,37 @@ pub(super) fn offered_transitions(text: &str) -> Vec<String> {
     spans.filter(|span| span.starts_with("rhei transition ")).map(str::to_string).collect()
 }
 
+/// The state an offered `rhei transition` goes to, as printed.
+pub(super) fn offered_to(offer: &str) -> Option<&str> {
+    let words: Vec<&str> = offer.split_whitespace().collect();
+    words.iter().position(|word| *word == "--to").map(|at| words[at + 1])
+}
+
 /// The way back a finished ticket's refusal offers ahead of the reset, returned as
-/// printed: it runs as printed and stops at the forced path's own terminal check,
-/// which comes after every stable preflight, so the shell, the arguments and the hop
-/// were all accepted, on every platform and with no pseudo-terminal. The line says
-/// who it is for. §FS-rhei-reset.5.1 §FS-rhei-transition-cmd.6
+/// printed. §FS-rhei-reset.5.1
 #[track_caller]
 pub(super) fn assert_offers_forced_reopen(said: &str, home: &Path) -> String {
+    let offer = assert_offers_forced_line(said, home);
+    let line = said
+        .lines()
+        .find(|line| line.contains(offer.as_str()))
+        .expect("the offer was read from one line");
+    let reset_at = line.find("`rhei reset ").expect("the reset is offered on the same line");
+    assert!(
+        line.find(offer.as_str()).is_some_and(|at| at < reset_at),
+        "the one-ticket way back comes before the reset:\n{line}"
+    );
+    offer
+}
+
+/// The forced transition a finished ticket's refusal offers, returned as printed: it
+/// runs as printed and stops at the forced path's own terminal check, which comes
+/// after every stable preflight, so the shell, the arguments and the hop were all
+/// accepted, on every platform and with no pseudo-terminal. The line says who it is
+/// for, and that the printed reason is theirs to replace.
+/// §FS-rhei-reset.5.1 §FS-rhei-transition-cmd.6
+#[track_caller]
+pub(super) fn assert_offers_forced_line(said: &str, home: &Path) -> String {
     let offers = offered_transitions(said);
     let [offer] = offers.as_slice() else {
         panic!("one `rhei transition` must be offered, found {}, in:\n{said}", offers.len());
@@ -68,14 +92,41 @@ pub(super) fn assert_offers_forced_reopen(said: &str, home: &Path) -> String {
         .lines()
         .find(|line| line.contains(offer.as_str()))
         .expect("the offer was read from one line");
-    let reset_at = line.find("`rhei reset ").expect("the reset is offered on the same line");
-    assert!(
-        line.find(offer.as_str()).is_some_and(|at| at < reset_at),
-        "the one-ticket way back comes before the reset:\n{line}"
-    );
     assert!(line.contains("An operator at a terminal"), "it says who may run it:\n{line}");
     assert!(line.contains("an agent may not run"), "it says an agent may not:\n{line}");
+    assert!(
+        line.contains(&format!("`{offer}`, giving their own reason")),
+        "it says the printed reason is the operator's to replace:\n{line}"
+    );
     offer.clone()
+}
+
+/// The `rhei complete` a finished ticket's refusal answers, with its help's commands
+/// held whole on the line they were printed on, in the bytes as written: `CliRun`
+/// undoes soft wraps, so only the raw reading can see this. `commands` is how many it
+/// offers, each wider than the eighty columns captured stderr renders at, whatever
+/// the temporary directory is, so without the exception no runner could keep them
+/// whole. §FS-rhei-reset.5.1 §FS-rhei-errors.2
+#[track_caller]
+pub(super) fn assert_finished_tickets_commands_stay_whole(world: &RemedyWorld, commands: usize) {
+    let refused =
+        world.rhei_output("complete", &["--task", "1", "--result", "again", "--no-callbacks"]);
+
+    let rendered = raw_stderr(&refused);
+    let unwrapped = stderr(&refused);
+    assert!(
+        unwrapped.contains("already in terminal state"),
+        "fixture: this is the refusal under test:\n{unwrapped}"
+    );
+    let offered = [offered_resets(&unwrapped), offered_transitions(&unwrapped)].concat();
+    assert_eq!(offered.len(), commands, "the commands offered in:\n{unwrapped}");
+    for command in offered {
+        assert!(command.len() > 80, "fixture: {command} must not fit the render");
+        assert!(
+            rendered.lines().any(|line| line.contains(&format!("`{command}`"))),
+            "`{command}` must arrive on one line, and was rendered:\n{rendered}"
+        );
+    }
 }
 
 /// Run `line` and what follows it through the platform's shell, from a directory

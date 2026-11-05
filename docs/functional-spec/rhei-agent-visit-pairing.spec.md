@@ -54,10 +54,9 @@ note: task <id> state '<state>': reusing this visit's finished spawn (<record pa
 The command and what it reaches are the text of [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy), with `<plan>` the
 run's own target. The note is about one spawn, and no reset reaches only that.
 Re-entering the state is the narrower redo, because it spawns the edited target
-and reaches only this ticket, but the note cannot name it: re-entry is a new
-entry rather than this visit, it exists only where the machine declares an edge
-back, and the note is written at the pre-spawn decision, while the hop's `--from`
-is wherever the reused visit then routes.
+and reaches only this ticket, but the note does not name it: re-entry is a new
+entry rather than this visit, and it takes a declared edge back or the operator's
+forced hop.
 
 ## 5. Ambiguity Pairs Nothing
 

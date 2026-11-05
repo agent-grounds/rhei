@@ -76,10 +76,10 @@ fn margin() -> Duration {
 
 /// Writes to `slave` until the terminal answers that it has hung up, within `bound`.
 ///
-/// A process already spawned holds the master until its `exec`, flagged or not, so
-/// the hang-up can come a moment after the last close this test can see
-/// (§REQ-cross-platform.7.2). `slave` must be non-blocking: a blocking write to a
-/// terminal that never hung up fills its buffer and stays there, past any bound.
+/// A process forked after the terminal was opened and not yet through its `exec` holds
+/// the master, flagged or not, so the hang-up can come a moment after the last close
+/// this test can see (§REQ-cross-platform.7.2). `slave` must be non-blocking: a blocking
+/// write to a terminal that never hung up fills its buffer and stays there, past any bound.
 fn hang_up_within(slave: &OwnedFd, bound: Duration) -> Result<(), String> {
     let deadline = Instant::now() + bound;
     loop {

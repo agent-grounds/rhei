@@ -1072,8 +1072,8 @@ fn a_hung_up_terminal_ends_the_groups_the_way_a_closed_pipe_does() {
     cmd.stdout(std::process::Stdio::from(slave_out));
     cmd.stderr(fs::File::create(dir.join("run.err")).expect("create run stderr"));
     let mut run = KillOnDrop(cmd.spawn().expect("rhei run should start"));
-    // Every slave copy in this process has to go, the `Command`'s own included,
-    // or the master close below is not a hangup.
+    // Nothing here needs a slave past the spawn, and the `Command` keeps its copy until
+    // dropped. The master's last close hangs up whether or not these copies are open.
     drop(cmd);
     drop(pty.slave);
 

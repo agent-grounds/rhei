@@ -46,8 +46,8 @@ fn run_halt_help(rhei: &rhei_core::ast::Rhei, spawn_refusal_help: Option<String>
     match (stranded, spawn_refusal_help) {
         (true, Some(refusal)) => format!("{refusal}\n{}", timeout_transition_unfired_help()),
         (false, Some(refusal)) => refusal,
-        (true, None) => timeout_transition_unfired_help().to_owned(),
-        (false, None) => nothing_claimable_help().to_owned(),
+        (true, None) => timeout_transition_unfired_help(),
+        (false, None) => nothing_claimable_help(),
     }
 }
 
@@ -371,7 +371,7 @@ fn format_dry_run_manual_only(task_id: &str, from: &str, to: &str) -> String {
 /// so this only carries the count and the fix.
 fn manual_only_dry_run_error(reported: &[String]) -> miette::Report {
     miette!(
-help = "claim one with: rhei next <plan>",
+help = format!("claim one with: {}", help_command("next")),
 
         "{} task(s) reported above are in a manual-only initial state and cannot be advanced \
          by `rhei run`. Claim each with `rhei next`, do the work, then finish with \

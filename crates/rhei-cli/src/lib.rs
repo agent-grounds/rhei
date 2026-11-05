@@ -33,6 +33,7 @@ include!("cli/diagnostic_causes.rs");
 include!("cli/reset_offer.rs");
 include!("cli/plan_input_guidance.rs");
 include!("cli/help_strings.rs");
+include!("cli/help_target.rs");
 include!("cli/rhei_home.rs");
 
 mod templates {
@@ -125,6 +126,7 @@ include!("cli/run_registry.rs");
 include!("cli/run_registry_access.rs");
 include!("cli/headless_launcher.rs");
 include!("cli/headless_startup_locks.rs");
+include!("cli/headless_child.rs");
 include!("cli/control_client.rs");
 include!("cli/run_options.rs");
 include!("cli/run_frontend.rs");
@@ -347,6 +349,7 @@ mod tests {
     include!("cli/tests_error_guidance.rs");
     include!("cli/tests_diagnostic_coverage.rs");
     include!("cli/tests_help_target_guard.rs");
+    include!("cli/tests_help_target_holder.rs");
     include!("cli/tests_prompt_templates.rs");
     include!("cli/tests_complete_reset_tooling.rs");
     include!("cli/tests_task_tooling_resolution.rs");

@@ -63,14 +63,13 @@ mod migrate_export_prior_tests {
     #[test]
     fn migration_diagnostic_quotes_the_requested_target_without_mutation() {
         let requested = Path::new("member plan's.rhei.md");
-        let report = with_validation_migration_target(requested, || {
-            validation_report(
-                Path::new("enclosing-project"),
-                &[],
-                &["Task p.2 consumes export 'x' from Task p.1 and must list Task p.1 directly in **Prior:**".to_string()],
-                &[],
-            )
-        });
+        let _help_target = enter_help_target(HelpTarget::naming(requested));
+        let report = validation_report(
+            Path::new("enclosing-project"),
+            &[],
+            &["Task p.2 consumes export 'x' from Task p.1 and must list Task p.1 directly in **Prior:**".to_string()],
+            &[],
+        );
         let help = report.help().expect("migration help").to_string();
         assert!(
             help.contains(&format!(

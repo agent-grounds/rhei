@@ -258,7 +258,10 @@ fn resolve_condition_operand(
         other => {
             let value = task_metadata_number(metadata, task_id, other).ok_or_else(|| {
                 miette!(
-                    help = "transition conditions read task metadata fields. Check the operand name against the state machine spec, then re-run: rhei validate <plan>",
+                    help = format!(
+                        "transition conditions read task metadata fields. Check the operand name against the state machine spec, then re-run: {}",
+                        help_command("validate")
+                    ),
                     "condition operand '{}' is not available in task metadata", other
                 )
             })?;

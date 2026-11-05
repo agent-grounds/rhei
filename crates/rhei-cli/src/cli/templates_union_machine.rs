@@ -457,7 +457,11 @@
         )
     }
 
-    fn union_target_help() -> &'static str {
-        "run `rhei validate <rhei>` on the target first: a union is written into a machine that \
-         already loads."
+    /// `--into` names an id, so the caller says which path that was.
+    /// §FS-rhei-errors.1.2.1
+    fn union_target_help() -> String {
+        format!(
+            "run `{}` on the target first: a union is written into a machine that already loads.",
+            help_command("validate")
+        )
     }

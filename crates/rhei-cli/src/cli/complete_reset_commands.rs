@@ -208,7 +208,17 @@ fn complete_command(
     }
     if machine.states.get(&current_state).map(|def| def.gating).unwrap_or(false) {
         return Err(miette!(
-            help = "a human gate is released explicitly: rhei transition <plan> <task> --to <state>",
+            help = format!(
+                "a human gate is released explicitly: {}",
+                help_command_with(
+                    "transition",
+                    &format!(
+                        "--task {} --from {} --to <state>",
+                        shell_quote(task_id_str),
+                        shell_quote(&current_state)
+                    )
+                )
+            ),
             "Task {} cannot be completed from gating state '{}'; use an explicit human transition",
             task_id_str,
             current_state

@@ -146,6 +146,10 @@ include!("cli_startup.rs");
 
 /// Dispatch the parsed CLI command.
 fn dispatch(cli: Cli) -> MietteResult<()> {
+    // Before anything can refuse, so a help that does not hold a resolved plan still
+    // knows what the command was given. §FS-rhei-errors.1.2.1
+    let _help_target =
+        enter_help_target(HelpTarget::of_command(&cli.command, cli.state_machine.as_deref()));
     // `--state-machine` is accepted both before the subcommand and on the
     // subcommands that read one; the subcommand copy wins when both appear.
     let before_subcommand = cli.state_machine;

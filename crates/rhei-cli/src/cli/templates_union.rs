@@ -144,7 +144,12 @@
         let host_machine_text = read_text(&host.machine)?;
         check_artifact_paths(&host_machine_text, &part_machine, sides)?;
         warn_shared_artifact_paths(&part_machine, &tickets);
-        let mut machine = union_machine(&host_machine_text, &host.machine, &part_machine)?;
+        let mut machine = {
+            // `--into` named an id; a help prints the path it resolved to. §FS-rhei-errors.1.2.1
+            let entry = if host.single_file { &host.index } else { &host.root };
+            let _help_target = enter_help_target(HelpTarget::naming(entry));
+            union_machine(&host_machine_text, &host.machine, &part_machine)?
+        };
         if !machine.ends_with('\n') {
             machine.push('\n');
         }
@@ -309,7 +314,10 @@
     ) -> MietteResult<()> {
         let Some(template) = template else {
             return Err(miette!(
-                help = "name the template to place: `rhei instantiate <template> --into <rhei>`.",
+                help = format!(
+                    "name the template to place: `rhei instantiate <template> --into {}`.",
+                    shell_quote(target)
+                ),
                 "`--into` needs a template to place"
             ));
         };

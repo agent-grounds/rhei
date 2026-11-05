@@ -288,10 +288,6 @@ fn ensure_terminal_result_available(
         return Ok(());
     }
     let relative = format!("runtime/results/{qualified_id}.md");
-    // The suggested commands carry the plan, like every other `help =` here;
-    // without it they only run from at or below the plan's own directory.
-    // §FS-rhei-errors.2
-    let plan = plan_arg_for_help(plan_path);
     // A ticket that fanned out has its workers' accounts on disk as fragments;
     // only `rhei run` folds them in, so say so rather than let the operator read
     // the empty ticket-level path as lost work. §FS-rhei-states.3.3
@@ -306,14 +302,21 @@ fn ensure_terminal_result_available(
     };
     // Name the file that was checked and the flag that carries the message:
     // "write a result" is the answer, but the user still has to know where.
-    // §FS-rhei-errors.2
+    // §FS-rhei-errors.2 §FS-rhei-errors.1.2.1
     Err(miette!(
         help = format!(
-            "a final state records why the ticket ended there. Pass it on the move: \
-             rhei transition {plan} --task {qualified_id} --from {from} --to {to} \
-             --result \"<what happened>\" \
-             (rhei complete {plan} --task {qualified_id} --result \"<what happened>\" for the \
-             everyday finish), or write {relative} before the move.{fragments}"
+            "a final state records why the ticket ended there. Pass it on the move: {} ({} for \
+             the everyday finish), or write {relative} before the move.{fragments}",
+            help_command_with_or(
+                "transition",
+                &format!("--task {qualified_id} --from {from} --to {to} --result \"<what happened>\""),
+                plan_path
+            ),
+            help_command_with_or(
+                "complete",
+                &format!("--task {qualified_id} --result \"<what happened>\""),
+                plan_path
+            )
         ),
         "Task {} cannot enter terminal state '{}' without a result.\n\
          Expected a non-empty result file at: {}",

@@ -24,10 +24,13 @@ fn install_diagnostic_handler() {
         let keeps_reset_offer_whole = [&help, &message]
             .into_iter()
             .any(|text| carries_offered_command(text) || says_a_reset_is_refused(text));
+        // A command naming its target runs as printed, on the launcher's relay too.
+        // §FS-rhei-errors.1.2.1
+        let keeps_target_whole = names_help_target(&help) || names_help_target(&message);
         Box::new(
             miette::MietteHandlerOpts::new()
                 .break_words(false)
-                .wrap_lines(!(keeps_migration_action_whole || keeps_reset_offer_whole))
+                .wrap_lines(!(keeps_migration_action_whole || keeps_reset_offer_whole || keeps_target_whole))
                 .word_separator(textwrap::WordSeparator::AsciiSpace)
                 .word_splitter(textwrap::WordSplitter::NoHyphenation)
                 .build(),

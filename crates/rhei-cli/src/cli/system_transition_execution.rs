@@ -21,10 +21,10 @@ fn task_profile_allows_state(
 /// The plan path as a user would type it: relative to the working directory
 /// when it sits beneath it, absolute otherwise.
 ///
-/// A `help =` names commands the user is meant to run next, and every other one
-/// echoes the argument they typed. The transition path only has the resolved,
-/// canonicalized plan path, so it renders that back down to the same shape
-/// rather than pasting an absolute path into the middle of a suggested command.
+/// A report line names the command to run next and has only the resolved,
+/// canonicalized plan path, so it renders that back down to the shape a user would
+/// type rather than pasting an absolute path into the middle of a suggested command.
+/// A `help =` prints through `help_target.rs` instead. §FS-rhei-errors.1.2.1
 // §FS-rhei-errors.2
 fn plan_arg_for_help(plan_path: &Path) -> String {
     // One spelling on both sides of the `strip_prefix`: the plan path is the
@@ -84,13 +84,13 @@ fn ensure_descendants_terminal_for_terminal_entry(
     }
     // Name the command that shows the open work and the one that claims it:
     // "finish the descendants" is the answer, but the user still has to find
-    // them. §FS-rhei-errors.2
-    let plan = plan_arg_for_help(plan_path);
+    // them. §FS-rhei-errors.2 §FS-rhei-errors.1.2.1
     Err(miette!(
         help = format!(
             "a parent is finished after its subtree is, and nothing finishes it on its \
-             children's behalf. See the open work with: rhei list {plan} --non-terminal, \
-             then claim it with: rhei next {plan}"
+             children's behalf. See the open work with: {}, then claim it with: {}",
+            help_command_with_or("list", "--non-terminal", plan_path),
+            help_command_or("next", plan_path)
         ),
         "Task {} cannot enter terminal state '{}' while descendant tasks remain non-terminal.\n\
          Offending descendants: {}",

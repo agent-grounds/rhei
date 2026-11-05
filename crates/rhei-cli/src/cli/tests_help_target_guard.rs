@@ -61,7 +61,6 @@ mod help_target_guard {
     /// Fails when a printed command holds a target placeholder at a site the list
     /// above does not name, and when the list names a site that no longer has one.
     #[test]
-    #[ignore = "red until #555: helps print `rhei list <plan>` on commands that know their target; implement removes this"]
     fn help_target_placeholders_stand_only_where_there_is_no_target() {
         let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()

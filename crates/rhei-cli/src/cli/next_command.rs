@@ -71,8 +71,8 @@ fn next_command(
             .ok_or_else(|| {
                 miette!(
                     help = format!(
-                        "list the task ids in this plan with: rhei list {}",
-                        shell_quote(&input.display().to_string())
+                        "list the task ids in this plan with: {}",
+                        help_command_or("list", input)
                     ),
                     "task '{}' not found in the plan",
                     tid
@@ -102,14 +102,13 @@ fn next_command(
             );
             let next_step = match claimable.first() {
                 Some(candidate) => format!(
-                    "claim what is ready instead: rhei next {} --task {}",
-                    shell_quote(&input.display().to_string()),
-                    candidate.id
+                    "claim what is ready instead: {}",
+                    help_command_with_or("next", &format!("--task {}", candidate.id), input)
                 ),
                 None => format!(
                     "finish or cancel the open descendants first, then claim this ticket. \
-                     See every task and its state with: rhei list {}",
-                    shell_quote(&input.display().to_string())
+                     See every task and its state with: {}",
+                    help_command_or("list", input)
                 ),
             };
             return Err(miette!(
@@ -136,8 +135,8 @@ fn next_command(
             let next_step = if let Some(holder) = holder {
                 format!(
                     "Task {supervisor} is the ticket to work and {holder} holds it; hand it \
-                     back with: rhei release {} --task {supervisor}",
-                    shell_quote(&input.display().to_string())
+                     back with: {}",
+                    help_command_with_or("release", &format!("--task {supervisor}"), input)
                 )
             } else if hold.awaiting_human {
                 format!(
@@ -146,14 +145,14 @@ fn next_command(
                      else to release the subtree: rhei{} transition {} --task {supervisor} \
                      --from {supervisor_state} --to <state>",
                     state_machine_flag(resolved.default.path.as_deref()),
-                    shell_quote(&input.display().to_string())
+                    help_target_word_or(input)
                 )
             } else {
                 format!(
                     "the supervisor releases the subtree on its next visit. Work the supervisor \
                      instead: rhei{} next {} --task {supervisor}",
                     state_machine_flag(resolved.default.path.as_deref()),
-                    shell_quote(&input.display().to_string())
+                    help_target_word_or(input)
                 )
             };
             return Err(miette!(
@@ -168,11 +167,11 @@ fn next_command(
             // `rhei release` is the command that owns `**Assignee:**`; telling a
             // worker to hand-edit the line contradicts every other surface,
             // which says the field is CLI-owned. §FS-rhei-release
-            let plan_arg = shell_quote(&input.display().to_string());
             return Err(miette!(
                 help = format!(
-                    "hand it back with: rhei release {plan_arg} --task {tid} — or claim \
-                     whatever is ready instead: rhei next {plan_arg}"
+                    "hand it back with: {} — or claim whatever is ready instead: {}",
+                    help_command_with_or("release", &format!("--task {tid}"), input),
+                    help_command_or("next", input)
                 ),
                 "Task {} is already assigned to {}",
                 tid,
@@ -199,8 +198,8 @@ fn next_command(
                 .unwrap_or_default();
             return Err(miette!(
                 help = format!(
-                    "finish the prerequisite first, or see what is claimable now: rhei list {}",
-                    shell_quote(&input.display().to_string())
+                    "finish the prerequisite first, or see what is claimable now: {}",
+                    help_command_or("list", input)
                 ),
                 "Task {} is blocked by incomplete prerequisites{}",
                 tid,
@@ -264,7 +263,7 @@ fn next_command(
         );
         if ready.is_empty() {
             return Err(miette!(
-                help = "see every task and its state with: rhei list <plan>",
+                help = format!("see every task and its state with: {}", help_command_or("list", input)),
                 "{}",
                 diagnose_no_claimable(
                     &loaded.rhei,
@@ -315,8 +314,8 @@ fn next_command(
         .ok_or_else(|| {
             miette!(
                 help = format!(
-                    "list the task ids in this plan with: rhei list {}",
-                    shell_quote(&input.display().to_string())
+                    "list the task ids in this plan with: {}",
+                    help_command_or("list", input)
                 ),
                 "task '{}' not found in the plan",
                 task_id_str
@@ -352,8 +351,8 @@ fn next_command(
             .ok_or_else(|| {
                 miette!(
                     help = format!(
-                        "list the task ids in this plan with: rhei list {}",
-                        shell_quote(&input.display().to_string())
+                        "list the task ids in this plan with: {}",
+                        help_command_or("list", input)
                     ),
                     "task '{}' not found in the plan",
                     task_id_str

@@ -390,7 +390,7 @@ fn collect_ready_agent_work_items(
         if invocations.is_empty() {
             if state_declares_autonomous_agent_work(state_def) {
                 return Err(miette!(
-                    help = "give the state an `agent:` or `target:` in the state machine, or run it yourself with: rhei next <plan>",
+                    help = format!("give the state an `agent:` or `target:` in the state machine, or run it yourself with: {}", help_command("next")),
                     "no agent configured for ready state '{}'", current_state
                 ));
             }

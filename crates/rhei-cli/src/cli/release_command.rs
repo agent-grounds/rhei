@@ -55,7 +55,7 @@ help = ticket_id_required_help(),
             let claimable_where_it_stands = execute_on_of(machine, &state).is_some();
             let target_exists = machine.states.contains_key(initial);
             if state != initial && !claimable_where_it_stands && target_exists {
-                let plan = shell_quote(&input.display().to_string());
+                let plan = help_target_word_or(input); // §FS-rhei-errors.1.2.1
                 println!(
                     "  note: still in '{}'. Automatic `rhei next` claims from '{}'; reclaim it \
                      explicitly with `rhei next {} --task {}`, or move it back with \
@@ -110,7 +110,7 @@ help = task_id_help(),
 "task '{}' not found in the plan", task_id_str))?;
     let Some(assignee) = task.assignee.clone() else {
         return Err(miette!(
-help = "nothing to release. See who holds what with: rhei list <plan>",
+help = format!("nothing to release. See who holds what with: {}", help_command("list")),
 
             "Task {} holds no claim — it has no **Assignee:** to release",
             task_id_str

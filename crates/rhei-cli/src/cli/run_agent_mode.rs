@@ -413,10 +413,10 @@ fn run_agent_mode(
                     };
                     return Err(miette!(
                         help = run_report_help(),
-                        "{header}\n\nSet one of:\n  \u{2022} defaults.agent in {}/{} or ~/.config/rhei/settings.json\n  \u{2022} the state's `agent:` in states.yaml\n  \u{2022} {model_remediation}\n  \u{2022} --agent <AGENT> on the rhei run command line (e.g. rhei run {} --agent claude-code)\n\nBuilt-in agents: claude-code, codex, gemini, cursor, kilocode, pi",
+                        "{header}\n\nSet one of:\n  \u{2022} defaults.agent in {}/{} or ~/.config/rhei/settings.json\n  \u{2022} the state's `agent:` in states.yaml\n  \u{2022} {model_remediation}\n  \u{2022} --agent <AGENT> on the rhei run command line (e.g. {})\n\nBuilt-in agents: claude-code, codex, gemini, cursor, kilocode, pi",
                         workspace_root.display(),
                         project_settings,
-                        input.display()
+                        help_command_with("run", "--agent claude-code") // §FS-rhei-errors.1.2.1
                     ));
                 }
 

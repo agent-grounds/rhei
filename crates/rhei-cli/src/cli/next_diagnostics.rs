@@ -286,7 +286,7 @@ fn diagnose_no_claimable(
                 supervisors.push(supervisor);
             }
         }
-        let plan_arg = shell_quote(&plan_path.display().to_string());
+        let plan_arg = help_target_word_or(plan_path);
         let next_step = supervisors
             .into_iter()
             .find_map(|id| {
@@ -317,7 +317,7 @@ fn diagnose_no_claimable(
     if let Some(task) = ready_non_initial.first() {
         let machine = machines.for_task(&task.id);
         let state_name = normalized_state_name(task.state.as_str(), machine);
-        let plan_arg = shell_quote(&plan_path.display().to_string());
+        let plan_arg = help_target_word_or(plan_path);
         let normalized_metadata = ensure_current_state_visit_count(
             rhei.metadata.as_ref(),
             &task.id,

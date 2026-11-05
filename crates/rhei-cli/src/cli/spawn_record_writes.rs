@@ -8,10 +8,24 @@ impl SpawnPlan {
     /// whole value is that its presence proves a worker ran.
     // §FS-rhei-agents.8.4
     fn record_spawn(&self, ended: SpawnEnding<'_>) {
+        let (task, state) = (ended.task_id, ended.state_name);
+        if let Err(err) = self.persist_spawn(ended) {
+            emit_run_diag(
+                rhei_tui::MessageLevel::Warn,
+                format!(
+                    "  warning: could not write spawn record for Task {task} in state '{state}' at {}: {err}",
+                    self.record.display()
+                ),
+            );
+        }
+    }
+
+    /// Persist completion through the shared transaction; the caller reports
+    /// failure without changing the worker's outcome. §FS-rhei-agents.8.4
+    fn persist_spawn(&self, ended: SpawnEnding<'_>) -> MietteResult<()> {
         if let Some(parent) = self.record.parent() {
-            if fs::create_dir_all(parent).is_err() {
-                return;
-            }
+            fs::create_dir_all(parent)
+                .map_err(|err| file_io_report(parent, "cannot create spawn record directory", err))?;
         }
         let attempt_charged = !matches!(ended.ending, "interrupted" | "provider_limited");
         let mut record = SpawnRecord {
@@ -39,7 +53,7 @@ impl SpawnPlan {
             reverted: None,
         };
         // §FS-rhei-agents.8.4: re-read under the grant's lock, never overwrite its audit.
-        let _ = update_spawn_record_with_policy(&self.record, true, |stored| {
+        update_spawn_record_with_policy(&self.record, true, |stored| {
             if let Some(stored) = stored.filter(|stored| stored.moves == self.moves) {
                 record.charged = stored.charged + u64::from(attempt_charged);
                 record.unavailable = stored.unavailable;
@@ -49,7 +63,8 @@ impl SpawnPlan {
                 record.grants = previous.grants.clone();
             }
             Ok(Some(record))
-        });
+        })?;
+        Ok(())
     }
 }
 

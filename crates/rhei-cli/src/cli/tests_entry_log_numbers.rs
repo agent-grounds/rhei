@@ -261,7 +261,8 @@ transitions:
             )
         );
         assert_eq!(
-            create_log_exclusively(&plan.log, "plan.1", plan.reset.as_ref()).err(),
+            create_log_exclusively(&plan.log, "plan.1", plan.reset.as_ref(), agent_log_help())
+                .err().map(|err| err.to_string()),
             Some(refusal)
         );
         assert_eq!(fs::read_to_string(&plan.log).expect("kept"), "planted");

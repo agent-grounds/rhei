@@ -35,6 +35,7 @@ fn schedule_agent_work_items(
     budget_run: &BudgetRun,
     snapshot_override_selection: Option<&SnapshotOverrideRunSelection>,
     sink: &Arc<dyn rhei_tui::EventSink>,
+    spawn_refusals: &mut SpawnRefusals,
     intervene: Option<&Arc<RunInterveneSink>>,
     free_slots: &mut BTreeSet<rhei_tui::Slot>,
     next_extra_slot: &mut rhei_tui::Slot,
@@ -79,6 +80,7 @@ fn schedule_agent_work_items(
             budget_run,
             snapshot_override_selection,
             sink,
+            spawn_refusals,
             intervene,
             &run_in_flight,
         )? {
@@ -124,6 +126,7 @@ fn schedule_program_work_items(
     settings: &RheiSettings,
     workspace_root: &Path,
     sink: &Arc<dyn rhei_tui::EventSink>,
+    spawn_refusals: &mut SpawnRefusals,
     free_slots: &mut BTreeSet<rhei_tui::Slot>,
     next_extra_slot: &mut rhei_tui::Slot,
     active_invocation_counts: &mut HashMap<String, usize>,
@@ -158,6 +161,7 @@ fn schedule_program_work_items(
             settings,
             workspace_root,
             sink,
+            spawn_refusals,
         )? {
             ParallelProgramSpawnOutcome::Spawned(spawned_program) => {
                 *active_invocation_counts
@@ -223,6 +227,7 @@ fn refill_parallel_worker_pool(
     run_id: &str,
     snapshot_override_selection: Option<&SnapshotOverrideRunSelection>,
     sink: &Arc<dyn rhei_tui::EventSink>,
+    spawn_refusals: &mut SpawnRefusals,
     intervene: Option<&Arc<RunInterveneSink>>,
     free_slots: &mut BTreeSet<rhei_tui::Slot>,
     next_extra_slot: &mut rhei_tui::Slot,
@@ -297,6 +302,7 @@ fn refill_parallel_worker_pool(
         settings,
         workspace_root,
         sink,
+        spawn_refusals,
         free_slots,
         next_extra_slot,
         active_invocation_counts,
@@ -358,6 +364,7 @@ fn refill_parallel_worker_pool(
         &identity.budget,
         snapshot_override_selection,
         sink,
+        spawn_refusals,
         intervene,
         free_slots,
         next_extra_slot,

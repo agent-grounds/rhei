@@ -211,14 +211,41 @@ fn create_log_exclusively(
     log_path: &Path,
     task_id: &str,
     reset: Option<&ResetOffer>,
-) -> Result<fs::File, String> {
+    help: &'static str,
+) -> MietteResult<fs::File> {
     fs::OpenOptions::new().write(true).create_new(true).open(log_path).map_err(|err| {
         if err.kind() == std::io::ErrorKind::AlreadyExists {
-            unaccounted_log_message(log_path, task_id, reset)
+            miette::Report::new(ExclusiveLogRefusal {
+                reason: unaccounted_log_message(log_path, task_id, reset),
+                remedy: help,
+            })
         } else {
-            format!("failed to create log file '{}': {err}", log_path.display())
+            miette!(help = help, "failed to create log file '{}': {err}", log_path.display())
         }
     })
+}
+
+/// A competing writer took the log after planning. Keep its refusal distinct
+/// from other spawn errors so completion handling can explain the halt.
+/// §FS-rhei-agents.8.1 §FS-rhei-run.3
+#[derive(Debug)]
+struct ExclusiveLogRefusal {
+    reason: String,
+    remedy: &'static str,
+}
+
+impl std::fmt::Display for ExclusiveLogRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.reason)
+    }
+}
+
+impl std::error::Error for ExclusiveLogRefusal {}
+
+impl miette::Diagnostic for ExclusiveLogRefusal {
+    fn help(&self) -> Option<Box<dyn std::fmt::Display + '_>> {
+        Some(Box::new(self.remedy))
+    }
 }
 
 /// The log a spawn created, removed again unless its subprocess starts.

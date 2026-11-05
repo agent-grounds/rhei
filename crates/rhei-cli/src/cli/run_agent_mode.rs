@@ -161,6 +161,8 @@ fn run_agent_mode(
     // siblings fare. Re-spawning them would only redo work the ticket cannot use
     // until the failed invocation is retried, which is what the next pass is for.
     let mut stalled_tasks: HashSet<String> = HashSet::new();
+    // Retained across passes, including a poll's refused next look. §FS-rhei-run.3
+    let mut spawn_refusals = SpawnRefusals::default();
     // Anything advanced since `stalled_tasks` was last emptied? A pass ends when
     // every claimable ticket advanced or stalled; one that moved something earns
     // the stalled ones another pass. §FS-rhei-run.3
@@ -689,6 +691,7 @@ fn run_agent_mode(
                 agents_spawned: &mut agents_spawned,
                 programs_spawned: &mut programs_spawned,
                 stalled_tasks: &mut stalled_tasks,
+                spawn_refusals: &mut spawn_refusals,
                 empty_visit_holds: &mut empty_visit_holds,
                 unpromptable_tasks: &mut unpromptable_tasks,
             };
@@ -911,6 +914,7 @@ fn run_agent_mode(
                 agents_spawned: &mut agents_spawned,
                 programs_spawned: &mut programs_spawned,
                 stalled_tasks: &mut stalled_tasks,
+                spawn_refusals: &mut spawn_refusals,
                 empty_visit_holds: &mut empty_visit_holds,
                 unpromptable_tasks: &mut unpromptable_tasks,
             };
@@ -936,6 +940,7 @@ fn run_agent_mode(
                 agents_spawned: &mut agents_spawned,
                 programs_spawned: &mut programs_spawned,
                 stalled_tasks: &mut stalled_tasks,
+                spawn_refusals: &mut spawn_refusals,
                 empty_visit_holds: &mut empty_visit_holds,
                 unpromptable_tasks: &mut unpromptable_tasks,
             };
@@ -1280,7 +1285,10 @@ fn run_agent_mode(
             )
         {
             return Err(miette!(
-                help = run_halt_help(&loaded.rhei),
+                help = run_halt_help(
+                    &loaded.rhei,
+                    spawn_refusals.halt_help(&loaded.rhei, &machines.set),
+                ),
                 "rhei run halted with non-terminal tasks remaining and no further advancement possible"
             ));
         }

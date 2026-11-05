@@ -93,10 +93,11 @@ fn run_sequential_program_work_items(
             None,
             &machines.reset,
         );
-        let plan = match plan {
+        let plan = match progress.spawn_refusals.observe(
+            task_id_str, current_state, None, plan, sink,
+        ) {
             Ok((plan, _)) => plan,
-            Err(refusal) => {
-                run_error!("  {refusal}");
+            Err(_) => {
                 progress.stalled_tasks.insert(task_id_str.clone());
                 continue;
             }
@@ -385,6 +386,7 @@ fn run_sequential_program_work_items(
                 }
             }
             Err(err) => {
+                progress.spawn_refusals.completion_error(task_id_str, current_state, None, &err);
                 run_error!("  error: {}", err);
                 if !opts.continue_on_error() {
                     return Err(err);

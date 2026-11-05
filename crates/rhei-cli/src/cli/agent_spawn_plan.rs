@@ -83,7 +83,8 @@ impl SpawnPlan {
     /// The attempt is derived from the records, so a name they account for is
     /// always behind the one planned: a file *at* the planned name is one no
     /// record accounts for — a planted file, a stale report-less leftover, or
-    /// the log of a spawn killed before it could record itself. It is kept, and
+    /// the log of a spawn killed before it could record itself, or whose
+    /// completion record could not be written. It is kept, and
     /// neither the attempt nor the entry moves forward because it exists.
     // §FS-rhei-agents.8.1
     fn unaccounted_log_refusal(&self, task_id: &str) -> Option<String> {

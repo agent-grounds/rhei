@@ -98,6 +98,7 @@ fn run_sequential_agent_invocation(
     // Settled before anything is composed or staged: a spawn this visit may not
     // have costs nothing to decline, and every step below it costs something.
     // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.1
+    let identity = resolved_agent_log_identity(resolved);
     let plan = plan_named_spawn(
         machine,
         &task_workspace_root,
@@ -105,15 +106,16 @@ fn run_sequential_agent_invocation(
         task_id_str,
         current_state,
         visit_count,
-        resolved_agent_log_identity(resolved).as_deref(),
+        identity.as_deref(),
         &machines.reset,
     );
     // A name the spawn cannot have is refused before it costs anything, and the
     // ticket keeps its state. §FS-rhei-agents.8.1
-    let (mut plan, log_number) = match plan {
+    let (mut plan, log_number) = match progress.spawn_refusals.observe(
+        task_id_str, current_state, identity.as_deref(), plan, sink,
+    ) {
         Ok(planned) => planned,
-        Err(refusal) => {
-            run_error!("  {refusal}");
+        Err(_) => {
             progress.stalled_tasks.insert(task_id_str.clone());
             return Ok(());
         }

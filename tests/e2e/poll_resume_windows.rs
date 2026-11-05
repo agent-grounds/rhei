@@ -1,12 +1,8 @@
 //! What one window of the resumed-poll proof can come to, and the rules over many
 //! windows. A window the scenario's own steps miss is worth nothing. §FS-rhei-run.3.5
-//!
-//! Until #552's fix lands, `prove_within`, `first_look`, `discard_missed_window` and
-//! `report_missed_window` hold today's behaviour: one window, no miss, no oracle on a
-//! discard, and a line libtest swallows. The tests in `poll_resume_window_tests.rs`
-//! fail against them.
 
 use std::cell::Cell;
+use std::io::Write as _;
 
 use super::*;
 
@@ -64,19 +60,60 @@ pub(super) struct ScenarioProof {
     pub(super) proven: ProvenWindow,
 }
 
+/// Run one step of a window, and keep what it cost. §FS-rhei-run.3.5
+pub(super) fn timed<T>(cost: &mut Option<Duration>, step: impl FnOnce() -> T) -> T {
+    let started = Instant::now();
+    let value = step();
+    *cost = Some(started.elapsed());
+    value
+}
+
 /// Open windows until one proves. No new window opens once `elapsed` has reached `budget`,
-/// an open window runs to its end, and running out panics naming every window's times.
-/// Today it opens one, and a miss is a panic. §FS-rhei-run.3.5
+/// an open window runs to its end, and running out panics naming every window's times. A
+/// window's own panic is a failure of the regression, and propagates. §FS-rhei-run.3.5
+/// §REQ-cross-platform.8
 pub(super) fn prove_within(
     budget: Duration,
     mut elapsed: impl FnMut() -> Duration,
     mut window: impl FnMut() -> WindowEnd,
 ) -> ScenarioProof {
-    let _ = (budget, &mut elapsed);
-    match window() {
-        WindowEnd::Proven(proven) => ScenarioProof { missed: Vec::new(), proven },
-        WindowEnd::Missed(missed) => panic!("the only window was missed: {}", missed.line()),
+    let mut missed = Vec::new();
+    loop {
+        match window() {
+            WindowEnd::Proven(proven) => return ScenarioProof { missed, proven },
+            WindowEnd::Missed(window) => {
+                report_missed_window(&window);
+                missed.push(window);
+            }
+        }
+        if elapsed() >= budget {
+            let lines: Vec<String> = missed.iter().map(MissedWindow::line).collect();
+            panic!(
+                "no poll-resume window proved within {budget:?}, and every one was missed:\n{}",
+                lines.join("\n")
+            );
+        }
     }
+}
+
+/// The one early-spawn comparison: attempt 2 must not start before the deadline it had to wait
+/// for. Each caller reads `started` from its own evidence. §FS-rhei-run.3.5
+pub(super) fn assert_started_after_deadline(started: u64, deadline: u64) {
+    assert!(
+        started >= deadline,
+        "early spawn: attempt 2's start sample {started} precedes deadline {deadline}"
+    );
+}
+
+/// The one wrong-route question. The fixture's program never exits 0, so nothing lawful reaches
+/// `resolved`. The plan and the ledger are published apart, so either saying so is enough.
+/// §FS-rhei-run.3.5
+pub(super) fn took_wrong_route(observed: &PollSnapshot) -> bool {
+    observed.state == "resolved" || observed.ledger.contains("triage@resolved")
+}
+
+fn assert_no_wrong_route(observed: &PollSnapshot) {
+    assert!(!took_wrong_route(observed), "wrong route in a missed window: {observed:#?}");
 }
 
 /// What one look at the first run's plan found.
@@ -87,33 +124,87 @@ pub(super) enum FirstLook {
     Missed,
 }
 
+/// Attempt 1's deadline as one look knows it: the snapshot's own while that is still attempt 1's,
+/// and otherwise the earliest it could be. The run samples it after the launch began, so
+/// `launched_at + interval` cannot be later than the real one. §FS-rhei-run.3.5
+pub(super) fn attempt_one_deadline(observed: &PollSnapshot, launched_at: u64) -> u64 {
+    match observed.deadline {
+        Some(deadline) if observed.visits == Some(2) => deadline,
+        _ => launched_at + POLL_INTERVAL_SECS,
+    }
+}
+
 /// Read one look at the first run. A look past the deadline is noticed at once; a look that
 /// finds later attempts has lost the deadline, and is called missed only once `launched_at`
 /// is old enough for that deadline to have come. Otherwise it is an early spawn, and a wrong
-/// route is never missed. Today only a future deadline ends the wait. §FS-rhei-run.3.5
+/// route is never missed. §FS-rhei-run.3.5
 pub(super) fn first_look(observed: &PollSnapshot, launched_at: u64, now: u64) -> FirstLook {
-    let _ = launched_at;
-    if observed.attempts == 1
-        && observed.visits == Some(2)
-        && observed.deadline.is_some_and(|deadline| deadline > now)
-    {
-        FirstLook::Ready
-    } else {
-        FirstLook::Waiting
+    assert_no_wrong_route(observed);
+    if observed.attempts > 1 {
+        // Attempt 2 had started by `now`, so a `now` before the deadline convicts it.
+        assert_started_after_deadline(now, attempt_one_deadline(observed, launched_at));
+        return FirstLook::Missed;
     }
+    match observed.deadline {
+        Some(deadline) if observed.attempts == 1 && observed.visits == Some(2) => {
+            if deadline > now {
+                FirstLook::Ready
+            } else {
+                FirstLook::Missed
+            }
+        }
+        _ => FirstLook::Waiting,
+    }
+}
+
+/// Look at the first run until one look decides, and keep the snapshot that decided: a second
+/// read could cross the deadline that this one was judged against. §FS-rhei-run.3.5
+pub(super) fn look_at_first_run(
+    workspace: &PollWorkspace,
+    launched_at: u64,
+) -> (FirstLook, PollSnapshot) {
+    let mut decided = None;
+    wait_for("attempt 1 and its persisted future deadline", || {
+        let observed = workspace.snapshot();
+        let look = first_look(&observed, launched_at, unix_secs());
+        if look == FirstLook::Waiting {
+            return false;
+        }
+        decided = Some((look, observed));
+        true
+    });
+    decided.expect("the wait ended on a look that decided")
 }
 
 /// Let a missed window that knows its deadline go. A discard excuses no evidence, so it panics
 /// on an attempt 2 that started early ("early spawn") or on a wrong route ("wrong route"), and
-/// passes when the evidence no longer names attempt 2. Today it checks nothing. §FS-rhei-run.3.5
+/// passes when the evidence no longer names attempt 2. The run is stopped first: a window held
+/// past its deadline can leave it alive, and attempt 2 starting under the read. §FS-rhei-run.3.5
 pub(super) fn discard_missed_window(workspace: &PollWorkspace, deadline: u64) {
-    let _ = (workspace, deadline);
+    workspace.stop_quietly();
+    assert_no_wrong_route(&workspace.snapshot());
+    if let Some(started) = evidence::attempt_two_start(workspace) {
+        assert_started_after_deadline(started, deadline);
+    }
 }
 
-/// Write a missed window's line to the job log, by a write libtest does not capture on a pass.
-/// Today it uses `eprintln!`, which libtest does capture. §FS-rhei-run.3.5
+/// End a window as missed at `crossing`, once what it leaves behind excuses nothing.
+/// §FS-rhei-run.3.5
+pub(super) fn missed_at(
+    crossing: Crossing,
+    workspace: &PollWorkspace,
+    deadline: u64,
+    times: WindowTimes,
+) -> WindowEnd {
+    discard_missed_window(workspace, deadline);
+    WindowEnd::Missed(MissedWindow { crossing, times })
+}
+
+/// Write a missed window's line to the job log, by a write libtest does not capture on a pass:
+/// it captures `eprintln!`, and would bury the line. A log that refuses it is no evidence about
+/// the run, so it does not fail the window. §FS-rhei-run.3.5
 pub(super) fn report_missed_window(window: &MissedWindow) {
-    eprintln!("{}", window.line());
+    let _ = writeln!(std::io::stderr(), "{}", window.line());
 }
 
 /// Holds one crossing, once, until the plan's persisted deadline has passed. The hold follows

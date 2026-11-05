@@ -8,8 +8,7 @@ use super::*;
 /// exact worker/log identity exclude other runs and the stale first record.
 /// §FS-rhei-run.3.5
 pub(super) fn completed_retry_start(workspace: &PollWorkspace) -> u64 {
-    let record_path =
-        workspace.project.join("runtime/spawns/task-triage-tool-reports.1-triage.json");
+    let record_path = retry_record_path(workspace);
     let log_path =
         workspace.project.join("runtime/logs/task-triage-tool-reports.1-triage-attempt2.log");
     let mut record = serde_json::Value::Null;
@@ -56,6 +55,29 @@ pub(super) fn completed_retry_start(workspace: &PollWorkspace) -> u64 {
     let ended = utc_seconds(record["ended"].as_str().expect("attempt end timestamp"));
     assert!(ended >= started, "completion precedes start: {record:#}");
     started
+}
+
+/// The one record this fixture's task and state keep; each attempt replaces it.
+fn retry_record_path(workspace: &PollWorkspace) -> PathBuf {
+    workspace.project.join("runtime/spawns/task-triage-tool-reports.1-triage.json")
+}
+
+/// When attempt 2 started, if the record still names it. A stop can end attempt 2 before the
+/// exit code and footer [`completed_retry_start`] waits for exist, so this asks for neither. The
+/// run publishes a record whole, by rename, once the spawn has ended (§FS-rhei-agents.8.4), so
+/// it is absent or complete: one that does not read breaks that promise, and excuses nothing.
+/// §FS-rhei-run.3.5
+pub(super) fn attempt_two_start(workspace: &PollWorkspace) -> Option<u64> {
+    let path = retry_record_path(workspace);
+    let body = match fs::read_to_string(&path) {
+        Ok(body) => body,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(err) => panic!("cannot read spawn record {}: {err}", path.display()),
+    };
+    let record: serde_json::Value = serde_json::from_str(&body)
+        .unwrap_or_else(|err| panic!("a spawn record is published whole: {err}\n{body}"));
+    (record["attempt"] == 2)
+        .then(|| utc_seconds(record["started"].as_str().expect("attempt start timestamp")))
 }
 
 /// Publish a completed attempt that no process made, for a negative control: its log and spawn

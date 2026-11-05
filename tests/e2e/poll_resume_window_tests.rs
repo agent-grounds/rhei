@@ -39,14 +39,12 @@ fn assert_held_window_is_discarded(crossing: Crossing) {
 
 /// §FS-rhei-run.3.5
 #[test]
-#[ignore = "red until #552: a window held past its deadline before the first look is discarded; implement removes this"]
 fn a_window_held_past_its_deadline_before_the_first_look_is_discarded() {
     assert_held_window_is_discarded(Crossing::FirstLook);
 }
 
 /// §FS-rhei-run.3.5
 #[test]
-#[ignore = "red until #552: a window held past its deadline across the stop is discarded; implement removes this"]
 fn a_window_held_past_its_deadline_across_the_stop_is_discarded() {
     assert_held_window_is_discarded(Crossing::Stop);
 }
@@ -54,7 +52,6 @@ fn a_window_held_past_its_deadline_across_the_stop_is_discarded() {
 /// The shape the ticket reports: the launcher returned in time and the test's clock read came late.
 /// §FS-rhei-run.3.5
 #[test]
-#[ignore = "red until #552: a window held past its deadline across the restart is discarded; implement removes this"]
 fn a_window_held_past_its_deadline_across_the_restart_is_discarded() {
     assert_held_window_is_discarded(Crossing::Restart);
 }
@@ -83,7 +80,6 @@ fn panic_message(panic: &(dyn std::any::Any + Send)) -> &str {
 
 /// §FS-rhei-run.3.5
 #[test]
-#[ignore = "red until #552: missed windows are followed by another until one proves; implement removes this"]
 fn the_windows_stop_at_the_first_that_proves() {
     let opened = Cell::new(0);
     let proof = prove_within(
@@ -104,7 +100,6 @@ fn the_windows_stop_at_the_first_that_proves() {
 /// Only a crossing reports a miss. A check that panics in a window is a failure of the regression,
 /// in its own words, and the loop does not read it as a reason to try again. §FS-rhei-run.3.5
 #[test]
-#[ignore = "red until #552: a hard failure in a later window ends the scenario; implement removes this"]
 fn a_hard_failure_in_a_window_is_not_a_miss() {
     let opened = Cell::new(0);
     let failed = catch_unwind(AssertUnwindSafe(|| {
@@ -128,7 +123,6 @@ fn a_hard_failure_in_a_window_is_not_a_miss() {
 /// The bound is the margin in time, not a count: six 5 s windows do not outlast a 40 s stall.
 /// §FS-rhei-run.3.5 §REQ-cross-platform.8
 #[test]
-#[ignore = "red until #552: windows are bounded by the margin; implement removes this"]
 fn the_margin_stops_new_windows_and_not_an_open_one() {
     let opened = Cell::new(0);
     let spent = catch_unwind(AssertUnwindSafe(|| {
@@ -168,7 +162,6 @@ fn the_margin_stops_new_windows_and_not_an_open_one() {
 
 /// §FS-rhei-run.3.5
 #[test]
-#[ignore = "red until #552: running out of windows names every window's times; implement removes this"]
 fn running_out_of_windows_panics_with_every_windows_times() {
     let opened = Cell::new(0);
     let spent = catch_unwind(AssertUnwindSafe(|| {
@@ -206,7 +199,6 @@ const LAUNCHED_AT: u64 = 1_000;
 /// time for the lost deadline to have come is whole seconds from the launch's own sample: the
 /// deadline is at least the poll interval past it. §FS-rhei-run.3.5
 #[test]
-#[ignore = "red until #552: a first look past the deadline misses its window at once; implement removes this"]
 fn a_first_look_past_the_deadline_misses_its_window() {
     let lawful_deadline = LAUNCHED_AT + POLL_INTERVAL_SECS;
     let ready = snapshot(1, 2, lawful_deadline, "");
@@ -221,7 +213,6 @@ fn a_first_look_past_the_deadline_misses_its_window() {
 /// missed when no deadline could yet have passed, or when the window took a wrong route.
 /// §FS-rhei-run.3.5
 #[test]
-#[ignore = "red until #552: a first look cannot excuse an early attempt or a wrong route; implement removes this"]
 fn a_first_look_cannot_excuse_an_early_attempt_or_a_wrong_route() {
     let lawful_deadline = LAUNCHED_AT + POLL_INTERVAL_SECS;
     let later = snapshot(2, 3, lawful_deadline + POLL_INTERVAL_SECS, "");
@@ -247,7 +238,6 @@ const SYNTHETIC_DEADLINE: u64 = 1_577_836_810;
 /// `an_early_retry_is_rejected_even_when_observed_after_the_deadline`, on evidence a missed
 /// window would otherwise take with it. §FS-rhei-run.3.5
 #[test]
-#[ignore = "red until #552: a missed window with an early attempt or a wrong route is rejected; implement removes this"]
 fn a_missed_window_is_discarded_only_if_it_shows_no_early_attempt_and_no_wrong_route() {
     let early = PollWorkspace::new();
     evidence::write_synthetic_attempt(&early, 2, "2020-01-01T00:00:09Z");
@@ -280,7 +270,6 @@ const LINE_CHILD: &str = "RHEI_552_MISSED_LINE_CHILD";
 /// The retry would otherwise bury what the panic used to say, and libtest swallows `eprintln!`
 /// on a pass. So a passing child test's output must still carry the line. §FS-rhei-run.3.5
 #[test]
-#[ignore = "red until #552: a missed window's line survives a passing test; implement removes this"]
 fn a_missed_windows_line_survives_a_passing_test() {
     let window = fake_missed(1);
     if std::env::var_os(LINE_CHILD).is_some() {
@@ -307,7 +296,6 @@ fn a_missed_windows_line_survives_a_passing_test() {
 /// A margin written shorter beside the named one fails the first look through a stall, whatever
 /// the retry does. §REQ-cross-platform.8 §FS-rhei-run.3.5
 #[test]
-#[ignore = "red until #552: the scenario's patience is the one fixture margin; implement removes this"]
 fn the_scenarios_patience_is_the_one_fixture_margin() {
     assert_eq!(format!("{}s", TEST_PATIENCE.as_secs()), super::super::FIXTURE_MARGIN);
 }

@@ -15,7 +15,14 @@
 // §REQ-cross-platform.4
 
 #[cfg(unix)]
+#[path = "run_signals_wait.rs"]
+mod wait;
+
+#[cfg(unix)]
 use std::fs;
+
+#[cfg(unix)]
+use wait::{lost_terminal_report, wait_for_exit, wait_for_exit_reporting};
 
 #[cfg(unix)]
 use super::native_pty_support::open_native_terminal;
@@ -253,26 +260,6 @@ fn poll_until(what: &str, timeout: std::time::Duration, mut check: impl FnMut() 
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
     panic!("timed out waiting for {what}");
-}
-
-/// Wait for `rhei run` to exit, rather than blocking forever if it does not.
-#[cfg(unix)]
-fn wait_for_exit(
-    child: &mut std::process::Child,
-    timeout: std::time::Duration,
-) -> std::process::ExitStatus {
-    let deadline = std::time::Instant::now() + timeout;
-    loop {
-        match child.try_wait().expect("try_wait") {
-            Some(status) => return status,
-            None if std::time::Instant::now() >= deadline => {
-                let _ = child.kill();
-                let _ = child.wait();
-                panic!("rhei run did not exit within {timeout:?}");
-            }
-            None => std::thread::sleep(std::time::Duration::from_millis(20)),
-        }
-    }
 }
 
 /// The pid the fake agent recorded for itself, once it has recorded one.
@@ -1101,7 +1088,9 @@ fn a_hung_up_terminal_ends_the_groups_the_way_a_closed_pipe_does() {
     drop(pty.master);
     fs::write(workspace.join("runtime/go"), "").expect("release the talking agent");
 
-    let status = wait_for_exit(&mut run, TEST_PATIENCE);
+    let status = wait_for_exit_reporting(&mut run, TEST_PATIENCE, || {
+        lost_terminal_report(&dir, &agent, &grandchild)
+    });
     assert_eq!(
         status.code(),
         Some(141),

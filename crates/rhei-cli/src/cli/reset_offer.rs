@@ -54,10 +54,9 @@ impl ResetOffer {
         (shell_quote(&self.target.display().to_string()), machine)
     }
 
-    /// The command and its reach, for the rhei owning `task_id`, the first segment
-    /// of its qualified id. §FS-rhei-reset.5.1
+    /// The command and its reach, for the rhei owning `task_id`. §FS-rhei-reset.5.1
     fn for_ticket(&self, task_id: &str) -> String {
-        let rhei = task_id.split('.').next().unwrap_or(task_id);
+        let rhei = owning_rhei(task_id);
         let (target, machine) = self.quoted_target_and_machine();
         format!("`rhei reset {target} --rhei {}{machine}`, {RESET_OFFER_REACH}", shell_quote(rhei))
     }
@@ -103,8 +102,8 @@ impl ResetOffer {
         } else {
             // Asked of the reset offered, the whole rhei's, by the computation it refuses with.
             // §FS-rhei-reset.5.1 §FS-rhei-reset.2.3
-            let rhei = task_id.split('.').next().unwrap_or(task_id);
-            let refused = errors_the_offered_reset_introduces(loaded, input, rhei, machines);
+            let refused =
+                errors_the_offered_reset_introduces(loaded, input, owning_rhei(task_id), machines);
             if refused.is_empty() {
                 format!("Otherwise, run {}", self.for_ticket(task_id))
             } else {
@@ -145,6 +144,12 @@ impl ResetOffer {
             ),
         }
     }
+}
+
+/// The rhei owning `task_id`, the first segment of its qualified id: the one rhei the
+/// offered reset names, and so the one whose reset the offer asks about. §FS-rhei-reset.5.1
+fn owning_rhei(task_id: &str) -> &str {
+    task_id.split('.').next().unwrap_or(task_id)
 }
 
 /// Whether `state` is one the machine declares as not terminal. §FS-rhei-reset.5.1

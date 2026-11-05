@@ -42,6 +42,7 @@ impl ResetRefusal {
                  declares; a reset would leave it in '{current}'."
             ));
         }
+        // §FS-rhei-reset.4: no edit and no moved task named, so this line; a help is never empty.
         let help = if self.help.is_empty() {
             "no edit to a **State:** line is known to let this reset through: fix what the \
              errors above name, then run the reset again"

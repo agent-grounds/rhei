@@ -4,12 +4,13 @@
 //! current fan-out sibling never answers for another, and an ambiguous edit is
 //! warned about and spawned.
 
-// §FS-rhei-agents.3.2 §FS-rhei-agent-visit-pairing
+// §FS-rhei-agents.3.2 §FS-rhei-agent-visit-pairing §FS-rhei-reset.5.1
 
 use std::fs;
 use std::path::PathBuf;
 
 use super::agent_reentry_support::{ledger, spawn_lines, write_settings, PLAN};
+use super::reset_remedy_support::assert_offers_runnable_reset;
 use super::*;
 
 /// Logs one line per spawn naming the target it ran for, and writes the one
@@ -188,6 +189,20 @@ fn an_in_place_target_edit_keeps_the_visits_finished_work_whatever_the_slug() {
         "finished work must survive an in-place target edit in all four cells:\n{}",
         failures.join("\n")
     );
+}
+
+// §FS-rhei-agent-visit-pairing.4 §FS-rhei-reset.5.1: the note's reset runs as printed and says how far it reaches.
+#[test]
+#[ignore = "red until #549: the note's `rhei reset` names no target; implement removes this"]
+fn the_reset_remedy_of_a_pairing_note_runs_as_printed() {
+    let fixture =
+        finished_then_died("agent-target-edit-note-reset", &target("mock:mock:m/x"), Entry::First);
+    let (run, spawned) = fixture.edit_and_run(&target("mock:mock:m-y"));
+    assert!(spawned.is_empty(), "fixture: the edit pairs; spawned {spawned:?}");
+    assert_eq!(reuse_notes(&run).len(), 1, "fixture: the note under test:\n{}", run.stdout);
+
+    let home = isolated_home_for(&fixture.plan);
+    assert_offers_runnable_reset(&run.stdout, &home, "plan", &[]);
 }
 
 // §FS-rhei-agent-visit-pairing.3: one edited fan-out member pairs with its orphan like a single target.

@@ -88,6 +88,14 @@ Each is pinned to a released crates.io version, never to a git revision, so the
 gate runs exactly what a contributor gets from `cargo install <tool> --version
 <pin>` and the contributor setup can name that same version.
 
+The job's link check asks no outside host, so neither the required job nor
+`main`'s push run can go red from one. `pre-commit run --all-files` stages
+nothing, so the staged pass of [§AR-ci-release.2.1](ci-release.spec.md#21-two-link-hooks) has no line to ask about, and
+the whole-tree pass is offline. That takes no wiring of its own: the job's steps
+and its checkout are what they were. What the job still proves is every internal
+link and anchor of the tree. A dead external link in a pull request whose author
+skipped the hooks is left to the sweep ([§AR-ci-release.5](ci-release.spec.md#5-link-sweep)).
+
 Both jobs stay inside the one `CI` workflow because the release helpers ([§AR-ci-release.3](ci-release.spec.md#3-release-workflows))
 look the green run up by workflow name.
 
@@ -98,6 +106,38 @@ scripts' tests, link checks, and attribution boilerplate checks before a
 commit. The pre-push hook reruns the Rust tests and nothing else
 ([§FS-rhei-distribution.6](../functional-spec/rhei-distribution.spec.md#6-local-gates)): no hook, at either stage, checks
 `docs/changelog.md` for a bullet, because a change adds none.
+
+### 2.1. Two link hooks
+
+A commit depends on no outside host except through a URL on a line it stages. A
+5xx on an untouched link says nothing about the change, and committing the same
+tree again cannot fix it, while each refusal repeats every hook ahead of the
+check. So the link check is two hooks over the same inputs, `README.md docs
+examples packages`.
+
+`lychee` is the whole-tree pass. It runs with `--offline`, so it checks every
+internal link and anchor on every commit, because a change can break one from
+another file, and it asks no host.
+
+`lychee-staged` is the staged pass. `scripts/check_staged_links.py` takes the
+lines `git diff --cached` adds under the inputs, keeps the external URLs those
+lines carry, and sends only those to `lychee --no-progress --include-fragments`.
+Those are the sweep's flags ([§AR-ci-release.5](ci-release.spec.md#5-link-sweep)), so a link gets one verdict
+wherever it is asked about. An added URL that fails refuses the commit, named
+with the file and line that carry it.
+
+Four things follow from "a line it stages":
+
+- A URL on an unchanged line is not asked about, even in a file the commit edits
+  elsewhere.
+- Moving a file touches none of its links, so the diff detects renames whatever
+  the contributor's git configuration says, and a renamed file is asked about
+  only for the lines its move also adds.
+- A URL on an added line that lychee would not check, such as one in a code
+  fence, is not asked about: the URLs are the ones `lychee --dump --verbose`
+  reports for that file, and an added line must carry them.
+- With nothing staged nothing is asked about, which is what makes
+  `pre-commit run --all-files` offline ([§AR-ci-release.1](ci-release.spec.md#1-development-ci)).
 
 ## 3. Release Workflows
 
@@ -150,3 +190,25 @@ PGO is exercised by the manual pre-release workflow and the release workflow,
 not by the normal development CI matrix. This keeps pull-request feedback tied
 to correctness and API behavior while still verifying that packaged binaries
 can be generated before a release. [§FS-rhei-distribution.4](../functional-spec/rhei-distribution.spec.md#4-pgo-binary-builds)
+
+## 5. Link Sweep
+
+`.github/workflows/links-nightly.yml` is what still asks about every external
+link, now that neither a commit ([§AR-ci-release.2.1](ci-release.spec.md#21-two-link-hooks)) nor the required job
+([§AR-ci-release.1](ci-release.spec.md#1-development-ci)) does. It runs once a day on `schedule:` and by hand on
+`workflow_dispatch:`, on `main`'s head, at the lychee version `ci.yml` pins, with
+`GITHUB_TOKEN` set for lychee's rate limit. Its command is
+`lychee --no-progress --include-fragments` over the inputs of the two link hooks.
+
+A first pass that fails is run again after a pause, and the second pass is the
+verdict, because a 5xx that passes by says nothing about the link. A failing
+verdict files one open issue titled `Nightly link sweep: external links failing`,
+labelled `bug`, and a later failure comments on that issue rather than opening a
+second.
+
+No pull request and no required check depends on it. So a pull request that
+skipped the hooks and adds a dead link is caught here rather than in the required
+job, by the next day, and that is deliberate: `CONTRIBUTING.md` forbids skipping
+them, and catching it in the job would mean taking the job's scope from a diff,
+which needs the pull request's base that [§AR-ci-release.1](ci-release.spec.md#1-development-ci) says nothing in the job
+needs.

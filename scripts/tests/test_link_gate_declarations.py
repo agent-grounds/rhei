@@ -42,7 +42,6 @@ class RequiredJobTests(unittest.TestCase):
         self.assertNotIn("lychee", skipped.group(1))
 
 
-@unittest.skipUnless(os.environ.get("RHEI_RED_562"), "red until #562: one hook asks every host; implement removes this")
 class LinkHookTests(unittest.TestCase):
     def test_the_whole_tree_hook_asks_no_host(self):
         entry = read_hooks()[WHOLE_TREE_HOOK]["entry"].split()
@@ -88,7 +87,6 @@ def triggers(workflow: Path) -> dict[str, str]:
     return {key: "\n".join(body) for key, body in found.items()}
 
 
-@unittest.skipUnless(os.environ.get("RHEI_RED_562"), "red until #562: there is no sweep; implement removes this")
 class SweepTests(unittest.TestCase):
     def test_it_runs_on_a_schedule_and_by_hand_and_on_nothing_else(self):
         """No pull request and no required check depends on it."""
@@ -142,7 +140,6 @@ with open(os.environ["SWEEP_STUB_SLEEP_CALLS"], "a", encoding="utf-8") as handle
 """
 
 
-@unittest.skipUnless(os.environ.get("RHEI_RED_562"), "red until #562: there is no sweep; implement removes this")
 @unittest.skipUnless(os.name == "posix" and shutil.which("bash"), "the sweep's step runs on ubuntu-latest, under bash")
 class SweepVerdictTests(unittest.TestCase):
     """The step itself, as GitHub runs it: a 5xx that passes by files nothing (§AR-ci-release.5)."""

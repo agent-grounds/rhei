@@ -22,12 +22,15 @@ use std::path::{Path, PathBuf};
 use std::process::Output;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use super::{fixture_command, rhei_command, stderr, stdout, unique_temp_dir, write_python_agent};
+use super::{
+    fixture_command, rhei_command, stderr, stdout, unique_temp_dir, write_python_agent,
+    FIXTURE_MARGIN_DURATION,
+};
 use windows::*;
 
 const POLL_INTERVAL_SECS: u64 = 5;
 const POLL_MAX_ATTEMPTS: u64 = 3;
-const TEST_PATIENCE: Duration = Duration::from_secs(20);
+const TEST_PATIENCE: Duration = FIXTURE_MARGIN_DURATION; // §REQ-cross-platform.8
 
 const PLAN: &str = r#"# Rhei: triage-tool-reports
 
@@ -237,19 +240,41 @@ fn resumed_poll_scenario(observe: impl Fn(&PollWorkspace, u64, &str) -> PollSnap
     held_poll_scenario(&Hold::nowhere(), observe);
 }
 
-/// [`resumed_poll_scenario`], with `hold` standing in for time spent outside `rhei run`. §FS-rhei-run.3.5
+/// [`resumed_poll_scenario`], with `hold` standing in for time spent outside `rhei run`. Its
+/// windows share the one fixture margin, from the scenario's own start. §FS-rhei-run.3.5
+/// §REQ-cross-platform.8
 fn held_poll_scenario(
     hold: &Hold,
     observe: impl Fn(&PollWorkspace, u64, &str) -> PollSnapshot,
 ) -> ScenarioProof {
+    let scenario_started = Instant::now();
+    prove_within(
+        FIXTURE_MARGIN_DURATION,
+        || scenario_started.elapsed(),
+        || poll_window(hold, &observe),
+    )
+}
+
+/// One fresh workspace's run at the proof. Only the three clock crossings can end it as missed;
+/// every other check is a failure of the regression. `hold` sits inside the step it delays, so
+/// a held step shows its true cost. §FS-rhei-run.3.5
+fn poll_window(
+    hold: &Hold,
+    observe: &impl Fn(&PollWorkspace, u64, &str) -> PollSnapshot,
+) -> WindowEnd {
     let workspace = PollWorkspace::new();
+    let mut times = WindowTimes::default();
     let launched_at = unix_secs();
-    let first_id = workspace.launch();
-    hold.reached(Crossing::FirstLook, &workspace);
-    wait_for("attempt 1 and its persisted future deadline", || {
-        first_look(&workspace.snapshot(), launched_at, unix_secs()) == FirstLook::Ready
+    let (first_id, look, first) = timed(&mut times.first_look, || {
+        let first_id = workspace.launch();
+        hold.reached(Crossing::FirstLook, &workspace);
+        let (look, first) = look_at_first_run(&workspace, launched_at);
+        (first_id, look, first)
     });
-    let first = workspace.snapshot();
+    if look == FirstLook::Missed {
+        let deadline = attempt_one_deadline(&first, launched_at);
+        return missed_at(Crossing::FirstLook, &workspace, deadline, times);
+    }
     let first_deadline = first.deadline.expect("attempt 1 should persist its retry deadline");
     assert_eq!(first.state, "triage", "attempt 1 should take the exit-75 self-loop: {first:#?}");
     assert_eq!(
@@ -258,23 +283,30 @@ fn held_poll_scenario(
         "attempt 1 should schedule attempt 2 while the three-attempt budget remains"
     );
 
-    workspace.stop(&first_id);
-    hold.reached(Crossing::Stop, &workspace);
+    timed(&mut times.stop, || {
+        workspace.stop(&first_id);
+        hold.reached(Crossing::Stop, &workspace);
+    });
     // Capture while no runner can update the plan; the later pre-deadline restart check bounds this read.
     // §FS-rhei-run.3.5
-    let captured_plan = fs::read_to_string(&workspace.plan).expect("capture stopped runner's plan");
-    assert!(
-        unix_secs() < first_deadline,
-        "the first run must stop before its persisted deadline: {first:#?}"
-    );
+    let captured_plan = timed(&mut times.capture, || {
+        fs::read_to_string(&workspace.plan).expect("capture stopped runner's plan")
+    });
+    let stopped_in_time = unix_secs() < first_deadline;
+    if !stopped_in_time {
+        return missed_at(Crossing::Stop, &workspace, first_deadline, times);
+    }
 
-    let resumed_id = workspace.launch();
-    hold.reached(Crossing::Restart, &workspace);
+    let resumed_id = timed(&mut times.relaunch, || {
+        let resumed_id = workspace.launch();
+        hold.reached(Crossing::Restart, &workspace);
+        resumed_id
+    });
     let restarted_at = unix_secs();
-    assert!(
-        restarted_at < first_deadline,
-        "the resumed run must start before the persisted deadline: {first:#?}"
-    );
+    let restarted_in_time = restarted_at < first_deadline;
+    if !restarted_in_time {
+        return missed_at(Crossing::Restart, &workspace, first_deadline, times);
+    }
     eprintln!("BOUNDARY captured_before_restart=true restarted_at={restarted_at} deadline={first_deadline}");
     loop {
         let checked_at = unix_secs();
@@ -289,7 +321,7 @@ fn held_poll_scenario(
 
     wait_for("the resumed run to respawn or take the reported false route", || {
         let observed = workspace.snapshot();
-        observed.state == "resolved"
+        took_wrong_route(&observed)
             || (observed.attempts >= 2
                 && observed.visits == Some(3)
                 && observed.deadline.is_some_and(|deadline| deadline > first_deadline))
@@ -312,17 +344,14 @@ fn held_poll_scenario(
             && resumed.state == "triage"
             && resumed.visits == Some(3)
             && resumed.deadline.is_some_and(|deadline| deadline > first_deadline)
-            && !resumed.ledger.contains("triage@resolved"),
+            && !took_wrong_route(&resumed),
         "after the deadline, attempt 2 must really exit 75 and leave the task polling\n\
          first run id: {first_id}\nresumed run id: {resumed_id}\n\
          poll max attempts: {POLL_MAX_ATTEMPTS}\nfirst snapshot: {first:#?}\n\
          resumed snapshot: {resumed:#?}\nrelevant resumed-run log:\n{}",
         resumed.run_log
     );
-    ScenarioProof {
-        missed: Vec::new(),
-        proven: ProvenWindow { restarted_at, deadline: first_deadline },
-    }
+    WindowEnd::Proven(ProvenWindow { restarted_at, deadline: first_deadline })
 }
 
 /// Counts observed across the deadline require invocation evidence, regardless
@@ -336,9 +365,6 @@ fn assert_retry_not_early(
     assert!(matches!(observed.attempts, 1 | 2), "unexpected invocation count: {observed:#?}");
     if observed.attempts == 2 {
         let started = evidence::completed_retry_start(workspace);
-        assert!(
-            started >= first_deadline,
-            "early spawn: attempt 2's pre-creation sample {started} precedes deadline {first_deadline}"
-        );
+        assert_started_after_deadline(started, first_deadline);
     }
 }

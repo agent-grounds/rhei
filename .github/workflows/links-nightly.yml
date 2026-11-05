@@ -29,7 +29,7 @@ jobs:
       - name: Install lychee
         run: cargo +stable install lychee --version "$LYCHEE_VERSION" --locked
 
-      # A 5xx that passes by says nothing about the link, so the second pass is the verdict.
+      # A 5xx that passes by says nothing about the link, so only a link failing on both passes counts.
       # `shell: bash` is what sets pipefail: without it the `tee` would lose lychee's exit code.
       - name: Ask about every external link
         id: sweep
@@ -39,14 +39,34 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           sweep() {
-            lychee --no-progress --include-fragments README.md docs examples packages 2>&1 | tee "$RUNNER_TEMP/link-sweep.txt"
+            lychee --no-progress --include-fragments README.md docs examples packages 2>&1 | tee "$RUNNER_TEMP/link-sweep-$1.txt"
           }
-          if sweep; then
+          failing() {
+            sed -n 's/^\[[^]]*\] \([^ ]*\) | .*/\1/p' "$RUNNER_TEMP/link-sweep-$1.txt" | sort -u
+          }
+          if sweep first; then
             exit 0
           fi
-          echo "The first pass failed. Asking again after a pause, and that pass is the verdict."
+          echo "The first pass failed. Asking again after a pause: only a link failing on both passes counts."
           sleep 300
-          sweep
+          second=0
+          sweep second || second=$?
+          if [ "$second" -eq 0 ]; then
+            exit 0
+          fi
+          # A failing pass that names no link is lychee failing, and the filing step reads no list as that.
+          if [ -z "$(failing first)" ] || [ -z "$(failing second)" ]; then
+            echo "lychee itself failed, so the two passes cannot be compared."
+            exit "$second"
+          fi
+          comm -12 <(failing first) <(failing second) > "$RUNNER_TEMP/link-sweep-both.txt"
+          if [ ! -s "$RUNNER_TEMP/link-sweep-both.txt" ]; then
+            echo "No link failed on both passes."
+            exit 0
+          fi
+          echo "These links failed on both passes:"
+          cat "$RUNNER_TEMP/link-sweep-both.txt"
+          exit 1
 
       # One open issue: a later failure comments on it rather than opening a second.
       - name: File the failing links
@@ -58,12 +78,33 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           body="$RUNNER_TEMP/link-sweep-issue.md"
-          {
-            echo "The [nightly link sweep]($RUN_URL) failed twice on \`$(git rev-parse --short HEAD)\`. What lychee said on the second pass, which is the verdict:"
-            echo
+          both="$RUNNER_TEMP/link-sweep-both.txt"
+          commit=$(git rev-parse --short HEAD)
+          quote() {
             echo '```text'
-            cat "$RUNNER_TEMP/link-sweep.txt"
+            cat "$RUNNER_TEMP/link-sweep-$1.txt"
             echo '```'
+          }
+          {
+            if [ -s "$both" ]; then
+              echo "The [nightly link sweep]($RUN_URL) on \`$commit\` found these links failing on both of its passes:"
+              echo
+              echo '```text'
+              cat "$both"
+              echo '```'
+              echo
+              echo "What lychee said on the second pass, which may also name a link that failed only there:"
+              echo
+              quote second
+            else
+              echo "lychee itself failed in the [nightly link sweep]($RUN_URL) on \`$commit\`, so its two passes could not be compared. What it printed on the first pass:"
+              echo
+              quote first
+              echo
+              echo "And on the second:"
+              echo
+              quote second
+            fi
           } > "$body"
           number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$TITLE\" in:title" \
             --json number,title --jq 'map(select(.title == env.TITLE)) | .[0].number // empty')

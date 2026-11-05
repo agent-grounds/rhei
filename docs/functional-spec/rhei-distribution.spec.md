@@ -180,9 +180,9 @@ release is due. It refuses an empty list instead, with the refusal of [§FS-rhei
 
 The local pre-commit configuration mirrors the CI checks that are cheap enough
 to run before a commit, and the pre-push hook reruns the Rust test suite. The
-release PGO build is intentionally excluded from local commit hooks. The one
-local check CI does not repeat is the pass over the external URLs on the lines a
-commit stages ([§AR-ci-release.2.1](../architecture/ci-release.spec.md#21-two-link-hooks)): CI's run stages nothing, and the scheduled
+release PGO build is intentionally excluded from local commit hooks. CI does not
+repeat the pass over the external URLs on the lines a commit stages
+([§AR-ci-release.2.1](../architecture/ci-release.spec.md#21-two-link-hooks)): CI's run stages nothing, and the scheduled
 sweep ([§AR-ci-release.5](../architecture/ci-release.spec.md#5-link-sweep)) asks about every external link instead.
 
 The pre-commit configuration also runs the release scripts' own tests with

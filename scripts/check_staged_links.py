@@ -33,6 +33,7 @@ from urllib.parse import urlsplit
 
 HUNK = re.compile(r"^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 DUMPED = re.compile(r"^(\S+) \((.+)\)( \[excluded\])?$")
+SCHEME_AND_HOST = re.compile(r"https?://[\w.:-]*", re.IGNORECASE)
 
 
 def _tool(name: str) -> str:
@@ -93,9 +94,15 @@ def added_lines(diff_text: str) -> dict[str, dict[int, str]]:
 
 
 def _carries(line: str, url: str) -> bool:
-    """Whether `line` writes `url`: entity-decoded, and maybe without the slash lychee adds to a bare host."""
-    text = html.unescape(line)
-    return any(re.search(re.escape(form) + r"(?![\w\-/%~+=&?#]|\.\w)", text) for form in {url, url.rstrip("/")})
+    """Whether `line` writes `url`, as lychee reports it: scheme and host in lower case, and maybe without the
+    slash it adds to a bare host. The path keeps its case, because `/Foo` and `/foo` are different URLs.
+
+    The raw line counts as well as the entity-decoded one: `html.unescape` reads the `&sect` of `&section=` as
+    an entity, and lychee does not. Any other form lychee rewrites is left to the sweep (§AR-ci-release.2.1).
+    """
+    texts = {SCHEME_AND_HOST.sub(lambda written: written[0].lower(), text) for text in (line, html.unescape(line))}
+    forms = {url, url.rstrip("/")}
+    return any(re.search(re.escape(form) + r"(?![\w\-/%~+=&?#]|\.\w)", text) for form in forms for text in texts)
 
 
 def staged_urls(dump_text: str, added: dict[str, dict[int, str]]) -> dict[str, list[str]]:

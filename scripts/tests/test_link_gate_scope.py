@@ -142,6 +142,22 @@ class StagedUrlsTests(unittest.TestCase):
         url = f"{NEW}?x=1&y=2"
         self.assertEqual(self.urls(f"{url} ({self.PATH})\n", {"docs/a.md": {5: f"[q]({NEW}?x=1&amp;y=2)"}}), {url: ["docs/a.md:5"]})
 
+    def test_the_case_of_a_scheme_and_a_host_does_not_matter(self):
+        """lychee reports both in lower case, however the line writes them."""
+        url = "http://github.com/foo/bar"
+        for written in ("http://GitHub.com/foo/bar", "HTTP://github.com/foo/bar"):
+            with self.subTest(written):
+                self.assertEqual(self.urls(f"{url} ({self.PATH})\n", {"docs/a.md": {5: f"[q]({written})"}}), {url: ["docs/a.md:5"]})
+
+    def test_the_case_of_a_path_does_matter(self):
+        """`/Foo` and `/foo` are different URLs."""
+        self.assertEqual(self.urls(f"http://github.com/foo ({self.PATH})\n", {"docs/a.md": {5: "[q](http://github.com/Foo)"}}), {})
+
+    def test_a_query_that_reads_like_an_entity_is_carried_as_written(self):
+        """`html.unescape` turns the `&sect` of `&section=` into a `§`, and lychee leaves it alone."""
+        url = "http://github.com/foo?a=1&section=2"
+        self.assertEqual(self.urls(f"{url} ({self.PATH})\n", {"docs/a.md": {5: f"[q]({url})"}}), {url: ["docs/a.md:5"]})
+
     def test_a_url_carried_twice_is_one_url_with_both_locations(self):
         other = os.path.join("docs", "b.md")
         added = {"docs/a.md": {5: f"[new]({NEW})"}, "docs/b.md": {7: f"[new]({NEW})"}}
@@ -164,6 +180,7 @@ HOSTILE_GIT_CONFIG = (
     ("diff", "renames", "false"),
     ("diff", "external", "false"),
     ("diff", "context", "9"),
+    ("diff", "interHunkContext", "3"),
 )
 
 
@@ -174,6 +191,7 @@ class StagedDiffTests(ScriptTestCase):
         repo = self.repo()
         repo.write("docs/a.md", "# A\n\nline\n")
         repo.write("docs/moved.md", f"# Moved\n\nfirst\nsecond\nthird\n\n[old]({OLD})\n")
+        repo.write("docs/hunks.md", "first\nsame\nlast\n")
         repo.write("crates/notes.md", "# Notes\n")
         repo.commit("baseline")
         return repo
@@ -202,10 +220,12 @@ class StagedDiffTests(ScriptTestCase):
     def test_a_hostile_git_configuration_changes_nothing(self):
         repo = self.seeded()
         repo.write("docs/a.md", "# A\n\nline\nedited\n")
+        # Two additions around one unchanged line: `diff.interHunkContext` would merge the hunks and misnumber B.
+        repo.write("docs/hunks.md", "first\nA\nsame\nB\nlast\n")
         repo.write("docs/日本語.md", "新しい\n")
         repo.git("mv", "docs/moved.md", "docs/renamed.md")
         repo.git("add", "-A")
-        expected = {"docs/a.md": {4: "edited"}, "docs/日本語.md": {1: "新しい"}}
+        expected = {"docs/a.md": {4: "edited"}, "docs/hunks.md": {2: "A", 4: "B"}, "docs/日本語.md": {1: "新しい"}}
         config = self.tmp / "gitconfig"
         for section, key, value in HOSTILE_GIT_CONFIG:
             with self.subTest(f"{section}.{key}={value}"):

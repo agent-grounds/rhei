@@ -272,7 +272,7 @@ fn omitted_validate_watch_renders_copyable_migration_help() {
     let initial = loop {
         let rendered = raw_stderr_from_file(&capture_path);
         if rendered.contains("Task plan.2 consumes export 'handoff'")
-            && rendered.contains("fix the errors above, then re-check with: rhei validate <plan>")
+            && rendered.contains("fix the errors above, then re-check with: rhei validate ")
         {
             break rendered;
         }
@@ -291,9 +291,7 @@ fn omitted_validate_watch_renders_copyable_migration_help() {
         let rendered = raw_stderr_from_file(&capture_path);
         if rendered.matches("--- change detected, revalidating ---").count() >= 1
             && rendered.contains("Task plan.changed consumes export 'handoff'")
-            && rendered
-                .matches("fix the errors above, then re-check with: rhei validate <plan>")
-                .count()
+            && rendered.matches("fix the errors above, then re-check with: rhei validate ").count()
                 >= 2
         {
             break rendered;
@@ -352,7 +350,6 @@ fn omitted_headless_startup_renders_copyable_migration_help() {
 /// §FS-rhei-migrate.5
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #555: a detached start prints the export-priors target relative; implement removes this"]
 fn help_target_a_detached_startup_prints_the_migration_target_absolute() {
     let (_root, plan) = diagnostic_case("migration-diagnostic-headless-typed");
     let name = plan.file_name().expect("plan file name").to_string_lossy().into_owned();

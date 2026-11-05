@@ -69,7 +69,10 @@ fn ensure_claimable_under_lock(
         return Ok(());
     }
     Err(miette!(
-        help = "another writer changed this task or its prerequisites; inspect current ready work with: rhei list <plan>",
+        help = format!(
+            "another writer changed this task or its prerequisites; inspect current ready work with: {}",
+            help_command("list")
+        ),
         "conflict: Task {} is no longer claimable after re-reading the plan under lock",
         qualified_id
     ))

@@ -73,8 +73,11 @@ fn insert_task_assignee(raw: &str, task_id: &str, assignee: &str) -> MietteResul
 
     let Some(meta_idx) = last_metadata_idx else {
         return Err(miette!(
-            help = "every task needs a `**State:** <state>` line under its heading. Add one, \
-                    then re-run: rhei validate <plan>",
+            help = format!(
+                "every task needs a `**State:** <state>` line under its heading. Add one, \
+                 then re-run: {}",
+                help_command("validate")
+            ),
             "could not find **State:**/**Prior:** metadata line for Task {} in the markdown",
             task_id
         ));
@@ -231,8 +234,10 @@ fn rewrite_task_state(raw: &str, task_id: &str, new_state: &str) -> MietteResult
 
     if !state_replaced {
         return Err(miette!(
-            help = "add a `**State:** <state>` line under the task heading, then re-run: \
-                    rhei validate <plan>",
+            help = format!(
+                "add a `**State:** <state>` line under the task heading, then re-run: {}",
+                help_command("validate")
+            ),
             "could not find **State:** line for Task {} in the markdown",
             task_id
         ));

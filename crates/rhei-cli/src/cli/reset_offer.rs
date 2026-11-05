@@ -46,11 +46,8 @@ impl ResetOffer {
 
     /// The target as one shell word, and the `--state-machine` that goes with it.
     fn quoted_target_and_machine(&self) -> (String, String) {
-        let machine = self
-            .state_machine
-            .as_ref()
-            .map(|path| format!(" --state-machine {}", shell_quote(&path.display().to_string())))
-            .unwrap_or_default();
+        let machine =
+            self.state_machine.as_deref().map(state_machine_argument).unwrap_or_default();
         (shell_quote(&self.target.display().to_string()), machine)
     }
 

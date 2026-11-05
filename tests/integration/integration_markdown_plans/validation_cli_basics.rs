@@ -360,15 +360,15 @@ fn cli_validate_output_is_byte_for_byte_pinned() {
         concat!(
             "  × -- VALIDATION ERROR ----------------------\n",
             "  │ in plan.rhei.md\n",
-            "\n",
+            "  │\n",
             "  │ I validated this plan using 'states.yaml', but found a problem.\n",
-            "\n",
+            "  │\n",
             "  │ The problem is:\n",
-            "\n",
+            "  │\n",
             "  │     Task plan.1 depends on missing Task plan.99\n",
-            "\n",
+            "  │\n",
             "  │ I recommend fixing the problems above and running the command again.\n",
-            "  help: fix the errors above, then re-check with: rhei validate <plan>\n",
+            "  help: fix the errors above, then re-check with: rhei validate plan.rhei.md --state-machine states.yaml\n",
             "\n",
         )
     );

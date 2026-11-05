@@ -367,6 +367,8 @@ fn spawn_parallel_agent_work_item(
     // The worker spawns this run's subprocess, so the run's shutdown guard —
     // and no other — owns the group it leads. §FS-rhei-run.3.2
     let run_owner = current_run_owner();
+    // §FS-rhei-errors.1.2.1: what this worker reports still names the command's target.
+    let help_target = current_help_target();
 
     // Ambiguity is recorded *before* the worker is handed the spawn, on this
     // thread, so a crash between here and the process can never refund the
@@ -375,6 +377,7 @@ fn spawn_parallel_agent_work_item(
     let lease = begin_worker_region(&loaded, input, &item.task_id_str, &item.current_state, plan_for_thread.effective_budget(budget)).with_recovery(recovery);
     let handle = std::thread::spawn(move || {
         inherit_run_owner(run_owner);
+        inherit_help_target(help_target);
         let thread_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let resolved = resolved_for_thread;
             let result = spawn_and_wait_agent(

@@ -165,7 +165,6 @@ fn listing_found(path: &Path) -> String {
 
 /// The ticket's own command: a target in the working directory. §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #555: a halted run prints `rhei list <plan>` though it was given plan.rhei.md; implement removes this"]
 fn help_target_a_halted_run_names_the_target_it_was_given() {
     let case = Case::new("help-target-halt");
     let project = case.held("project");
@@ -181,7 +180,6 @@ fn help_target_a_halted_run_names_the_target_it_was_given() {
 /// Printed as typed and quoted: a file name fails from the parent directory, an
 /// unquoted path fails when pasted. §FS-rhei-errors.1.2.1 §FS-rhei-errors.2
 #[test]
-#[ignore = "red until #555: a target in a subdirectory with a space prints `rhei list <plan>`; implement removes this"]
 fn help_target_with_a_space_prints_quoted_and_pastes() {
     let case = Case::new("help-target-space");
     case.held("sub dir");
@@ -198,7 +196,6 @@ fn help_target_with_a_space_prints_quoted_and_pastes() {
 /// A space past the wrap column would break inside the quotes and paste as a
 /// different path, which the short target above cannot show. §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #555: a long quoted target prints `rhei list <plan>`, and would wrap inside its quotes; implement removes this"]
 fn help_target_past_the_wrap_column_stays_on_one_line() {
     let case = Case::new("help-target-wrap");
     let typed = format!("{WIDER_THAN_THE_RENDER}/sub dir/plan.rhei.md");
@@ -214,7 +211,6 @@ fn help_target_past_the_wrap_column_stays_on_one_line() {
 /// Without a space there is nothing to break inside, but `rhei list` and its
 /// target on two lines still paste as two commands. §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #555: a long target prints `rhei list <plan>`, and would wrap before the target; implement removes this"]
 fn help_target_past_the_wrap_column_without_a_space_stays_on_one_line() {
     let case = Case::new("help-target-long");
     let typed = format!("{WIDER_THAN_THE_RENDER}/plan.rhei.md");
@@ -230,7 +226,6 @@ fn help_target_past_the_wrap_column_without_a_space_stays_on_one_line() {
 /// The dry run of the same halt, `nothing_claimable_help`'s second route.
 /// §FS-rhei-errors.1.2.1 §FS-rhei-run.4
 #[test]
-#[ignore = "red until #555: a dry run's halt prints `rhei list <plan>`; implement removes this"]
 fn help_target_a_dry_run_halt_names_its_target() {
     let case = Case::new("help-target-dry-run");
     let project = case.held("project");
@@ -247,7 +242,6 @@ fn help_target_a_dry_run_halt_names_its_target() {
 /// The built-in manual machine refuses `rhei run`, the third route.
 /// §FS-rhei-errors.1.2.1 §FS-rhei-run.4
 #[test]
-#[ignore = "red until #555: the manual-only refusal prints `rhei list <plan>`; implement removes this"]
 fn help_target_the_manual_only_refusal_names_its_target() {
     let case = Case::new("help-target-manual");
     let project = case.root.join("project");
@@ -271,7 +265,6 @@ fn help_target_the_manual_only_refusal_names_its_target() {
 /// Pasted, it reaches the same refusal, which is what a re-run may do until the
 /// cause is fixed. §FS-rhei-errors.1.2.1 §FS-rhei-errors.1.2
 #[test]
-#[ignore = "red until #555: a run with no agent prints `rhei run <plan>`, and its message an unquoted target; implement removes this"]
 fn help_target_a_run_with_no_agent_names_it_in_message_and_help() {
     let case = Case::new("help-target-no-agent");
     let project = case.root.join("sub dir");
@@ -321,7 +314,6 @@ fn help_target_a_run_with_no_agent_names_it_in_message_and_help() {
 /// timeout edge cannot charge, as `timeout_charge_halt_tests` does.
 /// §FS-rhei-errors.1.2.1 §FS-rhei-run.3
 #[test]
-#[ignore = "red until #555: a failed timeout edge's halt prints `rhei run <plan>`; implement removes this"]
 fn help_target_a_failed_timeout_edge_names_its_target() {
     let case = Case::new("help-target-timeout");
     let project = case.root.join("project");
@@ -358,7 +350,6 @@ fn help_target_a_failed_timeout_edge_names_its_target() {
 /// `resolve_plan_target` widens a member to its project, and printing that lists
 /// a scope the user did not ask about. §FS-rhei-errors.1.2.1 §FS-rhei-panta.6
 #[test]
-#[ignore = "red until #555: a member target prints `rhei list <plan>`; implement removes this"]
 fn help_target_a_member_target_prints_the_member_and_not_its_project() {
     let case = Case::new("help-target-member");
     let project = case.root.join("project");
@@ -377,10 +368,29 @@ fn help_target_a_member_target_prints_the_member_and_not_its_project() {
     assert_lists(&expected, &case.root, &case.home, "auth.1", &["billing.1"]);
 }
 
+/// `rhei next` holds the project by the time it refuses, and a member is not that:
+/// over a ticket someone holds, and with nothing to claim. §FS-rhei-errors.1.2.1 §FS-rhei-panta.6
+#[test]
+fn help_target_a_member_target_on_next_prints_the_member() {
+    let case = Case::new("help-target-next-member");
+    let project = case.held("project");
+    write_fixture_file(&project, "index.panta.md", "# Panta: Project\n");
+    write_fixture_file(&project, "auth.rhei.md", HELD_PLAN);
+    write_fixture_file(&project, "billing.rhei.md", HELD_PLAN);
+    let typed = "project/auth.rhei.md";
+
+    let held = case.rhei(&case.root, &["next", typed, "--task", "auth.1", "--no-callbacks"]);
+    assert_offers(&raw_stderr(&held), &format!("rhei next {}", shell_quote(typed)));
+
+    let out = case.rhei(&case.root, &["next", typed, "--no-callbacks"]);
+    let expected = listing(typed);
+    assert_offers(&raw_stderr(&out), &expected);
+    assert_lists(&expected, &case.root, &case.home, "auth.1", &["billing.1"]);
+}
+
 /// A bare `rhei run` has a target: the one it discovered, printed as
 /// `rhei migrate export-priors` prints it. §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #555: a bare run prints `rhei list <plan>` though it discovered its target; implement removes this"]
 fn help_target_a_bare_run_prints_the_path_it_discovered() {
     let case = Case::new("help-target-bare");
     let project = case.held("project");
@@ -397,7 +407,6 @@ fn help_target_a_bare_run_prints_the_path_it_discovered() {
 /// the wider scope, and the guard in `tests_help_target_guard.rs` holds the rest.
 /// §FS-rhei-errors.1.2.1 §FS-rhei-release
 #[test]
-#[ignore = "red until #555: `rhei release` on an unclaimed ticket prints `rhei list <plan>`; implement removes this"]
 fn help_target_a_release_of_an_unclaimed_ticket_names_its_target() {
     let case = Case::new("help-target-release");
     let project = case.project("project", UNCLAIMED_PLAN);
@@ -416,7 +425,6 @@ fn help_target_a_release_of_an_unclaimed_ticket_names_its_target() {
 /// `settings_help` says no plan root is in scope, which is about the file: a run
 /// that was given its target still knows it. §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #555: a run with broken settings prints `rhei validate <plan>`; implement removes this"]
 fn help_target_a_broken_settings_file_names_the_target() {
     let case = Case::new("help-target-settings");
     let project = case.held("project");
@@ -433,7 +441,6 @@ fn help_target_a_broken_settings_file_names_the_target() {
 /// refuses over a state that machine does not declare, which is a different error.
 /// §FS-rhei-errors.1.2.1 §FS-rhei-errors.1.2
 #[test]
-#[ignore = "red until #555: a help drops the --state-machine it was given, and prints `<plan>`; implement removes this"]
 fn help_target_a_given_state_machine_is_passed_on() {
     let case = Case::new("help-target-machine");
     let machines = case.root.join("machines");
@@ -478,7 +485,6 @@ fn help_target_a_given_state_machine_is_passed_on() {
 /// what it prints runs from another directory. §FS-rhei-errors.1.2.1
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #555: a detached run's log prints `rhei list <plan>`; implement removes this"]
 fn help_target_a_detached_run_logs_it_absolute() {
     let case = Case::new("help-target-detached");
     let project = case.held("project");
@@ -496,7 +502,6 @@ fn help_target_a_detached_run_logs_it_absolute() {
 /// a log read elsewhere needs it absolute too. §FS-rhei-errors.1.2.1
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #555: a detached run's log drops the machine it was given, and prints `<plan>`; implement removes this"]
 fn help_target_a_detached_run_logs_its_machine_absolute() {
     let case = Case::new("help-target-detached-machine");
     let machines = case.root.join("machines");
@@ -548,7 +553,6 @@ fn logged_diagnostic(project: &Path) -> String {
 /// renderer checks the message too, as it does for the reset offer. §FS-rhei-errors.1.2.1
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #555: a detached startup relays `rhei validate <plan>`, and would wrap the target; implement removes this"]
 fn help_target_a_relayed_startup_refusal_keeps_the_command_whole() {
     let case = Case::new("help-target-relay");
     let relative = format!("{WIDER_THAN_THE_RENDER}/sub dir");

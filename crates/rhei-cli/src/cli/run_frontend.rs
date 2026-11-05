@@ -303,8 +303,8 @@ fn transition_dashboard_gate(
         .ok_or_else(|| {
             miette!(
                 help = format!(
-                    "list the task ids in this plan with: rhei list {}",
-                    shell_quote(&input.display().to_string())
+                    "list the task ids in this plan with: {}",
+                    help_command_or("list", input)
                 ),
                 "task '{}' not found in the plan",
                 task_id_str
@@ -314,9 +314,8 @@ fn transition_dashboard_gate(
     if current_state != from {
         return Err(miette!(
             help = format!(
-                "someone moved the task since you looked. Re-read its current state with: \
-                 rhei list {}",
-                shell_quote(&input.display().to_string())
+                "someone moved the task since you looked. Re-read its current state with: {}",
+                help_command_or("list", input)
             ),
             "conflict: Task {} is in state '{}', expected '{}'",
             task_id_str,

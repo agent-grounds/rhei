@@ -10,7 +10,11 @@
 fn intervene_command(plan: &Path, task: &str, slot: Option<u16>, message: &str) -> MietteResult<()> {
     if message.trim().is_empty() {
         return Err(miette!(
-            help = "pass the message to deliver: rhei intervene <plan> <task> --message <text>",
+            help = format!(
+                "pass the message to deliver: rhei intervene --plan {} --task {} --message <text>",
+                help_target_word(),
+                shell_quote(task)
+            ),
             "refusing to send an empty intervention message"
         ));
     }
@@ -25,9 +29,9 @@ fn intervene_command(plan: &Path, task: &str, slot: Option<u16>, message: &str) 
     let raw = std::fs::read_to_string(&addr_file).map_err(|_| {
         miette!(
             help = dashboard_required_help(),
-            "no live dashboard found at {} — start one with `rhei run {} --dashboard`",
+            "no live dashboard found at {} — start one with `{}`",
             addr_file.display(),
-            plan.display()
+            help_command_with("run", "--dashboard") // §FS-rhei-errors.1.2.1
         )
     })?;
     let url = parse_dashboard_url(&raw)
@@ -53,7 +57,10 @@ fn intervene_command(plan: &Path, task: &str, slot: Option<u16>, message: &str) 
         Ok(())
     } else {
         Err(miette!(
-            help = "the dashboard rejected the message. Check the task is still running: rhei list <plan>",
+            help = format!(
+                "the dashboard rejected the message. Check the task is still running: {}",
+                help_command("list")
+            ),
             "intervention not delivered: {}",
             reply.error.unwrap_or_else(|| "unknown error".to_string())
         ))

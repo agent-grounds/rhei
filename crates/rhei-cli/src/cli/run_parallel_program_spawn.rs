@@ -149,9 +149,12 @@ fn spawn_parallel_program_work_item(
     let state_for_panic = item.current_state.clone();
     // §FS-rhei-run.3.2: the program's group belongs to this run.
     let run_owner = current_run_owner();
+    // §FS-rhei-errors.1.2.1: what this worker reports still names the command's target.
+    let help_target = current_help_target();
 
     let handle = std::thread::spawn(move || {
         inherit_run_owner(run_owner);
+        inherit_help_target(help_target);
         let thread_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let render_context = RuntimeTemplateContext {
                 workspace_root: &workspace_root_for_thread,

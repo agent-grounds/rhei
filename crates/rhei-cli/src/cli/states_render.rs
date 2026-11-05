@@ -1128,8 +1128,11 @@ fn load_workspace_for_validation(ws_dir: &Path) -> MietteResult<LoadedPlan> {
     }
     if let Some(error) = duplicate_task_error {
         return Err(miette!(
-            help = "two task files in tasks/ declare the same id. Renumber one of them, then \
-                    re-check with: rhei validate <workspace>",
+            help = format!(
+                "two task files in tasks/ declare the same id. Renumber one of them, then \
+                 re-check with: {}",
+                help_command_or("validate", ws_dir)
+            ),
             "{error}"
         ));
     }
@@ -1144,9 +1147,11 @@ fn load_workspace_for_validation(ws_dir: &Path) -> MietteResult<LoadedPlan> {
     )
     .map_err(|err| {
         miette!(
-            help = "a task file's metadata and the index's entry for the same task are disjoint \
-                    by key: delete the key from one of the two files, then re-check with: rhei \
-                    validate <workspace>",
+            help = format!(
+                "a task file's metadata and the index's entry for the same task are disjoint \
+                 by key: delete the key from one of the two files, then re-check with: {}",
+                help_command_or("validate", ws_dir)
+            ),
             "{}",
             err.message
         )

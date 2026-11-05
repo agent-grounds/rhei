@@ -273,7 +273,7 @@ impl WorkerRegions {
         // line, a task file's first line included, gets the loader's help. §FS-rhei-run.3.7.6
         let help = match &owner {
             Some(_) => format!("{}. Fix or remove that text, then re-run.", worker_edit_help()),
-            None => plan_authoring_help().to_string(),
+            None => plan_authoring_help(),
         };
         miette!(help = help, "{head} ({}).{refused}", at.message)
     }

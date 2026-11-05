@@ -31,7 +31,8 @@ fn diagnostics_never_break_a_file_path_across_lines() {
             .expect("validate command should run");
         let stderr = String::from_utf8_lossy(&output.stderr);
         let wanted = wanted.display().to_string();
-        let wanted_line = format!("│ {wanted}");
+        // Whole on its own line now the diagnostic is not wrapped. §FS-rhei-errors.1.2.1
+        let wanted_line = format!("│ in {wanted}");
 
         eprintln!("case: {case}");
         eprintln!("invocation directory: {}", cwd.display());

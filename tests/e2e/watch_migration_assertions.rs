@@ -5,7 +5,9 @@ use std::path::Path;
 use super::shell_quote;
 
 const REVALIDATION_BANNER: &str = "--- change detected, revalidating ---";
-const FAILED_REPORT_END: &str = "fix the errors above, then re-check with: rhei validate <plan>";
+/// As far as the target, which is the discovered path in a watch and which
+/// `assert_complete_help_line` checks exactly. §FS-rhei-errors.1.2.1
+const FAILED_REPORT_END: &str = "fix the errors above, then re-check with: rhei validate ";
 const SUCCESS_REPORT: &str = "Validation succeeded";
 
 pub(super) fn expected_help(target: &Path) -> String {

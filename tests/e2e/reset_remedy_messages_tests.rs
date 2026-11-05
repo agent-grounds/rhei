@@ -30,6 +30,7 @@ fn the_reset_remedy_of_a_finished_tickets_complete_runs_with_a_local_id() {
         refused.stderr
     );
     assert_offers_runnable_reset(&refused.stderr, &world.home, "plan", &["plan.1"]);
+    assert_offers_forced_reopen(&refused.stderr, &world.home);
 }
 
 /// The same message with what a lone plan cannot show: a member named relatively,
@@ -61,6 +62,82 @@ fn the_reset_remedy_of_a_finished_tickets_complete_runs_for_a_member_under_a_nam
         refused.stderr
     );
     assert_offers_runnable_reset(&refused.stderr, &world.home, "alpha", &["alpha.1"]);
+    assert_offers_forced_reopen(&refused.stderr, &world.home);
+}
+
+const AUTHORED_PAST_THE_INITIAL_STATE: &str = r#"# Rhei: Pre-authored
+
+## Tasks
+
+### Task 1: Authored past the machine's initial state
+**State:** waiting
+"#;
+
+/// A ticket authored past the machine's initial state never was in it, so that is
+/// not where its one-ticket way back goes: it goes where the reset beside it would.
+#[test]
+fn the_forced_reopen_of_a_finished_ticket_returns_it_to_its_authored_state() {
+    let world = RemedyWorld::at("reset-remedy-complete-authored", "lone").with_found_machine();
+    world.write("plan.rhei.md", AUTHORED_PAST_THE_INITIAL_STATE);
+    let world = RemedyWorld { target: world.root.join("plan.rhei.md"), ..world };
+    let finish = ["--task", "1", "--from", "waiting", "--to", "cancelled"];
+    world.step("transition", &[&finish[..], &["--result", "dropped", "--no-callbacks"]].concat());
+
+    let refused = world.rhei("complete", &["--task", "1", "--result", "again", "--no-callbacks"]);
+
+    assert!(
+        refused.stderr.contains("already in terminal state"),
+        "fixture: this is the refusal under test:\n{}",
+        refused.stderr
+    );
+    let offer = assert_offers_forced_reopen(&refused.stderr, &world.home);
+    let words: Vec<&str> = offer.split_whitespace().collect();
+    let to = words.iter().position(|word| *word == "--to").map(|at| words[at + 1]);
+    assert_eq!(to, Some("waiting"), "it goes to the authored state, not `open`:\n{offer}");
+
+    let [reset] = &offered_resets(&refused.stderr)[..] else {
+        panic!("one reset is offered in:\n{}", refused.stderr);
+    };
+    let preview = run_offer(reset, "--dry-run", &world.home);
+    assert!(
+        preview.stdout.contains("Task plan.1: cancelled → waiting"),
+        "the two offers agree on where the ticket goes:\n{}{}",
+        preview.stdout,
+        preview.stderr
+    );
+}
+
+/// The commands stay whole on the line they were printed on, in the bytes as written:
+/// `CliRun` undoes soft wraps, so only the raw reading can see this. Both are wider
+/// than the eighty columns captured stderr renders at, whatever the temporary
+/// directory is, so without the exception no runner could keep them whole.
+/// §FS-rhei-reset.5.1 §FS-rhei-errors.2
+#[test]
+fn the_commands_of_a_finished_tickets_complete_stay_on_one_line() {
+    let world = RemedyWorld::at("reset-remedy-complete-wide", &"w".repeat(90)).with_found_machine();
+    world.write("plan.rhei.md", TWO_TICKETS);
+    let world = RemedyWorld { target: world.root.join("plan.rhei.md"), ..world };
+    let finish = ["--task", "1", "--from", "open", "--to", "cancelled"];
+    world.step("transition", &[&finish[..], &["--result", "dropped", "--no-callbacks"]].concat());
+
+    let refused =
+        world.rhei_output("complete", &["--task", "1", "--result", "again", "--no-callbacks"]);
+
+    let rendered = raw_stderr(&refused);
+    let unwrapped = stderr(&refused);
+    assert!(
+        unwrapped.contains("already in terminal state"),
+        "fixture: this is the refusal under test:\n{unwrapped}"
+    );
+    let commands = [offered_resets(&unwrapped), offered_transitions(&unwrapped)].concat();
+    assert_eq!(commands.len(), 2, "a reset and a transition are offered in:\n{unwrapped}");
+    for command in commands {
+        assert!(command.len() > 80, "fixture: {command} must not fit the render");
+        assert!(
+            rendered.lines().any(|line| line.contains(&format!("`{command}`"))),
+            "`{command}` must arrive on one line, and was rendered:\n{rendered}"
+        );
+    }
 }
 
 const STRANDED_MACHINE: &str = r#"name: reset-remedy-stranded

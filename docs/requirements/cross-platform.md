@@ -45,6 +45,16 @@ platform whose shell differs, for a reason that lives entirely in the harness
 directories out of `PATH` and leaves the rest of it alone, rather than rebuilding
 `PATH` around a wrapper.
 
+### 4.1 A Reader Waits For The Content, Not For The File
+
+A fixture script that waits for a file another process publishes and then parses
+it waits for the content, not for the file to exist. Writing a file is creating
+it and then filling it, so for a moment it exists and holds nothing, and a reader
+that parses it in that moment dies on a run whose behaviour held.
+agent-grounds/rhei#553 is that failure: a helper parsed a pid file its writer had
+only just created, and the test reported a lock that was never taken, with the
+helper's traceback left in the job log rather than in the failure.
+
 ## 5. Paths Are Data
 
 Code never builds a path from `/`-joined strings, never compares two spellings

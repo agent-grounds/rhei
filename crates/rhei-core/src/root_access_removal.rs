@@ -53,10 +53,14 @@ pub(super) fn check_removal_marker(root: &Path) -> io::Result<()> {
         Ok(_) => (),
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(error) => {
-            return Err(io::Error::new(
-                error.kind(),
-                format!("cannot check removal marker {}: {error}", marker.display()),
-            ))
+            // Retain the marker path for error-kind-specific guidance. §FS-rhei-errors.6
+            return Err(super::with_path(
+                &marker,
+                io::Error::new(
+                    error.kind(),
+                    format!("cannot check removal marker {}: {error}", marker.display()),
+                ),
+            ));
         }
     }
     let owned = OWNED.lock().unwrap_or_else(|poison| poison.into_inner()).contains(&identity(root));

@@ -1,6 +1,6 @@
 //! Discover identities before any dependent reads or lock acquisition. §FS-rhei-panta.6.6
 
-use super::{check_pending, RootAccessGuard, MARKER};
+use super::{check_pending, with_path, RootAccessGuard, MARKER};
 use crate::workspace::{PANTA_INDEX_FILE, RHEI_INDEX_FILE};
 use std::collections::BTreeSet;
 use std::fs;
@@ -57,20 +57,23 @@ fn file_root(path: &Path) -> PathBuf {
 }
 
 /// Identities only: no parsing of a possibly in-doubt project manifest. §FS-rhei-recover.4
+/// Failed filesystem operations retain their own subject. §FS-rhei-errors.6
 pub fn input_roots(path: &Path) -> io::Result<Vec<PathBuf>> {
     let root = if path.is_dir() { path.to_path_buf() } else { file_root(path) };
-    let root = crate::platform::canonical_path(&root)?;
+    let root = crate::platform::canonical_path(&root).map_err(|err| with_path(&root, err))?;
     let mut roots = vec![root.clone()];
     if let Some(project) = project_owner(&root) {
         roots.push(project.to_path_buf());
-        for entry in fs::read_dir(project)? {
-            let entry = entry?;
+        for entry in fs::read_dir(project).map_err(|err| with_path(project, err))? {
+            let entry = entry.map_err(|err| with_path(project, err))?;
             let path = entry.path();
             if path.is_dir()
                 && (has_entry(&path.join(RHEI_INDEX_FILE))
                     || path.file_name().is_some_and(|name| name == "basin"))
             {
-                roots.push(crate::platform::canonical_path(&path)?);
+                roots.push(
+                    crate::platform::canonical_path(&path).map_err(|err| with_path(&path, err))?,
+                );
             }
         }
     }
@@ -80,10 +83,11 @@ pub fn input_roots(path: &Path) -> io::Result<Vec<PathBuf>> {
 }
 
 /// Acquire once in canonical order, including owners needed by nested loads. §FS-rhei-panta.6.6
+/// Failed canonicalization retains its own subject. §FS-rhei-errors.6
 pub fn shared_roots(roots: impl IntoIterator<Item = PathBuf>) -> io::Result<Vec<RootAccessGuard>> {
     let mut complete = BTreeSet::new();
     for root in roots {
-        let root = crate::platform::canonical_path(&root)?;
+        let root = crate::platform::canonical_path(&root).map_err(|err| with_path(&root, err))?;
         if !complete.contains(&root) {
             complete.extend(input_roots(&root)?);
         }

@@ -21,10 +21,14 @@ const WORKER_RETRY_HANDOFF_HELP: &str = "hand this request to an operator outsid
 /// Root interlocks carry their own recovery or account-directory guidance.
 /// Other access errors retain their kind, context path, and lower-level text. §FS-rhei-errors.6
 fn root_access_diagnostic(path: &Path, error: std::io::Error) -> Box<miette::MietteDiagnostic> {
+    let measured_path = rhei_core::root_access::error_path(&error);
+    let path = measured_path.unwrap_or(path);
     let help = rhei_core::root_access::refusal_help(&error)
         .map(str::to_owned)
         .unwrap_or_else(|| io_error_help(path, error.kind()));
-    Box::new(miette::MietteDiagnostic::new(format!("cannot access '{}': {error}", path.display()))
+    let message = if measured_path.is_some() { error.to_string() }
+        else { format!("cannot access '{}': {error}", path.display()) };
+    Box::new(miette::MietteDiagnostic::new(message)
         .with_help(help))
 }
 

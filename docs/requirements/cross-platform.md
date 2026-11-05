@@ -91,7 +91,10 @@ A test that drives the built binary through a terminal — a native pseudo-termi
 on Unix, a ConPTY on Windows — waits on what the terminal shows, and every such
 wait is bounded. When one runs out, the failure carries what the harness had
 read from the terminal up to that moment, and how long it waited. It never
-waits for the terminal to end before it can say so.
+waits for the terminal to end before it can say so. A wait for a run to end once
+its terminal has gone is bounded too, and when it runs out the failure also
+carries what the run left behind: its stderr and, read before the run is killed,
+whether what it started is still alive.
 
 The platforms do not agree on when a terminal ends. On Unix the reader sees the
 end once every process holding the terminal has gone; on Windows it sees it
@@ -128,6 +131,39 @@ actually sent.
 The measure is the stream quoted in agent-grounds/rhei#448 — the prompt's space
 drawn as a cursor-forward and a window title in the line — which signals the
 prompt, as does the same stream with the sequences split across reads.
+
+### 7.2 A Terminal Is Closed To Every Other Process From The Moment It Exists
+
+A native pseudo-terminal a test opens is closed to every other process from the
+moment it exists: both ends are created close-on-exec, by the call that creates
+them, and never flagged afterwards, however soon after.
+
+Tests in one binary spawn at any moment on other threads, and a spawn inherits
+every descriptor not flagged at that instant. A process spawned between the
+creation and the flag holds a copy for as long as it lives, and what ends a
+terminal is the last close. While that process holds the master, closing the
+test's own copy hangs nothing up; while it holds the slave, a reader of the
+master does not reach the end. Nothing complains at the terminal. The failure
+shows up somewhere else, as a run that did not notice its terminal had gone and
+a bound that runs out on it. agent-grounds/rhei#554 is that failure: shown on
+Linux by running it, and inferred from the logs of the two macOS runs it
+reports. That is a defect of the harness, not of the run or of the platform
+[§REQ-cross-platform.2](cross-platform.md#2-parity), and setting the flag sooner does not cure it: a gap
+between two calls is a gap however short, so only a descriptor created with the
+flag has none.
+
+A terminal opened through a library that flags afterwards carries that window
+with it, as `portable_pty` does, which the tests that also run on a ConPTY share.
+A verdict on such a terminal must not turn on its last close, so the worst a
+leak does there is delay a reader's end. A test whose verdict does turn on the
+last close opens its terminal the first way.
+
+The measure is a process spawned after the terminal was opened and still alive
+when its master closes: a write to the slave fails with `EIO`, on every platform
+with a native pseudo-terminal. The test of agent-grounds/rhei#554 passes with the
+moment after the creation widened to a second beside another test's spawn, and
+no source in the tree calls `nix::pty::openpty`, the call that leaves the flag
+to its caller.
 
 ## 8. A Margin Outlasts A Stalled Runner
 

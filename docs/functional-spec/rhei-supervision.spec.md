@@ -552,7 +552,7 @@ move — a workspace stranded before this rule existed, or one whose supervisor
 steered its subtree into a corner under rule 2 — gets a halt row of its own:
 it released its subtree on a visit that changed nothing and nothing beneath it
 can move, and the next action is to unblock one of the descendants the row
-names, or `rhei reset`. It is not "not scheduled … rerun to pick it up": a
+names, or the `rhei reset` of [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy). It is not "not scheduled … rerun to pick it up": a
 released supervisor is woken by a descendant checkpoint and by nothing else,
 so a rerun is the one remedy that provably does nothing
 ([§FS-rhei-run-report.3.1](rhei-run-report.spec.md#31-layout)).

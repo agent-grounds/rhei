@@ -358,6 +358,48 @@ Kept run evidence in runtime/evidence/; recorded the removed paths as reset even
 
 See [How Rhei Is Used — Command Surface](rhei-usage.spec.md#22-command-surface) for the full table comparing all five coordination commands.
 
+### 5.1. Offering Reset as a Remedy
+
+A message that offers `rhei reset` as the way out of something — a refusal, a
+halt row, a note — names a command that runs as printed and says how far it
+reaches. All of them print the same text, built in one place:
+
+```text
+`rhei reset <target> --rhei <rhei>`, which returns every ticket in that rhei to its authored state and deletes their results and logs
+```
+
+**It runs as printed**, from wherever the message is read, which may be a run
+report, a log, or another directory:
+
+- `<target>` is the target of the command that printed the message, because
+  reset never infers one ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)). It is quoted as one shell word
+  ([§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety)) but is always absolute, where that point would print it relative
+  to the working directory: the working directory that message was printed in is
+  not the one it is read from. It is not resolved through a symlink: a symlinked
+  workspace's name is its rhei id, so a resolved path names a different rhei and
+  `--rhei` is refused against it.
+- `<rhei>` is the rhei that owns the ticket: the first segment of its qualified
+  id, whichever way the ticket was named on the command line.
+- A command that was given `--state-machine` passes it on, absolute, as
+  `--state-machine <path>`. Without it the reset still runs, under whichever
+  machine the target resolves to on its own. If that machine has no such states,
+  the reset removes the results and logs and leaves the ticket where it stands
+  ([§FS-rhei-reset.4](rhei-reset.spec.md#4-output)).
+- It carries no `--yes`. The preview and the confirmation of
+  [§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation) are part of running it, so a caller without a terminal gets
+  reset's own refusal, which names both ways on.
+
+**It says how far it reaches.** `--rhei` is the narrowest scope reset has
+([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)), and a message about one ticket reads as an offer to clear
+one ticket. So the text says "every ticket in that rhei", and a message never
+describes the command as clearing the ticket it is about. Where there is a
+cheaper way out, it comes first: a refused log name offers moving the file away
+before the reset ([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)).
+
+This covers messages that name a command for the reader to run. A refusal that
+asks the reader to name a target, because none was given, keeps its placeholder:
+the reset it answers has no target to print ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
+
 ## 6. Related Specifications
 
 - [Plan Language Specification](rhei-plan-language.spec.md) — plan formats and semantic constraints

@@ -2510,8 +2510,9 @@ run, and the run prints
 refusing to spawn: <path> exists and no spawn record accounts for it
 ```
 
-and, on the line after it, the remedy: move the file away or run `rhei reset
---rhei <id>`, naming the ticket's rhei. A spawn whose subprocess never starts —
+and, on the line after it, the remedy: move the file away, or run the reset of
+[§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy), which names the run's own target and the ticket's rhei and says
+that it reaches every ticket in that rhei. A spawn whose subprocess never starts —
 its command cannot be found or built, or the run is interrupted first — removes
 the log it created, so only a worker killed after it started leaves one to
 refuse. A record accounts for the path when it is the record this invocation's own name

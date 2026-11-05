@@ -48,8 +48,11 @@ outputs and required result are still checked under its own identity
 pre-spawn decision:
 
 ```text
-note: task <id> state '<state>': reusing this visit's finished spawn (<record path>) for <target>; `rhei reset` redoes it
+note: task <id> state '<state>': reusing this visit's finished spawn (<record path>) for <target>; to redo it, run `rhei reset <plan> --rhei <rhei>`, which returns every ticket in that rhei to its authored state and deletes their results and logs
 ```
+
+The command and what it reaches are the text of [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy), with `<plan>` the
+run's own target. The note is about one spawn, and no reset reaches only that.
 
 ## 5. Ambiguity Pairs Nothing
 

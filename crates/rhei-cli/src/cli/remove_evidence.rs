@@ -17,6 +17,9 @@ struct RemovalAssessment {
     history: Vec<(String, String)>,
     /// Empty, ticket-owned paths removal cleans. §FS-rhei-remove.4.2
     residue: Vec<PathBuf>,
+    /// The state the ticket is in, which the cancellation it is offered moves it
+    /// from. §FS-rhei-remove.3.4
+    state: String,
 }
 
 impl RemovalAssessment {
@@ -45,9 +48,12 @@ impl RemovalAssessment {
             message.push_str(&format!("\n  {what}: {place}"));
         }
         let help = if !self.history.is_empty() {
+            // A line the parser takes, about the target removal was given; only the
+            // cancellation state is the reader's. §FS-rhei-errors.1.2.1 §FS-rhei-remove.3.4
+            let rest = format!("--task {id} --from {} --to <state>", shell_quote(&self.state));
             format!(
-                "instead: move it to its machine's cancellation state with \
-                 `rhei transition {id} <state>`"
+                "instead: move it to its machine's cancellation state with `{}`",
+                help_command_with("transition", &rest)
             )
         } else if self.blockers.iter().any(|line| line.starts_with(UNSAFE_PATH)) {
             "removal never follows a symlink or cleans a path it cannot prove is the ticket's \
@@ -70,8 +76,12 @@ fn assess_removal(
 ) -> MietteResult<RemovalAssessment> {
     let task = find_task_by_id_str(&loaded.rhei.tasks, id)
         .ok_or_else(|| miette!(help = task_id_help(), "task '{id}' not found"))?;
-    let mut assessment =
-        RemovalAssessment { blockers: Vec::new(), history: Vec::new(), residue: Vec::new() };
+    let mut assessment = RemovalAssessment {
+        blockers: Vec::new(),
+        history: Vec::new(),
+        residue: Vec::new(),
+        state: task.state.clone(),
+    };
     // §FS-rhei-remove.3.2
     if !task.children.is_empty() {
         let children: Vec<String> = task.children.iter().map(|c| c.id.to_string()).collect();

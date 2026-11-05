@@ -125,7 +125,11 @@ fn refuses_a_terminal_ticket_with_no_files_behind_it() {
     assert_failure(&result, "auth.1 cannot be removed");
     let said = flattened_output(&result);
     assert!(said.contains("completed is terminal"), "names the evidence; got:\n{said}");
-    assert!(said.contains("rhei transition auth.1"), "points at cancellation; got:\n{said}");
+    let cancel = "--task auth.1 --from completed --to <state>";
+    assert!(
+        said.contains("rhei transition ") && said.contains(cancel),
+        "points at cancellation; got:\n{said}"
+    );
     assert_eq!(fs::read_to_string(&plan).expect("plan"), text);
 }
 

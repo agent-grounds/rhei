@@ -199,8 +199,37 @@ fn issue_286_explicit_non_initial_claim_revalidates_real_contention_under_lock()
 }
 
 /// A claim that lost the race is told how to hand the ticket back, of the plan it was
-/// pointed at: bare, `rhei release plan.1` looks wherever the reader stands.
-/// §FS-rhei-errors.1.2.1 §FS-rhei-release
+/// pointed at: bare, `rhei release plan.1` looks wherever the reader stands. This one
+/// claims in place, under the lock `write_task_assignee` takes, where the ticket was
+/// selected in its initial state. §FS-rhei-errors.1.2.1 §FS-rhei-release
+#[test]
+fn help_target_an_in_place_claim_that_lost_the_race_releases_from_the_plan_it_named() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let plan = dir.path().join("plan.rhei.md");
+    let machine = dir.path().join("states.yaml");
+    fs::write(&plan, "# Rhei: Raced\n\n## Tasks\n\n### Task 1: Work\n**State:** pending\n").expect("plan");
+    fs::write(&machine, claim_revalidation_machine(false)).expect("machine");
+    let changed_path = plan.clone();
+    set_claim_before_lock_hook(move || {
+        fs::write(
+            changed_path,
+            "# Rhei: Raced\n\n## Tasks\n\n### Task 1: Work\n**State:** pending\n**Assignee:** other\n",
+        )
+        .expect("mutate plan")
+    });
+    let _scope = enter_help_target(HelpTarget::naming(&plan));
+
+    let error = next_command(&plan, Some(&machine), Some("1"), false, true, false, &[])
+        .expect_err("the concurrent claim must refuse this one");
+
+    assert!(error.to_string().contains("already assigned to other"), "{error:?}");
+    let help = error.help().map(|help| help.to_string()).unwrap_or_default();
+    let released = format!("rhei release {} --task plan.1", shell_quote(&plan.display().to_string()));
+    assert!(help.contains(&released), "expected `{released}`; got: {help}");
+}
+
+/// The same race on a ticket a passive state hands over, which the transition that
+/// claims it refuses. §FS-rhei-errors.1.2.1 §FS-rhei-release
 #[test]
 fn help_target_a_claim_that_lost_the_race_releases_from_the_plan_it_named() {
     let (_dir, plan, machine, _) = explicit_non_initial_revalidation_fixture("help-target-claim");

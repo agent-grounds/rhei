@@ -145,6 +145,10 @@
             None => None,
         };
 
+        // Kept, what was laid stays where it was asked for, and a help validates it
+        // there; otherwise nothing stays to name. §FS-rhei-errors.1.2.1
+        let kept = (lay.keep_on_error && !lay.dry_run).then(|| lay.layout.entrypoint(lay.output_dir));
+        let help_target = kept.as_deref().map(|laid| enter_help_target(HelpTarget::naming(laid)));
         // Both modes validate the intended member in its project, including siblings.
         // §FS-rhei-templates.6.1.2
         let validation = match placement.project() {
@@ -162,6 +166,7 @@
         if let Err(err) = validation {
             return Err(fail(settings.as_ref(), err));
         }
+        drop(help_target);
 
         // Every include has joined; diagnose this member's own machine once.
         // Inherited defaults are diagnosed by the project lay. §FS-rhei-library.7.2.3

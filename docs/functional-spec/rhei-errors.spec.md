@@ -141,6 +141,14 @@ machine describes another machine with no error to say so.
   whose stderr is its console log, `runtime/run.log` ([§FS-rhei-run-headless.8](rhei-run-headless.spec.md#8-failure-modes)), read
   later and from anywhere. A detached run prints the target and the machine
   absolute, not resolved through a symlink, for the reason [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy) does.
+  One help does reach the run's records: a strict refusal's remedy
+  ([§FS-rhei-seal.8.4](rhei-seal.spec.md#84-the-refusal)) is also its `seal_halt` record's remedy and the next action of the
+  report's Attention row, and in a detached run all three print it absolute.
+- **A verb with a subcommand is read as one.** `rhei budget show project` and
+  `rhei snapshot list --plan project` name a target as `rhei list project` does,
+  so they stay on one line too. Neither command takes `--state-machine`, so none
+  is passed on, and where the command has no target they stay bare, because
+  each discovers its own.
 
 ### 1.3. Near Misses
 

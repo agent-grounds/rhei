@@ -11,8 +11,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::help_target_tests::{
-    assert_lists, assert_offers, listing, logged_diagnostic, pasted, Case, HELD_MACHINE, HELD_PLAN,
-    WIDER_THAN_THE_RENDER,
+    assert_lists, assert_offers, listing, pasted, Case, HELD_MACHINE, HELD_PLAN,
 };
 use super::*;
 
@@ -33,7 +32,8 @@ transitions:
   - { from: middle, to: done, description: Done. }
 "#;
 
-const OPEN_PLAN: &str = "# Rhei: Project\n\n## Tasks\n\n### Task 1: A ticket\n**State:** open\n";
+pub(super) const OPEN_PLAN: &str =
+    "# Rhei: Project\n\n## Tasks\n\n### Task 1: A ticket\n**State:** open\n";
 
 /// A supervisor whose child is held for as long as its visit is pending.
 const SUPERVISOR_MACHINE: &str = r#"name: sup
@@ -61,7 +61,7 @@ const SUPERVISED_PLAN: &str = "# Rhei: Project\n\n## Tasks\n\n\
                                #### Task 1.1: A child\n**State:** ready\n";
 
 /// `name` in the directory, made first.
-fn write(dir: &Path, name: &str, contents: &str) -> PathBuf {
+pub(super) fn write(dir: &Path, name: &str, contents: &str) -> PathBuf {
     let path = dir.join(name);
     fs::create_dir_all(path.parent().expect("a parent")).expect("create the directory");
     fs::write(&path, contents).expect("write the fixture");
@@ -81,7 +81,7 @@ fn two_member_project(case: &Case) -> PathBuf {
 /// The physical line of `rendered` that holds `needle`, for a command with prose
 /// after it, where [`assert_offers`] would read the prose as part of the command.
 #[track_caller]
-fn assert_on_one_line(rendered: &str, needle: &str) {
+pub(super) fn assert_on_one_line(rendered: &str, needle: &str) {
     assert!(
         rendered.lines().any(|line| line.contains(needle)),
         "`{needle}` should be whole on one line; got:\n{rendered}"
@@ -314,7 +314,7 @@ fn help_target_a_strict_refusal_seals_what_the_run_sealed() {
 #[test]
 fn help_target_a_target_after_a_flag_stays_on_one_line() {
     let case = Case::new("help-target-intervene");
-    let relative = format!("{WIDER_THAN_THE_RENDER}/sub dir");
+    let relative = format!("{}/sub dir", super::help_target_tests::WIDER_THAN_THE_RENDER);
     case.held(&relative);
     let typed = format!("{relative}/plan.rhei.md");
 
@@ -446,7 +446,7 @@ fn help_target_a_launch_it_could_not_report_reaches_the_run() {
     let rendered = raw_stderr(&out);
     assert_eq!(out.status.code(), Some(1), "the report did not fit:\n{rendered}");
     assert_on_one_line(&rendered, "the run started regardless: `rhei attach .` reaches it");
-    logged_diagnostic(&project);
+    super::help_target_tests::logged_diagnostic(&project);
     let again = pasted("rhei attach .", &project, &case.home);
     assert!(again.status.success(), "`rhei attach .` should run:\n{}", again.stderr);
 }

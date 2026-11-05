@@ -51,8 +51,12 @@ fn budget_init_command(
     let (_, mut journal) =
         budget_result_at(&project_root, Account::establish(&project_root, &audit))?;
     if journal.contract().map(|contract| contract.is_lifetime()).unwrap_or(false) {
+        // §FS-rhei-errors.1.2.1
         return Err(miette!(
-            help = "change an existing allowance with: rhei budget adjust",
+            help = format!(
+                "change an existing allowance with: {}",
+                help_subcommand_or_bare("budget adjust", "", "--invocations <N> --reason <TEXT>")
+            ),
             "this project already holds a lifetime allowance; `init` establishes one"
         ));
     }
@@ -272,13 +276,15 @@ fn budget_grant_line(requested: u64, granted: u64, bounds: &CountBounds) -> Stri
 /// An absent account is lawful and silent, so the help names every route that
 /// ends it: establishment follows the first charge of either kind, and applying
 /// an edge by hand is one of them. A refusal at a bound sends its reader here,
-/// so a route this line leaves out is a route they will not find.
-/// §FS-rhei-budgets.5.4
+/// so a route this line leaves out is a route they will not find. The explicit one
+/// names the target the command was given. §FS-rhei-budgets.5.4 §FS-rhei-errors.1.2.1
 fn budget_no_account(project_root: &Path) -> miette::Report {
     miette!(
-        help = "an account is established by the first charge of either kind: run the plan, \
-                apply an edge with `rhei transition`, or establish one explicitly with: \
-                rhei budget init <TARGET> --invocations <N> --reason <TEXT>",
+        help = format!(
+            "an account is established by the first charge of either kind: run the plan, \
+             apply an edge with `rhei transition`, or establish one explicitly with: {}",
+            help_subcommand_or_bare("budget init", "", "--invocations <N> --reason <TEXT>")
+        ),
         "{} has no budget account yet",
         project_root.display()
     )

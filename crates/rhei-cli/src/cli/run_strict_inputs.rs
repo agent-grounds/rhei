@@ -104,7 +104,7 @@ fn arm_strict_inputs(
         run_id: run_id.to_string(),
         workspace_root: workspace_root.clone(),
         price_book: price_book.clone(),
-        plan_arg: plan_arg_for_help(input),
+        plan_arg: strict_remedy_target(input),
         machine_arg: help_machine_argument(),
         project: loaded.is_panta_project(),
         rheis: BTreeMap::new(),
@@ -116,6 +116,18 @@ fn arm_strict_inputs(
     let guard = keep_strict_settings(settings);
     *STRICT_INPUTS.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(strict);
     Ok(Some(guard))
+}
+
+/// The remedy's target: as the user would type it, or absolute in a detached run,
+/// whose refusal is read from its log, and from the `seal_halt` record and report
+/// row it also reaches, later and from anywhere. `input` is the run's own, which is
+/// absolute and not canonical. §FS-rhei-errors.1.2.1
+fn strict_remedy_target(input: &Path) -> String {
+    if is_headless_child() {
+        shell_word(&offered_path(input))
+    } else {
+        plan_arg_for_help(input)
+    }
 }
 
 impl StrictInputs {

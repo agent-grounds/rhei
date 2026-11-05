@@ -121,8 +121,10 @@ fn budget_result_at<T>(project_root: &Path, result: Result<T, BudgetError>) -> M
     result.map_err(|err| miette!(help = budget_inspect_help_for(project_root), "{}", err.message))
 }
 
-fn budget_inspect_help() -> &'static str {
-    "inspect the project's account with: rhei budget show"
+/// `show` of the target the command was given, which a run passes no machine to,
+/// because `rhei budget` takes none. §FS-rhei-errors.1.2.1
+fn budget_inspect_help() -> String {
+    format!("inspect the project's account with: {}", help_subcommand_or_bare("budget show", "", ""))
 }
 
 fn budget_inspect_help_for(project_root: &Path) -> String {

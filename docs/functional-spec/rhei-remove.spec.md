@@ -147,9 +147,16 @@ where, and pointing at the alternative that keeps history:
 error: grund.62 cannot be removed: it has history
        transition:  runtime/state-transitions.log records grund.62 pending@triage
        result:      runtime/results/grund.62.md
-       instead:     move it to its machine's cancellation state with
-                    `rhei transition grund.62 <state>`
+       instead:     move it to its machine's cancellation state with `rhei transition panta --task grund.62 --from triage --to <state>`
 ```
+
+That is `rhei remove panta --task 62`'s refusal. The alternative is a command
+that runs as printed ([§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names)): it names the target removal was
+given, or the one it discovered, the ticket's current state, and any
+`--state-machine` it was given, on one line. Only the
+cancellation state stays a placeholder, because which state that is depends on
+the machine and is the reader's to choose. A rhei id is refused with the same
+care: its help lists the tickets of the target removal was given.
 
 ## 4. What is removed
 

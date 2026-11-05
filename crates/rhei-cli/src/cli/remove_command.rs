@@ -141,7 +141,7 @@ fn resolve_removal_target(
     if let Some(plan) = loaded.rhei_ids.iter().find(|id| *id == ticket).map(|id| loaded.rhei_plans.get(id)) {
         let named = plan.map(|plan| format!("; its plan is {}", display_path(plan))).unwrap_or_default();
         return Err(miette!(
-            help = "name one of its tickets instead: `rhei list` shows them.",
+            help = format!("name one of its tickets instead: `{}` shows them.", help_command("list")),
             "{ticket} cannot be removed: it is a rhei, not a ticket{named}"
         ));
     }

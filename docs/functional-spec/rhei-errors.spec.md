@@ -94,6 +94,42 @@ hands the request to an operator outside the worker; it never suggests clearing
 `--force` refusal tells the caller to remove `--reason`; any offered force
 alternative states that it belongs to the human operator's ceremony.
 
+#### 1.2.1. The Target a Help Names
+
+A help that names a command taking a plan or project prints the target of the
+command that printed it, so the line runs as printed: `rhei run plan.rhei.md`
+ends `See what is left with: rhei list plan.rhei.md`, and nobody retypes a target
+they typed a moment earlier.
+
+- **A typed target is printed as typed**, quoted as one shell word
+  ([§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety)). It is not reduced to its file name, which fails from
+  another directory, and it is not the project a member target widens to
+  ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)): `rhei run panta/auth.rhei.md` prints `rhei list panta/auth.rhei.md`, because
+  `rhei list panta` is a wider scope than the one the user asked about.
+- **A discovered target is printed as discovered.** A command whose target was
+  omitted prints the project or rhei path it discovered, as the
+  `rhei migrate export-priors` line above does. A refusal raised before its
+  command resolved a target discovers one the way that command would have.
+- **A placeholder stands only where the command has no target at all**: `rhei
+  reset` refused for omitting one, which it never infers (§FS-rhei-panta.6), or a
+  command whose discovery found nothing. A value only the reader can choose, such
+  as the state a human gate moves to, is not a target and stays a placeholder.
+- **A given `--state-machine` is passed on**, spelled the way the target is, to a
+  command that takes the flag. Without it the pasted command resolves another
+  machine and may refuse for a different reason, which [§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help) calls
+  worse than no suggestion.
+- **The command stays on one line.** A diagnostic whose help or message names a
+  target this way is not wrapped. The renderer breaks at spaces, so a target
+  holding a space would break inside its quotes and paste as a different path; the
+  terminal soft-wraps the long line instead. This is the exception
+  [§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety) allows.
+- **What is read elsewhere is absolute.** A help is printed by the invocation
+  that raised it and reaches no run report ([§FS-rhei-run-report.1](rhei-run-report.spec.md#1-report-artifact)), so as typed it
+  is read from the directory it was typed in. The exception is a detached run,
+  whose stderr is its console log, `runtime/run.log` ([§FS-rhei-run-headless.8](rhei-run-headless.spec.md#8-failure-modes)), read
+  later and from anywhere. A detached run prints the target and the machine
+  absolute, not resolved through a symlink, for the reason [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy) does.
+
 ### 1.3. Near Misses
 
 When a name is not found and a declared set of valid names exists, the error
@@ -184,11 +220,12 @@ survive being pasted into an interactive shell: every value parses as the single
 argument Rhei meant, and no token is ever split across lines.
 
 A command wider than the terminal still wraps, at a space, unless the point that
-prints it keeps it whole, as [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy) does. Rejoining two lines
+prints it keeps it whole, as [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy) and [§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names) do. Rejoining two lines
 is a visible, recoverable inconvenience; a path or selector broken mid-token is
 neither, which is why the renderer breaks only at spaces. Suggestions are kept
 short for the same reason — paths are printed relative to the working directory
-when they sit beneath it.
+when they sit beneath it, apart from the target of [§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names), which
+keeps the spelling the user typed.
 
 Values are POSIX-quoted whenever they contain characters outside
 `[A-Za-z0-9_.,:/@%+=-]`, and whenever they begin with `=`, which zsh expands to
@@ -294,7 +331,9 @@ path, permission, already-exists) and always name the path.
 
 Coverage is a property of the whole binary rather than of any one call site, so
 it is enforced by a test that fails when a diagnostic is raised without help,
-not left to review.
+not left to review. So is [§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names): a test fails when a printed
+command holds a target placeholder at a site that test does not list, each listed
+site with the reason it has no target to print.
 
 Help is derived from the failure, never assigned by the area of code it sits
 in. A remedy that does not act on the reported failure — telling the user to

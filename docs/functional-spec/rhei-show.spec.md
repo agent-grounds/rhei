@@ -112,8 +112,9 @@ body and nothing else.
 
 A ticket id no rhei holds is [§FS-rhei-errors.1.3](rhei-errors.spec.md#13-near-misses)'s near miss — `closest ids: …`,
 or a pointer to `rhei list` where nothing is close — under
-`help: list the task ids in this plan with: rhei list <plan>`, which names the
-command that reveals what is missing ([§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help)). A shorthand more
+`help: list the task ids in this plan with: rhei list <target>`, printed with the
+target of [§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names), which names the command that reveals what is
+missing ([§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help)). A shorthand more
 than one in-scope rhei holds names the qualified candidates unchanged
 ([§FS-rhei-next.2.1](rhei-next.spec.md#21-ticket-targets)). Both are the resolver every ticket-taking command shares,
 so a stale id reads the same here as it does on `rhei complete`.

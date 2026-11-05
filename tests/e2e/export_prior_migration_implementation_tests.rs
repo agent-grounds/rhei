@@ -346,3 +346,22 @@ fn omitted_headless_startup_renders_copyable_migration_help() {
     assert_complete_help_line(&raw_stderr(&output), &discovered_target(&plan));
     assert_authored_unchanged(&plan, &before);
 }
+
+/// A detached run's console log is read elsewhere, so a target it was given prints
+/// absolute there, where the foreground keeps what was typed. §FS-rhei-errors.1.2.1
+/// §FS-rhei-migrate.5
+#[cfg(unix)]
+#[test]
+#[ignore = "red until #555: a detached start prints the export-priors target relative; implement removes this"]
+fn help_target_a_detached_startup_prints_the_migration_target_absolute() {
+    let (_root, plan) = diagnostic_case("migration-diagnostic-headless-typed");
+    let name = plan.file_name().expect("plan file name").to_string_lossy().into_owned();
+    let output = rhei_command(isolated_home_for(&plan))
+        .current_dir(plan.parent().expect("plan directory"))
+        .args(["run", "--headless", &name])
+        .output()
+        .expect("headless command");
+
+    assert!(!output.status.success(), "invalid headless run unexpectedly started");
+    assert_complete_help_line(&raw_stderr(&output), &discovered_target(&plan));
+}

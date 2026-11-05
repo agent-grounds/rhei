@@ -346,6 +346,7 @@ mod tests {
     include!("cli/tests_cli_option_surface.rs");
     include!("cli/tests_error_guidance.rs");
     include!("cli/tests_diagnostic_coverage.rs");
+    include!("cli/tests_help_target_guard.rs");
     include!("cli/tests_prompt_templates.rs");
     include!("cli/tests_complete_reset_tooling.rs");
     include!("cli/tests_task_tooling_resolution.rs");

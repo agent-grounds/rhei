@@ -121,6 +121,7 @@ mod headless_stop_ownership_tests;
 mod headless_support;
 mod headless_tests;
 mod headless_undecided_tests;
+mod help_target_tests;
 mod includes_under_tests;
 mod install_skills_tests;
 mod installed_state_machine_guidance_tests;

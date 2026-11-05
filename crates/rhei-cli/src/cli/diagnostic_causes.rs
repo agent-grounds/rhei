@@ -48,11 +48,17 @@ fn ledger_report(path: &Path, error: impl std::fmt::Display) -> Report {
 
 /// A visit limit and a poll limit are distinct authored blockers. §FS-rhei-errors.6
 fn loop_budget_help(spent: &SpentLoopBudget) -> String {
+    format!("take a declared outgoing edge that does not re-enter the exhausted state, or have the workflow author increase {} in the governing states.yaml if more iterations are intended. --force cannot bypass this budget.", loop_budget_key(spent))
+}
+
+/// The authored limit a spent budget is measured against, as the workflow author would
+/// raise it: `states.<s>.visits above <used>`. §FS-rhei-errors.6
+fn loop_budget_key(spent: &SpentLoopBudget) -> String {
     let key = match spent.kind {
         LoopBudgetKind::Visits => "visits",
         LoopBudgetKind::PollAttempts => "poll.max_attempts",
     };
-    format!("take a declared outgoing edge that does not re-enter the exhausted state, or have the workflow author increase states.{}.{key} above {} in the governing states.yaml if more iterations are intended. --force cannot bypass this budget.", spent.state, spent.used)
+    format!("states.{}.{key} above {}", spent.state, spent.used)
 }
 
 /// The failed edge's actual predicate or measured budget determines help. §FS-rhei-errors.6
@@ -75,17 +81,30 @@ fn forced_edge_help(
 }
 
 /// Use the shared operator command builder for the ancestor's own state and
-/// profile. The requested destination must also be valid for that ancestor. §FS-rhei-errors.1.2
+/// profile. The requested destination must also be valid for that ancestor, and every
+/// destination must be one the forced path's budget check lets it enter, measured
+/// against its own counted visits as `rhei complete` measures them for its ancestor
+/// line, so the line printed runs. §FS-rhei-errors.1.2 §FS-rhei-reset.5.1
 fn ancestor_reopen_help(
     request: &ForcedRequest<'_>,
+    loaded: &LoadedPlan,
+    input: &Path,
     ancestor: &rhei_core::ast::Task,
     machine: &rhei_validator::StateMachine,
 ) -> String {
-    let from = normalized_state_name(&ancestor.state, machine);
-    let permitted = |state: &str| {
-        machine.states.get(state).is_some_and(|definition| !definition.terminal)
-            && ensure_task_profile_allows_state(machine, &ancestor.id.to_string(), &ancestor.kind,
-                ancestor.profile_level(), state).is_ok()
+    let (id, from) = (ancestor.id.to_string(), normalized_state_name(&ancestor.state, machine));
+    let visits = forced_hop_visits(loaded, input, &id, ancestor, &from, machine);
+    let mut spent: Vec<SpentLoopBudget> = Vec::new();
+    let mut permitted = |state: &str| {
+        let allowed = machine.states.get(state).is_some_and(|definition| !definition.terminal)
+            && ensure_task_profile_allows_state(machine, &id, &ancestor.kind,
+                ancestor.profile_level(), state).is_ok();
+        // A spent state is passed over and named, each once. §FS-rhei-errors.1.2
+        match allowed.then(|| visits.as_ref()?.spent_entering(machine, state)).flatten() {
+            Some(budget) if spent.iter().any(|named| named.state == budget.state) => false,
+            Some(budget) => { spent.push(budget); false }
+            None => allowed,
+        }
     };
     let to = if permitted(request.to) {
         Some(request.to.to_owned())
@@ -95,9 +114,12 @@ fn ancestor_reopen_help(
             .or_else(|| machine.states.keys().find(|state| permitted(state)).cloned())
     };
     match to {
-        Some(to) => format!("a human operator must reopen ancestor {} first at an interactive terminal with fresh typed confirmation: {}. Supply the operator's own reason; an agent may not run this ceremony.",
+        Some(to) => format!("a human operator must reopen ancestor {} first at an interactive terminal with fresh typed confirmation: {}.{} Supply the operator's own reason; an agent may not run this ceremony.",
             ancestor.id, ResetOffer::new(request.input).under_machine(request.machine_path)
-                .forced_reopen(&ancestor.id.to_string(), &from, &to)),
+                .forced_reopen(&id, &from, &to), passed_over(&to, &spent)),
+        // Every candidate passed over for a spent budget: no line runs. §FS-rhei-errors.1.2
+        None if !spent.is_empty() => format!("ancestor {} must be reopened first, but it cannot be forced back into {}. --force cannot bypass a visit budget: have the workflow author increase {} in the governing states.yaml if more iterations are intended, before a human operator reopens it at an interactive terminal; an agent may not perform the ceremony.",
+            ancestor.id, spent_states(&spent), spent.iter().map(loop_budget_key).collect::<Vec<_>>().join(" or ")),
         None => format!("ancestor {} must be reopened first, but its profile has no permitted non-terminal destination. Ask the workflow author to add a non-terminal state for that ancestor's kind and level before a human operator reopens it at an interactive terminal; an agent may not perform the ceremony.", ancestor.id),
     }
 }

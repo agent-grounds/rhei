@@ -155,8 +155,9 @@ help: rhei migrate export-priors TARGET
 
 An explicitly supplied target retains its shell-safe spelling in the help; an
 omitted target is replaced by the discovered project or bare-rhei path so the
-line remains copyable. Neither command performs migration implicitly, and
-`validate --watch` never migrates after a file event.
+line remains copyable. A detached run prints either one absolute, because its
+console log is read elsewhere ([§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names)). Neither command performs
+migration implicitly, and `validate --watch` never migrates after a file event.
 
 After migration, `rhei validate` succeeds and retains the ordinary graph-level
 `**Consumes:**` advisory. `rhei run` then applies ordinary dependency readiness

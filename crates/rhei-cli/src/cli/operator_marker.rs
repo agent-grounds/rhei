@@ -36,7 +36,8 @@ fn forced_marker_location(root: &Path) -> MietteResult<()> {
     for (path, directory) in [(root.join(".rhei"), true), (root.join(rhei_core::root_access::MARKER), false)] {
         match fs::symlink_metadata(&path) {
             Ok(meta) if meta.file_type().is_symlink() || (directory && !meta.is_dir()) || (!directory && !meta.is_file()) =>
-                return Err(diagnostic!("forced-recovery marker location is not a regular contained path: {}", path.display())),
+                // §FS-rhei-errors.6
+                return Err(miette!(help = "preserve the recovery evidence, then restore .rhei as a real directory and forced-recovery.json as a regular contained file; do not follow symlinks.", "forced-recovery marker location is not a regular contained path: {}", path.display())),
             Ok(_) => (),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => (),
             Err(err) => return Err(file_io_report(&path, "failed to inspect recovery marker location", err)),
@@ -62,7 +63,8 @@ impl ForcedImage {
         match self {
             Self::Absent => Ok(None),
             Self::Present { bytes } => rhei_core::transition_history::decode(bytes)
-                .map(Some).map_err(|err| diagnostic!("invalid recovery image: {err}")),
+                // §FS-rhei-errors.6
+                .map(Some).map_err(|err| miette!(help = RECOVERY_MARKER_REPAIR_HELP, "invalid recovery image: {err}")),
         }
     }
 }
@@ -78,7 +80,8 @@ fn forced_image_path(root: &Path, relative: &str) -> MietteResult<PathBuf> {
     if relative.is_empty() || relative.contains('\\') || relative.contains(':')
         || relative.split('/').any(|part| part.is_empty() || part == "." || part == "..")
         || Path::new(relative).is_absolute() {
-        return Err(diagnostic!("invalid recovery image path '{relative}'"));
+        // §FS-rhei-errors.6
+        return Err(miette!(help = RECOVERY_MARKER_REPAIR_HELP, "invalid recovery image path '{relative}'"));
     }
     let mut path = root.to_path_buf();
     let parts = relative.split('/').collect::<Vec<_>>();
@@ -88,7 +91,8 @@ fn forced_image_path(root: &Path, relative: &str) -> MietteResult<PathBuf> {
             Ok(meta) if meta.file_type().is_symlink()
                 || (index + 1 == parts.len() && !meta.is_file())
                 || (index + 1 != parts.len() && !meta.is_dir()) => {
-                return Err(diagnostic!("recovery image path is not a regular contained file: {}", path.display()));
+                // §FS-rhei-errors.6
+                return Err(miette!(help = "preserve any pending recovery marker and image contents, then restore the named path as a regular file with real directory parents inside its owner root; do not follow symlinks.", "recovery image path is not a regular contained file: {}", path.display()));
             }
             Ok(_) => (),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => (),
@@ -101,34 +105,42 @@ fn forced_image_path(root: &Path, relative: &str) -> MietteResult<PathBuf> {
 impl ForcedMarker {
     /// §FS-rhei-recover.2
     fn bytes(&self) -> MietteResult<Vec<u8>> {
-        let mut bytes = rhei_core::transition_history::canonical_json(self).map_err(|err| diagnostic!("{err}"))?;
+        // §FS-rhei-errors.6
+        let mut bytes = rhei_core::transition_history::canonical_json(self).map_err(|err| miette!(help = INTERNAL_DIAGNOSTIC_HELP, "{err}"))?;
         bytes.push(b'\n');
         Ok(bytes)
     }
 
     /// Canonical reserialization also catches duplicate keys and alternate JSON. §FS-rhei-recover.2
     fn parse(root: &Path, bytes: &[u8]) -> MietteResult<Self> {
-        let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|err| diagnostic!("{err}"))?;
+        // §FS-rhei-errors.6
+        let value: serde_json::Value = serde_json::from_slice(bytes).map_err(|err| miette!(help = RECOVERY_MARKER_REPAIR_HELP, "{err}"))?;
         if let Some(version) = value["version"].as_u64().filter(|version| ![1, 2].contains(version)) {
-            return Err(diagnostic!("unsupported forced-recovery marker version {version}"));
+            // §FS-rhei-errors.6
+            return Err(miette!(help = "use a rhei version supporting this marker version; preserve the marker and its files until then.", "unsupported forced-recovery marker version {version}"));
         }
-        let marker: Self = serde_json::from_slice(bytes).map_err(|err| diagnostic!("{err}"))?;
-        let id = uuid::Uuid::parse_str(&marker.recovery_id).map_err(|err| diagnostic!("{err}"))?;
+        // §FS-rhei-errors.6
+        let marker: Self = serde_json::from_slice(bytes).map_err(|err| miette!(help = RECOVERY_MARKER_REPAIR_HELP, "{err}"))?;
+        // §FS-rhei-errors.6
+        let id = uuid::Uuid::parse_str(&marker.recovery_id).map_err(|err| miette!(help = RECOVERY_MARKER_REPAIR_HELP, "{err}"))?;
         if id.get_version_num() != 7 || id.to_string() != marker.recovery_id || marker.bytes()? != bytes {
-            return Err(diagnostic!("noncanonical marker or recovery id"));
+            // §FS-rhei-errors.6
+            return Err(miette!(help = RECOVERY_MARKER_REPAIR_HELP, "noncanonical marker or recovery id"));
         }
         let mut previous = None;
         let mut paths = std::collections::BTreeSet::new();
         for file in &marker.files {
             let path = forced_file_path(root, file)?;
             if (marker.version == 1 && file.owner.is_some()) || (marker.version == 2 && file.owner.is_none()) {
-                return Err(diagnostic!("image owner does not match recovery marker version"));
+                // §FS-rhei-errors.6
+                return Err(miette!(help = RECOVERY_MARKER_REPAIR_HELP, "image owner does not match recovery marker version"));
             }
             if previous.is_some_and(|p| p >= file.key()) || !paths.insert(path)
                 || file.path == marker.ledger.path || file.path.starts_with(".rhei/")
                 || file.roles.is_empty() || file.roles.windows(2).any(|p| p[0] >= p[1])
                 || file.roles.iter().any(|r| !["task", "metadata", "checkpoint", "result"].contains(&r.as_str())) {
-                return Err(diagnostic!("invalid recovery image inventory"));
+                // §FS-rhei-errors.6
+                return Err(miette!(help = RECOVERY_MARKER_REPAIR_HELP, "invalid recovery image inventory"));
             }
             file.before.bytes()?;
             file.after.bytes()?;
@@ -136,24 +148,31 @@ impl ForcedMarker {
         }
         if marker.version == 2 && (!marker.hop.task_id.starts_with("basin.")
             || !marker.files.iter().any(|file| file.owner == Some(ForcedOwner::BasinProjectMetadata))) {
-            return Err(diagnostic!("version 2 requires a basin project-metadata image"));
+            // §FS-rhei-errors.6
+            return Err(miette!(help = RECOVERY_MARKER_REPAIR_HELP, "version 2 requires a basin project-metadata image"));
         }
         forced_image_path(root, &marker.ledger.path)?;
         if marker.files.is_empty() || !marker.files.iter().any(|file| file.roles.iter().any(|r| r == "task"))
             || marker.ledger.path != "runtime/state-transitions.log"
             || !rhei_core::transition_history::is_digest(&marker.ledger.prefix_sha256) {
-            return Err(diagnostic!("incomplete recovery marker"));
+            // §FS-rhei-errors.6
+            return Err(miette!(help = RECOVERY_MARKER_REPAIR_HELP, "incomplete recovery marker"));
         }
         let pair = format!("{}{}", marker.ledger.metadata_line, marker.ledger.movement_line);
-        let entries = rhei_core::transition_history::parse(&pair).map_err(|err| diagnostic!("{err}"))?;
-        if entries.len() != 1 { return Err(diagnostic!("marker needs exactly one audit pair")); }
+        // §FS-rhei-errors.6
+        let entries = rhei_core::transition_history::parse(&pair).map_err(|err| miette!(help = RECOVERY_MARKER_REPAIR_HELP, "{err}"))?;
+        // §FS-rhei-errors.6
+        if entries.len() != 1 { return Err(miette!(help = RECOVERY_MARKER_REPAIR_HELP, "marker needs exactly one audit pair")); }
         let entry = &entries[0];
-        let audit = entry.audit.as_ref().ok_or_else(|| diagnostic!("marker has no exceptional audit"))?;
-        let (metadata, movement) = audit.pair().map_err(|err| diagnostic!("{err}"))?;
+        // §FS-rhei-errors.6
+        let audit = entry.audit.as_ref().ok_or_else(|| miette!(help = RECOVERY_MARKER_REPAIR_HELP, "marker has no exceptional audit"))?;
+        // §FS-rhei-errors.6
+        let (metadata, movement) = audit.pair().map_err(|err| miette!(help = RECOVERY_MARKER_REPAIR_HELP, "{err}"))?;
         if entry.task_id != marker.hop.task_id || entry.from != marker.hop.from || entry.to != marker.hop.to
             || audit.recovery_id != marker.recovery_id || metadata != marker.ledger.metadata_line
             || movement != marker.ledger.movement_line {
-            return Err(diagnostic!("marker hop contradicts audit pair"));
+            // §FS-rhei-errors.6
+            return Err(miette!(help = RECOVERY_MARKER_REPAIR_HELP, "marker hop contradicts audit pair"));
         }
         Ok(marker)
     }

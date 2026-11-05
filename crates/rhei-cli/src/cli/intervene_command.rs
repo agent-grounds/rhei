@@ -18,7 +18,8 @@ fn intervene_command(plan: &Path, task: &str, slot: Option<u16>, message: &str) 
     // Discovery and delivery are one guarded dependent operation. §FS-rhei-recover.4
     let _root_guards = workspace
         .exists()
-        .then(|| rhei_core::root_access::for_input(plan).map_err(|err| diagnostic!("{err}")))
+        // §FS-rhei-errors.6
+        .then(|| rhei_core::root_access::for_input(plan).map_err(|err| root_access_report(plan, err)))
         .transpose()?;
     let addr_file = workspace.join("runtime").join("dashboard.json");
     let raw = std::fs::read_to_string(&addr_file).map_err(|_| {

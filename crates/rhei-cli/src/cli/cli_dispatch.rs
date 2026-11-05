@@ -255,7 +255,8 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
             let target = resolve_plan_target(input)?;
             // §FS-rhei-transition-cmd.2: reject before the forced-recovery ceremony.
             if force && release_subtree {
-                return Err(diagnostic!("--release-subtree cannot be combined with --force"));
+                // §FS-rhei-errors.6
+                return Err(miette!(help = "remove --release-subtree for forced recovery, or remove --force for an ordinary supervising self-loop.", "--release-subtree cannot be combined with --force"));
             }
             if force {
                 validate_force_options(reason.as_deref(), supervisor.as_deref(), no_callbacks)?;
@@ -264,7 +265,8 @@ fn dispatch(cli: Cli) -> MietteResult<()> {
                     reason.as_deref().expect("reason validated"), result.as_deref());
             }
             if reason.is_some() {
-                return Err(diagnostic!("--reason is only valid with --force"));
+                // §FS-rhei-errors.1.2
+                return Err(miette!(help = "remove --reason from this ordinary transition.", "--reason is only valid with --force"));
             }
             transition_command_with_release(
                 target.path(),

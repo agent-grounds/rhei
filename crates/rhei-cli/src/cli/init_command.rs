@@ -29,7 +29,9 @@ help = cwd_help(),
     };
     let project = if here { host.clone() } else { host.join("panta") };
     // Guard host effects even before the destination exists. §FS-rhei-init.2
-    let _root_guards = init_root_access(&host, &project).map_err(|err| diagnostic!("{err}"))?;
+
+    // §FS-rhei-errors.6
+    let _root_guards = init_root_access(&host, &project).map_err(|err| root_access_report(&host, err))?;
 
     // §FS-rhei-init.2: a host that is itself a project refuses default mode
     // even under --force — a fresh `panta/` child nested inside it would lose

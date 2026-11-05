@@ -60,7 +60,8 @@ fn show_command(
         // §FS-rhei-show.4
         let payload = ShownTask { id: task.id.to_string(), title: &task.title, content: body };
         let rendered = serde_json::to_string_pretty(&payload)
-            .map_err(|err| diagnostic!("failed to render task '{}' as JSON: {err}", task_id))?;
+            // §FS-rhei-errors.6
+            .map_err(|err| miette!(help = INTERNAL_DIAGNOSTIC_HELP, "failed to render task '{}' as JSON: {err}", task_id))?;
         println!("{rendered}");
         return Ok(());
     }

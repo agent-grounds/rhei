@@ -19,7 +19,9 @@ pub(crate) fn attach_command(
 ) -> MietteResult<()> {
     let descriptor = resolve_run(reference)?;
     // Attached streaming retains exclusion for its complete lifetime. §FS-rhei-recover.4
-    let _root_guards = rhei_core::root_access::for_input(&descriptor.workspace).map_err(|err| diagnostic!("{err}"))?;
+
+    // §FS-rhei-errors.6
+    let _root_guards = rhei_core::root_access::for_input(&descriptor.workspace).map_err(|err| root_access_report(&descriptor.workspace, err))?;
     let events_path = resolve_workspace_relative(&descriptor, &descriptor.events);
 
     if json {

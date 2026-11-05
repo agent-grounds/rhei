@@ -55,10 +55,24 @@ fn resolve_log_number(
     runtime_dir: &Path,
     task_id: &str,
 ) -> Result<LogNumber, String> {
+    resolve_log_number_report(machine, state_name, visit_count, task_root, runtime_dir, task_id)
+        .map_err(|error| error.to_string())
+}
+
+/// Keep the failing path, I/O kind and structured remedy until the presentation
+/// boundary; legacy spawn summaries still use the same display text. §FS-rhei-errors.6
+fn resolve_log_number_report(
+    machine: &rhei_validator::StateMachine,
+    state_name: &str,
+    visit_count: u64,
+    task_root: &Path,
+    runtime_dir: &Path,
+    task_id: &str,
+) -> MietteResult<LogNumber> {
     if state_counts_visits(machine, state_name) {
         return Ok(LogNumber::Visit(visit_count));
     }
-    ticket_entry_number(task_root, runtime_dir, task_id, state_name).map(LogNumber::Entry)
+    ticket_entry_number_report(task_root, runtime_dir, task_id, state_name).map(LogNumber::Entry)
 }
 
 /// How many times the ticket has arrived in `state_name`: its arrivals over the
@@ -70,12 +84,25 @@ fn resolve_log_number(
 /// missing ledger is no lines; one that cannot be read or parsed is an `Err`,
 /// because guessing an entry number is how a log gets reused.
 // §FS-rhei-agents.8.1 §FS-rhei-agents.8.4
+#[cfg(test)]
 fn ticket_entry_number(
     task_root: &Path,
     runtime_dir: &Path,
     task_id: &str,
     state_name: &str,
 ) -> Result<u64, String> {
+    ticket_entry_number_report(task_root, runtime_dir, task_id, state_name)
+        .map_err(|error| error.to_string())
+}
+
+/// Read and count ledger movements once for every presentation boundary.
+/// Failed reads keep their kind; failed parses keep their evidence remedy. §FS-rhei-errors.6
+fn ticket_entry_number_report(
+    task_root: &Path,
+    runtime_dir: &Path,
+    task_id: &str,
+    state_name: &str,
+) -> MietteResult<u64> {
     let owning = task_root.join("runtime").join("state-transitions.log");
     let running = runtime_dir.join("state-transitions.log");
     let mut first_from: Option<String> = None;
@@ -84,10 +111,16 @@ fn ticket_entry_number(
         let raw = match fs::read_to_string(path) {
             Ok(raw) => raw,
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
-            Err(err) => return Err(unreadable_ledger(path, &err.to_string())),
+            Err(err) => {
+                let context = unreadable_ledger(path, &err.to_string());
+                return Err(file_io_report(path, "failed to read transition ledger", err).wrap_err(context));
+            }
         };
         let movements = rhei_core::transition_history::parse(&raw)
-            .map_err(|err| unreadable_ledger(path, &err.to_string()))?;
+            .map_err(|err| {
+                let context = unreadable_ledger(path, &err.to_string());
+                ledger_report(path, err).wrap_err(context)
+            })?;
         for movement in movements.into_iter().filter(|movement| movement.task_id == task_id) {
             first_from.get_or_insert_with(|| movement.from.clone());
             arrivals += u64::from(movement.to == state_name);

@@ -351,7 +351,8 @@ fn kept_as_last_loaded(loaded: LoadedPlan) -> LoadedPlan {
 fn run_plan_as_last_loaded(input: &Path, err: Report) -> MietteResult<LoadedPlan> {
     let Some(mut loaded) = worker_regions().last_loaded.clone() else { return Err(err) };
     loaded._root_guards =
-        rhei_core::root_access::for_input(input).map_err(|err| diagnostic!("{err}"))?;
+        // §FS-rhei-errors.6
+        rhei_core::root_access::for_input(input).map_err(|err| root_access_report(input, err))?;
     Ok(loaded)
 }
 

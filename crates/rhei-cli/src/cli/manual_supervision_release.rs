@@ -11,7 +11,8 @@ fn release_flag_preflight(
     to: &str,
 ) -> MietteResult<()> {
     if release && (force || from != to || execute_on_of(machine, from).is_none()) {
-        return Err(diagnostic!("--release-subtree is only valid on a supervising self-loop and cannot be combined with --force"));
+        // §FS-rhei-errors.6
+        return Err(miette!(help = "remove --release-subtree, or use it only on a supervising self-loop without --force.", "--release-subtree is only valid on a supervising self-loop and cannot be combined with --force"));
     }
     Ok(())
 }
@@ -40,7 +41,8 @@ fn manual_release_preflight(
             .map(|event| format!("Task {prefix}{} {} -> {}", event.task, event.from, event.to))
             .collect::<Vec<_>>()
             .join(", ");
-        return Err(diagnostic!("refusing to release Task {task}: the self-loop '{from}' -> '{to}' releases the subtree and drops {count} unread checkpoint{} ({events}). To give the halted visit more attempts with the subtree still held: rhei retry {task}. To release anyway: rhei transition {task} --from {from} --to {to} --release-subtree", if count == 1 { "" } else { "s" }));
+        // §FS-rhei-errors.6
+        return Err(miette!(help = format!("inspect the pending checkpoints first. An operator outside the worker can grant attempts with rhei retry {task}, or explicitly release with rhei transition {task} --from {from} --to {to} --release-subtree."), "refusing to release Task {task}: the self-loop '{from}' -> '{to}' releases the subtree and drops {count} unread checkpoint{} ({events}). To give the halted visit more attempts with the subtree still held: rhei retry {task}. To release anyway: rhei transition {task} --from {from} --to {to} --release-subtree", if count == 1 { "" } else { "s" }));
     }
     Ok(count)
 }

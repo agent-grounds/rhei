@@ -64,9 +64,21 @@ pub(super) fn check_removal_marker(root: &Path) -> io::Result<()> {
         return Ok(());
     }
     let ticket = pending_removal_ticket(&marker);
-    Err(io::Error::other(format!(
-        "removal pending: {ticket}; marker {}\nrhei remove {}",
-        marker.display(),
-        crate::platform::shell_quote(&ticket)
-    )))
+    // Resuming the unfinished removal is the only action this marker permits. §FS-rhei-errors.6
+    Err(super::refusal(
+        io::ErrorKind::Other,
+        format!(
+            "removal pending: {ticket}; marker {}\nrhei remove {}",
+            marker.display(),
+            crate::platform::shell_quote(&ticket)
+        ),
+        if ticket == "?" {
+            format!("preserve and restore the unreadable removal marker {} from trusted evidence so its ticket can be identified before resuming removal.", marker.display())
+        } else {
+            format!(
+                "resume the unfinished removal using the command above from project {}",
+                crate::platform::shell_quote(&root.display().to_string()),
+            )
+        },
+    ))
 }

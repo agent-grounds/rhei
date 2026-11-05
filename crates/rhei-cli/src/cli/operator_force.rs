@@ -50,13 +50,15 @@ fn commit_confirmed_force(request: &ForcedRequest<'_>, preview: PreparedForce, a
     forced_boundary("confirmed-before-locks")?;
     let _run_locks = operator_run_locks(&preview.roots, account)?;
     let _guards = forced_root_guards(&preview.roots)?;
-    for root in &preview.roots { rhei_core::root_access::check_pending(root).map_err(|err| diagnostic!("{err}"))?; }
+    // §FS-rhei-errors.6
+    for root in &preview.roots { rhei_core::root_access::check_pending(root).map_err(|err| root_access_report(root, err))?; }
     let _file_locks = forced_lock_images(&preview.root, &preview.files)?;
     let _ledger = LockedTransitionLedger::lock(&preview.root)?;
     let prepared = prepare_forced_transition(request)?;
     if prepared.roots != preview.roots || prepared.root != preview.root || prepared.task_id != preview.task_id
         || prepared.files.iter().map(ForcedFile::key).collect::<Vec<_>>() != preview.files.iter().map(ForcedFile::key).collect::<Vec<_>>() {
-        return Err(diagnostic!("recovery scope changed after confirmation; retry with fresh confirmation"));
+        // §FS-rhei-errors.6
+        return Err(miette!(help = FRESH_OPERATOR_CONFIRMATION_HELP, "recovery scope changed after confirmation; retry with fresh confirmation"));
     }
     let id = uuid::Uuid::now_v7().to_string();
     let audit = rhei_core::transition_history::ForceAudit {
@@ -66,12 +68,19 @@ fn commit_confirmed_force(request: &ForcedRequest<'_>, preview: PreparedForce, a
         timestamp: rhei_tui::format_rfc3339(std::time::SystemTime::now()),
         result_sha256: result.map(|message| forced_digest(message.as_bytes())),
     };
-    let (metadata_line, movement_line) = audit.pair().map_err(|err| diagnostic!("{err}"))?;
+    // §FS-rhei-errors.6
+    let (metadata_line, movement_line) = audit.pair().map_err(|err| miette!(help = INTERNAL_DIAGNOSTIC_HELP, "{err}"))?;
     let ledger_path = prepared.root.join("runtime/state-transitions.log");
     let prefix = ForcedImage::read(&ledger_path)?.bytes()?.unwrap_or_default();
-    rhei_core::transition_history::parse(std::str::from_utf8(&prefix).map_err(|err| diagnostic!("{err}"))?)
-        .map_err(|err| diagnostic!("{err}"))?;
-    if !prefix.is_empty() && !prefix.ends_with(b"\n") { return Err(diagnostic!("state ledger has an incomplete final row")); }
+    // §FS-rhei-errors.6
+    rhei_core::transition_history::parse(std::str::from_utf8(&prefix).map_err(|err| ledger_report(&ledger_path, err))?)
+        // §FS-rhei-errors.6
+        .map_err(|err| ledger_report(&ledger_path, err))?;
+    // §FS-rhei-errors.6
+    if !prefix.is_empty() && !prefix.ends_with(b"\n") {
+        return Err(ledger_report(&ledger_path, "state ledger has an incomplete final row")
+            .wrap_err("state ledger has an incomplete final row"));
+    }
     let marker = ForcedMarker { version: if prepared.files.iter().any(|file| file.owner.is_some()) { 2 } else { 1 }, recovery_id: id,
         hop: ForcedHop { task_id: prepared.task_id.clone(), from: from.into(), to: to.into() },
         files: prepared.files,
@@ -80,7 +89,8 @@ fn commit_confirmed_force(request: &ForcedRequest<'_>, preview: PreparedForce, a
     ForcedMarker::parse(&prepared.root, &marker.bytes()?)?;
     forced_commit(&prepared.root, &marker).map_err(|err| {
         match rhei_core::root_access::check_pending(&prepared.root) {
-            Err(pending) => diagnostic!("{err}\n{pending}"),
+            // §FS-rhei-errors.6
+            Err(pending) => root_access_report(&prepared.root, pending).wrap_err(err),
             Ok(()) => err,
         }
     })?;
@@ -96,7 +106,8 @@ fn forced_file(root: &Path, path: &Path, roles: &[&str], after: &[u8]) -> Miette
         Ok(relative) => (None, relative.to_string_lossy().replace('\\', "/")),
         Err(_) if path == forced_basin_manifest(root)? =>
             (Some(ForcedOwner::BasinProjectMetadata), "index.panta.md".to_string()),
-        Err(_) => return Err(diagnostic!("recovery image is outside its permitted owner: {}", path.display())),
+        // §FS-rhei-errors.6
+        Err(_) => return Err(miette!(help = "keep recovery images inside their execution root; a basin project-metadata image may refer only to its owning index.panta.md. Preserve any pending marker while restoring its paths.", "recovery image is outside its permitted owner: {}", path.display())),
     };
     let mut roles = roles.iter().map(|role| role.to_string()).collect::<Vec<_>>();
     roles.sort(); roles.dedup();

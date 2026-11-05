@@ -116,7 +116,8 @@ impl SpawnPlan {
 /// Keep stable sidecars outside the record directory: its entries are JSON records,
 /// and replacing a record cannot replace its lock identity. §FS-rhei-agents.8.4
 fn lock_spawn_record(path: &Path) -> MietteResult<LockedPlanFile> {
-    let parent = path.parent().ok_or_else(|| diagnostic!("spawn record has no directory"))?;
+    // §FS-rhei-errors.6
+    let parent = path.parent().ok_or_else(|| miette!(help = INTERNAL_DIAGNOSTIC_HELP, "spawn record has no directory"))?;
     let root = if parent.file_name() == Some(OsStr::new("spawns")) {
         parent.parent().and_then(Path::parent).unwrap_or(parent)
     } else {
@@ -125,7 +126,8 @@ fn lock_spawn_record(path: &Path) -> MietteResult<LockedPlanFile> {
     let locks = root.join(".rhei").join("spawn-locks");
     fs::create_dir_all(&locks)
         .map_err(|err| file_io_report(&locks, "cannot create spawn locks", err))?;
-    let name = path.file_name().ok_or_else(|| diagnostic!("spawn record has no filename"))?;
+    // §FS-rhei-errors.6
+    let name = path.file_name().ok_or_else(|| miette!(help = INTERNAL_DIAGNOSTIC_HELP, "spawn record has no filename"))?;
     LockedPlanFile::open(&locks.join(name))
 }
 
@@ -173,7 +175,8 @@ fn update_spawn_record_with_policy(
             Ok(record) => Some(record),
             Err(_) if replace_malformed => None,
             Err(err) => {
-                return Err(diagnostic!("cannot parse spawn record {}: {err}", path.display()))
+                // §FS-rhei-errors.6
+                return Err(miette!(help = format!("preserve {} and restore its valid JSON from a trusted copy; retry cannot infer exhaustion from a damaged record.", shell_quote(&path.display().to_string())), "cannot parse spawn record {}: {err}", path.display()))
             }
         },
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => None,
@@ -182,7 +185,8 @@ fn update_spawn_record_with_policy(
     let updated = update(stored)?;
     if let Some(record) = &updated {
         let body = serde_json::to_string_pretty(record)
-            .map_err(|err| diagnostic!("cannot serialize spawn record: {err}"))?;
+            // §FS-rhei-errors.6
+            .map_err(|err| miette!(help = INTERNAL_DIAGNOSTIC_HELP, "cannot serialize spawn record: {err}"))?;
         write_spawn_record_atomic(path, &body, &lock)?;
     }
     Ok(updated)
@@ -191,7 +195,8 @@ fn update_spawn_record_with_policy(
 /// Stage the whole record beside its destination and rename while the shared
 /// charge/grant lock remains held. §FS-rhei-agents.8.4
 fn write_spawn_record_atomic(path: &Path, body: &str, _lock: &LockedPlanFile) -> MietteResult<()> {
-    let parent = path.parent().ok_or_else(|| diagnostic!("spawn record has no directory"))?;
+    // §FS-rhei-errors.6
+    let parent = path.parent().ok_or_else(|| miette!(help = INTERNAL_DIAGNOSTIC_HELP, "spawn record has no directory"))?;
     let mut staged = tempfile::NamedTempFile::new_in(parent)
         .map_err(|err| file_io_report(path, "cannot stage spawn record", err))?;
     staged

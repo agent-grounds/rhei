@@ -51,7 +51,6 @@ mod diagnostic_guidance_guard {
     }
 
     #[test]
-    #[ignore = "red until #557: wrapper callers require failure-derived help; implement removes this"]
     fn diagnostic_guidance_all_wrapper_callers_carry_help() {
         check_sources(&["miette", "diagnostic"]);
     }

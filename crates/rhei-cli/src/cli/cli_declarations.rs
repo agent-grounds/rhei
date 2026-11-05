@@ -12,14 +12,6 @@ use fs2::FileExt;
 use indexmap::IndexMap;
 use miette::{miette, Report, Result as MietteResult};
 
-macro_rules! diagnostic {
-    ($($tokens:tt)*) => {
-        miette!(
-            help = "inspect the diagnostic output and retry the command",
-            $($tokens)*
-        )
-    };
-}
 use minijinja::{Environment as MiniJinjaEnvironment, UndefinedBehavior};
 #[cfg(unix)]
 use nix::sys::signal::{self, Signal};

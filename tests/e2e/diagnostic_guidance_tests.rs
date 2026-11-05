@@ -74,7 +74,6 @@ fn forced_refusal(dir: &Path, task: &str, message: &str) -> String {
 }
 
 #[test]
-#[ignore = "red until #557: forced refusal hands off to an operator; implement removes this"]
 fn diagnostic_guidance_force_requires_human_terminal() {
     let dir = fixture(FINISHED, MACHINE);
     let guidance = forced_refusal(&dir, "1", "requires an interactive terminal");
@@ -82,7 +81,6 @@ fn diagnostic_guidance_force_requires_human_terminal() {
 }
 
 #[test]
-#[ignore = "red until #557: ancestor help prints the parent's operator action; implement removes this"]
 fn diagnostic_guidance_force_reopens_ancestor_first() {
     let plan = format!("{FINISHED}\n#### Task 1.1: Child\n**State:** done\n");
     let dir = fixture(&plan, MACHINE);
@@ -98,7 +96,6 @@ fn diagnostic_guidance_force_reopens_ancestor_first() {
 }
 
 #[test]
-#[ignore = "red until #557: terminal retry explains authorized reopening; implement removes this"]
 fn diagnostic_guidance_retry_terminal_task() {
     let dir = fixture(FINISHED, MACHINE);
     let run = invoke(&dir, &["retry", "plan.rhei.md", "--task", "1"], false);
@@ -107,7 +104,6 @@ fn diagnostic_guidance_retry_terminal_task() {
 }
 
 #[test]
-#[ignore = "red until #557: worker retry hands off without evading its boundary; implement removes this"]
 fn diagnostic_guidance_retry_worker_handoff() {
     let dir = fixture(FINISHED, MACHINE);
     let run = invoke(&dir, &["retry", "plan.rhei.md", "--task", "1"], true);
@@ -119,7 +115,6 @@ fn diagnostic_guidance_retry_worker_handoff() {
 }
 
 #[test]
-#[ignore = "red until #557: invalid reason help names the flag to remove; implement removes this"]
 fn diagnostic_guidance_reason_without_force() {
     let dir = fixture(FINISHED, MACHINE);
     let run = invoke(
@@ -150,7 +145,6 @@ fn diagnostic_guidance_reason_without_force() {
 }
 
 #[test]
-#[ignore = "red until #557: forwarded safeguard retains the underlying help; implement removes this"]
 fn diagnostic_guidance_forwarded_output_remedy() {
     let machine = MACHINE.replace("    description: Work", "    description: Work\n    outputs:\n      - name: ruling\n        path: runtime/ruling.md");
     let dir = fixture(&FINISHED.replace("**State:** done", "**State:** open"), &machine);

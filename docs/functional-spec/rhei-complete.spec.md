@@ -241,10 +241,10 @@ Added avatar_url column and migration 0042
    terminal and not for an agent, where the machine has a state to reopen this
    ticket into. With no finished ancestor, that transition reopens this ticket
    alone. Under a finished ancestor it is the topmost such ancestor's, which the
-   help says has to be reopened first; an ancestor with no state to reopen it into
-   is named with no command. Then the reset and how far it reaches, offered
-   only where that reset would reopen this ticket; otherwise the help says a reset
-   would not, and prints no reset command.
+   help says has to be reopened first; an ancestor neither a reset nor its
+   profile's initial state would reopen is named with no command. Then the reset
+   and how far it reaches, offered only where that reset would reopen this ticket;
+   otherwise the help says a reset would not, and prints no reset command.
 5. Reject if the task's current state is a [gating state](rhei-states.spec.md#12-per-state-fields) (`gating: true`) — those can only be exited by an explicit human-initiated `rhei transition`.
 6. Reject if any `**Prior:**` of the target task is unsatisfied — resolved
    across the whole project graph and judged the same way readiness judges it

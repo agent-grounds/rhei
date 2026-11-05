@@ -445,8 +445,7 @@ worth what the operator writes, so the message tells them to replace it.
 
 Under a finished ancestor this ticket's forced line cannot run. The forced path
 refuses it until every terminal ancestor has been reopened
-([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)), and that refusal names only the nearest, so an operator
-would find the chain one refusal at a time. Printing the line anyway is the defect
+([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)). Printing the line anyway is the defect
 [§FS-rhei-errors.6](rhei-errors.spec.md#6-coverage) describes, so the message says where the way back starts instead.
 `<ancestor>` is the qualified id of the topmost finished ancestor, the only one
 whose line gets past that refusal, found the way the refusal finds a terminal
@@ -462,8 +461,11 @@ nothing to do — the task is finished. Its ancestor <ancestor> is finished too 
 An ancestor with no such state gets no command, and the message says why:
 
 ```text
-nothing to do — the task is finished. Its ancestor <ancestor> is finished too and has to be reopened first, and there is no state to reopen it into. <tail>
+nothing to do — the task is finished. Its ancestor <ancestor> is finished too and has to be reopened first, and neither a reset nor its profile's initial state would do that. <tail>
 ```
+
+The message goes no further because a profile may allow another non-terminal
+state, and which one is the operator's to choose.
 
 `<tail>` is how this ticket's own message above ends, unchanged, because it is still
 about this ticket: `Otherwise, run` and the reset text when `<dest>` is not terminal,

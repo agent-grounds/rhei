@@ -65,7 +65,7 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
         return Err(diagnostic!("Task {} is assigned to {}; release the claim before forced recovery", claim.id, claim.assignee.as_deref().unwrap_or("?")));
     }
     if !terminal {
-        if let Some(ancestor) = ancestors.iter().find(|ancestor| machine.states.get(&normalized_state_name(&ancestor.state, machine)).is_some_and(|state| state.terminal)) {
+        if let Some(ancestor) = terminal_ancestors(&loaded.rhei.tasks, &target_id, machine).first() {
             return Err(diagnostic!("terminal ancestor {} must be reopened before forcing {} into a non-terminal state", ancestor.id, task_id));
         }
     }

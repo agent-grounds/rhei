@@ -34,6 +34,25 @@ fn ancestor_chain<'a>(
     Vec::new()
 }
 
+/// `target`'s terminal ancestors, nearest first. The one lookup behind the forced path's
+/// refusal and the help that has to start above it, so the two cannot disagree on what
+/// is finished. §FS-rhei-transition-cmd.6 §FS-rhei-reset.5.1
+fn terminal_ancestors<'a>(
+    tasks: &'a [rhei_core::ast::Task],
+    target: &TaskId,
+    machine: &rhei_validator::StateMachine,
+) -> Vec<&'a rhei_core::ast::Task> {
+    ancestor_chain(tasks, target)
+        .into_iter()
+        .filter(|ancestor| {
+            machine
+                .states
+                .get(&normalized_state_name(&ancestor.state, machine))
+                .is_some_and(|state| state.terminal)
+        })
+        .collect()
+}
+
 /// The nearest supervising ancestor whose scope includes the moving task.
 ///
 /// Scope alone selects the owner. In particular, a nonmatching event filter

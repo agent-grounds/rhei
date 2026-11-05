@@ -31,14 +31,14 @@ use super::*;
 /// in flight until the run's stop terminates it.
 const COVER_BODY: &str = r#"here = pathlib.Path(__file__).resolve().parent
 write(here / 'cover.pid', str(os.getpid()))
-deadline = time.time() + 20
+deadline = time.time() + MARGIN
 while not (here / 'locked').exists() and time.time() < deadline:
     time.sleep(0.01)
 note = '\n#### Visit 1 (cover)\n\nLatest measurement was report-1.json (64.38%, 47/73 lines).\n'
 append(here / 'ws' / 'tasks' / '03-later.md', note)
 write(here / 'noted', 'x')
 # Ended by the run's SIGTERM once it stops; never by this sleep.
-time.sleep(30)
+time.sleep(MARGIN)
 result('Task 1 wrote its note.\n')
 "#;
 
@@ -46,7 +46,7 @@ result('Task 1 wrote its note.\n')
 /// meets the break with Task 1 in flight by either route §FS-rhei-run.3.7.2
 /// allows: the reload before Task 2's spawn, or the one after its exit.
 const OTHER_BODY: &str = r#"here = pathlib.Path(sys.argv[1])
-deadline = time.time() + 20
+deadline = time.time() + MARGIN
 while not (here / 'noted').exists() and time.time() < deadline:
     time.sleep(0.02)
 result('Task 2 did its unrelated work.\n')
@@ -59,17 +59,23 @@ const AFTER_REAP_SECONDS: &str = "1.5";
 
 /// Takes Task 1's spawn-record lock as soon as Task 1 has started, before its
 /// note exists, and lets go once `rhei run` has exited, or `AFTER_REAP_SECONDS`
-/// after Task 1 is reaped, or at a 20 s cap. The reason goes to `released`.
+/// after Task 1 is reaped, or at the margin. The reason goes to `released`.
+/// `cover.pid` exists before it holds the pid, so a missing file and an empty one
+/// both mean Task 1 has not said yet, and the one wait ends on the text.
+/// §REQ-cross-platform.4.1
 const HOLDER_BODY: &str = r#"import fcntl, os
 here = pathlib.Path(sys.argv[1])
 after_reap = float(sys.argv[2])
 lock_path = here / 'ws' / '.rhei' / 'spawn-locks' / 'task-ws.1-cover.json.lock'
-deadline = time.time() + 20
-while not (here / 'cover.pid').exists() and time.time() < deadline:
+def pid_text():
+    pid_file = here / 'cover.pid'
+    return pid_file.read_text() if pid_file.exists() else ''
+deadline = time.time() + MARGIN
+while not (text := pid_text()) and time.time() < deadline:
     time.sleep(0.005)
-if not (here / 'cover.pid').exists():
+if not text:
     sys.exit('holder: Task 1 never started')
-pid = int((here / 'cover.pid').read_text())
+pid = int(text)
 lock_path.parent.mkdir(parents=True, exist_ok=True)
 fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o666)
 fcntl.flock(fd, fcntl.LOCK_EX)
@@ -80,7 +86,7 @@ while True:
     if (here / 'rhei-exited').exists():
         reason = 'rhei-exit'
         break
-    if time.time() - held_from > 20:
+    if time.time() - held_from > MARGIN:
         reason = 'cap'
         break
     if reaped_at is None:
@@ -107,10 +113,12 @@ enum Worker {
 fn machine(worker: Worker, cover: &str, other: &str) -> String {
     let cover_state = match worker {
         Worker::Program => {
-            format!("    program:\n      command: {cover}\n    program_timeout: 60s")
+            format!("    program:\n      command: {cover}\n    program_timeout: {FIXTURE_MARGIN}")
         }
         Worker::Agent => {
-            "    agent: mock\n    agent_timeout: 60s\n    instructions: |\n      Cover.".into()
+            format!(
+                "    agent: mock\n    agent_timeout: {FIXTURE_MARGIN}\n    instructions: |\n      Cover."
+            )
         }
     };
     let cover_done = match worker {
@@ -128,7 +136,7 @@ states:
     description: Unrelated work.
     program:
       command: {other}
-    program_timeout: 60s
+    program_timeout: {FIXTURE_MARGIN}
   completed:
     description: Done.
     final: true
@@ -153,11 +161,17 @@ struct Scripts {
     holder: PathBuf,
 }
 
+/// Each script opens with the binary's one margin as `MARGIN`, and every bound in it that a correct
+/// run never reaches is that name. It goes in here rather than through an argument because the
+/// tests start the scripts with fixed arguments. §REQ-cross-platform.8
 fn write_scripts(here: &Path) -> Scripts {
+    let script = |name, body| {
+        write_python_agent(here, name, &format!("MARGIN = {}\n{body}", margin_seconds()))
+    };
     Scripts {
-        cover: write_python_agent(here, "cover.py", COVER_BODY),
-        other: write_python_agent(here, "other.py", OTHER_BODY),
-        holder: write_python_agent(here, "holder.py", HOLDER_BODY),
+        cover: script("cover.py", COVER_BODY),
+        other: script("other.py", OTHER_BODY),
+        holder: script("holder.py", HOLDER_BODY),
     }
 }
 
@@ -184,6 +198,7 @@ struct Forced {
     ws: PathBuf,
     run: CliRun,
     worker: Worker,
+    holder_said: String,
 }
 
 impl Forced {
@@ -220,18 +235,28 @@ fn run_forced(worker: Worker) -> Forced {
     );
     let machine = write_fixture_file(&ws, "states.yaml", &text);
 
-    let mut holder =
-        Holder(holder_command(&scripts.holder, &here).spawn().expect("the lock holder starts"));
     // The home `run_cli` gives it, without the identity of a `rhei run` the suite runs under: the
     // mock agent's admission would refuse an ancestor reservation this account never made.
     // §FS-rhei-budgets.7.1
     let mut cmd = isolated_command(&here);
     cmd.arg("--state-machine").arg(&machine).arg("run").arg(&ws);
     cmd.args(["--no-tui", "--no-callbacks", "--parallel", "2"]);
+
+    // `isolated_command` is what first builds `rhei`, so it comes before the helper: a compile must
+    // not spend the helper's wait. §REQ-cross-platform.8
+    let stderr_path = here.join("holder.stderr");
+    let stderr = fs::File::create(&stderr_path).expect("create the helper's stderr");
+    let mut holder = Holder(
+        holder_command(&scripts.holder, &here)
+            .stderr(stderr)
+            .spawn()
+            .expect("the lock holder starts"),
+    );
     let run = CliRun::from(&cmd.output().expect("rhei run starts"));
     fs::write(here.join("rhei-exited"), "x").expect("mark rhei's exit");
     let _ = holder.0.wait();
-    Forced { _dir: dir, here, ws, run, worker }
+    let holder_said = stderr_from_file(&stderr_path);
+    Forced { _dir: dir, here, ws, run, worker, holder_said }
 }
 
 /// The worker in flight when a `--parallel` run stops on a break in another
@@ -255,7 +280,11 @@ fn assert_recorded_before_exit(worker: Worker) {
     let out = portable(&format!("{}{}", ran.run.stdout, ran.run.stderr));
     let journal = journal_in(&ran.ws);
     let released = ran.marker("released").unwrap_or_default();
-    let context = format!("{}\nlock released on: {released}\njournal:\n{journal}", ran.output());
+    let context = format!(
+        "{}\nlock released on: {released}\nthe helper said:\n{}\njournal:\n{journal}",
+        ran.output(),
+        ran.holder_said
+    );
 
     // The scenario itself happened, or this run proves nothing.
     assert!(!ran.run.status.success(), "the run stops\n{context}");
@@ -315,7 +344,6 @@ fn watch_holder(
 /// with a live pid, and the helper still takes the lock and lets go cleanly.
 /// agent-grounds/rhei#553
 #[test]
-#[ignore = "red until #553: the helper parses cover.pid the moment it exists; implement removes this"]
 fn the_lock_holder_waits_for_the_pid_and_not_for_its_file() {
     let dir = unique_temp_dir("worker-edit-inflight-empty-pid");
     let here = dir.to_path_buf();
@@ -426,7 +454,6 @@ fn on_the_clock(script: fn(&Scripts) -> &PathBuf, cover_pid: Option<&str>) -> On
 /// `tests_fixture_margins.rs` reads its own, because a number equal to the margin today is still a
 /// second number.
 #[test]
-#[ignore = "red until #553: the scripts wait 20 s and sleep 30 s beside the 60 s margin; implement removes this"]
 fn every_bound_in_these_scripts_is_the_fixture_margin() {
     let cover = on_the_clock(|scripts| &scripts.cover, None);
     let other = on_the_clock(|scripts| &scripts.other, None);

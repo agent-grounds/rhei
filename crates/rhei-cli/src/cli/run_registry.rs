@@ -151,14 +151,16 @@ pub(crate) struct RegistrySweep {
     pub(crate) undecided: Vec<UndecidedRun>,
     /// Retain sorted root access through listing or reference resolution. §FS-rhei-panta.6.6
     root_guards: Vec<rhei_core::root_access::RootAccessGuard>,
-    access_error: Option<String>,
+    // §FS-rhei-errors.6
+    access_error: Option<Box<miette::MietteDiagnostic>>,
 }
 
 impl RegistrySweep {
     /// A pending root is a refusal, never an empty or partial listing. §FS-rhei-recover.4
     fn ensure_access(&self) -> MietteResult<()> {
         match &self.access_error {
-            Some(error) => Err(diagnostic!("{error}")),
+            // §FS-rhei-errors.6
+            Some(error) => Err(Report::new(error.as_ref().clone())),
             None => Ok(()),
         }
     }
@@ -255,7 +257,7 @@ fn classify_registry_roots(
         Ok(access) => access,
         Err(error) => {
             sweep.undecided.clear();
-            sweep.access_error = Some(error.to_string());
+            sweep.access_error = Some(error);
             return sweep;
         }
     };
@@ -408,7 +410,9 @@ fn ambiguous_reference(
 fn descriptor_for_path(path: &Path) -> MietteResult<RunDescriptor> {
     let workspace = execution_workspace_root(&normalize_workspace_input(path));
     // Retain exclusion while resolving the authoritative descriptor. §FS-rhei-recover.4
-    let _root_guards = rhei_core::root_access::for_input(&workspace).map_err(|err| diagnostic!("{err}"))?;
+
+    // §FS-rhei-errors.6
+    let _root_guards = rhei_core::root_access::for_input(&workspace).map_err(|err| root_access_report(&workspace, err))?;
     let descriptor_path = run_descriptor_path(&workspace);
     read_descriptor(&descriptor_path).ok_or_else(|| {
         miette!(

@@ -126,7 +126,8 @@ fn settle_provider_unavailable(
     }
     let wait = verdict
         .wait(record.unavailable)
-        .ok_or_else(|| diagnostic!("cannot date the wait of task {}", stall.task_id))?;
+        // §FS-rhei-errors.6
+        .ok_or_else(|| miette!(help = INTERNAL_DIAGNOSTIC_HELP, "cannot date the wait of task {}", stall.task_id))?;
     // The later deadline wins, whichever kind set it. §FS-rhei-run.3.3
     let effective =
         persist_provider_limit(stall.input, stall.reloaded, stall.task_id, stall.state, &wait)?;

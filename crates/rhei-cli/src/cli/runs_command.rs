@@ -97,7 +97,9 @@ fn report_undecided_runs(entries: &[UndecidedRun]) {
 pub(crate) fn stop_command(reference: Option<&str>, kill: bool, wait: bool) -> MietteResult<()> {
     let descriptor = resolve_run(reference)?;
     // Stop observes and signals a run only while its root is coherent. §FS-rhei-recover.4
-    let _root_guards = rhei_core::root_access::for_input(&descriptor.workspace).map_err(|err| diagnostic!("{err}"))?;
+
+    // §FS-rhei-errors.6
+    let _root_guards = rhei_core::root_access::for_input(&descriptor.workspace).map_err(|err| root_access_report(&descriptor.workspace, err))?;
     // Stopping something that has already stopped is not an error: the
     // operator's intent — "make sure this is not running" — is satisfied.
     //

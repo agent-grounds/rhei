@@ -22,7 +22,7 @@ fn registry_inspection<T>(result: std::io::Result<T>) -> std::io::Result<Result<
 fn registry_root_access(
     descriptors: &[(PathBuf, RunDescriptor)],
     guards: &mut Vec<rhei_core::root_access::RootAccessGuard>,
-) -> std::io::Result<Vec<Result<(), String>>> {
+) -> Result<Vec<Result<(), String>>, Box<miette::MietteDiagnostic>> {
     use rhei_core::root_access::{check_pending, input_roots, RootAccessGuard};
     let mut groups = Vec::new();
     let mut roots = BTreeMap::new();
@@ -33,7 +33,9 @@ fn registry_root_access(
             Err(error) => Err(error),
             Ok(_) => check_pending(&run.workspace).and_then(|()| input_roots(&run.workspace)),
         };
-        let group = registry_inspection(discovery)?;
+        // Keep each failing root and its typed cause across the sweep. §FS-rhei-errors.6
+        let group = registry_inspection(discovery)
+            .map_err(|err| root_access_diagnostic(&run.workspace, err))?;
         if let Ok(group) = &group {
             for root in group {
                 roots.insert(root.clone(), Ok(()));
@@ -42,11 +44,13 @@ fn registry_root_access(
         groups.push(group);
     }
     for (root, access) in &mut roots {
-        *access = registry_inspection(check_pending(root))?;
+        *access = registry_inspection(check_pending(root))
+            .map_err(|err| root_access_diagnostic(root, err))?;
     }
     for (root, access) in &mut roots {
         if access.is_ok() {
-            match registry_inspection(RootAccessGuard::shared(root))? {
+            match registry_inspection(RootAccessGuard::shared(root))
+                .map_err(|err| root_access_diagnostic(root, err))? {
                 Ok(guard) => guards.push(guard),
                 Err(reason) => *access = Err(reason),
             }
@@ -54,7 +58,8 @@ fn registry_root_access(
     }
     for (root, access) in &mut roots {
         if access.is_ok() {
-            *access = registry_inspection(check_pending(root))?;
+            *access = registry_inspection(check_pending(root))
+                .map_err(|err| root_access_diagnostic(root, err))?;
         }
     }
     Ok(groups

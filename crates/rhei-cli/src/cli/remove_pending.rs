@@ -45,7 +45,8 @@ fn acquire_removal_locks(
             None => return Err(refuse(format!("{}", run_lock_conflict(&root)))),
         }
     }
-    let roots = rhei_core::root_access::input_roots(input).map_err(|err| diagnostic!("{err}"))?;
+    // §FS-rhei-errors.6
+    let roots = rhei_core::root_access::input_roots(input).map_err(|err| root_access_report(input, err))?;
     let mut guards = Vec::new();
     for root in roots {
         match rhei_core::root_access::RootAccessGuard::try_exclusive(&root) {

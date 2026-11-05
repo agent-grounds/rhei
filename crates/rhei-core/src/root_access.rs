@@ -9,6 +9,11 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock, Weak};
 
+#[path = "root_access_guidance.rs"]
+mod guidance;
+use guidance::refusal;
+pub use guidance::refusal_help;
+
 pub const MARKER: &str = ".rhei/forced-recovery.json";
 
 /// The one lever a caller has over where root guards live, named wherever a
@@ -79,12 +84,14 @@ impl GuardFailure {
     /// they do not bound how the renderer wraps a line that is still too long.
     /// §FS-rhei-recover.4.1 §FS-rhei-errors.1.5
     fn refusal(&self) -> io::Error {
-        io::Error::new(
+        // The state-directory remedy belongs to this measured failure. §FS-rhei-errors.6
+        refusal(
             self.kind,
             format!(
                 "cannot create root guard lock {}\nfor execution root {}: {}\n{LEVER}",
                 self.lock, self.root, self.cause
             ),
+            LEVER.to_owned(),
         )
     }
 
@@ -175,23 +182,25 @@ fn check_forced_marker(root: &Path) -> io::Result<()> {
     let bytes = match fs::read(&marker) {
         Ok(bytes) => bytes,
         Err(err) => {
-            return Err(io::Error::other(format!(
+            // Preserve the attended recovery action through I/O adapters. §FS-rhei-errors.6
+            return Err(refusal(io::ErrorKind::Other, format!(
             "forced recovery pending: ? ? -> ?; marker {} is unreadable: {err}\nrhei recover {}",
             marker.display(), crate::platform::shell_quote(&root.display().to_string())
-        )))
+        ), "a human operator must inspect the unreadable marker and restore its evidence, then run the recovery command above at an interactive terminal. An agent may not perform the confirmation.".to_owned()));
         }
     };
     let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or_default();
     let hop = &value["hop"];
     let field = |key| hop[key].as_str().unwrap_or("?");
-    Err(io::Error::other(format!(
+    // The refusal carries the recovery command, even through a CLI wrapper. §FS-rhei-errors.6
+    Err(refusal(io::ErrorKind::Other, format!(
         "forced recovery pending: {} {} -> {}; marker {}\nrhei recover {}",
         field("task_id"),
         field("from"),
         field("to"),
         marker.display(),
         crate::platform::shell_quote(&root.display().to_string())
-    )))
+    ), "a human operator must finish the pending recovery using the command above at an interactive terminal. An agent may not perform the typed confirmation.".to_owned()))
 }
 
 // Unset in every `rhei` binary: only a test binary's in-process code pins it, at
@@ -236,7 +245,14 @@ pub fn guard_state_base() -> io::Result<PathBuf> {
                 std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/state"))
             }
         })
-        .ok_or_else(|| io::Error::other("cannot locate rhei platform state directory"))
+        // No account directory can be inferred: name its supported lever. §FS-rhei-errors.6
+        .ok_or_else(|| {
+            refusal(
+                io::ErrorKind::Other,
+                "cannot locate rhei platform state directory".to_owned(),
+                LEVER.to_owned(),
+            )
+        })
 }
 
 /// Naming the lock is separate from creating it, so a guard that fails can say
@@ -293,9 +309,10 @@ impl RootAccessGuard {
                 if try_only {
                     return Ok(None);
                 }
-                return Err(io::Error::other(
-                    "release shared root access before exclusive recovery",
-                ));
+                // This is an incompatible in-process lock upgrade. §FS-rhei-errors.1.2
+                return Err(refusal(io::ErrorKind::Other,
+                    "release shared root access before exclusive recovery".to_owned(),
+                    "this is an internal lock-order invariant failure. Report a bug with the command and diagnostic; exclusive recovery must release shared root access first.".to_owned()));
             }
             if !exclusive {
                 check_pending(&root)?;

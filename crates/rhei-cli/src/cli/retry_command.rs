@@ -3,13 +3,16 @@
 /// Refuse worker, poll and terminal recovery before any runtime write. §FS-rhei-retry.2
 fn retry_state_preflight(worker: bool, state: &rhei_validator::StateDef) -> MietteResult<()> {
     if worker {
-        return Err(diagnostic!("rhei retry is refused inside a worker (RHEI_TASK_ID is set)"));
+        // §FS-rhei-errors.1.2
+        return Err(miette!(help = WORKER_RETRY_HANDOFF_HELP, "rhei retry is refused inside a worker (RHEI_TASK_ID is set)"));
     }
     if state.terminal {
-        return Err(diagnostic!("cannot retry a terminal state"));
+        // §FS-rhei-errors.1.2
+        return Err(miette!(help = "an authorized human operator must reopen the finished task through rhei transition --force at an interactive terminal with fresh typed confirmation and a reason before retry can apply. An agent may not perform that ceremony.", "cannot retry a terminal state"));
     }
     if state.poll.is_some() {
-        return Err(diagnostic!("cannot retry a poll state; polling has its own exhaustion rule"));
+        // §FS-rhei-errors.6
+        return Err(miette!(help = "use the poll state's declared outgoing transition when polling is exhausted; rhei states shows the available edges. retry cannot refill poll attempts.", "cannot retry a poll state; polling has its own exhaustion rule"));
     }
     Ok(())
 }
@@ -26,11 +29,14 @@ fn retry_record_preflight(
     let record = record
         .filter(|record| record.task == task && record.state == state && record.moves == moves)
         .ok_or_else(|| {
-            diagnostic!("Task {task} has no spawn record for its current visit in '{state}'")
+            // §FS-rhei-errors.6
+            miette!(help = "run the task with rhei run first; retry can refill only an existing exhausted invocation of the current visit.", "Task {task} has no spawn record for its current visit in '{state}'")
         })?;
     let allowance = record.allowance(configured);
     if record.charged < allowance {
-        return Err(diagnostic!(
+        // §FS-rhei-errors.6
+        return Err(miette!(
+            help = "resume rhei run to use the remaining attempts; request retry only after this visit is exhausted.",
             "Task {task} has {} attempts left on this visit; retry grants cannot be stockpiled",
             allowance - record.charged
         ));
@@ -54,7 +60,8 @@ fn grant_retry_record(
         stored.grants.push(grant);
         Ok(Some(stored))
     })?
-    .ok_or_else(|| diagnostic!("spawn record disappeared during retry"))
+    // §FS-rhei-errors.6
+    .ok_or_else(|| miette!(help = INTERNAL_DIAGNOSTIC_HELP, "spawn record disappeared during retry"))
 }
 
 /// Resolve the shared ticket/plan target and refill its exhausted active invocations.
@@ -84,7 +91,8 @@ fn retry_command_with_worker(
     worker: bool,
 ) -> MietteResult<()> {
     if worker {
-        return Err(diagnostic!("rhei retry is refused inside a worker (RHEI_TASK_ID is set)"));
+        // §FS-rhei-errors.1.2
+        return Err(miette!(help = WORKER_RETRY_HANDOFF_HELP, "rhei retry is refused inside a worker (RHEI_TASK_ID is set)"));
     }
     let input_buf = normalize_workspace_input(input);
     let input = input_buf.as_path();
@@ -105,10 +113,12 @@ fn retry_command_with_worker(
     let machines = ExecutionMachines::build(&resolved, input, &loaded)?;
     let machine = machines.for_task_str(&task_id);
     let task = find_task_by_id(&loaded.rhei.tasks, &parse_task_id(&task_id))
-        .ok_or_else(|| diagnostic!("Task {task_id} not found"))?;
+        // §FS-rhei-errors.6
+        .ok_or_else(|| miette!(help = format!("find the current ticket id with rhei list {}; the task may have changed while acquiring its lock.", shell_quote(&input.display().to_string())), "Task {task_id} not found"))?;
     let state = normalized_state_name(&task.state, machine);
     let definition =
-        machine.states.get(&state).ok_or_else(|| diagnostic!("unknown state '{state}'"))?;
+        // §FS-rhei-errors.6
+        machine.states.get(&state).ok_or_else(|| miette!(help = "use rhei states to list valid states, then correct the task's **State:** in its plan to a declared state.", "unknown state '{state}'"))?;
     retry_state_preflight(false, definition)?;
     let root = execution_workspace_root(input);
     let settings = load_merged_settings(&root)?;
@@ -149,11 +159,14 @@ fn retry_command_with_worker(
     }
     let account = std::process::Command::new("whoami")
         .output()
-        .map_err(|err| diagnostic!("cannot identify invoking OS account: {err}"))?;
+        // §FS-rhei-errors.6
+        .map_err(|err| miette!(help = OS_ACCOUNT_HELP, "cannot identify invoking OS account: {err}"))?;
     let os_user = String::from_utf8(account.stdout)
-        .map_err(|err| diagnostic!("cannot decode OS account: {err}"))?;
+        // §FS-rhei-errors.6
+        .map_err(|err| miette!(help = OS_ACCOUNT_HELP, "cannot decode OS account: {err}"))?;
     if !account.status.success() || os_user.trim().is_empty() {
-        return Err(diagnostic!("cannot identify invoking OS account"));
+        // §FS-rhei-errors.6
+        return Err(miette!(help = OS_ACCOUNT_HELP, "cannot identify invoking OS account"));
     }
     for (path, previous, identity) in exhausted {
         let record = grant_retry_record(

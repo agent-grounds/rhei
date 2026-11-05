@@ -402,14 +402,17 @@ fn task_history_summary(
 // §FS-rhei-complete.3.1 §FS-rhei-memory.4.1
 fn read_ledger(root: &Path) -> MietteResult<Vec<(String, String, String)>> {
     // §FS-rhei-recover.4: direct readers hold access through the read.
-    let _guard = rhei_core::root_access::for_input(root).map_err(|err| diagnostic!("{err}"))?;
+
+    // §FS-rhei-errors.6
+    let _guard = rhei_core::root_access::for_input(root).map_err(|err| root_access_report(root, err))?;
     let path = root.join("runtime").join("state-transitions.log");
     if !path.exists() {
         return Ok(Vec::new());
     }
     let content = fs::read_to_string(&path)
         .map_err(|err| file_io_report(&path, "failed to read the transition ledger", err))?;
-    rhei_core::transition_history::parse(&content).map_err(|err| diagnostic!("{err}"))?;
+    // §FS-rhei-errors.6
+    rhei_core::transition_history::parse(&content).map_err(|err| ledger_report(&path, err))?;
     Ok(parse_ledger(&content))
 }
 

@@ -46,8 +46,8 @@ fn retry_active_records(
         invocations: &invocations,
         pairing: std::cell::OnceCell::new(),
     };
-    let number = resolve_log_number(machine, state, visit_count, artifact_root, runtime, &task_id)
-        .map_err(|message| diagnostic!("{message}"))?;
+    // Keep the ledger's path and typed read/parse guidance. §FS-rhei-errors.6
+    let number = resolve_log_number_report(machine, state, visit_count, artifact_root, runtime, &task_id)?;
     let identities = if invocations.is_empty() {
         vec![None]
     } else {

@@ -58,7 +58,8 @@ fn forced_rename(source: &Path, destination: &Path) -> MietteResult<()> {
 
 /// Preserve the destination's permissions as well as its complete image. §FS-rhei-recover.2
 fn forced_replace(path: &Path, bytes: &[u8]) -> MietteResult<()> {
-    let parent = path.parent().ok_or_else(|| diagnostic!("recovery file has no parent"))?;
+    // §FS-rhei-errors.6
+    let parent = path.parent().ok_or_else(|| miette!(help = INTERNAL_DIAGNOSTIC_HELP, "recovery file has no parent"))?;
     forced_create_directory(parent)?;
     let mut temporary = tempfile::NamedTempFile::new_in(parent)
         .map_err(|err| file_io_report(path, "failed to create recovery temporary", err))?;

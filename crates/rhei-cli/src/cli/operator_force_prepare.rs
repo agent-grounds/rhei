@@ -16,14 +16,17 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     let to = request.to;
     for state in [from, to] {
         if !machine.is_valid_state(state) {
-            return Err(diagnostic!("'{state}' is not a valid state. Allowed: [{}]", machine.allowed_states().collect::<Vec<_>>().join(", ")));
+            // §FS-rhei-errors.6
+            return Err(miette!(help = "choose --from and --to from the allowed states printed above; rhei states shows their edges.", "'{state}' is not a valid state. Allowed: [{}]", machine.allowed_states().collect::<Vec<_>>().join(", ")));
         }
     }
     let target_id = parse_task_id(&task_id);
-    let task = find_task_by_id(&loaded.rhei.tasks, &target_id).ok_or_else(|| diagnostic!("task '{task_id}' not found"))?;
+    // §FS-rhei-errors.6
+    let task = find_task_by_id(&loaded.rhei.tasks, &target_id).ok_or_else(|| miette!(help = format!("find the current ticket id with rhei list {}, then pass it with --task.", shell_quote(&input.display().to_string())), "task '{task_id}' not found"))?;
     let current = normalized_state_name(&task.state, machine);
     if current != from {
-        return Err(diagnostic!("conflict: Task {} is in state '{}', expected '{}'", task_id, task.state, from));
+        // §FS-rhei-errors.6
+        return Err(miette!(help = format!("inspect the current ticket with rhei show {} --task {}; use its actual state for --from after reviewing the correction.", shell_quote(&input.display().to_string()), shell_quote(&task_id)), "conflict: Task {} is in state '{}', expected '{}'", task_id, task.state, from));
     }
     ensure_task_profile_allows_state(machine, &task_id, &task.kind, parse_task_id(&route.local_id).depth() as u8, to)?;
     let metadata_raw = rhei_core::source::read_to_string(&route.metadata_file)
@@ -44,15 +47,18 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     if let Some(rule) = declared {
         if !transition_rule_is_applicable(rule, machine, checked_metadata, &key, Some(task), from, &task.state)? {
             let reason = describe_blocked_transition(rule, machine, checked_metadata, &key, from, &task.state);
-            return Err(diagnostic!("transition from '{from}' to '{to}' is not currently applicable: {reason}"));
+            // §FS-rhei-errors.6
+            return Err(miette!(help = forced_edge_help(machine, checked_metadata, &key, task, from, to, rule, &input), "transition from '{from}' to '{to}' is not currently applicable: {reason}"));
         }
     }
     if let Some(spent) = spent_loop_budget(machine, checked_metadata, &key, from, &task.state, to) {
-        return Err(diagnostic!("{spent}"));
+        // §FS-rhei-errors.6
+        return Err(miette!(help = loop_budget_help(&spent), "{spent}"));
     }
     let terminal = machine.states[to].terminal;
     if terminal && declared.is_none() && request.result.is_none_or(|result| result.trim().is_empty()) {
-        return Err(diagnostic!("forced entry into terminal state '{to}' requires a fresh non-empty --result"));
+        // §FS-rhei-errors.6
+        return Err(miette!(help = "supply --result with a fresh, non-empty account of the outcome for this terminal correction.", "forced entry into terminal state '{to}' requires a fresh non-empty --result"));
     }
     require_non_blank_result(request.result, "transition")?;
     let ancestors = ancestor_chain(&loaded.rhei.tasks, &target_id).into_iter().cloned().collect::<Vec<_>>();
@@ -62,11 +68,13 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
         if task.assignee.is_some() { Some(task) } else { task.children.iter().find_map(claimed) }
     }
     if let Some(claim) = claimed(task).or_else(|| owner.filter(|owner| owner.assignee.is_some())) {
-        return Err(diagnostic!("Task {} is assigned to {}; release the claim before forced recovery", claim.id, claim.assignee.as_deref().unwrap_or("?")));
+        // §FS-rhei-errors.6
+        return Err(miette!(help = format!("release the claim first: rhei release {} --task {}", shell_quote(&input.display().to_string()), shell_quote(&claim.id.to_string())), "Task {} is assigned to {}; release the claim before forced recovery", claim.id, claim.assignee.as_deref().unwrap_or("?")));
     }
     if !terminal {
         if let Some(ancestor) = terminal_ancestors(&loaded.rhei.tasks, &target_id, machine).first() {
-            return Err(diagnostic!("terminal ancestor {} must be reopened before forcing {} into a non-terminal state", ancestor.id, task_id));
+            // §FS-rhei-errors.1.2
+            return Err(miette!(help = ancestor_reopen_help(request, ancestor, machine), "terminal ancestor {} must be reopened before forcing {} into a non-terminal state", ancestor.id, task_id));
         }
     }
     ensure_descendants_terminal_for_terminal_entry(machine, task, &task_id, &task_id, to, &input)?;
@@ -78,8 +86,9 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     let to_visit = updated.as_ref().map(|meta| task_visit_count(Some(meta), &key, to)).filter(|count| *count > 0);
     let settings = load_merged_settings(&root)?;
     if !rhei_validator::is_cancelled_state_name(to) {
+        // Keep the ordinary transition's artifact path spelling in its remedy. §FS-rhei-errors.6
         ensure_state_outputs_exist_for_transition(
-            &root,
+            &route.execution_root,
             Some(task),
             &task_id,
             from,
@@ -91,7 +100,7 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
             terminal,
         )?;
     }
-    ensure_state_inputs_exist_for_transition(&root, Some(task), &task_id, to, &machine.states[to], to_visit, machine, &settings,
+    ensure_state_inputs_exist_for_transition(&route.execution_root, Some(task), &task_id, to, &machine.states[to], to_visit, machine, &settings,
         &format!("Task {task_id} cannot enter state {to}."))?;
     if declared.is_some() {
         ensure_terminal_result_available(machine, &root, &task_id, from, to, request.result, &input)?;
@@ -133,8 +142,13 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     })();
     match prepared {
         Ok(Some(prepared)) => Ok(prepared),
-        Ok(None) => Err(diagnostic!("the state machine already declares this edge; drop --force")),
-        Err(error) if declared.is_some() => Err(diagnostic!("{error}. --force does not bypass safeguards on declared edges")),
+        // §FS-rhei-errors.6
+        Ok(None) => Err(miette!(help = "remove --force and --reason, then use the declared transition with its normal safeguards.", "the state machine already declares this edge; drop --force")),
+        // Preserve the source diagnostic, including its help and structured members. §FS-rhei-errors.6
+        Err(error) if declared.is_some() => {
+            let context = format!("{error}. --force does not bypass safeguards on declared edges");
+            Err(error.wrap_err(context))
+        }
         Err(error) => Err(error),
     }
 }

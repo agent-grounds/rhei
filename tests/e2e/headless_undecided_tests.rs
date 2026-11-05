@@ -21,6 +21,10 @@ use std::time::{Duration, Instant};
 use super::headless_support::{parse_records, Workspace};
 use super::{stderr, stdout};
 
+#[path = "headless_outage_support.rs"]
+mod outage;
+use outage::{DescriptorGate, PausedOwner, RestoreRunLock, WaitingAttach};
+
 /// The lock file a liveness probe opens. Making *this* unreadable — rather than
 /// the whole `.rhei` directory — leaves `runtime/run.json` readable, which is
 /// what lets the run's own recorded end still be observed.
@@ -173,92 +177,99 @@ fn attach_wait_waits_out_the_outage_and_reports_the_runs_own_result() {
 
 /// The successful-outage fixture must survive the owner losing eight seconds
 /// of scheduler time, rather than needing a terminal record within unknown
-/// grace. This reuses its assertions and leaves its recovery order unchanged.
+/// grace. Both success cases recover probing before allowing completion.
 // §FS-rhei-run-headless.5.3
 #[test]
-#[ignore = "red until #565: recover probing independently of owner completion; implement removes this"]
 fn attach_wait_success_fixture_survives_an_eight_second_owner_pause() {
     assert_successful_outage(Some(Duration::from_secs(8)));
 }
 
 // §FS-rhei-run-headless.5.3
 fn assert_successful_outage(owner_pause: Option<Duration>) {
-    let ws = Workspace::new("undecided-wait-ok", 1);
+    let ws = Workspace::new("undecided-wait-ok", 0);
+    // A file gate prevents completion even if launch or SIGSTOP is delayed.
+    // §FS-rhei-run-headless.5.3
+    super::write_python_agent(
+        &ws.root,
+        "work.py",
+        r#"while not pathlib.Path('finish-work').exists():
+    time.sleep(0.02)
+result('finished\n')
+"#,
+    );
     let id = launch_unreadable(&ws);
     let _permissions = RestoreRunLock(&ws);
-    let pause = owner_pause.map(|duration| PausedOwner::new(&ws, duration));
+    let pause = PausedOwner::new(&ws);
+    let paused = ws.descriptor().expect("paused descriptor");
+    eprintln!("REGRESSION paused: descriptor={paused}");
+    assert_eq!(paused["id"], id);
+    assert!(paused["exit_code"].is_null(), "pause must precede terminal publication: {paused}");
+    let listed = stdout(&ws.rhei(&["runs"]));
+    assert!(listed.contains("could not be checked"), "the outage is established: {listed}");
+
+    let mut gate = DescriptorGate::new(&ws);
 
     let started = Instant::now();
-    let out = ws.rhei(&["attach", "--wait", &id]);
-    let waited = started.elapsed();
-    if pause.is_some() {
-        eprintln!(
-            "REGRESSION attach returned: elapsed={waited:?} status={} descriptor={}",
-            out.status,
-            ws.descriptor().expect("descriptor")
-        );
-    }
-    readable_again(&ws);
+    // No reference resolves this workspace directly: exactly one descriptor
+    // read precedes the wait loop, without a registry sweep's extra probes.
+    let mut attach = WaitingAttach::new(&ws);
+    gate.serve(); // Resolve the workspace descriptor.
+    gate.serve(); // First wait-loop probe: run.lock is still unreadable.
+    let next_probe = gate.reader();
+    attach.assert_waiting();
+    eprintln!("REGRESSION attach observed unknown: id={id}");
 
-    if let Some(pause) = pause {
-        drop(pause);
-        super::headless_support::wait_until(
-            "the paused run's result",
-            Duration::from_secs(60),
-            || ws.descriptor().is_some_and(|d| d["exit_code"].is_number()),
-        );
-        let terminal = ws.descriptor().expect("terminal descriptor");
-        eprintln!("REGRESSION terminal: descriptor={terminal}");
-        assert_eq!(terminal["id"], id, "the same run must record the result");
-        assert_eq!(terminal["exit_code"], 0, "the controlled run eventually succeeds");
-    }
+    // The next read proves the first unknown probe returned and kept waiting.
+    // Recover before answering it, while the same owner is still paused.
+    readable_again(&ws);
+    gate.answer(next_probe);
+    let live_probe = gate.reader();
+    attach.assert_waiting();
+    eprintln!("REGRESSION attach continued after live probe: id={id} descriptor={paused}");
+    gate.restore(live_probe);
+
+    let hold = owner_pause.unwrap_or(Duration::from_millis(750));
+    std::thread::sleep(hold.saturating_sub(started.elapsed()));
+    attach.assert_waiting();
+    assert_eq!(ws.descriptor().expect("still paused")["exit_code"], serde_json::Value::Null);
+    fs::write(ws.root.join("finish-work"), "").expect("allow work to finish");
+    drop(pause);
+    eprintln!("REGRESSION resumed owner after {:?}", started.elapsed());
+
+    let out = attach.finish();
+    let waited = started.elapsed();
+    let terminal = ws.descriptor().expect("terminal descriptor");
+    eprintln!("REGRESSION attach returned: elapsed={waited:?} status={}", out.status);
+    eprintln!("REGRESSION terminal: descriptor={terminal}");
+    assert_eq!(terminal["id"], id, "the same run must record the result");
+    assert_eq!(terminal["exit_code"], 0, "the controlled run eventually succeeds");
 
     let text = stdout(&out);
     assert!(out.status.success(), "the run exited 0:\n{text}\n{}", stderr(&out));
+    assert!(text.contains(&format!("Run {id} has ended.")), "the same run: {text}");
     assert!(text.contains("It exited 0."), "it reported the run's own status: {text}");
     assert!(waited > Duration::from_millis(500), "it returned in {waited:?} without waiting");
 }
 
-/// Cleanup precedes Workspace::drop, including an assertion failure while the
-/// owner is paused. Permission restoration does not depend on a passing test.
-struct RestoreRunLock<'a>(&'a Workspace);
-
-impl Drop for RestoreRunLock<'_> {
-    fn drop(&mut self) {
-        let _ = fs::set_permissions(run_lock(self.0), fs::Permissions::from_mode(0o644));
-    }
-}
-
-/// Port of triage's SIGSTOP/SIGCONT scheduling control. No production source or
-/// grace is modified; a stopped owner cannot publish a terminal descriptor.
+/// A terminal descriptor supplies the result even when probing the lock would
+/// fail. Completion is established before the outage, independently of grace.
 // §FS-rhei-run-headless.5.3
-struct PausedOwner(Option<std::thread::JoinHandle<()>>);
+#[test]
+fn attach_wait_reads_a_terminal_result_with_an_unreadable_lock() {
+    let ws = Workspace::new("undecided-wait-terminal", 0);
+    let id = ws.launch_headless();
+    super::headless_support::wait_until("the recorded result", Duration::from_secs(60), || {
+        ws.descriptor().is_some_and(|d| d["exit_code"] == 0 && d["id"] == id)
+    });
+    let _permissions = RestoreRunLock(&ws);
+    set_mode(&run_lock(&ws), 0o000);
+    assert!(fs::File::open(run_lock(&ws)).is_err(), "the lock really is unreadable");
 
-impl PausedOwner {
-    fn new(ws: &Workspace, duration: Duration) -> Self {
-        use nix::sys::signal::{kill, Signal};
-        let pid = nix::unistd::Pid::from_raw(descriptor_pid(ws));
-        kill(pid, Signal::SIGSTOP).expect("pause run owner");
-        let guard = Self(Some(std::thread::spawn(move || {
-            std::thread::sleep(duration);
-            kill(pid, Signal::SIGCONT).expect("resume run owner");
-            eprintln!("REGRESSION resumed owner after {duration:?}");
-        })));
-        let paused = ws.descriptor().expect("paused descriptor");
-        eprintln!("REGRESSION paused: descriptor={paused}");
-        assert!(paused["exit_code"].is_null(), "pause must precede terminal publication: {paused}");
-        let listed = stdout(&ws.rhei(&["runs"]));
-        assert!(listed.contains("could not be checked"), "the outage is established: {listed}");
-        guard
-    }
-}
-
-impl Drop for PausedOwner {
-    fn drop(&mut self) {
-        if let Some(handle) = self.0.take() {
-            let _ = handle.join();
-        }
-    }
+    let out = ws.rhei(&["attach", "--wait", &id]);
+    let text = stdout(&out);
+    assert!(out.status.success(), "the recorded zero succeeds: {}", stderr(&out));
+    assert!(text.contains(&format!("Run {id} has ended.")), "the same run: {text}");
+    assert!(text.contains("It exited 0."), "the recorded result: {text}");
 }
 
 /// And when the outage never clears, the wait ends the only honest way: saying

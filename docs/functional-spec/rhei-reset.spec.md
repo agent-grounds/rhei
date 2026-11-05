@@ -402,11 +402,12 @@ cheaper way out the message can print, it comes first: a refused log name offers
 moving the file away before the reset ([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)).
 
 `rhei complete` on a finished ticket ([§FS-rhei-complete.4](rhei-complete.spec.md#4-behavior)) prints a cheaper way
-too: the forced transition of [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery), which reopens that ticket
-alone and keeps every other ticket's state, results and logs. That command
-belongs to an operator at a terminal, and agents are forbidden it, while an agent
-is the likeliest reader of this refusal. So the text says both who may run it and
-that an agent may not.
+too: the forced transition of [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery). Where no ancestor of the
+ticket is finished, it reopens that ticket alone and keeps every other ticket's
+state, results and logs. Under a finished ancestor the message starts higher up,
+as the end of this point says. That command belongs to an operator at a terminal,
+and agents are forbidden it, while an agent is the likeliest reader of this
+refusal. So the text says both who may run it and that an agent may not.
 
 What else it offers depends on `<dest>`, the state a reset would leave this ticket
 in. `<dest>` follows [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state), by the one computation reset itself uses: the
@@ -440,9 +441,42 @@ The forced transition is built beside the reset, with the same `<target>` and th
 same `--state-machine`. `<id>` is the qualified id and `<from>` the ticket's base
 state. The printed reason is there so the command runs as printed:
 [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery) requires a reason on this invocation, and the audit row is only
-worth what the operator writes, so the message tells them to replace it. A hop the
-forced path would refuse, because of a terminal ancestor or a claim, gets that
-path's own refusal; the message does not predict it.
+worth what the operator writes, so the message tells them to replace it.
+
+Under a finished ancestor this ticket's forced line cannot run. The forced path
+refuses it until every terminal ancestor has been reopened
+([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)), and that refusal names only the nearest, so an operator
+would find the chain one refusal at a time. Printing the line anyway is the defect
+[§FS-rhei-errors.6](rhei-errors.spec.md#6-coverage) describes, so the message says where the way back starts instead.
+`<ancestor>` is the qualified id of the topmost finished ancestor, the only one
+whose line gets past that refusal, found the way the refusal finds a terminal
+ancestor. The line is that ancestor's own: `<ancestor-from>` is its base state, and
+`<ancestor-to>` is decided for it by the rule above, its own reset destination when
+that is not terminal, otherwise its own profile's `initial` when the machine
+declares that as not terminal:
+
+```text
+nothing to do — the task is finished. Its ancestor <ancestor> is finished too and has to be reopened first, then each finished ticket below it down to this one: an operator at a terminal starts with `rhei transition <target> --task <ancestor> --from <ancestor-from> --to <ancestor-to> --force --reason 'reopen this finished ticket'`, giving their own reason; an agent may not run that. <tail>
+```
+
+An ancestor with no such state gets no command, and the message says why:
+
+```text
+nothing to do — the task is finished. Its ancestor <ancestor> is finished too and has to be reopened first, and there is no state to reopen it into. <tail>
+```
+
+`<tail>` is how this ticket's own message above ends, unchanged, because it is still
+about this ticket: `Otherwise, run` and the reset text when `<dest>` is not terminal,
+and `A reset would not reopen it: it would leave this ticket in '<dest>'` when it is.
+A ticket with no state of its own to reopen into keeps its no-command message
+whatever its ancestors are: it offers no line, so nothing in it is false. Each hop
+moves the start down: the next `rhei complete` names the next finished ancestor, and
+once none is left, this ticket's own line.
+
+A hop the forced path would refuse because of a claim gets that path's own refusal;
+the message does not predict it. A claim differs from a finished ancestor: its
+refusal names the holder and the remedy, nothing else has to be reopened, and the
+printed line runs once the claim is released.
 
 This covers messages that name a command for the reader to run. A refusal that
 asks the reader to name a target, because none was given, keeps its placeholder:

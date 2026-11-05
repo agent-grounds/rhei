@@ -41,10 +41,16 @@ pub(super) fn offered_transitions(text: &str) -> Vec<String> {
     spans.filter(|span| span.starts_with("rhei transition ")).map(str::to_string).collect()
 }
 
+/// The word after `flag` in an offered command, as printed.
+pub(super) fn offered_flag<'a>(offer: &'a str, flag: &str) -> Option<&'a str> {
+    let mut words = offer.split_whitespace();
+    words.find(|word| *word == flag)?;
+    words.next()
+}
+
 /// The state an offered `rhei transition` goes to, as printed.
 pub(super) fn offered_to(offer: &str) -> Option<&str> {
-    let words: Vec<&str> = offer.split_whitespace().collect();
-    words.iter().position(|word| *word == "--to").map(|at| words[at + 1])
+    offered_flag(offer, "--to")
 }
 
 /// The way back a finished ticket's refusal offers ahead of the reset, returned as

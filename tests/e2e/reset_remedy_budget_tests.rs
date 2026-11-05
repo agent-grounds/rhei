@@ -4,10 +4,14 @@
 //! and has to get past that refusal to the terminal check; where none can, the help has
 //! to say which budget is spent rather than print one (agent-grounds/rhei#570).
 //!
-//! The refusal itself is right and is not under test, and neither is the help under it,
-//! which belongs to agent-grounds/rhei#557.
+//! The forced path's own refusal of a child under a finished ancestor offers the
+//! ancestor's line too, and is held to the same rule.
+//!
+//! The budget refusal itself is right and is not under test, and neither is the help
+//! under it, which belongs to agent-grounds/rhei#557.
 
 // §FS-rhei-reset.5.1 §FS-rhei-complete.4 §FS-rhei-transition-cmd.6 §FS-rhei-errors.1.5
+// §FS-rhei-errors.1.2
 
 use std::fs;
 use std::path::Path;
@@ -287,6 +291,77 @@ fn a_spent_ancestor_destination_sends_its_line_to_its_initial_state() {
          (1/1 visits). {NO_RESET}"
     );
     assert!(said.contains(&whole), "it says why the ancestor's line does not go to work:\n{said}");
+}
+
+/// What the forced path says when the child `1.1` is forced from `done` into `work`
+/// under its finished parent, once the fixture has shown it is that refusal. Its help
+/// is the second place that builds an ancestor's forced line. §FS-rhei-errors.1.2
+#[track_caller]
+fn forced_under_finished_parent(world: &RemedyWorld) -> String {
+    let hop = ["--task", "1.1", "--from", "done", "--to", "work", "--force", "--reason", "x"];
+    let run = world.rhei("transition", &hop);
+    assert!(
+        !run.status.success()
+            && run.stderr.contains("terminal ancestor plan.1 must be reopened before forcing"),
+        "fixture: this is the refusal under test:\n{}{}",
+        run.stdout,
+        run.stderr
+    );
+    run.stderr
+}
+
+/// Route A reached from the forced path: the child is forced into `work` under a parent
+/// dropped from `work`, whose one visit is spent. The ancestor's line in that refusal's
+/// help runs as printed, with no terminal, as far as the terminal check, and says why it
+/// does not go to the requested `work`. §FS-rhei-errors.1.2 §FS-rhei-transition-cmd.6
+#[test]
+fn a_forced_childs_ancestor_line_goes_past_the_ancestors_spent_budget() {
+    let world =
+        plan_world("reset-remedy-budget-forced", &machine(&[("work", 1)]), &child_under("work"));
+    drop_from_work(&world);
+    let before = fs::read(&world.target).expect("read the plan");
+
+    let said = forced_under_finished_parent(&world);
+
+    let offers = offered_transitions(&said);
+    let [offer] = offers.as_slice() else {
+        panic!("one `rhei transition` must be offered, found {}, in:\n{said}", offers.len());
+    };
+    let reached = refusal_of(offer, &world.home);
+    assert!(
+        reached.contains("--force requires an interactive terminal and fresh typed confirmation"),
+        "as printed, with no terminal, the ancestor's line reaches the terminal check rather \
+         than a refusal for its budget.\n{offer} said:\n{reached}\nin the help:\n{said}"
+    );
+    assert_eq!(offered_flag(offer, "--task"), Some("plan.1"), "the ancestor's line:\n{offer}");
+    assert_eq!(offered_to(offer), Some("open"), "its profile's initial state:\n{offer}");
+    let why = "That command goes to 'open' rather than 'work': visit budget for state 'work' is \
+               exhausted (1/1 visits).";
+    assert!(said.contains(why), "it says why the line does not go to work:\n{said}");
+    assert_eq!(fs::read(&world.target).expect("read the plan"), before, "refusals change nothing");
+}
+
+/// The same refusal where the parent has spent every state it could be forced back into:
+/// no line, and the help names both budgets rather than blame the profile.
+/// §FS-rhei-errors.1.2 §FS-rhei-errors.1.5
+#[test]
+fn a_forced_child_under_an_ancestor_with_every_state_spent_is_offered_no_line() {
+    let machine = machine(&[("open", 1), ("work", 1)]).replace(
+        "transitions:\n",
+        "transitions:\n  - { from: work, to: open, description: Back }\n",
+    );
+    let world = plan_world("reset-remedy-budget-forced-stuck", &machine, &child_under("work"));
+    world.step("transition", &["--task", "1", "--from", "work", "--to", "open", "--no-callbacks"]);
+    let cancel = ["--task", "1", "--from", "open", "--to", "cancelled", "--result", "dropped"];
+    world.step("transition", &[&cancel[..], &["--no-callbacks"]].concat());
+
+    let said = forced_under_finished_parent(&world);
+
+    assert_offers_no_line(&said, &world.home);
+    let named = "it cannot be forced back into 'work' or 'open': visit budget for state 'work' is \
+                 exhausted (1/1 visits); visit budget for state 'open' is exhausted (1/1 visits).";
+    assert!(said.contains(named), "it names the ancestor's spent budgets:\n{said}");
+    assert!(!said.contains("no permitted non-terminal"), "the profile is not why:\n{said}");
 }
 
 /// The parent started in the initial state that carries the budget and finished from

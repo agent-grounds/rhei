@@ -73,7 +73,7 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
         // Reopen the outermost blocker before its descendants. §FS-rhei-errors.1.2
         if let Some(ancestor) = terminal_ancestors(&loaded.rhei.tasks, &target_id, machine).last() {
             // §FS-rhei-errors.1.2
-            return Err(miette!(help = ancestor_reopen_help(request, ancestor, machine), "terminal ancestor {} must be reopened before forcing {} into a non-terminal state", ancestor.id, task_id));
+            return Err(miette!(help = ancestor_reopen_help(request, &loaded, &input, ancestor, machine), "terminal ancestor {} must be reopened before forcing {} into a non-terminal state", ancestor.id, task_id));
         }
     }
     ensure_descendants_terminal_for_terminal_entry(machine, task, &task_id, &task_id, to, &input)?;

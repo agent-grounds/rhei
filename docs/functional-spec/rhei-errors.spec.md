@@ -75,7 +75,16 @@ For operator-forced recovery, a non-terminal caller is directed to a human
 operator at an interactive terminal for fresh typed confirmation; an agent
 must not perform the ceremony. A terminal ancestor refusal identifies the
 ancestor to reopen first and gives its operator-only transition command,
-retaining the plan path, task, source and target state. These are explanations
+retaining the plan path, task, source and target state. The command goes only
+to a state the forced path would let that ancestor enter: one its profile
+allows that qualifies by [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy)'s rule, measured against the ancestor's own
+counted visits. It tries the requested target first, then the ancestor's
+profile `initial`, then any other state. Where a state was passed over for a
+spent budget, the help says why the command goes elsewhere, naming the first
+such state with the forced path's own refusal ([§FS-rhei-errors.1.5](rhei-errors.spec.md#15-the-subject-a-check-measured)). Where every
+candidate is passed over and a spent budget is why, the help prints no command:
+it names each spent state with that refusal and sends the limit to the workflow
+author, since `--force` cannot bypass a visit budget. These are explanations
 of the existing safeguards in [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery), not permission to bypass them.
 
 Retrying a terminal task instead explains the need to reopen it through the

@@ -2514,8 +2514,11 @@ and, on the line after it, the remedy: move the file away, or run the reset of
 [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy), which names the run's own target and the ticket's rhei and says
 that it reaches every ticket in that rhei. A spawn whose subprocess never starts —
 its command cannot be found or built, or the run is interrupted first — removes
-the log it created, so only a worker killed after it started leaves one to
-refuse. A record accounts for the path when it is the record this invocation's own name
+the log it created. A worker killed after it started, or a finished worker whose
+completion record could not be persisted, can leave an unaccounted log to
+refuse. A failed record write is reported as required by
+[§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records); it does not authorize reconstructing a record or advancing
+allocation from log names, headers, or exit footers. A record accounts for the path when it is the record this invocation's own name
 spells and its `moves` equals the ticket's current move count — the record of
 [§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records), trusted exactly as before and never checked against the log's header. A
 runtime written before entry numbers existed may hold the unsuffixed record of
@@ -2636,6 +2639,19 @@ place by each further attempt of the same invocation. It holds:
 | `attempt_charged` | whether this invocation consumed the state visit's `attempts:` budget |
 | `unavailable` | how many `provider_unavailable` endings this visit has had, charged or not; absent reads as `0` |
 | `grants` | attended grants for this visit: `[{at, os_user, attempts}]`, recording timestamp, operating-system user and the configured budget granted |
+
+**A failed completion-record write is observable.** If creating the record
+directory fails, or the shared record transaction returns an error while
+locking, reading, staging, writing, or replacing the record, `rhei run` emits
+a diagnostic naming the affected task, state, record destination, and underlying
+cause. This applies to agent and program completions in serial and parallel
+runs, including polling attempts. The failure does not change the subprocess's
+outcome, transition selection, or the command's existing exit status: a one-shot
+worker whose successful edge reaches a final state still completes even if only
+its record write fails. No partial record or inferred attempt, entry, charge,
+or grant substitutes for the failed transaction. If the next allocation meets
+the unaccounted log, the refusal of [§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming) still applies, even after
+the storage fault clears; automatic recovery is not required.
 
 Older spawn records without `grants` read as no grants. Further attempts of
 the same visit preserve its grants; a new visit has none. Grant persistence

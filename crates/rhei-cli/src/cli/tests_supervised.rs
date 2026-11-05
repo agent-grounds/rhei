@@ -617,18 +617,26 @@
     #[test]
     fn a_hung_up_pty_stops_answering_that_it_is_a_terminal() {
         use std::io::IsTerminal as _;
-        use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+        use std::os::fd::FromRawFd;
 
-        // SAFETY: `openpty` fills both ends; each raw fd is owned exactly once.
-        let (master, slave) = {
-            let pty = nix::pty::openpty(None, None).expect("openpty");
-            (pty.master, pty.slave)
-        };
-        let slave_file = unsafe { std::fs::File::from_raw_fd(slave.as_raw_fd()) };
-        std::mem::forget(slave);
+        use nix::fcntl::OFlag;
+        use nix::sys::stat::Mode;
+
+        // Close-on-exec from the call that creates each end, or a process another test
+        // spawns here keeps the master and the drop below hangs nothing up.
+        // §REQ-cross-platform.7.2
+        let flags = OFlag::O_RDWR | OFlag::O_NOCTTY | OFlag::O_CLOEXEC;
+        let master = nix::pty::posix_openpt(flags).expect("posix_openpt");
+        nix::pty::grantpt(&master).expect("grantpt");
+        nix::pty::unlockpt(&master).expect("unlockpt");
+        let slave_name = nix::pty::ptsname_r(&master).expect("ptsname_r");
+        let slave =
+            nix::fcntl::open(slave_name.as_str(), flags, Mode::empty()).expect("open pty slave");
+        // SAFETY: `open` just returned this descriptor and nothing else owns it.
+        let slave_file = unsafe { std::fs::File::from_raw_fd(slave) };
         assert!(slave_file.is_terminal(), "a live pty slave is a terminal");
 
-        drop::<OwnedFd>(master);
+        drop(master);
         // The hangup is what the operator closing a terminal window does.
         assert!(
             !slave_file.is_terminal(),

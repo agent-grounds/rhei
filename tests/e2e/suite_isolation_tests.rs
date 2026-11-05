@@ -386,7 +386,6 @@ fn only_the_shared_helper_names_git_as_a_program() {
 /// through `portable_pty` is not this call and carries §REQ-cross-platform.7.2's
 /// other rule instead.
 #[test]
-#[ignore = "red until #554: seven sites still open a pty the caller has to flag afterwards; implement removes this"]
 fn only_a_close_on_exec_call_opens_a_native_terminal() {
     let root = repo_root();
     // Spelled rather than written, so that this file does not count itself.

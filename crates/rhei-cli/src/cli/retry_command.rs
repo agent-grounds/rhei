@@ -12,7 +12,7 @@ fn retry_state_preflight(worker: bool, state: &rhei_validator::StateDef) -> Miet
     }
     if state.poll.is_some() {
         // §FS-rhei-errors.6
-        return Err(miette!(help = "use the poll state's declared outgoing transition when polling is exhausted; rhei states shows the available edges. retry cannot refill poll attempts.", "cannot retry a poll state; polling has its own exhaustion rule"));
+        return Err(miette!(help = format!("use the poll state's declared outgoing transition when polling is exhausted; {} shows the available edges. retry cannot refill poll attempts.", help_command_or_bare("states")), "cannot retry a poll state; polling has its own exhaustion rule"));
     }
     Ok(())
 }
@@ -30,13 +30,13 @@ fn retry_record_preflight(
         .filter(|record| record.task == task && record.state == state && record.moves == moves)
         .ok_or_else(|| {
             // §FS-rhei-errors.6
-            miette!(help = "run the task with rhei run first; retry can refill only an existing exhausted invocation of the current visit.", "Task {task} has no spawn record for its current visit in '{state}'")
+            miette!(help = format!("run the task first with {}; retry can refill only an existing exhausted invocation of the current visit.", help_command("run")), "Task {task} has no spawn record for its current visit in '{state}'")
         })?;
     let allowance = record.allowance(configured);
     if record.charged < allowance {
         // §FS-rhei-errors.6
         return Err(miette!(
-            help = "resume rhei run to use the remaining attempts; request retry only after this visit is exhausted.",
+            help = format!("resume the run to use the remaining attempts: {}; request retry only after this visit is exhausted.", help_command("run")),
             "Task {task} has {} attempts left on this visit; retry grants cannot be stockpiled",
             allowance - record.charged
         ));
@@ -114,11 +114,11 @@ fn retry_command_with_worker(
     let machine = machines.for_task_str(&task_id);
     let task = find_task_by_id(&loaded.rhei.tasks, &parse_task_id(&task_id))
         // §FS-rhei-errors.6
-        .ok_or_else(|| miette!(help = format!("find the current ticket id with rhei list {}; the task may have changed while acquiring its lock.", shell_quote(&input.display().to_string())), "Task {task_id} not found"))?;
+        .ok_or_else(|| miette!(help = format!("find the current ticket id with {}; the task may have changed while acquiring its lock.", help_command("list")), "Task {task_id} not found"))?;
     let state = normalized_state_name(&task.state, machine);
     let definition =
         // §FS-rhei-errors.6
-        machine.states.get(&state).ok_or_else(|| miette!(help = "use rhei states to list valid states, then correct the task's **State:** in its plan to a declared state.", "unknown state '{state}'"))?;
+        machine.states.get(&state).ok_or_else(|| miette!(help = format!("use {} to list valid states, then correct the task's **State:** in its plan to a declared state.", help_command_or_bare("states")), "unknown state '{state}'"))?;
     retry_state_preflight(false, definition)?;
     let root = execution_workspace_root(input);
     let settings = load_merged_settings(&root)?;

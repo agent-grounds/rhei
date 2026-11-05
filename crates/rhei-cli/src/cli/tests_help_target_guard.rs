@@ -66,6 +66,11 @@ mod help_target_guard {
             "re-checks the machine file it names and nothing else; a plan on the line could refuse first",
         ),
         (
+            "retry_command.rs",
+            "rhei transition",
+            "names the operator's forced-recovery ceremony, which an agent must not run; not a line to paste",
+        ),
+        (
             "roster_command.rs",
             "rhei roster",
             "the refusal is about the target given, so the form is the remedy",

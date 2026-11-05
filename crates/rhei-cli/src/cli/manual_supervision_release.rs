@@ -42,7 +42,7 @@ fn manual_release_preflight(
             .collect::<Vec<_>>()
             .join(", ");
         // §FS-rhei-errors.6
-        return Err(miette!(help = format!("inspect the pending checkpoints first. An operator outside the worker can grant attempts with rhei retry {task}, or explicitly release with rhei transition {task} --from {from} --to {to} --release-subtree."), "refusing to release Task {task}: the self-loop '{from}' -> '{to}' releases the subtree and drops {count} unread checkpoint{} ({events}). To give the halted visit more attempts with the subtree still held: rhei retry {task}. To release anyway: rhei transition {task} --from {from} --to {to} --release-subtree", if count == 1 { "" } else { "s" }));
+        return Err(miette!(help = format!("inspect the pending checkpoints first. An operator outside the worker can grant attempts with {}, or explicitly release with {}.", help_command_with("retry", &format!("--task {task}")), help_command_with("transition", &format!("--task {task} --from {} --to {} --release-subtree", shell_quote(from), shell_quote(to)))), "refusing to release Task {task}: the self-loop '{from}' -> '{to}' releases the subtree and drops {count} unread checkpoint{} ({events}). To give the halted visit more attempts with the subtree still held: rhei retry {task}. To release anyway: rhei transition {task} --from {from} --to {to} --release-subtree", if count == 1 { "" } else { "s" }));
     }
     Ok(count)
 }

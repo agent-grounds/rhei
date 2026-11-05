@@ -62,7 +62,6 @@ fn loop_budget_key(spent: &SpentLoopBudget) -> String {
 }
 
 /// The failed edge's actual predicate or measured budget determines help. §FS-rhei-errors.6
-#[allow(clippy::too_many_arguments)]
 fn forced_edge_help(
     machine: &rhei_validator::StateMachine,
     metadata: Option<&Metadata>,
@@ -71,13 +70,12 @@ fn forced_edge_help(
     from: &str,
     to: &str,
     rule: &rhei_core::ast::TransitionRule,
-    input: &Path,
 ) -> String {
     if let Some(spent) = spent_loop_budget(machine, metadata, key, from, &task.state, to) {
         return loop_budget_help(&spent);
     }
-    format!("satisfy the transition condition `{}` before taking this edge, or choose another applicable edge shown by: rhei states {}. --force does not override conditions.",
-        rule.condition.as_deref().unwrap_or("the declared edge predicate"), shell_quote(&input.display().to_string()))
+    format!("satisfy the transition condition `{}` before taking this edge, or choose another applicable edge shown by: {}. --force does not override conditions.",
+        rule.condition.as_deref().unwrap_or("the declared edge predicate"), help_command_or_bare("states"))
 }
 
 /// Use the shared operator command builder for the ancestor's own state and

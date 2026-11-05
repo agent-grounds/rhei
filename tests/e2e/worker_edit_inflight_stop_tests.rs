@@ -14,8 +14,9 @@
 #![cfg(unix)]
 
 use std::fs;
-use std::path::PathBuf;
-use std::process::{Child, Command, Stdio};
+use std::path::{Path, PathBuf};
+use std::process::{Child, Command, ExitStatus, Stdio};
+use std::time::{Duration, Instant};
 
 use super::agent_reentry_support::write_settings;
 use super::note_store_support::isolated_command;
@@ -145,6 +146,28 @@ transitions:
     )
 }
 
+/// The three scripts as a test runs them, wherever it runs them from.
+struct Scripts {
+    cover: PathBuf,
+    other: PathBuf,
+    holder: PathBuf,
+}
+
+fn write_scripts(here: &Path) -> Scripts {
+    Scripts {
+        cover: write_python_agent(here, "cover.py", COVER_BODY),
+        other: write_python_agent(here, "other.py", OTHER_BODY),
+        holder: write_python_agent(here, "holder.py", HOLDER_BODY),
+    }
+}
+
+/// The helper as every test starts it; where its stderr goes is the test's to say.
+fn holder_command(holder: &Path, here: &Path) -> Command {
+    let mut command = Command::new(python_command());
+    command.arg(holder).arg(here).arg(AFTER_REAP_SECONDS).stdin(Stdio::null());
+    command
+}
+
 /// Kills the helper if the test leaves before it let go.
 struct Holder(Child);
 
@@ -185,29 +208,20 @@ fn run_forced(worker: Worker) -> Forced {
     fs::write(ws.join("tasks/01-cover.md"), COVER).expect("write task 1");
     fs::write(ws.join("tasks/02-other.md"), OTHER).expect("write task 2");
     fs::write(ws.join("tasks/03-later.md"), LATER).expect("write task 3");
-    let cover = write_python_agent(&here, "cover.py", COVER_BODY);
-    let other = write_python_agent(&here, "other.py", OTHER_BODY);
-    let holder = write_python_agent(&here, "holder.py", HOLDER_BODY);
+    let scripts = write_scripts(&here);
     if matches!(worker, Worker::Agent) {
-        write_settings(&ws, &cover, false);
+        write_settings(&ws, &scripts.cover, false);
     }
     let here_arg = here.display().to_string();
     let text = machine(
         worker,
-        &fixture_command_with_args(&cover, &[]),
-        &fixture_command_with_args(&other, &[&here_arg]),
+        &fixture_command_with_args(&scripts.cover, &[]),
+        &fixture_command_with_args(&scripts.other, &[&here_arg]),
     );
     let machine = write_fixture_file(&ws, "states.yaml", &text);
 
-    let mut holder = Holder(
-        Command::new(python_command())
-            .arg(&holder)
-            .arg(&here)
-            .arg(AFTER_REAP_SECONDS)
-            .stdin(Stdio::null())
-            .spawn()
-            .expect("the lock holder starts"),
-    );
+    let mut holder =
+        Holder(holder_command(&scripts.holder, &here).spawn().expect("the lock holder starts"));
     // The home `run_cli` gives it, without the identity of a `rhei run` the suite runs under: the
     // mock agent's admission would refuse an ancestor reservation this account never made.
     // §FS-rhei-budgets.7.1
@@ -265,5 +279,198 @@ fn assert_recorded_before_exit(worker: Worker) {
             .iter()
             .any(|record| record["task"] == "ws.1" && record["outcome"] == "interrupted"),
         "ws.1's slot is released interrupted: {releases:#?}\n{context}"
+    );
+}
+
+/// [`FIXTURE_MARGIN`] as a number of seconds.
+fn margin_seconds() -> f64 {
+    FIXTURE_MARGIN
+        .strip_suffix('s')
+        .and_then(|seconds| seconds.parse().ok())
+        .expect("the margin is written in seconds")
+}
+
+/// How long `cover.pid` stays empty: many of the helper's 5 ms polls, and little for a green run to
+/// pay. A helper slow to start meets less of it, which can hide the defect and cannot fail a fix.
+const HELD_EMPTY: Duration = Duration::from_millis(500);
+
+/// Waits at most `within` for `done`, and stops early if the helper exits. Returns how it exited.
+fn watch_holder(
+    holder: &mut Holder,
+    within: Duration,
+    done: impl Fn() -> bool,
+) -> Option<ExitStatus> {
+    let deadline = Instant::now() + within;
+    loop {
+        let exited = holder.0.try_wait().expect("the lock holder can be polled");
+        if exited.is_some() || done() || Instant::now() >= deadline {
+            return exited;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+/// §REQ-cross-platform.4.1: `cover.pid` exists before it holds Task 1's pid, so the helper that
+/// parses it waits for the text. The file is held empty here rather than gambled on, then filled
+/// with a live pid, and the helper still takes the lock and lets go cleanly.
+/// agent-grounds/rhei#553
+#[test]
+#[ignore = "red until #553: the helper parses cover.pid the moment it exists; implement removes this"]
+fn the_lock_holder_waits_for_the_pid_and_not_for_its_file() {
+    let dir = unique_temp_dir("worker-edit-inflight-empty-pid");
+    let here = dir.to_path_buf();
+    let scripts = write_scripts(&here);
+    fs::write(here.join("cover.pid"), "").expect("create cover.pid before its text");
+    let stderr_path = here.join("holder.stderr");
+    let stderr = fs::File::create(&stderr_path).expect("create the helper's stderr");
+    let mut holder = Holder(
+        holder_command(&scripts.holder, &here)
+            .stderr(stderr)
+            .spawn()
+            .expect("the lock holder starts"),
+    );
+    let said = || stderr_from_file(&stderr_path);
+    let margin = Duration::from_secs_f64(margin_seconds());
+
+    let died = watch_holder(&mut holder, HELD_EMPTY, || false);
+    assert_eq!(died, None, "the helper died while cover.pid was empty:\n{}", said());
+
+    let pid = std::process::id().to_string();
+    fs::write(here.join("cover.pid"), pid).expect("fill cover.pid with a live pid");
+    let locked = here.join("locked");
+    let exited = watch_holder(&mut holder, margin, || locked.exists());
+    assert!(locked.exists(), "the lock was never taken, helper {exited:?}:\n{}", said());
+
+    fs::write(here.join("rhei-exited"), "x").expect("mark rhei's exit");
+    let exited = watch_holder(&mut holder, margin, || false);
+    assert!(
+        exited.is_some_and(|status| status.success()),
+        "the helper does not end cleanly once rhei has exited, {exited:?}:\n{}",
+        said()
+    );
+    let released = fs::read_to_string(here.join("released")).unwrap_or_default();
+    assert_eq!(released, "rhei-exit", "the helper let go for the wrong reason:\n{}", said());
+}
+
+/// Runs a script on a clock only its own sleeps move, so a bound of any length is read in no time,
+/// and however it is spelled. A sleep under a second is a poll spending a wait; a longer one is a
+/// stay. `finally`, because a script that gives up exits through `sys.exit`.
+const CLOCK_BODY: &str = r#"import runpy
+report, script = sys.argv[1:3]
+sys.argv = sys.argv[2:]
+now = time.time()
+polled = 0.0
+stayed = 0.0
+def sleep(seconds):
+    global now, polled, stayed
+    now += seconds
+    if seconds < 1:
+        polled += seconds
+    else:
+        stayed += seconds
+def clock():
+    return now
+time.time = time.monotonic = clock
+time.sleep = sleep
+try:
+    runpy.run_path(script, run_name='__main__')
+finally:
+    write(report, '{} {}'.format(polled, stayed))
+"#;
+
+/// What one script spent on [`CLOCK_BODY`]'s clock, and what it printed to stderr.
+struct OnTheClock {
+    polled: f64,
+    stayed: f64,
+    stderr: String,
+}
+
+/// Runs one script on the clock in a directory of its own, where `cover.pid` holds `cover_pid` if
+/// one is given. Every script gets the helper's two arguments; the others read only what they need.
+/// Without a run's identity, or `result` writes to the result path of a `rhei run` the suite runs
+/// under. §REQ-test-isolation
+fn on_the_clock(script: fn(&Scripts) -> &PathBuf, cover_pid: Option<&str>) -> OnTheClock {
+    let dir = unique_temp_dir("worker-edit-inflight-clock");
+    if let Some(text) = cover_pid {
+        fs::write(dir.join("cover.pid"), text).expect("write cover.pid");
+    }
+    let scripts = write_scripts(&dir);
+    let clock = write_python_agent(&dir, "clock.py", CLOCK_BODY);
+    let report = dir.join("clock.report");
+    let out = Command::new(python_command())
+        .arg(&clock)
+        .arg(&report)
+        .arg(script(&scripts))
+        .arg(&*dir)
+        .arg(AFTER_REAP_SECONDS)
+        .env_remove("RHEI_ATTEMPT")
+        .env_remove("RHEI_RESULT_PATH")
+        .stdin(Stdio::null())
+        .output()
+        .expect("the clock starts");
+    let stderr = stderr(&out);
+    let read = fs::read_to_string(&report).unwrap_or_else(|_| panic!("no report:\n{stderr}"));
+    let (polled, stayed) = read.split_once(' ').expect("the report holds two numbers");
+    OnTheClock {
+        polled: polled.parse().expect("seconds polled"),
+        stayed: stayed.parse().expect("seconds stayed"),
+        stderr,
+    }
+}
+
+/// §REQ-cross-platform.8: a correct run never reaches any bound these scripts set, so each of them
+/// is the binary's one margin and no second number beside it. The real scripts run on a clock
+/// rather than having their text scanned, so a number moved behind a name is still read.
+/// `AFTER_REAP_SECONDS` is the forcing rather than a margin (§REQ-cross-platform.8.1), and is never
+/// reached here because the pid stays alive. `machine`'s timeouts are read from this source, as
+/// `tests_fixture_margins.rs` reads its own, because a number equal to the margin today is still a
+/// second number.
+#[test]
+#[ignore = "red until #553: the scripts wait 20 s and sleep 30 s beside the 60 s margin; implement removes this"]
+fn every_bound_in_these_scripts_is_the_fixture_margin() {
+    let cover = on_the_clock(|scripts| &scripts.cover, None);
+    let other = on_the_clock(|scripts| &scripts.other, None);
+    let no_pid = on_the_clock(|scripts| &scripts.holder, None);
+    let empty = on_the_clock(|scripts| &scripts.holder, Some(""));
+    let live_pid = std::process::id().to_string();
+    let capped = on_the_clock(|scripts| &scripts.holder, Some(&live_pid));
+    let bounds = [
+        ("cover.py waits for `locked`", cover.polled),
+        ("cover.py stays in flight", cover.stayed),
+        ("other.py waits for `noted`", other.polled),
+        ("holder.py waits for cover.pid", no_pid.polled),
+        ("holder.py waits for cover.pid to hold text", empty.polled),
+        ("holder.py holds the lock", capped.polled),
+    ];
+
+    let margin = margin_seconds();
+    let mut wrong: Vec<String> = bounds
+        .iter()
+        .filter(|(_, seconds)| (seconds - margin).abs() >= 1.0)
+        .map(|(bound, seconds)| format!("  {bound}: {seconds:.0} s"))
+        .collect();
+    let source = include_str!("worker_edit_inflight_stop_tests.rs");
+    for (index, line) in source.lines().enumerate() {
+        let numbered = ["program_timeout: ", "agent_timeout: "].iter().any(|key| {
+            line.split(key)
+                .nth(1)
+                .is_some_and(|rest| rest.starts_with(|c: char| c.is_ascii_digit()))
+        });
+        if numbered {
+            wrong.push(format!("  line {}: {}", index + 1, line.trim()));
+        }
+    }
+    assert!(
+        wrong.is_empty(),
+        "bounds in this file that are not FIXTURE_MARGIN ({FIXTURE_MARGIN}):\n{}\n\
+         helper's stderr with no cover.pid:\n{}\nhelper's stderr with cover.pid empty:\n{}",
+        wrong.join("\n"),
+        no_pid.stderr,
+        empty.stderr,
+    );
+    assert!(
+        no_pid.stderr.contains("holder: Task 1 never started"),
+        "the helper's give-up names why, in the words the reproducer reads:\n{}",
+        no_pid.stderr
     );
 }

@@ -70,14 +70,28 @@ pub(super) fn assert_offers_forced_reopen(said: &str, home: &Path) -> String {
     offer
 }
 
+/// Who a ticket's own forced line says may run it. §FS-rhei-reset.5.1
+pub(super) const OWN_LINE_OPERATOR: &str = "An operator at a terminal";
+
+/// The same, as the topmost finished ancestor's line names them mid-sentence.
+/// §FS-rhei-reset.5.1
+pub(super) const ANCESTOR_LINE_OPERATOR: &str = "an operator at a terminal starts with";
+
 /// The forced transition a finished ticket's refusal offers, returned as printed: it
 /// runs as printed and stops at the forced path's own terminal check, which comes
 /// after every stable preflight, so the shell, the arguments and the hop were all
 /// accepted, on every platform and with no pseudo-terminal. The line says who it is
-/// for, and that the printed reason is theirs to replace.
+/// for, `An operator at a terminal`, and that the printed reason is theirs to replace.
 /// §FS-rhei-reset.5.1 §FS-rhei-transition-cmd.6
 #[track_caller]
 pub(super) fn assert_offers_forced_line(said: &str, home: &Path) -> String {
+    assert_offers_forced_line_naming(said, home, OWN_LINE_OPERATOR)
+}
+
+/// The same for a line that says who may run it as `who`: the ancestor's line names
+/// them mid-sentence, as [`ANCESTOR_LINE_OPERATOR`]. §FS-rhei-reset.5.1
+#[track_caller]
+pub(super) fn assert_offers_forced_line_naming(said: &str, home: &Path, who: &str) -> String {
     let offers = offered_transitions(said);
     let [offer] = offers.as_slice() else {
         panic!("one `rhei transition` must be offered, found {}, in:\n{said}", offers.len());
@@ -98,9 +112,7 @@ pub(super) fn assert_offers_forced_line(said: &str, home: &Path) -> String {
         .lines()
         .find(|line| line.contains(offer.as_str()))
         .expect("the offer was read from one line");
-    // The ancestor's line names them mid-sentence. §FS-rhei-reset.5.1
-    let who = ["An operator at a terminal", "an operator at a terminal starts with"];
-    assert!(who.iter().any(|who| line.contains(who)), "it says who may run it:\n{line}");
+    assert!(line.contains(who), "it says who may run it, as `{who}`:\n{line}");
     assert!(line.contains("an agent may not run"), "it says an agent may not:\n{line}");
     assert!(
         line.contains(&format!("`{offer}`, giving their own reason")),

@@ -373,7 +373,49 @@ fn only_the_shared_helper_names_git_as_a_program() {
     );
 }
 
-/// Every `.rs` file under `dir`, so the guard above reads the suite rather than
+/// §REQ-cross-platform.7.2: removing the way is what holds it here too — no
+/// source in the tree opens a pseudo-terminal through the call that leaves both
+/// ends inheritable until a later `fcntl`.
+///
+/// A process another test spawns in that gap keeps the master, so the master's
+/// close hangs nothing up and a run under test has no failed print to tell it
+/// the console is gone (§FS-rhei-run.3.2). The rule is checked here rather than
+/// raced, because the race is a matter of microseconds: the reproducer of
+/// agent-grounds/rhei#554 is what shows the mechanism, and this is what stops
+/// the next test copying the call. A comment may name it; a terminal opened
+/// through `portable_pty` is not this call and carries §REQ-cross-platform.7.2's
+/// other rule instead.
+#[test]
+#[ignore = "red until #554: seven sites still open a pty the caller has to flag afterwards; implement removes this"]
+fn only_a_close_on_exec_call_opens_a_native_terminal() {
+    let root = repo_root();
+    // Spelled rather than written, so that this file does not count itself.
+    let needle = format!("nix::pty::{}", "openpty");
+    let mut offenders: Vec<String> = Vec::new();
+    for tree in ["tests", "crates"] {
+        for path in rust_sources_under(&root.join(tree)) {
+            let text = std::fs::read_to_string(&path).expect("a source should be readable");
+            let shown = path.strip_prefix(&root).unwrap_or(&path).display().to_string();
+            for (index, line) in text.lines().enumerate() {
+                if !line.trim_start().starts_with("//") && line.contains(needle.as_str()) {
+                    offenders.push(format!("{shown}:{}", index + 1));
+                }
+            }
+        }
+    }
+    offenders.sort();
+    assert!(
+        offenders.is_empty(),
+        "{} place(s) open a pseudo-terminal through the call that leaves both ends \
+         inheritable until a later `fcntl`, so a process another test spawns in that gap \
+         holds the master, its close hangs nothing up, and a run under test never learns \
+         its terminal went (§REQ-cross-platform.7.2): {offenders:?}. Create both ends \
+         close-on-exec instead, in the call that creates them.",
+        offenders.len()
+    );
+}
+
+/// Every `.rs` file under `dir`, so the guards above read the tree rather than
 /// a list of files someone kept up to date.
 fn rust_sources_under(dir: &Path) -> Vec<std::path::PathBuf> {
     let mut found = Vec::new();

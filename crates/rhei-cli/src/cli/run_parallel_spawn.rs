@@ -80,6 +80,7 @@ fn spawn_parallel_agent_work_item(
         state,
         visit_count,
         identity.as_deref(),
+        &machines.reset,
     ) {
         Ok(planned) => planned,
         // Refused before it costs anything; `Skipped` is the pool's stall. §FS-rhei-agents.8.1

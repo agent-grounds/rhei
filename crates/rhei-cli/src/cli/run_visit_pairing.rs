@@ -207,11 +207,12 @@ impl InvocationCompletion<'_> {
     /// spawn: one note for an invocation an orphan answers for and that is not
     /// spawned after all, one warning for an ambiguous edit. Each is said once
     /// per run, however many passes reach the same decision.
-    // §FS-rhei-agent-visit-pairing.4 §FS-rhei-agent-visit-pairing.5
+    // §FS-rhei-agent-visit-pairing.4 §FS-rhei-agent-visit-pairing.5 §FS-rhei-reset.5.1
     fn announce_visit_pairing(
         &self,
         sink: &Arc<dyn rhei_tui::EventSink>,
         spawned: &[ResolvedAgent],
+        reset: &ResetOffer,
     ) {
         let task_id = self.task.id.to_string();
         let state = self.state_name;
@@ -226,9 +227,10 @@ impl InvocationCompletion<'_> {
             if let Some(resolved) = paired.filter(|_| !still_spawned) {
                 let text = format!(
                     "note: task {task_id} state '{state}': reusing this visit's finished spawn \
-                     ({}) for {}; `rhei reset` redoes it",
+                     ({}) for {}; to redo it, run {}",
                     record.display(),
-                    invocation_target_label(resolved)
+                    invocation_target_label(resolved),
+                    reset.for_ticket(&task_id)
                 );
                 self.announce_once(sink, rhei_tui::MessageLevel::Info, text);
             }

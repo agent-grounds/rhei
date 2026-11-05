@@ -196,7 +196,8 @@ fn spawn_and_wait_program(
     // Never truncated, as an agent's is not, and removed if the command never
     // starts. §FS-rhei-programs.5.1 §FS-rhei-agents.8.1
     let mut unstarted = UnstartedLog::new(log_path);
-    let log_file = create_log_exclusively(log_path, &render_context.task.id.to_string())
+    let task_id = render_context.task.id.to_string();
+    let log_file = create_log_exclusively(log_path, &task_id, plan.reset.as_ref())
         .map_err(|message| miette!(help = program_log_help(), "{message}"))?;
     unstarted.created();
     let command_label = match &resolved.program.command {

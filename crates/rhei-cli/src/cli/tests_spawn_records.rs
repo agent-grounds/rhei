@@ -193,6 +193,7 @@ mod spawn_records {
             charged: 0,
             previous: None,
             evidence_state: serde_json::Value::Null,
+            reset: None,
         };
         fix.record_spawn(SpawnEnding {
             task_id: "plan.1",

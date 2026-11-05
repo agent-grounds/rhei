@@ -14,7 +14,6 @@ use super::*;
 
 /// A member `.rhei.md` named relative to the project, as the issue's recipe does.
 #[test]
-#[ignore = "red until #549: the remedy for a member plan named relatively is refused; implement removes this"]
 fn the_reset_remedy_runs_for_a_member_plan_named_relatively() {
     let world = RemedyWorld::at("reset-remedy-member", "project").with_found_machine();
     world.write("index.panta.md", "# Panta: Remedy\n");
@@ -31,7 +30,6 @@ fn the_reset_remedy_runs_for_a_member_plan_named_relatively() {
 /// and applied for real, the named rhei goes back and the sibling keeps its
 /// ticket, its result and its logs.
 #[test]
-#[ignore = "red until #549: the remedy on a project with siblings is refused; implement removes this"]
 fn the_reset_remedy_stops_at_the_named_rhei_when_applied_to_a_project_with_siblings() {
     let world = RemedyWorld::at("reset-remedy-siblings", "project").with_found_machine();
     world.write("index.panta.md", "# Panta: Remedy\n");
@@ -90,7 +88,6 @@ fn workspace_member(name: &str) -> RemedyWorld {
 
 /// A directory-workspace member's program logs under its own root.
 #[test]
-#[ignore = "red until #549: the remedy for a workspace member's program is refused; implement removes this"]
 fn the_reset_remedy_runs_for_a_workspace_members_program_state() {
     let world = workspace_member("reset-remedy-workspace-program");
     let said = world.refuse("gamma.1", "measure", &world.root.join("gamma"));
@@ -99,7 +96,6 @@ fn the_reset_remedy_runs_for_a_workspace_members_program_state() {
 
 /// A directory-workspace member's agent logs under the project's root.
 #[test]
-#[ignore = "red until #549: the remedy for a workspace member's agent is refused; implement removes this"]
 fn the_reset_remedy_runs_for_a_workspace_members_agent_state() {
     let world = workspace_member("reset-remedy-workspace-agent");
     let said = world.refuse("gamma.1", "work", &world.root);
@@ -109,7 +105,6 @@ fn the_reset_remedy_runs_for_a_workspace_members_agent_state() {
 /// A lone `.rhei.md` with no `index.panta.md`: the target is that rhei alone,
 /// and `--rhei` is still the id its tickets carry.
 #[test]
-#[ignore = "red until #549: the remedy for a lone plan is refused; implement removes this"]
 fn the_reset_remedy_runs_for_a_lone_plan() {
     let world = RemedyWorld::at("reset-remedy-lone", "lone").with_found_machine();
     world.write("plan.rhei.md", TWO_TICKETS);
@@ -123,7 +118,6 @@ fn the_reset_remedy_runs_for_a_lone_plan() {
 
 /// A path that is not one shell word, and the shell is what reads it.
 #[test]
-#[ignore = "red until #549: the remedy on a path with a space is refused; implement removes this"]
 fn the_reset_remedy_runs_for_a_project_path_containing_a_space() {
     let world = RemedyWorld::at("reset-remedy-space", "my projects/project").with_found_machine();
     world.write("index.panta.md", "# Panta: Remedy\n");
@@ -140,7 +134,6 @@ fn the_reset_remedy_runs_for_a_project_path_containing_a_space() {
 /// shows, so the preview is what is held here. Relative paths on the run make the
 /// command's absolute spelling part of the case.
 #[test]
-#[ignore = "red until #549: the remedy leaves out the machine the run was told to use; implement removes this"]
 fn the_reset_remedy_carries_a_machine_named_on_the_run() {
     let world = RemedyWorld::at("reset-remedy-machine", "project");
     world.write("index.panta.md", "# Panta: Remedy\n");
@@ -165,7 +158,6 @@ fn the_reset_remedy_carries_a_machine_named_on_the_run() {
 /// resolved through the link names a rhei that `--rhei` is refused against.
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #549: the remedy for a symlinked workspace is refused; implement removes this"]
 fn the_reset_remedy_keeps_a_symlinked_workspaces_name() {
     let world = RemedyWorld::at("reset-remedy-symlink", "link/myws").with_found_machine();
     world.write("index.rhei.md", "# Rhei: Linked\n");
@@ -182,7 +174,6 @@ fn the_reset_remedy_keeps_a_symlinked_workspaces_name() {
 /// A workspace named `.` from inside it carries no name of its own, and a `.` in
 /// the printed command would name wherever the reader stands.
 #[test]
-#[ignore = "red until #549: the remedy for a workspace named as . is refused; implement removes this"]
 fn the_reset_remedy_runs_for_a_workspace_named_as_the_current_directory() {
     let world = RemedyWorld::at("reset-remedy-dot", "ws").with_found_machine();
     world.write("index.rhei.md", "# Rhei: Dot\n");
@@ -210,13 +201,11 @@ fn refuse_under_parallel(name: &str, ticket: &str, state: &str) {
 }
 
 #[test]
-#[ignore = "red until #549: the remedy from the parallel program site is refused; implement removes this"]
 fn the_reset_remedy_runs_for_a_program_under_parallel() {
     refuse_under_parallel("reset-remedy-parallel-program", "alpha.1", "measure");
 }
 
 #[test]
-#[ignore = "red until #549: the remedy from the parallel agent site is refused; implement removes this"]
 fn the_reset_remedy_runs_for_an_agent_under_parallel() {
     refuse_under_parallel("reset-remedy-parallel-agent", "beta.1", "work");
 }

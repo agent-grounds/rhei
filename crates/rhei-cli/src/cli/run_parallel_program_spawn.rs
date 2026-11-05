@@ -54,6 +54,7 @@ fn spawn_parallel_program_work_item(
         &item.current_state,
         visit_count,
         None,
+        &machines.reset,
     );
     // Refused before it runs; `Skipped` is the pool's stall. §FS-rhei-agents.8.1
     let plan = match plan {

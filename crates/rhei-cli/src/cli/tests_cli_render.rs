@@ -531,6 +531,7 @@ transitions:
             per_rhei_callbacks: BTreeMap::new(),
             member_local_runtimes: BTreeSet::new(),
             state_machine_override: None,
+            reset: ResetOffer::new(Path::new("plan.rhei.md")),
         };
         let frontend = start_run_frontend(
             Path::new("."),

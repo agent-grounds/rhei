@@ -236,6 +236,8 @@ fn agent_invocations_to_spawn(
     state_def: &rhei_validator::StateDef,
     invocations: Vec<ResolvedAgent>,
     sink: &Arc<dyn rhei_tui::EventSink>,
+    // What the note offers as the way to redo reused work. §FS-rhei-reset.5.1
+    reset: &ResetOffer,
 ) -> Vec<ResolvedAgent> {
     if state_def.outputs.is_empty() {
         return invocations;
@@ -272,6 +274,6 @@ fn agent_invocations_to_spawn(
         .collect::<Vec<_>>();
     // Said here, where the pass decides, not in the predicate, which is asked
     // again after every exit. §FS-rhei-agent-visit-pairing.4
-    completion.announce_visit_pairing(sink, &pending);
+    completion.announce_visit_pairing(sink, &pending, reset);
     pending
 }

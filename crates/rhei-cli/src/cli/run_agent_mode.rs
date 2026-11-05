@@ -440,6 +440,7 @@ fn run_agent_mode(
                     state_def,
                     invocations,
                     &sink,
+                    &live.machines.reset,
                 );
 
                 if pending.is_empty() {

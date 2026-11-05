@@ -412,8 +412,9 @@ transitions:
         root: &Path,
         runtime: &Path,
     ) {
-        let (plan, _) =
-            plan_named_spawn(machine, root, runtime, task_id, "waiting", 1, None).expect("plan");
+        let reset = ResetOffer::new(root);
+        let (plan, _) = plan_named_spawn(machine, root, runtime, task_id, "waiting", 1, None, &reset)
+            .expect("plan");
         plan.record_spawn(SpawnEnding {
             task_id,
             state_name: "waiting",

@@ -207,10 +207,14 @@ fn latest_agent_log_path(
 /// overwritten. A name already taken is the refusal of §FS-rhei-agents.8.1, said in its
 /// own words even when another writer took the name since the plan checked it.
 // §FS-rhei-agents.8.1 §FS-rhei-programs.5.1
-fn create_log_exclusively(log_path: &Path, task_id: &str) -> Result<fs::File, String> {
+fn create_log_exclusively(
+    log_path: &Path,
+    task_id: &str,
+    reset: Option<&ResetOffer>,
+) -> Result<fs::File, String> {
     fs::OpenOptions::new().write(true).create_new(true).open(log_path).map_err(|err| {
         if err.kind() == std::io::ErrorKind::AlreadyExists {
-            unaccounted_log_message(log_path, task_id)
+            unaccounted_log_message(log_path, task_id, reset)
         } else {
             format!("failed to create log file '{}': {err}", log_path.display())
         }

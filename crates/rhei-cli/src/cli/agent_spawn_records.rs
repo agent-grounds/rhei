@@ -254,6 +254,10 @@ struct SpawnPlan {
     /// The state's part of the configuration an agent spawn consumes; `null`
     /// for a program. §FS-rhei-evidence.6
     evidence_state: serde_json::Value,
+    /// The reset this spawn's refusal offers, from the invocation planning it.
+    /// `None` on a plan no spawn site made, which has no invocation to name.
+    // §FS-rhei-agents.8.1 §FS-rhei-reset.5.1
+    reset: Option<ResetOffer>,
 }
 
 impl SpawnPlan {
@@ -520,5 +524,6 @@ fn spawn_plan_for_test(log: &Path) -> SpawnPlan {
         charged: 0,
         previous: None,
         evidence_state: serde_json::Value::Null,
+        reset: None,
     }
 }

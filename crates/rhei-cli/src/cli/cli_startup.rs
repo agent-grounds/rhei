@@ -16,12 +16,16 @@ fn install_diagnostic_handler() {
         let help = diagnostic.help().map(|help| help.to_string()).unwrap_or_default();
         // A recovery command is a copyable unit even when it appears inside a
         // headless launcher's relayed diagnostic. §FS-rhei-migrate.5 §FS-rhei-errors.1.2
+        let message = diagnostic.to_string();
         let keeps_migration_action_whole = help.contains("rhei migrate export-priors ")
-            || diagnostic.to_string().contains("rhei migrate export-priors ");
+            || message.contains("rhei migrate export-priors ");
+        // An offered reset runs as printed, so it is not split over lines either. §FS-rhei-reset.5.1
+        let keeps_reset_offer_whole =
+            help.contains(RESET_OFFER_REACH) || message.contains(RESET_OFFER_REACH);
         Box::new(
             miette::MietteHandlerOpts::new()
                 .break_words(false)
-                .wrap_lines(!keeps_migration_action_whole)
+                .wrap_lines(!(keeps_migration_action_whole || keeps_reset_offer_whole))
                 .word_separator(textwrap::WordSeparator::AsciiSpace)
                 .word_splitter(textwrap::WordSplitter::NoHyphenation)
                 .build(),

@@ -131,15 +131,20 @@ fn reuse_notes(run: &CliRun) -> Vec<&str> {
 
 /// Why the run did not announce pairing `record` with `target`, if it did not.
 fn missing_reuse_note(run: &CliRun, record: &str, target: &str) -> Option<String> {
-    let suffix = format!(" for {target}; `rhei reset` redoes it");
+    let redo = format!(" for {target}; to redo it, run `rhei reset ");
+    let scope = " --rhei plan --state-machine ";
+    let reach = "`, which returns every ticket in that rhei to its authored state and deletes \
+                 their results and logs";
     let announced = reuse_notes(run).iter().any(|line| {
         line.starts_with(NOTE_PREFIX)
-            && line.contains(&format!("{record})"))
-            && line.ends_with(&suffix)
+            && line.contains(&format!("{record}){redo}"))
+            && line.contains(scope)
+            && line.ends_with(reach)
     });
     (!announced).then(|| {
         format!(
-            "the pairing must be announced on stdout as `{NOTE_PREFIX}…{record}){suffix}`; \
+            "the pairing must be announced on stdout as \
+             `{NOTE_PREFIX}…{record}){redo}<plan>{scope}<machine>{reach}`; \
              stdout:\n{}\nstderr:\n{}",
             run.stdout, run.stderr
         )
@@ -193,7 +198,6 @@ fn an_in_place_target_edit_keeps_the_visits_finished_work_whatever_the_slug() {
 
 // §FS-rhei-agent-visit-pairing.4 §FS-rhei-reset.5.1: the note's reset runs as printed and says how far it reaches.
 #[test]
-#[ignore = "red until #549: the note's `rhei reset` names no target; implement removes this"]
 fn the_reset_remedy_of_a_pairing_note_runs_as_printed() {
     let fixture =
         finished_then_died("agent-target-edit-note-reset", &target("mock:mock:m/x"), Entry::First);

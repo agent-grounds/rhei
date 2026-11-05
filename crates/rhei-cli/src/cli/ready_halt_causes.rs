@@ -64,8 +64,9 @@ enum HaltCause {
     /// self-loop reaches this, or one whose supervisor steered its subtree into
     /// a corner. Either way "not scheduled … rerun to pick it up" was the one
     /// remedy that provably does nothing, and this row names the ones that do.
+    /// `reset` is the one that always can, as §FS-rhei-reset.5.1 spells it.
     // §FS-rhei-supervision.3.6 §FS-rhei-run-report.3.1
-    SupervisorStrandedBySelfLoop { open: String },
+    SupervisorStrandedBySelfLoop { open: String, reset: String },
     /// A live `**Assignee:**`; the scheduler never schedules a claimed ticket.
     Claimed { assignee: String },
     /// An unsatisfied `**Prior:**`, already formatted as `Task <id> (<state>)`.
@@ -194,14 +195,14 @@ impl HaltCause {
             ),
             // §FS-rhei-supervision.3.6: the checkpoint is the only wake, so
             // the remedy is whatever lets a descendant produce one.
-            HaltCause::SupervisorStrandedBySelfLoop { open } => (
+            HaltCause::SupervisorStrandedBySelfLoop { open, reset } => (
                 format!(
                     "released its subtree on a visit that changed nothing, and nothing beneath \
                      it can move: {open}"
                 ),
                 format!(
                     "a released supervisor is woken only by a descendant that moves: unblock \
-                     one of the tickets above and rerun, or `rhei reset` to start Task {id} over"
+                     one of the tickets above and rerun, or run {reset}"
                 ),
             ),
             // §FS-rhei-states.2.5: the label, and the fact that waiting is all
@@ -414,7 +415,9 @@ fn classify_halt(
             supervisor: task,
         };
         if let Some(open) = stranded_released_supervisor(&held, &open) {
-            return HaltCause::SupervisorStrandedBySelfLoop { open };
+            // §FS-rhei-reset.5.1: every surface of the row names the same command.
+            let reset = spawns.machines.reset.for_ticket(&task.id.to_string());
+            return HaltCause::SupervisorStrandedBySelfLoop { open, reset };
         }
     }
     if machine.states.get(&state).map(|def| def.gating).unwrap_or(false) {

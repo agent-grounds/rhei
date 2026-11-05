@@ -231,14 +231,17 @@ transitions:
     }
 
     /// A taken name is refused by the one sentence the spec spells, with the
-    /// remedy naming the ticket's rhei on the line after it.
-    // §FS-rhei-agents.8.1
+    /// remedy on the line after it offering the reset that names the run's target
+    /// and the ticket's rhei, and both halves of the refusal say the same thing.
+    // §FS-rhei-agents.8.1 §FS-rhei-reset.5.1
     #[test]
     fn a_taken_log_name_is_refused() {
         let dir = tempfile::tempdir().expect("tmpdir");
         let runtime = dir.path().join("runtime");
-        let plan =
-            plan_spawn_attempt(&runtime, dir.path(), "plan.1", "work", None, LogNumber::Entry(2));
+        let plan = SpawnPlan {
+            reset: Some(ResetOffer::new(dir.path())),
+            ..plan_spawn_attempt(&runtime, dir.path(), "plan.1", "work", None, LogNumber::Entry(2))
+        };
         assert_eq!(plan.unaccounted_log_refusal("plan.1"), None);
         fs::create_dir_all(runtime.join("logs")).expect("logs");
         fs::write(&plan.log, "planted").expect("plant");
@@ -248,8 +251,19 @@ transitions:
         assert!(
             first.ends_with("task-plan.1-work-2.log exists and no spawn record accounts for it")
         );
-        assert!(remedy.contains("move that file away, or run `rhei reset --rhei plan`"));
-        assert_eq!(create_log_exclusively(&plan.log, "plan.1").err(), Some(refusal));
+        assert_eq!(
+            remedy,
+            format!(
+                "  help: move that file away, or run `rhei reset {} --rhei plan`, which returns \
+                 every ticket in that rhei to its authored state and deletes their results and \
+                 logs",
+                shell_quote(&dir.path().display().to_string())
+            )
+        );
+        assert_eq!(
+            create_log_exclusively(&plan.log, "plan.1", plan.reset.as_ref()).err(),
+            Some(refusal)
+        );
         assert_eq!(fs::read_to_string(&plan.log).expect("kept"), "planted");
     }
 }

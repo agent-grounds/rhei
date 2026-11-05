@@ -979,8 +979,8 @@ A discard excuses no evidence. A missed window that shows a pre-deadline
 invocation or a wrong route fails the regression. A first look that finds
 attempts beyond the first has lost the original deadline, so it is called missed
 only once enough time has passed since launch for that deadline to have come.
-Each discarded window leaves its step times in the job log even when the test
-passes, so a retry cannot bury a recurring slowdown.
+Each discarded window leaves its test's name and its step times in the job log
+even when the test passes, so a retry cannot bury a recurring slowdown.
 
 These are observation requirements for the existing scheduling and routing
 rules, not new runtime semantics.

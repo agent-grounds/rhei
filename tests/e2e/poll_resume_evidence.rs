@@ -62,12 +62,12 @@ fn retry_record_path(workspace: &PollWorkspace) -> PathBuf {
     workspace.project.join("runtime/spawns/task-triage-tool-reports.1-triage.json")
 }
 
-/// When attempt 2 started, if the record still names it. A stop can end attempt 2 before the
-/// exit code and footer [`completed_retry_start`] waits for exist, so this asks for neither. The
-/// run publishes a record whole, by rename, once the spawn has ended (§FS-rhei-agents.8.4), so
-/// it is absent or complete: one that does not read breaks that promise, and excuses nothing.
-/// §FS-rhei-run.3.5
-pub(super) fn attempt_two_start(workspace: &PollWorkspace) -> Option<u64> {
+/// When the latest retry started, if the record names one: attempt 2 or any later attempt, since
+/// each replaces the record. A stop can end a retry before the exit code and footer
+/// [`completed_retry_start`] waits for exist, so this asks for neither. The run publishes a
+/// record whole, by rename, once the spawn has ended (§FS-rhei-agents.8.4), so it is absent or
+/// complete: one that does not read breaks that promise, and excuses nothing. §FS-rhei-run.3.5
+pub(super) fn latest_retry_start(workspace: &PollWorkspace) -> Option<u64> {
     let path = retry_record_path(workspace);
     let body = match fs::read_to_string(&path) {
         Ok(body) => body,
@@ -76,7 +76,9 @@ pub(super) fn attempt_two_start(workspace: &PollWorkspace) -> Option<u64> {
     };
     let record: serde_json::Value = serde_json::from_str(&body)
         .unwrap_or_else(|err| panic!("a spawn record is published whole: {err}\n{body}"));
-    (record["attempt"] == 2)
+    record["attempt"]
+        .as_u64()
+        .is_some_and(|attempt| attempt >= 2)
         .then(|| utc_seconds(record["started"].as_str().expect("attempt start timestamp")))
 }
 

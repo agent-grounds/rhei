@@ -10,6 +10,7 @@ use super::{
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+#[cfg(unix)]
 use std::time::Duration;
 
 /// The one value behind both spellings of the margin. §REQ-cross-platform.8
@@ -24,6 +25,7 @@ pub(super) const FIXTURE_MARGIN: &str = concat!(fixture_margin_secs!(), "s");
 
 /// [`FIXTURE_MARGIN`], for a bound a test writes in code rather than in a fixture.
 /// §REQ-cross-platform.8
+#[cfg(unix)]
 pub(super) const FIXTURE_MARGIN_DURATION: Duration = Duration::from_secs(fixture_margin_secs!());
 
 // ---------------------------------------------------------------------------

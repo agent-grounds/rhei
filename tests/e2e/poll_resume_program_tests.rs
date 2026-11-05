@@ -251,6 +251,7 @@ fn held_poll_scenario(
     prove_within(
         FIXTURE_MARGIN_DURATION,
         || scenario_started.elapsed(),
+        report_missed_window,
         || poll_window(hold, &observe),
     )
 }

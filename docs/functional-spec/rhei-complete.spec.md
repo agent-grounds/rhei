@@ -243,8 +243,10 @@ Added avatar_url column and migration 0042
    alone. Under a finished ancestor it is the topmost such ancestor's, which the
    help says has to be reopened first; an ancestor neither a reset nor its
    profile's initial state would reopen is named with no command. Then the reset
-   and how far it reaches, offered only where that reset would reopen this ticket;
-   otherwise the help says a reset would not, and prints no reset command.
+   and how far it reaches, offered only where that reset would reopen this ticket
+   and would not be refused for leaving a plan validation refuses
+   ([§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse)); otherwise the help says a reset would not reopen it, or
+   would be refused and why, and prints no reset command.
 5. Reject if the task's current state is a [gating state](rhei-states.spec.md#12-per-state-fields) (`gating: true`) — those can only be exited by an explicit human-initiated `rhei transition`.
 6. Reject if any `**Prior:**` of the target task is unsatisfied — resolved
    across the whole project graph and judged the same way readiness judges it

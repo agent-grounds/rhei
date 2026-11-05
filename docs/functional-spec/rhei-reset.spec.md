@@ -59,6 +59,8 @@ Deliberate automation states the intent once with `--yes`.
    Re-read the current plan and ledger pathnames only after their sidecars are
    held, and retain the complete stack through preview, confirmation,
    restoration, scoped pruning or full cleanup, and the success summary.
+   Before the preview, refuse with nothing changed a reset whose moves would
+   leave a plan validation refuses ([§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse)).
 3. For every task node in the merged task graph (including all descendants):
    - Recover the task's authored state ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)) and rewrite the task's
      `**State:**` line to it. A task that never moved is already in that state,
@@ -261,9 +263,65 @@ before it deletes it, and for each in-scope task:
 Reset therefore never invents a state a task did not hold. It moves a task only
 where the ledger says that task has been.
 
+### 2.3. A Reset Validation Would Refuse
+
+Every destination [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state) decides is one task's, read from that task's own
+ledger rows and its own machine. A plan is more than its tasks one at a time, and
+the destinations can add up to a plan `rhei validate` refuses although every one of
+them is right for its task:
+
+- A finished task the reset leaves where it stands, over a descendant it reopens.
+  The finished task has no ledger row because its line was edited by hand, or the
+  row names a state the machine no longer declares, which is also what happens when
+  the run and the reset resolve different machines. Validation refuses a terminal
+  task over a descendant that is not ([§FS-rhei-plan-language.3](rhei-plan-language.spec.md#3-semantic-constraints)).
+- A ledger row that sends a task back to a terminal state it started in, over a
+  child that never moved and is not terminal.
+- A rule that has nothing to do with the tree: a recorded state the machine still
+  declares but the task's profile no longer allows.
+
+So reset asks the validator rather than copying one of its rules. Before it
+prints a preview, it validates the plan as it would leave it, under the machine
+set it resolved: every in-scope task in the state step 3 writes, with no
+`**Assignee:**` line and no `> **Result:**` link, and every other task as it
+stands. An error that validation reports and that the plan as it stands does not
+already carry is one the reset would **introduce**. An error the plan already
+carries is not the reset's doing: it is the invalid plan step 1 refuses. Links to
+files are not checked here, because the runtime output they may point at is what
+a reset deletes on purpose.
+
+When a reset would introduce an error, it refuses and changes nothing: no
+`**State:**` line, no ledger row, no result, no log. It decides this under the
+locks of step 2 and before its preview, so the preview never promises a deletion
+that is not going to happen, and a cancelled or refused reset still releases
+without mutation ([§FS-rhei-reset.3](rhei-reset.spec.md#3-safety)). `--dry-run` refuses the same way, with the same text,
+and exits non-zero: a dry run is read as a promise about what the reset does.
+
+It does not reopen the finished task instead. That task has no recorded state to
+go back to, and [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state) moves a task only where the ledger says it has
+been.
+
+The refusal names every error it would introduce, in the validator's own
+sentence, and keeps the line [§FS-rhei-reset.4](rhei-reset.spec.md#4-output) prints for a task whose recorded state
+the machine no longer declares, which is the reason that task stays where it is.
+Its help names a way on only where that way works. A finished task the reset
+leaves where it stands is there because its `**State:**` line says so, so editing
+that line lets the reset through. The help names that edit for each such task,
+but only where making every one of those edits leaves nothing the reset would
+introduce, and only with a state the edit can name: the task's profile's
+`initial` state, when the machine declares it not terminal. Where such a task has
+a `> **Result:**` link, the edit the help names deletes that line too, because
+validation refuses a result block on a task that is not terminal, and the plan has
+to be valid between the edit and the reset. Where the reset writes a state from
+the ledger instead, no edit to a `**State:**` line changes where it goes, and the
+help says that rather than offering one.
+
+A message that offers the reset as a way back checks this first, by the same
+computation, and does not offer a reset that would be refused ([§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy)).
+
 ## 3. Safety
 
-Reset is destructive with respect to runtime state: it deletes results, exports, logs, and the transition ledger. It is not destructive with respect to authored plan content — [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state) moves a task only to a state that task's own history records, so a reset can never invent a state and can never be worse for the plan than not running it. `--dry-run` previews both halves ([§FS-rhei-reset.1.1](rhei-reset.spec.md#11-options)) and confirmation gates the rest ([§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation)).
+Reset is destructive with respect to runtime state: it deletes results, exports, logs, and the transition ledger. It is not destructive with respect to authored plan content, and that takes two rules, because one task's history cannot see the others'. [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state) moves a task only to a state that task's own history records, so a reset never invents a state. [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) refuses, with nothing changed, a reset whose moves would add up to a plan validation refuses. Together they are why a reset can never be worse for the plan than not running it. `--dry-run` previews both halves ([§FS-rhei-reset.1.1](rhei-reset.spec.md#11-options)) and confirmation gates the rest ([§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation)).
 
 Because reset holds its whole selected-scope sidecar stack over the decision
 snapshot, it is safe against concurrent `rhei next` / `rhei transition` /
@@ -328,6 +386,33 @@ Reset <N> task(s) (and <M> descendant task(s)) to their authored states.
 
 The last line is `No runtime output was present.` when the `runtime/`
 directory did not exist.
+
+A reset [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) refuses prints no preview and no summary. It exits non-zero,
+with or without `--dry-run`, and its message is the refusal, then one line per
+error it would introduce, in the validator's words, then one line per task whose
+recorded state the machine no longer declares:
+
+```text
+Refusing to reset: the plan it would leave fails validation, so nothing was changed.
+  <error>
+Task <id> started in '<recorded>', which this state machine no longer declares; a reset would leave it in '<current>'.
+```
+
+Its help has one line per finished task the reset would leave where its line puts
+it, when those edits are the way on. `<file>` is the file holding the task, printed
+as [§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety) prints a path, and `<initial>` its profile's `initial` state. The
+part in brackets is there when the task has a result link:
+
+```text
+a reset leaves Task <id> where its **State:** line in <file> puts it, because nothing records a state it could restore: edit that line to '<initial>'[ and delete the `> **Result:**` line under it], then run the reset again
+```
+
+Otherwise the help names no edit. It has one line per task an error names that
+the reset moves, saying where the ledger sends it:
+
+```text
+a reset moves Task <id> to '<dest>', the state the ledger records it started in, whatever its **State:** line says
+```
 
 `--dry-run` and the pre-confirmation preview ([§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation)) print the same move list
 under `Would move <K> task(s) back:`, so what the preview promises and what the
@@ -414,8 +499,9 @@ in. `<dest>` follows [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)
 first `from` the ledger records for this ticket when the machine declares that
 state, and otherwise the state the ticket stands in.
 
-When `<dest>` is not terminal, the reset does reopen the ticket, and the two
-offers agree on where it goes:
+When `<dest>` is not terminal and the reset this message offers is not one
+[§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) refuses, the reset does reopen the ticket, and the two offers agree on
+where it goes:
 
 ```text
 nothing to do — the task is finished. An operator at a terminal can reopen this ticket alone with `rhei transition <target> --task <id> --from <from> --to <dest> --force --reason 'reopen this finished ticket'`, giving their own reason; an agent may not run that. Otherwise, run `rhei reset <target> --rhei <rhei>`, which returns every ticket in that rhei to its authored state and deletes their results and logs
@@ -436,6 +522,21 @@ Where it has no such state, the message prints no command:
 ```text
 nothing to do — the task is finished. A reset would not reopen it: it would leave this ticket in '<dest>'
 ```
+
+When `<dest>` is not terminal but [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) refuses the reset this message would
+offer, a reset is no way back either: it would change nothing. So the message
+prints no reset command and says the reset would be refused, and why, in the
+validator's words. The question is about the reset that would be offered, which
+is the whole rhei under `--rhei`, and not about this ticket's own tree: a ticket
+whose tree is fine is still not offered a reset that another tree in the same
+rhei gets refused. It is answered by the one computation the reset refuses with,
+the way `<dest>` is. The forced transition still goes to `<dest>`:
+
+```text
+nothing to do — the task is finished. An operator at a terminal can reopen this ticket alone with `rhei transition <target> --task <id> --from <from> --to <dest> --force --reason 'reopen this finished ticket'`, giving their own reason; an agent may not run that. A reset of its rhei would be refused: the plan it would leave fails validation, because <error>
+```
+
+Each error the reset would introduce is named, joined by `; `.
 
 The forced transition is built beside the reset, with the same `<target>` and the
 same `--state-machine`. `<id>` is the qualified id and `<from>` the ticket's base
@@ -468,8 +569,14 @@ The message goes no further because a profile may allow another non-terminal
 state, and which one is the operator's to choose.
 
 `<tail>` is how this ticket's own message above ends, unchanged, because it is still
-about this ticket: `Otherwise, run` and the reset text when `<dest>` is not terminal,
-and `A reset would not reopen it: it would leave this ticket in '<dest>'` when it is.
+about this ticket. It takes one of three forms: `Otherwise, run` and the reset text
+when `<dest>` is not terminal and the reset is not refused; `A reset of its rhei would
+be refused: the plan it would leave fails validation, because <error>` when
+`<dest>` is not terminal and the reset is refused; and `A reset would not reopen
+it: it would leave this ticket in '<dest>'` when `<dest>` is terminal. An ancestor
+the help names with no command is one a reset leaves finished, so where this
+ticket's `<dest>` is not terminal, that reset is refused and the tail says so rather
+than offering it.
 A ticket with no state of its own to reopen into keeps its no-command message
 whatever its ancestors are: it offers no line, so nothing in it is false. Each hop
 moves the start down: the next `rhei complete` names the next finished ancestor, and
@@ -479,6 +586,13 @@ A hop the forced path would refuse because of a claim gets that path's own refus
 the message does not predict it. A claim differs from a finished ancestor: its
 refusal names the holder and the remedy, nothing else has to be reopened, and the
 printed line runs once the claim is released.
+
+The other messages that offer the reset — a refused log name, a halt row, a note —
+do not predict [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) either. They offer the reset as the way out of
+something else and claim nothing about reopening a ticket, and they are built where
+no plan or machine has been loaded. On a plan where the reset would be refused,
+their reader gets that refusal with nothing deleted, and that refusal is what keeps
+every one of them harmless.
 
 This covers messages that name a command for the reader to run. A refusal that
 asks the reader to name a target, because none was given, keeps its placeholder:

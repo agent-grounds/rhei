@@ -33,7 +33,6 @@ fn assert_names_the_edit(said: &str, then: &str) {
 
 /// Route H, the report's own: the child reopens, the parent stays finished.
 #[test]
-#[ignore = "red until #569: the reset exits 0 and leaves a plan validation refuses; implement removes this"]
 fn a_reset_that_reopens_a_child_under_a_parent_finished_by_hand_is_refused_intact() {
     let world = parent_finished_by_hand("reset-invalid-hand");
 
@@ -45,7 +44,6 @@ fn a_reset_that_reopens_a_child_under_a_parent_finished_by_hand_is_refused_intac
 /// Route M: no hand edit. The parent stays because its first state is retired, and
 /// the refusal keeps the line that says so.
 #[test]
-#[ignore = "red until #569: the reset exits 0 and leaves a plan validation refuses; implement removes this"]
 fn a_reset_under_a_machine_that_retired_the_parents_first_state_is_refused_and_says_why() {
     let world = parent_started_in_a_retired_state("reset-invalid-retired");
 
@@ -63,7 +61,6 @@ fn a_reset_under_a_machine_that_retired_the_parents_first_state_is_refused_and_s
 
 /// Route S: no file edited. The run named its machine and the reset does not.
 #[test]
-#[ignore = "red until #569: the reset exits 0 and leaves a plan validation refuses; implement removes this"]
 fn a_reset_without_the_machine_the_run_used_is_refused_intact() {
     let world = finished_under_another_machine("reset-invalid-machine");
 
@@ -75,7 +72,6 @@ fn a_reset_without_the_machine_the_run_used_is_refused_intact() {
 /// The preview is read as a promise about what the reset does, so it refuses too,
 /// in the same words.
 #[test]
-#[ignore = "red until #569: the dry run exits 0 and previews a reset that leaves the plan invalid; implement removes this"]
 fn the_preview_of_a_refused_reset_refuses_the_same_way() {
     let world = parent_finished_by_hand("reset-invalid-preview");
 
@@ -89,7 +85,6 @@ fn the_preview_of_a_refused_reset_refuses_the_same_way() {
 /// never moved. A check of only the ancestors a reset leaves in place misses it, and
 /// editing the parent's line changes nothing, so the help does not offer that edit.
 #[test]
-#[ignore = "red until #569: the reset writes the parent back to done over an open child and exits 0; implement removes this"]
 fn a_ledger_row_that_finishes_a_parent_over_an_open_child_is_refused_and_names_no_edit() {
     let world = plan_world("reset-invalid-reverse", MACHINE, OPEN_PARENT);
     world.write("runtime/state-transitions.log", "plan.1 done@open\n");
@@ -135,7 +130,6 @@ transitions:
 /// A rule that is not about the tree, which is what shows the validator was asked
 /// rather than one of its rules copied.
 #[test]
-#[ignore = "red until #569: the reset writes back a state the profile no longer allows and exits 0; implement removes this"]
 fn a_recorded_state_the_profile_no_longer_allows_is_refused() {
     let plan = "# Rhei: Plan\n\n## Tasks\n\n### Task 1: A ticket\n**State:** draft\n";
     let world = plan_world("reset-invalid-profile", PROFILE_MACHINE, plan);
@@ -187,7 +181,6 @@ fn a_narrowed_reset_goes_through_when_only_another_rhei_would_be_left_invalid() 
 }
 
 #[test]
-#[ignore = "red until #569: the project-wide reset exits 0 and leaves b invalid; implement removes this"]
 fn a_project_wide_reset_is_refused_and_names_the_other_rheis_tickets() {
     let world = two_rheis("reset-invalid-project");
 
@@ -201,7 +194,6 @@ fn a_project_wide_reset_is_refused_and_names_the_other_rheis_tickets() {
 /// The way on for route H: the edit the help names, made, lets the reset through and
 /// leaves a plan `rhei validate` accepts before the reset and after it.
 #[test]
-#[ignore = "red until #569: the reset exits 0 where it should refuse and name the edit; implement removes this"]
 fn following_the_help_for_a_parent_finished_by_hand_lets_the_reset_through() {
     let world = parent_finished_by_hand("reset-invalid-hand-way-on");
     let said = assert_reset_refused_intact(&world, &RESET);
@@ -218,7 +210,6 @@ fn following_the_help_for_a_parent_finished_by_hand_lets_the_reset_through() {
 /// The way on for route M: the parent finished through `rhei complete`, so its result
 /// link goes with the edit, or validation would refuse the edited plan.
 #[test]
-#[ignore = "red until #569: the reset exits 0 where it should refuse and name the edit; implement removes this"]
 fn following_the_help_under_a_retired_state_lets_the_reset_through() {
     let world = parent_started_in_a_retired_state("reset-invalid-retired-way-on");
     let said = assert_reset_refused_intact(&world, &RESET);

@@ -38,19 +38,7 @@ fn reset_plan_file_states(
     locked: &LockedPlanFile,
 ) -> MietteResult<()> {
     let raw = locked.read_to_string("failed to read plan file")?;
-    let new_raw = rewrite_states_to_authored(&raw, authored)?;
-    let new_raw = strip_result_links(&new_raw);
-    let new_raw = strip_assignee_lines(&new_raw);
-    let new_raw = match rhei_core::parse(&new_raw) {
-        Ok(rhei) => {
-            if let Some(metadata) = clear_runtime_task_metadata(rhei.metadata.as_ref()) {
-                rewrite_frontmatter(&new_raw, &metadata)?
-            } else {
-                new_raw
-            }
-        }
-        Err(_) => new_raw,
-    };
+    let new_raw = reset_file_text(&raw, authored)?;
 
     let parent = path.parent().unwrap_or(Path::new("."));
     let mut tmp = tempfile::NamedTempFile::new_in(parent)
@@ -67,6 +55,23 @@ fn reset_plan_file_states(
         "failed to persist temp file: {err}"
     ))?;
     Ok(())
+}
+
+/// The text a reset writes over one plan file's `raw`: each task's `**State:**` line
+/// set to where `authored` sends it, every claim and result link gone, and the
+/// runtime metadata cleared. The one computation of it, because the plan a reset
+/// is checked against is built from it too. §FS-rhei-reset.2.2 §FS-rhei-reset.2.3
+fn reset_file_text(raw: &str, authored: &BTreeMap<String, String>) -> MietteResult<String> {
+    let new_raw = rewrite_states_to_authored(raw, authored)?;
+    let new_raw = strip_result_links(&new_raw);
+    let new_raw = strip_assignee_lines(&new_raw);
+    match rhei_core::parse(&new_raw) {
+        Ok(rhei) => match clear_runtime_task_metadata(rhei.metadata.as_ref()) {
+            Some(metadata) => rewrite_frontmatter(&new_raw, &metadata),
+            None => Ok(new_raw),
+        },
+        Err(_) => Ok(new_raw),
+    }
 }
 
 fn clear_runtime_metadata_in_file(
@@ -120,12 +125,20 @@ fn clear_runtime_metadata_in_file(
 /// present) inserted by `rhei complete`. Used during `rhei reset` so the
 /// plan returns to a clean authored state.
 fn strip_result_links(raw: &str) -> String {
+    strip_result_links_under(raw, |_| true)
+}
+
+/// [`strip_result_links`], for the lines under a task heading whose file-local id
+/// `under` accepts; `None` is the text before the first heading. §FS-rhei-reset.2.3
+fn strip_result_links_under(raw: &str, under: impl Fn(Option<&str>) -> bool) -> String {
     let lines: Vec<&str> = raw.lines().collect();
     let mut result: Vec<String> = Vec::with_capacity(lines.len());
+    let mut heading = None;
 
     for line in &lines {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with("> **Result:**") {
+        if let Some(task_id) = task_heading_id(line) {
+            heading = Some(task_id);
+        } else if line.trim_start().starts_with("> **Result:**") && under(heading) {
             // Drop a single trailing blank line accumulated before the result
             // link so we don't leave a pair of blank lines behind.
             if matches!(result.last(), Some(last) if last.trim().is_empty()) {
@@ -179,20 +192,14 @@ fn rewrite_states_to_authored(
     let mut expecting_state: Option<Option<&str>> = None;
     let mut state_lines = 0usize;
 
-    let task_heading_re = regex::Regex::new(
-        r#"^#{3,6}\s+[A-Za-z][A-Za-z0-9_-]*\s+([A-Za-z0-9][A-Za-z0-9_.\-]*):\s+"#,
-    )
-    .expect("task heading regex compiles");
-
     for line in &lines {
-        if let Some(captures) = task_heading_re.captures(line) {
+        if let Some(task_id) = task_heading_id(line) {
             if expecting_state.is_some() {
                 return Err(miette!(
                     help = plan_authoring_help(),
                     "could not find **State:** line before the next task header"
                 ));
             }
-            let task_id = captures.get(1).expect("task id capture").as_str();
             expecting_state = Some(authored.get(task_id).map(String::as_str));
             result.push((*line).to_string());
             continue;
@@ -238,6 +245,17 @@ fn rewrite_states_to_authored(
         output.push('\n');
     }
     Ok(output)
+}
+
+/// The file-local id of the task `line` is the heading of, if it is one: the
+/// headings a reset rewrites under. §FS-rhei-reset.2.2
+fn task_heading_id(line: &str) -> Option<&str> {
+    static HEADING: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let heading = HEADING.get_or_init(|| {
+        regex::Regex::new(r#"^#{3,6}\s+[A-Za-z][A-Za-z0-9_-]*\s+([A-Za-z0-9][A-Za-z0-9_.\-]*):\s+"#)
+            .expect("task heading regex compiles")
+    });
+    heading.captures(line).and_then(|captures| captures.get(1)).map(|id| id.as_str())
 }
 
 /// Find a terminal (non-cancelled) state reachable in one transition.

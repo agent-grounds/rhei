@@ -36,7 +36,6 @@ fn assert_says_the_reset_would_be_refused(said: &str) {
 /// Route H's child: the help still starts at the finished parent, as #566 made it,
 /// and ends without the reset.
 #[test]
-#[ignore = "red until #569: the help offers a reset that leaves the plan invalid; implement removes this"]
 fn a_finished_child_under_a_parent_finished_by_hand_is_not_offered_the_reset() {
     let world = parent_finished_by_hand("reset-invalid-offer-child");
 
@@ -90,7 +89,6 @@ transitions:
 /// The contradiction #566 left for this fix: an ancestor the help names with no
 /// command is one a reset leaves finished, so the reset that followed it is refused.
 #[test]
-#[ignore = "red until #569: the help says no reset reopens the ancestor, then offers one; implement removes this"]
 fn an_ancestor_nothing_reopens_is_not_followed_by_an_offered_reset() {
     let plan = OPEN_PARENT.replace(&parent_line("open"), &parent_line("draft"));
     let world = plan_world("reset-invalid-offer-stuck", TERMINAL_INITIAL, &plan);
@@ -111,7 +109,6 @@ fn an_ancestor_nothing_reopens_is_not_followed_by_an_offered_reset() {
 /// Ticket 2 finished cleanly and has no ancestor, but the reset it would be offered
 /// is the rhei's, and ticket 1's tree gets that reset refused.
 #[test]
-#[ignore = "red until #569: the help offers a rhei-wide reset another tree gets refused; implement removes this"]
 fn a_ticket_whose_own_tree_is_fine_is_not_offered_a_reset_another_tree_gets_refused() {
     let plan = format!("{OPEN_PARENT}\n### Task 2: Beside it\n**State:** open\n");
     let world = plan_world("reset-invalid-offer-beside", MACHINE, &plan);

@@ -1049,9 +1049,9 @@ fn a_hung_up_terminal_ends_the_groups_the_way_a_closed_pipe_does() {
     let (dir, workspace, machine_path) = setup_lost_output_workspace("run-hung-up-terminal");
 
     let winsize = nix::pty::Winsize { ws_row: 40, ws_col: 120, ws_xpixel: 0, ws_ypixel: 0 };
-    // Neither end may reach another process, whether this test's child or one another
-    // test spawns on its own thread at any moment. Whoever held the *master* would keep
-    // the terminal alive past the close below, and nothing would hang up. §REQ-cross-platform.7.2
+    // Neither end may survive an `exec`, in this test's child or in one another test spawns
+    // on its own thread at any moment. Whoever kept the *master* would keep the terminal
+    // alive past the close below, and nothing would hang up. §REQ-cross-platform.7.2
     let pty = open_native_terminal(&winsize);
 
     let mut cmd = rhei_command(dir.join(".home"));
@@ -1086,6 +1086,8 @@ fn a_hung_up_terminal_ends_the_groups_the_way_a_closed_pipe_does() {
     // The operator's window closes. Nothing has read this pty, so the run's
     // output so far is still sitting in a buffer that is about to be discarded.
     drop(pty.master);
+    // No wait for the hang-up here, deliberately: it would outlast an inherited holder, and
+    // this test would pass with the defect of agent-grounds/rhei#554 back. §REQ-cross-platform.7.2
     fs::write(workspace.join("runtime/go"), "").expect("release the talking agent");
 
     let status = wait_for_exit_reporting(&mut run, TEST_PATIENCE, || {

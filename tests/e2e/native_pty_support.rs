@@ -1,5 +1,6 @@
-//! The one way a test opens a native pseudo-terminal: closed to every other
-//! process from the moment it exists. §REQ-cross-platform.7.2
+//! The one way a test opens a native pseudo-terminal: both ends close-on-exec from
+//! the call that creates them, so no process keeps it past its own `exec`.
+//! §REQ-cross-platform.7.2
 //!
 //! Tests in this binary spawn on other threads at any moment, and a spawn
 //! inherits every descriptor not flagged at that instant, so a flag set after the
@@ -9,7 +10,9 @@
 
 use std::os::fd::{AsRawFd as _, FromRawFd as _, IntoRawFd as _, OwnedFd};
 use std::sync::{Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
+use nix::errno::Errno;
 use nix::fcntl::{FcntlArg, FdFlag, OFlag};
 use nix::pty::{OpenptyResult, Winsize};
 use nix::sys::stat::Mode;
@@ -51,31 +54,77 @@ pub fn open_native_terminal(size: &Winsize) -> OpenptyResult {
 
     // A platform that dropped the flag would reopen the window without a word, and
     // the failure would show up as a rare hang in whichever test last-closes it.
+    // This catches a lost flag and not a late one, which reads the same here; the
+    // guard in `suite_isolation_tests.rs` refuses the easy way of writing that.
     for (end, descriptor) in [("master", &master), ("slave", &slave)] {
         let bits = nix::fcntl::fcntl(descriptor.as_raw_fd(), FcntlArg::F_GETFD)
             .expect("read the pty's descriptor flags");
         assert!(
             FdFlag::from_bits_truncate(bits).contains(FdFlag::FD_CLOEXEC),
-            "the pty {end} must be close-on-exec from its creation (§REQ-cross-platform.7.2)"
+            "the pty {end} must be close-on-exec (§REQ-cross-platform.7.2)"
         );
     }
     OpenptyResult { master, slave }
 }
 
-/// The measure of §REQ-cross-platform.7.2: a process spawned after the terminal
-/// was opened, and still alive when its master closes, does not stop the hang-up.
+/// The binary's margin as a bound a test waits on itself, so its size stays decided
+/// in one place. §REQ-cross-platform.8
+fn margin() -> Duration {
+    let seconds = super::FIXTURE_MARGIN.strip_suffix('s').and_then(|whole| whole.parse().ok());
+    Duration::from_secs(seconds.expect("FIXTURE_MARGIN is a whole number of seconds"))
+}
+
+/// Writes to `slave` until the terminal answers that it has hung up, within `bound`.
+///
+/// A process already spawned holds the master until its `exec`, flagged or not, so
+/// the hang-up can come a moment after the last close this test can see
+/// (§REQ-cross-platform.7.2). `slave` must be non-blocking: a blocking write to a
+/// terminal that never hung up fills its buffer and stays there, past any bound.
+fn hang_up_within(slave: &OwnedFd, bound: Duration) -> Result<(), String> {
+    let deadline = Instant::now() + bound;
+    loop {
+        match nix::unistd::write(slave, b"x") {
+            Err(Errno::EIO) => return Ok(()),
+            Ok(_) | Err(Errno::EAGAIN) if Instant::now() >= deadline => {
+                return Err(format!(
+                    "the terminal did not hang up within {bound:?}, so something still holds \
+                     its master"
+                ));
+            }
+            Ok(_) | Err(Errno::EAGAIN) => std::thread::sleep(Duration::from_millis(1)),
+            Err(other) => {
+                return Err(format!("a write to a hung-up pty should fail with EIO: {other}"));
+            }
+        }
+    }
+}
+
+/// The first part of the measure of §REQ-cross-platform.7.2: a process spawned after
+/// the terminal was opened, and still alive when its master closes, does not stop
+/// the hang-up.
 ///
 /// The spawn lands after the open every time and every stdio of the process is
-/// `/dev/null`, so only an inherited descriptor could keep the master open. A
-/// helper that lost the flag therefore fails this every time rather than rarely.
+/// `/dev/null`, so only what it inherited can hold the master. Flagged, that copy
+/// lasts until its `exec`, which is why the verdict waits for the hang-up rather
+/// than judging the statement after the close. Unflagged, it lasts the process's
+/// 300s, past the margin, so a helper that lost the flag fails this every time
+/// rather than rarely.
 // §REQ-cross-platform.7.2 §FS-rhei-run.3.2
 #[test]
 fn a_process_spawned_after_the_terminal_opened_does_not_keep_it_from_hanging_up() {
-    use std::io::Write as _;
     use std::process::{Command, Stdio};
 
     let size = Winsize { ws_row: 24, ws_col: 80, ws_xpixel: 0, ws_ypixel: 0 };
     let pty = open_native_terminal(&size);
+    // On the open file description, so clones would share it: this slave goes to no
+    // child, which is why it is set here and not in the helper.
+    let bits = nix::fcntl::fcntl(pty.slave.as_raw_fd(), FcntlArg::F_GETFL)
+        .expect("read the slave's status flags");
+    let nonblocking = OFlag::from_bits_truncate(bits) | OFlag::O_NONBLOCK;
+    nix::fcntl::fcntl(pty.slave.as_raw_fd(), FcntlArg::F_SETFL(nonblocking))
+        .expect("make the slave non-blocking");
+    let bound = margin();
+
     let mut witness = Command::new("sleep")
         .arg("300")
         .stdin(Stdio::null())
@@ -85,7 +134,7 @@ fn a_process_spawned_after_the_terminal_opened_does_not_keep_it_from_hanging_up(
         .expect("sleep should start");
 
     drop(pty.master);
-    let written = std::fs::File::from(pty.slave).write(b"x");
+    let hung_up = hang_up_within(&pty.slave, bound);
 
     // Everything the verdict needs is read before the kill, and nothing before the
     // reap can panic, so the process is gone whichever way the verdict goes.
@@ -93,11 +142,8 @@ fn a_process_spawned_after_the_terminal_opened_does_not_keep_it_from_hanging_up(
     let _ = witness.kill();
     let _ = witness.wait();
 
-    assert!(outlived_the_close, "the witness must be alive when the master closes");
-    let error = written.expect_err("a write to a hung-up pty should fail");
-    assert_eq!(
-        error.raw_os_error(),
-        Some(nix::errno::Errno::EIO as i32),
-        "a hung-up pty should fail the write with EIO: {error}"
-    );
+    assert!(outlived_the_close, "the witness must outlive the master's close");
+    if let Err(failure) = hung_up {
+        panic!("{failure}");
+    }
 }

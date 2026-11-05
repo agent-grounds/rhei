@@ -132,11 +132,10 @@ The measure is the stream quoted in agent-grounds/rhei#448 — the prompt's spac
 drawn as a cursor-forward and a window title in the line — which signals the
 prompt, as does the same stream with the sequences split across reads.
 
-### 7.2 A Terminal Is Closed To Every Other Process From The Moment It Exists
+### 7.2 A Terminal Is Created Close-On-Exec, And A Verdict On Its Hang-Up Waits For It
 
-A native pseudo-terminal a test opens is closed to every other process from the
-moment it exists: both ends are created close-on-exec, by the call that creates
-them, and never flagged afterwards, however soon after.
+A native pseudo-terminal a test opens has both ends created close-on-exec, by
+the call that creates them, and never flagged afterwards, however soon after.
 
 Tests in one binary spawn at any moment on other threads, and a spawn inherits
 every descriptor not flagged at that instant. A process spawned between the
@@ -152,18 +151,38 @@ reports. That is a defect of the harness, not of the run or of the platform
 between two calls is a gap however short, so only a descriptor created with the
 flag has none.
 
+The flag does not close everything. A process already spawned holds a copy of
+every descriptor until its `exec`, flagged or not, so the last close can come a
+moment after the test's own. On Linux the slowest measured was 5.4 ms; nothing
+has measured it on macOS. So a test that judges the hang-up directly waits for
+it, within the binary's margin [§REQ-cross-platform.8](cross-platform.md#8-a-margin-outlasts-a-stalled-runner), rather than judging the
+statement after its close.
+
+The test of agent-grounds/rhei#554 is the exception, because a wait would undo
+what it proves. It shows that a run notices its lost terminal, so it releases the
+run's next print straight after the close. A wait there would also outlast an
+inherited holder: the run would print into a dead terminal and the test would
+pass with the defect back. What it keeps is a small exposure, not a zero one: the
+run's one print can land inside that moment, and the failure then reads as a run
+that did not exit, with the report [§REQ-cross-platform.7](cross-platform.md#7-a-terminal-harness-reports-what-it-read-without-waiting-for-the-end) asks for.
+
 A terminal opened through a library that flags afterwards carries that window
 with it, as `portable_pty` does, which the tests that also run on a ConPTY share.
 A verdict on such a terminal must not turn on its last close, so the worst a
 leak does there is delay a reader's end. A test whose verdict does turn on the
 last close opens its terminal the first way.
 
-The measure is a process spawned after the terminal was opened and still alive
-when its master closes: a write to the slave fails with `EIO`, on every platform
-with a native pseudo-terminal. The test of agent-grounds/rhei#554 passes with the
-moment after the creation widened to a second beside another test's spawn, and
-no source in the tree calls `nix::pty::openpty`, the call that leaves the flag
-to its caller.
+The measure has three parts:
+
+1. A process spawned after the terminal was opened and still alive when its
+   master closes does not stop the hang-up: a write to the slave fails with `EIO`
+   within the margin, on every platform with a native pseudo-terminal.
+2. The test of agent-grounds/rhei#554 passes with the moment after the creation
+   widened to a second beside another test's spawn.
+3. No source calls `nix::pty::openpty`, the call that leaves the flag to its
+   caller, and no file that opens a terminal sets a descriptor's flags. The first
+   part sees a flag that was lost and cannot see one that came late, so this is
+   what stops the easy way of writing that.
 
 ## 8. A Margin Outlasts A Stalled Runner
 

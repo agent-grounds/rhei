@@ -385,18 +385,28 @@ fn only_the_shared_helper_names_git_as_a_program() {
 /// the next test copying the call. A comment may name it; a terminal opened
 /// through `portable_pty` is not this call and carries §REQ-cross-platform.7.2's
 /// other rule instead.
+///
+/// The same gap can be written by hand: an end created without the flag and given
+/// it in the next statement passes the helper's assertion and every test here, so
+/// a file that opens a terminal may not set a descriptor's flags either. That
+/// stops the easy way of writing it, not a deliberate way round.
 #[test]
 fn only_a_close_on_exec_call_opens_a_native_terminal() {
     let root = repo_root();
     // Spelled rather than written, so that this file does not count itself.
     let needle = format!("nix::pty::{}", "openpty");
+    let opens_a_terminal = format!("posix_{}", "openpt");
+    let sets_descriptor_flags = format!("F_SET{}", "FD");
     let mut offenders: Vec<String> = Vec::new();
     for tree in ["tests", "crates"] {
         for path in rust_sources_under(&root.join(tree)) {
             let text = std::fs::read_to_string(&path).expect("a source should be readable");
             let shown = path.strip_prefix(&root).unwrap_or(&path).display().to_string();
+            let is_code = |line: &&str| !line.trim_start().starts_with("//");
+            let opens = text.lines().filter(is_code).any(|l| l.contains(opens_a_terminal.as_str()));
             for (index, line) in text.lines().enumerate() {
-                if !line.trim_start().starts_with("//") && line.contains(needle.as_str()) {
+                let late_flag = opens && line.contains(sets_descriptor_flags.as_str());
+                if is_code(&line) && (line.contains(needle.as_str()) || late_flag) {
                     offenders.push(format!("{shown}:{}", index + 1));
                 }
             }
@@ -406,10 +416,11 @@ fn only_a_close_on_exec_call_opens_a_native_terminal() {
     assert!(
         offenders.is_empty(),
         "{} place(s) open a pseudo-terminal through the call that leaves both ends \
-         inheritable until a later `fcntl`, so a process another test spawns in that gap \
-         holds the master, its close hangs nothing up, and a run under test never learns \
-         its terminal went (§REQ-cross-platform.7.2): {offenders:?}. Create both ends \
-         close-on-exec instead, in the call that creates them.",
+         inheritable until a later `fcntl`, or make that `fcntl` in a file that opens one, \
+         so a process another test spawns in that gap holds the master, its close hangs \
+         nothing up, and a run under test never learns its terminal went \
+         (§REQ-cross-platform.7.2): {offenders:?}. Create both ends close-on-exec instead, \
+         in the call that creates them.",
         offenders.len()
     );
 }

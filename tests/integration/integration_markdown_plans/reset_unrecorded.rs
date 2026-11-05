@@ -30,7 +30,8 @@ transitions:
 "#;
 
     // Task 1 carries a result link: the trace that says a run touched it, so
-    // reset cannot write it off as authored where it stands.
+    // reset cannot write it off as authored where it stands. The link is the
+    // one validation accepts, since reset refuses a plan it refuses. §FS-rhei-reset.2
     let plan = r#"# Rhei: Unrecorded
 
 ## Tasks
@@ -38,7 +39,7 @@ transitions:
 ### Task 1: Alpha
 **State:** completed
 
-> **Result:** [1](runtime/results/plan.1.md)
+> **Result:** [plan.1](runtime/results/plan.1.md)
 
 ### Task 2: Beta
 **State:** draft

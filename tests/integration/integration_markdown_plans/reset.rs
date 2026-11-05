@@ -31,7 +31,7 @@ transitions:
 **Assignee:** codex
 
 #### Task 1.1: Detail
-**State:** in-progress
+**State:** completed
 **Assignee:** claude-code
 
 ### Task 2: Beta
@@ -42,14 +42,14 @@ transitions:
     let plan_path = write_fixture_file(&dir, "plan.rhei.md", plan);
     let machine_path = write_fixture_file(&dir, "states.yaml", machine);
 
-    // Every task moved out of `draft`, and the ledger is what records it.
-    // §FS-rhei-reset.2.2
+    // Every task moved out of `draft`, and the ledger is what records it. The child
+    // finished before its parent: reset refuses a plan validation refuses. §FS-rhei-reset.2.2
     let runtime = dir.join("runtime");
     fs::create_dir_all(&runtime).expect("create runtime dir");
     fs::write(
         runtime.join("state-transitions.log"),
         "plan.1 draft@pending\nplan.1.1 draft@pending\nplan.2 draft@pending\n\
-         plan.1 pending@completed\nplan.1.1 pending@in-progress\n",
+         plan.1.1 pending@completed\nplan.1 pending@completed\n",
     )
     .expect("write ledger");
 

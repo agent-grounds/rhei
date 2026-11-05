@@ -93,14 +93,12 @@ fn assert_reset_refuses_as_validate_does(world: &RemedyWorld, problem: &str) {
 
 /// The issue's own shape.
 #[test]
-#[ignore = "red until #572: reset runs on a plan validate refuses; implement removes this"]
 fn a_parent_finished_over_an_open_child_is_refused_before_any_reset() {
     let world = refused_plan("reset-standing-parent", FINISHED_PARENT, PARENT_OVER_CHILD);
     assert_reset_refuses_as_validate_does(&world, PARENT_OVER_CHILD);
 }
 
 #[test]
-#[ignore = "red until #572: reset runs on a plan validate refuses; implement removes this"]
 fn a_prior_naming_a_missing_task_is_refused_before_any_reset() {
     let problem = "Task plan.1 depends on missing Task plan.9";
     let world = refused_plan("reset-standing-prior", MISSING_PRIOR, problem);
@@ -110,7 +108,6 @@ fn a_prior_naming_a_missing_task_is_refused_before_any_reset() {
 /// The validator lists the cycle's tasks in no fixed order, so only the sentence's
 /// stem is compared.
 #[test]
-#[ignore = "red until #572: reset runs on a plan validate refuses; implement removes this"]
 fn two_tasks_that_are_each_others_prior_are_refused_before_any_reset() {
     let problem = "Circular dependency detected among tasks";
     let world = refused_plan("reset-standing-cycle", CYCLE, problem);
@@ -118,7 +115,6 @@ fn two_tasks_that_are_each_others_prior_are_refused_before_any_reset() {
 }
 
 #[test]
-#[ignore = "red until #572: reset runs on a plan validate refuses; implement removes this"]
 fn a_state_the_machine_does_not_declare_is_refused_before_any_reset() {
     let problem = "Task plan.1 has invalid state 'bogus'. Allowed: [open, done]";
     let world = refused_plan("reset-standing-undeclared", UNDECLARED_STATE, problem);
@@ -129,7 +125,6 @@ fn a_state_the_machine_does_not_declare_is_refused_before_any_reset() {
 /// reset of a sound rhei is refused while another rhei is invalid; that is what
 /// `rhei complete` does to a ticket of `a` too. §FS-rhei-panta.6.4
 #[test]
-#[ignore = "red until #572: reset runs on a plan validate refuses; implement removes this"]
 fn a_narrowed_reset_is_refused_while_another_rhei_is_invalid() {
     let world = RemedyWorld::at("reset-standing-project", "project");
     world.write("index.panta.md", "# Panta: Two\n");

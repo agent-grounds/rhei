@@ -962,8 +962,28 @@ original deadline, exactly two real attempts at the second checkpoint, state
 `triage`, visits increasing from 2 to 3, an advanced retry deadline, actual
 exit 75, and no `triage@resolved` transition. No relaxed deadline, extra
 timing allowance, skipped waiting assertion, or eventual counter alone
-substitutes for this proof. These are observation requirements for the
-existing scheduling and routing rules, not new runtime semantics.
+substitutes for this proof.
+
+A window is one fresh workspace's run at this proof, and a window the
+scenario's own steps miss is worth nothing. Time spent outside `rhei run` can
+carry its first look, stop, or restart to the original deadline; such a window
+has not restarted before that deadline and says nothing about `rhei run`, for
+or against. It is discarded, and none of its checks count: the proof comes whole
+from one fresh workspace that restarts strictly before its own original
+deadline and meets every requirement above. Retries are bounded by the fixture
+margin ([§REQ-cross-platform.8](../requirements/cross-platform.md#8-a-margin-outlasts-a-stalled-runner)): no new window opens once that margin is spent,
+a window already open runs to its end, and running out of windows is a failure
+that names each window's step times.
+
+A discard excuses no evidence. A missed window that shows a pre-deadline
+invocation or a wrong route fails the regression. A first look that finds
+attempts beyond the first has lost the original deadline, so it is called missed
+only once enough time has passed since launch for that deadline to have come.
+Each discarded window leaves its step times in the job log even when the test
+passes, so a retry cannot bury a recurring slowdown.
+
+These are observation requirements for the existing scheduling and routing
+rules, not new runtime semantics.
 
 ### 3.6. Stall Release
 

@@ -98,7 +98,9 @@ pub(super) fn assert_offers_forced_line(said: &str, home: &Path) -> String {
         .lines()
         .find(|line| line.contains(offer.as_str()))
         .expect("the offer was read from one line");
-    assert!(line.contains("An operator at a terminal"), "it says who may run it:\n{line}");
+    // The ancestor's line names them mid-sentence. §FS-rhei-reset.5.1
+    let who = ["An operator at a terminal", "an operator at a terminal starts with"];
+    assert!(who.iter().any(|who| line.contains(who)), "it says who may run it:\n{line}");
     assert!(line.contains("an agent may not run"), "it says an agent may not:\n{line}");
     assert!(
         line.contains(&format!("`{offer}`, giving their own reason")),

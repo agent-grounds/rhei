@@ -267,7 +267,6 @@ const NO_RESET: &str = "A reset would not reopen it: it would leave this ticket 
 /// A child under a parent dropped from `work`, whose one visit is spent. The line is the
 /// parent's, and it goes to the parent's initial state and says why.
 #[test]
-#[ignore = "red until #570: the shared helper wants a capital 'An operator', which the ancestor's line has mid-sentence; the next commit corrects it"]
 fn a_spent_ancestor_destination_sends_its_line_to_its_initial_state() {
     let world =
         plan_world("reset-remedy-budget-ancestor", &machine(&[("work", 1)]), &child_under("work"));

@@ -211,6 +211,7 @@ mod reset_invalid_plan_offer_tests;
 mod reset_invalid_plan_support;
 mod reset_invalid_plan_tests;
 mod reset_remedy_ancestor_tests;
+mod reset_remedy_budget_tests;
 mod reset_remedy_finished_tests;
 mod reset_remedy_messages_tests;
 mod reset_remedy_support;

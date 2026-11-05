@@ -239,7 +239,9 @@ Added avatar_url column and migration 0042
 4. Reject if the task is already in a terminal state. The refusal's help is the
    text of [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy): first the forced transition, for an operator at a
    terminal and not for an agent, where the machine has a state to reopen this
-   ticket into. With no finished ancestor, that transition reopens this ticket
+   ticket into whose visit budget is not spent, the forced path refusing any
+   other; where a spent budget is why no line goes back, the help names it.
+   With no finished ancestor, that transition reopens this ticket
    alone. Under a finished ancestor it is the topmost such ancestor's, which the
    help says has to be reopened first; an ancestor neither a reset nor its
    profile's initial state would reopen is named with no command. Then the reset

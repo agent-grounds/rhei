@@ -509,7 +509,18 @@ in. `<dest>` follows [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)
 first `from` the ledger records for this ticket when the machine declares that
 state, and otherwise the state the ticket stands in.
 
-When `<dest>` is not terminal and the reset this message offers is not one
+The forced transition goes only to a state the forced path would let the hop
+enter: one the machine declares as not terminal, and whose `visits:` budget this
+ticket has not spent. The forced path refuses a hop into a spent state before
+its terminal check ([§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery)), so a line into one never runs, whoever
+runs it. Spent is what that refusal measures, the ticket's counted visits to the
+state against its limit ([§FS-rhei-transitions.4.3](rhei-transitions.spec.md#43-counted-loops)), decided by the one check both use,
+so the offer and the refusal cannot disagree. A state with no `visits:` is never
+spent. Such a state **qualifies**. The line goes to `<dest>` when it qualifies,
+and otherwise to the `initial` state of the ticket's own profile when that
+qualifies.
+
+When `<dest>` qualifies and the reset this message offers is not one
 [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) refuses, the reset does reopen the ticket, and the two offers agree on
 where it goes:
 
@@ -517,17 +528,27 @@ where it goes:
 nothing to do — the task is finished. An operator at a terminal can reopen this ticket alone with `rhei transition <target> --task <id> --from <from> --to <dest> --force --reason 'reopen this finished ticket'`, giving their own reason; an agent may not run that. Otherwise, run `rhei reset <target> --rhei <rhei>`, which returns every ticket in that rhei to its authored state and deletes their results and logs
 ```
 
+When `<dest>` is not terminal but its budget is spent, the reset still reopens
+the ticket, because it clears the ticket's counted visits along with its state
+([§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior)), so it stays offered where [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) does not refuse it. Where
+`initial` qualifies, the line goes there, and the message says why it does not go back to `<dest>`, in the forced
+path's own words ([§FS-rhei-errors.1.5](rhei-errors.spec.md#15-the-subject-a-check-measured)):
+
+```text
+nothing to do — the task is finished. An operator at a terminal can reopen this ticket alone with `rhei transition <target> --task <id> --from <from> --to <initial> --force --reason 'reopen this finished ticket'`, giving their own reason; an agent may not run that. That command goes to '<initial>' rather than '<dest>': visit budget for state '<dest>' is exhausted (<used>/<limit> visits). Otherwise, run `rhei reset <target> --rhei <rhei>`, which returns every ticket in that rhei to its authored state and deletes their results and logs
+```
+
 When `<dest>` is terminal, a reset is no way back: it would delete the rhei's
 results and logs and leave this ticket finished. So the message prints no reset
 command and says that a reset would not reopen the ticket. Where the ticket's
-profile has an `initial` state the machine declares as not terminal, the forced
-transition goes there:
+profile has an `initial` state that qualifies, the forced transition goes there:
 
 ```text
 nothing to do — the task is finished. An operator at a terminal can reopen this ticket alone with `rhei transition <target> --task <id> --from <from> --to <initial> --force --reason 'reopen this finished ticket'`, giving their own reason; an agent may not run that. A reset would not reopen it: it would leave this ticket in '<dest>'
 ```
 
-Where it has no such state, the message prints no command:
+Where the profile has no `initial` the machine declares as not terminal, the
+message prints no command:
 
 ```text
 nothing to do — the task is finished. A reset would not reopen it: it would leave this ticket in '<dest>'
@@ -540,13 +561,44 @@ validator's words. The question is about the reset that would be offered, which
 is the whole rhei under `--rhei`, and not about this ticket's own tree: a ticket
 whose tree is fine is still not offered a reset that another tree in the same
 rhei gets refused. It is answered by the one computation the reset refuses with,
-the way `<dest>` is. The forced transition still goes to `<dest>`:
+the way `<dest>` is. The forced transition still goes where the rule above sends
+it, `<dest>` when that qualifies:
 
 ```text
 nothing to do — the task is finished. An operator at a terminal can reopen this ticket alone with `rhei transition <target> --task <id> --from <from> --to <dest> --force --reason 'reopen this finished ticket'`, giving their own reason; an agent may not run that. A reset of its rhei would be refused: the plan it would leave fails validation, because <error>
 ```
 
 Each error the reset would introduce is named, joined by `; `.
+
+Where no state qualifies and a spent budget is why, the message prints no
+command either, and says which budget is spent. It names every state the rule
+passed over for its budget, `<dest>` first and each once, with the forced path's
+own refusal for it. Where `<dest>` is not terminal and the reset is not refused,
+the reset is offered, since it clears the count; with no line before it, its
+lead-in says it is the way back rather than `Otherwise`:
+
+```text
+nothing to do — the task is finished. It cannot be forced back into '<spent>': visit budget for state '<spent>' is exhausted (<used>/<limit> visits). A reset reopens it with its visits cleared: run `rhei reset <target> --rhei <rhei>`, which returns every ticket in that rhei to its authored state and deletes their results and logs
+```
+
+Where `<dest>` is terminal, or the reset is refused, the message ends as the
+others do for that case, with `A reset would not reopen it` or with `A reset of
+its rhei would be refused` and the errors:
+
+```text
+nothing to do — the task is finished. It cannot be forced back into '<spent>': visit budget for state '<spent>' is exhausted (<used>/<limit> visits). A reset would not reopen it: it would leave this ticket in '<dest>'
+```
+
+When `<dest>` and `initial` are two states and both are spent, the sentence
+names both and joins the two refusals with a semicolon:
+
+```text
+It cannot be forced back into '<dest>' or '<initial>': visit budget for state '<dest>' is exhausted (<used>/<limit> visits); visit budget for state '<initial>' is exhausted (<used>/<limit> visits).
+```
+
+The message goes no further than `<dest>` and `initial`, here or for an ancestor
+below, because a profile may allow another non-terminal state, and which one is
+the operator's to choose.
 
 The forced transition is built beside the reset, with the same `<target>` and the
 same `--state-machine`. `<id>` is the qualified id and `<from>` the ticket's base
@@ -561,22 +613,35 @@ refuses it until every terminal ancestor has been reopened
 `<ancestor>` is the qualified id of the topmost finished ancestor, the only one
 whose line gets past that refusal, found the way the refusal finds a terminal
 ancestor. The line is that ancestor's own: `<ancestor-from>` is its base state, and
-`<ancestor-to>` is decided for it by the rule above, its own reset destination when
-that is not terminal, otherwise its own profile's `initial` when the machine
-declares that as not terminal:
+`<ancestor-to>` is decided for it by the rule above, measured against the
+ancestor's own counted visits: `<ancestor-dest>`, its own reset destination, when
+that qualifies, otherwise its own profile's `initial` when that qualifies:
 
 ```text
 nothing to do — the task is finished. Its ancestor <ancestor> is finished too and has to be reopened first, then each finished ticket below it down to this one: an operator at a terminal starts with `rhei transition <target> --task <ancestor> --from <ancestor-from> --to <ancestor-to> --force --reason 'reopen this finished ticket'`, giving their own reason; an agent may not run that. <tail>
 ```
 
-An ancestor with no such state gets no command, and the message says why:
+Where that line passes over `<ancestor-dest>` for a spent budget, the message
+says so after the line, in the words this ticket's own message uses:
+
+```text
+nothing to do — the task is finished. Its ancestor <ancestor> is finished too and has to be reopened first, then each finished ticket below it down to this one: an operator at a terminal starts with `rhei transition <target> --task <ancestor> --from <ancestor-from> --to <ancestor-to> --force --reason 'reopen this finished ticket'`, giving their own reason; an agent may not run that. That command goes to '<ancestor-to>' rather than '<ancestor-dest>': visit budget for state '<ancestor-dest>' is exhausted (<used>/<limit> visits). <tail>
+```
+
+An ancestor for which neither `<ancestor-dest>` nor its profile's `initial` is a
+state the machine declares as not terminal gets no command, and the message says
+why:
 
 ```text
 nothing to do — the task is finished. Its ancestor <ancestor> is finished too and has to be reopened first, and neither a reset nor its profile's initial state would do that. <tail>
 ```
 
-The message goes no further because a profile may allow another non-terminal
-state, and which one is the operator's to choose.
+An ancestor no state qualifies for because of a spent budget gets no command
+either, and the message names each spent state as this ticket's own does:
+
+```text
+nothing to do — the task is finished. Its ancestor <ancestor> is finished too and has to be reopened first, and it cannot be forced back into '<spent>': visit budget for state '<spent>' is exhausted (<used>/<limit> visits). <tail>
+```
 
 `<tail>` is how this ticket's own message above ends, unchanged, because it is still
 about this ticket. It takes one of three forms: `Otherwise, run` and the reset text
@@ -584,18 +649,24 @@ when `<dest>` is not terminal and the reset is not refused; `A reset of its rhei
 be refused: the plan it would leave fails validation, because <error>` when
 `<dest>` is not terminal and the reset is refused; and `A reset would not reopen
 it: it would leave this ticket in '<dest>'` when `<dest>` is terminal. An ancestor
-the help names with no command is one a reset leaves finished, so where this
-ticket's `<dest>` is not terminal, that reset is refused and the tail says so rather
-than offering it.
+that neither a reset nor its profile's initial state would reopen is one a reset
+leaves finished, so where this ticket's `<dest>` is not terminal, that reset is
+refused and the tail says so rather than offering it. An ancestor named for a spent
+budget may be one the reset reopens, since the reset clears the count, and its tail
+is whichever form the reset's own computation gives.
 A ticket with no state of its own to reopen into keeps its no-command message
-whatever its ancestors are: it offers no line, so nothing in it is false. Each hop
-moves the start down: the next `rhei complete` names the next finished ancestor, and
-once none is left, this ticket's own line.
+whatever its ancestors are, the one naming a spent budget included: it offers no
+line, so nothing in it is false. Each hop moves the start down: the next
+`rhei complete` names the next finished ancestor, and once none is left, this
+ticket's own line.
 
-A hop the forced path would refuse because of a claim gets that path's own refusal;
-the message does not predict it. A claim differs from a finished ancestor: its
+The message predicts two of the forced path's refusals, a finished ancestor and a
+spent visit budget. A hop the forced path would refuse because of a claim gets that
+path's own refusal; the message does not predict it. A claim differs from both: its
 refusal names the holder and the remedy, nothing else has to be reopened, and the
-printed line runs once the claim is released.
+printed line runs once the claim is released. A spent budget's refusal names no
+remedy, and nothing short of a reset, which is the other offer, clears the count,
+so a line into a spent state would never run.
 
 The other messages that offer the reset — a refused log name, a halt row, a note —
 do not predict [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) either. They offer the reset as the way out of

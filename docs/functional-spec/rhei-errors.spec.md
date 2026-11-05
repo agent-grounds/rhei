@@ -154,7 +154,8 @@ Any command Rhei prints — in an error, a help line, or a success summary — m
 survive being pasted into an interactive shell: every value parses as the single
 argument Rhei meant, and no token is ever split across lines.
 
-A command wider than the terminal still wraps, at a space. Rejoining two lines
+A command wider than the terminal still wraps, at a space, unless the point that
+prints it keeps it whole, as [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy) does. Rejoining two lines
 is a visible, recoverable inconvenience; a path or selector broken mid-token is
 neither, which is why the renderer breaks only at spaces. Suggestions are kept
 short for the same reason — paths are printed relative to the working directory

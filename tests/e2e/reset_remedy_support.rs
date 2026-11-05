@@ -10,7 +10,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Command, Output, Stdio};
 
 use super::entry_log_support::settings;
 use super::*;
@@ -33,6 +33,49 @@ pub(super) fn offered_resets(text: &str) -> Vec<String> {
         }
     }
     offers
+}
+
+/// Every `rhei transition` the text offers in backticks, as printed.
+pub(super) fn offered_transitions(text: &str) -> Vec<String> {
+    let spans = text.lines().flat_map(|line| line.split('`').skip(1).step_by(2));
+    spans.filter(|span| span.starts_with("rhei transition ")).map(str::to_string).collect()
+}
+
+/// The way back a finished ticket's refusal offers ahead of the reset, returned as
+/// printed: it runs as printed and stops at the forced path's own terminal check,
+/// which comes after every stable preflight, so the shell, the arguments and the hop
+/// were all accepted, on every platform and with no pseudo-terminal. The line says
+/// who it is for. §FS-rhei-reset.5.1 §FS-rhei-transition-cmd.6
+#[track_caller]
+pub(super) fn assert_offers_forced_reopen(said: &str, home: &Path) -> String {
+    let offers = offered_transitions(said);
+    let [offer] = offers.as_slice() else {
+        panic!("one `rhei transition` must be offered, found {}, in:\n{said}", offers.len());
+    };
+
+    let literal = run_offer(offer, "", home);
+    let refusal = format!("{}{}", literal.stdout, literal.stderr);
+    assert!(
+        !literal.status.success()
+            && refusal
+                .contains("--force requires an interactive terminal and fresh typed confirmation"),
+        "as printed, with no terminal, it stops at the forced path's own confirmation.\n{offer} \
+         exited {:?}:\n{refusal}",
+        literal.status.code()
+    );
+
+    let line = said
+        .lines()
+        .find(|line| line.contains(offer.as_str()))
+        .expect("the offer was read from one line");
+    let reset_at = line.find("`rhei reset ").expect("the reset is offered on the same line");
+    assert!(
+        line.find(offer.as_str()).is_some_and(|at| at < reset_at),
+        "the one-ticket way back comes before the reset:\n{line}"
+    );
+    assert!(line.contains("An operator at a terminal"), "it says who may run it:\n{line}");
+    assert!(line.contains("an agent may not run"), "it says an agent may not:\n{line}");
+    offer.clone()
 }
 
 /// Run `line` and what follows it through the platform's shell, from a directory
@@ -242,6 +285,11 @@ impl RemedyWorld {
 
     /// `rhei <subcommand> <target> <args>`, as this world's run spells it.
     pub(super) fn rhei(&self, subcommand: &str, args: &[&str]) -> CliRun {
+        CliRun::from(&self.rhei_output(subcommand, args))
+    }
+
+    /// The same run with its bytes as written, for a test about where lines fall.
+    pub(super) fn rhei_output(&self, subcommand: &str, args: &[&str]) -> Output {
         let mut command = rhei_command(&self.home);
         command.current_dir(&self.cwd);
         scrub_inherited_rhei_env(&mut command);
@@ -249,7 +297,7 @@ impl RemedyWorld {
             command.arg("--state-machine").arg(machine);
         }
         command.arg(subcommand).arg(&self.target).args(args);
-        CliRun::from(&command.output().expect("rhei should start"))
+        command.output().expect("rhei should start")
     }
 
     pub(super) fn step(&self, subcommand: &str, args: &[&str]) {

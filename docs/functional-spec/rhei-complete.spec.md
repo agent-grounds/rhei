@@ -236,7 +236,10 @@ Added avatar_url column and migration 0042
    The accepted message itself is not normalized ([§FS-rhei-complete.2.2](rhei-complete.spec.md#22-result-sources)).
 2. Load the state machine and plan (single file or directory workspace). Validate.
 3. Locate the task by ID. Fail if the task does not exist.
-4. Reject if the task is already in a terminal state.
+4. Reject if the task is already in a terminal state. The refusal's help says
+   how to reopen it, in the text of [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy): first the forced transition
+   that reopens this ticket alone, for an operator at a terminal and not for an
+   agent, then the reset and how far it reaches.
 5. Reject if the task's current state is a [gating state](rhei-states.spec.md#12-per-state-fields) (`gating: true`) — those can only be exited by an explicit human-initiated `rhei transition`.
 6. Reject if any `**Prior:**` of the target task is unsatisfied — resolved
    across the whole project graph and judged the same way readiness judges it

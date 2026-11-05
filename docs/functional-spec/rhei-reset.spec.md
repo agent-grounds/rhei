@@ -388,13 +388,39 @@ report, a log, or another directory:
 - It carries no `--yes`. The preview and the confirmation of
   [§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation) are part of running it, so a caller without a terminal gets
   reset's own refusal, which names both ways on.
+- A diagnostic carrying this text is not wrapped. Its target alone may be wider
+  than the terminal, so a wrap would split the command over lines, and three
+  lines do not run as printed. The renderer leaves the line whole and the
+  terminal soft-wraps it, which copies back as one line. This is the exception
+  [§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety) allows.
 
 **It says how far it reaches.** `--rhei` is the narrowest scope reset has
 ([§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei)), and a message about one ticket reads as an offer to clear
 one ticket. So the text says "every ticket in that rhei", and a message never
 describes the command as clearing the ticket it is about. Where there is a
-cheaper way out, it comes first: a refused log name offers moving the file away
-before the reset ([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)).
+cheaper way out the message can print, it comes first: a refused log name offers
+moving the file away before the reset ([§FS-rhei-agents.8.1](rhei-agents.spec.md#81-log-file-naming)).
+
+`rhei complete` on a finished ticket ([§FS-rhei-complete.4](rhei-complete.spec.md#4-behavior)) prints a cheaper way
+too: the forced transition of [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery), which reopens that ticket
+alone and keeps every other ticket's state, results and logs. That command
+belongs to an operator at a terminal, and agents are forbidden it, while an agent
+is the likeliest reader of this refusal. So the text says both who may run it and
+that an agent may not:
+
+```text
+nothing to do — the task is finished. An operator at a terminal can reopen this ticket alone with `rhei transition <target> --task <id> --from <from> --to <to> --force --reason 'reopen this finished ticket'`; an agent may not run that. Otherwise, run `rhei reset <target> --rhei <rhei>`, which returns every ticket in that rhei to its authored state and deletes their results and logs
+```
+
+It is built beside the reset, with the same `<target>` and the same
+`--state-machine`. `<id>` is the qualified id and `<from>` the ticket's base
+state. `<to>` is the state the reset would return this ticket to, so the two
+offers agree: the first `from` the ledger records for it
+([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)), and otherwise its profile's `initial` state. A candidate must
+be declared by the machine, must not be terminal, and must differ from `<from>`.
+If neither candidate qualifies, the message offers the reset alone. A hop the
+forced path would refuse, because of a terminal ancestor or a claim, gets that
+path's own refusal; the message does not predict it.
 
 This covers messages that name a command for the reader to run. A refusal that
 asks the reader to name a target, because none was given, keeps its placeholder:

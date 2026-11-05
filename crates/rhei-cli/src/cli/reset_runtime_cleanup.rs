@@ -56,8 +56,9 @@ fn collect_reset_decision(
     let total_nodes: usize = in_scope.iter().map(|task| count_nodes(task)).sum();
 
     let authored = collect_authored_states(loaded, input, scope, machines);
-    // A reset that would leave a plan validation refuses is refused here, before
-    // any preview, `--dry-run` included, and with nothing changed. §FS-rhei-reset.2.3
+    // A reset that would leave a plan validation refuses is refused here, before any
+    // preview, `--dry-run` included, with nothing changed; so is a plan the reset
+    // cannot rewrite, through the `?`. §FS-rhei-reset.2.3
     if let Some(refusal) = reset_refusal(loaded, input, scope, machines, &authored)? {
         return Err(refusal.report());
     }

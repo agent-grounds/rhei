@@ -296,6 +296,9 @@ locks of step 2 and before its preview, so the preview never promises a deletion
 that is not going to happen, and a cancelled or refused reset still releases
 without mutation ([§FS-rhei-reset.3](rhei-reset.spec.md#3-safety)). `--dry-run` refuses the same way, with the same text,
 and exits non-zero: a dry run is read as a promise about what the reset does.
+A plan the reset cannot rewrite fails the same way, before any preview,
+`--dry-run` included, and changes nothing: the plan it would leave is written in
+memory before it is validated, so a rewrite that fails, fails there.
 
 It does not reopen the finished task instead. That task has no recorded state to
 go back to, and [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state) moves a task only where the ledger says it has
@@ -412,6 +415,13 @@ the reset moves, saying where the ledger sends it:
 
 ```text
 a reset moves Task <id> to '<dest>', the state the ledger records it started in, whatever its **State:** line says
+```
+
+Where the help names no edit and no task an error names is one the reset moves,
+it is this one line instead, so a refusal's help is never empty:
+
+```text
+no edit to a **State:** line is known to let this reset through: fix what the errors above name, then run the reset again
 ```
 
 `--dry-run` and the pre-confirmation preview ([§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation)) print the same move list

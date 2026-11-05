@@ -22,6 +22,25 @@ mod reset_refusal {
         assert!(error_names("it ends at Task plan.1.", "Task plan.1"));
     }
 
+    /// A refusal whose help names no edit and no moved task still ends on a help line.
+    /// No plan `rhei validate` accepts was found to reach it. §FS-rhei-reset.4
+    #[test]
+    fn a_refusal_with_no_way_on_named_says_so_rather_than_print_an_empty_help() {
+        let refusal = ResetRefusal {
+            errors: vec!["Task plan.1 is in terminal state 'done'".to_string()],
+            undeclared: Vec::new(),
+            help: Vec::new(),
+        };
+        let help = refusal.report().help().map(|help| help.to_string());
+        assert_eq!(
+            help.as_deref(),
+            Some(
+                "no edit to a **State:** line is known to let this reset through: fix what the \
+                 errors above name, then run the reset again"
+            )
+        );
+    }
+
     /// The edit the help names drops the result link under the task it edits, and
     /// keeps every other. §FS-rhei-reset.2.3
     #[test]

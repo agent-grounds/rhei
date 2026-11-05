@@ -51,19 +51,15 @@ impl TerminalWatch {
         self.prompt_rx.recv_timeout(timeout).is_ok()
     }
 
-    /// The transcript a failure reports, taking at most `timeout`: whatever the
-    /// terminal printed before it ended or the bound ran out, whichever is first.
-    /// §REQ-cross-platform.7
-    pub(super) fn transcript_for_failure(&self, timeout: Duration) -> String {
+    /// What the terminal printed, taking at most `timeout`: everything up to its end,
+    /// or up to the bound if it has not ended. §REQ-cross-platform.7
+    ///
+    /// Running out of the bound is not a failure of its own, because once the child
+    /// has exited the verdict must not turn on the terminal's end. A process that
+    /// inherited the slave through `portable_pty`'s window holds it open past that
+    /// exit, and all it may cost the test is this wait. §REQ-cross-platform.7.2
+    pub(super) fn transcript_within(&self, timeout: Duration) -> String {
         let _ = self.ended_rx.recv_timeout(timeout);
-        self.read_so_far()
-    }
-
-    /// The whole transcript once the terminal has ended, within `timeout`.
-    pub(super) fn transcript(&self, timeout: Duration) -> String {
-        if self.ended_rx.recv_timeout(timeout).is_err() {
-            panic!("terminal did not end within {timeout:?}; it printed: {}", self.read_so_far());
-        }
         self.read_so_far()
     }
 

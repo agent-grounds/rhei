@@ -8,9 +8,9 @@ use std::io::{Read, Write};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-/// How long the attended harness waits for the prompt, and then for the exit. Both are event
-/// barriers, so a passing run pays nothing for the bound; it covers a cold start on a loaded
-/// Windows runner. §REQ-cross-platform.7
+/// How long the attended harness waits for the prompt, then for the exit, then for the terminal
+/// to end. Each is an event barrier, so a passing run pays nothing for the bound; it covers a cold
+/// start on a loaded Windows runner. §REQ-cross-platform.7
 const ATTENDED_WAIT: Duration = Duration::from_secs(60);
 
 /// Input is sent only after the child's prompt is observed, using a channel barrier.
@@ -45,7 +45,7 @@ pub(super) fn attended(fixture: &ForceFixture, arguments: &[&str], answer: &str)
         panic!(
             "operator prompt missing after {:?}: {}",
             started.elapsed(),
-            watch.transcript_for_failure(Duration::from_secs(5))
+            watch.transcript_within(Duration::from_secs(5))
         );
     }
     writer.write_all(answer.as_bytes()).unwrap();
@@ -64,13 +64,13 @@ pub(super) fn attended(fixture: &ForceFixture, arguments: &[&str], answer: &str)
             panic!(
                 "attended child did not exit ({err}) {:?} after the answer: {}",
                 answered.elapsed(),
-                watch.transcript_for_failure(Duration::from_secs(5))
+                watch.transcript_within(Duration::from_secs(5))
             );
         }
     };
     drop(writer);
     drop(pair.master);
-    (status.success(), watch.transcript(Duration::from_secs(10)))
+    (status.success(), watch.transcript_within(ATTENDED_WAIT))
 }
 
 /// Equivalent success on Linux/macOS/Windows; no Unix-only test gate. §FS-rhei-recover.5
@@ -322,7 +322,7 @@ fn a_prompt_wait_that_runs_out_reports_what_a_never_ending_terminal_printed() {
     );
     assert!(!watch.prompted_within(Duration::from_millis(200)));
     let started = std::time::Instant::now();
-    let transcript = watch.transcript_for_failure(Duration::from_secs(2));
+    let transcript = watch.transcript_within(Duration::from_secs(2));
     assert!(
         started.elapsed() < Duration::from_secs(3),
         "the failure waited {:?}",

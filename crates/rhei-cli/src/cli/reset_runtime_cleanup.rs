@@ -55,11 +55,17 @@ fn collect_reset_decision(
     let task_count = in_scope.len();
     let total_nodes: usize = in_scope.iter().map(|task| count_nodes(task)).sum();
 
+    let authored = collect_authored_states(loaded, input, scope, machines);
+    // A reset that would leave a plan validation refuses is refused here, before
+    // any preview, `--dry-run` included, and with nothing changed. §FS-rhei-reset.2.3
+    if let Some(refusal) = reset_refusal(loaded, input, scope, machines, &authored)? {
+        return Err(refusal.report());
+    }
     Ok(ResetDecision {
         scope: scope.clone(),
         task_count,
         descendant_count: total_nodes.saturating_sub(task_count),
-        authored: collect_authored_states(loaded, input, scope, machines),
+        authored,
         runtime_targets: reset_runtime_preview(loaded, input, scope),
     })
 }

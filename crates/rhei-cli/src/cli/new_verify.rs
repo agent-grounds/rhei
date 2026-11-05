@@ -131,8 +131,9 @@ help = "nothing in the plan was meant to change but the new block, so this is a 
 ///
 /// Each inherited error is spent once, so a message the project already carried
 /// twice and now carries three times still reports one new occurrence — which
-/// is the honest reading of "the errors this create introduced".
-// §FS-rhei-new.5.2
+/// is the honest reading of "the errors this create introduced". A reset asks
+/// the same of the plan it would leave, under the same machines.
+// §FS-rhei-new.5.2 §FS-rhei-reset.2.3
 fn errors_introduced_over(inherited: &[String], after: Vec<String>) -> Vec<String> {
     let mut unspent: Vec<&String> = inherited.iter().collect();
     after

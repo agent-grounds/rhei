@@ -147,6 +147,10 @@ fn lock_plan_writer(file: &fs::File, path: &Path) -> MietteResult<()> {
 /// held-handle fallback because the destination itself is never locked.
 // §FS-rhei-transition-cmd.3
 fn read_plan_source(path: &Path, action: &str) -> MietteResult<String> {
+    // A plan staged to be loaded before it is written reads as staged. §FS-rhei-reset.2.3
+    if let Some(text) = rhei_core::source::staged(path) {
+        return Ok(text);
+    }
     fs::read_to_string(path).map_err(|err| file_io_report(path, action, err))
 }
 

@@ -196,7 +196,7 @@ fn complete_command(
             input,
             task_id_str,
             task,
-            &machine,
+            &machines.set,
             &current_state,
         );
         return Err(miette!(

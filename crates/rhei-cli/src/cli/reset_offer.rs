@@ -75,8 +75,9 @@ impl ResetOffer {
     }
 
     /// The help of a refusal over a finished ticket, standing in `from`. It offers
-    /// the rhei-wide reset only where that reset reopens this ticket: one that leaves
-    /// it finished still deletes the rhei's results and logs, so it is no way back.
+    /// the rhei-wide reset only where that reset reopens this ticket and is not refused:
+    /// one that leaves it finished still deletes the rhei's results and logs, and one
+    /// that is refused changes nothing, so neither is a way back.
     /// The forced line is this ticket's own only where no ancestor is finished; under
     /// a finished one the forced path would refuse it, so the help starts at the
     /// topmost finished ancestor, the only one whose line gets past that refusal. What
@@ -88,18 +89,31 @@ impl ResetOffer {
         input: &Path,
         task_id: &str,
         task: &rhei_core::ast::Task,
-        machine: &rhei_validator::StateMachine,
+        machines: &rhei_validator::MachineSet,
         from: &str,
     ) -> String {
         const FINISHED: &str = "nothing to do — the task is finished.";
 
+        let machine = machines.for_task(&task.id);
         let root = loaded.task_route(task_id, input).execution_root;
         let departures = ledger_first_departures(&root);
         let dest = reset_destination(departures.get(task_id), from, machine);
-        let tail = if state_reopens(machine, &dest) {
-            format!("Otherwise, run {}", self.for_ticket(task_id))
-        } else {
+        let tail = if !state_reopens(machine, &dest) {
             format!("A reset would not reopen it: it would leave this ticket in '{dest}'")
+        } else {
+            // Asked of the reset offered, the whole rhei's, by the computation it refuses with.
+            // §FS-rhei-reset.5.1 §FS-rhei-reset.2.3
+            let rhei = task_id.split('.').next().unwrap_or(task_id);
+            let refused = errors_the_offered_reset_introduces(loaded, input, rhei, machines);
+            if refused.is_empty() {
+                format!("Otherwise, run {}", self.for_ticket(task_id))
+            } else {
+                format!(
+                    "A reset of its rhei would be refused: {RESET_LEAVES_AN_INVALID_PLAN}, \
+                     because {}",
+                    refused.join("; ")
+                )
+            }
         };
 
         let Some(to) = reopen_state(machine, task, &dest) else {

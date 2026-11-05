@@ -87,6 +87,7 @@ mod cost_selection_tests;
 mod current_dir_target_tests;
 mod dead_end_state_tests;
 mod declared_exit_route_tests;
+mod diagnostic_guidance_tests;
 mod diagnostic_wrap_tests;
 mod effort_invocation_tests;
 mod effort_state_tests;

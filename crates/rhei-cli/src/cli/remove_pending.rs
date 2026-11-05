@@ -54,7 +54,9 @@ fn acquire_removal_locks(
             Ok(None) => {
                 return Err(refuse(format!("another rhei process holds {}", display_path(&root))))
             }
-            Err(err) => return Err(refuse(format!("{err}"))),
+            // Preserve the root refusal instead of applying contention help to I/O. §FS-rhei-errors.6
+            Err(err) => return Err(root_access_report(&root, err)
+                .wrap_err(format!("{id} cannot be removed: root access refused"))),
         }
     }
     let mut sidecar_paths = Vec::new();

@@ -11,8 +11,8 @@ use std::sync::{Arc, Mutex, RwLock, Weak};
 
 #[path = "root_access_guidance.rs"]
 mod guidance;
-use guidance::refusal;
-pub use guidance::refusal_help;
+pub use guidance::{error_path, refusal_help};
+use guidance::{refusal, with_path};
 
 pub const MARKER: &str = ".rhei/forced-recovery.json";
 
@@ -172,10 +172,14 @@ fn check_forced_marker(root: &Path) -> io::Result<()> {
         Ok(_) => (),
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(error) => {
-            return Err(io::Error::new(
-                error.kind(),
-                format!("cannot check recovery marker {}: {error}", marker.display()),
-            ))
+            // The failed object is the marker, not merely its root. §FS-rhei-errors.6
+            return Err(with_path(
+                &marker,
+                io::Error::new(
+                    error.kind(),
+                    format!("cannot check recovery marker {}: {error}", marker.display()),
+                ),
+            ));
         }
     }
     // Once existence is established, even unreadable contents mean refusal. §FS-rhei-recover.4
@@ -266,7 +270,7 @@ fn guard_lock(base: &Path, root: &Path) -> PathBuf {
 /// the account cannot hold this lock — rather than a list of error codes, which
 /// is the distinction this reads the same way on every platform.
 /// §FS-rhei-recover.4.1 §REQ-cross-platform
-fn open_lock(root: &Path) -> Result<File, GuardFailure> {
+fn open_lock(root: &Path) -> Result<(File, PathBuf), GuardFailure> {
     let path = lock_path(root).map_err(|error| GuardFailure::new(None, root, &error))?;
     let attempt = || {
         #[cfg(test)]
@@ -283,6 +287,8 @@ fn open_lock(root: &Path) -> Result<File, GuardFailure> {
         outcome => outcome,
     }
     .map_err(|error| GuardFailure::new(Some(&path), root, &error))
+    // Keep the same lock pathname for any later lock-operation error. §FS-rhei-errors.6
+    .map(|file| (file, path))
 }
 
 impl RootAccessGuard {
@@ -302,7 +308,8 @@ impl RootAccessGuard {
     }
 
     fn acquire(root: &Path, exclusive: bool, try_only: bool) -> io::Result<Option<Self>> {
-        let root = crate::platform::canonical_path(root)?;
+        // Retain the actual filesystem subject through diagnostic adapters. §FS-rhei-errors.6
+        let root = crate::platform::canonical_path(root).map_err(|err| with_path(root, err))?;
         let held = HELD.with(|held| held.borrow().get(&root).and_then(Weak::upgrade));
         if let Some(held) = held {
             if exclusive && !held.exclusive {
@@ -322,17 +329,19 @@ impl RootAccessGuard {
         if !exclusive {
             check_pending(&root)?;
         }
-        let file = match open_lock(&root) {
-            Ok(file) => Some(file),
+        let (file, guard_path) = match open_lock(&root) {
+            Ok((file, path)) => (Some(file), Some(path)),
             // Publishing or resolving a marker without exclusion is worse than
             // refusing, and a probe reports contention only. §FS-rhei-recover.4.1
             Err(failure) if exclusive || try_only => return Err(failure.refusal()),
             Err(failure) => {
                 warn_once(&root, failure.warning());
-                None
+                (None, None)
             }
         };
         if let Some(file) = &file {
+            // Open and lock refer to this same measured pathname. §FS-rhei-errors.6
+            let guard_path = guard_path.as_deref().expect("opened guard has a path");
             #[cfg(test)]
             {
                 let attempt = if exclusive {
@@ -347,7 +356,7 @@ impl RootAccessGuard {
                         }
                     });
                 } else {
-                    FileExt::unlock(file)?;
+                    FileExt::unlock(file).map_err(|err| with_path(guard_path, err))?;
                 }
             }
             if try_only {
@@ -359,12 +368,12 @@ impl RootAccessGuard {
                     {
                         return Ok(None)
                     }
-                    Err(err) => return Err(err),
+                    Err(err) => return Err(with_path(guard_path, err)),
                 }
             } else if exclusive {
-                file.lock_exclusive()?;
+                file.lock_exclusive().map_err(|err| with_path(guard_path, err))?;
             } else {
-                FileExt::lock_shared(file)?;
+                FileExt::lock_shared(file).map_err(|err| with_path(guard_path, err))?;
             }
         }
         let guard = Self(Arc::new(Hold { file, exclusive }));

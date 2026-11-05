@@ -139,6 +139,11 @@ Four things follow from "a line it stages":
 - With nothing staged nothing is asked about, which is what makes
   `pre-commit run --all-files` offline ([§AR-ci-release.1](ci-release.spec.md#1-development-ci)).
 
+The staged pass leaves two things to the sweep ([§AR-ci-release.5](ci-release.spec.md#5-link-sweep)), which catches
+them by the next day: a URL written in a form lychee rewrites, beyond the case of
+its scheme and host, and a file whose name git quotes, meaning one holding a
+double quote, a backslash or a control character.
+
 ## 3. Release Workflows
 
 The release workflow verifies the requested version against the selected source
@@ -200,11 +205,18 @@ link, now that neither a commit ([§AR-ci-release.2.1](ci-release.spec.md#21-two
 `GITHUB_TOKEN` set for lychee's rate limit. Its command is
 `lychee --no-progress --include-fragments` over the inputs of the two link hooks.
 
-A first pass that fails is run again after a pause, and the second pass is the
-verdict, because a 5xx that passes by says nothing about the link. A failing
-verdict files one open issue titled `Nightly link sweep: external links failing`,
-labelled `bug`, and a later failure comments on that issue rather than opening a
-second.
+A first pass that fails is run again after a pause, and a link counts against the
+sweep only if it fails on both passes, because a 5xx that passes by says nothing
+about the link and the next pass can fail on a different one. A clean second pass
+ends it, whatever the first pass did. Where both passes fail and either one names
+no link, lychee itself failed, the two cannot be compared, and that fails the
+sweep. A link failing on both passes, or that failure of lychee's, files one open
+issue titled `Nightly link sweep: external links failing`, labelled `bug`, and a
+later failure comments on that issue rather than opening a second.
+
+An outage that outlasts the pause still files, because the link then fails on
+both passes. This rule does not cure that: agent-grounds/grund#844 and
+agent-grounds/grund#1129 were that case on grund's own sweep.
 
 No pull request and no required check depends on it. So a pull request that
 skipped the hooks and adds a dead link is caught here rather than in the required

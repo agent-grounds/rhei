@@ -458,6 +458,22 @@ what they could not check and exit non-zero. For `--json` that also means the
 stream is announced as possibly incomplete, because a stream ending without
 `run_finished` otherwise reads as an interrupted run ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)).
 
+A recoverable outage can clear while the same run is still working: a decided
+live probe ends the consecutive-unknown interval, and the wait continues until
+that run records its result. The run need not finish within the unknown grace
+when probing has recovered. A terminal descriptor can also supply the recorded
+result while the lock remains unreadable; these are distinct ways for a wait
+to reach the run's own exit status.
+
+Coverage distinguishes recovery before completion, completion with an unreadable
+lock, and a persistently unknown run. The recovery case establishes an unknown
+observation, restores probing independently of attach returning or the owner
+finishing, and verifies continued waiting and the same run's recorded result
+even when owner progress takes longer than the unknown grace. It must not rely
+on timed work finishing before that grace. The persistent-unknown case still
+fails loudly within the existing bound
+([§REQ-cross-platform.8.1](../requirements/cross-platform.md#81-a-bound-that-is-the-behaviour-stays-as-tight-as-the-behaviour)).
+
 ## 6. `rhei runs`
 
 ```bash

@@ -168,18 +168,97 @@ fn stop_wait_handles_an_unchecked_run_only_with_proven_ownership() {
 // §FS-rhei-run-headless.5.3
 #[test]
 fn attach_wait_waits_out_the_outage_and_reports_the_runs_own_result() {
+    assert_successful_outage(None);
+}
+
+/// The successful-outage fixture must survive the owner losing eight seconds
+/// of scheduler time, rather than needing a terminal record within unknown
+/// grace. This reuses its assertions and leaves its recovery order unchanged.
+// §FS-rhei-run-headless.5.3
+#[test]
+#[ignore = "red until #565: recover probing independently of owner completion; implement removes this"]
+fn attach_wait_success_fixture_survives_an_eight_second_owner_pause() {
+    assert_successful_outage(Some(Duration::from_secs(8)));
+}
+
+// §FS-rhei-run-headless.5.3
+fn assert_successful_outage(owner_pause: Option<Duration>) {
     let ws = Workspace::new("undecided-wait-ok", 1);
     let id = launch_unreadable(&ws);
+    let _permissions = RestoreRunLock(&ws);
+    let pause = owner_pause.map(|duration| PausedOwner::new(&ws, duration));
 
     let started = Instant::now();
     let out = ws.rhei(&["attach", "--wait", &id]);
     let waited = started.elapsed();
+    if pause.is_some() {
+        eprintln!(
+            "REGRESSION attach returned: elapsed={waited:?} status={} descriptor={}",
+            out.status,
+            ws.descriptor().expect("descriptor")
+        );
+    }
     readable_again(&ws);
+
+    if let Some(pause) = pause {
+        drop(pause);
+        super::headless_support::wait_until(
+            "the paused run's result",
+            Duration::from_secs(60),
+            || ws.descriptor().is_some_and(|d| d["exit_code"].is_number()),
+        );
+        let terminal = ws.descriptor().expect("terminal descriptor");
+        eprintln!("REGRESSION terminal: descriptor={terminal}");
+        assert_eq!(terminal["id"], id, "the same run must record the result");
+        assert_eq!(terminal["exit_code"], 0, "the controlled run eventually succeeds");
+    }
 
     let text = stdout(&out);
     assert!(out.status.success(), "the run exited 0:\n{text}\n{}", stderr(&out));
     assert!(text.contains("It exited 0."), "it reported the run's own status: {text}");
     assert!(waited > Duration::from_millis(500), "it returned in {waited:?} without waiting");
+}
+
+/// Cleanup precedes Workspace::drop, including an assertion failure while the
+/// owner is paused. Permission restoration does not depend on a passing test.
+struct RestoreRunLock<'a>(&'a Workspace);
+
+impl Drop for RestoreRunLock<'_> {
+    fn drop(&mut self) {
+        let _ = fs::set_permissions(run_lock(self.0), fs::Permissions::from_mode(0o644));
+    }
+}
+
+/// Port of triage's SIGSTOP/SIGCONT scheduling control. No production source or
+/// grace is modified; a stopped owner cannot publish a terminal descriptor.
+// §FS-rhei-run-headless.5.3
+struct PausedOwner(Option<std::thread::JoinHandle<()>>);
+
+impl PausedOwner {
+    fn new(ws: &Workspace, duration: Duration) -> Self {
+        use nix::sys::signal::{kill, Signal};
+        let pid = nix::unistd::Pid::from_raw(descriptor_pid(ws));
+        kill(pid, Signal::SIGSTOP).expect("pause run owner");
+        let guard = Self(Some(std::thread::spawn(move || {
+            std::thread::sleep(duration);
+            kill(pid, Signal::SIGCONT).expect("resume run owner");
+            eprintln!("REGRESSION resumed owner after {duration:?}");
+        })));
+        let paused = ws.descriptor().expect("paused descriptor");
+        eprintln!("REGRESSION paused: descriptor={paused}");
+        assert!(paused["exit_code"].is_null(), "pause must precede terminal publication: {paused}");
+        let listed = stdout(&ws.rhei(&["runs"]));
+        assert!(listed.contains("could not be checked"), "the outage is established: {listed}");
+        guard
+    }
+}
+
+impl Drop for PausedOwner {
+    fn drop(&mut self) {
+        if let Some(handle) = self.0.take() {
+            let _ = handle.join();
+        }
+    }
 }
 
 /// And when the outage never clears, the wait ends the only honest way: saying

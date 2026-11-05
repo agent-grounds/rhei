@@ -49,8 +49,7 @@ fn a_window_held_past_its_deadline_across_the_stop_is_discarded() {
     assert_held_window_is_discarded(Crossing::Stop);
 }
 
-/// The shape the ticket reports: the launcher returned in time and the test's clock read came late.
-/// §FS-rhei-run.3.5
+/// The crossing the ticket's panic is at. §FS-rhei-run.3.5
 #[test]
 fn a_window_held_past_its_deadline_across_the_restart_is_discarded() {
     assert_held_window_is_discarded(Crossing::Restart);
@@ -70,6 +69,10 @@ fn fake_proven() -> WindowEnd {
     WindowEnd::Proven(ProvenWindow { restarted_at: 1, deadline: 2 })
 }
 
+/// The fake windows' reporter: their made-up times must not reach the job log, where they would
+/// pass for a real miss. §FS-rhei-run.3.5
+fn unreported(_: &MissedWindow) {}
+
 fn panic_message(panic: &(dyn std::any::Any + Send)) -> &str {
     panic
         .downcast_ref::<String>()
@@ -82,9 +85,11 @@ fn panic_message(panic: &(dyn std::any::Any + Send)) -> &str {
 #[test]
 fn the_windows_stop_at_the_first_that_proves() {
     let opened = Cell::new(0);
+    let mut reported = Vec::new();
     let proof = prove_within(
         MARGIN,
         || Duration::ZERO,
+        |window| reported.push(window.line()),
         || {
             opened.set(opened.get() + 1);
             match opened.get() {
@@ -95,6 +100,11 @@ fn the_windows_stop_at_the_first_that_proves() {
     );
     assert_eq!(opened.get(), 3, "the third window proved, and no fourth opens");
     assert_eq!(proof.missed.len(), 2, "the proof keeps what it discarded: {proof:#?}");
+    assert_eq!(
+        reported,
+        [fake_missed(1).line(), fake_missed(2).line()],
+        "every miss is reported as it is discarded"
+    );
 }
 
 /// Only a crossing reports a miss. A check that panics in a window is a failure of the regression,
@@ -106,6 +116,7 @@ fn a_hard_failure_in_a_window_is_not_a_miss() {
         prove_within(
             MARGIN,
             || Duration::ZERO,
+            unreported,
             || {
                 opened.set(opened.get() + 1);
                 match opened.get() {
@@ -129,6 +140,7 @@ fn the_margin_stops_new_windows_and_not_an_open_one() {
         prove_within(
             MARGIN,
             || Duration::from_secs(30) * opened.get(),
+            unreported,
             || {
                 opened.set(opened.get() + 1);
                 WindowEnd::Missed(fake_missed(opened.get()))
@@ -149,6 +161,7 @@ fn the_margin_stops_new_windows_and_not_an_open_one() {
                 _ => 90,
             })
         },
+        unreported,
         || {
             opened.set(opened.get() + 1);
             match opened.get() {
@@ -168,6 +181,7 @@ fn running_out_of_windows_panics_with_every_windows_times() {
         prove_within(
             MARGIN,
             || Duration::from_secs(30) * opened.get(),
+            unreported,
             || {
                 opened.set(opened.get() + 1);
                 WindowEnd::Missed(fake_missed(opened.get()))
@@ -246,6 +260,14 @@ fn a_missed_window_is_discarded_only_if_it_shows_no_early_attempt_and_no_wrong_r
     let panic = rejected.expect_err("a missed window took a pre-deadline attempt 2 with it");
     assert!(panic_message(panic.as_ref()).contains("early spawn"));
 
+    // Each attempt replaces the record, so a later attempt can carry the early date instead.
+    let early_later = PollWorkspace::new();
+    evidence::write_synthetic_attempt(&early_later, 3, "2020-01-01T00:00:09Z");
+    let rejected =
+        catch_unwind(AssertUnwindSafe(|| discard_missed_window(&early_later, SYNTHETIC_DEADLINE)));
+    let panic = rejected.expect_err("a missed window took a pre-deadline attempt 3 with it");
+    assert!(panic_message(panic.as_ref()).contains("early spawn"));
+
     let wrong = PollWorkspace::new();
     fs::create_dir_all(wrong.project.join("runtime")).expect("create synthetic runtime");
     fs::write(wrong.project.join("runtime/state-transitions.log"), WRONG_ROUTE)
@@ -259,16 +281,17 @@ fn a_missed_window_is_discarded_only_if_it_shows_no_early_attempt_and_no_wrong_r
     let lawful = PollWorkspace::new();
     evidence::write_synthetic_attempt(&lawful, 2, "2020-01-01T00:00:10Z");
     discard_missed_window(&lawful, SYNTHETIC_DEADLINE);
-    let overwritten = PollWorkspace::new();
-    evidence::write_synthetic_attempt(&overwritten, 3, "2020-01-01T00:00:09Z");
-    discard_missed_window(&overwritten, SYNTHETIC_DEADLINE);
+    let lawful_later = PollWorkspace::new();
+    evidence::write_synthetic_attempt(&lawful_later, 3, "2020-01-01T00:00:11Z");
+    discard_missed_window(&lawful_later, SYNTHETIC_DEADLINE);
     discard_missed_window(&PollWorkspace::new(), SYNTHETIC_DEADLINE);
 }
 
 const LINE_CHILD: &str = "RHEI_552_MISSED_LINE_CHILD";
 
 /// The retry would otherwise bury what the panic used to say, and libtest swallows `eprintln!`
-/// on a pass. So a passing child test's output must still carry the line. §FS-rhei-run.3.5
+/// on a pass. So a passing child test's output must still carry the line, on one line with the
+/// test's name, so a real miss can be told from a held test's. §FS-rhei-run.3.5
 #[test]
 fn a_missed_windows_line_survives_a_passing_test() {
     let window = fake_missed(1);
@@ -286,9 +309,12 @@ fn a_missed_windows_line_survives_a_passing_test() {
         .expect("run this test as a child");
     let (shown_out, shown_err) = (stdout(&out), stderr(&out));
     assert!(out.status.success() && shown_out.contains("1 passed"), "{shown_out}\n{shown_err}");
+    let names_it = |shown: &str| {
+        shown.lines().any(|line| line.contains(&name) && line.contains(&window.line()))
+    };
     assert!(
-        shown_out.contains(&window.line()) || shown_err.contains(&window.line()),
-        "the job log must keep {:?} on a pass\nstdout:\n{shown_out}\nstderr:\n{shown_err}",
+        names_it(&shown_out) || names_it(&shown_err),
+        "the job log must keep {:?} under {name} on a pass\nstdout:\n{shown_out}\nstderr:\n{shown_err}",
         window.line()
     );
 }

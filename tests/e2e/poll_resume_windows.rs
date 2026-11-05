@@ -68,13 +68,14 @@ pub(super) fn timed<T>(cost: &mut Option<Duration>, step: impl FnOnce() -> T) ->
     value
 }
 
-/// Open windows until one proves. No new window opens once `elapsed` has reached `budget`,
-/// an open window runs to its end, and running out panics naming every window's times. A
-/// window's own panic is a failure of the regression, and propagates. §FS-rhei-run.3.5
-/// §REQ-cross-platform.8
+/// Open windows until one proves, handing each miss to `report` as it is discarded. No new window
+/// opens once `elapsed` has reached `budget`, an open window runs to its end, and running out
+/// panics naming every window's times. A window's own panic is a failure of the regression, and
+/// propagates. §FS-rhei-run.3.5 §REQ-cross-platform.8
 pub(super) fn prove_within(
     budget: Duration,
     mut elapsed: impl FnMut() -> Duration,
+    mut report: impl FnMut(&MissedWindow),
     mut window: impl FnMut() -> WindowEnd,
 ) -> ScenarioProof {
     let mut missed = Vec::new();
@@ -82,7 +83,7 @@ pub(super) fn prove_within(
         match window() {
             WindowEnd::Proven(proven) => return ScenarioProof { missed, proven },
             WindowEnd::Missed(window) => {
-                report_missed_window(&window);
+                report(&window);
                 missed.push(window);
             }
         }
@@ -96,12 +97,13 @@ pub(super) fn prove_within(
     }
 }
 
-/// The one early-spawn comparison: attempt 2 must not start before the deadline it had to wait
-/// for. Each caller reads `started` from its own evidence. §FS-rhei-run.3.5
+/// The one early-spawn comparison: no retry may start before the deadline attempt 2 had to wait
+/// for. Each caller reads `started` from its own evidence: a record's start, or a clock read by
+/// which the retry had already started. §FS-rhei-run.3.5
 pub(super) fn assert_started_after_deadline(started: u64, deadline: u64) {
     assert!(
         started >= deadline,
-        "early spawn: attempt 2's start sample {started} precedes deadline {deadline}"
+        "early spawn: a retry had started by {started}, before deadline {deadline}"
     );
 }
 
@@ -177,13 +179,14 @@ pub(super) fn look_at_first_run(
 }
 
 /// Let a missed window that knows its deadline go. A discard excuses no evidence, so it panics
-/// on an attempt 2 that started early ("early spawn") or on a wrong route ("wrong route"), and
-/// passes when the evidence no longer names attempt 2. The run is stopped first: a window held
-/// past its deadline can leave it alive, and attempt 2 starting under the read. §FS-rhei-run.3.5
+/// on a retry that started early, whichever attempt its record names ("early spawn"), or on a
+/// wrong route ("wrong route"), and passes when the evidence dates no retry before the deadline.
+/// The run is stopped first: a window held past its deadline can leave it alive, and a retry
+/// starting under the read. §FS-rhei-run.3.5
 pub(super) fn discard_missed_window(workspace: &PollWorkspace, deadline: u64) {
     workspace.stop_quietly();
     assert_no_wrong_route(&workspace.snapshot());
-    if let Some(started) = evidence::attempt_two_start(workspace) {
+    if let Some(started) = evidence::latest_retry_start(workspace) {
         assert_started_after_deadline(started, deadline);
     }
 }
@@ -200,11 +203,14 @@ pub(super) fn missed_at(
     WindowEnd::Missed(MissedWindow { crossing, times })
 }
 
-/// Write a missed window's line to the job log, by a write libtest does not capture on a pass:
-/// it captures `eprintln!`, and would bury the line. A log that refuses it is no evidence about
-/// the run, so it does not fail the window. §FS-rhei-run.3.5
+/// Write a missed window's line to the job log under the name of the test that missed it, which
+/// libtest gives the test's thread, by a write libtest does not capture on a pass: it captures
+/// `eprintln!`, and would bury the line. A log that refuses it is no evidence about the run, so
+/// it does not fail the window. §FS-rhei-run.3.5
 pub(super) fn report_missed_window(window: &MissedWindow) {
-    let _ = writeln!(std::io::stderr(), "{}", window.line());
+    let thread = std::thread::current();
+    let test = thread.name().unwrap_or("<unnamed test>");
+    let _ = writeln!(std::io::stderr(), "{test}: {}", window.line());
 }
 
 /// Holds one crossing, once, until the plan's persisted deadline has passed. The hold follows

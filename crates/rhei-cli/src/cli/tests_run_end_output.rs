@@ -108,7 +108,13 @@
         assert!(slave_file.is_terminal(), "a live pty slave is a terminal");
 
         drop(master);
-        // The hangup is what the operator closing a terminal window does.
+        // The hangup is what the operator closing a terminal window does. A process another
+        // test forked after the open and not yet through its `exec` holds a copy of the master,
+        // so it comes within a moment of the drop rather than at it. §REQ-cross-platform.7.2
+        let deadline = Instant::now() + FIXTURE_MARGIN;
+        while slave_file.is_terminal() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(1));
+        }
         assert!(
             !slave_file.is_terminal(),
             "a hung-up pty denies being a terminal, which is why the reading is taken at startup"

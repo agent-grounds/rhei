@@ -151,12 +151,12 @@ reports. That is a defect of the harness, not of the run or of the platform
 between two calls is a gap however short, so only a descriptor created with the
 flag has none.
 
-The flag does not close everything. A process already spawned holds a copy of
-every descriptor until its `exec`, flagged or not, so the last close can come a
-moment after the test's own. On Linux the slowest measured was 5.4 ms; nothing
-has measured it on macOS. So a test that judges the hang-up directly waits for
-it, within the binary's margin [§REQ-cross-platform.8](cross-platform.md#8-a-margin-outlasts-a-stalled-runner), rather than judging the
-statement after its close.
+The flag does not close everything. A process forked after the terminal was
+opened and not yet through its `exec` holds a copy of every descriptor, flagged
+or not, so the last close can come a moment after the test's own. On Linux that
+was a few milliseconds; nothing has measured it on macOS. So a test that judges
+the hang-up directly waits for it, within the binary's margin [§REQ-cross-platform.8](cross-platform.md#8-a-margin-outlasts-a-stalled-runner),
+rather than judging the statement after its close.
 
 The test of agent-grounds/rhei#554 is the exception, because a wait would undo
 what it proves. It shows that a run notices its lost terminal, so it releases the
@@ -180,9 +180,9 @@ The measure has three parts:
 2. The test of agent-grounds/rhei#554 passes with the moment after the creation
    widened to a second beside another test's spawn.
 3. No source calls `nix::pty::openpty`, the call that leaves the flag to its
-   caller, and no file that opens a terminal sets a descriptor's flags. The first
-   part sees a flag that was lost and cannot see one that came late, so this is
-   what stops the easy way of writing that.
+   caller, and no file that opens a terminal sets its close-on-exec flag
+   afterwards. The first part sees a flag that was lost and cannot see one that
+   came late, so this is what stops the easy way of writing that.
 
 ## 8. A Margin Outlasts A Stalled Runner
 

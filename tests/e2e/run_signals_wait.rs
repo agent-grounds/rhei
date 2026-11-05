@@ -47,7 +47,8 @@ pub(super) fn lost_terminal_report(dir: &Path, agent: &str, grandchild: &str) ->
     let grandchild_alive = pid_is_alive(grandchild);
     let reading = match (agent_alive, grandchild_alive) {
         (true, true) => {
-            "the run never began to terminate them, so the print that should have failed never came"
+            "the run never began to terminate them, so no print has failed: none came, \
+             or it landed before the terminal hung up"
         }
         (false, false) => "the run began to terminate them and got stuck on its way out",
         _ => {

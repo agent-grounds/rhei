@@ -58,6 +58,32 @@ pub(super) fn completed_retry_start(workspace: &PollWorkspace) -> u64 {
     started
 }
 
+/// Publish a completed attempt that no process made, for a negative control: its log and spawn
+/// record, in the form [`completed_retry_start`] reads. No process is launched. §FS-rhei-run.3.5
+pub(super) fn write_synthetic_attempt(workspace: &PollWorkspace, attempt: u64, started: &str) {
+    let records = workspace.project.join("runtime/spawns");
+    fs::create_dir_all(&records).expect("create synthetic record directory");
+    let log = workspace
+        .project
+        .join(format!("runtime/logs/task-triage-tool-reports.1-triage-attempt{attempt}.log"));
+    let worker = format!(
+        "{} {}",
+        super::super::python_command(),
+        workspace._root.join("poll-program.py").display()
+    );
+    fs::create_dir_all(log.parent().unwrap()).unwrap();
+    fs::write(&log, format!("=== rhei program log v1 ===\nprogram: {worker}\ntask: triage-tool-reports.1\nstate: triage\n\n=== exit ===\ncode: 75\n===\n"))
+        .unwrap();
+    let record = serde_json::json!({
+        "task": "triage-tool-reports.1", "state": "triage", "moves": 0,
+        "attempt": attempt, "charged": attempt, "attempt_charged": true,
+        "kind": "program", "worker": worker, "log": log,
+        "started": started, "ended": "2020-01-01T00:00:11Z",
+        "duration": "2s", "code": 75, "ending": "exited"
+    });
+    fs::write(records.join("task-triage-tool-reports.1-triage.json"), record.to_string()).unwrap();
+}
+
 /// Parse the shipped whole-second UTC format without using interpreter-entry
 /// time. In this fixture, find_ready_tasks gates collect_ready_program_work_items
 /// before spawn_and_wait_program samples started_wall, which precedes creation.

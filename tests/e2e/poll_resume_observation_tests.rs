@@ -59,25 +59,7 @@ fn a_lawful_retry_during_snapshot_observation_is_accepted() {
 #[test]
 fn an_early_retry_is_rejected_even_when_observed_after_the_deadline() {
     let workspace = PollWorkspace::new();
-    let records = workspace.project.join("runtime/spawns");
-    fs::create_dir_all(&records).expect("create synthetic record directory");
-    let log = workspace.project.join("runtime/logs/task-triage-tool-reports.1-triage-attempt2.log");
-    let worker = format!(
-        "{} {}",
-        super::super::python_command(),
-        workspace._root.join("poll-program.py").display()
-    );
-    fs::create_dir_all(log.parent().unwrap()).unwrap();
-    fs::write(&log, format!("=== rhei program log v1 ===\nprogram: {worker}\ntask: triage-tool-reports.1\nstate: triage\n\n=== exit ===\ncode: 75\n===\n"))
-        .unwrap();
-    let record = serde_json::json!({
-        "task": "triage-tool-reports.1", "state": "triage", "moves": 0,
-        "attempt": 2, "charged": 2, "attempt_charged": true,
-        "kind": "program", "worker": worker, "log": log,
-        "started": "2020-01-01T00:00:09Z", "ended": "2020-01-01T00:00:11Z",
-        "duration": "2s", "code": 75, "ending": "exited"
-    });
-    fs::write(records.join("task-triage-tool-reports.1-triage.json"), record.to_string()).unwrap();
+    evidence::write_synthetic_attempt(&workspace, 2, "2020-01-01T00:00:09Z");
     // Synthetic creation at :09, deadline :10, interpreter entry and
     // observation at :11. A late observer cannot erase the early evidence.
     let deadline = 1_577_836_810;

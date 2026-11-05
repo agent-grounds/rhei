@@ -12,6 +12,10 @@
 mod evidence;
 #[path = "poll_resume_observation_tests.rs"]
 mod observation_tests;
+#[path = "poll_resume_window_tests.rs"]
+mod window_tests;
+#[path = "poll_resume_windows.rs"]
+mod windows;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,6 +23,7 @@ use std::process::Output;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::{fixture_command, rhei_command, stderr, stdout, unique_temp_dir, write_python_agent};
+use windows::*;
 
 const POLL_INTERVAL_SECS: u64 = 5;
 const POLL_MAX_ATTEMPTS: u64 = 3;
@@ -229,13 +234,20 @@ fn a_resumed_program_poll_waits_then_spawns_its_next_attempt() {
 
 /// Exercise the restart and actual-exit contract with independently published evidence. §FS-rhei-run.3.5
 fn resumed_poll_scenario(observe: impl Fn(&PollWorkspace, u64, &str) -> PollSnapshot) {
+    held_poll_scenario(&Hold::nowhere(), observe);
+}
+
+/// [`resumed_poll_scenario`], with `hold` standing in for time spent outside `rhei run`. §FS-rhei-run.3.5
+fn held_poll_scenario(
+    hold: &Hold,
+    observe: impl Fn(&PollWorkspace, u64, &str) -> PollSnapshot,
+) -> ScenarioProof {
     let workspace = PollWorkspace::new();
+    let launched_at = unix_secs();
     let first_id = workspace.launch();
+    hold.reached(Crossing::FirstLook, &workspace);
     wait_for("attempt 1 and its persisted future deadline", || {
-        let observed = workspace.snapshot();
-        observed.attempts == 1
-            && observed.visits == Some(2)
-            && observed.deadline.is_some_and(|deadline| deadline > unix_secs())
+        first_look(&workspace.snapshot(), launched_at, unix_secs()) == FirstLook::Ready
     });
     let first = workspace.snapshot();
     let first_deadline = first.deadline.expect("attempt 1 should persist its retry deadline");
@@ -247,6 +259,7 @@ fn resumed_poll_scenario(observe: impl Fn(&PollWorkspace, u64, &str) -> PollSnap
     );
 
     workspace.stop(&first_id);
+    hold.reached(Crossing::Stop, &workspace);
     // Capture while no runner can update the plan; the later pre-deadline restart check bounds this read.
     // §FS-rhei-run.3.5
     let captured_plan = fs::read_to_string(&workspace.plan).expect("capture stopped runner's plan");
@@ -256,6 +269,7 @@ fn resumed_poll_scenario(observe: impl Fn(&PollWorkspace, u64, &str) -> PollSnap
     );
 
     let resumed_id = workspace.launch();
+    hold.reached(Crossing::Restart, &workspace);
     let restarted_at = unix_secs();
     assert!(
         restarted_at < first_deadline,
@@ -305,6 +319,10 @@ fn resumed_poll_scenario(observe: impl Fn(&PollWorkspace, u64, &str) -> PollSnap
          resumed snapshot: {resumed:#?}\nrelevant resumed-run log:\n{}",
         resumed.run_log
     );
+    ScenarioProof {
+        missed: Vec::new(),
+        proven: ProvenWindow { restarted_at, deadline: first_deadline },
+    }
 }
 
 /// Counts observed across the deadline require invocation evidence, regardless

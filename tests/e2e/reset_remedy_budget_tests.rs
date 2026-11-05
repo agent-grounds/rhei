@@ -169,7 +169,6 @@ fn with_a_visit_to_spare_the_line_still_goes_back_to_its_reset_destination() {
 /// goes to the initial state instead and says why, and the reset, which clears the
 /// count, is still offered after it.
 #[test]
-#[ignore = "red until #570: the help offers a forced line into 'work', whose budget is spent; implement removes this"]
 fn a_spent_reset_destination_sends_the_line_to_the_initial_state_and_says_why() {
     let world =
         plan_world("reset-remedy-budget-dest", &machine(&[("work", 1)]), &ticket_at("work"));
@@ -194,7 +193,6 @@ fn a_spent_reset_destination_sends_the_line_to_the_initial_state_and_says_why() 
 /// and the fallback are one spent state. No line, the budget named, and the reset, the
 /// one way back, led in as that rather than as the other way.
 #[test]
-#[ignore = "red until #570: the help offers a forced line into 'open', whose budget is spent; implement removes this"]
 fn a_spent_initial_state_offers_no_line_and_names_the_budget() {
     let world =
         plan_world("reset-remedy-budget-initial", &machine(&[("open", 1)]), &ticket_at("open"));
@@ -222,7 +220,6 @@ fn a_spent_initial_state_offers_no_line_and_names_the_budget() {
 /// The same ticket with its ledger gone, so a reset would leave it finished and the only
 /// line the help could build is the one to the spent initial state.
 #[test]
-#[ignore = "red until #570: the help offers a forced line into 'open', whose budget is spent; implement removes this"]
 fn with_no_ledger_a_spent_initial_state_offers_no_line_and_no_reset() {
     let world =
         plan_world("reset-remedy-budget-ledger", &machine(&[("open", 1)]), &ticket_at("open"));
@@ -242,7 +239,6 @@ fn with_no_ledger_a_spent_initial_state_offers_no_line_and_no_reset() {
 /// Two spent states, the reset destination and the initial state, are both named, the
 /// reset destination first.
 #[test]
-#[ignore = "red until #570: the help offers a forced line into 'work', whose budget is spent; implement removes this"]
 fn two_spent_states_are_both_named() {
     let machine = machine(&[("open", 1), ("work", 1)]).replace(
         "transitions:\n",
@@ -271,7 +267,7 @@ const NO_RESET: &str = "A reset would not reopen it: it would leave this ticket 
 /// A child under a parent dropped from `work`, whose one visit is spent. The line is the
 /// parent's, and it goes to the parent's initial state and says why.
 #[test]
-#[ignore = "red until #570: the ancestor's line goes into 'work', whose budget is spent; implement removes this"]
+#[ignore = "red until #570: the shared helper wants a capital 'An operator', which the ancestor's line has mid-sentence; the next commit corrects it"]
 fn a_spent_ancestor_destination_sends_its_line_to_its_initial_state() {
     let world =
         plan_world("reset-remedy-budget-ancestor", &machine(&[("work", 1)]), &child_under("work"));
@@ -297,7 +293,6 @@ fn a_spent_ancestor_destination_sends_its_line_to_its_initial_state() {
 /// The parent started in the initial state that carries the budget and finished from
 /// there, so nothing reopens it by force; the child's own line is refused under it.
 #[test]
-#[ignore = "red until #570: the ancestor's line goes into 'open', whose budget is spent; implement removes this"]
 fn an_ancestor_whose_every_state_is_spent_is_named_with_its_budget() {
     let world =
         plan_world("reset-remedy-budget-stuck", &machine(&[("open", 1)]), &child_under("open"));

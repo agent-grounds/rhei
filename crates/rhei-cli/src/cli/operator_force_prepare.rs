@@ -35,23 +35,21 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
         rhei_core::source::read_to_string(&route.task_file)
             .map_err(|err| file_io_report(&route.task_file, "failed to read recovery task", err))?
     };
-    let metadata = parse_metadata_from_raw(&route.metadata_file, &metadata_raw)?;
-    let key = parse_task_id(&route.metadata_id);
-    let normalized = ensure_current_state_visit_count(metadata.as_ref(), &key, from, &task.state, machine);
-    let checked_metadata = normalized.as_ref().or(metadata.as_ref());
+    let visits = ForcedHopVisits::parse(&route, &metadata_raw, from, &task.state, machine)?;
+    let (key, normalized, checked_metadata) = (&visits.key, &visits.normalized, visits.checked());
     let declared = machine.transitions().iter().find(|rule| rule.from.0 == from && rule.to.0 == to)
         .or_else(|| (!machine.states[from].terminal).then(|| machine.transitions().iter()
             .find(|rule| rule.from.0 == "*" && rule.to.0 == to)).flatten());
     // Declaration is independent of applicability and every task-owned safeguard. §FS-rhei-transition-cmd.6
     let prepared = (|| -> MietteResult<Option<PreparedForce>> {
     if let Some(rule) = declared {
-        if !transition_rule_is_applicable(rule, machine, checked_metadata, &key, Some(task), from, &task.state)? {
-            let reason = describe_blocked_transition(rule, machine, checked_metadata, &key, from, &task.state);
+        if !transition_rule_is_applicable(rule, machine, checked_metadata, key, Some(task), from, &task.state)? {
+            let reason = describe_blocked_transition(rule, machine, checked_metadata, key, from, &task.state);
             // §FS-rhei-errors.6
-            return Err(miette!(help = forced_edge_help(machine, checked_metadata, &key, task, from, to, rule, &input), "transition from '{from}' to '{to}' is not currently applicable: {reason}"));
+            return Err(miette!(help = forced_edge_help(machine, checked_metadata, key, task, from, to, rule, &input), "transition from '{from}' to '{to}' is not currently applicable: {reason}"));
         }
     }
-    if let Some(spent) = spent_loop_budget(machine, checked_metadata, &key, from, &task.state, to) {
+    if let Some(spent) = visits.spent_entering(machine, to) {
         // §FS-rhei-errors.6
         return Err(miette!(help = loop_budget_help(&spent), "{spent}"));
     }
@@ -79,12 +77,12 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
         }
     }
     ensure_descendants_terminal_for_terminal_entry(machine, task, &task_id, &task_id, to, &input)?;
-    let mut updated = update_metadata_for_transition(checked_metadata, &key, to, machine).or_else(|| normalized.clone());
+    let mut updated = update_metadata_for_transition(checked_metadata, key, to, machine).or_else(|| normalized.clone());
     if machine.states[from].poll.is_some() && to != from {
-        updated = clear_poll_state_metadata(updated.as_ref().or(checked_metadata), &key, from);
+        updated = clear_poll_state_metadata(updated.as_ref().or(checked_metadata), key, from);
     }
-    let from_visit = Some(render_visit_count(checked_metadata, &key, from, &task.state, machine));
-    let to_visit = updated.as_ref().map(|meta| task_visit_count(Some(meta), &key, to)).filter(|count| *count > 0);
+    let from_visit = Some(render_visit_count(checked_metadata, key, from, &task.state, machine));
+    let to_visit = updated.as_ref().map(|meta| task_visit_count(Some(meta), key, to)).filter(|count| *count > 0);
     let settings = load_merged_settings(&root)?;
     if !rhei_validator::is_cancelled_state_name(to) {
         // Keep the ordinary transition's artifact path spelling in its remedy. §FS-rhei-errors.6
@@ -110,7 +108,7 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     // The shared pure supervision update includes counted visits and checkpoint delivery.
     // §FS-rhei-transition-cmd.6
     if let Some(next) = apply_supervision_transition(updated.as_ref().or(checked_metadata), SupervisionTransition {
-        machine, task, supervising_owner: owner, metadata_key: &key,
+        machine, task, supervising_owner: owner, metadata_key: key,
         metadata_prefix: route.metadata_id.strip_suffix(&route.local_id).unwrap_or(""),
         local_id: &route.local_id, from, to, to_visit: to_visit.unwrap_or(1), operation_supervisor: None,
     }) { updated = Some(next); }
@@ -151,6 +149,53 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
             Err(error.wrap_err(context))
         }
         Err(error) => Err(error),
+    }
+}
+
+/// A task's counted visits as a forced hop out of `from` measures them: its metadata, and
+/// the same with the visit it stands in counted. The forced path refuses on these and a
+/// finished ticket's help offers by them, so the two cannot disagree.
+/// §FS-rhei-transition-cmd.6 §FS-rhei-reset.5.1
+struct ForcedHopVisits {
+    key: TaskId,
+    from: String,
+    from_raw: String,
+    metadata: Option<Metadata>,
+    normalized: Option<Metadata>,
+}
+
+impl ForcedHopVisits {
+    /// Read from the task's metadata file's text, `metadata_raw`, for a task standing in
+    /// `from`, written `from_raw` in its plan.
+    fn parse(
+        route: &TaskRoute,
+        metadata_raw: &str,
+        from: &str,
+        from_raw: &str,
+        machine: &rhei_validator::StateMachine,
+    ) -> MietteResult<Self> {
+        let metadata = parse_metadata_from_raw(&route.metadata_file, metadata_raw)?;
+        let key = parse_task_id(&route.metadata_id);
+        let normalized =
+            ensure_current_state_visit_count(metadata.as_ref(), &key, from, from_raw, machine);
+        let (from, from_raw) = (from.to_string(), from_raw.to_string());
+        Ok(Self { key, from, from_raw, metadata, normalized })
+    }
+
+    /// The metadata every safeguard on the hop reads.
+    fn checked(&self) -> Option<&Metadata> {
+        self.normalized.as_ref().or(self.metadata.as_ref())
+    }
+
+    /// The visit budget a forced hop into `to` finds spent, if any: the one check the forced
+    /// path refuses on and a finished ticket's forced line is chosen by.
+    /// §FS-rhei-transition-cmd.6 §FS-rhei-reset.5.1 §FS-rhei-errors.1.5
+    fn spent_entering(
+        &self,
+        machine: &rhei_validator::StateMachine,
+        to: &str,
+    ) -> Option<SpentLoopBudget> {
+        spent_loop_budget(machine, self.checked(), &self.key, &self.from, &self.from_raw, to)
     }
 }
 

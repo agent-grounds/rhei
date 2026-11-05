@@ -98,9 +98,9 @@ fn refusal_of(offer: &str, home: &Path) -> String {
 
 /// The one line the help prints, which runs as printed past the forced path's budget
 /// check to its terminal check: the hop, its destination and its budget were accepted.
-/// §FS-rhei-reset.5.1 §FS-rhei-transition-cmd.6
+/// The line says who may run it as `who`. §FS-rhei-reset.5.1 §FS-rhei-transition-cmd.6
 #[track_caller]
-fn assert_line_gets_past_the_budget(said: &str, home: &Path) -> String {
+fn assert_line_gets_past_the_budget(said: &str, home: &Path, who: &str) -> String {
     let offers = offered_transitions(said);
     let [offer] = offers.as_slice() else {
         panic!("one `rhei transition` must be offered, found {}, in:\n{said}", offers.len());
@@ -112,7 +112,7 @@ fn assert_line_gets_past_the_budget(said: &str, home: &Path) -> String {
          with no terminal, it was refused for that budget.\n{offer} said:\n{refusal}\nin \
          the help:\n{said}"
     );
-    assert_offers_forced_line(said, home)
+    assert_offers_forced_line_naming(said, home, who)
 }
 
 /// No state the help could name gets past the budget, so it names none. Any line it
@@ -180,7 +180,7 @@ fn a_spent_reset_destination_sends_the_line_to_the_initial_state_and_says_why() 
 
     let said = refused(&world, "1");
 
-    let offer = assert_line_gets_past_the_budget(&said, &world.home);
+    let offer = assert_line_gets_past_the_budget(&said, &world.home, OWN_LINE_OPERATOR);
     assert_eq!(offered_to(&offer), Some("open"), "the profile's initial state:\n{offer}");
     let reset = the_one_reset(&said);
     let whole = format!(
@@ -278,7 +278,7 @@ fn a_spent_ancestor_destination_sends_its_line_to_its_initial_state() {
 
     let said = refused(&world, "1.1");
 
-    let offer = assert_line_gets_past_the_budget(&said, &world.home);
+    let offer = assert_line_gets_past_the_budget(&said, &world.home, ANCESTOR_LINE_OPERATOR);
     let word = |flag| offered_flag(&offer, flag);
     assert_eq!(word("--task"), Some("plan.1"), "the topmost finished ancestor's line:\n{offer}");
     assert_eq!(word("--from"), Some("cancelled"), "its base state:\n{offer}");

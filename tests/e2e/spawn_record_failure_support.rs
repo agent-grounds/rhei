@@ -189,7 +189,7 @@ sys.exit(code)
     }
 
     pub fn record(&self) -> PathBuf {
-        self.dir.join("runtime/spawns/task-plan.1-work.json")
+        self.dir.join("runtime").join("spawns").join("task-plan.1-work.json")
     }
 
     pub fn log(&self) -> PathBuf {

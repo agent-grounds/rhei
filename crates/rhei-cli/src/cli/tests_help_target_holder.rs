@@ -188,13 +188,14 @@ mod help_target_holder {
         }
         let typed = Some(PathBuf::from("sub dir/plan.rhei.md"));
         let _scope = enter_help_target(HelpTarget::new(typed, true, machine));
+        let quoted = shell_quote("sub dir/plan.rhei.md");
         assert_eq!(
             help_subcommand_or_bare("budget init", "", "--invocations <N>"),
-            "rhei budget init 'sub dir/plan.rhei.md' --invocations <N>"
+            format!("rhei budget init {quoted} --invocations <N>")
         );
         assert_eq!(
             help_subcommand_or_bare("snapshot list", "--plan", ""),
-            "rhei snapshot list --plan 'sub dir/plan.rhei.md'"
+            format!("rhei snapshot list --plan {quoted}")
         );
     }
 }

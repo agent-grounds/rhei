@@ -167,7 +167,7 @@ pub fn run_recover_in_terminal(root: &Path, confirmation: &str) -> TerminalRun {
 
 #[cfg(unix)]
 fn run_in_terminal(mut command: Command, response: &str) -> TerminalRun {
-    use std::io::{Read, Write};
+    use std::io::Write;
     use std::os::fd::AsRawFd;
     use std::time::{Duration, Instant};
 
@@ -185,26 +185,41 @@ fn run_in_terminal(mut command: Command, response: &str) -> TerminalRun {
     master.write_all(response.as_bytes()).expect("write typed confirmation");
     master.flush().expect("flush typed confirmation");
 
-    let deadline = Instant::now() + Duration::from_secs(10);
-    let status = loop {
-        if let Some(status) = child.try_wait().expect("poll rhei") {
-            break status;
-        }
-        if Instant::now() >= deadline {
-            child.kill().expect("kill hung rhei test process");
-            let _ = child.wait();
-            panic!("rhei did not finish after typed confirmation");
-        }
-        std::thread::sleep(Duration::from_millis(10));
-    };
-
     let bits = nix::fcntl::fcntl(master.as_raw_fd(), nix::fcntl::FcntlArg::F_GETFL)
         .expect("read pseudo-terminal flags");
     let flags = nix::fcntl::OFlag::from_bits_truncate(bits) | nix::fcntl::OFlag::O_NONBLOCK;
     nix::fcntl::fcntl(master.as_raw_fd(), nix::fcntl::FcntlArg::F_SETFL(flags))
         .expect("make pseudo-terminal transcript non-blocking");
 
+    // Read while waiting, as a terminal does: a pseudo-terminal's output queue is
+    // small on macOS, and a refusal longer than it blocks rhei until someone reads.
     let mut bytes = Vec::new();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let status = loop {
+        drain_terminal(&mut master, &mut bytes);
+        if let Some(status) = child.try_wait().expect("poll rhei") {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            child.kill().expect("kill hung rhei test process");
+            let _ = child.wait();
+            panic!(
+                "rhei did not finish after typed confirmation\ntranscript:\n{}",
+                String::from_utf8_lossy(&bytes)
+            );
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    drain_terminal(&mut master, &mut bytes);
+    TerminalRun { status, transcript: String::from_utf8_lossy(&bytes).into_owned() }
+}
+
+/// Take what the non-blocking terminal holds right now, stopping at an empty queue
+/// or a closed far end.
+#[cfg(unix)]
+fn drain_terminal(master: &mut fs::File, bytes: &mut Vec<u8>) {
+    use std::io::Read;
+
     let mut chunk = [0_u8; 4096];
     loop {
         match master.read(&mut chunk) {
@@ -215,7 +230,6 @@ fn run_in_terminal(mut command: Command, response: &str) -> TerminalRun {
             Err(err) => panic!("read pseudo-terminal transcript: {err}"),
         }
     }
-    TerminalRun { status, transcript: String::from_utf8_lossy(&bytes).into_owned() }
 }
 
 pub fn artifact_snapshot(root: &Path, plan: &Path) -> Vec<(PathBuf, Option<Vec<u8>>)> {

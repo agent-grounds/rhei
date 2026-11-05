@@ -77,9 +77,11 @@ impl ResetOffer {
     /// The help of a refusal over a finished ticket, standing in `from`. It offers
     /// the rhei-wide reset only where that reset reopens this ticket: one that leaves
     /// it finished still deletes the rhei's results and logs, so it is no way back.
-    /// A pre-authored chain's children never were in the initial state, so the forced
-    /// line goes there only when the reset is not offered beside it.
-    /// §FS-rhei-reset.5.1 §FS-rhei-complete.4
+    /// The forced line is this ticket's own only where no ancestor is finished; under
+    /// a finished one the forced path would refuse it, so the help starts at the
+    /// topmost finished ancestor, the only one whose line gets past that refusal. What
+    /// the help ends with is always about this ticket.
+    /// §FS-rhei-reset.5.1 §FS-rhei-complete.4 §FS-rhei-transition-cmd.6
     fn reopen_finished(
         &self,
         loaded: &LoadedPlan,
@@ -90,32 +92,68 @@ impl ResetOffer {
         from: &str,
     ) -> String {
         const FINISHED: &str = "nothing to do — the task is finished.";
-        let reopens = |state: &str| machine.states.get(state).is_some_and(|def| !def.terminal);
-        let forced = |to: &str| {
-            format!(
-                "An operator at a terminal can reopen this ticket alone with {}, giving their \
-                 own reason; an agent may not run that.",
-                self.forced_reopen(task_id, from, to)
-            )
-        };
 
         let root = loaded.task_route(task_id, input).execution_root;
-        let dest = reset_destination(ledger_first_departures(&root).get(task_id), from, machine);
-        if reopens(&dest) {
-            return format!(
-                "{FINISHED} {} Otherwise, run {}",
-                forced(&dest),
-                self.for_ticket(task_id)
-            );
-        }
+        let departures = ledger_first_departures(&root);
+        let dest = reset_destination(departures.get(task_id), from, machine);
+        let tail = if state_reopens(machine, &dest) {
+            format!("Otherwise, run {}", self.for_ticket(task_id))
+        } else {
+            format!("A reset would not reopen it: it would leave this ticket in '{dest}'")
+        };
 
-        let no_reset = format!("A reset would not reopen it: it would leave this ticket in '{dest}'");
-        let initial = initial_state_for_node(machine, &task.kind, task.profile_level()).ok();
-        match initial.filter(|state| reopens(state)) {
-            Some(initial) => format!("{FINISHED} {} {no_reset}", forced(&initial)),
-            None => format!("{FINISHED} {no_reset}"),
+        let Some(to) = reopen_state(machine, task, &dest) else {
+            return format!("{FINISHED} {tail}");
+        };
+        let terminal = terminal_ancestors(&loaded.rhei.tasks, &task.id, machine);
+        let Some(ancestor) = terminal.last() else {
+            return format!(
+                "{FINISHED} An operator at a terminal can reopen this ticket alone with {}, \
+                 giving their own reason; an agent may not run that. {tail}",
+                self.forced_reopen(task_id, from, &to)
+            );
+        };
+
+        let ancestor_id = ancestor.id.to_string();
+        let ancestor_from = normalized_state_name(&ancestor.state, machine);
+        let ancestor_dest = reset_destination(departures.get(&ancestor_id), &ancestor_from, machine);
+        match reopen_state(machine, ancestor, &ancestor_dest) {
+            Some(ancestor_to) => format!(
+                "{FINISHED} Its ancestor {ancestor_id} is finished too and has to be reopened \
+                 first, then each finished ticket below it down to this one: an operator at a \
+                 terminal starts with {}, giving their own reason; an agent may not run that. \
+                 {tail}",
+                self.forced_reopen(&ancestor_id, &ancestor_from, &ancestor_to)
+            ),
+            None => format!(
+                "{FINISHED} Its ancestor {ancestor_id} is finished too and has to be reopened \
+                 first, and neither a reset nor its profile's initial state would do that. {tail}"
+            ),
         }
     }
+}
+
+/// Whether `state` is one the machine declares as not terminal. §FS-rhei-reset.5.1
+fn state_reopens(machine: &rhei_validator::StateMachine, state: &str) -> bool {
+    machine.states.get(state).is_some_and(|def| !def.terminal)
+}
+
+/// The state a finished task reopens into, given `dest`, where a reset would leave it:
+/// that state when it is not terminal, otherwise the `initial` of the task's own profile
+/// when that is not terminal, otherwise none. One rule for the ticket and the ancestor
+/// the help starts at. A pre-authored chain's children never were in the initial state,
+/// so a task only goes there when the reset would not reopen it. §FS-rhei-reset.5.1
+fn reopen_state(
+    machine: &rhei_validator::StateMachine,
+    task: &rhei_core::ast::Task,
+    dest: &str,
+) -> Option<String> {
+    if state_reopens(machine, dest) {
+        return Some(dest.to_string());
+    }
+    initial_state_for_node(machine, &task.kind, task.profile_level())
+        .ok()
+        .filter(|state| state_reopens(machine, state))
 }
 
 /// `path` as the offer prints it: absolute, and not canonical. §FS-rhei-reset.5.1

@@ -169,7 +169,6 @@ const NO_RESET: &str = "A reset would not reopen it: it would leave this ticket 
 
 /// The report's own shape: parent and child authored finished, so a reset is no way back.
 #[test]
-#[ignore = "red until #559: the help offers the ticket's line, which the forced path refuses for the parent; implement removes this"]
 fn a_parent_authored_finished_comes_first() {
     let world = plan_world("reset-remedy-ancestor-authored", MACHINE, &chain(&["done", "done"]));
 
@@ -183,7 +182,6 @@ fn a_parent_authored_finished_comes_first() {
 /// Parent and child finished by a run, so the reset that was already offered still is,
 /// after the cheaper way back.
 #[test]
-#[ignore = "red until #559: the ticket's line is offered beside the reset and refused for the parent; implement removes this"]
 fn a_parent_finished_through_complete_comes_first_and_the_reset_stays_offered() {
     let world = plan_world("reset-remedy-ancestor-ran", MACHINE, &chain(&["open", "open"]));
     for ticket in ["1.1", "1"] {
@@ -200,10 +198,8 @@ fn a_parent_finished_through_complete_comes_first_and_the_reset_stays_offered() 
     assert_offers_runnable_reset(&said, &world.home, "plan", &["plan.1", "plan.1.1"]);
 }
 
-/// The nearest ancestor is the one the forced path's own refusal names, and it is not
-/// where an operator can start.
+/// A line for the nearest ancestor is refused as well, so an operator cannot start there.
 #[test]
-#[ignore = "red until #559: under three finished levels the line is the ticket's, and the refusal names only the nearest; implement removes this"]
 fn under_three_finished_levels_the_line_is_the_topmosts() {
     let plan = chain(&["done", "done", "done"]);
     let world = plan_world("reset-remedy-ancestor-three", MACHINE, &plan);
@@ -223,7 +219,6 @@ fn under_three_finished_levels_the_line_is_the_topmosts() {
 /// Topmost finished is not topmost: the root here is open, and its line would reopen
 /// nothing the ticket is waiting on.
 #[test]
-#[ignore = "red until #559: under an open root and a finished parent the line is the ticket's; implement removes this"]
 fn an_open_root_is_not_what_comes_first() {
     let plan = chain(&["open", "done", "done"]);
     let world = plan_world("reset-remedy-ancestor-open-root", MACHINE, &plan);
@@ -236,7 +231,6 @@ fn an_open_root_is_not_what_comes_first() {
 /// The parent left `work` for `cancelled`, while the ticket was authored `done` and
 /// never moved. Nothing about the ticket's own line would be right for the parent.
 #[test]
-#[ignore = "red until #559: the line carries the ticket's states rather than its ancestor's; implement removes this"]
 fn the_line_carries_the_ancestors_own_states() {
     let world = plan_world("reset-remedy-ancestor-states", MACHINE, &chain(&["work", "done"]));
     let cancel = ["--task", "1", "--from", "work", "--to", "cancelled"];
@@ -253,7 +247,6 @@ fn the_line_carries_the_ancestors_own_states() {
 /// The parent's reset would leave it `done`, so it goes to its own profile's initial
 /// state, which its child's profile does not allow and the forced path would refuse.
 #[test]
-#[ignore = "red until #559: the line goes to the ticket's initial state rather than its ancestor's; implement removes this"]
 fn the_line_goes_to_the_initial_state_of_the_ancestors_own_profile() {
     let machine = machine_with_initials("draft", "open");
     let world = plan_world("reset-remedy-ancestor-profile", &machine, &chain(&["done", "done"]));
@@ -267,7 +260,6 @@ fn the_line_goes_to_the_initial_state_of_the_ancestors_own_profile() {
 /// A counted visit on the ancestor's state is not part of its base state, and neither
 /// finding it finished nor naming the hop may read it as one.
 #[test]
-#[ignore = "red until #559: the line is the ticket's, whatever the ancestor's visit count; implement removes this"]
 fn the_line_carries_the_ancestors_base_state_past_a_counted_visit() {
     let machine = MACHINE.replace("    final: true\n", "    final: true\n    visits: 5\n");
     let world = plan_world("reset-remedy-ancestor-visit", &machine, &chain(&["done-2", "done"]));
@@ -281,8 +273,7 @@ fn the_line_carries_the_ancestors_base_state_past_a_counted_visit() {
 /// There is nothing for the operator to run, and the reader is told why rather than
 /// left with this ticket's line, which the forced path would refuse.
 #[test]
-#[ignore = "red until #559: the ticket's line is offered though nothing can reopen its parent; implement removes this"]
-fn an_ancestor_with_no_state_to_reopen_into_is_named_with_no_command() {
+fn an_ancestor_no_reset_or_initial_state_reopens_is_named_with_no_command() {
     let machine = machine_with_initials("done", "open");
     let world = plan_world("reset-remedy-ancestor-stuck", &machine, &chain(&["done", "done"]));
 
@@ -291,7 +282,8 @@ fn an_ancestor_with_no_state_to_reopen_into_is_named_with_no_command() {
     assert!(offered_transitions(&said).is_empty(), "no line can start this:\n{said}");
     let whole = format!(
         "nothing to do — the task is finished. Its ancestor plan.1 is finished too and has to be \
-         reopened first, and there is no state to reopen it into. {NO_RESET}"
+         reopened first, and neither a reset nor its profile's initial state would do that. \
+         {NO_RESET}"
     );
     assert!(said.contains(&whole), "it names the ancestor and says why:\n{said}");
     assert_does_not_say_alone(&said);
@@ -302,7 +294,6 @@ fn an_ancestor_with_no_state_to_reopen_into_is_named_with_no_command() {
 /// the member would find one. The help keeps its one line, in the bytes as written.
 /// §FS-rhei-reset.5.1 §FS-rhei-errors.2
 #[test]
-#[ignore = "red until #559: the machine is passed on in a line that is the ticket's rather than its ancestor's; implement removes this"]
 fn the_ancestors_line_passes_the_machine_on_and_stays_on_one_line() {
     let world = RemedyWorld::at("reset-remedy-ancestor-member", &"w".repeat(90));
     world.write("index.panta.md", "# Panta: Remedy\n");
@@ -338,7 +329,6 @@ fn the_ancestors_line_passes_the_machine_on_and_stays_on_one_line() {
 /// A claim below the ancestor stops its line too, and that refusal names the holder and
 /// the remedy, so the message still does not predict it.
 #[test]
-#[ignore = "red until #559: under a finished parent the line is the ticket's, not the parent's; implement removes this"]
 fn under_a_finished_parent_a_claim_is_left_to_the_forced_paths_refusal() {
     let plan = format!("{}**Assignee:** someone\n", chain(&["done", "done"]));
     let world = plan_world("reset-remedy-ancestor-claimed", MACHINE, &plan);
@@ -360,7 +350,6 @@ fn under_a_finished_parent_a_claim_is_left_to_the_forced_paths_refusal() {
 /// this ticket's own. The reason is replaced, as the help says to.
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #559: at a terminal the printed line is refused for a finished ancestor; implement removes this"]
 fn at_a_terminal_each_printed_line_reopens_its_ticket_down_to_this_one() {
     let plan = chain(&["done", "done", "done"]);
     let fixture = force_fixture("reset-remedy-ancestor-walk", &plan, MACHINE);

@@ -187,9 +187,9 @@ fn complete_command(
     let current_state_raw = task.state.as_str();
     let current_state = normalized_state_name(current_state_raw, &machine);
 
-    // Reject tasks already in a terminal state. The help says who may run the one-ticket way
-    // back, and offers the reset only where it would reopen this ticket.
-    // §FS-rhei-reset.5.1 §FS-rhei-transition-cmd.6
+    // Reject tasks already in a terminal state. The help says who may run the way back, which
+    // starts at the topmost finished ancestor if there is one, and offers the reset only where
+    // it would reopen this ticket. §FS-rhei-reset.5.1 §FS-rhei-transition-cmd.6
     if is_terminal_state(current_state_raw, &machine) {
         let help = machines.reset.reopen_finished(
             &loaded,

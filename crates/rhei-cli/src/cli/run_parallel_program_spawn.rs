@@ -17,6 +17,7 @@ fn spawn_parallel_program_work_item(
     settings: &RheiSettings,
     workspace_root: &Path,
     sink: &Arc<dyn rhei_tui::EventSink>,
+    spawn_refusals: &mut SpawnRefusals,
 ) -> MietteResult<ParallelProgramSpawnOutcome> {
     // As for agents: a slot was reserved for this item before the interrupt,
     // and the shutdown starts nothing further. §FS-rhei-run.3.2
@@ -57,10 +58,11 @@ fn spawn_parallel_program_work_item(
         &machines.reset,
     );
     // Refused before it runs; `Skipped` is the pool's stall. §FS-rhei-agents.8.1
-    let plan = match plan {
+    let plan = match spawn_refusals.observe(
+        &item.task_id_str, &item.current_state, None, plan, sink,
+    ) {
         Ok((plan, _)) => plan,
-        Err(refusal) => {
-            emit_run_message(sink, rhei_tui::MessageLevel::Error, format!("  {refusal}"));
+        Err(_) => {
             return Ok(ParallelProgramSpawnOutcome::Skipped);
         }
     };

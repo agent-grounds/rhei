@@ -26,19 +26,16 @@ fn refusal_after_failure(agent: bool, parallel: &'static str) {
 macro_rules! dispatch_contract {
     ($directory:ident, $publication:ident, $refusal:ident, $agent:expr, $parallel:expr) => {
         #[test]
-        #[ignore = "red until #548: report completion-record directory errors; implement removes this"]
         fn $directory() {
             completed_failure($agent, $parallel, "directory");
         }
 
         #[test]
-        #[ignore = "red until #548: report shared record transaction errors; implement removes this"]
         fn $publication() {
             completed_failure($agent, $parallel, "read");
         }
 
         #[test]
-        #[ignore = "red until #548: identify refused spawning in halt help; implement removes this"]
         fn $refusal() {
             refusal_after_failure($agent, $parallel);
         }
@@ -75,7 +72,23 @@ dispatch_contract!(
 );
 
 #[test]
-#[ignore = "red until #548: report completion-record lock failures; implement removes this"]
 fn completion_record_lock_failure_is_observable() {
     completed_failure(false, "1", "lock");
+}
+
+fn refill_failure(agent: bool) {
+    let fixture = Fixture::at_dispatch(agent, "2", "read", 0, false, true);
+    let out = fixture.run();
+    fixture.assert_worker(&out, 0, true);
+    fixture.assert_warning(&out, &fixture.cause("read"));
+}
+
+#[test]
+fn program_pool_refill_publication() {
+    refill_failure(false);
+}
+
+#[test]
+fn agent_pool_refill_publication() {
+    refill_failure(true);
 }

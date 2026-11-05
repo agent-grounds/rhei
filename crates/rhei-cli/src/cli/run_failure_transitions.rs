@@ -32,8 +32,10 @@ fn timeouts_unfired() -> std::sync::MutexGuard<'static, Vec<(String, String)>> {
 /// it failed to leave, and otherwise the nothing-claimable one. Read against the
 /// plan as the halt found it, so a timeout that later fired, or a task that has
 /// since moved, cannot leave the help pointing at a warning whose cause is gone.
+/// A refused spawn contributes its concrete cause rather than blockage help;
+/// when both causes strand tasks, retain both diagnoses.
 /// §FS-rhei-run.3
-fn run_halt_help(rhei: &rhei_core::ast::Rhei) -> &'static str {
+fn run_halt_help(rhei: &rhei_core::ast::Rhei, spawn_refusal_help: Option<String>) -> String {
     let unfired = timeouts_unfired();
     let mut tasks = Vec::new();
     collect_plan_tasks(&rhei.tasks, &mut tasks);
@@ -41,10 +43,11 @@ fn run_halt_help(rhei: &rhei_core::ast::Rhei) -> &'static str {
         let id = task.id.to_string();
         unfired.iter().any(|(task_id, state)| *task_id == id && task.state.as_str() == state)
     });
-    if stranded {
-        timeout_transition_unfired_help()
-    } else {
-        nothing_claimable_help()
+    match (stranded, spawn_refusal_help) {
+        (true, Some(refusal)) => format!("{refusal}\n{}", timeout_transition_unfired_help()),
+        (false, Some(refusal)) => refusal,
+        (true, None) => timeout_transition_unfired_help().to_owned(),
+        (false, None) => nothing_claimable_help().to_owned(),
     }
 }
 

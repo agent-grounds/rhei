@@ -63,5 +63,25 @@ int open64(const char *path, int flags, ...) {
         va_end(args);
         if (fail(path, "stage")) return -1;
     }
+    /* A competing writer wins after preflight, at the actual exclusive open.
+     * The refused spawn must preserve every byte and explain the halt.
+     * §FS-rhei-agents.8.1 §FS-rhei-run.3 */
+    const char *root = getenv("SPAWN_FAULT_ROOT");
+    const char *fault = getenv("SPAWN_FAULT_MODE");
+    if (root && fault && !strcmp(fault, "race") && (flags & O_EXCL) && (flags & O_CREAT)) {
+        char target[PATH_MAX];
+        snprintf(target, sizeof target, "%s/runtime/logs/task-plan.1-work.log", root);
+        if (!strcmp(path, target)) {
+            ssize_t (*real_write)(int, const void *, size_t) = dlsym(RTLD_NEXT, "write");
+            int fd = real(path, O_WRONLY | O_CREAT | O_EXCL, 0600);
+            if (fd >= 0) {
+                real_write(fd, "raced-log\n", 10);
+                close(fd);
+                snprintf(target, sizeof target, "%s/fault-hit", root);
+                fd = real(target, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+                if (fd >= 0) { real_write(fd, "race", 4); close(fd); }
+            }
+        }
+    }
     return real(path, flags, mode);
 }

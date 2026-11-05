@@ -566,7 +566,7 @@ fn run_callback_mode(
             )
         {
             return Err(miette!(
-                help = run_halt_help(&loaded.rhei),
+                help = run_halt_help(&loaded.rhei, None),
                 "rhei run halted with non-terminal tasks remaining and no further advancement possible"
             ));
         }

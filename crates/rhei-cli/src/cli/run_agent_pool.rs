@@ -71,6 +71,7 @@ fn run_agent_worker_pool(
         &live.settings,
         workspace_root,
         sink,
+        progress.spawn_refusals,
         &mut free_slots,
         &mut next_extra_slot,
         &mut active_invocation_counts,
@@ -111,6 +112,7 @@ fn run_agent_worker_pool(
         &identity.budget,
         snapshot_override_selection,
         sink,
+        progress.spawn_refusals,
         intervene,
         &mut free_slots,
         &mut next_extra_slot,
@@ -154,6 +156,7 @@ fn run_agent_worker_pool(
                     workspace_root,
                     sink,
                     completion,
+                    progress.spawn_refusals,
                 )?;
                 if effect.program_spawned {
                     *progress.programs_spawned += 1;
@@ -176,6 +179,7 @@ fn run_agent_worker_pool(
                     run_id,
                     snapshot_override_selection,
                     sink,
+                    progress.spawn_refusals,
                     intervene,
                     &mut free_slots,
                     &mut next_extra_slot,
@@ -235,6 +239,7 @@ fn run_agent_worker_pool(
                     run_id,
                     snapshot_override_selection,
                     sink,
+                    progress.spawn_refusals,
                     intervene,
                     &mut free_slots,
                     &mut next_extra_slot,
@@ -327,6 +332,9 @@ fn run_agent_worker_pool(
                 )?;
             }
             Err(err) => {
+                progress.spawn_refusals.completion_error(
+                    &task_id_str, &state_name, resolved_agent_log_identity(&resolved).as_deref(), &err,
+                );
                 // The spawn itself failed, so there is no exit to route and
                 // no verdict left to wait for. Out before the refill, as
                 // above. §FS-rhei-run-tui.1.7
@@ -367,6 +375,7 @@ fn run_agent_worker_pool(
             run_id,
             snapshot_override_selection,
             sink,
+            progress.spawn_refusals,
             intervene,
             &mut free_slots,
             &mut next_extra_slot,

@@ -34,6 +34,7 @@ fn spawn_parallel_agent_work_item(
     budget_run: &BudgetRun,
     snapshot_override_selection: Option<&SnapshotOverrideRunSelection>,
     sink: &Arc<dyn rhei_tui::EventSink>,
+    spawn_refusals: &mut SpawnRefusals,
     intervene: Option<&Arc<RunInterveneSink>>,
     // Tickets this pass already spawned and has not reaped: what `### In
     // Flight` names, since `rhei run` claims by spawning rather than by writing
@@ -72,7 +73,7 @@ fn spawn_parallel_agent_work_item(
     // §FS-rhei-agents.3.2.3 §FS-rhei-agents.8.1
     let identity = resolved_agent_log_identity(&item.resolved);
     let (task_id, state) = (item.task_id_str.as_str(), item.current_state.as_str());
-    let (mut plan, log_number) = match plan_named_spawn(
+    let planned = plan_named_spawn(
         machine,
         &task_workspace_root,
         &agent_runtime_dir,
@@ -81,11 +82,13 @@ fn spawn_parallel_agent_work_item(
         visit_count,
         identity.as_deref(),
         &machines.reset,
+    );
+    let (mut plan, log_number) = match spawn_refusals.observe(
+        task_id, state, identity.as_deref(), planned, sink,
     ) {
         Ok(planned) => planned,
         // Refused before it costs anything; `Skipped` is the pool's stall. §FS-rhei-agents.8.1
-        Err(refusal) => {
-            emit_run_message(sink, rhei_tui::MessageLevel::Error, format!("  {refusal}"));
+        Err(_) => {
             return Ok(ParallelAgentSpawnOutcome::Skipped);
         }
     };

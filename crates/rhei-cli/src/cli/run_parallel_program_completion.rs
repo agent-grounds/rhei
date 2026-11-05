@@ -20,6 +20,7 @@ fn handle_parallel_program_completion(
     workspace_root: &Path,
     sink: &Arc<dyn rhei_tui::EventSink>,
     completion: ParallelProgramCompletion,
+    spawn_refusals: &mut SpawnRefusals,
 ) -> MietteResult<ParallelProgramCompletionEffect> {
     let ParallelProgramCompletion {
         task_id_str,
@@ -283,6 +284,7 @@ fn handle_parallel_program_completion(
             })
         }
         Err(err) => {
+            spawn_refusals.completion_error(&task_id_str, &state_name, None, &err);
             emit_run_message(sink, rhei_tui::MessageLevel::Error, format!("  error: {}", err));
             if !opts.continue_on_error() {
                 return Err(err);
@@ -294,4 +296,3 @@ fn handle_parallel_program_completion(
         }
     }
 }
-

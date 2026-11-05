@@ -576,6 +576,9 @@ fn handle_sequential_agent_completion(
             }
         }
         Err(err) => {
+            progress.spawn_refusals.completion_error(
+                task_id_str, current_state, resolved_agent_log_identity(resolved).as_deref(), &err,
+            );
             run_error!("  error: {}", err);
             if !opts.continue_on_error() {
                 return Err(err);

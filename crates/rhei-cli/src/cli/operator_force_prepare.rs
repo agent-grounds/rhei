@@ -72,7 +72,8 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
         return Err(miette!(help = format!("release the claim first: rhei release {} --task {}", shell_quote(&input.display().to_string()), shell_quote(&claim.id.to_string())), "Task {} is assigned to {}; release the claim before forced recovery", claim.id, claim.assignee.as_deref().unwrap_or("?")));
     }
     if !terminal {
-        if let Some(ancestor) = terminal_ancestors(&loaded.rhei.tasks, &target_id, machine).first() {
+        // Reopen the outermost blocker before its descendants. §FS-rhei-errors.1.2
+        if let Some(ancestor) = terminal_ancestors(&loaded.rhei.tasks, &target_id, machine).last() {
             // §FS-rhei-errors.1.2
             return Err(miette!(help = ancestor_reopen_help(request, ancestor, machine), "terminal ancestor {} must be reopened before forcing {} into a non-terminal state", ancestor.id, task_id));
         }

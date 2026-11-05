@@ -95,6 +95,113 @@ fn diagnostic_guidance_force_reopens_ancestor_first() {
     );
 }
 
+/// The first offered hop must clear every ancestor prerequisite and retain the
+/// supplied machine and ancestor's profile. §FS-rhei-errors.1.2 §FS-rhei-transition-cmd.6
+#[test]
+fn diagnostic_guidance_force_reopens_outermost_ancestor_first() {
+    let plan = format!(
+        "{}\n#### Task 1.1: Parent\n**State:** done\n\n##### Task 1.1.1: Child\n**State:** done\n",
+        FINISHED.replace("## Tasks", "---\nstructure:\n  maxLevels: 3\n---\n\n## Tasks")
+    );
+    let profiled = format!(
+        "{}\nprofiles:\n  parent:\n    initial: parent_open\n    allowed: [parent_open, done]\n  child:\n    initial: open\n    allowed: [open, done]\nnode_policy:\n  root: parent\n  default: child\n  overrides:\n    - match: {{ level: 1 }}\n      profile: parent\n",
+        MACHINE
+            .replace("    initial: true\n", "")
+            .replace("  done:", "  parent_open:\n    description: Parent work\n  done:")
+            .replace("transitions:\n", "transitions:\n  - { from: parent_open, to: done, description: Finish parent }\n")
+    );
+    for (machine, destination, explicit) in
+        [(MACHINE, "open", false), (profiled.as_str(), "parent_open", true)]
+    {
+        let dir = fixture(&plan, machine);
+        let before = fs::read(dir.join("plan.rhei.md")).unwrap();
+        let mut args = vec![
+            "transition",
+            "plan.rhei.md",
+            "--task",
+            "1.1.1",
+            "--from",
+            "done",
+            "--to",
+            "open",
+            "--force",
+            "--reason",
+            "repair route",
+        ];
+        if explicit {
+            fs::rename(dir.join("states.yaml"), dir.join("custom states.yaml")).unwrap();
+            args.extend(["--state-machine", "custom states.yaml"]);
+            let valid = invoke(
+                &dir,
+                &["validate", "plan.rhei.md", "--state-machine", "custom states.yaml"],
+                false,
+            );
+            assert!(valid.status.success(), "invalid explicit fixture: {}", valid.stderr);
+        }
+        let run = invoke(&dir, &args, false);
+        let guidance = help(&run, "terminal ancestor plan.1 must be reopened");
+        requires(&guidance, &["operator", "reopen", "first", "confirmation", "agent"]);
+        let offers = super::reset_remedy_support::offered_transitions(&guidance);
+        assert_eq!(offers.len(), 1, "one first action: {guidance}");
+        let offered = &offers[0];
+        requires(
+            offered,
+            &[
+                "plan.rhei.md",
+                "--task plan.1 ",
+                "--from done",
+                &format!("--to {destination}"),
+                "--force",
+                "--reason",
+            ],
+        );
+        if explicit {
+            requires(offered, &["--state-machine", "custom states.yaml"]);
+        }
+        let next = super::reset_remedy_support::run_offer(offered, "", &dir.join("home"));
+        help(&next, "--force requires an interactive terminal and fresh typed confirmation");
+        assert!(
+            !next.stderr.contains("terminal ancestor"),
+            "another ancestor blocks the offered action: {}",
+            next.stderr
+        );
+        assert_eq!(fs::read(dir.join("plan.rhei.md")).unwrap(), before, "refusals changed plan");
+    }
+}
+
+/// Decoding damage on retry preserves evidence and receives its repair action.
+/// §FS-rhei-errors.6
+#[test]
+fn diagnostic_guidance_retry_invalid_utf8_ledger() {
+    let machine =
+        MACHINE.replace("    description: Work", "    description: Work\n    program: \"true\"");
+    let dir = fixture(&FINISHED.replace("**State:** done", "**State:** open"), &machine);
+    let before = fs::read(dir.join("plan.rhei.md")).unwrap();
+    let ledger = dir.join("runtime/state-transitions.log");
+    fs::create_dir_all(ledger.parent().unwrap()).unwrap();
+    let damaged = b"\xff\n";
+    fs::write(&ledger, damaged).unwrap();
+    let run = invoke(&dir, &["retry", "plan.rhei.md", "--task", "1"], false);
+    let guidance = help(&run, "invalid transition ledger");
+    requires(&run.stderr, &["utf-8", "state-transitions.log"]);
+    requires(
+        &guidance,
+        &[
+            "preserve",
+            "state-transitions.log",
+            "restore",
+            "valid utf-8",
+            "trusted backup",
+            "do not delete history",
+        ],
+    );
+    for unrelated in ["writable", "free space", "retry the command"] {
+        assert!(!guidance.contains(unrelated), "wrong remedy: {guidance}");
+    }
+    assert_eq!(fs::read(ledger).unwrap(), damaged, "refusal changed ledger");
+    assert_eq!(fs::read(dir.join("plan.rhei.md")).unwrap(), before, "refusal changed plan");
+}
+
 #[test]
 fn diagnostic_guidance_retry_terminal_task() {
     let dir = fixture(FINISHED, MACHINE);

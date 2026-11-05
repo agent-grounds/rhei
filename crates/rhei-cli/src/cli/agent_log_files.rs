@@ -96,7 +96,7 @@ fn ticket_entry_number(
 }
 
 /// Read and count ledger movements once for every presentation boundary.
-/// Failed reads keep their kind; failed parses keep their evidence remedy. §FS-rhei-errors.6
+/// Failed reads keep their kind; decoding and parse damage keep the evidence remedy. §FS-rhei-errors.6
 fn ticket_entry_number_report(
     task_root: &Path,
     runtime_dir: &Path,
@@ -108,7 +108,7 @@ fn ticket_entry_number_report(
     let mut first_from: Option<String> = None;
     let mut arrivals = 0u64;
     for path in std::iter::once(&owning).chain((running != owning).then_some(&running)) {
-        let raw = match fs::read_to_string(path) {
+        let bytes = match fs::read(path) {
             Ok(raw) => raw,
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
             Err(err) => {
@@ -116,7 +116,11 @@ fn ticket_entry_number_report(
                 return Err(file_io_report(path, "failed to read transition ledger", err).wrap_err(context));
             }
         };
-        let movements = rhei_core::transition_history::parse(&raw)
+        // Decoding damage needs ledger repair, not filesystem changes. §FS-rhei-errors.6
+        let raw = std::str::from_utf8(&bytes).map_err(|err| {
+            ledger_report(path, err).wrap_err(unreadable_ledger(path, &err.to_string()))
+        })?;
+        let movements = rhei_core::transition_history::parse(raw)
             .map_err(|err| {
                 let context = unreadable_ledger(path, &err.to_string());
                 ledger_report(path, err).wrap_err(context)

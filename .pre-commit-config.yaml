@@ -58,9 +58,17 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
+      # One offline pass over the tree, one pass over the URLs a commit stages. §AR-ci-release.2.1
       - id: lychee
         name: lychee
-        entry: lychee --no-progress --include-fragments README.md docs examples packages
+        entry: lychee --offline --no-progress --include-fragments README.md docs examples packages
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: lychee-staged
+        name: lychee (staged lines)
+        entry: python scripts/check_staged_links.py README.md docs examples packages
         language: system
         pass_filenames: false
         always_run: true

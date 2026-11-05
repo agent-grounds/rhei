@@ -1,0 +1,74 @@
+# What still asks about every external link, on main's head. §AR-ci-release.5
+# No pull request and no required check depends on it; the one open issue it files is the record.
+name: Nightly link sweep
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  sweep:
+    name: every external link
+    runs-on: ubuntu-latest
+    env:
+      LYCHEE_VERSION: 0.23.0
+    steps:
+      # By name, so a dispatch from another branch still judges main's links.
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Install current stable Rust for tooling
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install lychee
+        run: cargo +stable install lychee --version "$LYCHEE_VERSION" --locked
+
+      # A 5xx that passes by says nothing about the link, so the second pass is the verdict.
+      # `shell: bash` is what sets pipefail: without it the `tee` would lose lychee's exit code.
+      - name: Ask about every external link
+        id: sweep
+        shell: bash
+        env:
+          # lychee reads it for GitHub's authenticated rate limit.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sweep() {
+            lychee --no-progress --include-fragments README.md docs examples packages 2>&1 | tee "$RUNNER_TEMP/link-sweep.txt"
+          }
+          if sweep; then
+            exit 0
+          fi
+          echo "The first pass failed. Asking again after a pause, and that pass is the verdict."
+          sleep 300
+          sweep
+
+      # One open issue: a later failure comments on it rather than opening a second.
+      - name: File the failing links
+        if: failure() && steps.sweep.outcome == 'failure'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: "Nightly link sweep: external links failing"
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body="$RUNNER_TEMP/link-sweep-issue.md"
+          {
+            echo "The [nightly link sweep]($RUN_URL) failed twice on \`$(git rev-parse --short HEAD)\`. What lychee said on the second pass, which is the verdict:"
+            echo
+            echo '```text'
+            cat "$RUNNER_TEMP/link-sweep.txt"
+            echo '```'
+          } > "$body"
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$TITLE\" in:title" \
+            --json number,title --jq 'map(select(.title == env.TITLE)) | .[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --label bug --body-file "$body"
+          fi

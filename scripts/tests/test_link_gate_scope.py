@@ -35,7 +35,6 @@ def diff_of(path: str, *hunks: str) -> str:
     return f"diff --git a/{path} b/{path}\nindex 1111111..2222222 100644\n--- a/{path}\n+++ b/{path}\n" + "".join(hunks)
 
 
-@unittest.skipUnless(os.environ.get("RHEI_RED_562"), "red until #562: added_lines does not exist; implement removes this")
 class AddedLinesTests(unittest.TestCase):
     def added(self, diff: str):
         return staged_links().added_lines(diff)
@@ -98,7 +97,6 @@ def located(found: dict[str, list[str]]) -> dict[str, list[str]]:
     return {url: [where.replace("\\", "/") for where in places] for url, places in found.items()}
 
 
-@unittest.skipUnless(os.environ.get("RHEI_RED_562"), "red until #562: staged_urls does not exist; implement removes this")
 class StagedUrlsTests(unittest.TestCase):
     PATH = os.path.join("docs", "a.md")
 
@@ -169,7 +167,6 @@ HOSTILE_GIT_CONFIG = (
 )
 
 
-@unittest.skipUnless(os.environ.get("RHEI_RED_562"), "red until #562: staged_diff does not exist; implement removes this")
 class StagedDiffTests(ScriptTestCase):
     """Real git and no lychee, so all three platforms read the diff the hook reads."""
 
@@ -233,7 +230,6 @@ sys.exit(int(os.environ.get("LYCHEE_STUB_EXIT", "0")))
 """
 
 
-@unittest.skipUnless(os.environ.get("RHEI_RED_562"), "red until #562: the script does not exist; implement removes this")
 class StagedScriptTests(ScriptTestCase):
     """The script's wiring under a stub lychee, on the platforms that have no real one."""
 

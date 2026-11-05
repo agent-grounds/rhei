@@ -10,7 +10,6 @@ proves the scoping itself on all three platforms.
 
 from __future__ import annotations
 
-import os
 import unittest
 
 from scripts.tests.link_gate_test_support import (
@@ -159,7 +158,6 @@ class InternalLinkTests(LinkGateCase):
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assert_names_the_broken_link(result, "target.md#the-anchor")
 
-    @unittest.skipUnless(os.environ.get("RHEI_RED_562"), "red until #562: the refusal asks every outside host first; implement removes this")
     def test_the_refusal_asks_no_outside_host(self):
         self.repo.git("rm", self.TARGET)
         result = self.commit()
@@ -167,7 +165,6 @@ class InternalLinkTests(LinkGateCase):
         self.assertEqual(self.stand_in.asked(), [])
 
 
-@unittest.skipUnless(os.environ.get("RHEI_RED_562"), "red until #562: a commit depends on every outside host; implement removes this")
 @needs_lychee_and_pre_commit
 class UntouchedLinkTests(LinkGateCase):
     """What the ticket reports: every link of the fixture answers 504, and none it leaves alone may refuse."""

@@ -664,9 +664,11 @@ The message predicts two of the forced path's refusals, a finished ancestor and 
 spent visit budget. A hop the forced path would refuse because of a claim gets that
 path's own refusal; the message does not predict it. A claim differs from both: its
 refusal names the holder and the remedy, nothing else has to be reopened, and the
-printed line runs once the claim is released. A spent budget's refusal names no
-remedy, and nothing short of a reset, which is the other offer, clears the count,
-so a line into a spent state would never run.
+printed line runs once the claim is released. A spent budget differs where it
+matters: the printed line itself can never run. Its refusal does name a way on,
+another declared edge or a higher limit from the workflow author, but neither runs
+that line: `--force` cannot bypass the budget, and short of editing the machine
+only a reset, which is the other offer, clears the count.
 
 The other messages that offer the reset — a refused log name, a halt row, a note —
 do not predict [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) either. They offer the reset as the way out of

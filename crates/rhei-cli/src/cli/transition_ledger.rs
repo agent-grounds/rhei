@@ -7,6 +7,47 @@
 
 // §AR-source-file-size.3 §FS-rhei-complete.3 §FS-rhei-viz.4
 
+/// Keep absence available to callers without confusing decoding damage with I/O.
+/// Retry, memory/reset and pruning share this classification. §FS-rhei-errors.6
+#[derive(Debug)]
+enum TransitionLedgerReadError {
+    Io(std::io::Error),
+    Utf8(std::string::FromUtf8Error),
+}
+
+impl std::fmt::Display for TransitionLedgerReadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(err) => std::fmt::Display::fmt(err, f),
+            Self::Utf8(err) => std::fmt::Display::fmt(err, f),
+        }
+    }
+}
+
+impl TransitionLedgerReadError {
+    fn is_not_found(&self) -> bool {
+        matches!(self, Self::Io(err) if err.kind() == std::io::ErrorKind::NotFound)
+    }
+
+    /// Retain the caller's action and path; only real I/O gets filesystem help.
+    /// Decoding damage requires preserved, trusted evidence. §FS-rhei-errors.1.2 §FS-rhei-errors.6
+    fn into_report(self, path: &Path, action: &str) -> Report {
+        match self {
+            Self::Io(err) => file_io_report(path, action, err),
+            Self::Utf8(err) => ledger_report(path, err)
+                .wrap_err(format!("{action} '{}'", path.display())),
+        }
+    }
+}
+
+/// Read bytes before decoding so every caller can distinguish a missing file,
+/// an OS failure, and damaged ledger content. Does not mutate or lock the file;
+/// callers retain their access guards and sidecar holds. §FS-rhei-errors.6
+fn read_transition_ledger(path: &Path) -> Result<String, TransitionLedgerReadError> {
+    let bytes = fs::read(path).map_err(TransitionLedgerReadError::Io)?;
+    String::from_utf8(bytes).map_err(TransitionLedgerReadError::Utf8)
+}
+
 /// Append a state-transition entry to the central transition ledger and, when a
 /// completion message is present, to `runtime/results/<task-id>.md`.
 ///
@@ -135,8 +176,8 @@ impl LockedTransitionLedger {
         if !path.is_file() {
             return Ok(false);
         }
-        let raw = fs::read_to_string(&path).map_err(|err| {
-            file_io_report(&path, "failed to read state transition log", err)
+        let raw = read_transition_ledger(&path).map_err(|err| {
+            err.into_report(&path, "failed to read state transition log")
         })?;
         // §FS-rhei-reset.2.1: validate adjacency before pruning both task-keyed rows.
 

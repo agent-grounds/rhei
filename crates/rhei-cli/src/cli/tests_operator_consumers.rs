@@ -40,3 +40,69 @@ fn operator_all_history_consumers_refuse_a_broken_pair() {
     assert!(reset_command(&plan, Some(&machine_path), &[], true, false).is_err());
     assert_eq!(operator_snapshot(dir.path()), before);
 }
+
+/// Exercise pruning directly so reset's earlier memory read cannot mask a
+/// competing decoder. Both lock-only and append handles preserve the evidence.
+/// §FS-rhei-errors.1.2 §FS-rhei-errors.6
+#[test]
+fn diagnostic_guidance_prune_invalid_utf8_ledger() {
+    for append_handle in [false, true] {
+        let (dir, plan, _) = operator_fixture();
+        let before = fs::read(&plan).unwrap();
+        let path = dir.path().join("runtime/state-transitions.log");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let damaged = b"\xff\n";
+        fs::write(&path, damaged).unwrap();
+        let mut ledger = if append_handle {
+            LockedTransitionLedger::open(dir.path()).unwrap()
+        } else {
+            LockedTransitionLedger::lock(dir.path()).unwrap()
+        };
+        let error = ledger.prune(&BTreeSet::from(["plan.1".to_string()]))
+            .expect_err("pruning must refuse decoding damage");
+        let diagnostic = error.chain().map(ToString::to_string).collect::<Vec<_>>().join("\n");
+        for expected in [
+            "failed to read state transition log",
+            "invalid transition ledger",
+            &path.display().to_string(),
+            "invalid utf-8 sequence of 1 bytes from index 0",
+        ] {
+            assert!(diagnostic.contains(expected), "{diagnostic}");
+        }
+        let guidance = error.help().expect("ledger repair help").to_string();
+        for expected in ["preserve", "restore", "valid UTF-8", "trusted backup", "Do not delete history"] {
+            assert!(guidance.contains(expected), "{guidance}");
+        }
+        for unrelated in ["writable", "free space", "retry the command", "try again"] {
+            assert!(!guidance.contains(unrelated), "{guidance}");
+        }
+        assert_eq!(fs::read(&path).unwrap(), damaged, "refusal changed ledger");
+        assert_eq!(fs::read(&plan).unwrap(), before, "refusal changed plan");
+    }
+}
+
+/// Shared decoding must retain memory/pruning absence behavior and classify
+/// actual OS failures as filesystem failures. §FS-rhei-errors.6
+#[test]
+fn diagnostic_guidance_ledger_absence_and_io_remain_distinct() {
+    let (dir, _, _) = operator_fixture();
+    let path = dir.path().join("runtime/state-transitions.log");
+    let absent = read_transition_ledger(&path).unwrap_err();
+    assert!(absent.is_not_found());
+    assert!(read_ledger(dir.path()).unwrap().is_empty());
+    let mut ledger = LockedTransitionLedger::lock(dir.path()).unwrap();
+    assert!(!ledger.prune(&BTreeSet::from(["plan.1".to_string()])).unwrap());
+    assert!(!path.exists(), "an absent ledger stays absent");
+
+    fs::create_dir_all(&path).unwrap();
+    let cause = fs::read(&path).unwrap_err();
+    let error = read_ledger(dir.path()).expect_err("a directory cannot be read as history");
+    let diagnostic = error.to_string();
+    assert!(diagnostic.contains(&path.display().to_string()), "{diagnostic}");
+    assert!(diagnostic.contains(&cause.to_string()), "{diagnostic}");
+    let guidance = error.help().expect("I/O help").to_string();
+    assert_eq!(guidance, io_error_help(&path, cause.kind()));
+    assert!(!guidance.contains("trusted backup"), "{guidance}");
+    assert!(!ledger.prune(&BTreeSet::from(["plan.1".to_string()])).unwrap());
+    assert!(path.is_dir(), "pruning still ignores a non-file ledger path");
+}

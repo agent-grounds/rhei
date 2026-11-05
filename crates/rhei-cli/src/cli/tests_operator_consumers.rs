@@ -49,7 +49,11 @@ fn diagnostic_guidance_prune_invalid_utf8_ledger() {
     for append_handle in [false, true] {
         let (dir, plan, _) = operator_fixture();
         let before = fs::read(&plan).unwrap();
-        let path = dir.path().join("runtime/state-transitions.log");
+        // The ledger names the canonical root it locked, in the platform's separators.
+        let path = rhei_core::platform::canonical_path(dir.path())
+            .unwrap()
+            .join("runtime")
+            .join("state-transitions.log");
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         let damaged = b"\xff\n";
         fs::write(&path, damaged).unwrap();
@@ -86,7 +90,8 @@ fn diagnostic_guidance_prune_invalid_utf8_ledger() {
 #[test]
 fn diagnostic_guidance_ledger_absence_and_io_remain_distinct() {
     let (dir, _, _) = operator_fixture();
-    let path = dir.path().join("runtime/state-transitions.log");
+    // `read_ledger` names the root as given, in the platform's separators.
+    let path = dir.path().join("runtime").join("state-transitions.log");
     let absent = read_transition_ledger(&path).unwrap_err();
     assert!(absent.is_not_found());
     assert!(read_ledger(dir.path()).unwrap().is_empty());

@@ -108,19 +108,15 @@ fn ticket_entry_number_report(
     let mut first_from: Option<String> = None;
     let mut arrivals = 0u64;
     for path in std::iter::once(&owning).chain((running != owning).then_some(&running)) {
-        let bytes = match fs::read(path) {
+        let raw = match read_transition_ledger(path) {
             Ok(raw) => raw,
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(err) if err.is_not_found() => continue,
             Err(err) => {
                 let context = unreadable_ledger(path, &err.to_string());
-                return Err(file_io_report(path, "failed to read transition ledger", err).wrap_err(context));
+                return Err(err.into_report(path, "failed to read transition ledger").wrap_err(context));
             }
         };
-        // Decoding damage needs ledger repair, not filesystem changes. §FS-rhei-errors.6
-        let raw = std::str::from_utf8(&bytes).map_err(|err| {
-            ledger_report(path, err).wrap_err(unreadable_ledger(path, &err.to_string()))
-        })?;
-        let movements = rhei_core::transition_history::parse(raw)
+        let movements = rhei_core::transition_history::parse(&raw)
             .map_err(|err| {
                 let context = unreadable_ledger(path, &err.to_string());
                 ledger_report(path, err).wrap_err(context)

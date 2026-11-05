@@ -210,6 +210,43 @@ fn diagnostic_guidance_retry_terminal_task() {
     requires(&guidance, &["reopen", "operator"]);
 }
 
+/// Reset refuses damaged history before any cleanup, with the same evidence
+/// remedy as retry. §FS-rhei-errors.1.2 §FS-rhei-errors.6
+#[test]
+fn diagnostic_guidance_reset_invalid_utf8_ledger() {
+    let machine =
+        MACHINE.replace("    description: Work", "    description: Work\n    program: \"true\"");
+    let dir = fixture(&FINISHED.replace("**State:** done", "**State:** open"), &machine);
+    let before = fs::read(dir.join("plan.rhei.md")).unwrap();
+    let ledger = dir.join("runtime/state-transitions.log");
+    fs::create_dir_all(ledger.parent().unwrap()).unwrap();
+    let damaged = b"\xff\n";
+    fs::write(&ledger, damaged).unwrap();
+    let run = invoke(&dir, &["reset", "plan.rhei.md"], false);
+    let guidance = help(&run, "invalid transition ledger");
+    let diagnostic = run.stderr.split_whitespace().collect::<Vec<_>>().join(" ");
+    requires(
+        &diagnostic,
+        &["state-transitions.log", "invalid utf-8 sequence of 1 bytes from index 0"],
+    );
+    requires(
+        &guidance,
+        &[
+            "preserve",
+            "state-transitions.log",
+            "restore",
+            "valid utf-8",
+            "trusted backup",
+            "do not delete history",
+        ],
+    );
+    for unrelated in ["writable", "free space", "retry the command", "try again"] {
+        assert!(!guidance.contains(unrelated), "wrong remedy: {guidance}");
+    }
+    assert_eq!(fs::read(ledger).unwrap(), damaged, "refusal changed ledger");
+    assert_eq!(fs::read(dir.join("plan.rhei.md")).unwrap(), before, "refusal changed plan");
+}
+
 #[test]
 fn diagnostic_guidance_retry_worker_handoff() {
     let dir = fixture(FINISHED, MACHINE);

@@ -409,8 +409,8 @@ fn read_ledger(root: &Path) -> MietteResult<Vec<(String, String, String)>> {
     if !path.exists() {
         return Ok(Vec::new());
     }
-    let content = fs::read_to_string(&path)
-        .map_err(|err| file_io_report(&path, "failed to read the transition ledger", err))?;
+    let content = read_transition_ledger(&path)
+        .map_err(|err| err.into_report(&path, "failed to read the transition ledger"))?;
     // §FS-rhei-errors.6
     rhei_core::transition_history::parse(&content).map_err(|err| ledger_report(&path, err))?;
     Ok(parse_ledger(&content))

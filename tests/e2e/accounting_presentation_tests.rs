@@ -11,6 +11,8 @@ use super::accounting_support::{
     accounting_workspace_with_agent, invocation_records, WORKING_PLAN,
 };
 #[cfg(unix)]
+use super::native_pty_support::open_native_terminal;
+#[cfg(unix)]
 use super::*;
 
 #[cfg(unix)]
@@ -67,7 +69,9 @@ fn run_in_tty(dir: &Path, plan: &Path, machine: &Path) -> CliRun {
     use std::os::fd::OwnedFd;
 
     let winsize = nix::pty::Winsize { ws_row: 40, ws_col: 160, ws_xpixel: 0, ws_ypixel: 0 };
-    let pty = nix::pty::openpty(Some(&winsize), None).expect("open pty");
+    // The read below runs to end of file, and a leaked slave would hold that off
+    // for as long as the process that took it lives. §REQ-cross-platform.7.2
+    let pty = open_native_terminal(&winsize);
     let mut command = rhei_command(dir.join(".home"));
     command
         .env("NO_COLOR", "1")

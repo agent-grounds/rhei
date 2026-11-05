@@ -173,11 +173,7 @@ fn run_in_terminal(mut command: Command, response: &str) -> TerminalRun {
 
     // Keep exact diagnostics independent of terminal wrapping. §FS-rhei-transition-cmd.6
     let size = nix::pty::Winsize { ws_row: 40, ws_col: 240, ws_xpixel: 0, ws_ypixel: 0 };
-    let pty = nix::pty::openpty(Some(&size), None).expect("open pseudo-terminal");
-    for fd in [pty.master.as_raw_fd(), pty.slave.as_raw_fd()] {
-        nix::fcntl::fcntl(fd, nix::fcntl::FcntlArg::F_SETFD(nix::fcntl::FdFlag::FD_CLOEXEC))
-            .expect("keep pseudo-terminal handles out of the child");
-    }
+    let pty = super::native_pty_support::open_native_terminal(&size);
     let mut master = fs::File::from(pty.master);
     let slave = fs::File::from(pty.slave);
     command

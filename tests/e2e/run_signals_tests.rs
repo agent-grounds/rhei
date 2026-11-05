@@ -18,6 +18,8 @@
 use std::fs;
 
 #[cfg(unix)]
+use super::native_pty_support::open_native_terminal;
+#[cfg(unix)]
 use super::*;
 
 // ---------------------------------------------------------------------------
@@ -733,10 +735,9 @@ fn an_external_signal_ends_a_tui_run_instead_of_parking_it() {
     let (dir, workspace, machine_path) =
         setup_supervised_workspace("run-tui-sigterm", GRANDCHILD_AGENT, "120s");
 
-    // A real size, or ratatui has no room to lay anything out; `openpty` with
-    // no winsize leaves the terminal 0x0.
+    // A real size, or ratatui has no room to lay anything out: a new terminal is 0x0.
     let winsize = nix::pty::Winsize { ws_row: 40, ws_col: 120, ws_xpixel: 0, ws_ypixel: 0 };
-    let pty = nix::pty::openpty(Some(&winsize), None).expect("openpty");
+    let pty = open_native_terminal(&winsize);
 
     let mut cmd = rhei_command(dir.join(".home"));
     cmd.env("TERM", "xterm-256color");
@@ -829,7 +830,7 @@ fn ctrl_c_on_the_finished_tui_screen_still_writes_the_report() {
         setup_supervised_workspace("run-tui-finished-ctrl-c", QUICK_AGENT, "120s");
 
     let winsize = nix::pty::Winsize { ws_row: 40, ws_col: 120, ws_xpixel: 0, ws_ypixel: 0 };
-    let pty = nix::pty::openpty(Some(&winsize), None).expect("openpty");
+    let pty = open_native_terminal(&winsize);
 
     let mut cmd = rhei_command(dir.join(".home"));
     cmd.env("TERM", "xterm-256color");
@@ -1056,20 +1057,15 @@ fn a_closed_stdout_still_ends_the_groups_in_flight() {
 #[cfg(unix)]
 #[test]
 fn a_hung_up_terminal_ends_the_groups_the_way_a_closed_pipe_does() {
-    use std::os::fd::{AsRawFd as _, OwnedFd};
+    use std::os::fd::OwnedFd;
 
     let (dir, workspace, machine_path) = setup_lost_output_workspace("run-hung-up-terminal");
 
     let winsize = nix::pty::Winsize { ws_row: 40, ws_col: 120, ws_xpixel: 0, ws_ypixel: 0 };
-    let pty = nix::pty::openpty(Some(&winsize), None).expect("openpty");
-    // Neither end may leak into the child. `Command` sets up stdio and leaves
-    // every other inherited descriptor open, and `openpty` hands back plain
-    // descriptors — so without this the child holds the *master* as well, and
-    // closing this process's copy hangs nothing up at all.
-    for fd in [pty.master.as_raw_fd(), pty.slave.as_raw_fd()] {
-        nix::fcntl::fcntl(fd, nix::fcntl::FcntlArg::F_SETFD(nix::fcntl::FdFlag::FD_CLOEXEC))
-            .expect("set FD_CLOEXEC on the pty");
-    }
+    // Neither end may reach another process, whether this test's child or one another
+    // test spawns on its own thread at any moment. Whoever held the *master* would keep
+    // the terminal alive past the close below, and nothing would hang up. §REQ-cross-platform.7.2
+    let pty = open_native_terminal(&winsize);
 
     let mut cmd = rhei_command(dir.join(".home"));
     cmd.env("TERM", "xterm-256color");
@@ -1405,7 +1401,7 @@ fn a_failing_tui_run_leaves_its_screen_instead_of_parking_on_it() {
         setup_program_workspace("run-tui-failure-parks", FAILING_LONE_MACHINE, &["Fails"]);
 
     let winsize = nix::pty::Winsize { ws_row: 40, ws_col: 120, ws_xpixel: 0, ws_ypixel: 0 };
-    let pty = nix::pty::openpty(Some(&winsize), None).expect("openpty");
+    let pty = open_native_terminal(&winsize);
 
     let mut cmd = rhei_command(dir.join(".home"));
     cmd.env("TERM", "xterm-256color");

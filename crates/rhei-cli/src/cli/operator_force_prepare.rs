@@ -17,16 +17,16 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     for state in [from, to] {
         if !machine.is_valid_state(state) {
             // §FS-rhei-errors.6
-            return Err(miette!(help = "choose --from and --to from the allowed states printed above; rhei states shows their edges.", "'{state}' is not a valid state. Allowed: [{}]", machine.allowed_states().collect::<Vec<_>>().join(", ")));
+            return Err(miette!(help = format!("choose --from and --to from the allowed states printed above; {} shows their edges.", help_command_or_bare("states")), "'{state}' is not a valid state. Allowed: [{}]", machine.allowed_states().collect::<Vec<_>>().join(", ")));
         }
     }
     let target_id = parse_task_id(&task_id);
     // §FS-rhei-errors.6
-    let task = find_task_by_id(&loaded.rhei.tasks, &target_id).ok_or_else(|| miette!(help = format!("find the current ticket id with rhei list {}, then pass it with --task.", shell_quote(&input.display().to_string())), "task '{task_id}' not found"))?;
+    let task = find_task_by_id(&loaded.rhei.tasks, &target_id).ok_or_else(|| miette!(help = format!("find the current ticket id with {}, then pass it with --task.", help_command("list")), "task '{task_id}' not found"))?;
     let current = normalized_state_name(&task.state, machine);
     if current != from {
         // §FS-rhei-errors.6
-        return Err(miette!(help = format!("inspect the current ticket with rhei show {} --task {}; use its actual state for --from after reviewing the correction.", shell_quote(&input.display().to_string()), shell_quote(&task_id)), "conflict: Task {} is in state '{}', expected '{}'", task_id, task.state, from));
+        return Err(miette!(help = format!("inspect the current ticket with {}; use its actual state for --from after reviewing the correction.", help_command_without_machine("show", &format!("--task {}", shell_quote(&task_id)), None)), "conflict: Task {} is in state '{}', expected '{}'", task_id, task.state, from));
     }
     ensure_task_profile_allows_state(machine, &task_id, &task.kind, parse_task_id(&route.local_id).depth() as u8, to)?;
     let metadata_raw = rhei_core::source::read_to_string(&route.metadata_file)
@@ -46,7 +46,7 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
         if !transition_rule_is_applicable(rule, machine, checked_metadata, key, Some(task), from, &task.state)? {
             let reason = describe_blocked_transition(rule, machine, checked_metadata, key, from, &task.state);
             // §FS-rhei-errors.6
-            return Err(miette!(help = forced_edge_help(machine, checked_metadata, key, task, from, to, rule, &input), "transition from '{from}' to '{to}' is not currently applicable: {reason}"));
+            return Err(miette!(help = forced_edge_help(machine, checked_metadata, key, task, from, to, rule), "transition from '{from}' to '{to}' is not currently applicable: {reason}"));
         }
     }
     if let Some(spent) = visits.spent_entering(machine, to) {
@@ -67,7 +67,7 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     }
     if let Some(claim) = claimed(task).or_else(|| owner.filter(|owner| owner.assignee.is_some())) {
         // §FS-rhei-errors.6
-        return Err(miette!(help = format!("release the claim first: rhei release {} --task {}", shell_quote(&input.display().to_string()), shell_quote(&claim.id.to_string())), "Task {} is assigned to {}; release the claim before forced recovery", claim.id, claim.assignee.as_deref().unwrap_or("?")));
+        return Err(miette!(help = format!("release the claim first: {}", help_command_with("release", &format!("--task {}", shell_quote(&claim.id.to_string())))), "Task {} is assigned to {}; release the claim before forced recovery", claim.id, claim.assignee.as_deref().unwrap_or("?")));
     }
     if !terminal {
         // Reopen the outermost blocker before its descendants. §FS-rhei-errors.1.2

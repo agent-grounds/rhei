@@ -211,7 +211,7 @@ fn run_command(
             // §FS-rhei-errors.6
             || rhei_core::root_access::input_roots(input).map_err(|err| root_access_report(input, err))?.into_iter().collect::<BTreeSet<_>>() != roots {
             // §FS-rhei-errors.6
-            return Err(miette!(help = "stop concurrent changes to the project/rhei layout, then run rhei run again so it can acquire a stable set of root locks.", "execution roots changed while acquiring run locks; retry the run"));
+            return Err(miette!(help = format!("stop concurrent changes to the project/rhei layout so the run can acquire a stable set of root locks, then run it again: {}", help_command("run")), "execution roots changed while acquiring run locks; retry the run"));
         }
         locks
     } else {
@@ -221,7 +221,7 @@ fn run_command(
             .map_err(|err| attribute_startup_break(input, err))?;
         if run_lock_roots(&loaded, &workspace_root) != lock_roots {
             // §FS-rhei-errors.6
-            return Err(miette!(help = "stop concurrent changes to the project/rhei layout, then run rhei run again so it can acquire a stable set of root locks.", "execution roots changed while acquiring run locks; retry the run"));
+            return Err(miette!(help = format!("stop concurrent changes to the project/rhei layout so the run can acquire a stable set of root locks, then run it again: {}", help_command("run")), "execution roots changed while acquiring run locks; retry the run"));
         }
         locks
     };

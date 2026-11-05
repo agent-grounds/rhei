@@ -293,26 +293,6 @@ fn agent_flag_selector_help(value: &str, known: &[String]) -> Option<String> {
     Some(help)
 }
 
-/// Help for a required handoff that has no recorded producer to inherit from.
-// §FS-rhei-errors.6: every failure names the next action.
-fn handoff_missing_source_help() -> &'static str {
-    "a required handoff inherits from the transition that entered this state. Either \
-     reach this state through a transition that produces it, or set `required: false` \
-     on the `inherit` entry in the state machine: rhei states"
-}
-
-/// Help for a required handoff whose producing state declares no matching output.
-fn handoff_no_output_help() -> &'static str {
-    "the producing state must declare the handoff it hands over: add an `outputs` entry \
-     with `kind: handoff` to that state, or relax the `inherit` entry: rhei states"
-}
-
-/// Help for a handoff selection that matches more than one declared output.
-fn handoff_ambiguous_help() -> &'static str {
-    "more than one handoff output matched. Name the one you want with `name:` on the \
-     `inherit` entry, or set `merge: all` to take every match: rhei states"
-}
-
 /// Help for a declared handoff whose artifact was never written with content.
 fn handoff_empty_artifact_help() -> &'static str {
     "the producing state declared this handoff but wrote nothing to it. An empty file \

@@ -45,7 +45,7 @@ fn split_complete_ticket_target(
              `rhei complete <ticket-id> --result <message>` \
              (or `rhei complete {} --task <ticket-id> --result <message>`)",
             plan.display(),
-            plan.display(),
+            help_target_word_or(&plan),
         )),
         (None, None) => Err(miette!(
 help = ticket_id_required_help(),
@@ -73,7 +73,7 @@ fn split_show_ticket_target(
             "'{}' is a plan path; name the ticket too: `rhei show <ticket-id>` \
              (or `rhei show {} --task <ticket-id>`)",
             plan.display(),
-            plan.display(),
+            help_target_word_or(&plan),
         )),
         (None, None) => Err(miette!(
             help = ticket_id_required_help(),
@@ -96,7 +96,7 @@ fn split_transition_ticket_target(
              `rhei transition <ticket-id> --from <state> --to <state>` \
              (or `rhei transition {} --task <ticket-id> --from <state> --to <state>`)",
             plan.display(),
-            plan.display(),
+            help_target_word_or(&plan),
         )),
         (None, None) => Err(miette!(
 help = ticket_id_required_help(),
@@ -238,7 +238,7 @@ fn complete_command(
     let blocked_by = blocking_priors(task, &state_map, &machines.set);
     if !blocked_by.is_empty() {
         return Err(miette!(
-help = "finish the blocking priors first, or move this ticket deliberately with: rhei transition <ticket-id> --from <state> --to <state>",
+help = blocked_completion_help(task_id_str, current_state_raw),
 
             "Task {} cannot be completed while its prerequisites are unsatisfied.\nBlocking priors: {}\n\
              Complete them first, or use `rhei transition` for a deliberate out-of-order move.",
@@ -251,7 +251,7 @@ help = "finish the blocking priors first, or move this ticket deliberately with:
     // a single declared transition from the current state.
     let to_state = find_completion_state(&current_state, &machine).ok_or_else(|| {
         miette!(
-            help = "the machine declares no terminal edge from that state. List the edges with: rhei states",
+            help = no_terminal_edge_help(),
             "no transition to a terminal state available from '{}' for Task {}",
             current_state_raw,
             task_id_str
@@ -283,7 +283,7 @@ help = "finish the blocking priors first, or move this ticket deliberately with:
         // its finalization: a ticket redirected to `cancelled` is left cancelled
         // with the caller's message recorded against it. §FS-rhei-complete.4
         return Err(miette!(
-            help = "inspect the machine and the task's state with: rhei states",
+            help = redirected_completion_help(),
             "Task {} was redirected to '{}', which is not a successful completion state",
             task_id_str,
             effective_to

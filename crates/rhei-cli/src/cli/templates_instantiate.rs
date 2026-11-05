@@ -145,6 +145,9 @@
             let state_machine_path = Some(output_dir.join("states.yaml"))
                 .filter(|path| layout != TemplateLayout::Project && path.is_file());
             let opts = parse_execute_run_options(&entrypoint, execute_args)?;
+            // The run's helps name what was laid, whatever plan sits beside the
+            // template. §FS-rhei-errors.1.2.1
+            let _help_target = enter_help_target(HelpTarget::naming(&entrypoint));
             return run_command(&entrypoint, state_machine_path.as_deref(), opts);
         }
         Ok(())

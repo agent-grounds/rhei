@@ -1,10 +1,15 @@
 // §AR-source-file-size.3: directory workspaces — how one is loaded, validated,
 // and written back. Projects, diagnostics, `panta`, and `rhei init` are
 // siblings; shared fixtures live in `common.rs`.
-/// A path broken across lines cannot be copied, clicked, or grepped. The
-/// slash-and-hyphen-heavy fixture keeps the selected spelling longer than the
-/// renderer's wrap width; the assertion must accept the shorter of its relative
-/// and absolute spellings, intact on one physical line. §FS-rhei-validate.4.2
+/// A path broken across lines cannot be copied, clicked, or grepped. This diagnostic
+/// names its target, so it is not wrapped at all (§FS-rhei-errors.1.2.1), and that is
+/// what this holds: the path stays beside `in` on the line it is printed on. The
+/// slash-and-hyphen-heavy fixture keeps the selected spelling longer than the width a
+/// wrap would use, or a wrapped diagnostic would pass too; the assertion must accept
+/// the shorter of its relative and absolute spellings, intact on one physical line.
+/// What a diagnostic that does wrap does to a path is the renderer's break settings,
+/// held by `a_wrapped_diagnostic_reads_as_the_sentence_the_binary_printed`.
+/// §FS-rhei-validate.4.2
 #[test]
 fn diagnostics_never_break_a_file_path_across_lines() {
     const RENDERER_WRAP_WIDTH: usize = 78;

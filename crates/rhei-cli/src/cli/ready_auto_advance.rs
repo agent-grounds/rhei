@@ -230,7 +230,10 @@ fn try_auto_advance_task(
                     .unwrap_or(u64::MAX)
         {
             return Err(miette!(
-                help = "the poll state ran out of attempts without a transition becoming applicable. Raise its `poll.max_attempts`, or fix the condition the poll waits on: rhei states",
+                help = format!(
+                    "the poll state ran out of attempts without a transition becoming applicable. Raise its `poll.max_attempts`, or fix the condition the poll waits on: {}",
+                    help_command_or_bare("states")
+                ),
                 "polling exhausted with no matching non-self-loop transition for Task {} in state '{}'",
                 task_id_str,
                 current_state

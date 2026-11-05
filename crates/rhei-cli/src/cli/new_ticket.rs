@@ -143,7 +143,10 @@ fn reject_unloadable_target_rhei(loaded: &LoadedPlan, parent: &str) -> MietteRes
         return Ok(());
     };
     Err(miette!(
-help = "fix that rhei and re-run; `rhei validate` reports it with a code frame. Creates into every other rhei in this project are unaffected.",
+help = format!(
+    "fix that rhei and re-run; `{}` reports it with a code frame. Creates into every other rhei in this project are unaffected.",
+    help_command("validate")
+),
 
         "{skipped}\n\n`rhei new` cannot place a ticket in a rhei it cannot read: the ids already \
          in it decide the new ticket's number, and its `## Tasks` section decides where the \
@@ -221,7 +224,10 @@ fn reject_unloadable_reference_rheis(
             continue;
         };
         return Err(miette!(
-help = "fix that rhei and re-run; `rhei validate` reports it with a code frame. Drop the reference to create the ticket now and add it once the rhei reads.",
+help = format!(
+    "fix that rhei and re-run; `{}` reports it with a code frame. Drop the reference to create the ticket now and add it once the rhei reads.",
+    help_command("validate")
+),
 
             "{skipped}\n\n{flag} '{}' points into rhei '{rhei_id}', so nothing can check that \
              the reference resolves — and a reference written unchecked comes back as an error \

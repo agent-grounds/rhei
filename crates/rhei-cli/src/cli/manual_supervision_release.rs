@@ -55,11 +55,11 @@ fn manual_supervisor_release_command(
     state: &str,
 ) -> String {
     format!(
-        "rhei{} transition {} --task {} --from {} --to {} --release-subtree",
-        state_machine_flag(state_machine),
+        "rhei transition {} --task {} --from {} --to {} --release-subtree{}",
         shell_quote(&input.display().to_string()),
         task,
         shell_quote(state),
-        shell_quote(state)
+        shell_quote(state),
+        state_machine.map(state_machine_argument).unwrap_or_default()
     )
 }

@@ -217,7 +217,8 @@ fn write_task_assignee(
     if let Some(existing) = task.assignee.as_deref() {
         return Err(miette!(
             help = format!(
-                "release it with: rhei release {qualified_id} — or work on a different task."
+                "release it with: {} — or work on a different task.",
+                help_command_with("release", &format!("--task {qualified_id}"))
             ),
             "Task {} is already assigned to {}",
             qualified_id,

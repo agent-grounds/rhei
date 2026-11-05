@@ -142,17 +142,21 @@ fn next_command(
                 format!(
                     "Task {supervisor} is at a human gate and still holds this subtree. A human \
                      moves it back into its supervising state to resume supervision, or anywhere \
-                     else to release the subtree: rhei{} transition {} --task {supervisor} \
-                     --from {supervisor_state} --to <state>",
-                    state_machine_flag(resolved.default.path.as_deref()),
-                    help_target_word_or(input)
+                     else to release the subtree: {}",
+                    help_command_with_or(
+                        "transition",
+                        &format!(
+                            "--task {supervisor} --from {} --to <state>",
+                            shell_quote(supervisor_state.as_ref())
+                        ),
+                        input
+                    )
                 )
             } else {
                 format!(
                     "the supervisor releases the subtree on its next visit. Work the supervisor \
-                     instead: rhei{} next {} --task {supervisor}",
-                    state_machine_flag(resolved.default.path.as_deref()),
-                    help_target_word_or(input)
+                     instead: {}",
+                    help_command_with_or("next", &format!("--task {supervisor}"), input)
                 )
             };
             return Err(miette!(
@@ -248,7 +252,10 @@ fn next_command(
             // that prints this ticket's body, which `rhei list` does not.
             // §FS-rhei-next.4 §FS-rhei-show
             return Err(miette!(
-                help = format!("read this ticket's body with: rhei show {}", tid),
+                help = format!(
+                    "read this ticket's body with: {}",
+                    help_command_without_machine("show", &format!("--task {tid}"), Some(input))
+                ),
                 "Task {} is not ready to be claimed in state '{}'",
                 tid,
                 state_name
@@ -265,13 +272,7 @@ fn next_command(
             return Err(miette!(
                 help = format!("see every task and its state with: {}", help_command_or("list", input)),
                 "{}",
-                diagnose_no_claimable(
-                    &loaded.rhei,
-                    &machines.set,
-                    input,
-                    resolved.default.path.as_deref(),
-                    &scope
-                )
+                diagnose_no_claimable(&loaded.rhei, &machines.set, input, &scope)
             ));
         }
         let task = ready.into_iter().next().unwrap();
@@ -361,8 +362,8 @@ fn next_command(
         let to_state = find_next_transition(task, &loaded.rhei, machine)?.ok_or_else(|| {
             miette!(
                 help = format!(
-                    "no transition leaves '{current_state_raw}'. See the machine's edges with: \
-                     rhei states"
+                    "no transition leaves '{current_state_raw}'. See the machine's edges with: {}",
+                    help_command_or_bare("states")
                 ),
                 "no forward transition available from state '{}'",
                 current_state_raw

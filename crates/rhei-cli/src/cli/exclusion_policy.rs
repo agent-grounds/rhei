@@ -359,7 +359,10 @@ fn loaded_task_exclusions(
 
 fn exclusion_report(errors: Vec<String>) -> miette::Report {
     miette!(
-        help = "edit **Excludes:** so every entry resolves inside its declared root and does not hide a required source; then run `rhei validate`.",
+        help = format!(
+            "edit **Excludes:** so every entry resolves inside its declared root and does not hide a required source; then run `{}`.",
+            help_command("validate")
+        ),
         "{}",
         errors.join("\n")
     )

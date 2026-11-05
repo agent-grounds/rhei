@@ -113,17 +113,23 @@ fn read_summary_checkpoint(given: &str) -> MietteResult<SummaryCheckpoint> {
     };
     let value: serde_json::Value = serde_json::from_str(&text)
         .map_err(|err| {
-            miette!(help = "pass a document `rhei summary --print-checkpoint` printed", "checkpoint {given}: is not JSON: {err}")
+            miette!(help = "pass a document `--print-checkpoint` printed", "checkpoint {given}: is not JSON: {err}")
         })?;
     if value.get("schema").and_then(serde_json::Value::as_str) != Some(SUMMARY_CHECKPOINT_SCHEMA) {
         return Err(miette!(
-            help = "pass a document `rhei summary --print-checkpoint` printed",
+            help = "pass a document `--print-checkpoint` printed",
             "checkpoint {given}: its schema is not {SUMMARY_CHECKPOINT_SCHEMA}"
         ));
     }
     serde_json::from_value(value)
         .map_err(|err| {
-            miette!(help = "take the checkpoint again with `rhei summary --print-checkpoint`", "checkpoint {given}: is not a {SUMMARY_CHECKPOINT_SCHEMA} document: {err}")
+            miette!(
+                help = format!(
+                    "take the checkpoint again with `{}`",
+                    help_command_without_machine("summary", "--print-checkpoint", None)
+                ),
+                "checkpoint {given}: is not a {SUMMARY_CHECKPOINT_SCHEMA} document: {err}"
+            )
         })
 }
 

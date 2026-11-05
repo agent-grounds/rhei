@@ -53,12 +53,18 @@ fn select_completed_run_for_summary(
             held.record.run_id.as_deref().is_some_and(|candidate| candidate.starts_with(run_id))
         }) {
             return Err(miette!(
-                help = "copy the complete id from `rhei cost --by run` or `rhei runs --all`",
+                help = format!(
+                    "copy the complete id from `{}` or `rhei runs --all`",
+                    help_command_without_machine("cost", "--by run", None)
+                ),
                 "run id '{run_id}' is not an exact match"
             ));
         }
         return Err(miette!(
-            help = "list durable ids with `rhei cost --by run` or `rhei runs --all`",
+            help = format!(
+                "list durable ids with `{}` or `rhei runs --all`",
+                help_command_without_machine("cost", "--by run", None)
+            ),
             "run '{run_id}' is absent from the resolved project"
         ));
     }

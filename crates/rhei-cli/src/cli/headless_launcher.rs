@@ -92,7 +92,10 @@ pub(crate) fn launch_headless_run(
 
     if run_registry_dir().is_none() {
         return Err(miette!(
-            help = "set HOME or XDG_STATE_HOME, or run in the foreground with `rhei run --no-tui`",
+            help = format!(
+                "set HOME or XDG_STATE_HOME, or run in the foreground with `{}`",
+                help_command_with("run", "--no-tui")
+            ),
             "a detached run needs a state directory to publish its id into, and neither \
              XDG_STATE_HOME nor HOME is set"
         ));

@@ -7,9 +7,12 @@
 // §AR-source-file-size.3 §FS-rhei-errors.2
 
 /// Help for a state machine that declares something Rhei cannot execute.
-fn state_machine_help() -> &'static str {
-    "fix the state definition in the active states.yaml. Inspect the machine \
-     rhei resolved with: rhei states"
+fn state_machine_help() -> String {
+    format!(
+        "fix the state definition in the active states.yaml. Inspect the machine \
+         rhei resolved with: {}",
+        help_command_or_bare("states")
+    )
 }
 
 /// Help for a settings file that is missing or malformed.
@@ -109,8 +112,61 @@ fn task_moved_help() -> String {
 }
 
 /// Help for an unnamed state.
-fn unknown_state_help() -> &'static str {
-    "pick a state the machine declares. List them with: rhei states"
+fn unknown_state_help() -> String {
+    format!("pick a state the machine declares. List them with: {}", help_command_or_bare("states"))
+}
+
+/// Help for a required handoff that has no recorded producer to inherit from.
+// §FS-rhei-errors.6: every failure names the next action.
+fn handoff_missing_source_help() -> String {
+    format!(
+        "a required handoff inherits from the transition that entered this state. Either \
+         reach this state through a transition that produces it, or set `required: false` \
+         on the `inherit` entry in the state machine: {}",
+        help_command_or_bare("states")
+    )
+}
+
+/// Help for a required handoff whose producing state declares no matching output.
+fn handoff_no_output_help() -> String {
+    format!(
+        "the producing state must declare the handoff it hands over: add an `outputs` entry \
+         with `kind: handoff` to that state, or relax the `inherit` entry: {}",
+        help_command_or_bare("states")
+    )
+}
+
+/// Help for a handoff selection that matches more than one declared output.
+fn handoff_ambiguous_help() -> String {
+    format!(
+        "more than one handoff output matched. Name the one you want with `name:` on the \
+         `inherit` entry, or set `merge: all` to take every match: {}",
+        help_command_or_bare("states")
+    )
+}
+
+/// Help for a completion its unsatisfied priors refuse. §FS-rhei-complete.4
+fn blocked_completion_help(task: &str, state: &str) -> String {
+    format!(
+        "finish the blocking priors first, or move this ticket deliberately with: {}",
+        help_command_with(
+            "transition",
+            &format!("--task {task} --from {} --to <state>", shell_quote(state))
+        )
+    )
+}
+
+/// Help for a completion from a state with no terminal edge.
+fn no_terminal_edge_help() -> String {
+    format!(
+        "the machine declares no terminal edge from that state. List the edges with: {}",
+        help_command_or_bare("states")
+    )
+}
+
+/// Help for a completion the machine redirected away from success.
+fn redirected_completion_help() -> String {
+    format!("inspect the machine and the task's state with: {}", help_command_or_bare("states"))
 }
 
 /// Help for an artifact path that leaves the workspace.
@@ -336,9 +392,11 @@ fn embedded_extraction_help() -> &'static str {
 }
 
 /// Help for a `rhei init` conflict, which every message already names a flag for.
-fn init_conflict_help() -> &'static str {
-    "inspect what is already here with: rhei list, then re-run init with the flag \
-     named above."
+fn init_conflict_help() -> String {
+    format!(
+        "inspect what is already here with: {}, then re-run init with the flag named above.",
+        help_command("list")
+    )
 }
 
 /// Help for a command that needs a ticket id it was not given. §FS-rhei-errors.1.2.1
@@ -350,17 +408,23 @@ fn ticket_id_required_help() -> String {
 }
 
 /// Help for a `--rhei` scope that excludes what the command was asked to touch.
-fn rhei_scope_help() -> &'static str {
-    "drop --rhei to search the whole project, or name the rhei that owns the ticket. \
-     List the rheis with: rhei list"
+fn rhei_scope_help() -> String {
+    format!(
+        "drop --rhei to search the whole project, or name the rhei that owns the ticket. \
+         List the target's tickets with: {}",
+        help_command("list")
+    )
 }
 
 /// Help for a `rhei cost --task` naming a ticket outside the accounting roots
 /// the reading covers. The scope may come from `--rhei` or from the member the
 /// positional named, so both ways out are spelled. §FS-rhei-panta.6.5
-fn cost_task_scope_help() -> &'static str {
-    "point the command at the project, with no --rhei, to read every accounting root, \
-     or narrow to the rhei that owns the ticket. List the rheis with: rhei list"
+fn cost_task_scope_help() -> String {
+    format!(
+        "point the command at the project, with no --rhei, to read every accounting root, \
+         or narrow to the rhei that owns the ticket. List the target's tickets with: {}",
+        help_command("list")
+    )
 }
 
 /// The budget authority directory, spelled from the variables that place it, in

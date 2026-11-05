@@ -186,10 +186,10 @@ metadata:
     // them, so this is the whole line and not a bag of substrings.
     assert!(
         supervising.contains(&format!(
-            "rhei --state-machine={} transition {} --task plan.1 --from supervising \
-             --to supervising",
-            shell_quote(&machine_path.display().to_string()),
+            "rhei transition {} --task plan.1 --from supervising --to supervising \
+             --release-subtree --state-machine {}",
             shell_quote(&plan_path.display().to_string()),
+            shell_quote(&machine_path.display().to_string()),
         )),
         "got: {supervising}"
     );

@@ -38,10 +38,19 @@ fn collect_reset_decision(
     loaded: &LoadedPlan,
     input: &Path,
     scope: &RheiScope,
-    machines: &rhei_validator::MachineSet,
+    resolved: &ResolvedMachineSet,
 ) -> MietteResult<ResetDecision> {
     // §FS-rhei-reset.2.1: corrupt pairs refuse before any destructive rewrite.
     for root in loaded.rhei_roots.values().collect::<BTreeSet<_>>() { read_ledger(root)?; }
+    // Step 1 judges the whole plan as it stands, whatever `--rhei` names, and without its links,
+    // as `rhei complete` does; a refusal is validate's own report, before any preview.
+    // §FS-rhei-reset.2 §FS-rhei-reset.4
+    let machines = &resolved.validator_set();
+    let report = rhei_validator::validate_with_machine_set(&loaded.rhei, machines);
+    if report.has_errors() {
+        let sources = resolved.validation_sources(&loaded.rhei_ids);
+        return Err(validation_report(input, &sources, &report.errors, &report.help));
+    }
     fn count_nodes(task: &rhei_core::ast::Task) -> usize {
         1 + task.children.iter().map(count_nodes).sum::<usize>()
     }

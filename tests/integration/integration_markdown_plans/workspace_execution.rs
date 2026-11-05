@@ -86,7 +86,7 @@ fn workspace_reset_restores_initial_states_and_removes_runtime() {
         &[
             (
                 "a.md",
-                "### Task 1: Alpha\n**State:** completed\n\n#### Task 1.1: Detail\n**State:** in-progress\n",
+                "### Task 1: Alpha\n**State:** completed\n\n#### Task 1.1: Detail\n**State:** completed\n",
             ),
             ("b.md", "### Task 2: Beta\n**State:** in-progress\n"),
         ],
@@ -96,10 +96,11 @@ fn workspace_reset_restores_initial_states_and_removes_runtime() {
     let runtime_dir = ws.join("runtime/logs");
     fs::create_dir_all(&runtime_dir).expect("create runtime dir");
     fs::write(runtime_dir.join("team.log"), "generated").expect("write runtime log");
-    // The ledger is what records where each task started. §FS-rhei-reset.2.2
+    // The ledger is what records where each task started. The child finished
+    // before its parent: reset refuses a plan validation refuses. §FS-rhei-reset.2.2
     fs::write(
         ws.join("runtime").join("state-transitions.log"),
-        "workspace.1 pending@completed\nworkspace.1.1 pending@in-progress\n\
+        "workspace.1.1 pending@completed\nworkspace.1 pending@completed\n\
          workspace.2 pending@in-progress\n",
     )
     .expect("write ledger");

@@ -124,6 +124,7 @@ mod headless_undecided_tests;
 mod help_target_detached_seal_tests;
 mod help_target_paste_tests;
 mod help_target_removal_template_tests;
+mod help_target_run_route_tests;
 mod help_target_subcommand_tests;
 mod help_target_tests;
 mod includes_under_tests;

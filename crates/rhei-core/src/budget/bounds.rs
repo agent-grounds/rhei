@@ -347,7 +347,10 @@ pub enum Remedy {
     Renews(String),
     /// An explicit lifetime allowance is what limits, so the audited command
     /// is the remedy rather than any settings key. §FS-rhei-budgets.10
-    Adjust,
+    ///
+    /// It holds that command as the caller spells it, because only the caller
+    /// knows which target the invocation was given. §FS-rhei-errors.1.2.1
+    Adjust(String),
 }
 
 /// Every label in a halt is padded to this column, so one halt reads the same
@@ -433,10 +436,7 @@ pub fn halt_text(spent: &Exhaustion, bound: &Bound, remedy: &Remedy, marks: &Spe
     lines.push(row("mode:", &mode));
     lines.push(match remedy {
         Remedy::Renews(instant) => row("renews at:", instant),
-        Remedy::Adjust => row(
-            "to raise it:",
-            "run `rhei budget adjust <TARGET> --invocations <N> --reason <TEXT>`",
-        ),
+        Remedy::Adjust(command) => row("to raise it:", &format!("run `{command}`")),
         Remedy::Raise => row("to raise it:", &bound.remedy()),
     });
     lines.join("\n")

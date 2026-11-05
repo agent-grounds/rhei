@@ -79,8 +79,11 @@ impl Case {
         dir
     }
 
+    /// The parent reservation is removed because this suite may itself run inside a
+    /// `rhei run`, whose reservation a nested run here cannot use. §FS-rhei-budgets.7.1
     pub(super) fn rhei(&self, cwd: &Path, args: &[&str]) -> Output {
         rhei_command(&self.home)
+            .env_remove("RHEI_BUDGET_PARENT_RESERVATION")
             .current_dir(cwd)
             .args(args)
             .stdin(Stdio::null())
@@ -118,6 +121,7 @@ pub(super) fn pasted(command: &str, cwd: &Path, home: &Path) -> CliRun {
         .arg("-c")
         .arg(command)
         .current_dir(cwd)
+        .env_remove("RHEI_BUDGET_PARENT_RESERVATION")
         .env("PATH", std::env::join_paths(dirs).expect("join PATH"))
         .env("HOME", home)
         .env("XDG_STATE_HOME", home.join("state"))

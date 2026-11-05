@@ -146,9 +146,9 @@ machine describes another machine with no error to say so.
   report's Attention row, and in a detached run all three print it absolute.
 - **A verb with a subcommand is read as one.** `rhei budget show project` and
   `rhei snapshot list --plan project` name a target as `rhei list project` does,
-  so they stay on one line too. Neither command takes `--state-machine`, so none
-  is passed on, and where the command has no target they stay bare, because
-  each discovers its own.
+  so they stay on one line too. No `--state-machine` is passed on: `rhei budget`
+  takes none, and `rhei snapshot list` reads the same store with or without one.
+  Where the command has no target they stay bare, because each discovers its own.
 
 ### 1.3. Near Misses
 

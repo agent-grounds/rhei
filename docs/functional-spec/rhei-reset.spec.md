@@ -53,6 +53,22 @@ Deliberate automation states the intent once with `--yes`.
 ## 2. Behavior
 
 1. Load the state machine and plan. Validate the plan (reset refuses to operate on an invalid plan).
+   The check is the one `rhei complete` makes before it moves a ticket: the plan's
+   semantics under the state machines reset resolved, as `rhei validate` checks
+   them ([§FS-rhei-validate.4](rhei-validate.spec.md#4-behavior) step 2), over the whole project graph whatever `--rhei`
+   names ([§FS-rhei-panta.6.4](rhei-panta.spec.md#64-reset-validate-list-viz)). Links to files are not checked, because the runtime
+   output they may point at is what a reset deletes on purpose ([§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse)),
+   and settings are not read, because a reset runs no agent. A plan that fails it
+   is refused before any preview, `--dry-run` included, and nothing is changed: no
+   `**State:**` line, no ledger row, no result, no log ([§FS-rhei-reset.4](rhei-reset.spec.md#4-output)).
+   The plan judged is the plan as it stands, so a plan only the reset would make
+   valid again is refused too. One written under another machine through
+   `--state-machine` validates under that machine, and a reset given the same
+   `--state-machine` goes through.
+   A pending forced recovery ([§FS-rhei-recover.4](rhei-recover.spec.md#4-pending-root-interlock)) and a pending removal
+   ([§FS-rhei-remove.6.2](rhei-remove.spec.md#62-pending-removal)) are refused first: each marker names the one command that
+   resumes, and the operation it left unfinished may be what makes the plan invalid. A destructive
+   reset decides again on the plan it re-reads under the locks of step 2.
 2. Resolve the whole selected scope and acquire its canonical sibling sidecars
    in the shared order: sorted and deduplicated metadata paths, then distinct
    task paths, then ledger roots. Leave every replaceable destination unlocked.
@@ -390,6 +406,12 @@ Reset <N> task(s) (and <M> descendant task(s)) to their authored states.
 The last line is `No runtime output was present.` when the `runtime/`
 directory did not exist.
 
+A plan step 1 of [§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior) refuses gets the diagnostic `rhei validate` prints for a
+semantic validation failure ([§FS-rhei-validate.6](rhei-validate.spec.md#6-output)): every error in the validator's own
+sentence, under the state-machine sources it used. It prints no preview and no
+summary, and exits non-zero with or without `--dry-run`, because a dry run that
+exits 0 reads as a promise that the reset will go through.
+
 A reset [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) refuses prints no preview and no summary. It exits non-zero,
 with or without `--dry-run`, and its message is the refusal, then one line per
 error it would introduce, in the validator's words, then one line per task whose
@@ -676,6 +698,13 @@ something else and claim nothing about reopening a ticket, and they are built wh
 no plan or machine has been loaded. On a plan where the reset would be refused,
 their reader gets that refusal with nothing deleted, and that refusal is what keeps
 every one of them harmless.
+
+No message asks about step 1 of [§FS-rhei-reset.2](rhei-reset.spec.md#2-behavior), the refusal of a plan that is already
+invalid. `rhei complete` refuses such a plan before it looks at the ticket
+([§FS-rhei-complete.4](rhei-complete.spec.md#4-behavior) step 2), by the same check under the same machines, so a finished
+ticket's message is only ever printed over a plan step 1 lets through. The other
+messages leave their reader step 1's refusal, which deletes nothing, as they leave
+the refusal above.
 
 This covers messages that name a command for the reader to run. A refusal that
 asks the reader to name a target, because none was given, keeps its placeholder:

@@ -3,8 +3,9 @@
 //! way, and where editing a line lets it through the help says so
 //! (agent-grounds/rhei#569).
 //!
-//! A plan validation already refuses is not reset here in either direction: whether
-//! reset runs on one is rhei.81's, against §FS-rhei-reset.2 step 1.
+//! A plan validation already refuses is not reset here in either direction: step 1
+//! of §FS-rhei-reset.2 refuses it before this refusal is asked, and
+//! `reset_already_invalid_plan_tests` pins that (agent-grounds/rhei#572).
 
 // §FS-rhei-reset.2.3 §FS-rhei-reset.3 §FS-rhei-reset.4
 

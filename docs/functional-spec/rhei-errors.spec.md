@@ -65,6 +65,26 @@ error is worse than none, because it costs a round trip to discover that.
 Errors that cannot be user-caused (broken internal invariants) carry help that
 says so and asks for a bug report; they never invent a remedy.
 
+A refusal's help names the action that changes its blocking condition. A retry
+is a next action only when it can overcome that condition; inspecting the
+message and repeating the same refused invocation is not a remedy. If the next
+action requires another actor, help hands off to that actor instead of telling
+the caller to bypass the boundary.
+
+For operator-forced recovery, a non-terminal caller is directed to a human
+operator at an interactive terminal for fresh typed confirmation; an agent
+must not perform the ceremony. A terminal ancestor refusal identifies the
+ancestor to reopen first and gives its operator-only transition command,
+retaining the plan path, task, source and target state. These are explanations
+of the existing safeguards in [§FS-rhei-transition-cmd.6](rhei-transition-cmd.spec.md#6-operator-forced-missing-edge-recovery), not permission to bypass them.
+
+Retrying a terminal task instead explains the need to reopen it through the
+authorized operator path before retry can apply. Retrying inside a worker
+hands the request to an operator outside the worker; it never suggests clearing
+`RHEI_TASK_ID` or otherwise evading that boundary. A `--reason` without
+`--force` refusal tells the caller to remove `--reason`; any offered force
+alternative states that it belongs to the human operator's ceremony.
+
 ### 1.3. Near Misses
 
 When a name is not found and a declared set of valid names exists, the error
@@ -274,6 +294,20 @@ machine for a `waitpid` failure — is the same defect as no help at all, and th
 honest answer for a cause the user cannot have created is [§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help)'s bug report.
 Recurring categories share one wording so that improving a remedy improves
 every site that reaches it.
+
+This includes diagnostics constructed through shared macros and errors
+forwarded from lower layers. A wrapper must require failure-specific help at
+its caller, preserve useful help already carried by the underlying diagnostic,
+or use a helper that derives guidance from the actual cause. A universal retry
+or bug-report fallback does not cover user-caused failures. Filesystem
+conversion keeps the failing path and the underlying cause together with its
+cause-specific action.
+
+The coverage test checks wrapper callers as well as direct diagnostic sites;
+a help clause in a macro definition cannot cover a help-less caller. A negative
+fixture proves such a caller is rejected. Runtime tests also check what the
+help tells the reader to do, since presence of a help line or absence of a
+particular misleading phrase alone cannot establish this contract.
 
 `rhei remove` refusals are covered like every other: each opens
 `<qualified-id> cannot be removed: <reason>`, names every blocker with the

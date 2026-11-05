@@ -347,42 +347,7 @@ mod error_guidance_tests {
     /// of any one call site. §FS-rhei-errors.6
     #[test]
     fn every_miette_site_carries_help() {
-        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-        let mut uncovered = Vec::new();
-        let mut total = 0usize;
-        let mut pending = vec![src];
-        while let Some(dir) = pending.pop() {
-            for entry in std::fs::read_dir(&dir).expect("read source dir") {
-                let path = entry.expect("dir entry").path();
-                if path.is_dir() {
-                    pending.push(path);
-                    continue;
-                }
-                let name = path.file_name().and_then(|n| n.to_str()).unwrap_or_default();
-                // Test fixtures construct reports to assert on, not to show.
-                if !name.ends_with(".rs") || name.starts_with("tests_") {
-                    continue;
-                }
-                let text = std::fs::read_to_string(&path).expect("read source file");
-                let lines: Vec<&str> = text.lines().collect();
-                for (index, line) in lines.iter().enumerate() {
-                    for _ in line.match_indices("miette!(") {
-                        total += 1;
-                        let window = lines[index..lines.len().min(index + 3)].join("\n");
-                        if !window.contains("help =") {
-                            uncovered.push(format!("{}:{}", name, index + 1));
-                        }
-                    }
-                }
-            }
-        }
-        assert!(total > 300, "the scan found only {total} sites; has the pattern changed?");
-        assert!(
-            uncovered.is_empty(),
-            "{} of {total} miette! sites carry no help:\n  {}",
-            uncovered.len(),
-            uncovered.join("\n  ")
-        );
+        super::diagnostic_guidance_guard::check_sources(&["miette"]);
     }
 
     /// Filesystem remedies derived from the error kind. §FS-rhei-errors.6

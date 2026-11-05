@@ -8,14 +8,6 @@
 
 // §AR-source-file-size.3 §FS-rhei-next.3.4
 
-/// The ` --state-machine=<path>` a suggested command needs to resolve the same
-/// machine this invocation did, or nothing when the default was in force.
-fn state_machine_flag(state_machine_path: Option<&Path>) -> String {
-    state_machine_path
-        .map(|path| format!(" --state-machine={}", shell_quote(&path.display().to_string())))
-        .unwrap_or_default()
-}
-
 /// The next step for a worker whose whole scope is held: claim the supervisor's
 /// visit, or — when someone already has — say who and how to take it back.
 ///
@@ -28,8 +20,7 @@ fn supervisor_next_step(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     supervisor: &TaskId,
-    plan_arg: &str,
-    state_machine_path: Option<&Path>,
+    plan_path: &Path,
 ) -> Option<String> {
     let mut all = Vec::new();
     collect_plan_tasks(&rhei.tasks, &mut all);
@@ -37,7 +28,8 @@ fn supervisor_next_step(
     if let Some(assignee) = task.assignee.as_deref() {
         return Some(format!(
             " Task {supervisor} is the ticket to work and {assignee} holds it; hand it back \
-             with: rhei release {plan_arg} --task {supervisor}"
+             with: {}",
+            help_command_with_or("release", &format!("--task {supervisor}"), plan_path)
         ));
     }
     let index = task_index(&all);
@@ -52,8 +44,8 @@ fn supervisor_next_step(
         return None;
     }
     Some(format!(
-        " Work the supervisor instead: rhei{} next {plan_arg} --task {supervisor}",
-        state_machine_flag(state_machine_path)
+        " Work the supervisor instead: {}",
+        help_command_with_or("next", &format!("--task {supervisor}"), plan_path)
     ))
 }
 
@@ -62,10 +54,8 @@ fn transition_command_lines(
     state_name: &str,
     machine: &rhei_validator::StateMachine,
     metadata: Option<&Metadata>,
-    plan_arg: &str,
-    state_machine_path: Option<&Path>,
+    plan_path: &Path,
 ) -> Vec<String> {
-    let state_machine_arg = state_machine_flag(state_machine_path);
     let from_arg = shell_quote(state_name);
     machine
         .transitions()
@@ -92,11 +82,8 @@ fn transition_command_lines(
             .unwrap_or(false)
         })
         .map(|rule| {
-            let to_arg = shell_quote(&rule.to.0);
-            format!(
-                "  rhei{} transition {} --task {} --from={} --to={}",
-                state_machine_arg, plan_arg, task.id, from_arg, to_arg
-            )
+            let rest = format!("--task {} --from={from_arg} --to={}", task.id, shell_quote(&rule.to.0));
+            format!("  {}", help_command_with_or("transition", &rest, plan_path))
         })
         .collect()
 }
@@ -108,7 +95,6 @@ fn diagnose_no_claimable(
     rhei: &rhei_core::ast::Rhei,
     machines: &rhei_validator::MachineSet,
     plan_path: &Path,
-    state_machine_path: Option<&Path>,
     scope: &RheiScope,
 ) -> String {
     let mut project = Vec::new();
@@ -286,12 +272,9 @@ fn diagnose_no_claimable(
                 supervisors.push(supervisor);
             }
         }
-        let plan_arg = help_target_word_or(plan_path);
         let next_step = supervisors
             .into_iter()
-            .find_map(|id| {
-                supervisor_next_step(rhei, machines, id, &plan_arg, state_machine_path)
-            })
+            .find_map(|id| supervisor_next_step(rhei, machines, id, plan_path))
             .unwrap_or_default();
         return format!(
             "no tickets are ready to claim{}: {} ticket(s) held by a supervisor: {}{}.{}",
@@ -317,7 +300,6 @@ fn diagnose_no_claimable(
     if let Some(task) = ready_non_initial.first() {
         let machine = machines.for_task(&task.id);
         let state_name = normalized_state_name(task.state.as_str(), machine);
-        let plan_arg = help_target_word_or(plan_path);
         let normalized_metadata = ensure_current_state_visit_count(
             rhei.metadata.as_ref(),
             &task.id,
@@ -331,8 +313,7 @@ fn diagnose_no_claimable(
             &state_name,
             machine,
             metadata_for_checks,
-            &plan_arg,
-            state_machine_path,
+            plan_path,
         );
         let guidance = if commands.is_empty() {
             "No outgoing transitions are currently applicable for this state.".to_string()

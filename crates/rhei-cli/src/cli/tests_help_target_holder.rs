@@ -65,12 +65,56 @@ mod help_target_holder {
         assert_eq!(help_target_word_or(in_hand), "the-path-it-validated");
 
         {
-            let _scope = enter_help_target(HelpTarget::of_command(&Commands::Version, None));
+            let target = HelpTarget::of_command(&Commands::Version, None);
+            target.discovered.set(Some(PathBuf::from("what-the-directory-holds"))).unwrap();
+            let _scope = enter_help_target(target);
             assert_eq!(help_target_word_or(in_hand), "the-path-it-validated");
         }
 
         let _scope = enter_help_target(HelpTarget::naming(Path::new("member.rhei.md")));
         assert_eq!(help_target_word_or(Path::new("project")), "member.rhei.md");
+    }
+
+    /// A verb that runs with no target stays bare where the command has none, and
+    /// what the directory holds is not the answer for a command with no target of its
+    /// own, even once something has looked. §FS-rhei-errors.1.2.1
+    #[test]
+    fn help_target_a_verb_that_runs_bare_never_gains_a_placeholder() {
+        assert_eq!(help_command_or_bare("states"), "rhei states");
+        {
+            let target = HelpTarget::new(None, false, None);
+            target.discovered.set(Some(PathBuf::from("what-the-directory-holds"))).unwrap();
+            let _scope = enter_help_target(target);
+            assert_eq!(help_command_or_bare("states"), "rhei states");
+            assert_eq!(help_command("list"), "rhei list <plan>");
+        }
+        {
+            let machine = Some(PathBuf::from("machine.yaml"));
+            let _scope = enter_help_target(HelpTarget::new(None, false, machine.clone()));
+            assert_eq!(help_command_or_bare("states"), "rhei states --state-machine machine.yaml");
+
+            let typed = Some(PathBuf::from("plan.rhei.md"));
+            let _scope = enter_help_target(HelpTarget::new(typed, true, machine));
+            assert_eq!(
+                help_command_or_bare("states"),
+                "rhei states plan.rhei.md --state-machine machine.yaml"
+            );
+        }
+    }
+
+    /// A verb that takes no `--state-machine` is not handed one. §FS-rhei-errors.1.2.1
+    #[test]
+    fn help_target_a_verb_with_no_machine_flag_is_not_handed_one() {
+        let _scope = enter_help_target(HelpTarget::new(
+            Some(PathBuf::from("plan.rhei.md")),
+            true,
+            Some(PathBuf::from("machine.yaml")),
+        ));
+        assert_eq!(
+            help_command_without_machine("show", "--task 1", None),
+            "rhei show plan.rhei.md --task 1"
+        );
+        assert_eq!(help_machine_argument(), " --state-machine machine.yaml");
     }
 
     /// A machine given before the subcommand is passed on the same as one after it,
@@ -96,7 +140,10 @@ mod help_target_holder {
             "See: rhei list 'sub dir/plan.rhei.md' --non-terminal",
             "rhei list /abs/plan.rhei.md, then claim it",
             "start one with `rhei run ./plan --dashboard`",
-            "rhei --state-machine=m.yaml transition plan.rhei.md --task 1",
+            "rhei transition plan.rhei.md --task 1 --state-machine m.yaml",
+            "rhei intervene --plan project/plan.rhei.md --task 1 --message <text>",
+            "rhei states --state-machine 'machines dir/custom.yaml'",
+            "rhei states --state-machine custom.yaml",
         ] {
             assert!(names_help_target(named), "{named}");
         }

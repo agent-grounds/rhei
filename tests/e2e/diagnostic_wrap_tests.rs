@@ -41,8 +41,9 @@ fn missing_plan_path_wider_than_the_render(dir: &TestDir) -> String {
     path
 }
 
-/// A sentence rendered across two lines still reads as one sentence.
-/// §FS-rhei-errors.2
+/// A sentence rendered across two lines still reads as one sentence, and a path in it
+/// stays whole: this is what fails when the renderer's break settings go.
+/// §FS-rhei-errors.2 §FS-rhei-validate.4.2
 #[test]
 fn a_wrapped_diagnostic_reads_as_the_sentence_the_binary_printed() {
     const SENTENCE: &str = "or omit the argument to use the enclosing project";

@@ -12,7 +12,7 @@ use std::process::{Output, Stdio};
 
 use super::*;
 
-const HELD_PLAN: &str = "# Rhei: Project\n\n## Tasks\n\n\
+pub(super) const HELD_PLAN: &str = "# Rhei: Project\n\n## Tasks\n\n\
                          ### Task 1: A ticket someone else holds\n\
                          **State:** open\n\
                          **Assignee:** someone-else\n";
@@ -27,7 +27,7 @@ const INVALID_PLAN: &str = "# Rhei: Project\n\n## Tasks\n\n\
                             **Prior:** 99\n";
 
 /// Never spawned: its one ticket is held, so the run has nothing it may pick up.
-const HELD_MACHINE: &str = r#"name: held
+pub(super) const HELD_MACHINE: &str = r#"name: held
 version: 1
 states:
   open:
@@ -48,18 +48,18 @@ transitions:
 "#;
 
 /// A directory name that takes the space after it past the wrap column.
-const WIDER_THAN_THE_RENDER: &str =
+pub(super) const WIDER_THAN_THE_RENDER: &str =
     "a-directory-whose-name-alone-runs-past-the-column-a-rendered-help-wraps-at-eighty";
 
 /// One directory for the project and one for the account, so a project written
 /// beneath the root is the only thing discovery finds there. §REQ-test-isolation.2
-struct Case {
-    root: TestDir,
-    home: PathBuf,
+pub(super) struct Case {
+    pub(super) root: TestDir,
+    pub(super) home: PathBuf,
 }
 
 impl Case {
-    fn new(prefix: &str) -> Self {
+    pub(super) fn new(prefix: &str) -> Self {
         let root = unique_temp_dir(prefix);
         let home = root.join(".home");
         fs::create_dir_all(&home).expect("create the account directory");
@@ -67,7 +67,7 @@ impl Case {
     }
 
     /// A held ticket and its machine in `relative`, returning that directory.
-    fn held(&self, relative: &str) -> PathBuf {
+    pub(super) fn held(&self, relative: &str) -> PathBuf {
         self.project(relative, HELD_PLAN)
     }
 
@@ -79,7 +79,7 @@ impl Case {
         dir
     }
 
-    fn rhei(&self, cwd: &Path, args: &[&str]) -> Output {
+    pub(super) fn rhei(&self, cwd: &Path, args: &[&str]) -> Output {
         rhei_command(&self.home)
             .current_dir(cwd)
             .args(args)
@@ -98,7 +98,7 @@ fn offered_command(rendered: &str, start: &str) -> Option<String> {
 
 /// That the help ends on exactly this command, whole on one physical line.
 #[track_caller]
-fn assert_offers(rendered: &str, expected: &str) {
+pub(super) fn assert_offers(rendered: &str, expected: &str) {
     let start = expected.split(' ').take(2).collect::<Vec<_>>().join(" ");
     assert_eq!(
         offered_command(rendered, &start).as_deref(),
@@ -109,7 +109,7 @@ fn assert_offers(rendered: &str, expected: &str) {
 
 /// `command` pasted into `sh`, from `cwd`, finding the binary under test as `rhei`.
 #[cfg(unix)]
-fn pasted(command: &str, cwd: &Path, home: &Path) -> CliRun {
+pub(super) fn pasted(command: &str, cwd: &Path, home: &Path) -> CliRun {
     let binary = rhei_binary();
     let bin_dir = binary.parent().expect("the binary's directory").to_path_buf();
     let mut dirs = vec![bin_dir];
@@ -131,7 +131,7 @@ fn pasted(command: &str, cwd: &Path, home: &Path) -> CliRun {
 /// so the paste is a Unix claim; the printed spelling is `shell_quote`'s on each.
 #[track_caller]
 #[cfg(unix)]
-fn assert_lists(command: &str, cwd: &Path, home: &Path, listed: &str, absent: &[&str]) {
+pub(super) fn assert_lists(command: &str, cwd: &Path, home: &Path, listed: &str, absent: &[&str]) {
     let run = pasted(command, cwd, home);
     assert!(run.status.success(), "`{command}` should run as printed:\n{}", run.stderr);
     assert!(run.stdout.contains(listed), "`{command}` should list {listed}:\n{}", run.stdout);
@@ -141,7 +141,7 @@ fn assert_lists(command: &str, cwd: &Path, home: &Path, listed: &str, absent: &[
 }
 
 #[cfg(windows)]
-fn assert_lists(_: &str, _: &Path, _: &Path, _: &str, _: &[&str]) {}
+pub(super) fn assert_lists(_: &str, _: &Path, _: &Path, _: &str, _: &[&str]) {}
 
 /// What an omitted target discovers: whatever the OS reports as the current
 /// directory, which `getcwd` resolves on Unix and Windows leaves as it was.
@@ -154,7 +154,7 @@ fn discovered(path: &Path) -> PathBuf {
 }
 
 /// `rhei list` of what the command was given, in the platform shell's quoting.
-fn listing(target: &str) -> String {
+pub(super) fn listing(target: &str) -> String {
     format!("rhei list {}", shell_quote(target))
 }
 
@@ -537,7 +537,7 @@ fn help_target_a_detached_run_logs_its_machine_absolute() {
 
 /// `runtime/run.log` once the halt is written, which a blank line ends.
 #[cfg(unix)]
-fn logged_diagnostic(project: &Path) -> String {
+pub(super) fn logged_diagnostic(project: &Path) -> String {
     let log = project.join("runtime/run.log");
     let halted =
         |text: &str| text.rsplit_once("help:").is_some_and(|(_, help)| help.contains("\n\n"));

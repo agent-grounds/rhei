@@ -559,7 +559,10 @@ transitions:
     );
     assert!(
         stderr.contains(&format!(
-            "rhei --state-machine={} transition",
+            "rhei transition {} --task plan.1 --from={} --to={} --state-machine {}",
+            shell_quote(&plan_path.display().to_string()),
+            shell_quote("in progress"),
+            shell_quote("done now"),
             shell_quote(&machine_path.display().to_string())
         )),
         "expected suggested command to include quoted custom state-machine path; got:\n{}",
@@ -1344,7 +1347,10 @@ Body nobody can reach through a claim.
         "the gate itself is unchanged; got:\n{said}"
     );
     assert!(
-        said.contains("rhei show plan.2"),
+        said.contains(&format!(
+            "rhei show {} --task plan.2",
+            shell_quote(&plan_path.display().to_string())
+        )),
         "the help should name the verb that prints this task's body; got:\n{said}"
     );
     assert!(

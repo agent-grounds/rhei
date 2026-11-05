@@ -37,6 +37,9 @@ struct StrictInputs {
     price_book: Option<PathBuf>,
     /// The remedy names the plan the operator ran, and the rhei when it is a member.
     plan_arg: String,
+    /// And the machine it ran under: without it the seal covers another file set,
+    /// and the next strict run refuses again. §FS-rhei-errors.1.2.1 §FS-rhei-seal.8.4
+    machine_arg: String,
     project: bool,
     rheis: BTreeMap<String, StrictRhei>,
     /// Tickets already refused, so each gets one refusal however often it is ready.
@@ -102,6 +105,7 @@ fn arm_strict_inputs(
         workspace_root: workspace_root.clone(),
         price_book: price_book.clone(),
         plan_arg: plan_arg_for_help(input),
+        machine_arg: help_machine_argument(),
         project: loaded.is_panta_project(),
         rheis: BTreeMap::new(),
         refused: BTreeSet::new(),
@@ -138,8 +142,8 @@ impl StrictInputs {
 
     fn remedy(&self, rhei: &str) -> String {
         match self.project {
-            true => format!("rhei seal {} --rhei {rhei}", self.plan_arg),
-            false => format!("rhei seal {}", self.plan_arg),
+            true => format!("rhei seal {} --rhei {rhei}{}", self.plan_arg, self.machine_arg),
+            false => format!("rhei seal {}{}", self.plan_arg, self.machine_arg),
         }
     }
 }
@@ -340,7 +344,10 @@ fn strict_refusal_outcome(result: MietteResult<()>) -> MietteResult<()> {
     let refused = STRICT_INPUTS.lock().ok().and_then(|strict| strict.as_ref().map(|s| s.refused.len()));
     match (result, refused) {
         (Ok(()), Some(count)) if count > 0 => Err(miette!(
-            help = "restore the changed files, or accept them with `rhei seal`; then run again",
+            help = format!(
+                "restore the changed files, or accept them with `{}`; then run again",
+                help_command("seal")
+            ),
             "{count} ticket(s) refused because their sealed inputs changed"
         )),
         (result, _) => result,

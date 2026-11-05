@@ -90,9 +90,9 @@ impl HelpTarget {
             Commands::Snapshot { command, state_machine } => {
                 (Some(command.plan().to_path_buf()), state_machine.as_ref(), true)
             }
-            Commands::Init { .. }
-            | Commands::New { .. }
-            | Commands::Budget { .. }
+            Commands::Init { dir, .. } => (dir.clone(), None, true),
+            Commands::New { options } => (options.project.clone(), None, true),
+            Commands::Budget { .. }
             | Commands::Schema { .. }
             | Commands::Templates { .. }
             | Commands::Instantiate { .. }
@@ -109,7 +109,8 @@ impl HelpTarget {
     }
 
     /// The target as typed; otherwise what the command discovers, or for one with
-    /// no target of its own, the path the help is about. §FS-rhei-errors.1.2.1
+    /// no target of its own, only the path the help is about: what the directory
+    /// holds is another plan's answer. §FS-rhei-errors.1.2.1
     fn target(&self, fallback: Option<&Path>) -> Option<PathBuf> {
         if let Some(typed) = &self.typed {
             return Some(typed.clone());
@@ -118,7 +119,7 @@ impl HelpTarget {
         if self.takes_target {
             self.discovered().or(fallback)
         } else {
-            fallback.or_else(|| self.discovered())
+            fallback
         }
     }
 
@@ -216,12 +217,19 @@ fn target_word(fallback: Option<&Path>) -> String {
 }
 
 fn command_line(verb: &str, rest: &str, fallback: Option<&Path>) -> String {
+    format!("{}{}", machineless_line(verb, rest, fallback), help_machine_argument())
+}
+
+fn machineless_line(verb: &str, rest: &str, fallback: Option<&Path>) -> String {
     let word = target_word(fallback);
-    let machine = current_help_target()
-        .and_then(|target| target.machine_argument())
-        .unwrap_or_default();
     let rest = if rest.is_empty() { String::new() } else { format!(" {rest}") };
-    format!("rhei {verb} {word}{rest}{machine}")
+    format!("rhei {verb} {word}{rest}")
+}
+
+/// The ` --state-machine <word>` the command was given, or nothing, for a line
+/// built somewhere else: a seal's remedy prints its own target. §FS-rhei-errors.1.2.1
+fn help_machine_argument() -> String {
+    current_help_target().and_then(|target| target.machine_argument()).unwrap_or_default()
 }
 
 /// The command's target as one shell word, for a command line that spells the rest
@@ -258,14 +266,31 @@ fn help_command_with_or(verb: &str, rest: &str, fallback: &Path) -> String {
     command_line(verb, rest, Some(fallback))
 }
 
+/// `rhei <verb>` of the command's target where it has one, and bare where it has
+/// none, for a verb that runs with no target at all. A placeholder there would ask
+/// for what the line does not need. §FS-rhei-errors.1.2.1
+fn help_command_or_bare(verb: &str) -> String {
+    let word = current_help_target()
+        .and_then(|holder| holder.target(None).map(|path| holder.spelled(&path)));
+    let word = word.map(|word| format!(" {word}")).unwrap_or_default();
+    format!("rhei {verb}{word}{}", help_machine_argument())
+}
+
+/// [`help_command_with_or`] for a verb that refuses `--state-machine`, as `rhei
+/// show`, `rhei summary` and `rhei cost` do. §FS-rhei-errors.1.2.1
+fn help_command_without_machine(verb: &str, rest: &str, fallback: Option<&Path>) -> String {
+    machineless_line(verb, rest, fallback)
+}
+
 /// Whether a diagnostic's text prints a command naming a target, which a wrap would
 /// cut into two pasted commands, or into a quoted path with a line break in it.
 /// §FS-rhei-errors.1.2.1 §FS-rhei-errors.2
 ///
 /// This reads what the text says rather than asking who built it, because a detached
-/// run's refusal reaches its launcher as text. The word after the verb is what tells
-/// a target from a ticket id or a flag. A false positive only leaves prose unwrapped,
-/// for the terminal to soft-wrap.
+/// run's refusal reaches its launcher as text. The first word after the verb that is
+/// not a flag is what tells a target from a ticket id, and may follow a flag, as it
+/// does on `rhei intervene --plan`. A false positive only leaves prose unwrapped, for
+/// the terminal to soft-wrap.
 fn names_help_target(text: &str) -> bool {
     let typed = current_help_target()
         .and_then(|target| target.typed.as_deref().map(|typed| target.spelled(typed)));
@@ -277,10 +302,9 @@ fn names_help_target(text: &str) -> bool {
         if !starts_a_word {
             return false;
         }
-        let mut words = text[at + prefix.len()..]
-            .split_ascii_whitespace()
-            .skip_while(|word| word.starts_with("--state-machine="));
-        let (Some(verb), Some(word)) = (words.next(), words.next()) else {
+        let mut words = text[at + prefix.len()..].split_ascii_whitespace();
+        let (Some(verb), Some(word)) = (words.next(), words.find(|word| !word.starts_with("--")))
+        else {
             return false;
         };
         verb.chars().all(|ch| ch.is_ascii_lowercase() || ch == '-')
@@ -293,6 +317,8 @@ fn is_path_word(word: &str, typed: Option<&str>) -> bool {
     typed == Some(word)
         || word.contains(['/', '\\'])
         || word.ends_with(".md")
+        || word.ends_with(".yaml")
+        || word.ends_with(".yml")
         || word.starts_with(['\'', '"'])
 }
 

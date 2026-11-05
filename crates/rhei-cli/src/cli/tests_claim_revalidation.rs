@@ -197,3 +197,27 @@ fn issue_286_explicit_non_initial_claim_revalidates_real_contention_under_lock()
         assert!(!dir.path().join("runtime/state-transitions.log").exists());
     }
 }
+
+/// A claim that lost the race is told how to hand the ticket back, of the plan it was
+/// pointed at: bare, `rhei release plan.1` looks wherever the reader stands.
+/// §FS-rhei-errors.1.2.1 §FS-rhei-release
+#[test]
+fn help_target_a_claim_that_lost_the_race_releases_from_the_plan_it_named() {
+    let (_dir, plan, machine, _) = explicit_non_initial_revalidation_fixture("help-target-claim");
+    let changed_path = plan.clone();
+    set_claim_before_lock_hook(move || {
+        fs::write(
+            changed_path,
+            "# Rhei: Explicit revalidation\n\n---\nstructure:\n  maxLevels: 3\n---\n\n## Tasks\n\n### Task prerequisite: Finished prerequisite\n**State:** done\n\n### Task 1: Work\n**State:** bridge\n**Assignee:** other\n**Prior:** Task prerequisite\n",
+        )
+        .expect("mutate plan")
+    });
+    let _scope = enter_help_target(HelpTarget::naming(&plan));
+
+    let error = next_command(&plan, Some(&machine), Some("1"), false, true, false, &[])
+        .expect_err("the concurrent claim must refuse this one");
+
+    let help = error.help().map(|help| help.to_string()).unwrap_or_default();
+    let released = format!("rhei release {} --task plan.1", shell_quote(&plan.display().to_string()));
+    assert!(help.contains(&released), "expected `{released}`; got: {help}");
+}

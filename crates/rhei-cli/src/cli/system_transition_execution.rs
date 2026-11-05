@@ -241,8 +241,8 @@ fn execute_transition_with_origin(
             metadata_handle.release();
             return Err(miette!(
                 help = format!(
-                    "release it with: rhei release {} — or work on a different task.",
-                    files.artifact_id
+                    "release it with: {} — or work on a different task.",
+                    help_command_with("release", &format!("--task {}", files.artifact_id))
                 ),
                 "Task {} is already assigned to {}",
                 files.artifact_id,
@@ -351,7 +351,10 @@ fn execute_transition_with_origin(
         }
         metadata_handle.release();
         return Err(miette!(
-            help = "the machine declares no such edge. List the edges with: rhei states",
+            help = format!(
+                "the machine declares no such edge. List the edges with: {}",
+                help_command_or_bare("states")
+            ),
             "transition from '{}' to '{}' is not allowed by the state machine",
             from,
             to
@@ -399,7 +402,10 @@ fn execute_transition_with_origin(
             resolved_by_pair,
         );
         return Err(miette!(
-            help = "the edge exists but its condition is unmet. Inspect the machine with: rhei states",
+            help = format!(
+                "the edge exists but its condition is unmet. Inspect the machine with: {}",
+                help_command_or_bare("states")
+            ),
             "transition from '{}' to '{}' is not currently applicable: {}. {}",
             from,
             to,
@@ -776,7 +782,10 @@ fn execute_transition_with_origin(
         }
         metadata_handle.release();
         return Err(miette!(
-            help = "finish the work explicitly with `rhei complete`; `rhei next` only takes ownership of non-terminal work",
+            help = format!(
+                "finish the work explicitly with `{}`; a claim only takes ownership of non-terminal work",
+                help_command_with("complete", &format!("--task {} --result <message>", files.artifact_id))
+            ),
             "Task {} cannot enter terminal state '{}' during a claim",
             files.artifact_id,
             to

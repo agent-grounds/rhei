@@ -13,6 +13,15 @@ rhei yet with `--under basin`. Work tickets with `rhei list`,
 `rhei next`, and `rhei complete`; validate edits with `rhei validate`.
 Orchestration (`rhei run`) is started by humans, never by agents.";
 
+/// A conflict's help lists what is in the way, spelled from where `init` was typed.
+/// That is not always the host: `rhei list` refuses a host whose project sits in
+/// `panta/`, and one holding two rheis and no manifest. §FS-rhei-errors.1.2.1
+fn init_conflict(in_the_way: &Path, message: String) -> miette::Report {
+    let listed = PathBuf::from(display_path(in_the_way));
+    let _help_target = enter_help_target(HelpTarget::naming(&listed));
+    miette!(help = init_conflict_help(), "{message}")
+}
+
 fn init_command(
     dir: Option<&Path>,
     title: Option<&str>,
@@ -37,14 +46,12 @@ help = cwd_help(),
     // even under --force — a fresh `panta/` child nested inside it would lose
     // every target resolution to the host manifest and never be reachable.
     if !here && host.join("index.panta.md").is_file() {
-        return Err(miette!(
-help = init_conflict_help(),
-
+        return Err(init_conflict(&host, format!(
             "{} is already a Panta project itself: index.panta.md exists at the host. \
              Re-run with `--force --here` to re-initialize it in place; a new `panta/` \
              project inside it would be shadowed by the host manifest",
             host.display()
-        ));
+        )));
     }
     // §FS-rhei-init.2: --here must not shadow an existing `panta/` project —
     // target resolution prefers the host manifest (§FS-rhei-panta.6). Not
@@ -54,9 +61,7 @@ help = init_conflict_help(),
         && !host.join("index.panta.md").is_file()
         && conventional.join("index.panta.md").is_file()
     {
-        return Err(miette!(
-help = init_conflict_help(),
-
+        return Err(init_conflict(&conventional, format!(
             "{} already holds a Panta project at {}: an adopted host project would \
              shadow it — every inferred target would resolve to the host manifest. \
              Keep using the project at {}, or move its contents into the host and \
@@ -64,18 +69,16 @@ help = init_conflict_help(),
             host.display(),
             conventional.display(),
             conventional.display()
-        ));
+        )));
     }
     // §FS-rhei-init.2: refuse an existing project untouched unless --force,
     // which rewrites the manifest and updates companion files in place.
     if project.join("index.panta.md").is_file() && !force {
-        return Err(miette!(
-help = init_conflict_help(),
-
+        return Err(init_conflict(&project, format!(
             "{} is already a Panta project: index.panta.md exists. Re-run with \
              `--force` to overwrite the manifest",
             project.display()
-        ));
+        )));
     }
     // §FS-rhei-init.2: a `panta/` project would not discover plans sitting in
     // the host — refuse rather than silently shadow them.
@@ -87,16 +90,15 @@ help = init_conflict_help(),
                 .filter_map(|path| path.file_name())
                 .map(|name| name.to_string_lossy().into_owned())
                 .collect();
-            return Err(miette!(
-help = init_conflict_help(),
-
+            // Listing the directory is what these rheis make fail, so name one of them.
+            return Err(init_conflict(&stranded[0], format!(
                 "{} already holds {} rhei(s) ({}) that a `panta/` project would not \
                  discover. Re-run with `--here` to adopt them in place, or move them \
                  into panta/ first",
                 host.display(),
                 names.len(),
                 names.join(", ")
-            ));
+            )));
         }
     }
 

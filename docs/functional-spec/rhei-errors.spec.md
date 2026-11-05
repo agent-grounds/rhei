@@ -99,7 +99,10 @@ alternative states that it belongs to the human operator's ceremony.
 A help that names a command taking a plan or project prints the target of the
 command that printed it, so the line runs as printed: `rhei run plan.rhei.md`
 ends `See what is left with: rhei list plan.rhei.md`, and nobody retypes a target
-they typed a moment earlier.
+they typed a moment earlier. A help that names such a command with no target at
+all is the same defect: `List the tickets with: rhei list`, pasted from another
+directory, finds no plan, and a bare `rhei states` after a command given its own
+machine describes another machine with no error to say so.
 
 - **A typed target is printed as typed**, quoted as one shell word
   ([§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety)). It is not reduced to its file name, which fails from
@@ -110,14 +113,23 @@ they typed a moment earlier.
   omitted prints the project or rhei path it discovered, as the
   `rhei migrate export-priors` line above does. A refusal raised before its
   command resolved a target discovers one the way that command would have.
+- **A command with no target of its own discovers none.** What `rhei instantiate`
+  or `rhei templates` was asked about is not whatever plan the directory holds, so
+  it names the path its help is about: `rhei instantiate --execute` names what it
+  laid.
 - **A placeholder stands only where the command has no target at all**: `rhei
   reset` refused for omitting one, which it never infers (§FS-rhei-panta.6), or a
   command whose discovery found nothing. A value only the reader can choose, such
   as the state a human gate moves to, is not a target and stays a placeholder.
-- **A given `--state-machine` is passed on**, spelled the way the target is, to a
-  command that takes the flag. Without it the pasted command resolves another
-  machine and may refuse for a different reason, which [§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help) calls
-  worse than no suggestion.
+- **A verb that runs with no target stays bare where the command has none.**
+  `rhei states` answers with no target at all, so with nothing to name a help
+  prints `rhei states`, with any machine the command was given, and never gains a
+  placeholder where the bare line runs.
+- **A given `--state-machine` is passed on**, spelled the way the target is and
+  last on the line, to a command that takes the flag. Without it the pasted command
+  resolves another machine and may refuse for a different reason, which
+  [§FS-rhei-errors.1.2](rhei-errors.spec.md#12-help) calls worse than no suggestion. A machine the command
+  resolved for itself is not passed on: the pasted command resolves it the same way.
 - **The command stays on one line.** A diagnostic whose help or message names a
   target this way is not wrapped. The renderer breaks at spaces, so a target
   holding a space would break inside its quotes and paste as a different path; the
@@ -333,7 +345,9 @@ Coverage is a property of the whole binary rather than of any one call site, so
 it is enforced by a test that fails when a diagnostic is raised without help,
 not left to review. So is [§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names): a test fails when a printed
 command holds a target placeholder at a site that test does not list, each listed
-site with the reason it has no target to print.
+site with the reason it has no target to print, and when help text names a command
+taking a target with no target at a site it does not list, each with the reason
+the line is right as it stands.
 
 Help is derived from the failure, never assigned by the area of code it sits
 in. A remedy that does not act on the reported failure — telling the user to

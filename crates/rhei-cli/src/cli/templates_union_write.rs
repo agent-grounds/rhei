@@ -44,9 +44,12 @@
             .find(|(_, ids)| ids.iter().any(|id| id == parent))
             .map(|(path, _)| path.clone())
             .ok_or_else(|| {
+                let entry = if host.single_file { &host.index } else { &host.root };
                 miette!(
-                    help = "run `rhei validate` on the target first, so the plan on disk and \
-                            the ids agree.",
+                    help = format!(
+                        "run `{}` first, so the plan on disk and the ids agree.",
+                        help_command_or("validate", entry)
+                    ),
                     "no file in the target holds the heading for ticket '{parent}'"
                 )
             })?;

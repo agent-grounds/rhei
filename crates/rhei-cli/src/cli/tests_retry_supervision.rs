@@ -55,7 +55,7 @@ mod retry_supervision {
             "plan.1",
             "supervising",
         );
-        assert_eq!(command, "rhei --state-machine=states.yaml transition plan.rhei.md --task plan.1 --from supervising --to supervising --release-subtree");
+        assert_eq!(command, "rhei transition plan.rhei.md --task plan.1 --from supervising --to supervising --release-subtree --state-machine states.yaml");
     }
 
     // §FS-rhei-supervision.3.1: engine-owned release still consumes unread events.

@@ -816,7 +816,7 @@ help = rhei_scope_help(),
                 Err(miette!(
 help = task_id_help(),
 
-                    "task '{}' not found in this {}; `rhei list` shows every ticket id",
+                    "task '{}' not found in this {}",
                     task_id_str,
                     scope_noun
                 ))
@@ -833,7 +833,7 @@ help = task_id_help(),
         }
         1 => Ok(candidates.into_iter().next().expect("one candidate")),
         _ => Err(miette!(
-help = "a qualified id is <rhei>.<ticket>. Copy one from: rhei list",
+help = format!("a qualified id is <rhei>.<ticket>. Copy one from: {}", help_command("list")),
 
             "task id '{}' is ambiguous across rheis; use a qualified id: {}",
             task_id_str,

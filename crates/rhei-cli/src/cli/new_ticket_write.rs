@@ -159,7 +159,10 @@ fn place_ticket(
         let contents =
             insert_ticket_after_subtree(&raw, parent_local, ticket.block).ok_or_else(|| {
             miette!(
-help = "re-run after `rhei validate` passes, so the plan on disk and the ids agree.",
+help = format!(
+    "re-run after `{}` passes, so the plan on disk and the ids agree.",
+    help_command("validate")
+),
 
                 "could not find the heading for ticket {qualified_parent} in {}",
                 display_path(&path)

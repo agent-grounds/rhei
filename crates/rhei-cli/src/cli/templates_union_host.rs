@@ -19,6 +19,21 @@
         project: Option<PathBuf>,
     }
 
+    impl UnionHost {
+        /// The rhei as the path `--into` resolved to, which is what a help about it
+        /// prints. §FS-rhei-errors.1.2.1
+        fn entry(&self) -> &Path {
+            if self.single_file { &self.index } else { &self.root }
+        }
+
+        /// Run `read`, about this rhei, with a help naming it: not the template, and
+        /// not whatever the directory holds. §FS-rhei-errors.1.2.1
+        fn naming<T>(&self, read: impl FnOnce() -> T) -> T {
+            let _help_target = enter_help_target(HelpTarget::naming(self.entry()));
+            read()
+        }
+    }
+
     /// What a `--into` names, decided by what is on disk rather than by how it
     /// is spelled: a rhei, perhaps with a task in it, or a Panta project.
     /// §FS-rhei-library.2.2
@@ -455,8 +470,7 @@
         if retired.is_empty() {
             return Ok(());
         }
-        let entry = if host.single_file { &host.index } else { &host.root };
-        let rhei_id = workspace::rhei_id_for_path(entry).map_err(|err| rhei_identity_report(&err))?;
+        let rhei_id = workspace::rhei_id_for_path(host.entry()).map_err(|err| rhei_identity_report(&err))?;
         let Some(clash) = placed.iter().find(|id| retired.contains_key(&format!("{rhei_id}.{id}")))
         else {
             return Ok(());

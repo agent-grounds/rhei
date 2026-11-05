@@ -92,8 +92,8 @@ impl HelpTarget {
             }
             Commands::Init { dir, .. } => (dir.clone(), None, true),
             Commands::New { options } => (options.project.clone(), None, true),
-            Commands::Budget { .. }
-            | Commands::Schema { .. }
+            Commands::Budget { command } => (command.input().cloned(), None, true),
+            Commands::Schema { .. }
             | Commands::Templates { .. }
             | Commands::Instantiate { .. }
             | Commands::Attach { .. }
@@ -266,14 +266,37 @@ fn help_command_with_or(verb: &str, rest: &str, fallback: &Path) -> String {
     command_line(verb, rest, Some(fallback))
 }
 
+/// The command's target as one shell word where it has one, and `None` where it has
+/// none, for a line that runs bare then.
+fn target_word_if_any() -> Option<String> {
+    current_help_target().and_then(|holder| holder.target(None).map(|path| holder.spelled(&path)))
+}
+
 /// `rhei <verb>` of the command's target where it has one, and bare where it has
 /// none, for a verb that runs with no target at all. A placeholder there would ask
 /// for what the line does not need. §FS-rhei-errors.1.2.1
 fn help_command_or_bare(verb: &str) -> String {
-    let word = current_help_target()
-        .and_then(|holder| holder.target(None).map(|path| holder.spelled(&path)));
-    let word = word.map(|word| format!(" {word}")).unwrap_or_default();
+    let word = target_word_if_any().map(|word| format!(" {word}")).unwrap_or_default();
     format!("rhei {verb}{word}{}", help_machine_argument())
+}
+
+/// `rhei <verb> <subcommand>` of the command's target, after `flag` where the verb
+/// takes it there, for `rhei budget` and `rhei snapshot`: neither takes
+/// `--state-machine`, and each discovers its own target, so where the command has
+/// none the line stays bare rather than gain a placeholder. §FS-rhei-errors.1.2.1
+fn help_subcommand_or_bare(verb: &str, flag: &str, rest: &str) -> String {
+    let mut line = format!("rhei {verb}");
+    if let Some(word) = target_word_if_any() {
+        for part in [flag, word.as_str()].into_iter().filter(|part| !part.is_empty()) {
+            line.push(' ');
+            line.push_str(part);
+        }
+    }
+    if !rest.is_empty() {
+        line.push(' ');
+        line.push_str(rest);
+    }
+    line
 }
 
 /// [`help_command_with_or`] for a verb that refuses `--state-machine`, as `rhei
@@ -289,8 +312,9 @@ fn help_command_without_machine(verb: &str, rest: &str, fallback: Option<&Path>)
 /// This reads what the text says rather than asking who built it, because a detached
 /// run's refusal reaches its launcher as text. The first word after the verb that is
 /// not a flag is what tells a target from a ticket id, and may follow a flag, as it
-/// does on `rhei intervene --plan`. A false positive only leaves prose unwrapped, for
-/// the terminal to soft-wrap.
+/// does on `rhei intervene --plan`. A verb with a subcommand, such as `rhei budget
+/// init`, is read as one, and only for the subcommands it has. A false positive only
+/// leaves prose unwrapped, for the terminal to soft-wrap.
 fn names_help_target(text: &str) -> bool {
     let typed = current_help_target()
         .and_then(|target| target.typed.as_deref().map(|typed| target.spelled(typed)));
@@ -302,15 +326,26 @@ fn names_help_target(text: &str) -> bool {
         if !starts_a_word {
             return false;
         }
-        let mut words = text[at + prefix.len()..].split_ascii_whitespace();
-        let (Some(verb), Some(word)) = (words.next(), words.find(|word| !word.starts_with("--")))
-        else {
+        let mut words = text[at + prefix.len()..].split_ascii_whitespace().peekable();
+        let Some(verb) = words.next() else {
+            return false;
+        };
+        let subcommands = SUBCOMMANDS.iter().find(|(name, _)| *name == verb).map(|(_, of)| *of);
+        if words.peek().is_some_and(|word| subcommands.is_some_and(|of| of.contains(word))) {
+            words.next();
+        }
+        let Some(word) = words.find(|word| !word.starts_with("--")) else {
             return false;
         };
         verb.chars().all(|ch| ch.is_ascii_lowercase() || ch == '-')
             && (typed.as_deref() == Some(word) || is_path_word(word, typed.as_deref()))
     })
 }
+
+/// The verbs whose next word is a subcommand rather than a target, with those
+/// subcommands. §FS-rhei-errors.1.2.1
+const SUBCOMMANDS: &[(&str, &[&str])] =
+    &[("budget", &["init", "show", "adjust", "forget"]), ("snapshot", &["list", "show", "gc", "continue"])];
 
 fn is_path_word(word: &str, typed: Option<&str>) -> bool {
     let word = word.trim_end_matches([',', ';', ':', ')', '`', '.']);
@@ -320,6 +355,18 @@ fn is_path_word(word: &str, typed: Option<&str>) -> bool {
         || word.ends_with(".yaml")
         || word.ends_with(".yml")
         || word.starts_with(['\'', '"'])
+}
+
+impl BudgetCommand {
+    /// The target a budget subcommand was pointed at; `None` where it discovers one.
+    fn input(&self) -> Option<&PathBuf> {
+        match self {
+            Self::Init { input, .. }
+            | Self::Show { input, .. }
+            | Self::Adjust { input, .. }
+            | Self::Forget { input, .. } => input.as_ref(),
+        }
+    }
 }
 
 impl SnapshotCommand {

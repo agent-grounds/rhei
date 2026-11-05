@@ -6,6 +6,12 @@ mod help_target_guard {
     /// no target to print. A site not listed here prints the one it was given.
     const NO_TARGET_TO_PRINT: &[(&str, &str, &str)] = &[
         (
+            "bounds.rs",
+            "rhei budget adjust <TARGET>",
+            "still the defect: a run's halt row, which rhei-core renders knowing no invocation; it \
+             goes with the run's other halt lines",
+        ),
+        (
             "cli_dispatch.rs",
             "rhei reset <plan-or-project>",
             "reset never infers its target, and this refusal is about omitting it; §FS-rhei-panta.6",
@@ -19,6 +25,11 @@ mod help_target_guard {
             "run_prompt_navigation.rs",
             "rhei render <plan>",
             "prompt text a worker reads beside the plan's path, not a diagnostic",
+        ),
+        (
+            "roster_command.rs",
+            "rhei roster <RHEI_PLAN>",
+            "the refusal is about the target given, so the form is the remedy",
         ),
         (
             "templates_union.rs",
@@ -37,9 +48,24 @@ mod help_target_guard {
         ),
     ];
 
+    /// The snapshot helps not yet routed through `help_target.rs`.
+    const BEYOND_SNAPSHOT_HELP: &str =
+        "still the defect: a snapshot help beyond `snapshot_help`, found when budget and snapshot \
+         joined the pattern";
+
     /// Every `rhei <verb>` help text may keep, and why the line is right as it stands.
     /// A site not listed here prints the command's target through `help_target.rs`.
     const BARE_VERB_STANDS: &[(&str, &str, &str)] = &[
+        (
+            "budget_forget.rs",
+            "rhei budget adjust",
+            "prints the root `forget` was pointed at, through `budget_target_argument`",
+        ),
+        (
+            "budget_forget.rs",
+            "rhei budget show",
+            "prints the root `forget` was pointed at, through `budget_target_argument`",
+        ),
         (
             "budget_command.rs",
             "rhei transition",
@@ -50,16 +76,8 @@ mod help_target_guard {
             "rhei states",
             "re-checks the machine file it names and nothing else; a plan on the line could refuse first",
         ),
-        (
-            "remove_command.rs",
-            "rhei list",
-            "still the defect: removal's lines were left out when this guard landed",
-        ),
-        (
-            "remove_evidence.rs",
-            "rhei transition",
-            "still the defect: removal's lines were left out when this guard landed",
-        ),
+        ("help_strings.rs", "rhei snapshot gc", BEYOND_SNAPSHOT_HELP),
+        ("help_strings.rs", "rhei snapshot list", BEYOND_SNAPSHOT_HELP),
         (
             "roster_command.rs",
             "rhei roster",
@@ -73,6 +91,8 @@ mod help_target_guard {
             "rhei run",
             "`--headless` stands between the verb and the path it prints, which is the one it looked for",
         ),
+        ("snapshot_refs_gc.rs", "rhei snapshot gc", BEYOND_SNAPSHOT_HELP),
+        ("snapshot_runtime_preload.rs", "rhei snapshot list", BEYOND_SNAPSHOT_HELP),
         ("templates_instantiate.rs", "rhei run", "`--help` needs no target"),
         (
             "templates_union_host.rs",
@@ -116,7 +136,11 @@ mod help_target_guard {
                 rust_sources(&source_dir, &mut sources);
             }
         }
-        assert!(sources.len() > 300, "the scan found only {} files; has the layout changed?", sources.len());
+        assert!(
+            sources.len() > 300,
+            "the scan found only {} files; has the layout changed?",
+            sources.len()
+        );
         sources
     }
 
@@ -128,7 +152,8 @@ mod help_target_guard {
 
         let continuation = regex::Regex::new(r"\\\r?\n\s*").expect("continuation pattern");
         let placeholder = regex::Regex::new(
-            r#"\brhei [a-z][a-z-]*\b[^"`\n]*?<(?:plan|plan-or-project|plan-or-directory|project|rhei|target|workspace)>"#,
+            // A placeholder in clap's spelling, `<RHEI_PLAN>` or `<TARGET>`, asks for the same.
+            r#"\brhei [a-z][a-z-]*\b[^"`\n]*?<(?i:plan|plan-or-project|plan-or-directory|project|rhei|rhei_plan|target|workspace)>"#,
         )
         .expect("placeholder pattern");
 
@@ -200,7 +225,7 @@ mod help_target_guard {
     fn help_target_bare_verbs_stand_only_where_listed() {
         let continuation = regex::Regex::new(r"\\\r?\n\s*").expect("continuation pattern");
         let bare = regex::Regex::new(
-            r"\brhei (?:list|states|validate|show|release|next|complete|transition|seal|run|render|retry|cost|archive|verify|roster|summary|viz)\b",
+            r"\brhei (?:list|states|validate|show|release|next|complete|transition|seal|run|render|retry|cost|archive|verify|roster|summary|viz|budget (?:init|show|adjust|forget)|snapshot (?:list|show|gc|continue))\b",
         )
         .expect("verb pattern");
 

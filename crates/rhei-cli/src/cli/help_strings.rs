@@ -55,9 +55,10 @@ fn rhei_identity_help() -> &'static str {
      by a path that carries such a name."
 }
 
-/// Help for the snapshot store.
-fn snapshot_help() -> &'static str {
-    "inspect the snapshot store with: rhei snapshot list"
+/// Help for the snapshot store: the target's, which `--plan` names, since it
+/// defaults to the directory the line is pasted in. §FS-rhei-errors.1.2.1
+fn snapshot_help() -> String {
+    format!("inspect the snapshot store with: {}", help_subcommand_or_bare("snapshot list", "--plan", ""))
 }
 
 /// Help for a template bundle whose `template.yaml` is wrong.
@@ -355,10 +356,13 @@ fn snapshot_inherit_help() -> &'static str {
      snapshot.inherit in the state machine."
 }
 
-/// Help for a snapshot this agent cannot resume.
-fn snapshot_resume_help() -> &'static str {
-    "that snapshot cannot be resumed by this agent. Pick another with: rhei snapshot \
-     list, or run the state without --from-snapshot."
+/// Help for a snapshot this agent cannot resume. §FS-rhei-errors.1.2.1
+fn snapshot_resume_help() -> String {
+    format!(
+        "that snapshot cannot be resumed by this agent. Pick another with: {}, or run the \
+         state without --from-snapshot.",
+        help_subcommand_or_bare("snapshot list", "--plan", "")
+    )
 }
 
 /// Help for a `--from-snapshot` value the run does not offer.

@@ -144,6 +144,8 @@ mod help_target_holder {
             "rhei intervene --plan project/plan.rhei.md --task 1 --message <text>",
             "rhei states --state-machine 'machines dir/custom.yaml'",
             "rhei states --state-machine custom.yaml",
+            "inspect it with: rhei budget show 'sub dir/plan.rhei.md'",
+            "rhei snapshot list --plan project/plan.rhei.md",
         ] {
             assert!(names_help_target(named), "{named}");
         }
@@ -154,6 +156,10 @@ mod help_target_holder {
             "the rhei validate step",
             "library/rhei list plan.rhei.md",
             "rhei list",
+            "rhei list the rest",
+            "inspect it with: rhei budget show",
+            "rhei budget init --invocations <N> --reason <TEXT>",
+            "rhei snapshot gc --orphaned",
         ] {
             assert!(!names_help_target(prose), "{prose}");
         }
@@ -162,5 +168,33 @@ mod help_target_holder {
         let _scope = enter_help_target(HelpTarget::naming(Path::new("project")));
         assert!(names_help_target("rhei list project"));
         assert!(names_help_target("See it with: rhei list project."));
+        assert!(names_help_target("rhei budget init project --invocations <N>"));
+        assert!(!names_help_target("rhei list the rest"));
+    }
+
+    /// A budget or snapshot line is handed no machine, since neither takes one after
+    /// its subcommand, and runs bare where the command has no target, since each
+    /// discovers its own. §FS-rhei-errors.1.2.1
+    #[test]
+    fn help_target_a_subcommand_line_never_takes_a_machine_and_is_bare_without_a_target() {
+        assert_eq!(help_subcommand_or_bare("budget show", "", ""), "rhei budget show");
+        let machine = Some(PathBuf::from("machine.yaml"));
+        {
+            let _scope = enter_help_target(HelpTarget::new(None, false, machine.clone()));
+            assert_eq!(
+                help_subcommand_or_bare("budget init", "", "--invocations <N>"),
+                "rhei budget init --invocations <N>"
+            );
+        }
+        let typed = Some(PathBuf::from("sub dir/plan.rhei.md"));
+        let _scope = enter_help_target(HelpTarget::new(typed, true, machine));
+        assert_eq!(
+            help_subcommand_or_bare("budget init", "", "--invocations <N>"),
+            "rhei budget init 'sub dir/plan.rhei.md' --invocations <N>"
+        );
+        assert_eq!(
+            help_subcommand_or_bare("snapshot list", "--plan", ""),
+            "rhei snapshot list --plan 'sub dir/plan.rhei.md'"
+        );
     }
 }

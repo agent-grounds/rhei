@@ -136,7 +136,7 @@
         let placed: Vec<String> = tickets.iter().flat_map(|file| file.ids.clone()).collect();
         check_depth(&placed)?;
         check_id_collisions(&placed, host_files)?;
-        check_retired_ids(host, &placed)?;
+        host.naming(|| check_retired_ids(host, &placed))?;
         if let Some(parent) = host.parent.as_deref() {
             check_parent_exists(parent, host_files)?;
         }
@@ -144,12 +144,8 @@
         let host_machine_text = read_text(&host.machine)?;
         check_artifact_paths(&host_machine_text, &part_machine, sides)?;
         warn_shared_artifact_paths(&part_machine, &tickets);
-        let mut machine = {
-            // `--into` named an id; a help prints the path it resolved to. §FS-rhei-errors.1.2.1
-            let entry = if host.single_file { &host.index } else { &host.root };
-            let _help_target = enter_help_target(HelpTarget::naming(entry));
-            union_machine(&host_machine_text, &host.machine, &part_machine)?
-        };
+        let mut machine =
+            host.naming(|| union_machine(&host_machine_text, &host.machine, &part_machine))?;
         if !machine.ends_with('\n') {
             machine.push('\n');
         }
@@ -354,7 +350,8 @@
                     manifest.name
                 ));
             }
-            resolve_host_machine(host)?;
+            // The host's parse is refused about the host. §FS-rhei-errors.1.2.1
+            host.naming(|| resolve_host_machine(host))?;
         }
         let values = collect_template_inputs(
             &manifest,

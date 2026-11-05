@@ -145,7 +145,7 @@ pub(super) fn assert_lists(_: &str, _: &Path, _: &Path, _: &str, _: &[&str]) {}
 
 /// What an omitted target discovers: whatever the OS reports as the current
 /// directory, which `getcwd` resolves on Unix and Windows leaves as it was.
-fn discovered(path: &Path) -> PathBuf {
+pub(super) fn discovered(path: &Path) -> PathBuf {
     if cfg!(unix) {
         rhei_core::platform::canonical_path(path).unwrap_or_else(|_| path.to_path_buf())
     } else {

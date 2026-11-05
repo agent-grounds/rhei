@@ -267,6 +267,17 @@ metadata:
         &result,
         "Task plan.1 cannot enter terminal state 'completed' during a claim",
     );
+    // The way to finish it names the plan and machine the claim was given.
+    // §FS-rhei-errors.1.2.1
+    assert_stderr_contains(
+        &result,
+        &format!(
+            "finish the work explicitly with `rhei complete {} --task plan.1 --result <message> \
+             --state-machine {}`",
+            shell_quote(&plan_path.display().to_string()),
+            shell_quote(&machine_path.display().to_string())
+        ),
+    );
     let persisted = fs::read_to_string(&plan_path).expect("persisted plan");
     assert_eq!(persisted, plan, "task and counted metadata must be unchanged");
     assert!(!persisted.contains("**Assignee:**"), "original lack of ownership must remain");

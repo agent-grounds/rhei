@@ -6,12 +6,12 @@ use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::PathBuf;
 use std::process::{Child, Output, Stdio};
-use std::time::Duration;
 
 use nix::sys::signal::{kill, Signal};
 use nix::unistd::{mkfifo, Pid};
 
 use super::super::headless_support::wait_until;
+use super::super::helpers::FIXTURE_MARGIN_DURATION;
 use super::{descriptor_pid, run_lock, Workspace};
 
 /// Restore modes before Workspace's cleanup, including during unwinding.
@@ -76,9 +76,10 @@ impl DescriptorGate {
 
     /// Nonblocking writer open succeeds only when attach has opened the reader.
     /// A deadline turns an unexpected read sequence into a fixture failure.
+    /// Readiness uses the shared runner margin. §REQ-cross-platform.8
     pub(super) fn reader(&self) -> File {
         let mut writer = None;
-        wait_until("attach's next descriptor read", Duration::from_secs(10), || {
+        wait_until("attach's next descriptor read", FIXTURE_MARGIN_DURATION, || {
             match OpenOptions::new()
                 .write(true)
                 .custom_flags(nix::libc::O_NONBLOCK)
@@ -146,7 +147,8 @@ impl WaitingAttach {
     }
 
     pub(super) fn finish(&mut self) -> Output {
-        wait_until("attach's result", Duration::from_secs(60), || {
+        // §REQ-cross-platform.8
+        wait_until("attach's result", FIXTURE_MARGIN_DURATION, || {
             self.0.as_mut().expect("owned attach").try_wait().expect("inspect attach").is_some()
         });
         self.0.take().expect("owned attach").wait_with_output().expect("collect attach result")

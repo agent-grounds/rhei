@@ -79,8 +79,10 @@ impl ResetOffer {
     /// that is refused changes nothing, so neither is a way back.
     /// The forced line is this ticket's own only where no ancestor is finished; under
     /// a finished one the forced path would refuse it, so the help starts at the
-    /// topmost finished ancestor, the only one whose line gets past that refusal. What
-    /// the help ends with is always about this ticket.
+    /// topmost finished ancestor, the only one whose line gets past that refusal. A
+    /// line never goes to a state whose visit budget is spent, which that path refuses
+    /// too; the help names any budget it passed over. What the help ends with is
+    /// always about this ticket.
     /// §FS-rhei-reset.5.1 §FS-rhei-complete.4 §FS-rhei-transition-cmd.6
     fn reopen_finished(
         &self,
@@ -97,50 +99,79 @@ impl ResetOffer {
         let root = loaded.task_route(task_id, input).execution_root;
         let departures = ledger_first_departures(&root);
         let dest = reset_destination(departures.get(task_id), from, machine);
-        let tail = if !state_reopens(machine, &dest) {
-            format!("A reset would not reopen it: it would leave this ticket in '{dest}'")
-        } else {
-            // Asked of the reset offered, the whole rhei's, by the computation it refuses with.
-            // §FS-rhei-reset.5.1 §FS-rhei-reset.2.3
-            let refused =
-                errors_the_offered_reset_introduces(loaded, input, owning_rhei(task_id), machines);
-            if refused.is_empty() {
-                format!("Otherwise, run {}", self.for_ticket(task_id))
-            } else {
-                format!(
-                    "A reset of its rhei would be refused: {RESET_LEAVES_AN_INVALID_PLAN}, \
-                     because {}",
-                    refused.join("; ")
-                )
-            }
+        // Asked of the reset offered, the whole rhei's, by the computation it refuses with, where
+        // that reset would reopen this ticket at all. §FS-rhei-reset.5.1 §FS-rhei-reset.2.3
+        let refused = state_reopens(machine, &dest).then(|| {
+            errors_the_offered_reset_introduces(loaded, input, owning_rhei(task_id), machines)
+        });
+        // What the help says in place of the reset where it offers none.
+        let no_reset = match &refused {
+            None => Some(format!(
+                "A reset would not reopen it: it would leave this ticket in '{dest}'"
+            )),
+            Some(errors) if !errors.is_empty() => Some(format!(
+                "A reset of its rhei would be refused: {RESET_LEAVES_AN_INVALID_PLAN}, because {}",
+                errors.join("; ")
+            )),
+            Some(_) => None,
         };
+        let tail = no_reset
+            .clone()
+            .unwrap_or_else(|| format!("Otherwise, run {}", self.for_ticket(task_id)));
 
-        let Some(to) = reopen_state(machine, task, &dest) else {
-            return format!("{FINISHED} {tail}");
+        let visits = forced_hop_visits(loaded, input, task_id, task, from, machine);
+        let own = reopen_state(machine, task, &dest, visits.as_ref());
+        let Some(to) = own.to else {
+            if own.spent.is_empty() {
+                return format!("{FINISHED} {tail}");
+            }
+            // No line comes before the reset, which clears the count. §FS-rhei-reset.5.1
+            let way_back = no_reset.unwrap_or_else(|| {
+                format!(
+                    "A reset reopens it with its visits cleared: run {}",
+                    self.for_ticket(task_id)
+                )
+            });
+            return format!(
+                "{FINISHED} It cannot be forced back into {}. {way_back}",
+                spent_states(&own.spent)
+            );
         };
         let terminal = terminal_ancestors(&loaded.rhei.tasks, &task.id, machine);
         let Some(ancestor) = terminal.last() else {
             return format!(
                 "{FINISHED} An operator at a terminal can reopen this ticket alone with {}, \
-                 giving their own reason; an agent may not run that. {tail}",
-                self.forced_reopen(task_id, from, &to)
+                 giving their own reason; an agent may not run that.{} {tail}",
+                self.forced_reopen(task_id, from, &to),
+                passed_over(&to, &own.spent)
             );
         };
 
         let ancestor_id = ancestor.id.to_string();
         let ancestor_from = normalized_state_name(&ancestor.state, machine);
-        let ancestor_dest = reset_destination(departures.get(&ancestor_id), &ancestor_from, machine);
-        match reopen_state(machine, ancestor, &ancestor_dest) {
+        let ancestor_dest =
+            reset_destination(departures.get(&ancestor_id), &ancestor_from, machine);
+        let ancestor_visits =
+            forced_hop_visits(loaded, input, &ancestor_id, ancestor, &ancestor_from, machine);
+        let reopening = reopen_state(machine, ancestor, &ancestor_dest, ancestor_visits.as_ref());
+        match reopening.to {
             Some(ancestor_to) => format!(
                 "{FINISHED} Its ancestor {ancestor_id} is finished too and has to be reopened \
                  first, then each finished ticket below it down to this one: an operator at a \
-                 terminal starts with {}, giving their own reason; an agent may not run that. \
+                 terminal starts with {}, giving their own reason; an agent may not run that.{} \
                  {tail}",
-                self.forced_reopen(&ancestor_id, &ancestor_from, &ancestor_to)
+                self.forced_reopen(&ancestor_id, &ancestor_from, &ancestor_to),
+                passed_over(&ancestor_to, &reopening.spent)
             ),
-            None => format!(
+            None if reopening.spent.is_empty() => format!(
                 "{FINISHED} Its ancestor {ancestor_id} is finished too and has to be reopened \
                  first, and neither a reset nor its profile's initial state would do that. {tail}"
+            ),
+            // §FS-rhei-reset.5.1: an ancestor no state qualifies for because of a spent budget.
+            None => format!(
+                "{FINISHED} Its ancestor {ancestor_id} is finished too and has to be reopened \
+                 first, and it cannot be forced back into {}. {tail}",
+                spent_states(&reopening.spent)
             ),
         }
     }
@@ -157,22 +188,73 @@ fn state_reopens(machine: &rhei_validator::StateMachine, state: &str) -> bool {
     machine.states.get(state).is_some_and(|def| !def.terminal)
 }
 
+/// Where a finished task's forced line goes, if anywhere, and every state the rule passed
+/// over because its visit budget is spent, `<dest>` first and each once. §FS-rhei-reset.5.1
+struct Reopening {
+    to: Option<String>,
+    spent: Vec<SpentLoopBudget>,
+}
+
 /// The state a finished task reopens into, given `dest`, where a reset would leave it:
-/// that state when it is not terminal, otherwise the `initial` of the task's own profile
-/// when that is not terminal, otherwise none. One rule for the ticket and the ancestor
-/// the help starts at. A pre-authored chain's children never were in the initial state,
-/// so a task only goes there when the reset would not reopen it. §FS-rhei-reset.5.1
+/// that state when it qualifies, otherwise the `initial` of the task's own profile when
+/// that qualifies, otherwise none. A state qualifies when the machine declares it not
+/// terminal and the forced path's own budget check, over `visits`, lets the hop in. One
+/// rule for the ticket and the ancestor the help starts at. A pre-authored chain's
+/// children never were in the initial state, so a task only goes there when `dest` does
+/// not qualify. §FS-rhei-reset.5.1 §FS-rhei-transition-cmd.6
 fn reopen_state(
     machine: &rhei_validator::StateMachine,
     task: &rhei_core::ast::Task,
     dest: &str,
-) -> Option<String> {
-    if state_reopens(machine, dest) {
-        return Some(dest.to_string());
+    visits: Option<&ForcedHopVisits>,
+) -> Reopening {
+    let initial = initial_state_for_node(machine, &task.kind, task.profile_level()).ok();
+    let mut spent = Vec::new();
+    for state in std::iter::once(dest.to_string()).chain(initial.filter(|state| state != dest)) {
+        if !state_reopens(machine, &state) {
+            continue;
+        }
+        match visits.and_then(|visits| visits.spent_entering(machine, &state)) {
+            Some(budget) => spent.push(budget),
+            None => return Reopening { to: Some(state), spent },
+        }
     }
-    initial_state_for_node(machine, &task.kind, task.profile_level())
-        .ok()
-        .filter(|state| state_reopens(machine, state))
+    Reopening { to: None, spent }
+}
+
+/// The counted visits a forced hop of `task_id`, standing in `from`, is measured against,
+/// read the way the forced path reads them. Metadata it cannot read is a refusal that path
+/// gives on its own, so the offer predicts no budget from it. §FS-rhei-reset.5.1
+fn forced_hop_visits(
+    loaded: &LoadedPlan,
+    input: &Path,
+    task_id: &str,
+    task: &rhei_core::ast::Task,
+    from: &str,
+    machine: &rhei_validator::StateMachine,
+) -> Option<ForcedHopVisits> {
+    let route = loaded.task_route(task_id, input);
+    let raw = rhei_core::source::read_to_string(&route.metadata_file).ok()?;
+    ForcedHopVisits::parse(&route, &raw, from, &task.state, machine).ok()
+}
+
+/// Why a line that passed over a spent `<dest>` does not go back there, as the clause that
+/// follows it; empty when it passed over nothing. §FS-rhei-reset.5.1 §FS-rhei-errors.1.5
+fn passed_over(to: &str, spent: &[SpentLoopBudget]) -> String {
+    spent
+        .first()
+        .map(|budget| {
+            format!(" That command goes to '{to}' rather than '{}': {budget}.", budget.state)
+        })
+        .unwrap_or_default()
+}
+
+/// The states passed over for their budgets, then the forced path's refusal for each:
+/// `'<dest>' or '<initial>': <refusal>; <refusal>`. §FS-rhei-reset.5.1 §FS-rhei-errors.1.5
+fn spent_states(spent: &[SpentLoopBudget]) -> String {
+    let names: Vec<String> = spent.iter().map(|budget| format!("'{}'", budget.state)).collect();
+    let refusals: Vec<String> = spent.iter().map(ToString::to_string).collect();
+    format!("{}: {}", names.join(" or "), refusals.join("; "))
 }
 
 /// `path` as the offer prints it: absolute, and not canonical. §FS-rhei-reset.5.1

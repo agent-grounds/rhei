@@ -187,13 +187,20 @@ fn complete_command(
     let current_state_raw = task.state.as_str();
     let current_state = normalized_state_name(current_state_raw, &machine);
 
-    // Reject tasks already in a terminal state. The forced transition is the one-ticket way
-    // back. Agents have neither that nor a narrower reset, so the help says who may run it
-    // and how far the reset reaches. §FS-rhei-reset.5.1 §FS-rhei-transition-cmd.6
+    // Reject tasks already in a terminal state. The help says who may run the one-ticket way
+    // back, and offers the reset only where it would reopen this ticket.
+    // §FS-rhei-reset.5.1 §FS-rhei-transition-cmd.6
     if is_terminal_state(current_state_raw, &machine) {
-        let to = reopen_state(&loaded, input, task_id_str, task, &machine, &current_state);
+        let help = machines.reset.reopen_finished(
+            &loaded,
+            input,
+            task_id_str,
+            task,
+            &machine,
+            &current_state,
+        );
         return Err(miette!(
-            help = machines.reset.reopen_finished(task_id_str, &current_state, to.as_deref()),
+            help = help,
             "Task {} is already in terminal state '{}'",
             task_id_str,
             current_state_raw

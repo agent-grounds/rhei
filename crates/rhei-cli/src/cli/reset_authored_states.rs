@@ -64,6 +64,21 @@ fn ledger_first_departures(root: &Path) -> BTreeMap<String, String> {
     first
 }
 
+/// The state a reset leaves a task in, given `recorded`, the first state its ledger
+/// says it left: that state when the task's machine declares it, otherwise `current`,
+/// where it stands. The one computation of this, because a message offering a reset
+/// has to say what the reset does. §FS-rhei-reset.2.2 §FS-rhei-reset.5.1
+fn reset_destination(
+    recorded: Option<&String>,
+    current: &str,
+    machine: &rhei_validator::StateMachine,
+) -> String {
+    match recorded {
+        Some(state) if machine.states.contains_key(state.as_str()) => state.clone(),
+        _ => current.to_string(),
+    }
+}
+
 /// Whether this task carries a trace of having been run: a claim, a result
 /// link, or a counted-visit suffix on its state. Used only to keep the
 /// "cannot account for this" report off a plan that plainly never ran.
@@ -134,25 +149,18 @@ fn collect_authored_states(
         // id at the same root, and taking that line would move a task that
         // never ran — the very defect this command is being fixed for.
         let recorded = ledger.get(&task_id);
-        let recovered = match recorded {
-            Some(state) if !machine.states.contains_key(state.as_str()) => {
-                result.undeclared.push((task_id.clone(), current.clone(), state.clone()));
-                None
-            }
-            other => other,
-        };
+        if let Some(state) = recorded.filter(|state| !machine.states.contains_key(state.as_str())) {
+            result.undeclared.push((task_id.clone(), current.clone(), state.clone()));
+        }
 
-        let target = recovered.cloned().unwrap_or_else(|| current.clone());
+        let target = reset_destination(recorded, &current, machine);
         if target != current {
             result.moves.push(StateMove {
                 task_id: task_id.clone(),
                 from: current.clone(),
                 to: target.clone(),
             });
-        } else if recovered.is_none()
-            && ledger.is_empty()
-            && (ran_here || shows_run_trace(task, &current))
-        {
+        } else if ledger.is_empty() && (ran_here || shows_run_trace(task, &current)) {
             // No ledger at this root, so "no line" carries no information —
             // unlike a root whose ledger exists, where it means "never moved".
             let initial = initial_state_for_node(machine, &task.kind, task.profile_level());

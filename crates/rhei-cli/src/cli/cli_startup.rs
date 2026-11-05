@@ -19,9 +19,10 @@ fn install_diagnostic_handler() {
         let message = diagnostic.to_string();
         let keeps_migration_action_whole = help.contains("rhei migrate export-priors ")
             || message.contains("rhei migrate export-priors ");
-        // An offered reset runs as printed, so it is not split over lines either. §FS-rhei-reset.5.1
+        // An offered reset or forced reopen runs as printed, so neither is split over lines.
+        // §FS-rhei-reset.5.1
         let keeps_reset_offer_whole =
-            help.contains(RESET_OFFER_REACH) || message.contains(RESET_OFFER_REACH);
+            carries_offered_command(&help) || carries_offered_command(&message);
         Box::new(
             miette::MietteHandlerOpts::new()
                 .break_words(false)

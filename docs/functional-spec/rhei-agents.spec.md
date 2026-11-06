@@ -1617,6 +1617,9 @@ Under `orchestrator` authority, `rhei run`:
    still holds the stdout or stderr it inherited does not delay completion.
    Output written before that exit is captured whole, and what a descendant
    writes after it only best-effort ([§FS-rhei-agent-output-drain](rhei-agent-output-drain.spec.md#fs-rhei-agent-output-drain-agent-output-at-exit)).
+   A descendant keeping inherited stdin open without reading cannot delay
+   completion through an unacknowledged intervention either; pending delivery
+   is settled at exit ([§FS-rhei-evidence.5.4](rhei-evidence.spec.md#54-interventions)).
 2. On timeout, sends `SIGTERM` to the subprocess, 10 s grace, then `SIGKILL`.
    Timeout transitions fire per [Timeout Handling](#7-timeout-handling). Agents
    that fork long-running descendants should install their own cleanup; the

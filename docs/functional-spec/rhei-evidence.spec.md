@@ -244,6 +244,12 @@ with `at` and `outcome` to the end record's `interventions`, in delivery order.
 Its bytes are the message as the operator sent it, without the newline rhei
 adds when it writes the message to the agent's stdin.
 The message is also mirrored into the log, so the log hash covers it too.
+If the agent exits immediately after receiving a live message, that successful
+delivery still belongs in its invocation's end record. Before finalizing that
+record and its log hash, rhei accounts for deliveries already in progress and
+finishes mirroring each successfully delivered message. Once that invocation's
+delivery record is finalized, no further delivery to it can succeed. A failed
+stdin write or an unreachable target adds no delivered intervention.
 `runtime/interventions.log` stays the operator's journal.
 
 ## 6. The Configuration Actually Consumed

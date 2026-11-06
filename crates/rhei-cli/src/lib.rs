@@ -379,6 +379,7 @@ mod tests {
     include!("cli/tests_writable_roots.rs");
     include!("cli/tests_spawn_records.rs");
     include!("cli/tests_evidence_store.rs");
+    include!("cli/tests_intervention_evidence.rs");
     include!("cli/tests_verify_findings.rs");
     include!("cli/tests_retry_contract.rs");
     include!("cli/tests_retry_operations.rs");

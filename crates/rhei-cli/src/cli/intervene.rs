@@ -27,6 +27,8 @@ struct InterveneWrite {
 /// One registered running invocation: a channel to its stdin writer thread, the
 /// shared handle to its durable agent log (so a mirror line cannot interleave
 /// with the agent's own output), and identifying metadata for the audit trail.
+/// The delivered mutex serializes stdin delivery through retention; `None`
+/// closes admission after the final snapshot. §FS-rhei-evidence.5.4
 struct InterveneTarget {
     task_id: String,
     stdin_tx: Sender<InterveneWrite>,
@@ -34,7 +36,7 @@ struct InterveneTarget {
     slot: rhei_tui::Slot,
     state: String,
     stdin_format: AgentStdinFormat,
-    delivered: Arc<Mutex<Vec<DeliveredIntervention>>>,
+    delivered: Arc<Mutex<Option<Vec<DeliveredIntervention>>>>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -95,7 +97,7 @@ impl RunInterveneSink {
                     slot,
                     state: state.to_string(),
                     stdin_format,
-                    delivered: Arc::new(Mutex::new(Vec::new())),
+                    delivered: Arc::new(Mutex::new(Some(Vec::new()))),
                 },
             );
         }
@@ -103,17 +105,21 @@ impl RunInterveneSink {
 
     /// Drop a task's registration once its agent exits. Dropping the stored
     /// sender ends the writer thread, which closes the child's stdin. Returns
-    /// the messages it received, in delivery order. §FS-rhei-evidence.5.4
+    /// the messages it received, in delivery order, after in-progress delivery
+    /// finishes mirroring and retention. Closes admission for stale selections
+    /// before returning the final snapshot. §FS-rhei-evidence.5.4
     pub(crate) fn unregister(
         &self,
         task_id: &str,
         slot: rhei_tui::Slot,
     ) -> Vec<DeliveredIntervention> {
-        let Ok(mut targets) = self.targets.lock() else { return Vec::new() };
-        targets
-            .remove(&InterveneKey { task_id: task_id.to_string(), slot })
-            .and_then(|target| target.delivered.lock().ok().map(|delivered| delivered.clone()))
-            .unwrap_or_default()
+        let target = {
+            let Ok(mut targets) = self.targets.lock() else { return Vec::new() };
+            targets.remove(&InterveneKey { task_id: task_id.to_string(), slot })
+        };
+        let Some(target) = target else { return Vec::new() };
+        let Ok(mut delivered) = target.delivered.lock() else { return Vec::new() };
+        delivered.take().unwrap_or_default()
     }
 
     /// Append one line to the durable audit trail. Serialized through `audit`
@@ -210,6 +216,14 @@ impl rhei_tui::InterveneSink for RunInterveneSink {
         let mut delivered = 0usize;
         let mut failed = 0usize;
         for (task_id, tx, log_file, slot, state, stdin_format, received) in targets {
+            // Serialize admission, write, mirror and retention with unregister's
+            // final snapshot, including stale selections. §FS-rhei-evidence.5.4
+            let mut received = received.lock().map_err(|_| "intervene delivery poisoned".to_string())?;
+            let Some(received) = received.as_mut() else {
+                self.audit(&task_id, Some(slot), &state, message, "unreachable");
+                failed += 1;
+                continue;
+            };
             let bytes = stdin_message_bytes(stdin_format, message);
             let (ack_tx, ack_rx) = channel();
             if tx.send(InterveneWrite { bytes, ack: ack_tx }).is_err() {
@@ -236,13 +250,11 @@ impl rhei_tui::InterveneSink for RunInterveneSink {
                 )
             });
             self.audit(&task_id, Some(slot), &state, message, "delivered");
-            if let Ok(mut received) = received.lock() {
-                received.push(DeliveredIntervention {
-                    at: format_iso8601_utc(std::time::SystemTime::now()),
-                    message: message.to_string(),
-                    outcome: "delivered".to_string(),
-                });
-            }
+            received.push(DeliveredIntervention {
+                at: format_iso8601_utc(std::time::SystemTime::now()),
+                message: message.to_string(),
+                outcome: "delivered".to_string(),
+            });
             delivered += 1;
         }
 
@@ -310,7 +322,7 @@ mod intervene_tests {
                 slot,
                 state: "review".to_string(),
                 stdin_format,
-                delivered: Arc::new(Mutex::new(Vec::new())),
+                delivered: Arc::new(Mutex::new(Some(Vec::new()))),
             },
             rx,
         )

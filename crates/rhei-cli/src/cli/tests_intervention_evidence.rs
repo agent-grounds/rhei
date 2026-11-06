@@ -111,7 +111,6 @@ pathlib.Path(__file__).with_name('receipt').write_bytes(received)
     /// An acknowledged write is retained even if the reader exits while its
     /// transcript mirror is blocked. §FS-rhei-evidence.5.4
     #[test]
-    #[ignore = "red until #561: immediate exit loses an acknowledged intervention; implement removes this"]
     fn a_received_intervention_survives_exit_during_transcript_contention() {
         let mut fixture = Fixture::new(1);
         let (evidence, end_path) = fixture.evidence();

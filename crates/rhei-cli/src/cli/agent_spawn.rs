@@ -405,8 +405,8 @@ fn spawn_and_wait_agent(
     let timed_out = ended.cause == EndCause::TimedOut;
     let interrupted = ended.cause == EndCause::Interrupted;
 
-    // The agent has exited: drop its intervene registration, which ends the
-    // stdin writer thread and closes the pipe.
+    // All wait outcomes close intervention admission: cancel unacknowledged
+    // writes and finish acknowledged mirrors before evidence. §FS-rhei-evidence.5.4
     let interventions = match (registered_intervene, intervene) {
         (true, Some(registry)) => registry.unregister(task_id, slot),
         _ => Vec::new(),

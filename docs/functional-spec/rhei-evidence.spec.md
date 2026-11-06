@@ -250,6 +250,12 @@ record and its log hash, rhei accounts for deliveries already in progress and
 finishes mirroring each successfully delivered message. Once that invocation's
 delivery record is finalized, no further delivery to it can succeed. A failed
 stdin write or an unreachable target adds no delivered intervention.
+At invocation exit, a pending write whose success has not been acknowledged is
+cancelled rather than waiting for a descendant that keeps stdin open without
+reading. Acknowledgement and exit cancellation have one ordered boundary: an
+acknowledged success still finishes its mirror and retention, while cancellation
+reports failure and excludes the attempt from delivered interventions. A later
+write completion cannot turn a cancelled attempt into a successful delivery.
 `runtime/interventions.log` stays the operator's journal.
 
 ## 6. The Configuration Actually Consumed

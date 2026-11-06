@@ -21,7 +21,7 @@ struct DeliveredIntervention {
 
 struct InterveneWrite {
     bytes: Vec<u8>,
-    ack: Sender<Result<(), String>>,
+    ack: InterveneAck,
 }
 
 /// One registered running invocation: a channel to its stdin writer thread, the
@@ -37,6 +37,7 @@ struct InterveneTarget {
     state: String,
     stdin_format: AgentStdinFormat,
     delivered: Arc<Mutex<Option<Vec<DeliveredIntervention>>>>,
+    writer: Arc<Mutex<InterveneWriterState>>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -59,7 +60,8 @@ impl RunInterveneSink {
     /// Register a running task's stdin for intervention. The provided
     /// `child_stdin` is moved into a dedicated writer thread that holds it open
     /// for the process lifetime and writes any delivered messages; the thread
-    /// exits (closing stdin) when the task is unregistered.
+    /// exits after unregister once any blocking OS write returns. Invocation
+    /// completion does not wait for an unacknowledged write.
     pub(crate) fn register(
         &self,
         task_id: &str,
@@ -70,9 +72,13 @@ impl RunInterveneSink {
         stdin_format: AgentStdinFormat,
     ) {
         let (tx, rx) = channel::<InterveneWrite>();
+        let writer = Arc::new(Mutex::new(InterveneWriterState::default()));
         std::thread::spawn(move || {
             let mut stdin = child_stdin;
             while let Ok(write) = rx.recv() {
+                if !write.ack.pending() {
+                    break;
+                }
                 let result = stdin
                     .write_all(&write.bytes)
                     .and_then(|()| stdin.flush())
@@ -98,16 +104,16 @@ impl RunInterveneSink {
                     state: state.to_string(),
                     stdin_format,
                     delivered: Arc::new(Mutex::new(Some(Vec::new()))),
+                    writer,
                 },
             );
         }
     }
 
-    /// Drop a task's registration once its agent exits. Dropping the stored
-    /// sender ends the writer thread, which closes the child's stdin. Returns
-    /// the messages it received, in delivery order, after in-progress delivery
-    /// finishes mirroring and retention. Closes admission for stale selections
-    /// before returning the final snapshot. §FS-rhei-evidence.5.4
+    /// Close acknowledgement/admission on exit and cancel an unconfirmed write,
+    /// without waiting for an inherited stdin pipe. §FS-rhei-agents.3.2.1
+    /// Return acknowledged deliveries after their mirrors and retention finish;
+    /// stale selections cannot succeed after closure. §FS-rhei-evidence.5.4
     pub(crate) fn unregister(
         &self,
         task_id: &str,
@@ -118,6 +124,14 @@ impl RunInterveneSink {
             targets.remove(&InterveneKey { task_id: task_id.to_string(), slot })
         };
         let Some(target) = target else { return Vec::new() };
+        // Close before waiting on delivery: its ack wait must be released even
+        // when a descendant never reads the pipe. §FS-rhei-agents.3.2.1
+        if let Ok(mut writer) = target.writer.lock() {
+            writer.closed = true;
+            if let Some(ack) = writer.pending.take() {
+                let _ = ack.send(Err("agent stdin is closed".to_string()));
+            }
+        }
         let Ok(mut delivered) = target.delivered.lock() else { return Vec::new() };
         delivered.take().unwrap_or_default()
     }
@@ -196,6 +210,7 @@ impl rhei_tui::InterveneSink for RunInterveneSink {
                         target.state.clone(),
                         target.stdin_format,
                         target.delivered.clone(),
+                        target.writer.clone(),
                     )
                 })
                 .collect::<Vec<_>>()
@@ -215,7 +230,7 @@ impl rhei_tui::InterveneSink for RunInterveneSink {
 
         let mut delivered = 0usize;
         let mut failed = 0usize;
-        for (task_id, tx, log_file, slot, state, stdin_format, received) in targets {
+        for (task_id, tx, log_file, slot, state, stdin_format, received, writer) in targets {
             // Serialize admission, write, mirror and retention with unregister's
             // final snapshot, including stale selections. §FS-rhei-evidence.5.4
             let mut received = received.lock().map_err(|_| "intervene delivery poisoned".to_string())?;
@@ -226,7 +241,24 @@ impl rhei_tui::InterveneSink for RunInterveneSink {
             };
             let bytes = stdin_message_bytes(stdin_format, message);
             let (ack_tx, ack_rx) = channel();
-            if tx.send(InterveneWrite { bytes, ack: ack_tx }).is_err() {
+            // Admission and acknowledgement race with exit only under this
+            // short lock; never hold it over pipe I/O. §FS-rhei-evidence.5.4
+            let queued = {
+                let mut guard = writer.lock().map_err(|_| "intervene writer poisoned".to_string())?;
+                if guard.closed {
+                    false
+                } else {
+                    guard.pending = Some(ack_tx);
+                    let ack = InterveneAck { writer: writer.clone() };
+                    if tx.send(InterveneWrite { bytes, ack }).is_err() {
+                        guard.pending.take();
+                        false
+                    } else {
+                        true
+                    }
+                }
+            };
+            if !queued {
                 self.audit(&task_id, Some(slot), &state, message, "stdin-closed");
                 failed += 1;
                 continue;
@@ -272,6 +304,8 @@ impl rhei_tui::InterveneSink for RunInterveneSink {
 mod intervene_tests {
     use super::*;
     use std::time::Duration;
+
+    include!("tests_intervene_shutdown.rs");
 
     /// A sink for the writes a delivery makes, in a directory this harness
     /// empties on the way in.
@@ -323,6 +357,7 @@ mod intervene_tests {
                 state: "review".to_string(),
                 stdin_format,
                 delivered: Arc::new(Mutex::new(Some(Vec::new()))),
+                writer: Arc::new(Mutex::new(InterveneWriterState::default())),
             },
             rx,
         )

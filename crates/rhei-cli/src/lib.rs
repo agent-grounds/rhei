@@ -184,6 +184,7 @@ include!("cli/mcp_config_file.rs");
 include!("cli/mcp_preflight.rs");
 include!("cli/agent_output_reader.rs");
 include!("cli/agent_spawn.rs");
+include!("cli/intervene_writer.rs");
 include!("cli/intervene.rs");
 include!("cli/accounting_price_book.rs");
 include!("cli/accounting_profile_prices.rs");
@@ -380,6 +381,7 @@ mod tests {
     include!("cli/tests_spawn_records.rs");
     include!("cli/tests_evidence_store.rs");
     include!("cli/tests_intervention_evidence.rs");
+    include!("cli/tests_intervention_shutdown.rs");
     include!("cli/tests_verify_findings.rs");
     include!("cli/tests_retry_contract.rs");
     include!("cli/tests_retry_operations.rs");

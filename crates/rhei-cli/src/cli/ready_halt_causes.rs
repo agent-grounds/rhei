@@ -148,14 +148,22 @@ impl HaltCause {
     /// halt may stand in for it.
     ///
     /// Only a ticket the scheduler was starting reaches a bound, so the first group
-    /// is what the classifier says of one it merely saw not move, a poll's person
-    /// included: the answer would not release it. The second is a reading no
-    /// refused start leaves behind. It means something moved the ticket after the
-    /// halt, or that a wait the run honours now holds it, and it is the truer row.
+    /// is what the classifier says of one it merely saw not move: a poll's person
+    /// or a manual claim would not release it. A manual-only ticket with no agent
+    /// configured is never started, so it has no halt and keeps its row.
+    ///
+    /// The second group means something moved the ticket after the halt, or that a
+    /// wait the run honours now holds it, and it is the truer row. One of them is
+    /// different: a supervisor refused on its wake-up does read
+    /// `SupervisorHasNoTerminalEdge`, with nothing having moved it. That names a
+    /// machine defect that outranks the bound and that no renewal cures, and
+    /// `renews automatically` would promise a resumption that cannot finish the
+    /// ticket, so its row stands and `## Bounds` lists the halt.
     /// Spelled out so a new cause has to choose. §FS-rhei-run-report.3.1
     fn yields_to_bound_halt(&self) -> bool {
         match self {
             HaltCause::WaitingOnPerson { .. }
+            | HaltCause::ManualOnly { .. }
             | HaltCause::MissingOutputs { .. }
             | HaltCause::NoTransition
             | HaltCause::NotScheduled
@@ -171,7 +179,6 @@ impl HaltCause {
             | HaltCause::SupervisorStrandedBySelfLoop { .. }
             | HaltCause::Claimed { .. }
             | HaltCause::BlockedByPrior { .. }
-            | HaltCause::ManualOnly { .. }
             | HaltCause::Interrupted
             | HaltCause::MissingInputs { .. } => false,
         }

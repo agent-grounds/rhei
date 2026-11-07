@@ -88,7 +88,6 @@ fn assert_carried_on_with_b(run: &CliRun, project: &TwoRheis) {
 
 /// §FS-rhei-seal.8.4 §FS-rhei-run.5
 #[test]
-#[ignore = "red until #585: a refusal ends the serial run with b.1 deferred and never started; implement removes this"]
 fn a_refusal_carries_on_with_a_ticket_of_another_rhei_deferred_behind_it() {
     let project = TwoRheis::lay("strict-carry-on", ONE_TICKET);
     project.seal_and_change_a();
@@ -105,7 +104,6 @@ fn a_refusal_carries_on_with_a_ticket_of_another_rhei_deferred_behind_it() {
 /// "Starts nothing more in that rhei" beside "carries on with the others".
 /// §FS-rhei-seal.8.4
 #[test]
-#[ignore = "red until #585: the first refusal ends the serial run before a.2 or b.1 gets a pass; implement removes this"]
 fn every_ticket_of_the_refused_rhei_is_refused_once_and_the_other_rhei_still_runs() {
     let project = TwoRheis::lay("strict-carry-on-two", TWO_TICKETS);
     project.seal_and_change_a();
@@ -169,7 +167,6 @@ fn a_refusal_under_parallel_carries_on_with_a_ticket_deferred_behind_it() {
 /// The same exit with no seal: a program that exits 0 without its result stalls
 /// its ticket, and the ticket deferred behind it still gets its pass. §FS-rhei-run.3.6
 #[test]
-#[ignore = "red until #585: a stall ends the serial run with b.1 deferred and never started; implement removes this"]
 fn a_stalled_program_carries_on_with_a_ticket_of_another_rhei_deferred_behind_it() {
     let project = TwoRheis::lay("stall-carry-on", ONE_TICKET);
     on_ticket(&project.a, 1, "sys.exit(0)\n");

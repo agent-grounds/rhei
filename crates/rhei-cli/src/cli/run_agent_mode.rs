@@ -7,6 +7,28 @@
 
 // §AR-source-file-size.3 §FS-rhei-run.3
 
+/// Whether a pass that moved nothing must still go on: a ticket stepped out in
+/// it, and another is still claimable, whether collected or deferred behind a
+/// same-state claimant. Requiring a *new* stall bounds it, since each turn takes
+/// one more ticket out. Every exit from a pass asks here. §FS-rhei-run.3.6
+fn pass_stalled_with_more_claimable(
+    stalled_tasks: &HashSet<String>,
+    stalled_before_pass: usize,
+    unpromptable_tasks: &HashSet<String>,
+    unpromptable_before_pass: usize,
+    agent_tasks: &[(String, String, String, ResolvedAgent)],
+    program_tasks: &[(String, String, String, ResolvedProgram)],
+    deferred_tasks: &BTreeSet<String>,
+) -> bool {
+    let newly_stalled = stalled_tasks.len() > stalled_before_pass
+        || unpromptable_tasks.len() > unpromptable_before_pass;
+    let claimable = |id: &String| !stalled_tasks.contains(id) && !unpromptable_tasks.contains(id);
+    newly_stalled
+        && (agent_tasks.iter().any(|entry| claimable(&entry.0))
+            || program_tasks.iter().any(|entry| claimable(&entry.0))
+            || deferred_tasks.iter().any(claimable))
+}
+
 /// Agent-driven execution mode: spawn coding agents for tasks.
 fn run_agent_mode(
     input: &Path,
@@ -716,6 +738,20 @@ fn run_agent_mode(
                     sink.emit(RunEvent::PassEnded { pass, progressed: false });
                     break;
                 }
+                // A refused or stalled ticket leaves the tickets deferred behind
+                // it their pass. §FS-rhei-seal.8.4 §FS-rhei-run.3.6
+                if pass_stalled_with_more_claimable(
+                    &stalled_tasks,
+                    stalled_before_pass,
+                    &unpromptable_tasks,
+                    unpromptable_before_pass,
+                    &agent_tasks,
+                    &program_tasks,
+                    &deferred_tasks,
+                ) {
+                    sink.emit(RunEvent::PassEnded { pass, progressed: false });
+                    continue;
+                }
                 // Nothing left that has not already stalled: the pass is over.
                 // If it moved anything at all, the stalled tickets earn a fresh
                 // pass rather than ending the run. §FS-rhei-run.3
@@ -975,17 +1011,16 @@ fn run_agent_mode(
             continue;
         }
         // Nothing moved, but a stalled ticket's siblings are still claimable:
-        // keep going while one has not been tried. Requiring a *new* stall
-        // bounds it — each turn takes one more ticket out. §FS-rhei-run.3
-        let newly_stalled = stalled_tasks.len() > stalled_before_pass
-            || unpromptable_tasks.len() > unpromptable_before_pass;
-        let claimable = |id: &String| {
-            !stalled_tasks.contains(id) && !unpromptable_tasks.contains(id)
-        };
-        let more_claimable = agent_tasks.iter().any(|entry| claimable(&entry.0))
-            || program_tasks.iter().any(|entry| claimable(&entry.0))
-            || deferred_tasks.iter().any(claimable);
-        if newly_stalled && more_claimable {
+        // keep going while one has not been tried. §FS-rhei-run.3.6
+        if pass_stalled_with_more_claimable(
+            &stalled_tasks,
+            stalled_before_pass,
+            &unpromptable_tasks,
+            unpromptable_before_pass,
+            &agent_tasks,
+            &program_tasks,
+            &deferred_tasks,
+        ) {
             continue;
         }
         // Every claimable ticket has now advanced or stalled. A pass that moved

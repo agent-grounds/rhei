@@ -421,6 +421,9 @@ file's own metadata block, because the parser does not read one there either.
 A task file has no header, so its only frontmatter is a block that leads it. A
 `# Rhei:` line anywhere in a task file is body text, and so is a `---` under it: the
 tasks below them are tasks, and a reset moves them as `rhei validate` lists them.
+Whether a file is a task file is what the load the reset chose it from read it as,
+never where the file sits ([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)): a plan given directly is a
+plan even inside a workspace's `tasks/` directory.
 
 `--dry-run`, the preview and the plan [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) judges read a fence the same way,
 because each comes from the same rewrite.

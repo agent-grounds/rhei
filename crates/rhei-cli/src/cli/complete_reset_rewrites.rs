@@ -31,15 +31,17 @@ fn reset_target_files(
 
 /// `authored` maps this file's *local* task ids to the state each was authored
 /// in; a task absent from it never moved and keeps the line it has. A file whose
-/// text does not change is not written. Returns whether it was.
-/// §FS-rhei-reset.2.2 §FS-rhei-reset.2
+/// text does not change is not written. Returns whether it was. `role` is what the
+/// load that chose the file read it as. §FS-rhei-reset.2.2 §FS-rhei-reset.2
+/// §FS-rhei-reset.2.4
 fn reset_plan_file_states(
     path: &Path,
+    role: PlanFileKind,
     authored: &BTreeMap<String, String>,
     locked: &LockedPlanFile,
 ) -> MietteResult<bool> {
     let raw = locked.read_to_string("failed to read plan file")?;
-    let new_raw = reset_file_text(&raw, authored, plan_file_kind(path))?;
+    let new_raw = reset_file_text(&raw, authored, role)?;
     if new_raw == raw {
         return Ok(false);
     }

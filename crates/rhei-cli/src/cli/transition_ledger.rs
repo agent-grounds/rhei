@@ -292,7 +292,7 @@ fn rewrite_task_completion(
     let all_lines: Vec<&str> = raw.lines().collect();
     // §FS-rhei-complete.3.3: a fence the task's text ends inside is below the link, unread.
     let (lines, final_fence) =
-        split_at_a_tasks_final_fence(&all_lines, plan_file_kind(task_file), task_id);
+        split_at_a_tasks_final_fence(&all_lines, role, task_id);
     let mut result_lines: Vec<String> = Vec::with_capacity(all_lines.len() + 2);
 
     let mut in_target_task = false;

@@ -107,13 +107,13 @@ mod reset_refusal {
         let text = "### Task 1: A\n**State:** done\n\nBody\n\n```text\nopen\n";
         fs::write(&path, text).expect("write");
         let link = "runtime/results/plan.1.md";
-        rewrite_task_completion(&path, "1", "plan.1", link, true).expect("first");
+        rewrite_task_completion(&path, PlanFileKind::Plan, "1", "plan.1", link, true).expect("first");
         let first = fs::read_to_string(&path).expect("read");
         assert_eq!(
             first,
             format!("### Task 1: A\n**State:** done\n\nBody\n\n> **Result:** [plan.1]({link})\n\n```text\nopen\n")
         );
-        rewrite_task_completion(&path, "1", "plan.1", link, true).expect("second");
+        rewrite_task_completion(&path, PlanFileKind::Plan, "1", "plan.1", link, true).expect("second");
         assert_eq!(fs::read_to_string(&path).expect("read"), first);
     }
 
@@ -133,16 +133,22 @@ mod reset_refusal {
         assert!(reopened.ends_with("```text\nopen\n"), "{reopened}");
     }
 
-    /// A plan document is read as one, and any file under a directory the loader takes
-    /// task files from is a task file, whatever it is named. §FS-rhei-reset.2.4
+    /// A plan document is read as one, and any file the load read tickets from under a
+    /// directory it takes task files from is a task file, whatever it is named. The load
+    /// decides, not the path. §FS-rhei-reset.2.4 §FS-rhei-plan-language.2.1
     #[test]
     fn a_files_kind_comes_from_where_the_loader_reads_it() {
         let dir = tempfile::tempdir().expect("tmpdir");
-        fs::write(dir.path().join("index.rhei.md"), "# Rhei: W\n").expect("write index");
-        let root = dir.path();
-        assert_eq!(plan_file_kind(&root.join("index.rhei.md")), PlanFileKind::Plan);
-        assert_eq!(plan_file_kind(Path::new("plan.rhei.md")), PlanFileKind::Plan);
-        assert_eq!(plan_file_kind(&root.join("tasks/01.md")), PlanFileKind::TaskFile);
-        assert_eq!(plan_file_kind(&root.join("tasks/01.rhei.md")), PlanFileKind::TaskFile);
+        let root = &dir.path().join("ws");
+        fs::create_dir(root).expect("workspace dir");
+        fs::write(root.join("index.rhei.md"), "# Rhei: W\n").expect("write index");
+        fs::create_dir(root.join("tasks")).expect("tasks dir");
+        fs::write(root.join("tasks/01.md"), "### Task 1: A\n\n**State:** open\n").expect("task");
+        fs::write(root.join("tasks/01.rhei.md"), "### Task 2: B\n\n**State:** open\n").expect("task");
+        let loaded = load_plan(root).expect("load workspace");
+        assert_eq!(loaded.document_role(&root.join("index.rhei.md")), PlanFileKind::Plan);
+        assert_eq!(loaded.document_role(Path::new("plan.rhei.md")), PlanFileKind::Plan);
+        assert_eq!(loaded.document_role(&root.join("tasks/01.md")), PlanFileKind::TaskFile);
+        assert_eq!(loaded.document_role(&root.join("tasks/01.rhei.md")), PlanFileKind::TaskFile);
     }
 }

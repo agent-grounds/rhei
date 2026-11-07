@@ -14,7 +14,7 @@
 // §FS-rhei-run-report.3.1 §FS-rhei-budgets.8 §FS-rhei-budgets.3.4 §FS-rhei-run.3.4
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::budget_support::*;
@@ -204,4 +204,234 @@ fn a_run_that_starts_on_a_spent_bound_names_it_rather_than_never_scheduled() {
             "the ledger explains it the way Attention does:\n{report}"
         );
     }
+}
+
+/// Two tickets on the built-in machine, whose initial state `pending` reads as
+/// manual-only, with an agent configured, so `rhei run` does start them.
+const TWO_PENDING_TASKS: &str = r#"# Rhei: Manual
+
+## Tasks
+
+### Task 1: First
+**State:** pending
+
+### Task 2: Second
+**State:** pending
+"#;
+
+/// A workspace whose plan runs on the built-in machine: no `states.yaml` beside it
+/// for rhei to find, and no `--state-machine`, which [`run_at`] always passes.
+fn setup_on_the_default_machine(prefix: &str, extra: &str) -> (TestDir, PathBuf) {
+    let (dir, plan, machine) = setup(prefix, FINISHING_MACHINE, extra);
+    fs::remove_file(machine).expect("remove the machine setup wrote");
+    write_fixture_file(&dir, "plan.rhei.md", TWO_PENDING_TASKS);
+    (dir, plan)
+}
+
+fn run_on_the_default_machine(plan: &Path) -> CliRun {
+    let root = plan.parent().expect("plan has a parent");
+    let mut cmd: Command = rhei_command(home_for(root));
+    cmd.arg("run").arg(plan).arg("--no-tui").arg("--no-callbacks");
+    cmd.env("RHEI_BUDGET_NOW", NOON);
+    CliRun::from(&cmd.output().expect("rhei run should run"))
+}
+
+/// The ticket named by a `budget_halt` record has the bound's row, not the row
+/// telling the reader to claim it by hand, which would not release it.
+fn assert_refused_ticket_names_the_bound(root: &Path, task: &str, bound: &str) -> String {
+    let events = fs::read_to_string(root.join("runtime/events.jsonl")).expect("read events");
+    let refused = format!(r#""task":"{task}""#);
+    assert!(
+        events.lines().any(|line| line.contains("budget_halt") && line.contains(&refused)),
+        "a bound refused {task}:\n{events}"
+    );
+    let (blocker, next) = attention_row(root, task);
+    assert!(blocker.contains(bound), "the blocker names the bound {bound:?}: {blocker:?}");
+    for wrong in ["rhei next", "manual-only"] {
+        let row = format!("{blocker} | {next}");
+        assert!(!row.contains(wrong), "the row still gives {wrong:?}: {row:?}");
+    }
+    next
+}
+
+/// `plan.1` is not asserted on: no bound refused it, and its row is its own matter.
+#[test]
+fn a_window_halt_on_the_default_machine_is_not_read_as_manual_only() {
+    let (dir, plan) = setup_on_the_default_machine(
+        "budget-attention-manual-window",
+        r#", "invocations_per_day": 1"#,
+    );
+
+    let result = run_on_the_default_machine(&plan);
+
+    assert!(!result.status.success(), "a run ending with a halted ticket exits non-zero");
+    assert_spawn_count(&dir, 1, "the day's allowance buys one invocation");
+    let next = assert_refused_ticket_names_the_bound(&dir, "plan.2", "1 (machine)");
+    assert_eq!(next, "renews automatically");
+    let (blocker, _) = attention_row(&dir, "plan.2");
+    assert!(blocker.contains(RENEWAL), "the blocker names when it renews: {blocker:?}");
+}
+
+#[test]
+fn a_lifetime_halt_on_the_default_machine_is_not_read_as_manual_only() {
+    let (dir, plan) = setup_on_the_default_machine("budget-attention-manual-lifetime", "");
+    budget_init_invocations(&plan, "1");
+
+    let result = run_on_the_default_machine(&plan);
+
+    assert!(!result.status.success(), "a run ending with a halted ticket exits non-zero");
+    assert_spawn_count(&dir, 1, "the allowance buys one invocation");
+    let record = halt_record(&dir);
+    assert_eq!(record["mode"], "lifetime", "the allowance limited, not a window");
+    let next = assert_refused_ticket_names_the_bound(&dir, "plan.2", "1 (account)");
+    assert!(next.contains("rhei budget adjust"), "the audited command: {next:?}");
+    assert_eq!(next, record["remedy"].as_str().expect("a remedy"));
+}
+
+/// An agent for a supervised plan: every visit ends with the ticket's own account,
+/// so what stops the chain is the bound and not a missing result.
+const SUPERVISED_AGENT: &str = r#"root = pathlib.Path(env('RHEI_ROOT'))
+append(root / 'runtime' / 'spawn-count.log', '{} {}\n'.format(env('RHEI_TASK_ID'), env('RHEI_STATE')))
+write(root / 'runtime' / '{}.md'.format(env('RHEI_STATE')), '{}\n'.format(env('RHEI_STATE')))
+result('done\n')
+"#;
+
+const SUPERVISED_PLAN: &str = r#"# Rhei: Supervised
+
+## Tasks
+
+### Task 1: Parent
+**State:** supervising
+
+#### Task 1.1: First
+**State:** work
+
+#### Task 1.2: Second
+**State:** work
+**Prior:** 1.1
+
+#### Task 1.3: Third
+**State:** work
+**Prior:** 1.2
+"#;
+
+const SUPERVISING_MACHINE: &str = r#"name: budget-supervising
+version: 1
+states:
+  supervising:
+    initial: true
+    execute_on: child-terminal
+    description: Supervise
+    agent: mock
+    visits: 12
+  work:
+    description: Work
+    agent: mock
+  completed: { description: Done, final: true }
+  cancelled: { description: Stop, final: true }
+transitions:
+  - { from: supervising, to: completed, condition: 'openDescendants < 1', description: Done }
+  - { from: supervising, to: supervising, description: Release }
+  - { from: work, to: completed, description: Done }
+  - { from: work, to: cancelled, description: Stop }
+  - { from: supervising, to: cancelled, description: Stop }
+"#;
+
+/// A subtree that closes when its one child finishes, so nothing is left to say
+/// but that the machine cannot finish the supervisor.
+const ONE_CHILD_PLAN: &str = r#"# Rhei: One child
+
+## Tasks
+
+### Task 1: Parent
+**State:** supervising
+
+#### Task 1.1: First
+**State:** work
+"#;
+
+/// The same machine with no `openDescendants` edge reaching a final state.
+const NO_TERMINAL_EDGE_MACHINE: &str = r#"name: budget-no-terminal-edge
+version: 1
+states:
+  supervising:
+    initial: true
+    execute_on: child-terminal
+    description: Supervise
+    agent: mock
+    visits: 12
+  work:
+    description: Work
+    agent: mock
+  completed: { description: Done, final: true }
+  cancelled: { description: Stop, final: true }
+transitions:
+  - { from: supervising, to: supervising, description: Release }
+  - { from: work, to: completed, description: Done }
+  - { from: supervising, to: cancelled, description: Stop, condition: 'visitCount >= 99' }
+"#;
+
+/// The day's two invocations go on the supervisor's first visit and its first
+/// child, so the wake-up that child's finish asks for is what the bound refuses.
+fn supervisor_refused_on_its_wake_up(
+    prefix: &str,
+    machine: &str,
+    tasks: &str,
+) -> (TestDir, CliRun) {
+    let (dir, plan, machine) =
+        setup_with_agent(prefix, machine, SUPERVISED_AGENT, r#", "invocations_per_day": 2"#);
+    write_fixture_file(&dir, "plan.rhei.md", tasks);
+    let result = run_plan(&plan, &machine, Some(NOON));
+    assert_eq!(spawns(&dir), ["plan.1 supervising", "plan.1.1 work"], "{}", result.stderr);
+    assert_eq!(halt_record(&dir)["task"], "plan.1", "the wake-up is what the bound refused");
+    (dir, result)
+}
+
+/// The supervisor needs only the next day. What it holds is truly held, by it, so
+/// the descendants stay in Waiting rather than being called halted themselves.
+// §FS-rhei-supervision.3.4
+#[test]
+fn a_supervisor_refused_on_its_wake_up_names_the_bound_over_its_held_descendants() {
+    let (dir, result) = supervisor_refused_on_its_wake_up(
+        "budget-attention-wake-up",
+        SUPERVISING_MACHINE,
+        SUPERVISED_PLAN,
+    );
+
+    assert!(!result.status.success(), "a run ending with a halted ticket exits non-zero");
+    let (blocker, next) = attention_row(&dir, "plan.1");
+    assert!(blocker.contains("project invocations"), "the dimension: {blocker:?}");
+    assert!(blocker.contains("2 (machine)"), "the bound and its source: {blocker:?}");
+    assert!(blocker.contains(RENEWAL), "the blocker names when it renews: {blocker:?}");
+    assert_eq!(next, "renews automatically");
+    let report = report(&dir);
+    let waiting = section(&report, "Waiting");
+    for task in ["plan.1.2", "plan.1.3"] {
+        assert!(
+            waiting.lines().any(|line| {
+                line.contains(task) && line.contains("held by supervisor Task plan.1")
+            }),
+            "{task} is held by the supervisor:\n{report}"
+        );
+    }
+}
+
+/// The one reading a refused start does leave that keeps its row: a machine defect
+/// no renewal cures, where `renews automatically` would promise a resumption that
+/// cannot finish the ticket. `## Bounds` still says what refused the visit.
+#[test]
+fn a_supervisor_with_no_terminal_edge_keeps_that_row_when_a_bound_refuses_it() {
+    let (dir, _) = supervisor_refused_on_its_wake_up(
+        "budget-attention-no-edge",
+        NO_TERMINAL_EDGE_MACHINE,
+        ONE_CHILD_PLAN,
+    );
+
+    let (blocker, next) = attention_row(&dir, "plan.1");
+    assert!(blocker.contains("no `openDescendants` transition"), "the defect: {blocker:?}");
+    assert!(next.contains("openDescendants"), "the edge to add: {next:?}");
+    assert_ne!(next, "renews automatically");
+    let report = report(&dir);
+    let halt = "- `plan.1` was stopped by its project invocations bound";
+    assert!(section(&report, "Bounds").contains(halt), "## Bounds lists the halt:\n{report}");
 }

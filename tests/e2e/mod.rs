@@ -99,6 +99,7 @@ mod diagnostic_wrap_tests;
 mod effort_invocation_tests;
 mod effort_state_tests;
 mod effort_support;
+mod effort_version_tests;
 mod entry_log_restart_tests;
 mod entry_log_support;
 mod entry_log_tests;

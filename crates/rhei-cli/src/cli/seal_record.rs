@@ -188,12 +188,6 @@ fn owner_executable(_meta: &fs::Metadata) -> Option<bool> {
 /// by path. §FS-rhei-seal.4
 fn seal_changes(sealed: &SealSnapshot, current: &SealSnapshot) -> Vec<SealChange> {
     let mut changes = Vec::new();
-    // §FS-rhei-seal.4: a rhei that gained or lost a machine of its own.
-    match (&sealed.machine, &current.machine) {
-        (None, Some(path)) => changes.push(SealChange { path: path.clone(), kind: "added" }),
-        (Some(path), None) => changes.push(SealChange { path: path.clone(), kind: "deleted" }),
-        _ => {}
-    }
     let dirs: BTreeSet<&String> = sealed.directories.keys().chain(current.directories.keys()).collect();
     for dir in dirs {
         let was = sealed.directories.get(dir).copied().unwrap_or(false);
@@ -209,6 +203,16 @@ fn seal_changes(sealed: &SealSnapshot, current: &SealSnapshot) -> Vec<SealChange
         if let Some(kind) = seal_entry_change(was, is) {
             changes.push(SealChange { path: path.clone(), kind });
         }
+    }
+    // §FS-rhei-seal.4: a rhei that gained or lost a machine of its own, once. The loop's kind
+    // stands, as it describes the bytes; this speaks only when the loop was silent (a missing file).
+    let machine = match (&sealed.machine, &current.machine) {
+        (None, Some(path)) => Some((path, "added")),
+        (Some(path), None) => Some((path, "deleted")),
+        _ => None,
+    };
+    if let Some((path, kind)) = machine.filter(|(path, _)| !changes.iter().any(|c| c.path == **path)) {
+        changes.push(SealChange { path: path.clone(), kind });
     }
     changes.sort_by(|a, b| a.path.cmp(&b.path));
     changes

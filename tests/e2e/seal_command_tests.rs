@@ -132,7 +132,6 @@ fn rhei_seal_refuses_while_a_run_is_live_and_names_it() {
 /// listing says so once.
 // §FS-rhei-seal.5 §FS-rhei-seal.4
 #[test]
-#[ignore = "red until #584: a lost machine is listed twice; implement removes this"]
 fn a_rhei_that_loses_its_machine_lists_it_once() {
     let plan = OptionalMachine::lay("seal-lost-machine");
     assert_success(&plan.seal_with_machine());
@@ -150,7 +149,6 @@ fn a_rhei_that_loses_its_machine_lists_it_once() {
 /// Sealing under the machine again accepts one file, and the listing says so once.
 // §FS-rhei-seal.5 §FS-rhei-seal.4
 #[test]
-#[ignore = "red until #584: a gained machine is listed twice; implement removes this"]
 fn a_rhei_that_gains_its_machine_lists_it_once() {
     let plan = OptionalMachine::lay("seal-gained-machine");
     plan.sealed_then_lost();

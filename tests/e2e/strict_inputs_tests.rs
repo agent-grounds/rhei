@@ -119,7 +119,6 @@ fn a_json_refusal_carries_a_stable_reason_code_and_the_changed_paths() {
 /// and the refusal lists that one file once.
 // §FS-rhei-seal.8.4 §FS-rhei-seal.4
 #[test]
-#[ignore = "red until #584: the refusal lists a gained machine twice; implement removes this"]
 fn a_strict_refusal_lists_a_gained_machine_once() {
     let plan = OptionalMachine::lay("strict-gained-machine");
     plan.sealed_then_lost();
@@ -137,7 +136,6 @@ fn a_strict_refusal_lists_a_gained_machine_once() {
 /// input, not two.
 // §FS-rhei-seal.8.4 §FS-rhei-run-json.2.1
 #[test]
-#[ignore = "red until #584: seal_halt carries a gained machine twice; implement removes this"]
 fn a_json_refusal_carries_a_gained_machine_once() {
     let plan = OptionalMachine::lay("strict-gained-machine-json");
     plan.sealed_then_lost();

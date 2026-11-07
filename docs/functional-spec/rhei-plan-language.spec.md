@@ -717,9 +717,10 @@ This is the language's only definition of a fence, and every reader of a plan
 resolves it the same way — the structural scan that decides which `## ` lines
 are chapters and which `### <kind> <id>: ` lines are task nodes, the link
 checker that decides which links are references ([§FS-rhei-plan-language.3.6](rhei-plan-language.spec.md#36-link-integrity)),
-and the result-block scan of section 3.8 alike. A plan must never be read by two
-different fence rules, because the same line would then be structure to one
-reader and content to another.
+the result-block scan of section 3.8, and the rewrite `rhei reset` makes of a plan
+file ([§FS-rhei-reset.2.4](rhei-reset.spec.md#24-fenced-lines)) alike. A plan must never be read by two different
+fence rules, because the same line would then be structure to one reader and
+content to another.
 
 Two consequences are normative, and an implementation is held to them:
 

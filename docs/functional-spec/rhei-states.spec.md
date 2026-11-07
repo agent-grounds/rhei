@@ -69,17 +69,33 @@ Examples:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | Yes | The machine's human-readable name |
-| `version` | number or string | Yes | The machine's version, kept as written |
+| `version` | number or string | Yes | The machine's version, kept as written; also selects the compatibility boundary described below. |
 | `states` | map of state name to state definition | Yes | The allowed states, in the order written. See [States](#10-states). |
 | `transitions` | array of transition rules | No | The declared transitions between states; none when omitted. See [Transitions](#11-transitions). |
 | `models` | string array | No | The complete set of model profile identifiers available to the machine |
-| `profiles` | map of name to `{initial, allowed}` | Yes | Named, reusable state profiles. Each profile declares the `initial` state and the `allowed` state subset for any node assigned to it. Referenced by `node_policy`. |
-| `node_policy` | object | Yes | Maps nodes to profiles. Must define `root` (the Panta project root) and `default`. Optionally defines `rhei` (the rhei tier), `by_type`, and `overrides`. See [Node Policy](#9-node-policy). |
+| `profiles` | map of name to `{initial, allowed}` | Conditional; see below | Named, reusable state profiles. Each profile declares the `initial` state and the `allowed` state subset for any node assigned to it. Referenced by `node_policy`. |
+| `node_policy` | object | Conditional; see below | Maps nodes to profiles. Must define `root` (the Panta project root) and `default`. Optionally defines `rhei` (the rhei tier), `by_type`, and `overrides`. See [Node Policy](#9-node-policy). |
 
-The `profiles` and `node_policy` blocks replace the earlier per-state
-`initial: true` boolean. A state definition no longer carries its own initial
-flag; the initial state is a property of each profile, so different node kinds
-can start in different states within the same state machine.
+The `profiles` and `node_policy` blocks must appear together at every version.
+In a machine with both blocks (a **profiled machine**), they replace the
+per-state `initial: true` boolean: the initial state belongs to each profile,
+so different node kinds can start in different states within the same machine.
+
+For compatibility, a **legacy machine** omits both blocks and may mark a
+state with `initial: true`. This shape is accepted unless `version` yields a
+major of at least 3. In particular, complete legacy machines at versions 1
+and 2 load; at version 3 they are refused. Profiled machines are accepted at
+versions 1 and 2 as well as 3, subject to the validation rules below.
+
+The compatibility gate reads numeric and string versions differently. A
+non-negative whole numeric value supplies its value as the major (`3` and
+`3.0` both yield 3); a fractional or negative numeric value yields no major.
+For a string, only the component before the first `.` is parsed as an
+unsigned 64-bit integer; the remaining components are not validated. Thus
+`"3.1"` requires both blocks, but numeric `3.1` does not. A string whose first
+component cannot be parsed (for example `"v3"`) yields no major. When no major
+is obtained, the legacy shape remains accepted. This is a compatibility
+check, not semantic-version validation.
 
 ### 1.2. Per-state fields
 
@@ -120,7 +136,10 @@ implicit rather than declared: see [Terminal Result](#33-terminal-result).
 
 ### 1.3. Validation Rules
 
-- `profiles` must be present and non-empty. Each entry must declare `initial`
+- `profiles` and `node_policy` must either both be present or both be absent;
+  omission of both is permitted only by the compatibility boundary in
+  [§FS-rhei-states.1.1](#11-top-level-fields).
+- In a profiled machine, `profiles` must be non-empty. Each entry must declare `initial`
   (a state name) and `allowed` (a list of state names). See
   [Profiles](#8-profiles) for per-profile validation.
 - `states.yaml` must not declare a top-level `prompt_templates` block.
@@ -139,13 +158,14 @@ implicit rather than declared: see [Terminal Result](#33-terminal-result).
   `prompt_template.values` map. Runtime variables are used by assigning them as
   values, for example `task_id: "{task_id}"`. Non-identifier brace content such
   as JSON examples is literal.
-- `node_policy.root` and `node_policy.default` are required and must name
+- In a profiled machine, `node_policy.root` and `node_policy.default` are required and must name
   defined profiles. `node_policy.by_type`, when present, maps each declared
   non-root node kind to a defined profile. `node_policy.overrides`, when
   present, is an ordered list of `{match, profile}` entries. See
   [Node Policy](#9-node-policy) for resolution and validation rules.
-- A state definition must not declare `initial: true`. The initial state is
-  a property of each profile, not of the state itself.
+- In a profiled machine, a state definition must not declare `initial: true`,
+  regardless of version. The initial state is a property of each profile.
+  Legacy machines may retain the per-state flag.
 - `state.target`, when present, must be a non-empty string matching one of:
   `<agent>:<model>`, `<agent>[<mode>]:<model>`,
   `<agent>:<provider>:<model>`, or
@@ -1304,6 +1324,10 @@ A **profile** is a named bundle of `{initial, allowed}` that defines a
 per-node state policy. Profiles are defined once at the top level of the
 state machine YAML and referenced from `node_policy`.
 
+This section describes profiled machines. Legacy machines may omit both
+blocks under [§FS-rhei-states.1.1](#11-top-level-fields); their initial state
+is selected by the per-state flag instead.
+
 Separating policy from state definitions means:
 
 - One canonical definition of each state and transition.
@@ -1378,6 +1402,10 @@ explicitly.
 `node_policy` maps each node in a plan to a profile. Its keys are the required
 `root` (the Panta project root, [§FS-rhei-panta](rhei-panta.spec.md#fs-rhei-panta-panta-the-project-root-above-all-rheis)) and `default`, and the optional
 `rhei` (the rhei tier), `by_type`, and `overrides`.
+
+These rules apply when the block is present. A legacy machine omits it
+together with `profiles` under [§FS-rhei-states.1.1](#11-top-level-fields)
+and has no node-to-profile mapping.
 
 ### 9.1. Shape
 

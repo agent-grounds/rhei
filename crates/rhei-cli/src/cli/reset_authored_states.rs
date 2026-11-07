@@ -90,7 +90,7 @@ fn reset_destination(
 fn shows_run_trace(task: &rhei_core::ast::Task, normalized_state: &str) -> bool {
     task.assignee.is_some()
         || task.state.as_str() != normalized_state
-        || task.content.contains("> **Result:**")
+        || has_result_link(&task.content) // §FS-rhei-reset.2.4
 }
 
 /// Recover every in-scope task's authored state from the ledger of the

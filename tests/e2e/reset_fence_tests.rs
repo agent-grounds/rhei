@@ -181,14 +181,12 @@ impl Authored {
 
 /// The report's case 1.
 #[test]
-#[ignore = "red until #580: a fenced task heading stops a reset of a single-file plan; implement removes this"]
 fn a_fenced_task_heading_with_no_state_line_does_not_stop_a_reset_of_a_single_file() {
     Authored::quoting_in_a_file("reset-fence-heading-file", QUOTED_TASK).assert_round_trip();
 }
 
 /// The fence is the last thing in the file, so the refusal has another wording here.
 #[test]
-#[ignore = "red until #580: a fenced task heading stops a reset of a workspace; implement removes this"]
 fn a_fenced_task_heading_last_in_a_task_file_does_not_stop_a_reset_of_a_workspace() {
     Authored::quoting_in_a_workspace("reset-fence-heading-ws", QUOTED_TASK).assert_round_trip();
 }
@@ -196,7 +194,6 @@ fn a_fenced_task_heading_last_in_a_task_file_does_not_stop_a_reset_of_a_workspac
 /// The report's case 3: the quotation is in a file with no task the reset moves, and
 /// the file before it holds one.
 #[test]
-#[ignore = "red until #580: a fence in a file nothing moved in stops a workspace reset; implement removes this"]
 fn a_fence_in_a_task_file_with_no_moved_task_does_not_stop_a_reset_of_a_workspace() {
     let first = "### Task 1: Finished\n**State:** open\n";
     let second = format!("### Task 2: Quotes\n**State:** open\n\n{QUOTED_TASK}\n");
@@ -208,7 +205,6 @@ fn a_fence_in_a_task_file_with_no_moved_task_does_not_stop_a_reset_of_a_workspac
 /// The report's case 4, which nothing reports: the reset exits 0 and the lines are
 /// gone. A real result link and a real claim are in the same plan, and still go.
 #[test]
-#[ignore = "red until #580: a reset that exits 0 deletes fenced result and assignee lines; implement removes this"]
 fn fenced_result_and_assignee_lines_survive_a_reset_of_a_single_file_that_clears_real_ones() {
     let plan = Authored::quoting_in_a_file("reset-fence-runtime-file", QUOTED_RUNTIME_LINES);
     plan.finish_the_first_task();
@@ -221,7 +217,6 @@ fn fenced_result_and_assignee_lines_survive_a_reset_of_a_single_file_that_clears
 }
 
 #[test]
-#[ignore = "red until #580: a workspace reset that exits 0 deletes fenced result and assignee lines; implement removes this"]
 fn fenced_result_and_assignee_lines_survive_a_reset_of_a_workspace() {
     Authored::quoting_in_a_workspace("reset-fence-runtime-ws", QUOTED_RUNTIME_LINES)
         .assert_round_trip();
@@ -230,14 +225,12 @@ fn fenced_result_and_assignee_lines_survive_a_reset_of_a_workspace() {
 /// A quoted heading naming the very task that moved, with a state under it. The real
 /// line goes back and the quotation does not, on a reset that exits 0 either way.
 #[test]
-#[ignore = "red until #580: a reset rewrites a fenced state line under a fenced heading of a moved task; implement removes this"]
 fn a_fenced_state_line_under_a_heading_naming_a_moved_task_is_not_rewritten_in_a_file() {
     let quote = "```markdown\n### Task 1: Example\n**State:** done\n```";
     Authored::quoting_in_a_file("reset-fence-moved-file", quote).assert_round_trip();
 }
 
 #[test]
-#[ignore = "red until #580: a workspace reset rewrites a fenced state line of a moved task; implement removes this"]
 fn a_fenced_state_line_under_a_heading_naming_a_moved_task_is_not_rewritten_in_a_workspace() {
     let quote = "```markdown\n### Task 1: Example\n**State:** done\n```";
     Authored::quoting_in_a_workspace("reset-fence-moved-ws", quote).assert_round_trip();
@@ -245,7 +238,6 @@ fn a_fenced_state_line_under_a_heading_naming_a_moved_task_is_not_rewritten_in_a
 
 /// A tilde fence. A flag flipped on three backticks does not see it.
 #[test]
-#[ignore = "red until #580: a reset does not read a tilde fence; implement removes this"]
 fn a_tilde_fence_is_a_fence_to_a_reset_of_a_single_file() {
     let quote = format!("~~~markdown\n{EVERY_SHAPE}\n~~~");
     Authored::around_a_quote_in_a_file("reset-fence-tilde-file", &quote)
@@ -253,7 +245,6 @@ fn a_tilde_fence_is_a_fence_to_a_reset_of_a_single_file() {
 }
 
 #[test]
-#[ignore = "red until #580: a workspace reset does not read a tilde fence; implement removes this"]
 fn a_tilde_fence_is_a_fence_to_a_reset_of_a_workspace() {
     let quote = format!("~~~markdown\n{EVERY_SHAPE}\n~~~");
     Authored::around_a_quote_in_a_workspace("reset-fence-tilde-ws", &quote)
@@ -263,7 +254,6 @@ fn a_tilde_fence_is_a_fence_to_a_reset_of_a_workspace() {
 /// A longer fence holding a shorter one. A flag flipped on every run of three
 /// backticks closes on the inner line and reads what follows as structure.
 #[test]
-#[ignore = "red until #580: a reset does not nest a shorter fence in a longer one; implement removes this"]
 fn a_four_backtick_fence_holds_an_inner_fence_in_a_reset_of_a_single_file() {
     let quote = format!("````markdown\n```\n{EVERY_SHAPE}\n```\n````");
     Authored::around_a_quote_in_a_file("reset-fence-nested-file", &quote)
@@ -271,7 +261,6 @@ fn a_four_backtick_fence_holds_an_inner_fence_in_a_reset_of_a_single_file() {
 }
 
 #[test]
-#[ignore = "red until #580: a workspace reset does not nest a shorter fence in a longer one; implement removes this"]
 fn a_four_backtick_fence_holds_an_inner_fence_in_a_reset_of_a_workspace() {
     let quote = format!("````markdown\n```\n{EVERY_SHAPE}\n```\n````");
     Authored::around_a_quote_in_a_workspace("reset-fence-nested-ws", &quote)
@@ -282,7 +271,6 @@ fn a_four_backtick_fence_holds_an_inner_fence_in_a_reset_of_a_workspace() {
 /// other character, and not a run carrying an info string. Only Task 1 is finished:
 /// `rhei complete` would not find Task 3 past this fence (agent-grounds/rhei#614).
 #[test]
-#[ignore = "red until #580: a reset closes a fence on a line that does not close it; implement removes this"]
 fn only_a_bare_matching_run_closes_a_fence_to_a_reset() {
     let quote = format!("```\n~~~\n```info\n{EVERY_SHAPE}\n```");
     Authored::around_a_quote_in_a_file("reset-fence-close", &quote).assert_round_trip();
@@ -291,7 +279,6 @@ fn only_a_bare_matching_run_closes_a_fence_to_a_reset() {
 /// An unclosed fence runs to the end of the text that opened it, the next task's
 /// heading and state line with it. They are content, so the reset leaves them.
 #[test]
-#[ignore = "red until #580: a reset reads past an unclosed fence as structure; implement removes this"]
 fn an_unclosed_fence_runs_to_the_end_of_a_single_file() {
     let plan = format!(
         "# Rhei: Plan\n\n## Tasks\n\n### Task 1: Finished\n**State:** open\n\n### Task 2: Quotes\n\
@@ -303,7 +290,6 @@ fn an_unclosed_fence_runs_to_the_end_of_a_single_file() {
 /// In a workspace that text is one task file, so the next file's lines are structure
 /// again: the task there moved, and it goes back.
 #[test]
-#[ignore = "red until #580: a reset stops at an unclosed fence in a workspace task file; implement removes this"]
 fn an_unclosed_fence_runs_to_the_end_of_its_task_file_and_no_further() {
     let first = format!("### Task 2: Quotes\n**State:** open\n\n```markdown\n{EVERY_SHAPE}\n");
     let second = "### Task 1: Finished\n**State:** open\n";
@@ -314,7 +300,6 @@ fn an_unclosed_fence_runs_to_the_end_of_its_task_file_and_no_further() {
 /// The preview is read as a promise about what the reset does, so it reads the fence
 /// the same way, and it changes nothing. §FS-rhei-reset.1.2
 #[test]
-#[ignore = "red until #580: the preview refuses a plan a fence quotes a heading in; implement removes this"]
 fn the_dry_run_reads_a_fence_as_the_reset_does() {
     let plan = Authored::quoting_in_a_file("reset-fence-dry-run", QUOTED_TASK);
     plan.finish_the_first_task();
@@ -349,7 +334,6 @@ fn refused_parent_quoting(name: &str, quote: &str) -> RemedyWorld {
 /// The plan §FS-rhei-reset.2.3 judges is built by the same rewrite, so the refusal is
 /// the one a plan without the quotation gets, and not a failure to read the plan.
 #[test]
-#[ignore = "red until #580: a fenced heading replaces the refusal with a failure to read the plan; implement removes this"]
 fn the_refusal_of_a_reset_that_leaves_an_invalid_plan_reads_a_fence_as_the_reset_does() {
     let world = refused_parent_quoting("reset-fence-refusal", QUOTED_TASK);
 
@@ -363,7 +347,6 @@ fn the_refusal_of_a_reset_that_leaves_an_invalid_plan_reads_a_fence_as_the_reset
 /// The way on the refusal's help names has no line to delete where the only
 /// `> **Result:**` is a quotation. §FS-rhei-reset.4
 #[test]
-#[ignore = "red until #580: the help tells the reader to delete a result line that is only quoted; implement removes this"]
 fn the_refusals_help_does_not_name_a_quoted_result_line_as_one_to_delete() {
     let quote = "```markdown\n> **Result:** runtime/results/plan.7.md\n```";
     let world = refused_parent_quoting("reset-fence-help-quoted", quote);
@@ -380,7 +363,6 @@ fn the_refusals_help_does_not_name_a_quoted_result_line_as_one_to_delete() {
 /// A real link below a fence is still under the task above the fence, so the edit
 /// the help checks clears it, and the help names the edit with the line to delete.
 #[test]
-#[ignore = "red until #580: a fenced heading hides the real result link from the help's edit; implement removes this"]
 fn a_fenced_heading_does_not_take_a_real_result_link_from_the_task_above_it() {
     let quote = "```markdown\n### Task 9: Example\n**State:** open\n```";
     let world = refused_parent_quoting("reset-fence-help-real", quote);
@@ -401,7 +383,6 @@ fn a_fenced_heading_does_not_take_a_real_result_link_from_the_task_above_it() {
 /// pre-authored chain's children look like. A quotation is no trace of a run.
 /// §FS-rhei-reset.2.2
 #[test]
-#[ignore = "red until #580: a quoted result line reads as a trace of having run; implement removes this"]
 fn a_quoted_result_line_is_no_trace_of_a_run() {
     let plan = "# Rhei: Plan\n\n## Tasks\n\n### Task 1: Authored in review\n**State:** review\n\n\
                 ```markdown\n> **Result:** runtime/results/plan.7.md\n```\n";

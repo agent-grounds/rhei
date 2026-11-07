@@ -115,24 +115,28 @@ fn strip_result_links(raw: &str) -> String {
 }
 
 /// [`strip_result_links`], for the lines under a task heading whose file-local id
-/// `under` accepts; `None` is the text before the first heading. §FS-rhei-reset.2.3
+/// `under` accepts; `None` is the text before the first heading. A fence's own lines
+/// are never dropped: the line above one read as structure is outside any fence, since
+/// a fence's last line is the run that closes it. §FS-rhei-reset.2.3 §FS-rhei-reset.2.4
 fn strip_result_links_under(raw: &str, under: impl Fn(Option<&str>) -> bool) -> String {
-    let lines: Vec<&str> = raw.lines().collect();
+    let lines = plan_file_lines(raw);
     let mut result: Vec<String> = Vec::with_capacity(lines.len());
     let mut heading = None;
 
-    for line in &lines {
-        if let Some(task_id) = task_heading_id(line) {
-            heading = Some(task_id);
-        } else if line.trim_start().starts_with("> **Result:**") && under(heading) {
-            // Drop a single trailing blank line accumulated before the result
-            // link so we don't leave a pair of blank lines behind.
-            if matches!(result.last(), Some(last) if last.trim().is_empty()) {
-                result.pop();
+    for (line, structure) in lines {
+        if structure {
+            if let Some(task_id) = task_heading_id(line) {
+                heading = Some(task_id);
+            } else if is_result_link(line) && under(heading) {
+                // Drop a single trailing blank line accumulated before the result
+                // link so we don't leave a pair of blank lines behind.
+                if matches!(result.last(), Some(last) if last.trim().is_empty()) {
+                    result.pop();
+                }
+                continue;
             }
-            continue;
         }
-        result.push((*line).to_string());
+        result.push(line.to_string());
     }
 
     let mut output = result.join("\n");
@@ -142,16 +146,17 @@ fn strip_result_links_under(raw: &str, under: impl Fn(Option<&str>) -> bool) -> 
     output
 }
 
-/// Remove all runtime-owned `**Assignee:** …` lines during reset.
+/// Remove all runtime-owned `**Assignee:** …` lines during reset. A quoted one is
+/// authored text. §FS-rhei-reset.2.4
 fn strip_assignee_lines(raw: &str) -> String {
-    let lines: Vec<&str> = raw.lines().collect();
+    let lines = plan_file_lines(raw);
     let mut result: Vec<String> = Vec::with_capacity(lines.len());
 
-    for line in &lines {
-        if line.starts_with("**Assignee:**") {
+    for (line, structure) in lines {
+        if structure && line.starts_with("**Assignee:**") {
             continue;
         }
-        result.push((*line).to_string());
+        result.push(line.to_string());
     }
 
     let mut output = result.join("\n");
@@ -165,12 +170,12 @@ fn strip_assignee_lines(raw: &str) -> String {
 /// authored in. A task with no recorded authored state never moved, so its
 /// line is already right and is left exactly as written — that is what keeps a
 /// pre-authored chain intact across a reset.
-// §FS-rhei-reset.2.2 §FS-rhei-supervision.7
+// §FS-rhei-reset.2.2 §FS-rhei-reset.2.4 §FS-rhei-supervision.7
 fn rewrite_states_to_authored(
     raw: &str,
     authored: &BTreeMap<String, String>,
 ) -> MietteResult<String> {
-    let lines: Vec<&str> = raw.lines().collect();
+    let lines = plan_file_lines(raw);
     let mut result = Vec::with_capacity(lines.len());
     // The authored state of the heading being read, and `None` once its
     // `**State:**` line has been passed. The outer `Option` is "am I inside a
@@ -178,7 +183,12 @@ fn rewrite_states_to_authored(
     let mut expecting_state: Option<Option<&str>> = None;
     let mut state_lines = 0usize;
 
-    for line in &lines {
+    for (line, structure) in lines {
+        if !structure {
+            result.push(line.to_string());
+            continue;
+        }
+
         if let Some(task_id) = task_heading_id(line) {
             if expecting_state.is_some() {
                 return Err(miette!(
@@ -187,13 +197,13 @@ fn rewrite_states_to_authored(
                 ));
             }
             expecting_state = Some(authored.get(task_id).map(String::as_str));
-            result.push((*line).to_string());
+            result.push(line.to_string());
             continue;
         }
 
         if let Some(authored_state) = expecting_state {
             if !line.starts_with("**State:**") {
-                result.push((*line).to_string());
+                result.push(line.to_string());
                 continue;
             }
             // A task with no recorded history keeps its line verbatim: reset
@@ -201,14 +211,14 @@ fn rewrite_states_to_authored(
             match authored_state {
                 Some(state) => result
                     .push(format!("**State:** {}", format_state_metadata_value(state))),
-                None => result.push((*line).to_string()),
+                None => result.push(line.to_string()),
             }
             expecting_state = None;
             state_lines += 1;
             continue;
         }
 
-        result.push((*line).to_string());
+        result.push(line.to_string());
     }
 
     if expecting_state.is_some() {

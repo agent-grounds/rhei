@@ -319,7 +319,9 @@ pub struct Exhaustion {
 #[derive(Debug, Clone)]
 pub struct BudgetError {
     pub reason_code: String,
-    pub message: String,
+    /// Crate-private with no `Display` outside tests, so a reader outside core can only
+    /// take the whole refusal, with the `forget` it offers. §FS-rhei-budgets.10.1
+    pub(crate) message: String,
     /// Present exactly when a bound is what refused.
     ///
     /// Boxed because every refusal in this module travels in a `Result` and
@@ -409,13 +411,12 @@ impl BudgetError {
     }
 }
 
+#[cfg(test)]
 impl std::fmt::Display for BudgetError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.message)
     }
 }
-
-impl std::error::Error for BudgetError {}
 
 /// An io failure carries no path, so it cannot claim a particular ledger is
 /// damaged: it reports that the account could not be read or written, and the

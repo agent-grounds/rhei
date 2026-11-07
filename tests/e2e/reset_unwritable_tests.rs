@@ -25,7 +25,6 @@ const INDEX_WITH_VISITS: &str =
 
 /// The issue's fixture: the root is read-only, so `runtime/` cannot be removed.
 #[test]
-#[ignore = "red until #609: the issue's fixture, dry run exits 0 and --yes rewrites the task file; implement removes this"]
 fn a_read_only_workspace_root_refuses_the_reset_and_its_dry_run_intact() {
     let world = workspace("reset-unwritable-root", &[A]);
     finish(&world, "1", &[]);
@@ -36,7 +35,6 @@ fn a_read_only_workspace_root_refuses_the_reset_and_its_dry_run_intact() {
 
 /// A second directory of task files, after the first took its write.
 #[test]
-#[ignore = "red until #609: --yes rewrites the first directory and stops at the second; implement removes this"]
 fn a_second_read_only_task_directory_refuses_the_reset_intact() {
     let world = workspace("reset-unwritable-second", &[NESTED_A, NESTED_B]);
     finish(&world, "1", &[]);
@@ -48,7 +46,6 @@ fn a_second_read_only_task_directory_refuses_the_reset_intact() {
 
 /// No `runtime/` here: the index is the one write the root would have to take.
 #[test]
-#[ignore = "red until #609: --yes rewrites the task file and stops at the index; implement removes this"]
 fn an_index_with_runtime_metadata_under_a_read_only_root_refuses_the_reset_intact() {
     let world = workspace("reset-unwritable-index", &[A]);
     lay_sidecars(&world);
@@ -61,7 +58,6 @@ fn an_index_with_runtime_metadata_under_a_read_only_root_refuses_the_reset_intac
 
 /// The root is writable, and the tree still cannot be removed from inside.
 #[test]
-#[ignore = "red until #609: --yes rewrites the plan and stops part way through the tree; implement removes this"]
 fn a_directory_inside_runtime_that_cannot_be_emptied_refuses_the_reset_intact() {
     let world = workspace("reset-unwritable-runtime", &[A]);
     finish(&world, "1", &[]);
@@ -74,7 +70,6 @@ fn a_directory_inside_runtime_that_cannot_be_emptied_refuses_the_reset_intact() 
 /// list it too. A directory that takes a file and cannot be listed therefore fails the
 /// removal after every plan file was written, and the check has to see it.
 #[test]
-#[ignore = "red until #609: --yes rewrites the plan, then cannot list the tree; implement removes this"]
 fn a_directory_inside_runtime_that_cannot_be_listed_refuses_the_reset_intact() {
     use std::os::unix::fs::PermissionsExt;
 
@@ -114,7 +109,6 @@ fn a_directory_inside_runtime_that_cannot_be_listed_refuses_the_reset_intact() {
 
 /// Every directory that fails is named, so one chmod is not followed by another refusal.
 #[test]
-#[ignore = "red until #609: no refusal exists, --yes stops at the first directory; implement removes this"]
 fn a_refusal_names_every_directory_that_fails() {
     let world = workspace("reset-unwritable-every", &[NESTED_A, NESTED_B]);
     finish(&world, "1", &[]);
@@ -127,7 +121,6 @@ fn a_refusal_names_every_directory_that_fails() {
 
 /// A member's root read-only under a project reset, after the other member was written.
 #[test]
-#[ignore = "red until #609: --yes rewrites both members' tasks and stops at an index; implement removes this"]
 fn a_read_only_member_root_refuses_a_project_reset_intact() {
     let world = project_of_workspaces("reset-unwritable-member", &["alpha", "beta"]);
     finish(&world, "alpha.1", &[]);
@@ -140,7 +133,6 @@ fn a_read_only_member_root_refuses_a_project_reset_intact() {
 /// The lock a reset would create is a write too. The real reset stops there having
 /// changed nothing, so the dry run has to say the same.
 #[test]
-#[ignore = "red until #609: dry run exits 0 over a lock --yes cannot create; implement removes this"]
 fn a_lock_sidecar_that_cannot_be_created_refuses_the_dry_run_too() {
     let world = workspace("reset-unwritable-sidecar", &[NESTED_A, NESTED_B]);
     finish(&world, "1", &[]);
@@ -152,7 +144,6 @@ fn a_lock_sidecar_that_cannot_be_created_refuses_the_dry_run_too() {
 
 /// The other side: a read-only directory of files the reset leaves as they are.
 #[test]
-#[ignore = "red until #609: --yes writes a file it did not change, so it stops there; implement removes this"]
 fn a_read_only_directory_of_unchanged_files_does_not_refuse_the_reset() {
     let world = workspace("reset-unwritable-unchanged", &[NESTED_A, NESTED_B]);
     lay_sidecars(&world);
@@ -170,7 +161,6 @@ fn a_read_only_directory_of_unchanged_files_does_not_refuse_the_reset() {
 /// The index with nothing to clear and no `runtime/`: a read-only root has nothing to
 /// take, while the task file still loses its claim.
 #[test]
-#[ignore = "red until #609: --yes writes an unchanged index, so it stops there; implement removes this"]
 fn a_read_only_root_with_an_unchanged_index_and_no_runtime_does_not_refuse_the_reset() {
     let world = workspace("reset-unwritable-index-unchanged", &[A]);
     lay_sidecars(&world);
@@ -185,7 +175,6 @@ fn a_read_only_root_with_an_unchanged_index_and_no_runtime_does_not_refuse_the_r
 
 /// A plan a reset has nothing to do to, in directories that would refuse everything.
 #[test]
-#[ignore = "red until #609: --yes writes files it did not change, so it stops; implement removes this"]
 fn a_plan_with_nothing_to_reset_finishes_under_read_only_directories() {
     let world = workspace("reset-unwritable-nothing", &[A]);
     lay_sidecars(&world);
@@ -196,6 +185,22 @@ fn a_plan_with_nothing_to_reset_finishes_under_read_only_directories() {
     assert_finishes(&world, &[]);
 
     assert_eq!(snapshot(&world), before, "nothing needed writing");
+}
+
+/// An empty read-only directory inside the tree holds nothing to remove from itself,
+/// and removing the tree takes it anyway, so it refuses nothing. Passes today, and must
+/// keep passing.
+#[test]
+fn an_empty_read_only_directory_inside_runtime_does_not_refuse_the_reset() {
+    let world = workspace("reset-unwritable-empty", &[A]);
+    finish(&world, "1", &[]);
+    fs::create_dir_all(world.root.join("runtime/empty")).expect("an empty directory");
+    let Some(_empty) = read_only(&world, "runtime/empty") else { return };
+
+    assert_finishes(&world, &[]);
+
+    assert_eq!(listed_state(&world, "ws.1"), "open", "the task goes back");
+    assert!(!world.root.join("runtime").exists(), "the tree is gone");
 }
 
 /// The rename a write ends in asks the directory, not the file, so a read-only plan
@@ -256,7 +261,6 @@ fn world_with_a_large_task(name: &str, large: &str, small: &str) -> RemedyWorld 
 /// `a_witness_write_cut_short_leaves_both_files_as_they_were` says of this limit.
 #[cfg(target_os = "linux")]
 #[test]
-#[ignore = "red until #609: the error does not say the plan is partly reset; implement removes this"]
 fn a_write_failing_after_the_first_landed_says_partly_reset_and_a_second_reset_finishes() {
     let world = world_with_a_large_task(
         "reset-unwritable-partway",

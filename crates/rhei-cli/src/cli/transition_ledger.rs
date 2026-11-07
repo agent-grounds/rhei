@@ -127,6 +127,11 @@ struct LockedTransitionLedger {
     journal: LockedRuntimeJournal,
 }
 
+/// Whether pruning `task_ids` keeps this ledger line. §FS-rhei-reset.2.1
+fn ledger_line_is_kept(line: &str, task_ids: &BTreeSet<String>) -> bool {
+    !task_ids.contains(line.split_whitespace().next().unwrap_or_default())
+}
+
 impl LockedTransitionLedger {
     /// Acquire the stable synchronization identity without creating or opening
     /// the replaceable runtime tree. Reset retains this form through cleanup;
@@ -185,10 +190,7 @@ impl LockedTransitionLedger {
         rhei_core::transition_history::parse(&raw).map_err(|err| ledger_report(&path, err))?;
         let kept = raw
             .lines()
-            .filter(|line| {
-                let id = line.split_whitespace().next().unwrap_or_default();
-                !task_ids.contains(id)
-            })
+            .filter(|line| ledger_line_is_kept(line, task_ids))
             .collect::<Vec<_>>();
         if kept.len() == raw.lines().count() {
             return Ok(false);

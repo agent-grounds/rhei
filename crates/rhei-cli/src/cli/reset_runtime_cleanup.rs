@@ -71,6 +71,10 @@ fn collect_reset_decision(
     if let Some(refusal) = reset_refusal(loaded, input, scope, machines, &authored)? {
         return Err(refusal.report());
     }
+    // So is one the filesystem would stop, with the same text from both runs. §FS-rhei-reset.2.3
+    if let Some(refusal) = reset_filesystem_refusal(loaded, input, scope, machines, &authored)? {
+        return Err(refusal);
+    }
     Ok(ResetDecision {
         scope: scope.clone(),
         task_count,
@@ -130,19 +134,24 @@ enum ScopedTarget {
     Prefixed { dir: PathBuf, prefix: String },
 }
 
-/// Remove everything keyed by an in-scope ticket id — results, logs, declared
-/// artifacts, snapshots, worktree refs, accounting, ledger lines — and nothing
-/// else: sibling rheis share one execution root. §FS-rhei-reset.2.1
-fn remove_scoped_runtime_artifacts(
+/// Everything keyed by an in-scope ticket id that a narrowed reset removes, and
+/// nothing else: sibling rheis share one execution root. §FS-rhei-reset.2.1
+struct ScopedRemovals {
+    targets: Vec<ScopedTarget>,
+    /// Ledger lines are pruned per execution root, once, after the per-ticket
+    /// sweep: sibling rheis share one `state-transitions.log`.
+    ledgers: BTreeMap<PathBuf, BTreeSet<String>>,
+}
+
+/// The one enumeration of [`ScopedRemovals`], for the removal and for the check that it
+/// can be made. §FS-rhei-reset.2.1 §FS-rhei-reset.2.3
+fn scoped_removals(
     loaded: &LoadedPlan,
     input: &Path,
     scope: &RheiScope,
     machines: &rhei_validator::MachineSet,
-    reset_locks: &mut ResetWriterLocks,
-    // Every file removed, for the reset event. §FS-rhei-evidence.10.1
-    removed_paths: &mut Vec<PathBuf>,
-) -> MietteResult<bool> {
-    let mut removed = false;
+) -> ScopedRemovals {
+    let mut targets = Vec::new();
     let mut task_ids: Vec<String> = Vec::new();
     fn collect(task: &rhei_core::ast::Task, out: &mut Vec<String>) {
         out.push(task.id.to_string());
@@ -154,9 +163,7 @@ fn remove_scoped_runtime_artifacts(
         collect(task, &mut task_ids);
     }
 
-    // Ledger lines are pruned per execution root, once, after the per-ticket
-    // sweep: sibling rheis share one `state-transitions.log`.
-    let mut ledger_roots: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
+    let mut ledgers: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
 
     // Pre-qualification runtime records are keyed by the rhei-local id; a
     // local-id sweep at a root is only unambiguous when every rhei rooted
@@ -178,7 +185,7 @@ fn remove_scoped_runtime_artifacts(
     let project_root = execution_workspace_root(input);
     for task_id in task_ids.iter().filter(|id| task_in_rhei_scope(scope, id)) {
         let root = loaded.task_root(task_id, input);
-        let ledger_ids = ledger_roots.entry(root.clone()).or_default();
+        let ledger_ids = ledgers.entry(root.clone()).or_default();
         ledger_ids.insert(task_id.clone());
         let local_id = rhei_local_id_str(task_id);
         if local_id != task_id && legacy_sweep_ok(&root) {
@@ -196,19 +203,34 @@ fn remove_scoped_runtime_artifacts(
             // Artifact-name patterns come from the owning ticket's machine.
             // §DA-per-rhei-state-machines
             let machine = machines.for_task_str(task_id);
-            for target in scoped_runtime_targets(&runtime, task_id, machine) {
-                removed |= remove_scoped_target(&target, removed_paths)?;
-            }
+            targets.extend(scoped_runtime_targets(&runtime, task_id, machine));
             if local_id != task_id && legacy_sweep_ok(&base) {
-                for target in scoped_runtime_targets(&runtime, local_id, machine) {
-                    removed |= remove_scoped_target(&target, removed_paths)?;
-                }
+                targets.extend(scoped_runtime_targets(&runtime, local_id, machine));
             }
         }
     }
+    ScopedRemovals { targets, ledgers }
+}
 
-    for (root, ids) in ledger_roots {
-        removed |= prune_transition_ledger(&root, &ids, reset_locks)?;
+/// Remove what [`scoped_removals`] names, recording in `progress` what has landed.
+/// §FS-rhei-reset.2.1 §FS-rhei-reset.4
+fn remove_scoped_runtime_artifacts(
+    loaded: &LoadedPlan,
+    input: &Path,
+    scope: &RheiScope,
+    machines: &rhei_validator::MachineSet,
+    reset_locks: &mut ResetWriterLocks,
+    progress: &mut ResetProgress,
+) -> MietteResult<bool> {
+    let removals = scoped_removals(loaded, input, scope, machines);
+    let mut removed = false;
+    for target in &removals.targets {
+        removed |= remove_scoped_target(target, &mut progress.removed_paths)?;
+    }
+    for (root, ids) in &removals.ledgers {
+        let pruned = prune_transition_ledger(root, ids, reset_locks)?;
+        progress.landed |= pruned;
+        removed |= pruned;
     }
     Ok(removed)
 }
@@ -284,35 +306,46 @@ fn remove_scoped_target(target: &ScopedTarget, removed_paths: &mut Vec<PathBuf>)
     match target {
         ScopedTarget::Exact(path) => remove_runtime_path(path, removed_paths),
         ScopedTarget::Prefixed { dir, prefix } => {
-            if !dir.is_dir() {
-                return Ok(false);
-            }
+            let paths = matching_entries(dir, prefix)
+                .map_err(|err| file_io_report(dir, "failed to read runtime directory", err))?;
             let mut removed = false;
-            for entry in fs::read_dir(dir)
-                .map_err(|err| file_io_report(dir, "failed to read runtime directory", err))?
-                .flatten()
-            {
-                let name = entry.file_name();
-                let Some(name) = name.to_str() else { continue };
-                if name.starts_with(prefix.as_str()) {
-                    removed |= remove_runtime_path(&entry.path(), removed_paths)?;
-                }
+            for path in paths {
+                removed |= remove_runtime_path(&path, removed_paths)?;
             }
             Ok(removed)
         }
     }
 }
 
+/// The entries of `dir` whose name starts with `prefix`; none where `dir` is not a
+/// directory. §FS-rhei-reset.2.1
+fn matching_entries(dir: &Path, prefix: &str) -> std::io::Result<Vec<PathBuf>> {
+    if !dir.is_dir() {
+        return Ok(Vec::new());
+    }
+    Ok(fs::read_dir(dir)?
+        .flatten()
+        .filter(|entry| entry.file_name().to_str().is_some_and(|name| name.starts_with(prefix)))
+        .map(|entry| entry.path())
+        .collect())
+}
+
+/// Remove one runtime path, adding to `removed_paths` each file that went, those
+/// a failed removal took before it stopped included: they have landed. §FS-rhei-reset.4
 fn remove_runtime_path(path: &Path, removed_paths: &mut Vec<PathBuf>) -> MietteResult<bool> {
-    removed_paths.extend(files_under(path));
+    let files = files_under(path);
     if path.is_dir() {
-        fs::remove_dir_all(path)
-            .map_err(|err| file_io_report(path, "failed to remove runtime directory", err))?;
+        if let Err(err) = fs::remove_dir_all(path) {
+            removed_paths.extend(files.into_iter().filter(|file| !file.exists()));
+            return Err(file_io_report(path, "failed to remove runtime directory", err));
+        }
+        removed_paths.extend(files);
         return Ok(true);
     }
     if path.exists() {
         fs::remove_file(path)
             .map_err(|err| file_io_report(path, "failed to remove runtime artifact", err))?;
+        removed_paths.extend(files);
         return Ok(true);
     }
     Ok(false)

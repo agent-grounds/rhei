@@ -307,6 +307,7 @@ include!("cli/task_metadata_lines.rs");
 include!("cli/next_command.rs");
 include!("cli/reset_authored_states.rs");
 include!("cli/reset_refusal.rs");
+include!("cli/reset_writability.rs");
 include!("cli/reset_locks.rs");
 include!("cli/reset_runtime_cleanup.rs");
 include!("cli/complete_reset_commands.rs");

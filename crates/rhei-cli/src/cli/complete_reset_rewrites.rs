@@ -30,31 +30,21 @@ fn reset_target_files(
 }
 
 /// `authored` maps this file's *local* task ids to the state each was authored
-/// in; a task absent from it never moved and keeps the line it has.
-/// §FS-rhei-reset.2.2
+/// in; a task absent from it never moved and keeps the line it has. A file whose
+/// text does not change is not written. Returns whether it was.
+/// §FS-rhei-reset.2.2 §FS-rhei-reset.2
 fn reset_plan_file_states(
     path: &Path,
     authored: &BTreeMap<String, String>,
     locked: &LockedPlanFile,
-) -> MietteResult<()> {
+) -> MietteResult<bool> {
     let raw = locked.read_to_string("failed to read plan file")?;
     let new_raw = reset_file_text(&raw, authored)?;
-
-    let parent = path.parent().unwrap_or(Path::new("."));
-    let mut tmp = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|err| miette!(
-            help = temp_write_help(),
-            "failed to create temp file: {err}"
-        ))?;
-    tmp.write_all(new_raw.as_bytes()).map_err(|err| miette!(
-        help = temp_write_help(),
-        "failed to write temp file: {err}"
-    ))?;
-    persist_locked(tmp, path).map_err(|err| miette!(
-        help = temp_write_help(),
-        "failed to persist temp file: {err}"
-    ))?;
-    Ok(())
+    if new_raw == raw {
+        return Ok(false);
+    }
+    write_file_atomic_locked(path, &new_raw, Some(locked))?;
+    Ok(true)
 }
 
 /// The text a reset writes over one plan file's `raw`: each task's `**State:**` line
@@ -74,14 +64,27 @@ fn reset_file_text(raw: &str, authored: &BTreeMap<String, String>) -> MietteResu
     }
 }
 
+/// Clear one file's runtime metadata. A file with none to clear is not written.
+/// Returns whether it was. §FS-rhei-reset.2
 fn clear_runtime_metadata_in_file(
     path: &Path,
     workspace_index: bool,
     locked: &LockedPlanFile,
-) -> MietteResult<()> {
+) -> MietteResult<bool> {
     let raw = locked.read_to_string("failed to read plan file")?;
+    let new_raw = text_with_runtime_metadata_cleared(&raw, workspace_index)?;
+    if new_raw == raw {
+        return Ok(false);
+    }
+    write_file_atomic_locked(path, &new_raw, Some(locked))?;
+    Ok(true)
+}
+
+/// The text a reset writes over a file's `raw` to clear its runtime metadata. The one
+/// computation of it, because the reset's check asks whether it changes. §FS-rhei-reset.2.3
+fn text_with_runtime_metadata_cleared(raw: &str, workspace_index: bool) -> MietteResult<String> {
     let metadata = if workspace_index {
-        rhei_core::parser::parse_workspace_index(&raw)
+        rhei_core::parser::parse_workspace_index(raw)
             .map_err(|err| {
                 miette!(
                     help = plan_authoring_help(),
@@ -90,7 +93,7 @@ fn clear_runtime_metadata_in_file(
             })?
             .metadata
     } else {
-        rhei_core::parse(&raw)
+        rhei_core::parse(raw)
             .map_err(|err| miette!(
                 help = plan_authoring_help(),
                 "failed to parse plan for metadata reset: {}", err.message
@@ -98,27 +101,10 @@ fn clear_runtime_metadata_in_file(
             .metadata
     };
 
-    let new_raw = if let Some(metadata) = clear_runtime_task_metadata(metadata.as_ref()) {
-        rewrite_frontmatter(&raw, &metadata)?
-    } else {
-        raw
-    };
-
-    let parent = path.parent().unwrap_or(Path::new("."));
-    let mut tmp = tempfile::NamedTempFile::new_in(parent)
-        .map_err(|err| miette!(
-            help = temp_write_help(),
-            "failed to create temp file: {err}"
-        ))?;
-    tmp.write_all(new_raw.as_bytes()).map_err(|err| miette!(
-        help = temp_write_help(),
-        "failed to write temp file: {err}"
-    ))?;
-    persist_locked(tmp, path).map_err(|err| miette!(
-        help = temp_write_help(),
-        "failed to persist temp file: {err}"
-    ))?;
-    Ok(())
+    match clear_runtime_task_metadata(metadata.as_ref()) {
+        Some(metadata) => rewrite_frontmatter(raw, &metadata),
+        None => Ok(raw.to_string()),
+    }
 }
 
 /// Remove `> **Result:** …` lines (and a single leading blank line when

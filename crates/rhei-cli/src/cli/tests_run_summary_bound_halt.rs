@@ -198,40 +198,42 @@ transitions:
         assert!(report.render_markdown().contains("was stopped by its ticket travel bound"));
     }
 
-    /// A move a slot does show: the worker of another arm, in flight across the
-    /// refusal, moved the ticket when it was released.
+    /// A release says nothing about where a ticket went: `from` is the raw plan
+    /// state and `to` the normalized name of the same state. So a counted state's
+    /// worker, in flight across the refusal, leaves the halt standing when it ends.
+    /// This is the order a fan-out over `visits:` logs.
     #[test]
-    fn a_worker_that_moved_the_ticket_after_the_halt_takes_the_bound_row_back() {
-        let moved = summary_with_spawn("1", "work", "work", true);
-        emit_bound_halt(&moved, None);
-        emit_release_into(&moved, "1", "work", "plan-approval");
-        let report = bound_halted_report("plan-approval", &moved);
-        assert_eq!(report.waiting.len(), 1, "the poll is in Waiting again");
-        assert!(report.attention.is_empty(), "the halt is stale");
+    fn a_counted_states_release_across_a_refusal_leaves_the_bound_row() {
+        let sink = SummarySink::new();
+        emit_assign_into(&sink, "1", "work-2", "work");
+        emit_bound_halt(&sink, None);
+        emit_release_into(&sink, "1", "work-2", "work");
 
-        let unmoved = summary_with_spawn("1", "work", "work", true);
-        emit_bound_halt(&unmoved, None);
-        emit_release_into(&unmoved, "1", "work", "work");
-        let report = bound_halted_report("work", &unmoved);
+        let report = bound_halted_report("work", &sink);
+
         let row = report.attention.iter().find(|row| row.id == "1").expect("an Attention row");
-        assert_eq!(row.next, BOUND_REMEDY, "a release that moved nothing leaves the halt");
+        assert_eq!(row.next, BOUND_REMEDY, "the ticket has not moved, so the halt is still true");
     }
 
     fn emit_spawn_into(sink: &SummarySink, task: &str, state: &str) {
+        emit_assign_into(sink, task, state, state);
+        emit_release_into(sink, task, state, state);
+    }
+
+    fn emit_assign_into(sink: &SummarySink, task: &str, from: &str, to: &str) {
         use rhei_tui::EventSink;
         let log = std::path::PathBuf::from("runtime/logs/x.log");
         sink.emit(rhei_tui::RunEvent::SlotAssigned {
             slot: 0,
             task: task.to_string(),
-            from: state.to_string(),
-            to: state.to_string(),
+            from: from.to_string(),
+            to: to.to_string(),
             agent: Some("mock".to_string()),
             template_context: None,
             log_path: log,
             started_at: std::time::Instant::now(),
             wall_clock: std::time::SystemTime::now(),
         });
-        emit_release_into(sink, task, state, state);
     }
 
     fn emit_release_into(sink: &SummarySink, task: &str, from: &str, to: &str) {

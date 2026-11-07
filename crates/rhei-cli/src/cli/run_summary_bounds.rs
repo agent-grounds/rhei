@@ -159,8 +159,8 @@ impl BoundsSection {
 /// [`BoundsSection::halts`], which keeps every halt of the run as history.
 ///
 /// `budget_halt` carries no state, so a halt is taken back by what can be seen
-/// after it: the ticket's next slot, a slot of its that moved it, and at the
-/// overlay a reading of the plan no refused start leaves behind.
+/// after it: the ticket's next slot, and at the overlay a reading of the plan
+/// that does not yield to a halt.
 /// §FS-rhei-run-report.3.1
 #[derive(Default)]
 struct StandingBoundHalts(HashMap<String, HaltCause>);

@@ -193,7 +193,8 @@ fn reset_filesystem_refusal(
     let no_moves = BTreeMap::new();
     for (file, _sample_task_id) in reset_target_files(loaded, input, scope) {
         let raw = read_plan_source(&file, "failed to read plan file")?;
-        if reset_file_text(&raw, authored.by_file.get(&file).unwrap_or(&no_moves))? != raw {
+        let moves = authored.by_file.get(&file).unwrap_or(&no_moves);
+        if reset_file_text(&raw, moves, plan_file_kind(&file))? != raw {
             check.entry(&file);
         }
     }

@@ -115,7 +115,7 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     let rendered = format_task_state_value(to, to_visit, machine);
     let mut new_task = rewrite_task_for_transition(&task_raw, &route.local_id, &rendered, transition_ends_supervisor_visit(machine, from, to))?;
     if terminal || machine.states[from].terminal {
-        new_task = forced_result_link(&new_task, &route.local_id, &task_id, terminal);
+        new_task = forced_result_link(&new_task, plan_file_kind(&route.task_file), &route.local_id, &task_id, terminal);
     }
     let mut files = Vec::new();
     if route.task_file == route.metadata_file {

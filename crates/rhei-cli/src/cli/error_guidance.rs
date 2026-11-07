@@ -183,20 +183,34 @@ fn io_error_help(path: &Path, kind: std::io::ErrorKind) -> String {
 }
 
 /// Turn a state machine load failure into a diagnostic that says what to fix
-/// and where. §FS-rhei-errors.1.2
+/// and where. §FS-rhei-errors.1.2 §FS-rhei-errors.1.2.2
 fn state_machine_load_report(path: &Path, err: rhei_validator::StateMachineLoadError) -> Report {
     let quoted = shell_quote(&path.display().to_string());
     match err {
         rhei_validator::StateMachineLoadError::Io(err) => {
             file_io_report(path, "failed to read state machine", err)
         }
-        rhei_validator::StateMachineLoadError::Yaml(err) => miette!(
-            help = format!(
-                "'{}' is not valid YAML. Fix the syntax at the position above, then re-check it \
-                 with: rhei states --state-machine {quoted}",
+        rhei_validator::StateMachineLoadError::Yaml(err) => {
+            // serde_yaml's message leaves out a mark at the very start, which is where a
+            // top-level duplicate key puts it, so there is no position above. §FS-rhei-errors.1.2.2
+            let printed = err.location().is_some_and(|at| (at.line(), at.column()) != (1, 1));
+            let at = if printed { " at the position above" } else { "" };
+            miette!(
+                help = format!(
+                    "'{}' is not valid YAML. Fix the syntax{at}, then re-check it with: \
+                     rhei states --state-machine {quoted}",
+                    path.display()
+                ),
+                "failed to parse state machine '{}': {err}",
                 path.display()
+            )
+        }
+        rhei_validator::StateMachineLoadError::Shape { error, fault } => miette!(
+            help = format!(
+                "{}, then re-check it with: rhei states --state-machine {quoted}",
+                state_machine_shape_help(path, fault)
             ),
-            "failed to parse state machine '{}': {err}",
+            "failed to parse state machine '{}': {error}",
             path.display()
         ),
         rhei_validator::StateMachineLoadError::Invalid(message) => miette!(

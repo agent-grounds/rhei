@@ -124,7 +124,6 @@ fn the_tickets_machine_loads_once_it_has_a_name() {
 }
 
 #[test]
-#[ignore = "red until #615: a missing top-level field is told to fix YAML syntax; implement removes this"]
 fn a_missing_top_level_field_gets_the_edit_that_adds_it() {
     let machine_without = |key: &str| match key {
         "name" => NO_NAME.to_string(),
@@ -149,7 +148,6 @@ fn a_missing_top_level_field_gets_the_edit_that_adds_it() {
 /// false of most and owed to none. The `name` missing inside an input is the one
 /// a classifier reading only the field's name would send to the top level.
 #[test]
-#[ignore = "red until #615: a wrong shape below the top level is told to fix YAML syntax; implement removes this"]
 fn a_wrong_shape_elsewhere_makes_no_top_level_claim() {
     let states = "name: m\nversion: 1\nstates:\n  open:\n    initial: true\n";
     let cases = [
@@ -193,7 +191,6 @@ fn a_wrong_shape_elsewhere_makes_no_top_level_claim() {
 /// the mapping and everything it must hold. The comment-only file is the one
 /// missing `name` that prints a position.
 #[test]
-#[ignore = "red until #615: a document with no mapping is told to fix YAML syntax; implement removes this"]
 fn a_document_with_no_mapping_is_told_what_it_must_hold() {
     let cases = [
         ("", "missing field `name`"),
@@ -216,7 +213,6 @@ fn a_document_with_no_mapping_is_told_what_it_must_hold() {
 /// A repeated key is refused by the parse itself, and YAML does call it invalid, so
 /// this stays a syntax failure; only the position it points at is not there.
 #[test]
-#[ignore = "red until #615: a duplicate key is sent to a position no line prints; implement removes this"]
 fn a_syntax_failure_with_no_position_points_at_none() {
     let machine = "name: m\nname: n\nversion: 1\nstates:\n  open:\n    initial: true\n";
     let cause = "duplicate entry with key \"name\"";

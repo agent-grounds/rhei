@@ -198,12 +198,14 @@ deadline continues to exclude the task from the ready set until it elapses; it
 delays the next subprocess attempt rather than hiding that attempt from mode
 selection.
 
-The built-in `pending` -> `completed` machine is manual-only, not
-callback-complete work. If a ready task under that built-in machine is in its
-profile's initial `pending` state, `rhei run` must fail without changing the
-task. The manual worker loop must claim such a task with `rhei next`, do the
-work, and finish it with `rhei complete`. This prevents the built-in machine
-from silently completing fresh tasks without executing them.
+The built-in `pending` -> `completed` machine must not complete fresh work by
+callbacks alone. A configured agent, including one selected by `defaults.agent`,
+may execute a ready task in its profile's initial `pending` state when agent
+spawning is enabled; the ordinary result obligations and transition rules still
+apply. Without an agent, or with agent spawning disabled, `rhei run` must fail
+without changing the task rather than callback-completing it. In that case the
+manual worker loop must claim the task with `rhei next`, do the work, and finish
+it with `rhei complete`.
 
 Every reload made for scheduling is also a live-member admission checkpoint.
 The run performs one after processing each completed worker, before choosing

@@ -342,7 +342,8 @@ the summary prints five stacked groups:
    worker interrupted mid-flight by an *operator's*
    shutdown ([§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)) — a run that tore its own workers down while
    failing describes their tickets by the failure instead, never by "re-run to
-   continue"; a manual-only initial state; a worker that ran and
+   continue"; a manual-only initial state for a ticket this run neither worked
+   nor interrupted; a worker that ran and
    left a required artifact unwritten — agent or program alike, since both are
    workers and both stall the same way; a required `inputs:` artifact of the
    ticket's current state that is not on disk ([§FS-rhei-states.3](rhei-states.spec.md#3-artifact-contracts)), named with
@@ -354,7 +355,17 @@ the summary prints five stacked groups:
    ahead of the missing-artifact class because it explains it: a worker the run
    killed had no chance to write what it owed, and telling the operator to
    write those files by hand would be advice about a stall that did not
-   happen. A missing required input is classified ahead of "never scheduled"
+   happen. The built-in machine's initial `pending` state does not make a
+   ticket manual-only when this run actually spawned its worker, including
+   through `defaults.agent` (§FS-rhei-run.3). For that ticket, use the existing
+   interruption reason and `re-run to continue` recovery; otherwise name the
+   required outputs the worker left unwritten and their existing file-writing
+   or outcome-recording recovery, or use the ordinary stall reason and recovery
+   when no missing outputs were recorded. These work readings replace only the
+   structural manual-only inference; independently proven higher-priority
+   blockers keep their precedence. A ticket no agent could work keeps the
+   manual-only reason and `rhei next` / `rhei complete` advice.
+   A missing required input is classified ahead of "never scheduled"
    for the same reason: it *is* why the ticket was never scheduled, and
    "rerun to pick it up" sends the operator back to a run that halts
    identically — but only when the missing file is what readiness stopped at:

@@ -7,6 +7,7 @@
 // §AR-source-file-size.3 §FS-rhei-run-report
 
     use super::*;
+    include!("tests_run_summary_worked_pending.rs");
 
     fn machine() -> rhei_validator::StateMachine {
         rhei_validator::StateMachine::builtin_default()

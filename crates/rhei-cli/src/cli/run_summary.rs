@@ -202,10 +202,6 @@ impl rhei_tui::EventSink for SummarySink {
                 ..
             } => {
                 let driver = state.inflight.remove(&slot).unwrap_or("program");
-                // Another arm's worker moved it after the refusal. §FS-rhei-run-report.3.1
-                if from != to {
-                    state.standing_bound_halts.take_back(&task);
-                }
                 let entry = state.tasks.entry(task.clone()).or_default();
                 // Each kind counts only its own invocations. §FS-rhei-run-report.3.2
                 if driver == "agent" {

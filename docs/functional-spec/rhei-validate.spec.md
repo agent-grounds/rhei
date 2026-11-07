@@ -59,7 +59,8 @@ error naming its line
    are [§FS-rhei-validate.4.4](rhei-validate.spec.md#44-workspace-task-file-metadata-diagnostics).
 2. Resolve the state machine and validate plan semantics, including state
    values, task ids, dependencies, node policy, terminal and gating states,
-   counted-loop syntax, artifact contracts, and task read exclusions.
+   counted-loop syntax, artifact contracts, and task read exclusions. A
+   dependency cycle is reported as [§FS-rhei-plan-language.3.3](rhei-plan-language.spec.md#33-acyclic-dependencies) says.
    [§FS-rhei-plan-language](rhei-plan-language.spec.md#fs-rhei-plan-language-rhei-plan-language-specification) [§FS-rhei-states](rhei-states.spec.md#fs-rhei-states-rhei-states-specification)
 
    Machine validation refuses a `callback_timeout` that is not a duration in

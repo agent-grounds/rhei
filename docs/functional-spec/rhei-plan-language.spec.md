@@ -1037,6 +1037,28 @@ The task dependency graph must be a Directed Acyclic Graph (DAG). Circular depen
 **Prior:** Task 1    ← ERROR: creates cycle
 ```
 
+Each cycle is reported as one error, and the text of that error is a function of
+the cycle alone, so one fault reads the same in every process and every
+validation, whatever else the project holds:
+
+```text
+Circular dependency detected among tasks: ["plan.1", "plan.2"]
+```
+
+- It names **only the tasks on the cycle**: tasks each reachable from the others
+  through `**Prior:**`, and a task whose `**Prior:**` names itself, alone. A task
+  that merely waits on a cycle, or sits on a path from one cycle to another, can
+  never become ready either, but it is not the fault and no error names it for
+  that.
+- Cycles that share a task are one cycle and one error, naming all their tasks.
+  Cycles that share none are one error each.
+- The names are sorted as text, so `plan.10` comes before `plan.2`, and the errors
+  are in the order of the name each one lists first.
+
+A write that adds a cycle, adds a task to one, or joins two therefore changes
+what is reported and answers for it, and a write that does none of these leaves
+the text as it was ([§FS-rhei-new.5.2](rhei-new.spec.md#52-a-create-answers-for-the-errors-it-introduced)).
+
 ### 3.4. Hierarchical Task Consistency
 
 Task nodes form a tree. Authored heading depth and task-id path depth must

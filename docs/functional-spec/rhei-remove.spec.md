@@ -177,8 +177,11 @@ task file's metadata block is authored and never written by a Rhei command
 exists, and leaving it would fail that file's own-tasks-only rule on the next
 load.
 
-The project is validated after the edit, under the same locks, and a removal
-whose result does not validate is rolled back.
+The project is validated before the edit and again after it, under the same
+locks, and a removal answers for the errors it introduced, the reading a create
+takes of its own write ([§FS-rhei-new.5.2](rhei-new.spec.md#52-a-create-answers-for-the-errors-it-introduced)). A removal whose result carries an
+error the project did not already have is rolled back; a removal over errors that
+were already there goes through.
 
 ### 4.2. Residue
 

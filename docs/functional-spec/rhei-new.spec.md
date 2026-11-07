@@ -663,7 +663,9 @@ text of an error in a rhei it never touched, and so no longer takes the blame
 for it. The `rhei init` on-ramp is where this shows: `rhei init` prints
 `rhei new "<title>"`, that create prints `rhei new "<first ticket>" --under
 <id>`, and with a single dangling `**Prior:**` anywhere in the project the second
-step was refused for an error the first step's own rhei list had reworded.
+step was refused for an error the first step's own rhei list had reworded. A
+dependency cycle's error is held to the same rule by naming only the cycle's
+own tasks, in a fixed order ([§FS-rhei-plan-language.3.3](rhei-plan-language.spec.md#33-acyclic-dependencies)).
 
 - Errors the create introduced — a `--prior` naming nothing, for instance —
   undo the write: a created file is removed, and a modified file is restored

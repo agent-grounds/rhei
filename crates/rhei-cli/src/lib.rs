@@ -209,6 +209,7 @@ include!("cli/summary_command.rs");
 include!("cli/summary_checkpoint.rs");
 include!("cli/summary_tally.rs");
 include!("cli/programs.rs");
+include!("cli/program_exit_route.rs");
 include!("cli/snapshot_pointer.rs");
 include!("cli/snapshot_records.rs");
 // §FS-rhei-evidence: per-invocation evidence and the run manifest.

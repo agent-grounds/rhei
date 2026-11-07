@@ -163,6 +163,7 @@ fn run_sequential_agent_invocation(
         settings,
         task,
         task_id_str,
+        current_state,
         &opts.price_book().currency,
         budget_run,
     )? {

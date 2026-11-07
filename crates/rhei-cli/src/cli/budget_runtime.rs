@@ -299,6 +299,9 @@ fn run_is_gone(execution_root: &str) -> bool {
 /// its first amount and is refused where the account already holds another.
 /// §FS-rhei-budgets.6.1 §FS-rhei-budgets.5.5 §FS-rhei-run.3.4
 /// All admissions use their run's note entitlement. §FS-rhei-budgets.7.2
+/// `state` is the normalized state the spawn is for, which a refusal records; it
+/// is the caller's because `task` is loaded fresh, and so may already show another
+/// arm's move. §FS-rhei-run-json.2.1
 #[allow(clippy::too_many_arguments)]
 fn budget_admit_spawn(
     input: &Path,
@@ -308,6 +311,7 @@ fn budget_admit_spawn(
     settings: &RheiSettings,
     task: &rhei_core::ast::Task,
     task_id_str: &str,
+    state: &str,
     currency: &str,
     run: &BudgetRun,
 ) -> MietteResult<BudgetAdmission> {
@@ -397,7 +401,7 @@ fn budget_admit_spawn(
         }
         Err(refusal) => Ok(BudgetAdmission::Refused {
             halt: budget_halt_text(&refusal, &bounds, &journal),
-            event: budget_halt_event(&refusal, &bounds, &journal, task_id_str).map(Box::new),
+            event: budget_halt_event(&refusal, &bounds, &journal, task_id_str, state).map(Box::new),
             // A trusted exhaustion can report without reserving or spending.
             // §FS-rhei-budgets.9 §FS-rhei-run-report.3.1
             bounds: if refusal.exhaustion.is_some() {

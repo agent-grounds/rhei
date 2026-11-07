@@ -163,12 +163,20 @@ impl BoundsSection {
 /// The bound halts still true of their tickets, for `## Attention`. Apart from
 /// [`BoundsSection::halts`], which keeps every distinct halt of the run as history.
 ///
-/// `budget_halt` carries no state, so a halt is taken back by what can be seen
-/// after it: the ticket's next slot, and at the overlay a reading of the plan
-/// that does not yield to a halt.
-/// §FS-rhei-run-report.3.1
+/// A halt is taken back by what can be seen after it: the ticket's next slot, and
+/// at the overlay a plan state other than the one refused, or a reading of the plan
+/// that does not yield to a halt. Only the latest refusal of a ticket is kept, and
+/// so compared. §FS-rhei-run-report.3.1
 #[derive(Default)]
-struct StandingBoundHalts(HashMap<String, HaltCause>);
+struct StandingBoundHalts(HashMap<String, StandingBoundHalt>);
+
+/// One ticket's latest refusal: its Attention reading and the state it was refused
+/// in, `None` from a record written before `budget_halt` named one.
+/// §FS-rhei-run-report.3.1 §FS-rhei-run-json.2.1
+struct StandingBoundHalt {
+    refused_in: Option<String>,
+    cause: HaltCause,
+}
 
 impl StandingBoundHalts {
     /// A window renews by itself, so its row has a deadline and nothing to do.
@@ -177,6 +185,7 @@ impl StandingBoundHalts {
     fn record(
         &mut self,
         task: &str,
+        refused_in: Option<String>,
         bound: &rhei_tui::BoundReport,
         renews_at: Option<&str>,
         remedy: &str,
@@ -186,7 +195,8 @@ impl StandingBoundHalts {
             Some(at) => (format!("{blocker}, renews {at}"), "renews automatically".to_string()),
             None => (blocker, remedy.to_string()),
         };
-        self.0.insert(task.to_string(), HaltCause::BoundHalted { blocker, next_action });
+        let cause = HaltCause::BoundHalted { blocker, next_action };
+        self.0.insert(task.to_string(), StandingBoundHalt { refused_in, cause });
     }
 
     fn take_back(&mut self, task: &str) {
@@ -194,11 +204,27 @@ impl StandingBoundHalts {
     }
 
     /// A refused start outranks what the classifier inferred from the ticket not
-    /// moving. A terminal ticket has no cause to replace. §FS-rhei-run-report.3.1
-    fn overlay(&self, halt_causes: &mut HashMap<String, HaltCause>) {
+    /// moving, while it is in the state refused: once it has moved the refusal says
+    /// nothing about where it is now, so the classifier's reading stands. A record
+    /// with no state proves no move. A terminal ticket has no cause to replace.
+    /// §FS-rhei-run-report.3.1
+    fn overlay(
+        &self,
+        rhei: &rhei_core::ast::Rhei,
+        machines: &rhei_validator::MachineSet,
+        halt_causes: &mut HashMap<String, HaltCause>,
+    ) {
+        let moved_from = |id: &str, refused_in: &str| {
+            find_task_by_id(&rhei.tasks, &parse_task_id(id)).is_some_and(|task| {
+                normalized_state_name(task.state.as_str(), machines.for_task(&task.id)) != refused_in
+            })
+        };
         for (task, halt) in &self.0 {
+            if halt.refused_in.as_deref().is_some_and(|refused_in| moved_from(task, refused_in)) {
+                continue;
+            }
             if let Some(cause) = halt_causes.get_mut(task).filter(|c| c.yields_to_bound_halt()) {
-                *cause = halt.clone();
+                *cause = halt.cause.clone();
             }
         }
     }

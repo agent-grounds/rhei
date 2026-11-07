@@ -3,8 +3,7 @@
 //!
 //! A directory target still runs today, so running a printed line would pass before
 //! the fix and pin nothing. Each case therefore also shows that `rhei list` takes
-//! the printed target, and that is the line each `#[ignore]` below fails on. The
-//! printed line is run as printed, with only `<N>` and `<TEXT>` filled in, and
+//! the printed target. The printed line is run as printed, with only `<N>` and `<TEXT>` filled in, and
 //! its text is not otherwise matched. The path needs quoting so the quoting is
 //! tested by the shell that has to read it.
 
@@ -46,7 +45,6 @@ fn assert_forget_retires(world: &World, printed: &str) {
 /// `forget` refuses a sound account and sends its reader to `adjust`.
 // §FS-rhei-budgets.10.1 §FS-rhei-budgets.5.3
 #[test]
-#[ignore = "red until #577: the sound-account help names the plan's directory; implement removes this"]
 fn budget_target_printed_the_sound_account_adjust_runs() {
     let world = lone("budget-printed-adjust");
     world.init(PLAN);
@@ -65,7 +63,6 @@ fn budget_target_printed_the_sound_account_adjust_runs() {
 /// `forget` with nothing to retire sends its reader to `show`.
 // §FS-rhei-budgets.10.1
 #[test]
-#[ignore = "red until #577: the nothing-to-retire help names the plan's directory; implement removes this"]
 fn budget_target_printed_the_nothing_to_retire_show_runs() {
     let world = lone("budget-printed-nothing");
 
@@ -86,7 +83,6 @@ fn budget_target_printed_the_nothing_to_retire_show_runs() {
 /// `budget_result_at` writes.
 // §FS-rhei-budgets.10.1 §FS-rhei-budgets.5.4
 #[test]
-#[ignore = "red until #577: the account-error help names the plan's directory; implement removes this"]
 fn budget_target_printed_the_account_error_show_runs() {
     let world = lone("budget-printed-account-error");
     world.init(PLAN);
@@ -119,7 +115,6 @@ fn budget_target_printed_the_account_error_show_runs() {
 /// The damaged report's `forget`, in text. §FS-rhei-budgets.10
 // §FS-rhei-budgets.10 §FS-rhei-budgets.5.4
 #[test]
-#[ignore = "red until #577: the damaged report's forget names the resolved root; implement removes this"]
 fn budget_target_printed_the_damaged_reports_forget_runs() {
     let world = lone("budget-printed-damaged");
     world.init(PLAN);
@@ -134,7 +129,6 @@ fn budget_target_printed_the_damaged_reports_forget_runs() {
 /// The same `forget` as the `forget` member of the error object. §FS-rhei-budgets.10
 // §FS-rhei-budgets.10 §FS-rhei-errors.5
 #[test]
-#[ignore = "red until #577: the JSON `forget` member names the resolved root; implement removes this"]
 fn budget_target_printed_the_damaged_json_forget_runs() {
     let world = lone("budget-printed-damaged-json");
     world.init(PLAN);
@@ -177,7 +171,6 @@ fn assert_copy_forget_runs(world: &copied::World, uuid: &str, witness: &[u8], sa
 /// `rhei run` of a copy, refused as `held_elsewhere`.
 // §FS-rhei-budgets.5.4.1 §FS-rhei-budgets.10.1
 #[test]
-#[ignore = "red until #577: `rhei run` refusing a copy offers forget of the copy's root; implement removes this"]
 fn budget_target_printed_the_held_elsewhere_forget_from_rhei_run_runs() {
     let (world, uuid, witness, plan) = refused_copy("budget-printed-held-run");
 
@@ -196,7 +189,6 @@ fn budget_target_printed_the_held_elsewhere_forget_from_rhei_run_runs() {
 /// The copied-account refusal of a hand edge, the sentence §FS-rhei-budgets.5.4.1 writes.
 // §FS-rhei-budgets.5.4.1 §FS-rhei-budgets.10.1
 #[test]
-#[ignore = "red until #577: a refused `rhei transition` on a copy offers forget of the copy's root; implement removes this"]
 fn budget_target_printed_the_copied_account_forget_from_a_hand_edge_runs() {
     let (world, uuid, witness, _) = refused_copy("budget-printed-held-edge");
 

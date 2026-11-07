@@ -23,7 +23,7 @@ use rhei_core::budget::{halt_text, AppliedEdge, Contract, Dimension, Remedy, Spe
 /// §FS-rhei-budgets.8
 fn budget_halt_text(refusal: &BudgetError, bounds: &CountBounds, journal: &Journal) -> String {
     let Some(spent) = refusal.exhaustion.as_deref() else {
-        return format!("error: {}", refusal.message);
+        return format!("error: {}", budget_refusal_text(refusal));
     };
     let bound = bounds.halt_bound(spent);
     let remedy = budget_halt_remedy(spent, bounds, journal);
@@ -177,7 +177,7 @@ fn budget_charge_applied_edge(
     // establishes an absent account, and the journal it returns is opened
     // before the identity is settled: settling reads it. §FS-rhei-budgets.5.4
     let (account, mut journal) =
-        budget_result_at(&project_root, Account::establish(&project_root, &audit))?;
+        budget_result(Account::establish(&project_root, &audit))?;
     let bounds =
         resolve_count_bounds(charge.settings, node_transition_limit(charge.machine, charge.task));
     // The unit admission is holding for this very edge, where the move came

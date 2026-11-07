@@ -203,9 +203,13 @@ than refused. A machine that trusts the repositories it runs may set
 `transition_limit` and `invocations_per_day` become the ceiling on that machine.
 A ticket's travel bound is per *identity*, so a copied task
 definition is refused rather than handed the history of the ticket it was copied
-from. `rhei budget show <plan-or-project>` says where a project stands,
-and [Bounded ticket travel, project invocations, and a day's spend](docs/functional-spec/rhei-budgets.spec.md)
-is the reference.
+from. `rhei budget show <plan-or-project>` says where a project stands, and
+takes what `rhei list` takes: a lone plan is named by its file, as in
+`rhei budget show lone/plan.rhei.md`, because its parent directory is refused
+like any directory without a manifest, even where earlier releases printed that
+directory in a budget command. See
+[Bounded ticket travel, project invocations, and a day's spend](docs/functional-spec/rhei-budgets.spec.md),
+the reference.
 
 An explicit `rhei budget init <plan-or-project> --invocations <N> --reason <TEXT>`
 instead establishes a lifetime invocation allowance. Reports identify its

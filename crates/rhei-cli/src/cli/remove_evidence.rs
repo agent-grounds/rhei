@@ -266,14 +266,14 @@ fn budget_evidence(
         Ok(Some(account)) => account,
         Ok(None) => return,
         Err(err) => {
-            out.push(("unreadable".into(), format!("budget account: {err}")));
+            out.push(("unreadable".into(), format!("budget account: {}", budget_refusal_text(&err))));
             return;
         }
     };
     let journal = match account.open(false) {
         Ok(journal) => journal,
         Err(err) => {
-            out.push(("unreadable".into(), format!("budget account: {err}")));
+            out.push(("unreadable".into(), format!("budget account: {}", budget_refusal_text(&err))));
             return;
         }
     };

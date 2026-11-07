@@ -112,18 +112,12 @@ fn budget_audit(reason: &str) -> MietteResult<Audit> {
     })
 }
 
+/// A core refusal for a reader, with the help that names the command's own target:
+/// a help line is a command they can paste, so it carries the argument that mattered.
+/// `show` itself never takes this help: sending an operator back to the command they
+/// just ran is not a next action. §FS-rhei-errors.1.2 §FS-rhei-budgets.10.1
 fn budget_result<T>(result: Result<T, BudgetError>) -> MietteResult<T> {
-    result.map_err(|err| miette!(help = budget_inspect_help(), "{}", err.message))
-}
-
-/// The same, spelled with the project the refusal is about.
-///
-/// A help line is a command the reader can paste, so it carries the target
-/// rather than leaving them to supply the one argument that mattered. `show`
-/// itself never takes this help: sending an operator back to the command they
-/// just ran is not a next action. §FS-rhei-errors.1.2
-fn budget_result_at<T>(project_root: &Path, result: Result<T, BudgetError>) -> MietteResult<T> {
-    result.map_err(|err| miette!(help = budget_inspect_help_for(project_root), "{}", err.message))
+    result.map_err(|err| miette!(help = budget_inspect_help(), "{}", budget_refusal_text(&err)))
 }
 
 /// `show` of the target the command was given, which a run passes no machine to,
@@ -132,11 +126,19 @@ fn budget_inspect_help() -> String {
     format!("inspect the project's account with: {}", help_subcommand_or_bare("budget show", "", ""))
 }
 
-fn budget_inspect_help_for(project_root: &Path) -> String {
-    format!(
-        "inspect the project's account with: rhei budget show {}",
-        budget_target_argument(project_root)
-    )
+/// `forget` of the target the command was given, never the account root, which for
+/// a lone plan is a directory no plan verb takes. It reaches the same root: the one
+/// the witness index is keyed by, and what a retirement retracts.
+/// §FS-rhei-budgets.10.1 §FS-rhei-budgets.5.4.1
+fn budget_forget_line() -> String {
+    help_subcommand_or_bare("budget forget", "", "--reason <TEXT>")
+}
+
+/// What core refused, whole: the one place its `forget` offer meets the target.
+/// Every surface a refusal reaches a reader through reads this, not `message`.
+/// §FS-rhei-budgets.10.1
+fn budget_refusal_text(refusal: &BudgetError) -> String {
+    refusal.told_with_forget(&budget_forget_line())
 }
 
 /// The project in the spelling every other budget surface prints it, so a help
@@ -150,16 +152,6 @@ fn budget_target(project_root: &Path) -> String {
         .to_string()
 }
 
-/// The same path as an **argument** of a command the reader is meant to paste.
-///
-/// Prose names a path; a command line passes one, and a path holding a space
-/// passed bare is two arguments that `clap` rejects. Quoted only where the
-/// shell needs it, so the ordinary case reads exactly as it always has.
-/// §FS-rhei-errors.2 §FS-rhei-budgets.10
-fn budget_target_argument(project_root: &Path) -> String {
-    shell_quote(&budget_target(project_root))
-}
-
 /// The project's account, established when it is absent.
 ///
 /// `None` means there is no project directory to account against, which is not
@@ -169,7 +161,7 @@ fn open_project_account(project_root: &Path, reason: &str) -> MietteResult<Optio
         return Ok(None);
     }
     let audit = budget_audit(reason)?;
-    let (_, journal) = budget_result_at(project_root, Account::establish(project_root, &audit))?;
+    let (_, journal) = budget_result(Account::establish(project_root, &audit))?;
     Ok(Some(journal))
 }
 

@@ -62,6 +62,7 @@ mod budget_spend_tests;
 mod budget_spent_visit_support;
 mod budget_spent_visit_tests;
 mod budget_support;
+mod budget_target_printed_damage_tests;
 mod budget_target_printed_tests;
 mod budget_target_shape_tests;
 mod budget_target_support;

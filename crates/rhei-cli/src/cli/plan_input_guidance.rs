@@ -55,6 +55,23 @@ fn unrecognized_plan_directory_report(
     ))
 }
 
+/// Refuse by shape what `rhei list` refuses by shape, without loading a task body:
+/// a directory holding neither manifest, and a path whose name gives no rhei id.
+/// For a command that has to work when the plan does not parse.
+/// §FS-rhei-errors.3.2 §AR-rhei-panta.3 §FS-rhei-budgets.10.1 §FS-rhei-agents.1.1.7
+fn refuse_unrecognized_plan_target(path: &Path) -> MietteResult<()> {
+    if workspace::panta_project_dir(path).is_some() {
+        return Ok(());
+    }
+    if let Some(directory) = workspace::workspace_dir(path) {
+        return check_rhei_identity(&directory);
+    }
+    if path.is_dir() {
+        return Err(unrecognized_plan_directory_report(path, None)?);
+    }
+    check_rhei_identity(path)
+}
+
 #[derive(Clone, Copy)]
 struct RunPlanInput<'a> {
     options: &'a RunOptions,

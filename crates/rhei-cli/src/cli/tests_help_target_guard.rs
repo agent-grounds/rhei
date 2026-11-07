@@ -46,16 +46,6 @@ mod help_target_guard {
     /// A site not listed here prints the command's target through `help_target.rs`.
     const BARE_VERB_STANDS: &[(&str, &str, &str)] = &[
         (
-            "budget_forget.rs",
-            "rhei budget adjust",
-            "prints the root `forget` was pointed at, through `budget_target_argument`",
-        ),
-        (
-            "budget_forget.rs",
-            "rhei budget show",
-            "prints the root `forget` was pointed at, through `budget_target_argument`",
-        ),
-        (
             "budget_command.rs",
             "rhei transition",
             "names the kind of charge an edge is, and runs nothing",

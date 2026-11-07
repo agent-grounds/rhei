@@ -150,21 +150,23 @@ impl Sides<'_> {
 /// bytes follow its last whole receipt, and the trim — never the copy, which
 /// would write the fragment into the journal. Where the journal is wholly
 /// absent, `forget` is offered beside it. §FS-rhei-budgets.5.4.3
+/// §FS-rhei-budgets.10.1
 fn torn_refusal(diagnosis: &Diagnosis) -> BudgetError {
-    let forget = diagnosis
-        .forget_command()
-        .map(|forget| {
-            format!("; if the path was reused, retire that record instead with: {forget}")
-        })
-        .unwrap_or_default();
-    BudgetError::corrupt(format!(
+    let refusal = BudgetError::corrupt(format!(
         "the committed history at {} ends mid-receipt, {}, the fragment of an append that was \
          cut short; copying it anywhere would carry the fragment along, so keep it and cut it \
-         back to its last whole receipt with: {}{forget}",
+         back to its last whole receipt with: {}",
         diagnosis.witness.display(),
         diagnosis.fragment_phrase().unwrap_or_default(),
         diagnosis.trim_command().unwrap_or_default(),
-    ))
+    ));
+    match diagnosis.offers_forget() {
+        true => refusal.offering_forget(
+            "if the path was reused, retire that record instead with".to_string(),
+            None,
+        ),
+        false => refusal,
+    }
 }
 
 /// The refusal a tail written from another root raises: it names that root and

@@ -332,14 +332,13 @@ impl Diagnosis {
         self.witness.with_file_name(format!("history-{what}-{stamp}.jsonl"))
     }
 
-    /// The command that retires the record, for the reading where a different
-    /// project held the path before this one.
+    /// Whether retiring the record is offered, for the reading where a different
+    /// project held the path before this one. The caller spells the command, because
+    /// its target is what that command was given. §FS-rhei-budgets.10.1
     ///
-    /// `None` wherever a journal is present, because there the journal **is**
-    /// this project's and retiring the root would discard a real account. The
-    /// root is quoted for the same reason the restore's paths are: unquoted, a
-    /// path with a space reaches `clap` as two arguments and the command is
-    /// rejected before it runs. §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
+    /// Never wherever a journal is present, because there the journal **is** this
+    /// project's and retiring the root would discard a real account.
+    /// §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
     ///
     /// A copy is the one present journal it is offered for: the account is the
     /// holder's, so retiring this root's claim gives up nothing of this
@@ -347,13 +346,12 @@ impl Diagnosis {
     ///
     /// A torn witness with no journal is offered it beside the trim: retiring
     /// moves the witness whole, fragment included. §FS-rhei-budgets.5.4.3
-    pub fn forget_command(&self) -> Option<String> {
-        let offered = match self.damage {
+    pub fn offers_forget(&self) -> bool {
+        match self.damage {
             Damage::JournalAbsent | Damage::HeldElsewhere => true,
             Damage::WitnessTorn => !self.journal_present,
             Damage::JournalTruncated | Damage::ChainBroken | Damage::ForeignTail => false,
-        };
-        offered.then(|| super::roots::forget_line(&self.root))
+        }
     }
 
     /// One line saying what is wrong, in the words the refusal uses.

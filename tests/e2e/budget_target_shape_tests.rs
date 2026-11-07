@@ -1,8 +1,8 @@
 //! `rhei budget` takes what the plan verbs take (`agent-grounds/rhei#577`).
 //!
 //! Each refusal is compared with what `rhei list` says of the same target. The
-//! reproducer's own disagreement, which each `#[ignore]` below still shows, was
-//! that `init` wrote an account in a directory every plan verb refuses.
+//! reproducer's own disagreement was that `init` wrote an account in a directory
+//! every plan verb refuses.
 
 // §FS-rhei-budgets.10.1 §FS-rhei-errors.3.2
 
@@ -14,7 +14,6 @@ use super::*;
 /// The issue's first case: nothing is written and every verb says what `list` says.
 // §FS-rhei-budgets.10.1
 #[test]
-#[ignore = "red until #577: `budget init` exits 0 on a directory `rhei list` refuses; implement removes this"]
 fn budget_target_a_plain_directory_is_refused_by_every_verb() {
     let world = world("budget-target-plain");
     world.plain("dir");
@@ -28,7 +27,6 @@ fn budget_target_a_plain_directory_is_refused_by_every_verb() {
 /// project, which `rhei list` refuses though a project encloses it.
 // §FS-rhei-budgets.10.1 §FS-rhei-panta.6
 #[test]
-#[ignore = "red until #577: `budget` takes the plain directory it is standing in, and one inside a project; implement removes this"]
 fn budget_target_a_plain_directory_is_refused_however_it_is_reached() {
     let world = world("budget-target-plain-reached");
     world.plain("dir");
@@ -47,7 +45,6 @@ fn budget_target_a_plain_directory_is_refused_however_it_is_reached() {
 /// beside a plan, in a workspace's `tasks/` and in a project.
 // §FS-rhei-budgets.10.1
 #[test]
-#[ignore = "red until #577: `budget init README.md` writes an account under the file's parent; implement removes this"]
 fn budget_target_a_non_plan_file_is_refused_as_rhei_list_refuses_it() {
     let world = world("budget-target-file");
     world.plain("lone");
@@ -67,7 +64,6 @@ fn budget_target_a_non_plan_file_is_refused_as_rhei_list_refuses_it() {
 /// parse first; `rhei budget` parses no task body, so it says the name's refusal.
 // §FS-rhei-budgets.10.1
 #[test]
-#[ignore = "red until #577: `budget init` writes an account under a real README or task file; implement removes this"]
 fn budget_target_a_non_plan_file_is_refused_without_parsing_it() {
     let world = world("budget-target-file-text");
     world.plain("lone");
@@ -90,7 +86,6 @@ fn budget_target_a_non_plan_file_is_refused_without_parsing_it() {
 /// so this still means something once `init` refuses.
 // §FS-rhei-budgets.10.1
 #[test]
-#[ignore = "red until #577: `budget show` and `adjust` read and write an account under a plain directory; implement removes this"]
 fn budget_target_an_account_under_a_lost_manifest_is_refused_and_untouched() {
     let world = world("budget-target-seeded");
     world.workspace("seeded");
@@ -106,7 +101,6 @@ fn budget_target_an_account_under_a_lost_manifest_is_refused_and_untouched() {
 /// the target it names: the issue's other complaint.
 // §FS-rhei-budgets.10.1 §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #577: a plain directory with broken settings reports the settings, and offers a `rhei validate` that refuses it; implement removes this"]
 fn budget_target_the_refusal_comes_before_settings_are_read() {
     let world = world("budget-target-settings");
     world.plain("broken");

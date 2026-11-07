@@ -31,8 +31,8 @@ fn verify_program_account(
         miette::Report::new(ProgramAccountRefusal {
             task: task.to_string(),
             state: state.to_string(),
-            diagnosis: error.message,
-            remedy: budget_inspect_help_for(&project),
+            diagnosis: budget_refusal_text(&error),
+            remedy: budget_inspect_help(),
         })
     })
 }
@@ -46,7 +46,7 @@ fn verify_program_account(
 /// §FS-rhei-budgets.5.4
 fn verify_spent_agent_account(workspace_root: &Path) -> MietteResult<()> {
     let project = budget_project_root(workspace_root);
-    budget_result_at(&project, verify_account_trust(&project))
+    budget_result(verify_account_trust(&project))
 }
 
 /// A pre-start refusal, kept distinct from a program's exit or spawn failure.

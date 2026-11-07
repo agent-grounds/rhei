@@ -80,7 +80,7 @@ fn a_cut_short_append_is_witness_torn_and_verifies_once_trimmed() {
     assert_eq!(torn.damage.as_str(), "witness_torn");
     assert_eq!(torn.history.receipts, receipts, "a fragment is not a receipt");
     assert_eq!(torn.restore_command(), None, "the copy would carry the fragment into the journal");
-    assert_eq!(torn.forget_command(), None, "the journal is present and this project's own");
+    assert!(!torn.offers_forget(), "the journal is present and this project's own");
     let refusal = case.account.open(true).expect_err("a charge is refused");
     assert!(!refusal.message.contains(&copy_line(&torn)), "{}", refusal.message);
     assert!(!refusal.message.contains("copying the witness back"), "{}", refusal.message);
@@ -146,13 +146,13 @@ fn no_journal_and_a_fragment_are_witness_torn_with_forget_beside_the_trim() {
     let torn = diagnosis(&case);
     assert_eq!(torn.damage.as_str(), "witness_torn", "the journal file is gone");
     assert_eq!(torn.restore_command(), None);
-    assert!(torn.forget_command().is_some(), "retiring keeps every byte, fragment included");
+    assert!(torn.offers_forget(), "retiring keeps every byte, fragment included");
 
     fs::remove_dir_all(case.root().join(ACCOUNT_DIR)).expect("lose the account directory");
     let torn = diagnosis(&case);
     assert_eq!(torn.damage.as_str(), "witness_torn", "the account directory is gone");
     assert_eq!(torn.restore_command(), None);
-    assert!(torn.forget_command().is_some());
+    assert!(torn.offers_forget());
 
     trim_by_hand(&case);
     assert_eq!(diagnosis(&case).damage.as_str(), "journal_absent");

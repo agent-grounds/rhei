@@ -36,7 +36,10 @@ fn the_commands_offered_for_a_path_with_a_space_are_runnable() {
         "the case is only a case while its project path needs quoting; got {target}"
     );
     assert!(
-        report.contains(&format!("rhei budget forget {} --reason <TEXT>", shell_quote(&target))),
+        report.contains(&format!(
+            "rhei budget forget {} --reason <TEXT>",
+            shell_quote(&world.plan())
+        )),
         "the retirement is offered as one argument, which is what `clap` has to \
          receive; got:\n{report}"
     );

@@ -26,9 +26,15 @@ fn budget_command(command: BudgetCommand) -> MietteResult<()> {
     }
 }
 
-/// The project the target belongs to, and the bounds in force for it.
+/// The project the target belongs to, and the bounds in force for it. A named
+/// target is recognized before settings or the account are read; an omitted one
+/// discovers. §FS-rhei-budgets.10.1
 fn budget_command_context(input: Option<PathBuf>) -> MietteResult<(PathBuf, CountBounds)> {
+    let named = input.is_some();
     let target = resolve_plan_target(input)?;
+    if named {
+        refuse_unrecognized_plan_target(target.path())?;
+    }
     let workspace_root = execution_workspace_root(target.path());
     let settings = load_merged_settings(&workspace_root)?;
     let project_root = budget_project_root(&workspace_root);
@@ -49,7 +55,7 @@ fn budget_init_command(
     let (project_root, bounds) = budget_command_context(input)?;
     let audit = budget_audit(reason)?;
     let (_, mut journal) =
-        budget_result_at(&project_root, Account::establish(&project_root, &audit))?;
+        budget_result(Account::establish(&project_root, &audit))?;
     if journal.contract().map(|contract| contract.is_lifetime()).unwrap_or(false) {
         // §FS-rhei-errors.1.2.1
         return Err(miette!(
@@ -78,13 +84,13 @@ fn budget_adjust_command(
     reason: &str,
 ) -> MietteResult<()> {
     let (project_root, bounds) = budget_command_context(input)?;
-    let Some(account) = budget_result_at(&project_root, Account::locate(&project_root))? else {
+    let Some(account) = budget_result(Account::locate(&project_root))? else {
         return Err(budget_no_account(&project_root));
     };
     let audit = budget_audit(reason)?;
-    let mut journal = budget_result_at(&project_root, account.open(true))?;
+    let mut journal = budget_result(account.open(true))?;
     let granted = budget_clamped_allowance(invocations, &bounds);
-    budget_result_at(&project_root, journal.adjust(granted, &audit))?;
+    budget_result(journal.adjust(granted, &audit))?;
     println!("{}", budget_grant_line(invocations, granted, &bounds));
     Ok(())
 }
@@ -308,7 +314,7 @@ fn budget_show_result<T>(project_root: &Path, result: Result<T, BudgetError>) ->
             "unreachable_budget_path" => budget_unreachable_help(project_root),
             _ => budget_unclassified_help(project_root),
         };
-        miette!(help = help, "{}", err.message)
+        miette!(help = help, "{}", budget_refusal_text(&err))
     })
 }
 
@@ -317,5 +323,5 @@ fn budget_show_result<T>(project_root: &Path, result: Result<T, BudgetError>) ->
 /// invariant and the help asks for a bug report rather than inventing a remedy.
 /// §FS-rhei-budgets.10 §FS-rhei-errors.1.2
 fn budget_show_invariant<T>(result: Result<T, BudgetError>) -> MietteResult<T> {
-    result.map_err(|err| miette!(help = internal_error_help(), "{}", err.message))
+    result.map_err(|err| miette!(help = internal_error_help(), "{}", budget_refusal_text(&err)))
 }

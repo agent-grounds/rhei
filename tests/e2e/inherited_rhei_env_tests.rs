@@ -12,7 +12,6 @@ use super::inherited_rhei_env::{
 /// run that inherits it is refused with `nested admission cannot use ancestor`
 /// (§FS-rhei-budgets.7.1) — a refusal that is right, and is not the test's.
 #[test]
-#[ignore = "red until #635: an inherited RHEI_BUDGET_PARENT_RESERVATION reaches the rhei the e2e harness spawns; implement removes this"]
 fn an_e2e_plan_run_reaches_its_clean_verdict_under_an_inherited_parent_reservation() {
     assert_verdict_ignores_inherited_rhei_env(
         "accounting_line_tests::one_accounting_line_carries_the_invocations_final_cost",

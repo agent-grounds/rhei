@@ -51,11 +51,6 @@ transitions:
 
     let home = dir.join("home");
     let mut cmd = rhei_command(&home);
-    for (name, _) in std::env::vars_os() {
-        if name.to_string_lossy().starts_with("RHEI_") {
-            cmd.env_remove(name);
-        }
-    }
     cmd.env("XDG_CONFIG_HOME", home.join(".config"))
         .env("GIT_CEILING_DIRECTORIES", &*dir)
         .current_dir(&dir)

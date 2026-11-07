@@ -99,13 +99,9 @@ impl World {
         self.dir.join("project")
     }
 
-    /// `rhei <args>` from `cwd` on the named machine. The parent reservation is
-    /// removed because this suite may itself run inside a `rhei run`.
-    // §FS-rhei-budgets.7.1
+    /// `rhei <args>` from `cwd` on the named machine.
     fn rhei(&self, home: &str, cwd: &Path, args: impl FnOnce(&mut Command)) -> CliRun {
         let mut cmd = rhei_command(self.home(home));
-        cmd.env_remove("RHEI_BUDGET_PARENT_RESERVATION");
-        cmd.env_remove("RHEI_BUDGET_PARENT_ACCOUNT");
         cmd.current_dir(cwd).arg("--state-machine").arg(&self.machine);
         args(&mut cmd);
         CliRun::from(&cmd.output().expect("rhei should run"))

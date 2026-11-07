@@ -69,6 +69,8 @@ fn rhei_command() -> Command {
     // the four fixtures that want a ceiling set it on the command they get back.
     // §REQ-test-isolation.3
     git_env::scrub_git_repository_env(&mut cmd);
+    // So is which rhei run it belongs to. §REQ-test-isolation.7
+    git_env::scrub_rhei_env(&mut cmd);
     cmd
 }
 

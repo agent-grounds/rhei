@@ -30,7 +30,8 @@ const HEADLESS_LAUNCH_LOCK: &str = "headless-launch.lock";
 
 /// Whether this process is the detached child of a `--headless` launch.
 pub(crate) fn is_headless_child() -> bool {
-    std::env::var_os(HEADLESS_CHILD_ENV).is_some()
+    // §REQ-test-isolation.7: the marker is read through the one reader of rhei's own variables.
+    inherited_rhei_var_os(HEADLESS_CHILD_ENV).is_some()
 }
 
 /// The one-live-run-per-rhei refusal, naming the run that is in the way.

@@ -46,12 +46,6 @@ raise SystemExit({code})
 
 fn start(fixture: &ProviderFixture, name: &str) -> RunningChild {
     let mut command = rhei_command(fixture.root.join(".home"));
-    // A nested fixture owns its admission and accounting context. §FS-rhei-budgets.5
-    for (key, _) in std::env::vars_os() {
-        if key.to_string_lossy().starts_with("RHEI_") {
-            command.env_remove(key);
-        }
-    }
     command.arg("--state-machine").arg(&fixture.machine).arg("run").arg(&fixture.root);
     command.args(["--no-tui", "--no-dashboard", "--json", "--continue-on-error", "--until-idle"]);
     RunningChild::spawn(&mut command, &fixture.dir, name)

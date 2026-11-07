@@ -35,9 +35,11 @@ struct InheritedAncestry {
 
 impl InheritedAncestry {
     /// The two variables as one descriptor. An empty value is no value: an
-    /// exporter that sets a variable to nothing has said nothing.
+    /// exporter that sets a variable to nothing has said nothing. Read through
+    /// the one reader of rhei's own variables, so a unit test's admission is
+    /// never parented by the run that started `cargo test`. §REQ-test-isolation.7
     fn from_environment() -> Option<Self> {
-        let read = |key: &str| std::env::var(key).ok().filter(|value| !value.is_empty());
+        let read = |key: &str| inherited_rhei_var(key).filter(|value| !value.is_empty());
         read(PARENT_RESERVATION_ENV)
             .map(|reservation| Self { reservation, account: read(PARENT_ACCOUNT_ENV) })
     }

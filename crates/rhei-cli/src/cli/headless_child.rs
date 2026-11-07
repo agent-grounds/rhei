@@ -93,8 +93,8 @@ fn headless_child_marker(options: &RunOptions) -> String {
 }
 
 fn headless_launcher_flag_was_supplied(flag: &str) -> bool {
-    std::env::var(HEADLESS_CHILD_ENV)
-        .ok()
+    // §REQ-test-isolation.7: the marker is read through the one reader of rhei's own variables.
+    inherited_rhei_var(HEADLESS_CHILD_ENV)
         .is_some_and(|marker| marker.split(',').any(|candidate| candidate == flag))
 }
 

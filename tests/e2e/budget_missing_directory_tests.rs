@@ -136,10 +136,6 @@ impl Fixture {
 
 fn run(project: &Path, home: &Path, args: &[&str]) -> CliRun {
     let mut command = rhei_command(home);
-    // §FS-rhei-budgets.7.1: the enclosing runner's reservation is not this fixture's.
-    for (name, _) in std::env::vars().filter(|(name, _)| name.starts_with("RHEI_")) {
-        command.env_remove(name);
-    }
     command
         .env("XDG_CONFIG_HOME", home.join(".config"))
         .env("GIT_CEILING_DIRECTORIES", project.parent().expect("fixture root"))

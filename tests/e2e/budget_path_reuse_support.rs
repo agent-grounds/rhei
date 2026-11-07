@@ -62,16 +62,11 @@ impl World {
     /// `rhei_command` pins `HOME` and `XDG_STATE_HOME` under this world's own
     /// home, which is what keeps a test off the developer's real budget
     /// authority: a case that reached it would write receipts and `roots.json`
-    /// entries against real project paths.
-    ///
-    /// The parent reservation is removed because this suite is itself run from
-    /// inside a `rhei run` on the machine that maintains it, so the descriptor
-    /// is in the environment and every case here would refuse for an unrelated
-    /// reason. §FS-rhei-budgets.7.1
+    /// entries against real project paths, and it takes off every inherited
+    /// `RHEI_*`, so no case is admitted under the reservation of the run this
+    /// suite was started from. §REQ-test-isolation.7
     pub(super) fn rhei(&self) -> Command {
-        let mut cmd = rhei_command(home_for(&self.dir));
-        cmd.env_remove("RHEI_BUDGET_PARENT_RESERVATION");
-        cmd
+        rhei_command(home_for(&self.dir))
     }
 
     pub(super) fn run(&self) -> CliRun {
@@ -183,10 +178,10 @@ impl World {
     /// directory, and the assertions that follow it still fail.
     /// §FS-rhei-budgets.10
     pub(super) fn shell(&self, line: &str) -> std::process::Output {
-        rhei_core::platform::system_shell_command(line)
-            .current_dir(&self.dir)
-            .output()
-            .expect("the offered command should run")
+        let mut shell = rhei_core::platform::system_shell_command(line);
+        // A shell, not `rhei_command`, so it takes the removal itself. §REQ-test-isolation.7
+        super::git_env::scrub_rhei_env(&mut shell);
+        shell.current_dir(&self.dir).output().expect("the offered command should run")
     }
 }
 

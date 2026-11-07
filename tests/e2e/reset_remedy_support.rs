@@ -172,13 +172,11 @@ pub(super) fn run_offer(line: &str, suffix: &str, home: &Path) -> CliRun {
     CliRun::from(&command.output().expect("the offered command should start"))
 }
 
+/// The pasted line runs under a shell rather than [`rhei_process_at`], so it
+/// takes the same removals itself. §REQ-test-isolation.3 §REQ-test-isolation.7
 pub(super) fn scrub_inherited_rhei_env(command: &mut Command) {
-    for (name, _) in std::env::vars_os() {
-        let name_text = name.to_string_lossy();
-        if name_text.starts_with("RHEI_") || name_text.starts_with("GIT_") {
-            command.env_remove(&name);
-        }
-    }
+    super::git_env::scrub_git_repository_env(command);
+    super::git_env::scrub_rhei_env(command);
 }
 
 /// The whole of §FS-rhei-reset.5.1 for one surface: every reset `said` offers
@@ -363,7 +361,6 @@ impl RemedyWorld {
     pub(super) fn rhei_output(&self, subcommand: &str, args: &[&str]) -> Output {
         let mut command = rhei_command(&self.home);
         command.current_dir(&self.cwd);
-        scrub_inherited_rhei_env(&mut command);
         if let Some(machine) = &self.machine {
             command.arg("--state-machine").arg(machine);
         }

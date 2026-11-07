@@ -100,12 +100,6 @@ pub fn fixture() -> (TestDir, PathBuf, PathBuf) {
 
 pub fn cli(dir: &Path, verb: &str, task: &str, args: &[&str], worker: bool) -> CliRun {
     let mut cmd = rhei_command(dir.join("home"));
-    // This fixture must model an operator, independent of its launching run.
-    for (key, _) in std::env::vars_os() {
-        if key.to_string_lossy().starts_with("RHEI_") {
-            cmd.env_remove(key);
-        }
-    }
     if worker {
         cmd.env("RHEI_TASK_ID", "plan.1");
     }

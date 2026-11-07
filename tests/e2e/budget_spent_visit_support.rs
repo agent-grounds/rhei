@@ -132,13 +132,6 @@ impl SpentWorld {
 
     pub fn cli(&self, args: &[&str]) -> CliRun {
         let mut cmd = rhei_command(&self.home);
-        // A fixture must not borrow the supervising run's identity or reservation.
-        // §FS-rhei-budgets.7.1
-        for (name, _) in std::env::vars_os() {
-            if name.to_string_lossy().starts_with("RHEI_") {
-                cmd.env_remove(name);
-            }
-        }
         cmd.env("XDG_CONFIG_HOME", self.home.join(".config"));
         cmd.env("GIT_CEILING_DIRECTORIES", &self.project);
         cmd.current_dir(&self.project).arg("--state-machine").arg(&self.machine).args(args);

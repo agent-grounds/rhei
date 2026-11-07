@@ -435,7 +435,6 @@ fn help_target_a_launch_it_could_not_report_reaches_the_run() {
     let full = fs::OpenOptions::new().write(true).open("/dev/full").expect("open /dev/full");
 
     let out = rhei_command(&case.home)
-        .env_remove("RHEI_BUDGET_PARENT_RESERVATION")
         .current_dir(&project)
         .args(["run", "--headless", "plan.rhei.md", "--no-callbacks"])
         .stdin(std::process::Stdio::null())

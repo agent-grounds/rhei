@@ -9,12 +9,10 @@ use super::effort_support::*;
 use super::evidence_support::one_start;
 use super::{assert_success, rhei_command, unique_temp_dir, CliRun};
 
+/// The fixture binary is spawned directly rather than through `rhei_command`,
+/// so it takes the shared removal itself. §REQ-test-isolation.7
 fn remove_run_identity(cmd: &mut Command) {
-    for (name, _) in std::env::vars_os() {
-        if name.to_string_lossy().starts_with("RHEI_") {
-            cmd.env_remove(name);
-        }
-    }
+    super::git_env::scrub_rhei_env(cmd);
 }
 
 fn assert_probe_isolated(agent: &str, executable: &str, expected: &[&str]) {
@@ -34,7 +32,6 @@ fn assert_probe_isolated(agent: &str, executable: &str, expected: &[&str]) {
     let plan_text = PLAN.replace("Exercise effort", "Exercise effort with --version in the prompt");
     let (plan, machine) = write_case(&dir, &plan_text, &machine);
     let mut cmd = rhei_command(dir.join("home"));
-    remove_run_identity(&mut cmd);
     cmd.env("PATH", path)
         .env("RHEI_CHECKOUT_ROOT", &outer)
         .env("RHEI_STATE", "specify")

@@ -56,13 +56,9 @@ impl World {
         self.project.join("plan.rhei.md")
     }
 
-    /// Every `rhei` these cases spawn. The parent reservation is removed
-    /// because this suite may itself run inside a `rhei run`.
-    /// §FS-rhei-budgets.7.1
+    /// Every `rhei` these cases spawn.
     pub(super) fn rhei(&self) -> Command {
-        let mut cmd = rhei_command(home_for(&self.dir));
-        cmd.env_remove("RHEI_BUDGET_PARENT_RESERVATION");
-        cmd
+        rhei_command(home_for(&self.dir))
     }
 
     /// One hand edge on task 1, unrun, for a case that sets limits on it.
@@ -177,10 +173,11 @@ impl World {
     /// this world's directory, and require that it succeeded.
     /// §FS-rhei-budgets.10
     pub(super) fn shell(&self, line: &str) {
-        let out: Output = rhei_core::platform::system_shell_command(line)
-            .current_dir(&self.dir)
-            .output()
-            .expect("the offered command should run");
+        let mut shell = rhei_core::platform::system_shell_command(line);
+        // A shell, not `rhei_command`, so it takes the removal itself. §REQ-test-isolation.7
+        super::git_env::scrub_rhei_env(&mut shell);
+        let out: Output =
+            shell.current_dir(&self.dir).output().expect("the offered command should run");
         assert!(
             out.status.success(),
             "the offered command runs: {line}\n{}{}",

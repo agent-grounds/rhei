@@ -96,12 +96,6 @@ transitions:
 
     fn command(&self, cwd: &Path, args: &[&str]) -> CliRun {
         let mut command = rhei_command(&self.home);
-        // Only isolated fixture processes discard the enclosing worker context.
-        for (key, _) in std::env::vars_os() {
-            if key.to_string_lossy().starts_with("RHEI_") {
-                command.env_remove(key);
-            }
-        }
         CliRun::from(&command.current_dir(cwd).args(args).output().unwrap())
     }
 

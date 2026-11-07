@@ -38,7 +38,6 @@ fn passed_alone(output: &std::process::Output) -> bool {
 /// Under a parent reservation the code cannot resolve, a plan run that reads it
 /// from the harness is refused with `nested admission cannot use ancestor`.
 #[test]
-#[ignore = "red until #635: the in-process plan run reads RHEI_BUDGET_PARENT_RESERVATION from the harness; implement removes this"]
 fn an_in_process_plan_run_reaches_its_clean_verdict_under_an_inherited_parent_reservation() {
     let test = "tests::missing_outputs_reschedule_single_invocation_spawns_once_and_keeps_state";
     let clean = rerun_this_binary(test, &[]);

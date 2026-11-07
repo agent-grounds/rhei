@@ -17,12 +17,6 @@ fn fixture(plan: &str, machine: &str) -> TestDir {
 
 fn invoke(dir: &Path, args: &[&str], worker: bool) -> CliRun {
     let mut command = rhei_command(dir.join("home"));
-    // These are independent scratch projects, never this worker's reservation.
-    for (key, _) in std::env::vars_os() {
-        if key.to_string_lossy().starts_with("RHEI_") {
-            command.env_remove(key);
-        }
-    }
     if worker {
         command.env("RHEI_TASK_ID", "plan.1");
     }

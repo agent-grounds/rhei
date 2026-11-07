@@ -77,7 +77,8 @@ fn retry_command(
         scope,
         state_machine_path,
         task_id,
-        std::env::var_os("RHEI_TASK_ID").is_some(),
+        // §REQ-test-isolation.7: read through the one reader of rhei's own variables.
+        inherited_rhei_var_os("RHEI_TASK_ID").is_some(),
     )
 }
 

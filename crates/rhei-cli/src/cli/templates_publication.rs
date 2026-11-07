@@ -46,7 +46,7 @@ fn validate_staged_project_member(
         ))?;
     let respell = |report: Report| respell_staging(report, staged, output);
     let refusal = |report: Report| {
-        let report = if discarded { discarded_member_report(project, output, report) } else { report };
+        let report = if discarded { discarded_member_report(project, output, staged, report) } else { report };
         respell(report)
     };
     let loaded =
@@ -88,7 +88,7 @@ pub(super) fn project_member_parse_report(
             && *path != project.join(workspace::PANTA_INDEX_FILE)
     }) else {
         return match proposed {
-            Some(output) => discarded_member_report(project, output, report),
+            Some(output) => discarded_member_report(project, output, staged, report),
             None => report,
         };
     };

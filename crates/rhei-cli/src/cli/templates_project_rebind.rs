@@ -208,10 +208,11 @@
     /// Only failures after applying the proposed default get placement recovery;
     /// failures loading the original project keep their own remedy. §FS-rhei-library.7.5
     fn replacement_refusal_report(project: &Path, mirror: &Path, report: Report) -> Report {
-        let context = format!(
+        let mut context = format!(
             "Placement replacing the default machine of project '{}' was refused.",
             crate::display_path(project),
         );
+        context.push_str(&original_project_machine_context(project));
         let report = discarded_placement_report(&context, mirror, report);
         respell_report(report, &copy_respellings(mirror, project))
     }

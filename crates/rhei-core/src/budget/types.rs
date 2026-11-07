@@ -353,7 +353,9 @@ impl BudgetError {
         }
     }
 
-    pub(crate) fn exhausted(code: &str, message: impl Into<String>, spent: Exhaustion) -> Self {
+    /// Public so a caller's tests can build a bound's refusal; `message` stays
+    /// unreadable outside core all the same. §FS-rhei-budgets.10.1
+    pub fn exhausted(code: &str, message: impl Into<String>, spent: Exhaustion) -> Self {
         Self {
             reason_code: code.into(),
             message: message.into(),

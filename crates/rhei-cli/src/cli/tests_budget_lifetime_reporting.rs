@@ -44,10 +44,10 @@ mod lifetime_reporting {
     }
 
     fn refusal(dimension: Dimension, contract: Contract, bound: u64, day: &str) -> BudgetError {
-        BudgetError {
-            reason_code: "invocation_exhausted".into(),
-            message: "spent".into(),
-            exhaustion: Some(Box::new(Exhaustion {
+        BudgetError::exhausted(
+            "invocation_exhausted",
+            "spent",
+            Exhaustion {
                 dimension,
                 subject: "project".into(),
                 counter: Counter { consumed: bound, reserved: 0 },
@@ -55,8 +55,8 @@ mod lifetime_reporting {
                 contract,
                 day: day.into(),
                 currency: dimension.is_money().then(|| "USD".into()),
-            })),
-        }
+            },
+        )
     }
 
     // Pin the resolved value and its rendering by both producers for every halt kind.

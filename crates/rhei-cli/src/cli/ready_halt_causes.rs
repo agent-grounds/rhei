@@ -508,9 +508,6 @@ fn classify_halt(
     if let Some(label) = machine.states.get(&state).and_then(|def| def.waiting_on_person()) {
         return HaltCause::WaitingOnPerson { label: label.to_string() };
     }
-    if let Ok(Some(to)) = manual_initial_terminal_transition(task, rhei, machine) {
-        return HaltCause::ManualOnly { to };
-    }
     // Ahead of every work-shaped cause below: an interrupted worker explains
     // both an unwritten artifact and a bare stall. §FS-rhei-run-report.3.1
     if interrupted {
@@ -528,6 +525,11 @@ fn classify_halt(
             },
             _ => HaltCause::Stalled,
         };
+    }
+    // Only infer manual-only work when this run neither worked nor interrupted
+    // the ticket. §FS-rhei-run-report.3.1
+    if let Ok(Some(to)) = manual_initial_terminal_transition(task, rhei, machine) {
+        return HaltCause::ManualOnly { to };
     }
     // Readiness refused this ticket because a file it needs is not there — but
     // only say so when the input is what the scan stopped at, never over a wait

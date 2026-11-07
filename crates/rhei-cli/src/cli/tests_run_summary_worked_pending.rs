@@ -24,7 +24,6 @@
     }
 
     #[test]
-    #[ignore = "red until #597: pending worker's missing outputs outrank manual shape; implement removes this"]
     fn issue_597_pending_work_with_missing_outputs_is_missing_outputs() {
         let cause = pending_cause(true, true, false, "");
         assert!(matches!(&cause, HaltCause::MissingOutputs { entries, exit_code: Some(0), .. }
@@ -32,7 +31,6 @@
     }
 
     #[test]
-    #[ignore = "red until #597: pending worker without missing-output evidence is stalled; implement removes this"]
     fn issue_597_pending_work_without_missing_outputs_is_stalled() {
         let cause = pending_cause(true, false, false, "");
         assert!(matches!(cause, HaltCause::Stalled), "{cause:?}");
@@ -42,7 +40,6 @@
     }
 
     #[test]
-    #[ignore = "red until #597: pending worker's interruption outranks manual shape and missing outputs; implement removes this"]
     fn issue_597_pending_interruption_outranks_missing_outputs_and_manual_shape() {
         for missing in [false, true] {
             let cause = pending_cause(true, missing, true, "");

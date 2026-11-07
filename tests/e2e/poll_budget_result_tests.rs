@@ -172,7 +172,6 @@ const TWO_TICKETS: [(&str, &str); 2] = [
 /// the ticket moved. Exit 75 was no failure and chose no edge.
 // §FS-rhei-run.5.1 §FS-rhei-errors.1.5
 #[test]
-#[ignore = "red until #608: the entry names the exit and never the spent poll budget; implement removes this"]
 fn a_program_poll_answering_75_until_its_budget_is_spent_names_the_budget() {
     let (dir, plan, machine) = run_program_poll(
         "poll-budget-issue-fixture",
@@ -189,7 +188,6 @@ fn a_program_poll_answering_75_until_its_budget_is_spent_names_the_budget() {
 /// The worker pool's program path is a separate call site.
 // §FS-rhei-run.5.1 §FS-rhei-run.5
 #[test]
-#[ignore = "red until #608: the worker pool's entry never names the spent poll budget; implement removes this"]
 fn the_worker_pool_names_the_budget_a_program_poll_spent() {
     let (dir, ws, machine) = create_workspace("poll-budget-pool", "# Rhei: Poll\n", &TWO_TICKETS);
     let script = write_python_agent(&dir, "worker.py", "sys.exit(75)\n");
@@ -216,7 +214,6 @@ fn the_worker_pool_names_the_budget_a_program_poll_spent() {
 /// wait. So the entry names the budget and the exit that actually happened.
 // §FS-rhei-run.5.1
 #[test]
-#[ignore = "red until #608: a crash on a poll's last attempt reads like any other exit; implement removes this"]
 fn a_crash_on_the_last_attempt_names_the_budget_and_that_exit() {
     let (dir, plan, machine) = run_program_poll(
         "poll-budget-last-crash",
@@ -250,7 +247,6 @@ fn assert_the_budget_is_named_after(
 /// the exact code its self-loop does. Whatever it declares, the budget chose it.
 // §FS-rhei-run.5.1 §FS-rhei-programs.3.2
 #[test]
-#[ignore = "red until #608: an exhaustion edge on the self-loop's code gets no budget named; implement removes this"]
 fn an_exhaustion_edge_declaring_the_self_loops_code_names_the_budget() {
     let exhaustion =
         "  - { from: awaiting-checks, to: completed, exit_code: 75, description: Out of attempts }";
@@ -268,7 +264,6 @@ fn an_exhaustion_edge_declaring_the_self_loops_code_names_the_budget() {
 /// the same edge reports while attempts remain.
 // §FS-rhei-run.5.1 §FS-rhei-programs.3.2
 #[test]
-#[ignore = "red until #608: a catch-all the spent budget left gets no budget named; implement removes this"]
 fn a_catch_all_the_spent_budget_left_names_the_budget() {
     assert_the_budget_is_named_after(
         "poll-budget-catch-all-spent",
@@ -283,7 +278,6 @@ fn a_catch_all_the_spent_budget_left_names_the_budget() {
 /// `exit_code:` to recognize the wait.
 // §FS-rhei-run.5.1
 #[test]
-#[ignore = "red until #608: a condition-only self-loop gets no budget named; implement removes this"]
 fn a_condition_only_self_loop_names_the_budget() {
     assert_the_budget_is_named_after(
         "poll-budget-condition-loop",
@@ -294,12 +288,27 @@ fn a_condition_only_self_loop_names_the_budget() {
     );
 }
 
+/// A last attempt whose exit has an exact edge of its own: the ticket takes that
+/// edge, but the spent budget is what let the exit leave, so the budget is still
+/// named beside the exit. The classification, not the edge's code, decides this.
+// §FS-rhei-run.5.1 §FS-rhei-programs.3.2
+#[test]
+fn a_different_exact_edge_on_the_last_attempt_names_the_budget() {
+    let route = "  - { from: awaiting-checks, to: checked, exit_code: 3, description: Routed }";
+    assert_the_budget_is_named_after(
+        "poll-budget-other-exact-edge",
+        "sys.exit([75, 75, 3][attempt - 1])\n",
+        &[SELF_LOOP_ON_75, route],
+        "checked",
+        3,
+    );
+}
+
 /// The second copy of the rule, and the one the issue does not name. An agent's
 /// first attempt finishes and takes the self-loop; its second fails, and the
 /// budget it spent is the only thing that selects an edge for it.
 // §FS-rhei-run.5.1 §FS-rhei-states.3.3
 #[test]
-#[ignore = "red until #608: an agent poll's entry never names the spent budget; implement removes this"]
 fn an_agent_poll_that_spends_its_budget_names_it() {
     let dir = unique_temp_dir("poll-budget-agent");
     write_mock_agent(&dir, &dir, "sys.exit([0, 1][attempt - 1])\n");
@@ -322,7 +331,6 @@ fn an_agent_poll_that_spends_its_budget_names_it() {
 /// whole budget.
 // §FS-rhei-run.5.1 §FS-rhei-run.5
 #[test]
-#[ignore = "red until #608: the agent worker pool's entry never names the spent budget; implement removes this"]
 fn the_worker_pool_names_the_budget_an_agent_poll_spent() {
     let (dir, ws, machine) =
         create_workspace("poll-budget-agent-pool", "# Rhei: Poll\n", &TWO_TICKETS);

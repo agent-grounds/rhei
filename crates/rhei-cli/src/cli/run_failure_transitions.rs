@@ -280,12 +280,11 @@ fn fire_agent_exit_transition(
     machines: &ExecutionMachines,
     task_id_str: &str,
     from_state: &str,
-    to_state: &str,
+    // What the caller's selection returned: an exhausted poll budget picks its
+    // edge by evaluating conditions, so neither the rule nor how it matched can
+    // be recovered from the state pair afterwards. §FS-rhei-transitions.4.4
+    exit_route: &ProgramExitRoute,
     exit_code: i32,
-    // Which rule the caller's selection chose: an exhausted poll budget picks
-    // its edge by evaluating conditions, so the pair cannot recover it
-    // afterwards. §FS-rhei-transitions.4.4
-    selected_rule: Option<usize>,
     no_callbacks: bool,
 ) -> TimeoutTransitionOutcome {
     // The failing ticket's own machine and callback base fire the transition.
@@ -303,16 +302,11 @@ fn fire_agent_exit_transition(
         machine,
         &route.local_id,
         from_state,
-        to_state,
+        // A timeout never reaches here, and load refuses an `exit_code:` edge from
+        // a state with no `program:`, so this is a spent poll budget's edge and the
+        // selection says so, as it does for a program. §FS-rhei-run.5.1
+        exit_route,
         exit_code,
-        // Every edge that reaches here is one the engine chose for a worker it
-        // ended — a timeout, an agent's failure, a spent poll budget — so none
-        // of them is a declared route. §FS-rhei-programs.3.2
-        ExitCodeMatch::None,
-        // Every caller here is an agent exit whose selection chose a rule, so one
-        // always arrives; the `Option` is for the callers that name only a state
-        // pair and have none. §FS-rhei-transitions.4.4
-        selected_rule,
         no_callbacks,
     ) {
         Ok(effective_to) => {

@@ -341,12 +341,10 @@ fn run_sequential_program_work_items(
                         machine,
                         &route.local_id,
                         current_state,
-                        to_state,
-                        exit_code,
-                        exit_route.matched,
                         // The rule this very selection chose, over this very
                         // machine. §FS-rhei-programs.3.2
-                        Some(exit_route.selected_rule),
+                        &exit_route,
+                        exit_code,
                         opts.no_callbacks(),
                     );
                     if leave_refused_exit_unrouted(&routed, &mut release, &plan.record) {

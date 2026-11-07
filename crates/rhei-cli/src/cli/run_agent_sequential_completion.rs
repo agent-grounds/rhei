@@ -205,15 +205,15 @@ fn handle_sequential_agent_completion(
             } else {
                 SnapshotCompletion::Failure
             };
-            // The target and, where a selection chose it, the rule: a timeout
+            // The target and, where a selection chose it, the route: a timeout
             // computes a target and selects nothing, an exhausted poll's edge is
             // chosen by evaluating conditions. §FS-rhei-transitions.4.4
-            let (failure_selected_to_state, failure_selected_rule) = if timed_out {
+            let (failure_selected_to_state, failure_exit_route) = if timed_out {
                 (find_timeout_transition(machine, current_state), None)
             } else if !status.success() {
                 // Load refuses an `exit_code:` edge from a state with no `program:`,
-                // so an agent reaches this only by a poll exhaustion edge, whose
-                // classification the caller never reads. §FS-rhei-run.5.1
+                // so an agent reaches this only by a poll exhaustion edge, and the
+                // route carries the budget that chose it. §FS-rhei-run.5.1
                 let route = find_program_exit_transition(
                     machine,
                     loaded.rhei.metadata.as_ref(),
@@ -221,10 +221,7 @@ fn handle_sequential_agent_completion(
                     current_state,
                     status.code().unwrap_or(-1),
                 )?;
-                (
-                    route.as_ref().map(|route| route.to.clone()),
-                    route.map(|route| route.selected_rule),
-                )
+                (route.as_ref().map(|route| route.to.clone()), route)
             } else {
                 (None, None)
             };
@@ -539,15 +536,14 @@ fn handle_sequential_agent_completion(
                     code,
                     task_id_str
                 );
-                if let Some(to_state) = failure_selected_to_state.as_deref() {
+                if let Some(exit_route) = failure_exit_route.as_ref() {
                     let fired = fire_agent_exit_transition(
                         input,
                         machines,
                         task_id_str,
                         state_before,
-                        to_state,
+                        exit_route,
                         code,
-                        failure_selected_rule,
                         opts.no_callbacks(),
                     );
                     leave_refused_exit_unrouted(&fired, &mut release, &spawn_record);

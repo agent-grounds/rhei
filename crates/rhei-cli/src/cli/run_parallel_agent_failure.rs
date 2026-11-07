@@ -15,10 +15,11 @@ struct ParallelAgentFailure<'a> {
     timed_out: bool,
     timeout_secs: Option<u64>,
     code: i32,
-    /// The edge the failure selection chose, when it chose one.
+    /// The target a timeout computed or the failure selection chose.
     to_state: Option<&'a str>,
-    /// Which rule it chose. §FS-rhei-transitions.4.4
-    selected_rule: Option<usize>,
+    /// The failure selection itself, where one ran; a timeout selects nothing.
+    /// §FS-rhei-transitions.4.4
+    exit_route: Option<&'a ProgramExitRoute>,
     spawn_record: &'a Path,
 }
 
@@ -56,15 +57,14 @@ fn route_parallel_agent_failure(
             MessageLevel::Error,
             format!("  error: agent exited with code {code} for task {task_id_str}"),
         );
-        failure.to_state.map(|to_state| {
+        failure.exit_route.map(|exit_route| {
             fire_agent_exit_transition(
                 input,
                 machines,
                 task_id_str,
                 state_name,
-                to_state,
+                exit_route,
                 code,
-                failure.selected_rule,
                 opts.no_callbacks(),
             )
         })

@@ -111,10 +111,10 @@ fn handle_parallel_agent_exit(
     let mut missing_required_outputs = Vec::new();
     let mut snapshot_completion_for_emit = None;
     let mut failure_selected_to_state = None;
-    // Which rule the selection chose, where a selection ran at all: an exhausted
-    // poll's edge is picked by evaluating candidates' conditions, and the
-    // `(from, to)` pair cannot recover it. §FS-rhei-transitions.4.4
-    let mut failure_selected_rule = None;
+    // What the selection returned, where one ran at all: an exhausted poll's edge
+    // is picked by evaluating candidates' conditions, and the `(from, to)` pair
+    // cannot recover it. §FS-rhei-transitions.4.4
+    let mut failure_exit_route = None;
     // Hoisted out of the block below so the pending-invocation
     // check can ask the same question about the same edge.
     // §FS-rhei-agents.3.2
@@ -179,12 +179,12 @@ fn handle_parallel_agent_exit(
         } else {
             SnapshotCompletion::Failure
         };
-        (failure_selected_to_state, failure_selected_rule) = if timed_out {
+        (failure_selected_to_state, failure_exit_route) = if timed_out {
             (find_timeout_transition(machine, &state_name), None)
         } else if !status.success() {
             // Load refuses an `exit_code:` edge from a state with no `program:`,
-            // so an agent reaches this only by a poll exhaustion edge, whose
-            // classification the caller never reads. §FS-rhei-run.5.1
+            // so an agent reaches this only by a poll exhaustion edge, and the
+            // route carries the budget that chose it. §FS-rhei-run.5.1
             let route = find_program_exit_transition(
                 machine,
                 reloaded.rhei.metadata.as_ref(),
@@ -192,10 +192,7 @@ fn handle_parallel_agent_exit(
                 &state_name,
                 status.code().unwrap_or(-1),
             )?;
-            (
-                route.as_ref().map(|route| route.to.clone()),
-                route.map(|route| route.selected_rule),
-            )
+            (route.as_ref().map(|route| route.to.clone()), route)
         } else {
             (None, None)
         };
@@ -516,7 +513,7 @@ fn handle_parallel_agent_exit(
             timeout_secs,
             code: status.code().unwrap_or(-1),
             to_state: failure_selected_to_state.as_deref(),
-            selected_rule: failure_selected_rule,
+            exit_route: failure_exit_route.as_ref(),
             spawn_record: &spawn_record,
         };
         route_parallel_agent_failure(failure, input, machines, opts, sink, &mut release, progress)?;

@@ -80,7 +80,7 @@ fn budget_target_printed_the_nothing_to_retire_show_runs() {
 }
 
 /// A verb that could not open the account sends its reader to `show`, the help
-/// `budget_result_at` writes.
+/// `budget_result` writes.
 // §FS-rhei-budgets.10.1 §FS-rhei-budgets.5.4
 #[test]
 fn budget_target_printed_the_account_error_show_runs() {

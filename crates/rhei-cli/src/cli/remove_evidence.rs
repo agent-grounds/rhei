@@ -254,7 +254,7 @@ fn note_and_event_evidence(project_root: &Path, id: &str, out: &mut Vec<(String,
 }
 
 /// A reservation, start or travel receipt for the ticket; an identity binding
-/// alone is not evidence. §FS-rhei-remove.2 §FS-rhei-budgets.5.2
+/// alone is not evidence. §FS-rhei-remove.2 §FS-rhei-budgets.5.2 §FS-rhei-budgets.10.1
 fn budget_evidence(
     loaded: &LoadedPlan,
     project_root: &Path,

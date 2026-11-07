@@ -128,13 +128,11 @@ fn complete_below_quotation(workspace: bool, text: &str) {
 // The issue's two shapes, on the command it ran.
 
 #[test]
-#[ignore = "red until #622: complete refuses, naming a State line the task has; implement removes this"]
 fn fence_reader_622_complete_fence_value_single() {
     complete_finishes(false, &plan(FENCE_YAML));
 }
 
 #[test]
-#[ignore = "red until #622: complete refuses, naming a State line the task has; implement removes this"]
 fn fence_reader_622_complete_fence_value_workspace() {
     complete_finishes(true, &task_file(FENCE_FILE));
 }
@@ -142,13 +140,11 @@ fn fence_reader_622_complete_fence_value_workspace() {
 // The claim scans the same way; the issue inferred this from the code and never ran it.
 
 #[test]
-#[ignore = "red until #622: a claim refuses, naming metadata the task has; implement removes this"]
 fn fence_reader_622_claim_fence_value_single() {
     claim_succeeds(false, &plan(FENCE_YAML));
 }
 
 #[test]
-#[ignore = "red until #622: a claim refuses, naming metadata the task has; implement removes this"]
 fn fence_reader_622_claim_fence_value_workspace() {
     claim_succeeds(true, &task_file(FENCE_FILE));
 }
@@ -156,25 +152,21 @@ fn fence_reader_622_claim_fence_value_workspace() {
 // The reverse direction: YAML read as the task. These exit 0 today and damage the plan.
 
 #[test]
-#[ignore = "red until #622: complete exits 0 and leaves the task open; implement removes this"]
 fn fence_reader_622_complete_column_0_decoy_single() {
     complete_finishes(false, &plan(COLUMN_0_DECOY_YAML));
 }
 
 #[test]
-#[ignore = "red until #622: complete writes done into the YAML value, not the task; implement removes this"]
 fn fence_reader_622_complete_column_0_decoy_workspace() {
     complete_finishes(true, &task_file(COLUMN_0_DECOY_FILE));
 }
 
 #[test]
-#[ignore = "red until #622: a claim writes its assignee into the YAML value; implement removes this"]
 fn fence_reader_622_claim_column_0_decoy_single() {
     claim_succeeds(false, &plan(COLUMN_0_DECOY_YAML));
 }
 
 #[test]
-#[ignore = "red until #622: a claim writes its assignee into the YAML value; implement removes this"]
 fn fence_reader_622_claim_column_0_decoy_workspace() {
     claim_succeeds(true, &task_file(COLUMN_0_DECOY_FILE));
 }
@@ -182,26 +174,22 @@ fn fence_reader_622_claim_column_0_decoy_workspace() {
 // Where the block stands: every place the parsers find it. §FS-rhei-plan-language.2.3
 
 #[test]
-#[ignore = "red until #622: the block past a fence under the header is scanned; implement removes this"]
 fn fence_reader_622_complete_block_past_a_fence() {
     complete_finishes(false, &plan(&format!("```\nquoted\n```\n\n{FENCE_YAML}")));
 }
 
 #[test]
-#[ignore = "red until #622: a leading block below blank lines is scanned; implement removes this"]
 fn fence_reader_622_complete_block_below_blank_lines_workspace() {
     complete_finishes(true, &task_file(&format!("\n\n{FENCE_FILE}")));
 }
 
 #[test]
-#[ignore = "red until #622: a CRLF block is scanned; implement removes this"]
 fn fence_reader_622_complete_crlf_block() {
     complete_finishes(false, &plan(FENCE_YAML).replace('\n', "\r\n"));
 }
 
 /// A header and a `---` quoted above the real header are content, so the block is the one below.
 #[test]
-#[ignore = "red until #622: the block under the real header is scanned; implement removes this"]
 fn fence_reader_622_complete_block_below_a_quoted_header() {
     let quoted = "```\n# Rhei: quoted\n---\nquoted: true\n---\n```\n\n";
     complete_finishes(false, &format!("{quoted}{}", plan(FENCE_YAML)));

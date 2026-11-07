@@ -8,6 +8,10 @@
 //! walk the same lines themselves, taking the first header by this pattern and
 //! the fence rule, and passing the same lines over on the way to its frontmatter.
 //! §FS-rhei-plan-language.2.3
+//!
+//! A command that scans a document's raw lines reads them through
+//! [`DocumentFence`], which knows that block, so the lines the parsers hand to
+//! YAML are not the plan's text to it either. §FS-rhei-plan-language.2.1
 
 use crate::fence::FenceTracker;
 use regex::Regex;
@@ -72,11 +76,9 @@ pub fn find_frontmatter<'a>(lines: impl IntoIterator<Item = &'a str>) -> Option<
     let mut below = (header + 1..).zip(lines);
     let content =
         below.find(|(_, line)| !(fence.read(line) || fence.is_open() || line.trim().is_empty()));
-    let block =
-        content.filter(|(_, line)| line.trim() == "---").map(|(open, _)| FrontmatterBlock {
-            open,
-            close: below.find(|(_, line)| line.trim() == "---").map(|(close, _)| close),
-        });
+    let block = content
+        .filter(|(_, line)| line.trim() == "---")
+        .map(|(open, _)| block_opened_at(open, &mut below));
     Some(FrontmatterPlace { header, block })
 }
 
@@ -87,13 +89,95 @@ pub fn find_leading_frontmatter<'a>(
     lines: impl IntoIterator<Item = &'a str>,
 ) -> Option<FrontmatterBlock> {
     let mut lines = lines.into_iter().enumerate();
-    let (open, _) = lines
-        .by_ref()
-        .find(|(_, line)| !line.trim().is_empty())
-        .filter(|(_, line)| line.trim() == "---")?;
-    let close = lines.find(|(_, line)| line.trim() == "---").map(|(close, _)| close);
-    Some(FrontmatterBlock { open, close })
+    let (open, first) = lines.find(|(_, line)| !line.trim().is_empty())?;
+    (first.trim() == "---").then(|| block_opened_at(open, lines))
 }
 
+/// The block whose opening `---` is at `open`, closed by the first `---` below it.
+fn block_opened_at<'a>(
+    open: usize,
+    mut below: impl Iterator<Item = (usize, &'a str)>,
+) -> FrontmatterBlock {
+    let close = below.find(|(_, line)| line.trim() == "---").map(|(close, _)| close);
+    FrontmatterBlock { open, close }
+}
+
+/// The frontmatter block of a whole document, wherever the parsers read one: a
+/// task file's leading block, or else the block under the header of a plan.
+///
+/// A task file's body is read under a synthetic header, so a `# Rhei:` line in it
+/// is the body's text and a `---` below that line is too. What tells the two apart
+/// in text alone is the `## Tasks` chapter: a plan's tickets stand under one, and a
+/// task file refuses one. §FS-rhei-plan-language.2.3 §FS-rhei-plan-language.1.4
+fn find_document_block(text: &str) -> Option<FrontmatterBlock> {
+    find_leading_frontmatter(text.lines()).or_else(|| {
+        let block = find_frontmatter(text.lines())?.block?;
+        let mut fence = FenceTracker::default();
+        let has_tasks_chapter = text.lines().skip(block.close? + 1).any(|line| {
+            let is_fence = fence.read(line);
+            !is_fence && !fence.is_open() && is_tasks_chapter(line)
+        });
+        has_tasks_chapter.then_some(block)
+    })
+}
+
+/// The `## Tasks` line, spelled any way the parsers accept it.
+fn is_tasks_chapter(line: &str) -> bool {
+    line.trim()
+        .strip_prefix("##")
+        .is_some_and(|rest| rest.starts_with(char::is_whitespace) && rest.trim() == "Tasks")
+}
+
+/// The fence a line-by-line scan of a document's raw text is inside, counting the
+/// frontmatter block as one.
+///
+/// The block's lines are YAML, so none of them is read as a fence, and
+/// [`DocumentFence::is_open`] holds from its opening `---` through its closing one:
+/// a scan that takes no production from a fenced line takes none from them. This is
+/// [`FenceTracker`] for text that still carries its block, and it finds that block
+/// where the parsers do rather than each scan skipping it for itself.
+/// §FS-rhei-plan-language.2.1
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct DocumentFence {
+    fence: FenceTracker,
+    block: Option<FrontmatterBlock>,
+    next_line: usize,
+    in_block: bool,
+}
+
+impl DocumentFence {
+    /// The reader of a whole document, its frontmatter block found in `text`.
+    /// §FS-rhei-plan-language.2.1
+    pub fn new(text: &str) -> Self {
+        Self { block: find_document_block(text), ..Self::default() }
+    }
+
+    /// The reader of text whose block is already off, such as a template's body:
+    /// a `---` at the top of that text is content. §FS-rhei-plan-language.2.1
+    pub fn body() -> Self {
+        Self::default()
+    }
+
+    /// Read the document's next line, and say whether it is a fence line. Call this
+    /// exactly once per line, in order, from the document's first line: the block
+    /// is known by line number. §FS-rhei-plan-language.2.1
+    pub fn read(&mut self, line: &str) -> bool {
+        let index = self.next_line;
+        self.next_line += 1;
+        self.in_block = self
+            .block
+            .is_some_and(|block| index >= block.open && block.close.is_none_or(|c| index <= c));
+        !self.in_block && self.fence.read(line)
+    }
+
+    /// True while the line just read is in a fenced block or the frontmatter block,
+    /// so no production of the grammar is recognized on it. §FS-rhei-plan-language.2.1
+    pub fn is_open(&self) -> bool {
+        self.in_block || self.fence.is_open()
+    }
+}
+
+#[cfg(test)]
+mod document_fence_tests;
 #[cfg(test)]
 mod tests;

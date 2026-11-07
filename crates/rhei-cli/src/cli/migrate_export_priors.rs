@@ -297,7 +297,7 @@ fn rewrite_export_priors(
 fn rewrite_one_consumer(raw: &str, local_id: &str, references: &[&str]) -> Result<String, String> {
     let lines = line_spans(raw);
     // §FS-rhei-plan-language.2.1: quoted headings do not bound the consumer.
-    let mut in_code = rhei_core::fence::FenceTracker::default();
+    let mut in_code = rhei_core::header::DocumentFence::new(raw);
     let mut target_heading = None;
     let mut target_end = raw.len();
     for (start, end) in &lines {

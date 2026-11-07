@@ -269,3 +269,90 @@ fn reset_keeps_the_real_header_below_a_frontmatter_fence_in_a_quotation() {
     assert!(text.contains(&format!("\n{ONE_SPACE}\n")), "the real header stays:\n{text}");
     assert!(!text.contains("stateVisits"), "reset clears the runtime metadata:\n{text}");
 }
+
+/// The title the plan reports, read the way a caller of `rhei render` reads it.
+#[track_caller]
+fn rendered_title(world: &RemedyWorld) -> String {
+    let run = world.rhei("render", &["--format", "json"]);
+    assert!(run.status.success(), "`rhei render` failed:\n{}{}", run.stdout, run.stderr);
+    let plan: serde_json::Value = serde_json::from_str(&run.stdout).expect("render prints JSON");
+    plan["title"].as_str().expect("the plan has a title").to_string()
+}
+
+/// A second header between the first and `## Tasks`: the first names the plan and takes
+/// the write, and the second stays where it was, as content. §FS-rhei-plan-language.2.3
+#[track_caller]
+fn assert_the_first_header_is_the_header(name: &str, above_tasks: &str, between: &str) {
+    let world = single_file(name, above_tasks);
+    assert_validates(&world);
+    assert_eq!(rendered_title(&world), "first");
+    assert_completes(&world, "1", "plan.1");
+    assert_eq!(rendered_title(&world), "first");
+    let text = read(&world, "plan.rhei.md");
+    let below = text.strip_prefix("# Rhei: first\n").expect("the first header stays on top");
+    let block = below.trim_start_matches('\n').strip_prefix("---\n").expect("the write is next");
+    let (block, rest) = block.split_once("---\n").expect("the block closes");
+    assert!(block.contains("budgetTicketId"), "the write landed there:\n{text}");
+    assert!(rest.contains(between), "what stood between them stays:\n{text}");
+    assert!(rest.contains("# Rhei: second\n"), "the second header stays as content:\n{text}");
+}
+
+#[test]
+fn the_first_of_two_headers_with_prose_between_is_the_header() {
+    let plan = "# Rhei: first\n\nprose\n\n# Rhei: second\n";
+    assert_the_first_header_is_the_header("header-two-prose", plan, "prose\n");
+}
+
+#[test]
+fn the_first_of_two_headers_with_a_chapter_between_is_the_header() {
+    let plan = "# Rhei: first\n\n## Notes\n\nA note.\n\n# Rhei: second\n";
+    assert_the_first_header_is_the_header("header-two-chapter", plan, "## Notes\n");
+}
+
+#[test]
+fn the_first_of_two_headers_with_a_fence_between_is_the_header() {
+    let plan = "# Rhei: first\n\n```\nx\n```\n\n# Rhei: second\n---\nowner: keep\n---\n";
+    assert_the_first_header_is_the_header("header-two-fence", plan, "```\nx\n```\n");
+}
+
+/// What the first-header rule costs a document outside the grammar: a block under a
+/// second header is no longer read, so a kind only it declares stops being declared.
+/// §FS-rhei-plan-language.2.3
+#[test]
+fn a_structure_block_under_a_second_header_is_not_read() {
+    let plan = "# Rhei: first\n# Rhei: second\n---\nstructure:\n  nodeKinds: [task, bug]\n---\n\n\
+                ## Tasks\n\n### Bug 1: First\n**State:** open\n";
+    let world = plan_world("header-two-structure", MACHINE, plan);
+    let run = world.rhei("validate", &[]);
+    assert!(!run.status.success(), "the kind is undeclared:\n{}{}", run.stdout, run.stderr);
+    assert!(run.stderr.contains("unknown node kind"), "it says so:\n{}", run.stderr);
+}
+
+/// A write ends every line in a newline alone, and only the ending changes above the
+/// block. §FS-rhei-plan-language.2.3
+#[test]
+fn a_frontmatter_write_keeps_the_text_above_it_and_leaves_no_carriage_return() {
+    let index = "<!-- a -->\r\n```\r\n# Rhei: quoted\r\n```\r\n#  Rhei: WS\r\n";
+    let world = workspace("header-crlf", index);
+    assert_completes(&world, "1", "ws.1");
+    let text = read(&world, "index.rhei.md");
+    assert!(!text.contains('\r'), "no carriage return is left:\n{text:?}");
+    assert!(
+        text.starts_with("<!-- a -->\n```\n# Rhei: quoted\n```\n#  Rhei: WS\n---\n"),
+        "the text above the block stays:\n{text}"
+    );
+}
+
+/// The write finds a block below a fence where the parser does, rather than opening a
+/// second block above the fence and leaving the first stale. §FS-rhei-plan-language.2.3
+#[test]
+fn a_frontmatter_write_replaces_a_block_below_a_fence() {
+    let index = "# Rhei: WS\n\n```\nx\n```\n\n---\nowner: keep\n---\n";
+    let world = workspace("header-block-below-fence", index);
+    assert_completes(&world, "1", "ws.1");
+    let text = read(&world, "index.rhei.md");
+    let (above, below) = text.split_once("```\nx\n```\n\n---\n").expect("the block stays below it");
+    assert_eq!(above, "# Rhei: WS\n\n", "nothing opens above the fence:\n{text}");
+    assert!(below.contains("owner: keep") && below.contains("budgetTicketId"), "{text}");
+    assert_eq!(text.matches("owner: keep").count(), 1, "one block, not two:\n{text}");
+}

@@ -79,3 +79,54 @@ fn the_title_is_the_first_capture_under_the_names_asked_for() {
     let any = header_regex(&[RHEI_HEADER, PANTA_HEADER]);
     assert_eq!(&any.captures("# Panta: B").unwrap()[1], "B");
 }
+
+fn block_of(text: &str) -> Option<(usize, Option<usize>)> {
+    let place = find_frontmatter(text.lines()).expect("the document has a header");
+    place.block.map(|block| (block.open, block.close))
+}
+
+#[test]
+fn a_document_with_no_header_has_no_frontmatter_place() {
+    assert_eq!(find_frontmatter("---\nowner: me\n---\n".lines()), None);
+    assert_eq!(find_frontmatter("```\n# Rhei: quoted\n```\n".lines()), None);
+}
+
+#[test]
+fn the_block_is_the_next_thing_under_the_header() {
+    assert_eq!(block_of("# Rhei: T\n---\nowner: me\n---\n"), Some((1, Some(3))));
+    assert_eq!(block_of("#  Panta: T\n\n  \n---\n---\n"), Some((3, Some(4))));
+    assert_eq!(block_of("# Rhei: T\n  ---  \nowner: me\n---\t\n"), Some((1, Some(3))));
+}
+
+#[test]
+fn a_fence_under_the_header_is_passed_over_on_the_way_to_the_block() {
+    assert_eq!(block_of("# Rhei: T\n\n```\nx\n```\n\n---\nowner: me\n---\n"), Some((6, Some(8))));
+}
+
+#[test]
+fn a_dashed_line_in_a_quotation_is_not_the_block() {
+    assert_eq!(block_of("```\n---\n```\n\n# Rhei: T\n"), None);
+    assert_eq!(block_of("```\n---\n```\n\n# Rhei: T\n---\n---\n"), Some((5, Some(6))));
+    assert_eq!(block_of("# Rhei: T\n```\n---\n```\n"), None);
+    assert_eq!(block_of("# Rhei: T\n```\n---\n"), None);
+}
+
+#[test]
+fn a_dashed_line_below_anything_else_is_content() {
+    assert_eq!(block_of("# Rhei: T\n\nprose\n\n---\nowner: me\n---\n"), None);
+    assert_eq!(block_of("# Rhei: T\n\n## Notes\n\n---\n"), None);
+    assert_eq!(block_of("# Rhei: T\n# Rhei: second\n---\nowner: me\n---\n"), None);
+}
+
+#[test]
+fn a_block_left_open_says_so_and_a_fence_does_not_close_it() {
+    assert_eq!(block_of("# Rhei: T\n---\nowner: me\n"), Some((1, None)));
+    assert_eq!(block_of("# Rhei: T\n---\n```\n---\n```\n"), Some((1, Some(3))));
+}
+
+#[test]
+fn the_place_names_the_header_above_the_block() {
+    let place = find_frontmatter("prose\n\n# Rhei: T\n\n---\n---\n".lines()).unwrap();
+    assert_eq!(place.header, 2);
+    assert_eq!(place.block, Some(FrontmatterBlock { open: 4, close: Some(5) }));
+}

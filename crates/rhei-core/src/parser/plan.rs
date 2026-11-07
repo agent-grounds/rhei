@@ -153,7 +153,8 @@ pub fn parse(input: &str) -> Result<Rhei> {
                 return Err(retired_states_line(line_number));
             }
 
-            if let Some(cap) = re_rhei.captures(line) {
+            // The first header is the header, and a later one is content. §FS-rhei-plan-language.2.3
+            if let Some(cap) = re_rhei.captures(line).filter(|_| !rhei_header_seen) {
                 rhei_title = Some(cap.get(1).unwrap().as_str().to_string());
                 rhei_header_seen = true;
                 continue;

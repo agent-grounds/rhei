@@ -814,12 +814,27 @@ header as `# Rhei: Release`. Whatever rhei writes uses one space, and rhei does 
 rewrite an author's spacing.
 
 A line that reads like a header inside a fenced block is content, by the rule of
-[§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks), so a document may quote a header above its own.
+[§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks), so a document may quote a header above its own. The first such line
+outside a fence is the header. A later one is content as well: it names nothing, and
+a `---` block under it is not frontmatter. Such a document is outside the grammar, and
+it is read this way rather than refused.
 
-Every command that looks for the header finds the one the parser reads. A document
-`rhei validate` accepts is therefore one whose frontmatter every command can write,
-below that header, with the header and every line above it kept byte for byte.
-Neither the header's spacing nor a quotation above it may stop that write or move it.
+The productions of section 2 start at the header. What the parsers accept above it
+is content that no production describes, in `rhei_document`, `workspace_index` and
+`panta_manifest` alike.
+
+A document's frontmatter is the `---` block the parsers read under its header. Blank
+lines and fenced blocks are passed over on the way to it, and the block is there only
+if the next line is `---`. A `---` in a fence above the header, or below any other
+content under it, is content.
+
+Every command that looks for the header or the frontmatter finds the ones the parser
+reads. A document `rhei validate` accepts is therefore one whose frontmatter every
+command can write: over the block where it stands, or, with none, in a new block
+directly under the header. The header and every line above it keep their text, and
+neither the header's spacing nor a quotation above it may stop that write or move it.
+A frontmatter write does not keep line endings: every line break in the document it
+leaves is a newline alone, so a CRLF document comes out LF.
 
 ## 3. Semantic Constraints
 

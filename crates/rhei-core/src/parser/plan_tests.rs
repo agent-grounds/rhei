@@ -79,6 +79,15 @@ fn parses_task_execution_overrides() {
     assert_eq!(rhei.tasks[1].target.as_deref(), Some("codex[yolo]:openai:gpt-5-codex"));
 }
 
+/// §FS-rhei-plan-language.2.3
+#[test]
+fn the_first_header_names_the_plan_and_a_later_one_is_content() {
+    let input = "# Rhei: first\n\n## Notes\n\n# Rhei: second\n\n## Tasks\n\n### Task 1: One\n**State:** pending\n";
+    let rhei = parse(input).expect("the plan parses");
+    assert_eq!(rhei.title, "first");
+    assert!(rhei.content_sections[0].content.contains("# Rhei: second"));
+}
+
 #[test]
 fn parses_plan_frontmatter_metadata() {
     let input = r#"# Rhei: Example

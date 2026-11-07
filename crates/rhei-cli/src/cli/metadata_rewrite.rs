@@ -19,38 +19,32 @@ fn rewrite_frontmatter(raw: &str, metadata: &Metadata) -> MietteResult<String> {
     let lines = raw.lines().collect::<Vec<_>>();
     // Both manifest forms carry frontmatter in the same position, and the Panta
     // manifest owns basin tickets' runtime metadata, so it must be rewritable too.
-    // The line is the one the parsers read. §FS-rhei-panta.6.1 §FS-rhei-plan-language.2.3
-    let header_index =
-        rhei_core::header::find_header_line(lines.iter().copied()).ok_or_else(|| {
-            miette!(
-                help = plan_authoring_help(),
-                "could not find a '# Rhei:' or '# Panta:' header when rewriting frontmatter"
-            )
-        })?;
+    // The place is the one the parsers read. §FS-rhei-panta.6.1 §FS-rhei-plan-language.2.3
+    let place = rhei_core::header::find_frontmatter(lines.iter().copied()).ok_or_else(|| {
+        miette!(
+            help = plan_authoring_help(),
+            "could not find a '# Rhei:' or '# Panta:' header when rewriting frontmatter"
+        )
+    })?;
 
-    let mut idx = header_index + 1;
-    while idx < lines.len() && lines[idx].trim().is_empty() {
-        idx += 1;
-    }
-
-    let start = idx;
-    let mut end = idx;
-    if start < lines.len() && lines[start].trim() == "---" {
-        end += 1;
-        while end < lines.len() && lines[end].trim() != "---" {
-            end += 1;
+    let next_content = |from: usize| {
+        (from..lines.len()).find(|at| !lines[*at].trim().is_empty()).unwrap_or(lines.len())
+    };
+    let (start, end) = match place.block {
+        Some(rhei_core::header::FrontmatterBlock { open, close: Some(close) }) => {
+            (open, next_content(close + 1))
         }
-        if end == lines.len() {
+        Some(_) => {
             return Err(miette!(
                 help = plan_authoring_help(),
                 "unterminated YAML frontmatter in plan source"
             ));
         }
-        end += 1;
-        while end < lines.len() && lines[end].trim().is_empty() {
-            end += 1;
+        None => {
+            let under_header = next_content(place.header + 1);
+            (under_header, under_header)
         }
-    }
+    };
 
     let mut result = Vec::with_capacity(lines.len() + 8);
     result.extend(lines[..start].iter().map(|line| (*line).to_string()));

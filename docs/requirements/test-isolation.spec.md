@@ -186,3 +186,40 @@ The measure is the guard-taking test's verdict. While another test holds
 transition and its replay still commit, on every platform the gate runs. This
 governs the tests only: the built `rhei` still resolves its state directory, and
 every lock beneath it, as [§FS-rhei-recover.4](../functional-spec/rhei-recover.spec.md#4-pending-root-interlock) says.
+
+## 7. Which Rhei Run A Test Belongs To Is Chosen, Never Inherited
+
+A test belongs to no rhei run but the ones it starts. Every `rhei` and every
+program the suite spawns starts with rhei's own variables gone from the child's
+environment, and the rule is the whole of it rather than a list: every `RHEI_*`
+the child would otherwise see is removed — whether this harness process
+inherited it or a caller had already put it on the command — and what survives
+is only what a test sets on that spawn afterwards. Code a test runs in-process
+is held to the same line by another means: it reads no `RHEI_*` from the
+harness's own environment, because that environment is the caller's and not the
+test's, and a test that needs one hands it to the code under test itself.
+
+This is [§REQ-test-isolation.3](test-isolation.spec.md#3-which-repository-a-spawned-command-acts-on-is-chosen-never-inherited) read against rhei's own variables. There git took the
+repository from the environment; here rhei takes its place in a run from it — the
+budget an admission reserves under
+([§FS-rhei-budgets.7.1](../functional-spec/rhei-budgets.spec.md#71-how-the-descriptor-reaches-a-nested-run)), and the task and run an agent was started for. A
+`rhei run` exports those to every agent it starts, and an agent that commits to
+this repository runs the whole suite from its pre-commit hook
+([§AR-ci-release.2](../architecture/ci-release.spec.md#2-local-hooks)) — so under such a run, and nowhere else, every plan a test runs
+is admitted as a child of a reservation the test never made. When the parent
+exports `RHEI_BUDGET_PARENT_RESERVATION` without the account it was minted for,
+the refusal [§FS-rhei-budgets.7.1](../functional-spec/rhei-budgets.spec.md#71-how-the-descriptor-reaches-a-nested-run) keeps for that case is correct, and it
+fails several hundred tests whose change had nothing to do with budgets, under a
+message that names a reservation rather than the environment. The refusal stays;
+what this point removes is its reaching the suite.
+
+The measure is the verdict. With `RHEI_BUDGET_PARENT_RESERVATION` naming a
+reservation no journal holds in the environment that starts the suite, every
+test reaches the verdict it reaches with no `RHEI_*` set at all — through each
+of the three ways the suite runs a plan: the end-to-end harness, the integration
+harness, and the library's own tests. A list is what the next variable gets left
+off, as [§REQ-test-isolation.3](test-isolation.spec.md#3-which-repository-a-spawned-command-acts-on-is-chosen-never-inherited) found; `RHEI_BUDGET_PARENT_RESERVATION` is the name
+observed to do damage, not the definition of what is taken off. Removing the way
+is what holds this too: the removal lives in the helpers every spawn goes
+through, never at a call site, and the per-test removals that patched some tests
+are what left the rest of the suite inheriting.

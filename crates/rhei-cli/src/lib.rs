@@ -430,6 +430,7 @@ mod tests {
     include!("cli/tests_budget_delegation.rs");
     include!("cli/tests_budget_ancestry.rs");
     include!("cli/tests_budget_forget.rs");
+    include!("cli/tests_inherited_rhei_env.rs");
     include!("cli/tests_roster.rs");
     include!("cli/tests_snapshots_gc.rs");
     include!("cli/tests_snapshot_pointer.rs");

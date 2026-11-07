@@ -17,6 +17,9 @@ pub mod callback;
 /// The language's one reading of a fenced code block.
 /// §FS-rhei-plan-language.2.1
 pub mod fence;
+/// The language's one reading of a document's header.
+/// §FS-rhei-plan-language.2.3
+pub mod header;
 pub mod lexer;
 /// The keys rhei writes into a task's metadata, and the one conversion every
 /// JSON surface that publishes frontmatter uses.

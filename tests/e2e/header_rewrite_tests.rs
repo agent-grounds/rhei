@@ -146,7 +146,6 @@ fn complete_under_one_space_is_the_control() {
 }
 
 #[test]
-#[ignore = "red until #581: rhei complete refuses a two-space header rhei validate accepts; implement removes this"]
 fn complete_finishes_a_ticket_under_two_spaces() {
     let world = workspace("header-complete-two", &format!("{TWO_SPACES}\n"));
     assert_completes(&world, "1", "ws.1");
@@ -154,7 +153,6 @@ fn complete_finishes_a_ticket_under_two_spaces() {
 }
 
 #[test]
-#[ignore = "red until #581: rhei complete refuses a tab header rhei validate accepts; implement removes this"]
 fn complete_finishes_a_ticket_under_a_tab() {
     let world = workspace("header-complete-tab", &format!("{TAB}\n"));
     assert_completes(&world, "1", "ws.1");
@@ -163,7 +161,6 @@ fn complete_finishes_a_ticket_under_a_tab() {
 
 /// The parser's `\s` is Unicode, so the rule is not only about ASCII blanks.
 #[test]
-#[ignore = "red until #581: rhei complete refuses a no-break-space header rhei validate accepts; implement removes this"]
 fn complete_finishes_a_ticket_under_a_no_break_space() {
     let world = workspace("header-complete-nbsp", &format!("{NO_BREAK_SPACE}\n"));
     assert_completes(&world, "1", "ws.1");
@@ -177,7 +174,6 @@ fn reset_of_a_workspace_under_one_space_is_the_control() {
 /// A dry run that promises a clean reset, and a real one that leaves the task reopened
 /// with its result still under `runtime/`. §FS-rhei-reset.2.3
 #[test]
-#[ignore = "red until #581: rhei reset --yes fails after rewriting the task file under a two-space header; implement removes this"]
 fn reset_of_a_workspace_under_two_spaces_is_whole() {
     reset_workspace_under("header-reset-two", TWO_SPACES);
 }
@@ -189,7 +185,6 @@ fn single_file_plan_under_one_space_is_the_control() {
 }
 
 #[test]
-#[ignore = "red until #581: rhei complete refuses a single-file plan's two-space header; implement removes this"]
 fn complete_finishes_a_single_file_plan_under_two_spaces() {
     let world = single_file("header-single-two", &format!("{TWO_SPACES}\n"));
     assert_completes(&world, "1", "plan.1");
@@ -203,7 +198,6 @@ fn reset_of_a_single_file_plan_under_one_space_is_the_control() {
 /// Here the rewrite runs inside the simulation, so the reset refuses before its preview
 /// and changes nothing, `--dry-run` included. It is a plan that can never be reset.
 #[test]
-#[ignore = "red until #581: rhei reset --dry-run refuses a single-file plan's two-space header; implement removes this"]
 fn reset_of_a_single_file_plan_under_two_spaces_is_whole() {
     reset_single_file_under("header-single-reset-two", TWO_SPACES);
 }
@@ -218,7 +212,6 @@ fn complete_under_a_one_space_manifest_is_the_control() {
 /// The basin has no index of its own, so its metadata is written to the manifest.
 /// §FS-rhei-panta.6
 #[test]
-#[ignore = "red until #581: rhei complete cannot write a two-space Panta manifest's frontmatter; implement removes this"]
 fn complete_writes_the_metadata_of_a_basin_ticket_under_a_two_space_manifest() {
     let world = project("header-panta-two", "#  Panta: P\n");
     assert_completes(&world, "basin.1", "basin.1");
@@ -230,7 +223,6 @@ fn complete_writes_the_metadata_of_a_basin_ticket_under_a_two_space_manifest() {
 /// Today the write lands inside the fence, where nothing reads it, and validation still
 /// passes. §FS-rhei-plan-language.2.1
 #[test]
-#[ignore = "red until #581: rhei complete writes the frontmatter inside a fence quoting a header; implement removes this"]
 fn complete_writes_a_workspace_index_under_its_real_header_not_a_quoted_one() {
     let world = workspace("header-fence-index", &format!("{QUOTED}{ONE_SPACE}\n"));
     assert_completes(&world, "1", "ws.1");
@@ -238,7 +230,6 @@ fn complete_writes_a_workspace_index_under_its_real_header_not_a_quoted_one() {
 }
 
 #[test]
-#[ignore = "red until #581: rhei complete writes a single-file plan's frontmatter inside a fence quoting a header; implement removes this"]
 fn complete_writes_a_single_file_plan_under_its_real_header_not_a_quoted_one() {
     let world = single_file("header-fence-single", &format!("{QUOTED}{ONE_SPACE}\n"));
     assert_completes(&world, "1", "plan.1");
@@ -247,7 +238,6 @@ fn complete_writes_a_single_file_plan_under_its_real_header_not_a_quoted_one() {
 
 /// With no `---` below it to close on, the quoted `---` reads as frontmatter left open.
 #[test]
-#[ignore = "red until #581: rhei complete reports unterminated frontmatter from a quoted fence; implement removes this"]
 fn complete_is_not_refused_for_a_frontmatter_fence_in_a_quotation() {
     let world = workspace("header-fence-open", &format!("{QUOTED_FENCE}{ONE_SPACE}\n"));
     assert_completes(&world, "1", "ws.1");
@@ -257,7 +247,6 @@ fn complete_is_not_refused_for_a_frontmatter_fence_in_a_quotation() {
 /// The write spans from the quoted `---` to the real frontmatter's, which takes the
 /// fence's close and the real header with it: exit 0, and a plan that no longer parses.
 #[test]
-#[ignore = "red until #581: rhei complete deletes the real header through a frontmatter fence in a quotation; implement removes this"]
 fn complete_keeps_the_real_header_below_a_frontmatter_fence_in_a_quotation() {
     let index = format!("{QUOTED_FENCE}{ONE_SPACE}\n---\nowner: me\n---\n");
     let world = workspace("header-fence-kept", &index);
@@ -269,7 +258,6 @@ fn complete_keeps_the_real_header_below_a_frontmatter_fence_in_a_quotation() {
 
 /// The same span taken by a reset, through its clear of the index's runtime metadata.
 #[test]
-#[ignore = "red until #581: rhei reset deletes the real header through a frontmatter fence in a quotation; implement removes this"]
 fn reset_keeps_the_real_header_below_a_frontmatter_fence_in_a_quotation() {
     let index = format!("{QUOTED_FENCE}{ONE_SPACE}\n{FRONTMATTER}");
     let world = workspace("header-fence-reset", &index);

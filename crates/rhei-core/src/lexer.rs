@@ -6,6 +6,7 @@
 
 use crate::ast::{ConsumedExport, TaskId, TaskSnapshotInherit};
 use crate::fence::FenceTracker;
+use crate::header::{header_regex, RHEI_HEADER};
 use crate::text::parse_task_id;
 use crate::tokens::Token;
 use regex::Regex;
@@ -33,7 +34,8 @@ pub struct Tokenizer<'a> {
 impl<'a> Tokenizer<'a> {
     /// Construct a new tokenizer over the provided input.
     pub fn new(input: &'a str) -> Self {
-        let re_rhei = Regex::new(r#"^#\s+Rhei:\s+.*$"#).unwrap();
+        // §FS-rhei-plan-language.2.3
+        let re_rhei = header_regex(&[RHEI_HEADER]);
         let re_tasks = Regex::new(r#"^##\s+Tasks\s*$"#).unwrap();
 
         // Node headers at H3..=H6: `### Task 1: Title`, `#### Bug 1.1: Title`.

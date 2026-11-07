@@ -123,6 +123,7 @@ mod export_prior_migration_implementation_tests;
 mod export_prior_migration_tests;
 mod fence_structure_tests;
 mod handoff_tests;
+mod header_rewrite_tests;
 mod headless_dead_supervisor_tests;
 mod headless_recovery_tests;
 mod headless_registry_access_tests;

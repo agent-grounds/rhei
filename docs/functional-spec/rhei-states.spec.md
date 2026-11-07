@@ -106,6 +106,11 @@ component cannot be parsed (for example `"v3"`) yields no major. When no major
 is obtained, the legacy shape remains accepted. This is a compatibility
 check, not semantic-version validation.
 
+A `states.yaml` that begins with a UTF-8 byte order mark loads as the same
+machine as the file without it: one leading mark is not part of the text
+([§REQ-cross-platform.9](../requirements/cross-platform.md#9-an-authored-file-reads-the-same-whatever-editor-saved-it)), so it is never read as a key, a document boundary or a
+syntax error.
+
 ### 1.2. Per-state fields
 
 | Field | Type | Required | Description |

@@ -244,3 +244,23 @@ spawn that waited for it pass for one that did not. The pin then passes against
 the defect it is there to catch. So the fixture holds for longer than the
 margin, or until the test releases it, and the test observes the absence itself
 rather than reading it off how long the spawn took.
+
+## 9. An Authored File Reads The Same Whatever Editor Saved It
+
+Some editors, most of them on Windows, save UTF-8 with a byte order mark: the
+three bytes `EF BB BF`, read as the character U+FEFF, ahead of the first line.
+The mark says how the file is encoded and is not part of what it says, so one
+leading mark is not part of the text of any file a user authors for Rhei to
+read: a state machine ([§FS-rhei-states.1](../functional-spec/rhei-states.spec.md#1-schema-additions)), a template manifest and a `--values`
+file ([§FS-rhei-templates](../functional-spec/rhei-templates.spec.md#fs-rhei-templates-rhei-templates-specification)), and the plan, workspace index and task files of
+[§FS-rhei-language-reference.1](../functional-spec/rhei-language-reference.spec.md#1-language-surfaces), frontmatter included. Such a file loads exactly
+as the same bytes without the mark: the same machine, the same values, the same
+header, the same frontmatter. It is never refused because of the mark, and
+never refused as text that is not YAML or that holds more than one document
+([§FS-rhei-errors.1.2.2](../functional-spec/rhei-errors.spec.md#122-a-state-machine-that-will-not-load)).
+
+Exactly one mark is set aside, and only at the very start of the file. A second
+U+FEFF after it, or one anywhere else in the file, is content, and the file is
+read with it in place. Setting the mark aside moves no line: a line number a
+refusal reports is the same with the mark as without it, and a column on the
+first line counts from the character after the mark.

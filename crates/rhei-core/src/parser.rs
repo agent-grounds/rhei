@@ -188,6 +188,8 @@ fn unescape_state(input: &str) -> String {
 }
 
 #[cfg(test)]
+mod byte_order_mark_tests;
+#[cfg(test)]
 mod fence_tests;
 #[cfg(test)]
 mod plan_snapshot_prior_tests;

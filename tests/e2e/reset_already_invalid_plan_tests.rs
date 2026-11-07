@@ -105,11 +105,9 @@ fn a_prior_naming_a_missing_task_is_refused_before_any_reset() {
     assert_reset_refuses_as_validate_does(&world, problem);
 }
 
-/// The validator lists the cycle's tasks in no fixed order, so only the sentence's
-/// stem is compared.
 #[test]
 fn two_tasks_that_are_each_others_prior_are_refused_before_any_reset() {
-    let problem = "Circular dependency detected among tasks";
+    let problem = r#"Circular dependency detected among tasks: ["plan.1", "plan.2"]"#;
     let world = refused_plan("reset-standing-cycle", CYCLE, problem);
     assert_reset_refuses_as_validate_does(&world, problem);
 }

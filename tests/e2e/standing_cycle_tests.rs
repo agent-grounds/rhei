@@ -11,6 +11,9 @@
 
 use std::path::Path;
 
+use super::into_project_lay_support::{
+    machine, machine_name, rhei_in, write_project, write_project_template, PLAIN_MANIFEST,
+};
 use super::into_support::{read, run_into, write_review_template, HOST_MACHINE};
 use super::new_tests::{flattened_output, new_run};
 use super::*;
@@ -94,7 +97,6 @@ fn assert_cycle_errors(dir: &Path, expected: &[String]) {
 
 /// The whole text of the report, for a ring with a task waiting on it.
 #[test]
-#[ignore = "red until #582: validate names a task downstream of the cycle, in hash order; implement removes this"]
 fn validate_names_only_the_tasks_on_the_cycle_sorted() {
     let tickets = ring_of_nine() + &ticket(10, Some("release.1"));
     let dir = plan_with_a_standing_cycle("cycle-validate-whole-text", &tickets);
@@ -103,7 +105,6 @@ fn validate_names_only_the_tasks_on_the_cycle_sorted() {
 
 /// The issue's case 2, on a ring long enough not to be a coin.
 #[test]
-#[ignore = "red until #582: rhei new refuses over a standing cycle reworded by hash order; implement removes this"]
 fn new_of_an_unrelated_ticket_over_a_standing_cycle_is_kept() {
     let dir = plan_with_a_standing_cycle("cycle-new-unrelated", &ring_of_nine());
 
@@ -116,7 +117,6 @@ fn new_of_an_unrelated_ticket_over_a_standing_cycle_is_kept() {
 /// The new ticket waits on a cycle member and so can never run, which is the
 /// cycle's doing: today it is named in the error and takes the blame for it.
 #[test]
-#[ignore = "red until #582: rhei new --prior on a cycle member is refused for joining the list; implement removes this"]
 fn new_with_a_prior_on_a_cycle_member_is_kept() {
     let dir = plan_with_a_standing_cycle("cycle-new-prior", &two_task_cycle());
 
@@ -132,7 +132,6 @@ fn new_with_a_prior_on_a_cycle_member_is_kept() {
 
 /// The issue's case 3, on a ring long enough not to be a coin.
 #[test]
-#[ignore = "red until #582: rhei remove refuses over a standing cycle reworded by hash order; implement removes this"]
 fn remove_of_an_unrelated_ticket_over_a_standing_cycle_goes_through() {
     let tickets = ring_of_nine() + &ticket(10, None);
     let dir = plan_with_a_standing_cycle("cycle-remove-unrelated", &tickets);
@@ -147,7 +146,6 @@ fn remove_of_an_unrelated_ticket_over_a_standing_cycle_goes_through() {
 /// it was, and today the error shrinks by its name, so the removal is refused and
 /// its dry run is not. §FS-rhei-remove.4.1 §FS-rhei-remove.7
 #[test]
-#[ignore = "red until #582: rhei remove of a leaf on a cycle is refused for leaving the list; implement removes this"]
 fn remove_of_a_leaf_waiting_on_a_cycle_member_goes_through() {
     let tickets = two_task_cycle() + &ticket(3, Some("release.1"));
     let dir = plan_with_a_standing_cycle("cycle-remove-leaf", &tickets);
@@ -164,7 +162,6 @@ fn remove_of_a_leaf_waiting_on_a_cycle_member_goes_through() {
 
 /// The issue read this path and did not run it. §FS-rhei-library.2
 #[test]
-#[ignore = "red until #582: --into refuses over a standing cycle reworded by hash order; implement removes this"]
 fn a_placement_over_a_standing_cycle_is_placed() {
     let dir = plan_with_a_standing_cycle("cycle-into-unrelated", &ring_of_nine());
     write_review_template(&dir);
@@ -176,11 +173,37 @@ fn a_placement_over_a_standing_cycle_is_placed() {
     assert!(read(&dir.join(PLAN)).contains("Coordinate review"), "the tickets are placed");
 }
 
+/// Replacing a project's default compares the errors before and after by the same
+/// text, so a cycle it leaves alone is not its doing. The replacement keeps the state
+/// the ring holds, so nothing but the cycle could refuse it. §FS-rhei-library.2.3
+#[test]
+fn a_rebind_over_a_standing_cycle_replaces_the_default() {
+    let dir = unique_temp_dir("cycle-rebind");
+    write_project_template(&dir, "relaid", &machine("relaid", "pending", "task"), "");
+    let house = machine("house", "pending", "task");
+    let project = write_project(&dir, "reports", PLAIN_MANIFEST, Some(&house));
+    write_fixture_file(
+        &project,
+        PLAN,
+        &format!("# Rhei: Release\n\n## Tasks\n\n{}", ring_of_nine()),
+    );
+    let validate = rhei_in(&dir, &project, &["validate", "."]);
+    assert!(
+        !validate.status.success() && validate.stderr.contains("Circular dependency"),
+        "fixture: `rhei validate` refuses the project for its cycle:\n{}",
+        validate.stderr
+    );
+
+    let rebound = rhei_in(&dir, &project, &["instantiate", "relaid", "--into", "."]);
+
+    assert!(rebound.status.success(), "the rebind goes through:\n{}", rebound.stderr);
+    assert_eq!(machine_name(&project.join("states.yaml")), "relaid", "the default is replaced");
+}
+
 /// The guard against a fix too generous: a write that really does add a cycle is
 /// still refused, wrote nothing, and names the new cycle and not the standing one.
 /// §FS-rhei-new.5.2, "The report lists only those new errors".
 #[test]
-#[ignore = "red until #582: the refusal lists the new and the standing cycle as one; implement removes this"]
 fn a_placement_that_adds_a_cycle_is_refused_naming_only_that_cycle() {
     let dir = plan_with_a_standing_cycle("cycle-into-adds", &two_task_cycle());
     let template = write_review_template(&dir);

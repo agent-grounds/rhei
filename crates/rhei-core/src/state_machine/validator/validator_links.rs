@@ -284,7 +284,9 @@ fn validate_result_blocks(rhei: &Rhei, machines: &MachineSet, report: &mut Valid
     });
 }
 
-/// Detect cycles using Kahn's algorithm; report a generic cycle set on failure.
+/// Detect cycles using Kahn's algorithm, then report each cycle in what it could not
+/// drain as one error whose text depends on nothing but that cycle.
+/// §FS-rhei-plan-language.3.3
 fn validate_circular_dependencies(
     _rhei: &Rhei,
     index: &HashMap<TaskId, &Task>,
@@ -314,10 +316,8 @@ fn validate_circular_dependencies(
     // Kahn's algorithm
     let mut q: VecDeque<TaskId> =
         indegree.iter().filter_map(|(n, &d)| if d == 0 { Some(n.clone()) } else { None }).collect();
-    let mut processed = 0usize;
 
     while let Some(n) = q.pop_front() {
-        processed += 1;
         if let Some(neigh) = adj.get(&n) {
             for m in neigh {
                 if let Some(d) = indegree.get_mut(m) {
@@ -330,22 +330,73 @@ fn validate_circular_dependencies(
         }
     }
 
-    if processed != indegree.len() {
-        // Collect nodes still with indegree > 0
-        let cyc_nodes: Vec<String> = indegree
-            .iter()
-            .filter_map(|(n, &d)| if d > 0 { Some(n.to_string()) } else { None })
-            .collect();
-        if !cyc_nodes.is_empty() {
-            report
-                .errors
-                .push(format!("Circular dependency detected among tasks: {:?}", cyc_nodes));
-        } else {
-            report
-                .errors
-                .push("Circular dependency detected (unable to isolate nodes)".to_string());
+    let residue: Vec<&TaskId> =
+        indegree.iter().filter_map(|(n, &d)| if d > 0 { Some(n) } else { None }).collect();
+    for names in cycles_in_residue(residue, &adj) {
+        report.errors.push(format!("Circular dependency detected among tasks: {:?}", names));
+    }
+}
+
+/// The names of each cycle among the tasks Kahn's algorithm could not drain, which
+/// also holds whatever merely waits on a cycle or joins two. Two tasks are on one
+/// cycle when each reaches the other, so a task's cycle is what it reaches both ways.
+/// Going through the tasks in text order lists the cycles by their first names.
+/// §FS-rhei-plan-language.3.3
+fn cycles_in_residue<'a>(
+    mut residue: Vec<&'a TaskId>,
+    adj: &'a HashMap<TaskId, Vec<TaskId>>,
+) -> Vec<Vec<String>> {
+    residue.sort_by_cached_key(|task| task.to_string());
+
+    // Only edges out of the residue: they all stay inside it, and a drained task
+    // pointing in is on no cycle.
+    let mut dependents: HashMap<&TaskId, Vec<&TaskId>> = HashMap::new();
+    let mut priors: HashMap<&TaskId, Vec<&TaskId>> = HashMap::new();
+    for &task in &residue {
+        for dependent in adj.get(task).into_iter().flatten() {
+            dependents.entry(task).or_default().push(dependent);
+            priors.entry(dependent).or_default().push(task);
         }
     }
+
+    let mut settled: HashSet<&TaskId> = HashSet::new();
+    let mut cycles = Vec::new();
+    for &task in &residue {
+        if settled.contains(task) {
+            continue;
+        }
+        let forward = reachable_from(task, &dependents);
+        let backward = reachable_from(task, &priors);
+        let mut names: Vec<String> = Vec::new();
+        for &member in forward.intersection(&backward) {
+            settled.insert(member);
+            names.push(member.to_string());
+        }
+        let own_prior = dependents.get(&task).is_some_and(|next| next.contains(&task));
+        if names.len() > 1 || own_prior {
+            names.sort();
+            cycles.push(names);
+        }
+    }
+    cycles
+}
+
+/// `start` and every task reachable from it over `edges`. An explicit stack, because
+/// a `**Prior:**` chain is as long as the plan makes it.
+fn reachable_from<'a>(
+    start: &'a TaskId,
+    edges: &HashMap<&'a TaskId, Vec<&'a TaskId>>,
+) -> HashSet<&'a TaskId> {
+    let mut seen = HashSet::from([start]);
+    let mut stack = vec![start];
+    while let Some(task) = stack.pop() {
+        for &next in edges.get(&task).into_iter().flatten() {
+            if seen.insert(next) {
+                stack.push(next);
+            }
+        }
+    }
+    seen
 }
 
 // ---------------------------

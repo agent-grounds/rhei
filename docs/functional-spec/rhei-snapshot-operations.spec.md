@@ -48,8 +48,7 @@ If the text output has no matching rows, it still prints the header followed by
 a short empty-state hint that suggests running `rhei run` first or adjusting
 filters such as `--produced-by all`. JSON output remains an empty array.
 
-A generation whose manifest cannot be read costs that generation's row and
-nothing else; [§FS-rhei-snapshot-operations.1.6](rhei-snapshot-operations.spec.md#16-unreadable-generations) says what the command prints and
+An unreadable generation costs that generation's row and nothing else; [§FS-rhei-snapshot-operations.1.6](rhei-snapshot-operations.spec.md#16-unreadable-generations) says what the command prints and
 how it exits.
 
 ### 1.3. `rhei snapshot show <ref>`
@@ -107,8 +106,7 @@ deterministic behavior must stop the orchestrator first, or pass `--force`
 to acknowledge the risk. `--force` is required to GC any snapshot in a
 workspace whose `run.lock` is held.
 
-A generation whose manifest cannot be read is skipped and reported, never
-deleted, and it does not stop the policy acting on the rest of the store;
+An unreadable generation is skipped and reported, never deleted, and it does not stop the policy acting on the rest of the store;
 [§FS-rhei-snapshot-operations.1.6](rhei-snapshot-operations.spec.md#16-unreadable-generations) is the whole rule.
 
 ### 1.5. `rhei snapshot continue <ref>`
@@ -289,13 +287,14 @@ the `current` pointer chain.
 One damaged generation costs that generation and nothing else.
 `rhei snapshot list` and `rhei snapshot gc` are how an operator sees and trims the
 store, so neither may lose the store to one file. This is the stance
-[§FS-rhei-snapshots.4.7](rhei-snapshots.spec.md#47-state-local-continuation) already takes on the preload path, where an unreadable
+[§FS-rhei-snapshots.4.7](rhei-snapshots.spec.md#47-state-local-continuation) already takes on state-local continuation, where an unreadable
 manifest is logged and the run continues cold.
 
-A generation is **unreadable** when its `manifest.json` cannot be read (a
-permission error, bytes that are not UTF-8), cannot be parsed as JSON, or parses
-and is not accepted as a manifest (a `version` other than `1`, a field missing).
-All three are the same condition here. For list and gc:
+A generation is **unreadable** when its directory cannot be listed, when its
+`manifest.json` cannot be read (a permission error, bytes that are not UTF-8),
+cannot be parsed as JSON, or parses and is not accepted as a manifest (a `version`
+other than `1`, a field missing). All four are the same condition here. For list
+and gc:
 
 - **Readable generations proceed.** List prints every row its filters select. Gc
   applies its policy to the readable generations and deletes what that selects,
@@ -307,7 +306,9 @@ All three are the same condition here. For list and gc:
 - **Each unreadable generation is named on stderr**, in path order, one physical
   line each, never wrapped, so the path can be pasted: `unreadable <directory>:
   <reason>` from list and `skipped <directory>: <reason>` from gc, where
-  `<directory>` is the generation directory and `<reason>` says what failed.
+  `<directory>` is the generation directory and `<reason>` says what failed. A
+  control character in the reason, which a manifest's own value can carry, is
+  printed escaped, so it can neither break the line nor forge another one.
 - **The exit code is 1.** After the rows or deletions, the command ends in an
   error saying how many generations it could not read. Its help says to delete
   the directories named above and re-record them by running the state that emits
@@ -329,16 +330,25 @@ counts for nothing in gc's decisions about the readable ones:
 - A `latest` selector in an active `snapshot.inherit` resolves among the readable
   generations, so damage anywhere leaves exactly the newest readable generation of
   a lineage protected by the interlock in [§FS-rhei-snapshot-operations.1.4](rhei-snapshot-operations.spec.md#14-rhei-snapshot-gc).
+- A `current` selector in an active `snapshot.inherit` whose pointer is on an
+  unreadable generation selects only that generation, so the interlock protects no
+  readable generation of that lineage.
 
 The refusals that come first are unchanged, and a store with damage gives the same
 one a store without damage would: no deletion policy, `--keep-generations 0`, a
 held `.rhei/run.lock`, a selection protected by an active `snapshot.inherit`, and a
-delete that fails. So is a failure to walk the cache directory itself, which is not
-one generation's damage.
+delete that fails.
 
-Every other command stays strict and refuses on the first unreadable manifest it
-reads: `rhei snapshot show`, `rhei snapshot continue`, `rhei run --from-snapshot`,
-an emit allocating its next generation, and `rhei validate`.
+Any directory that cannot be listed and is not a generation directory refuses too,
+for list and gc alike, with an error naming that directory: a directory above a
+generation may hold any number of them, so its failure is not one generation's
+damage.
+
+Every other command stays strict and refuses on the first unreadable generation it
+reads, naming it: `rhei snapshot show`, `rhei snapshot continue`,
+`rhei run --from-snapshot`, a run resolving a named `snapshot.inherit` before it
+spawns, and `rhei validate`. State-local continuation is the one reader that runs
+cold instead, as [§FS-rhei-snapshots.4.7](rhei-snapshots.spec.md#47-state-local-continuation) says.
 
 ## 2. Run Override
 

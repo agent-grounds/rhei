@@ -18,6 +18,9 @@ const DAMAGED: &str = "plan.1/implementation/work/1/agent/g1";
 const POLICIES: [&[&str]; 3] =
     [&["--orphaned"], &["--older-than", "0s"], &["--keep-generations", "1"]];
 
+#[path = "snapshot_unreadable_mode_tests.rs"]
+mod mode_tests;
+
 const ONE_TASK: &str = "# Rhei: Plan\n\n## Tasks\n\n### Task 1: One\n**State:** pending\n";
 
 /// A task waiting in `consume`, whose `latest` inherit makes the newest orchestrator
@@ -51,7 +54,7 @@ transitions:
 const LATEST_LINEAGE: &str = "plan.1/implementation/source/1/agent";
 const ELSEWHERE: &str = "plan.7/implementation/work/1/agent/g1";
 
-/// The three failures §FS-rhei-snapshot-operations.1.6 counts as one condition, each
+/// The manifest failures §FS-rhei-snapshot-operations.1.6 counts as one condition, each
 /// with the words its reason must carry.
 #[derive(Clone, Copy)]
 enum Damage {
@@ -423,7 +426,7 @@ fn a_damaged_newest_generation_holds_no_retention_slot() {
 }
 
 /// The fixture the two tests below rest on: with no damage, `g1` is collectable and only
-/// the `latest` `g2` is protected. It passes today. §FS-rhei-snapshot-operations.1.4
+/// the `latest` `g2` is protected. §FS-rhei-snapshot-operations.1.4
 #[test]
 fn a_latest_inherit_protects_only_the_newest_generation_of_an_undamaged_store() {
     let store = Store::latest_inherit("snapshot-unreadable-latest-clean");
@@ -471,8 +474,8 @@ fn the_inherit_interlock_still_refuses_a_protected_selection_past_damage() {
     assert!(store.on_disk(&format!("{LATEST_LINEAGE}/g2")), "a refusal deletes nothing");
 }
 
-/// The refusals ahead of the read are as they were. They pass today, and hold the order
-/// against a fix that moves the scan up. §FS-rhei-snapshot-operations.1.6
+/// The refusals ahead of the read are as they were, and hold the order against a change
+/// that moves the scan up. §FS-rhei-snapshot-operations.1.6
 #[test]
 fn the_refusals_ahead_of_the_scan_are_unchanged_by_damage() {
     let store = Store::damaged("snapshot-unreadable-gc-refusals", Damage::NotJson);
@@ -540,4 +543,28 @@ fn validate_still_refuses_on_an_unreadable_generation() {
 
     assert_exit(&out, 1, "validate stays strict");
     assert!(stderr(&out).contains("failed to parse snapshot manifest"), "{}", stderr(&out));
+}
+
+/// A `current` pointer on damage selects only that generation, so the interlock protects
+/// nothing readable in the lineage, and gc deletes what its policy selects.
+/// §FS-rhei-snapshot-operations.1.6
+#[test]
+fn a_current_inherit_on_a_damaged_generation_protects_nothing_readable() {
+    let store = Store::empty("snapshot-unreadable-current-inherit", LATEST_INHERIT_TASK);
+    let machine = LATEST_INHERIT_MACHINE.replace("generation: latest", "generation: current");
+    write_fixture_file(&store.project, "states.yaml", &machine);
+    store.readable(&format!("{LATEST_LINEAGE}/g1"), 1);
+    store.readable(&format!("{LATEST_LINEAGE}/g2"), 2);
+    let g3 = format!("{LATEST_LINEAGE}/g3");
+    store.damage(&g3, Damage::NotJson);
+    store.point_current_at(LATEST_LINEAGE, "g3");
+
+    let out = store.gc_with_machine(&["--older-than", "0s"]);
+
+    assert_exit(&out, 1, "damage stands");
+    assert!(!stderr(&out).contains("active snapshot.inherit"), "{}", stderr(&out));
+    assert!(!store.on_disk(&format!("{LATEST_LINEAGE}/g1")), "{}", raw_stderr(&out));
+    assert!(!store.on_disk(&format!("{LATEST_LINEAGE}/g2")), "{}", raw_stderr(&out));
+    assert!(store.on_disk(&g3), "gc never deletes what it cannot read");
+    assert_named(&out, "skipped", &g3, Damage::NotJson.reason());
 }

@@ -23,8 +23,11 @@
         /// is validated before anything is written either way.
         /// §FS-rhei-library.3.1 §AR-rhei-library.5
         fn load(name: &str, path: &Path) -> MietteResult<Self> {
-            let text = fs::read_to_string(path)
+            let raw = fs::read_to_string(path)
                 .map_err(|err| file_io_report(path, "failed to read the template's states", err))?;
+            // The text is spliced into the host's machine, so the mark is set aside
+            // here; `parse_fragment` sets it aside from `raw` itself. §REQ-cross-platform.9
+            let text = rhei_core::source::without_byte_order_mark(&raw).to_owned();
             let value: YamlValue = serde_yaml::from_str(&text).map_err(|err| {
                 miette!(
                     help = "a template's states.yaml must parse on its own before it can join a machine.",
@@ -32,7 +35,7 @@
                     path.display()
                 )
             })?;
-            let machine = rhei_core::state_machine::StateMachine::parse_fragment(&text)
+            let machine = rhei_core::state_machine::StateMachine::parse_fragment(&raw)
                 .map_err(|err| {
                     miette!(
                         help = "every template stands alone, so its states.yaml is readable \

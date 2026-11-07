@@ -8,7 +8,6 @@
     }
 
     #[test]
-    #[ignore = "red until #630: a leading BOM is read as a document boundary; implement removes this"]
     fn a_machine_string_with_a_leading_byte_order_mark_loads_as_the_same_machine() {
         let plain = StateMachine::from_yaml_str(BOM_MACHINE).expect("the machine loads without the mark");
         let marked = StateMachine::from_yaml_str(&format!("\u{feff}{BOM_MACHINE}"))
@@ -17,7 +16,6 @@
     }
 
     #[test]
-    #[ignore = "red until #630: a states.yaml saved with a BOM is refused; implement removes this"]
     fn a_machine_file_with_a_leading_byte_order_mark_loads_as_the_same_machine() {
         let dir = tempfile::tempdir().expect("tempdir");
         let plain_path = dir.path().join("plain").join("states.yaml");

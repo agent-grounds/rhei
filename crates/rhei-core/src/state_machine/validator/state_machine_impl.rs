@@ -23,6 +23,8 @@ impl StateMachine {
     /// [`Self::parse_fragment`] for a machine read from `source`, so a refusal
     /// that names where a key was found can name the file.
     fn parse_fragment_at(yaml: &str, source: Option<&Path>) -> Result<Self, StateMachineLoadError> {
+        // Every check below reads the text after one leading mark. §REQ-cross-platform.9
+        let yaml = crate::source::without_byte_order_mark(yaml);
         // One raw parse feeds every check that has to see the YAML as written
         // rather than as serde collapsed it.
         // A refusal here is not yet a syntax failure: the scan decides. §FS-rhei-errors.1.2.2

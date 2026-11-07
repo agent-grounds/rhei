@@ -15,6 +15,8 @@ use super::{
 };
 
 pub fn parse(input: &str) -> Result<Rhei> {
+    // A leading mark would hide the header. §FS-rhei-language-reference.1 §REQ-cross-platform.9
+    let input = crate::source::without_byte_order_mark(input);
     // §FS-rhei-plan-language.2.3
     let re_rhei = header_regex(&[RHEI_HEADER]);
     let re_tasks = Regex::new(r#"^##\s+Tasks\s*$"#).unwrap();

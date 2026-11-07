@@ -35,6 +35,9 @@ pub(super) struct LeadingFrontmatter {
 pub(super) fn split_leading_frontmatter(
     input: &str,
 ) -> Result<(Option<LeadingFrontmatter>, String)> {
+    // A leading mark would hide the opening `---`, and the block with it.
+    // §FS-rhei-language-reference.1 §REQ-cross-platform.9
+    let input = crate::source::without_byte_order_mark(input);
     let lines: Vec<&str> = input.lines().collect();
     let Some(FrontmatterBlock { open, close }) = find_leading_frontmatter(lines.iter().copied())
     else {

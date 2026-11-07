@@ -46,7 +46,6 @@ metadata:
 ";
 
 #[test]
-#[ignore = "red until #630: a BOM hides the `# Rhei:` header; implement removes this"]
 fn a_plan_with_a_leading_byte_order_mark_reads_as_the_same_plan() {
     let plain = parse(PLAN).expect("the plan parses without the mark");
     let marked = parse(&format!("{MARK}{PLAN}")).expect("the plan parses with one leading mark");
@@ -54,7 +53,6 @@ fn a_plan_with_a_leading_byte_order_mark_reads_as_the_same_plan() {
 }
 
 #[test]
-#[ignore = "red until #630: a BOM hides the workspace index header; implement removes this"]
 fn a_workspace_index_with_a_leading_byte_order_mark_reads_as_the_same_index() {
     let plain = parse_workspace_index(INDEX).expect("the index parses without the mark");
     let marked =
@@ -63,7 +61,6 @@ fn a_workspace_index_with_a_leading_byte_order_mark_reads_as_the_same_index() {
 }
 
 #[test]
-#[ignore = "red until #630: a BOM before a task file's `---` drops its metadata; implement removes this"]
 fn a_task_file_with_a_leading_byte_order_mark_keeps_its_frontmatter() {
     let plain = parse_workspace_task_file(TASK_FILE, None).expect("parses without the mark");
     assert!(plain.metadata.is_some(), "the fixture's block is read without the mark");

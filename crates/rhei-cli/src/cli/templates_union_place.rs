@@ -33,7 +33,9 @@
             }
             let raw = fs::read_to_string(&plan)
                 .map_err(|err| file_io_report(&plan, "failed to read the template's plan", err))?;
-            return Ok(vec![part_tickets("plan", &tasks_chapter_body(&raw))]);
+            // §REQ-cross-platform.9
+            let raw = rhei_core::source::without_byte_order_mark(&raw);
+            return Ok(vec![part_tickets("plan", &tasks_chapter_body(raw))]);
         }
         let mut entries: Vec<PathBuf> = fs::read_dir(&tasks_dir)
             .map_err(|err| file_io_report(&tasks_dir, "failed to read the template's tasks", err))?
@@ -46,8 +48,11 @@
         for path in entries {
             let raw = fs::read_to_string(&path)
                 .map_err(|err| file_io_report(&path, "failed to read a template task file", err))?;
+            // The body is spliced into the host, so the mark must not come with it.
+            // §REQ-cross-platform.9
+            let raw = rhei_core::source::without_byte_order_mark(&raw);
             let stem = path.file_stem().and_then(|stem| stem.to_str()).unwrap_or("task");
-            files.push(part_tickets(file_slug(stem), &raw));
+            files.push(part_tickets(file_slug(stem), raw));
         }
         Ok(files)
     }

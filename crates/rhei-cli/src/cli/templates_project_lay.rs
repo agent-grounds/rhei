@@ -126,7 +126,7 @@
         let source = SourceIdentity::of(lay.template_dir, lay.builtin, lay.input_files);
         let fence = laid_fence(lay.manifest, &template_digest(lay.template_dir)?, &source, lay.values);
         append_laid_fence(&machine_path, &fence)?;
-        let machine = machine_name_of(&read_text(&machine_path)?).ok_or_else(|| {
+        let machine = machine_name_of(&read_authored_text(&machine_path)?).ok_or_else(|| {
             miette!(
                 help = "a state machine names itself with a top-level `name:`.",
                 "the states.yaml of project template '{}' declares no machine name",

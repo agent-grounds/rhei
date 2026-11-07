@@ -260,6 +260,7 @@ mod snapshot_prior_fix_tests;
 mod snapshot_prior_inheritance_tests;
 mod snapshot_prior_selection_tests;
 mod snapshot_tests;
+mod snapshot_unreadable_tests;
 #[cfg(target_os = "linux")]
 mod spawn_record_failure_linux_tests;
 mod spawn_record_failure_support;

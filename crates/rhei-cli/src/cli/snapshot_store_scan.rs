@@ -1,16 +1,49 @@
-/// Every generation of the store, for a reader that refuses on the first manifest it
-/// cannot read. `rhei snapshot list` and `gc` use [`scan_snapshot_records`] instead;
-/// the rest of Rhei stays strict. §FS-rhei-snapshot-operations.1.6
+/// Every generation of the store, for a reader that refuses on the first one it cannot
+/// read. `rhei snapshot list` and `gc` use [`scan_snapshot_records`] instead; the rest of
+/// Rhei stays strict. §FS-rhei-snapshot-operations.1.6
 fn read_snapshot_records(cache_root: &Path) -> MietteResult<Vec<SnapshotRecord>> {
     let mut records = Vec::new();
-    for manifest_path in snapshot_manifest_paths(cache_root)? {
-        records.extend(read_snapshot_manifest(cache_root, &manifest_path)?);
+    for generation in snapshot_store_generations(cache_root)? {
+        records.extend(generation.read(cache_root)?);
     }
     Ok(records)
 }
 
-/// A generation whose manifest could not be read, parsed or accepted, and what failed.
-/// §FS-rhei-snapshot-operations.1.6
+/// One generation directory the walk found: its manifest to read, or why it could not be
+/// listed. §FS-rhei-snapshot-operations.1.6
+enum StoreGeneration {
+    Manifest(PathBuf),
+    Unlistable { directory: PathBuf, cause: std::io::Error },
+}
+
+impl StoreGeneration {
+    fn directory(&self) -> &Path {
+        match self {
+            Self::Manifest(manifest_path) => manifest_path.parent().unwrap_or(manifest_path),
+            Self::Unlistable { directory, .. } => directory,
+        }
+    }
+
+    /// The path a failure of [`Self::read`] names in its message.
+    fn read_path(&self) -> &Path {
+        match self {
+            Self::Manifest(manifest_path) => manifest_path,
+            Self::Unlistable { directory, .. } => directory,
+        }
+    }
+
+    fn read(&self, cache_root: &Path) -> MietteResult<Option<SnapshotRecord>> {
+        match self {
+            Self::Manifest(manifest_path) => read_snapshot_manifest(cache_root, manifest_path),
+            Self::Unlistable { directory, cause } => {
+                Err(file_io_report(directory, "failed to read generation directory", cause))
+            }
+        }
+    }
+}
+
+/// A generation that could not be listed, or whose manifest could not be read, parsed or
+/// accepted, and what failed. §FS-rhei-snapshot-operations.1.6
 struct UnreadableGeneration {
     directory: PathBuf,
     reason: String,
@@ -24,24 +57,39 @@ struct SnapshotStoreScan {
     unreadable: Vec<UnreadableGeneration>,
 }
 
-/// Read every generation, letting an unreadable one cost only itself. A failure walking
-/// the cache still refuses, because it is not one generation's damage.
+/// Read every generation, letting an unreadable one cost only itself. A directory above a
+/// generation that cannot be listed still refuses, because it may hold any number of them.
 /// §FS-rhei-snapshot-operations.1.6
 fn scan_snapshot_records(cache_root: &Path) -> MietteResult<SnapshotStoreScan> {
     let mut scan = SnapshotStoreScan::default();
-    for manifest_path in snapshot_manifest_paths(cache_root)? {
-        match read_snapshot_manifest(cache_root, &manifest_path) {
+    for generation in snapshot_store_generations(cache_root)? {
+        match generation.read(cache_root) {
             Ok(record) => scan.records.extend(record),
             Err(report) => scan.unreadable.push(UnreadableGeneration {
-                directory: manifest_path.parent().unwrap_or(&manifest_path).to_path_buf(),
-                // The line already names the generation, so the reason does not repeat it.
-                reason: report
-                    .to_string()
-                    .replace(&format!(" '{}'", manifest_path.display()), ""),
+                directory: generation.directory().to_path_buf(),
+                reason: unreadable_reason(&report, generation.read_path()),
             }),
         }
     }
     Ok(scan)
+}
+
+/// The failure as one line after the generation's path: the line already names the path, so
+/// the reason does not repeat it, and a manifest's value cannot break the line or forge
+/// another. §FS-rhei-snapshot-operations.1.6
+fn unreadable_reason(report: &Report, read_path: &Path) -> String {
+    report
+        .to_string()
+        .replace(&format!(" '{}'", read_path.display()), "")
+        .chars()
+        .fold(String::new(), |mut reason, character| {
+            if character.is_control() {
+                reason.extend(character.escape_default());
+            } else {
+                reason.push(character);
+            }
+            reason
+        })
 }
 
 /// Name each unreadable generation on one unwrapped stderr line, so its path can be pasted,
@@ -62,17 +110,17 @@ fn report_unreadable_generations(
     Err(miette!(help = snapshot_unreadable_help(), "could not read {count} snapshot {noun}"))
 }
 
-/// The committed manifests under the cache, in path order so what names them is predictable.
+/// The committed generations under the cache, in path order so what names them is
+/// predictable. A walk failure above a generation names the directory that failed.
 /// §FS-rhei-snapshot-operations.1.6
-fn snapshot_manifest_paths(cache_root: &Path) -> MietteResult<Vec<PathBuf>> {
+fn snapshot_store_generations(cache_root: &Path) -> MietteResult<Vec<StoreGeneration>> {
     if !cache_root.exists() {
         return Ok(Vec::new());
     }
-    let mut manifests = Vec::new();
-    collect_manifest_paths(cache_root, cache_root, &mut manifests)
-        .map_err(|err| file_io_report(cache_root, "failed to read snapshot cache", err))?;
-    manifests.sort();
-    Ok(manifests)
+    let mut generations = Vec::new();
+    collect_store_generations(cache_root, cache_root, &mut generations)?;
+    generations.sort_by(|left, right| left.directory().cmp(right.directory()));
+    Ok(generations)
 }
 
 fn read_snapshot_manifest(
@@ -90,11 +138,22 @@ fn read_snapshot_manifest(
     snapshot_record_from_manifest(cache_root, manifest_path, manifest)
 }
 
-fn collect_manifest_paths(cache_root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
+fn collect_store_generations(
+    cache_root: &Path,
+    dir: &Path,
+    out: &mut Vec<StoreGeneration>,
+) -> MietteResult<()> {
+    let entries = match list_directory(dir) {
+        Ok(entries) => entries,
+        // §FS-rhei-snapshot-operations.1.6: a generation costs itself; anything else refuses.
+        Err(cause) if is_generation_directory(cache_root, dir) => {
+            out.push(StoreGeneration::Unlistable { directory: dir.to_path_buf(), cause });
+            return Ok(());
+        }
+        Err(cause) => return Err(file_io_report(dir, "failed to read snapshot cache", cause)),
+    };
+    for (entry, file_type) in entries {
         let path = entry.path();
-        let file_type = entry.file_type()?;
         if file_type.is_symlink() {
             continue;
         }
@@ -102,18 +161,31 @@ fn collect_manifest_paths(cache_root: &Path, dir: &Path, out: &mut Vec<PathBuf>)
             if entry.file_name().to_str().is_some_and(|name| name.contains(".tmp-")) {
                 continue;
             }
-            collect_manifest_paths(cache_root, &path, out)?;
+            collect_store_generations(cache_root, &path, out)?;
         } else if entry.file_name() == OsStr::new("manifest.json")
-            && is_committed_snapshot_manifest(cache_root, &path)
+            && path.parent().is_some_and(|parent| is_generation_directory(cache_root, parent))
         {
-            out.push(path);
+            out.push(StoreGeneration::Manifest(path));
         }
     }
     Ok(())
 }
 
-fn is_committed_snapshot_manifest(cache_root: &Path, manifest_path: &Path) -> bool {
-    let relative = manifest_path.strip_prefix(cache_root).unwrap_or(manifest_path);
+/// Every entry of `dir` with its type, or the failure that stopped listing it.
+fn list_directory(dir: &Path) -> std::io::Result<Vec<(fs::DirEntry, fs::FileType)>> {
+    fs::read_dir(dir)?
+        .map(|entry| {
+            let entry = entry?;
+            let file_type = entry.file_type()?;
+            Ok((entry, file_type))
+        })
+        .collect()
+}
+
+/// A committed generation's directory: named `g<N>`, and not in a staging directory.
+/// §FS-rhei-snapshot-operations.1.6
+fn is_generation_directory(cache_root: &Path, dir: &Path) -> bool {
+    let relative = dir.strip_prefix(cache_root).unwrap_or(dir);
     if relative.components().any(|component| {
         component
             .as_os_str()
@@ -122,9 +194,8 @@ fn is_committed_snapshot_manifest(cache_root: &Path, manifest_path: &Path) -> bo
     }) {
         return false;
     }
-    manifest_path
-        .parent()
-        .and_then(Path::file_name)
+    relative
+        .file_name()
         .and_then(OsStr::to_str)
         .and_then(|name| name.strip_prefix('g'))
         .is_some_and(|generation| !generation.is_empty() && generation.parse::<u64>().is_ok())

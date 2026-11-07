@@ -234,7 +234,6 @@ fn rows(out: &Output, task: &str) -> usize {
 /// All three failures in one store: every readable row, every damaged generation named
 /// with its own reason in path order, the store untouched. §FS-rhei-snapshot-operations.1.6
 #[test]
-#[ignore = "red until #578: list refuses at the first unreadable manifest and prints no rows; implement removes this"]
 fn list_shows_the_readable_rows_and_names_each_unreadable_generation() {
     let store = Store::lineage("snapshot-unreadable-list");
     let damaged: Vec<String> =
@@ -267,7 +266,6 @@ fn list_shows_the_readable_rows_and_names_each_unreadable_generation() {
 /// JSON stays one array a caller can parse, whatever the store holds.
 /// §FS-rhei-snapshot-operations.1.6
 #[test]
-#[ignore = "red until #578: list --format json refuses and prints no array; implement removes this"]
 fn list_json_stays_one_array_of_the_readable_rows() {
     let store = Store::damaged("snapshot-unreadable-list-json", Damage::NotJson);
 
@@ -288,7 +286,6 @@ fn list_json_stays_one_array_of_the_readable_rows() {
 /// A store with nothing readable keeps the empty-state output of §FS-rhei-snapshot-operations.1.2.
 /// §FS-rhei-snapshot-operations.1.6
 #[test]
-#[ignore = "red until #578: list refuses instead of printing its empty state; implement removes this"]
 fn list_of_only_damage_keeps_its_empty_state_output() {
     let store = Store::empty("snapshot-unreadable-list-empty", ONE_TASK);
     store.damage(DAMAGED, Damage::NotJson);
@@ -307,7 +304,6 @@ fn list_of_only_damage_keeps_its_empty_state_output() {
 /// A filter chooses among readable rows and cannot say a damaged generation is out of
 /// scope, because its manifest cannot say what it belongs to. §FS-rhei-snapshot-operations.1.6
 #[test]
-#[ignore = "red until #578: list --task refuses on damage its filter excludes; implement removes this"]
 fn list_filter_narrows_the_rows_and_does_not_hide_damage() {
     let store = Store::damaged("snapshot-unreadable-list-filter", Damage::Version2);
     store.readable("plan.8/implementation/work/1/agent/g1", 1);
@@ -323,7 +319,6 @@ fn list_filter_narrows_the_rows_and_does_not_hide_damage() {
 /// Each policy against each failure: it deletes the readable generations it selects,
 /// skips the damaged one, leaves it on disk and exits 1. §FS-rhei-snapshot-operations.1.6
 #[test]
-#[ignore = "red until #578: every gc policy refuses before it selects anything; implement removes this"]
 fn each_gc_policy_deletes_what_it_selects_and_skips_the_damage() {
     for policy in POLICIES {
         for damage in DAMAGE {
@@ -354,7 +349,6 @@ fn each_gc_policy_deletes_what_it_selects_and_skips_the_damage() {
 /// `--dry-run` reports the same selection and the same skip, and touches nothing.
 /// §FS-rhei-snapshot-operations.1.6
 #[test]
-#[ignore = "red until #578: gc --dry-run refuses before it can say what it would delete; implement removes this"]
 fn gc_dry_run_prints_the_selection_and_skips_the_damage() {
     let store = Store::damaged("snapshot-unreadable-gc-dry-run", Damage::NotJson);
 
@@ -375,7 +369,6 @@ fn gc_dry_run_prints_the_selection_and_skips_the_damage() {
 /// The issue's scoped attempt: `--task` does the scoped work and still names the damage.
 /// §FS-rhei-snapshot-operations.1.6
 #[test]
-#[ignore = "red until #578: gc --task refuses on damage its filter excludes; implement removes this"]
 fn gc_filter_acts_on_its_scope_and_does_not_hide_damage() {
     let store = Store::damaged("snapshot-unreadable-gc-filter", Damage::NotJson);
     store.readable("plan.8/implementation/work/1/agent/g1", 1);
@@ -393,7 +386,6 @@ fn gc_filter_acts_on_its_scope_and_does_not_hide_damage() {
 /// must get past damage in another lineage too, or gc deletes and then stops with the
 /// pointer dangling. §FS-rhei-snapshot-operations.1.6
 #[test]
-#[ignore = "red until #578: gc refuses before it deletes, and a strict refresh_current_links would refuse after; implement removes this"]
 fn gc_refreshes_current_on_a_lineage_it_deleted_from_past_damage_elsewhere() {
     let store = Store::damaged("snapshot-unreadable-gc-current", Damage::NotJson);
     store.point_current_at(LINEAGE, "g1");
@@ -410,7 +402,6 @@ fn gc_refreshes_current_on_a_lineage_it_deleted_from_past_damage_elsewhere() {
 /// slot, and `current` goes to the newest generation that can be read.
 /// §FS-rhei-snapshot-operations.1.6
 #[test]
-#[ignore = "red until #578: gc refuses instead of keeping the newest readable generations; implement removes this"]
 fn a_damaged_newest_generation_holds_no_retention_slot() {
     let store = Store::lineage("snapshot-unreadable-gc-slot");
     let g3 = format!("{LINEAGE}/g3");
@@ -452,7 +443,6 @@ fn a_latest_inherit_protects_only_the_newest_generation_of_an_undamaged_store() 
 /// `latest_orchestrator_generation` falls back to the record's own generation, so gc would
 /// refuse the collectable `g1` as protected. §FS-rhei-snapshot-operations.1.6
 #[test]
-#[ignore = "red until #578: gc refuses at the first read, and a strict latest lookup would refuse g1 as protected; implement removes this"]
 fn a_latest_inherit_with_damage_elsewhere_does_not_protect_older_generations() {
     let store = Store::latest_inherit("snapshot-unreadable-latest-elsewhere");
     store.damage(ELSEWHERE, Damage::NotJson);
@@ -469,7 +459,6 @@ fn a_latest_inherit_with_damage_elsewhere_does_not_protect_older_generations() {
 /// The interlock still comes first: a selection holding the `latest` generation is refused
 /// whole, as it is with no damage. §FS-rhei-snapshot-operations.1.6
 #[test]
-#[ignore = "red until #578: gc reports the manifest rather than the protected generation; implement removes this"]
 fn the_inherit_interlock_still_refuses_a_protected_selection_past_damage() {
     let store = Store::latest_inherit("snapshot-unreadable-latest-refused");
     store.damage(ELSEWHERE, Damage::NotJson);

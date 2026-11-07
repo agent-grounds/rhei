@@ -226,6 +226,7 @@ include!("cli/archive_command.rs");
 include!("cli/verify_command.rs");
 include!("cli/snapshot_session_locator.rs");
 include!("cli/snapshot_list_show.rs");
+include!("cli/snapshot_store_scan.rs");
 include!("cli/snapshot_refs_gc.rs");
 include!("cli/snapshot_continue_lock.rs");
 include!("cli/init_command.rs");

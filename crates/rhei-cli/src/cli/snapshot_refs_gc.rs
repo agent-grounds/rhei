@@ -273,8 +273,11 @@ fn snapshot_gc_command(
 
     let older_than_secs = older_than.map(parse_snapshot_duration_secs).transpose()?;
     let now = std::time::SystemTime::now();
-    let all_records = read_snapshot_records(&ctx.cache_root)?;
-    let base_eligible: Vec<SnapshotRecord> = all_records
+    // The policy acts on what can be read, and never deletes the rest.
+    // §FS-rhei-snapshot-operations.1.6
+    let scan = scan_snapshot_records(&ctx.cache_root)?;
+    let base_eligible: Vec<SnapshotRecord> = scan
+        .records
         .into_iter()
         .filter(|record| {
             if task.is_some_and(|value| record.task_id != value) {
@@ -335,7 +338,9 @@ fn snapshot_gc_command(
     if !dry_run {
         refresh_current_links(&ctx.cache_root, deleted_identities)?;
     }
-    Ok(())
+    // Last, so a refusal above reads as it does on an undamaged store.
+    // §FS-rhei-snapshot-operations.1.6
+    report_unreadable_generations("skipped", &scan.unreadable)
 }
 
 fn snapshot_generation_protected_by_active_inherit(
@@ -501,11 +506,15 @@ fn refresh_current_links(
     Ok(())
 }
 
+/// The readable generations of one lineage, wherever else the store is damaged: gc's
+/// `current` refresh and its `latest` lookup both choose among these.
+/// §FS-rhei-snapshot-operations.1.6
 fn read_snapshot_records_for_identity(
     cache_root: &Path,
     identity: &SnapshotIdentity,
 ) -> MietteResult<Vec<SnapshotRecord>> {
-    Ok(read_snapshot_records(cache_root)?
+    Ok(scan_snapshot_records(cache_root)?
+        .records
         .into_iter()
         .filter(|record| record.identity() == *identity)
         .collect())

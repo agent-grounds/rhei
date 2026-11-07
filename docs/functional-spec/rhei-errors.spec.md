@@ -150,6 +150,38 @@ machine describes another machine with no error to say so.
   takes none, and `rhei snapshot list` reads the same store with or without one.
   Where the command has no target they stay bare, because each discovers its own.
 
+#### 1.2.2. A State Machine That Will Not Load
+
+A state machine file fails to load in one of two ways, told apart by whether
+its text parses as YAML at all, and each gets its own help. Both open with the
+same headline, `failed to parse state machine '<path>': <cause>`, and both end
+in the command that re-checks the file:
+`rhei states --state-machine <path>`.
+
+Text that does not parse is a syntax failure. The help says the file is not
+valid YAML and to fix the syntax. It refers to the position above only when the
+headline prints one, which a duplicate key at the top level of the file does
+not.
+
+Text that parses but has the wrong shape is a shape failure. Its help says the
+file is valid YAML, never says to fix the syntax, and never refers to a position
+the headline does not print. What it asks for depends on what the shape lacks:
+
+- A required top-level field is absent: the precise edit, naming the key, that
+  it goes at the top level of the file, and its value shape, as
+  [§FS-rhei-states.1.1](rhei-states.spec.md#11-top-level-fields) lists them.
+- The document holds no top-level mapping, because it is empty, only comments,
+  `null`, a scalar or a sequence: that the document must be a mapping, naming
+  every required top-level key. There is no one field to add.
+- Anything else, such as a wrong type at any depth or a field missing from a
+  nested entry: the correction of what the headline names. The headline already
+  carries the key's path and position, so the help makes no claim that the key
+  belongs at the top level.
+
+The help states the correction itself rather than pointing at a document: the
+reader of a refusal may hold only the installed binary, with no repository
+around it to follow a path into.
+
 ### 1.3. Near Misses
 
 When a name is not found and a declared set of valid names exists, the error

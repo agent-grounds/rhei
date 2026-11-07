@@ -68,6 +68,10 @@ Examples:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `name` | string | Yes | The machine's human-readable name |
+| `version` | number or string | Yes | The machine's version, kept as written |
+| `states` | map of state name to state definition | Yes | The allowed states, in the order written. See [States](#10-states). |
+| `transitions` | array of transition rules | No | The declared transitions between states; none when omitted. See [Transitions](#11-transitions). |
 | `models` | string array | No | The complete set of model profile identifiers available to the machine |
 | `profiles` | map of name to `{initial, allowed}` | Yes | Named, reusable state profiles. Each profile declares the `initial` state and the `allowed` state subset for any node assigned to it. Referenced by `node_policy`. |
 | `node_policy` | object | Yes | Maps nodes to profiles. Must define `root` (the Panta project root) and `default`. Optionally defines `rhei` (the rhei tier), `by_type`, and `overrides`. See [Node Policy](#9-node-policy). |

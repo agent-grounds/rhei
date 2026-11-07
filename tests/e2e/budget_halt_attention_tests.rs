@@ -36,7 +36,7 @@ pub(super) fn section(report: &str, heading: &str) -> String {
 }
 
 /// The blocker and the next action of the ticket's `## Attention` row.
-fn attention_row(root: &Path, task: &str) -> (String, String) {
+pub(super) fn attention_row(root: &Path, task: &str) -> (String, String) {
     let report = report(root);
     let attention = section(&report, "Attention");
     let row = attention
@@ -50,7 +50,7 @@ fn attention_row(root: &Path, task: &str) -> (String, String) {
 
 /// The run's last `budget_halt` record: the premise that a bound stopped it, and
 /// the remedy the row has to agree with.
-fn halt_record(root: &Path) -> serde_json::Value {
+pub(super) fn halt_record(root: &Path) -> serde_json::Value {
     fs::read_to_string(root.join("runtime/events.jsonl"))
         .expect("read the run's event stream")
         .lines()

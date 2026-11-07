@@ -145,19 +145,16 @@ fn check_remedies(requester: Requester) {
 }
 
 #[test]
-#[ignore = "red until #592: project equality must name the machine ceiling; implement removes this"]
 fn ceiling_equality_project_request_names_machine_in_human_and_json_halts() {
     check_remedies(Requester::Project);
 }
 
 #[test]
-#[ignore = "red until #592: profile equality must name the machine ceiling; implement removes this"]
 fn ceiling_equality_profile_request_names_machine_in_human_and_json_halts() {
     check_remedies(Requester::Profile);
 }
 
 #[test]
-#[ignore = "red until #592: profile equality must name the delegated ceiling; implement removes this"]
 fn ceiling_equality_profile_request_names_delegated_project_in_human_and_json_halts() {
     check_remedies(Requester::DelegatedProfile);
 }

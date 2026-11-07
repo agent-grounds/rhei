@@ -244,18 +244,11 @@ impl Bound {
         Self { key, effective, source, requested, unit, ceiling, limiter, files }
     }
 
-    /// Whether the active ceiling, rather than the requester, is what decides
-    /// this value — and therefore what a remedy has to name. A delegated
-    /// project value is its own ceiling, so it limits when it is the source.
-    /// §FS-rhei-budgets.8
+    /// Whether raising the bound requires raising its active ceiling, whose
+    /// holder the remedy must name. Equality leaves no room to raise an inner
+    /// request, even when no numerical clamp occurred. §FS-rhei-budgets.8
     pub fn limited_by_ceiling(&self) -> bool {
-        self.requested.is_some()
-            || match self.limiter {
-                Limiter::Machine => {
-                    matches!(self.source, BoundSource::Machine | BoundSource::BuiltIn)
-                }
-                Limiter::Project => self.source == BoundSource::Project,
-            }
+        self.effective == self.ceiling
     }
 
     /// Whether the machine handed this dimension's ceiling to the project.

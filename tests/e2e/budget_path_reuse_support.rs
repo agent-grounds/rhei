@@ -85,8 +85,7 @@ impl World {
         CliRun::from(&cmd.output().expect("rhei run should run"))
     }
 
-    /// `rhei budget <args…>` with the project directory as the target, which is
-    /// the spelling an operator has and the one a refusal names back to them.
+    /// `rhei budget <args…>`.
     pub(super) fn budget(&self, args: &[&str]) -> CliRun {
         CliRun::from(&self.budget_output(args))
     }
@@ -103,16 +102,22 @@ impl World {
         cmd.output().expect("rhei budget should run")
     }
 
+    /// The target every budget verb here is given: a lone plan is named by its own
+    /// path, because its plain parent is not a target. §FS-rhei-budgets.10.1
+    pub(super) fn plan(&self) -> String {
+        self.project.join("plan.rhei.md").display().to_string()
+    }
+
     pub(super) fn show(&self) -> CliRun {
-        self.budget(&["show", &self.project.display().to_string()])
+        self.budget(&["show", &self.plan()])
     }
 
     pub(super) fn show_json(&self) -> std::process::Output {
-        self.budget_output(&["show", &self.project.display().to_string(), "--format", "json"])
+        self.budget_output(&["show", &self.plan(), "--format", "json"])
     }
 
     pub(super) fn forget(&self, reason: &str) -> CliRun {
-        self.budget(&["forget", &self.project.display().to_string(), "--reason", reason])
+        self.budget(&["forget", &self.plan(), "--reason", reason])
     }
 
     /// The witness base in the spelling the **tool** resolves it to.

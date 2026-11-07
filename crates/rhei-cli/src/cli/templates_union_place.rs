@@ -128,7 +128,8 @@
 
     /// Every node heading id a markdown body declares, in document order.
     fn declared_ids(body: &str) -> Vec<String> {
-        let mut in_code_block = false;
+        // §FS-rhei-plan-language.2.1: quoted ids do not declare tickets.
+        let mut in_code_block = rhei_core::fence::FenceTracker::default();
         body.lines()
             .filter_map(|line| {
                 node_heading_outside_code(line, &mut in_code_block).map(|(_, id)| id.to_owned())
@@ -170,7 +171,8 @@
     /// level of depth, and every reference to a template task is rewritten to
     /// the placed id. §FS-rhei-library.4
     fn reparent_body(body: &str, parent: &str, known: &BTreeSet<String>) -> String {
-        let mut in_code_block = false;
+        // §FS-rhei-plan-language.2.1: quoted headings and references remain verbatim.
+        let mut in_code_block = rhei_core::fence::FenceTracker::default();
         let mut out = String::with_capacity(body.len() + 64);
         for line in body.split_inclusive('\n') {
             let text = line.trim_end_matches('\n').trim_end_matches('\r');
@@ -187,7 +189,7 @@
                     continue;
                 }
             }
-            out.push_str(&reparent_reference_line(text, parent, known, in_code_block));
+            out.push_str(&reparent_reference_line(text, parent, known, in_code_block.is_open()));
             out.push_str(eol);
         }
         out

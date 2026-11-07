@@ -73,7 +73,8 @@ fn region_lines_with_offsets(text: &str) -> impl Iterator<Item = (usize, &str)> 
 /// the file. `None` unless the heading is declared exactly once.
 // §FS-rhei-run.3.7.1
 fn snapshot_region(text: &str, local_id: &str) -> Option<RegionSnapshot> {
-    let mut in_code = false;
+    // §FS-rhei-plan-language.2.1: quoted headings do not delimit worker regions.
+    let mut in_code = rhei_core::fence::FenceTracker::default();
     let mut own: Option<(usize, usize, &str)> = None;
     let mut declared = 0;
     let mut following: Option<(usize, &str)> = None;
@@ -147,7 +148,8 @@ fn restore_region(
 /// under it, so line 1 of a task file has no owner, though `region_span` counts
 /// that line in the task's region. §FS-rhei-run.3.7.6
 fn region_owner_at(text: &str, line: usize) -> Option<String> {
-    let mut in_code = false;
+    // §FS-rhei-plan-language.2.1: a quoted heading cannot change the owning task.
+    let mut in_code = rhei_core::fence::FenceTracker::default();
     let mut owner = None;
     for (_, current) in region_lines_with_offsets(text).take(line.saturating_sub(1)) {
         if let Some((_, id)) = node_heading_outside_code(current, &mut in_code) {

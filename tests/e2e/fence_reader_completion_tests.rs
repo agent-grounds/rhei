@@ -51,7 +51,6 @@ fn complete_below(quotation: &str, workspace: bool) {
 macro_rules! red_completion {
     ($name:ident, $quote:expr, $workspace:expr) => {
         #[test]
-        #[ignore = "red until #614: completion must use matching fences; implement removes this"]
         fn $name() {
             complete_below($quote, $workspace);
         }

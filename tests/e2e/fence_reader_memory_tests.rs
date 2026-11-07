@@ -44,8 +44,9 @@ const QUOTED_INFO: &str =
 macro_rules! red_memory {
     ($name:ident, $quote:expr) => {
         #[test]
-        #[ignore = "red until #614: legacy result lookup must skip matching fences; implement removes this"]
-        fn $name() { history($quote, false); }
+        fn $name() {
+            history($quote, false);
+        }
     };
 }
 

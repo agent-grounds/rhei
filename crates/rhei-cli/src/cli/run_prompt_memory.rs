@@ -330,28 +330,19 @@ fn is_result_entry_heading(line: &str) -> bool {
 /// verdict block it is objecting to puts a `## Result — <identity>` heading
 /// inside a fenced example, and read as an entry that quotation becomes the
 /// standing verdict — the opposite of what the file says. So fences are
-/// tracked while scanning, by the rule the plan validator applies to a plan
-/// body: [`rhei_validator::code_fence_run`], which `markdown_prose` in
-/// `validator_links.rs` is built from. An unclosed fence runs to the end of
-/// the file, as a renderer reads it.
+/// tracked while scanning with the shared [`rhei_core::fence::FenceTracker`]
+/// from §FS-rhei-plan-language.2.1. An unclosed fence runs to the end of the
+/// file, as a renderer reads it.
 // §FS-rhei-memory.4.3 §FS-rhei-plan-language.3.6
 fn last_result_entry_line(lines: &[&str]) -> Option<usize> {
-    let mut fence: Option<(char, usize)> = None;
+    let mut fences = rhei_core::fence::FenceTracker::default();
     let mut last = None;
     for (index, line) in lines.iter().enumerate() {
-        match fence {
-            Some((marker, open)) => {
-                if let Some((character, run, bare)) = rhei_validator::code_fence_run(line) {
-                    if character == marker && run >= open && bare {
-                        fence = None;
-                    }
-                }
-            }
-            None => match rhei_validator::code_fence_run(line) {
-                Some((marker, run, _)) => fence = Some((marker, run)),
-                None if is_result_entry_heading(line) => last = Some(index),
-                None => {}
-            },
+        if fences.read(line) || fences.is_open() {
+            continue;
+        }
+        if is_result_entry_heading(line) {
+            last = Some(index);
         }
     }
     last

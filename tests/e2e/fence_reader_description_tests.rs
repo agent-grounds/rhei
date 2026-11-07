@@ -83,7 +83,6 @@ fn refused(body: &str, needle: &str) {
 
 /// §FS-rhei-new.3.4: the exact intake forgery has its heading outside the fence.
 #[test]
-#[ignore = "red until #614: forged description must be refused before writing; implement removes this"]
 fn fence_reader_614_description_forgery() {
     refused(FORGED, "line 4 of --description-file - would be read as plan structure");
 }
@@ -123,19 +122,16 @@ fn accepts(body: &str) {
 
 /// §FS-rhei-new.3.4: a canonical close protects headings and metadata inside it.
 #[test]
-#[ignore = "red until #614: tilde quotations are description content; implement removes this"]
 fn fence_reader_614_description_tilde_content() {
     accepts("~~~markdown\n### Task 9: smuggled\n**State:** done\n~~~\n");
 }
 
 #[test]
-#[ignore = "red until #614: shorter runs do not expose quoted headings; implement removes this"]
 fn fence_reader_614_description_longer_content() {
     accepts("````markdown\n```console\n### Task 9: smuggled\n**State:** done\n````\n");
 }
 
 #[test]
-#[ignore = "red until #614: info strings do not expose quoted headings; implement removes this"]
 fn fence_reader_614_description_info_content() {
     accepts("```markdown\n```console\n### Task 9: smuggled\n**State:** done\n```\n");
 }
@@ -148,8 +144,9 @@ fn fence_reader_614_description_ordinary_control() {
 macro_rules! unclosed {
     ($name:ident, $body:expr) => {
         #[test]
-        #[ignore = "red until #614: report the actual unclosed opening fence; implement removes this"]
-        fn $name() { refused($body, "code fence opened on line 3 of --description-file - is never closed"); }
+        fn $name() {
+            refused($body, "code fence opened on line 3 of --description-file - is never closed");
+        }
     };
 }
 

@@ -170,14 +170,15 @@ fn without_task_assignee(raw: &str, local_id: &str) -> (String, bool, bool) {
     let mut in_target_task = false;
     let mut target_found = false;
     let mut removed = false;
-    let mut in_code_block = false;
+    // §FS-rhei-plan-language.2.1: release never removes quoted assignee lines.
+    let mut in_code_block = rhei_core::fence::FenceTracker::default();
 
     for line in raw.lines() {
         if let Some((_, id)) = node_heading_outside_code(line, &mut in_code_block) {
             in_target_task = id == local_id;
             target_found |= in_target_task;
         }
-        if !in_code_block && in_target_task && line.starts_with("**Assignee:**") {
+        if !in_code_block.is_open() && in_target_task && line.starts_with("**Assignee:**") {
             removed = true;
             continue;
         }

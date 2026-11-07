@@ -124,7 +124,8 @@ fn remove_task_metadata_entry(metadata: &mut Metadata, key: &str) -> bool {
 /// §FS-rhei-remove.4.1
 fn remove_ticket_section(raw: &str, local_id: &str) -> Option<String> {
     let lines: Vec<&str> = raw.split_inclusive('\n').collect();
-    let mut in_code = false;
+    // §FS-rhei-plan-language.2.1: quoted headings do not end a ticket section.
+    let mut in_code = rhei_core::fence::FenceTracker::default();
     let mut start = None;
     let mut level = 0;
     let mut end = lines.len();
@@ -142,7 +143,7 @@ fn remove_ticket_section(raw: &str, local_id: &str) -> Option<String> {
             }
             Some(_) => {
                 let closes = heading.is_some_and(|(hashes, _)| hashes <= level)
-                    || (!in_code && (text.starts_with("# ") || text.starts_with("## ")));
+                    || (!in_code.is_open() && (text.starts_with("# ") || text.starts_with("## ")));
                 if closes {
                     end = index;
                     break;

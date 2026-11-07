@@ -26,10 +26,11 @@ fn normalize_whitespace(text: &str) -> String {
 /// prose wraps a command it shows; inside a fence there are no code spans, only
 /// those continuations, so an unmatched backtick joins nothing there. A blank
 /// line ends whatever is pending, because a code span cannot cross one.
+/// Fence boundaries follow §FS-rhei-plan-language.2.1.
 fn logical_lines(text: &str) -> Vec<String> {
     let mut lines = Vec::new();
     let mut pending = String::new();
-    let mut fenced = false;
+    let mut fences = rhei_core::fence::FenceTracker::default();
     let mut flush = |pending: &mut String| {
         if !pending.is_empty() {
             lines.push(normalize_whitespace(pending));
@@ -37,9 +38,8 @@ fn logical_lines(text: &str) -> Vec<String> {
         }
     };
     for line in text.lines() {
-        if line.trim_start().starts_with("```") {
+        if fences.read(line) {
             flush(&mut pending);
-            fenced = !fenced;
             continue;
         }
         if line.trim().is_empty() {
@@ -51,7 +51,7 @@ fn logical_lines(text: &str) -> Vec<String> {
         }
         let continued = line.trim_end().ends_with('\\');
         pending.push_str(line.trim_end().trim_end_matches('\\'));
-        let open_span = !fenced && pending.matches('`').count() % 2 == 1;
+        let open_span = !fences.is_open() && pending.matches('`').count() % 2 == 1;
         if !continued && !open_span {
             flush(&mut pending);
         }
@@ -296,4 +296,25 @@ fn the_guard_reads_a_continued_command_whole() {
         vec!["rhei transition <id> --to cancelled".to_string()],
         "a paragraph the command does not belong to cannot excuse it"
     );
+}
+
+/// §FS-rhei-transition-cmd.2: a separate command's `--from` never excuses a
+/// missing flag, including inside the fences of §FS-rhei-plan-language.2.1.
+#[test]
+fn the_guard_keeps_commands_separate_inside_matching_fences() {
+    let bad = "rhei transition plan.rhei.md --task 1 --to done";
+    for (name, opening, inner, closing) in [
+        ("ordinary control", "```sh", "", "```"),
+        ("tilde", "~~~sh", "", "~~~"),
+        ("shorter inner run", "````sh", "```sh\n", "````"),
+        ("info string non-close", "```sh", "```console\n", "```"),
+    ] {
+        let text =
+            format!("{opening}\n{inner}# see ` for details\n{bad}\necho --from\n{closing}\n");
+        assert_eq!(
+            offending_invocations(&text),
+            vec![bad.to_string()],
+            "{name}: a fenced backtick must not join separate commands"
+        );
+    }
 }

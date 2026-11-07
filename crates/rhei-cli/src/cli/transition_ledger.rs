@@ -276,6 +276,7 @@ fn trim_trailing_blank_lines(lines: &mut Vec<String>) {
 ///
 /// Operates on raw text lines so the parser does not need to know about
 /// assignee or result fields.
+/// §FS-rhei-complete.4.2 §FS-rhei-complete.4.3: write only the real task's result and assignee.
 fn rewrite_task_completion(
     task_file: &Path,
     task_id: &str,
@@ -293,7 +294,7 @@ fn rewrite_task_completion(
     let mut target_found = false;
     let mut link_inserted = !insert_link; // skip insertion when not requested
     let result_line = format!("> **Result:** [{}]({})", link_text, link_path);
-    let mut in_code_block = false;
+    let mut in_code_block = rhei_core::fence::FenceTracker::default();
 
     for line in &lines {
         let heading = node_heading_outside_code(line, &mut in_code_block);
@@ -315,10 +316,10 @@ fn rewrite_task_completion(
         }
 
         // Strip the assignee line from the target task.
-        if !in_code_block && in_target_task && line.starts_with("**Assignee:**") {
+        if !in_code_block.is_open() && in_target_task && line.starts_with("**Assignee:**") {
             continue;
         }
-        if !in_code_block && in_target_task && line.starts_with("> **Result:**") {
+        if !in_code_block.is_open() && in_target_task && line.starts_with("> **Result:**") {
             // §FS-rhei-panta.6.3: completion owns this ticket's result link.
             // An existing (possibly legacy rhei-local) link is refreshed to
             // the file this completion actually wrote.

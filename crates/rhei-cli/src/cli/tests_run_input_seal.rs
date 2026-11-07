@@ -108,7 +108,6 @@ fn a_directory_or_a_machine_that_appears_or_goes_is_a_change() {
 }
 
 #[test]
-#[ignore = "red until #584: a machine in both `machine` and `entries` is listed twice; implement removes this"]
 fn snapshots_of_a_real_scope_list_a_gained_or_lost_machine_once() {
     // §FS-rhei-seal.4 §FS-rhei-seal.5: `take_seal_snapshot` puts the machine in `entries` too.
     let (dir, scope) = seal_fixture();
@@ -123,7 +122,6 @@ fn snapshots_of_a_real_scope_list_a_gained_or_lost_machine_once() {
 }
 
 #[test]
-#[ignore = "red until #584: a gained machine whose entry also changed has two kinds; implement removes this"]
 fn a_gained_machine_whose_entry_also_changed_keeps_the_kind_of_its_bytes() {
     // §FS-rhei-seal.4: one path, one kind; de-duplicating equal lines would leave two here.
     let sealed = SealSnapshot {

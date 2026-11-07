@@ -125,41 +125,20 @@ fn spawn_parallel_agent_work_item(
         );
         return Ok(ParallelAgentSpawnOutcome::Skipped);
     }
-    // The same bound at the same point: a worker pool that skipped it would
-    // be the exception that makes the count untrue. One arm at a time, which is
-    // the stated residual. §FS-rhei-run.3.4 §FS-rhei-budgets.6.1 §FS-rhei-budgets.4.2
-    match budget_admit_spawn(
+    // The same bound at the same point as the sequential path. §FS-rhei-run.3.4
+    if !admit_parallel_agent_spawn(
+        item,
         input,
         &loaded,
         workspace_root,
         machine,
         settings,
         task,
-        &item.task_id_str,
-        &opts.price_book().currency,
+        opts,
         budget_run,
+        sink,
     )? {
-        // §FS-rhei-budgets.9
-        BudgetAdmission::Admitted { bounds, note } => {
-            sink.emit(rhei_tui::RunEvent::BudgetSnapshot { bounds });
-            // Nothing is wrong, so it is a note and not a warning.
-            // §FS-rhei-budgets.7.2
-            if let Some(note) = note {
-                emit_run_message(sink, rhei_tui::MessageLevel::Info, note);
-            }
-        }
-        BudgetAdmission::NotAccounted => {}
-        BudgetAdmission::Refused { halt, event, bounds } => {
-            // The same current facts on a refused pool admission. §FS-rhei-budgets.9
-            if !bounds.is_empty() {
-                sink.emit(rhei_tui::RunEvent::BudgetSnapshot { bounds });
-            }
-            emit_run_message(sink, rhei_tui::MessageLevel::Error, halt);
-            if let Some(event) = event {
-                sink.emit(*event);
-            }
-            return Ok(ParallelAgentSpawnOutcome::Skipped);
-        }
+        return Ok(ParallelAgentSpawnOutcome::Skipped);
     }
     // Bound while both roots still have their own names: the rebind below
     // shadows the project root, and the two differ only in a Panta project.

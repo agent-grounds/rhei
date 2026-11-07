@@ -123,6 +123,7 @@
         mirror_project_files(project, &mirror)?;
         // A refusal names the project's files, never the copy it read them in.
         let onto = |report: Report| respell_report(report, &copy_respellings(&mirror, project));
+        let refused = |report: Report| replacement_refusal_report(project, &mirror, report);
         let mut inherited = union_validation_errors(&mirror);
         let before = load_plan_for_validation(&mirror).map_err(onto)?;
         let mut before_set = resolve_state_machines_for_loaded_plan(&mirror, &before, None);
@@ -136,9 +137,9 @@
             before_set = resolve_state_machines_for_loaded_plan(&mirror, &before, None);
         }
         write_project_root(&root.writes, project, &mirror).map_err(onto)?;
-        let after = load_plan_for_validation(&mirror).map_err(onto)?;
+        let after = load_plan_for_validation(&mirror).map_err(refused)?;
         let after_set =
-            resolve_state_machines_for_loaded_plan(&mirror, &after, None).map_err(onto)?;
+            resolve_state_machines_for_loaded_plan(&mirror, &after, None).map_err(refused)?;
         // The after set loaded, so a before set that still did not is the default
         // being replaced: nothing to subtract, every error counts. §FS-rhei-library.2.3
         let (before_set, inherited) = match before_set {
@@ -168,7 +169,7 @@
             return Err(stranding_refusal(project, machine, &stranding.tickets, &kinds));
         }
 
-        let pass = validation_pass(&mirror, None).map_err(onto)?;
+        let pass = validation_pass(&mirror, None).map_err(refused)?;
         let introduced = errors_a_rebind_introduces(&inherited, pass.errors);
         if !introduced.is_empty() {
             let (sources, help) = (&pass.state_machine_sources, &pass.help);
@@ -192,7 +193,7 @@
 
     /// The validation refusal for an error the replacement introduces, naming
     /// the project and its own files rather than the copy it was found in.
-    /// §FS-rhei-library.2.3 §FS-rhei-validate.6
+    /// §FS-rhei-library.7.5
     fn mirror_validation_report(
         project: &Path,
         mirror: &Path,
@@ -200,14 +201,18 @@
         errors: &[String],
         help: &[String],
     ) -> Report {
-        let sources: Vec<ValidationMachineSource> = sources
-            .iter()
-            .map(|source| ValidationMachineSource {
-                path: source.path.as_deref().map(|path| onto_project(path, mirror, project)),
-                ..source.clone()
-            })
-            .collect();
-        let report = validation_report(project, &sources, errors, help);
+        let report = placement_validation_report(mirror, sources, errors, help);
+        replacement_refusal_report(project, mirror, report)
+    }
+
+    /// Only failures after applying the proposed default get placement recovery;
+    /// failures loading the original project keep their own remedy. §FS-rhei-library.7.5
+    fn replacement_refusal_report(project: &Path, mirror: &Path, report: Report) -> Report {
+        let context = format!(
+            "Placement replacing the default machine of project '{}' was refused.",
+            crate::display_path(project),
+        );
+        let report = discarded_placement_report(&context, mirror, report);
         respell_report(report, &copy_respellings(mirror, project))
     }
 

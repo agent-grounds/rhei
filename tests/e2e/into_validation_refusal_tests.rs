@@ -36,12 +36,17 @@ fn assert_refusal(host: Host, dry_run: bool, load_failure: bool) {
         }
     }
 
+    assert_report(&scenario, &report);
+}
+
+pub(super) fn assert_report(scenario: &Scenario, report: &str) {
+    let folded = report.split_whitespace().collect::<Vec<_>>().join(" ");
     // Collect violations so each red run demonstrates both symptoms even if
     // the path assertion fails first. These are semantic requirements, not an
     // exact rendering or an obligation to print a concrete retry command.
     let lower = folded.to_lowercase();
     let mut violations = Vec::new();
-    if report.contains(".tmp") || report.contains("scratch/") || report.contains("scratch\\") {
+    if scenario.exposes_mirror(report) || report.contains(".rhei-instantiate-") {
         violations.push("report exposes the disposable validation mirror");
     }
     if !scenario.names_original(&folded, &scenario.target)
@@ -84,19 +89,16 @@ fn assert_refusal(host: Host, dry_run: bool, load_failure: bool) {
 }
 
 #[test]
-#[ignore = "red until #604: single-file union refusal paths and recovery; implement removes this"]
 fn single_file_union_refusal_names_original_files_and_retry() {
     assert_refusal(Host::Single, false, false);
 }
 
 #[test]
-#[ignore = "red until #604: single-file preview refusal paths and recovery; implement removes this"]
 fn single_file_preview_refusal_names_original_files_and_retry() {
     assert_refusal(Host::Single, true, false);
 }
 
 #[test]
-#[ignore = "red until #604: member union refusal paths and recovery; implement removes this"]
 fn member_union_refusal_names_original_files_and_retry() {
     // A passing control inside the red regression protects the existing
     // inherited-error exception and ordinary validate's separate recovery.
@@ -121,31 +123,26 @@ fn member_union_refusal_names_original_files_and_retry() {
 }
 
 #[test]
-#[ignore = "red until #604: member preview refusal paths and recovery; implement removes this"]
 fn member_preview_refusal_names_original_files_and_retry() {
     assert_refusal(Host::Member, true, false);
 }
 
 #[test]
-#[ignore = "red until #604: directory union refusal paths and recovery; implement removes this"]
 fn directory_union_refusal_names_original_files_and_retry() {
     assert_refusal(Host::Directory, false, false);
 }
 
 #[test]
-#[ignore = "red until #604: directory preview refusal paths and recovery; implement removes this"]
 fn directory_preview_refusal_names_original_files_and_retry() {
     assert_refusal(Host::Directory, true, false);
 }
 
 #[test]
-#[ignore = "red until #604: introduced load refusal paths and recovery; implement removes this"]
 fn introduced_load_refusal_names_original_files_and_retry() {
     assert_refusal(Host::Single, false, true);
 }
 
 #[test]
-#[ignore = "red until #604: introduced preview load refusal paths and recovery; implement removes this"]
 fn introduced_preview_load_refusal_names_original_files_and_retry() {
     assert_refusal(Host::Single, true, true);
 }

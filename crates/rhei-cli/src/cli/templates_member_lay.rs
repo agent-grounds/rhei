@@ -150,13 +150,14 @@
         let kept = (lay.keep_on_error && !lay.dry_run).then(|| lay.layout.entrypoint(lay.output_dir));
         let help_target = kept.as_deref().map(|laid| enter_help_target(HelpTarget::naming(laid)));
         // Both modes validate the intended member in its project, including siblings.
-        // §FS-rhei-templates.6.1.2
+        // §FS-rhei-templates.6.1.2 §FS-rhei-library.7.5
         let validation = match placement.project() {
             Some(project) => validate_staged_project_member(
                 project,
                 lay.output_dir,
                 &materialized.output_dir,
                 settings.is_some(),
+                lay.dry_run || !lay.keep_on_error,
             ),
             _ => run_validation_once(
                 &materialized.entrypoint(),

@@ -108,6 +108,37 @@ impl Scenario {
         self.run(&args)
     }
 
+    pub fn place_in_project(&self, dry_run: bool) -> CliRun {
+        let mut args = vec!["instantiate", "leak", "--into", self.scope.to_str().unwrap()];
+        if dry_run {
+            args.push("--dry-run");
+        }
+        self.run(&args)
+    }
+
+    /// Match this scenario's mirror root, including diagnostics shortened from
+    /// the invocation directory. An original ancestor named test-scratch is
+    /// unrelated to this root. §FS-rhei-library.7.5
+    pub fn exposes_mirror(&self, report: &str) -> bool {
+        let mut relative = PathBuf::new();
+        for _ in self.cwd.strip_prefix(&*self._root).unwrap().components() {
+            relative.push("..");
+        }
+        relative.push("scratch");
+        let canonical = fs::canonicalize(&self.scratch).unwrap();
+        let report = report.replace('\\', "/");
+        [&self.scratch, &canonical, &relative].iter().any(|path| {
+            let spelling = format!("{}/", path.to_string_lossy().replace('\\', "/"));
+            report.match_indices(&spelling).any(|(at, _)| {
+                at == 0
+                    || report[..at]
+                        .chars()
+                        .next_back()
+                        .is_some_and(|c| c.is_whitespace() || ['\'', '"', '`', '('].contains(&c))
+            })
+        })
+    }
+
     pub fn authored_bytes(&self) -> BTreeMap<PathBuf, Option<Vec<u8>>> {
         snapshot(&self.scope)
             .into_iter()

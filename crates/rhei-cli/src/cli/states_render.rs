@@ -1034,9 +1034,10 @@ fn load_project_with_member_for_validation(
     project: &Path,
     rhei_id: &str,
     staged_entry: &Path,
+    proposed: Option<&Path>,
 ) -> MietteResult<LoadedPlan> {
     let project = workspace::load_panta_project_with_member(project, rhei_id, staged_entry)
-        .map_err(|err| templates::project_member_parse_report(&err, project, staged_entry))?;
+        .map_err(|err| templates::project_member_parse_report(&err, project, staged_entry, proposed))?;
     Ok(panta_loaded_plan(project))
 }
 

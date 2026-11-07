@@ -28,7 +28,7 @@ mod templates_publication_tests {
         let previous = "{\"models\":{}}\n".to_string();
         fs::write(project.join(settings_path), &previous).unwrap();
         let settings = prepare_workspace_settings_for_project(&staged, project).unwrap().unwrap();
-        validate_staged_project_member(project, &output, &staged, true).unwrap();
+        validate_staged_project_member(project, &output, &staged, true, true).unwrap();
         (staged, output, settings, previous)
     }
 

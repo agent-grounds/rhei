@@ -237,6 +237,12 @@ mod reset_remedy_finished_tests;
 mod reset_remedy_messages_tests;
 mod reset_remedy_support;
 mod reset_remedy_tests;
+#[cfg(unix)]
+mod reset_unwritable_scope_tests;
+#[cfg(unix)]
+mod reset_unwritable_support;
+#[cfg(unix)]
+mod reset_unwritable_tests;
 mod retry_fanout_tests;
 mod retry_runtime_precedence_tests;
 mod roster_behavior_tests;

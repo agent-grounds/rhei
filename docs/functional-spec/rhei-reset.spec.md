@@ -76,7 +76,8 @@ Deliberate automation states the intent once with `--yes`.
    held, and retain the complete stack through preview, confirmation,
    restoration, scoped pruning or full cleanup, and the success summary.
    Before the preview, refuse with nothing changed a reset whose moves would
-   leave a plan validation refuses ([§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse)).
+   leave a plan validation refuses, or that the filesystem would stop
+   ([§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse)).
 3. For every task node in the merged task graph (including all descendants):
    - Recover the task's authored state ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)) and rewrite the task's
      `**State:**` line to it. A task that never moved is already in that state,
@@ -92,8 +93,9 @@ Deliberate automation states the intent once with `--yes`.
 4. After every plan file is rewritten — the ledger step 3 reads lives there — for a directory workspace, delete the `runtime/` directory at the workspace root if it exists. For a single-file plan, delete the `runtime/` directory next to the plan file if it exists. This removes result files, findings, logs, and journaled transition records.
    It removes the run-input seals under `runtime/seal/` with the rest
    ([§FS-rhei-seal.6](rhei-seal.spec.md#6-lifecycle)).
-5. Write each modified task file atomically (temp file + rename). Release the
-   sidecar stack in reverse order.
+5. Write each modified task file atomically (temp file + rename). A file whose
+   text the reset does not change is not written. Release the sidecar stack in
+   reverse order.
 
 Reset does **not**:
 
@@ -313,8 +315,36 @@ that is not going to happen, and a cancelled or refused reset still releases
 without mutation ([§FS-rhei-reset.3](rhei-reset.spec.md#3-safety)). `--dry-run` refuses the same way, with the same text,
 and exits non-zero: a dry run is read as a promise about what the reset does.
 A plan the reset cannot rewrite fails the same way, before any preview,
-`--dry-run` included, and changes nothing: the plan it would leave is written in
-memory before it is validated, so a rewrite that fails, fails there.
+`--dry-run` included, and changes nothing. A rewrite can fail in two places, so
+the check has two halves. The plan it would leave is written in memory before it
+is validated, so a rewrite that cannot be computed fails there. A rewrite the
+filesystem would refuse cannot be seen in memory, so the reset also establishes,
+under the same decision, that it can make every entry it would make and remove
+every one it would remove:
+
+- every file whose text it would change, in the directory holding that file;
+- every lock sidecar of step 2 that is not there yet, in the directory it would be
+  created in;
+- for a full reset, each `runtime/` tree it would delete: the directory holding the
+  tree and every directory inside it, because removing a tree takes both, and a
+  directory inside it that cannot be listed cannot be removed;
+- for a narrowed reset, what [§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei) would remove, in the directory holding it, the
+  ledger's lines included, and where it would write its reset event
+  ([§FS-rhei-evidence.10.1](rhei-evidence.spec.md#101-the-reset-event)).
+
+It asks each directory by doing what the write itself does, creating a temp file
+there and dropping it, so the check leaves no entry behind and `--dry-run` still
+changes nothing ([§FS-rhei-reset.1.1](rhei-reset.spec.md#11-options)). The refusal names every directory that fails, in
+[§FS-rhei-reset.4](rhei-reset.spec.md#4-output). A directory with nothing to write, create or remove is not asked: it
+does not matter whether a reset could write where it has nothing to write, so a
+read-only directory holding only files the reset leaves as they are does not
+refuse it, and neither does a directory a narrowed reset has no business in.
+
+The check is not a promise about the future. A refusal it cannot foresee, a disk
+filling or a permission changed between the check and the write, can still stop a
+reset part way, and a reset stopped that way says so ([§FS-rhei-reset.4](rhei-reset.spec.md#4-output)). The plan it leaves
+is a valid one, and a second reset finishes what the first left once the cause is
+fixed, because every plan file is written before the ledger it reads is touched.
 
 It does not reopen the finished task instead. That task has no recorded state to
 go back to, and [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state) moves a task only where the ledger says it has
@@ -340,7 +370,7 @@ computation, and does not offer a reset that would be refused ([§FS-rhei-reset.
 
 ## 3. Safety
 
-Reset is destructive with respect to runtime state: it deletes results, exports, logs, and the transition ledger. It is not destructive with respect to authored plan content, and that takes two rules, because one task's history cannot see the others'. [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state) moves a task only to a state that task's own history records, so a reset never invents a state. [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) refuses, with nothing changed, a reset whose moves would add up to a plan validation refuses. Together they are why a reset can never be worse for the plan than not running it. `--dry-run` previews both halves ([§FS-rhei-reset.1.1](rhei-reset.spec.md#11-options)) and confirmation gates the rest ([§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation)).
+Reset is destructive with respect to runtime state: it deletes results, exports, logs, and the transition ledger. It is not destructive with respect to authored plan content, and that takes two rules, because one task's history cannot see the others'. [§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state) moves a task only to a state that task's own history records, so a reset never invents a state. [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) refuses, with nothing changed, a reset whose moves would add up to a plan validation refuses, and one the filesystem would stop. Together they are why a reset can never be worse for the plan than not running it, short of the failure that point says no check can foresee, which a second reset recovers from. `--dry-run` previews both halves ([§FS-rhei-reset.1.1](rhei-reset.spec.md#11-options)) and confirmation gates the rest ([§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation)).
 
 Because reset holds its whole selected-scope sidecar stack over the decision
 snapshot, it is safe against concurrent `rhei next` / `rhei transition` /
@@ -423,8 +453,31 @@ Refusing to reset: the plan it would leave fails validation, so nothing was chan
 Task <id> started in '<recorded>', which this state machine no longer declares; a reset would leave it in '<current>'.
 ```
 
-Its help has one line per finished task the reset would leave where its line puts
-it, when those edits are the way on. `<file>` is the file holding the task, printed
+A reset the filesystem would stop ([§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse)) refuses the same way: no preview and no
+summary, non-zero with or without `--dry-run`, and the same text for both. Its
+message is the refusal, then one line per directory that fails, printed as
+[§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety) prints a path, with the operating system's own error:
+
+```text
+Refusing to reset: it cannot write in every directory it needs, so nothing was changed.
+  <directory>: <error>
+```
+
+Its help is the one every failed plan write carries: rhei writes plan edits through
+a temp file in the same directory, so check that directory is writable and has free
+space.
+
+A write that fails after the first write has landed, which is the failure that
+check cannot foresee, keeps the error it has and adds what has become true of the
+plan:
+
+```text
+The reset stopped part way, so the plan is partly reset: fix the cause and run the reset again, which finishes what this one left.
+```
+
+The help of a reset [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) refuses for what it would leave has one line per finished
+task the reset would leave where its line puts it, when those edits are the way
+on. `<file>` is the file holding the task, printed
 as [§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety) prints a path, and `<initial>` its profile's `initial` state. The
 part in brackets is there when the task has a result link:
 

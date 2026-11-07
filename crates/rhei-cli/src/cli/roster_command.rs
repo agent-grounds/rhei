@@ -348,18 +348,26 @@ fn roster_project_root(input: Option<PathBuf>) -> MietteResult<PathBuf> {
         )
     })?;
     let normalized = normalize_workspace_input(target.path());
-    refuse_unrecognized_plan_target(&normalized).map_err(|refusal| {
-        if normalized.is_dir() {
-            return refusal;
+    let is_single_file_plan = normalized.is_file()
+        && normalized
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.ends_with(".rhei.md"));
+    match plan_input_shape(&normalized) {
+        PlanShape::Project(_) | PlanShape::Workspace(_) => {
+            Ok(execution_workspace_root(&normalized))
         }
-        miette!(
+        PlanShape::UnrecognizedDir => {
+            Err(unrecognized_plan_directory_report(&normalized, None)?)
+        }
+        PlanShape::File if is_single_file_plan => Ok(execution_workspace_root(&normalized)),
+        PlanShape::File => Err(miette!(
             help = "pass a `*.rhei.md` plan, a Directory Workspace, or a Panta Project: \
                     rhei roster <RHEI_PLAN>",
             "'{}' is not a recognized Rhei plan or project",
             normalized.display()
-        )
-    })?;
-    Ok(execution_workspace_root(&normalized))
+        )),
+    }
 }
 
 fn warn_deprecated_roster_source(root: &Path, sources: &RosterSources) {

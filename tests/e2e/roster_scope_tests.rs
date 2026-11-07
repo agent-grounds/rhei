@@ -99,6 +99,33 @@ fn roster_rejects_explicit_unrecognized_directory_and_file_with_json_guidance() 
     }
 }
 
+/// Roster takes any `*.rhei.md` file and any workspace, whatever its name gives: it
+/// reads settings, not a rhei, so the name rule `rhei budget` applies is not its own.
+/// §FS-rhei-agents.1.1.7
+#[test]
+fn roster_accepts_a_plan_or_workspace_whose_name_gives_no_rhei_id() {
+    let root = unique_temp_dir("roster-invalid-names");
+    let home = root.join("home");
+    let lone = root.join("lone");
+    fs::create_dir_all(&lone).expect("create the plan's directory");
+    let plan = "# Rhei: P\n\n## Tasks\n\n### Task 1: A\n**State:** pending\n";
+
+    for name in ["basin.rhei.md", "1bad.rhei.md"] {
+        let target = write_fixture_file(&lone, name, plan);
+        let result = run_roster(&home, &root, Some(&target), true);
+        assert!(result.status.success(), "roster refused {name}:\n{}", result.stderr);
+        assert_root(&result, &lone);
+    }
+    for name in ["basin", "Bad.Name"] {
+        let workspace = root.join(name);
+        fs::create_dir_all(workspace.join("tasks")).expect("create the workspace");
+        write_fixture_file(&workspace, "index.rhei.md", "# Rhei: W\n");
+        let result = run_roster(&home, &root, Some(&workspace), true);
+        assert!(result.status.success(), "roster refused {name}:\n{}", result.stderr);
+        assert_root(&result, &workspace);
+    }
+}
+
 /// The current project home wins and suppresses the deprecated warning; only
 /// after it is absent may the deprecated file supply the entire project layer.
 /// §FS-rhei-agents.1.1 §FS-rhei-agents.1.1.7

@@ -1,0 +1,11 @@
+name: host
+version: 1
+states:
+  pending:
+    initial: true
+    description: Ready
+  completed:
+    final: true
+    description: Done
+transitions:
+  - {from: pending, to: completed}

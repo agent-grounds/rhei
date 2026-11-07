@@ -1,0 +1,11 @@
+name: mini
+version: 1
+states:
+  todo:
+    initial: true
+    description: Waiting
+  done:
+    final: true
+    description: Done
+transitions:
+  - {from: todo, to: done}

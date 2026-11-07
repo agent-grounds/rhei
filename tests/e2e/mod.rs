@@ -124,6 +124,7 @@ mod export_prior_migration_implementation_tests;
 mod export_prior_migration_tests;
 mod fence_reader_completion_tests;
 mod fence_reader_description_tests;
+mod fence_reader_frontmatter_tests;
 mod fence_reader_memory_tests;
 mod fence_reader_support;
 mod fence_structure_tests;

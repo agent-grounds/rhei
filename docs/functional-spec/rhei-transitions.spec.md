@@ -1263,8 +1263,9 @@ its source state and the run's log carries the message.
 
 > The examples in this section focus on state definitions, transitions, and
 > callback wiring. For readability they omit the top-level `profiles` and
-> `node_policy` blocks that a complete state machine YAML must declare. See
-> the [States Specification](rhei-states.spec.md#8-profiles) for the full
+> `node_policy` blocks required for a profiled machine. For legacy compatibility,
+> see [§FS-rhei-states.1.1](rhei-states.spec.md#11-top-level-fields).
+> See the [States Specification](rhei-states.spec.md#8-profiles) for the full
 > profile and node-policy model and the
 > [reference machine](states.yaml) for a complete example.
 

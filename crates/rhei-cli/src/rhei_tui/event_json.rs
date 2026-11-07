@@ -175,9 +175,13 @@ fn payload(event: &RunEvent, workspace: Option<&Path>) -> Map<String, Value> {
                 put("ceiling_policy", policy);
             }
         }
-        RunEvent::BudgetHalt { task, reason_code, bound, renews_at, remedy } => {
+        RunEvent::BudgetHalt { task, state, reason_code, bound, renews_at, remedy } => {
             put("event", json!("budget_halt"));
             put("task", json!(task));
+            // Absent on a replayed record that predates it. §FS-rhei-run-json.2.1
+            if let Some(state) = state {
+                put("state", json!(state));
+            }
             put("reason_code", json!(reason_code));
             let Value::Object(fields) = bound_value(bound) else { unreachable!("object") };
             for (key, value) in fields {
@@ -420,6 +424,7 @@ fn decode_event(kind: &str, v: &Value, wall_clock: SystemTime) -> Option<RunEven
         },
         "budget_halt" => RunEvent::BudgetHalt {
             task: text("task"),
+            state: v.get("state").and_then(Value::as_str).map(str::to_owned),
             reason_code: text("reason_code"),
             bound: bound_report(v, v.get("ceiling_policy"))?,
             renews_at: v.get("renews_at").and_then(Value::as_str).map(str::to_owned),

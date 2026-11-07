@@ -299,12 +299,14 @@ fn budget_halt_event(
     bounds: &CountBounds,
     journal: &Journal,
     task_id_str: &str,
+    state: &str,
 ) -> Option<rhei_tui::RunEvent> {
     let spent = refusal.exhaustion.as_deref()?;
     let bound = bounds.halt_bound(spent);
     let remedy = budget_halt_remedy(spent, bounds, journal);
     Some(rhei_tui::RunEvent::BudgetHalt {
         task: task_id_str.to_string(),
+        state: Some(state.to_string()),
         reason_code: refusal.reason_code.clone(),
         bound: rhei_tui::BoundReport {
             dimension: spent.dimension.label().into(),

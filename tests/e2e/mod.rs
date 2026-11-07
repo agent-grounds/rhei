@@ -52,6 +52,7 @@ mod budget_empty_journal_tests;
 mod budget_failed_append_tests;
 mod budget_halt_attention_tests;
 mod budget_halt_bounds_section_tests;
+mod budget_halt_moved_attention_tests;
 mod budget_lifetime_reporting_tests;
 mod budget_missing_directory_tests;
 mod budget_nested_plan_tests;

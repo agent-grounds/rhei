@@ -53,6 +53,7 @@ transitions:
         use rhei_tui::EventSink;
         sink.emit(rhei_tui::RunEvent::BudgetHalt {
             task: "1".to_string(),
+            state: Some("work".to_string()),
             reason_code: "travel_exhausted".to_string(),
             bound: rhei_tui::BoundReport {
                 dimension: "ticket travel".to_string(),
@@ -112,8 +113,9 @@ transitions:
     /// the poll waits on: the author's answer would not release it.
     #[test]
     fn a_bound_halted_poll_waiting_on_a_person_is_in_attention() {
+        use rhei_tui::EventSink;
         let sink = SummarySink::new();
-        emit_bound_halt(&sink, None);
+        sink.emit(bound_halt_record(Some("plan-approval")));
 
         let report = bound_halted_report("plan-approval", &sink);
 
@@ -226,6 +228,7 @@ transitions:
         use rhei_tui::EventSink;
         sink.emit(rhei_tui::RunEvent::BudgetHalt {
             task: task.to_string(),
+            state: Some("work".to_string()),
             reason_code: "travel_exhausted".to_string(),
             bound: rhei_tui::BoundReport {
                 dimension: dimension.to_string(),
@@ -320,6 +323,89 @@ transitions:
                 format!("- `2` was stopped by its ticket travel bound of 4 (machine); {BOUND_REMEDY}"),
             ]
         );
+    }
+
+    /// A `budget_halt` as the stream carries it, from the state a refusal named.
+    /// Decoded rather than built, so the same record serves one that predates the
+    /// field: `None` writes none. §FS-rhei-run-json.2.1
+    fn bound_halt_record(state: Option<&str>) -> rhei_tui::RunEvent {
+        let mut record = serde_json::json!({
+            "seq": 1,
+            "ts": "2026-09-24T12:00:00Z",
+            "event": "budget_halt",
+            "task": "1",
+            "reason_code": "travel_exhausted",
+            "dimension": "ticket travel",
+            "effective": 4,
+            "value_source": "machine",
+            "limiting_source": null,
+            "consumed": 4,
+            "outstanding": 0,
+            "remaining": 0,
+            "mode": "per ticket identity",
+            "window": null,
+            "renews_at": null,
+            "remedy": BOUND_REMEDY,
+        });
+        if let Some(state) = state {
+            record["state"] = serde_json::json!(state);
+        }
+        rhei_tui::decode_event(&record.to_string()).expect("a budget_halt record").event
+    }
+
+    /// Whether task `1` still reads as the bound's, after these refusals, from `state`.
+    fn bound_row_stands(refused_in: &[Option<&str>], state: &str) -> bool {
+        use rhei_tui::EventSink;
+        let sink = SummarySink::new();
+        for refused in refused_in {
+            sink.emit(bound_halt_record(*refused));
+        }
+        let report = bound_halted_report(state, &sink);
+        assert!(
+            report.render_markdown().contains("was stopped by its ticket travel bound"),
+            "## Bounds keeps every halt as history"
+        );
+        report.attention.iter().any(|row| row.id == "1" && row.next == BOUND_REMEDY)
+    }
+
+    /// Refused in `work`, then moved by what was already running: no later slot
+    /// clears it, and the plan's state is the only thing that shows the move.
+    /// §FS-rhei-run-report.3.1
+    #[test]
+    fn a_move_after_the_refusal_takes_the_bound_row_off_the_ticket() {
+        assert!(!bound_row_stands(&[Some("work")], "plan-approval"));
+    }
+
+    /// The first pair fails an implementation that keeps the first refusal, the
+    /// second one that keeps any of them. §FS-rhei-run-report.3.1
+    #[test]
+    fn the_latest_refusals_state_is_the_one_compared() {
+        assert!(bound_row_stands(&[Some("work"), Some("plan-approval")], "plan-approval"));
+        assert!(!bound_row_stands(&[Some("plan-approval"), Some("work")], "plan-approval"));
+    }
+
+    /// Green today, and has to stay so: `work-2` is `work`. §FS-rhei-run-report.3.1
+    #[test]
+    fn a_counted_state_is_the_state_the_bound_refused_it_in() {
+        assert!(bound_row_stands(&[Some("work")], "work-2"));
+    }
+
+    /// Green today, and has to stay so: a record from before the field proves no
+    /// move, and replaying it invents no state. §FS-rhei-run-report.3.1
+    #[test]
+    fn a_record_with_no_state_takes_no_halt_back() {
+        assert!(bound_row_stands(&[None], "plan-approval"));
+        let at = std::time::SystemTime::now();
+        let encoded = rhei_tui::encode_event(Some(1), &bound_halt_record(None), at, None);
+        assert!(encoded["state"].is_null(), "{encoded}");
+    }
+
+    /// `rhei attach --json` re-emits what it decoded, unchanged. §FS-rhei-run-json.2
+    #[test]
+    fn a_replayed_budget_halt_keeps_its_state() {
+        let at = std::time::SystemTime::now();
+        let encoded = rhei_tui::encode_event(Some(1), &bound_halt_record(Some("work")), at, None);
+        assert_eq!(encoded["state"], "work", "{encoded}");
     }
 
     fn emit_spawn_into(sink: &SummarySink, task: &str, state: &str) {

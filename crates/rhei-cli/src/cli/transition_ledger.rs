@@ -287,8 +287,11 @@ fn rewrite_task_completion(
     let raw = fs::read_to_string(task_file)
         .map_err(|err| file_io_report(task_file, "failed to read plan file", err))?;
 
-    let lines: Vec<&str> = raw.lines().collect();
-    let mut result_lines: Vec<String> = Vec::with_capacity(lines.len() + 2);
+    let all_lines: Vec<&str> = raw.lines().collect();
+    // §FS-rhei-complete.3.3: a fence the task's text ends inside is below the link, unread.
+    let (lines, final_fence) =
+        split_at_a_tasks_final_fence(&all_lines, plan_file_kind(task_file), task_id);
+    let mut result_lines: Vec<String> = Vec::with_capacity(all_lines.len() + 2);
 
     let mut in_target_task = false;
     let mut target_found = false;
@@ -296,7 +299,7 @@ fn rewrite_task_completion(
     let result_line = format!("> **Result:** [{}]({})", link_text, link_path);
     let mut in_code_block = rhei_core::fence::FenceTracker::default();
 
-    for line in &lines {
+    for line in lines {
         let heading = node_heading_outside_code(line, &mut in_code_block);
         if in_target_task && !link_inserted && heading.is_some() {
             // Exactly one blank line on each side: the task body already ends
@@ -337,10 +340,9 @@ fn rewrite_task_completion(
     // If the target task is the last element in the file, append here. No
     // trailing blank: the final newline is restored from the source below.
     if in_target_task && !link_inserted {
-        trim_trailing_blank_lines(&mut result_lines);
-        result_lines.push(String::new());
-        result_lines.push(result_line);
+        append_result_link(&mut result_lines, result_line, !final_fence.is_empty());
     }
+    result_lines.extend(final_fence.iter().map(ToString::to_string));
     if !target_found {
         return Err(miette!(
             help = task_id_help(),

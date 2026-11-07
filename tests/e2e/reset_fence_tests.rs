@@ -1,6 +1,6 @@
 //! A reset reads a plan's text by the language's one fence rule, as `rhei validate`
-//! does, so a plan that quotes the plan format in a fence can be reset and the
-//! quotation comes through byte-identical (agent-grounds/rhei#580).
+//! does, so a plan that quotes the plan format in a fence can be reset and the text of
+//! every quoted line comes through unchanged (agent-grounds/rhei#580).
 //!
 //! The quotations go through both layouts a reset rewrites, because the two fail
 //! differently: the fence is last in a workspace task file, and followed by another
@@ -39,10 +39,9 @@ fn quoting_task(quote: &str) -> String {
     format!("### Task 1: Write the docs\n**State:** open\n\nAn example of a task:\n\n{quote}\n")
 }
 
-/// Three tasks with `quote` in the middle one. `rhei complete` never reads that far
-/// for Task 1, and it stops at Task 3's heading: it does not read this fence by the
-/// language's rule (see agent-grounds/rhei#614), and a link it wrote inside a quotation
-/// would be the reset's to delete, so these tests finish the tasks around the quote.
+/// Three tasks with `quote` in the middle one, and the tasks around it finished, so the
+/// fence is between real lines on both sides. Finishing the quoting task itself is
+/// `reset_fence_link_tests`' subject.
 fn around_a_quote(quote: &str) -> [String; 3] {
     [
         "### Task 1: Finished\n**State:** open\n".to_string(),

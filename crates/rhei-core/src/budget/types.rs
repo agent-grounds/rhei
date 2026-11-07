@@ -326,11 +326,29 @@ pub struct BudgetError {
     /// most of them carry none: an unboxed variant would make the ordinary
     /// `Ok` path pay for the rare one. §FS-rhei-budgets.8
     pub exhaustion: Option<Box<Exhaustion>>,
+    /// Where this refusal offers `rhei budget forget`, which only the caller can
+    /// spell: core knows the account root, and a root is not a target.
+    /// §FS-rhei-budgets.10.1
+    forget_offer: Option<ForgetOffer>,
+}
+
+/// The words around a `rhei budget forget` line the caller supplies. Held apart
+/// from `message` so that a reader who skips it loses a remedy and never sees a
+/// placeholder or a root as a target. §FS-rhei-budgets.10.1
+#[derive(Debug, Clone)]
+struct ForgetOffer {
+    before: String,
+    after: Option<String>,
 }
 
 impl BudgetError {
     pub(crate) fn new(code: &str, message: impl Into<String>) -> Self {
-        Self { reason_code: code.into(), message: message.into(), exhaustion: None }
+        Self {
+            reason_code: code.into(),
+            message: message.into(),
+            exhaustion: None,
+            forget_offer: None,
+        }
     }
 
     pub(crate) fn exhausted(code: &str, message: impl Into<String>, spent: Exhaustion) -> Self {
@@ -338,7 +356,25 @@ impl BudgetError {
             reason_code: code.into(),
             message: message.into(),
             exhaustion: Some(Box::new(spent)),
+            forget_offer: None,
         }
+    }
+
+    /// This refusal, offering `forget` after `before`, with `after` following the
+    /// line. §FS-rhei-budgets.10.1
+    pub(crate) fn offering_forget(mut self, before: String, after: Option<String>) -> Self {
+        self.forget_offer = Some(ForgetOffer { before, after });
+        self
+    }
+
+    /// The whole refusal as a reader is told it, given the `rhei budget forget` line
+    /// of the target the command was given. §FS-rhei-budgets.10.1 §FS-rhei-budgets.5.4.1
+    pub fn told_with_forget(&self, forget_line: &str) -> String {
+        let Some(offer) = &self.forget_offer else {
+            return self.message.clone();
+        };
+        let after = offer.after.as_ref().map(|after| format!("; {after}")).unwrap_or_default();
+        format!("{}; {}: {forget_line}{after}", self.message, offer.before)
     }
 
     pub(crate) fn bounds(message: impl Into<String>) -> Self {

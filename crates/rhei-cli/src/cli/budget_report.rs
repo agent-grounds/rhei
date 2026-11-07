@@ -89,19 +89,19 @@ fn budget_report_damaged(
 /// is offered the copy of the witness. §FS-rhei-budgets.5.4.1
 /// §FS-rhei-budgets.5.4.2 §FS-rhei-budgets.5.4.3
 fn budget_damaged_help(diagnosis: &Diagnosis) -> String {
+    let offered = budget_offered_forget(diagnosis);
     if let Some(set_aside) = diagnosis.set_aside_command() {
         return format!("set the witness aside, keeping every byte, with: {set_aside}");
     }
     if let Some(trim) = diagnosis.trim_command() {
-        let forget = diagnosis
-            .forget_command()
+        let forget = offered
             .map(|forget| format!("; if the path was reused, retire that record with: {forget}"))
             .unwrap_or_default();
         return format!(
             "keep the witness and cut it back to its last whole receipt with: {trim}{forget}"
         );
     }
-    match (diagnosis.forget_command(), &diagnosis.held_by) {
+    match (offered, &diagnosis.held_by) {
         (Some(forget), Some(holder)) => format!(
             "if this is a copy, give it an account of its own with: {forget}; if it is meant to \
              replace {}, move or delete that project first",
@@ -113,6 +113,13 @@ fn budget_damaged_help(diagnosis: &Diagnosis) -> String {
             diagnosis.restore_command().unwrap_or_default()
         ),
     }
+}
+
+/// The `forget` this sub-case offers, naming the target `show` was given: it resolves
+/// to the root the witness index is keyed by, which is what a retirement retracts.
+/// §FS-rhei-budgets.10 §FS-rhei-budgets.10.1
+fn budget_offered_forget(diagnosis: &Diagnosis) -> Option<String> {
+    diagnosis.offers_forget().then(budget_forget_line)
 }
 
 /// The same facts as named members, for a harness that reads a damaged
@@ -148,7 +155,7 @@ fn budget_damaged_details(
     if let Some(restore) = diagnosis.restore_command() {
         details.insert("restore".into(), restore.into());
     }
-    if let Some(forget) = diagnosis.forget_command() {
+    if let Some(forget) = budget_offered_forget(diagnosis) {
         details.insert("forget".into(), forget.into());
     }
     if let Some(trim) = diagnosis.trim_command() {
@@ -186,7 +193,7 @@ fn budget_damaged_lines(diagnosis: &Diagnosis, target: &Path) -> Vec<String> {
         lines.push(format!("Held by: {}, which still holds this account", holder.display()));
         lines.push(String::new());
         lines.push("  if this project is a copy, give it an account of its own:".into());
-        lines.push(format!("    {}", diagnosis.forget_command().unwrap_or_default()));
+        lines.push(format!("    {}", budget_forget_line()));
         lines.push(String::new());
         lines.push(format!(
             "  if it is meant to replace {}, move or delete that project first",
@@ -212,7 +219,7 @@ fn budget_damaged_lines(diagnosis: &Diagnosis, target: &Path) -> Vec<String> {
     if let Some(trim) = diagnosis.trim_command() {
         return budget_torn_lines(diagnosis, &trim, lines);
     }
-    let Some(forget) = diagnosis.forget_command() else {
+    let Some(forget) = budget_offered_forget(diagnosis) else {
         lines.push(
             "This journal is this project's own and its tail is what was lost — restore it:"
                 .into(),
@@ -244,12 +251,13 @@ fn budget_torn_lines(diagnosis: &Diagnosis, trim: &str, mut lines: Vec<String>) 
     lines.push("Keep every byte and cut the witness back to its last whole receipt:".into());
     lines.push(format!("  {trim}"));
     lines.push(String::new());
-    lines.push(
-        "then run `rhei budget show` again: the account is read again and answered as what its \
-         whole receipts make it."
-            .into(),
-    );
-    if let Some(forget) = diagnosis.forget_command() {
+    // The target it was given, so the line runs from anywhere. §FS-rhei-budgets.10.1
+    lines.push(format!(
+        "then run `{}` again: the account is read again and answered as what its whole receipts \
+         make it.",
+        help_subcommand_or_bare("budget show", "", "")
+    ));
+    if let Some(forget) = budget_offered_forget(diagnosis) {
         lines.push(String::new());
         lines.push(
             "If the path was previously held by a different project, retire that record instead:"

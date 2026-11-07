@@ -28,10 +28,10 @@ use rhei_core::budget::Retirement;
 fn budget_forget_command(input: Option<PathBuf>, reason: &str) -> MietteResult<()> {
     let (project_root, _) = budget_command_context(input)?;
     let audit = budget_audit(reason)?;
-    let Some(account) = budget_result_at(&project_root, Account::locate(&project_root))? else {
+    let Some(account) = budget_result(Account::locate(&project_root))? else {
         return Err(budget_nothing_to_retire(&project_root));
     };
-    let retired = match budget_result_at(&project_root, account.retire(&audit))? {
+    let retired = match budget_result(account.retire(&audit))? {
         Retirement::Sound => return Err(budget_sound_account(&project_root)),
         Retirement::NothingToRetire => return Err(budget_nothing_to_retire(&project_root)),
         Retirement::RestoreInstead(diagnosis) => return Err(budget_restore_instead(&diagnosis)),
@@ -50,12 +50,12 @@ fn budget_forget_command(input: Option<PathBuf>, reason: &str) -> MietteResult<(
 
 /// The refusal that keeps `forget` a recovery command. `adjust` is named
 /// because it is what does change an allowance, so the two never compete for a
-/// case. §FS-rhei-budgets.5.3 §FS-rhei-errors.1.2
+/// case. §FS-rhei-budgets.5.3 §FS-rhei-errors.1.2 §FS-rhei-budgets.10.1
 fn budget_sound_account(project_root: &Path) -> miette::Report {
     miette!(
         help = format!(
-            "change an allowance with: rhei budget adjust {} --invocations <N> --reason <TEXT>",
-            budget_target_argument(project_root)
+            "change an allowance with: {}",
+            help_subcommand_or_bare("budget adjust", "", "--invocations <N> --reason <TEXT>")
         ),
         "the budget account at {} verifies; retiring a sound account would recreate capacity",
         budget_target(project_root)
@@ -110,11 +110,12 @@ fn budget_restore_instead(diagnosis: &Diagnosis) -> miette::Report {
 
 /// A path no witness claims is far more often a typo than a repeat, so it is
 /// named rather than treated as already done. §FS-rhei-budgets.10
+/// §FS-rhei-budgets.10.1
 fn budget_nothing_to_retire(project_root: &Path) -> miette::Report {
     miette!(
         help = format!(
-            "see what this path resolves to with: rhei budget show {}",
-            budget_target_argument(project_root)
+            "see what this path resolves to with: {}",
+            help_subcommand_or_bare("budget show", "", "")
         ),
         "no committed history claims {}, so there is no root to retire",
         budget_target(project_root)

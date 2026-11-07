@@ -106,33 +106,27 @@ fn holds(root: &Path, uuid: &str) -> bool {
 /// The refusal a copy's charge raises, before anything is appended.
 ///
 /// It names the account, this root and the holder, says where the charge would
-/// have landed, and offers both answers: `forget` where this is a copy, and
-/// moving the holder where this root is meant to replace it. The reason code
-/// stays `untrustworthy_ledger`, so a harness routing on it is not broken.
-/// §FS-rhei-budgets.5.4.1
+/// have landed, and offers both answers: `forget` where this is a copy, spelled by
+/// the caller, and moving the holder where this root is meant to replace it. The
+/// reason code stays `untrustworthy_ledger`, so a harness routing on it is not
+/// broken. §FS-rhei-budgets.5.4.1 §FS-rhei-budgets.10.1
 pub(crate) fn held_elsewhere_refusal(root: &Path, uuid: &str, holder: &Path) -> BudgetError {
     BudgetError::new(
         "untrustworthy_ledger",
         format!(
             "budget account panta:{uuid} belongs to another project root: {} presents it, but \
-             {} still holds it, so this charge would be written into the history of {}; if this \
-             is a copy, give it an account of its own with: {}; if it is meant to replace {}, \
-             move or delete that project first",
+             {} still holds it, so this charge would be written into the history of {}",
             root.display(),
             holder.display(),
             holder.display(),
-            forget_line(root),
-            holder.display(),
         ),
     )
-}
-
-/// `rhei budget forget '<root>' --reason <TEXT>`, the root quoted for the shell
-/// the operator holds. §FS-rhei-budgets.10
-pub(crate) fn forget_line(root: &Path) -> String {
-    format!(
-        "rhei budget forget {} --reason <TEXT>",
-        crate::platform::shell_quote(&root.display().to_string())
+    .offering_forget(
+        "if this is a copy, give it an account of its own with".to_string(),
+        Some(format!(
+            "if it is meant to replace {}, move or delete that project first",
+            holder.display()
+        )),
     )
 }
 

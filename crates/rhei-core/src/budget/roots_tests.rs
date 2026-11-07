@@ -114,9 +114,11 @@ fn a_copy_is_refused_and_reported_without_touching_the_witness() {
     assert!(
         refusal.message.contains(&copy.display().to_string())
             && refusal.message.contains(&holder.display().to_string())
-            && refusal.message.contains("rhei budget forget"),
+            && refusal
+                .told_with_forget("FORGET-LINE")
+                .contains("own with: FORGET-LINE; if it is meant"),
         "the refusal names both roots and forget: {}",
-        refusal.message
+        refusal.told_with_forget("FORGET-LINE")
     );
     assert!(located.open(true).is_err(), "nor is it opened for a charge");
     match located.inspect().expect("inspect the copy") {
@@ -124,7 +126,7 @@ fn a_copy_is_refused_and_reported_without_touching_the_witness() {
             assert_eq!(diagnosis.damage, Damage::HeldElsewhere);
             assert_eq!(diagnosis.held_by.as_deref(), Some(holder.as_path()));
             assert_eq!(diagnosis.restore_command(), None, "the holder's witness is not restored");
-            assert!(diagnosis.forget_command().is_some());
+            assert!(diagnosis.offers_forget());
         }
         other => panic!("expected held_elsewhere; got {other:?}"),
     }

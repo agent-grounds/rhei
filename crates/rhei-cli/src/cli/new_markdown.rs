@@ -206,9 +206,14 @@ fn line_offsets(raw: &str) -> impl Iterator<Item = (usize, &str)> {
 /// Insert a ticket immediately after `parent_local_id`'s existing subtree, so
 /// the file stays in id order. `None` when the parent's heading is not in this
 /// file. §FS-rhei-new.3.1
-fn insert_ticket_after_subtree(raw: &str, parent_local_id: &str, block: &str) -> Option<String> {
+fn insert_ticket_after_subtree(
+    raw: &str,
+    role: rhei_core::header::DocumentRole,
+    parent_local_id: &str,
+    block: &str,
+) -> Option<String> {
     // §FS-rhei-plan-language.2.1: quoted headings cannot end the parent's subtree.
-    let mut in_code_block = rhei_core::header::DocumentFence::new(raw);
+    let mut in_code_block = rhei_core::header::DocumentFence::of_role(role, raw);
     let mut parent_hashes: Option<usize> = None;
     let mut subtree_end: Option<usize> = None;
 

@@ -52,14 +52,15 @@
         Ok(files)
     }
 
-    /// What a plan holds below its `## Tasks` line, which neither a quotation nor
-    /// a frontmatter value can be. §FS-rhei-plan-language.2.1
+    /// What a plan holds below its `## Tasks` line, spelled any way the parser
+    /// accepts and neither quoted nor in a frontmatter value.
+    /// §FS-rhei-plan-language.2.1 §FS-rhei-plan-language.2.3
     fn tasks_chapter_body(raw: &str) -> String {
-        let mut fence = rhei_core::header::DocumentFence::new(raw);
+        let mut fence = rhei_core::header::DocumentFence::plan(raw);
         let mut lines = raw.split_inclusive('\n');
         let is_chapter = |line: &&str| {
             let is_fence = fence.read(line.trim_end());
-            !is_fence && !fence.is_open() && line.trim_end() == "## Tasks"
+            !is_fence && !fence.is_open() && rhei_core::header::is_tasks_chapter(line)
         };
         match lines.find(is_chapter) {
             Some(_) => lines.collect::<String>().trim_start_matches(['\n', '\r']).to_owned(),

@@ -227,7 +227,8 @@ fn write_task_assignee(
     }
     claim.validate(&task, qualified_id, &current_state, machine)?;
 
-    let rewritten = insert_task_assignee(&raw, task_id, assignee)?;
+    let role = rhei_core::workspace::document_role(task_file);
+    let rewritten = insert_task_assignee(&raw, role, task_id, assignee)?;
     let parent = task_file.parent().unwrap_or(Path::new("."));
     let mut tmp = tempfile::NamedTempFile::new_in(parent)
         .map_err(|err| miette!(help = temp_write_help(), "failed to create temp file: {err}"))?;

@@ -397,6 +397,7 @@ mod tests {
     include!("cli/tests_retry_supervision.rs");
     include!("cli/tests_visit_pairing.rs");
     include!("cli/tests_worker_edit_regions.rs");
+    include!("cli/tests_worker_restore_boundaries.rs");
     include!("cli/tests_entry_log_numbers.rs");
     include!("cli/tests_session_reports.rs");
     include!("cli/tests_session_report_streams.rs");

@@ -368,7 +368,7 @@ the summary prints five stacked groups:
    write those files by hand would be advice about a stall that did not
    happen. The built-in machine's initial `pending` state does not make a
    ticket manual-only when this run actually spawned its worker, including
-   through `defaults.agent` (§FS-rhei-run.3). For that ticket, use the existing
+   through `defaults.agent` ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)). For that ticket, use the existing
    interruption reason and `re-run to continue` recovery; otherwise name the
    required outputs the worker left unwritten and their existing file-writing
    or outcome-recording recovery, or use the ordinary stall reason and recovery

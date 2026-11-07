@@ -7,6 +7,7 @@
 
 mod worker_edit_regions {
     use super::super::*;
+    use rhei_core::header::DocumentRole::{Plan, TaskFile};
 
     const PLAN: &str = "\
 # Plan
@@ -31,7 +32,8 @@ Raise it.
 ";
 
     fn region(file: &Path, text: &str, local_id: &str, live: usize) -> InFlightRegion {
-        let snapshot = snapshot_region(text, local_id).expect("region");
+        let role = rhei_core::workspace::document_role(file);
+        let snapshot = snapshot_region(text, role, local_id).expect("region");
         InFlightRegion { file: file.to_path_buf(), snapshot, live }
     }
 
@@ -51,13 +53,13 @@ Raise it.
     /// depth, and a deeper child stays inside it. §FS-rhei-run.3.7.1
     #[test]
     fn a_region_ends_at_the_next_sibling_and_keeps_its_children() {
-        let snapshot = snapshot_region(PLAN, "1").expect("Task 1 is declared once");
+        let snapshot = snapshot_region(PLAN, Plan, "1").expect("Task 1 is declared once");
         assert_eq!(snapshot.heading, "### Task 1: Raise coverage");
         assert!(snapshot.text.contains("#### Task 1.1: A child kept inside"));
         assert!(!snapshot.text.contains("Task 2"));
         assert_eq!(snapshot.following.as_deref(), Some("### Task 2: Other"));
 
-        let child = snapshot_region(PLAN, "1.1").expect("the child is a region too");
+        let child = snapshot_region(PLAN, Plan, "1.1").expect("the child is a region too");
         assert_eq!(child.following.as_deref(), Some("### Task 2: Other"));
     }
 
@@ -65,11 +67,11 @@ Raise it.
     /// to the end of the file. §FS-rhei-run.3.7.1
     #[test]
     fn a_region_with_no_following_heading_ends_the_file() {
-        let last = snapshot_region(PLAN, "2").expect("Task 2");
+        let last = snapshot_region(PLAN, Plan, "2").expect("Task 2");
         assert_eq!(last.following, None);
         assert!(PLAN.ends_with(&last.text));
 
-        let task_file = snapshot_region(TASK_FILE, "1").expect("the task file's task");
+        let task_file = snapshot_region(TASK_FILE, TaskFile, "1").expect("the task file's task");
         assert_eq!(task_file.text, TASK_FILE);
         assert_eq!(task_file.following, None);
     }
@@ -78,15 +80,15 @@ Raise it.
     #[test]
     fn a_duplicated_heading_has_no_region() {
         let twice = format!("{TASK_FILE}\n### Task 1: Raise coverage\n");
-        assert_eq!(snapshot_region(&twice, "1"), None);
-        assert_eq!(snapshot_region(PLAN, "9"), None);
+        assert_eq!(snapshot_region(&twice, TaskFile, "1"), None);
+        assert_eq!(snapshot_region(PLAN, Plan, "9"), None);
     }
 
     /// The restore replaces the region and nothing else: a sibling's
     /// transition in the same file survives it. §FS-rhei-run.3.7.3
     #[test]
     fn a_restore_puts_back_one_region_and_keeps_every_other_byte() {
-        let snapshot = snapshot_region(PLAN, "1").expect("Task 1");
+        let snapshot = snapshot_region(PLAN, Plan, "1").expect("Task 1");
         let edited = PLAN
             .replace("Raise it.\n", "Raise it.\n\n#### Visit 1 (cover)\n\nNotes.\n")
             .replace("**State:** other", "**State:** completed");
@@ -96,7 +98,7 @@ Raise it.
         assert!(replaced.contains("#### Visit 1 (cover)"));
         assert!(!replaced.contains("Task 2"));
 
-        let file_snapshot = snapshot_region(TASK_FILE, "1").expect("task file");
+        let file_snapshot = snapshot_region(TASK_FILE, TaskFile, "1").expect("task file");
         let appended = format!("{TASK_FILE}\n#### Visit 1 (cover)\n");
         let (restored, _) = restore_region(&appended, &file_snapshot).expect("end of file");
         assert_eq!(restored, TASK_FILE);
@@ -106,7 +108,7 @@ Raise it.
     /// than guesses, and says which. §FS-rhei-run.3.7.3
     #[test]
     fn a_restore_refuses_a_missing_or_duplicated_boundary() {
-        let snapshot = snapshot_region(PLAN, "1").expect("Task 1");
+        let snapshot = snapshot_region(PLAN, Plan, "1").expect("Task 1");
         let renamed = PLAN.replace("### Task 1: Raise coverage", "### Task 1: Renamed");
         assert_eq!(region_span(&renamed, &snapshot), Err(RestoreRefusal::Heading { found: 0 }));
         let doubled = format!("{PLAN}### Task 1: Raise coverage\n");

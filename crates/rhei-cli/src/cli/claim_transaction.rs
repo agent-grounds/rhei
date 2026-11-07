@@ -168,10 +168,12 @@ impl<'a> ClaimTransaction<'a> {
             ));
         }
         if let Some(task_raw_updated) = task_raw_updated {
-            let claimed = insert_task_assignee(task_raw_updated, local_id, assignee)?;
+            let role = rhei_core::workspace::document_role(self.files.task_file);
+            let claimed = insert_task_assignee(task_raw_updated, role, local_id, assignee)?;
             write_file_atomic_locked(self.files.task_file, &claimed, self.task_handle)
         } else {
-            let claimed = insert_task_assignee(metadata_raw_updated, local_id, assignee)?;
+            let role = rhei_core::workspace::document_role(self.files.metadata_file);
+            let claimed = insert_task_assignee(metadata_raw_updated, role, local_id, assignee)?;
             write_file_atomic_locked(
                 self.files.metadata_file,
                 &claimed,

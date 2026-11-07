@@ -191,7 +191,8 @@ fn migrate_locked(
     for (canonical, additions) in &grouped {
         let locked = locks.get(canonical).expect("affected file lock is held");
         let raw = locked.read_to_string("failed to read migration target")?;
-        let rewritten = rewrite_export_priors(&raw, additions)?;
+        let role = rhei_core::workspace::document_role(&additions[0].file);
+        let rewritten = rewrite_export_priors(&raw, role, additions)?;
         let parent = additions[0].file.parent().unwrap_or(Path::new("."));
         let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|err| {
             file_io_report(parent, "failed to stage export Prior migration", err)
@@ -262,6 +263,7 @@ fn group_migration_additions(
 /// bytes and every unrelated byte. §FS-rhei-migrate.2 §FS-rhei-migrate.2.1
 fn rewrite_export_priors(
     raw: &str,
+    role: rhei_core::header::DocumentRole,
     additions: &[ExportPriorAddition],
 ) -> MietteResult<String> {
     let mut output = raw.to_string();
@@ -281,7 +283,7 @@ fn rewrite_export_priors(
     }
     for (consumer, file, refs) in edits {
         let local = rhei_local_id_str(&consumer);
-        output = rewrite_one_consumer(&output, local, &refs).map_err(|reason| {
+        output = rewrite_one_consumer(&output, role, local, &refs).map_err(|reason| {
             miette!(
                 help = "the plan changed while migration was preparing it; re-run the command",
                 "could not rewrite Task {} in {}: {}",
@@ -294,10 +296,15 @@ fn rewrite_export_priors(
     Ok(output)
 }
 
-fn rewrite_one_consumer(raw: &str, local_id: &str, references: &[&str]) -> Result<String, String> {
+fn rewrite_one_consumer(
+    raw: &str,
+    role: rhei_core::header::DocumentRole,
+    local_id: &str,
+    references: &[&str],
+) -> Result<String, String> {
     let lines = line_spans(raw);
     // §FS-rhei-plan-language.2.1: quoted headings do not bound the consumer.
-    let mut in_code = rhei_core::header::DocumentFence::new(raw);
+    let mut in_code = rhei_core::header::DocumentFence::of_role(role, raw);
     let mut target_heading = None;
     let mut target_end = raw.len();
     for (start, end) in &lines {

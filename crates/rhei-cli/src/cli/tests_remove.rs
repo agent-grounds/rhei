@@ -180,19 +180,19 @@ fn removing_a_section_preserves_everything_else() {
     let plan = "# Rhei: P\n\n## Tasks\n\n### Task 1: A\n**State:** pending\n\nBody A.\n\n\
         ### Task 2: B\n**State:** pending\n\n```md\n### Task 3: Not a heading\n```\n\n\
         ### Task 3: C\n**State:** pending\n\n## Notes\n\nKept.\n";
-    let without_two = remove_ticket_section(plan, "2").unwrap();
+    let without_two = remove_ticket_section(plan, rhei_core::header::DocumentRole::Plan, "2").unwrap();
     assert_eq!(
         without_two,
         "# Rhei: P\n\n## Tasks\n\n### Task 1: A\n**State:** pending\n\nBody A.\n\n\
          ### Task 3: C\n**State:** pending\n\n## Notes\n\nKept.\n"
     );
-    let without_three = remove_ticket_section(plan, "3").unwrap();
+    let without_three = remove_ticket_section(plan, rhei_core::header::DocumentRole::Plan, "3").unwrap();
     assert!(without_three.contains("```md\n### Task 3: Not a heading\n```"), "{without_three}");
     assert!(without_three.ends_with("## Notes\n\nKept.\n"), "{without_three}");
-    assert!(remove_ticket_section(plan, "9").is_none());
+    assert!(remove_ticket_section(plan, rhei_core::header::DocumentRole::Plan, "9").is_none());
 
     let last = "# Rhei: P\n\n## Tasks\n\n### Task 1: A\n**State:** pending\n\n### Task 2: B\n**State:** pending\n";
-    assert_eq!(remove_ticket_section(last, "2").unwrap(), "# Rhei: P\n\n## Tasks\n\n### Task 1: A\n**State:** pending\n");
+    assert_eq!(remove_ticket_section(last, rhei_core::header::DocumentRole::Plan, "2").unwrap(), "# Rhei: P\n\n## Tasks\n\n### Task 1: A\n**State:** pending\n");
 }
 
 /// Only the ticket's own metadata entry goes, and only the containers it

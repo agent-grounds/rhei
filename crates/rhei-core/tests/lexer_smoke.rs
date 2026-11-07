@@ -135,3 +135,23 @@ fn a_frontmatter_value_opens_no_fence_and_declares_no_node() {
         .collect();
     assert_eq!(nodes, ["1"]);
 }
+
+// §FS-rhei-plan-language.2.1: an index's block is YAML though it has no `## Tasks` chapter.
+#[test]
+fn an_index_block_with_a_fence_shaped_value_leaves_its_sections_readable() {
+    let input = "# Rhei: I\n\n---\nnote: |\n  ```\n---\n\n## Overview\n\nprose\n";
+    assert!(tokenize(input).any(|token| matches!(token, Token::SectionHeader { .. })));
+}
+
+// §FS-rhei-plan-language.2.1: text with no header has no block, so its `---` is a line.
+#[test]
+fn text_opening_with_a_rule_and_no_header_keeps_its_nodes() {
+    let input = "---\n### Task 1: A\n**State:** open\n---\n### Task 2: B\n";
+    let nodes: Vec<String> = tokenize(input)
+        .filter_map(|token| match token {
+            Token::NodeHeader { id, .. } => Some(id.to_string()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(nodes, ["1", "2"]);
+}

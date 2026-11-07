@@ -73,7 +73,11 @@ fn plan_removal_images(loaded: &LoadedPlan, input: &Path, id: &str) -> MietteRes
     }
 
     let image = images.current(&route.task_file)?;
-    let mut after = remove_ticket_section(&image.after, &route.local_id).ok_or_else(|| {
+    let mut after = remove_ticket_section(
+        &image.after,
+        rhei_core::workspace::document_role(&route.task_file),
+        &route.local_id,
+    ).ok_or_else(|| {
         miette!(
             help = "the plan changed under removal; re-run it.",
             "could not find the section of {id} in {}",
@@ -122,10 +126,10 @@ fn remove_task_metadata_entry(metadata: &mut Metadata, key: &str) -> bool {
 /// Delete exactly one ticket's section: its heading through the line before the
 /// next sibling or ancestor heading. `None` when the heading is not there.
 /// §FS-rhei-remove.4.1
-fn remove_ticket_section(raw: &str, local_id: &str) -> Option<String> {
+fn remove_ticket_section(raw: &str, role: rhei_core::header::DocumentRole, local_id: &str) -> Option<String> {
     let lines: Vec<&str> = raw.split_inclusive('\n').collect();
     // §FS-rhei-plan-language.2.1: quoted headings do not end a ticket section.
-    let mut in_code = rhei_core::header::DocumentFence::new(raw);
+    let mut in_code = rhei_core::header::DocumentFence::of_role(role, raw);
     let mut start = None;
     let mut level = 0;
     let mut end = lines.len();

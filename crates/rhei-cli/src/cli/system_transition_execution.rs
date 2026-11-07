@@ -827,9 +827,10 @@ fn execute_transition_with_origin(
     // §FS-rhei-supervision.3.4: the release self-loop ends the visit, so it
     // ends the claim the visit was taken under.
     let ends_visit = transition_ends_supervisor_visit(machine, from, to);
+    let role = rhei_core::workspace::document_role(task_file);
     let metadata_raw_updated = if task_file == metadata_file {
         let new_task_raw =
-            rewrite_task_for_transition(&task_raw, task_id_str, &rendered_to_state, ends_visit)?;
+            rewrite_task_for_transition(&task_raw, role, task_id_str, &rendered_to_state, ends_visit)?;
         if let Some(updated_metadata) = updated_metadata.as_ref() {
             rewrite_frontmatter(&new_task_raw, updated_metadata)?
         } else {
@@ -846,6 +847,7 @@ fn execute_transition_with_origin(
     } else {
         Some(rewrite_task_for_transition(
             &task_raw,
+            role,
             task_id_str,
             &rendered_to_state,
             ends_visit,
@@ -1066,15 +1068,16 @@ fn execute_transition_with_origin(
 // §FS-rhei-supervision.3.4 §FS-rhei-transition-cmd.3
 fn rewrite_task_for_transition(
     raw: &str,
+    role: rhei_core::header::DocumentRole,
     local_id: &str,
     rendered_to_state: &str,
     ends_supervisor_visit: bool,
 ) -> MietteResult<String> {
-    let rewritten = rewrite_task_state(raw, local_id, rendered_to_state)?;
+    let rewritten = rewrite_task_state(raw, role, local_id, rendered_to_state)?;
     if !ends_supervisor_visit {
         return Ok(rewritten);
     }
-    Ok(without_task_assignee(&rewritten, local_id).0)
+    Ok(without_task_assignee(&rewritten, role, local_id).0)
 }
 
 /// Extract the current state and node-policy inputs for a task from raw

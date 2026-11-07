@@ -1668,8 +1668,8 @@ a sound account and why a damaged report puts restore first.
 ### 10.1. A target is recognized before anything is read
 
 All four verbs take what a command's plan argument takes: [§FS-rhei-errors.3.2](rhei-errors.spec.md#32-unrecognized-plan-directories) for a directory
-holding neither manifest, [§AR-rhei-panta.3](../architecture/rhei-panta.spec.md#3-identity-and-id-namespacing) for a file whose name gives no rhei id, and
-[§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior) for how a recognized or omitted target resolves. Particular to `rhei budget`:
+holding neither manifest, [§AR-rhei-panta.3](../architecture/rhei-panta.spec.md#3-identity-and-id-namespacing) for a file or workspace whose own name gives no rhei id,
+a project's member too, and [§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior) for how a recognized or omitted target resolves. Particular to `rhei budget`:
 
 - **The refusal comes first**, before settings are read or the account is looked for, so
   a plain directory whose settings do not parse, or that holds an account, is refused alike.

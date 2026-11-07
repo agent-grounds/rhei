@@ -747,6 +747,11 @@ Two consequences are normative, and an implementation is held to them:
 
 The frontmatter delimiter is not a fence and is not governed by this section: it
 is `frontmatter` above, opened and closed by a line that is exactly `---`.
+The lines between those two delimiters are YAML, in `frontmatter` and in
+`task_metadata_frontmatter` alike, and no reader takes one of them as a fence or
+as any other production of this grammar. A line of backticks in a YAML value
+opens nothing, and a `### <kind> <id>: ` or `**State:**` line in one is neither a
+task node nor its metadata.
 
 `````markdown
 # Rhei: A plan that quotes a plan

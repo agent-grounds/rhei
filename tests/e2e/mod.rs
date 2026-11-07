@@ -124,6 +124,7 @@ mod export_prior_migration_tests;
 mod fence_structure_tests;
 mod handoff_tests;
 mod header_rewrite_into_tests;
+mod header_rewrite_new_tests;
 mod header_rewrite_tests;
 mod headless_dead_supervisor_tests;
 mod headless_recovery_tests;

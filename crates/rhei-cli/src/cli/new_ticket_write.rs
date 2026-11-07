@@ -96,11 +96,12 @@ struct RheiStructure {
     declared: bool,
 }
 
-/// True when `raw` authors a `structure:` block, rather than inheriting the
-/// defaults. The block is frontmatter, so the key is flush-left on its own
-/// line. §FS-rhei-plan-language.1.1
-fn declares_structure(raw: &str) -> bool {
-    raw.lines().any(|line| line.trim_end() == "structure:")
+/// True when the frontmatter the parser read authors a `structure:` block, rather
+/// than inheriting the defaults. It asks the parse, so a `structure:` line anywhere
+/// else in the document is the content it is. §FS-rhei-plan-language.1.1
+/// §FS-rhei-plan-language.2.3
+fn declares_structure(metadata: Option<&rhei_core::ast::Metadata>) -> bool {
+    metadata.is_some_and(|metadata| metadata.contains_key("structure"))
 }
 
 /// The structure a rhei declares — the limits a new ticket is checked against.
@@ -111,14 +112,14 @@ fn rhei_entry_structure(entry: &RheiEntry, target: &Path) -> MietteResult<RheiSt
         RheiEntry::SingleFile(path) => {
             let raw = read_input_file(path)?;
             let rhei = rhei_core::parse(&raw).map_err(|err| parse_report(path, &raw, &err))?;
-            Ok(RheiStructure { structure: rhei.structure, declared: declares_structure(&raw) })
+            Ok(RheiStructure { structure: rhei.structure, declared: declares_structure(rhei.metadata.as_ref()) })
         }
         RheiEntry::Workspace(dir) => {
             let path = dir.join("index.rhei.md");
             let raw = read_input_file(&path)?;
             let index = rhei_core::parser::parse_workspace_index(&raw)
                 .map_err(|err| parse_report(&path, &raw, &err))?;
-            Ok(RheiStructure { structure: index.structure, declared: declares_structure(&raw) })
+            Ok(RheiStructure { structure: index.structure, declared: declares_structure(index.metadata.as_ref()) })
         }
         RheiEntry::Basin(_) => {
             let Some(project_dir) = workspace::panta_project_dir(target) else {
@@ -131,7 +132,7 @@ fn rhei_entry_structure(entry: &RheiEntry, target: &Path) -> MietteResult<RheiSt
             let raw = read_input_file(&path)?;
             let manifest = rhei_core::parser::parse_panta_manifest(&raw)
                 .map_err(|err| parse_report(&path, &raw, &err))?;
-            Ok(RheiStructure { structure: manifest.structure, declared: declares_structure(&raw) })
+            Ok(RheiStructure { structure: manifest.structure, declared: declares_structure(manifest.metadata.as_ref()) })
         }
     }
 }

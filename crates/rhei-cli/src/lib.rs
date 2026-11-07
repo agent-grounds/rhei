@@ -29,6 +29,7 @@ include!("cli/completion_context.rs");
 include!("cli/list_command.rs");
 include!("cli/show_command.rs");
 include!("cli/error_guidance.rs");
+include!("cli/state_machine_shape_help.rs");
 include!("cli/diagnostic_causes.rs");
 include!("cli/reset_offer.rs");
 include!("cli/plan_input_guidance.rs");

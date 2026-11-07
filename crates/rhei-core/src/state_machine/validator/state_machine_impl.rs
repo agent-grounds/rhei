@@ -25,12 +25,17 @@ impl StateMachine {
     fn parse_fragment_at(yaml: &str, source: Option<&Path>) -> Result<Self, StateMachineLoadError> {
         // One raw parse feeds every check that has to see the YAML as written
         // rather than as serde collapsed it.
-        let raw: serde_yaml::Value = serde_yaml::from_str(yaml)?;
+        // A refusal here is a syntax failure; one past it is a shape failure. §FS-rhei-errors.1.2.2
+        let raw: serde_yaml::Value =
+            serde_yaml::from_str(yaml).map_err(StateMachineLoadError::Yaml)?;
         // Before deserialization, which would drop the key unseen. §FS-rhei-agents.1.1.1
         reject_clamp_projects(&raw, source)?;
         reject_explicit_empty_all_targets(&raw)?;
         reject_inline_prompt_templates(&raw)?;
-        Ok(serde_yaml::from_str(yaml)?)
+        serde_yaml::from_str(yaml).map_err(|error| StateMachineLoadError::Shape {
+            error,
+            fault: state_machine_shape_fault(&raw),
+        })
     }
 
     fn validate(mut self) -> Result<Self, StateMachineLoadError> {

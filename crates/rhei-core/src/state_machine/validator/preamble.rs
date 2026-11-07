@@ -78,8 +78,46 @@ impl Validate for () {
 #[derive(Debug)]
 pub enum StateMachineLoadError {
     Io(std::io::Error),
+    /// The text does not parse as YAML at all. §FS-rhei-errors.1.2.2
     Yaml(serde_yaml::Error),
+    /// The text parses as YAML, but not into a state machine. §FS-rhei-errors.1.2.2
+    Shape {
+        /// The deserializer's refusal, which is what a reader is shown.
+        error: serde_yaml::Error,
+        /// What that refusal asks of the file.
+        fault: StateMachineShapeFault,
+    },
     Invalid(String),
+}
+
+/// A top-level key every state machine must carry, as §FS-rhei-states.1.1 lists it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RequiredTopLevelField {
+    /// The key as written in the file.
+    pub key: &'static str,
+    /// The value the key holds, in words a help can quote.
+    pub shape: &'static str,
+}
+
+/// The required top-level keys, in the order [`StateMachine`] declares them: the
+/// order in which its deserializer reports the first one absent.
+/// §FS-rhei-states.1.1
+pub const REQUIRED_TOP_LEVEL_FIELDS: [RequiredTopLevelField; 3] = [
+    RequiredTopLevelField { key: "name", shape: "a string" },
+    RequiredTopLevelField { key: "version", shape: "a number or string" },
+    RequiredTopLevelField { key: "states", shape: "a map of state name to state definition" },
+];
+
+/// What a machine that parses as YAML lacks, as far as its help is concerned.
+/// §FS-rhei-errors.1.2.2
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StateMachineShapeFault {
+    /// The refusal is this required top-level field being absent.
+    MissingTopLevelField(RequiredTopLevelField),
+    /// The document is empty, only comments, `null`, a scalar or a sequence.
+    NoTopLevelMapping,
+    /// Anything else: the refusal itself names the key and what is wrong with it.
+    Other,
 }
 
 impl std::fmt::Display for StateMachineLoadError {
@@ -87,6 +125,10 @@ impl std::fmt::Display for StateMachineLoadError {
         match self {
             StateMachineLoadError::Io(e) => write!(f, "I/O error: {e}"),
             StateMachineLoadError::Yaml(e) => write!(f, "YAML error: {e}"),
+            // Not "YAML error": this file is valid YAML. §FS-rhei-errors.1.2.2
+            StateMachineLoadError::Shape { error, .. } => {
+                write!(f, "invalid state machine: {error}")
+            }
             StateMachineLoadError::Invalid(message) => {
                 write!(f, "invalid state machine: {message}")
             }
@@ -99,12 +141,6 @@ impl std::error::Error for StateMachineLoadError {}
 impl From<std::io::Error> for StateMachineLoadError {
     fn from(e: std::io::Error) -> Self {
         StateMachineLoadError::Io(e)
-    }
-}
-
-impl From<serde_yaml::Error> for StateMachineLoadError {
-    fn from(e: serde_yaml::Error) -> Self {
-        StateMachineLoadError::Yaml(e)
     }
 }
 

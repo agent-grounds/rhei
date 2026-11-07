@@ -9,7 +9,7 @@
 
 // §AR-source-file-size.3 §FS-rhei-budgets.2 §AR-neural-admission.2
 
-use rhei_core::budget::{built_in, Bound, BoundSource};
+use rhei_core::budget::{built_in, Bound, BoundSource, Limiter};
 
 /// The four bounds in force, each with the value and the provenance every
 /// surface prints. §FS-rhei-budgets.2.3
@@ -24,6 +24,44 @@ struct CountBounds {
 }
 
 impl CountBounds {
+    /// Keep the maximum's own remedy first, then name any other constraint
+    /// blocking a larger grant. The resolved bound retains the machine ceiling
+    /// and, when declared, the project's original request. §FS-rhei-budgets.8
+    fn lifetime_ceiling_remedies(&self, allowance: u64) -> Vec<String> {
+        let bound = &self.lifetime_max;
+        let mut edits = vec![bound.remedy()];
+        let project = (bound.source == BoundSource::Project)
+            .then_some(bound.requested.unwrap_or(bound.effective));
+        for (holder, maximum) in [(Limiter::Machine, Some(bound.ceiling)), (Limiter::Project, project)]
+        {
+            if maximum.is_some_and(|value| value <= allowance) {
+                let edit = format!("set `defaults.{}` in {}", bound.key, bound.files.name(holder));
+                if !edits.contains(&edit) {
+                    edits.push(edit);
+                }
+            }
+        }
+        edits
+    }
+
+    /// Lifetime presentation uses the stored account allowance, never the
+    /// daily setting's provenance, limiter or delegation. §FS-rhei-budgets.3.2
+    fn invocation_bound(&self, contract: &rhei_core::budget::Contract) -> Bound {
+        match contract {
+            rhei_core::budget::Contract::Window => self.per_day.clone(),
+            rhei_core::budget::Contract::Lifetime { allowance } => Bound::account(*allowance),
+        }
+    }
+
+    /// The same presentation bound on both halt producers. §FS-rhei-budgets.8
+    fn halt_bound(&self, spent: &rhei_core::budget::Exhaustion) -> Bound {
+        match spent.dimension {
+            rhei_core::budget::Dimension::Travel => self.travel.clone(),
+            rhei_core::budget::Dimension::Invocations => self.invocation_bound(&spent.contract),
+            rhei_core::budget::Dimension::Spend => self.spend.clone(),
+        }
+    }
+
     /// The lines `rhei validate` and `rhei budget show` report, in dimension
     /// order, followed where the machine delegated a count ceiling by one
     /// ceiling line per delegated key and the policy line.

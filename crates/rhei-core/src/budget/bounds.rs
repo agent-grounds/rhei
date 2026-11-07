@@ -25,6 +25,8 @@ pub enum BoundSource {
     Machine,
     Project,
     Plan,
+    /// The stored audited lifetime allowance. §FS-rhei-budgets.2.3
+    Account,
 }
 
 impl BoundSource {
@@ -34,6 +36,7 @@ impl BoundSource {
             Self::Machine => "machine",
             Self::Project => "project",
             Self::Plan => "plan",
+            Self::Account => "account",
         }
     }
 }
@@ -142,6 +145,22 @@ pub struct Bound {
 }
 
 impl Bound {
+    /// Present the stored lifetime allowance without settings resolution or a
+    /// historical grant clamp. The limiter fields are inactive: there is no
+    /// request to clamp and no delegated ceiling. §FS-rhei-budgets.3.2
+    pub fn account(allowance: u64) -> Self {
+        Self {
+            key: "invocation_allowance",
+            effective: allowance,
+            source: BoundSource::Account,
+            requested: None,
+            unit: BoundUnit::Count,
+            ceiling: allowance,
+            limiter: Limiter::Machine,
+            files: SettingsFiles::default(),
+        }
+    }
+
     /// Resolve one dimension: most specific request wins the value, and the
     /// machine's number is then applied as a ceiling.
     ///
@@ -310,6 +329,9 @@ impl Bound {
     /// operator to a field that cannot take effect sends them to the wrong
     /// file. §FS-rhei-budgets.8
     pub fn remedy(&self) -> String {
+        // Lifetime remedies require the current grant ceiling and audited target.
+        // §FS-rhei-budgets.8
+        assert_ne!(self.source, BoundSource::Account, "account remedies require a Remedy");
         let holder = if self.limited_by_ceiling() {
             self.limiter
         } else if self.source == BoundSource::Project {
@@ -338,6 +360,7 @@ pub fn ceiling_policy_line<'a>(bounds: impl IntoIterator<Item = &'a Bound>) -> O
 /// The one thing a halt tells an operator to do, chosen by which limiter
 /// actually stopped the work rather than by which number is smallest.
 /// §FS-rhei-budgets.8
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Remedy {
     /// Raise the bound, wherever it was set.
     Raise,
@@ -351,6 +374,35 @@ pub enum Remedy {
     /// It holds that command as the caller spells it, because only the caller
     /// knows which target the invocation was given. §FS-rhei-errors.1.2.1
     Adjust(String),
+    /// The ceilings must first permit an allowance above the stored one; only
+    /// the subsequent audited adjustment grants it. §FS-rhei-budgets.8
+    RaiseThenAdjust { ceilings: Vec<String>, allowance: u64, command: String },
+}
+
+impl Remedy {
+    /// The same single next action on text and durable halt surfaces.
+    /// Account bounds reach only the audited adjustment variants. §FS-rhei-budgets.8
+    pub fn render(&self, bound: &Bound) -> String {
+        match self {
+            Self::Raise => bound.remedy(),
+            Self::Renews(instant) => format!("wait: the window renews at {instant}"),
+            Self::Adjust(command) => format!("run `{command}`"),
+            Self::RaiseThenAdjust { ceilings, allowance, command } => {
+                let edits: Vec<String> =
+                    ceilings.iter().map(|ceiling| format!("{ceiling} above {allowance}")).collect();
+                format!("{}, then run `{command}`", edits.join(", "))
+            }
+        }
+    }
+
+    /// Renewal metadata and the text row come from the same choice.
+    /// §FS-rhei-budgets.8 §FS-rhei-run-json.2.1
+    pub fn renews_at(&self) -> Option<&str> {
+        match self {
+            Self::Renews(instant) => Some(instant),
+            _ => None,
+        }
+    }
 }
 
 /// Every label in a halt is padded to this column, so one halt reads the same
@@ -434,10 +486,9 @@ pub fn halt_text(spent: &Exhaustion, bound: &Bound, remedy: &Remedy, marks: &Spe
         }
     }
     lines.push(row("mode:", &mode));
-    lines.push(match remedy {
-        Remedy::Renews(instant) => row("renews at:", instant),
-        Remedy::Adjust(command) => row("to raise it:", &format!("run `{command}`")),
-        Remedy::Raise => row("to raise it:", &bound.remedy()),
+    lines.push(match remedy.renews_at() {
+        Some(instant) => row("renews at:", instant),
+        None => row("to raise it:", &remedy.render(bound)),
     });
     lines.join("\n")
 }

@@ -1207,10 +1207,25 @@ is the existing target-specific audited command:
 `rhei budget adjust <TARGET> --invocations <N> --reason <TEXT>`.
 When the allowance equals or exceeds that ceiling, take the key and file from
 `lifetime_max`'s own remedy: the machine file, or the project file where the
-project lowered the ceiling. The single ordered remedy sentence is:
+project lowered the ceiling. For one required ceiling edit, the single ordered
+remedy sentence is:
 
 ```text
 set `defaults.invocation_lifetime_max` in <file> above <allowance>, then run `rhei budget adjust …`
+```
+
+If more than one current lifetime-maximum setting prevents a grant above the
+stored allowance, keep that own-remedy edit first and supplement it with every
+other required edit before the one audited adjustment. The machine's maximum
+(including its built-in fallback) and any declared project maximum are
+independent constraints: each at or below the allowance must be raised, even
+when the allowance exceeds both unequal maxima. Name only required edits, with
+no duplicate file paths; after the primary edit, order additional edits machine
+then project. For equal project and machine maxima, both equal to the allowance,
+the one sentence is:
+
+```text
+set `defaults.invocation_lifetime_max` in <project file> above <allowance>, set `defaults.invocation_lifetime_max` in <machine file> above <allowance>, then run `rhei budget adjust …`
 ```
 
 The adjustment command retains the effective run target and its shell quoting

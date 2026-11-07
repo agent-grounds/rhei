@@ -149,7 +149,11 @@ fn spawn_parallel_agent_work_item(
             }
         }
         BudgetAdmission::NotAccounted => {}
-        BudgetAdmission::Refused { halt, event } => {
+        BudgetAdmission::Refused { halt, event, bounds } => {
+            // The same current facts on a refused pool admission. §FS-rhei-budgets.9
+            if !bounds.is_empty() {
+                sink.emit(rhei_tui::RunEvent::BudgetSnapshot { bounds });
+            }
             emit_run_message(sink, rhei_tui::MessageLevel::Error, halt);
             if let Some(event) = event {
                 sink.emit(*event);

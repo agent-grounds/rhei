@@ -177,7 +177,11 @@ fn run_sequential_agent_invocation(
             }
         }
         BudgetAdmission::NotAccounted => {}
-        BudgetAdmission::Refused { halt, event } => {
+        BudgetAdmission::Refused { halt, event, bounds } => {
+            // Refusal still reports the current bounds without a spawn. §FS-rhei-budgets.9
+            if !bounds.is_empty() {
+                sink.emit(RunEvent::BudgetSnapshot { bounds });
+            }
             run_error!("{halt}");
             if let Some(event) = event {
                 sink.emit(*event);

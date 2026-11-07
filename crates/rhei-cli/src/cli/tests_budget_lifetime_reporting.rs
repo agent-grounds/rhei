@@ -59,13 +59,30 @@ mod lifetime_reporting {
         }
     }
 
-    // Exercise existing callable producers, without requiring a not-yet-written resolver.
+    // Pin the resolved value and its rendering by both producers for every halt kind.
     // §FS-rhei-budgets.8
     fn remedy_table(include_lifetime: bool) {
         let (_window_dir, window) = journal(false);
         let (_lifetime_dir, lifetime) = journal(true);
         let bounds = bounds(false);
         let project_bounds = self::bounds(true);
+        let maxima = |machine, project: Option<u64>| {
+            let mut b = bounds.clone();
+            b.lifetime_max = Bound::resolve(
+                "invocation_lifetime_max",
+                10,
+                Some(machine),
+                project.map(|value| (value, BoundSource::Project)),
+            )
+            .with_files(bounds.lifetime_max.files.clone());
+            b
+        };
+        let equal_bounds = maxima(1, Some(1));
+        let lower_project = maxima(2, Some(1));
+        let lower_machine = maxima(1, Some(2));
+        let higher_project = maxima(1, Some(10));
+        let mut same_file = equal_bounds.clone();
+        same_file.lifetime_max.files.project = same_file.lifetime_max.files.machine.clone();
         let _target = enter_help_target(HelpTarget::naming(Path::new("sub dir/plan's.rhei.md")));
         let command = format!(
             "rhei budget adjust {} --invocations <N> --reason <TEXT>",
@@ -83,6 +100,7 @@ mod lifetime_reporting {
                 3,
                 bounds.travel.remedy(),
                 None,
+                Remedy::Raise,
             ),
             (
                 "window renewal",
@@ -93,6 +111,7 @@ mod lifetime_reporting {
                 50,
                 format!("wait: the window renews at {renews}"),
                 Some(renews.clone()),
+                Remedy::Renews(renews.clone()),
             ),
             (
                 "window without instant",
@@ -103,6 +122,7 @@ mod lifetime_reporting {
                 50,
                 bounds.per_day.remedy(),
                 None,
+                Remedy::Raise,
             ),
             (
                 "spend on window",
@@ -113,6 +133,7 @@ mod lifetime_reporting {
                 400_000_000,
                 format!("wait: the window renews at {renews}"),
                 Some(renews.clone()),
+                Remedy::Renews(renews.clone()),
             ),
             (
                 "spend on lifetime",
@@ -123,6 +144,7 @@ mod lifetime_reporting {
                 400_000_000,
                 format!("wait: the window renews at {renews}"),
                 Some(renews.clone()),
+                Remedy::Renews(renews.clone()),
             ),
         ];
         if include_lifetime {
@@ -138,6 +160,15 @@ mod lifetime_reporting {
                 } else {
                     format!("{} above {allowance}, then {adjust}", b.lifetime_max.remedy())
                 };
+                let resolved = if allowance < b.lifetime_max.effective {
+                    Remedy::Adjust(command.clone())
+                } else {
+                    Remedy::RaiseThenAdjust {
+                        ceilings: vec![b.lifetime_max.remedy()],
+                        allowance,
+                        command: command.clone(),
+                    }
+                };
                 cases.push((
                     name,
                     b,
@@ -147,12 +178,49 @@ mod lifetime_reporting {
                     allowance,
                     remedy,
                     None,
+                    resolved,
+                ));
+            }
+            // Every independent constraint at/below the allowance must change,
+            // keeping the own-remedy edit first and avoiding unnecessary edits.
+            // §FS-rhei-budgets.8
+            for (name, b, allowance, files) in [
+                ("equal ceilings", &equal_bounds, 1, vec!["project", "machine"]),
+                ("above both equal ceilings", &equal_bounds, 3, vec!["project", "machine"]),
+                ("above unequal project first", &lower_project, 3, vec!["project", "machine"]),
+                ("above unequal machine first", &lower_machine, 3, vec!["machine", "project"]),
+                ("project already permits increase", &higher_project, 2, vec!["machine"]),
+                ("no duplicate path", &same_file, 1, vec!["machine"]),
+            ] {
+                let ceilings: Vec<String> = files
+                    .iter()
+                    .map(|file| format!("set `defaults.invocation_lifetime_max` in {file}/settings.json"))
+                    .collect();
+                let edits: Vec<String> = ceilings
+                    .iter()
+                    .map(|edit| format!("{edit} above {allowance}"))
+                    .collect();
+                cases.push((
+                    name,
+                    b,
+                    &lifetime,
+                    Dimension::Invocations,
+                    Contract::Lifetime { allowance },
+                    allowance,
+                    format!("{}, then {adjust}", edits.join(", ")),
+                    None,
+                    Remedy::RaiseThenAdjust { ceilings, allowance, command: command.clone() },
                 ));
             }
         }
         let mut failures = Vec::new();
-        for (name, bounds, journal, dimension, contract, bound, expected, instant) in cases {
+        for (name, bounds, journal, dimension, contract, bound, expected, instant, resolved) in cases {
             let error = refusal(dimension, contract, bound, window.day());
+            let spent = error.exhaustion.as_deref().unwrap();
+            let actual = budget_halt_remedy(spent, bounds, journal);
+            assert_eq!(actual, resolved, "{name}: shared remedy choice");
+            assert_eq!(actual.render(&bounds.halt_bound(spent)), expected, "{name}: rendering");
+            assert_eq!(actual.renews_at(), instant.as_deref(), "{name}: renewal metadata");
             let text = budget_halt_text(&error, bounds, journal);
             let event = budget_halt_event(&error, bounds, journal, "plan.2").unwrap();
             let RunEvent::BudgetHalt { remedy, renews_at, .. } = event else {
@@ -172,7 +240,6 @@ mod lifetime_reporting {
     }
 
     #[test]
-    #[ignore = "red until #579: stderr and record share the effective lifetime remedy; implement removes this"]
     fn issue579_shared_remedy_table() {
         remedy_table(true);
     }
@@ -200,8 +267,16 @@ mod lifetime_reporting {
 
     // §FS-rhei-budgets.2.3 §FS-rhei-budgets.9
     #[test]
-    #[ignore = "red until #579: account source renders on invocation snapshots and halt text; implement removes this"]
     fn issue579_account_source_rendering() {
+        let account = Bound::account(2);
+        assert_eq!(account.source, BoundSource::Account);
+        assert_eq!(BoundSource::Account.as_str(), "account");
+        assert_eq!(account.effective, 2);
+        assert_eq!(account.amount_phrase(None), "2 (account)");
+        assert_eq!(account.requested, None);
+        assert!(!account.delegated());
+        assert!(!account.limited_by_ceiling());
+        assert_eq!(account.ceiling_halt_phrase(None), None);
         let (_dir, journal) = journal(true);
         let bounds = bounds(false);
         let reports = budget_reports(&journal, "ticket", &bounds).unwrap();

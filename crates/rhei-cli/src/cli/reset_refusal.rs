@@ -249,8 +249,8 @@ fn edit_line(
 ) -> String {
     let task_id = task.id.to_string();
     let file = display_path(&loaded.task_file(&task_id, input));
-    let has_result = task.content.lines().any(|line| line.trim_start().starts_with("> **Result:**"));
-    let result = if has_result { " and delete the `> **Result:**` line under it" } else { "" };
+    // §FS-rhei-reset.2.4
+    let result = if has_result_link(&task.content) { " and delete the `> **Result:**` line under it" } else { "" };
     format!(
         "a reset leaves Task {task_id} where its **State:** line in {file} puts it, because \
          nothing records a state it could restore: edit that line to '{initial}'{result}, then \

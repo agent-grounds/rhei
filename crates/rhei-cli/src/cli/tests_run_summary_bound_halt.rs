@@ -2,8 +2,8 @@
 // reach: the console group, which needs a terminal, and the two edges no plain run
 // produces on demand. Included into `mod run_summary_tests` in `run_summary.rs`, so
 // the indentation is the module's and `use super::*` is already in scope from
-// `tests_run_summary.rs`. Each is red until agent-grounds/rhei#587 is fixed; the
-// scenarios it shares a defect with are in `tests/e2e/budget_halt_attention_tests.rs`.
+// `tests_run_summary.rs`. The scenarios of agent-grounds/rhei#587 are in
+// `tests/e2e/budget_halt_attention_tests.rs`.
 
 // §FS-rhei-run-report.3.1 §FS-rhei-budgets.8 §FS-rhei-states.2.5
 
@@ -24,9 +24,11 @@ states:
     description: Wait for the author
     program: "./check-reply.sh"
     poll: { interval: 10m, max_attempts: 60, waiting_on: author }
+  review: { description: Wait for a reviewer, gating: true }
   done: { description: Done, final: true }
 transitions:
   - { from: work, to: done }
+  - { from: review, to: done }
   - { from: plan-approval, to: plan-approval }
   - { from: plan-approval, to: done }
 "#,
@@ -44,6 +46,10 @@ transitions:
 
     /// Task `1` refused by a bound of 4: a count, or a window where `renews_at` is set.
     fn emit_bound_halt(sink: &SummarySink, renews_at: Option<&str>) {
+        emit_bound_halt_with(sink, renews_at, BOUND_REMEDY);
+    }
+
+    fn emit_bound_halt_with(sink: &SummarySink, renews_at: Option<&str>, remedy: &str) {
         use rhei_tui::EventSink;
         sink.emit(rhei_tui::RunEvent::BudgetHalt {
             task: "1".to_string(),
@@ -63,7 +69,7 @@ transitions:
                 ceiling: None,
             },
             renews_at: renews_at.map(str::to_string),
-            remedy: BOUND_REMEDY.to_string(),
+            remedy: remedy.to_string(),
         });
     }
 
@@ -71,7 +77,6 @@ transitions:
     /// that ran and on one the run never spawned. The second is the one whose
     /// reason also reaches the ledger and the task tree.
     #[test]
-    #[ignore = "red until #587: the console group gives the stall advice; implement removes this"]
     fn the_console_group_names_the_bound_of_a_halted_ticket() {
         for sink in [summary_with_spawn("1", "work", "work", true), SummarySink::new()] {
             emit_bound_halt(&sink, Some(BOUND_RENEWAL));
@@ -90,7 +95,6 @@ transitions:
     /// Without a renewal the next action is the event's own remedy verbatim, and a
     /// ticket the run never spawned explains itself the same way in the ledger.
     #[test]
-    #[ignore = "red until #587: the row and the ledger give no remedy; implement removes this"]
     fn a_count_halt_carries_the_events_remedy_into_the_row_and_the_ledger() {
         let sink = SummarySink::new();
         emit_bound_halt(&sink, None);
@@ -107,7 +111,6 @@ transitions:
     /// A refused start is why the ticket is not moving, so it outranks the person
     /// the poll waits on: the author's answer would not release it.
     #[test]
-    #[ignore = "red until #587: a bound-halted poll reads as Waiting; implement removes this"]
     fn a_bound_halted_poll_waiting_on_a_person_is_in_attention() {
         let sink = SummarySink::new();
         emit_bound_halt(&sink, None);
@@ -129,7 +132,6 @@ transitions:
     /// admitted again, and whatever stopped it next is its own story. `## Bounds`
     /// keeps the history either way. An old stall never explains a new one.
     #[test]
-    #[ignore = "red until #587: no row names the bound at all yet; implement removes this"]
     fn a_ticket_admitted_again_after_a_bound_halt_does_not_keep_the_bound_row() {
         let halted_last = summary_with_spawn("1", "work", "work", true);
         emit_bound_halt(&halted_last, None);
@@ -147,6 +149,74 @@ transitions:
         assert!(report.render_markdown().contains("was stopped by its ticket travel bound"));
     }
 
+    /// §FS-rhei-budgets.8's long form: one line with backticks and ordered steps. A
+    /// plan path may hold a pipe, so the table cell escapes it, and the console takes
+    /// the text as it is on a single `→` line.
+    #[test]
+    fn a_long_lifetime_remedy_is_one_row_and_one_console_line() {
+        let remedy = "set `defaults.lifetime_max` in /m/settings.json above 2, then run \
+                      `rhei budget adjust 'a|b.rhei.md' --invocations <N> --reason <TEXT>`";
+        let sink = summary_with_spawn("1", "work", "work", true);
+        emit_bound_halt_with(&sink, None, remedy);
+
+        let report = bound_halted_report("work", &sink);
+
+        let row = report.attention.iter().find(|row| row.id == "1").expect("an Attention row");
+        assert_eq!(row.next, remedy, "the row holds the record's remedy verbatim");
+        let markdown = report.render_markdown();
+        let cell = remedy.replace('|', "\\|");
+        let rows: Vec<&str> = markdown.lines().filter(|line| line.starts_with("| 1 | work |")).collect();
+        assert!(
+            rows.iter().any(|line| line.ends_with(&format!("| {cell} |"))),
+            "one intact row:\n{markdown}"
+        );
+        assert!(
+            report.render_tty(false).lines().any(|line| line.trim() == format!("→ {remedy}")),
+            "one console line"
+        );
+    }
+
+    /// A move with no slot: only the plan shows it, and a refused start does not leave
+    /// a ticket final, at a gate, or claimed, so the classifier's reading stands.
+    #[test]
+    fn a_ticket_that_moved_on_with_no_slot_does_not_keep_the_bound_row() {
+        let sink = SummarySink::new();
+        emit_bound_halt(&sink, None);
+
+        let report = bound_halted_report("done", &sink);
+        assert!(report.attention.iter().all(|row| row.id != "1"), "a final ticket has no row");
+
+        let report = bound_halted_report("review", &sink);
+        let row = report.attention.iter().find(|row| row.id == "1").expect("a gate row");
+        assert_eq!(row.reason, "gating state awaiting review");
+        assert!(row.is_gate, "the gate, not halted work");
+
+        let report = bound_halted_report("work\n**Assignee:** someone", &sink);
+        let row = report.attention.iter().find(|row| row.id == "1").expect("a claim row");
+        assert_eq!(row.reason, "claimed by someone");
+
+        assert!(report.render_markdown().contains("was stopped by its ticket travel bound"));
+    }
+
+    /// A move a slot does show: the worker of another arm, in flight across the
+    /// refusal, moved the ticket when it was released.
+    #[test]
+    fn a_worker_that_moved_the_ticket_after_the_halt_takes_the_bound_row_back() {
+        let moved = summary_with_spawn("1", "work", "work", true);
+        emit_bound_halt(&moved, None);
+        emit_release_into(&moved, "1", "work", "plan-approval");
+        let report = bound_halted_report("plan-approval", &moved);
+        assert_eq!(report.waiting.len(), 1, "the poll is in Waiting again");
+        assert!(report.attention.is_empty(), "the halt is stale");
+
+        let unmoved = summary_with_spawn("1", "work", "work", true);
+        emit_bound_halt(&unmoved, None);
+        emit_release_into(&unmoved, "1", "work", "work");
+        let report = bound_halted_report("work", &unmoved);
+        let row = report.attention.iter().find(|row| row.id == "1").expect("an Attention row");
+        assert_eq!(row.next, BOUND_REMEDY, "a release that moved nothing leaves the halt");
+    }
+
     fn emit_spawn_into(sink: &SummarySink, task: &str, state: &str) {
         use rhei_tui::EventSink;
         let log = std::path::PathBuf::from("runtime/logs/x.log");
@@ -157,16 +227,21 @@ transitions:
             to: state.to_string(),
             agent: Some("mock".to_string()),
             template_context: None,
-            log_path: log.clone(),
+            log_path: log,
             started_at: std::time::Instant::now(),
             wall_clock: std::time::SystemTime::now(),
         });
+        emit_release_into(sink, task, state, state);
+    }
+
+    fn emit_release_into(sink: &SummarySink, task: &str, from: &str, to: &str) {
+        use rhei_tui::EventSink;
         sink.emit(rhei_tui::RunEvent::SlotReleased {
             slot: 0,
             task: task.to_string(),
-            from: state.to_string(),
-            to: state.to_string(),
-            log_path: log,
+            from: from.to_string(),
+            to: to.to_string(),
+            log_path: std::path::PathBuf::from("runtime/logs/x.log"),
             outcome: rhei_tui::TaskOutcome::Completed,
             finished_at: std::time::Instant::now(),
             wall_clock: std::time::SystemTime::now(),

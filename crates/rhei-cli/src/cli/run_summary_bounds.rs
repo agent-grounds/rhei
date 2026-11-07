@@ -154,3 +154,47 @@ impl BoundsSection {
         out
     }
 }
+
+/// The bound halts still true of their tickets, for `## Attention`. Apart from
+/// [`BoundsSection::halts`], which keeps every halt of the run as history.
+///
+/// `budget_halt` carries no state, so a halt is taken back by what can be seen
+/// after it: the ticket's next slot, a slot of its that moved it, and at the
+/// overlay a reading of the plan no refused start leaves behind.
+/// §FS-rhei-run-report.3.1
+#[derive(Default)]
+struct StandingBoundHalts(HashMap<String, HaltCause>);
+
+impl StandingBoundHalts {
+    /// A window renews by itself, so its row has a deadline and nothing to do.
+    /// Otherwise the next action is the record's remedy verbatim, never a second
+    /// resolution of it. §FS-rhei-run-report.3.1 §FS-rhei-budgets.8
+    fn record(
+        &mut self,
+        task: &str,
+        bound: &rhei_tui::BoundReport,
+        renews_at: Option<&str>,
+        remedy: &str,
+    ) {
+        let blocker = format!("{} bound of {}", bound.dimension, BoundsSection::provenance(bound));
+        let (blocker, next_action) = match renews_at {
+            Some(at) => (format!("{blocker}, renews {at}"), "renews automatically".to_string()),
+            None => (blocker, remedy.to_string()),
+        };
+        self.0.insert(task.to_string(), HaltCause::BoundHalted { blocker, next_action });
+    }
+
+    fn take_back(&mut self, task: &str) {
+        self.0.remove(task);
+    }
+
+    /// A refused start outranks what the classifier inferred from the ticket not
+    /// moving. A terminal ticket has no cause to replace. §FS-rhei-run-report.3.1
+    fn overlay(&self, halt_causes: &mut HashMap<String, HaltCause>) {
+        for (task, halt) in &self.0 {
+            if let Some(cause) = halt_causes.get_mut(task).filter(|c| c.yields_to_bound_halt()) {
+                *cause = halt.clone();
+            }
+        }
+    }
+}

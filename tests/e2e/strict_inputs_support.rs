@@ -207,6 +207,81 @@ pub fn assert_refused(run: &CliRun, file: &str) {
     }
 }
 
+/// The lines of `output` that list `path` as a change, whitespace collapsed, so
+/// a doubled listing reads as two lines where a substring match would not see
+/// it. A change line is `<kind> <path> …`. §FS-rhei-seal.5
+pub fn change_lines(output: &str, path: &str) -> Vec<String> {
+    output
+        .lines()
+        .filter(|line| line.split_whitespace().nth(1) == Some(path))
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .collect()
+}
+
+/// One plan at `sub/plan.rhei.md` and a machine at `machines/custom.yaml` it
+/// takes only when told to, so a rhei can gain and lose a machine of its own
+/// between two commands. Nothing here runs the machine's program: every strict
+/// run in these cases is refused first. §FS-rhei-seal.4
+pub struct OptionalMachine {
+    pub _dir: TestDir,
+    pub work: PathBuf,
+    pub home: PathBuf,
+}
+
+pub const OPTIONAL_PLAN: &str = "sub/plan.rhei.md";
+pub const OPTIONAL_MACHINE: &str = "machines/custom.yaml";
+/// The machine's path as a change names it: relative to the machine's directory.
+pub const OPTIONAL_MACHINE_LABEL: &str = "custom.yaml";
+
+impl OptionalMachine {
+    pub fn lay(prefix: &str) -> Self {
+        let dir = unique_temp_dir(prefix);
+        let work = dir.join("work");
+        let home = dir.join("home");
+        fs::create_dir_all(work.join("sub")).expect("plan directory");
+        fs::create_dir_all(work.join("machines")).expect("machine directory");
+        let plan = format!("# Rhei: plan\n\n## Tasks\n\n{}", ticket_chain(1));
+        write_fixture_file(&work.join("sub"), "plan.rhei.md", &plan);
+        let machine = drift_machine("custom", "\"true\"", &MachineShape::default());
+        write_fixture_file(&work.join("machines"), "custom.yaml", &machine);
+        Self { _dir: dir, work, home }
+    }
+
+    pub fn rhei(&self, args: &[&str]) -> CliRun {
+        rhei_at(&self.home, &self.work, args)
+    }
+
+    pub fn seal_with_machine(&self) -> CliRun {
+        self.rhei(&["seal", OPTIONAL_PLAN, "--state-machine", OPTIONAL_MACHINE])
+    }
+
+    pub fn seal_without_machine(&self) -> CliRun {
+        self.rhei(&["seal", OPTIONAL_PLAN])
+    }
+
+    /// `rhei run` under the machine with `--strict-inputs`, plus `extra`.
+    pub fn strict_run(&self, extra: &[&str]) -> CliRun {
+        let mut args = vec![
+            "run",
+            OPTIONAL_PLAN,
+            "--state-machine",
+            OPTIONAL_MACHINE,
+            "--strict-inputs",
+            "--no-tui",
+            "--no-callbacks",
+        ];
+        args.extend_from_slice(extra);
+        self.rhei(&args)
+    }
+
+    /// Generation 1 with the machine, generation 2 without it: the state from
+    /// which a run under the machine is a rhei that gained one.
+    pub fn sealed_then_lost(&self) {
+        assert_success(&self.seal_with_machine());
+        assert_success(&self.seal_without_machine());
+    }
+}
+
 pub fn ticket_chain(count: u32) -> String {
     let mut plan = String::new();
     for n in 1..=count {

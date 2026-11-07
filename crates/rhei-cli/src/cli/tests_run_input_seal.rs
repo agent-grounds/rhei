@@ -108,6 +108,38 @@ fn a_directory_or_a_machine_that_appears_or_goes_is_a_change() {
 }
 
 #[test]
+#[ignore = "red until #584: a machine in both `machine` and `entries` is listed twice; implement removes this"]
+fn snapshots_of_a_real_scope_list_a_gained_or_lost_machine_once() {
+    // §FS-rhei-seal.4 §FS-rhei-seal.5: `take_seal_snapshot` puts the machine in `entries` too.
+    let (dir, scope) = seal_fixture();
+    let own = take_seal_snapshot(&scope).unwrap();
+    let built_in = SealScope::new("drift", dir.path(), None, dir.path(), None);
+    let built_in = take_seal_snapshot(&built_in).unwrap();
+    let listed = |kind| {
+        [("scripts", kind), ("scripts/nested/helper.py", kind), ("scripts/step.py", kind), ("states.yaml", kind)]
+    };
+    assert_eq!(kinds(&seal_changes(&own, &built_in)), listed("deleted"));
+    assert_eq!(kinds(&seal_changes(&built_in, &own)), listed("added"));
+}
+
+#[test]
+#[ignore = "red until #584: a gained machine whose entry also changed has two kinds; implement removes this"]
+fn a_gained_machine_whose_entry_also_changed_keeps_the_kind_of_its_bytes() {
+    // §FS-rhei-seal.4: one path, one kind; de-duplicating equal lines would leave two here.
+    let sealed = SealSnapshot {
+        entries: BTreeMap::from([("shared.yaml".to_string(), file("1", Some(false)))]),
+        ..SealSnapshot::default()
+    };
+    let current = SealSnapshot {
+        machine: Some("shared.yaml".to_string()),
+        entries: BTreeMap::from([("shared.yaml".to_string(), file("2", Some(false)))]),
+        ..SealSnapshot::default()
+    };
+    assert_eq!(kinds(&seal_changes(&sealed, &current)), [("shared.yaml", "modified")]);
+    assert_eq!(kinds(&seal_changes(&current, &sealed)), [("shared.yaml", "modified")]);
+}
+
+#[test]
 fn an_edit_on_disk_is_found_against_the_latest_generation() {
     // §FS-rhei-seal.3.1 §FS-rhei-seal.8.2
     let (dir, scope) = seal_fixture();

@@ -374,7 +374,9 @@ rhei_document   = rhei_header, { blank_line },
                   { content_section },
                   tasks_section ;
 
-rhei_header     = "# Rhei: ", title, NEWLINE ;
+rhei_header     = "#", header_space, "Rhei:", header_space, title, NEWLINE ;
+
+header_space    = ? one or more Unicode whitespace characters ? ;
 
 content_section = "## ", section_title, NEWLINE, { markdown_block } ;
 
@@ -422,7 +424,7 @@ panta_manifest  = panta_header, { blank_line },
                   [ frontmatter, { blank_line } ],
                   { content_section } ;
 
-panta_header    = "# Panta: ", title, NEWLINE ;
+panta_header    = "#", header_space, "Panta:", header_space, title, NEWLINE ;
 
 
 (* ============================================== *)
@@ -801,6 +803,23 @@ machine changes because of it:
 - **In a task body or a workspace task file.** The grammar never gave the line
   a meaning below the header, so it is ordinary task text, like any other bold
   line past the metadata block.
+
+### 2.3. The Header
+
+The header is the line a document's name and title are read from: `# Rhei: <title>`
+in a plan or a workspace index, `# Panta: <title>` in a project manifest. It is
+matched on the line with its surrounding whitespace removed, and any whitespace
+separates its parts, so `#  Rhei: Release` and `#<TAB>Rhei: Release` are the same
+header as `# Rhei: Release`. Whatever rhei writes uses one space, and rhei does not
+rewrite an author's spacing.
+
+A line that reads like a header inside a fenced block is content, by the rule of
+[§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks), so a document may quote a header above its own.
+
+Every command that looks for the header finds the one the parser reads. A document
+`rhei validate` accepts is therefore one whose frontmatter every command can write,
+below that header, with the header and every line above it kept byte for byte.
+Neither the header's spacing nor a quotation above it may stop that write or move it.
 
 ## 3. Semantic Constraints
 
@@ -1681,7 +1700,7 @@ For lexer implementation, the following token types are a reasonable minimum:
 
 | Token | Pattern | Example |
 |-------|---------|---------|
-| `RheiHeader` | `# Rhei: .*` | `# Rhei: My Project` |
+| `RheiHeader` | `^#\s+Rhei:\s+.*$`, on the line with its surrounding whitespace removed | `# Rhei: My Project` |
 | `CodeFence` | A line whose first non-whitespace run is three or more backticks or three or more tildes; the token carries that character, the run length, and whether the rest of the line is blank | a backtick run with the info string `console`; a bare `~~~` |
 | `FrontmatterFence` | `^---\s*$` | `---` |
 | `FrontmatterYamlLine` | Any line inside frontmatter that is not `---` | `metadata:` |

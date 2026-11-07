@@ -6,7 +6,7 @@
 /// mutually exclusive and are raised by different keys, so the refusal says
 /// which one it measured rather than leaving the reader to guess the field.
 /// §FS-rhei-errors.1.5
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum LoopBudgetKind {
     /// A state's `visits:` budget, counted in visits.
     Visits,
@@ -36,6 +36,7 @@ impl LoopBudgetKind {
 /// was, and how far it is spent. Carried out of the check that measured it so
 /// the refusal cannot re-derive the subject and arrive at a different state.
 /// §FS-rhei-errors.1.5
+#[derive(Debug, Clone)]
 struct SpentLoopBudget {
     state: String,
     kind: LoopBudgetKind,

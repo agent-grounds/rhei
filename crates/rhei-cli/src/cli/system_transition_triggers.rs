@@ -319,13 +319,10 @@ fn execute_system_program_exit_transition(
     machine: &rhei_validator::StateMachine,
     task_id_str: &str,
     from: &str,
-    to: &str,
+    // The edge and how it matched, as the selection over this `machine` returned
+    // them: `selected_rule` indexes this machine's `transitions()`. §FS-rhei-transitions.4.4
+    route: &ProgramExitRoute,
     exit_code: i32,
-    matched: ExitCodeMatch,
-    // Which rule of `machine`'s own `transitions()` the exit code selected; it
-    // arrives beside the machine it indexes. An engine-chosen target passes
-    // `None`. §FS-rhei-transitions.4.4
-    selected_rule: Option<usize>,
     no_callbacks: bool,
 ) -> MietteResult<String> {
     let mut data = serde_json::Map::new();
@@ -333,16 +330,22 @@ fn execute_system_program_exit_transition(
     // A zero exit reports success and a declared route names an edge: either
     // way the worker spoke, and only an exit the engine ended the work on is
     // the engine's to explain. §FS-rhei-run.3 §FS-rhei-programs.3.2
-    let engine_owns_the_outcome = exit_code != 0 && !matched.is_declared_route();
-    let message = engine_owns_the_outcome
-        .then(|| format!("`rhei run`: the subprocess exited {exit_code} in state '{from}'."));
+    let engine_owns_the_outcome = exit_code != 0 && !route.matched.is_declared_route();
+    let message = engine_owns_the_outcome.then(|| match &route.matched {
+        // The spent budget chose the edge, so it leads and the exit follows as
+        // what the last attempt did. §FS-rhei-run.5.1 §FS-rhei-errors.1.5
+        ExitCodeMatch::PollExhausted(budget) => {
+            format!("`rhei run`: {budget}; the last attempt exited {exit_code}.")
+        }
+        _ => format!("`rhei run`: the subprocess exited {exit_code} in state '{from}'."),
+    });
     execute_transition_with_origin(
         files,
         callback_paths,
         machine,
         task_id_str,
         from,
-        to,
+        &route.to,
         no_callbacks,
         TransitionOrigin {
             manual_release: None,
@@ -358,7 +361,7 @@ fn execute_system_program_exit_transition(
             terminal_result_fallback: None,
             // The rule the exit code chose is the rule that must fire, and only
             // this trigger knows which it was. §FS-rhei-programs.3.2
-            selected_rule,
+            selected_rule: Some(route.selected_rule),
         },
         None,
         None,

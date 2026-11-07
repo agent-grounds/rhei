@@ -45,21 +45,23 @@ fn program_transition_is_applicable(
 // Keyed strictly to `poll:` states, mutually exclusive with `visits`, so an
 // exhausted supervising `visits` budget never widens into this carve-out
 // (agent-grounds/rhei#122). §FS-rhei-run.5.1
-fn poll_attempts_exhausted(
+fn spent_poll_budget(
     machine: &rhei_validator::StateMachine,
     metadata: Option<&Metadata>,
     task: &rhei_core::ast::Task,
     current_state: &str,
-) -> bool {
-    machine.states.get(current_state).and_then(|def| def.poll.as_ref()).is_some()
-        && !loop_reentry_allowed(
-            machine,
-            metadata,
-            &task.id,
-            current_state,
-            task.state.as_str(),
-            current_state,
-        )
+) -> Option<SpentLoopBudget> {
+    machine.states.get(current_state)?.poll.as_ref()?;
+    // The state is its own destination: what is weighed is the self-loop the
+    // spent attempts refuse, whichever edge then leaves it. §FS-rhei-errors.1.5
+    spent_loop_budget(
+        machine,
+        metadata,
+        &task.id,
+        current_state,
+        task.state.as_str(),
+        current_state,
+    )
 }
 
 /// How the edge a program's exit selected matched that exit.
@@ -70,7 +72,7 @@ fn poll_attempts_exhausted(
 /// exit-`0` fall-through — is neither. A spent poll budget is its own answer:
 /// the edge was selected regardless of what the program exited with, so the
 /// exit named nothing whatever the rule declares. §FS-rhei-programs.3.2
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 enum ExitCodeMatch {
     /// An integer or integer-array `exit_code:` condition: a **declared route**.
     Exact,
@@ -80,8 +82,10 @@ enum ExitCodeMatch {
     None,
     /// The state's poll attempt budget was spent, so the engine selected this
     /// edge regardless of its `exit_code:` — whatever it declares, the exit did
-    /// not choose it. §FS-rhei-programs.3.2 §FS-rhei-run.5.1
-    PollExhausted,
+    /// not choose it. It carries the budget as the selection measured it, so the
+    /// account of the spent budget cannot exist without its figure.
+    /// §FS-rhei-programs.3.2 §FS-rhei-run.5.1
+    PollExhausted(SpentLoopBudget),
 }
 
 impl ExitCodeMatch {
@@ -97,7 +101,7 @@ impl ExitCodeMatch {
 
     /// Whether this exit chose its own edge, and so owns the account of the
     /// outcome the engine would otherwise write. §FS-rhei-programs.3.2
-    fn is_declared_route(self) -> bool {
+    fn is_declared_route(&self) -> bool {
         matches!(self, Self::Exact)
     }
 }
@@ -147,8 +151,9 @@ fn find_program_exit_transition(
                 program_transition_is_applicable(rule, machine, metadata, task, current_state)
             });
 
-    let poll_exhaustion_active =
-        exit_code != 0 && poll_attempts_exhausted(machine, metadata, task, current_state);
+    let spent_budget = (exit_code != 0)
+        .then(|| spent_poll_budget(machine, metadata, task, current_state))
+        .flatten();
 
     // A non-zero exit selects only an exit_code-declaring rule — except a
     // poll state's exhaustion edge, the spec'd non-self-loop match once
@@ -162,7 +167,7 @@ fn find_program_exit_transition(
             if exit_code == 0 {
                 rule.exit_code.is_none() || transition_matches_exit_code(rule, exit_code)
             } else if rule.exit_code.is_none() {
-                poll_exhaustion_active && rule.to.0 != current_state
+                spent_budget.is_some() && rule.to.0 != current_state
             } else {
                 transition_matches_exit_code(rule, exit_code)
             }
@@ -176,10 +181,9 @@ fn find_program_exit_transition(
             // Classified here, where the condition fired, not re-derived later.
             // An exhausted poll budget picks the edge on its own, so the exit
             // chose nothing and the engine still owes the account. §FS-rhei-programs.3.2
-            let matched = if poll_exhaustion_active {
-                ExitCodeMatch::PollExhausted
-            } else {
-                ExitCodeMatch::of(rule)
+            let matched = match spent_budget {
+                Some(budget) => ExitCodeMatch::PollExhausted(budget),
+                None => ExitCodeMatch::of(rule),
             };
             return Ok(Some(ProgramExitRoute {
                 to: rule.to.0.clone(),

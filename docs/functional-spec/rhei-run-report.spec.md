@@ -294,7 +294,17 @@ the summary prints five stacked groups:
 
    A run that halted on a bound names that
    bound there as well as in Attention, so the record answers "what stopped it"
-   without the reader reconstructing it from rows. Where the machine delegated
+   without the reader reconstructing it from rows. The section lists one line
+   per distinct halt, in the order each first appeared. A run retries a stalled
+   ticket after a pass that moved something, so one spent bound can refuse one
+   ticket on several passes; refused admissions that render the same line are
+   one stop, and that line is printed once. A halt that differs in its ticket,
+   dimension, provenance or renewal says something new and has its own line. A
+   halt a later admission took back stays listed, because this section is the
+   run's history and Attention is what still stands. The event stream still
+   records every refusal as its own `budget_halt`
+   ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)), so counting
+   those events counts refused admissions, not stops. Where the machine delegated
    a count ceiling to the project ([§FS-rhei-budgets.2](rhei-budgets.spec.md#2-where-a-bound-comes-from)), the ceiling and policy
    rows of [§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued) follow the bounds table, once, and a clamped
    row's limiting source reads `limited by project settings`.

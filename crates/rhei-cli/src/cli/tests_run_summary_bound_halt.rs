@@ -215,6 +215,114 @@ transitions:
         assert_eq!(row.next, BOUND_REMEDY, "the ticket has not moved, so the halt is still true");
     }
 
+    /// A halt of `task` on `dimension`, consuming `consumed` of a bound of 4 from
+    /// `value_source`, and a window where `renews_at` is set.
+    fn emit_distinct_halt(
+        sink: &SummarySink,
+        (task, dimension, value_source): (&str, &str, &str),
+        renews_at: Option<&str>,
+        consumed: u64,
+    ) {
+        use rhei_tui::EventSink;
+        sink.emit(rhei_tui::RunEvent::BudgetHalt {
+            task: task.to_string(),
+            reason_code: "travel_exhausted".to_string(),
+            bound: rhei_tui::BoundReport {
+                dimension: dimension.to_string(),
+                effective: 4,
+                value_source: value_source.to_string(),
+                limiting_source: None,
+                consumed,
+                outstanding: 0,
+                remaining: 0,
+                mode: "per ticket identity".to_string(),
+                window: None,
+                currency: None,
+                marks: None,
+                ceiling: None,
+            },
+            renews_at: renews_at.map(str::to_string),
+            remedy: BOUND_REMEDY.to_string(),
+        });
+    }
+
+    /// The halt lines of the report, in printed order.
+    fn halt_lines(report: &RunSummaryReport) -> Vec<String> {
+        let markdown = report.render_markdown();
+        let halts = markdown.lines().filter(|line| line.contains("was stopped by its"));
+        halts.map(str::to_owned).collect()
+    }
+
+    const NEXT_RENEWAL: &str = "2026-09-26T00:00:00Z";
+
+    /// A stop is what a line says, so any difference a line shows is a new one, kept
+    /// where it first appeared. Green today: this guards the fix against collapsing
+    /// too much, as no real run has built such a pair yet.
+    #[test]
+    fn halts_differing_in_ticket_dimension_provenance_or_renewal_stay_separate_lines() {
+        let sink = SummarySink::new();
+        let renewing = Some(BOUND_RENEWAL);
+        emit_distinct_halt(&sink, ("1", "project spend", "machine"), renewing, 4);
+        emit_distinct_halt(&sink, ("1", "project invocations", "machine"), renewing, 4);
+        emit_distinct_halt(&sink, ("1", "project invocations", "project"), renewing, 4);
+        emit_distinct_halt(&sink, ("1", "project invocations", "project"), Some(NEXT_RENEWAL), 4);
+        emit_distinct_halt(&sink, ("2", "project invocations", "project"), Some(NEXT_RENEWAL), 4);
+
+        let report = bound_halted_report("work", &sink);
+
+        let renews = |at: &str| format!("it renews at {at}");
+        assert_eq!(
+            halt_lines(&report),
+            [
+                format!(
+                    "- `1` was stopped by its project spend bound of 4 (machine); {}",
+                    renews(BOUND_RENEWAL)
+                ),
+                format!(
+                    "- `1` was stopped by its project invocations bound of 4 (machine); {}",
+                    renews(BOUND_RENEWAL)
+                ),
+                format!(
+                    "- `1` was stopped by its project invocations bound of 4 (project); {}",
+                    renews(BOUND_RENEWAL)
+                ),
+                format!(
+                    "- `1` was stopped by its project invocations bound of 4 (project); {}",
+                    renews(NEXT_RENEWAL)
+                ),
+                format!(
+                    "- `2` was stopped by its project invocations bound of 4 (project); {}",
+                    renews(NEXT_RENEWAL)
+                ),
+            ]
+        );
+    }
+
+    /// Two tickets refused on each of two passes alternate, so comparing a line with
+    /// the one before it would miss every repeat. `consumed` differs between passes
+    /// and no line shows it, so it cannot split a stop.
+    #[test]
+    #[ignore = "red until #605: a repeated halt prints a line per refusal; implement removes this"]
+    fn a_repeated_halt_is_one_line_in_the_place_it_first_appeared() {
+        let sink = SummarySink::new();
+        let first = ("1", "ticket travel", "machine");
+        let second = ("2", "ticket travel", "machine");
+        emit_distinct_halt(&sink, first, None, 4);
+        emit_distinct_halt(&sink, second, None, 4);
+        emit_distinct_halt(&sink, first, None, 5);
+        emit_distinct_halt(&sink, second, None, 5);
+
+        let report = bound_halted_report("work", &sink);
+
+        assert_eq!(
+            halt_lines(&report),
+            [
+                format!("- `1` was stopped by its ticket travel bound of 4 (machine); {BOUND_REMEDY}"),
+                format!("- `2` was stopped by its ticket travel bound of 4 (machine); {BOUND_REMEDY}"),
+            ]
+        );
+    }
+
     fn emit_spawn_into(sink: &SummarySink, task: &str, state: &str) {
         emit_assign_into(sink, task, state, state);
         emit_release_into(sink, task, state, state);

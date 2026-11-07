@@ -80,5 +80,20 @@ pub fn find_frontmatter<'a>(lines: impl IntoIterator<Item = &'a str>) -> Option<
     Some(FrontmatterPlace { header, block })
 }
 
+/// The block a bare task file leads with: past any blank lines, its first line is
+/// `---`. A task file has no header above it, so [`find_frontmatter`] never finds
+/// this one, and the node parser never sees it. §FS-rhei-plan-language.1.4
+pub fn find_leading_frontmatter<'a>(
+    lines: impl IntoIterator<Item = &'a str>,
+) -> Option<FrontmatterBlock> {
+    let mut lines = lines.into_iter().enumerate();
+    let (open, _) = lines
+        .by_ref()
+        .find(|(_, line)| !line.trim().is_empty())
+        .filter(|(_, line)| line.trim() == "---")?;
+    let close = lines.find(|(_, line)| line.trim() == "---").map(|(close, _)| close);
+    Some(FrontmatterBlock { open, close })
+}
+
 #[cfg(test)]
 mod tests;

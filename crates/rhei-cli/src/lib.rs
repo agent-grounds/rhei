@@ -314,6 +314,7 @@ include!("cli/reset_locks.rs");
 include!("cli/reset_runtime_cleanup.rs");
 include!("cli/complete_reset_commands.rs");
 include!("cli/complete_reset_rewrites.rs");
+include!("cli/reset_plan_lines.rs");
 include!("cli/file_locks.rs");
 include!("cli/migrate_export_priors.rs");
 include!("cli/session_report_parse.rs");

@@ -52,4 +52,16 @@ mod reset_refusal {
         assert!(edited.contains("[plan.1.1]("), "{edited}");
         assert_eq!(strip_result_links_under(raw, |_| true), strip_result_links(raw));
     }
+
+    /// A task file has no header, so a `# Rhei:` line in a task's body opens no
+    /// frontmatter: the next task is still read, and its state goes back.
+    /// §FS-rhei-reset.2.4
+    #[test]
+    fn a_header_shaped_line_in_a_task_files_body_opens_no_frontmatter() {
+        let raw = "### Task 1: Quotes\n**State:** open\n\n# Rhei: Quoted\n\n---\n\n\
+                   ### Task 2: Next\n**State:** done\n";
+        let authored = BTreeMap::from([("2".to_string(), "open".to_string())]);
+        let rewritten = rewrite_states_to_authored(raw, &authored).expect("rewrite states");
+        assert_eq!(rewritten, raw.replace("**State:** done", "**State:** open"));
+    }
 }

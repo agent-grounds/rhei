@@ -62,6 +62,12 @@ State machines constrain which states and transitions are legal. Cancellation ro
 preprocessing layer that materializes ordinary plan markdown and optional state
 machines before runtime parsing.
 
+Every file on all four surfaces is read as the text after one leading UTF-8
+byte order mark, if the file has one, and loads exactly as the same bytes
+without it: a plan's header is still its header, a task file's opening
+frontmatter is still read, and a YAML file is still one document
+([§REQ-cross-platform.9](../requirements/cross-platform.md#9-an-authored-file-reads-the-same-whatever-editor-saved-it)).
+
 ## 2. Reading Path
 
 Use this order when learning or auditing the language:

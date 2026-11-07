@@ -158,6 +158,10 @@ and reading the message never does. All four open with the same headline,
 `failed to parse state machine '<path>': <cause>`, and all four end in the
 command that re-checks the file: `rhei states --state-machine <path>`.
 
+The scan reads the text after one leading byte order mark, never the mark
+([§REQ-cross-platform.9](../requirements/cross-platform.md#9-an-authored-file-reads-the-same-whatever-editor-saved-it)). A file that is valid YAML with one document once the
+mark is set aside loads, so a mark alone is none of the four failures.
+
 Text the scan rejects in any document is a syntax failure. The help says the
 file is not valid YAML and to fix the syntax. It refers to the position above
 only when the headline prints one, which a failure at the very first character

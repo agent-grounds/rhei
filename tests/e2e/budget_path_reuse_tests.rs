@@ -63,7 +63,7 @@ fn the_documented_sequence_is_refused_with_both_readings_and_released_by_forget(
          and charges this project the previous occupant's whole spend; got:\n{refusal}"
     );
     assert!(
-        refusal.contains(&format!("rhei budget show {}", world.plan())),
+        refusal.contains(&format!("rhei budget show {}", shell_quote(&world.plan()))),
         "the refusal ends in the one diagnostic it names, spelled with the target \
          that was typed; got:\n{refusal}"
     );
@@ -113,7 +113,7 @@ fn show_reports_the_damaged_account_rather_than_failing_to_open_it() {
         "the report says what the recorded history holds; got:\n{report}"
     );
     assert!(
-        report.contains(&format!("rhei budget forget {}", world.plan())),
+        report.contains(&format!("rhei budget forget {}", shell_quote(&world.plan()))),
         "the report gives the reused-path reading a runnable command; got:\n{report}"
     );
     assert!(

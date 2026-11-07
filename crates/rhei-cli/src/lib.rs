@@ -418,6 +418,7 @@ mod tests {
     include!("cli/tests_mcp_surface.rs");
     include!("cli/tests_mcp_preflight.rs");
     include!("cli/tests_budget_spend.rs");
+    include!("cli/tests_budget_lifetime_reporting.rs");
     include!("cli/tests_budget_delegation.rs");
     include!("cli/tests_budget_ancestry.rs");
     include!("cli/tests_budget_forget.rs");

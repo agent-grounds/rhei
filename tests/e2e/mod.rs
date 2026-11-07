@@ -49,6 +49,7 @@ mod budget_delegated_support;
 mod budget_edge_support;
 mod budget_empty_journal_tests;
 mod budget_failed_append_tests;
+mod budget_lifetime_reporting_tests;
 mod budget_missing_directory_tests;
 mod budget_nested_plan_tests;
 mod budget_path_reuse_quoting_tests;

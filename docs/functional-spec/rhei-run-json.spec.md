@@ -99,6 +99,15 @@ finished state ([§FS-rhei-states.2.2](rhei-states.spec.md#22-semantics)). Paths
 are workspace-relative when inside the workspace and absolute otherwise, as in
 the journal.
 
+`value_source` is `"built_in"`, `"machine"`, `"project"`, `"plan"` or
+`"account"`. On lifetime invocation snapshots and halts, `"account"` names
+the stored audited allowance, `limiting_source` is null, and `ceiling` is
+absent; daily settings and a prior grant-time clamp supply none of these
+fields ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued)).
+This additive value retains schema `1` and follows the unfamiliar-value
+carry-through rule of [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version).
+Historical journals and reports require no migration.
+
 `limiting_source` is `"machine"`, `"project"` or null: `"project"` only where
 the machine delegated that dimension's ceiling (`defaults.clamp_projects:
 false`) and the project's value clamped the request. A delegated entry's
@@ -107,8 +116,11 @@ settings file read, and `ceiling_policy` is `{ "delegated": [<keys>], "setting":
 "defaults.clamp_projects", "path": <machine settings file> }`, listing only the
 keys actually delegated ([§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued)). Both are absent where nothing was delegated, so a
 machine that never set the switch emits the records it always did; they are
-additions under [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version), so `schema` does not move. `remedy` names the settings file
-by its path ([§FS-rhei-budgets.8](rhei-budgets.spec.md#8-exhaustion)).
+additions under [§FS-rhei-run-json.2.2](rhei-run-json.spec.md#22-schema-version), so `schema` does not move. `remedy` is the same shared choice as stderr:
+a settings remedy names its file by path, an audited adjustment names its
+target-specific command (preceded by the ceiling-setting step when required),
+and a renewal wait names its instant
+([§FS-rhei-budgets.8](rhei-budgets.spec.md#8-exhaustion)).
 
 `reverted` is the journal's key of the same name ([§FS-rhei-run-tui.1.7](rhei-run-tui.spec.md#17-journal-format)): the
 string `<file>:<line>` at which the worker's edit broke the plan, present only on

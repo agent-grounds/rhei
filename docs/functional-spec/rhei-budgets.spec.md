@@ -218,12 +218,19 @@ transition_limit: 100 (requested 500 by the plan, limited by machine settings)
 transition_limit: 40 (requested 60 by the plan, limited by project settings)
 ```
 
-The value sources are `built_in`, `machine`, `project`, and `plan` — `plan`
+The value sources are `built_in`, `machine`, `project`, `plan`, and `account` — `plan`
 covering anything the plan's own state machine declares, such as a
 `profiles.<name>.transition_limit`, because from the operator's side the plan is
 what asked. `machine` is both a value source and, where it clamps, the limiting
 source; a report never collapses the two, because "the machine set this" and
 "the machine lowered this" send a reader to different files.
+
+`account` identifies the stored lifetime invocation allowance established by
+audited `rhei budget init` or `rhei budget adjust`, rather than a settings
+value. It renders as `<allowance> (account)`. Its limiting source is null and
+it carries no delegated ceiling. A daily setting supplies none of this
+provenance, even with `clamp_projects: false`. A historical grant-time clamp
+does not become a present limiter of the stored allowance.
 
 The clamped form names the requester and the limiter in one line, and is the
 same sentence on every surface that reports a bound:
@@ -273,6 +280,12 @@ capacity changes only through an audited `adjust` ([§FS-rhei-budgets.10](rhei-b
 
 An explicit allowance is clamped by `defaults.invocation_lifetime_max` at `init`
 and at every `adjust`.
+
+The stored allowance supplies the invocation bound and its `account` value
+source on stderr, invocation snapshots and halt events, and the run report's
+Bounds table and halt lines. Reporting neither reclamps that allowance nor
+changes admission, consumption or grant policy. Editing a daily setting cannot
+raise it or change its provenance. Spend retains its daily contract.
 
 The two contracts are mutually exclusive, and an explicitly initialized account
 does not revert to the window contract. Reversion is **not offered**: the two
@@ -1179,6 +1192,32 @@ The halt names, in one place:
 It never offers an inner value the ceiling would clamp: telling an operator to
 raise a plan field that cannot take effect sends them to the wrong file.
 
+One shared `Remedy` choice supplies stderr's `to raise it:` row and
+`budget_halt.remedy`; the report's Bounds halt lines read that recorded remedy.
+Travel uses the active bound's settings/profile remedy. Window invocations
+wait for their renewal instant when known, and otherwise use the active daily
+bound's remedy. Spend waits for its daily renewal instant under either
+invocation contract (falling back to its settings remedy if no instant can be
+derived). Ordinary window, travel and delegated-ceiling behavior is unchanged.
+
+Lifetime invocation halts never pass an `account` bound to `Bound::remedy()`.
+When the stored allowance is below `bounds.lifetime_max.effective`, the remedy
+is the existing target-specific audited command:
+`run ` followed by the backtick-quoted
+`rhei budget adjust <TARGET> --invocations <N> --reason <TEXT>`.
+When the allowance equals or exceeds that ceiling, take the key and file from
+`lifetime_max`'s own remedy: the machine file, or the project file where the
+project lowered the ceiling. The single ordered remedy sentence is:
+
+```text
+set `defaults.invocation_lifetime_max` in <file> above <allowance>, then run `rhei budget adjust …`
+```
+
+The adjustment command retains the effective run target and its shell quoting
+on both paths. Raising the setting alone grants no lifetime capacity: only the
+subsequent audited adjustment raises the allowance
+([§REQ-bounded-neural-work.4](../requirements/bounded-neural-work.spec.md#4-nothing-creates-capacity)).
+
 Every settings remedy names the file by the path rhei actually read, on every
 machine: the machine settings file as the loader opens it, expanded
 (`~/.config/rhei/settings.json`), or the project settings file the loader chose —
@@ -1347,6 +1386,13 @@ after it changes, so the entry prices tomorrow's work and the window renews
 today's.
 
 ## 9. Visibility
+
+Lifetime invocation snapshots and halts agree on the stored allowance,
+`value_source: account`, null limiting source, and absence of a daily delegated
+ceiling. Stderr and the report's Bounds table and halt lines render these same
+facts; the halt lines use the event's remedy from
+[§FS-rhei-budgets.8](rhei-budgets.spec.md#8-exhaustion). Existing historical
+journals and reports are preserved without migration or rewriting.
 
 Every bound in force is visible with its value and its source **before** capacity
 is spent, on every surface that already shows autonomous work:

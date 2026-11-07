@@ -126,7 +126,7 @@ fn plan_a_reset_leaves(
             None => read_plan_source(&file, "failed to read plan file")?,
         };
         let moves = authored.by_file.get(&file).unwrap_or(&no_moves);
-        let text = reset_file_text(&raw, moves, plan_file_kind(&file))?;
+        let text = reset_file_text(&raw, moves, loaded.document_role(&file))?;
         staged.insert(file, text);
     }
     for (file, task_ids) in reset_metadata_targets(loaded, input, scope) {
@@ -224,7 +224,7 @@ fn edits_let_the_reset_through(
     let mut staged = HashMap::new();
     for (file, file_edits) in by_file {
         let raw = read_plan_source(&file, "failed to read plan file")?;
-        let kind = plan_file_kind(&file);
+        let kind = loaded.document_role(&file);
         let edited = rewrite_states_to_authored(&raw, &file_edits, kind)?;
         let edited = strip_result_links_under(&edited, kind, |id| {
             id.is_some_and(|id| file_edits.contains_key(id))

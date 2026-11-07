@@ -194,7 +194,7 @@ fn reset_filesystem_refusal(
     for (file, _sample_task_id) in reset_target_files(loaded, input, scope) {
         let raw = read_plan_source(&file, "failed to read plan file")?;
         let moves = authored.by_file.get(&file).unwrap_or(&no_moves);
-        if reset_file_text(&raw, moves, plan_file_kind(&file))? != raw {
+        if reset_file_text(&raw, moves, loaded.document_role(&file))? != raw {
             check.entry(&file);
         }
     }
@@ -254,7 +254,7 @@ fn apply_reset(
     let no_moves: BTreeMap<String, String> = BTreeMap::new();
     for (file, _sample_task_id) in reset_target_files(loaded, input, &decision.scope) {
         let file_authored = decision.authored.by_file.get(&file).unwrap_or(&no_moves);
-        progress.landed |= reset_plan_file_states(&file, file_authored, reset_locks.plan(&file)?)?;
+        progress.landed |= reset_plan_file_states(&file, loaded.document_role(&file), file_authored, reset_locks.plan(&file)?)?;
     }
     // Clear selected live tickets in their owning documents, including the
     // basin manifest and tickets that never moved. §FS-rhei-reset.2

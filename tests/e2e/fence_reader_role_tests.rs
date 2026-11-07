@@ -133,3 +133,26 @@ fn fence_reader_622_complete_a_workspace_task_file_under_any_spelling() {
         assert!(after.contains(VALUE), "{spelling}: value kept:\n{after}");
     }
 }
+
+/// A reset takes the plan's role from the load that chose it, as `rhei complete` does, so a plan
+/// in a workspace's `tasks/` directory is reset as a plan from any spelling: its task returns to
+/// `open`, the link goes and the value stays. §FS-rhei-reset.2.4 §FS-rhei-plan-language.2.1
+#[test]
+fn fence_reader_622_reset_a_plan_in_tasks_under_any_spelling() {
+    for spelling in ["from-parent", "absolute"] {
+        let (root, plan) = lay_in_tasks("plan.rhei.md", PLAN_IN_TASKS);
+        let absolute = plan.display().to_string();
+        let target =
+            if spelling == "absolute" { absolute.as_str() } else { "ws/tasks/plan.rhei.md" };
+        succeeds_from(
+            &root,
+            &root,
+            &["complete", target, "--task", "1", "--result", "finished", "--no-callbacks"],
+        );
+        succeeds_from(&root, &root, &["reset", target, "--yes"]);
+        let after = fs::read_to_string(&plan).expect("plan");
+        assert!(after.contains("**State:** open"), "{spelling}: the task must be open:\n{after}");
+        assert!(!after.contains("> **Result:**"), "{spelling}: the link must go:\n{after}");
+        assert!(after.contains("    ```\n    not a fence\n"), "{spelling}: value kept:\n{after}");
+    }
+}

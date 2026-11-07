@@ -152,18 +152,28 @@ machine describes another machine with no error to say so.
 
 #### 1.2.2. A State Machine That Will Not Load
 
-A state machine file fails to load in one of two ways, told apart by whether
-its text parses as YAML at all, and each gets its own help. Both open with the
-same headline, `failed to parse state machine '<path>': <cause>`, and both end
-in the command that re-checks the file:
-`rhei states --state-machine <path>`.
+A state machine file fails to load in one of four ways, each with its own help.
+A scan of the text as YAML, document by document, tells the first three apart,
+and reading the message never does. All four open with the same headline,
+`failed to parse state machine '<path>': <cause>`, and all four end in the
+command that re-checks the file: `rhei states --state-machine <path>`.
 
-Text that does not parse is a syntax failure. The help says the file is not
-valid YAML and to fix the syntax. It refers to the position above only when the
-headline prints one, which a duplicate key at the top level of the file does
-not.
+Text the scan rejects in any document is a syntax failure. The help says the
+file is not valid YAML and to fix the syntax. It refers to the position above
+only when the headline prints one, which a failure at the very first character
+of the file does not.
 
-Text that parses but has the wrong shape is a shape failure. Its help says the
+Text the scan accepts in every document, when there is more than one, is a
+several-documents failure. The help says the file is valid YAML but must hold
+one document, and says nothing about syntax.
+
+Text the scan accepts as one document, which still cannot be read into a YAML
+value, is a read failure: a plain integer too large to hold, a nesting or alias
+limit, a duplicate key. The help says the file cannot be read as a state machine
+and to correct what the headline names. It makes no claim either way about valid
+YAML, says nothing about syntax, and refers to no position.
+
+Text that is read into a YAML value but has the wrong shape is a shape failure. Its help says the
 file is valid YAML, never says to fix the syntax, and never refers to a position
 the headline does not print. What it asks for depends on what the shape lacks:
 

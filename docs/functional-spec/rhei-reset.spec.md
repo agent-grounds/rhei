@@ -380,8 +380,9 @@ A reset rewrites a plan file's text line by line, and it reads that text by the
 language's one fence rule ([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)), as `rhei validate` does. It
 recognizes a task heading, a `**State:**` line, an `**Assignee:**` line and a
 `> **Result:**` line only outside a fenced code block. A plan `rhei validate`
-accepts is therefore never refused over what a fence quotes, and a fence comes
-through a reset byte-identical:
+accepts is therefore never refused over what a fence quotes, and the text of every
+fenced line comes through a reset unchanged. Its line ending comes out as LF, as
+with every plan writer:
 
 - A quoted heading opens no task, so a reset looks for no `**State:**` line under
   it and a real line after the fence still belongs to the task above it.
@@ -399,6 +400,10 @@ a Directory Workspace is one task file: the next file's lines are structure agai
 Frontmatter is not text a fence is read in. A fence-shaped line in a YAML value
 opens nothing, in a single-file plan, in `index.rhei.md`, and in a workspace task
 file's own metadata block, because the parser does not read one there either.
+
+A task file has no header, so its only frontmatter is a block that leads it. A
+`# Rhei:` line anywhere in a task file is body text, and so is a `---` under it: the
+tasks below them are tasks, and a reset moves them as `rhei validate` lists them.
 
 `--dry-run`, the preview and the plan [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) judges read a fence the same way,
 because each comes from the same rewrite.

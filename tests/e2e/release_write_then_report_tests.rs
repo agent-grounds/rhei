@@ -78,7 +78,6 @@ fn plain_plan(prefix: &str) -> (TestDir, PathBuf, PathBuf) {
 /// A refused write for `--task` exits non-zero and prints no `Released` line
 /// for the claim it could not drop. §FS-rhei-release.3
 #[test]
-#[ignore = "red until #627: release prints Released before the write that fails; implement removes this"]
 fn release_task_whose_write_fails_prints_no_released_line() {
     let (dir, plan, machine) = plain_plan("release-627-task");
     let Some(_held) = read_only(&dir) else { return };
@@ -98,7 +97,6 @@ fn release_task_whose_write_fails_prints_no_released_line() {
 /// `--all` over two claims a read-only directory protects prints a `Released`
 /// line for neither. §FS-rhei-release.3
 #[test]
-#[ignore = "red until #627: release prints Released before the write that fails; implement removes this"]
 fn release_all_whose_writes_fail_prints_no_released_line() {
     let (dir, plan, machine) = plain_plan("release-627-all");
     let Some(_held) = read_only(&dir) else { return };
@@ -138,7 +136,6 @@ fn two_rhei_project(prefix: &str) -> (TestDir, PathBuf) {
 /// the tickets released before it: `a.1` is released and says so, `b.1` keeps
 /// its claim and is not reported. §FS-rhei-release.3
 #[test]
-#[ignore = "red until #627: release prints Released before the write that fails; implement removes this"]
 fn release_all_reports_exactly_the_tickets_released_before_a_failed_write() {
     let (dir, project) = two_rhei_project("release-627-partial");
     let home = dir.join(".home");

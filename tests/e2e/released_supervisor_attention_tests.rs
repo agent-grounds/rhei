@@ -202,7 +202,6 @@ fn assert_the_child_names_the_bound(root: &Path) {
 }
 
 #[test]
-#[ignore = "red until #596: a released supervisor over a child a bound refused reads as waiting on its subtree; implement removes this"]
 fn a_released_supervisor_over_a_child_a_bound_refused_waits_on_its_subtree() {
     let (dir, plan, machine) =
         workspace("released-supervisor-bound", SUPERVISED_PLAN, "", "", THREE_A_DAY);
@@ -219,7 +218,6 @@ fn a_released_supervisor_over_a_child_a_bound_refused_waits_on_its_subtree() {
 /// The same command again on the spent window. Nothing ran, so the row read `not
 /// scheduled … rerun to pick it up` where the first run's read `stalled`.
 #[test]
-#[ignore = "red until #596: a released supervisor over a refused child reads as waiting on a rerun too; implement removes this"]
 fn a_released_supervisor_rerun_on_the_spent_window_waits_on_its_subtree() {
     let (dir, plan, machine) =
         workspace("released-supervisor-rerun", SUPERVISED_PLAN, "", "", THREE_A_DAY);
@@ -237,7 +235,6 @@ fn a_released_supervisor_rerun_on_the_spent_window_waits_on_its_subtree() {
 
 /// No bound anywhere: what misreads the supervisor is the subtree, not the bound.
 #[test]
-#[ignore = "red until #596: a released supervisor over a child that wrote nothing reads as waiting on its subtree; implement removes this"]
 fn a_released_supervisor_over_a_child_that_wrote_nothing_waits_on_its_subtree() {
     let (dir, plan, machine) =
         workspace("released-supervisor-missing", SUPERVISED_PLAN, "plan.1.2", "", "");

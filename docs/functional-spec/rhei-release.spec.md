@@ -62,10 +62,19 @@ neither would make a bare `rhei release` ambiguous between "nothing" and
    - `--all` selects every claimed ticket in scope whose state is
      **non-terminal**. An assignee on a finished ticket records who completed
      it rather than blocking anyone, so a sweep never erases it.
-3. Print one line per target naming the ticket and the claim being dropped.
-4. With `--dry-run`, stop here and change nothing.
-5. Remove the `**Assignee:**` line from each target's task file, atomically,
-   leaving every other line untouched.
+3. With `--dry-run`, print one `Would release` line per target naming the
+   ticket and the claim that would be dropped, and stop: nothing is changed.
+4. Otherwise, take the targets in order. For each, remove the `**Assignee:**`
+   line from its task file, atomically, leaving every other line untouched,
+   and only once that write has succeeded print its `Released` line naming the
+   ticket and the claim dropped (and the note of
+   [§FS-rhei-release.3.1](rhei-release.spec.md#31-releasing-from-a-non-initial-state)). Write, then report: a
+   `Released` line is the evidence a person or a script reads to decide the
+   claim is gone, so it is never printed for a claim still in the file.
+5. A write that fails stops the command with a non-zero exit, having printed
+   nothing for that target or any later one. The claims already removed stay
+   removed, so under `--all` the `Released` lines printed are exactly the
+   tickets released, and every target without one still holds its claim.
 
 Release never transitions a ticket, never writes a result, never appends to
 `runtime/state-transitions.log`, and never deletes runtime artifacts.

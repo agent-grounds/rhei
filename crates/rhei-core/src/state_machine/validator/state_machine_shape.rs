@@ -1,3 +1,24 @@
+/// Name the failure of text the first read into a YAML value refused, from a scan of
+/// the text and never from the words of `error`, which is what a reader is shown
+/// whichever failure this is. The read is no syntax test: it also refuses text that
+/// is well-formed, so only a scan rejecting a document is a syntax failure.
+/// §FS-rhei-errors.1.2.2
+fn refused_text_error(yaml: &str, error: serde_yaml::Error) -> StateMachineLoadError {
+    let mut documents = 0_usize;
+    for document in serde_yaml::Deserializer::from_str(yaml) {
+        if serde::de::IgnoredAny::deserialize(document).is_err() {
+            return StateMachineLoadError::Yaml(error);
+        }
+        documents += 1;
+    }
+    let fault = if documents > 1 {
+        StateMachineShapeFault::SeveralDocuments
+    } else {
+        StateMachineShapeFault::Unreadable
+    };
+    StateMachineLoadError::Shape { error, fault }
+}
+
 /// Say what a document that parsed as `raw`, but not into a [`StateMachine`], lacks.
 ///
 /// The deserializer's error has no structured kind, and its words do not separate a

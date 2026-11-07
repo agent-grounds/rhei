@@ -78,9 +78,9 @@ impl Validate for () {
 #[derive(Debug)]
 pub enum StateMachineLoadError {
     Io(std::io::Error),
-    /// The text does not parse as YAML at all. §FS-rhei-errors.1.2.2
+    /// A scan of the text as YAML rejects it. §FS-rhei-errors.1.2.2
     Yaml(serde_yaml::Error),
-    /// The text parses as YAML, but not into a state machine. §FS-rhei-errors.1.2.2
+    /// The scan accepts the text, but it does not load as a state machine. §FS-rhei-errors.1.2.2
     Shape {
         /// The deserializer's refusal, which is what a reader is shown.
         error: serde_yaml::Error,
@@ -108,7 +108,7 @@ pub const REQUIRED_TOP_LEVEL_FIELDS: [RequiredTopLevelField; 3] = [
     RequiredTopLevelField { key: "states", shape: "a map of state name to state definition" },
 ];
 
-/// What a machine that parses as YAML lacks, as far as its help is concerned.
+/// What a machine the YAML scan accepts lacks, as far as its help is concerned.
 /// §FS-rhei-errors.1.2.2
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StateMachineShapeFault {
@@ -118,6 +118,11 @@ pub enum StateMachineShapeFault {
     NoTopLevelMapping,
     /// Anything else: the refusal itself names the key and what is wrong with it.
     Other,
+    /// The text holds more than one document, and a machine is one.
+    SeveralDocuments,
+    /// The text is one document that cannot be read into a YAML value, for a reason
+    /// the refusal names: an integer too large, a limit, a duplicate key.
+    Unreadable,
 }
 
 impl std::fmt::Display for StateMachineLoadError {
@@ -125,7 +130,7 @@ impl std::fmt::Display for StateMachineLoadError {
         match self {
             StateMachineLoadError::Io(e) => write!(f, "I/O error: {e}"),
             StateMachineLoadError::Yaml(e) => write!(f, "YAML error: {e}"),
-            // Not "YAML error": this file is valid YAML. §FS-rhei-errors.1.2.2
+            // Not "YAML error": the scan accepts this file. §FS-rhei-errors.1.2.2
             StateMachineLoadError::Shape { error, .. } => {
                 write!(f, "invalid state machine: {error}")
             }

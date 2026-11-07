@@ -191,8 +191,8 @@ fn state_machine_load_report(path: &Path, err: rhei_validator::StateMachineLoadE
             file_io_report(path, "failed to read state machine", err)
         }
         rhei_validator::StateMachineLoadError::Yaml(err) => {
-            // serde_yaml's message leaves out a mark at the very start, which is where a
-            // top-level duplicate key puts it, so there is no position above. §FS-rhei-errors.1.2.2
+            // serde_yaml's message leaves out a mark at the very start of the file, so a
+            // failure at the first character has no position above. §FS-rhei-errors.1.2.2
             let printed = err.location().is_some_and(|at| (at.line(), at.column()) != (1, 1));
             let at = if printed { " at the position above" } else { "" };
             miette!(

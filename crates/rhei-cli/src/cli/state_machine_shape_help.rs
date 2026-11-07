@@ -1,4 +1,4 @@
-/// What to do about a state machine whose text parses but has the wrong shape,
+/// What to do about a state machine the YAML scan accepts but rhei cannot load,
 /// ending where the re-check command takes over. §FS-rhei-errors.1.2.2
 fn state_machine_shape_help(path: &Path, fault: rhei_validator::StateMachineShapeFault) -> String {
     use rhei_validator::StateMachineShapeFault as Fault;
@@ -22,6 +22,13 @@ fn state_machine_shape_help(path: &Path, fault: rhei_validator::StateMachineShap
         Fault::Other => format!(
             "'{path}' is valid YAML but is not the shape of a state machine. Correct what the \
              message above names"
+        ),
+        Fault::SeveralDocuments => format!(
+            "'{path}' is valid YAML but a state machine must hold one document. Keep one and \
+             remove the others"
+        ),
+        Fault::Unreadable => format!(
+            "'{path}' cannot be read as a state machine. Correct what the message above names"
         ),
     }
 }

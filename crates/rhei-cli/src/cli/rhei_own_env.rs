@@ -7,6 +7,10 @@
 // — so there the read finds nothing: a test belongs to no rhei run but the ones
 // it starts, and one that needs a variable hands it to the code under test
 // itself. One reader, so no copy of the read can be the one left inheriting.
+//
+// What it covers is run membership: the variables a `rhei run` exports to what
+// it starts. `RHEI_BUDGET_NOW`, the budget clock rhei-core reads, is not routed
+// here — it is the clock a test sets on purpose, and no run exports it.
 
 /// One of rhei's own `RHEI_*` variables from the environment this process was
 /// started with; in this crate's unit tests, never the harness's.

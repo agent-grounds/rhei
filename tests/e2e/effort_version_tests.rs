@@ -77,31 +77,26 @@ fn assert_probe_isolated(agent: &str, executable: &str, expected: &[&str]) {
 }
 
 #[test]
-#[ignore = "red until #591: version probe writes under outer identity; implement removes this"]
 fn effort_version_claude_probe_leaves_outer_root_empty() {
     assert_probe_isolated("claude-code", "claude", &["--effort", "high"]);
 }
 
 #[test]
-#[ignore = "red until #591: version probe writes under outer identity; implement removes this"]
 fn effort_version_codex_probe_leaves_outer_root_empty() {
     assert_probe_isolated("codex", "codex", &["-c", "model_reasoning_effort=\"high\""]);
 }
 
 #[test]
-#[ignore = "red until #591: version probe writes under outer identity; implement removes this"]
 fn effort_version_kilo_probe_leaves_outer_root_empty() {
     assert_probe_isolated("kilocode", "kilo", &["--variant", "high"]);
 }
 
 #[test]
-#[ignore = "red until #591: version probe writes under outer identity; implement removes this"]
 fn effort_version_pi_probe_leaves_outer_root_empty() {
     assert_probe_isolated("pi", "pi", &["--thinking", "high"]);
 }
 
 #[test]
-#[ignore = "red until #591: version queries panic without run identity; implement removes this"]
 fn effort_version_queries_succeed_without_run_identity() {
     let dir = unique_temp_dir("effort-version-no-identity");
     let mut failures = Vec::new();

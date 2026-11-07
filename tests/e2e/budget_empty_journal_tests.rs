@@ -121,7 +121,7 @@ fn budget_show_never_sends_the_operator_back_to_budget_show() {
         );
     }
 
-    let text = world.budget(&["show", &world.project.display().to_string()]);
+    let text = world.budget(&["show", &world.plan().display().to_string()]);
     let json = show_error(&world);
     fs::set_permissions(&journal, readable).expect("give the journal back");
 
@@ -151,7 +151,7 @@ fn budget_show_names_the_correction_for_a_witness_index_that_does_not_parse() {
         "the charge sends the operator to show:\n{charged}"
     );
 
-    let text = world.budget(&["show", &world.project.display().to_string()]);
+    let text = world.budget(&["show", &world.plan().display().to_string()]);
     let json = show_error(&world);
 
     let said = said(&text);
@@ -173,7 +173,7 @@ fn budget_show_names_the_correction_for_a_witness_index_that_does_not_parse() {
 /// budget account yet, and `rhei budget init` establishes one. Nothing calls it
 /// untrustworthy, and no help names the command just run.
 fn assert_reports_no_account(world: &World) {
-    let text = world.budget(&["show", &world.project.display().to_string()]);
+    let text = world.budget(&["show", &world.plan().display().to_string()]);
     let said = said(&text);
     assert!(!text.status.success(), "show exits non-zero on an absent account:\n{said}");
     assert!(said.contains("has no budget account yet"), "text report:\n{said}");
@@ -195,7 +195,7 @@ fn assert_reports_no_account(world: &World) {
 /// account it does not show as verified. §FS-rhei-budgets.10
 fn show_error(world: &World) -> serde_json::Value {
     let mut cmd = world.rhei();
-    cmd.arg("budget").arg("show").arg(&world.project).args(["--format", "json"]);
+    cmd.arg("budget").arg("show").arg(world.plan()).args(["--format", "json"]);
     let out = cmd.output().expect("rhei budget show should run");
     let raw = raw_stderr(&out);
     assert!(!out.status.success(), "show exits non-zero:\n{raw}");

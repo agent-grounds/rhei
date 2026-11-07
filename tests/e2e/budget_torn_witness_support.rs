@@ -92,14 +92,14 @@ impl World {
     }
 
     pub(super) fn forget(&self) -> CliRun {
-        self.budget(&["forget", &self.project.display().to_string(), "--reason", "a torn witness"])
+        self.budget(&["forget", &self.plan().display().to_string(), "--reason", "a torn witness"])
     }
 
     /// The error object `rhei budget show --format json` emits for a damaged
     /// account. §FS-rhei-budgets.10
     pub(super) fn damaged(&self) -> serde_json::Value {
         let mut cmd = self.rhei();
-        cmd.arg("budget").arg("show").arg(&self.project).args(["--format", "json"]);
+        cmd.arg("budget").arg("show").arg(self.plan()).args(["--format", "json"]);
         let out = cmd.output().expect("rhei budget show should run");
         let raw = raw_stderr(&out);
         assert!(!out.status.success(), "a damaged account exits non-zero:\n{raw}");

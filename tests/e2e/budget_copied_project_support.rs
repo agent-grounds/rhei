@@ -111,10 +111,13 @@ impl World {
         CliRun::from(&cmd.output().expect("rhei budget should run"))
     }
 
-    /// `rhei budget show <root> --format json`, undecoded, on the first machine.
+    /// `rhei budget show <the root's plan> --format json`, undecoded, on the first machine.
     pub(super) fn show_json(&self, name: &str) -> std::process::Output {
         let mut cmd = self.rhei("home");
-        cmd.arg("budget").arg("show").arg(self.root(name)).args(["--format", "json"]);
+        cmd.arg("budget")
+            .arg("show")
+            .arg(self.root(name).join("plan.rhei.md"))
+            .args(["--format", "json"]);
         cmd.output().expect("rhei budget show should run")
     }
 

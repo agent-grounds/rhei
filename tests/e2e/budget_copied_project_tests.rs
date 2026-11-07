@@ -88,7 +88,7 @@ fn forget_in_the_copy_gives_it_a_fresh_account_and_keeps_its_old_claim() {
 
     let forget = world.budget_in(
         "home",
-        &["forget", &world.root("copy").display().to_string()],
+        &["forget", &world.root("copy").join("plan.rhei.md").display().to_string()],
         "a copy of original",
     );
 

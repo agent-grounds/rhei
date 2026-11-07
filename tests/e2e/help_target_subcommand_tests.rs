@@ -81,11 +81,11 @@ fn help_target_budget_with_no_account_establishes_the_one_it_was_given() {
     let case = Case::new("help-target-budget-none");
     write(&case.root.join("project"), "plan.rhei.md", OPEN_PLAN);
 
-    let out = case.rhei(&case.root, &["budget", "show", "project"]);
+    let out = case.rhei(&case.root, &["budget", "show", "project/plan.rhei.md"]);
 
     let rendered = raw_stderr(&out);
     assert_eq!(out.status.code(), Some(1), "no account yet:\n{rendered}");
-    let expected = "rhei budget init project --invocations <N> --reason <TEXT>";
+    let expected = "rhei budget init project/plan.rhei.md --invocations <N> --reason <TEXT>";
     assert_on_one_line(&rendered, &format!("establish one explicitly with: {expected}"));
     let again = filled_in(expected, &case.root, &case);
     assert!(again.status.success(), "`{expected}` should run:\n{}", again.stderr);
@@ -98,7 +98,8 @@ fn help_target_budget_with_no_account_establishes_the_one_it_was_given() {
 fn help_target_budget_already_held_adjusts_the_one_it_was_given() {
     let case = Case::new("help-target-budget-held");
     write(&case.root.join("project"), "plan.rhei.md", OPEN_PLAN);
-    let init = ["budget", "init", "project", "--invocations", "5", "--reason", "first"];
+    let init =
+        ["budget", "init", "project/plan.rhei.md", "--invocations", "5", "--reason", "first"];
     let first = case.rhei(&case.root, &init);
     assert!(first.status.success(), "the first init works:\n{}", raw_stderr(&first));
 
@@ -106,7 +107,7 @@ fn help_target_budget_already_held_adjusts_the_one_it_was_given() {
 
     let rendered = raw_stderr(&out);
     assert_eq!(out.status.code(), Some(1), "the second init refuses:\n{rendered}");
-    let expected = "rhei budget adjust project --invocations <N> --reason <TEXT>";
+    let expected = "rhei budget adjust project/plan.rhei.md --invocations <N> --reason <TEXT>";
     assert_offers(&rendered, expected);
     let again = filled_in(expected, &case.root, &case);
     assert!(again.status.success(), "`{expected}` should run:\n{}", again.stderr);
@@ -118,8 +119,8 @@ fn help_target_budget_already_held_adjusts_the_one_it_was_given() {
 #[test]
 fn help_target_budget_target_past_the_wrap_column_stays_whole() {
     let case = Case::new("help-target-budget-wide");
-    let typed = format!("{WIDER_THAN_THE_RENDER}/sub dir");
-    write(&case.root.join(&typed), "plan.rhei.md", OPEN_PLAN);
+    let typed = format!("{WIDER_THAN_THE_RENDER}/sub dir/plan.rhei.md");
+    write(case.root.join(&typed).parent().expect("a parent"), "plan.rhei.md", OPEN_PLAN);
 
     let out = case.rhei(&case.root, &["budget", "show", &typed]);
 

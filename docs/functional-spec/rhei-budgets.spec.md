@@ -828,9 +828,10 @@ take the original's account.
 
 The refusal names the account, **this root**, and the **holding root**, says
 that the charge would be written into the holder's history, and offers two
-answers: `rhei budget forget '<this root>' --reason '<why>'` where this is a
-copy, and moving or deleting the holder first where this root is meant to
-replace it. The holder is untouched — its next charge proceeds as if the copy
+answers: `rhei budget forget <target> --reason <TEXT>` where this is a copy, and
+moving or deleting the holder first where this root is meant to replace it. The
+`<target>` is what the refused command was given, not this root ([§FS-rhei-budgets.10.1](rhei-budgets.spec.md#101-a-target-is-recognized-before-anything-is-read)).
+The holder is untouched — its next charge proceeds as if the copy
 had never been made. `rhei budget forget` in the copy retires the copy's claim
 ([§FS-rhei-budgets.10](rhei-budgets.spec.md#10-rhei-budget)), and its next charge opens a fresh account at zero
 consumed; the two projects then run side by side.
@@ -1607,8 +1608,12 @@ So does `project_root`, and its spelling is fixed for both health states: it is
 the target as the operator spelled it, which is what the text report's
 `Project:` line prints beside the identity. Everything that names where bytes are
 or which identity owns them is spelled **resolved** instead — `account`,
-`journal`, `witness`, and every command the report offers — because the witness
-index is keyed by the resolved root, and it is that key a retirement retracts.
+`journal`, `witness`, and the restore, set-aside and trim the report offers,
+because each of those commands is a filesystem operation on those bytes.
+
+The `forget` the report offers, in text and as the JSON `forget` member, is a `rhei budget`
+command line and names the command's target ([§FS-rhei-budgets.10.1](rhei-budgets.spec.md#101-a-target-is-recognized-before-anything-is-read)). The typed target resolves
+to the same root the witness index is keyed by, and it is that key a retirement retracts.
 
 `forget` retires a **root** rather than repairing an account: it is how an
 operator says that the path was reused, or the root is a copy, and the recorded
@@ -1659,6 +1664,24 @@ recorded against the retired account is not in the new one. On a reused path
 there is no such key to lose, the plan files being a fresh copy. Anywhere else
 that is a reason to restore rather than to forget, which is why `forget` refuses
 a sound account and why a damaged report puts restore first.
+
+### 10.1. A target is recognized before anything is read
+
+All four verbs take what a command's plan argument takes: [§FS-rhei-errors.3.2](rhei-errors.spec.md#32-unrecognized-plan-directories) for a directory
+holding neither manifest, [§AR-rhei-panta.3](../architecture/rhei-panta.spec.md#3-identity-and-id-namespacing) for a file whose name gives no rhei id, and
+[§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior) for how a recognized or omitted target resolves. Particular to `rhei budget`:
+
+- **The refusal comes first**, before settings are read or the account is looked for, so
+  a plain directory whose settings do not parse, or that holds an account, is refused alike.
+- **A refusal writes nothing**: no account, directory or lock, and an account already there
+  keeps its journal, witness and index entry byte for byte. It is unreachable, not altered:
+  restore the manifest the directory lost, or name a plan in it that resolves to the same root.
+- **No task body is parsed**, because `show` is where a refusal sends an operator and a plan
+  that does not parse may be why they are there. So a non-plan file is refused for its name
+  whatever it holds, where `rhei list`, which parses first, reports the parse error.
+- **An account root is not a target.** A lone plan's root is its plain parent directory, so a
+  budget command line rhei prints names the plan or project the command was given, by
+  [§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names), and never the root.
 
 ## 11. What does not change
 

@@ -22,6 +22,12 @@ enum HaltCause {
     /// Account verification refused work before a program could start.
     /// §FS-rhei-budgets.9
     AccountRefused { diagnosis: String, remedy: String },
+    /// A spent bound refused this ticket's last start. `blocker` and
+    /// `next_action` are already rendered from the run's own `budget_halt`, so
+    /// the row cannot disagree with that record. Never a Waiting reading: nothing
+    /// but the bound releases it, whatever else the ticket waits on.
+    /// §FS-rhei-run-report.3.1 §FS-rhei-budgets.8
+    BoundHalted { blocker: String, next_action: String },
     /// A non-leaf ticket whose own subtree is still open. It is a task in its
     /// own right, so it is reported — but the work is in the descendants.
     /// §FS-rhei-plan-language.3
@@ -138,12 +144,49 @@ enum HaltCause {
 }
 
 impl HaltCause {
+    /// Whether this reading can be true of a ticket a bound refused, so a recorded
+    /// halt may stand in for it.
+    ///
+    /// Only a ticket the scheduler was starting reaches a bound, so the first group
+    /// is what the classifier says of one it merely saw not move, a poll's person
+    /// included: the answer would not release it. The second is a reading no
+    /// refused start leaves behind. It means something moved the ticket after the
+    /// halt, or that a wait the run honours now holds it, and it is the truer row.
+    /// Spelled out so a new cause has to choose. §FS-rhei-run-report.3.1
+    fn yields_to_bound_halt(&self) -> bool {
+        match self {
+            HaltCause::WaitingOnPerson { .. }
+            | HaltCause::MissingOutputs { .. }
+            | HaltCause::NoTransition
+            | HaltCause::NotScheduled
+            | HaltCause::Stalled => true,
+            HaltCause::AccountRefused { .. }
+            | HaltCause::BoundHalted { .. }
+            | HaltCause::WaitingOnDescendants { .. }
+            | HaltCause::Gate
+            | HaltCause::GateHoldingSubtree { .. }
+            | HaltCause::ProviderLimited { .. }
+            | HaltCause::HeldBySupervisor { .. }
+            | HaltCause::SupervisorHasNoTerminalEdge { .. }
+            | HaltCause::SupervisorStrandedBySelfLoop { .. }
+            | HaltCause::Claimed { .. }
+            | HaltCause::BlockedByPrior { .. }
+            | HaltCause::ManualOnly { .. }
+            | HaltCause::Interrupted
+            | HaltCause::MissingInputs { .. } => false,
+        }
+    }
+
     /// The reason and the next action, for the report table and the halt
     /// diagnostics. Both name concrete commands wherever one exists.
     fn describe(&self, id: &str, state: &str) -> (String, String) {
         match self {
             // Preserve the account's diagnosis, paths and guidance. §FS-rhei-budgets.9
             HaltCause::AccountRefused { diagnosis, remedy } => (diagnosis.clone(), remedy.clone()),
+            // §FS-rhei-run-report.3.1: the bound, and the one remedy for it.
+            HaltCause::BoundHalted { blocker, next_action } => {
+                (blocker.clone(), next_action.clone())
+            }
             HaltCause::WaitingOnDescendants { open } => (
                 format!("waiting on open descendant {open}"),
                 "finish the descendants; the parent is claimable once its subtree is terminal"

@@ -71,6 +71,8 @@ struct SummaryState {
     /// what stopped it without the reader reconstructing it from rows.
     /// §FS-rhei-budgets.8
     bound_halts: Vec<(String, rhei_tui::BoundReport, Option<String>, String)>,
+    /// The ones still true of their tickets. §FS-rhei-run-report.3.1
+    standing_bound_halts: StandingBoundHalts,
     /// Refused work has no invocation; retain its diagnosis separately.
     /// §FS-rhei-budgets.9
     program_refusals: HashMap<String, ProgramAccountRefusal>,
@@ -165,6 +167,7 @@ impl rhei_tui::EventSink for SummarySink {
                 }
             }
             rhei_tui::RunEvent::BudgetHalt { task, bound, renews_at, remedy, .. } => {
+                state.standing_bound_halts.record(&task, &bound, renews_at.as_deref(), &remedy);
                 state.bound_halts.push((task, bound, renews_at, remedy));
             }
             // §FS-rhei-seal.8.4: the Attention row of a refused start, as an account refusal's.
@@ -178,6 +181,7 @@ impl rhei_tui::EventSink for SummarySink {
             rhei_tui::RunEvent::SlotAssigned { slot, task, agent, .. } => {
                 let driver = if agent.is_some() { "agent" } else { "program" };
                 state.inflight.insert(slot, driver);
+                state.standing_bound_halts.take_back(&task); // Admitted: §FS-rhei-run-report.3.1
                 // A fresh attempt supersedes what the last one left unwritten,
                 // and the exit that went with it. §FS-rhei-run-report.3.1
                 let entry = state.tasks.entry(task).or_default();
@@ -198,6 +202,10 @@ impl rhei_tui::EventSink for SummarySink {
                 ..
             } => {
                 let driver = state.inflight.remove(&slot).unwrap_or("program");
+                // Another arm's worker moved it after the refusal. §FS-rhei-run-report.3.1
+                if from != to {
+                    state.standing_bound_halts.take_back(&task);
+                }
                 let entry = state.tasks.entry(task.clone()).or_default();
                 // Each kind counts only its own invocations. §FS-rhei-run-report.3.2
                 if driver == "agent" {
@@ -825,6 +833,8 @@ impl RunSummaryReport {
         // It has no worker activity to classify. §FS-rhei-budgets.9
         let mut halt_causes = halt_causes;
         if let Ok(state) = summary.inner.lock() {
+            // Ahead of the refusals below, whose recorded state proves them. §FS-rhei-run-report.3.1
+            state.standing_bound_halts.overlay(&mut halt_causes);
             for refusal in state.program_refusals.values() {
                 if let Some(task) = find_task_by_id(&rhei.tasks, &parse_task_id(&refusal.task)) {
                     let machine = machines.for_task(&task.id);

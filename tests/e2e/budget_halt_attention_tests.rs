@@ -6,10 +6,10 @@
 //! that do not explain the stop and to cancel a ticket that needed nothing but the
 //! next day (agent-grounds/rhei#587).
 //!
-//! The next action is compared with the run's own `budget_halt` record, not with a
-//! string: the two surfaces must not disagree, and agent-grounds/rhei#579 changes
-//! what the lifetime record says. That defect is not this one, so nothing here pins
-//! the lifetime remedy's text or the lifetime bound's source.
+//! The next action is compared with the run's own `budget_halt` record, because the
+//! two surfaces must not disagree: the row reads the record's remedy rather than
+//! resolving one of its own. Which remedy is right belongs to the resolver, so the
+//! tests here pin only as much of the text as says the row carries the limiter's.
 
 // §FS-rhei-run-report.3.1 §FS-rhei-budgets.8 §FS-rhei-budgets.3.4 §FS-rhei-run.3.4
 
@@ -101,7 +101,6 @@ fn budget_init_invocations(plan: &Path, invocations: &str) {
 
 /// A count: the settings key is the one remedy, and the row carries the record's.
 #[test]
-#[ignore = "red until #587: a travel halt gets the generic stall row; implement removes this"]
 fn a_travel_halt_names_the_bound_and_the_settings_remedy() {
     let (dir, plan, machine) =
         setup("budget-attention-travel", PING_PONG_MACHINE, r#", "transition_limit": 4"#);
@@ -116,10 +115,9 @@ fn a_travel_halt_names_the_bound_and_the_settings_remedy() {
     assert_eq!(next, halt_record(&dir)["remedy"].as_str().expect("a remedy"));
 }
 
-/// A count too, so the next action is the record's remedy. Agreement is what this
-/// ticket owes here; which remedy is right is agent-grounds/rhei#579's.
+/// A count too, so the next action is the record's remedy: the audited command, as
+/// the account's allowance is what limits. §FS-rhei-budgets.8
 #[test]
-#[ignore = "red until #587: a lifetime halt gets the generic stall row; implement removes this"]
 fn a_lifetime_halt_names_the_bound_and_the_remedy_of_its_record() {
     let (dir, plan, machine) = setup("budget-attention-lifetime", PING_PONG_MACHINE, "");
     budget_init_invocations(&plan, "2");
@@ -131,14 +129,14 @@ fn a_lifetime_halt_names_the_bound_and_the_remedy_of_its_record() {
     let record = halt_record(&dir);
     assert_eq!(record["mode"], "lifetime", "the allowance limited, not a window");
     let (blocker, next) = attention_row(&dir, "plan.1");
-    assert!(blocker.contains("2 ("), "the bound, and a source beside it: {blocker:?}");
+    assert!(blocker.contains("2 (account)"), "the bound and its source: {blocker:?}");
+    assert!(next.contains("rhei budget adjust"), "the audited command: {next:?}");
     assert_eq!(next, record["remedy"].as_str().expect("a remedy"));
 }
 
 /// The ticket needs only the next day, and following the stall row's advice to
 /// cancel it would have ended it.
 #[test]
-#[ignore = "red until #587: a window halt gets the generic stall row; implement removes this"]
 fn a_window_halt_names_the_renewal_and_renews_automatically() {
     let (dir, plan, machine) =
         setup("budget-attention-window", PING_PONG_MACHINE, r#", "invocations_per_day": 2"#);
@@ -154,7 +152,6 @@ fn a_window_halt_names_the_renewal_and_renews_automatically() {
 /// unmeasurable invocations at the $20.00 reserve reach the built-in $400.00.
 // §FS-rhei-budgets.3.4
 #[test]
-#[ignore = "red until #587: a spend halt gets the generic stall row; implement removes this"]
 fn a_spend_halt_names_the_renewal_and_renews_automatically() {
     let (dir, plan, machine) = setup("budget-attention-spend", PING_PONG_MACHINE, "");
 
@@ -169,7 +166,6 @@ fn a_spend_halt_names_the_renewal_and_renews_automatically() {
 /// `not scheduled … rerun to pick it up`, the one remedy that provably changes
 /// nothing, and the Transition Ledger and Task Final States repeated its reason.
 #[test]
-#[ignore = "red until #587: a run starting on a spent bound says rerun; implement removes this"]
 fn a_run_that_starts_on_a_spent_bound_names_it_rather_than_never_scheduled() {
     for (prefix, extra, spawned, dimension, next) in [
         (
@@ -199,6 +195,8 @@ fn a_run_that_starts_on_a_spent_bound_names_it_rather_than_never_scheduled() {
         assert!(blocker.contains(dimension), "the blocker names {dimension:?}: {blocker:?}");
         let remedy = halt_record(&dir)["remedy"].as_str().expect("a remedy").to_owned();
         assert_eq!(row_next, next.map_or(remedy, str::to_owned));
+        let halt = format!("- `plan.1` was stopped by its {dimension} bound");
+        assert!(section(&report, "Bounds").contains(&halt), "## Bounds lists the halt:\n{report}");
         let ledger = section(&report, "Transition Ledger");
         let blocked = ledger.lines().find(|line| line.contains("| blocked |"));
         assert!(

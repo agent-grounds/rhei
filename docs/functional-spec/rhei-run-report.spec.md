@@ -268,6 +268,12 @@ the summary prints five stacked groups:
    only a person resumes it. Its blocker reads `sealed input changed: <file>`,
    naming the first changed file, and its next action is `rhei seal <plan>`.
 
+   For lifetime invocations, the Bounds table and Bounds halt lines show the
+   stored allowance as `<allowance> (account)`, with no limiting source or
+   daily delegated ceiling. Halt lines continue to read the event's single
+   remedy, including the ordered ceiling-setting and audited-adjustment steps
+   when required ([§FS-rhei-budgets.8](rhei-budgets.spec.md#8-exhaustion)).
+
    The durable report additionally records, in a `## Bounds` section after
    `## Attention`, each dimension's effective bound with its value source and
    limiting source, and the consumed, outstanding and remaining amounts at the

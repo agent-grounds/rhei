@@ -256,7 +256,10 @@ admission:
   attempt ([§REQ-bounded-neural-work.5](../requirements/bounded-neural-work.spec.md#5-exhaustion-is-a-halt-where-the-ticket-stands)). Drift that only a person can fix does not
   spend the ticket's bound.
 - **The rest of the run.** It starts nothing more in that rhei and carries on
-  with the others.
+  with the others. That includes a ticket of another rhei that a non-concurrent
+  state deferred behind the refused one ([§FS-rhei-run.5](rhei-run.spec.md#5-parallel-execution)): it gets its pass, as
+  a ticket deferred behind a stall does ([§FS-rhei-run.3.6](rhei-run.spec.md#36-stall-release)). Another ticket of the
+  refused rhei is refused in its turn, once.
 - **Exit code.** `1` ([§FS-rhei-run-json.5](rhei-run-json.spec.md#5-exit-codes)), also under `--until-idle`: a
   refusal is work for a person.
 

@@ -27,7 +27,6 @@ fn finished_siblings(name: &str) -> RemedyWorld {
 /// Its directory read-only: nothing half-resets today, but the dry run promises a
 /// reset that then stops at its first write.
 #[test]
-#[ignore = "red until #609: dry run exits 0 over a plan --yes cannot write; implement removes this"]
 fn a_read_only_single_file_plans_directory_refuses_the_reset_and_its_dry_run_intact() {
     let world = plan_world("reset-unwritable-single", MACHINE, ONE_TASK);
     finish(&world, "1", &[]);
@@ -37,7 +36,6 @@ fn a_read_only_single_file_plans_directory_refuses_the_reset_and_its_dry_run_int
 }
 
 #[test]
-#[ignore = "red until #609: --yes rewrites the plan and stops part way through the tree; implement removes this"]
 fn a_single_file_plans_runtime_that_cannot_be_emptied_refuses_the_reset_intact() {
     let world = plan_world("reset-unwritable-single-runtime", MACHINE, ONE_TASK);
     finish(&world, "1", &[]);
@@ -48,7 +46,6 @@ fn a_single_file_plans_runtime_that_cannot_be_emptied_refuses_the_reset_intact()
 
 /// The narrowed ticket's own result cannot be removed.
 #[test]
-#[ignore = "red until #609: --yes rewrites the plan, then cannot remove the result; implement removes this"]
 fn a_narrowed_reset_refuses_intact_over_the_directory_holding_its_result() {
     let world = finished_siblings("reset-unwritable-narrowed-result");
     let Some(_results) = read_only(&world, "runtime/results") else { return };
@@ -58,7 +55,6 @@ fn a_narrowed_reset_refuses_intact_over_the_directory_holding_its_result() {
 
 /// The ledger keeps `b`'s lines, so pruning `a`'s writes a new file beside it.
 #[test]
-#[ignore = "red until #609: --yes rewrites the plan and removes the result, then stops; implement removes this"]
 fn a_narrowed_reset_refuses_intact_over_a_ledger_it_cannot_prune() {
     let world = finished_siblings("reset-unwritable-narrowed-ledger");
     let Some(_runtime) = read_only(&world, "runtime") else { return };
@@ -66,21 +62,25 @@ fn a_narrowed_reset_refuses_intact_over_a_ledger_it_cannot_prune() {
     assert_refused_intact(&world, &["--rhei", "a"], &["project/runtime"]);
 }
 
-/// A narrowed reset keeps the evidence store and records its removals there; finishing
-/// without the record would leave `rhei verify` no way to tell them from tampering.
+/// A narrowed reset keeps the evidence store and records its removals there. Where it
+/// cannot, it still finishes and warns: that stops nothing, so it is no refusal.
 #[test]
-#[ignore = "red until #609: --yes exits 0 with a warning and no reset event; implement removes this"]
-fn a_narrowed_reset_refuses_intact_where_it_cannot_record_its_reset_event() {
+fn a_narrowed_reset_finishes_with_a_warning_where_it_cannot_record_its_reset_event() {
     let world = finished_siblings("reset-unwritable-narrowed-event");
     fs::create_dir_all(world.root.join("runtime/evidence/events")).expect("the store's events");
     let Some(_events) = read_only(&world, "runtime/evidence/events") else { return };
 
-    assert_refused_intact(&world, &["--rhei", "a"], &["project/runtime/evidence/events"]);
+    let dry = world.rhei("reset", &["--rhei", "a", "--dry-run"]);
+    assert!(dry.status.success(), "the dry run does not refuse:\n{}", dry.stderr);
+    let yes = world.rhei("reset", &["--rhei", "a", "--yes"]);
+
+    assert!(yes.status.success(), "the reset finishes:\n{}", yes.stderr);
+    assert!(yes.stderr.contains("could not write the reset event"), "it warns:\n{}", yes.stderr);
+    assert_eq!(listed_state(&world, "a.1"), "open", "the named rhei goes back");
 }
 
 /// An in-scope member's index holds metadata only its own write clears.
 #[test]
-#[ignore = "red until #609: --yes rewrites the task file and stops at the index; implement removes this"]
 fn a_narrowed_reset_refuses_intact_over_a_members_index_it_cannot_write() {
     let world = project_of_workspaces("reset-unwritable-narrowed-index", &["alpha", "beta"]);
     finish(&world, "alpha.1", &[]);

@@ -333,6 +333,14 @@ fn reset_command(
     #[cfg(test)]
     run_reset_before_locks_hook();
 
+    // A lock it cannot create would stop it below without the dry run's refusal, so
+    // that case asks the unlocked snapshot, as the dry run does. §FS-rhei-reset.2.3
+    if reset_sidecars_are_blocked(&loaded, input, &scope)? {
+        let resolved =
+            resolve_state_machines_for_loaded_plan(input, &loaded, state_machine_path)?;
+        collect_reset_decision(&loaded, input, &scope, &resolved)?;
+    }
+
     // Reset participates in the same metadata, distinct-task, then ledger
     // order as every ordinary writer. Its authoritative decision is made only
     // after the whole stack is held. §AR-agent-orchestrator-workflow.3.3.1
@@ -371,49 +379,15 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
         }
     }
 
-    // Each plan file's tasks return to the states *that file* authored them
-    // in; a file whose tasks never moved still has its runtime lines
-    // (assignee, result links) stripped. §FS-rhei-reset.2.2
-    let no_moves: BTreeMap<String, String> = BTreeMap::new();
-    for (file, _sample_task_id) in reset_target_files(&loaded, input, &decision.scope) {
-        let file_authored = decision.authored.by_file.get(&file).unwrap_or(&no_moves);
-        reset_plan_file_states(&file, file_authored, reset_locks.plan(&file)?)?;
-    }
-    if workspace::is_workspace(input) {
-        let index = input.join("index.rhei.md");
-        clear_runtime_metadata_in_file(&index, true, reset_locks.plan(&index)?)?;
-    }
+    let mut progress = ResetProgress::default();
+    let removed = apply_reset(&loaded, input, &decision, &machines, &mut reset_locks, &mut progress)
+        .map_err(|err| progress.stopped(err))?;
+    report_reset_summary(&decision, removed);
 
-    // §FS-rhei-panta.6.4: a narrowed reset removes per-ticket artifacts, never
-    // whole `runtime/` trees — sibling rheis share one execution root.
     if decision.scope.is_some() {
-        // §FS-rhei-panta.6.4: runtime ticket metadata (visit counts, poll
-        // timers) in an in-scope workspace rhei's index is ticket-owned
-        // state; leaving it would be a silent partial reset.
-        let scoped_roots: BTreeSet<&PathBuf> = loaded
-            .task_roots
-            .iter()
-            .filter(|(task_id, _)| task_in_rhei_scope(&decision.scope, task_id))
-            .map(|(_, root)| root)
-            .collect();
-        for root in scoped_roots {
-            if workspace::is_workspace(root) && root.as_path() != input {
-                let index = root.join("index.rhei.md");
-                clear_runtime_metadata_in_file(&index, true, reset_locks.plan(&index)?)?;
-            }
-        }
-        let mut removed_paths = Vec::new();
-        let removed = remove_scoped_runtime_artifacts(
-            &loaded,
-            input,
-            &decision.scope,
-            &machines,
-            &mut reset_locks,
-            &mut removed_paths,
-        )?;
-        report_reset_summary(&decision, removed);
         // The store is kept and the removals recorded for verify. §FS-rhei-evidence.10.1
-        if let Some(event) = write_reset_event(&loaded, input, &decision.scope, &removed_paths) {
+        let removed_paths = &progress.removed_paths;
+        if let Some(event) = write_reset_event(&loaded, input, &decision.scope, removed_paths) {
             println!("Kept run evidence in runtime/evidence/; recorded the removed paths as reset event {event}.");
         }
         // A narrowed reset can only speak for ticket-owned artifacts; run-scoped
@@ -429,36 +403,7 @@ help = "re-run with -y to confirm, or --dry-run to preview what it would clear."
              run-input seals (runtime/seal/). Reset without `--rhei` to clear them; for a \
              fresh seal of one rhei, run `rhei seal --rhei <id>`."
         );
-        #[cfg(test)]
-        run_reset_before_unlock_hook(&decision);
-        return Ok(());
     }
-
-    if loaded.is_panta_project() {
-        let mut roots: BTreeSet<PathBuf> = loaded.task_roots.values().cloned().collect();
-        roots.insert(input.to_path_buf());
-        for root in roots {
-            if workspace::is_workspace(&root) {
-                let index = root.join("index.rhei.md");
-                clear_runtime_metadata_in_file(&index, true, reset_locks.plan(&index)?)?;
-            }
-        }
-    }
-
-    let mut removed_runtime = false;
-    // Delete exactly the runtime directories named in the confirmed preview.
-    // A cooperating writer cannot create another one until these locks leave.
-    // §FS-rhei-reset.1.2 §FS-rhei-reset.4
-    for runtime_dir in &decision.runtime_targets {
-        if runtime_dir.exists() {
-            fs::remove_dir_all(runtime_dir).map_err(|err| {
-                file_io_report(runtime_dir, "failed to remove runtime directory", err)
-            })?;
-            removed_runtime = true;
-        }
-    }
-
-    report_reset_summary(&decision, removed_runtime);
     #[cfg(test)]
     run_reset_before_unlock_hook(&decision);
     Ok(())

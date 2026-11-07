@@ -15,7 +15,9 @@ const RESET_LEAVES_AN_INVALID_PLAN: &str = "the plan it would leave fails valida
 /// keeps unwrapped: it names each error on a line of its own, in the validator's
 /// words, and a file to edit. §FS-rhei-reset.4 §FS-rhei-reset.5.1
 fn says_a_reset_is_refused(text: &str) -> bool {
-    text.contains(RESET_LEAVES_AN_INVALID_PLAN)
+    [RESET_LEAVES_AN_INVALID_PLAN, RESET_CANNOT_WRITE, RESET_STOPPED_PART_WAY]
+        .iter()
+        .any(|phrase| text.contains(phrase))
 }
 
 /// A reset that would introduce an error validation reports, and what its refusal

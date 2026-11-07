@@ -326,11 +326,10 @@ every one it would remove:
 - every lock sidecar of step 2 that is not there yet, in the directory it would be
   created in;
 - for a full reset, each `runtime/` tree it would delete: the directory holding the
-  tree and every directory inside it, because removing a tree takes both, and a
-  directory inside it that cannot be listed cannot be removed;
+  tree and every directory inside it, which has to be listable, and writable where
+  it holds an entry, because removing a tree takes both;
 - for a narrowed reset, what [§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei) would remove, in the directory holding it, the
-  ledger's lines included, and where it would write its reset event
-  ([§FS-rhei-evidence.10.1](rhei-evidence.spec.md#101-the-reset-event)).
+  ledger's lines included.
 
 It asks each directory by doing what the write itself does, creating a temp file
 there and dropping it, so the check leaves no entry behind and `--dry-run` still

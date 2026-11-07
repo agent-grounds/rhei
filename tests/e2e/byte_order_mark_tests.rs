@@ -68,7 +68,6 @@ fn same_outcome(prefix: &str, write: impl Fn(&Path, bool), args: &[&str]) -> (Te
 /// The reported case: `rhei states --state-machine` on the machine from #630.
 /// §FS-rhei-states.1 §FS-rhei-errors.1.2.2
 #[test]
-#[ignore = "red until #630: a BOM-led states.yaml is refused as several documents; implement removes this"]
 fn a_state_machine_saved_with_a_byte_order_mark_loads() {
     same_outcome(
         "bom-states",
@@ -90,7 +89,6 @@ fn a_second_byte_order_mark_is_content() {
 /// `rhei instantiate --list-inputs` on a template whose `template.yaml` has the mark.
 /// §FS-rhei-templates
 #[test]
-#[ignore = "red until #630: a BOM-led template.yaml is refused as missing `version`; implement removes this"]
 fn a_template_manifest_saved_with_a_byte_order_mark_loads() {
     same_outcome(
         "bom-manifest",
@@ -105,7 +103,6 @@ fn a_template_manifest_saved_with_a_byte_order_mark_loads() {
 /// `rhei instantiate --values` with a values file that has the mark renders the
 /// same plan. §FS-rhei-templates
 #[test]
-#[ignore = "red until #630: a BOM-led --values file is refused as several documents; implement removes this"]
 fn a_values_file_saved_with_a_byte_order_mark_loads() {
     let (plain, marked) = same_outcome(
         "bom-values",
@@ -123,7 +120,6 @@ fn a_values_file_saved_with_a_byte_order_mark_loads() {
 
 /// `rhei render` on a single-file plan that has the mark. §FS-rhei-language-reference.1
 #[test]
-#[ignore = "red until #630: a BOM hides the plan's `# Rhei:` header; implement removes this"]
 fn a_plan_saved_with_a_byte_order_mark_loads() {
     same_outcome(
         "bom-plan",
@@ -135,7 +131,6 @@ fn a_plan_saved_with_a_byte_order_mark_loads() {
 /// `rhei render` on a workspace whose task file has the mark keeps that file's
 /// frontmatter. §FS-rhei-language-reference.1 §FS-rhei-plan-language.1.4
 #[test]
-#[ignore = "red until #630: a BOM before a task file's `---` drops its metadata; implement removes this"]
 fn a_task_file_saved_with_a_byte_order_mark_keeps_its_frontmatter() {
     let (_plain, marked) = same_outcome(
         "bom-task-file",

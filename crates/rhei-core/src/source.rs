@@ -62,3 +62,16 @@ pub fn read_staged<R>(texts: HashMap<PathBuf, String>, read: impl FnOnce() -> R)
 pub fn staged(path: &Path) -> Option<String> {
     STAGED.with(|staged| staged.borrow().as_ref()?.get(path).cloned())
 }
+
+/// The text of a file a user authored, with the one byte order mark an editor
+/// may have saved ahead of its first line set aside.
+///
+/// Exactly one leading U+FEFF is removed: a second one, or one anywhere else, is
+/// content and stays. Every reader of authored text sets the mark aside through
+/// this one function, once, where the text is first interpreted — so a reader
+/// that hands the text on to another must not call it again. No line moves, so
+/// a reported line number is the same with the mark as without it.
+/// §REQ-cross-platform.9
+pub fn without_byte_order_mark(text: &str) -> &str {
+    text.strip_prefix('\u{feff}').unwrap_or(text)
+}

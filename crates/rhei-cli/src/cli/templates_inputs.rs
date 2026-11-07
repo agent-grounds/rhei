@@ -134,11 +134,13 @@
     fn load_template_values_file(path: &Path) -> MietteResult<BTreeMap<String, YamlValue>> {
         let raw = fs::read_to_string(path)
             .map_err(|err| file_io_report(path, "failed to read values file", err))?;
+        // §REQ-cross-platform.9
+        let raw = rhei_core::source::without_byte_order_mark(&raw);
         if raw.trim().is_empty() {
             return Ok(BTreeMap::new());
         }
 
-        let value: YamlValue = serde_yaml::from_str(&raw)
+        let value: YamlValue = serde_yaml::from_str(raw)
             .map_err(|err| {
                 miette!(
                     help = format!(

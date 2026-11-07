@@ -229,12 +229,14 @@
         let raw = fs::read_to_string(&manifest_path).map_err(|err| {
             file_io_report(&manifest_path, "failed to read template manifest", err)
         })?;
-        let manifest: TemplateManifest = serde_yaml::from_str(&raw)
+        // §REQ-cross-platform.9
+        let raw = rhei_core::source::without_byte_order_mark(&raw);
+        let manifest: TemplateManifest = serde_yaml::from_str(raw)
             .map_err(|err| miette!(
                 help = template_manifest_help(),
                 "failed to parse '{}': {err}", manifest_path.display()
             ))?;
-        refuse_removed_manifest_fields(&raw, &manifest_path)?;
+        refuse_removed_manifest_fields(raw, &manifest_path)?;
         validate_template_manifest(&manifest, template_dir)?;
         Ok(manifest)
     }

@@ -139,7 +139,7 @@
             return Ok(Vec::new());
         }
         // A post-validation YAML failure needs a report, even after cleanup. §FS-rhei-errors.1.2
-        let machine: YamlValue = serde_yaml::from_str(&read_text(path)?).map_err(|err| {
+        let machine: YamlValue = serde_yaml::from_str(&read_authored_text(path)?).map_err(|err| {
             miette!(
                 help = format!(
                     "{} The machine '{}' failed YAML parsing after validation; include its \

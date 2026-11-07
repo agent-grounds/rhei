@@ -106,7 +106,7 @@
         let part_header = [part_index, part_plan]
             .into_iter()
             .find(|path| path.is_file())
-            .map(|path| read_text(&path))
+            .map(|path| read_authored_text(&path))
             .transpose()?
             .unwrap_or_default();
         let part_front = plan_frontmatter(&part_header)
@@ -141,7 +141,7 @@
             check_parent_exists(parent, host_files)?;
         }
 
-        let host_machine_text = read_text(&host.machine)?;
+        let host_machine_text = read_authored_text(&host.machine)?;
         check_artifact_paths(&host_machine_text, &part_machine, sides)?;
         warn_shared_artifact_paths(&part_machine, &tickets);
         let mut machine =
@@ -160,7 +160,7 @@
 
         let kinds = declared_node_kinds(&part_front);
         let levels = placed.iter().map(|id| id.split('.').count() as u8).max().unwrap_or(1);
-        let index_raw = read_text(&host.index)?;
+        let index_raw = read_authored_text(&host.index)?;
         let additions = IndexAdditions { kinds: &kinds, levels, tasks: &task_metadata };
         let mut index = union_index(&index_raw, &additions)?;
         if host.single_file {
@@ -293,6 +293,14 @@
 
     fn read_text(path: &Path) -> MietteResult<String> {
         fs::read_to_string(path).map_err(|err| file_io_report(path, "failed to read", err))
+    }
+
+    /// [`read_text`] for a file a template or the host authored that the union
+    /// reads itself, rather than handing it to a parser that sets the mark aside
+    /// on its own: its one leading byte order mark is not part of its text, and
+    /// so is not spliced into what the union writes. §REQ-cross-platform.9
+    fn read_authored_text(path: &Path) -> MietteResult<String> {
+        read_text(path).map(|text| rhei_core::source::without_byte_order_mark(&text).to_owned())
     }
 
     /// `rhei instantiate <template> [inputs] --into <rhei>[.<task>]`, or
@@ -448,7 +456,7 @@
         let front = [index, plan]
             .into_iter()
             .find(|path| path.is_file())
-            .map(|path| read_text(&path))
+            .map(|path| read_authored_text(&path))
             .transpose()?
             .and_then(|raw| plan_frontmatter(&raw))
             .and_then(|text| serde_yaml::from_str::<YamlValue>(&text).ok())

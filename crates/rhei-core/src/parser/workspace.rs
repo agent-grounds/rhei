@@ -59,6 +59,8 @@ struct ManifestParts {
 }
 
 fn parse_manifest(input: &str, header_name: &str, frontmatter_kind: &str) -> Result<ManifestParts> {
+    // A leading mark would hide the header. §FS-rhei-language-reference.1 §REQ-cross-platform.9
+    let input = crate::source::without_byte_order_mark(input);
     // §FS-rhei-plan-language.2.3
     let re_header = header_regex(&[header_name]);
     let re_tasks = Regex::new(r#"^##\s+Tasks\s*$"#).unwrap();

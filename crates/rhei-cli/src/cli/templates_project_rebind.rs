@@ -366,7 +366,8 @@
     fn declared_kinds_of(plan: &Path) -> Vec<String> {
         let declared = fs::read_to_string(plan)
             .ok()
-            .and_then(|raw| plan_frontmatter(&raw))
+            // §REQ-cross-platform.9
+            .and_then(|raw| plan_frontmatter(rhei_core::source::without_byte_order_mark(&raw)))
             .and_then(|text| serde_yaml::from_str::<YamlValue>(&text).ok())
             .map(|front| declared_node_kinds(&front))
             .unwrap_or_default();

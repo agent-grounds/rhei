@@ -3,6 +3,7 @@
 //! §FS-rhei-plan-language.1.4 §FS-rhei-validate.4.4
 
 use crate::ast::{Metadata, Task};
+use crate::header::{find_leading_frontmatter, FrontmatterBlock};
 
 use super::{ParseError, Result};
 
@@ -35,28 +36,19 @@ pub(super) fn split_leading_frontmatter(
     input: &str,
 ) -> Result<(Option<LeadingFrontmatter>, String)> {
     let lines: Vec<&str> = input.lines().collect();
-    let mut open = 0usize;
-    while open < lines.len() && lines[open].trim().is_empty() {
-        open += 1;
-    }
-    if open >= lines.len() || lines[open].trim() != "---" {
+    let Some(FrontmatterBlock { open, close }) = find_leading_frontmatter(lines.iter().copied())
+    else {
         return Ok((None, input.to_string()));
-    }
-
-    let mut body = Vec::new();
-    let mut cursor = open + 1;
-    while cursor < lines.len() && lines[cursor].trim() != "---" {
-        body.push(lines[cursor].to_string());
-        cursor += 1;
-    }
-    if cursor >= lines.len() {
+    };
+    let Some(close) = close else {
         return Err(ParseError::new(
             "Unterminated YAML frontmatter: missing closing '---'",
             Some(open + 1),
         ));
-    }
+    };
+    let body = lines[open + 1..close].iter().map(|line| (*line).to_string()).collect();
 
-    let consumed = cursor + 1;
+    let consumed = close + 1;
     let mut remainder = lines[consumed..].join("\n");
     if input.ends_with('\n') && !remainder.is_empty() {
         remainder.push('\n');

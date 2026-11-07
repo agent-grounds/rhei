@@ -117,13 +117,16 @@ fn forced_file(root: &Path, path: &Path, roles: &[&str], after: &[u8]) -> Miette
 }
 
 /// Completion/reopening changes only the task's result link, preserving history. §FS-rhei-plan-language.3.8
-fn forced_result_link(raw: &str, task: &str, qualified: &str, terminal: bool) -> String {
+fn forced_result_link(raw: &str, kind: PlanFileKind, task: &str, qualified: &str, terminal: bool) -> String {
+    let all_lines: Vec<&str> = raw.lines().collect();
+    // §FS-rhei-complete.3.3: a fence the task's text ends inside is below the link, unread.
+    let (raw_lines, final_fence) = split_at_a_tasks_final_fence(&all_lines, kind, task);
     let mut lines = Vec::new();
     let mut target = false;
     // §FS-rhei-plan-language.2.1: quoted result and assignee lines remain content.
     let mut code = rhei_core::fence::FenceTracker::default();
     let link = format!("> **Result:** [{qualified}](runtime/results/{qualified}.md)");
-    for line in raw.lines() {
+    for line in raw_lines.iter().copied() {
         if let Some((_, id)) = node_heading_outside_code(line, &mut code) {
             if target && terminal { trim_trailing_blank_lines(&mut lines); lines.extend([String::new(), link.clone(), String::new()]); }
             target = id == task;
@@ -131,7 +134,8 @@ fn forced_result_link(raw: &str, task: &str, qualified: &str, terminal: bool) ->
         if target && !code.is_open() && (line.starts_with("> **Result:**") || line.starts_with("**Assignee:**")) { continue; }
         lines.push(line.to_string());
     }
-    if target && terminal { trim_trailing_blank_lines(&mut lines); lines.extend([String::new(), link]); }
+    if target && terminal { append_result_link(&mut lines, link, !final_fence.is_empty()); }
+    lines.extend(final_fence.iter().map(ToString::to_string));
     let mut text = lines.join("\n");
     if raw.ends_with('\n') { text.push('\n'); }
     if raw.contains("\r\n") { text = text.replace('\n', "\r\n"); }

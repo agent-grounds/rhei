@@ -124,7 +124,8 @@ fn plan_a_reset_leaves(
             Some(text) => text.clone(),
             None => read_plan_source(&file, "failed to read plan file")?,
         };
-        let text = reset_file_text(&raw, authored.by_file.get(&file).unwrap_or(&no_moves))?;
+        let moves = authored.by_file.get(&file).unwrap_or(&no_moves);
+        let text = reset_file_text(&raw, moves, plan_file_kind(&file))?;
         staged.insert(file, text);
     }
     rhei_core::source::read_staged(staged, || load_plan(input))
@@ -215,9 +216,11 @@ fn edits_let_the_reset_through(
     let mut staged = HashMap::new();
     for (file, file_edits) in by_file {
         let raw = read_plan_source(&file, "failed to read plan file")?;
-        let edited = rewrite_states_to_authored(&raw, &file_edits)?;
-        let edited =
-            strip_result_links_under(&edited, |id| id.is_some_and(|id| file_edits.contains_key(id)));
+        let kind = plan_file_kind(&file);
+        let edited = rewrite_states_to_authored(&raw, &file_edits, kind)?;
+        let edited = strip_result_links_under(&edited, kind, |id| {
+            id.is_some_and(|id| file_edits.contains_key(id))
+        });
         staged.insert(file, edited);
     }
 
@@ -241,8 +244,8 @@ fn edit_line(
 ) -> String {
     let task_id = task.id.to_string();
     let file = display_path(&loaded.task_file(&task_id, input));
-    let has_result = task.content.lines().any(|line| line.trim_start().starts_with("> **Result:**"));
-    let result = if has_result { " and delete the `> **Result:**` line under it" } else { "" };
+    // §FS-rhei-reset.2.4
+    let result = if has_result_link(&task.content) { " and delete the `> **Result:**` line under it" } else { "" };
     format!(
         "a reset leaves Task {task_id} where its **State:** line in {file} puts it, because \
          nothing records a state it could restore: edit that line to '{initial}'{result}, then \

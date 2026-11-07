@@ -452,16 +452,16 @@ tasks_section   = "## Tasks", NEWLINE, { blank_line },
                   task_level_1, { task_level_1 } ;
 
 task_level_1    = node_header_level_1, NEWLINE, metadata, { task_markdown_block },
-                  [ result_block ], { task_level_2 } ;
+                  [ result_block, [ task_final_fence ] ], { task_level_2 } ;
 
 task_level_2    = node_header_level_2, NEWLINE, metadata, { task_markdown_block },
-                  [ result_block ], { task_level_3 } ;
+                  [ result_block, [ task_final_fence ] ], { task_level_3 } ;
 
 task_level_3    = node_header_level_3, NEWLINE, metadata, { task_markdown_block },
-                  [ result_block ], { task_level_4 } ;
+                  [ result_block, [ task_final_fence ] ], { task_level_4 } ;
 
 task_level_4    = node_header_level_4, NEWLINE, metadata, { task_markdown_block },
-                  [ result_block ] ;
+                  [ result_block, [ task_final_fence ] ] ;
 
 node_header_level_1 = "### ", node_kind_keyword, " ", task_id, ": ", title ;
 node_header_level_2 = "#### ", node_kind_keyword, " ", task_id, ": ", title ;
@@ -537,7 +537,10 @@ tooling_char    = ? any Unicode character except whitespace, ",", "(", and ")" ?
 
 (* Result block links a terminal task to its runtime result/audit file.
    It is inserted by the `complete` command after task content and before child
-   tasks. The link text is the task id itself, and the target is always
+   tasks. A task whose text ends inside a fence never closed has it above that
+   fence (`task_final_fence`), since nothing below the opening line is outside
+   the fence, and no child task can follow: see section 3.3 of `rhei complete`.
+   The link text is the task id itself, and the target is always
    runtime/results/<task-id>.md. The grammar is form-agnostic: `complete`
    writes the project-qualified id, and the legacy rhei-local id still parses
    in plans completed before ticket ids gained their rhei prefix. Text and
@@ -545,6 +548,8 @@ tooling_char    = ? any Unicode character except whitespace, ",", "(", and ")" ?
 result_block    = "> **Result:** ", "[", task_id, "](", result_path, ")", NEWLINE ;
 
 result_path     = "runtime/results/", task_id, ".md" ;
+
+task_final_fence = { blank_line }, fence_open, NEWLINE, { fenced_line, NEWLINE } ;
 
 state_field     = "**State:** ", state_value, NEWLINE ;
 
@@ -717,9 +722,10 @@ This is the language's only definition of a fence, and every reader of a plan
 resolves it the same way — the structural scan that decides which `## ` lines
 are chapters and which `### <kind> <id>: ` lines are task nodes, the link
 checker that decides which links are references ([§FS-rhei-plan-language.3.6](rhei-plan-language.spec.md#36-link-integrity)),
-and the result-block scan of section 3.8 alike. A plan must never be read by two
-different fence rules, because the same line would then be structure to one
-reader and content to another.
+the result-block scan of section 3.8, and the rewrite `rhei reset` makes of a plan
+file ([§FS-rhei-reset.2.4](rhei-reset.spec.md#24-fenced-lines)) alike. A plan must never be read by two different
+fence rules, because the same line would then be structure to one reader and
+content to another.
 
 Two consequences are normative, and an implementation is held to them:
 

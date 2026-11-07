@@ -1440,6 +1440,14 @@ floor above.
 
 Once `stateVisits.<state-name>` reaches `poll.max_attempts`, the engine refuses to select a self-loop transition and picks the first matching non-self-loop instead. If no non-self-loop transition matches, the run halts that task with a "polling exhausted with no matching non-self-loop transition" error — `--continue-on-error` applies as with any other task failure. A non-self-loop exit at any attempt clears both `pollNextAttemptAt.<state-name>` and `stateVisits.<state-name>`.
 
+**What the spent budget's entry says.** When the spent budget selects that edge and the last attempt exited non-zero, the budget ended the state and the exit chose nothing, so the result entry the engine owes ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)) names the budget in the form of [§FS-rhei-errors.1.5](rhei-errors.spec.md#15-the-subject-a-check-measured) and then the last exit, which may still be a crash:
+
+```text
+`rhei run`: poll budget for state 'awaiting-checks' is exhausted (3/3 attempts); the last attempt exited 75.
+```
+
+This holds for a program and an agent, whatever the last non-zero exit was and whatever `exit_code:` the selected edge declares. The budget ended nothing in the other outcomes, so they keep their own account and name no budget: a `"nonzero"` catch-all that matches while attempts remain, and a timeout on the last attempt, which takes the timeout route. A zero last attempt and an exact route taken while attempts remain write no entry ([§FS-rhei-programs.3.2](rhei-programs.spec.md#32-evaluation-order)). Attempts spent by reverted edits fire no edge, so they write no entry either ([§FS-rhei-run.3.7.4](rhei-run.spec.md#374-the-charge)).
+
 A poll that declares `waiting_on` ([§FS-rhei-states.2.5](rhei-states.spec.md#25-waiting-on-a-person)) is scheduled by every
 rule above, unchanged: same attempts, same slot release, same sleep to the
 earliest `pollNextAttemptAt`, same exhaustion edge, and the same contribution

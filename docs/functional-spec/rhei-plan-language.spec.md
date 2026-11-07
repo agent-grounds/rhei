@@ -1249,6 +1249,13 @@ When a task contains a `> **Result:**` block, that block must describe the
 enclosing task itself. Text and target are validated **as a pair**: both name
 the same ticket, in the same form.
 
+Result lookup, including prompt memory's fallback to a legacy rhei-local
+artifact, ignores markers inside fences using [§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks).
+A quoted marker cannot replace or hide the real marker after the quotation.
+The qualified result file still takes precedence when it exists, and fallback
+targets must remain relative paths without parent-directory traversal under
+the owning execution root.
+
 - The link text must equal the enclosing task's `task_id`, and the target path
   must be `runtime/results/<task-id>.md` using that same id.
 - Because every ticket gained a rhei prefix when bare rheis became implicit

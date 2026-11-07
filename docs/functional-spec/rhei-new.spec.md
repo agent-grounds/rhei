@@ -335,14 +335,22 @@ doc can be piped in, and that is exactly the content that carries `### ` heading
 and `---` blocks.
 
 Lines inside a fenced code block are content rather than structure and are
-accepted unchanged — which makes the fences themselves load-bearing, so a
-description whose ``` fences do not balance is refused as well, naming the line
-the unclosed one opened on. An open fence is the most destructive thing a
+accepted unchanged. Description checking uses the same matching rule as the
+plan reader ([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)):
+backtick and tilde fences close only on a bare run of the same character at
+least as long as the opening run. A shorter run, a run of the other character,
+or one carrying an info string does not close the block. Structural lines
+after the actual close are refused even when counting fence-looking lines
+would place them inside a block.
+
+A description with an unclosed fence is refused before mutation, naming the
+line of the actual opening run, including when misleading shorter runs or
+info-string lines follow it. An open fence is the most destructive thing a
 description can carry: it is written verbatim, and every ticket *after* the
-insertion point then reads as fenced text rather than as a plan node. An odd
-number of fences is the ordinary shape of a pasted issue body that was cut
-short, so the refusal is an argument error about the fence rather than the
-whole-file guard in [§FS-rhei-new.5.1](rhei-new.spec.md#51-a-create-is-verified-not-assumed) catching the wreckage afterwards.
+insertion point then reads as fenced text rather than as a plan node. A pasted
+issue body cut short can leave such a fence, so the refusal is an argument
+error about the fence rather than the whole-file guard in
+[§FS-rhei-new.5.1](rhei-new.spec.md#51-a-create-is-verified-not-assumed) catching the wreckage afterwards.
 
 The refusal names the three ways to keep an offending line — escape the marker,
 fence it, or make it bold text — and `rhei new` applies none of them itself.

@@ -232,6 +232,7 @@ mod remove_retirement_tests;
 mod remove_tests;
 mod rendered_stderr;
 mod reset_already_invalid_plan_tests;
+mod reset_fence_tests;
 mod reset_invalid_plan_offer_tests;
 mod reset_invalid_plan_support;
 mod reset_invalid_plan_tests;

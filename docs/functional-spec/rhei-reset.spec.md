@@ -78,7 +78,9 @@ Deliberate automation states the intent once with `--yes`.
    Before the preview, refuse with nothing changed a reset whose moves would
    leave a plan validation refuses, or that the filesystem would stop
    ([§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse)).
-3. For every task node in the merged task graph (including all descendants):
+3. For every task node in the merged task graph (including all descendants),
+   reading the plan's text by the fence rule, so that a fenced line is none of the
+   lines this step names ([§FS-rhei-reset.2.4](rhei-reset.spec.md#24-fenced-lines)):
    - Recover the task's authored state ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)) and rewrite the task's
      `**State:**` line to it. A task that never moved is already in that state,
      so the line keeps its state name — but it is still rewritten in normalized
@@ -371,6 +373,35 @@ help says that rather than offering one.
 
 A message that offers the reset as a way back checks this first, by the same
 computation, and does not offer a reset that would be refused ([§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy)).
+
+### 2.4. Fenced Lines
+
+A reset rewrites a plan file's text line by line, and it reads that text by the
+language's one fence rule ([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)), as `rhei validate` does. It
+recognizes a task heading, a `**State:**` line, an `**Assignee:**` line and a
+`> **Result:**` line only outside a fenced code block. A plan `rhei validate`
+accepts is therefore never refused over what a fence quotes, and a fence comes
+through a reset byte-identical:
+
+- A quoted heading opens no task, so a reset looks for no `**State:**` line under
+  it and a real line after the fence still belongs to the task above it.
+- A quoted `**State:**` line is not rewritten, even under a quoted heading whose id
+  is a task the reset moves. The real task's line is.
+- A quoted `**Assignee:**` or `> **Result:**` line is not removed, and neither is
+  the blank line before it.
+- A quoted `> **Result:**` line is not a result link anywhere reset asks about one.
+  It is no trace of a run ([§FS-rhei-reset.2.2](rhei-reset.spec.md#22-authored-state)) and not a line the help tells the
+  reader to delete ([§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse)).
+
+A fence that is never closed runs to the end of the text that opened it, which in
+a Directory Workspace is one task file: the next file's lines are structure again.
+
+Frontmatter is not text a fence is read in. A fence-shaped line in a YAML value
+opens nothing, in a single-file plan, in `index.rhei.md`, and in a workspace task
+file's own metadata block, because the parser does not read one there either.
+
+`--dry-run`, the preview and the plan [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) judges read a fence the same way,
+because each comes from the same rewrite.
 
 ## 3. Safety
 

@@ -64,10 +64,15 @@ fn project_load_refusal(replacement: bool, dry_run: bool) {
     assert_context_path(&scenario, &report, "Original project state machine:", &scenario.machine);
     assert!(folded.contains("project default; rhei: member"), "original ownership:\n{report}");
     let parse_path = parse_file.strip_prefix(&scenario.cwd).unwrap();
+    // Separator-blind: Windows spells the parse frame's path with `\`.
+    let slashed = folded.replace('\\', "/");
     let parse_paths =
         [parse_file.clone(), Path::new(".").join(parse_path), parse_path.to_path_buf()];
     assert!(
-        parse_paths.iter().any(|path| folded.contains(&format!("in {}", path.display()))),
+        parse_paths
+            .iter()
+            .any(|path| slashed
+                .contains(&format!("in {}", path.to_string_lossy().replace('\\', "/")))),
         "parse frame should name {} from the invocation directory:\n{report}",
         parse_file.display(),
     );

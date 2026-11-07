@@ -153,6 +153,8 @@ impl Scenario {
 
     pub fn names_original(&self, report: &str, path: &Path) -> bool {
         let relative = path.strip_prefix(&self.cwd).unwrap_or(path);
+        // Compare separator-blind: Windows reports spell paths with `\`.
+        let report = report.replace('\\', "/");
         [path, relative].iter().any(|path| {
             if path.as_os_str().is_empty() {
                 return report.split_whitespace().any(|word| word.trim_matches(['\'', '`']) == ".");

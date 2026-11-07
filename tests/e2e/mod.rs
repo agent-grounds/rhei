@@ -171,6 +171,8 @@ mod into_refusal_tests;
 mod into_root_machine_tests;
 mod into_support;
 mod into_template_gate_tests;
+mod into_validation_refusal_support;
+mod into_validation_refusal_tests;
 mod laid_output_root_tests;
 mod list_ready_tests;
 mod list_task_metadata_tests;

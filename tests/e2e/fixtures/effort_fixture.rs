@@ -37,6 +37,12 @@ fn safe(value: &str) -> String {
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
+    // Answer only version queries before any task input or identity access. §FS-rhei-evidence.7.1
+    if args == ["--version"] || args == ["exec", "--version"] {
+        println!("effort-fixture 1.0.0");
+        return;
+    }
+
     let mut stdin = String::new();
     io::stdin().read_to_string(&mut stdin).expect("read prompt stdin");
     let prompt = prompt_from(&args, &stdin);

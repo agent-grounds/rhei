@@ -92,6 +92,24 @@ fn a_narrowed_reset_refuses_intact_over_a_members_index_it_cannot_write() {
     assert_refused_intact(&world, &["--rhei", "alpha"], &["project/alpha"]);
 }
 
+/// Basin metadata belongs to the shared manifest even when its ticket never moved.
+/// Its directory must be checked before either reset preview. §FS-rhei-reset.2
+#[test]
+fn a_narrowed_basin_reset_refuses_intact_over_a_manifest_it_cannot_write() {
+    let world = RemedyWorld::at("reset-unwritable-basin-manifest", "project");
+    world.write("states.yaml", MACHINE);
+    world.write("index.panta.md", "# Panta: Reset fixture\n");
+    world.write("basin/01-a.md", &format!("### Task 1: A{OPEN_TASK}"));
+    lay_sidecars(&world);
+    world.write(
+        "index.panta.md",
+        "# Panta: Reset fixture\n---\nmetadata:\n  tasks:\n    basin.1:\n      stateVisits:\n        open: 2\n---\n",
+    );
+    let Some(_project) = read_only(&world, ".") else { return };
+
+    assert_refused_intact(&world, &["--rhei", "basin"], &["project"]);
+}
+
 /// The other side, and the point of narrowing: another rhei's read-only directories
 /// are no business of this reset. Passes today, and must keep passing.
 #[test]

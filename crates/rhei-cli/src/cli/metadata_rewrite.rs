@@ -123,13 +123,13 @@ fn update_metadata_for_transition(
     Some(root)
 }
 
-/// Drop one of rhei's own keys from every task's metadata entry.
-///
-/// Which keys a caller passes is the register's business, not this function's:
-/// `rhei reset` reads them off the `Cleared by rhei reset` column so that a
-/// runtime key added later is cleared by adding its row.
-// §FS-rhei-transitions.2.5 §FS-rhei-reset.2
-fn clear_rhei_written_key(existing: Option<&Metadata>, key: &str) -> Option<Metadata> {
+/// Delete the register's reset-cleared keys only for selected tickets. Prune
+/// entries and ancestors only when these deletions emptied them; preserve every
+/// other key and entry. §FS-rhei-reset.2 §FS-rhei-transitions.2.5
+fn clear_runtime_task_metadata_for(
+    existing: Option<&Metadata>,
+    selected: impl Fn(&str) -> bool,
+) -> Option<Metadata> {
     let mut root = existing.cloned()?;
     let Some(YamlValue::Mapping(metadata_section)) = root.get_mut(yaml_key("metadata")) else {
         return Some(root);
@@ -138,12 +138,32 @@ fn clear_rhei_written_key(existing: Option<&Metadata>, key: &str) -> Option<Meta
         return Some(root);
     };
 
-    for value in tasks.values_mut() {
-        if let YamlValue::Mapping(task_map) = value {
-            task_map.remove(yaml_key(key));
+    let mut removed = false;
+    tasks.retain(|id, value| {
+        // Existing numbered ticket keys are YAML numbers; preserve their shape
+        // while matching the routed id text. §FS-rhei-reset.2
+        let is_selected = match id {
+            YamlValue::String(id) => selected(id),
+            YamlValue::Number(id) => selected(&id.to_string()),
+            _ => false,
+        };
+        if !is_selected {
+            return true;
+        }
+        let YamlValue::Mapping(task_map) = value else { return true };
+        let mut task_removed = false;
+        for key in keys_cleared_by_reset() {
+            task_removed |= task_map.remove(yaml_key(key)).is_some();
+        }
+        removed |= task_removed;
+        !(task_removed && task_map.is_empty())
+    });
+    if removed && tasks.is_empty() {
+        metadata_section.remove(yaml_key("tasks"));
+        if metadata_section.is_empty() {
+            root.remove(yaml_key("metadata"));
         }
     }
-
     Some(root)
 }
 

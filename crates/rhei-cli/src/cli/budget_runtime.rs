@@ -40,7 +40,12 @@ enum BudgetAdmission {
     ///
     /// Boxed because a refusal is the rare arm and a `RunEvent` is wide: the
     /// ordinary admitted path should not pay for it.
-    Refused { halt: String, event: Option<Box<rhei_tui::RunEvent>> },
+    Refused {
+        halt: String,
+        event: Option<Box<rhei_tui::RunEvent>>,
+        /// Current facts even when no spawn was admitted. §FS-rhei-budgets.9
+        bounds: Vec<rhei_tui::BoundReport>,
+    },
     /// This target has no project directory to account against. Nothing is
     /// bounded and nothing is charged, which is the same answer the engine gave
     /// before this checkpoint existed.
@@ -401,6 +406,13 @@ fn budget_admit_spawn(
         Err(refusal) => Ok(BudgetAdmission::Refused {
             halt: budget_halt_text(&refusal, &bounds, &journal),
             event: budget_halt_event(&refusal, &bounds, &journal, task_id_str).map(Box::new),
+            // A trusted exhaustion can report without reserving or spending.
+            // §FS-rhei-budgets.9 §FS-rhei-run-report.3.1
+            bounds: if refusal.exhaustion.is_some() {
+                budget_reports(&journal, &ticket, &bounds).unwrap_or_default()
+            } else {
+                Vec::new()
+            },
         }),
     }
 }

@@ -25,48 +25,60 @@ fn budget_halt_text(refusal: &BudgetError, bounds: &CountBounds, journal: &Journ
     let Some(spent) = refusal.exhaustion.as_deref() else {
         return format!("error: {}", refusal.message);
     };
-    let none = SpendMarks::default();
+    let bound = bounds.halt_bound(spent);
+    let remedy = budget_halt_remedy(spent, bounds, journal);
+    let marks = if spent.dimension.is_money() {
+        budget_spend_marks(journal)
+    } else {
+        SpendMarks::default()
+    };
+    halt_text(spent, &bound, &remedy, &marks)
+}
+
+/// Choose the one effective remedy for every halt surface. Lifetime commands
+/// retain the caller's target and quoting; at the grant ceiling, changing the
+/// setting must precede the audited grant. §FS-rhei-budgets.8 §FS-rhei-errors.1.2.1
+fn budget_halt_remedy(
+    spent: &rhei_core::budget::Exhaustion,
+    bounds: &CountBounds,
+    journal: &Journal,
+) -> Remedy {
     match spent.dimension {
-        Dimension::Travel => halt_text(spent, &bounds.travel, &Remedy::Raise, &none),
+        Dimension::Travel => Remedy::Raise,
         Dimension::Invocations => match &spent.contract {
-            // A window renews on its own, so the instant *is* the remedy.
-            Contract::Window => match journal.renewal_instant() {
-                Ok(Some(instant)) => {
-                    halt_text(spent, &bounds.per_day, &Remedy::Renews(instant), &none)
-                }
-                _ => halt_text(spent, &bounds.per_day, &Remedy::Raise, &none),
-            },
-            // An explicit allowance is the ledger's own number rather than a
-            // settings value, so it is reported as one and raised by the
-            // audited command, of the target the run was given. §FS-rhei-budgets.10
-            Contract::Lifetime { allowance } => halt_text(
-                spent,
-                &Bound::resolve("invocation_allowance", *allowance, None, None),
-                // §FS-rhei-errors.1.2.1
-                &Remedy::Adjust(help_subcommand_or_bare(
+            Contract::Window => journal
+                .renewal_instant()
+                .ok()
+                .flatten()
+                .map(Remedy::Renews)
+                .unwrap_or(Remedy::Raise),
+            Contract::Lifetime { allowance } => {
+                let command = help_subcommand_or_bare(
                     "budget adjust",
                     "",
                     "--invocations <N> --reason <TEXT>",
-                )),
-                &none,
-            ),
+                );
+                if *allowance < bounds.lifetime_max.effective {
+                    Remedy::Adjust(command)
+                } else {
+                    Remedy::RaiseThenAdjust {
+                        ceilings: bounds.lifetime_ceiling_remedies(*allowance),
+                        allowance: *allowance,
+                        command,
+                    }
+                }
+            }
         },
         // Spend is window-bounded whichever contract the account holds, so
         // its one remedy is the renewal instant rather than the settings key.
         // §FS-rhei-budgets.3.4 §FS-rhei-budgets.8
-        Dimension::Spend => {
-            let marks = budget_spend_marks(journal);
-            let remedy = match journal.renewal_instant() {
-                Ok(Some(instant)) => Remedy::Renews(instant),
-                // A lifetime account still bounds spend by the day, so the
-                // instant is derived from the day key rather than skipped.
-                _ => match rhei_core::budget::renewal_instant(&spent.day) {
-                    Ok(instant) => Remedy::Renews(instant),
-                    Err(_) => Remedy::Raise,
-                },
-            };
-            halt_text(spent, &bounds.spend, &remedy, &marks)
-        }
+        Dimension::Spend => journal
+            .renewal_instant()
+            .ok()
+            .flatten()
+            .or_else(|| rhei_core::budget::renewal_instant(&spent.day).ok())
+            .map(Remedy::Renews)
+            .unwrap_or(Remedy::Raise),
     }
 }
 
@@ -219,30 +231,30 @@ fn budget_charge_applied_edge(
 /// The travel line is per ticket, so it is reported for the ticket being
 /// admitted rather than for the project: a run that showed one ticket's travel
 /// as the project's would be reporting a number that is true of nothing.
-/// §FS-rhei-budgets.9
+/// Lifetime invocation facts come from the account. §FS-rhei-budgets.3.2 §FS-rhei-budgets.9
 fn budget_reports(
     journal: &Journal,
     ticket: &str,
     bounds: &CountBounds,
 ) -> Result<Vec<rhei_tui::BoundReport>, BudgetError> {
     let snapshot = journal.snapshot()?;
-    let invocation_bound = snapshot.invocation_bound(bounds.per_day.effective);
+    let invocation_bound = bounds.invocation_bound(&snapshot.contract);
     let travel = snapshot.travel_for(ticket);
     let marks = snapshot.marks(&run_is_gone);
     Ok(vec![
         rhei_tui::BoundReport {
             dimension: Dimension::Invocations.label().into(),
-            effective: invocation_bound,
-            value_source: bounds.per_day.source.as_str().into(),
-            limiting_source: bounds.per_day.requested.map(|_| bounds.per_day.limiter.as_str().into()),
+            effective: invocation_bound.effective,
+            value_source: invocation_bound.source.as_str().into(),
+            limiting_source: invocation_bound.requested.map(|_| invocation_bound.limiter.as_str().into()),
             consumed: snapshot.invocations.consumed,
             outstanding: snapshot.invocations.reserved,
-            remaining: snapshot.invocations.remaining(invocation_bound)?,
+            remaining: snapshot.invocations.remaining(invocation_bound.effective)?,
             mode: snapshot.contract.name().into(),
             window: matches!(snapshot.contract, Contract::Window).then(|| snapshot.day.clone()),
             currency: None,
             marks: None,
-            ceiling: rhei_tui::BoundCeiling::of(&bounds.per_day),
+            ceiling: rhei_tui::BoundCeiling::of(&invocation_bound),
         },
         // Amounts in micro-units and the currency beside them, so a frontend
         // renders `$25.00` rather than a bare number whose unit the reader has
@@ -280,7 +292,8 @@ fn budget_reports(
 
 /// The refused admission as a record, carrying the same facts the halt text
 /// prints so a reader can route on them without parsing prose.
-/// §FS-rhei-run-json.2.1
+/// Lifetime provenance and the shared remedy follow §FS-rhei-budgets.3.2 and
+/// §FS-rhei-budgets.8. The record shape follows §FS-rhei-run-json.2.1.
 fn budget_halt_event(
     refusal: &BudgetError,
     bounds: &CountBounds,
@@ -288,21 +301,8 @@ fn budget_halt_event(
     task_id_str: &str,
 ) -> Option<rhei_tui::RunEvent> {
     let spent = refusal.exhaustion.as_deref()?;
-    let (bound, renews_at) = match spent.dimension {
-        Dimension::Travel => (&bounds.travel, None),
-        Dimension::Invocations => (
-            &bounds.per_day,
-            match spent.contract {
-                Contract::Window => journal.renewal_instant().ok().flatten(),
-                Contract::Lifetime { .. } => None,
-            },
-        ),
-        // Always window-limited, whichever contract the account holds.
-        // §FS-rhei-budgets.3.4
-        Dimension::Spend => {
-            (&bounds.spend, rhei_core::budget::renewal_instant(&spent.day).ok())
-        }
-    };
+    let bound = bounds.halt_bound(spent);
+    let remedy = budget_halt_remedy(spent, bounds, journal);
     Some(rhei_tui::RunEvent::BudgetHalt {
         task: task_id_str.to_string(),
         reason_code: refusal.reason_code.clone(),
@@ -335,15 +335,12 @@ fn budget_halt_event(
                 .then(|| budget_spend_marks(journal)),
             // The same delegated ceiling the halt's `ceiling:` row prints.
             // §FS-rhei-run-json.2.1
-            ceiling: rhei_tui::BoundCeiling::of(bound),
+            ceiling: rhei_tui::BoundCeiling::of(&bound),
         },
         // Never an inner value the machine ceiling would clamp: telling an
         // operator to raise a field that cannot take effect sends them to the
         // wrong file. §FS-rhei-budgets.8
-        remedy: match &renews_at {
-            Some(instant) => format!("wait: the window renews at {instant}"),
-            None => bound.remedy(),
-        },
-        renews_at,
+        remedy: remedy.render(&bound),
+        renews_at: remedy.renews_at().map(str::to_owned),
     })
 }

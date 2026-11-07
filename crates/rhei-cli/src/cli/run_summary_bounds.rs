@@ -24,7 +24,7 @@ struct BoundsSection {
 
 impl BoundsSection {
     fn is_empty(&self) -> bool {
-        self.last.is_empty()
+        self.last.is_empty() && self.halts.is_empty()
     }
 
     /// `80 (built_in)`, or the clamped form naming requester and limiter.

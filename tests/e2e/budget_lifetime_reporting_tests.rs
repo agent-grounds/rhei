@@ -86,7 +86,6 @@ fn assert_halted(result: &CliRun, records: &[Value], allowance: u64) {
 
 // §FS-rhei-budgets.3.2 §FS-rhei-budgets.9 §REQ-bounded-neural-work.4
 #[test]
-#[ignore = "red until #579: lifetime surfaces identify the audited account; implement removes this"]
 fn issue579_lifetime_account_provenance_survives_daily_edit_and_adjustment() {
     let (dir, plan, machine) = fixture("", 2);
     grant(&plan, "init", 1);
@@ -153,7 +152,6 @@ fn issue579_lifetime_account_provenance_survives_daily_edit_and_adjustment() {
 
 // §FS-rhei-budgets.8 §FS-rhei-run-report.3.1
 #[test]
-#[ignore = "red until #579: saved lifetime remedy matches stderr and releases halt; implement removes this"]
 fn issue579_lifetime_remedy_is_the_target_adjustment_on_all_bounds_surfaces() {
     let (dir, plan, machine) = fixture("", 2);
     grant(&plan, "init", 1);
@@ -170,7 +168,6 @@ fn issue579_lifetime_remedy_is_the_target_adjustment_on_all_bounds_surfaces() {
 
 // §FS-rhei-budgets.2.3 §FS-rhei-run-json.2.1
 #[test]
-#[ignore = "red until #579: daily delegation cannot leak into lifetime records; implement removes this"]
 fn issue579_lifetime_records_have_no_delegated_daily_ceiling() {
     let (dir, plan, machine) = fixture(r#", "clamp_projects": false"#, 2);
     write_project_settings(
@@ -199,7 +196,6 @@ fn issue579_lifetime_records_have_no_delegated_daily_ceiling() {
 
 // §FS-rhei-budgets.2.3 §FS-rhei-budgets.3.2
 #[test]
-#[ignore = "red until #579: daily clamp and historical grant clamp are not lifetime limiters; implement removes this"]
 fn issue579_lifetime_records_have_no_daily_limiter_after_a_clamped_grant() {
     let (dir, plan, machine) =
         fixture(r#", "invocations_per_day": 1, "invocation_lifetime_max": 2"#, 3);
@@ -299,13 +295,114 @@ fn ceiling_control(project: bool) {
 }
 
 #[test]
-#[ignore = "red until #579: machine ceiling is raised before audited adjustment; implement removes this"]
 fn issue579_lifetime_machine_ceiling_remedy_and_control() {
     ceiling_control(false);
 }
 
 #[test]
-#[ignore = "red until #579: lowered project ceiling is raised before audited adjustment; implement removes this"]
 fn issue579_lifetime_project_ceiling_remedy_and_control() {
     ceiling_control(true);
+}
+
+// A refusal with zero new starts still reports the current account and all
+// three Bounds rows, and all halt surfaces retain the same ordered remedy.
+// §FS-rhei-budgets.8 §FS-rhei-budgets.9 §FS-rhei-run-report.3.1
+fn assert_co_ceiling_halt(root: &Path, plan: &Path, machine: &Path, expected: &str) {
+    let result = run_plan(plan, machine, None);
+    let rows = records(root);
+    assert_halted(&result, &rows, 1);
+    assert_spawn_count(root, 1, "settings and capped adjustments start no remaining work");
+    assert!(
+        result.stderr.lines().any(|line| line.trim() == format!("to raise it: {expected}")),
+        "{}",
+        result.stderr
+    );
+    assert_eq!(halt(&rows)["remedy"], expected);
+    let report = fs::read_to_string(root.join("runtime/run-report.md")).unwrap();
+    assert!(
+        report.contains("| project invocations | 1 (account) | lifetime | 1 | 1 | 0 | 0 |"),
+        "{report}"
+    );
+    assert!(report.contains("| ticket travel |"), "{report}");
+    assert!(report.contains("| project spend |"), "{report}");
+    assert!(
+        report.lines().any(|line| line.starts_with("- `plan.2` was stopped by")
+            && line.ends_with(&format!("; {expected}"))),
+        "{report}"
+    );
+    for bound in invocation_bounds(&rows) {
+        assert_eq!(bound["value_source"], "account");
+        assert!(bound["limiting_source"].is_null(), "{bound}");
+        assert!(bound.get("ceiling").is_none(), "{bound}");
+    }
+}
+
+// Port of review-1/edge_repro.py's two independent, equal grant constraints.
+// §FS-rhei-budgets.8 §REQ-bounded-neural-work.4
+#[test]
+fn issue579_lifetime_co_limiting_ceilings_require_both_edits_then_adjustment() {
+    let (dir, plan, machine) = fixture(r#", "invocation_lifetime_max": 1"#, 2);
+    let set_project = |maximum| {
+        write_project_settings(
+            &dir,
+            ".agent-grounds/rhei",
+            &format!(r#"{{"defaults":{{"invocation_lifetime_max":{maximum}}}}}"#),
+        )
+    };
+    let set_machine = |maximum| {
+        write_machine_settings(
+            &dir,
+            &agent_defaults(
+                &dir.join("mock-agent.py"),
+                &format!(r#", "invocation_lifetime_max": {maximum}"#),
+            ),
+        )
+    };
+    let edit = |file: PathBuf| {
+        format!("set `defaults.invocation_lifetime_max` in {} above 1", file.display())
+    };
+    let project_edit = edit(project_file(&dir, ".agent-grounds/rhei"));
+    let machine_edit = edit(machine_file(&dir));
+    let adjust = adjust_remedy(&plan);
+    set_project(1);
+    grant(&plan, "init", 1);
+    let first = run_plan(&plan, &machine, None);
+    let rows = records(&dir);
+    assert_halted(&first, &rows, 1);
+    let both = format!("{project_edit}, {machine_edit}, then {adjust}");
+    assert_eq!(halt(&rows)["remedy"], both);
+    assert!(first.stderr.contains(&format!("to raise it: {both}")), "{}", first.stderr);
+    let report = fs::read_to_string(dir.join("runtime/run-report.md")).unwrap();
+    assert!(
+        report.lines().any(|line| line.starts_with("- `plan.2` was stopped by")
+            && line.ends_with(&format!("; {both}"))),
+        "{report}"
+    );
+    assert_co_ceiling_halt(&dir, &plan, &machine, &both);
+
+    set_project(10);
+    let machine_only = format!("{machine_edit}, then {adjust}");
+    assert_co_ceiling_halt(&dir, &plan, &machine, &machine_only);
+    grant(&plan, "adjust", 10);
+    assert_co_ceiling_halt(&dir, &plan, &machine, &machine_only);
+
+    set_project(1);
+    set_machine(10);
+    let project_only = format!("{project_edit}, then {adjust}");
+    assert_co_ceiling_halt(&dir, &plan, &machine, &project_only);
+    grant(&plan, "adjust", 10);
+    assert_co_ceiling_halt(&dir, &plan, &machine, &project_only);
+
+    set_project(10);
+    assert_co_ceiling_halt(&dir, &plan, &machine, &adjust);
+    grant(&plan, "adjust", 10);
+    assert_success(&run_plan(&plan, &machine, None));
+    assert_spawn_count(&dir, 2, "both edits then adjustment complete only the remaining ticket");
+    let final_records = records(&dir);
+    let bounds = invocation_bounds(&final_records);
+    let end = bounds.last().unwrap();
+    assert_eq!(end["effective"], 10);
+    assert_eq!(end["consumed"], 2);
+    assert_eq!(end["remaining"], 8);
+    assert_eq!(end["value_source"], "account");
 }

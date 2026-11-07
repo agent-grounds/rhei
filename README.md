@@ -212,7 +212,7 @@ instead establishes a lifetime invocation allowance. Reports identify its
 source as `account`; changing `defaults.invocations_per_day` does not raise it.
 Use `rhei budget adjust <plan-or-project> --invocations <N> --reason <TEXT>`.
 If the allowance has reached the permitted lifetime grant, the halt first names
-the `defaults.invocation_lifetime_max` setting and file to raise, then the
+the `defaults.invocation_lifetime_max` settings and files to raise, then the
 audited adjustment: a settings edit alone grants no lifetime capacity.
 
 The spend bound only bounds spending on runs that are priced: an invocation

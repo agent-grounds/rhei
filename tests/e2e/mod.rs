@@ -286,6 +286,7 @@ mod state_machine_resolution_support;
 mod state_machine_resolution_tests;
 mod states_line_refused_tests;
 mod strict_inputs_admission_tests;
+mod strict_inputs_carry_on_tests;
 mod strict_inputs_exit_tests;
 mod strict_inputs_support;
 mod strict_inputs_tests;

@@ -156,6 +156,10 @@ Each difference has one kind:
 | `mode`     | Only the executable bit differs                                         |
 | `link`     | A symlink's text changed, or a path changed between symlink and file     |
 
+A path is one difference, however many ways it changed. A rhei that gains or
+loses its own machine lists the machine's file once, as `added` or `deleted`;
+where the file's recorded state differs as well, that kind is the one listed.
+
 ## 5. `rhei seal`
 
 `rhei seal` appends a generation for each rhei in scope and prints, per rhei,

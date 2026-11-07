@@ -115,6 +115,55 @@ fn a_json_refusal_carries_a_stable_reason_code_and_the_changed_paths() {
     );
 }
 
+/// A strict run under a machine the latest generation does not have is refused,
+/// and the refusal lists that one file once.
+// §FS-rhei-seal.8.4 §FS-rhei-seal.4
+#[test]
+#[ignore = "red until #584: the refusal lists a gained machine twice; implement removes this"]
+fn a_strict_refusal_lists_a_gained_machine_once() {
+    let plan = OptionalMachine::lay("strict-gained-machine");
+    plan.sealed_then_lost();
+    let refused = plan.strict_run(&[]);
+    assert_refused(&refused, OPTIONAL_MACHINE_LABEL);
+    assert_eq!(
+        change_lines(&refused.stderr, OPTIONAL_MACHINE_LABEL),
+        ["added custom.yaml (sealed in generation 2)"],
+        "stderr:\n{}",
+        refused.stderr
+    );
+}
+
+/// The same refusal under `--json`: a script counting `changes` reads one drifted
+/// input, not two.
+// §FS-rhei-seal.8.4 §FS-rhei-run-json.2.1
+#[test]
+#[ignore = "red until #584: seal_halt carries a gained machine twice; implement removes this"]
+fn a_json_refusal_carries_a_gained_machine_once() {
+    let plan = OptionalMachine::lay("strict-gained-machine-json");
+    plan.sealed_then_lost();
+    let refused = plan.strict_run(&["--json"]);
+    assert_eq!(
+        refused.status.code(),
+        Some(1),
+        "stdout:\n{}\nstderr:\n{}",
+        refused.stdout,
+        refused.stderr
+    );
+    let halts: Vec<serde_json::Value> = refused
+        .stdout
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .filter(|record| record["event"] == "seal_halt")
+        .collect();
+    assert_eq!(halts.len(), 1, "one seal_halt record\nstdout:\n{}", refused.stdout);
+    assert_eq!(
+        halts[0]["changes"],
+        serde_json::json!([{ "path": "custom.yaml", "kind": "added" }]),
+        "{:#}",
+        halts[0]
+    );
+}
+
 /// The guard on the opt-in: without `--strict-inputs` the run behaves as it
 /// always has. The edited script runs, the run exits 0, and no seal is written.
 /// It passes before the change and after it.

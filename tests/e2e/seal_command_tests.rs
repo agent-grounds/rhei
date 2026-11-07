@@ -128,6 +128,63 @@ fn rhei_seal_refuses_while_a_run_is_live_and_names_it() {
     assert!(!drift.ws.join("runtime/seal").exists(), "a refused seal writes nothing");
 }
 
+/// Sealing without the machine a rhei was sealed under loses one file, and the
+/// listing says so once.
+// §FS-rhei-seal.5 §FS-rhei-seal.4
+#[test]
+#[ignore = "red until #584: a lost machine is listed twice; implement removes this"]
+fn a_rhei_that_loses_its_machine_lists_it_once() {
+    let plan = OptionalMachine::lay("seal-lost-machine");
+    assert_success(&plan.seal_with_machine());
+    let lost = plan.seal_without_machine();
+    assert_success(&lost);
+    assert!(lost.stdout.contains("generation 2"), "{}", lost.stdout);
+    assert_eq!(
+        change_lines(&lost.stdout, OPTIONAL_MACHINE_LABEL),
+        ["deleted custom.yaml"],
+        "stdout:\n{}",
+        lost.stdout
+    );
+}
+
+/// Sealing under the machine again accepts one file, and the listing says so once.
+// §FS-rhei-seal.5 §FS-rhei-seal.4
+#[test]
+#[ignore = "red until #584: a gained machine is listed twice; implement removes this"]
+fn a_rhei_that_gains_its_machine_lists_it_once() {
+    let plan = OptionalMachine::lay("seal-gained-machine");
+    plan.sealed_then_lost();
+    let gained = plan.seal_with_machine();
+    assert_success(&gained);
+    assert!(gained.stdout.contains("generation 3"), "{}", gained.stdout);
+    assert_eq!(
+        change_lines(&gained.stdout, OPTIONAL_MACHINE_LABEL),
+        ["added custom.yaml"],
+        "stdout:\n{}",
+        gained.stdout
+    );
+}
+
+/// The control beside the two above: a machine on both sides is reported by its
+/// bytes alone, once. It passes before the fix to #584 and must stay so.
+// §FS-rhei-seal.5 §FS-rhei-seal.4
+#[test]
+fn a_machine_edited_in_place_is_listed_once() {
+    let plan = OptionalMachine::lay("seal-edited-machine");
+    assert_success(&plan.seal_with_machine());
+    let machine = plan.work.join(OPTIONAL_MACHINE);
+    let text = fs::read_to_string(&machine).unwrap();
+    fs::write(&machine, format!("{text}# edited in place\n")).unwrap();
+    let edited = plan.seal_with_machine();
+    assert_success(&edited);
+    assert_eq!(
+        change_lines(&edited.stdout, OPTIONAL_MACHINE_LABEL),
+        ["modified custom.yaml"],
+        "stdout:\n{}",
+        edited.stdout
+    );
+}
+
 // §FS-rhei-seal.6 §FS-rhei-reset.2
 #[test]
 fn a_full_reset_removes_the_seal() {

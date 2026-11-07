@@ -367,6 +367,7 @@ mod tests {
     include!("cli/tests_claim_writer_exclusion.rs");
     include!("cli/tests_reset_writer_exclusion.rs");
     include!("cli/tests_reset_refusal.rs");
+    include!("cli/tests_reset_removal.rs");
     include!("cli/tests_claim_revalidation.rs");
     include!("cli/tests_headless_console_log.rs");
     include!("cli/tests_agent_resolution.rs");

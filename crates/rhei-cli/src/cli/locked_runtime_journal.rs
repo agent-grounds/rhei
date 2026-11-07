@@ -141,12 +141,7 @@ impl LockedRuntimeJournal {
         })?;
         let data_file = workspace_root.join("runtime").join(kind.file);
         let lock_path = workspace_root.join(kind.lock);
-        let lock = fs::OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .truncate(false)
-            .open(&lock_path)
+        let lock = open_lock_sidecar(&lock_path)
             .map_err(|err| miette!(
                 help = (kind.help)(),
                 "failed to open {} lock: {err}", kind.noun

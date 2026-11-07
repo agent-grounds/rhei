@@ -14,11 +14,7 @@ use super::reset_remedy_support::*;
 
 /// What a reset the filesystem would stop says first. §FS-rhei-reset.4
 pub(super) const UNWRITABLE_REFUSAL: &str =
-    "Refusing to reset: it cannot write in every directory it needs, so nothing was changed.";
-
-/// What a reset stopped part way adds to the error it has. §FS-rhei-reset.4
-pub(super) const PARTLY_RESET: &str = "The reset stopped part way, so the plan is partly reset: \
-     fix the cause and run the reset again, which finishes what this one left.";
+    "Refusing to reset: it cannot write everywhere it needs to, so nothing was changed.";
 
 pub(super) const OPEN_TASK: &str = "\n\n**State:** open\n\nDo the thing.\n";
 

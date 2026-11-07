@@ -9,18 +9,24 @@
 
 /// What a reset the filesystem would stop says it cannot do. One phrase, so the
 /// renderer can keep its lines whole. §FS-rhei-reset.4
-const RESET_CANNOT_WRITE: &str = "it cannot write in every directory it needs";
+const RESET_CANNOT_WRITE: &str = "it cannot write everywhere it needs to";
+
+/// What the help adds where a refusal line names a lock file: the file is the matter,
+/// and the directory it sits in may be fine. §FS-rhei-reset.4
+const RESET_LOCK_FILE_HELP: &str = "A lock file named here has to open for writing itself.";
 
 /// What a reset stopped after something landed adds to the error it has. §FS-rhei-reset.4
 const RESET_STOPPED_PART_WAY: &str = "The reset stopped part way, so the plan is partly reset: \
      fix the cause and run the reset again, which finishes what this one left.";
 
-/// The directories a reset has asked, and the ones that said no with what they said.
-/// Keyed by canonical path, so one directory is asked and named once. §FS-rhei-reset.2.3
+/// The directories a reset has asked, and the ones that said no with what they said,
+/// beside the lock files that did. Keyed by canonical path, so one is asked and named
+/// once, in one spelling. §FS-rhei-reset.2.3 §FS-rhei-reset.4
 #[derive(Default)]
 struct ResetDirectoryCheck {
     asked: BTreeSet<PathBuf>,
     failures: BTreeMap<PathBuf, String>,
+    lock_file_failed: bool,
 }
 
 impl ResetDirectoryCheck {
@@ -36,6 +42,12 @@ impl ResetDirectoryCheck {
             let os_error = text.split(" at path ").next().unwrap_or(&text).to_string();
             self.failures.entry(dir).or_insert(os_error);
         }
+    }
+
+    /// `dir` could not be listed, under the key `write_in` would give it.
+    fn unlistable(&mut self, dir: &Path, err: std::io::Error) {
+        let dir = rhei_core::platform::canonical_path(dir).unwrap_or_else(|_| dir.to_path_buf());
+        self.failures.entry(dir).or_insert(err.to_string());
     }
 
     /// The entry at `path` is made or removed, which asks the directory holding it.
@@ -56,7 +68,7 @@ impl ResetDirectoryCheck {
         let entries = match fs::read_dir(dir) {
             Ok(entries) => entries,
             Err(err) => {
-                self.failures.entry(dir.to_path_buf()).or_insert(err.to_string());
+                self.unlistable(dir, err);
                 return;
             }
         };
@@ -65,7 +77,7 @@ impl ResetDirectoryCheck {
             let entry = match entry {
                 Ok(entry) => entry,
                 Err(err) => {
-                    self.failures.entry(dir.to_path_buf()).or_insert(err.to_string());
+                    self.unlistable(dir, err);
                     continue;
                 }
             };
@@ -80,8 +92,10 @@ impl ResetDirectoryCheck {
         }
     }
 
-    /// The lock sidecars the reset would create, which `ResetWriterLocks::acquire` opens.
-    fn absent_sidecars(
+    /// The lock sidecars `ResetWriterLocks::acquire` opens. An absent one is an entry the
+    /// reset would make. One already there is opened as the lock opens it, which takes no
+    /// lock and truncates nothing, and a lock held on another handle stays held.
+    fn sidecars(
         &mut self,
         loaded: &LoadedPlan,
         input: &Path,
@@ -95,8 +109,13 @@ impl ResetDirectoryCheck {
         for root in reset_ledger_roots(loaded, input, scope)? {
             sidecars.push(root.join(TRANSITION_LEDGER.lock));
         }
-        for sidecar in sidecars.iter().filter(|sidecar| !sidecar.exists()) {
-            self.entry(sidecar);
+        for sidecar in &sidecars {
+            if !sidecar.exists() {
+                self.entry(sidecar);
+            } else if let Err(err) = open_lock_sidecar(sidecar) {
+                self.failures.entry(sidecar.clone()).or_insert(err.to_string());
+                self.lock_file_failed = true;
+            }
         }
         Ok(())
     }
@@ -108,10 +127,9 @@ impl ResetDirectoryCheck {
                 ScopedTarget::Exact(path) if path.exists() => self.removal(path),
                 ScopedTarget::Exact(_) => {}
                 ScopedTarget::Prefixed { dir, prefix } => match matching_entries(dir, prefix) {
-                    Ok(paths) => paths.iter().for_each(|path| self.removal(path)),
-                    Err(err) => {
-                        self.failures.entry(dir.clone()).or_insert(err.to_string());
-                    }
+                    // Only what the removal removes: it skips a dangling link.
+                    Ok(paths) => paths.iter().filter(|path| path.exists()).for_each(|path| self.removal(path)),
+                    Err(err) => self.unlistable(dir, err),
                 },
             }
         }
@@ -127,7 +145,7 @@ impl ResetDirectoryCheck {
     }
 
     /// The refusal as §FS-rhei-reset.4 prints it, the same with or without `--dry-run`.
-    /// A path keeps the form its target was typed in. §FS-rhei-errors.2
+    /// A path keeps the form its target was typed in.
     fn refusal(&self, input: &Path) -> Option<Report> {
         if self.failures.is_empty() {
             return None;
@@ -137,20 +155,25 @@ impl ResetDirectoryCheck {
             let shown = if input.is_absolute() { dir.display().to_string() } else { display_path(dir) };
             lines.push(format!("  {shown}: {error}"));
         }
-        Some(miette!(help = temp_write_help(), "{}", lines.join("\n")))
+        let help = if self.lock_file_failed {
+            format!("{} {RESET_LOCK_FILE_HELP}", temp_write_help())
+        } else {
+            temp_write_help().to_string()
+        };
+        Some(miette!(help = help, "{}", lines.join("\n")))
     }
 }
 
-/// Whether a lock sidecar the reset would create cannot be created. The real reset asks
-/// this before it takes its locks, because the failure would stop it there, without the
-/// text the dry run prints. §FS-rhei-reset.2.3
+/// Whether a lock sidecar the reset opens cannot be opened. The real reset asks this
+/// before it takes its locks, because the failure would stop it there, without the text
+/// the dry run prints. §FS-rhei-reset.2.3
 fn reset_sidecars_are_blocked(
     loaded: &LoadedPlan,
     input: &Path,
     scope: &RheiScope,
 ) -> MietteResult<bool> {
     let mut check = ResetDirectoryCheck::default();
-    check.absent_sidecars(loaded, input, scope)?;
+    check.sidecars(loaded, input, scope)?;
     Ok(!check.failures.is_empty())
 }
 
@@ -165,7 +188,7 @@ fn reset_filesystem_refusal(
     authored: &AuthoredStates,
 ) -> MietteResult<Option<Report>> {
     let mut check = ResetDirectoryCheck::default();
-    check.absent_sidecars(loaded, input, scope)?;
+    check.sidecars(loaded, input, scope)?;
 
     let no_moves = BTreeMap::new();
     for (file, _sample_task_id) in reset_target_files(loaded, input, scope) {

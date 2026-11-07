@@ -239,20 +239,11 @@ fn clear_supervision_for_task(existing: Option<&Metadata>, task_id: &TaskId) -> 
     Some(root)
 }
 
-/// The runtime task metadata `rhei reset` clears — every key the register marks
-/// `Cleared by rhei reset`, and not a second list kept here, so a runtime key
-/// added later is cleared by adding its row.
-///
-/// A task whose whole entry was runtime state loses the entry too. `tasks: {1:
-/// {}}` in a reset plan is a record of nothing, and the next reader has to
-/// decide whether it means anything.
-// §FS-rhei-transitions.2.5 §FS-rhei-reset.2 §FS-rhei-supervision.3.3
+/// Exercise reset's register-driven cleanup for all tickets in metadata unit
+/// tests; command cleanup selects live tickets by owning document. §FS-rhei-reset.2
+#[cfg(test)]
 fn clear_runtime_task_metadata(existing: Option<&Metadata>) -> Option<Metadata> {
-    let mut cleared = existing.cloned()?;
-    for key in keys_cleared_by_reset() {
-        cleared = clear_rhei_written_key(Some(&cleared), key)?;
-    }
-    Some(drop_empty_task_metadata(cleared))
+    clear_runtime_task_metadata_for(existing, |_| true)
 }
 
 /// Drop `metadata.tasks` entries left empty by a clear, and the containers left
@@ -272,4 +263,3 @@ fn drop_empty_task_metadata(mut root: Metadata) -> Metadata {
     }
     root
 }
-

@@ -62,13 +62,11 @@ fn counted_reset(narrow: bool) {
 }
 
 #[test]
-#[ignore = "red until #611: project reset clears basin visits and permits re-entry; implement removes this"]
 fn project_reset_restarts_basin_counted_visits() {
     counted_reset(false);
 }
 
 #[test]
-#[ignore = "red until #611: narrowed reset clears basin visits and permits re-entry; implement removes this"]
 fn narrowed_reset_restarts_basin_counted_visits() {
     counted_reset(true);
 }
@@ -95,13 +93,11 @@ fn metadata_reset(narrow: bool) {
 }
 
 #[test]
-#[ignore = "red until #611: project reset clears only basin runtime keys and prunes empty task maps; implement removes this"]
 fn project_reset_clears_basin_runtime_metadata_only() {
     metadata_reset(false);
 }
 
 #[test]
-#[ignore = "red until #611: narrowed reset clears only basin runtime keys and prunes empty task maps; implement removes this"]
 fn narrowed_reset_clears_basin_runtime_metadata_only() {
     metadata_reset(true);
 }
@@ -124,13 +120,11 @@ fn empty_metadata_reset(narrow: bool) {
 }
 
 #[test]
-#[ignore = "red until #611: project reset prunes emptied basin metadata containers; implement removes this"]
 fn project_reset_prunes_empty_basin_metadata_containers() {
     empty_metadata_reset(false);
 }
 
 #[test]
-#[ignore = "red until #611: narrowed reset prunes emptied basin metadata containers; implement removes this"]
 fn narrowed_reset_prunes_empty_basin_metadata_containers() {
     empty_metadata_reset(true);
 }

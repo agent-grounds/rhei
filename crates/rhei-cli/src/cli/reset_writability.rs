@@ -197,10 +197,10 @@ fn reset_filesystem_refusal(
             check.entry(&file);
         }
     }
-    for index in reset_index_files(loaded, input, scope) {
-        let raw = read_plan_source(&index, "failed to read plan file")?;
-        if text_with_runtime_metadata_cleared(&raw, true)? != raw {
-            check.entry(&index);
+    for (file, task_ids) in reset_metadata_targets(loaded, input, scope) {
+        let raw = read_plan_source(&file, "failed to read metadata document")?;
+        if reset_metadata_text(&file, &raw, &task_ids)? != raw {
+            check.entry(&file);
         }
     }
 
@@ -212,20 +212,6 @@ fn reset_filesystem_refusal(
         }
     }
     Ok(check.refusal(input))
-}
-
-/// The `index.rhei.md` files a reset clears the runtime metadata of. §FS-rhei-reset.2
-/// §FS-rhei-panta.6.4
-fn reset_index_files(loaded: &LoadedPlan, input: &Path, scope: &RheiScope) -> Vec<PathBuf> {
-    let mut roots: BTreeSet<PathBuf> = BTreeSet::new();
-    if scope.is_some() {
-        let in_scope = loaded.task_roots.iter().filter(|(task_id, _)| task_in_rhei_scope(scope, task_id));
-        roots.extend(in_scope.map(|(_, root)| root.clone()));
-    } else if loaded.is_panta_project() {
-        roots.extend(loaded.task_roots.values().cloned());
-    }
-    roots.insert(input.to_path_buf());
-    roots.iter().filter(|root| workspace::is_workspace(root)).map(|root| root.join("index.rhei.md")).collect()
 }
 
 /// What of a reset's writes has landed, so a failure can say what is true of the plan.
@@ -269,11 +255,10 @@ fn apply_reset(
         let file_authored = decision.authored.by_file.get(&file).unwrap_or(&no_moves);
         progress.landed |= reset_plan_file_states(&file, file_authored, reset_locks.plan(&file)?)?;
     }
-    // §FS-rhei-panta.6.4: runtime ticket metadata (visit counts, poll timers) in an
-    // in-scope workspace rhei's index is ticket-owned state; leaving it would be a
-    // silent partial reset.
-    for index in reset_index_files(loaded, input, &decision.scope) {
-        progress.landed |= clear_runtime_metadata_in_file(&index, true, reset_locks.plan(&index)?)?;
+    // Clear selected live tickets in their owning documents, including the
+    // basin manifest and tickets that never moved. §FS-rhei-reset.2
+    for (path, task_ids) in reset_metadata_targets(loaded, input, &decision.scope) {
+        progress.landed |= clear_runtime_metadata_in_file(&path, &task_ids, reset_locks.plan(&path)?)?;
     }
 
     // §FS-rhei-panta.6.4: a narrowed reset removes per-ticket artifacts, never

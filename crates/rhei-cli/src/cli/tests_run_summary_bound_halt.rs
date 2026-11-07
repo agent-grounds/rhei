@@ -302,7 +302,6 @@ transitions:
     /// the one before it would miss every repeat. `consumed` differs between passes
     /// and no line shows it, so it cannot split a stop.
     #[test]
-    #[ignore = "red until #605: a repeated halt prints a line per refusal; implement removes this"]
     fn a_repeated_halt_is_one_line_in_the_place_it_first_appeared() {
         let sink = SummarySink::new();
         let first = ("1", "ticket travel", "machine");

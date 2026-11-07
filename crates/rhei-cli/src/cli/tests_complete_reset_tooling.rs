@@ -590,7 +590,7 @@ Some work description.
         ]
         .into_iter()
         .collect();
-        let rewritten = rewrite_states_to_authored(raw, &authored).expect("rewrite states");
+        let rewritten = rewrite_states_to_authored(raw, &authored, PlanFileKind::Plan).expect("rewrite states");
 
         assert_eq!(rewritten.matches("**State:** pending").count(), 3);
         assert!(!rewritten.contains("**State:** completed"));
@@ -619,7 +619,7 @@ Some work description.
         // Only the supervisor ever moved.
         let authored: BTreeMap<String, String> =
             [("1".to_string(), "supervising".to_string())].into_iter().collect();
-        let rewritten = rewrite_states_to_authored(raw, &authored).expect("rewrite states");
+        let rewritten = rewrite_states_to_authored(raw, &authored, PlanFileKind::Plan).expect("rewrite states");
 
         // The supervisor goes back to its authored state, losing the counted
         // visit suffix.
@@ -683,7 +683,7 @@ Some work description.
     fn rewrite_states_to_authored_rejects_a_plan_with_no_states() {
         let raw = "# Rhei: Reset\n\n## Tasks\n\nNo tasks here.\n";
         let authored: BTreeMap<String, String> = BTreeMap::new();
-        assert!(rewrite_states_to_authored(raw, &authored).is_err());
+        assert!(rewrite_states_to_authored(raw, &authored, PlanFileKind::Plan).is_err());
     }
 
     #[test]
@@ -835,8 +835,8 @@ transitions:
         ]
         .into_iter()
         .collect();
-        let rewritten = rewrite_states_to_authored(raw, &authored).expect("rewrite states");
-        let rewritten = strip_assignee_lines(&rewritten);
+        let rewritten = rewrite_states_to_authored(raw, &authored, PlanFileKind::Plan).expect("rewrite states");
+        let rewritten = strip_assignee_lines(&rewritten, PlanFileKind::Plan);
 
         assert_eq!(rewritten.matches("**State:** draft").count(), 2);
         assert!(!rewritten.contains("**Assignee:**"));

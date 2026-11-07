@@ -324,9 +324,20 @@ The command scans declared transitions for a non-cancelled terminal state reacha
 
 The result file is written relative to the plan file's parent directory. The state change, assignee removal, and result link are applied in the plan file itself.
 
+Locating and rewriting the task obeys the canonical fence rule
+([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)). A valid quotation before the target,
+including a transcript in an earlier task, cannot hide the target's heading or
+state line. Completion preserves the quotation and neighbouring tasks while
+recording the target's terminal state and result.
+
 ### 4.3. Directory Workspaces
 
 The result file is written relative to the workspace root. The state change, assignee removal, and result link are applied in the task file under `tasks/`.
+
+Task-file scanning obeys the same canonical fence rule and preservation
+requirements as single-file completion ([§FS-rhei-complete.4.2](rhei-complete.spec.md#42-single-file-plans)), including when a quotation
+and the target are in the same task file. The workspace index is not rewritten
+as a substitute for the task file.
 
 ## 5. Output
 

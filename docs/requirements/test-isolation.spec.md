@@ -195,9 +195,13 @@ environment, and the rule is the whole of it rather than a list: every `RHEI_*`
 the child would otherwise see is removed — whether this harness process
 inherited it or a caller had already put it on the command — and what survives
 is only what a test sets on that spawn afterwards. Code a test runs in-process
-is held to the same line by another means: it reads no `RHEI_*` from the
-harness's own environment, because that environment is the caller's and not the
-test's, and a test that needs one hands it to the code under test itself.
+is held to the same line by another means: it reads none of the variables a
+`rhei run` exports to what it starts — the reservation, task and run that make a
+process a member of that run — from the harness's own environment, because that
+environment is the caller's and not the test's, and a test that needs one hands
+it to the code under test itself. `RHEI_BUDGET_NOW` is not one of them: it is
+the clock a test sets on purpose, no run exports it, and in-process code may
+still read it.
 
 This is [§REQ-test-isolation.3](test-isolation.spec.md#3-which-repository-a-spawned-command-acts-on-is-chosen-never-inherited) read against rhei's own variables. There git took the
 repository from the environment; here rhei takes its place in a run from it — the

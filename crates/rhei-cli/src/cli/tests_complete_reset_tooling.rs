@@ -497,7 +497,7 @@ Some work description.
         )
         .expect("write");
 
-        rewrite_task_completion(&path, "1", "1", "runtime/results/1.md", true).expect("rewrite");
+        rewrite_task_completion(&path, rhei_core::header::DocumentRole::Plan, "1", "1", "runtime/results/1.md", true).expect("rewrite");
 
         let content = fs::read_to_string(&path).expect("read");
         assert!(!content.contains("**Assignee:**"), "assignee should be removed");
@@ -531,7 +531,7 @@ Some work description.
 
         // §FS-rhei-panta.6.3: completion owns this ticket's result link, so a
         // stale legacy link is replaced by the file this completion wrote.
-        rewrite_task_completion(&path, "1", "plan.1", "runtime/results/plan.1.md", true)
+        rewrite_task_completion(&path, rhei_core::header::DocumentRole::Plan, "1", "plan.1", "runtime/results/plan.1.md", true)
             .expect("rewrite");
 
         let content = fs::read_to_string(&path).expect("read");
@@ -562,7 +562,7 @@ Some work description.
         )
         .expect("write");
 
-        rewrite_task_completion(&path, "1", "1", "runtime/results/1.md", true).expect("rewrite");
+        rewrite_task_completion(&path, rhei_core::header::DocumentRole::Plan, "1", "1", "runtime/results/1.md", true).expect("rewrite");
 
         let content = fs::read_to_string(&path).expect("read");
         assert!(content.contains("> **Result:** [1](runtime/results/1.md)"));
@@ -703,7 +703,7 @@ Body text.
         )
         .expect("write");
 
-        rewrite_task_completion(&path, "2", "2", "runtime/results/2.md", true).expect("rewrite");
+        rewrite_task_completion(&path, rhei_core::header::DocumentRole::Plan, "2", "2", "runtime/results/2.md", true).expect("rewrite");
 
         let content = fs::read_to_string(&path).expect("read");
         let result_pos =
@@ -727,7 +727,7 @@ Body text.
         )
         .expect("write");
 
-        rewrite_task_completion(&path, "cache-key", "cache-key", "runtime/results/cache-key.md", true)
+        rewrite_task_completion(&path, rhei_core::header::DocumentRole::Plan, "cache-key", "cache-key", "runtime/results/cache-key.md", true)
             .expect("rewrite");
 
         let content = fs::read_to_string(&path).expect("read");
@@ -757,7 +757,7 @@ Body.
         )
         .expect("write");
 
-        rewrite_task_completion(&path, "1.1", "1.1", "runtime/results/1.1.md", true)
+        rewrite_task_completion(&path, rhei_core::header::DocumentRole::Plan, "1.1", "1.1", "runtime/results/1.1.md", true)
             .expect("rewrite");
 
         let content = fs::read_to_string(&path).expect("read");

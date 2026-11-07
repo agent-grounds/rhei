@@ -107,11 +107,11 @@ fn snapshot_region(
     })
 }
 
-/// The region of `local_id` in `file` as it is on disk, read in the role the
-/// loader reads that file in. §FS-rhei-run.3.7.1 §FS-rhei-plan-language.2.1
-fn file_region(file: &Path, local_id: &str) -> Option<RegionSnapshot> {
-    let text = fs::read_to_string(file).ok()?;
-    snapshot_region(&text, workspace::document_role(file), local_id)
+/// The region of `route`'s task in its file as it is on disk, read in the role
+/// `loaded` read that file in. §FS-rhei-run.3.7.1 §FS-rhei-plan-language.2.1
+fn file_region(loaded: &LoadedPlan, route: &TaskRoute) -> Option<RegionSnapshot> {
+    let text = fs::read_to_string(&route.task_file).ok()?;
+    snapshot_region(&text, loaded.document_role(&route.task_file), &route.local_id)
 }
 
 /// Where the snapshot's region lies in `text` now, found by its two boundary
@@ -119,8 +119,9 @@ fn file_region(file: &Path, local_id: &str) -> Option<RegionSnapshot> {
 ///
 /// The task's heading is a node heading as [`snapshot_region`] reads one, so a
 /// copy of its line in a value or a fence is not it. The following heading is
-/// matched by text below that heading, with no fence state carried out of the
-/// worker's region, which may hold the fence the worker left open.
+/// matched by text alone, with no fence state carried out of the worker's region,
+/// which may hold the fence the worker left open; so it is counted over the whole
+/// file, and its one line must be below the task's heading.
 // §FS-rhei-run.3.7.3
 fn region_span(text: &str, snapshot: &RegionSnapshot) -> Result<RegionSpan, RestoreRefusal> {
     let lines: Vec<(usize, &str)> = region_lines_with_offsets(text).collect();
@@ -141,11 +142,12 @@ fn region_span(text: &str, snapshot: &RegionSnapshot) -> Result<RegionSpan, Rest
     let (end, end_index) = match &snapshot.following {
         None => (text.len(), lines.len()),
         Some(following) => {
-            let below: Vec<usize> = (heading + 1..lines.len())
-                .filter(|&at| lines[at].1 == following.as_str())
-                .collect();
-            match below[..] {
-                [at] => (lines[at].0, at),
+            // Counted over the whole file: read without fences, a second copy anywhere
+            // means the line below may be a later task's quote. §FS-rhei-run.3.7.3
+            let found: Vec<usize> =
+                (0..lines.len()).filter(|&at| lines[at].1 == following.as_str()).collect();
+            match found[..] {
+                [at] if at > heading => (lines[at].0, at),
                 ref found => return Err(RestoreRefusal::Following { found: found.len() }),
             }
         }
@@ -191,10 +193,14 @@ fn region_owner_at(
 }
 
 /// The task id, as the run prints it, of the task under whose heading `line`
-/// of `file` falls: the in-file id under the id of the rhei that owns the file.
+/// of `file` falls, `file` read in `role`: the in-file id under the id of the
+/// rhei that owns the file. §FS-rhei-plan-language.2.1
 // §FS-rhei-run.3.7.6 §AR-rhei-panta.3
-fn task_owning_line(file: &Path, line: usize) -> Option<String> {
-    let role = workspace::document_role(file);
+fn task_owning_line(
+    file: &Path,
+    role: rhei_core::header::DocumentRole,
+    line: usize,
+) -> Option<String> {
     let local = region_owner_at(&fs::read_to_string(file).ok()?, role, line)?;
     let entry = file.ancestors().skip(1).find(|dir| workspace::is_workspace(dir)).unwrap_or(file);
     match workspace::rhei_id_for_path(entry) {

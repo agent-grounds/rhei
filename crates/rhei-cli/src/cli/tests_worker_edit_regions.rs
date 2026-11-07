@@ -31,8 +31,13 @@ Raise it.
 Raise it.
 ";
 
-    fn region(file: &Path, text: &str, local_id: &str, live: usize) -> InFlightRegion {
-        let role = rhei_core::workspace::document_role(file);
+    fn region(
+        file: &Path,
+        role: rhei_core::header::DocumentRole,
+        text: &str,
+        local_id: &str,
+        live: usize,
+    ) -> InFlightRegion {
         let snapshot = snapshot_region(text, role, local_id).expect("region");
         InFlightRegion { file: file.to_path_buf(), snapshot, live }
     }
@@ -129,9 +134,9 @@ Raise it.
         let file = dir.path().join("plan.rhei.md");
         fs::write(&file, PLAN).expect("plan");
         let at = |line| PlanBreak { file: file.clone(), line, message: "Malformed".into() };
-        let own = region(&file, PLAN, "1", 0);
+        let own = region(&file, Plan, PLAN, "1", 0);
         let mut registry = empty_registry();
-        registry.in_flight.insert("plan.2".into(), region(&file, PLAN, "2", 1));
+        registry.in_flight.insert("plan.2".into(), region(&file, Plan, PLAN, "2", 1));
 
         assert_eq!(registry.classify(Some(&own), Some(&at(5))), BreakClass::Own);
         assert_eq!(registry.classify(None, Some(&at(12))), BreakClass::Running("plan.2".into()));
@@ -152,13 +157,13 @@ Raise it.
         fs::write(ws.join("index.rhei.md"), "# Plan\n").expect("index");
         let task_file = ws.join("tasks/03-later.md");
         fs::write(&task_file, TASK_FILE).expect("task file");
-        assert_eq!(task_owning_line(&task_file, 4).as_deref(), Some("ws.1"));
+        assert_eq!(task_owning_line(&task_file, TaskFile, 4).as_deref(), Some("ws.1"));
 
         let plan = dir.path().join("plan.rhei.md");
         fs::write(&plan, PLAN).expect("plan");
-        assert_eq!(task_owning_line(&plan, 9).as_deref(), Some("plan.1.1"));
-        assert_eq!(task_owning_line(&plan, 12).as_deref(), Some("plan.2"));
-        assert_eq!(task_owning_line(&plan, 1), None);
+        assert_eq!(task_owning_line(&plan, Plan, 9).as_deref(), Some("plan.1.1"));
+        assert_eq!(task_owning_line(&plan, Plan, 12).as_deref(), Some("plan.2"));
+        assert_eq!(task_owning_line(&plan, Plan, 1), None);
     }
 
     /// The outcomes a release reported, in order.
@@ -221,7 +226,7 @@ Raise it.
             let mut regions = empty_registry();
             regions.root = Some(ws.clone());
             let file = ws.join("tasks/01-t.md");
-            regions.in_flight.insert("ws.1".into(), region(&file, TASK_FILE, "1", 1));
+            regions.in_flight.insert("ws.1".into(), region(&file, TaskFile, TASK_FILE, "1", 1));
             Self { _dir: dir, ws, regions, attempt, sink: Arc::default() }
         }
 

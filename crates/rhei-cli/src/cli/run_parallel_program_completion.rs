@@ -220,6 +220,7 @@ fn handle_parallel_program_completion(
                 let routed = execute_system_program_exit_transition(
                     TransitionFiles {
                         task_file: &route.task_file,
+                        role: reloaded.document_role(&route.task_file),
                         metadata_file: &route.metadata_file,
                         metadata_id: &route.metadata_id,
                         artifact_root: &route.execution_root,

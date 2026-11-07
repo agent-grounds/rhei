@@ -751,7 +751,11 @@ The lines between those two delimiters are YAML, in `frontmatter` and in
 `task_metadata_frontmatter` alike, and no reader takes one of them as a fence or
 as any other production of this grammar. A line of backticks in a YAML value
 opens nothing, and a `### <kind> <id>: ` or `**State:**` line in one is neither a
-task node nor its metadata.
+task node nor its metadata. Which of the two blocks a file has is decided by how
+the command loaded it, never by where the file sits: a file given as the plan is
+read as one even inside a workspace's `tasks/` directory, and a file the loader
+read tickets from under a workspace's `tasks/` or a project's `basin/` is a task
+file, however its path is spelled.
 
 `````markdown
 # Rhei: A plan that quotes a plan

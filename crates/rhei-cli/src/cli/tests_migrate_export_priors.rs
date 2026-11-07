@@ -6,6 +6,7 @@ mod migrate_export_prior_tests {
     fn addition(consumer: &str, reference: &str) -> ExportPriorAddition {
         ExportPriorAddition {
             file: PathBuf::from("plan.rhei.md"),
+            role: rhei_core::header::DocumentRole::Plan,
             consumer: consumer.to_string(),
             consumer_kind: "Task".to_string(),
             producer: reference

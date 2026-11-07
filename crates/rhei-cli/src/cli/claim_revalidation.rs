@@ -80,11 +80,17 @@ fn ensure_claimable_under_lock(
 
 struct LockedTaskAssigneeClaimContext<'a> {
     metadata_file: &'a Path,
+    /// The role the load read the task file in. §FS-rhei-plan-language.2.1
+    role: rhei_core::header::DocumentRole,
     eligibility: &'a ClaimEligibilityContext<'a>,
 }
 
 trait TaskAssigneeRevalidation {
     fn metadata_file<'a>(&'a self, task_file: &'a Path) -> &'a Path;
+
+    /// The role the task file is read in, which the assignee's insertion reads its
+    /// fences in. §FS-rhei-plan-language.2.1
+    fn role(&self) -> rhei_core::header::DocumentRole;
 
     fn before_lock(&self) {}
 
@@ -104,6 +110,10 @@ trait TaskAssigneeRevalidation {
 impl TaskAssigneeRevalidation for LockedTaskAssigneeClaimContext<'_> {
     fn metadata_file<'a>(&'a self, _task_file: &'a Path) -> &'a Path {
         self.metadata_file
+    }
+
+    fn role(&self) -> rhei_core::header::DocumentRole {
+        self.role
     }
 
     fn before_lock(&self) {
@@ -135,6 +145,11 @@ struct TaskAssigneeClaimContext<'a> {
 impl TaskAssigneeRevalidation for TaskAssigneeClaimContext<'_> {
     fn metadata_file<'a>(&'a self, task_file: &'a Path) -> &'a Path {
         task_file
+    }
+
+    /// The task file is its own metadata file: a single-file plan.
+    fn role(&self) -> rhei_core::header::DocumentRole {
+        rhei_core::header::DocumentRole::Plan
     }
 
     fn structure(&self) -> Option<&rhei_core::ast::Structure> {
@@ -227,8 +242,7 @@ fn write_task_assignee(
     }
     claim.validate(&task, qualified_id, &current_state, machine)?;
 
-    let role = rhei_core::workspace::document_role(task_file);
-    let rewritten = insert_task_assignee(&raw, role, task_id, assignee)?;
+    let rewritten = insert_task_assignee(&raw, claim.role(), task_id, assignee)?;
     let parent = task_file.parent().unwrap_or(Path::new("."));
     let mut tmp = tempfile::NamedTempFile::new_in(parent)
         .map_err(|err| miette!(help = temp_write_help(), "failed to create temp file: {err}"))?;

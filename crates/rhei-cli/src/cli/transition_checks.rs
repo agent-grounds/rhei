@@ -279,7 +279,7 @@ fn transition_command_with_release(
     let route = loaded.task_route(task_id_str, input);
 
     let effective_to = execute_transition_with_origin(
-        TransitionFiles { task_file: &route.task_file, metadata_file: &route.metadata_file, metadata_id: &route.metadata_id, artifact_root: &route.execution_root, artifact_id: task_id_str },
+        TransitionFiles { task_file: &route.task_file, role: loaded.document_role(&route.task_file), metadata_file: &route.metadata_file, metadata_id: &route.metadata_id, artifact_root: &route.execution_root, artifact_id: task_id_str },
         callback_paths,
         machine,
         &route.local_id,

@@ -94,4 +94,45 @@ After.
         let twice = plan.replace("Body.\n", "Body.\n\n```\n### Task 3: After\n");
         assert_eq!(region_span(&twice, &snapshot), Err(RestoreRefusal::Following { found: 2 }));
     }
+
+    /// A plan with a copy of Task 3's heading in a frontmatter value above the
+    /// chapter and another in a fence under a later Task 4.
+    fn following_copied_above_and_below() -> String {
+        let later = "\n### Task 4: Later\n**State:** completed\n\nQuoting:\n\n```\n### Task 3: After\n```\n\nTail.\n";
+        format!("# Rhei: P\n\n---\nmetadata:\n  note: \"\n### Task 3: After\n\"\n---\n\n{TASKS}{later}")
+    }
+
+    /// The following heading is counted over the whole file, so a copy above the
+    /// task is a second copy: when the worker renamed the heading, the fenced copy
+    /// below is not taken for it, and Task 3 and Task 4 are kept. §FS-rhei-run.3.7.3
+    #[test]
+    fn a_following_heading_copied_above_and_quoted_below_refuses_after_a_rename() {
+        let plan = following_copied_above_and_below();
+        let snapshot = snapshot_region(&plan, Plan, "2").expect("Task 2");
+        assert_eq!(snapshot.following.as_deref(), Some("### Task 3: After"));
+        let broken = appended(&plan).replace("\n### Task 3: After\n**State:**", "\n### Task 3: After, renamed\n**State:**");
+        assert_eq!(region_span(&broken, &snapshot), Err(RestoreRefusal::Following { found: 2 }));
+    }
+
+    /// A copy above the task is no boundary, but it is still a second copy of the
+    /// line, so even an ordinary bad edit is refused rather than guessed at.
+    /// §FS-rhei-run.3.7.3
+    #[test]
+    fn a_following_heading_copied_in_a_value_above_refuses() {
+        let plan = format!("# Rhei: P\n\n---\nmetadata:\n  note: \"\n### Task 3: After\n\"\n---\n\n{TASKS}");
+        let snapshot = snapshot_region(&plan, Plan, "2").expect("Task 2");
+        assert_eq!(region_span(&appended(&plan), &snapshot), Err(RestoreRefusal::Following { found: 2 }));
+    }
+
+    /// The one occurrence of the following line above the task's heading is not
+    /// below it, so the restore refuses rather than taking it. §FS-rhei-run.3.7.3
+    #[test]
+    fn a_following_heading_found_once_above_the_task_refuses() {
+        let plan = format!("# Rhei: P\n\n{TASKS}");
+        let snapshot = snapshot_region(&plan, Plan, "2").expect("Task 2");
+        let moved = appended(&plan)
+            .replace("\n### Task 3: After\n**State:**", "\n### Task 3: After, renamed\n**State:**")
+            .replace("Earlier work, must survive.\n", "Earlier work, must survive.\n\n```\n### Task 3: After\n```\n");
+        assert_eq!(region_span(&moved, &snapshot), Err(RestoreRefusal::Following { found: 1 }));
+    }
 }

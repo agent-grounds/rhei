@@ -89,6 +89,7 @@ mod templates {
 
 include!("cli/skills_builtin.rs");
 include!("cli/states_render.rs");
+include!("cli/loaded_document_role.rs");
 include!("cli/ticket_file_layout.rs");
 include!("cli/loop_budget.rs");
 include!("cli/metadata_conditions.rs");

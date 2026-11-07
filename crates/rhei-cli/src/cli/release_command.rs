@@ -40,47 +40,59 @@ help = ticket_id_required_help(),
         return Ok(());
     }
 
-    for target in &targets {
-        let verb = if dry_run { "Would release" } else { "Released" };
-        println!("{verb} Task {} (was assigned to {})", target.id, target.assignee);
-        // Automatic `next` only claims from the initial state. A released ticket remains
-        // explicitly reclaimable or can be deliberately reset, without `release` moving it.
-        // §FS-rhei-release.3.1
-        if let Some(initial) = target.initial_state.as_deref() {
-            let machine = machines.for_task_str(&target.id);
-            let state = normalized_state_name(&target.state, machine);
-            // A supervisor is claimed where it stands, and a name the machine
-            // does not declare cannot be transitioned to.
-            // §FS-rhei-supervision.3.4 §FS-rhei-release
-            let claimable_where_it_stands = execute_on_of(machine, &state).is_some();
-            let target_exists = machine.states.contains_key(initial);
-            if state != initial && !claimable_where_it_stands && target_exists {
-                let plan = help_target_word_or(input); // §FS-rhei-errors.1.2.1
-                println!(
-                    "  note: still in '{}'. Automatic `rhei next` claims from '{}'; reclaim it \
-                     explicitly with `rhei next {} --task {}`, or move it back with \
-                     `rhei transition --task {} --from {} --to {}`.",
-                    target.state,
-                    initial,
-                    plan,
-                    target.id,
-                    target.id,
-                    target.state,
-                    initial
-                );
-            }
-        }
-    }
-
     if dry_run {
+        for target in &targets {
+            report_release(input, &machines, target, "Would release");
+        }
         println!("\nDry run — nothing was changed.");
         return Ok(());
     }
 
+    // Write, then report: a target's `Released` line follows its own removed claim, and a failed
+    // write stops here, so the lines printed are exactly the tickets released. §FS-rhei-release.3
     for target in &targets {
         remove_task_assignee(&target.file, &target.local_id, &target.id)?;
+        report_release(input, &machines, target, "Released");
     }
     Ok(())
+}
+
+/// Print one target's `Released` / `Would release` line and, where it applies,
+/// the reclaim note of §FS-rhei-release.3.1.
+fn report_release(
+    input: &Path,
+    machines: &rhei_validator::MachineSet,
+    target: &ReleaseTarget,
+    verb: &str,
+) {
+    println!("{verb} Task {} (was assigned to {})", target.id, target.assignee);
+    // Automatic `next` only claims from the initial state. A released ticket remains
+    // explicitly reclaimable or can be deliberately reset, without `release` moving it.
+    // §FS-rhei-release.3.1
+    if let Some(initial) = target.initial_state.as_deref() {
+        let machine = machines.for_task_str(&target.id);
+        let state = normalized_state_name(&target.state, machine);
+        // A supervisor is claimed where it stands, and a name the machine
+        // does not declare cannot be transitioned to.
+        // §FS-rhei-supervision.3.4 §FS-rhei-release
+        let claimable_where_it_stands = execute_on_of(machine, &state).is_some();
+        let target_exists = machine.states.contains_key(initial);
+        if state != initial && !claimable_where_it_stands && target_exists {
+            let plan = help_target_word_or(input); // §FS-rhei-errors.1.2.1
+            println!(
+                "  note: still in '{}'. Automatic `rhei next` claims from '{}'; reclaim it \
+                 explicitly with `rhei next {} --task {}`, or move it back with \
+                 `rhei transition --task {} --from {} --to {}`.",
+                target.state,
+                initial,
+                plan,
+                target.id,
+                target.id,
+                target.state,
+                initial
+            );
+        }
+    }
 }
 
 /// A ticket whose claim `rhei release` will drop.

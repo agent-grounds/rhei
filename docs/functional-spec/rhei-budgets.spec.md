@@ -1239,7 +1239,7 @@ then project. For equal project and machine maxima, both equal to the allowance,
 the one sentence is:
 
 ```text
-set `defaults.invocation_lifetime_max` in <project file> above <allowance>, set `defaults.invocation_lifetime_max` in <machine file> above <allowance>, then run `rhei budget adjust …`
+set `defaults.invocation_lifetime_max` in <machine file> above <allowance>, set `defaults.invocation_lifetime_max` in <project file> above <allowance>, then run `rhei budget adjust …`
 ```
 
 The adjustment command retains the effective run target and its shell quoting

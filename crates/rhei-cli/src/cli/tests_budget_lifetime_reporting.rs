@@ -185,8 +185,8 @@ mod lifetime_reporting {
             // keeping the own-remedy edit first and avoiding unnecessary edits.
             // §FS-rhei-budgets.8
             for (name, b, allowance, files) in [
-                ("equal ceilings", &equal_bounds, 1, vec!["project", "machine"]),
-                ("above both equal ceilings", &equal_bounds, 3, vec!["project", "machine"]),
+                ("equal ceilings", &equal_bounds, 1, vec!["machine", "project"]),
+                ("above both equal ceilings", &equal_bounds, 3, vec!["machine", "project"]),
                 ("above unequal project first", &lower_project, 3, vec!["project", "machine"]),
                 ("above unequal machine first", &lower_machine, 3, vec!["machine", "project"]),
                 ("project already permits increase", &higher_project, 2, vec!["machine"]),

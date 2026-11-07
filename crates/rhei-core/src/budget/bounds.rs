@@ -247,8 +247,9 @@ impl Bound {
     /// Whether raising the bound requires raising its active ceiling, whose
     /// holder the remedy must name. Equality leaves no room to raise an inner
     /// request, even when no numerical clamp occurred. §FS-rhei-budgets.8
+    /// Stored account allowances have no active ceiling. §FS-rhei-budgets.3.2
     pub fn limited_by_ceiling(&self) -> bool {
-        self.effective == self.ceiling
+        self.source != BoundSource::Account && self.effective == self.ceiling
     }
 
     /// Whether the machine handed this dimension's ceiling to the project.

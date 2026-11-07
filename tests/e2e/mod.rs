@@ -228,6 +228,8 @@ mod provider_unavailable_pi_guard_tests;
 mod provider_unavailable_pi_support;
 mod provider_unavailable_pi_tests;
 mod registry_location_tests;
+#[cfg(unix)]
+mod release_write_then_report_tests;
 mod released_supervisor_attention_tests;
 mod remove_resolution_tests;
 mod remove_retirement_tests;

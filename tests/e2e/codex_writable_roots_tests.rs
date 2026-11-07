@@ -301,15 +301,11 @@ fn the_fake_codex_refuses_a_commit_without_the_git_dir_grant() {
         args.extend(["--sandbox", "workspace-write", "--"].map(str::to_string));
         let mut command = std::process::Command::new(python_command());
         // The shim's own git must act on the fixture, never on an inherited
-        // repository. §REQ-test-isolation.3
+        // repository, and it joins no inherited run. §REQ-test-isolation.3 §REQ-test-isolation.7
         super::git_env::scrub_git_repository_env(&mut command);
-        let status = command
-            .arg(&shim)
-            .args(&args)
-            .current_dir(&checkout)
-            .env_remove("RHEI_ATTEMPT")
-            .status()
-            .expect("run the shim");
+        super::git_env::scrub_rhei_env(&mut command);
+        let status =
+            command.arg(&shim).args(&args).current_dir(&checkout).status().expect("run the shim");
         assert!(status.success());
         shim_records(&log).pop().expect("the shim logged")
     };

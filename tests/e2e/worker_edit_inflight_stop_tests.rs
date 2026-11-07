@@ -425,14 +425,15 @@ fn on_the_clock(script: fn(&Scripts) -> &PathBuf, cover_pid: Option<&str>) -> On
     let scripts = write_scripts(&dir);
     let clock = write_python_agent(&dir, "clock.py", CLOCK_BODY);
     let report = dir.join("clock.report");
-    let out = Command::new(python_command())
+    // The clock belongs to no inherited run. §REQ-test-isolation.7
+    let mut clock_command = Command::new(python_command());
+    super::git_env::scrub_rhei_env(&mut clock_command);
+    let out = clock_command
         .arg(&clock)
         .arg(&report)
         .arg(script(&scripts))
         .arg(&*dir)
         .arg(AFTER_REAP_SECONDS)
-        .env_remove("RHEI_ATTEMPT")
-        .env_remove("RHEI_RESULT_PATH")
         .stdin(Stdio::null())
         .output()
         .expect("the clock starts");

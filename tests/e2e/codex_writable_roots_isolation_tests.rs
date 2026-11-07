@@ -112,6 +112,7 @@ fn the_fake_codex_refuses_outside_repositories_despite_writable_grants() {
         );
         let mut command = Command::new(python_command());
         super::git_env::scrub_git_repository_env(&mut command);
+        super::git_env::scrub_rhei_env(&mut command);
         command.arg(&shim).arg("--add-dir").arg(checkout).arg("--add-dir").arg(&state);
         for path in metadata.lines() {
             command.arg("--add-dir").arg(path);
@@ -119,7 +120,6 @@ fn the_fake_codex_refuses_outside_repositories_despite_writable_grants() {
         let output = command
             .args(["--sandbox", "workspace-write", "--"])
             .current_dir(checkout)
-            .env_remove("RHEI_ATTEMPT")
             .stdin(Stdio::null())
             .output()
             .expect("launch the misdirected shim");

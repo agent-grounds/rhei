@@ -94,12 +94,25 @@
     /// §FS-rhei-plan-language.1.1
     fn plan_frontmatter(raw: &str) -> Option<String> {
         let lines: Vec<&str> = raw.lines().collect();
+        let (start, end) = plan_frontmatter_span(&lines)?;
+        Some(lines[start..end].join("\n"))
+    }
+
+    /// The `(start, end)` line indices of a plan's frontmatter body, where the
+    /// parsers read it. A template's part is read here before anything parses it,
+    /// so a document with no header keeps its first block above any chapter.
+    /// §FS-rhei-plan-language.2.3
+    fn plan_frontmatter_span(lines: &[&str]) -> Option<(usize, usize)> {
+        if let Some(place) = rhei_core::header::find_frontmatter(lines.iter().copied()) {
+            let block = place.block?;
+            return Some((block.open + 1, block.close?));
+        }
         let open = lines.iter().position(|line| line.trim_end() == "---")?;
         if lines[..open].iter().any(|line| line.starts_with("## ")) {
             return None;
         }
         let close = lines[open + 1..].iter().position(|line| line.trim_end() == "---")?;
-        Some(lines[open + 1..open + 1 + close].join("\n"))
+        Some((open + 1, open + 1 + close))
     }
 
     /// The `metadata.tasks` entries of a parsed frontmatter block.

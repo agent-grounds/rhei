@@ -44,28 +44,31 @@
     }
 
     /// The `(start, end)` line indices of the frontmatter body, exclusive of
-    /// its two `---` fences. §FS-rhei-plan-language.1.1
+    /// its two `---` fences. §FS-rhei-plan-language.1.1 §FS-rhei-plan-language.2.3
     fn frontmatter_span(lines: &[String]) -> Option<(usize, usize)> {
-        let open = lines.iter().position(|line| line.trim_end() == "---")?;
-        if lines[..open].iter().any(|line| line.starts_with("## ")) {
-            return None;
-        }
-        let close = lines[open + 1..].iter().position(|line| line.trim_end() == "---")?;
-        Some((open + 1, open + 1 + close))
+        plan_frontmatter_span(&lines.iter().map(String::as_str).collect::<Vec<_>>())
     }
 
-    /// Open a frontmatter block on a plan that has none, directly after the
-    /// header, which is where the plan language fixes it.
-    /// §FS-rhei-plan-language.1.1
+    /// Open a frontmatter block on a plan that has none, directly under the
+    /// header, which is where the plan language fixes it. A document with no
+    /// header is not yet a plan: it takes the block below its last line above
+    /// any chapter, and its parse says what is wrong with it.
+    /// §FS-rhei-plan-language.1.1 §FS-rhei-plan-language.2.3
     fn open_frontmatter(lines: &mut Vec<String>) -> (usize, usize) {
-        let header_end = lines
-            .iter()
-            .position(|line| line.starts_with("## ") || line.starts_with("### "))
-            .unwrap_or(lines.len());
-        let at = lines[..header_end]
-            .iter()
-            .rposition(|line| !line.trim().is_empty())
-            .map_or(0, |last| last + 1);
+        let header = rhei_core::header::find_header_line(lines.iter().map(String::as_str));
+        let at = header.map_or_else(
+            || {
+                let header_end = lines
+                    .iter()
+                    .position(|line| line.starts_with("## ") || line.starts_with("### "))
+                    .unwrap_or(lines.len());
+                lines[..header_end]
+                    .iter()
+                    .rposition(|line| !line.trim().is_empty())
+                    .map_or(0, |last| last + 1)
+            },
+            |header| header + 1,
+        );
         let block = vec![
             String::new(),
             "---".to_owned(),

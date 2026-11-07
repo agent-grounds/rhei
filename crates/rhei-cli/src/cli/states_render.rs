@@ -958,33 +958,36 @@ fn load_plan_with(
 ) -> MietteResult<LoadedPlan> {
     // §FS-rhei-errors.6
     let _guards = rhei_core::root_access::for_input(path).map_err(|err| root_access_report(path, err))?;
-    if let Some(project_dir) = workspace::panta_project_dir(path) {
-        let project = if lenient {
-            workspace::load_panta_project_lenient(&project_dir)
-        } else {
-            workspace::load_panta_project(&project_dir)
+    match plan_input_shape(path) {
+        PlanShape::Project(project_dir) => {
+            let project = if lenient {
+                workspace::load_panta_project_lenient(&project_dir)
+            } else {
+                workspace::load_panta_project(&project_dir)
+            }
+            .map_err(|err| nested_parse_report(&err))?;
+            Ok(panta_loaded_plan(project))
         }
-        .map_err(|err| nested_parse_report(&err))?;
-        Ok(panta_loaded_plan(project))
-    } else if let Some(ws_dir) = workspace::workspace_dir(path) {
-        // §AR-rhei-panta.2: a bare Directory Workspace is the single rhei of
-        // an implicit Panta; the graph shape matches an explicit project.
-        let ws = workspace::load_workspace(&ws_dir).map_err(|err| nested_parse_report(&err))?;
-        check_rhei_identity(&ws_dir)?;
-        let project = workspace::wrap_rhei_as_implicit_panta(ws, &ws_dir)
-            .map_err(|err| nested_parse_report(&err))?;
-        Ok(implicit_loaded_plan(project, LoadedPlanKind::Workspace))
-    } else if path.is_dir() {
-        Err(unrecognized_plan_directory_report(path, run)?)
-    } else {
-        let input = read_input_file(path)?;
-        let rhei = rhei_core::parse(&input).map_err(|err| parse_report(path, &input, &err))?;
-        // §AR-rhei-panta.2/.3: a bare rhei file wraps as an implicit Panta
-        // with its id derived from the file stem.
-        check_rhei_identity(path)?;
-        let project = workspace::implicit_panta_from_file_rhei(rhei, path)
-            .map_err(|err| nested_parse_report(&err))?;
-        Ok(implicit_loaded_plan(project, LoadedPlanKind::SingleFile))
+        PlanShape::Workspace(ws_dir) => {
+            // §AR-rhei-panta.2: a bare Directory Workspace is the single rhei of
+            // an implicit Panta; the graph shape matches an explicit project.
+            let ws = workspace::load_workspace(&ws_dir).map_err(|err| nested_parse_report(&err))?;
+            check_rhei_identity(&ws_dir)?;
+            let project = workspace::wrap_rhei_as_implicit_panta(ws, &ws_dir)
+                .map_err(|err| nested_parse_report(&err))?;
+            Ok(implicit_loaded_plan(project, LoadedPlanKind::Workspace))
+        }
+        PlanShape::UnrecognizedDir => Err(unrecognized_plan_directory_report(path, run)?),
+        PlanShape::File => {
+            let input = read_input_file(path)?;
+            let rhei = rhei_core::parse(&input).map_err(|err| parse_report(path, &input, &err))?;
+            // §AR-rhei-panta.2/.3: a bare rhei file wraps as an implicit Panta
+            // with its id derived from the file stem.
+            check_rhei_identity(path)?;
+            let project = workspace::implicit_panta_from_file_rhei(rhei, path)
+                .map_err(|err| nested_parse_report(&err))?;
+            Ok(implicit_loaded_plan(project, LoadedPlanKind::SingleFile))
+        }
     }
 }
 
@@ -1042,20 +1045,17 @@ fn load_project_with_member_for_validation(
 fn load_plan_for_validation(path: &Path) -> MietteResult<LoadedPlan> {
     // §FS-rhei-errors.6
     let _guards = rhei_core::root_access::for_input(path).map_err(|err| root_access_report(path, err))?;
-    if let Some(project_dir) = workspace::panta_project_dir(path) {
-        let project = workspace::load_panta_project(&project_dir)
-            .map_err(|err| nested_parse_report(&err))?;
-        return Ok(panta_loaded_plan(project));
-    }
-
-    if let Some(ws_dir) = workspace::workspace_dir(path) {
-        return load_workspace_for_validation(&ws_dir);
-    }
-
-    if path.is_dir() {
+    match plan_input_shape(path) {
+        PlanShape::Project(project_dir) => {
+            let project = workspace::load_panta_project(&project_dir)
+                .map_err(|err| nested_parse_report(&err))?;
+            return Ok(panta_loaded_plan(project));
+        }
+        PlanShape::Workspace(ws_dir) => return load_workspace_for_validation(&ws_dir),
         // Validation keeps its collect-errors parser for files, but a real
         // directory with neither manifest is a plan-shape error. §FS-rhei-errors.3.2
-        return Err(unrecognized_plan_directory_report(path, None)?);
+        PlanShape::UnrecognizedDir => return Err(unrecognized_plan_directory_report(path, None)?),
+        PlanShape::File => {}
     }
 
     let raw = read_input_file(path)?;

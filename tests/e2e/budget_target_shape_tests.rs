@@ -82,6 +82,58 @@ fn budget_target_a_non_plan_file_is_refused_without_parsing_it() {
     }
 }
 
+/// A name that gives no rhei id is refused on a file and on a workspace, in `rhei list`'s
+/// words, because neither a parse error nor a project stands in front of it here.
+// §FS-rhei-budgets.10.1 §AR-rhei-panta.3
+#[test]
+fn budget_target_a_name_that_gives_no_id_is_refused_by_every_verb() {
+    let world = world("budget-target-name");
+    world.write("lone/1bad.rhei.md", PLAN_TEXT);
+    world.write("lone/basin.rhei.md", PLAN_TEXT);
+    world.workspace("Bad.Name");
+    world.workspace("basin");
+
+    for (target, watched) in [
+        ("lone/1bad.rhei.md", "lone"),
+        ("lone/basin.rhei.md", "lone"),
+        ("Bad.Name", "Bad.Name"),
+        ("basin", "basin"),
+    ] {
+        let refusal = world.list_refusal(&world.dir, target);
+        world.assert_every_verb_refuses(&world.dir, target, &refusal, watched);
+    }
+}
+
+/// The same names as members of a project, which resolving widens to the project:
+/// the member's own name is what is judged. `rhei list` reports these as a rhei it
+/// could not load, so budget's own words are held instead of its first line.
+// §FS-rhei-budgets.10.1 §AR-rhei-panta.3 §FS-rhei-panta.6
+#[test]
+fn budget_target_a_project_member_whose_name_gives_no_id_is_refused() {
+    let world = world("budget-target-member-name");
+    let init = world.run(&["init"]);
+    assert!(init.status.success(), "`rhei init`:\n{}", raw_stderr(&init));
+    world.write("panta/1bad.rhei.md", PLAN_TEXT);
+    world.write("panta/basin.rhei.md", PLAN_TEXT);
+    world.workspace("panta/Bad.Name");
+
+    for (target, said) in [
+        ("panta/1bad.rhei.md", "rhei id '1bad'"),
+        ("panta/basin.rhei.md", "`basin` is reserved"),
+        ("panta/Bad.Name", "rhei id 'Bad.Name'"),
+    ] {
+        let listed = world.run(&["list", target]);
+        assert_eq!(listed.status.code(), Some(1), "`list {target}`:\n{}", raw_stderr(&listed));
+        let before = world.bytes_under("panta");
+        for verb in every_verb(target) {
+            let out = world.run(&verb);
+            assert_eq!(out.status.code(), Some(1), "`{verb:?}`:\n{}", raw_stderr(&out));
+            assert!(first_line(&out).contains(said), "`{verb:?}`:\n{}", raw_stderr(&out));
+            assert!(world.bytes_under("panta") == before, "`{verb:?}` changed something");
+        }
+    }
+}
+
 /// An account already there is out of reach, not altered: the reproducer's seeding,
 /// so this still means something once `init` refuses.
 // §FS-rhei-budgets.10.1
@@ -151,6 +203,21 @@ fn budget_target_control_a_manifest_file_is_its_directory() {
         world.init(manifest);
         assert_eq!(world.project_id(directory), world.project_id(manifest), "{manifest}");
     }
+}
+
+/// A project's `basin/` holds no manifest of its own and is the project's, as
+/// `rhei list` takes it, unlike a workspace or a file claiming that name.
+// §FS-rhei-budgets.10.1 §FS-rhei-panta.6
+#[test]
+fn budget_target_control_a_projects_basin_reaches_the_projects_account() {
+    let world = world("budget-target-basin");
+    world.project("proj", &["m"]);
+    fs::create_dir_all(world.dir.join("proj/basin")).expect("create the basin");
+    world.init("proj");
+
+    let listed = world.run(&["list", "proj/basin"]);
+    assert!(listed.status.success(), "`list proj/basin`:\n{}", raw_stderr(&listed));
+    assert_eq!(world.project_id("proj/basin"), world.project_id("proj"));
 }
 
 /// With no target the verbs still discover, from a project and from a plain

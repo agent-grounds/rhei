@@ -26,14 +26,37 @@ fn budget_command(command: BudgetCommand) -> MietteResult<()> {
     }
 }
 
+/// Refuse what `rhei list` refuses by shape or by name, without loading a task body:
+/// a directory holding neither manifest, and a path whose own name gives no rhei id.
+/// Asked of the path as typed, because a project member's name is lost once resolving
+/// it widens it to the project; a project's `basin/` names no rhei and is taken.
+/// §FS-rhei-errors.3.2 §AR-rhei-panta.3 §FS-rhei-budgets.10.1 §FS-rhei-panta.6
+fn refuse_unrecognized_budget_target(typed: &Path) -> MietteResult<()> {
+    match plan_input_shape(typed) {
+        PlanShape::Project(_) => Ok(()),
+        _ if is_project_basin(typed) => Ok(()),
+        PlanShape::Workspace(directory) => check_rhei_identity(&directory),
+        PlanShape::UnrecognizedDir => {
+            Err(unrecognized_plan_directory_report(typed, None)?)
+        }
+        PlanShape::File => check_rhei_identity(typed),
+    }
+}
+
+fn is_project_basin(typed: &Path) -> bool {
+    let entry = workspace::workspace_dir(typed).unwrap_or_else(|| typed.to_path_buf());
+    entry.is_dir()
+        && workspace::panta_member(&entry).is_some_and(|(_, id)| id == workspace::BASIN_RHEI_ID)
+}
+
 /// The project the target belongs to, and the bounds in force for it. A named
 /// target is recognized before settings or the account are read; an omitted one
 /// discovers. §FS-rhei-budgets.10.1
 fn budget_command_context(input: Option<PathBuf>) -> MietteResult<(PathBuf, CountBounds)> {
-    let named = input.is_some();
+    let typed = input.clone();
     let target = resolve_plan_target(input)?;
-    if named {
-        refuse_unrecognized_plan_target(target.path())?;
+    if let Some(typed) = typed {
+        refuse_unrecognized_budget_target(&typed)?;
     }
     let workspace_root = execution_workspace_root(target.path());
     let settings = load_merged_settings(&workspace_root)?;

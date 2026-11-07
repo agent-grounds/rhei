@@ -1,11 +1,14 @@
 impl StateMachine {
-    /// Validate the `profiles` and `node_policy` blocks introduced by the
-    /// current schema revision.
+    /// Validate the `profiles` and `node_policy` blocks.
     ///
-    /// When both are absent, the machine is treated as legacy and no
-    /// additional checks run. When either is present, both must be present
-    /// and consistent.
+    /// When both are absent, legacy machines skip these checks only if the
+    /// parsed major version is absent or below 3. A major of at least 3 requires
+    /// both blocks. §FS-rhei-states.1.1
+    ///
+    /// At every version, declaring either block requires both to be present
+    /// and consistent, and forbids per-state `initial: true`. §FS-rhei-states.1.3
     fn validate_profiles_and_node_policy(&self) -> Result<(), StateMachineLoadError> {
+        // §FS-rhei-states.1.1: Only a parsed major of at least 3 requires the profiled schema.
         let requires_profile_schema = self.schema_major_version().is_some_and(|major| major >= 3);
         match (self.profiles.as_ref(), self.node_policy.as_ref()) {
             (None, None) if !requires_profile_schema => return Ok(()),

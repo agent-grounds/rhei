@@ -500,9 +500,10 @@ pub struct StateMachine {
     pub transitions: Vec<TransitionRule>,
     /// Named reusable state policies referenced from `node_policy`.
     ///
-    /// The current schema revision makes this required, but the field is
-    /// decoded optionally so legacy YAML without profiles still loads. When
-    /// present, [`NodePolicy`] must be present as well.
+    /// Required together with `node_policy` when the parsed major version is
+    /// at least 3. Both blocks may be omitted for legacy machines only when
+    /// the parsed major is absent or below 3. §FS-rhei-states.1.1
+    /// Whenever either block is present, both must be present. §FS-rhei-states.1.3
     // §FS-rhei-states.8: Profile map.
     #[serde(default)]
     pub profiles: Option<IndexMap<String, Profile>>,

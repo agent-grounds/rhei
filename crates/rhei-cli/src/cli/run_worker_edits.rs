@@ -259,7 +259,9 @@ impl WorkerRegions {
     /// The break no exited worker answers for, as the run stops on it. §FS-rhei-run.3.7.6
     fn attributed_stop(&self, at: &PlanBreak) -> Report {
         let place = format!("{}:{}", display_in_workspace(self.root.as_deref(), &at.file), at.line);
-        let owner = task_owning_line(&at.file, at.line);
+        // The plan no longer loads: read the file as the last load did. §FS-rhei-plan-language.2.1
+        let role = self.last_loaded.as_ref().map(|load| load.document_role(&at.file));
+        let owner = task_owning_line(&at.file, role.unwrap_or(DocumentRole::Plan), at.line);
         let refused = owner
             .as_ref()
             .and_then(|task| self.refusals.get(task).map(|why| (task, why)))
@@ -405,7 +407,7 @@ fn begin_worker_region(
         region.live += 1;
     } else {
         let route = loaded.task_route(task_id, input);
-        let Some(snapshot) = file_region(&route.task_file, &route.local_id) else { return lease };
+        let Some(snapshot) = file_region(loaded, &route) else { return lease };
         let region = InFlightRegion { file: route.task_file, snapshot, live: 1 };
         regions.in_flight.insert(task_id.to_string(), region);
     }

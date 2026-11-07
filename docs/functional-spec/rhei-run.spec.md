@@ -1099,9 +1099,13 @@ for a snapshot that had no following heading. The task's heading is found as the
 region was ([§FS-rhei-run.3.7.1](rhei-run.spec.md#371-the-region)): only a node heading counts, so a copy of its
 line in a fenced block or a frontmatter value does not ([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)). The
 text above the region is as the run left it, so that reading holds there. The
-following heading is matched by its text below the task's heading, with no fence
-carried out of the region: the worker's broken text is what the restore puts
-right, and a fence it left open must not hide the boundary. The run then writes the text it
+following heading is matched by its text alone, with no fence carried out of the
+region: the worker's broken text is what the restore puts right, and a fence it
+left open must not hide the boundary. Read that way, a copy of the line in a
+frontmatter value or a later task's fence is indistinguishable from the heading,
+so the line is counted over the **whole file**: it must be there exactly once,
+and that once below the task's heading. A second copy anywhere, above the
+region or below it, refuses the restore. The run then writes the text it
 is about to replace to the reverted-text file ([§FS-rhei-run.3.7.7](rhei-run.spec.md#377-what-the-operator-reads)), and replaces only the
 text from the task's heading up to the following heading with the snapshot.
 Every other byte of the file is kept, so a sibling's transition written to the

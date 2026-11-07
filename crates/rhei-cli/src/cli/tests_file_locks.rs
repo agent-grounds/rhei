@@ -404,6 +404,7 @@ mod file_lock_tests {
         let recorded = record_transition_result(
             dir.path(),
             &path,
+            rhei_core::header::DocumentRole::Plan,
             "1",
             &machine,
             "1",

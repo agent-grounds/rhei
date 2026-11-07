@@ -113,7 +113,7 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
         local_id: &route.local_id, from, to, to_visit: to_visit.unwrap_or(1), operation_supervisor: None,
     }) { updated = Some(next); }
     let rendered = format_task_state_value(to, to_visit, machine);
-    let role = rhei_core::workspace::document_role(&route.task_file);
+    let role = loaded.document_role(&route.task_file);
     let mut new_task = rewrite_task_for_transition(&task_raw, role, &route.local_id, &rendered, transition_ends_supervisor_visit(machine, from, to))?;
     if terminal || machine.states[from].terminal {
         new_task = forced_result_link(&new_task, role, &route.local_id, &task_id, terminal);

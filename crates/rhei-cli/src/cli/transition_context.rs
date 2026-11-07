@@ -8,6 +8,8 @@ struct CallbackPaths {
 #[derive(Clone, Copy)]
 struct TransitionFiles<'a> {
     task_file: &'a Path,
+    /// The role the load read `task_file` in. §FS-rhei-plan-language.2.1
+    role: rhei_core::header::DocumentRole,
     metadata_file: &'a Path,
     /// `metadata.tasks.<id>` key inside `metadata_file`. Equal to the ticket's
     /// rhei-local id except for basin tickets, whose metadata shares the

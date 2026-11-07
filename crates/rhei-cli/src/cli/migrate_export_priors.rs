@@ -5,6 +5,8 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ExportPriorAddition {
     file: PathBuf,
+    /// How the load read `file`. §FS-rhei-plan-language.2.1
+    role: rhei_core::header::DocumentRole,
     consumer: String,
     consumer_kind: String,
     producer: String,
@@ -112,8 +114,10 @@ fn export_prior_additions(input: &Path, loaded: &LoadedPlan) -> Vec<ExportPriorA
             let producer = relationship.producer.to_string();
             let producer_local = migration_reference_id(&consumer, &producer).to_string();
             let producer_kind = relationship.producer_kind.as_deref().unwrap_or("task");
+            let file = loaded.task_file(&consumer, input);
             ExportPriorAddition {
-                file: loaded.task_file(&consumer, input),
+                role: loaded.document_role(&file),
+                file,
                 consumer,
                 consumer_kind: title_case_node_kind(&relationship.consumer_kind),
                 producer,
@@ -191,8 +195,7 @@ fn migrate_locked(
     for (canonical, additions) in &grouped {
         let locked = locks.get(canonical).expect("affected file lock is held");
         let raw = locked.read_to_string("failed to read migration target")?;
-        let role = rhei_core::workspace::document_role(&additions[0].file);
-        let rewritten = rewrite_export_priors(&raw, role, additions)?;
+        let rewritten = rewrite_export_priors(&raw, additions[0].role, additions)?;
         let parent = additions[0].file.parent().unwrap_or(Path::new("."));
         let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|err| {
             file_io_report(parent, "failed to stage export Prior migration", err)

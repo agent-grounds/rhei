@@ -73,11 +73,7 @@ fn plan_removal_images(loaded: &LoadedPlan, input: &Path, id: &str) -> MietteRes
     }
 
     let image = images.current(&route.task_file)?;
-    let mut after = remove_ticket_section(
-        &image.after,
-        rhei_core::workspace::document_role(&route.task_file),
-        &route.local_id,
-    ).ok_or_else(|| {
+    let mut after = remove_ticket_section(&image.after, loaded.document_role(&route.task_file), &route.local_id).ok_or_else(|| {
         miette!(
             help = "the plan changed under removal; re-run it.",
             "could not find the section of {id} in {}",

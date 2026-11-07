@@ -265,6 +265,7 @@ help = blocked_completion_help(task_id_str, current_state_raw),
     let effective_to = execute_transition(
         TransitionFiles {
             task_file: &route.task_file,
+            role: loaded.document_role(&route.task_file),
             metadata_file: &route.metadata_file,
             metadata_id: &route.metadata_id,
             artifact_root: &route.execution_root,

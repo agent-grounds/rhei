@@ -22,6 +22,8 @@ impl ClaimFixture {
     fn files(&self) -> TransitionFiles<'_> {
         TransitionFiles {
             task_file: &self.task,
+            // A task file beside its index, as a workspace route reads one.
+            role: rhei_core::header::DocumentRole::TaskFile,
             metadata_file: &self.metadata,
             metadata_id: "1",
             artifact_root: self.dir.path(),

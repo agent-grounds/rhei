@@ -225,6 +225,7 @@ impl LockedTransitionLedger {
 fn record_transition_result(
     artifact_root: &Path,
     task_file: &Path,
+    role: rhei_core::header::DocumentRole,
     local_id: &str,
     machine: &rhei_validator::StateMachine,
     task_id: &str,
@@ -242,7 +243,7 @@ fn record_transition_result(
         // existing result must not link a path that does not exist.
         ensure_result_file(artifact_root, task_id)?;
         let result_link = format!("runtime/results/{}.md", task_id);
-        rewrite_task_completion(task_file, local_id, task_id, &result_link, true)?;
+        rewrite_task_completion(task_file, role, local_id, task_id, &result_link, true)?;
     }
     Ok(())
 }
@@ -279,6 +280,7 @@ fn trim_trailing_blank_lines(lines: &mut Vec<String>) {
 /// §FS-rhei-complete.4.2 §FS-rhei-complete.4.3: write only the real task's result and assignee.
 fn rewrite_task_completion(
     task_file: &Path,
+    role: rhei_core::header::DocumentRole,
     task_id: &str,
     link_text: &str,
     link_path: &str,
@@ -297,10 +299,7 @@ fn rewrite_task_completion(
     let mut target_found = false;
     let mut link_inserted = !insert_link; // skip insertion when not requested
     let result_line = format!("> **Result:** [{}]({})", link_text, link_path);
-    let mut in_code_block = rhei_core::header::DocumentFence::of_role(
-        rhei_core::workspace::document_role(task_file),
-        &raw,
-    );
+    let mut in_code_block = rhei_core::header::DocumentFence::of_role(role, &raw);
 
     for line in lines {
         let heading = node_heading_outside_code(line, &mut in_code_block);

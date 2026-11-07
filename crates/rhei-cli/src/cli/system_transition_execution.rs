@@ -827,7 +827,7 @@ fn execute_transition_with_origin(
     // §FS-rhei-supervision.3.4: the release self-loop ends the visit, so it
     // ends the claim the visit was taken under.
     let ends_visit = transition_ends_supervisor_visit(machine, from, to);
-    let role = rhei_core::workspace::document_role(task_file);
+    let role = files.role;
     let metadata_raw_updated = if task_file == metadata_file {
         let new_task_raw =
             rewrite_task_for_transition(&task_raw, role, task_id_str, &rendered_to_state, ends_visit)?;
@@ -1037,6 +1037,7 @@ fn execute_transition_with_origin(
         record_transition_result(
             files.artifact_root,
             files.task_file,
+            files.role,
             task_id_str,
             machine,
             files.artifact_id,

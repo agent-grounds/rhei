@@ -51,7 +51,7 @@ help = ticket_id_required_help(),
     // Write, then report: a target's `Released` line follows its own removed claim, and a failed
     // write stops here, so the lines printed are exactly the tickets released. §FS-rhei-release.3
     for target in &targets {
-        remove_task_assignee(&target.file, &target.local_id, &target.id)?;
+        remove_task_assignee(&target.file, target.role, &target.local_id, &target.id)?;
         report_release(input, &machines, target, "Released");
     }
     Ok(())
@@ -105,6 +105,8 @@ struct ReleaseTarget {
     /// machine defines one.
     initial_state: Option<String>,
     file: PathBuf,
+    /// How the load read `file`. §FS-rhei-plan-language.2.1
+    role: rhei_core::header::DocumentRole,
 }
 
 /// Resolve an explicit `--task` target, refusing a ticket that holds no claim.
@@ -161,6 +163,7 @@ fn release_target(
     let id = task.id.to_string();
     let file = loaded.task_file(&id, Path::new("."));
     ReleaseTarget {
+        role: loaded.document_role(&file),
         local_id: rhei_local_id_of(task),
         id,
         assignee,
@@ -208,13 +211,14 @@ fn without_task_assignee(raw: &str, role: rhei_core::header::DocumentRole, local
 /// leaving every other line alone. §AR-agent-orchestrator-workflow.3.3.1
 fn remove_task_assignee(
     task_file: &Path,
+    role: rhei_core::header::DocumentRole,
     local_id: &str,
     qualified_id: &str,
 ) -> MietteResult<()> {
     let locked = LockedPlanFile::open(task_file)?;
     let raw = locked.read_to_string("failed to read plan file")?;
 
-    let (output, target_found, removed) = without_task_assignee(&raw, rhei_core::workspace::document_role(task_file), local_id);
+    let (output, target_found, removed) = without_task_assignee(&raw, role, local_id);
 
     if !target_found {
         return Err(miette!(

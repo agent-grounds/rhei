@@ -263,7 +263,7 @@
         let claimed = insert_task_assignee(TOOLED_TASK, rhei_core::header::DocumentRole::Plan, "1", "codex").expect("claim");
         fs::write(&plan, &claimed).expect("write plan");
 
-        rewrite_task_completion(&plan, "1", "result", "result.md", false).expect("complete");
+        rewrite_task_completion(&plan, rhei_core::header::DocumentRole::Plan, "1", "result", "result.md", false).expect("complete");
 
         assert_eq!(fs::read_to_string(&plan).expect("read plan"), TOOLED_TASK);
     }

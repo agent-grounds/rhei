@@ -382,6 +382,7 @@ mod verify_reset_tests;
 mod verify_tests;
 mod waiting_on_person_tests;
 mod worker_capture_precondition_tests;
+mod worker_edit_following_copy_tests;
 mod worker_edit_inflight_stop_tests;
 mod worker_edit_one_file_support;
 mod worker_edit_poll_deadline_tests;

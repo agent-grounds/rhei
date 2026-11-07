@@ -96,7 +96,9 @@ fn assert_worked_pending(bound: bool) {
     for task in expected {
         let row = attention_row(&dir, task);
         assert!(
-            row.contains("worker exited 0 without result") && row.contains(&format!("runtime/results/{task}.md")),
+            row.contains("worker exited 0 without result")
+                // The row prints the host's native path, so only this comparison ignores the separator.
+                && row.replace('\\', "/").contains(&format!("runtime/results/{task}.md")),
             "{task} was spawned, remains pending, owes its result and has no budget halt; expected the missing-result reason: {row}"
         );
         assert!(

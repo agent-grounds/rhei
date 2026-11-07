@@ -114,13 +114,11 @@ fn assert_worked_pending(bound: bool) {
 }
 
 #[test]
-#[ignore = "red until #597: worked pending ticket must name its missing result without a bound; implement removes this"]
 fn issue_597_worked_pending_without_bound_reports_missing_result() {
     assert_worked_pending(false);
 }
 
 #[test]
-#[ignore = "red until #597: worked pending ticket must name its missing result beside a refused sibling; implement removes this"]
 fn issue_597_worked_pending_beside_bound_refused_sibling_reports_missing_result() {
     assert_worked_pending(true);
 }

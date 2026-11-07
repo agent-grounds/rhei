@@ -92,7 +92,7 @@ runtime/results/<task-id>.md
 
 The `runtime/results/` directory is created if it does not exist. A markdown
 link to the result file is appended to the task body (after task content,
-before child nodes):
+before child nodes, and above a fence the task's text ends inside, [§FS-rhei-complete.3.3](rhei-complete.spec.md#33-a-task-that-ends-inside-a-fence)):
 
 ```markdown
 > **Result:** [<task-id>](runtime/results/<task-id>.md)
@@ -218,6 +218,32 @@ Example result file after a task completes:
 
 Added avatar_url column and migration 0042
 ```
+
+### 3.3. A Task That Ends Inside a Fence
+
+A fence that is never closed runs to the end of the text that opened it
+([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)), so a task whose text ends inside one has nothing
+outside the fence below that fence's opening line. A link written at the end of
+that text would be a quotation: no reader would take it for this task's result,
+and no reset would remove it ([§FS-rhei-reset.2.4](rhei-reset.spec.md#24-fenced-lines)).
+
+The link therefore goes above the opening line, and that fence stays the last
+thing in the task:
+
+- One blank line separates the link from the text above it. The link is followed
+  by a blank line only where one stood above the fence, so that a reset, which
+  removes the link and the blank line before it, leaves the task as authored.
+- Every line from the opening line down stays as written. Neither the link nor a
+  removed `**Assignee:**` line is read from there, since each of those lines is
+  content.
+- A task whose link is already above the fence has that one link refreshed, as any
+  completion refreshes one ([§FS-rhei-panta.6.3](rhei-panta.spec.md#63-completion-and-rollup)). It does not gain a second.
+- The opening line is found by the language's one fence rule, read from where the
+  parser reads it. Frontmatter opens no fence, and that includes the block leading
+  a workspace task file.
+
+The rule binds every path that writes the link: `rhei complete`, `rhei transition`,
+`rhei run`, and the operator-forced path.
 
 ## 4. Behavior
 

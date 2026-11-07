@@ -403,7 +403,14 @@ the summary prints five stacked groups:
    the claim is the only thing that starts it again. The two readings would
    otherwise contradict each other on the plan shape a supervisor is for: the
    ledger would call the supervisor `blocked … claimed by <name>` while the
-   run's stop called the whole plan a wait on its subtree's clock.
+   run's stop called the whole plan a wait on its subtree's clock. Only a
+   **released** supervisor answers through its subtree, and then it reads as any
+   parent held open by its subtree does: no Attention row, not counted, and
+   `waiting on open descendant …` in the task tree even if it ran this run. A
+   **held** one, or one with no recorded phase, is itself the ready ticket and
+   keeps a row of its own, because its descendants read `held by supervisor`
+   back at it: were it to read as waiting on them, each would wait on the other
+   and nothing would be left in Attention.
 
    A **gating** parent that still carries a `held` supervision block
    ([§FS-rhei-supervision.3.1](rhei-supervision.spec.md#31-the-rule)) is classified ahead of the open-subtree reading,

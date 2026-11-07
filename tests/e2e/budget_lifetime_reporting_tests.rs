@@ -369,7 +369,7 @@ fn issue579_lifetime_co_limiting_ceilings_require_both_edits_then_adjustment() {
     let first = run_plan(&plan, &machine, None);
     let rows = records(&dir);
     assert_halted(&first, &rows, 1);
-    let both = format!("{project_edit}, {machine_edit}, then {adjust}");
+    let both = format!("{machine_edit}, {project_edit}, then {adjust}");
     assert_eq!(halt(&rows)["remedy"], both);
     assert!(first.stderr.contains(&format!("to raise it: {both}")), "{}", first.stderr);
     let report = fs::read_to_string(dir.join("runtime/run-report.md")).unwrap();

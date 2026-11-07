@@ -682,7 +682,7 @@ terminal entry past it, and a refused move leaves the plan untouched.
    (`rhei complete --result`, `rhei complete --result-file`, `rhei transition
    --result`, or a failure route under `rhei run` the engine genuinely owns —
    a timeout, unavailable tooling, an exit code that matched no route or only a
-   `"nonzero"` catch-all, an edge walked with no subprocess). `--result-file`
+   `"nonzero"` catch-all, a spent poll budget, an edge walked with no subprocess). `--result-file`
    changes only how `rhei complete` loads that caller message; after source
    validation it satisfies the same obligation without weakening the
    non-empty requirement. An exit that fired an *exact* `exit_code:`
@@ -774,8 +774,8 @@ finishes the ticket. A worker under `orchestrator` authority writes the file
 before it exits — the path is in its prompt
 ([§FS-rhei-agents.3](rhei-agents.spec.md#3-prompt-composition)). The engine supplies the message only for
 outcomes the engine itself produced: a timeout it fired, tooling it could not
-start, an exit code it read **that no declared route matched**, an edge it
-walked with no subprocess in the state
+start, an exit code it read **that no declared route matched**, a poll budget
+that ran out ([§FS-rhei-run.5.1](rhei-run.spec.md#51-polling-states)), an edge it walked with no subprocess in the state
 ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)). It never speaks for a worker that ran and never speaks for a
 human — where a worker ran, a missing result fails the completion condition,
 and a program that exited on an exact `exit_code:` edge is a worker that ran;

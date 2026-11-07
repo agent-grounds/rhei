@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use super::*;
 
 #[test]
-#[ignore = "red until #592: equal requests must name the active ceiling without a clamp; implement removes this"]
 fn ceiling_equality_shared_bound_remedies_preserve_request_provenance() {
     let files = SettingsFiles {
         machine: Some(PathBuf::from("machine/settings.json")),

@@ -40,6 +40,13 @@ fn task_detail(
     halt_causes: &HashMap<String, HaltCause>,
     activity: &HashMap<String, TaskActivity>,
 ) -> Option<String> {
+    // The tree is the only place a calm parent appears, so its wait outranks its work: a
+    // released supervisor has run, where an ordinary parent has not. §FS-rhei-run-report.3.1
+    if marker == Marker::Gate
+        && matches!(halt_causes.get(id), Some(HaltCause::WaitingOnDescendants { .. }))
+    {
+        return Some(attention_reason(marker, id, state, halt_causes).0);
+    }
     if let Some(act) = activity.get(id) {
         let cost = act
             .accounting

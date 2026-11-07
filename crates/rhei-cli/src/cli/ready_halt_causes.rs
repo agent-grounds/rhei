@@ -478,6 +478,15 @@ fn classify_halt(
     if let Some(assignee) = task.assignee.as_deref() {
         return HaltCause::Claimed { assignee: assignee.to_string() };
     }
+    // Only a released supervisor answers through its subtree: a held one is the ready
+    // ticket its descendants read back at. Every ticket reaching this with an open
+    // subtree is a supervisor, by the parent rung above. §FS-rhei-run-report.3.1
+    if !open.is_empty()
+        && recorded_supervision_phase(rhei.metadata.as_ref(), &task.id)
+            == Some(SupervisionPhase::Released)
+    {
+        return HaltCause::WaitingOnDescendants { open: format_open_descendants(&open, machines) };
+    }
     if let Some(BlockingPrior { prior, cancelled }) =
         first_blocking_prior_reading(task, state_map, machines, scope)
     {

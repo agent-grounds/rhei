@@ -86,7 +86,7 @@ impl<'a> Tokenizer<'a> {
             re_assignee,
             re_model,
             re_target,
-            fence: DocumentFence::new(input),
+            fence: DocumentFence::plan(input),
         }
     }
 
@@ -100,6 +100,11 @@ impl<'a> Tokenizer<'a> {
 }
 
 /// Convenience constructor to obtain a streaming tokenizer.
+///
+/// The input is read as a plan, a workspace index or a manifest: a frontmatter
+/// block is the one under the `# Rhei:` header, and its lines are text. Input
+/// with no header, such as a fragment or a task file's body, has no block, so a
+/// `---` opening it is a line like any other. §FS-rhei-plan-language.2.1
 pub fn tokenize(input: &str) -> Tokenizer<'_> {
     Tokenizer::new(input)
 }

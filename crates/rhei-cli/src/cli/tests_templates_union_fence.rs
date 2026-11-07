@@ -119,4 +119,15 @@ mod templates_union_fence_tests {
         let part = part_tickets("a", "---\nk: v\n---\n---\n```\n---\n### Task 1: A\n");
         assert!(part.ids.is_empty(), "the fence between the rules quotes the heading: {:?}", part.ids);
     }
+
+    // §FS-rhei-plan-language.2.3: the chapter is found in every spelling the parser accepts.
+    #[test]
+    fn a_plan_template_tasks_chapter_is_found_however_the_parser_spells_it() {
+        for chapter in ["  ## Tasks", "##  Tasks", "##\tTasks", "## Tasks  "] {
+            let raw = format!("# Rhei: T\n\n{chapter}\n\n### Task 1: A\n**State:** open\n");
+            assert_eq!(tasks_chapter_body(&raw), "### Task 1: A\n**State:** open\n", "{chapter:?}");
+        }
+        let above = "# Rhei: T\n\n## Tasks and more\n\nx\n\n## Overview\n\n### Tasks\n\n## Tasks\n\n### Task 1: A\n";
+        assert_eq!(tasks_chapter_body(above), "### Task 1: A\n");
+    }
 }

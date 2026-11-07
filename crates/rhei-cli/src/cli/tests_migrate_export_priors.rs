@@ -102,14 +102,14 @@ mod migrate_export_prior_tests {
     #[test]
     fn migration_rewriter_preserves_lf_and_crlf_and_repeats_as_a_no_op() {
         let lf = "# Rhei: x\n\n## Tasks\n\n### Task 1: Consumer\n**State:** pending\n**Consumes:** 2:a\nBody  \n";
-        let inserted = rewrite_one_consumer(lf, "1", &["Review 2"]).expect("insert");
+        let inserted = rewrite_one_consumer(lf, rhei_core::header::DocumentRole::Plan, "1", &["Review 2"]).expect("insert");
         assert_eq!(
             inserted,
             "# Rhei: x\n\n## Tasks\n\n### Task 1: Consumer\n**State:** pending\n**Prior:** Review 2\n**Consumes:** 2:a\nBody  \n"
         );
 
         let crlf = "### Task 1: Consumer\r\n**State:** pending\r\n**Prior:** 9\r\n**Consumes:** 2:a, 3:b\r\n";
-        let appended = rewrite_one_consumer(crlf, "1", &["Review 2", "Task 3"])
+        let appended = rewrite_one_consumer(crlf, rhei_core::header::DocumentRole::Plan, "1", &["Review 2", "Task 3"])
             .expect("append");
         assert_eq!(
             appended,

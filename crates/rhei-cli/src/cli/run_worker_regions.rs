@@ -17,6 +17,9 @@ struct RegionSnapshot {
     text: String,
     /// The heading line that followed the region, or `None` when it ended the file.
     following: Option<String>,
+    /// The role the file is read in, so the restore finds the heading the snapshot
+    /// did. §FS-rhei-plan-language.2.1
+    role: rhei_core::header::DocumentRole,
 }
 
 /// Where one region sits in a file's current text: byte offsets, and 1-based
@@ -72,9 +75,13 @@ fn region_lines_with_offsets(text: &str) -> impl Iterator<Item = (usize, &str)> 
 /// up to the next node heading at the same or a shallower depth, or the end of
 /// the file. `None` unless the heading is declared exactly once.
 // §FS-rhei-run.3.7.1
-fn snapshot_region(text: &str, local_id: &str) -> Option<RegionSnapshot> {
+fn snapshot_region(
+    text: &str,
+    role: rhei_core::header::DocumentRole,
+    local_id: &str,
+) -> Option<RegionSnapshot> {
     // §FS-rhei-plan-language.2.1: quoted headings do not delimit worker regions.
-    let mut in_code = rhei_core::header::DocumentFence::new(text);
+    let mut in_code = rhei_core::header::DocumentFence::of_role(role, text);
     let mut own: Option<(usize, usize, &str)> = None;
     let mut declared = 0;
     let mut following: Option<(usize, &str)> = None;
@@ -96,32 +103,52 @@ fn snapshot_region(text: &str, local_id: &str) -> Option<RegionSnapshot> {
         heading: heading.to_string(),
         text: text[start..end].to_string(),
         following: following.map(|(_, line)| line.to_string()),
+        role,
     })
+}
+
+/// The region of `local_id` in `file` as it is on disk, read in the role the
+/// loader reads that file in. §FS-rhei-run.3.7.1 §FS-rhei-plan-language.2.1
+fn file_region(file: &Path, local_id: &str) -> Option<RegionSnapshot> {
+    let text = fs::read_to_string(file).ok()?;
+    snapshot_region(&text, workspace::document_role(file), local_id)
 }
 
 /// Where the snapshot's region lies in `text` now, found by its two boundary
 /// lines, each exactly once and the second after the first; refused otherwise.
+///
+/// The task's heading is a node heading as [`snapshot_region`] reads one, so a
+/// copy of its line in a value or a fence is not it. The following heading is
+/// matched by text below that heading, with no fence state carried out of the
+/// worker's region, which may hold the fence the worker left open.
 // §FS-rhei-run.3.7.3
 fn region_span(text: &str, snapshot: &RegionSnapshot) -> Result<RegionSpan, RestoreRefusal> {
     let lines: Vec<(usize, &str)> = region_lines_with_offsets(text).collect();
-    let indices_of = |wanted: &str| -> Vec<usize> {
-        lines
-            .iter()
-            .enumerate()
-            .filter(|(_, (_, line))| *line == wanted)
-            .map(|(at, _)| at)
-            .collect()
-    };
-    let headings = indices_of(&snapshot.heading);
+    let mut in_code = rhei_core::header::DocumentFence::of_role(snapshot.role, text);
+    let headings: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, (_, line))| {
+            // Read every line, so the fence state is right on each one.
+            let is_heading = node_heading_outside_code(line, &mut in_code).is_some();
+            is_heading && *line == snapshot.heading
+        })
+        .map(|(at, _)| at)
+        .collect();
     let [heading] = headings[..] else {
         return Err(RestoreRefusal::Heading { found: headings.len() });
     };
     let (end, end_index) = match &snapshot.following {
         None => (text.len(), lines.len()),
-        Some(following) => match indices_of(following)[..] {
-            [at] if at > heading => (lines[at].0, at),
-            ref found => return Err(RestoreRefusal::Following { found: found.len() }),
-        },
+        Some(following) => {
+            let below: Vec<usize> = (heading + 1..lines.len())
+                .filter(|&at| lines[at].1 == following.as_str())
+                .collect();
+            match below[..] {
+                [at] => (lines[at].0, at),
+                ref found => return Err(RestoreRefusal::Following { found: found.len() }),
+            }
+        }
     };
     Ok(RegionSpan {
         start: lines[heading].0,
@@ -147,9 +174,13 @@ fn restore_region(
 /// would have ended or nested that task first. A task's own heading line is not
 /// under it, so line 1 of a task file has no owner, though `region_span` counts
 /// that line in the task's region. §FS-rhei-run.3.7.6
-fn region_owner_at(text: &str, line: usize) -> Option<String> {
+fn region_owner_at(
+    text: &str,
+    role: rhei_core::header::DocumentRole,
+    line: usize,
+) -> Option<String> {
     // §FS-rhei-plan-language.2.1: a quoted heading cannot change the owning task.
-    let mut in_code = rhei_core::header::DocumentFence::new(text);
+    let mut in_code = rhei_core::header::DocumentFence::of_role(role, text);
     let mut owner = None;
     for (_, current) in region_lines_with_offsets(text).take(line.saturating_sub(1)) {
         if let Some((_, id)) = node_heading_outside_code(current, &mut in_code) {
@@ -163,7 +194,8 @@ fn region_owner_at(text: &str, line: usize) -> Option<String> {
 /// of `file` falls: the in-file id under the id of the rhei that owns the file.
 // §FS-rhei-run.3.7.6 §AR-rhei-panta.3
 fn task_owning_line(file: &Path, line: usize) -> Option<String> {
-    let local = region_owner_at(&fs::read_to_string(file).ok()?, line)?;
+    let role = workspace::document_role(file);
+    let local = region_owner_at(&fs::read_to_string(file).ok()?, role, line)?;
     let entry = file.ancestors().skip(1).find(|dir| workspace::is_workspace(dir)).unwrap_or(file);
     match workspace::rhei_id_for_path(entry) {
         Ok(rhei) => Some(format!("{rhei}.{local}")),

@@ -117,14 +117,20 @@ fn forced_file(root: &Path, path: &Path, roles: &[&str], after: &[u8]) -> Miette
 }
 
 /// Completion/reopening changes only the task's result link, preserving history. §FS-rhei-plan-language.3.8
-fn forced_result_link(raw: &str, kind: PlanFileKind, task: &str, qualified: &str, terminal: bool) -> String {
+fn forced_result_link(
+    raw: &str,
+    role: rhei_core::header::DocumentRole,
+    task: &str,
+    qualified: &str,
+    terminal: bool,
+) -> String {
     let all_lines: Vec<&str> = raw.lines().collect();
     // §FS-rhei-complete.3.3: a fence the task's text ends inside is below the link, unread.
-    let (raw_lines, final_fence) = split_at_a_tasks_final_fence(&all_lines, kind, task);
+    let (raw_lines, final_fence) = split_at_a_tasks_final_fence(&all_lines, role, task);
     let mut lines = Vec::new();
     let mut target = false;
     // §FS-rhei-plan-language.2.1: quoted result and assignee lines remain content.
-    let mut code = rhei_core::header::DocumentFence::new(raw);
+    let mut code = rhei_core::header::DocumentFence::of_role(role, raw);
     let link = format!("> **Result:** [{qualified}](runtime/results/{qualified}.md)");
     for line in raw_lines.iter().copied() {
         if let Some((_, id)) = node_heading_outside_code(line, &mut code) {

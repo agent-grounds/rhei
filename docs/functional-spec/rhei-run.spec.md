@@ -1095,7 +1095,13 @@ every engine write hold ([§AR-agent-orchestrator-workflow.3.3.1](../architectur
 run reads the file again and finds the two boundaries: the task's own heading
 line, and the heading line that followed the region at spawn. Each must be
 found **exactly once**, the second after the first; the end of the file stands
-for a snapshot that had no following heading. The run then writes the text it
+for a snapshot that had no following heading. The task's heading is found as the
+region was ([§FS-rhei-run.3.7.1](rhei-run.spec.md#371-the-region)): only a node heading counts, so a copy of its
+line in a fenced block or a frontmatter value does not ([§FS-rhei-plan-language.2.1](rhei-plan-language.spec.md#21-fenced-code-blocks)). The
+text above the region is as the run left it, so that reading holds there. The
+following heading is matched by its text below the task's heading, with no fence
+carried out of the region: the worker's broken text is what the restore puts
+right, and a fence it left open must not hide the boundary. The run then writes the text it
 is about to replace to the reverted-text file ([§FS-rhei-run.3.7.7](rhei-run.spec.md#377-what-the-operator-reads)), and replaces only the
 text from the task's heading up to the following heading with the snapshot.
 Every other byte of the file is kept, so a sibling's transition written to the

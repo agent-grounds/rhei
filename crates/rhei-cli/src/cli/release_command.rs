@@ -177,13 +177,13 @@ fn release_target(
 /// heading match uses that rather than the project-qualified id. Kept apart
 /// from the file write so the transition path — which rewrites the same text in
 /// memory and may still roll it back — can drop a claim through it too.
-fn without_task_assignee(raw: &str, local_id: &str) -> (String, bool, bool) {
+fn without_task_assignee(raw: &str, role: rhei_core::header::DocumentRole, local_id: &str) -> (String, bool, bool) {
     let mut out: Vec<String> = Vec::with_capacity(raw.lines().count());
     let mut in_target_task = false;
     let mut target_found = false;
     let mut removed = false;
     // §FS-rhei-plan-language.2.1: release never removes quoted assignee lines.
-    let mut in_code_block = rhei_core::header::DocumentFence::new(raw);
+    let mut in_code_block = rhei_core::header::DocumentFence::of_role(role, raw);
 
     for line in raw.lines() {
         if let Some((_, id)) = node_heading_outside_code(line, &mut in_code_block) {
@@ -214,7 +214,7 @@ fn remove_task_assignee(
     let locked = LockedPlanFile::open(task_file)?;
     let raw = locked.read_to_string("failed to read plan file")?;
 
-    let (output, target_found, removed) = without_task_assignee(&raw, local_id);
+    let (output, target_found, removed) = without_task_assignee(&raw, rhei_core::workspace::document_role(task_file), local_id);
 
     if !target_found {
         return Err(miette!(

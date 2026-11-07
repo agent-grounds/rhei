@@ -405,8 +405,7 @@ fn begin_worker_region(
         region.live += 1;
     } else {
         let route = loaded.task_route(task_id, input);
-        let Ok(text) = fs::read_to_string(&route.task_file) else { return lease };
-        let Some(snapshot) = snapshot_region(&text, &route.local_id) else { return lease };
+        let Some(snapshot) = file_region(&route.task_file, &route.local_id) else { return lease };
         let region = InFlightRegion { file: route.task_file, snapshot, live: 1 };
         regions.in_flight.insert(task_id.to_string(), region);
     }

@@ -150,15 +150,19 @@ fn place_ticket(
 ) -> MietteResult<PlacedTicket> {
     if let Some(parent_local) = &placement.parent_local {
         let qualified_parent = format!("{}.{}", placement.rhei_id, parent_local);
-        let path = match entry {
-            RheiEntry::SingleFile(path) => path.clone(),
+        // The entry says which document the parent is in, and so where its block is.
+        let (path, role) = match entry {
+            RheiEntry::SingleFile(path) => (path.clone(), rhei_core::header::DocumentRole::Plan),
             // A task file owns a subtree: splitting one across files would put
             // a parent and its child in different diffs.
-            _ => loaded.task_file(&qualified_parent, target),
+            _ => (
+                loaded.task_file(&qualified_parent, target),
+                rhei_core::header::DocumentRole::TaskFile,
+            ),
         };
         let raw = read_input_file(&path)?;
         let contents =
-            insert_ticket_after_subtree(&raw, parent_local, ticket.block).ok_or_else(|| {
+            insert_ticket_after_subtree(&raw, role, parent_local, ticket.block).ok_or_else(|| {
             miette!(
 help = format!(
     "re-run after `{}` passes, so the plan on disk and the ids agree.",

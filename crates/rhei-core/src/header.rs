@@ -102,27 +102,37 @@ fn block_opened_at<'a>(
     FrontmatterBlock { open, close }
 }
 
-/// The frontmatter block of a whole document, wherever the parsers read one: a
-/// task file's leading block, or else the block under the header of a plan.
-///
-/// A task file's body is read under a synthetic header, so a `# Rhei:` line in it
-/// is the body's text and a `---` below that line is too. What tells the two apart
-/// in text alone is the `## Tasks` chapter: a plan's tickets stand under one, and a
-/// task file refuses one. §FS-rhei-plan-language.2.3 §FS-rhei-plan-language.1.4
-fn find_document_block(text: &str) -> Option<FrontmatterBlock> {
-    find_leading_frontmatter(text.lines()).or_else(|| {
-        let block = find_frontmatter(text.lines())?.block?;
-        let mut fence = FenceTracker::default();
-        let has_tasks_chapter = text.lines().skip(block.close? + 1).any(|line| {
-            let is_fence = fence.read(line);
-            !is_fence && !fence.is_open() && is_tasks_chapter(line)
-        });
-        has_tasks_chapter.then_some(block)
-    })
+/// Which entry point the parsers read a document through, and so where its
+/// frontmatter block stands. Text alone cannot say: the same bytes can be a plan
+/// holding a ticket and a task file holding none, so the caller, which knows
+/// which file it opened, says which. §FS-rhei-plan-language.2.3
+/// §FS-rhei-plan-language.1.4
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocumentRole {
+    /// A document with a header: a single-file plan, a workspace index or a
+    /// project manifest. Its block is the one under the header.
+    Plan,
+    /// A workspace task file or a basin ticket file. Its body is read under a
+    /// synthetic header, so its block is only a leading one, and a `# Rhei:` line
+    /// and a `---` below it are the body's text.
+    TaskFile,
 }
 
-/// The `## Tasks` line, spelled any way the parsers accept it.
-fn is_tasks_chapter(line: &str) -> bool {
+impl DocumentRole {
+    /// The frontmatter block the parsers read in `text` for this role.
+    /// §FS-rhei-plan-language.2.3 §FS-rhei-plan-language.1.4
+    pub fn frontmatter_block(self, text: &str) -> Option<FrontmatterBlock> {
+        match self {
+            DocumentRole::Plan => find_frontmatter(text.lines())?.block,
+            DocumentRole::TaskFile => find_leading_frontmatter(text.lines()),
+        }
+    }
+}
+
+/// The `## Tasks` line, spelled any way the parsers accept it: the line's
+/// surrounding whitespace and the run of whitespace after `##` do not matter.
+/// §FS-rhei-plan-language.2.3
+pub fn is_tasks_chapter(line: &str) -> bool {
     line.trim()
         .strip_prefix("##")
         .is_some_and(|rest| rest.starts_with(char::is_whitespace) && rest.trim() == "Tasks")
@@ -146,10 +156,22 @@ pub struct DocumentFence {
 }
 
 impl DocumentFence {
-    /// The reader of a whole document, its frontmatter block found in `text`.
-    /// §FS-rhei-plan-language.2.1
-    pub fn new(text: &str) -> Self {
-        Self { block: find_document_block(text), ..Self::default() }
+    /// The reader of a whole document in `role`, its frontmatter block found in
+    /// `text` where the parser for that role reads it. §FS-rhei-plan-language.2.1
+    pub fn of_role(role: DocumentRole, text: &str) -> Self {
+        Self { block: role.frontmatter_block(text), ..Self::default() }
+    }
+
+    /// The reader of a plan, a workspace index or a manifest: its block is the one
+    /// under the header. §FS-rhei-plan-language.2.3
+    pub fn plan(text: &str) -> Self {
+        Self::of_role(DocumentRole::Plan, text)
+    }
+
+    /// The reader of a task file: its block is only a leading one.
+    /// §FS-rhei-plan-language.1.4
+    pub fn task_file(text: &str) -> Self {
+        Self::of_role(DocumentRole::TaskFile, text)
     }
 
     /// The reader of text whose block is already off, such as a template's body:

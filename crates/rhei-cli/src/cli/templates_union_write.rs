@@ -13,7 +13,12 @@
         let mut out = raw.to_owned();
         for file in tickets {
             out = match parent {
-                Some(parent) => insert_ticket_after_subtree(&out, parent, &file.body)
+                Some(parent) => insert_ticket_after_subtree(
+                    &out,
+                    rhei_core::header::DocumentRole::Plan,
+                    parent,
+                    &file.body,
+                )
                     .unwrap_or_else(|| append_ticket(&out, &file.body)),
                 None => append_ticket(&out, &file.body),
             };
@@ -55,7 +60,9 @@
             })?;
         let mut text = read_text(&owner)?;
         for file in tickets {
-            text = insert_ticket_after_subtree(&text, parent, &file.body).ok_or_else(|| {
+            // A workspace's tickets are in task files. §FS-rhei-plan-language.1.4
+            let role = rhei_core::header::DocumentRole::TaskFile;
+            text = insert_ticket_after_subtree(&text, role, parent, &file.body).ok_or_else(|| {
                 miette!(
                     help = internal_error_help(),
                     "internal error: the parent heading for '{parent}' moved mid-placement"

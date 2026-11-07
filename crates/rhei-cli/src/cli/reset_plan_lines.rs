@@ -1,13 +1,7 @@
 /// Which reading of a file's text applies: the parser reads frontmatter under a plan's
-/// header, and only at the very top of a task file, which has no header.
-/// §FS-rhei-plan-language.1.4 §FS-rhei-plan-language.2.3
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PlanFileKind {
-    /// A single-file plan or a workspace's `index.rhei.md`.
-    Plan,
-    /// A file under a workspace's `tasks/` or a project's `basin/`.
-    TaskFile,
-}
+/// header, and only at the very top of a task file, which has no header. It is the
+/// one role every reader of a plan's raw text takes. §FS-rhei-plan-language.2.1
+type PlanFileKind = rhei_core::header::DocumentRole;
 
 /// What `path` is to the loader. A plan document is named `*.rhei.md`; a task file may
 /// be named anything, that included, once it sits in a directory the loader reads task

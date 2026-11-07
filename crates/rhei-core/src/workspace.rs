@@ -77,6 +77,27 @@ fn nested_parse_error(err: ParseError, path: &Path) -> ParseError {
     err.in_file(path)
 }
 
+/// The role the loader reads the file at `path` in, and so where its frontmatter
+/// block stands: a file under a workspace's `tasks/` or a project's `basin/` is a
+/// task file, and every other document, a single-file plan, an index or a
+/// manifest, is a plan. This is the one place a command turns a path into a
+/// [`DocumentRole`](crate::header::DocumentRole). §FS-rhei-plan-language.2.1
+/// §FS-rhei-plan-language.1.4
+pub fn document_role(path: &Path) -> crate::header::DocumentRole {
+    let task_dir = path.ancestors().skip(1).any(|dir| {
+        let name = dir.file_name().and_then(|name| name.to_str());
+        let parent = dir.parent().unwrap_or(Path::new("."));
+        let parent = if parent.as_os_str().is_empty() { Path::new(".") } else { parent };
+        (name == Some("tasks") && is_workspace(parent))
+            || (name == Some(BASIN_RHEI_ID) && is_panta_project(parent))
+    });
+    if task_dir {
+        crate::header::DocumentRole::TaskFile
+    } else {
+        crate::header::DocumentRole::Plan
+    }
+}
+
 /// Returns `true` if `path` is a directory workspace
 /// (a directory containing `index.rhei.md`).
 pub fn is_workspace(path: &Path) -> bool {

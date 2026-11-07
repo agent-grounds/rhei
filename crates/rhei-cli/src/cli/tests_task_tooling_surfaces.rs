@@ -242,7 +242,7 @@
     // §FS-rhei-plan-language.2
     #[test]
     fn a_claim_lands_before_model_and_the_tooling_lines() {
-        let claimed = insert_task_assignee(TOOLED_TASK, "1", "codex").expect("claim");
+        let claimed = insert_task_assignee(TOOLED_TASK, rhei_core::header::DocumentRole::Plan, "1", "codex").expect("claim");
 
         assert!(
             claimed.contains(
@@ -260,7 +260,7 @@
     fn completing_drops_the_claim_and_leaves_the_tooling_lines() {
         let dir = tempfile::tempdir().expect("tmpdir");
         let plan = dir.path().join("plan.rhei.md");
-        let claimed = insert_task_assignee(TOOLED_TASK, "1", "codex").expect("claim");
+        let claimed = insert_task_assignee(TOOLED_TASK, rhei_core::header::DocumentRole::Plan, "1", "codex").expect("claim");
         fs::write(&plan, &claimed).expect("write plan");
 
         rewrite_task_completion(&plan, "1", "result", "result.md", false).expect("complete");

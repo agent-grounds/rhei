@@ -15,7 +15,12 @@
 /// the end of that block, matching the task grammar order. A duplicate
 /// insertion is treated as a claim conflict.
 // §FS-rhei-plan-language.2: Task metadata grammar order.
-fn insert_task_assignee(raw: &str, task_id: &str, assignee: &str) -> MietteResult<String> {
+fn insert_task_assignee(
+    raw: &str,
+    role: rhei_core::header::DocumentRole,
+    task_id: &str,
+    assignee: &str,
+) -> MietteResult<String> {
     let lines: Vec<&str> = raw.lines().collect();
     let mut result: Vec<String> = Vec::with_capacity(lines.len() + 1);
 
@@ -24,7 +29,7 @@ fn insert_task_assignee(raw: &str, task_id: &str, assignee: &str) -> MietteResul
     let mut already_present = false;
     let mut inserted = false;
     // §FS-rhei-plan-language.2.1: quoted metadata is never a claim or insertion point.
-    let mut in_code_block = rhei_core::header::DocumentFence::new(raw);
+    let mut in_code_block = rhei_core::header::DocumentFence::of_role(role, raw);
 
     for line in lines.iter() {
         if let Some(id) = node_heading_id_outside_code(line, &mut in_code_block) {
@@ -140,10 +145,12 @@ fn insert_after(lines: &mut Vec<String>, idx: usize, value: &str) {
 mod next_assignee_rewrite_tests {
     use super::*;
 
+    const PLAN: rhei_core::header::DocumentRole = rhei_core::header::DocumentRole::Plan;
+
     #[test]
     fn insert_assignee_after_state_when_no_prior() {
         let raw = "# Rhei: Test\n\n## Tasks\n\n### Task 1: Work\n**State:** pending\nBody\n";
-        let rewritten = insert_task_assignee(raw, "1", "codex").expect("rewrite");
+        let rewritten = insert_task_assignee(raw, PLAN, "1", "codex").expect("rewrite");
         assert!(rewritten.contains("**State:** pending\n**Assignee:** codex\nBody"));
     }
 
@@ -151,14 +158,14 @@ mod next_assignee_rewrite_tests {
     fn insert_assignee_after_prior_when_present() {
         let raw =
             "# Rhei: Test\n\n## Tasks\n\n### Task 2: Work\n**State:** pending\n**Prior:** Task 1\nBody\n";
-        let rewritten = insert_task_assignee(raw, "2", "codex").expect("rewrite");
+        let rewritten = insert_task_assignee(raw, PLAN, "2", "codex").expect("rewrite");
         assert!(rewritten.contains("**Prior:** Task 1\n**Assignee:** codex\nBody"));
     }
 
     #[test]
     fn insert_assignee_supports_child_task_heading() {
         let raw = "# Rhei: Test\n\n## Tasks\n\n### Task 1: Parent\n**State:** pending\n\n#### Task 1.1: Child\n**State:** pending\nBody\n";
-        let rewritten = insert_task_assignee(raw, "1.1", "codex").expect("rewrite");
+        let rewritten = insert_task_assignee(raw, PLAN, "1.1", "codex").expect("rewrite");
         assert!(rewritten.contains("#### Task 1.1: Child\n**State:** pending\n**Assignee:** codex\nBody"));
         assert!(!rewritten.contains("### Task 1: Parent\n**State:** pending\n**Assignee:**"));
     }
@@ -166,21 +173,21 @@ mod next_assignee_rewrite_tests {
     #[test]
     fn insert_assignee_supports_custom_node_kind() {
         let raw = "# Rhei: Test\n\n## Tasks\n\n### Bug cache-key: Fix cache\n**State:** pending\nBody\n";
-        let rewritten = insert_task_assignee(raw, "cache-key", "codex").expect("rewrite");
+        let rewritten = insert_task_assignee(raw, PLAN, "cache-key", "codex").expect("rewrite");
         assert!(rewritten.contains("### Bug cache-key: Fix cache\n**State:** pending\n**Assignee:** codex\nBody"));
     }
 
     #[test]
     fn insert_assignee_rejects_existing_assignee() {
         let raw = "# Rhei: Test\n\n## Tasks\n\n### Task 1: Work\n**State:** pending\n**Assignee:** alice\nBody\n";
-        let err = insert_task_assignee(raw, "1", "codex").expect_err("existing assignee");
+        let err = insert_task_assignee(raw, PLAN, "1", "codex").expect_err("existing assignee");
         assert!(err.to_string().contains("already has an **Assignee:** line"));
     }
 
     #[test]
     fn rewrite_state_supports_child_task_heading() {
         let raw = "# Rhei: Test\n\n## Tasks\n\n### Task 1: Parent\n**State:** draft\n\n#### Task 1.1: Child\n**State:** draft\nBody\n";
-        let rewritten = rewrite_task_state(raw, "1.1", "pending").expect("rewrite");
+        let rewritten = rewrite_task_state(raw, PLAN, "1.1", "pending").expect("rewrite");
         assert!(rewritten.contains("### Task 1: Parent\n**State:** draft"));
         assert!(rewritten.contains("#### Task 1.1: Child\n**State:** pending\nBody"));
     }
@@ -188,7 +195,7 @@ mod next_assignee_rewrite_tests {
     #[test]
     fn insert_assignee_ignores_task_shaped_heading_inside_code_fence() {
         let raw = "# Rhei: Test\n\n## Tasks\n\n### Task 1: Parent\n**State:** pending\n```markdown\n#### Task 1.1: Example\n**State:** draft\n```\n\n#### Task 1.1: Real child\n**State:** pending\nBody\n";
-        let rewritten = insert_task_assignee(raw, "1.1", "codex").expect("rewrite");
+        let rewritten = insert_task_assignee(raw, PLAN, "1.1", "codex").expect("rewrite");
         assert!(rewritten.contains("#### Task 1.1: Example\n**State:** draft\n```"));
         assert!(rewritten.contains("#### Task 1.1: Real child\n**State:** pending\n**Assignee:** codex\nBody"));
     }
@@ -196,7 +203,7 @@ mod next_assignee_rewrite_tests {
     #[test]
     fn rewrite_state_ignores_task_shaped_heading_inside_code_fence() {
         let raw = "# Rhei: Test\n\n## Tasks\n\n### Task 1: Parent\n**State:** draft\n```markdown\n#### Task 1.1: Example\n**State:** draft\n```\n\n#### Task 1.1: Real child\n**State:** draft\nBody\n";
-        let rewritten = rewrite_task_state(raw, "1.1", "pending").expect("rewrite");
+        let rewritten = rewrite_task_state(raw, PLAN, "1.1", "pending").expect("rewrite");
         assert!(rewritten.contains("#### Task 1.1: Example\n**State:** draft\n```"));
         assert!(rewritten.contains("#### Task 1.1: Real child\n**State:** pending\nBody"));
     }
@@ -207,13 +214,18 @@ mod next_assignee_rewrite_tests {
 /// Locates the task node header and replaces the immediately following
 /// `**State:**` line with the new state value.
 /// §FS-rhei-complete.4.2 §FS-rhei-complete.4.3: preserve quoted content in either layout.
-fn rewrite_task_state(raw: &str, task_id: &str, new_state: &str) -> MietteResult<String> {
+fn rewrite_task_state(
+    raw: &str,
+    role: rhei_core::header::DocumentRole,
+    task_id: &str,
+    new_state: &str,
+) -> MietteResult<String> {
     let lines: Vec<&str> = raw.lines().collect();
     let mut result = Vec::with_capacity(lines.len());
 
     let mut in_target_task = false;
     let mut state_replaced = false;
-    let mut in_code_block = rhei_core::header::DocumentFence::new(raw);
+    let mut in_code_block = rhei_core::header::DocumentFence::of_role(role, raw);
 
     for line in &lines {
         if let Some(id) = node_heading_id_outside_code(line, &mut in_code_block) {

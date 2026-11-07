@@ -110,7 +110,8 @@ fn errors_a_reset_introduces(
 /// The plan as a reset of `scope` would leave it, loaded as every command loads a
 /// plan: each file the reset rewrites read as [`reset_file_text`] would write it,
 /// starting from `staged` where a file is staged there and from disk otherwise.
-/// Every other file reads as it stands. §FS-rhei-reset.2.3
+/// Writable metadata documents receive the same selected cleanup as persistence;
+/// every other file reads as it stands. §FS-rhei-reset.2 §FS-rhei-reset.2.3
 fn plan_a_reset_leaves(
     loaded: &LoadedPlan,
     input: &Path,
@@ -126,6 +127,13 @@ fn plan_a_reset_leaves(
         };
         let text = reset_file_text(&raw, authored.by_file.get(&file).unwrap_or(&no_moves))?;
         staged.insert(file, text);
+    }
+    for (file, task_ids) in reset_metadata_targets(loaded, input, scope) {
+        let raw = match staged.get(&file) {
+            Some(text) => text.clone(),
+            None => read_plan_source(&file, "failed to read metadata document")?,
+        };
+        staged.insert(file.clone(), reset_metadata_text(&file, &raw, &task_ids)?);
     }
     rhei_core::source::read_staged(staged, || load_plan(input))
 }

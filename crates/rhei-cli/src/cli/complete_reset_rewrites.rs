@@ -48,63 +48,67 @@ fn reset_plan_file_states(
 }
 
 /// The text a reset writes over one plan file's `raw`: each task's `**State:**` line
-/// set to where `authored` sends it, every claim and result link gone, and the
-/// runtime metadata cleared. The one computation of it, because the plan a reset
+/// set to where `authored` sends it, every claim and result link gone. Metadata
+/// is reset separately in its owning document. The plan a reset
 /// is checked against is built from it too. §FS-rhei-reset.2.2 §FS-rhei-reset.2.3
 fn reset_file_text(raw: &str, authored: &BTreeMap<String, String>) -> MietteResult<String> {
     let new_raw = rewrite_states_to_authored(raw, authored)?;
     let new_raw = strip_result_links(&new_raw);
-    let new_raw = strip_assignee_lines(&new_raw);
-    match rhei_core::parse(&new_raw) {
-        Ok(rhei) => match clear_runtime_task_metadata(rhei.metadata.as_ref()) {
-            Some(metadata) => rewrite_frontmatter(&new_raw, &metadata),
-            None => Ok(new_raw),
-        },
-        Err(_) => Ok(new_raw),
+    Ok(strip_assignee_lines(&new_raw))
+}
+
+/// Group selected live tickets, descendants included, by their writable metadata
+/// document and its own task keys. Shared manifests are written once, without
+/// touching out-of-scope entries or authored task-file blocks. §FS-rhei-reset.2
+fn reset_metadata_targets(
+    loaded: &LoadedPlan,
+    input: &Path,
+    scope: &RheiScope,
+) -> BTreeMap<PathBuf, BTreeSet<String>> {
+    let mut tasks = Vec::new();
+    collect_plan_tasks(&loaded.rhei.tasks, &mut tasks);
+    let mut targets: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
+    for task in tasks {
+        let id = task.id.to_string();
+        if task_in_rhei_scope(scope, &id) {
+            let route = loaded.task_route(&id, input);
+            targets.entry(route.metadata_file).or_default().insert(route.metadata_id);
+        }
+    }
+    targets
+}
+
+/// The metadata reset writes, also used by the validation projection. Read each
+/// document through the existing form dispatch and delete only selected tickets'
+/// register-cleared keys, pruning containers emptied by them. §FS-rhei-reset.2
+fn reset_metadata_text(path: &Path, raw: &str, task_ids: &BTreeSet<String>) -> MietteResult<String> {
+    let metadata = rhei_core::metadata::parse_metadata_file(path, raw).map_err(|err| {
+        miette!(
+            help = plan_authoring_help(),
+            "failed to parse metadata document for reset: {}", err.error.message
+        )
+    })?;
+    match clear_runtime_task_metadata_for(metadata.as_ref(), |id| task_ids.contains(id)) {
+        Some(cleared) if Some(&cleared) != metadata.as_ref() => rewrite_frontmatter(raw, &cleared),
+        _ => Ok(raw.to_string()),
     }
 }
 
-/// Clear one file's runtime metadata. A file with none to clear is not written.
-/// Returns whether it was. §FS-rhei-reset.2
+/// Persist the scoped cleanup used by validation and the writability check while
+/// the complete reset writer-lock stack remains held. Unchanged files are not
+/// written. Returns whether it was. §FS-rhei-reset.2
 fn clear_runtime_metadata_in_file(
     path: &Path,
-    workspace_index: bool,
+    task_ids: &BTreeSet<String>,
     locked: &LockedPlanFile,
 ) -> MietteResult<bool> {
     let raw = locked.read_to_string("failed to read plan file")?;
-    let new_raw = text_with_runtime_metadata_cleared(&raw, workspace_index)?;
+    let new_raw = reset_metadata_text(path, &raw, task_ids)?;
     if new_raw == raw {
         return Ok(false);
     }
     write_file_atomic_locked(path, &new_raw, Some(locked))?;
     Ok(true)
-}
-
-/// The text a reset writes over a file's `raw` to clear its runtime metadata. The one
-/// computation of it, because the reset's check asks whether it changes. §FS-rhei-reset.2.3
-fn text_with_runtime_metadata_cleared(raw: &str, workspace_index: bool) -> MietteResult<String> {
-    let metadata = if workspace_index {
-        rhei_core::parser::parse_workspace_index(raw)
-            .map_err(|err| {
-                miette!(
-                    help = plan_authoring_help(),
-                    "failed to parse workspace index for metadata reset: {}", err.message
-                )
-            })?
-            .metadata
-    } else {
-        rhei_core::parse(raw)
-            .map_err(|err| miette!(
-                help = plan_authoring_help(),
-                "failed to parse plan for metadata reset: {}", err.message
-            ))?
-            .metadata
-    };
-
-    match clear_runtime_task_metadata(metadata.as_ref()) {
-        Some(metadata) => rewrite_frontmatter(raw, &metadata),
-        None => Ok(raw.to_string()),
-    }
 }
 
 /// Remove `> **Result:** …` lines (and a single leading blank line when

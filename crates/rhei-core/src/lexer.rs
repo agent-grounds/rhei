@@ -5,8 +5,7 @@
 //! metadata tokens.
 
 use crate::ast::{ConsumedExport, TaskId, TaskSnapshotInherit};
-use crate::fence::FenceTracker;
-use crate::header::{header_regex, RHEI_HEADER};
+use crate::header::{header_regex, DocumentFence, RHEI_HEADER};
 use crate::text::parse_task_id;
 use crate::tokens::Token;
 use regex::Regex;
@@ -26,9 +25,9 @@ pub struct Tokenizer<'a> {
     re_model: Regex,
     re_target: Regex,
 
-    /// The fenced block the scan is inside, if any: inside one every line is
-    /// text, whatever it looks like. §FS-rhei-plan-language.2.1
-    fence: FenceTracker,
+    /// The fenced or frontmatter block the scan is inside, if any: inside one
+    /// every line is text, whatever it looks like. §FS-rhei-plan-language.2.1
+    fence: DocumentFence,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -87,7 +86,7 @@ impl<'a> Tokenizer<'a> {
             re_assignee,
             re_model,
             re_target,
-            fence: FenceTracker::default(),
+            fence: DocumentFence::new(input),
         }
     }
 

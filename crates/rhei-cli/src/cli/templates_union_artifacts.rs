@@ -204,7 +204,7 @@
     /// Every heading's kind and id, in document order.
     fn declared_kinds(body: &str) -> Vec<(String, String)> {
         // §FS-rhei-plan-language.2.1: quoted kinds do not declare placed tickets.
-        let mut in_code_block = rhei_core::fence::FenceTracker::default();
+        let mut in_code_block = rhei_core::header::DocumentFence::body();
         body.lines()
             .filter_map(|line| {
                 let (hashes, id) = node_heading_outside_code(line, &mut in_code_block)?;

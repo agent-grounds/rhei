@@ -125,7 +125,7 @@ fn remove_task_metadata_entry(metadata: &mut Metadata, key: &str) -> bool {
 fn remove_ticket_section(raw: &str, local_id: &str) -> Option<String> {
     let lines: Vec<&str> = raw.split_inclusive('\n').collect();
     // §FS-rhei-plan-language.2.1: quoted headings do not end a ticket section.
-    let mut in_code = rhei_core::fence::FenceTracker::default();
+    let mut in_code = rhei_core::header::DocumentFence::new(raw);
     let mut start = None;
     let mut level = 0;
     let mut end = lines.len();

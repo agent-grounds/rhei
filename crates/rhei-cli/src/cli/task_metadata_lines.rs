@@ -24,7 +24,7 @@ fn insert_task_assignee(raw: &str, task_id: &str, assignee: &str) -> MietteResul
     let mut already_present = false;
     let mut inserted = false;
     // §FS-rhei-plan-language.2.1: quoted metadata is never a claim or insertion point.
-    let mut in_code_block = rhei_core::fence::FenceTracker::default();
+    let mut in_code_block = rhei_core::header::DocumentFence::new(raw);
 
     for line in lines.iter() {
         if let Some(id) = node_heading_id_outside_code(line, &mut in_code_block) {
@@ -95,15 +95,15 @@ fn insert_task_assignee(raw: &str, task_id: &str, assignee: &str) -> MietteResul
 // §FS-rhei-plan-language.2.1: share the heading scanner's fence state with metadata guards.
 fn node_heading_id_outside_code<'a>(
     line: &'a str,
-    in_code_block: &mut rhei_core::fence::FenceTracker,
+    in_code_block: &mut rhei_core::header::DocumentFence,
 ) -> Option<&'a str> {
     node_heading_outside_code(line, in_code_block).map(|(_, id)| id)
 }
 
-// §FS-rhei-plan-language.2.1: advance the canonical tracker once for every scanned line.
+// §FS-rhei-plan-language.2.1: advance the document's fence once per line; the type keeps frontmatter out.
 fn node_heading_outside_code<'a>(
     line: &'a str,
-    in_code_block: &mut rhei_core::fence::FenceTracker,
+    in_code_block: &mut rhei_core::header::DocumentFence,
 ) -> Option<(usize, &'a str)> {
     if in_code_block.read(line) || in_code_block.is_open() {
         return None;
@@ -213,7 +213,7 @@ fn rewrite_task_state(raw: &str, task_id: &str, new_state: &str) -> MietteResult
 
     let mut in_target_task = false;
     let mut state_replaced = false;
-    let mut in_code_block = rhei_core::fence::FenceTracker::default();
+    let mut in_code_block = rhei_core::header::DocumentFence::new(raw);
 
     for line in &lines {
         if let Some(id) = node_heading_id_outside_code(line, &mut in_code_block) {

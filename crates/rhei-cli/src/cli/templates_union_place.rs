@@ -33,10 +33,7 @@
             }
             let raw = fs::read_to_string(&plan)
                 .map_err(|err| file_io_report(&plan, "failed to read the template's plan", err))?;
-            let body = raw.split_once("## Tasks").map_or(String::new(), |(_, rest)| {
-                rest.trim_start_matches('\n').to_owned()
-            });
-            return Ok(vec![part_tickets("plan", &body)]);
+            return Ok(vec![part_tickets("plan", &tasks_chapter_body(&raw))]);
         }
         let mut entries: Vec<PathBuf> = fs::read_dir(&tasks_dir)
             .map_err(|err| file_io_report(&tasks_dir, "failed to read the template's tasks", err))?
@@ -53,6 +50,21 @@
             files.push(part_tickets(file_slug(stem), &raw));
         }
         Ok(files)
+    }
+
+    /// What a plan holds below its `## Tasks` line, which neither a quotation nor
+    /// a frontmatter value can be. §FS-rhei-plan-language.2.1
+    fn tasks_chapter_body(raw: &str) -> String {
+        let mut fence = rhei_core::header::DocumentFence::new(raw);
+        let mut lines = raw.split_inclusive('\n');
+        let is_chapter = |line: &&str| {
+            let is_fence = fence.read(line.trim_end());
+            !is_fence && !fence.is_open() && line.trim_end() == "## Tasks"
+        };
+        match lines.find(is_chapter) {
+            Some(_) => lines.collect::<String>().trim_start_matches(['\n', '\r']).to_owned(),
+            None => String::new(),
+        }
     }
 
     /// `001-coordinate` becomes `coordinate`: the number is the host's to
@@ -74,19 +86,16 @@
         PartTickets { slug: slug.to_owned(), body, metadata, ids }
     }
 
-    /// A document's leading `---` frontmatter, and everything after it.
+    /// A document's leading `---` frontmatter, and everything after it, where the
+    /// parser reads that block. §FS-rhei-plan-language.1.4 §FS-rhei-plan-language.2.1
     fn split_frontmatter(raw: &str) -> (Option<String>, String) {
-        let body = raw.strip_prefix("---\n").or_else(|| raw.strip_prefix("---\r\n"));
-        let Some(body) = body else {
+        let block = rhei_core::header::find_leading_frontmatter(raw.lines());
+        let Some((open, close)) = block.and_then(|block| Some((block.open, block.close?))) else {
             return (None, raw.to_owned());
         };
-        match body.split_once("\n---") {
-            Some((front, rest)) => (
-                Some(front.to_owned()),
-                rest.trim_start_matches('\n').trim_start_matches("\r\n").to_owned(),
-            ),
-            None => (None, raw.to_owned()),
-        }
+        let front = raw.lines().skip(open + 1).take(close - open - 1).collect::<Vec<_>>();
+        let rest = raw.split_inclusive('\n').skip(close + 1).collect::<String>();
+        (Some(front.join("\n")), rest.trim_start_matches(['\n', '\r']).to_owned())
     }
 
     /// A plan's frontmatter block, which sits after the header rather than at
@@ -129,7 +138,7 @@
     /// Every node heading id a markdown body declares, in document order.
     fn declared_ids(body: &str) -> Vec<String> {
         // §FS-rhei-plan-language.2.1: quoted ids do not declare tickets.
-        let mut in_code_block = rhei_core::fence::FenceTracker::default();
+        let mut in_code_block = rhei_core::header::DocumentFence::body();
         body.lines()
             .filter_map(|line| {
                 node_heading_outside_code(line, &mut in_code_block).map(|(_, id)| id.to_owned())
@@ -172,7 +181,7 @@
     /// the placed id. §FS-rhei-library.4
     fn reparent_body(body: &str, parent: &str, known: &BTreeSet<String>) -> String {
         // §FS-rhei-plan-language.2.1: quoted headings and references remain verbatim.
-        let mut in_code_block = rhei_core::fence::FenceTracker::default();
+        let mut in_code_block = rhei_core::header::DocumentFence::body();
         let mut out = String::with_capacity(body.len() + 64);
         for line in body.split_inclusive('\n') {
             let text = line.trim_end_matches('\n').trim_end_matches('\r');

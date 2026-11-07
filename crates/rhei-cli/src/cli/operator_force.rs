@@ -124,7 +124,7 @@ fn forced_result_link(raw: &str, kind: PlanFileKind, task: &str, qualified: &str
     let mut lines = Vec::new();
     let mut target = false;
     // §FS-rhei-plan-language.2.1: quoted result and assignee lines remain content.
-    let mut code = rhei_core::fence::FenceTracker::default();
+    let mut code = rhei_core::header::DocumentFence::new(raw);
     let link = format!("> **Result:** [{qualified}](runtime/results/{qualified}.md)");
     for line in raw_lines.iter().copied() {
         if let Some((_, id)) = node_heading_outside_code(line, &mut code) {

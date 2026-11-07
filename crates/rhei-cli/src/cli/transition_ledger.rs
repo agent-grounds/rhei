@@ -297,7 +297,7 @@ fn rewrite_task_completion(
     let mut target_found = false;
     let mut link_inserted = !insert_link; // skip insertion when not requested
     let result_line = format!("> **Result:** [{}]({})", link_text, link_path);
-    let mut in_code_block = rhei_core::fence::FenceTracker::default();
+    let mut in_code_block = rhei_core::header::DocumentFence::new(&raw);
 
     for line in lines {
         let heading = node_heading_outside_code(line, &mut in_code_block);

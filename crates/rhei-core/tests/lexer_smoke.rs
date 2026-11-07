@@ -122,3 +122,16 @@ fn tokenizes_named_task_ids_and_prior_references() {
 
     assert_eq!(tokens, expected);
 }
+
+// §FS-rhei-plan-language.2.1: a frontmatter value is text, whatever it looks like.
+#[test]
+fn a_frontmatter_value_opens_no_fence_and_declares_no_node() {
+    let input = "# Rhei: Plan\n\n---\nnote: \"\n```\n\n### Task 9: decoy\n\"\n---\n\n## Tasks\n\n### Task 1: A\n";
+    let nodes: Vec<String> = tokenize(input)
+        .filter_map(|token| match token {
+            Token::NodeHeader { id, .. } => Some(id.to_string()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(nodes, ["1"]);
+}

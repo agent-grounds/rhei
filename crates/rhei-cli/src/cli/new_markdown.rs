@@ -208,7 +208,7 @@ fn line_offsets(raw: &str) -> impl Iterator<Item = (usize, &str)> {
 /// file. §FS-rhei-new.3.1
 fn insert_ticket_after_subtree(raw: &str, parent_local_id: &str, block: &str) -> Option<String> {
     // §FS-rhei-plan-language.2.1: quoted headings cannot end the parent's subtree.
-    let mut in_code_block = rhei_core::fence::FenceTracker::default();
+    let mut in_code_block = rhei_core::header::DocumentFence::new(raw);
     let mut parent_hashes: Option<usize> = None;
     let mut subtree_end: Option<usize> = None;
 

@@ -96,4 +96,27 @@ mod templates_union_fence_tests {
             format!("# --- laid tiny 1.0.0 src:sha256:d1 clean inputs:sha256:{inputs} ---\n")
         );
     }
+
+    // §FS-rhei-plan-language.2.1: a template's block is off before its body is read.
+    #[test]
+    fn a_task_file_block_below_blank_lines_comes_off_before_its_ids_are_read() {
+        let raw = "\n---\nnote: \"\n### Task 9: decoy\n\"\n---\n\n### Task 1: A\n**State:** open\n";
+        let part = part_tickets("a", raw);
+        assert_eq!(part.ids, ["1"]);
+        assert_eq!(part.body, "### Task 1: A\n**State:** open\n");
+    }
+
+    // §FS-rhei-plan-language.2.1: a value spelling the chapter's line does not start the chapter.
+    #[test]
+    fn a_plan_template_tasks_chapter_is_not_found_in_a_value() {
+        let raw = "# Rhei: T\n\n---\nnote: \"\n## Tasks\n\n### Task 9: decoy\n\"\n---\n\n## Tasks\n\n### Task 1: A\n";
+        assert_eq!(tasks_chapter_body(raw), "### Task 1: A\n");
+    }
+
+    // §FS-rhei-plan-language.2.1: the block is off, so a `---` opening the body is the body's.
+    #[test]
+    fn a_rule_opening_a_template_body_is_read_as_content() {
+        let part = part_tickets("a", "---\nk: v\n---\n---\n```\n---\n### Task 1: A\n");
+        assert!(part.ids.is_empty(), "the fence between the rules quotes the heading: {:?}", part.ids);
+    }
 }

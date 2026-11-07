@@ -38,6 +38,8 @@ mod adjust_tests;
 #[cfg(test)]
 mod ancestry_tests;
 #[cfg(test)]
+mod bounds_ceiling_equality_tests;
+#[cfg(test)]
 mod bounds_tests;
 #[cfg(test)]
 mod empty_journal_tests;

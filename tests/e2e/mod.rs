@@ -39,6 +39,7 @@ mod archive_support;
 mod archive_tamper_tests;
 mod archive_tests;
 mod budget_ancestry_project_tests;
+mod budget_ceiling_equality_tests;
 mod budget_ceiling_tests;
 mod budget_clamp_projects_refusal_tests;
 mod budget_copied_project_support;

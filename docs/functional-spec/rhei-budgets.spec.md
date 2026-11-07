@@ -1193,6 +1193,19 @@ The halt names, in one place:
 It never offers an inner value the ceiling would clamp: telling an operator to
 raise a plan field that cannot take effect sends them to the wrong file.
 
+For a settings remedy, an effective bound **equal to its active ceiling**
+already requires raising the ceiling holder: the machine settings file, or the
+project settings file where the machine delegated that dimension. This holds
+even when the project or profile requested exactly that value and no numerical
+clamp occurred. Equality preserves the requester's value source and leaves the
+clamped-request value absent, as specified in
+[§FS-rhei-budgets.2.3](rhei-budgets.spec.md#23-provenance-is-two-valued);
+the human halt and JSON `budget_halt` remedy both name the ceiling holder's
+actual settings path. Raising only the inner request above that ceiling leaves
+the effective bound unchanged. A request **strictly below** the active ceiling
+keeps its own remedy — the project settings path or the node's profile — since
+raising that request can still increase the effective bound up to the ceiling.
+
 One shared `Remedy` choice supplies stderr's `to raise it:` row and
 `budget_halt.remedy`; the report's Bounds halt lines read that recorded remedy.
 Travel uses the active bound's settings/profile remedy. Window invocations

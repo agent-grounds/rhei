@@ -80,7 +80,6 @@ fn refusals(root: &Path) -> Vec<String> {
 /// The whole line and the two events: one line would pass a `contains` as two would,
 /// and a fix that silenced the events or dropped the retry would pass without the second.
 #[test]
-#[ignore = "red until #605: one stop prints two identical lines under ## Bounds; implement removes this"]
 fn a_ticket_one_bound_refused_on_two_passes_is_one_line_under_bounds() {
     let (dir, plan, machine) = setup_with_agent(
         "budget-bounds-one-line",

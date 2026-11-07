@@ -136,8 +136,10 @@ impl BoundsSection {
         if !delegation.is_empty() {
             out.push('\n');
         }
+        // The same line is one stop, however many passes refused it. §FS-rhei-run-report.3.1
+        let mut listed = std::collections::HashSet::new();
         for (task, bound, renews_at, remedy) in &self.halts {
-            out.push_str(&format!(
+            let line = format!(
                 "- `{}` was stopped by its {} bound of {}; {}\n",
                 task,
                 bound.dimension,
@@ -146,7 +148,10 @@ impl BoundsSection {
                     Some(at) => format!("it renews at {at}"),
                     None => remedy.clone(),
                 }
-            ));
+            );
+            if listed.insert(line.clone()) {
+                out.push_str(&line);
+            }
         }
         if !self.halts.is_empty() {
             out.push('\n');
@@ -156,7 +161,7 @@ impl BoundsSection {
 }
 
 /// The bound halts still true of their tickets, for `## Attention`. Apart from
-/// [`BoundsSection::halts`], which keeps every halt of the run as history.
+/// [`BoundsSection::halts`], which keeps every distinct halt of the run as history.
 ///
 /// `budget_halt` carries no state, so a halt is taken back by what can be seen
 /// after it: the ticket's next slot, and at the overlay a reading of the plan

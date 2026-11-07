@@ -1,5 +1,6 @@
 use crate::ast::{ContentSection, Metadata, Structure, Task};
 use crate::fence::FenceTracker;
+use crate::header::{header_regex, PANTA_HEADER, RHEI_HEADER};
 use regex::Regex;
 
 use super::task_file_metadata::{
@@ -29,7 +30,7 @@ pub struct PantaManifest {
 
 /// Parse a workspace index file (`index.rhei.md`).
 pub fn parse_workspace_index(input: &str) -> Result<WorkspaceIndex> {
-    let parsed = parse_manifest(input, "Rhei", "workspace index")?;
+    let parsed = parse_manifest(input, RHEI_HEADER, "workspace index")?;
     Ok(WorkspaceIndex {
         title: parsed.title,
         structure: parsed.structure,
@@ -40,7 +41,7 @@ pub fn parse_workspace_index(input: &str) -> Result<WorkspaceIndex> {
 
 /// Parse a Panta project manifest file (`index.panta.md`). §FS-rhei-plan-language.1.5
 pub fn parse_panta_manifest(input: &str) -> Result<PantaManifest> {
-    let parsed = parse_manifest(input, "Panta", "Panta manifest")?;
+    let parsed = parse_manifest(input, PANTA_HEADER, "Panta manifest")?;
     Ok(PantaManifest {
         title: parsed.title,
         structure: parsed.structure,
@@ -58,8 +59,8 @@ struct ManifestParts {
 }
 
 fn parse_manifest(input: &str, header_name: &str, frontmatter_kind: &str) -> Result<ManifestParts> {
-    let re_header =
-        Regex::new(&format!(r#"^#\s+{}:\s+(.*)$"#, regex::escape(header_name))).unwrap();
+    // §FS-rhei-plan-language.2.3
+    let re_header = header_regex(&[header_name]);
     let re_tasks = Regex::new(r#"^##\s+Tasks\s*$"#).unwrap();
     let re_section_header = Regex::new(r#"^##\s+(.+)$"#).unwrap();
 

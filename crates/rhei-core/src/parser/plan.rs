@@ -3,6 +3,7 @@ use crate::ast::{
     TaskSnapshotInherit, MAX_ALLOWED_LEVELS,
 };
 use crate::fence::FenceTracker;
+use crate::header::{header_regex, RHEI_HEADER};
 use crate::text::parse_task_id;
 use regex::Regex;
 
@@ -14,7 +15,8 @@ use super::{
 };
 
 pub fn parse(input: &str) -> Result<Rhei> {
-    let re_rhei = Regex::new(r#"^#\s+Rhei:\s+(.*)$"#).unwrap();
+    // §FS-rhei-plan-language.2.3
+    let re_rhei = header_regex(&[RHEI_HEADER]);
     let re_tasks = Regex::new(r#"^##\s+Tasks\s*$"#).unwrap();
     let task_id_segment = r#"(?:[A-Za-z][A-Za-z0-9_-]*|0|[1-9][0-9]*)"#;
     let task_id_pattern = format!(r#"{task_id_segment}(?:\.{task_id_segment})*"#);

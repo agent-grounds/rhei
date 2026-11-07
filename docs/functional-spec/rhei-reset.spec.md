@@ -89,7 +89,24 @@ Deliberate automation states the intent once with `--yes`.
    - Clear any counted-visit suffix; `stateVisits` entries and provider-limit
      waits for the task in frontmatter `metadata.tasks.<id>.stateVisits` and
      `metadata.tasks.<id>.providerLimits` are deleted, together with the task's
-     `supervision` block ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)). A `metadata.tasks.<id>` entry left empty by those deletions is removed as well, and so are `metadata.tasks` and `metadata` when nothing else remains in them: an empty entry is a record of nothing, and the next reader would have to decide whether it meant something. Both the deletions and that pruning are confined to the plan's **writable** metadata document — `index.rhei.md` for a Directory Workspace ([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)). A workspace task file's own metadata block is authored, holds none of the runtime keys named above, and is neither read nor rewritten by reset: it survives byte-identical.
+     `supervision` block ([§FS-rhei-supervision.3.3](rhei-supervision.spec.md#33-supervision-metadata)). A `metadata.tasks.<id>` entry left empty by those deletions is removed as well, and so are `metadata.tasks` and `metadata` when nothing else remains in them: an empty entry is a record of nothing, and the next reader would have to decide whether it meant something.
+     Both the deletions and that pruning are confined to the task's **writable**
+     metadata document: the plan itself for a single-file rhei,
+     `index.rhei.md` for a Directory Workspace ([§FS-rhei-plan-language.1.4](rhei-plan-language.spec.md#14-directory-workspace-metadata)),
+     and the project manifest `index.panta.md` for a basin ticket, keyed by its
+     project-qualified id (for example, `basin.1` or `basin.1.1`)
+     ([§FS-rhei-panta.6](rhei-panta.spec.md#6-project-scope-and-command-behavior)).
+     Clear these keys for every in-scope ticket and descendant, including those
+     already at their authored state, both project-wide and with `--rhei basin`.
+     A reset basin ticket can therefore enter a counted state again with a fresh
+     visit count. A narrowed reset leaves out-of-scope metadata in the shared
+     manifest unchanged. Keys the register does not mark cleared, including
+     `pollNextAttemptAt` and `budgetTicketId`, and authored or unknown keys survive
+     ([§FS-rhei-transitions.2.5](rhei-transitions.spec.md#25-keys-rhei-writes));
+     so does `metadata.retiredTickets` as specified below.
+     A workspace task file's own metadata block is authored, holds none of the
+     runtime keys named above, and is neither read nor rewritten by reset: it
+     survives byte-identical.
 4. After every plan file is rewritten — the ledger step 3 reads lives there — for a directory workspace, delete the `runtime/` directory at the workspace root if it exists. For a single-file plan, delete the `runtime/` directory next to the plan file if it exists. This removes result files, findings, logs, and journaled transition records.
    It removes the run-input seals under `runtime/seal/` with the rest
    ([§FS-rhei-seal.6](rhei-seal.spec.md#6-lifecycle)).

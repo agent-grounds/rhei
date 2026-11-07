@@ -286,13 +286,13 @@ fn transition_firing_replay_retains_id_and_direct_invocation_has_none() {
     let captured = read_callback_observations(&dir)[0]["context"].clone();
     let captured_id = captured["transition"]["firingId"].as_str().expect("captured firing ID");
 
+    // Neither probe may join an inherited run: no firing, no plan path. §REQ-test-isolation.7
     let mut replay = Command::new(python_command());
+    git_env::scrub_rhei_env(&mut replay);
     replay
         .arg(&probe)
         .arg("replay")
         .current_dir(&dir)
-        .env_remove("RHEI_TRANSITION_FIRING_ID")
-        .env_remove("RHEI_TRANSITION_LEDGER_STATUS")
         .stdin(std::process::Stdio::piped());
     let mut child = replay.spawn().expect("replay callback");
     use std::io::Write as _;
@@ -304,12 +304,12 @@ fn transition_firing_replay_retains_id_and_direct_invocation_has_none() {
         .unwrap();
     assert!(child.wait().expect("replay status").success());
 
-    let direct = Command::new(python_command())
+    let mut direct = Command::new(python_command());
+    git_env::scrub_rhei_env(&mut direct);
+    let direct = direct
         .arg(&probe)
         .arg("direct")
         .current_dir(&dir)
-        .env_remove("RHEI_TRANSITION_FIRING_ID")
-        .env_remove("RHEI_TRANSITION_LEDGER_STATUS")
         .stdin(std::process::Stdio::null())
         .output()
         .expect("direct callback");

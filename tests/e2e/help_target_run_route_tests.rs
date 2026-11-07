@@ -258,11 +258,11 @@ fn help_target_an_ambiguous_snapshot_lists_what_matched() {
     assert_lists_from_parent(&case, &rendered, &command, &["plan.one", "plan.two"]);
 }
 
-/// `gc` reads every manifest before any policy, so it refuses on the corrupt one too,
-/// and the help names the directory to delete rather than a command that cannot.
-/// §FS-rhei-errors.1.2
+/// `gc` skips the corrupt generation and leaves it for a person, so the help names the
+/// directory to delete rather than a command that will not.
+/// §FS-rhei-errors.1.2 §FS-rhei-snapshot-operations.1.6
 #[test]
-fn help_target_a_corrupt_snapshot_names_no_command_that_refuses_it_too() {
+fn help_target_a_corrupt_snapshot_names_no_command_that_leaves_it_in_place() {
     let case = Case::new("help-target-snapshot-corrupt");
     let project = emitted(&case, ONE_SOURCE);
     for manifest in manifests_of(&project.join(".rhei/cache/snapshots"), "implementation") {
@@ -274,6 +274,6 @@ fn help_target_a_corrupt_snapshot_names_no_command_that_refuses_it_too() {
 
     let rendered = raw_stderr(&out);
     assert!(rendered.contains("failed to parse snapshot manifest"), "it is corrupt:\n{rendered}");
-    assert!(!rendered.contains("rhei snapshot gc"), "gc refuses it too:\n{rendered}");
+    assert!(!rendered.contains("rhei snapshot gc"), "gc leaves it in place:\n{rendered}");
     assert!(rendered.contains("generation directory"), "name what to delete:\n{rendered}");
 }

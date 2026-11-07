@@ -5,9 +5,9 @@ fn snapshot_command(
     match command {
         SnapshotCommand::List { plan, task, name, state, produced_by, orphaned, format } => {
             let ctx = load_snapshot_context(&plan, state_machine_path)?;
-            let records = read_snapshot_records(&ctx.cache_root)?;
+            let scan = scan_snapshot_records(&ctx.cache_root)?;
             let mut rows = Vec::new();
-            for record in records {
+            for record in scan.records {
                 if !snapshot_record_matches_filters(
                     &record,
                     task.as_deref(),
@@ -32,7 +32,9 @@ fn snapshot_command(
                     .then_with(|| a.0.target_slug.cmp(&b.0.target_slug))
                     .then_with(|| a.0.generation.cmp(&b.0.generation))
             });
-            print_snapshot_list(rows, format)
+            print_snapshot_list(rows, format)?;
+            // A filter narrowed the rows, not the damage. §FS-rhei-snapshot-operations.1.6
+            report_unreadable_generations("unreadable", &scan.unreadable)
         }
         SnapshotCommand::Show { reference, plan } => {
             let ctx = load_snapshot_context(&plan, state_machine_path)?;
@@ -113,72 +115,6 @@ fn snapshot_record_matches_filters(
         SnapshotProducedByFilter::Operator => record.produced_by == "operator",
         SnapshotProducedByFilter::All => true,
     }
-}
-
-fn read_snapshot_records(cache_root: &Path) -> MietteResult<Vec<SnapshotRecord>> {
-    if !cache_root.exists() {
-        return Ok(Vec::new());
-    }
-    let mut manifests = Vec::new();
-    collect_manifest_paths(cache_root, cache_root, &mut manifests)
-        .map_err(|err| file_io_report(cache_root, "failed to read snapshot cache", err))?;
-
-    let mut records = Vec::new();
-    for manifest_path in manifests {
-        let raw = fs::read_to_string(&manifest_path).map_err(|err| {
-            file_io_report(&manifest_path, "failed to read snapshot manifest", err)
-        })?;
-        let manifest: serde_json::Value = serde_json::from_str(&raw).map_err(|err| {
-            miette!(
-                help = snapshot_corrupt_help(),
-                "failed to parse snapshot manifest '{}': {err}", manifest_path.display()
-            )
-        })?;
-        if let Some(record) = snapshot_record_from_manifest(cache_root, &manifest_path, manifest)? {
-            records.push(record);
-        }
-    }
-    Ok(records)
-}
-
-fn collect_manifest_paths(cache_root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        let file_type = entry.file_type()?;
-        if file_type.is_symlink() {
-            continue;
-        }
-        if file_type.is_dir() {
-            if entry.file_name().to_str().is_some_and(|name| name.contains(".tmp-")) {
-                continue;
-            }
-            collect_manifest_paths(cache_root, &path, out)?;
-        } else if entry.file_name() == OsStr::new("manifest.json")
-            && is_committed_snapshot_manifest(cache_root, &path)
-        {
-            out.push(path);
-        }
-    }
-    Ok(())
-}
-
-fn is_committed_snapshot_manifest(cache_root: &Path, manifest_path: &Path) -> bool {
-    let relative = manifest_path.strip_prefix(cache_root).unwrap_or(manifest_path);
-    if relative.components().any(|component| {
-        component
-            .as_os_str()
-            .to_str()
-            .is_some_and(|name| name.contains(".tmp-"))
-    }) {
-        return false;
-    }
-    manifest_path
-        .parent()
-        .and_then(Path::file_name)
-        .and_then(OsStr::to_str)
-        .and_then(|name| name.strip_prefix('g'))
-        .is_some_and(|generation| !generation.is_empty() && generation.parse::<u64>().is_ok())
 }
 
 fn snapshot_record_from_manifest(

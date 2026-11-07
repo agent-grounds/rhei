@@ -328,13 +328,21 @@ fn snapshot_reference_help() -> String {
 }
 
 /// Help for a snapshot generation whose stored bytes do not read back. It names no
-/// command: `rhei snapshot gc` reads every manifest before any policy, so it refuses
-/// on this one too, which §FS-rhei-errors.1.2 calls worse than no suggestion. The
-/// message names either the generation directory or a file inside it.
+/// command: `rhei snapshot gc` skips this generation and leaves it for a person
+/// (§FS-rhei-snapshot-operations.1.6), so suggesting it would send the reader to a
+/// command that cannot remove it, which §FS-rhei-errors.1.2 rules out. The message
+/// names either the generation directory or a file inside it.
 fn snapshot_corrupt_help() -> &'static str {
     "this cached snapshot is corrupt. Delete the generation directory named above, or \
      the one that holds the file named above, then re-record it by running the state \
      that emits it."
+}
+
+/// Help for the error ending `rhei snapshot list` or `gc` past unreadable generations.
+/// It names no command, because none removes them. §FS-rhei-snapshot-operations.1.6
+fn snapshot_unreadable_help() -> &'static str {
+    "these cached snapshots are corrupt. Delete the generation directories named above, \
+     then re-record them by running the state that emits each."
 }
 
 /// Help for the redactor hook that runs over recorded snapshots.

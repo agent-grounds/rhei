@@ -296,7 +296,8 @@ fn rewrite_export_priors(
 
 fn rewrite_one_consumer(raw: &str, local_id: &str, references: &[&str]) -> Result<String, String> {
     let lines = line_spans(raw);
-    let mut in_code = false;
+    // §FS-rhei-plan-language.2.1: quoted headings do not bound the consumer.
+    let mut in_code = rhei_core::fence::FenceTracker::default();
     let mut target_heading = None;
     let mut target_end = raw.len();
     for (start, end) in &lines {
@@ -317,12 +318,17 @@ fn rewrite_one_consumer(raw: &str, local_id: &str, references: &[&str]) -> Resul
 
     let mut state_end = None;
     let mut prior_span = None;
+    // §FS-rhei-plan-language.2.1: the task body starts outside a fence; skip quoted metadata.
+    let mut in_code = rhei_core::fence::FenceTracker::default();
     for (line_start, line_end) in lines
         .iter()
         .copied()
         .filter(|(line_start, _)| *line_start >= start && *line_start < target_end)
     {
         let line = trim_line_ending(&raw[line_start..line_end]);
+        if in_code.read(line) || in_code.is_open() {
+            continue;
+        }
         if line.starts_with("**State:**") {
             state_end = Some(line_end);
         } else if line.starts_with("**Prior:**") {

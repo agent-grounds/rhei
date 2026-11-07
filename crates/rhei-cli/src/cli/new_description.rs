@@ -85,18 +85,16 @@ fn description_file_report(path: &Path, err: std::io::Error) -> Report {
 /// something they can act on.
 // §FS-rhei-new.3.4
 fn reject_structural_description(description: &str, flag: &str) -> MietteResult<()> {
-    let mut fence_opened_at: Option<usize> = None;
+    let mut fences = rhei_core::fence::FenceTracker::default();
+    let mut fence_opened_at = None;
     for (index, raw) in description.lines().enumerate() {
-        if raw.trim_start().starts_with("```") {
-            fence_opened_at = match fence_opened_at {
-                Some(_) => None,
-                None => Some(index + 1),
-            };
+        if fences.read(raw) {
+            fence_opened_at = fences.is_open().then_some((index + 1, raw));
             continue;
         }
         // Fenced lines are content, not structure — the parser reads them that
         // way too, so they stay accepted exactly as written.
-        if fence_opened_at.is_some() {
+        if fences.is_open() {
             continue;
         }
         let Some(what) = structural_description_line(raw) else {
@@ -112,15 +110,15 @@ fn reject_structural_description(description: &str, flag: &str) -> MietteResult<
             raw.trim()
         ));
     }
-    if let Some(line) = fence_opened_at {
-        return Err(unbalanced_fence_report(flag, line));
+    if let Some((line, opening)) = fence_opened_at {
+        return Err(unbalanced_fence_report(flag, line, opening));
     }
     Ok(())
 }
 
-/// Refuse a description whose ``` fences do not balance.
+/// Refuse a description whose opening fence has no matching close.
 ///
-/// An odd number of fences is the ordinary shape of a pasted issue body, and it
+/// A pasted issue body cut short can leave an open fence, which
 /// is the most destructive thing a description can carry: the fence is written
 /// verbatim, so every node *after* the insertion point becomes fenced content
 /// and stops being a ticket. Named against the flag, like every other
@@ -128,10 +126,17 @@ fn reject_structural_description(description: &str, flag: &str) -> MietteResult<
 /// on, where the whole-id-set guard behind the write is only the last line of
 /// defence.
 // §FS-rhei-new.3.4 §FS-rhei-new.5.1
-fn unbalanced_fence_report(flag: &str, opened_at: usize) -> Report {
+fn unbalanced_fence_report(flag: &str, opened_at: usize, opening: &str) -> Report {
+    let (marker, run, _) = rhei_core::fence::code_fence_run(opening)
+        .expect("the tracker recognized the opening fence");
+    let character = if marker == '`' { "backticks" } else { "tildes" };
+    let close = marker.to_string().repeat(run);
     miette!(
-help = "close the fence with a matching ``` line, or drop the opening one. A stray fence is usually a pasted issue body that was cut short.",
-
+        help = format!(
+            "close the fence with a bare line of at least {run} {character} ({close}), \
+             with no info string, or drop the opening one. A stray fence is usually \
+             a pasted issue body that was cut short."
+        ),
         "the code fence opened on line {opened_at} of {flag} is never closed:\n\n`rhei new` \
          writes the description into the plan as given, so an open fence would swallow every \
          ticket after it — they would stop being plan nodes and become fenced text. Nothing \

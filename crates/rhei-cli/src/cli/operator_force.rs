@@ -120,14 +120,15 @@ fn forced_file(root: &Path, path: &Path, roles: &[&str], after: &[u8]) -> Miette
 fn forced_result_link(raw: &str, task: &str, qualified: &str, terminal: bool) -> String {
     let mut lines = Vec::new();
     let mut target = false;
-    let mut code = false;
+    // §FS-rhei-plan-language.2.1: quoted result and assignee lines remain content.
+    let mut code = rhei_core::fence::FenceTracker::default();
     let link = format!("> **Result:** [{qualified}](runtime/results/{qualified}.md)");
     for line in raw.lines() {
         if let Some((_, id)) = node_heading_outside_code(line, &mut code) {
             if target && terminal { trim_trailing_blank_lines(&mut lines); lines.extend([String::new(), link.clone(), String::new()]); }
             target = id == task;
         }
-        if target && !code && (line.starts_with("> **Result:**") || line.starts_with("**Assignee:**")) { continue; }
+        if target && !code.is_open() && (line.starts_with("> **Result:**") || line.starts_with("**Assignee:**")) { continue; }
         lines.push(line.to_string());
     }
     if target && terminal { trim_trailing_blank_lines(&mut lines); lines.extend([String::new(), link]); }

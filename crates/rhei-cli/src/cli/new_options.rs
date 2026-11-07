@@ -41,7 +41,7 @@ struct NewOptions {
     id: Option<String>,
     /// Body content: the ticket's description, or the rhei's lead paragraph.
     /// Prose only — a heading, a `**Field:**` line, a bare `---`, or an
-    /// unclosed ``` fence would author plan structure, so each is refused
+    /// unclosed code fence would author plan structure, so each is refused
     #[arg(long, value_name = "TEXT")]
     description: Option<String>,
     /// Read the description from a file; `-` reads standard input

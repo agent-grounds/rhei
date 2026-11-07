@@ -19,14 +19,10 @@ fn task_result_path(workspace_root: &Path, task_id: &TaskId) -> PathBuf {
 /// the execution root of the rhei that owns it.
 // §FS-rhei-plan-language.3.8
 fn legacy_result_path(root: &Path, task: &rhei_core::ast::Task) -> Option<PathBuf> {
-    let mut fenced = false;
+    let mut fences = rhei_core::fence::FenceTracker::default();
     for line in task.content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("```") {
-            fenced = !fenced;
-            continue;
-        }
-        if fenced || !trimmed.starts_with("> **Result:**") {
+        if fences.read(line) || fences.is_open() || !trimmed.starts_with("> **Result:**") {
             continue;
         }
         let target = trimmed.split_once("](").and_then(|(_, rest)| rest.strip_suffix(')'))?;

@@ -23,7 +23,8 @@ fn insert_task_assignee(raw: &str, task_id: &str, assignee: &str) -> MietteResul
     let mut last_metadata_idx: Option<usize> = None;
     let mut already_present = false;
     let mut inserted = false;
-    let mut in_code_block = false;
+    // §FS-rhei-plan-language.2.1: quoted metadata is never a claim or insertion point.
+    let mut in_code_block = rhei_core::fence::FenceTracker::default();
 
     for line in lines.iter() {
         if let Some(id) = node_heading_id_outside_code(line, &mut in_code_block) {
@@ -37,10 +38,10 @@ fn insert_task_assignee(raw: &str, task_id: &str, assignee: &str) -> MietteResul
             in_target_task = id == task_id;
         }
 
-        if !in_code_block && in_target_task && line.starts_with("**Assignee:**") {
+        if !in_code_block.is_open() && in_target_task && line.starts_with("**Assignee:**") {
             already_present = true;
         }
-        if !in_code_block
+        if !in_code_block.is_open()
             && in_target_task
             && (line.starts_with("**State:**")
                 || line.starts_with("**Prior:**")
@@ -91,22 +92,20 @@ fn insert_task_assignee(raw: &str, task_id: &str, assignee: &str) -> MietteResul
     Ok(output)
 }
 
+// §FS-rhei-plan-language.2.1: share the heading scanner's fence state with metadata guards.
 fn node_heading_id_outside_code<'a>(
     line: &'a str,
-    in_code_block: &mut bool,
+    in_code_block: &mut rhei_core::fence::FenceTracker,
 ) -> Option<&'a str> {
     node_heading_outside_code(line, in_code_block).map(|(_, id)| id)
 }
 
+// §FS-rhei-plan-language.2.1: advance the canonical tracker once for every scanned line.
 fn node_heading_outside_code<'a>(
     line: &'a str,
-    in_code_block: &mut bool,
+    in_code_block: &mut rhei_core::fence::FenceTracker,
 ) -> Option<(usize, &'a str)> {
-    if line.trim_start().starts_with("```") {
-        *in_code_block = !*in_code_block;
-        return None;
-    }
-    if *in_code_block {
+    if in_code_block.read(line) || in_code_block.is_open() {
         return None;
     }
     node_heading(line)
@@ -207,22 +206,21 @@ mod next_assignee_rewrite_tests {
 ///
 /// Locates the task node header and replaces the immediately following
 /// `**State:**` line with the new state value.
+/// §FS-rhei-complete.4.2 §FS-rhei-complete.4.3: preserve quoted content in either layout.
 fn rewrite_task_state(raw: &str, task_id: &str, new_state: &str) -> MietteResult<String> {
     let lines: Vec<&str> = raw.lines().collect();
     let mut result = Vec::with_capacity(lines.len());
 
     let mut in_target_task = false;
     let mut state_replaced = false;
-    let mut in_code_block = false;
+    let mut in_code_block = rhei_core::fence::FenceTracker::default();
 
     for line in &lines {
-        if !state_replaced {
-            if let Some(id) = node_heading_id_outside_code(line, &mut in_code_block) {
-                in_target_task = id == task_id;
-            }
+        if let Some(id) = node_heading_id_outside_code(line, &mut in_code_block) {
+            in_target_task = id == task_id;
         }
 
-        if !in_code_block && in_target_task && !state_replaced && line.starts_with("**State:**") {
+        if !in_code_block.is_open() && in_target_task && !state_replaced && line.starts_with("**State:**") {
             let formatted = format!("**State:** {}", format_state_metadata_value(new_state));
             result.push(formatted);
             state_replaced = true;

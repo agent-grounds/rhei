@@ -148,6 +148,7 @@ mod help_target_run_route_tests;
 mod help_target_subcommand_tests;
 mod help_target_tests;
 mod includes_under_tests;
+mod inherited_rhei_env_tests;
 mod install_skills_tests;
 mod installed_state_machine_guidance_tests;
 mod instantiate_existing_output_tests;
@@ -413,6 +414,8 @@ pub use helpers::*;
 mod binaries;
 #[path = "../support/git_env.rs"]
 mod git_env;
+#[path = "../support/inherited_rhei_env.rs"]
+mod inherited_rhei_env;
 #[path = "../support/python_fixture.rs"]
 mod python_fixture;
 #[path = "../support/test_dir.rs"]

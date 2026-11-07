@@ -33,6 +33,10 @@ use binaries::rhei_binary;
 #[path = "../../support/git_env.rs"]
 mod git_env;
 
+// One of this binary's tests run again under an inherited `RHEI_*`. §REQ-test-isolation.7
+#[path = "../../support/inherited_rhei_env.rs"]
+mod inherited_rhei_env;
+
 /// Every `rhei` this harness spawns, with **both** state locations pinned into
 /// a directory of its own.
 ///

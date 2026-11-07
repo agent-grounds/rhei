@@ -263,6 +263,17 @@ the summary prints five stacked groups:
    halted on spend is always in that case, because spend is bounded by a window
    ([§FS-rhei-budgets.3.4](rhei-budgets.spec.md#34-the-spend-window)).
 
+   A bound's row stands only while the ticket is in the state the bound refused
+   it in. The state is the one the ticket's latest `budget_halt` names
+   ([§FS-rhei-run-json.2.1](rhei-run-json.spec.md#21-records)), compared by normalized name, so a counted state's
+   `work-2` is still `work` and its row stands. Once the ticket has moved, as a
+   fan-out's other arm can move it after the bound refused this one, the
+   classifier's reading stands, whichever it gives and with no promise of a
+   renewal: the refusal says nothing about the state the ticket is in now, and a
+   renewal may not resume it. `## Bounds` goes on listing the halt as the run's
+   history. A record with no `state`, written before the field existed, proves no
+   move and so takes no halt back.
+
    A ticket refused by a strict run because a sealed input changed
    ([§FS-rhei-seal.8.4](rhei-seal.spec.md#84-the-refusal)) belongs in **Attention** too, and for the same reason:
    only a person resumes it. Its blocker reads `sealed input changed: <file>`,

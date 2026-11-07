@@ -237,8 +237,14 @@ mod reset_remedy_finished_tests;
 mod reset_remedy_messages_tests;
 mod reset_remedy_support;
 mod reset_remedy_tests;
+#[cfg(target_os = "linux")]
+mod reset_unwritable_limit_tests;
+#[cfg(unix)]
+mod reset_unwritable_link_tests;
 #[cfg(unix)]
 mod reset_unwritable_scope_tests;
+#[cfg(unix)]
+mod reset_unwritable_sidecar_tests;
 #[cfg(unix)]
 mod reset_unwritable_support;
 #[cfg(unix)]

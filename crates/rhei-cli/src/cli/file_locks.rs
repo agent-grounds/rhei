@@ -22,6 +22,13 @@ struct LockedPlanFile {
     path: PathBuf,
 }
 
+/// Open a lock sidecar, creating it where it is absent and leaving its bytes alone: the
+/// one way every lock opens one, and the way a reset asks whether it could.
+/// §FS-rhei-reset.2.3
+fn open_lock_sidecar(path: &Path) -> std::io::Result<fs::File> {
+    fs::OpenOptions::new().create(true).read(true).write(true).truncate(false).open(path)
+}
+
 impl LockedPlanFile {
     /// Take the stable sidecar without opening the destination it protects.
     ///
@@ -33,12 +40,7 @@ impl LockedPlanFile {
         // §FS-rhei-errors.6
         let root_guard = rhei_core::root_access::for_file(path).map_err(|err| root_access_report(path, err))?;
         let lock_path = plan_lock_path(path)?;
-        let writer_lock = fs::OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .truncate(false)
-            .open(&lock_path)
+        let writer_lock = open_lock_sidecar(&lock_path)
             .map_err(|err| file_io_report(&lock_path, "failed to open plan lock file", err))?;
         lock_plan_writer(&writer_lock, &lock_path)?;
         Ok(Self {

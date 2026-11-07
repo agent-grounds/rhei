@@ -336,7 +336,7 @@ fn remove_runtime_path(path: &Path, removed_paths: &mut Vec<PathBuf>) -> MietteR
     let files = files_under(path);
     if path.is_dir() {
         if let Err(err) = fs::remove_dir_all(path) {
-            removed_paths.extend(files.into_iter().filter(|file| !file.exists()));
+            removed_paths.extend(files.into_iter().filter(|file| path_is_gone(file)));
             return Err(file_io_report(path, "failed to remove runtime directory", err));
         }
         removed_paths.extend(files);
@@ -362,12 +362,21 @@ fn prune_transition_ledger(
     reset_locks.ledger(root)?.prune(task_ids)
 }
 
-/// Every file at or under `path`, as a removal is about to take them.
+/// Whether `path` itself is gone. A link is there until it is removed, wherever it
+/// points, and a path that cannot be asked may still be there.
+fn path_is_gone(path: &Path) -> bool {
+    fs::symlink_metadata(path).is_err_and(|err| err.kind() == std::io::ErrorKind::NotFound)
+}
+
+/// Every file at or under `path`, as a removal is about to take them. A symlink is one
+/// entry, as it is to the removal: following it would walk out of the tree, and round
+/// and round where it leads back up. §FS-rhei-reset.2
 fn files_under(path: &Path) -> Vec<PathBuf> {
-    if !path.is_dir() {
-        return if path.exists() { vec![path.to_path_buf()] } else { Vec::new() };
+    match fs::symlink_metadata(path) {
+        Ok(meta) if meta.is_dir() => fs::read_dir(path)
+            .map(|entries| entries.flatten().flat_map(|entry| files_under(&entry.path())).collect())
+            .unwrap_or_default(),
+        Ok(_) => vec![path.to_path_buf()],
+        Err(_) => Vec::new(),
     }
-    fs::read_dir(path)
-        .map(|entries| entries.flatten().flat_map(|entry| files_under(&entry.path())).collect())
-        .unwrap_or_default()
 }

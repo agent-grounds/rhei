@@ -23,7 +23,7 @@ rhei reset <RHEI_PLAN_OR_WORKSPACE> [--rhei <RHEI_ID>] [--dry-run] [--yes]
 | Flag               | Default | Description                                                                    |
 |--------------------|---------|--------------------------------------------------------------------------------|
 | `--rhei <RHEI_ID>` | all     | Narrow the reset to the named rheis (repeatable). See [§FS-rhei-reset.2.1](rhei-reset.spec.md#21-narrowed-reset---rhei). [§FS-rhei-panta.6.4](rhei-panta.spec.md#64-reset-validate-list-viz) |
-| `--dry-run`        | false   | Report what would be reset and deleted, then exit without changing anything    |
+| `--dry-run`        | false   | Report what would be reset and deleted, then exit with every file as it was. What asking the filesystem still costs is in [§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse) |
 | `--yes`, `-y`      | false   | Confirm without prompting; required when stdin is not a terminal. See [§FS-rhei-reset.1.2](rhei-reset.spec.md#12-confirmation)     |
 
 An id that names no rhei in the project is an error listing the available rhei
@@ -323,8 +323,9 @@ under the same decision, that it can make every entry it would make and remove
 every one it would remove:
 
 - every file whose text it would change, in the directory holding that file;
-- every lock sidecar of step 2 that is not there yet, in the directory it would be
-  created in;
+- every lock sidecar of step 2: one that is not there yet in the directory it would
+  be created in, and one that is by opening it as the lock does, without truncating
+  it or taking the lock;
 - for a full reset, each `runtime/` tree it would delete: the directory holding the
   tree and every directory inside it, which has to be listable, and writable where
   it holds an entry, because removing a tree takes both;
@@ -332,9 +333,13 @@ every one it would remove:
   ledger's lines included.
 
 It asks each directory by doing what the write itself does, creating a temp file
-there and dropping it, so the check leaves no entry behind and `--dry-run` still
-changes nothing ([§FS-rhei-reset.1.1](rhei-reset.spec.md#11-options)). The refusal names every directory that fails, in
-[§FS-rhei-reset.4](rhei-reset.spec.md#4-output). A directory with nothing to write, create or remove is not asked: it
+there and dropping it, and that has a known cost, for `--dry-run` too ([§FS-rhei-reset.1.1](rhei-reset.spec.md#11-options)). A run
+that finishes leaves no entry behind, and no file's name, mode or bytes change, but
+the modification time of each directory it asks moves. A run killed while it asks
+can leave a temp file there. A dry run alongside a real reset can stop that reset
+part way, because its temp file can be in a directory the reset is emptying, and a
+second reset then finishes. The refusal names every directory and lock file that
+fails, in [§FS-rhei-reset.4](rhei-reset.spec.md#4-output). A directory with nothing to write, create or remove is not asked: it
 does not matter whether a reset could write where it has nothing to write, so a
 read-only directory holding only files the reset leaves as they are does not
 refuse it, and neither does a directory a narrowed reset has no business in.
@@ -454,17 +459,21 @@ Task <id> started in '<recorded>', which this state machine no longer declares; 
 
 A reset the filesystem would stop ([§FS-rhei-reset.2.3](rhei-reset.spec.md#23-a-reset-validation-would-refuse)) refuses the same way: no preview and no
 summary, non-zero with or without `--dry-run`, and the same text for both. Its
-message is the refusal, then one line per directory that fails, printed as
-[§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety) prints a path, with the operating system's own error:
+message is the refusal, then one line per directory or lock file that fails, with
+the operating system's own error. A lock file that exists and will not open is
+named itself, because the directory holding it may be writable. A path prints in
+one spelling throughout, relative to the working directory for a target typed
+relative and absolute for a target typed absolute:
 
 ```text
-Refusing to reset: it cannot write in every directory it needs, so nothing was changed.
-  <directory>: <error>
+Refusing to reset: it cannot write everywhere it needs to, so nothing was changed.
+  <directory or lock file>: <error>
 ```
 
 Its help is the one every failed plan write carries: rhei writes plan edits through
 a temp file in the same directory, so check that directory is writable and has free
-space.
+space. Where a line names a lock file, the help adds that the file itself has to
+open for writing.
 
 A write that fails after the first write has landed, which is the failure that
 check cannot foresee, keeps the error it has and adds what has become true of the

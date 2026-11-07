@@ -128,7 +128,7 @@ under `crates/rhei-cli/src/cli/`:
 - `run_command`, `run_git_consistency`, `run_agent_mode`, `run_work_items`,
   `run_program_sequential`, `run_agent_sequential`,
   `run_agent_sequential_completion`, `run_parallel_spawn`,
-  `run_parallel_schedule`, `run_agent_pool`, `run_parallel_agent_exit`,
+  `run_parallel_spawn_admission`, `run_parallel_schedule`, `run_agent_pool`, `run_parallel_agent_exit`,
   `run_parallel_program_completion`, `run_callback_mode`,
   `run_failure_transitions`, and `ready_transition` contain orchestration,
   durable-state consistency checks, ready-set collection, sequential agent and

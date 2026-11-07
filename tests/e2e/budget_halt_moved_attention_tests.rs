@@ -146,7 +146,6 @@ fn assert_bounds_keeps_the_halt(root: &Path) {
 /// The issue's case. Its row promised a resumption, and the renewal run below shows
 /// that none comes. §FS-rhei-run-report.3.1
 #[test]
-#[ignore = "red until #603: a ticket moved into a state with no agent keeps the bound's row; implement removes this"]
 fn a_ticket_moved_into_a_state_with_no_agent_gets_the_classifiers_row_not_the_bounds() {
     let (dir, plan, machine) = fan_out("budget-moved-parked", PARKED_MACHINE, 1);
 
@@ -181,7 +180,6 @@ fn a_ticket_moved_into_a_state_with_no_agent_gets_the_classifiers_row_not_the_bo
 /// this way today; what is red is the record that lets the report tell the two apart.
 /// §FS-rhei-run-report.3.1 §FS-rhei-run-json.2.1
 #[test]
-#[ignore = "red until #603: `budget_halt` names no state to compare; implement removes this"]
 fn a_ticket_moved_then_refused_again_in_its_new_state_keeps_the_bounds_row() {
     let (dir, plan, machine) = fan_out("budget-moved-refused-again", REVIEW_MACHINE, 1);
 
@@ -210,7 +208,6 @@ fn a_ticket_moved_then_refused_again_in_its_new_state_keeps_the_bounds_row() {
 /// the state, not the plan's raw `work-2`.
 /// §FS-rhei-run-json.2.1
 #[test]
-#[ignore = "red until #603: `budget_halt` carries no `state`; implement removes this"]
 fn a_budget_halt_names_the_state_the_refused_spawn_was_for() {
     let (dir, plan, machine) =
         setup("budget-halt-state", COUNTED_MACHINE, r#", "invocations_per_day": 1"#);

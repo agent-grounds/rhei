@@ -222,7 +222,7 @@ mod lifetime_reporting {
             assert_eq!(actual.render(&bounds.halt_bound(spent)), expected, "{name}: rendering");
             assert_eq!(actual.renews_at(), instant.as_deref(), "{name}: renewal metadata");
             let text = budget_halt_text(&error, bounds, journal);
-            let event = budget_halt_event(&error, bounds, journal, "plan.2").unwrap();
+            let event = budget_halt_event(&error, bounds, journal, "plan.2", "work").unwrap();
             let RunEvent::BudgetHalt { remedy, renews_at, .. } = event else {
                 panic!("halt event")
             };

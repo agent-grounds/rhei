@@ -240,6 +240,7 @@ transitions:
             &settings,
             task,
             "plan.1",
+            "work",
             "USD",
             &begin_budget_run(),
         )

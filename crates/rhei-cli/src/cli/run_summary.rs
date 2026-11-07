@@ -166,8 +166,14 @@ impl rhei_tui::EventSink for SummarySink {
                     state.bounds_last.insert(bound.dimension.clone(), bound);
                 }
             }
-            rhei_tui::RunEvent::BudgetHalt { task, bound, renews_at, remedy, .. } => {
-                state.standing_bound_halts.record(&task, &bound, renews_at.as_deref(), &remedy);
+            rhei_tui::RunEvent::BudgetHalt { task, state: refused_in, bound, renews_at, remedy, .. } => {
+                state.standing_bound_halts.record(
+                    &task,
+                    refused_in,
+                    &bound,
+                    renews_at.as_deref(),
+                    &remedy,
+                );
                 state.bound_halts.push((task, bound, renews_at, remedy));
             }
             // §FS-rhei-seal.8.4: the Attention row of a refused start, as an account refusal's.
@@ -830,7 +836,7 @@ impl RunSummaryReport {
         let mut halt_causes = halt_causes;
         if let Ok(state) = summary.inner.lock() {
             // Ahead of the refusals below, whose recorded state proves them. §FS-rhei-run-report.3.1
-            state.standing_bound_halts.overlay(&mut halt_causes);
+            state.standing_bound_halts.overlay(rhei, machines, &mut halt_causes);
             for refusal in state.program_refusals.values() {
                 if let Some(task) = find_task_by_id(&rhei.tasks, &parse_task_id(&refusal.task)) {
                     let machine = machines.for_task(&task.id);

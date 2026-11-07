@@ -240,6 +240,9 @@ pub enum RunEvent {
     /// can route on. §FS-rhei-budgets.8 §FS-rhei-run-json.2.1
     BudgetHalt {
         task: String,
+        /// The normalized name of the state the refused spawn was for; `None` on
+        /// a record written before the field existed. §FS-rhei-run-json.2.1
+        state: Option<String>,
         reason_code: String,
         bound: BoundReport,
         /// The instant the window renews, present exactly when the window

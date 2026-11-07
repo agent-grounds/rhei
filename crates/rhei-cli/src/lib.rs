@@ -262,6 +262,7 @@ include!("cli/run_worker_edit_charge.rs");
 include!("cli/run_work_items.rs");
 include!("cli/run_spawn_refusals.rs");
 include!("cli/run_empty_visit_holds.rs");
+include!("cli/run_parallel_spawn_admission.rs");
 include!("cli/run_parallel_spawn.rs");
 include!("cli/run_parallel_program_spawn.rs");
 include!("cli/run_parallel_schedule.rs");

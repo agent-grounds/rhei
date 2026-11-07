@@ -172,7 +172,7 @@ pub(super) fn run_offer(line: &str, suffix: &str, home: &Path) -> CliRun {
     CliRun::from(&command.output().expect("the offered command should start"))
 }
 
-fn scrub_inherited_rhei_env(command: &mut Command) {
+pub(super) fn scrub_inherited_rhei_env(command: &mut Command) {
     for (name, _) in std::env::vars_os() {
         let name_text = name.to_string_lossy();
         if name_text.starts_with("RHEI_") || name_text.starts_with("GIT_") {

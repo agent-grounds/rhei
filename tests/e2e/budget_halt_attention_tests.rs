@@ -23,12 +23,12 @@ use super::*;
 const NOON: &str = "2026-09-24T12:00:00Z";
 const RENEWAL: &str = "2026-09-25T00:00:00Z";
 
-fn report(root: &Path) -> String {
+pub(super) fn report(root: &Path) -> String {
     fs::read_to_string(root.join("runtime/run-report.md")).expect("read the run report")
 }
 
 /// The body of the report's `## <heading>` section, empty where it has none.
-fn section(report: &str, heading: &str) -> String {
+pub(super) fn section(report: &str, heading: &str) -> String {
     let marker = format!("## {heading}\n");
     let Some(start) = report.find(&marker) else { return String::new() };
     let body = &report[start + marker.len()..];
@@ -296,7 +296,7 @@ write(root / 'runtime' / '{}.md'.format(env('RHEI_STATE')), '{}\n'.format(env('R
 result('done\n')
 "#;
 
-const SUPERVISED_PLAN: &str = r#"# Rhei: Supervised
+pub(super) const SUPERVISED_PLAN: &str = r#"# Rhei: Supervised
 
 ## Tasks
 

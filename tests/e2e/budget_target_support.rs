@@ -58,11 +58,9 @@ impl World {
         }
     }
 
-    /// Every `rhei` these cases spawn. The parent reservation is removed because
-    /// this suite may itself run inside a `rhei run`. §FS-rhei-budgets.7.1
+    /// Every `rhei` these cases spawn.
     pub(super) fn rhei(&self) -> Command {
         let mut cmd = rhei_command(home_for(&self.dir));
-        cmd.env_remove("RHEI_BUDGET_PARENT_RESERVATION");
         cmd.current_dir(&*self.dir);
         cmd
     }

@@ -111,12 +111,6 @@ sys.exit(code)
 
     pub fn command(&self) -> std::process::Command {
         let mut cmd = rhei_command(self.dir.join("home"));
-        // Nested runs must not inherit the invoking worker's budget reservation or identity.
-        for (key, _) in std::env::vars_os() {
-            if key.to_string_lossy().starts_with("RHEI_") {
-                cmd.env_remove(key);
-            }
-        }
         cmd.current_dir(&self.dir)
             .args(["--state-machine", "states.yaml", "run"])
             .arg(if self.parallel == "1" { "plan.rhei.md" } else { "." })

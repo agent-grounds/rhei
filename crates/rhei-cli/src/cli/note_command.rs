@@ -42,8 +42,9 @@ fn note_writing_task(options: &NoteOptions) -> String {
     if let Some(task) = options.task.as_deref().map(str::trim).filter(|id| !id.is_empty()) {
         return task.to_string();
     }
-    match std::env::var("RHEI_TASK_ID") {
-        Ok(task) if !task.trim().is_empty() => task.trim().to_string(),
+    // §REQ-test-isolation.7: read through the one reader of rhei's own variables.
+    match inherited_rhei_var("RHEI_TASK_ID") {
+        Some(task) if !task.trim().is_empty() => task.trim().to_string(),
         _ => note_usage_error(
             "no writing task: `rhei note` spends one task's slot, so name it with \
              `--task <ticket-id>`, the qualified id in your prompt's task heading."

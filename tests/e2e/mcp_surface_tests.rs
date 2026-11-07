@@ -97,7 +97,6 @@ fn exercise_profile(agent: &str) {
         path.extend(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default()));
         let output = rhei_command(dir.join("home"))
             .current_dir(&dir)
-            .env_remove("RHEI_BUDGET_PARENT_RESERVATION")
             .env("PATH", std::env::join_paths(path).expect("fixture PATH"))
             .env("RHEI_MCP_RECORD_DIR", dir.join("records"))
             .args(["--state-machine"])

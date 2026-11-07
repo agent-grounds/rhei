@@ -39,11 +39,6 @@ fn operator(ws_root: &Path, args: &[&str]) -> CliRun {
 
 fn operator_command(ws_root: &Path, args: &[&str]) -> Command {
     let mut cmd = rhei_command(ws_root.join(".home"));
-    for (key, _) in std::env::vars_os() {
-        if key.to_string_lossy().starts_with("RHEI_") {
-            cmd.env_remove(key);
-        }
-    }
     cmd.current_dir(ws_root).args(args);
     cmd
 }

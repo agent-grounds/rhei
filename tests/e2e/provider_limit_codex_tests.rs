@@ -54,11 +54,6 @@ fn start(
     parallel: bool,
 ) -> RunningChild {
     let mut command = rhei_command(fixture.root.join(".home"));
-    for (key, _) in std::env::vars_os() {
-        if key.to_string_lossy().starts_with("RHEI_") {
-            command.env_remove(key);
-        }
-    }
     // Only the child gets TZ; Windows exercises its native OS-local zone.
     // §FS-rhei-run.3.3 §REQ-test-isolation
     if let Some(zone) = child_tz {

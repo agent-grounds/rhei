@@ -65,12 +65,6 @@ impl Requester {
 fn run(root: &Path, plan: &Path, states: &Path, json: bool) -> CliRun {
     let home = home_for(root);
     let mut cmd = rhei_command(&home);
-    // Nested fixture runs must not inherit the enclosing worker's reservation.
-    for (key, _) in
-        std::env::vars_os().filter(|(key, _)| key.to_string_lossy().starts_with("RHEI_"))
-    {
-        cmd.env_remove(key);
-    }
     cmd.env("XDG_CONFIG_HOME", home.join(".config")).env("RHEI_BUDGET_NOW", DAY);
     cmd.arg("--state-machine").arg(states).arg("run").arg(plan);
     cmd.args(["--no-tui", "--no-callbacks"]);

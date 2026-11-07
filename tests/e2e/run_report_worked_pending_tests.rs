@@ -34,12 +34,6 @@ fn setup(default_agent: bool, bound: bool) -> TestDir {
 
 fn run(dir: &std::path::Path, no_agent: bool) -> CliRun {
     let mut cmd = rhei_command(home_for(dir));
-    // An enclosing run's reservation and state must not enter this nested run.
-    for (name, _) in std::env::vars_os() {
-        if name.to_string_lossy().starts_with("RHEI_") {
-            cmd.env_remove(name);
-        }
-    }
     cmd.current_dir(dir)
         .env("XDG_CONFIG_HOME", home_for(dir).join(".config"))
         .env("RHEI_BUDGET_NOW", "2026-09-24T12:00:00Z")

@@ -34,11 +34,7 @@ fn writable_roots_scenarios_leave_an_enclosing_tmpdir_repository_unchanged() {
         // Remove inherited discovery overrides and run identity, then set only
         // this child's temp directory. §REQ-test-isolation.3 §REQ-test-isolation.5
         super::git_env::scrub_git_repository_env(&mut child);
-        for (key, _) in std::env::vars_os() {
-            if key.to_string_lossy().starts_with("RHEI_") {
-                child.env_remove(key);
-            }
-        }
+        super::git_env::scrub_rhei_env(&mut child);
         let prior = git_ok(&outer, &["rev-parse", "HEAD"]);
         let output = child
             .args([&name, "--exact", "--nocapture"])

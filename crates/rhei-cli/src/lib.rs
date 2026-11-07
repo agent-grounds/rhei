@@ -126,6 +126,7 @@ include!("cli/run_descriptor.rs");
 include!("cli/run_lock_ownership.rs");
 include!("cli/run_registry.rs");
 include!("cli/run_registry_access.rs");
+include!("cli/rhei_own_env.rs");
 include!("cli/headless_launcher.rs");
 include!("cli/headless_startup_locks.rs");
 include!("cli/headless_child.rs");

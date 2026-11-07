@@ -84,9 +84,7 @@ impl World {
             fs::copy(home_for(&self.dir).join(".config/rhei/settings.json"), &settings)
                 .expect("copy the machine settings");
         }
-        let mut cmd = rhei_command(base);
-        cmd.env_remove("RHEI_BUDGET_PARENT_RESERVATION");
-        cmd
+        rhei_command(base)
     }
 
     /// One hand edge on task 1 of the project at `name`, on the first machine.

@@ -10,12 +10,6 @@ pub const TILDE: &str = "~~~\n```\n~~~\n";
 
 pub fn command(dir: &Path) -> std::process::Command {
     let mut cmd = rhei_command(dir.join(".home"));
-    // An enclosing run's reservation, identity and settings are not fixture input.
-    for (key, _) in std::env::vars_os() {
-        if key.to_string_lossy().starts_with("RHEI_") {
-            cmd.env_remove(key);
-        }
-    }
     cmd.env("XDG_CONFIG_HOME", dir.join(".home/config"));
     cmd.current_dir(dir);
     cmd

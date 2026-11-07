@@ -196,6 +196,9 @@ pub fn rhei_process_at(bin: impl AsRef<Path>) -> Command {
     // Which repository the spawn acts on is the test's to choose too, and a
     // caller that wants one sets it after this. §REQ-test-isolation.3
     git_env::scrub_git_repository_env(&mut cmd);
+    // So is which rhei run it belongs to; a test that wants a `RHEI_*` sets it
+    // on the command it gets back. §REQ-test-isolation.7
+    git_env::scrub_rhei_env(&mut cmd);
     cmd
 }
 

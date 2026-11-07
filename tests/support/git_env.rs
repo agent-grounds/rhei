@@ -1,4 +1,5 @@
-//! Git's repository variables, kept out of everything the suite spawns.
+//! Git's repository variables, and rhei's own, kept out of everything the suite
+//! spawns.
 //!
 //! Shared verbatim by the CLI's two harnesses, and both take it with `#[path]
 //! mod`: the file opens with an inner attribute of its own, so it has to arrive
@@ -21,18 +22,33 @@ use std::process::Command;
 ///
 /// §REQ-test-isolation.3
 pub fn scrub_git_repository_env(cmd: &mut Command) {
+    scrub_by_prefix(cmd, is_git_variable);
+}
+
+/// Take every `RHEI_*` off `cmd`, so the child belongs to no rhei run but the
+/// one its test starts instead of the one that started `cargo test`.
+///
+/// The same two sources as [`scrub_git_repository_env`], by prefix rather than
+/// by list: a `rhei run` exports its reservation, task and run to every agent
+/// it starts, and an agent's commit hook runs this suite under them. What a
+/// caller sets *after* this is the test's deliberate value and is kept.
+///
+/// §REQ-test-isolation.7
+pub fn scrub_rhei_env(cmd: &mut Command) {
+    scrub_by_prefix(cmd, is_rhei_variable);
+}
+
+/// Remove from `cmd` every variable `matches` selects, staged or inherited.
+fn scrub_by_prefix(cmd: &mut Command, matches: fn(&OsStr) -> bool) {
     // Both lists are collected before anything is removed: `get_envs` borrows
     // `cmd`, so a removal taken while reading it would not borrow-check — and
     // the inherited names have to be spelled out on the command too, because
     // `env_remove` is the only way to say "not this one" about a variable the
     // child would otherwise be handed by the parent.
-    let staged: Vec<OsString> = cmd
-        .get_envs()
-        .map(|(key, _)| key.to_os_string())
-        .filter(|key| is_git_variable(key))
-        .collect();
+    let staged: Vec<OsString> =
+        cmd.get_envs().map(|(key, _)| key.to_os_string()).filter(|key| matches(key)).collect();
     let inherited: Vec<OsString> =
-        std::env::vars_os().map(|(key, _)| key).filter(|key| is_git_variable(key)).collect();
+        std::env::vars_os().map(|(key, _)| key).filter(|key| matches(key)).collect();
     for key in staged.into_iter().chain(inherited) {
         cmd.env_remove(key);
     }
@@ -46,6 +62,12 @@ pub fn scrub_git_repository_env(cmd: &mut Command) {
 /// core.hooksPath=…` reach every fixture. §REQ-test-isolation.3
 fn is_git_variable(key: &OsStr) -> bool {
     key.as_encoded_bytes().starts_with(b"GIT_")
+}
+
+/// Rhei's own variables, by the same rule: the next one a run starts exporting
+/// is covered before anyone has named it. §REQ-test-isolation.7
+fn is_rhei_variable(key: &OsStr) -> bool {
+    key.as_encoded_bytes().starts_with(b"RHEI_")
 }
 
 /// Every `git` the suite spawns.

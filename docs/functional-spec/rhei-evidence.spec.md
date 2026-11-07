@@ -316,6 +316,25 @@ non-empty line of stdout, trimmed.
 
 The probe calls no model, so it spends nothing ([§REQ-bounded-neural-work](../requirements/bounded-neural-work.spec.md#req-bounded-neural-work-every-unit-of-neural-work-is-bounded-before-it-starts)).
 
+### 7.1. Effort Fixture Version Queries
+
+Regression coverage of this probe obeys
+[§REQ-test-isolation.1](../requirements/test-isolation.spec.md#1-the-checkout-is-not-a-tests-directory):
+the shared effort fixture, installed as `claude`, `codex`, `kilo` or `pi`,
+answers its built-in version query (`--version`, or `exec --version` for
+Codex) successfully with a deterministic non-empty version line. It recognizes
+these query arguments before reading stdin, resolving a task root or requiring
+run identity, and writes no task artifacts. This holds both without `RHEI_*`
+identity and with an inherited outer run identity: a separate sentinel named by
+the outer `RHEI_CHECKOUT_ROOT` stays empty while the inner run completes its task
+and records the native effort arguments
+([§FS-rhei-agents.2.2](rhei-agents.spec.md#22-modes)).
+
+Only actual version-query arguments take this path; a task prompt containing
+`--version` still executes and records its task normally. This is a fixture
+requirement and regression scenario under the existing isolation rule; it adds
+no production guarantee about the probe's inherited environment.
+
 ## 8. The Snapshot Generation
 
 `snapshot` is `{ref, transcript_sha256}`: `ref` is exactly the `parent_ref` the

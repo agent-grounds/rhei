@@ -28,12 +28,14 @@ fn hidden_staging_path(output: &Path) -> MietteResult<PathBuf> {
 
 /// Validate hidden bytes as the final project-qualified member without making
 /// the staging name part of the authored graph, or of what a refusal names.
-// §FS-rhei-templates.6.1.2 §FS-rhei-templates.6.2
+/// Discarded proposals and output retained for repair have different recovery.
+/// §FS-rhei-templates.6.1.2 §FS-rhei-templates.6.2 §FS-rhei-library.7.5
 fn validate_staged_project_member(
     project: &Path,
     output: &Path,
     staged: &Path,
     staged_settings: bool,
+    discarded: bool,
 ) -> MietteResult<()> {
     let intended_id = output
         .file_name()
@@ -43,22 +45,25 @@ fn validate_staged_project_member(
             "output path '{}' has no UTF-8 member id", output.display()
         ))?;
     let respell = |report: Report| respell_staging(report, staged, output);
+    let refusal = |report: Report| {
+        let report = if discarded { discarded_member_report(project, output, report) } else { report };
+        respell(report)
+    };
     let loaded =
-        load_project_with_member_for_validation(project, intended_id, staged).map_err(respell)?;
+        load_project_with_member_for_validation(project, intended_id, staged, discarded.then_some(output))
+            .map_err(respell)?;
     let pass = validation_pass_for_loaded(
         project,
         None,
         loaded,
         staged_settings.then_some(staged),
     )
-    .map_err(respell)?;
+    .map_err(refusal)?;
     if !pass.errors.is_empty() {
-        return Err(respell(validation_report(
-            project,
-            &pass.state_machine_sources,
-            &pass.errors,
-            &pass.help,
-        )));
+        // Retained output remains repairable through validate; a discarded
+        // member must be placed again. §FS-rhei-library.7.5
+        let render = if discarded { placement_validation_report } else { validation_report };
+        return Err(refusal(render(project, &pass.state_machine_sources, &pass.errors, &pass.help)));
     }
     print_validation_report(&pass.warnings);
     Ok(())
@@ -68,11 +73,13 @@ fn validate_staged_project_member(
 /// lies outside the staged member and the project manifest. Preserve the
 /// parser's source context, replace its generic remedy with the owning entry,
 /// and make no claim about validation that the interrupted load did not finish.
-/// §FS-rhei-templates.6.1.2 §FS-rhei-errors.4
+/// Only introduced faults in discarded members get placement recovery.
+/// §FS-rhei-templates.6.1.2 §FS-rhei-errors.4 §FS-rhei-library.7.5
 pub(super) fn project_member_parse_report(
     err: &rhei_core::parser::ParseError,
     project: &Path,
     staged: &Path,
+    proposed: Option<&Path>,
 ) -> Report {
     let report = nested_parse_report(err);
     let Some(sibling) = err.file.as_deref().filter(|path| {
@@ -80,7 +87,10 @@ pub(super) fn project_member_parse_report(
             && !path.starts_with(staged)
             && *path != project.join(workspace::PANTA_INDEX_FILE)
     }) else {
-        return report;
+        return match proposed {
+            Some(output) => discarded_member_report(project, output, report),
+            None => report,
+        };
     };
     // A task fragment is inspected here but validated through its workspace; a basin
     // fragment has no index of its own, so through the project. §FS-rhei-templates.6.1.2

@@ -792,29 +792,34 @@ the union extends and nothing else:
 YAML the union generated is never reported as a syntax error in the user's
 file.
 
-### 7.5. A refused proposed union names the original files and the placement to retry
+### 7.5. A refused proposed placement names the original files and the placement to retry
 
-When validation of a proposed `--into` union introduces an error, the refusal
+When validation of a proposed `--into` placement introduces an error, the refusal
 describes the **attempted placement**, which has not been written. This applies
 both when the resulting scope loads but fails validation and when the union
 introduces a failure to load it, with or without `--dry-run`. It applies to
-single-file rheis, project members, and Directory Workspaces.
+unions into single-file rheis, project members, and Directory Workspaces, and
+to discarded project-default replacements and member placements
+([§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target)).
 
 The rendered report, including help and nested error detail:
 
 - names the original target or enclosing project scope and the original
   `states.yaml` source(s), as the reader can open them from the invocation
   directory, rather than any path into the disposable validation mirror;
+- identifies a discarded new member's destination and machine as **proposed**,
+  since they are not published, while retaining the original enclosing project
+  and existing machine sources;
 - retains the useful error and per-error help, including the affected task,
   dependency, or load failure; translating paths must not hide the reason;
 - explains that the proposed placement was refused and nothing was written;
 - directs the reader to correct the attempted placement's inputs and retry
   `rhei instantiate`. Where appropriate, this means correcting the template or
-  its supplied values; a union error need not be a defect in the template
+  its supplied values; a placement error need not be a defect in the template
   alone. Any command offered must be runnable with the original arguments;
 - does not offer `rhei validate` as a re-check of the refused proposal: the real
   host still contains its previous contents and can validate successfully
-  while the proposed union remains invalid.
+  while the proposed placement remains invalid.
 
 This is the inspectable-path and actionable-help contract of
 [§FS-rhei-errors.4](rhei-errors.spec.md#4-paths-in-errors) and
@@ -824,8 +829,9 @@ validation-before-write rule in
 The original host's authored files and artifacts remain byte-identical; no
 proposed ticket, machine entry, or bundled file is published. The validation
 scope and acceptance of unchanged inherited errors remain as specified there.
-Ordinary `rhei validate` keeps its own recovery advice. The earlier flow-style
-collection refusal remains the distinct check in
+Ordinary `rhei validate`, output retained for repair, and refusals identifying
+genuine existing-sibling faults keep their appropriate recovery advice. The
+earlier flow-style collection refusal remains the distinct check in
 [§FS-rhei-library.7.4](rhei-library.spec.md#74-a-collection-the-target-writes-in-flow-style-is-refused-not-extended).
 
 ## 8. Related specifications

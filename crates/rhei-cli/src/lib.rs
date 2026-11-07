@@ -62,6 +62,7 @@ mod templates {
     include!("cli/templates_project_rebind.rs");
     include!("cli/templates_project_links.rs");
     include!("cli/templates_publication.rs");
+    include!("cli/templates_placement_report.rs");
     include!("cli/templates_rename.rs");
     include!("cli/templates_project.rs");
     include!("cli/templates_discovery.rs");

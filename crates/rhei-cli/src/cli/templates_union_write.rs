@@ -167,7 +167,8 @@
     /// ticket whose result block links an artifact is already failing there
     /// before the union touches anything, and a project may hold a defect of a
     /// member the union never read. Neither is the placement's to refuse.
-    /// §AR-rhei-library.5
+    /// Refusals describe the unwritten placement using the original files.
+    /// §AR-rhei-library.5 §FS-rhei-library.7.5
     fn validate_union(host: &UnionHost, writes: &UnionWrites) -> MietteResult<()> {
         let scratch = tempfile::tempdir().map_err(|err| {
             miette!(
@@ -214,7 +215,9 @@
                 if introduced.is_empty() {
                     return Ok(());
                 }
-                Err(validation_report(
+                // Keep per-error guidance without ordinary validate's re-check:
+                // the proposal exists only in this mirror. §FS-rhei-library.7.5
+                Err(placement_validation_report(
                     &entrypoint,
                     &pass.state_machine_sources,
                     &introduced,
@@ -226,6 +229,27 @@
             Err(report) if inherited.contains(&report.to_string()) => Ok(()),
             Err(report) => Err(report),
         }
+        .map_err(|report| union_refusal_report(host, scope, &mirror, &entrypoint, report))
+    }
+
+    /// Both validation and load failures describe the same unwritten proposal.
+    /// Translate paths while the mirror still exists, preserve the reason and
+    /// its guidance, and replace recovery commands that can only read the host.
+    /// §FS-rhei-library.7.5
+    fn union_refusal_report(
+        host: &UnionHost,
+        scope: &Path,
+        mirror: &Path,
+        entrypoint: &Path,
+        report: Report,
+    ) -> Report {
+        let context = format!(
+            "Placement into '{}' was refused.\nTarget state machine: '{}'",
+            crate::display_path(host.entry()),
+            crate::display_path(&host.machine),
+        );
+        let report = discarded_placement_report(&context, entrypoint, report);
+        respell_report(report, &copy_respellings(mirror, scope))
     }
 
     /// Every error the mirrored scope's validation finds right now, as plain

@@ -13,6 +13,9 @@ use super::agent_reentry_support::{ledger, spawn_lines, write_settings, PLAN};
 use super::reset_remedy_support::assert_offers_runnable_reset;
 use super::*;
 
+#[path = "agent_target_edit_failure_support.rs"]
+mod failure_support;
+
 /// Logs one line per spawn naming the target it ran for, and writes the one
 /// output every identity shares, so a first entry's pre-populated-work rule
 /// would see it on disk whichever identity wrote it.
@@ -269,35 +272,16 @@ fn an_ambiguous_fanout_edit_warns_and_spawns_every_member() {
 // §FS-rhei-agent-visit-pairing.2: an invocation whose own record of this visit failed is not recordless.
 #[test]
 fn an_orphan_never_answers_for_an_invocation_whose_own_spawn_failed() {
-    let fixture = finished_then_died(
-        "agent-target-edit-own-failed",
-        r#"all_targets: ["mock:mock:x"]"#,
-        Entry::Reentry,
-    );
-    let agent = write_python_agent(&fixture.dir, "mock-agent.py", D_FAILS_AGENT);
-    write_settings(&fixture.dir, &agent, false);
-    fs::write(&fixture.machine, machine(r#"all_targets: ["mock:mock:c", "mock:mock:d"]"#))
-        .expect("edit the target in place");
-    let args = ["--no-tui", "--no-callbacks"];
-    let first = run_cli("run", &fixture.plan, &fixture.machine, &args);
-    let mut spawned = spawn_lines(&fixture.dir).split_off(fixture.spawns_before_edit);
-    spawned.sort();
-    spawned.dedup();
-    assert_eq!(spawned, ["mock:mock:c", "mock:mock:d"], "an ambiguous edit spawns both");
-    assert!(first.stderr.contains(&fixture.record_name("mock-mock-x")), "{}", first.stderr);
-    let state = || fs::read_to_string(&fixture.plan).expect("plan");
-    assert!(state().contains("**State:** work"), "d failed, so the ticket stays in work");
+    failure_support::check_failed_own_record(None);
+}
 
-    let before_second = spawn_lines(&fixture.dir).len();
-    let second = run_cli("run", &fixture.plan, &fixture.machine, &args);
-    let respawned = spawn_lines(&fixture.dir).split_off(before_second);
-    assert!(
-        respawned.iter().any(|target| target == "mock:mock:d"),
-        "d's own failed record decides, so d spawns again; spawned={respawned:?}\nstdout:\n{}",
-        second.stdout
-    );
-    assert!(reuse_notes(&second).is_empty(), "x must not answer for d:\n{}", second.stdout);
-    assert!(state().contains("**State:** work"), "x's work must not advance the ticket");
+// §FS-rhei-agent-visit-pairing.2 §FS-rhei-agent-visit-pairing.5: startup order cannot invalidate this fixture.
+#[test]
+#[ignore = "red until #619: delayed c loses its append before d fails; implement removes this"]
+fn failed_own_record_coverage_survives_delayed_sibling_startup() {
+    for order in ["c-first", "d-first"] {
+        failure_support::check_failed_own_record(Some(order));
+    }
 }
 
 // §FS-rhei-agent-visit-pairing.1: a current sibling's record is never an orphan. A guard: it passes today.

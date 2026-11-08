@@ -385,6 +385,16 @@ overrides the location.
 Tickets carry the same project-qualified ids the rest of the CLI uses
 (`auth.1`), including for a bare rhei rendered directly ([§AR-rhei-panta.2](../architecture/rhei-panta.spec.md#2-load-model)).
 
+#### 7.2.1. Equivalent file paths
+
+For a plan file in the current directory, `rhei viz plan.rhei.md`,
+`rhei viz ./plan.rhei.md`, and an absolute path to that file must all render
+the same plan, tasks, resolved state machine, and available state history.
+A bare filename resolves against the current directory, including discovery of
+a sibling `states.yaml` when no `--state-machine` override is given. A relative
+path with a directory component retains that directory as the location for
+sibling-machine discovery and plan history.
+
 ### 7.3. Panta projects render as one graph
 
 Pointed at a project directory, `rhei viz` loads the merged project

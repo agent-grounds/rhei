@@ -390,6 +390,7 @@ mod values_file_help_tests;
 mod verify_findings_tests;
 mod verify_reset_tests;
 mod verify_tests;
+mod viz_file_paths_tests;
 mod waiting_on_person_tests;
 mod worker_capture_precondition_tests;
 mod worker_edit_following_copy_tests;

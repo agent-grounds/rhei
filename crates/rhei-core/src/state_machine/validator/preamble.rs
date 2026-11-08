@@ -82,7 +82,7 @@ pub enum StateMachineLoadError {
     Yaml(serde_yaml::Error),
     /// The scan accepts the text, but it does not load as a state machine. §FS-rhei-errors.1.2.2
     Shape {
-        /// The deserializer's refusal, which is what a reader is shown.
+        /// The deserializer's refusal, before applying the fault's diagnostic wording.
         error: serde_yaml::Error,
         /// What that refusal asks of the file.
         fault: StateMachineShapeFault,
@@ -125,14 +125,26 @@ pub enum StateMachineShapeFault {
     Unreadable,
 }
 
+impl StateMachineShapeFault {
+    /// The human-facing cause shared by load-error reporters and Display consumers.
+    /// A document without a mapping names the required YAML shape; all other
+    /// faults retain the deserializer's cause. §FS-rhei-errors.1.2.2
+    pub fn cause(&self, error: &serde_yaml::Error) -> String {
+        match self {
+            Self::NoTopLevelMapping => "the document must be a mapping".to_owned(),
+            _ => error.to_string(),
+        }
+    }
+}
+
 impl std::fmt::Display for StateMachineLoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             StateMachineLoadError::Io(e) => write!(f, "I/O error: {e}"),
             StateMachineLoadError::Yaml(e) => write!(f, "YAML error: {e}"),
             // Not "YAML error": the scan accepts this file. §FS-rhei-errors.1.2.2
-            StateMachineLoadError::Shape { error, .. } => {
-                write!(f, "invalid state machine: {error}")
+            StateMachineLoadError::Shape { error, fault } => {
+                write!(f, "invalid state machine: {}", fault.cause(error))
             }
             StateMachineLoadError::Invalid(message) => {
                 write!(f, "invalid state machine: {message}")

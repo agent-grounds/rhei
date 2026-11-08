@@ -140,6 +140,7 @@ mod headless_stop_ownership_tests;
 mod headless_support;
 mod headless_tests;
 mod headless_undecided_tests;
+mod help_literal_whitespace_tests;
 mod help_target_detached_seal_tests;
 mod help_target_paste_tests;
 mod help_target_removal_template_tests;

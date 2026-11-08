@@ -65,6 +65,14 @@ but not exactly one of each, such as two orphans or two recordless invocations â
 pairs nothing. The run prints a warning on standard error naming every orphaned
 record, and the invocations are spawned.
 
+Spawning does not guarantee that every invocation finishes its body or leaves
+application side effects: a sibling's failure may terminate the run and
+interrupt it ([Â§FS-rhei-run.3.2](rhei-run.spec.md#32-interruption-and-process-ownership)). The current-visit spawn
+records distinguish successful work, failure and interruption; the absence of
+an application side effect does not prove an invocation was never spawned. Tests
+that require a successful sibling before another deliberately fails must
+establish that order within their fixture, rather than rely on startup order.
+
 An orphan with no invocation to answer for (a removed fan-out member) or an
 invocation with no orphan (an added one) pairs nothing and passes silently.
 

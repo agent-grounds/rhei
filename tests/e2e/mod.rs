@@ -182,6 +182,8 @@ mod laid_output_root_tests;
 mod list_ready_tests;
 mod list_task_metadata_tests;
 mod live_checkpoint_validation_tests;
+mod live_gate_budget_support;
+mod live_gate_budget_tests;
 mod live_member_admission_tests;
 mod live_member_lock_tests;
 mod live_member_program_tests;

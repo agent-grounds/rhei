@@ -405,7 +405,10 @@ without special casing:
   with this invocation's plan path and machine, because that edge is what
   releases the subtree and drops the claim. The rendered command includes
   `--release-subtree`: the manual worker has read the checkpoints and is
-  explicitly releasing them. Under `--json` each is a field,
+  explicitly releasing them. Its plan path is the target `rhei next` was given,
+  printed by the rule a help follows ([§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names)): a typed member as
+  typed, not the project it widens to, so the command acts on the scope the
+  worker asked about and runs from where `rhei next` was typed. Under `--json` each is a field,
   present only when the section is. A plan with no supervising state produces
   the output it always did. It never claims a descendant of a held supervisor;
   such descendants are reported as `Task <id> held by supervisor Task <P>

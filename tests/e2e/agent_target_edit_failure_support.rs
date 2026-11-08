@@ -34,7 +34,7 @@ def wait_for(description, predicate):
 def c_succeeded():
     path = runtime / 'spawns/task-plan.1-work-mock-mock-c-2.json'
     try:
-        record = json.loads(path.read_text())
+        record = json.loads(path.read_text(encoding='utf-8'))
     except (FileNotFoundError, json.JSONDecodeError):
         return False
     return (record.get('task') == 'plan.1' and record.get('state') == 'work'
@@ -58,7 +58,7 @@ try:
 except SystemExit as outcome:
     if target == 'mock:mock:d' and outcome.code == 1:
         try:
-            c_record = json.loads((runtime / 'spawns/task-plan.1-work-mock-mock-c-2.json').read_text())
+            c_record = json.loads((runtime / 'spawns/task-plan.1-work-mock-mock-c-2.json').read_text(encoding='utf-8'))
         except (FileNotFoundError, json.JSONDecodeError):
             c_record = None
         (runtime / 'c-at-d-exit.json').write_text(json.dumps(c_record))

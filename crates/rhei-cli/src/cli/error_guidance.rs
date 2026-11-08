@@ -206,13 +206,7 @@ fn state_machine_load_report(path: &Path, err: rhei_validator::StateMachineLoadE
             )
         }
         rhei_validator::StateMachineLoadError::Shape { error, fault } => {
-            // Name the required YAML shape, not serde's Rust type. §FS-rhei-errors.1.2.2
-            let cause = match fault {
-                rhei_validator::StateMachineShapeFault::NoTopLevelMapping => {
-                    "the document must be a mapping".to_string()
-                }
-                _ => error.to_string(),
-            };
+            let cause = fault.cause(&error);
             miette!(
                 help = format!(
                     "{}, then re-check it with: rhei states --state-machine {quoted}",

@@ -188,7 +188,9 @@ the headline does not print. What it asks for depends on what the shape lacks:
   and empty or comment-only input must not instead report a missing `name`.
   This also applies to a tagged sequence. Both `rhei states --state-machine`
   and `rhei validate` report this cause and retain their refusal exit code 1;
-  which inputs are accepted does not change.
+  visualization and template-union refusals that display the load error use
+  the same cause, retaining their surrounding diagnostic context and help.
+  Which inputs are accepted does not change.
 - Anything else, such as a wrong type at any depth or a field missing from a
   nested entry: the correction of what the headline names. The headline already
   carries the key's path and position, so the help makes no claim that the key

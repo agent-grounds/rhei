@@ -309,6 +309,7 @@ mod spawn_record_failure_support;
 mod spawn_record_failure_tests;
 mod spawn_record_malformed_tests;
 mod standing_cycle_tests;
+mod state_machine_load_display_tests;
 mod state_machine_load_help_tests;
 mod state_machine_placement_tests;
 mod state_machine_profile_compatibility_tests;

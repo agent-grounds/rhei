@@ -151,19 +151,55 @@ fn budget_target_printed_the_program_refusals_show_runs_from_a_detached_log() {
     let machine = ["--state-machine", "states.yaml"];
     let launched =
         world.run(&[&machine[..], &["run", "--headless", PLAN, "--no-callbacks"]].concat());
-    assert!(launched.status.success(), "the launch works:\n{}", raw_stderr(&launched));
+    let refusal = "budget journal is untrustworthy";
+    let damage = "does not match the project journal";
+    // Either startup observation is valid; other launch failures are not. §FS-rhei-run-headless.1.1
+    if !launched.status.success() {
+        let said = raw_stderr(&launched);
+        assert_eq!(launched.status.code(), Some(1), "the account refuses:\n{said}");
+        assert!(
+            said.contains("the run exited before it started (exit status 1)")
+                && said.contains(refusal)
+                && said.contains(damage),
+            "only the damaged-account early exit is expected:\n{said}"
+        );
+    }
 
     let log = world.dir.join("my project/runtime/run.log");
+    let report = world.dir.join("my project/runtime/run-report.md");
+    let descriptor = world.dir.join("my project/runtime/run.json");
+    let plan = fs::canonicalize(&*world.dir).expect("absolute fixture directory").join(PLAN);
+    let expected = format!("rhei budget show {}", shell_quote(&plan.display().to_string()));
+    // Wait for the complete remedy, not just its prefix. §FS-rhei-errors.1.2.1
     super::headless_support::wait_until(
-        "the detached run to refuse",
+        "the detached run's complete refusal and remedy",
         std::time::Duration::from_secs(30),
-        || raw_stderr_from_file(&log).contains("rhei budget show "),
+        || {
+            let said = raw_stderr_from_file(&log);
+            said.contains(refusal)
+                && said.contains(damage)
+                && said.contains(&format!("{expected}\n"))
+        },
     );
-    let _ = world.run(&["stop", "--wait", PLAN]);
+    // The run must fail by itself and retain its diagnosis. §FS-rhei-budgets.9
+    super::headless_support::wait_until(
+        "the detached run's failed outcome and durable report",
+        std::time::Duration::from_secs(30),
+        || {
+            let ended = fs::read(&descriptor)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                .is_some_and(|d| d["status"] == "failed" && d["exit_code"] == 1);
+            let report = fs::read_to_string(&report).unwrap_or_default();
+            ended && report.contains(refusal) && report.contains(damage)
+        },
+    );
 
     let printed = printed_command(&raw_stderr_from_file(&log), "rhei budget show ");
+    assert_eq!(printed, expected, "the log names the exact absolute plan, quoted as one word");
     let elsewhere = world.write("elsewhere/.keep", "").parent().expect("a parent").to_path_buf();
     assert_printed_target_is_listable_with(&world.rhei(), &printed, &elsewhere);
     let shown = paste_with(&world.rhei(), &printed, &elsewhere);
+    assert_eq!(shown.status.code(), Some(1), "the account is damaged:\n{}", shown.stderr);
     assert!(shown.stdout.contains("fewer receipts"), "`{printed}`:\n{}", shown.stdout);
 }

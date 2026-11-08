@@ -50,7 +50,7 @@
             // Diagnose the completed target plus part only after validation;
             // nested and partial includes never emit it. §FS-rhei-library.7.2.3
             if let Some((_, text)) = writes.files.iter().find(|(path, _)| path == &host.machine) {
-                let machine = serde_yaml::from_str(text).unwrap_or(YamlValue::Null);
+                let machine = written_machine_value(text);
                 for warning in shared_input_warnings(&machine) {
                     eprintln!("{warning}");
                 }
@@ -141,7 +141,7 @@
             check_parent_exists(parent, host_files)?;
         }
 
-        let host_machine_text = read_authored_text(&host.machine)?;
+        let (machine_mark, host_machine_text) = read_host_text(&host.machine)?;
         check_artifact_paths(&host_machine_text, &part_machine, sides)?;
         warn_shared_artifact_paths(&part_machine, &tickets);
         let mut machine =
@@ -156,18 +156,18 @@
             &part.source,
             &part.inputs,
         ));
-        writes.files.push((host.machine.clone(), machine));
+        writes.files.push((host.machine.clone(), format!("{machine_mark}{machine}")));
 
         let kinds = declared_node_kinds(&part_front);
         let levels = placed.iter().map(|id| id.split('.').count() as u8).max().unwrap_or(1);
-        let index_raw = read_authored_text(&host.index)?;
+        let (index_mark, index_raw) = read_host_text(&host.index)?;
         let additions = IndexAdditions { kinds: &kinds, levels, tasks: &task_metadata };
         let mut index = union_index(&index_raw, &additions)?;
         if host.single_file {
             index = place_tickets_in_file(&index, host.parent.as_deref(), &tickets);
-            writes.files.push((host.index.clone(), index));
+            writes.files.push((host.index.clone(), format!("{index_mark}{index}")));
         } else {
-            writes.files.push((host.index.clone(), index));
+            writes.files.push((host.index.clone(), format!("{index_mark}{index}")));
             place_workspace_tickets(host, host_files, &tickets, &mut writes)?;
         }
         copy_bundled_files(&part.root, host, &mut writes)?;

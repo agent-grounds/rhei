@@ -160,9 +160,12 @@ fn place_ticket(
                 rhei_core::header::DocumentRole::TaskFile,
             ),
         };
-        let raw = read_input_file(&path)?;
-        let contents =
-            insert_ticket_after_subtree(&raw, role, parent_local, ticket.block).ok_or_else(|| {
+        let marked = read_input_file(&path)?;
+        // The parent's heading is found after the mark, which is written back. §REQ-cross-platform.9
+        let (mark, raw) = split_byte_order_mark(&marked);
+        let contents = insert_ticket_after_subtree(raw, role, parent_local, ticket.block)
+            .map(|contents| format!("{mark}{contents}"))
+            .ok_or_else(|| {
             miette!(
 help = format!(
     "re-run after `{}` passes, so the plan on disk and the ids agree.",

@@ -3,8 +3,8 @@
 //!
 //! Each test runs one command over two fixtures that differ only in the three
 //! leading bytes `EF BB BF` of the file under test, and asks for the same outcome
-//! from both: a transition through §FS-rhei-transition-cmd, and the ticket-id
-//! collision of §FS-rhei-library.4.
+//! from both: a transition through §FS-rhei-transition-cmd, the ticket-id
+//! collision of §FS-rhei-library.4, and a subtask placed by §FS-rhei-new.3.1.
 
 use std::path::Path;
 
@@ -92,5 +92,56 @@ fn a_union_sees_a_ticket_declared_in_a_task_file_saved_with_a_byte_order_mark() 
             "marked: {marked}\nstderr:\n{}",
             run.stderr
         );
+    }
+}
+
+/// `rhei new --under` a ticket whose heading opens a task file saved with the
+/// mark: the parent is found, the subtask lands under it, and the file keeps its
+/// mark. §FS-rhei-new.3.1
+#[test]
+fn a_subtask_lands_under_a_heading_that_opens_a_task_file_saved_with_a_byte_order_mark() {
+    let (plain, marked) = same_outcome(
+        "bom-new-under",
+        |dir, marked| {
+            write_bytes(dir, "ws/index.rhei.md", "# Rhei: Host\n", false);
+            write_bytes(dir, "ws/states.yaml", MACHINE, false);
+            write_bytes(dir, "ws/tasks/01-h.md", TASK_FILE, marked);
+        },
+        &["new", "Gamma", "--project", "ws", "--under", "ws.1"],
+    );
+    let read = |dir: &Path| std::fs::read(dir.join("ws/tasks/01-h.md")).expect("task file");
+    let (plain, marked) = (read(&plain), read(&marked));
+    assert!(String::from_utf8_lossy(&plain).contains("Task 1.1: Gamma"), "the subtask was written");
+    assert_eq!(marked.strip_prefix(MARK).expect("the write keeps the mark"), plain.as_slice());
+}
+
+/// `rhei instantiate --into ws.1` a host whose files are saved with the mark: the
+/// parent heading that opens its task file is found, and the task file, index and
+/// machine the union extends come back with their marks, as the plain host's bytes
+/// with the same lines added. §FS-rhei-library.7.1
+#[test]
+fn a_union_under_a_ticket_keeps_the_marks_of_the_files_it_extends() {
+    let (plain, marked) = same_outcome(
+        "bom-union-under",
+        |dir, marked| {
+            write_bytes(
+                dir,
+                "tpl/template.yaml",
+                "name: tpl\nversion: 1.0.0\ndescription: T.\n",
+                false,
+            );
+            write_bytes(dir, "tpl/plan.rhei.md", PLAN.replace("Example", "Part").as_str(), false);
+            write_bytes(dir, "tpl/states.yaml", MACHINE, false);
+            write_bytes(dir, "ws/index.rhei.md", "# Rhei: Host\n", marked);
+            write_bytes(dir, "ws/states.yaml", MACHINE, marked);
+            write_bytes(dir, "ws/tasks/01-h.md", TASK_FILE, marked);
+        },
+        &["instantiate", "./tpl", "--into", "ws.1"],
+    );
+    for name in ["ws/tasks/01-h.md", "ws/index.rhei.md", "ws/states.yaml"] {
+        let read = |dir: &Path| std::fs::read(dir.join(name)).expect("host file");
+        let (plain, marked) = (read(&plain), read(&marked));
+        let marked = marked.strip_prefix(MARK).expect("the union keeps the mark");
+        assert_eq!(marked, plain.as_slice(), "{name}");
     }
 }

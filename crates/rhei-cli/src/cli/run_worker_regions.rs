@@ -110,7 +110,7 @@ fn snapshot_region(
 /// The region of `route`'s task in its file as it is on disk, read in the role
 /// `loaded` read that file in. §FS-rhei-run.3.7.1 §FS-rhei-plan-language.2.1
 fn file_region(loaded: &LoadedPlan, route: &TaskRoute) -> Option<RegionSnapshot> {
-    let text = fs::read_to_string(&route.task_file).ok()?;
+    let text = read_region_text(&route.task_file)?;
     snapshot_region(&text, loaded.document_role(&route.task_file), &route.local_id)
 }
 
@@ -201,12 +201,22 @@ fn task_owning_line(
     role: rhei_core::header::DocumentRole,
     line: usize,
 ) -> Option<String> {
-    let local = region_owner_at(&fs::read_to_string(file).ok()?, role, line)?;
+    let local = region_owner_at(&read_region_text(file)?, role, line)?;
     let entry = file.ancestors().skip(1).find(|dir| workspace::is_workspace(dir)).unwrap_or(file);
     match workspace::rhei_id_for_path(entry) {
         Ok(rhei) => Some(format!("{rhei}.{local}")),
         Err(_) => Some(local),
     }
+}
+
+/// `file`'s text as the loader and the locked restore read it: after the one
+/// leading byte order mark an editor may have saved, so the snapshot, the
+/// classification and the restore all find a task heading on line 1 alike, and
+/// no line moves. §FS-rhei-run.3.7 §REQ-cross-platform.9
+fn read_region_text(file: &Path) -> Option<String> {
+    let raw = fs::read_to_string(file).ok()?;
+    let text = rhei_core::source::without_byte_order_mark(&raw);
+    Some(if text.len() == raw.len() { raw } else { text.to_owned() })
 }
 
 /// The reverted-text file beside an attempt's log: its name, `-attempt{n}`

@@ -69,3 +69,22 @@ fn a_task_file_with_a_leading_byte_order_mark_keeps_its_frontmatter() {
     assert_eq!(format!("{:?}", marked.metadata), format!("{:?}", plain.metadata));
     assert_eq!(format!("{:?}", marked.tasks), format!("{:?}", plain.tasks));
 }
+
+/// A ticket redeclared on the first line of a task file saved with the mark is
+/// reported at that line, as in the plain file, so a run can place the break.
+/// §REQ-cross-platform.9
+#[test]
+fn a_duplicate_heading_after_the_mark_is_reported_at_its_line() {
+    for mark in ["", MARK] {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let tasks = dir.path().join("tasks");
+        std::fs::create_dir_all(&tasks).expect("tasks dir");
+        std::fs::write(dir.path().join("index.rhei.md"), "# Rhei: Host\n").expect("index");
+        std::fs::write(tasks.join("01-a.md"), "### Task 1: A\n**State:** pending\n").expect("a");
+        let redeclared = format!("{mark}### Task 1: B\n**State:** pending\n");
+        std::fs::write(tasks.join("02-b.md"), redeclared).expect("b");
+        let err = crate::workspace::load_workspace(dir.path()).expect_err("duplicate id");
+        assert!(err.message.contains("duplicate task ID '1'"), "{}", err.message);
+        assert_eq!(err.line, Some(1), "mark: {mark:?}");
+    }
+}

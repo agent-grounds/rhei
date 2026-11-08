@@ -483,3 +483,20 @@
             "cannot place ticket '{clash}': {rhei_id}.{clash} is retired (metadata.retiredTickets)"
         ))
     }
+
+    /// A host file the union extends, as the one leading byte order mark it may
+    /// carry and the text after it: the union reads the text, and writes the mark
+    /// back ahead of the host's own bytes with its lines added.
+    /// §FS-rhei-library.7.1 §REQ-cross-platform.9
+    fn read_host_text(path: &Path) -> MietteResult<(String, String)> {
+        let raw = read_text(path)?;
+        let (mark, text) = split_byte_order_mark(&raw);
+        Ok((mark.to_owned(), text.to_owned()))
+    }
+
+    /// The host's machine as the union writes it back, read after the mark it
+    /// keeps. §REQ-cross-platform.9
+    fn written_machine_value(text: &str) -> YamlValue {
+        serde_yaml::from_str(rhei_core::source::without_byte_order_mark(text))
+            .unwrap_or(YamlValue::Null)
+    }

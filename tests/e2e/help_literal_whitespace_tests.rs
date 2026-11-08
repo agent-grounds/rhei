@@ -44,7 +44,6 @@ fn assert_no_space_run(text: &str) {
 /// refused before it joins the host, with a help that is one sentence.
 /// §FS-rhei-library.3.1 §FS-rhei-errors.1.2
 #[test]
-#[ignore = "red until #632: the unreadable-state-machine help carries 33 spaces; implement removes this"]
 fn an_unreadable_template_machine_has_a_one_sentence_help() {
     let (dir, root) = host_workspace("help-unreadable-machine");
     let template = dir.join("bad");
@@ -83,7 +82,6 @@ fn an_unreadable_template_machine_has_a_one_sentence_help() {
 /// `index.panta.md` is warned about, and the warning reads as prose.
 /// §FS-rhei-templates.6.2 §FS-rhei-errors.1.2
 #[test]
-#[ignore = "red until #632: the single-file-in-a-project warning carries four 18-space runs; implement removes this"]
 fn a_single_file_template_in_a_project_is_warned_about_in_plain_prose() {
     let dir = unique_temp_dir("help-single-file-in-project");
     let template = dir.join("one");

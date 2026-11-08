@@ -35,7 +35,8 @@
             let machine = rhei_core::state_machine::StateMachine::parse_fragment(&text)
                 .map_err(|err| {
                     miette!(
-                        help = "every template stands alone, so its states.yaml is readable                                 before it joins a machine.",
+                        help = "every template stands alone, so its states.yaml is readable \
+                                 before it joins a machine.",
                         "template '{name}' has an unreadable state machine: {err}"
                     )
                 })?;

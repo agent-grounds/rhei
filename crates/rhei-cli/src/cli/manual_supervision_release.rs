@@ -41,13 +41,20 @@ fn manual_release_preflight(
             .map(|event| format!("Task {prefix}{} {} -> {}", event.task, event.from, event.to))
             .collect::<Vec<_>>()
             .join(", ");
-        // §FS-rhei-errors.6
-        return Err(miette!(help = format!("inspect the pending checkpoints first. An operator outside the worker can grant attempts with {}, or explicitly release with {}.", help_command_with("retry", &format!("--task {task}")), help_command_with("transition", &format!("--task {task} --from {} --to {} --release-subtree", shell_quote(from), shell_quote(to)))), "refusing to release Task {task}: the self-loop '{from}' -> '{to}' releases the subtree and drops {count} unread checkpoint{} ({events}). To give the halted visit more attempts with the subtree still held: rhei retry {task}. To release anyway: rhei transition {task} --from {from} --to {to} --release-subtree", if count == 1 { "" } else { "s" }));
+        // The message names the target its help does. §FS-rhei-errors.6 §FS-rhei-errors.1.2.1
+        let retry = help_command_with("retry", &format!("--task {task}"));
+        let release_anyway = help_command_with(
+            "transition",
+            &format!("--task {task} --from {} --to {} --release-subtree", shell_quote(from), shell_quote(to)),
+        );
+        return Err(miette!(help = format!("inspect the pending checkpoints first. An operator outside the worker can grant attempts with {retry}, or explicitly release with {release_anyway}."), "refusing to release Task {task}: the self-loop '{from}' -> '{to}' releases the subtree and drops {count} unread checkpoint{} ({events}). To give the halted visit more attempts with the subtree still held: {retry}. To release anyway: {release_anyway}", if count == 1 { "" } else { "s" }));
     }
     Ok(count)
 }
 
-/// The actual command `next` hands a manual supervisor. §FS-rhei-supervision.3.4
+/// The actual command `next` hands a manual supervisor, naming the target `next` was
+/// typed with rather than the project `input` widened to. §FS-rhei-supervision.3.4
+/// §FS-rhei-errors.1.2.1
 fn manual_supervisor_release_command(
     input: &Path,
     state_machine: Option<&Path>,
@@ -56,7 +63,7 @@ fn manual_supervisor_release_command(
 ) -> String {
     format!(
         "rhei transition {} --task {} --from {} --to {} --release-subtree{}",
-        shell_quote(&input.display().to_string()),
+        help_target_word_or(input),
         task,
         shell_quote(state),
         shell_quote(state),

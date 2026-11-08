@@ -58,6 +58,35 @@ mod retry_supervision {
         assert_eq!(command, "rhei transition plan.rhei.md --task plan.1 --from supervising --to supervising --release-subtree --state-machine states.yaml");
     }
 
+    // The refusal's message names the target its help does, as typed. §FS-rhei-errors.1.2.1
+    #[test]
+    fn manual_release_refusal_message_names_the_typed_target() {
+        let machine = supervision_machine();
+        let mut plan = supervised_plan(&["completed"]);
+        let key = parse_task_id("1");
+        let pending = checkpoint("1.1", "review", "completed", 1);
+        plan.metadata = Some(record_supervision_hold(plan.metadata.as_ref(), &key, Some(&pending)));
+        let _scope = enter_help_target(HelpTarget::naming(Path::new("project/auth.rhei.md")));
+        let error = manual_release_preflight(
+            &machine,
+            plan.metadata.as_ref(),
+            &key,
+            "plan.1",
+            "supervising",
+            "supervising",
+            false,
+        )
+        .unwrap_err()
+        .to_string();
+        for expected in [
+            "more attempts with the subtree still held: rhei retry project/auth.rhei.md --task plan.1.",
+            "To release anyway: rhei transition project/auth.rhei.md --task plan.1 --from supervising \
+             --to supervising --release-subtree",
+        ] {
+            assert!(error.contains(expected), "{error}");
+        }
+    }
+
     // §FS-rhei-supervision.3.1: engine-owned release still consumes unread events.
     #[test]
     fn engine_release_with_pending_checkpoints_keeps_existing_semantics() {
@@ -81,7 +110,7 @@ mod retry_supervision {
         for expected in [
             "plan.1.1 review -> completed",
             "1 unread checkpoint",
-            "rhei retry plan.1",
+            "rhei retry <plan> --task plan.1",
             "--release-subtree",
         ] {
             assert!(error.contains(expected), "{error}");

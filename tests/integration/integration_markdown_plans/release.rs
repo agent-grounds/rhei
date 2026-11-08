@@ -174,9 +174,14 @@ fn release_explains_a_ticket_left_past_the_initial_state() {
     ]);
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(output.status.success(), "release should succeed: {stdout}");
+    // The undo names the target and machine release was given. §FS-rhei-errors.1.2.1
+    let undo = format!(
+        "rhei transition {} --task plan.1 --from in-progress --to pending --state-machine {}",
+        plan_path.display(),
+        machine_path.display()
+    );
     assert!(
-        stdout.contains("still in 'in-progress'")
-            && stdout.contains("rhei transition --task plan.1 --from in-progress --to pending"),
+        stdout.contains("still in 'in-progress'") && stdout.contains(&undo),
         "the note names the exact transition back: {stdout}"
     );
 

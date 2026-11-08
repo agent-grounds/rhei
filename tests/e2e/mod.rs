@@ -313,6 +313,7 @@ mod state_machine_placement_tests;
 mod state_machine_profile_compatibility_tests;
 mod state_machine_resolution_support;
 mod state_machine_resolution_tests;
+mod state_machine_top_level_type_tests;
 mod states_line_refused_tests;
 mod strict_inputs_admission_tests;
 mod strict_inputs_carry_on_tests;

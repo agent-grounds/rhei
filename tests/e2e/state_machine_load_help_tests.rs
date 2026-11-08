@@ -119,11 +119,20 @@ fn a_file_that_does_not_parse_keeps_its_help_word_for_word() {
 }
 
 #[test]
-fn the_tickets_machine_loads_once_it_has_a_name() {
+fn a_valid_mapping_loads_through_both_commands() {
     let dir = unique_temp_dir("load-help-named");
-    write_fixture_file(&dir, "states.yaml", &format!("name: open-done\n{NO_NAME}"));
-    let run = run_in(&["states", "--state-machine", "states.yaml"], &dir);
-    assert!(run.status.success(), "the missing name is the only fault: {}", run.stderr);
+    let profiles = "profiles:\n  work:\n    initial: open\n    allowed: [open, done]\n\
+                    node_policy:\n  root: work\n  default: work\n";
+    // With profiles the initial state belongs to the profile alone.
+    let body = NO_NAME.replace("    initial: true\n", "");
+    write_fixture_file(&dir, "states.yaml", &format!("name: open-done\n{body}{profiles}"));
+    write_fixture_file(&dir, "plan.rhei.md", PLAN);
+    for args in
+        [&["states", "--state-machine", "states.yaml"][..], &["validate", "plan.rhei.md"][..]]
+    {
+        let run = run_in(args, &dir);
+        assert!(run.status.success(), "{args:?} accepts the mapping control: {}", run.stderr);
+    }
 }
 
 #[test]
@@ -190,28 +199,50 @@ fn a_wrong_shape_elsewhere_makes_no_top_level_claim() {
     }
 }
 
-/// None of these has a top-level mapping to add one field to, so the help asks for
-/// the mapping and everything it must hold. The comment-only file is the one
-/// missing `name` that prints a position.
+/// §FS-rhei-errors.1.2.2: the headline itself explains the missing mapping,
+/// independently of the help that names its keys and the command to re-check it.
 #[test]
-fn a_document_with_no_mapping_is_told_what_it_must_hold() {
+#[ignore = "red until #633: non-mapping headlines must name the required mapping; implement removes this"]
+fn a_document_with_no_mapping_gets_a_yaml_facing_headline_and_actionable_help() {
     let cases = [
-        ("", "missing field `name`"),
-        ("# nothing\n", "missing field `name` at line 2 column 1"),
-        ("null\n", "invalid type: unit value, expected struct StateMachine"),
-        ("just a string\n", "invalid type: string \"just a string\", expected struct StateMachine"),
-        ("- a\n- b\n", "invalid type: sequence, expected struct StateMachine"),
-        ("!foo\n- a\n- b\n", "invalid type: sequence, expected struct StateMachine"),
+        ("empty", ""),
+        ("comment-only", "# nothing\n"),
+        ("null", "null\n"),
+        ("string", "just a string\n"),
+        ("integer", "42\n"),
+        ("sequence", "- a\n- b\n"),
+        ("tagged sequence", "!foo\n- a\n- b\n"),
     ];
-    for (machine, cause) in cases {
-        for (command, help) in refusal_help("load-help-no-mapping", machine, cause) {
+    let cause = "the document must be a mapping";
+    let expected = format!("failed to parse state machine 'states.yaml': {cause}");
+    let mut wrong_headlines = Vec::new();
+    for (label, machine) in cases {
+        let dir = unique_temp_dir("load-help-no-mapping");
+        write_fixture_file(&dir, "states.yaml", machine);
+        write_fixture_file(&dir, "plan.rhei.md", PLAN);
+        for (command, args) in [
+            ("states", &["states", "--state-machine", "states.yaml"][..]),
+            ("validate", &["validate", "plan.rhei.md"][..]),
+        ] {
+            let run = run_in(args, &dir);
+            assert_eq!(run.status.code(), Some(1), "{command} on {label}: {}", run.stderr);
+            let headline = rendered_line(&run.stderr, "× ");
+            if headline != expected {
+                wrong_headlines.push(format!("{command} on {label}: {headline}"));
+            }
+            let help = rendered_line(&run.stderr, "help: ");
             assert_shape_help(command, cause, &help);
-            assert!(help.contains("mapping"), "`rhei {command}` on {machine:?}: {help}");
+            assert!(help.contains("Write a mapping"), "`rhei {command}` on {label}: {help}");
             for key in ["name", "version", "states"] {
                 assert_names_key(command, key, &help);
             }
         }
     }
+    assert!(
+        wrong_headlines.is_empty(),
+        "expected headline for every non-mapping: {expected}\n{}",
+        wrong_headlines.join("\n")
+    );
 }
 
 /// A repeated key scans clean and cannot be told from a limit without reading the

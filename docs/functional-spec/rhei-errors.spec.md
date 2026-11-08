@@ -182,7 +182,13 @@ the headline does not print. What it asks for depends on what the shape lacks:
   [§FS-rhei-states.1.1](rhei-states.spec.md#11-top-level-fields) lists them.
 - The document holds no top-level mapping, because it is empty, only comments,
   `null`, a scalar or a sequence: that the document must be a mapping, naming
-  every required top-level key. There is no one field to add.
+  every required top-level key. There is no one field to add. Independently of
+  that help, the headline's cause is `the document must be a mapping`, inside
+  the same wrapper naming the failing file. It names no Rust or serde type,
+  and empty or comment-only input must not instead report a missing `name`.
+  This also applies to a tagged sequence. Both `rhei states --state-machine`
+  and `rhei validate` report this cause and retain their refusal exit code 1;
+  which inputs are accepted does not change.
 - Anything else, such as a wrong type at any depth or a field missing from a
   nested entry: the correction of what the headline names. The headline already
   carries the key's path and position, so the help makes no claim that the key

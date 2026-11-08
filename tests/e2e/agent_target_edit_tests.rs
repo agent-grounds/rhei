@@ -24,12 +24,34 @@ append(root / 'runtime' / 'spawn-count.log', os.environ.get('RHEI_TARGET', '?') 
 write(root / 'runtime' / 'digest.md', 'written by an invocation\n')
 "#;
 
-/// [`TARGET_AGENT`], except that the invocation for `mock:mock:d` exits 1.
+/// [`TARGET_AGENT`], except that d exits 1 after c successfully completes this visit.
+/// §FS-rhei-agent-visit-pairing.2 §FS-rhei-agent-visit-pairing.5
 const D_FAILS_AGENT: &str = r#"root = pathlib.Path(env('RHEI_ROOT'))
 target = os.environ.get('RHEI_TARGET', '?')
 append(root / 'runtime' / 'spawn-count.log', target + '\n')
 write(root / 'runtime' / 'digest.md', 'written by an invocation\n')
 if target == 'mock:mock:d':
+    import json
+
+    # §FS-rhei-agent-visit-pairing.5: finish c before deliberate failure can interrupt it.
+    record_path = root / 'runtime/spawns/task-plan.1-work-mock-mock-c-2.json'
+    deadline = time.monotonic() + 5  # Leave room within the fixture's 10s agent timeout.
+    observed = 'no record read'
+    while time.monotonic() < deadline:
+        try:
+            record = json.loads(record_path.read_text(encoding='utf-8'))
+            observed = repr(record)
+            if (record.get('task') == 'plan.1' and record.get('state') == 'work'
+                    and record.get('moves') == 2 and record.get('ending') == 'exited'
+                    and record.get('code') == 0):
+                break
+        except (FileNotFoundError, json.JSONDecodeError) as error:
+            observed = str(error)
+        time.sleep(0.005)
+    else:
+        print('d prerequisite timed out: c must complete plan.1 work visit 2; '
+              + str(record_path) + ': ' + observed, file=sys.stderr)
+        sys.exit(97)
     sys.exit(1)
 "#;
 
@@ -277,7 +299,6 @@ fn an_orphan_never_answers_for_an_invocation_whose_own_spawn_failed() {
 
 // §FS-rhei-agent-visit-pairing.2 §FS-rhei-agent-visit-pairing.5: startup order cannot invalidate this fixture.
 #[test]
-#[ignore = "red until #619: delayed c loses its append before d fails; implement removes this"]
 fn failed_own_record_coverage_survives_delayed_sibling_startup() {
     for order in ["c-first", "d-first"] {
         failure_support::check_failed_own_record(Some(order));

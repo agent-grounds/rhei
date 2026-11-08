@@ -267,6 +267,9 @@ pub fn load_workspace(dir: &Path) -> parser::Result<Workspace> {
 /// reads simply yields no line rather than masking the duplicate itself.
 fn duplicate_heading_line(path: &Path, id_str: &str) -> Option<usize> {
     let source = crate::source::read_to_string(path).ok()?;
+    // A heading on the first line is found after the file's mark, as the parser
+    // found it; no line moves. §REQ-cross-platform.9
+    let source = crate::source::without_byte_order_mark(&source);
     let mut found = None;
     for (index, line) in source.lines().enumerate() {
         let rest = line.trim_start_matches('#');

@@ -32,7 +32,8 @@
         }
         let previous = project.join("states.yaml");
         let previous = previous.is_file().then(|| {
-            machine_name_of(&fs::read_to_string(&previous).unwrap_or_default())
+            // Named as the loader reads the machine, after its mark. §REQ-cross-platform.9
+            machine_name_of(&read_authored_text(&previous).unwrap_or_default())
                 .unwrap_or_else(|| "an unnamed machine".to_owned())
         });
         let mut summary = ProjectSummary::new(lay.manifest, &rendered.machine, &root);

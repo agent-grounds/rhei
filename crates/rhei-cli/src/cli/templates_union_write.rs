@@ -58,7 +58,8 @@
                     "no file in the target holds the heading for ticket '{parent}'"
                 )
             })?;
-        let mut text = read_text(&owner)?;
+        // The parent's heading is found after the mark, which is written back. §REQ-cross-platform.9
+        let (mark, mut text) = read_host_text(&owner)?;
         for file in tickets {
             // A workspace's tickets are in task files. §FS-rhei-plan-language.1.4
             let role = rhei_core::header::DocumentRole::TaskFile;
@@ -69,7 +70,7 @@
                 )
             })?;
         }
-        writes.files.push((owner, text));
+        writes.files.push((owner, format!("{mark}{text}")));
         Ok(())
     }
 

@@ -166,6 +166,34 @@ Raise it.
         assert_eq!(task_owning_line(&plan, Plan, 1), None);
     }
 
+    /// A task file saved with a leading byte order mark arms the region of the
+    /// ticket on its first line, classifies a break in it as that worker's, and
+    /// restores it with the mark kept: arm, classify and restore read one text.
+    /// §FS-rhei-run.3.7 §REQ-cross-platform.9
+    #[test]
+    fn a_marked_task_file_arms_and_restores_its_first_ticket() {
+        let dir = tempfile::tempdir().expect("tmpdir");
+        let ws = dir.path().join("ws");
+        fs::create_dir_all(ws.join("tasks")).expect("tasks dir");
+        fs::write(ws.join("index.rhei.md"), "# Plan\n").expect("index");
+        let task_file = ws.join("tasks/01-raise.md");
+        let marked = format!("\u{feff}{TASK_FILE}");
+        fs::write(&task_file, &marked).expect("task file");
+
+        let own = region(&task_file, TaskFile, &read_region_text(&task_file).expect("text"), "1", 0);
+        assert_eq!(own.snapshot.heading, "### Task 1: Raise coverage");
+        let at = PlanBreak { file: task_file.clone(), line: 3, message: "Malformed".into() };
+        assert_eq!(empty_registry().classify(Some(&own), Some(&at)), BreakClass::Own);
+        assert_eq!(task_owning_line(&task_file, TaskFile, 4).as_deref(), Some("ws.1"));
+
+        fs::write(&task_file, marked.replace("Raise it.", "Raised it badly.")).expect("edit");
+        let lock = LockedPlanFile::open(&task_file).expect("lock");
+        let current = lock.read_to_string("failed to read task file").expect("read");
+        let (restored, _) = restore_region(&current, &own.snapshot).expect("restore");
+        write_file_atomic_locked(&task_file, &restored, Some(&lock)).expect("write");
+        assert_eq!(fs::read_to_string(&task_file).expect("read back"), marked);
+    }
+
     /// The outcomes a release reported, in order.
     #[derive(Default)]
     struct Released(std::sync::Mutex<Vec<rhei_tui::TaskOutcome>>);

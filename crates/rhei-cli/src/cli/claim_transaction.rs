@@ -273,7 +273,9 @@ fn configured_claim_recovery_target(
     let Some(path) = state_machine_path else { return Ok(None) };
     let raw = fs::read_to_string(path)
         .map_err(|err| file_io_report(path, "failed to read state machine recovery policy", err))?;
-    let yaml: serde_yaml::Value = serde_yaml::from_str(&raw).map_err(|err| {
+    // Read as the machine loader reads it, after one leading mark. §REQ-cross-platform.9
+    let raw = rhei_core::source::without_byte_order_mark(&raw);
+    let yaml: serde_yaml::Value = serde_yaml::from_str(raw).map_err(|err| {
         miette!(
             help = state_machine_help(),
             "failed to parse state machine recovery policy: {err}"

@@ -197,7 +197,7 @@ impl WorkerRegions {
     /// regions still in flight. §FS-rhei-run.3.7.2
     fn classify(&self, exited: Option<&InFlightRegion>, at: Option<&PlanBreak>) -> BreakClass {
         let Some(at) = at else { return BreakClass::Outside };
-        let text = fs::read_to_string(&at.file).ok();
+        let text = read_region_text(&at.file);
         let holds = |region: &InFlightRegion| {
             same_file(&region.file, &at.file)
                 && text.as_deref().is_some_and(|text| {

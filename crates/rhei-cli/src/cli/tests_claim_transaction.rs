@@ -266,3 +266,19 @@ fn claim_transaction_restoration_double_fault_reports_errors_and_paths() {
     assert!(error.contains(&ledger_root.join("runtime").join("state-transitions.log").display().to_string()));
     assert!(!error.contains("retryable"));
 }
+
+/// The recovery a failed claim enter takes is read from a machine saved with a
+/// leading byte order mark as from the same machine without one.
+/// §FS-rhei-transitions.4.9 §REQ-cross-platform.9
+#[test]
+fn a_machine_saved_with_a_byte_order_mark_still_names_its_claim_recovery() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("states.yaml");
+    let machine =
+        "name: m\nversion: 1\nerror_handling:\n  on_enter_failure:\n    - transition_to: failed\n";
+    for text in [machine.to_owned(), format!("\u{feff}{machine}")] {
+        fs::write(&path, text).expect("machine");
+        let recovery = configured_claim_recovery_target(Some(&path)).expect("the policy reads");
+        assert_eq!(recovery.as_deref(), Some("failed"));
+    }
+}

@@ -286,8 +286,11 @@ fn rewrite_task_completion(
     link_path: &str,
     insert_link: bool,
 ) -> MietteResult<()> {
-    let raw = fs::read_to_string(task_file)
+    let marked = fs::read_to_string(task_file)
         .map_err(|err| file_io_report(task_file, "failed to read plan file", err))?;
+    // The task heading is found after the mark, which is written back. §REQ-cross-platform.9
+    let raw = rhei_core::source::without_byte_order_mark(&marked);
+    let mark = &marked[..marked.len() - raw.len()];
 
     let all_lines: Vec<&str> = raw.lines().collect();
     // §FS-rhei-complete.3.3: a fence the task's text ends inside is below the link, unread.
@@ -352,7 +355,7 @@ fn rewrite_task_completion(
         ));
     }
 
-    let mut output = result_lines.join("\n");
+    let mut output = format!("{mark}{}", result_lines.join("\n"));
     if raw.ends_with('\n') {
         output.push('\n');
     }

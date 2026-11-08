@@ -243,12 +243,14 @@ fn write_task_assignee(
     claim.validate(&task, qualified_id, &current_state, machine)?;
 
     let rewritten = insert_task_assignee(&raw, claim.role(), task_id, assignee)?;
+    let task_lock = task_lock.as_ref().unwrap_or(&metadata_lock);
+    // The mark the locked read set aside goes back on. §REQ-cross-platform.9
+    let rewritten = task_lock.with_byte_order_mark(&rewritten);
     let parent = task_file.parent().unwrap_or(Path::new("."));
     let mut tmp = tempfile::NamedTempFile::new_in(parent)
         .map_err(|err| miette!(help = temp_write_help(), "failed to create temp file: {err}"))?;
     tmp.write_all(rewritten.as_bytes())
         .map_err(|err| miette!(help = temp_write_help(), "failed to write temp file: {err}"))?;
-    let task_lock = task_lock.as_ref().unwrap_or(&metadata_lock);
     persist_locked(tmp, task_file)
         .map_err(|err| miette!(help = temp_write_help(), "failed to persist temp file: {err}"))?;
 

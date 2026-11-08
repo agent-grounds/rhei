@@ -114,16 +114,21 @@ fn prepare_forced_transition(request: &ForcedRequest<'_>) -> MietteResult<Prepar
     }) { updated = Some(next); }
     let rendered = format_task_state_value(to, to_visit, machine);
     let role = loaded.document_role(&route.task_file);
-    let mut new_task = rewrite_task_for_transition(&task_raw, role, &route.local_id, &rendered, transition_ends_supervisor_visit(machine, from, to))?;
+    // Each rewrite scans after the file's mark, which it writes back. §REQ-cross-platform.9
+    let ((task_mark, task_text), (metadata_mark, metadata_text)) =
+        (split_byte_order_mark(&task_raw), split_byte_order_mark(&metadata_raw));
+    let mut new_task = rewrite_task_for_transition(task_text, role, &route.local_id, &rendered, transition_ends_supervisor_visit(machine, from, to))?;
     if terminal || machine.states[from].terminal {
         new_task = forced_result_link(&new_task, role, &route.local_id, &task_id, terminal);
     }
     let mut files = Vec::new();
     if route.task_file == route.metadata_file {
         if let Some(metadata) = &updated { new_task = rewrite_frontmatter(&new_task, metadata)?; }
+        let new_task = format!("{task_mark}{new_task}");
         files.push(forced_file(&root, &route.task_file, &["task", "metadata", "checkpoint"], &forced_newlines(&task_raw, &new_task))?);
     } else {
-        let new_metadata = match &updated { Some(metadata) => rewrite_frontmatter(&metadata_raw, metadata)?, None => metadata_raw.clone() };
+        let new_metadata = match &updated { Some(metadata) => format!("{metadata_mark}{}", rewrite_frontmatter(metadata_text, metadata)?), None => metadata_raw.clone() };
+        let new_task = format!("{task_mark}{new_task}");
         files.push(forced_file(&root, &route.metadata_file, &["metadata", "checkpoint"], &forced_newlines(&metadata_raw, &new_metadata))?);
         files.push(forced_file(&root, &route.task_file, &["task"], &forced_newlines(&task_raw, &new_task))?);
     }

@@ -271,8 +271,13 @@ fn write_file_atomic(path: &Path, content: &str) -> MietteResult<()> {
 fn write_file_atomic_locked(
     path: &Path,
     content: &str,
-    _locked: Option<&LockedPlanFile>,
+    locked: Option<&LockedPlanFile>,
 ) -> MietteResult<()> {
+    // A mark the locked read set aside goes back on. §REQ-cross-platform.9
+    let content = match locked {
+        Some(locked) => locked.with_byte_order_mark(content),
+        None => std::borrow::Cow::Borrowed(content),
+    };
     let parent = path.parent().unwrap_or(Path::new("."));
     let mut tmp = tempfile::NamedTempFile::new_in(parent)
         .map_err(|err| miette!(

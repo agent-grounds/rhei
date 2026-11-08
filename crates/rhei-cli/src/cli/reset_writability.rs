@@ -192,15 +192,18 @@ fn reset_filesystem_refusal(
 
     let no_moves = BTreeMap::new();
     for (file, _sample_task_id) in reset_target_files(loaded, input, scope) {
-        let raw = read_plan_source(&file, "failed to read plan file")?;
+        let marked = read_plan_source(&file, "failed to read plan file")?;
+        // Scanned after the mark, as the locked rewrite will. §REQ-cross-platform.9
+        let (_, raw) = split_byte_order_mark(&marked);
         let moves = authored.by_file.get(&file).unwrap_or(&no_moves);
-        if reset_file_text(&raw, moves, loaded.document_role(&file))? != raw {
+        if reset_file_text(raw, moves, loaded.document_role(&file))? != raw {
             check.entry(&file);
         }
     }
     for (file, task_ids) in reset_metadata_targets(loaded, input, scope) {
-        let raw = read_plan_source(&file, "failed to read metadata document")?;
-        if reset_metadata_text(&file, &raw, &task_ids)? != raw {
+        let marked = read_plan_source(&file, "failed to read metadata document")?;
+        let (_, raw) = split_byte_order_mark(&marked);
+        if reset_metadata_text(&file, raw, &task_ids)? != raw {
             check.entry(&file);
         }
     }

@@ -329,12 +329,14 @@
     }
 
     /// Every ticket id the target already holds, rhei-local, and the file each
-    /// one lives in. §FS-rhei-library.4
+    /// one lives in. Each file's headings are read after its one leading byte
+    /// order mark, as the parser reads them. §FS-rhei-library.4 §REQ-cross-platform.9
     fn host_ticket_files(host: &UnionHost) -> MietteResult<Vec<(PathBuf, Vec<String>)>> {
         if host.single_file {
             let raw = fs::read_to_string(&host.index)
                 .map_err(|err| file_io_report(&host.index, "failed to read the target", err))?;
-            return Ok(vec![(host.index.clone(), declared_ids(&raw))]);
+            let text = rhei_core::source::without_byte_order_mark(&raw);
+            return Ok(vec![(host.index.clone(), declared_ids(text))]);
         }
         let tasks = host.root.join("tasks");
         if !tasks.is_dir() {
@@ -351,7 +353,7 @@
         for path in paths {
             let raw = fs::read_to_string(&path)
                 .map_err(|err| file_io_report(&path, "failed to read a task file", err))?;
-            files.push((path, declared_ids(&raw)));
+            files.push((path, declared_ids(rhei_core::source::without_byte_order_mark(&raw))));
         }
         Ok(files)
     }

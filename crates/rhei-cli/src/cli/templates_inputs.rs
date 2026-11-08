@@ -146,7 +146,7 @@
                     help = format!(
                         "a --values file is a YAML or JSON object mapping input names to \
                          values. {}",
-                        template_values_load_correction(&raw)
+                        template_values_load_correction(raw)
                     ),
                     "failed to parse values file '{}': {err}",
                     path.display()

@@ -105,7 +105,6 @@ fn equivalent_file_paths(explicit_machine: bool) {
 /// Port the intake reproducer's explicit-machine comparison to the CLI harness.
 /// §FS-rhei-viz.7.2.1
 #[test]
-#[ignore = "red until #643: bare viz filenames render with an explicit machine; implement removes this"]
 fn viz_equivalent_file_paths_with_explicit_machine() {
     equivalent_file_paths(true);
 }
@@ -113,7 +112,6 @@ fn viz_equivalent_file_paths_with_explicit_machine() {
 /// The same spellings discover the sibling machine and preserve a nonempty parent.
 /// §FS-rhei-viz.7.2.1
 #[test]
-#[ignore = "red until #643: bare viz filenames render with a sibling machine; implement removes this"]
 fn viz_equivalent_file_paths_with_sibling_machine() {
     equivalent_file_paths(false);
 }

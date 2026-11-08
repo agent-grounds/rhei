@@ -103,6 +103,12 @@ pub fn collect_plans(
     Ok(plans)
 }
 
+/// Resolve a file's containing directory, using the current directory when its
+/// parent is empty or missing. §FS-rhei-viz.7.2.1
+fn file_parent(path: &Path) -> &Path {
+    path.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."))
+}
+
 fn load_plan_file(path: &Path, machine_override: Option<&Path>) -> io::Result<VizModel> {
     let _guards = rhei_core::root_access::for_input(path)?;
     let text = fs::read_to_string(path)?;
@@ -122,7 +128,8 @@ fn load_plan_file(path: &Path, machine_override: Option<&Path>) -> io::Result<Vi
         })?
         .rhei;
     let machine = resolve_machine(path, machine_override)?;
-    let workspace_root = path.parent().unwrap_or_else(|| Path::new("."));
+    // §FS-rhei-viz.7.2.1: bare filenames read history from the current directory.
+    let workspace_root = file_parent(path);
     build_with_history(&rhei, &machine, workspace_root)
 }
 
@@ -172,7 +179,8 @@ fn resolve_machine(
     let dir = if plan_or_dir.is_dir() {
         plan_or_dir.to_path_buf()
     } else {
-        plan_or_dir.parent().unwrap_or_else(|| Path::new(".")).to_path_buf()
+        // §FS-rhei-viz.7.2.1: machine discovery uses the same file parent as history.
+        file_parent(plan_or_dir).to_path_buf()
     };
     let candidate = dir.join("states.yaml");
     if candidate.is_file() {

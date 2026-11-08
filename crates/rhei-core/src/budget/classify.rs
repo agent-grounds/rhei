@@ -9,7 +9,10 @@
 //! authority lock and renders the one reading that comes back.
 //! §FS-rhei-budgets.5.4 §FS-rhei-budgets.5.4.3
 
-use super::diagnosis::{foreign_tail, journal_path, Damage, Diagnosis, History, Torn};
+use super::diagnosis::{
+    foreign_tail, journal_path, Damage, Diagnosis, History, Torn, SET_ASIDE_INSTEAD_LEAD_IN,
+    TRIM_LEAD_IN,
+};
 use super::journal::{replay_chain, Replayed};
 use super::types::BudgetError;
 use std::path::Path;
@@ -150,12 +153,13 @@ impl Sides<'_> {
 /// bytes follow its last whole receipt, and the trim — never the copy, which
 /// would write the fragment into the journal. Where the journal is wholly
 /// absent, `forget` is offered beside it. §FS-rhei-budgets.5.4.3
-/// §FS-rhei-budgets.10.1
+/// §FS-rhei-budgets.10.1 The trim follows its shared lead-in, so the renderer keeps
+/// it on one line. §FS-rhei-errors.2.1
 fn torn_refusal(diagnosis: &Diagnosis) -> BudgetError {
     let refusal = BudgetError::corrupt(format!(
         "the committed history at {} ends mid-receipt, {}, the fragment of an append that was \
-         cut short; copying it anywhere would carry the fragment along, so keep it and cut it \
-         back to its last whole receipt with: {}",
+         cut short; copying it anywhere would carry the fragment along, so keep it and \
+         {TRIM_LEAD_IN}{}",
         diagnosis.witness.display(),
         diagnosis.fragment_phrase().unwrap_or_default(),
         diagnosis.trim_command().unwrap_or_default(),
@@ -170,8 +174,8 @@ fn torn_refusal(diagnosis: &Diagnosis) -> BudgetError {
 }
 
 /// The refusal a tail written from another root raises: it names that root and
-/// the receipts, and offers setting the witness aside — never the copy.
-/// §FS-rhei-budgets.5.4.2
+/// the receipts, and offers setting the witness aside — never the copy, after the
+/// lead-in that keeps it on one line. §FS-rhei-budgets.5.4.2 §FS-rhei-errors.2.1
 fn foreign_tail_refusal(diagnosis: &Diagnosis) -> BudgetError {
     let foreign = diagnosis.foreign.as_ref().expect("a foreign tail names its root");
     BudgetError::new(
@@ -179,7 +183,7 @@ fn foreign_tail_refusal(diagnosis: &Diagnosis) -> BudgetError {
         format!(
             "budget journal is untrustworthy: the committed history at {} holds {} past the \
              project journal at {}, written from another project root, {}; copying the witness \
-             back would import them, so set the witness aside instead, keeping every byte: {}",
+             back would import them, so {SET_ASIDE_INSTEAD_LEAD_IN}{}",
             diagnosis.witness.display(),
             match foreign.receipts {
                 1 => "1 receipt".to_string(),

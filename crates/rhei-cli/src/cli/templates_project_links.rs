@@ -52,7 +52,8 @@
     }
 
     /// The refusal naming each link and where it points, with the one command
-    /// that removes the link and nothing it points to. §FS-rhei-library.2.2
+    /// that removes the link and nothing it points to, after the lead-in that keeps
+    /// it on one line. §FS-rhei-library.2.2 §FS-rhei-errors.2.1
     fn linked_root_refusal(links: &[PathBuf]) -> Report {
         let pointing = |link: &Path| {
             fs::read_link(link).map_or_else(|_| "?".to_owned(), |target| display_slash(&target))
@@ -66,7 +67,7 @@
                     pointing(link)
                 ),
                 format!(
-                    "remove the link ({} removes the link, not what it points to)",
+                    "{UNLINK_ONE_LEAD_IN}{} removes the link, not what it points to)",
                     unlink_command(links)
                 ),
             ),
@@ -81,7 +82,7 @@
                     subject.push_str(&format!("\n  {shown:<width$} -> {}", pointing(link)));
                 }
                 let remedy = format!(
-                    "remove the links ({} removes the links, not what they point to)",
+                    "{UNLINK_MANY_LEAD_IN}{} removes the links, not what they point to)",
                     unlink_command(links)
                 );
                 (subject, remedy)

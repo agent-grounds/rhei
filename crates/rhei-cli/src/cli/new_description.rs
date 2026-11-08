@@ -57,16 +57,16 @@ help = "`--description-file -` reads the description from standard input; pipe i
 /// The generic file report offers to `mkdir -p` the missing directory, which is
 /// advice for a path being *written*; this one is being read, and the answer is
 /// to check the path or pipe the text in instead.
-// §FS-rhei-new.1.1 §FS-rhei-errors.1.2
+// §FS-rhei-new.1.1 §FS-rhei-errors.1.2 §FS-rhei-errors.2.1
 fn description_file_report(path: &Path, err: std::io::Error) -> Report {
     let help = match err.kind() {
         std::io::ErrorKind::NotFound => format!(
             "no file there to read. Check the path, or pipe the text in with \
-             `--description-file -`. Look with: ls {}",
+             `--description-file -`. {LOOK_WITH_LEAD_IN}ls {}",
             shell_quote(&path.parent().unwrap_or(Path::new(".")).display().to_string())
         ),
         std::io::ErrorKind::PermissionDenied => format!(
-            "the current user cannot read that file. Inspect it with: ls -l {}",
+            "the current user cannot read that file. {INSPECT_IT_LEAD_IN}ls -l {}",
             shell_quote(&path.display().to_string())
         ),
         _ => "the description is read from this path; check that it exists and is readable."

@@ -16,7 +16,7 @@ use super::{
     assert_stderr_contains, raw_stderr, raw_stderr_from_file, repo_root, rhei_command, stderr,
     stderr_from_file, unique_temp_dir,
 };
-use super::{setup_single_file, CliRun, TestDir, LINEAR_PLAN};
+use super::{setup_single_file, CliRun, LINEAR_PLAN};
 
 /// Captured output carrying `text` on stderr, so a rule about the reading can
 /// be stated against the exact bytes it is a rule about.
@@ -24,22 +24,22 @@ fn captured(text: &str) -> Output {
     Output { status: ExitStatus::default(), stdout: Vec::new(), stderr: text.as_bytes().to_vec() }
 }
 
-/// A missing plan path long enough to occupy a rendered line by itself.
+/// A missing plan named bare, long enough to occupy a rendered line by itself.
 ///
 /// Forcing the width by construction is what makes this test say the same
 /// thing everywhere. Left to the environment, the wrap column is decided by
 /// the length of the temp directory the runner handed out, and the test would
 /// be green on the machines that never see the defect — which is how this
 /// reached two open issues and three supervised runs before it was caught.
-fn missing_plan_path_wider_than_the_render(dir: &TestDir) -> String {
-    let mut name = String::new();
-    let mut path = dir.join("plan.rhei.md").to_string_lossy().into_owned();
-    while path.len() < 96 {
-        name.push('w');
-        path = dir.join(format!("{name}.rhei.md")).to_string_lossy().into_owned();
-    }
-    path
-}
+///
+/// Bare, so it has no directory to offer a command about: its help is the
+/// prose "Check the spelling.", and the diagnostic still wraps. A path with a
+/// directory is offered `ls` of it, which is kept whole, and the whole
+/// diagnostic with it. §FS-rhei-errors.2.1
+const MISSING_PLAN_NAME_WIDER_THAN_THE_RENDER: &str = concat!(
+    "a-plan-name-that-does-not-exist-and-is-long-enough-",
+    "to-sit-on-a-rendered-line-by-itself-wwwwww.rhei.md",
+);
 
 /// A sentence rendered across two lines still reads as one sentence, and a path in it
 /// stays whole: this is what fails when the renderer's break settings go.
@@ -50,12 +50,17 @@ fn a_wrapped_diagnostic_reads_as_the_sentence_the_binary_printed() {
 
     let dir = unique_temp_dir("diagnostic-wrap");
     let home = dir.join(".home");
-    let missing = missing_plan_path_wider_than_the_render(&dir);
-    let out = rhei_command(&home).arg("next").arg(&missing).output().expect("rhei next should run");
+    let out = rhei_command(&home)
+        .current_dir(&dir)
+        .arg("next")
+        .arg(MISSING_PLAN_NAME_WIDER_THAN_THE_RENDER)
+        .output()
+        .expect("rhei next should run");
 
     let rendered = raw_stderr(&out);
     assert!(
-        rendered.contains("no plan or project at"),
+        rendered.contains("no plan or project at")
+            && rendered.contains(MISSING_PLAN_NAME_WIDER_THAN_THE_RENDER),
         "the missing-path diagnostic was not reached, so this test proves nothing: {rendered}"
     );
     assert!(

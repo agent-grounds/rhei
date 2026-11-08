@@ -5,9 +5,9 @@
 // way everywhere: quoted for paste, echoing the arguments the user already
 // typed, and pointing at a command that reveals whatever they were missing.
 
-// The renderer that keeps a printed command intact lives in `cli_dispatch.rs`
-// as `install_diagnostic_handler`: breaking only at spaces leaves a long token
-// whole for the terminal to soft-wrap. §FS-rhei-errors.2
+// The renderer that keeps a printed command intact is `install_diagnostic_handler`
+// in `cli_startup.rs`: it breaks only at spaces, and not at all after a lead-in from
+// `offered_command.rs`. §FS-rhei-errors.2 §FS-rhei-errors.2.1
 
 /// Quote a shell word so a printed command survives paste into an interactive
 /// shell — whichever shell this platform gives the user. §FS-rhei-errors.2
@@ -145,7 +145,8 @@ fn levenshtein_distance(left: &str, right: &str) -> usize {
 }
 
 /// Help text for a filesystem failure, derived from the error kind so the user
-/// is told which of the three usual causes they hit. §FS-rhei-errors.6
+/// is told which of the three usual causes they hit, each command after the lead-in
+/// that keeps it on one line. §FS-rhei-errors.6 §FS-rhei-errors.2.1
 fn io_error_help(path: &Path, kind: std::io::ErrorKind) -> String {
     let parent = path.parent().filter(|parent| !parent.as_os_str().is_empty());
     match kind {
@@ -154,22 +155,22 @@ fn io_error_help(path: &Path, kind: std::io::ErrorKind) -> String {
         // created before anything can be written into it.
         std::io::ErrorKind::NotFound => match parent {
             Some(parent) if parent.is_dir() => format!(
-                "nothing exists at that path. Check the spelling: ls {}",
+                "nothing exists at that path. {CHECK_SPELLING_LEAD_IN}ls {}",
                 shell_quote(&parent.display().to_string())
             ),
             Some(parent) => format!(
-                "nothing exists at that path, and neither does its directory. Create it with: \
-                 mkdir -p {}",
+                "nothing exists at that path, and neither does its directory. \
+                 {CREATE_IT_LEAD_IN}mkdir -p {}",
                 shell_quote(&parent.display().to_string())
             ),
             None => "nothing exists at that path. Check the spelling.".to_string(),
         },
         std::io::ErrorKind::PermissionDenied => format!(
-            "the current user cannot access that path. Inspect it with: ls -ld {}",
+            "the current user cannot access that path. {INSPECT_IT_LEAD_IN}ls -ld {}",
             shell_quote(&path.display().to_string())
         ),
         std::io::ErrorKind::AlreadyExists => format!(
-            "that path already exists. Remove it or pick another: ls -ld {}",
+            "that path already exists. {REMOVE_OR_PICK_LEAD_IN}ls -ld {}",
             shell_quote(&path.display().to_string())
         ),
         _ => match parent {

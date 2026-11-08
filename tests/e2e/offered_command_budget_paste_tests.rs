@@ -104,7 +104,6 @@ fn set_aside_offered_whole_on(prefix: &str, surface: Surface, lead_in: &str) {
 
 /// `rhei budget show` offers the set-aside whole. §FS-rhei-budgets.5.4.2
 #[test]
-#[ignore = "red until #583: budget show's set-aside is split across lines at 80 columns; implement removes this"]
 fn budget_show_offers_the_set_aside_whole() {
     set_aside_offered_whole_on("offered-set-aside-show", Surface::Show, SET_ASIDE);
 }
@@ -112,7 +111,6 @@ fn budget_show_offers_the_set_aside_whole() {
 /// `rhei budget forget` refuses a foreign tail offering the set-aside whole.
 /// §FS-rhei-budgets.5.4.2 §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #583: budget forget's set-aside is split across lines at 80 columns; implement removes this"]
 fn budget_forget_offers_the_set_aside_whole() {
     set_aside_offered_whole_on("offered-set-aside-forget", Surface::Forget, SET_ASIDE);
 }
@@ -152,7 +150,6 @@ fn trim_offered_whole_on(prefix: &str, surface: Surface, lead_in: &str) {
 
 /// `rhei budget show` offers the trim whole. §FS-rhei-budgets.5.4.3
 #[test]
-#[ignore = "red until #583: budget show's trim is split across lines at 80 columns; implement removes this"]
 fn budget_show_offers_the_trim_whole() {
     trim_offered_whole_on("offered-trim-show", Surface::Show, TRIM);
 }
@@ -160,7 +157,6 @@ fn budget_show_offers_the_trim_whole() {
 /// `rhei budget forget` refuses a torn witness offering the trim whole.
 /// §FS-rhei-budgets.5.4.3 §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #583: budget forget's trim is split across lines at 80 columns; implement removes this"]
 fn budget_forget_offers_the_trim_whole() {
     trim_offered_whole_on("offered-trim-forget", Surface::Forget, TRIM);
 }
@@ -198,7 +194,6 @@ fn restore_offered_whole_on(prefix: &str, surface: Surface) {
 
 /// `rhei budget show` offers the restore whole. §FS-rhei-budgets.5.4
 #[test]
-#[ignore = "red until #583: budget show's restore is split across lines at 80 columns; implement removes this"]
 fn budget_show_offers_the_restore_whole() {
     restore_offered_whole_on("offered-restore-show", Surface::Show);
 }
@@ -206,7 +201,6 @@ fn budget_show_offers_the_restore_whole() {
 /// `rhei budget forget` refuses this project's own journal offering the
 /// restore whole. §FS-rhei-budgets.5.4 §FS-rhei-budgets.10
 #[test]
-#[ignore = "red until #583: budget forget's restore is split across lines at 80 columns; implement removes this"]
 fn budget_forget_offers_the_restore_whole() {
     restore_offered_whole_on("offered-restore-forget", Surface::Forget);
 }

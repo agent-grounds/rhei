@@ -91,14 +91,14 @@ fn budget_report_damaged(
 fn budget_damaged_help(diagnosis: &Diagnosis) -> String {
     let offered = budget_offered_forget(diagnosis);
     if let Some(set_aside) = diagnosis.set_aside_command() {
-        return format!("set the witness aside, keeping every byte, with: {set_aside}");
+        return format!("{SET_ASIDE_LEAD_IN}{set_aside}");
     }
     if let Some(trim) = diagnosis.trim_command() {
         let forget = offered
             .map(|forget| format!("; if the path was reused, retire that record with: {forget}"))
             .unwrap_or_default();
         return format!(
-            "keep the witness and cut it back to its last whole receipt with: {trim}{forget}"
+            "keep the witness and {TRIM_LEAD_IN}{trim}{forget}"
         );
     }
     match (offered, &diagnosis.held_by) {
@@ -109,7 +109,7 @@ fn budget_damaged_help(diagnosis: &Diagnosis) -> String {
         ),
         (Some(forget), None) => format!("if the path was reused, retire that record with: {forget}"),
         (None, _) => format!(
-            "restore this project's journal with: {}",
+            "{RESTORE_LEAD_IN}{}",
             diagnosis.restore_command().unwrap_or_default()
         ),
     }

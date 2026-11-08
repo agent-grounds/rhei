@@ -75,7 +75,7 @@ fn budget_sound_account(project_root: &Path) -> miette::Report {
 fn budget_restore_instead(diagnosis: &Diagnosis) -> miette::Report {
     if let Some(set_aside) = diagnosis.set_aside_command() {
         return miette!(
-            help = format!("set the witness aside, keeping every byte, with: {set_aside}"),
+            help = format!("{SET_ASIDE_LEAD_IN}{set_aside}"),
             "the budget journal at {} is this project's own, but the committed history past it \
              was written from {}; retiring the root would discard a real account",
             diagnosis.journal.display(),
@@ -89,7 +89,7 @@ fn budget_restore_instead(diagnosis: &Diagnosis) -> miette::Report {
     // §FS-rhei-budgets.5.4.3
     if let Some(trim) = diagnosis.trim_command() {
         return miette!(
-            help = format!("keep the witness and cut it back to its last whole receipt with: {trim}"),
+            help = format!("keep the witness and {TRIM_LEAD_IN}{trim}"),
             "the budget journal at {} is this project's own, but the committed history at {} ends \
              mid-receipt, {}; retiring the root would discard a real account",
             diagnosis.journal.display(),
@@ -99,7 +99,7 @@ fn budget_restore_instead(diagnosis: &Diagnosis) -> miette::Report {
     }
     miette!(
         help = format!(
-            "restore this project's journal with: {}",
+            "{RESTORE_LEAD_IN}{}",
             diagnosis.restore_command().unwrap_or_default()
         ),
         "the budget journal at {} is this project's own and its tail is what was lost; \

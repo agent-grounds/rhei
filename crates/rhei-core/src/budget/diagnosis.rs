@@ -11,6 +11,24 @@ use super::journal::{replay_chain, Journal, Receipt};
 use super::types::BudgetError;
 use std::path::{Path, PathBuf};
 
+/// The words a damaged account's remedy follows, one per offer, shared by every
+/// message that offers it and by the renderer that keeps the command after them
+/// on one line. §FS-rhei-errors.2.1 §FS-rhei-budgets.5.4
+///
+/// The set-aside, as `rhei budget show` and `rhei budget forget` offer it.
+/// §FS-rhei-budgets.5.4.2
+pub const SET_ASIDE_LEAD_IN: &str = "set the witness aside, keeping every byte, with: ";
+
+/// The set-aside, as a refused charge offers it. §FS-rhei-budgets.5.4.2
+pub const SET_ASIDE_INSTEAD_LEAD_IN: &str = "set the witness aside instead, keeping every byte: ";
+
+/// The trim, the tail every message offering it ends on, however its sentence
+/// begins. §FS-rhei-budgets.5.4.3
+pub const TRIM_LEAD_IN: &str = "cut it back to its last whole receipt with: ";
+
+/// The restore from the witness. §FS-rhei-budgets.5.4
+pub const RESTORE_LEAD_IN: &str = "restore this project's journal with: ";
+
 /// Which of the six damaged sub-cases of §FS-rhei-budgets.5.4 this is.
 ///
 /// A closed vocabulary, because it is what a machine reader gets from

@@ -251,8 +251,10 @@ fn issue_653_gate_release_offers_usable_descriptor_path_without_registry() {
     // `rhei stop` needs POSIX signals, so it must not be offered here. §FS-rhei-transition-cmd.3.4
     #[cfg(not(unix))]
     {
-        assert!(!release.stderr.contains("rhei stop"), "{}", release.stderr);
-        assert!(release.stderr.contains("not supported on this platform"), "{}", release.stderr);
+        let reason = "`rhei stop` is not supported on this platform";
+        assert!(release.stderr.contains(reason), "{}", release.stderr);
+        // The stated reason is the only mention: no invocation of it is offered.
+        assert!(!release.stderr.replace(reason, "").contains("rhei stop"), "{}", release.stderr);
         assert!(release.stderr.contains("Ctrl-C"), "{}", release.stderr);
         write_fixture_file(&fixture.member, "finish", "finished\n");
         finish_budget_run(&mut live);

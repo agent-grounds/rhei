@@ -78,18 +78,23 @@ fn report_release(
         let claimable_where_it_stands = execute_on_of(machine, &state).is_some();
         let target_exists = machine.states.contains_key(initial);
         if state != initial && !claimable_where_it_stands && target_exists {
-            let plan = help_target_word_or(input); // §FS-rhei-errors.1.2.1
+            // Both commands name the target and machine release was given, so each
+            // runs from where it was typed. §FS-rhei-release.3.1 §FS-rhei-errors.1.2.1
+            let reclaim = help_command_with_or("next", &format!("--task {}", target.id), input);
+            let move_back = help_command_with_or(
+                "transition",
+                &format!(
+                    "--task {} --from {} --to {}",
+                    target.id,
+                    shell_quote(&target.state),
+                    shell_quote(initial)
+                ),
+                input,
+            );
             println!(
                 "  note: still in '{}'. Automatic `rhei next` claims from '{}'; reclaim it \
-                 explicitly with `rhei next {} --task {}`, or move it back with \
-                 `rhei transition --task {} --from {} --to {}`.",
-                target.state,
-                initial,
-                plan,
-                target.id,
-                target.id,
-                target.state,
-                initial
+                 explicitly with `{reclaim}`, or move it back with `{move_back}`.",
+                target.state, initial
             );
         }
     }

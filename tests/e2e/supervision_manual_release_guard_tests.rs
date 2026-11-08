@@ -26,7 +26,8 @@ fn plain_manual_self_loop_refuses_instead_of_silently_dropping_unread_checkpoint
         "work",
         "completed",
         "releases the subtree",
-        "rhei retry plan.1",
+        "rhei retry ",
+        "--task plan.1",
         "--release-subtree",
     ] {
         assert!(

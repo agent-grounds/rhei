@@ -122,7 +122,6 @@ fn runs_as_printed(line: &str, cwd: &Path, home: &Path, says: &str) {
 /// printed with no target, so pasted there it finds no plan. §FS-rhei-release.3.1
 /// §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #586: the release note's undo has no target and fails pasted from the parent; implement removes this"]
 fn help_target_a_release_note_from_the_parent_names_the_member() {
     let case = Case::new("help-target-release-note-member");
     project(&case, false);
@@ -140,7 +139,6 @@ fn help_target_a_release_note_from_the_parent_names_the_member() {
 /// A typed project is printed as the project, as typed. §FS-rhei-release.3.1
 /// §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #586: the release note's undo has no target; implement removes this"]
 fn help_target_a_release_note_for_a_typed_project_names_the_project() {
     let case = Case::new("help-target-release-note-project");
     project(&case, false);
@@ -157,7 +155,6 @@ fn help_target_a_release_note_for_a_typed_project_names_the_project() {
 /// the same word, and the undo runs where release was typed. §FS-rhei-release.3.1
 /// §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #586: the release note's undo has no target while its reclaim names one; implement removes this"]
 fn help_target_a_release_note_with_no_target_names_what_it_discovered() {
     let case = Case::new("help-target-release-note-bare");
     let project = project(&case, false);
@@ -179,7 +176,6 @@ fn help_target_a_release_note_with_no_target_names_what_it_discovered() {
 /// pasted undo resolves no machine that declares `working`. §FS-rhei-release.3.1
 /// §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #586: the release note drops the machine it was given; implement removes this"]
 fn help_target_a_release_note_passes_on_the_machine_it_was_given() {
     let case = Case::new("help-target-release-note-machine");
     project(&case, true);
@@ -206,7 +202,6 @@ fn help_target_a_release_note_passes_on_the_machine_it_was_given() {
 /// not as the absolute project it widened to. §FS-rhei-supervision.3.4
 /// §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #586: the handoff names the absolute project a typed member widened to; implement removes this"]
 fn help_target_a_supervisor_handoff_from_the_parent_names_the_member() {
     let case = Case::new("help-target-handoff-member");
     project(&case, false);
@@ -256,7 +251,6 @@ fn help_target_a_supervisor_handoff_with_no_target_runs_where_it_was_typed() {
 /// A machine given to `rhei next` is passed on once, after the member as typed.
 /// §FS-rhei-supervision.3.4 §FS-rhei-errors.1.2.1
 #[test]
-#[ignore = "red until #586: the handoff names the absolute project a typed member widened to; implement removes this"]
 fn help_target_a_supervisor_handoff_passes_on_the_machine_it_was_given() {
     let case = Case::new("help-target-handoff-machine");
     project(&case, true);

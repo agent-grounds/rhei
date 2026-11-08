@@ -141,6 +141,10 @@ machine describes another machine with no error to say so.
   whose stderr is its console log, `runtime/run.log` ([§FS-rhei-run-headless.8](rhei-run-headless.spec.md#8-failure-modes)), read
   later and from anywhere. A detached run prints the target and the machine
   absolute, not resolved through a symlink, for the reason [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy) does.
+  An account-verification refusal's printed `rhei budget show` command remains
+  usable from another directory whether the launcher observed `running` and
+  returned success or observed the child's failure and returned non-zero
+  ([§FS-rhei-run-headless.1.1](rhei-run-headless.spec.md#11-startup-is-synchronous)).
   One help does reach the run's records: a strict refusal's remedy
   ([§FS-rhei-seal.8.4](rhei-seal.spec.md#84-the-refusal)) is also its `seal_halt` record's remedy and the next action of the
   report's Attention row, and in a detached run all three print it absolute.

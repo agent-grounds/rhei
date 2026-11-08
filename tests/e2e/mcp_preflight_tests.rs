@@ -15,6 +15,9 @@ use std::path::PathBuf;
 
 use super::*;
 
+// Share endpoint ownership with the library regression. §FS-rhei-agents.6.2.1
+include!("../../crates/rhei-cli/src/cli/tests_mcp_preflight_endpoint.rs");
+
 const PLAN: &str = "# Rhei: Preflight
 
 ## Tasks
@@ -107,29 +110,28 @@ fn a_required_server_with_no_executable_fires_mcp_unavailable() {
 }
 
 /// An optional server whose host accepts no connection is dropped with the
-/// reason, and the agent starts without it.
+/// reason, and the agent starts without it. §FS-rhei-agents.6.2.1
 #[test]
 fn an_optional_server_nothing_listens_for_is_dropped_with_its_reason() {
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-    let port = listener.local_addr().expect("address").port();
-    drop(listener);
-    let (run, plan, handed) = run(
-        "mcp-preflight-optional",
-        serde_json::json!({
-            "url": format!("http://127.0.0.1:{port}/sse"),
-            "transport": "sse",
-            "startup_timeout": "1s"
-        }),
-        "[{id: lookup, optional: true}]",
-    );
-    assert_success(&run);
-    let said = format!("{}{}", run.stdout, run.stderr);
-    assert!(
+    with_mcp_preflight_failure_endpoint(|port| {
+        let (run, plan, handed) = run(
+            "mcp-preflight-optional",
+            serde_json::json!({
+                "url": format!("http://127.0.0.1:{port}/sse"),
+                "transport": "sse",
+                "startup_timeout": "1s"
+            }),
+            "[{id: lookup, optional: true}]",
+        );
+        assert_success(&run);
+        let said = format!("{}{}", run.stdout, run.stderr);
+        assert!(
         said.contains(&format!(
             "warning: optional mcp 'lookup' unavailable (127.0.0.1:{port} accepted no connection within 1s); dropping"
         )),
         "the warning must name the preflight's reason; got:\n{said}"
     );
-    assert!(plan.contains("**State:** completed"), "the agent ran without it: {plan}");
-    assert_eq!(handed, None, "a dropped server reaches no --mcp-config file");
+        assert!(plan.contains("**State:** completed"), "the agent ran without it: {plan}");
+        assert_eq!(handed, None, "a dropped server reaches no --mcp-config file");
+    });
 }

@@ -108,15 +108,8 @@
         assert_eq!(preflight_mcp_server(&def, root.path(), true), Ok(()));
     }
 
-    /// The existing failure fixture's lifecycle, shared with its ownership
-    /// regression. It still releases the endpoint; #647 must retain a bound,
-    /// non-listening socket through `probe`. §FS-rhei-agents.6.2.1
-    fn with_mcp_preflight_failure_endpoint(probe: impl FnOnce(u16)) {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
-        let port = listener.local_addr().expect("addr").port();
-        drop(listener);
-        probe(port);
-    }
+    // Share endpoint ownership with the end-to-end fixture. §FS-rhei-agents.6.2.1
+    include!("tests_mcp_preflight_endpoint.rs");
 
     /// A url server passes when its host accepts a connection, and fails with
     /// the bound it waited when nothing listens. §FS-rhei-agents.6.2.1
@@ -137,7 +130,6 @@
     /// Force the competing bind from #647 before the real probe, keeping any
     /// acquired listener alive through it. §FS-rhei-agents.6.2.1
     #[test]
-    #[ignore = "red until #647: the failure fixture retains its endpoint; implement removes this"]
     fn mcp_preflight_failure_fixture_retains_its_endpoint() {
         with_mcp_preflight_failure_endpoint(|port| {
             let competing_listener = std::net::TcpListener::bind(("127.0.0.1", port));

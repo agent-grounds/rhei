@@ -95,6 +95,13 @@ windows-sys = { version = "0.61.2", features = [
 # Pins the lib test binary's state directory before any test runs, so no
 # test moving `XDG_STATE_HOME` moves a sibling's guard or witness. §REQ-test-isolation.6
 ctor = "=0.2.9"
+# Bound, non-listening TCP failure fixtures; this release supports Rust 1.70.
+# §FS-rhei-agents.6.2.1
+socket2 = "=0.6.4"
+
+[target.'cfg(windows)'.dev-dependencies]
+# Exclusive fixture ownership even against a reuse-enabled listener. §FS-rhei-agents.6.2.1
+windows-sys = { version = "0.61.2", features = ["Win32_Networking_WinSock"] }
 
 [target.'cfg(unix)'.dev-dependencies]
 # `fs` is what gates `nix::fcntl`, which the hung-up-terminal e2e needs to keep

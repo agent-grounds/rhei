@@ -59,4 +59,5 @@ mod tests {
     include!("validator/tests_snapshots.rs");
     include!("validator/tests_prompt_templates.rs");
     include!("validator/tests_callback_bound.rs");
+    include!("validator/tests_top_level_types.rs");
 }

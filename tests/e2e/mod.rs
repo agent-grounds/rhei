@@ -403,6 +403,7 @@ mod worker_edit_following_copy_tests;
 mod worker_edit_inflight_stop_tests;
 mod worker_edit_one_file_support;
 mod worker_edit_poll_deadline_tests;
+mod worker_edit_poll_read_tests;
 // The controlled read observer uses Linux /proc and ELF interposition only.
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 mod worker_edit_publication_tests;

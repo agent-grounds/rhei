@@ -248,12 +248,14 @@ pub(super) fn assert_advisory(release: &CliRun, id: &str, root: &Path, run_id: O
     ] {
         assert!(text.contains(part), "advisory is missing {part:?}: {text}");
     }
-    if run_id.is_some() {
+    if run_id.is_some() && cfg!(unix) {
         assert!(text.contains("rhei stop"), "live descriptor must offer stop: {text}");
     } else {
         assert!(text.contains("rhei stop") || text.contains("Ctrl-C"), "missing recovery: {text}");
     }
     assert!(text.contains("may") || text.contains("can"), "risk must be conditional: {text}");
+    // The advisory prints the resolved root; temp_dir() may spell it another way.
+    let root = rhei_core::platform::canonical_path(root).unwrap();
     assert!(
         text.contains(&root.display().to_string()) || run_id.is_some_and(|id| text.contains(id)),
         "advisory must identify the relevant run or execution root: {text}"

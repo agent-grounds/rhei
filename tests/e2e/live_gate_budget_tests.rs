@@ -231,19 +231,32 @@ fn issue_653_gate_release_offers_usable_descriptor_path_without_registry() {
     let release = fixture.transition(&fixture.input, "human-review", "work");
     assert_release_success(&release, fixture.id, "human-review", "work");
     assert_advisory(&release, fixture.id, &fixture.dir, descriptor["id"].as_str());
-    let target = fixture.dir.display().to_string();
-    let suggested = format!("`rhei stop {}`", rhei_core::platform::shell_quote(&target));
-    assert!(release.stderr.contains(&suggested), "{}", release.stderr);
-    // An absolute descriptor path must resolve even when the registry is unavailable.
-    let output = fixture
-        .command()
-        .env("XDG_STATE_HOME", fixture.dir.join("no-registry"))
-        .args(["stop", &target])
-        .output()
-        .unwrap();
-    assert_success(&CliRun::from(&output));
-    let status = live.wait_for_exit("the suggested stop command");
-    assert!(!status.success(), "an interrupted run must record interruption");
+    #[cfg(unix)]
+    {
+        let target =
+            rhei_core::platform::canonical_path(&fixture.dir).unwrap().display().to_string();
+        let suggested = format!("`rhei stop {}`", rhei_core::platform::shell_quote(&target));
+        assert!(release.stderr.contains(&suggested), "{}", release.stderr);
+        // An absolute descriptor path must resolve even when the registry is unavailable.
+        let output = fixture
+            .command()
+            .env("XDG_STATE_HOME", fixture.dir.join("no-registry"))
+            .args(["stop", &target])
+            .output()
+            .unwrap();
+        assert_success(&CliRun::from(&output));
+        let status = live.wait_for_exit("the suggested stop command");
+        assert!(!status.success(), "an interrupted run must record interruption");
+    }
+    // `rhei stop` needs POSIX signals, so it must not be offered here. §FS-rhei-transition-cmd.3.4
+    #[cfg(not(unix))]
+    {
+        assert!(!release.stderr.contains("rhei stop"), "{}", release.stderr);
+        assert!(release.stderr.contains("not supported on this platform"), "{}", release.stderr);
+        assert!(release.stderr.contains("Ctrl-C"), "{}", release.stderr);
+        write_fixture_file(&fixture.member, "finish", "finished\n");
+        finish_budget_run(&mut live);
+    }
 }
 
 #[test]

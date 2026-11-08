@@ -42,6 +42,17 @@ Validate a plan with the built-in default states definition:
 cargo run -p rhei-cli -- validate examples/release-automation.rhei.md
 ```
 
+A plan named under a directory that does not exist is refused with the command
+that creates it. The command stays whole on one line however long the path, so
+pasting that line makes the directory
+([§FS-rhei-errors.2.1](functional-spec/rhei-errors.spec.md#21-a-command-offered-as-the-next-action)):
+
+```console
+$ rhei validate plans/2026/q4/release-automation/x.rhei.md
+  × no plan or project at 'plans/2026/q4/release-automation/x.rhei.md'. Pass a `.rhei.md` file, a workspace directory, or omit the argument to use the enclosing project.
+  help: nothing exists at that path, and neither does its directory. Create it with: mkdir -p plans/2026/q4/release-automation
+```
+
 Validate using a specific states file:
 
 ```bash

@@ -70,7 +70,6 @@ const REMOVE_THAT_ONE: &str = "remove that one: ";
 /// directory on its line, and pasting that line creates it.
 // §FS-rhei-errors.2.1 §FS-rhei-errors.6
 #[test]
-#[ignore = "red until #583: the 80-column render splits `mkdir -p` from its directory; implement removes this"]
 fn a_missing_directory_is_offered_mkdir_whole_at_eighty_columns() {
     let fixture = Fixture::new("offered-mkdir-80");
     let target = format!("{LONG_DIR}/x.rhei.md");
@@ -93,7 +92,6 @@ fn a_missing_directory_is_offered_mkdir_whole_at_eighty_columns() {
 // §FS-rhei-errors.2.1
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #583: at 120 columns the prose pushes the mkdir's directory onto the next line; implement removes this"]
 fn a_missing_directory_is_offered_mkdir_whole_when_the_prose_fills_a_wide_line() {
     let fixture = Fixture::new("offered-mkdir-120");
     let command = format!("mkdir -p {LONG_DIR}");
@@ -151,7 +149,6 @@ fn a_terminal_wide_enough_keeps_the_mkdir_offer_whole() {
 /// directory on one line, and the pasted line lists it, not the working one.
 // §FS-rhei-errors.2.1 §FS-rhei-errors.6
 #[test]
-#[ignore = "red until #583: the 80-column render splits `ls` from its directory; implement removes this"]
 fn a_misspelled_name_is_offered_ls_of_its_directory_whole() {
     let fixture = Fixture::new("offered-ls");
     fs::create_dir_all(fixture.work().join(LONG_DIR)).expect("the existing directory");
@@ -177,7 +174,6 @@ fn a_misspelled_name_is_offered_ls_of_its_directory_whole() {
 // §FS-rhei-errors.2.1 §FS-rhei-errors.6
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #583: the 80-column render splits `ls -ld` from its path; implement removes this"]
 fn an_unreadable_path_is_offered_ls_ld_of_itself_whole() {
     let fixture = Fixture::new("offered-ls-ld-denied");
     fs::create_dir_all(fixture.work().join(LONG_DIR)).expect("the existing directory");
@@ -201,7 +197,6 @@ fn an_unreadable_path_is_offered_ls_ld_of_itself_whole() {
 /// the pasted line inspects that path, not `.`.
 // §FS-rhei-errors.2.1 §FS-rhei-errors.6
 #[test]
-#[ignore = "red until #583: the 80-column render splits `ls -ld` from its path; implement removes this"]
 fn an_existing_path_in_the_way_is_offered_ls_ld_of_itself_whole() {
     let fixture = Fixture::new("offered-ls-ld-exists");
     fs::create_dir_all(fixture.work().join(LONG_DIR)).expect("the existing directory");
@@ -232,7 +227,6 @@ fn with_rhei(fixture: &Fixture) {
 /// `ls` of that directory on one line, and the pasted line lists it.
 // §FS-rhei-errors.2.1 §FS-rhei-new.1.1
 #[test]
-#[ignore = "red until #583: the 80-column render splits `ls` from the description's directory; implement removes this"]
 fn a_missing_description_file_is_offered_ls_of_its_directory_whole() {
     let fixture = Fixture::new("offered-description-ls");
     with_rhei(&fixture);
@@ -259,7 +253,6 @@ fn a_missing_description_file_is_offered_ls_of_its_directory_whole() {
 // §FS-rhei-errors.2.1 §FS-rhei-new.1.1
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #583: the 80-column render splits `ls -l` from the description's path; implement removes this"]
 fn an_unreadable_description_file_is_offered_ls_l_of_itself_whole() {
     let fixture = Fixture::new("offered-description-ls-l");
     with_rhei(&fixture);
@@ -284,7 +277,6 @@ fn an_unreadable_description_file_is_offered_ls_l_of_itself_whole() {
 /// line, and the pasted line removes it.
 // §FS-rhei-errors.2.1 §FS-rhei-templates.6.2
 #[test]
-#[ignore = "red until #583: the 80-column render splits `rm -rf` from the output path; implement removes this"]
 fn an_existing_output_is_offered_rm_rf_of_itself_whole() {
     let fixture = Fixture::new("offered-rm-rf");
     let output = fixture.work().join(LONG_DIR);
@@ -317,7 +309,6 @@ fn an_existing_output_is_offered_rm_rf_of_itself_whole() {
 // §FS-rhei-errors.2.1 §FS-rhei-library.2.2
 #[cfg(unix)]
 #[test]
-#[ignore = "red until #583: the 80-column render splits the linked-root `rm` across lines; implement removes this"]
 fn linked_bundle_paths_are_offered_one_rm_whole() {
     use super::into_project_lay_support::*;
     use std::os::unix::fs::symlink;

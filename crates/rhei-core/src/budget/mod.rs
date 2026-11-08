@@ -92,7 +92,10 @@ pub use bounds::{
     ceiling_policy_line, halt_text, Bound, BoundSource, BoundUnit, Limiter, Remedy, SettingsFiles,
     CLAMP_PROJECTS,
 };
-pub use diagnosis::{Damage, Diagnosis, Foreign, History, Inspection, Retired, Torn};
+pub use diagnosis::{
+    Damage, Diagnosis, Foreign, History, Inspection, Retired, Torn, RESTORE_LEAD_IN,
+    SET_ASIDE_INSTEAD_LEAD_IN, SET_ASIDE_LEAD_IN, TRIM_LEAD_IN,
+};
 pub use events::{BudgetEvent, BudgetLine};
 pub use identity::IdentityMove;
 pub use journal::{Audit, Journal, Receipt};

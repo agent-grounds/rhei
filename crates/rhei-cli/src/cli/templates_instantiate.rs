@@ -394,7 +394,7 @@
         if explicit_output {
             return miette!(
                 help = format!(
-                    "pass a --output path that does not exist yet, or remove that one: rm -rf {}",
+                    "pass a --output path that does not exist yet, or {REMOVE_THAT_ONE_LEAD_IN}rm -rf {}",
                     shell_quote(&output_dir.display().to_string())
                 ),
                 "output path '{}' already exists",

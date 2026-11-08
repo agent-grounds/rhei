@@ -49,13 +49,11 @@ fn raised_budget_release(project: bool) {
 }
 
 #[test]
-#[ignore = "red until #653: live gate release explains the held visits budget; implement removes this"]
 fn issue_653_live_gate_release_explains_held_visits_budget() {
     raised_budget_release(false);
 }
 
 #[test]
-#[ignore = "red until #653: member release explains the enclosing run budget; implement removes this"]
 fn issue_653_member_release_explains_enclosing_live_run_budget() {
     raised_budget_release(true);
 }
@@ -76,13 +74,11 @@ fn held_scope_release(project_lock: bool) {
 }
 
 #[test]
-#[ignore = "red until #653: a held project lock qualifies a member release; implement removes this"]
 fn issue_653_gate_release_detects_project_activity_without_member_lock() {
     held_scope_release(true);
 }
 
 #[test]
-#[ignore = "red until #653: project transition detects its member run; implement removes this"]
 fn issue_653_gate_release_detects_member_activity_without_project_lock() {
     held_scope_release(false);
 }

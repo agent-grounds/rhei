@@ -1,4 +1,4 @@
-//! §FS-rhei-states.1.1: a `name` or `version` whose value is not of the type its
+//! §FS-rhei-states.1.1: a `name`, `version` or `models` whose value is not of the type its
 //! row names is refused when the machine loads, naming the field, and the help
 //! does not call the valid YAML around it invalid (§FS-rhei-errors.1.2.2).
 
@@ -93,6 +93,16 @@ fn a_version_that_is_neither_number_nor_string_is_refused_naming_the_field() {
             "version",
         );
     }
+}
+
+/// A `models` entry that is not a string is refused like a wrong-typed `name`.
+#[test]
+fn a_models_entry_that_is_not_a_string_is_refused_naming_the_field() {
+    assert_refused_naming(
+        "top-level-models-entry",
+        "name: m\nversion: 1\nmodels: [null]\n",
+        "models[0]",
+    );
 }
 
 /// The type check `name` already had stays, and its help stays the shape help.

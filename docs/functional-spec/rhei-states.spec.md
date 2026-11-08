@@ -76,11 +76,14 @@ Examples:
 | `profiles` | map of name to `{initial, allowed}` | Conditional; see below | Named, reusable state profiles. Each profile declares the `initial` state and the `allowed` state subset for any node assigned to it. Referenced by `node_policy`. |
 | `node_policy` | object | Conditional; see below | Maps nodes to profiles. Must define `root` (the Panta project root) and `default`. Optionally defines `rhei` (the rhei tier), `by_type`, and `overrides`. See [Node Policy](#9-node-policy). |
 
-A `name` or `version` whose value is not of the type its row names is refused
-when the machine loads, and the refusal names the field. A key written with no
-value is a null, which is neither a string nor a number, so `name:` and
+A `name`, `version` or `models` whose value is not of the type its row names is
+refused when the machine loads, and the refusal names the field. A key written
+with no value is a null, which is neither a string nor a number, so `name:` and
 `version:` left empty are refused like `version: {a: 1}` or `version: true`. A
-`name: ""` is a string and loads.
+`name: ""` is a string and loads. Every entry of `models` must be a string, so
+`models: [null]`, `models: [true]` or `models: [1.5]` is refused, and so is a
+`models:` left empty, since a null is not a string array; `models: []` and an
+omitted `models` both declare no models.
 
 The `profiles` and `node_policy` blocks must appear together at every version.
 In a machine with both blocks (a **profiled machine**), they replace the

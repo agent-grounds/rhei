@@ -200,6 +200,33 @@ The help states the correction itself rather than pointing at a document: the
 reader of a refusal may hold only the installed binary, with no repository
 around it to follow a path into.
 
+#### 1.2.3. A Values File That Will Not Load
+
+When `rhei instantiate --values <path>` cannot read a file into a YAML value,
+the diagnostic retains the actual file path and the original loading cause,
+and the command still exits 1. Help distinguishes syntax, several documents,
+and a read failure by scanning every YAML document, as for state machines in
+[§FS-rhei-errors.1.2.2](rhei-errors.spec.md#122-a-state-machine-that-will-not-load), never by matching the words of the cause.
+
+If the scan rejects any document, help asks the reader to fix the syntax.
+This includes malformed later documents, even when the original loading cause
+only reports several documents. A reference to a position is offered only when
+the diagnostic prints that position.
+
+If every document scans and there is more than one, help explicitly asks for
+one document. It neither asks for syntax repair nor refers to a position.
+
+If the scan accepts one document that still cannot be read into a value, such
+as an integer too large to hold or a duplicate key, help asks the reader to
+correct the loading problem named in the cause. It makes no claim either way
+about valid YAML, asks for no syntax repair, and refers to no position. Merely
+omitting syntax guidance without giving a correction is insufficient.
+
+This help distinction changes no accepted inputs: whitespace-empty files still
+supply no inputs; a successfully read value must still be a top-level mapping
+with string keys. Input precedence and flag behavior remain as specified in
+[§FS-rhei-templates.6.1.2](rhei-templates.spec.md#612-behavior).
+
 ### 1.3. Near Misses
 
 When a name is not found and a declared set of valid names exists, the error

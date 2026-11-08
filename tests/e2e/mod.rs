@@ -382,6 +382,7 @@ mod until_idle_support;
 mod validate_parallel_layout_tests;
 mod validate_retry_cache_tests;
 mod validation_source_tests;
+mod values_file_help_tests;
 mod verify_findings_tests;
 mod verify_reset_tests;
 mod verify_tests;

@@ -90,7 +90,7 @@ fn visualization_uses_the_mapping_cause_for_every_non_mapping() {
             help,
             format!(
                 "check the path and re-run: rhei viz {} --state-machine states.yaml",
-                plan.display()
+                rhei_core::platform::shell_quote(&plan.display().to_string())
             ),
             "{label}: visualization retains its contextual help"
         );

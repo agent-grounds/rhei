@@ -61,6 +61,7 @@ fn refused(out: &Output) -> String {
 
 const CREATE_IT: &str = "Create it with: ";
 const CHECK_SPELLING: &str = "Check the spelling: ";
+#[cfg(unix)] // Only the unix-only unreadable-path tests offer it.
 const INSPECT_IT: &str = "Inspect it with: ";
 const REMOVE_OR_PICK: &str = "Remove it or pick another: ";
 const LOOK_WITH: &str = "Look with: ";

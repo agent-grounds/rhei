@@ -2267,6 +2267,23 @@ Three choices are deliberate:
   one machine and run on another is judged on the second
   ([§FS-rhei-states.7.3](rhei-states.spec.md#73-runtime-semantics)).
 
+#### 6.2.1. URL Preflight Test Evidence
+
+Tests of URL preflight keep a real loopback listener for successful connections.
+For failed connections, the fixture owns a separate, OS-assigned loopback TCP
+endpoint, bound but not listening, throughout the probe and its diagnostic
+assertions. Another ordinary listener must be unable to bind that endpoint
+while the fixture is alive. Binding a listener and dropping it before the probe
+does not establish failure: a parallel test can acquire the released port and
+make the connection succeed. This is test independence
+([§REQ-test-isolation](../requirements/test-isolation.spec.md#req-test-isolation-a-test-writes-only-inside-its-own-directory)) applied to TCP endpoints.
+
+A deterministic regression attempts a competing listener bind while the failure
+fixture is alive and checks that the real preflight still fails with
+`<host>:<port> accepted no connection within <startup_timeout>`. The fixture
+retains ownership through that assertion. This evidence preserves the TCP-only,
+no-bytes-sent preflight defined above; it changes no availability rule.
+
 ## 7. Timeout Handling
 
 ### 7.1. Configuration

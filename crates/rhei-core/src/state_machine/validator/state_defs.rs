@@ -404,16 +404,17 @@ fn statically_resolved_snapshot_agent(state: &StateDef) -> Option<String> {
 
 /// States data loaded from YAML.
 ///
-/// `name` must be a string and `version` a number or a string, which is kept as
-/// written in a [`serde_yaml::Value`]; any other type, a null included, is
-/// refused at load naming the field (§FS-rhei-states.1.1).
+/// `name` must be a string, `version` a number or a string, which is kept as
+/// written in a [`serde_yaml::Value`], and every `models` entry a string; any
+/// other type, a null included, is refused at load naming the field
+/// (§FS-rhei-states.1.1).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct StateMachine {
     /// Human-readable states definition name.
     #[serde(deserialize_with = "deserialize_machine_name")]
     pub name: String,
     /// Optional declared model identifiers available to states in this machine.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_machine_models")]
     pub models: Vec<String>,
     /// Reusable prompt definitions keyed by prompt-template id.
     // §FS-rhei-states.4.4: prompt_templates/*.md is normalized into this map.

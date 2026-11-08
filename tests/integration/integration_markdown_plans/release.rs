@@ -177,8 +177,8 @@ fn release_explains_a_ticket_left_past_the_initial_state() {
     // The undo names the target and machine release was given. §FS-rhei-errors.1.2.1
     let undo = format!(
         "rhei transition {} --task plan.1 --from in-progress --to pending --state-machine {}",
-        plan_path.display(),
-        machine_path.display()
+        rhei_core::platform::shell_quote(&plan_path.display().to_string()),
+        rhei_core::platform::shell_quote(&machine_path.display().to_string())
     );
     assert!(
         stdout.contains("still in 'in-progress'") && stdout.contains(&undo),

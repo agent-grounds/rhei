@@ -116,9 +116,30 @@ node_policy:
     }
 
     pub fn start(&self, input: &Path, name: &str) -> RunningChild {
+        self.start_with_args(input, name, &[])
+    }
+
+    pub fn start_with_args(&self, input: &Path, name: &str, args: &[&str]) -> RunningChild {
         let mut cmd = self.command();
-        cmd.arg("run").arg(input).arg("--no-tui");
+        cmd.arg("run").arg(input).arg("--no-tui").args(args);
         RunningChild::spawn(&mut cmd, &self.dir, name)
+    }
+
+    pub fn add_sibling(&self) -> PathBuf {
+        let other = self.dir.join("other");
+        fs::create_dir_all(other.join("tasks")).unwrap();
+        write_fixture_file(&other, "index.rhei.md", "# Rhei: Other\n");
+        fs::copy(&self.task_file, other.join("tasks/01-ticket.md")).unwrap();
+        let mut machine = fs::read_to_string(&self.machine).unwrap();
+        for script in ["work.py", "keepalive.py"] {
+            fs::copy(self.member.join(script), other.join(script)).unwrap();
+            machine = machine.replace(
+                &fixture_command(&self.member.join(script)),
+                &fixture_command(&other.join(script)),
+            );
+        }
+        fs::write(other.join("states.yaml"), machine).unwrap();
+        other
     }
 
     pub fn transition(&self, input: &Path, from: &str, to: &str) -> CliRun {
@@ -134,6 +155,11 @@ node_policy:
 
     pub fn visits(&self) -> usize {
         fs::read_to_string(self.member.join("visits.txt")).unwrap_or_default().lines().count()
+    }
+
+    pub fn raise_budget(&self) {
+        let machine = fs::read_to_string(&self.machine).unwrap();
+        fs::write(&self.machine, machine.replace("visits: 2", "visits: 5")).unwrap();
     }
 
     pub fn gated(&self) -> bool {
@@ -216,12 +242,16 @@ pub(super) fn assert_advisory(release: &CliRun, id: &str, root: &Path, run_id: O
         "validat",
         "release",
         "adopt",
-        "rhei stop",
         "rhei transition",
         "gated",
         "rhei run",
     ] {
         assert!(text.contains(part), "advisory is missing {part:?}: {text}");
+    }
+    if run_id.is_some() {
+        assert!(text.contains("rhei stop"), "live descriptor must offer stop: {text}");
+    } else {
+        assert!(text.contains("rhei stop") || text.contains("Ctrl-C"), "missing recovery: {text}");
     }
     assert!(text.contains("may") || text.contains("can"), "risk must be conditional: {text}");
     assert!(

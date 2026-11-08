@@ -302,60 +302,6 @@ fn transition_command_with_release(
     Ok(())
 }
 
-/// A successful gate release does not prove adoption of the disk machine.
-/// Detection is best-effort and read-only: uncertainty cannot refuse a release.
-/// §FS-rhei-transition-cmd.3.4
-fn advise_live_gate_budget(
-    input: &Path,
-    route: &TaskRoute,
-    machine: &rhei_validator::StateMachine,
-    task_id: &str,
-    from: &str,
-    to: &str,
-) {
-    if !machine.states.get(from).is_some_and(|state| state.gating)
-        || !machine.states.get(to).is_some_and(|state| state.visits.is_some())
-    {
-        return;
-    }
-
-    // Check only the enclosing project and this ticket's owner, never sibling
-    // roots. Prefer the project so recovery retains the live run's scope.
-    // §FS-rhei-transition-cmd.3.4
-    let project = workspace::panta_project_dir(input)
-        .or_else(|| workspace::panta_member(input).map(|(project, _)| project));
-    let member = run_root_key(&route.execution_root);
-    let roots = project.into_iter().map(|root| run_root_key(&root)).chain([member]);
-    for root in roots {
-        let descriptor = read_descriptor(&run_descriptor_path(&root)).filter(|descriptor| {
-            run_root_key(&descriptor.workspace) == root
-                && matches!(descriptor.liveness(), Liveness::Live)
-        });
-        if !matches!(probe_run_lock(&root), RunLockProbe::Held) && descriptor.is_none() {
-            continue;
-        }
-
-        let run_id = descriptor.as_ref().map(|run| run.id.clone())
-            .or_else(|| run_lock_owner_id(&root).ok().flatten());
-        let stop_target = run_id.unwrap_or_else(|| root.display().to_string());
-        let scope = descriptor.as_ref().map(|run| run.plan.as_path()).unwrap_or_else(|| {
-            if workspace::is_panta_project(&root) { &root } else { &route.metadata_file }
-        });
-        eprintln!(
-            "Advisory: Task {task_id} was released into '{to}' with a visits budget while a run \
-             is active at {}. The live scheduler may still use its held machine and old visits \
-             budget; successful validation and gate release do not guarantee adoption of an \
-             edited machine. To use the edited budget reliably, stop the relevant run with \
-             `rhei stop {}`, release with `rhei transition` if the task is still gated, then \
-             start a fresh `rhei run {}` with the intended machine and options.",
-            root.display(),
-            shell_quote(&stop_target),
-            shell_quote(&scope.display().to_string()),
-        );
-        return;
-    }
-}
-
 /// Reject a `--result` that carries no message.
 ///
 /// The flag exists to record why a ticket ended where it did; taking it with an

@@ -149,6 +149,7 @@ mod help_target_removal_template_tests;
 mod help_target_retry_tests;
 mod help_target_run_route_tests;
 mod help_target_subcommand_tests;
+mod help_target_success_line_tests;
 mod help_target_tests;
 mod includes_under_tests;
 mod inherited_rhei_env_tests;

@@ -96,6 +96,13 @@ entry is written. Whether that work is salvageable, explicitly re-claimed, or
 should be moved elsewhere is the operator's call, and the state is the only
 remaining evidence of it.
 
+The note offers both ways out as commands to paste, `rhei next` to reclaim the
+ticket and `rhei transition` to move it back, and both name the target and
+machine `rhei release` was given, by the rule a help follows
+([§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names)): a typed member is printed as typed, not as the project
+it widens to, and neither command is printed with no target, so each runs from
+the directory `rhei release` was typed in.
+
 The note is **not** printed for two tickets it would be wrong about:
 
 - a ticket in a **supervising** state ([§FS-rhei-supervision.3.4](rhei-supervision.spec.md#34-manual-workers)), which

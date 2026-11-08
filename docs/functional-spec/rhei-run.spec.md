@@ -1131,6 +1131,31 @@ not find.
 After the restore the run reloads. A plan that still fails to load was broken by
 more than this worker, and the run stops, attributed, at the new location.
 
+##### 3.7.3.1. Shared-file Scenario Harness
+
+The shared-file preservation fixture must reach its malformed edit despite a
+temporary access, sharing or lock refusal while polling for the sibling's
+transition. It retries only those read refusals within the polling loop's
+15-second monotonic deadline. A permanent refusal must terminate at that bound
+and identify the task-file path and the last refusal. Unrelated I/O errors,
+malformed content and programming errors propagate rather than being retried.
+This is a requirement on this test harness, not an engine-wide read retry policy.
+
+A deterministic regression injects one recognizable polling refusal into the
+actual concurrent fixture, observes a subsequent successful poll, and still
+requires the complete preservation, restoration, charging and retained-text
+scenario above ([§FS-rhei-run.3.7.4](rhei-run.spec.md#374-the-charge),
+[§FS-rhei-run.3.7.7](rhei-run.spec.md#377-what-the-operator-reads)). The authoritative
+edit read remains under the stable writer sidecar, held through complete-image
+staged publication; polling recovery must not replace that exclusion.
+
+Failure diagnostics from this scenario include the culprit program's first
+attempt log, `runtime/logs/task-ws.1-cover.log`, alongside the existing task,
+transition, spawn and reverted-text evidence. A separate failing program must
+remain failed while its traceback and recognizable fault text appear in the
+returned diagnostics. This distinguishes failure before publication from a
+failed restore without presuming the cause of an intermittent platform failure.
+
 #### 3.7.4. The Charge
 
 The broken visit is a **failed attempt**, not a failed task. **No transition

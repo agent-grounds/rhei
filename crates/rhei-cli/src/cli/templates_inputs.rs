@@ -111,6 +111,26 @@
         ))
     }
 
+    /// Choose a correction by scanning all documents before offering document-count
+    /// help. Keep syntax guidance independent of coordinates: the retained loading
+    /// cause may report only multiple documents. §FS-rhei-errors.1.2.3
+    fn template_values_load_correction(raw: &str) -> &'static str {
+        let mut documents = 0_usize;
+        for document in serde_yaml::Deserializer::from_str(raw) {
+            if serde::de::IgnoredAny::deserialize(document).is_err() {
+                return "Fix the syntax in the values file.";
+            }
+            documents += 1;
+        }
+        if documents > 1 {
+            "Use one YAML document in each --values file; combine its input mappings into that document."
+        } else {
+            "Correct the loading problem reported above, such as a number out of range or a duplicate key."
+        }
+    }
+
+    /// Preserve values-file loading and shape checks, selecting help from the text
+    /// rather than the words of the original loading cause. §FS-rhei-errors.1.2.3
     fn load_template_values_file(path: &Path) -> MietteResult<BTreeMap<String, YamlValue>> {
         let raw = fs::read_to_string(path)
             .map_err(|err| file_io_report(path, "failed to read values file", err))?;
@@ -121,8 +141,11 @@
         let value: YamlValue = serde_yaml::from_str(&raw)
             .map_err(|err| {
                 miette!(
-                    help = "a --values file is a YAML or JSON object mapping input names to \
-                            values. Fix the syntax at the position above.",
+                    help = format!(
+                        "a --values file is a YAML or JSON object mapping input names to \
+                         values. {}",
+                        template_values_load_correction(&raw)
+                    ),
                     "failed to parse values file '{}': {err}",
                     path.display()
                 )

@@ -49,21 +49,18 @@ fn assert_read_help(help: &str, subject: &[&str]) {
 }
 
 #[test]
-#[ignore = "red until #631: overflow needs loading correction, not syntax repair; implement removes this"]
 fn overflow_values_file_gets_loading_correction() {
     let (_, help) = refusal("a: 99999999999999999999999\n", "99999999999999999999999");
     assert_read_help(&help, &["above", "reported", "named", "number", "integer"]);
 }
 
 #[test]
-#[ignore = "red until #631: duplicate keys need loading correction, not syntax repair; implement removes this"]
 fn duplicate_values_key_gets_loading_correction() {
     let (_, help) = refusal("a: 1\na: 2\n", "duplicate entry with key \"a\"");
     assert_read_help(&help, &["above", "reported", "named", "duplicate", "key"]);
 }
 
 #[test]
-#[ignore = "red until #631: several values documents need a one-document correction; implement removes this"]
 fn multiple_values_documents_are_told_to_keep_one() {
     for text in ["a: 1\n---\nb: 2\n", "a: 1\n...\n---\n"] {
         let (_, help) = refusal(text, "more than one document");
@@ -112,7 +109,6 @@ fn malformed_values_document_keeps_syntax_help() {
 }
 
 #[test]
-#[ignore = "red until #631: later malformed documents need syntax help without a phantom position; implement removes this"]
 fn malformed_later_values_documents_keep_syntax_help() {
     // The original cause reports multiple documents; the scanner must inspect
     // the second and third documents rather than stop at the first separator.

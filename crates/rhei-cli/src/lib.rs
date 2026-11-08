@@ -112,6 +112,7 @@ include!("cli/exclusion_requirements.rs");
 include!("cli/artifacts.rs");
 include!("cli/task_exports.rs");
 include!("cli/transition_checks.rs");
+include!("cli/transition_live_budget.rs");
 include!("cli/operator_ceremony.rs");
 include!("cli/operator_force.rs");
 include!("cli/operator_force_prepare.rs");

@@ -18,8 +18,7 @@ fn raised_budget_release(project: bool) {
     let original = fixture.descriptor(&fixture.dir);
     assert_eq!(original["pid"], pid);
 
-    let machine = fs::read_to_string(&fixture.machine).unwrap();
-    fs::write(&fixture.machine, machine.replace("visits: 2", "visits: 5")).unwrap();
+    fixture.raise_budget();
     assert_success(&run_cli_without_machine("validate", &run_input, &[]));
     // A project run is addressed through its member: there is no member run.json.
     let release = fixture.transition(&fixture.input, "human-review", "work");
@@ -58,29 +57,41 @@ fn issue_653_member_release_explains_enclosing_live_run_budget() {
     raised_budget_release(true);
 }
 
-fn held_scope_release(project_lock: bool) {
-    let fixture = BudgetFixture::new(true);
-    fixture.set_source("human-review");
-    let root = if project_lock { fixture.dir.to_path_buf() } else { fixture.member.clone() };
-    let _held = run_lock(&root, true);
-    // Probe project-only and member-only locks separately. No mismatch is known,
-    // so the advisory must be conservative even with no machine edit.
-    for input in [&fixture.input, &*fixture.dir] {
+fn selected_scope_release(project_run: bool) {
+    for project_address in [false, true] {
+        let fixture = BudgetFixture::new(true);
+        let other = fixture.add_sibling();
+        let run_input = if project_run { &*fixture.dir } else { &fixture.input };
+        let mut live = fixture.start(run_input, "selected-scope");
+        wait_for_budget_run(&mut live, "selected target gating", || {
+            fixture.gated() && fixture.visits() == 2
+        });
+        let descriptor = fixture.descriptor(&fixture.dir);
+        assert_eq!(descriptor["pid"], live.child().id());
+        assert!(live.child().try_wait().unwrap().is_none());
+        if !project_run {
+            assert!(live.output().contains("Scope: narrowed to ticket"));
+            assert!(!other.join("visits.txt").exists());
+        }
+        let input = if project_address { &*fixture.dir } else { &fixture.input };
+        fixture.raise_budget();
         let release = fixture.transition(input, "human-review", "work");
         assert_release_success(&release, fixture.id, "human-review", "work");
-        fixture.set_source("human-review");
-        assert_advisory(&release, fixture.id, &root, None);
+        assert_advisory(&release, fixture.id, &fixture.dir, descriptor["id"].as_str());
+        if !project_run {
+            assert!(release.stderr.contains("--rhei ticket"), "{}", release.stderr);
+        }
     }
 }
 
 #[test]
-fn issue_653_gate_release_detects_project_activity_without_member_lock() {
-    held_scope_release(true);
+fn issue_653_gate_release_detects_selected_project_activity() {
+    selected_scope_release(true);
 }
 
 #[test]
-fn issue_653_gate_release_detects_member_activity_without_project_lock() {
-    held_scope_release(false);
+fn issue_653_gate_release_detects_selected_member_activity() {
+    selected_scope_release(false);
 }
 
 #[test]
@@ -121,6 +132,118 @@ fn issue_653_gate_release_ignores_unrelated_member_activity() {
     let release = fixture.transition(&fixture.dir, "human-review", "work");
     assert_release_success(&release, fixture.id, "human-review", "work");
     assert_no_advisory(&release);
+}
+
+#[test]
+fn issue_653_gate_release_ignores_real_narrowed_sibling_run() {
+    for explicit_scope in [false, true] {
+        let fixture = BudgetFixture::new(true);
+        let other = fixture.add_sibling();
+        fixture.set_source("human-review");
+        let (input, args): (_, &[&str]) = if explicit_scope {
+            (&*fixture.dir, &["--rhei", "other"])
+        } else {
+            (other.as_path(), &[])
+        };
+        let mut live = fixture.start_with_args(input, "unrelated-scope", args);
+        wait_for_budget_run(&mut live, "sibling gating outside the ticket scope", || {
+            fs::read_to_string(other.join("visits.txt")).unwrap_or_default().lines().count() == 2
+                && fs::read_to_string(other.join("tasks/01-ticket.md"))
+                    .unwrap()
+                    .contains("**State:** human-review")
+        });
+        let descriptor = fixture.descriptor(&fixture.dir);
+        assert_eq!(descriptor["pid"], live.child().id());
+        assert!(live.output().contains("Scope: narrowed to other"));
+        for input in [&fixture.input, &*fixture.dir] {
+            let release = fixture.transition(input, "human-review", "work");
+            assert_release_success(&release, fixture.id, "human-review", "work");
+            assert_no_advisory(&release);
+            assert!(live.child().try_wait().unwrap().is_none(), "sibling must remain alive");
+            assert_eq!(fixture.visits(), 0, "the live run must not select the target");
+            fixture.set_source("human-review");
+        }
+    }
+}
+
+#[test]
+fn issue_653_gate_release_without_descriptor_gives_foreground_recovery() {
+    for project in [false, true] {
+        let fixture = BudgetFixture::new(project);
+        let input = if project { &*fixture.dir } else { &fixture.input };
+        // Publication is best-effort: the run must still work with this obstruction.
+        fs::create_dir_all(fixture.dir.join("runtime/run.json")).unwrap();
+        let mut live = fixture.start(input, "unpublished");
+        wait_for_budget_run(&mut live, "unpublished run gating", || {
+            fixture.gated() && fixture.visits() == 2
+        });
+        assert!(live.output().contains("could not publish the run descriptor"));
+        fixture.raise_budget();
+        let release = fixture.transition(&fixture.input, "human-review", "work");
+        assert_release_success(&release, fixture.id, "human-review", "work");
+        assert_advisory(&release, fixture.id, &fixture.dir, None);
+        assert!(release.stderr.contains("interrupt the foreground run"), "{}", release.stderr);
+        assert!(release.stderr.contains("Ctrl-C"), "{}", release.stderr);
+        assert!(release.stderr.contains("no resolvable live run descriptor"));
+        assert!(!release.stderr.contains("rhei stop"), "must not offer an unusable command");
+        assert!(!release.stderr.contains(&format!("kill {}", live.child().id())));
+        assert!(live.child().try_wait().unwrap().is_none());
+        // On Unix exercise the same SIGINT as Ctrl-C, using the Child handle's
+        // known pid rather than trusting any suggested lock-only process id.
+        #[cfg(unix)]
+        {
+            nix::sys::signal::kill(
+                nix::unistd::Pid::from_raw(live.child().id() as i32),
+                nix::sys::signal::Signal::SIGINT,
+            )
+            .unwrap();
+            assert_eq!(live.wait_for_exit("foreground interruption").code(), Some(130));
+        }
+        #[cfg(not(unix))]
+        {
+            write_fixture_file(&fixture.member, "finish", "finished\n");
+            finish_budget_run(&mut live);
+        }
+    }
+}
+
+#[test]
+fn issue_653_empty_lock_owner_does_not_invent_a_stop_target() {
+    let fixture = BudgetFixture::new(false);
+    fixture.set_source("human-review");
+    let _held = run_lock(&fixture.dir, true);
+    let release = fixture.transition(&fixture.input, "human-review", "work");
+    assert_release_success(&release, fixture.id, "human-review", "work");
+    assert_advisory(&release, fixture.id, &fixture.dir, None);
+    assert!(release.stderr.contains("Ctrl-C"));
+    assert!(!release.stderr.contains("rhei stop"));
+}
+
+#[test]
+fn issue_653_gate_release_offers_usable_descriptor_path_without_registry() {
+    let fixture = BudgetFixture::new(false);
+    let mut live = fixture.start(&fixture.input, "usable-stop");
+    wait_for_budget_run(&mut live, "recorded run gating", || {
+        fixture.gated() && fixture.visits() == 2
+    });
+    let descriptor = fixture.descriptor(&fixture.dir);
+    fixture.raise_budget();
+    let release = fixture.transition(&fixture.input, "human-review", "work");
+    assert_release_success(&release, fixture.id, "human-review", "work");
+    assert_advisory(&release, fixture.id, &fixture.dir, descriptor["id"].as_str());
+    let target = fixture.dir.display().to_string();
+    let suggested = format!("`rhei stop {}`", rhei_core::platform::shell_quote(&target));
+    assert!(release.stderr.contains(&suggested), "{}", release.stderr);
+    // An absolute descriptor path must resolve even when the registry is unavailable.
+    let output = fixture
+        .command()
+        .env("XDG_STATE_HOME", fixture.dir.join("no-registry"))
+        .args(["stop", &target])
+        .output()
+        .unwrap();
+    assert_success(&CliRun::from(&output));
+    let status = live.wait_for_exit("the suggested stop command");
+    assert!(!status.success(), "an interrupted run must record interruption");
 }
 
 #[test]

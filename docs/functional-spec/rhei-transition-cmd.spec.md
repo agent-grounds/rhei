@@ -343,7 +343,10 @@ relevant run is active. Activity includes a run on the ticket's owning rhei
 or its enclosing Panta project, regardless of whether the command addresses
 the member or the project. Use live run-lock/identity evidence: a leftover
 lock file or run descriptor alone does not establish activity. A run confined
-to an unrelated member does not qualify.
+to an unrelated member does not qualify. Shared project/member locks establish
+activity, not selection: use the active run's selected-scope evidence before
+treating those locks as relevant to the ticket. Detection remains best-effort
+and read-only; unavailable evidence cannot refuse a successful release.
 
 The advisory identifies the ticket and budgeted target and explains that the
 live scheduler **may still use its held machine and old visits budget**:
@@ -353,9 +356,15 @@ not claim that a machine was edited or that a mismatch was detected. It must
 not promise a machine frozen for the whole run: successful member admission
 can adopt newly resolved machines ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)).
 
-Give actionable recovery: stop the relevant run with `rhei stop <run>`,
-release the ticket with `rhei transition` if it is still gated, then start a
-fresh `rhei run` on the intended scope to read the edited budget. Name the
+Give actionable recovery: recommend `rhei stop <run>` only with a relevant live
+descriptor whose target the existing stop resolver can use. Lock ownership
+alone does not establish such a target. If descriptor publication failed or
+there is no resolvable descriptor, direct the operator to interrupt the
+identified foreground run (Ctrl-C in its terminal), or stop a positively
+identified process through existing facilities; never give an unverified pid
+or unresolvable id as an executable recovery command. Then release the ticket
+with `rhei transition` if it is still gated and start a fresh `rhei run` on the
+intended scope, with the intended machine and options, to read the edited budget. Name the
 relevant run or execution root so the operator can identify what to stop and
 restart. Practical recovery after raising `visits` is to stop the live run
 before releasing the gate, rather than spending another visit under a possibly

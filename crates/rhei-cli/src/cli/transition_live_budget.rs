@@ -48,14 +48,20 @@ fn advise_live_gate_budget(
         // A workspace path resolves directly without depending on registry publication.
         // An owner id alone is not a stop target; never invent a pid from lock bytes.
         // §FS-rhei-transition-cmd.3.4
-        let recovery = if descriptor.is_some() {
+        let recovery = if descriptor.is_some() && cfg!(unix) {
             format!("stop the relevant run with `rhei stop {}`", shell_quote(&root.display().to_string()))
         } else {
+            // `rhei stop` needs POSIX signals; never offer it where it can only refuse.
+            let unavailable = if descriptor.is_some() {
+                "`rhei stop` is not supported on this platform"
+            } else {
+                "There is no resolvable live run descriptor"
+            };
             format!(
                 "stop the run at {} through its original launcher or process controls \
                  (interrupt the foreground run with Ctrl-C in its terminal; for a detached \
-                 run, identify its supervisor process before stopping it). There is no \
-                 resolvable live run descriptor; once the run has stopped",
+                 run, identify its supervisor process before stopping it). {unavailable}; \
+                 once the run has stopped",
                 root.display(),
             )
         };

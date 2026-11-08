@@ -357,9 +357,10 @@ not promise a machine frozen for the whole run: successful member admission
 can adopt newly resolved machines ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)).
 
 Give actionable recovery: recommend `rhei stop <run>` only with a relevant live
-descriptor whose target the existing stop resolver can use. Lock ownership
-alone does not establish such a target. If descriptor publication failed or
-there is no resolvable descriptor, direct the operator to interrupt the
+descriptor whose target the existing stop resolver can use, on a platform where
+`rhei stop` can signal a run. Lock ownership alone does not establish such a
+target. If descriptor publication failed, there is no resolvable descriptor, or
+the platform has no `rhei stop`, direct the operator to interrupt the
 identified foreground run (Ctrl-C in its terminal), or stop a positively
 identified process through existing facilities; never give an unverified pid
 or unresolvable id as an executable recovery command. Then release the ticket

@@ -249,9 +249,12 @@ all follow from the project already existing:
   ```text
   × 'tool-reports/scripts' is a symbolic link to '…/grounded-ticket/scripts',
   │ and a rebind copies the machine's bundle — it never writes through a link
-  ╰─▶ remove the link (`rm tool-reports/scripts` removes the link, not what it
-      points to), then run this again. Nothing was written.
+  ╰─▶ remove the link (`rm tool-reports/scripts` removes the link, not what it points to), then run this again. Nothing was written.
   ```
+
+  The remedy line is printed whole however wide the terminal is, because it
+  offers the `rm` as the next action
+  ([§FS-rhei-errors.2.1](rhei-errors.spec.md#21-a-command-offered-as-the-next-action)): pasted alone, it removes every link it names.
 
 Before writing, the command checks the replacement ([§FS-rhei-library.2.3](rhei-library.spec.md#23-the-default-machine-is-replaced-never-unioned-into)) and
 validates the prospective project in the project's own terms, under the

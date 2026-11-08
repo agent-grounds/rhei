@@ -317,7 +317,8 @@ survive being pasted into an interactive shell: every value parses as the single
 argument Rhei meant, and no token is ever split across lines.
 
 A command wider than the terminal still wraps, at a space, unless the point that
-prints it keeps it whole, as [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy) and [§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names) do. Rejoining two lines
+prints it keeps it whole, as [§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy) and [§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names) do, and as every
+command offered as the next action does under [§FS-rhei-errors.2.1](rhei-errors.spec.md#21-a-command-offered-as-the-next-action). Rejoining two lines
 is a visible, recoverable inconvenience; a path or selector broken mid-token is
 neither, which is why the renderer breaks only at spaces. Suggestions are kept
 short for the same reason — paths are printed relative to the working directory
@@ -347,6 +348,38 @@ bare YAML.
 A repair example is keyed to the input it corrects. A suggestion built around a
 guessed name is not a next action: pasted back, it fails on the name rather
 than on the value.
+
+### 2.1. A Command Offered as the Next Action
+
+A command is *offered* when a help or message tells the reader to run it next —
+to create the missing directory, list what is there, inspect a path, remove what
+is in the way, set an account aside or cut it back — so that the reader's next
+move is to paste it. What makes a command offered is that purpose, not where it
+sits: it may close the help, as `Create it with: mkdir -p <dir>` does, or stand
+mid-sentence, as the `rm <link>` of
+[§FS-rhei-library.2.2](rhei-library.spec.md#22-a-project-target) and the reset of
+[§FS-rhei-reset.5.1](rhei-reset.spec.md#51-offering-reset-as-a-remedy) do. A command only mentioned inside the prose, to explain
+rather than to be run, is not offered.
+
+An offered command, with every operand it was given, stays whole on one
+physical line of output, so the line that holds it is the command: pasting that
+line alone does what the help promised. This holds both when the command is
+wider than the terminal and when the prose ahead of it fills the line, so it
+settles [§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety) for this case — "survives being pasted" wins over "wraps at a
+space". The diagnostic that offers it is printed unwrapped and left to the
+terminal to soft-wrap; the cost, that its prose is unwrapped too, is accepted
+because a remedy that cannot be pasted is no remedy.
+
+The rule covers every shell command a help offers, whatever its words on the
+platform — `mkdir -p`, `ls`, `ls -ld`, `ls -l`, `rm -rf`, `rm`/`rmdir`/`del`, and the
+budget account's set-aside, trim and restore — and it is recognized by the
+sentence that offers it rather than by the command's spelling, so a later
+platform spelling keeps the guarantee
+([§REQ-cross-platform.2](../requirements/cross-platform.md#2-parity)). A `rhei` command naming a target is already kept
+whole by [§FS-rhei-errors.1.2.1](rhei-errors.spec.md#121-the-target-a-help-names). A `rhei` command offered with no target —
+`rhei states`, `rhei budget show` — is not yet covered and may still wrap at a
+space; extending the rule to it is separate work. Help with no command in it,
+and every other diagnostic, keeps wrapping as [§FS-rhei-errors.2](rhei-errors.spec.md#2-copy-paste-safety) describes.
 
 ## 3. Failing at the Input Boundary
 
@@ -424,7 +457,8 @@ is that command's own contract and is specified where the command is.
 
 The contract applies to every diagnostic `rhei` prints on a failing exit path.
 Filesystem failures derive their help from the underlying error kind (missing
-path, permission, already-exists) and always name the path.
+path, permission, already-exists) and always name the path, in a command that
+stays whole on one line under [§FS-rhei-errors.2.1](rhei-errors.spec.md#21-a-command-offered-as-the-next-action).
 
 Coverage is a property of the whole binary rather than of any one call site, so
 it is enforced by a test that fails when a diagnostic is raised without help,

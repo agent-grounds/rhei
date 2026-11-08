@@ -62,18 +62,22 @@ fn plan_removal_images(loaded: &LoadedPlan, input: &Path, id: &str) -> MietteRes
     rhei_core::retired::record_retirement(&mut metadata, id, &record).map_err(|err| {
         miette!(help = "the key is reserved for the retirement record; rename yours.", "{err}")
     })?;
-    image.after = rewrite_frontmatter(&raw, &metadata)?;
+    // Each rewrite scans after the file's mark, which it writes back. §REQ-cross-platform.9
+    let (mark, text) = split_byte_order_mark(&raw);
+    image.after = format!("{mark}{}", rewrite_frontmatter(text, &metadata)?);
 
     let image = images.current(&route.metadata_file)?;
     let raw = image.after.clone();
     if let Some(mut metadata) = parse_document_metadata(&route.metadata_file, &raw)? {
         if remove_task_metadata_entry(&mut metadata, &route.metadata_id) {
-            image.after = rewrite_frontmatter(&raw, &metadata)?;
+            let (mark, text) = split_byte_order_mark(&raw);
+            image.after = format!("{mark}{}", rewrite_frontmatter(text, &metadata)?);
         }
     }
 
     let image = images.current(&route.task_file)?;
-    let mut after = remove_ticket_section(&image.after, loaded.document_role(&route.task_file), &route.local_id).ok_or_else(|| {
+    let (mark, text) = split_byte_order_mark(&image.after);
+    let mut after = remove_ticket_section(text, loaded.document_role(&route.task_file), &route.local_id).ok_or_else(|| {
         miette!(
             help = "the plan changed under removal; re-run it.",
             "could not find the section of {id} in {}",
@@ -85,7 +89,7 @@ fn plan_removal_images(loaded: &LoadedPlan, input: &Path, id: &str) -> MietteRes
     if route.task_file != route.metadata_file {
         after = remove_task_file_entry(&after, &route.local_id)?;
     }
-    image.after = after;
+    image.after = format!("{mark}{after}");
     images.0.retain(|image| image.before.as_deref() != Some(image.after.as_str()));
     Ok(images)
 }

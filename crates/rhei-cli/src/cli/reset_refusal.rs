@@ -126,7 +126,9 @@ fn plan_a_reset_leaves(
             None => read_plan_source(&file, "failed to read plan file")?,
         };
         let moves = authored.by_file.get(&file).unwrap_or(&no_moves);
-        let text = reset_file_text(&raw, moves, loaded.document_role(&file))?;
+        // Scanned after the mark, staged with it. §REQ-cross-platform.9
+        let (mark, raw) = split_byte_order_mark(&raw);
+        let text = format!("{mark}{}", reset_file_text(raw, moves, loaded.document_role(&file))?);
         staged.insert(file, text);
     }
     for (file, task_ids) in reset_metadata_targets(loaded, input, scope) {
@@ -134,7 +136,8 @@ fn plan_a_reset_leaves(
             Some(text) => text.clone(),
             None => read_plan_source(&file, "failed to read metadata document")?,
         };
-        staged.insert(file.clone(), reset_metadata_text(&file, &raw, &task_ids)?);
+        let (mark, raw) = split_byte_order_mark(&raw);
+        staged.insert(file.clone(), format!("{mark}{}", reset_metadata_text(&file, raw, &task_ids)?));
     }
     rhei_core::source::read_staged(staged, || load_plan(input))
 }
@@ -223,13 +226,15 @@ fn edits_let_the_reset_through(
     }
     let mut staged = HashMap::new();
     for (file, file_edits) in by_file {
-        let raw = read_plan_source(&file, "failed to read plan file")?;
+        let marked = read_plan_source(&file, "failed to read plan file")?;
+        // Scanned after the mark, staged with it. §REQ-cross-platform.9
+        let (mark, raw) = split_byte_order_mark(&marked);
         let kind = loaded.document_role(&file);
-        let edited = rewrite_states_to_authored(&raw, &file_edits, kind)?;
+        let edited = rewrite_states_to_authored(raw, &file_edits, kind)?;
         let edited = strip_result_links_under(&edited, kind, |id| {
             id.is_some_and(|id| file_edits.contains_key(id))
         });
-        staged.insert(file, edited);
+        staged.insert(file, format!("{mark}{edited}"));
     }
 
     let edited = rhei_core::source::read_staged(staged.clone(), || load_plan(input))?;

@@ -11,7 +11,7 @@ use std::path::Path;
 
 use super::*;
 
-const MARK: &[u8] = b"\xef\xbb\xbf";
+pub(super) const MARK: &[u8] = b"\xef\xbb\xbf";
 
 /// The machine from #630.
 const MACHINE: &str = "name: m\nversion: 1\nstates:\n  o:\n    initial: true\n  d:\n    final: true\ntransitions:\n  - {from: o, to: d}\n";
@@ -26,14 +26,14 @@ const VALUES: &str = "title: Marked\nnote: kept\n";
 const PLAN: &str = "# Rhei: Example\n\n---\nmetadata:\n  tasks:\n    1:\n      stateVisits:\n        review: 2\n---\n\n## Tasks\n\n### Task 1: Alpha\n**State:** pending\n";
 const TASK_FILE: &str = "---\nmetadata:\n  tasks:\n    a:\n      priority: high\n---\n\n### Task a: Alpha\n**State:** pending\n";
 
-fn write_bytes(dir: &Path, name: &str, text: &str, marked: bool) {
+pub(super) fn write_bytes(dir: &Path, name: &str, text: &str, marked: bool) {
     let path = dir.join(name);
     std::fs::create_dir_all(path.parent().expect("fixture parent")).expect("fixture dir");
     let bytes = if marked { [MARK, text.as_bytes()].concat() } else { text.as_bytes().to_vec() };
     std::fs::write(path, bytes).expect("fixture file should be written");
 }
 
-fn run_in(dir: &Path, args: &[&str]) -> CliRun {
+pub(super) fn run_in(dir: &Path, args: &[&str]) -> CliRun {
     let home = dir.join("home");
     CliRun::from(
         &rhei_command(&home).current_dir(dir).args(args).output().expect("rhei command should run"),
@@ -42,7 +42,11 @@ fn run_in(dir: &Path, args: &[&str]) -> CliRun {
 
 /// Run `args` over a fixture written plain and one written with the mark, and
 /// require the marked run to succeed with the plain run's stdout.
-fn same_outcome(prefix: &str, write: impl Fn(&Path, bool), args: &[&str]) -> (TestDir, TestDir) {
+pub(super) fn same_outcome(
+    prefix: &str,
+    write: impl Fn(&Path, bool),
+    args: &[&str],
+) -> (TestDir, TestDir) {
     let plain = unique_temp_dir(&format!("{prefix}-plain"));
     let marked = unique_temp_dir(&format!("{prefix}-marked"));
     write(&plain, false);

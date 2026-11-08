@@ -196,6 +196,8 @@ fn migrate_locked(
         let locked = locks.get(canonical).expect("affected file lock is held");
         let raw = locked.read_to_string("failed to read migration target")?;
         let rewritten = rewrite_export_priors(&raw, additions[0].role, additions)?;
+        // The mark the locked read set aside goes back on. §REQ-cross-platform.9
+        let rewritten = locked.with_byte_order_mark(&rewritten);
         let parent = additions[0].file.parent().unwrap_or(Path::new("."));
         let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|err| {
             file_io_report(parent, "failed to stage export Prior migration", err)

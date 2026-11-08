@@ -20,6 +20,9 @@ struct LockedPlanFile {
     _root_guard: Vec<rhei_core::root_access::RootAccessGuard>,
     writer_lock: Mutex<Option<fs::File>>,
     path: PathBuf,
+    /// Whether the last read set aside a leading byte order mark, which every
+    /// write under this lock puts back. §REQ-cross-platform.9
+    byte_order_mark: std::sync::atomic::AtomicBool,
 }
 
 /// Open a lock sidecar, creating it where it is absent and leaving its bytes alone: the
@@ -47,6 +50,7 @@ impl LockedPlanFile {
             _root_guard: root_guard,
             writer_lock: Mutex::new(Some(writer_lock)),
             path: path.to_path_buf(),
+            byte_order_mark: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -54,10 +58,30 @@ impl LockedPlanFile {
     ///
     /// `action` names the read the way `file_io_report` wants it, so a caller's
     /// diagnostic reads the same as it did when this was `fs::read_to_string`.
+    ///
+    /// The text is the authored file's, with the one leading byte order mark an
+    /// editor may have saved set aside, so every rewrite that finds a header,
+    /// frontmatter or task heading in it sees what the parser saw. The lock
+    /// remembers the mark and [`Self::with_byte_order_mark`] puts it back on
+    /// write, so a rewrite does not re-encode the file. §REQ-cross-platform.9
     // §FS-rhei-transition-cmd.3
     fn read_to_string(&self, action: &str) -> MietteResult<String> {
-        fs::read_to_string(&self.path)
-            .map_err(|err| file_io_report(&self.path, action, err))
+        let raw = fs::read_to_string(&self.path)
+            .map_err(|err| file_io_report(&self.path, action, err))?;
+        let text = rhei_core::source::without_byte_order_mark(&raw);
+        let marked = text.len() != raw.len();
+        self.byte_order_mark.store(marked, std::sync::atomic::Ordering::Relaxed);
+        Ok(if marked { text.to_owned() } else { raw })
+    }
+
+    /// `content` as it is written under this lock: with the byte order mark
+    /// the last read set aside put back in front. §REQ-cross-platform.9
+    fn with_byte_order_mark<'a>(&self, content: &'a str) -> std::borrow::Cow<'a, str> {
+        if self.byte_order_mark.load(std::sync::atomic::Ordering::Relaxed) {
+            std::borrow::Cow::Owned(format!("\u{feff}{content}"))
+        } else {
+            std::borrow::Cow::Borrowed(content)
+        }
     }
 
     /// Release the stable writer sidecar. Idempotent.
@@ -154,6 +178,14 @@ fn read_plan_source(path: &Path, action: &str) -> MietteResult<String> {
         return Ok(text);
     }
     fs::read_to_string(path).map_err(|err| file_io_report(path, action, err))
+}
+
+/// `raw` split into the one leading byte order mark it may carry and the text after
+/// it, for a writer that scans a plan file it read without its lock and must hand
+/// back the file's own bytes. §REQ-cross-platform.9
+fn split_byte_order_mark(raw: &str) -> (&str, &str) {
+    let text = rhei_core::source::without_byte_order_mark(raw);
+    (&raw[..raw.len() - text.len()], text)
 }
 
 /// Rename a temp file over the unlocked destination pathname, waiting out a

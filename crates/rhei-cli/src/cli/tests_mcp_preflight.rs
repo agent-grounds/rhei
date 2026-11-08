@@ -108,8 +108,18 @@
         assert_eq!(preflight_mcp_server(&def, root.path(), true), Ok(()));
     }
 
+    /// The existing failure fixture's lifecycle, shared with its ownership
+    /// regression. It still releases the endpoint; #647 must retain a bound,
+    /// non-listening socket through `probe`. §FS-rhei-agents.6.2.1
+    fn with_mcp_preflight_failure_endpoint(probe: impl FnOnce(u16)) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        drop(listener);
+        probe(port);
+    }
+
     /// A url server passes when its host accepts a connection, and fails with
-    /// the bound it waited when nothing listens.
+    /// the bound it waited when nothing listens. §FS-rhei-agents.6.2.1
     #[test]
     fn mcp_preflight_connects_to_a_url_servers_host() {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
@@ -117,10 +127,36 @@
         let live = mcp_preflight_url(&format!("http://127.0.0.1:{port}/mcp"));
         assert_eq!(preflight_mcp_server(&live, Path::new("."), false), Ok(()));
 
-        drop(listener);
-        let closed = mcp_preflight_url(&format!("http://127.0.0.1:{port}/mcp"));
-        let reason = preflight_mcp_server(&closed, Path::new("."), false).expect_err("closed");
-        assert_eq!(reason, format!("127.0.0.1:{port} accepted no connection within 1s"));
+        with_mcp_preflight_failure_endpoint(|port| {
+            let closed = mcp_preflight_url(&format!("http://127.0.0.1:{port}/mcp"));
+            let reason = preflight_mcp_server(&closed, Path::new("."), false).expect_err("closed");
+            assert_eq!(reason, format!("127.0.0.1:{port} accepted no connection within 1s"));
+        });
+    }
+
+    /// Force the competing bind from #647 before the real probe, keeping any
+    /// acquired listener alive through it. §FS-rhei-agents.6.2.1
+    #[test]
+    #[ignore = "red until #647: the failure fixture retains its endpoint; implement removes this"]
+    fn mcp_preflight_failure_fixture_retains_its_endpoint() {
+        with_mcp_preflight_failure_endpoint(|port| {
+            let competing_listener = std::net::TcpListener::bind(("127.0.0.1", port));
+            let closed = mcp_preflight_url(&format!("http://127.0.0.1:{port}/mcp"));
+            let result = preflight_mcp_server(&closed, Path::new("."), false);
+            assert!(
+                competing_listener.is_err(),
+                "failure fixture released 127.0.0.1:{port}: competing listener acquired the endpoint; \
+                 preflight returned {result:?}"
+            );
+            assert_eq!(
+                result,
+                Err(format!("127.0.0.1:{port} accepted no connection within 1s"))
+            );
+            assert!(
+                std::net::TcpListener::bind(("127.0.0.1", port)).is_err(),
+                "failure fixture must retain its endpoint through the diagnostic assertion"
+            );
+        });
     }
 
     #[test]

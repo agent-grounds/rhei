@@ -20,7 +20,6 @@
     }
 
     #[test]
-    #[ignore = "red until #629: a null name decodes as an empty string; implement removes this"]
     fn a_null_name_is_refused_at_load() {
         assert_top_level_refused("name:\nversion: 1\n", "name");
         assert_top_level_refused("name: null\nversion: 1\n", "name");
@@ -28,7 +27,6 @@
     }
 
     #[test]
-    #[ignore = "red until #629: version decodes as any YAML value; implement removes this"]
     fn a_version_that_is_neither_number_nor_string_is_refused_at_load() {
         for version in ["", " null", " ~", " {a: 1}", " [1, 2]", " true", " false"] {
             assert_top_level_refused(&format!("name: m\nversion:{version}\n"), "version");

@@ -17,6 +17,8 @@ include!("validator/preamble.rs");
 include!("validator/registry_entries.rs");
 include!("validator/agent_effort.rs");
 include!("validator/state_defs.rs");
+include!("validator/top_level_types.rs");
+include!("validator/profile_defs.rs");
 include!("validator/metrics_decl.rs");
 include!("validator/state_machine_impl.rs");
 include!("validator/state_machine_shape.rs");

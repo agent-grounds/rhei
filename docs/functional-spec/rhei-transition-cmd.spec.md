@@ -335,6 +335,41 @@ agent and program exits, callback-only advancement, and redirected edges have
 one rule. A terminal state merely named `failed` is ordinary and does not gain
 the reserved cancellation waiver.
 
+### 3.4. Live Gate Release into a Visits Budget
+
+After a successful manual release from a `gating: true` state into a state
+with a `visits` budget, `rhei transition` emits an advisory on stderr when a
+relevant run is active. Activity includes a run on the ticket's owning rhei
+or its enclosing Panta project, regardless of whether the command addresses
+the member or the project. Use live run-lock/identity evidence: a leftover
+lock file or run descriptor alone does not establish activity. A run confined
+to an unrelated member does not qualify.
+
+The advisory identifies the ticket and budgeted target and explains that the
+live scheduler **may still use its held machine and old visits budget**:
+successful validation and gate release do not guarantee that an edited
+machine has been adopted. Without evidence of an actual difference it must
+not claim that a machine was edited or that a mismatch was detected. It must
+not promise a machine frozen for the whole run: successful member admission
+can adopt newly resolved machines ([§FS-rhei-run.3](rhei-run.spec.md#3-execution-loop)).
+
+Give actionable recovery: stop the relevant run with `rhei stop <run>`,
+release the ticket with `rhei transition` if it is still gated, then start a
+fresh `rhei run` on the intended scope to read the edited budget. Name the
+relevant run or execution root so the operator can identify what to stop and
+restart. Practical recovery after raising `visits` is to stop the live run
+before releasing the gate, rather than spending another visit under a possibly
+older budget.
+
+The advisory is conservative: it may accompany a qualifying live release even
+when the disk machine was not edited. It is absent without an active relevant
+run, on a refused transition, on a move from a non-gating state, and on a move
+into a state without a visits budget. It leaves the successful exit status,
+ordinary success stdout ([§FS-rhei-transition-cmd.5](rhei-transition-cmd.spec.md#5-output)), callbacks, transition effects, visit
+accounting, machine adoption, and strict-input guarantees
+([§FS-rhei-seal.8.6](rhei-seal.spec.md#86-admission)) unchanged. Run-side output alone does not satisfy this
+transition-command diagnostic.
+
 ## 4. Compare-and-Swap Conflicts
 
 Two agents that race on the same task both specify the same `--from`. The first call to acquire the lock rewrites the state. The second call re-reads under the lock, sees the actual state no longer matches `--from`, and fails non-zero with:

@@ -230,8 +230,15 @@ not re-adopted and starts nothing more, and a newly admitted member is sealed
 on arrival ([§FS-rhei-seal.8.6](rhei-seal.spec.md#86-admission)).
 
 Only after that validation does the run compare discovered member ids with the
-initialized set. The membership delta controls initialization, not whether
-validation runs. A delta becomes eligible only after all of the following
+initialized set. The membership delta controls initialization and machine
+adoption, not whether validation runs. With unchanged membership, the newly
+resolved machines are validated but the scheduler continues using its held
+machines; successful validation does not imply adoption of an edited `visits`
+budget. A successful admission can replace held machines with newly resolved
+ones, subject to the strict-input guarantees above. A manual gate release
+during an active run explains this risk and stop/restart recovery
+([§FS-rhei-transition-cmd.3.4](rhei-transition-cmd.spec.md#34-live-gate-release-into-a-visits-budget)).
+A delta becomes eligible only after all of the following
 succeed as one admission: merged settings reload; member machine and
 callback-base resolution; acquisition of every new execution-root lock; and
 initialization of the member's execution and accounting roots. Whole-run

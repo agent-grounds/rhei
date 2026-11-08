@@ -10,6 +10,17 @@ import errno
 import tempfile
 
 
+def _shared_access_refused(error):
+    """Classify access/sharing/lock refusals for polling and publication.
+
+    Other I/O errors propagate. §FS-rhei-run.3.7.3.1
+    §AR-agent-orchestrator-workflow.3.3.1.1
+    """
+    return isinstance(error, PermissionError) or (
+        os.name == 'nt' and getattr(error, 'winerror', None) in (5, 32, 33)
+    )
+
+
 def _try_shared_writer_lock(handle):
     """Overlap fs2's exclusive lock on the permanent sidecar, never the plan.
 
@@ -76,10 +87,7 @@ def _publish_shared_image(plan, text):
                 os.replace(staged, plan)
                 return
             except OSError as error:
-                refused = isinstance(error, PermissionError) or (
-                    os.name == 'nt' and getattr(error, 'winerror', None) in (5, 32, 33)
-                )
-                if not refused or time.monotonic() >= deadline:
+                if not _shared_access_refused(error) or time.monotonic() >= deadline:
                     raise RuntimeError(
                         f'cannot publish shared fixture {staged} -> {plan}: {error}'
                     ) from error

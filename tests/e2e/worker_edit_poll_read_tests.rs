@@ -36,7 +36,6 @@ fn run_parallel(scenario: &OneFileScenario) -> CliRun {
 
 // §FS-rhei-run.3.7.3.1 §FS-rhei-run.3.7.4 §FS-rhei-run.3.7.7
 #[test]
-#[ignore = "red until #623: retry a transient polling refusal; implement removes this"]
 fn a_refused_poll_still_reaches_the_concurrent_restore_and_charged_retry() {
     let scenario = scenario("transient");
     let ran = run_parallel(&scenario);
@@ -66,7 +65,6 @@ fn a_refused_poll_still_reaches_the_concurrent_restore_and_charged_retry() {
 
 // §FS-rhei-run.3.7.3.1
 #[test]
-#[ignore = "red until #623: retain the culprit program traceback in diagnostics; implement removes this"]
 fn diagnostics_retain_an_independent_failing_programs_traceback() {
     let scenario = scenario("diagnostics");
     let ran = run_parallel(&scenario);
@@ -105,7 +103,6 @@ fn run_focused(scenario: &OneFileScenario) -> std::process::Output {
 
 // §FS-rhei-run.3.7.3.1
 #[test]
-#[ignore = "red until #623: bound permanent polling refusal and retain its cause; implement removes this"]
 fn a_permanent_polling_refusal_expires_with_path_and_last_error() {
     let scenario = scenario("permanent");
     let ran = run_focused(&scenario);

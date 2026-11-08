@@ -51,7 +51,8 @@ impl OneFileScenario {
         fs::read_to_string(self.ws.join("runtime/transitions.log")).unwrap_or_default()
     }
 
-    /// Both authored files and the accounting evidence accompany any failure.
+    /// Authored files, accounting evidence and the culprit's first program log
+    /// accompany any failure. §FS-rhei-run.3.7.3.1
     pub fn diagnostics(&self, ran: &CliRun) -> String {
         let mut output = format!(
             "mode {:?}; fixture {}\nstdout:\n{}\nstderr:\n{}",
@@ -67,6 +68,7 @@ impl OneFileScenario {
             "runtime/state-transitions.log",
             "runtime/spawns/task-ws.1-cover.json",
             "runtime/spawns/task-ws.2-other.json",
+            "runtime/logs/task-ws.1-cover.log",
             "runtime/logs/task-ws.1-cover.reverted.md",
         ] {
             let text = fs::read_to_string(self.ws.join(file)).unwrap_or_default();

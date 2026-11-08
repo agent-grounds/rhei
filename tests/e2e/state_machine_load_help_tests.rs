@@ -202,7 +202,6 @@ fn a_wrong_shape_elsewhere_makes_no_top_level_claim() {
 /// §FS-rhei-errors.1.2.2: the headline itself explains the missing mapping,
 /// independently of the help that names its keys and the command to re-check it.
 #[test]
-#[ignore = "red until #633: non-mapping headlines must name the required mapping; implement removes this"]
 fn a_document_with_no_mapping_gets_a_yaml_facing_headline_and_actionable_help() {
     let cases = [
         ("empty", ""),

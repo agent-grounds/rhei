@@ -205,14 +205,23 @@ fn state_machine_load_report(path: &Path, err: rhei_validator::StateMachineLoadE
                 path.display()
             )
         }
-        rhei_validator::StateMachineLoadError::Shape { error, fault } => miette!(
-            help = format!(
-                "{}, then re-check it with: rhei states --state-machine {quoted}",
-                state_machine_shape_help(path, fault)
-            ),
-            "failed to parse state machine '{}': {error}",
-            path.display()
-        ),
+        rhei_validator::StateMachineLoadError::Shape { error, fault } => {
+            // Name the required YAML shape, not serde's Rust type. §FS-rhei-errors.1.2.2
+            let cause = match fault {
+                rhei_validator::StateMachineShapeFault::NoTopLevelMapping => {
+                    "the document must be a mapping".to_string()
+                }
+                _ => error.to_string(),
+            };
+            miette!(
+                help = format!(
+                    "{}, then re-check it with: rhei states --state-machine {quoted}",
+                    state_machine_shape_help(path, fault)
+                ),
+                "failed to parse state machine '{}': {cause}",
+                path.display()
+            )
+        }
         rhei_validator::StateMachineLoadError::Invalid(message) => miette!(
             help = format!(
                 "edit '{}' so the state definition above is valid, then re-check it with: \

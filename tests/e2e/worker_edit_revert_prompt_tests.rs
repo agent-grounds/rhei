@@ -39,6 +39,8 @@ Runs after Task 2.
 /// §AR-agent-orchestrator-workflow.3.3.1 §AR-agent-orchestrator-workflow.3.3.1.1
 /// Task 1 still puts a malformed note at the end of its own region, requiring
 /// a real restore and charged retry with retained text. §FS-rhei-run.3.7.4 §FS-rhei-run.3.7.7
+/// Polling read refusals share one deadline and retain their last cause on
+/// exhaustion; unrelated errors propagate. §FS-rhei-run.3.7.3.1
 /// Task 3 runs the same state and writes nothing.
 pub(super) const ONE_FILE_COVER: &str = concat!(
     include_str!("fixtures/worker_edit_shared_writer.py"),
@@ -50,12 +52,22 @@ if env('RHEI_TASK_ID_LOCAL') == '1' and not marker.exists():
     marker.write_text('x')
     if concurrent:
         deadline = time.monotonic() + 15
+        last_refusal = None
+        sibling = ''
         while True:
-            sibling = plan.read_text(encoding='utf-8').split('### Task 2:', 1)[1]
-            if '**State:** completed' in sibling:
-                break
+            try:
+                image = plan.read_text(encoding='utf-8')
+            except OSError as error:
+                if not _shared_access_refused(error):
+                    raise
+                last_refusal = error
+            else:
+                sibling = image.split('### Task 2:', 1)[1]
+                if '**State:** completed' in sibling:
+                    break
             if time.monotonic() >= deadline:
-                raise RuntimeError(f'Task 2 transition timed out in {plan}:\n{sibling}')
+                detail = f'last read refusal: {last_refusal}' if last_refusal else sibling
+                raise RuntimeError(f'Task 2 transition timed out in {plan}:\n{detail}') from last_refusal
             time.sleep(0.05)
     # Optional test timing seam, before the authoritative read/edit operation.
     if '_before_shared_edit' in globals():

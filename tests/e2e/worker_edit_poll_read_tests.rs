@@ -119,10 +119,8 @@ fn a_permanent_polling_refusal_expires_with_path_and_last_error() {
     assert!(finished["reads"].as_u64().unwrap() > 1, "{events:?}");
     assert!(error.contains("timed out") || error.contains("timeout"), "{error}");
     assert!(error.contains("rhei-623 controlled polling refusal"), "{error}");
-    assert!(
-        error.contains(&scenario.ws.join("tasks/01-shared.md").display().to_string()),
-        "{error}"
-    );
+    let shared_file = scenario.ws.join("tasks").join("01-shared.md");
+    assert!(error.contains(&shared_file.display().to_string()), "{error}");
     assert!(
         !error.contains("fault injector:"),
         "instrumentation guard, not fixture bound\n{error}"

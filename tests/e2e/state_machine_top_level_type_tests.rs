@@ -75,19 +75,16 @@ fn assert_refused_naming(prefix: &str, top: &str, key: &str) {
 }
 
 #[test]
-#[ignore = "red until #629: a null name loads as an empty name; implement removes this"]
 fn a_null_name_is_refused_naming_the_field() {
     assert_refused_naming("top-level-null-name", "name:\nversion: 1\n", "name");
 }
 
 #[test]
-#[ignore = "red until #629: a null version loads and shows as null; implement removes this"]
 fn a_null_version_is_refused_naming_the_field() {
     assert_refused_naming("top-level-null-version", "name: m\nversion:\n", "version");
 }
 
 #[test]
-#[ignore = "red until #629: a version that is a map, a list or a bool loads; implement removes this"]
 fn a_version_that_is_neither_number_nor_string_is_refused_naming_the_field() {
     for version in ["{a: 1}", "[1, 2]", "true"] {
         assert_refused_naming(

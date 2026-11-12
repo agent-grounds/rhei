@@ -182,7 +182,6 @@ fn summary_spawn(task: &str, worker: &str, started: &str, ended: &str) -> Unreco
 }
 
 #[test]
-#[ignore = "red until #655: attempts at one visit print one entry each; implement removes this"]
 fn a_folded_entry_sums_its_durations_and_omits_the_sum_when_one_attempt_has_none() {
     // §FS-rhei-summary.2.2.1: the duration is the sum of every attempt's own,
     // so one attempt without one leaves the entry with none, not a partial sum.
@@ -208,7 +207,6 @@ fn a_folded_entry_sums_its_durations_and_omits_the_sum_when_one_attempt_has_none
 }
 
 #[test]
-#[ignore = "red until #655: attempts at one visit print one entry each; implement removes this"]
 fn a_folded_entry_prints_a_token_side_only_when_every_attempt_measured_it() {
     // §FS-rhei-summary.2.2.1: each side is the sum of what every record would
     // print for it, and a side one record did not measure is left out.
@@ -240,7 +238,6 @@ fn a_folded_entry_prints_a_token_side_only_when_every_attempt_measured_it() {
 }
 
 #[test]
-#[ignore = "red until #655: unrecorded spawns of one visit print one entry each; implement removes this"]
 fn consecutive_unrecorded_spawns_fold_by_task_state_and_worker_and_never_with_a_record() {
     // §FS-rhei-summary.2.2.1: spawns fold on task, state and worker; a record
     // of the same task, state and agent beside them stays its own entry.

@@ -302,15 +302,16 @@ fn a_project_summary_numbers_its_steps_by_when_they_started() {
         .lines()
         .filter(|line| line.starts_with(|c: char| c.is_ascii_digit()))
         .collect();
+    // `billing.1`'s two records are consecutive attempts at one visit by one
+    // actor, so they print as one entry. §FS-rhei-summary.2.2.1
     assert_eq!(
         steps,
         vec![
-            "1. `billing.1` draft (visit 1) — claude-code, anthropic/claude-sonnet-4-6 — 30.0s — 800 in / 200 out",
-            "2. `billing.1` draft (visit 1) — claude-code, anthropic/claude-sonnet-4-6 — 30.0s — 1.6k in / 400 out",
-            "3. `billing.2` draft — claude-code, anthropic/claude-sonnet-4-6 — 30.0s — 3.2k in / 800 out",
-            "4. `ledger.1` draft — claude-code, anthropic/claude-opus-5 — 30.0s — 8.0k in / 2.0k out",
-            "5. `spool.1` draft — claude-code, anthropic/claude-opus-5 — 30.0s — 16.0k in / 4.0k out",
-            "6. `basin.1` draft — claude-code, anthropic/claude-opus-5 — 30.0s — 32.0k in / 8.0k out",
+            "1. `billing.1` draft (visit 1) ×2 — claude-code, anthropic/claude-sonnet-4-6 — 1m00s — 2.4k in / 600 out",
+            "2. `billing.2` draft — claude-code, anthropic/claude-sonnet-4-6 — 30.0s — 3.2k in / 800 out",
+            "3. `ledger.1` draft — claude-code, anthropic/claude-opus-5 — 30.0s — 8.0k in / 2.0k out",
+            "4. `spool.1` draft — claude-code, anthropic/claude-opus-5 — 30.0s — 16.0k in / 4.0k out",
+            "5. `basin.1` draft — claude-code, anthropic/claude-opus-5 — 30.0s — 32.0k in / 8.0k out",
         ],
         "the member's three records start first and must be numbered first; got:\n{}",
         said(&result)

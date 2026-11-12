@@ -53,7 +53,6 @@ fn write_a_held_visit(root: &Path) {
 }
 
 #[test]
-#[ignore = "red until #655: every retry of one visit prints as its own step; implement removes this"]
 fn summary_folds_consecutive_attempts_at_one_visit_into_one_entry() {
     // §FS-rhei-summary.2.2.1: consecutive attempts sharing task, state, visit,
     // agent and model are one `×N` entry with their durations and tokens summed.
@@ -118,7 +117,6 @@ fn summary_folds_consecutive_attempts_at_one_visit_into_one_entry() {
 }
 
 #[test]
-#[ignore = "red until #655: a visit held 400 retries prints 400 steps; implement removes this"]
 fn summary_details_of_a_visit_held_for_hundreds_of_attempts_stays_a_fraction_of_a_pr_body() {
     // §FS-rhei-summary.2.2.1 §FS-rhei-summary: however long a gate held a visit,
     // it is one entry, so the `--details` block stays compact enough to paste

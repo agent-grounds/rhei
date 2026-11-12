@@ -211,6 +211,7 @@ include!("cli/accounting_presentation.rs");
 include!("cli/run_lock_owner_read.rs");
 include!("cli/summary_repricing.rs");
 include!("cli/summary_command.rs");
+include!("cli/summary_steps.rs");
 include!("cli/summary_checkpoint.rs");
 include!("cli/summary_tally.rs");
 include!("cli/programs.rs");

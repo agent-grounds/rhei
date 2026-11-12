@@ -1,8 +1,9 @@
 # FS-rhei-summary: `rhei summary`
 
 Read-only Markdown summary of a run, compact enough to paste into a pull
-request body: one numbered line per agent invocation the accounting recorded,
-then the aggregate token accounting. No local paths, no workspace boilerplate,
+request body: one numbered line per step of the run — an agent invocation the
+accounting recorded, with the consecutive attempts at one visit folded into one
+line — then the aggregate token accounting. No local paths, no workspace boilerplate,
 and no dependency on a finished run — a step of a live run can summarize the
 run it belongs to. [§GOAL-rhei-outcomes](../goals.md#goal-rhei-outcomes-goals)
 [§FS-rhei-cost-accounting](rhei-cost-accounting.spec.md#fs-rhei-cost-accounting-rhei-cost-accounting)
@@ -122,7 +123,11 @@ distinct models, and the task tally:
 
 ### 2.2. The steps
 
-One numbered entry per invocation record, ordered by `started_at`:
+One numbered entry per step, ordered by `started_at`: an invocation record,
+or a run of consecutive attempts at one visit folded into one entry
+([§FS-rhei-summary.2.2.1](rhei-summary.spec.md#221-consecutive-attempts-at-one-visit-fold)). Entries are numbered from 1 after folding, so the last
+number counts entries, not invocations; the lead counts those
+([§FS-rhei-summary.2.1](rhei-summary.spec.md#21-the-lead-line)).
 
 ```text
 1. `ticket.ticket` supervising (visit 1) — claude-code, anthropic/claude-fable-5 — 2m32s
@@ -144,9 +149,57 @@ One numbered entry per invocation record, ordered by `started_at`:
   does not know. It carries no `(visit N)`: a spawn record names no visit, and
   its file name is never matched to find one ([§FS-rhei-agents.8.4](rhei-agents.spec.md#84-spawn-records)):
   `` 3. `plan.1` implement — cdx — 1s — no accounting record ``
+  Consecutive unrecorded spawns fold too, by the rule of
+  [§FS-rhei-summary.2.2.1](rhei-summary.spec.md#221-consecutive-attempts-at-one-visit-fold).
 - With explicit `--run`/`--prices`, entries come only from that exact run after
   accounting-root filtering and record-identity deduplication. The same
-  selected records supply the lead, steps, and accounting table.
+  selected records supply the lead, steps, and accounting table, and the steps
+  fold them as any other summary does.
+
+#### 2.2.1. Consecutive attempts at one visit fold
+
+A visit rhei starts again — a routing gate that holds it, a provider that
+refuses it — leaves one record per attempt. Listed one per line, a visit held a
+few hundred attempts outgrows the pull request body this summary is written
+for, and the reader scrolls past hundreds of identical lines to find the steps
+that describe the run. So consecutive attempts at one visit print as one entry:
+
+```text
+1. `ticket.ticket` supervising (visit 1) — cdx, openai/gpt-6.1-sol — 2m28s — 460.1k in / 3.8k out
+2. `ticket.ticket` supervising (visit 2) ×358 — cdx, openai/gpt-6.1-sol — 273m38s — 140.8M in / 665.1k out
+3. `ticket.ticket` supervising (visit 2) — cld, anthropic/claude-opus-5-5 — 2m14s — 2.4M in / 11.1k out
+4. `ticket.ticket.clarify` clarifying — cld, anthropic/claude-opus-5-5 — 5m47s — 3.6M in / 35.0k out
+```
+
+- **What folds.** Entries fold only when they are **consecutive** in the step
+  order, after unrecorded spawns are placed in it: an entry for anything else
+  between two attempts ends the run, and each entry stays where its first
+  attempt happened. Records fold when they carry the same task id, state,
+  `visit`, agent, provider and model — an entry names one actor, so an attempt
+  on another agent or model is its own entry. Unrecorded spawns fold when they
+  carry the same task, state and `worker`. A record and an unrecorded spawn
+  never fold together.
+- **How it prints.** A folded entry prints `×N`, the number of attempts it
+  holds, after the task id, the state and any `(visit N)`, and before the
+  actor: `` `plan.1` implement ×3 — cdx — 4.0s — no accounting record ``. A run
+  of one attempt prints exactly as an unfolded entry does, byte for byte, so a
+  summary with no consecutive repeat does not change.
+- **Duration** is the sum of each attempt's own duration, humanized as any
+  other entry's (`273m38s`). It is printed only when every attempt in the
+  entry would print one on its own; otherwise it is omitted, never shown as a
+  partial sum.
+- **Tokens.** Each side, `in` and `out`, is the sum of what each folded record
+  would print for that side, and is printed only when every folded record
+  would print it; a side one record did not measure is left out, and with
+  neither side left the entry carries no token clause.
+- **What folding never changes.** It shortens the steps and nothing else. The
+  lead counts every record and every unrecorded spawn
+  ([§FS-rhei-summary.2.1](rhei-summary.spec.md#21-the-lead-line)), the accounting sums every record
+  ([§FS-rhei-summary.2.3](rhei-summary.spec.md#23-the-accounting)), `(visit N)` is decided by every record of the
+  task, and the provenance line counts every member
+  ([§FS-rhei-summary.2.4](rhei-summary.spec.md#24-the-provenance-line)). The checkpoint document holds members, not
+  entries, so neither it nor its id moves ([§FS-rhei-summary.6](rhei-summary.spec.md#6-the-checkpoint-document)), and a replay
+  folds exactly as the live summary it reproduces did.
 
 ### 2.3. The accounting
 

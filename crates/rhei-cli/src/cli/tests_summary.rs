@@ -166,3 +166,97 @@ fn an_empty_accounting_store_still_renders_a_lead_line_and_the_unmeasured_line()
          1 task in progress.\n\nToken accounting was not measured for this run.\n"
     );
 }
+
+/// An agent spawn of task `task`, state `work`, that no record answers for.
+fn summary_spawn(task: &str, worker: &str, started: &str, ended: &str) -> UnrecordedSpawn {
+    UnrecordedSpawn {
+        task: task.to_string(),
+        state: "work".to_string(),
+        moves: 1,
+        attempt: 1,
+        spawn: format!("task-{task}-work-{started}.json"),
+        worker: worker.to_string(),
+        started: started.to_string(),
+        ended: ended.to_string(),
+    }
+}
+
+#[test]
+#[ignore = "red until #655: attempts at one visit print one entry each; implement removes this"]
+fn a_folded_entry_sums_its_durations_and_omits_the_sum_when_one_attempt_has_none() {
+    // §FS-rhei-summary.2.2.1: the duration is the sum of every attempt's own,
+    // so one attempt without one leaves the entry with none, not a partial sum.
+    let timed = CostInspection::from_records(
+        None,
+        vec![
+            summary_record("1", 2, "2026-05-20T10:00:00Z", "2026-05-20T10:01:00Z"),
+            summary_record("1", 2, "2026-05-20T10:02:00Z", "2026-05-20T10:02:30Z"),
+            summary_record("1", 2, "2026-05-20T10:03:00Z", "2026-05-20T10:03:45Z"),
+        ],
+    );
+    assert_eq!(summary_steps(&timed), "1. `1` work (visit 2) ×3 — codex, openai/gpt-test — 2m15s\n");
+
+    let untimed = CostInspection::from_records(
+        None,
+        vec![
+            summary_record("1", 2, "2026-05-20T10:00:00Z", "2026-05-20T10:01:00Z"),
+            summary_record("1", 2, "not-a-timestamp", "2026-05-20T10:02:30Z"),
+            summary_record("1", 2, "2026-05-20T10:03:00Z", "2026-05-20T10:03:45Z"),
+        ],
+    );
+    assert_eq!(summary_steps(&untimed), "1. `1` work (visit 2) ×3 — codex, openai/gpt-test\n");
+}
+
+#[test]
+#[ignore = "red until #655: attempts at one visit print one entry each; implement removes this"]
+fn a_folded_entry_prints_a_token_side_only_when_every_attempt_measured_it() {
+    // §FS-rhei-summary.2.2.1: each side is the sum of what every record would
+    // print for it, and a side one record did not measure is left out.
+    let attempt = |input: Option<u64>, output: Option<u64>| {
+        let mut record = summary_record("1", 1, "2026-05-20T10:00:00Z", "2026-05-20T10:01:00Z");
+        if let Some(value) = input {
+            record.tokens.input.total = AccountingTokenDimension::measured(value);
+        }
+        if let Some(value) = output {
+            record.tokens.output.total = AccountingTokenDimension::measured(value);
+        }
+        record
+    };
+    let both = CostInspection::from_records(
+        None,
+        vec![attempt(Some(41_200), Some(3_800)), attempt(Some(1_000), Some(200))],
+    );
+    assert_eq!(
+        summary_steps(&both),
+        "1. `1` work (visit 1) ×2 — codex, openai/gpt-test — 2m00s — 42.2k in / 4.0k out\n"
+    );
+
+    let one_side =
+        CostInspection::from_records(None, vec![attempt(Some(41_200), Some(3_800)), attempt(Some(1_000), None)]);
+    assert_eq!(summary_steps(&one_side), "1. `1` work (visit 1) ×2 — codex, openai/gpt-test — 2m00s — 42.2k in\n");
+
+    let neither = CostInspection::from_records(None, vec![attempt(Some(41_200), Some(3_800)), attempt(None, None)]);
+    assert_eq!(summary_steps(&neither), "1. `1` work (visit 1) ×2 — codex, openai/gpt-test — 2m00s\n");
+}
+
+#[test]
+#[ignore = "red until #655: unrecorded spawns of one visit print one entry each; implement removes this"]
+fn consecutive_unrecorded_spawns_fold_by_task_state_and_worker_and_never_with_a_record() {
+    // §FS-rhei-summary.2.2.1: spawns fold on task, state and worker; a record
+    // of the same task, state and agent beside them stays its own entry.
+    let mut inspection = CostInspection::from_records(
+        None,
+        vec![summary_record("1", 1, "2026-05-20T10:00:00Z", "2026-05-20T10:01:00Z")],
+    );
+    inspection.unrecorded = vec![
+        summary_spawn("1", "codex", "2026-05-20T10:02:00Z", "2026-05-20T10:02:01Z"),
+        summary_spawn("1", "codex", "2026-05-20T10:03:00Z", "2026-05-20T10:03:02Z"),
+        summary_spawn("1", "cdx", "2026-05-20T10:04:00Z", "2026-05-20T10:04:01Z"),
+    ];
+    assert_eq!(
+        summary_steps(&inspection),
+        "1. `1` work — codex, openai/gpt-test — 1m00s\n\
+         2. `1` work ×2 — codex — 3.0s — no accounting record\n\
+         3. `1` work — cdx — 1.0s — no accounting record\n"
+    );
+}
